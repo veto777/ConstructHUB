@@ -13,7 +13,7 @@
  */
 import { YOUTUBE_HOLDS } from "./holds";
 import { MODULE_NAMES, PLANS, PLAN_KEYS, planForModule, type ModuleKey } from "../plans";
-import { CALL_ASSISTANT_PLANS, COMPETITOR_INTEL_PLANS, PROTECTED_SITE_PLANS, callAssistantAvailabilityLine } from "../plan-copy";
+import { CALL_ASSISTANT_SEPARATE_LINE, COMPETITOR_INTEL_PLANS, PROTECTED_SITE_PLANS, callAssistantAvailabilityLine } from "../plan-copy";
 import type { HelpDraft, HelpEntry, HelpGroup } from "./types";
 import * as moreEntries from "./entries/index";
 import { helpVideoFor } from "./videos";
@@ -588,7 +588,7 @@ const entries: Draft[] = [
       "Read the results under Calls. Pause stops it answering.",
     ],
     howItWorks: "It says it is a virtual assistant if asked, and can play a notice that calls may be recorded. It does not quote prices unless you allow price ranges, does not book appointments, and never gives out a teammate’s number. Publishing creates a version you can restore later.",
-    needs: [`An add-on to the ${CALL_ASSISTANT_PLANS} plans.`, callAssistantAvailabilityLine()],
+    needs: [CALL_ASSISTANT_SEPARATE_LINE, callAssistantAvailabilityLine()],
   },
   {
     key: "social-media", group: "Tools", route: "/social-media", title: "Social Media",

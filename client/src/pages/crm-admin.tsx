@@ -364,9 +364,30 @@ export default function CrmAdminPage() {
     enabled: isAdmin && gateOpen,
     refetchInterval: 60_000,
   });
-  // Hub (the corner assistant): outcome counts only — no messages, replies or people.
-  const { data: hubStats, isError: hubStatsError } = useQuery<{ days: number; rows: { tier: string; outcome: string; reason: string; count: number }[] }>({
+  // Hub (the corner assistant): outcome counts only — no messages, replies or people — plus the
+  // provider Gabe is on (mode, model, whether a key is set; never the key) and today's token counts.
+  const { data: hubStats, isError: hubStatsError } = useQuery<{
+    days: number;
+    rows: { tier: string; outcome: string; reason: string; count: number }[];
+    provider?: {
+      provider: string; model: string; host: string; keySet: boolean; online: boolean; tokenCap: number | null;
+      /** Today's counts; null when the counter (hub_usage_days) could not be read. */
+      tokens: { day: string; calls: number; prompt: number; completion: number; total: number } | null;
+    };
+  }>({
     queryKey: ["/api/admin/hub-stats"],
+    enabled: isAdmin && gateOpen,
+  });
+  // The Call Assistant's billing machinery: the overage safety switch (CALL_ASSISTANT_OVERAGE_BILLING, default off),
+  // the database constraints in place, and the work still open (counts only).
+  const { data: caBilling } = useQuery<{
+    overageBilling: "on" | "off";
+    constraints: { btreeGist: boolean; overlapExclusion: boolean; rangeCheck: boolean };
+    work: { unfinishedClaims: number; queuedClaims: number; pendingSettlements: number; failedSettlements: number };
+    duplicates: { pending: number; notOurs: number };
+    checkoutsInFlight: number;
+  }>({
+    queryKey: ["/api/admin/call-assistant-billing"],
     enabled: isAdmin && gateOpen,
   });
   const { data: orgDetail, isError: orgDetailError } = useQuery<OrgDetail>({
@@ -969,6 +990,26 @@ export default function CrmAdminPage() {
       <div className="space-y-3" data-testid="section-admin-hub">
         <SectionTitle icon={MessageCircle} title="Hub assistant"
           description="Outcome counts for Gabe, the corner assistant, over the last 30 days. Gabe keeps no messages, replies or identities." />
+        {hubStats?.provider && (
+          <p className="text-[12px] text-muted-foreground" data-testid="text-admin-hub-provider">
+            Model <code>{hubStats.provider.model}</code> on {hubStats.provider.provider === "openai" ? "OpenAI" : "TruthCoder"}
+            {hubStats.provider.host ? ` (${hubStats.provider.host})` : ""}, key {hubStats.provider.keySet ? "set" : "missing"},
+            {" "}{hubStats.provider.online ? "chat on" : "off site"}.
+            {" "}Today (UTC): {hubStats.provider.tokens
+              ? `${hubStats.provider.tokens.calls.toLocaleString()} model calls, ${hubStats.provider.tokens.prompt.toLocaleString()} prompt + ${hubStats.provider.tokens.completion.toLocaleString()} completion tokens`
+              : "token counter unavailable"}
+            {hubStats.provider.tokenCap ? ` of a ${hubStats.provider.tokenCap.toLocaleString()} daily cap` : ", no daily cap"}.
+            {" "}Server env: <code>HUB_AI_PROVIDER</code>, <code>HUB_AI_MODEL</code>, <code>HUB_OPENAI_API_KEY</code>, <code>HUB_AI_DAILY_TOKEN_CAP</code>.
+          </p>
+        )}
+        {caBilling && (
+          <p className="text-[12px] text-muted-foreground" data-testid="text-admin-call-assistant-billing">
+            Call Assistant overage billing <strong>{caBilling.overageBilling}</strong> (<code>CALL_ASSISTANT_OVERAGE_BILLING</code>
+            {caBilling.overageBilling === "off" ? ", default: minutes above the tier are metered and shown, never charged; settlement jobs are recorded, not run" : ": Stripe items and invoices are created for minutes above the tier"}).
+            {" "}Range constraints: {caBilling.constraints.rangeCheck ? "check" : "no check"}, overlap exclusion {caBilling.constraints.overlapExclusion ? "on" : `off (btree_gist ${caBilling.constraints.btreeGist ? "installed" : "not installed"}; the application check stands alone)`}.
+            {" "}Open work: {caBilling.work.unfinishedClaims} unfinished claim(s), {caBilling.work.queuedClaims} queued, {caBilling.work.pendingSettlements} pending + {caBilling.work.failedSettlements} failed settlement(s), {caBilling.duplicates.pending} duplicate cancellation(s) pending, {caBilling.checkoutsInFlight} checkout(s) in flight.
+          </p>
+        )}
         <div className={crmTable.wrapper}>
           <table className={crmTable.table}>
             <thead className={crmTable.thead}>

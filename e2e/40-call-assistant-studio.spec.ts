@@ -3,7 +3,7 @@ import { gotoCrm } from "./helpers";
 import { defaultVoiceProfile, type VoiceProfile } from "../shared/voice-profile";
 import { VOICE_PERSONA_LIST } from "../shared/voice-personas";
 import { ADDONS, CALL_ASSISTANT_TIERS } from "../shared/plans";
-import { CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_SPAM, callAssistantIntroShort } from "../shared/plan-copy";
+import { CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_SPAM, CALL_ASSISTANT_SEPARATE_LINE } from "../shared/plan-copy";
 
 /**
  * Call Assistant — Agent Studio, Overview and Simulator (studio-frontend lane).
@@ -96,12 +96,16 @@ class VoiceMock {
   statusResponse() {
     return {
       enabled: this.opts.enabled !== false,
-      // `preview` as server/voice/billing.ts reports it: from the price book (false since the launch).
-      addon: { key: "call_assistant", name: "AI Call Assistant", preview: ADDONS.call_assistant.preview === true, availableOn: ["pro", "growth", "agency"] },
+      // `preview` as server/voice/billing.ts reports it: from the price book (false since the launch). A separate
+      // service (owner, 2026-10-08): its own subscription, bought on its own section of Pricing.
+      addon: { key: "call_assistant", name: "AI Call Assistant", preview: ADDONS.call_assistant.preview === true },
+      separateService: true,
+      pricingHref: "/pricing#call-assistant",
+      subscriptionStatus: "active",
       plan: "pro",
-      allowance: { numbers: 1, minutes: 500 },
-      pricing: { includedMinutes: 500, overageCentsPerMinute: 10, freeSpamCalls: 500 },
-      tier: { key: "solo", addon: "call_assistant", name: "Solo" },
+      allowance: { numbers: 1, minutes: 1000 },
+      pricing: { includedMinutes: 1000, overageCentsPerMinute: 50, freeSpamCalls: 500 },
+      tier: { key: "solo", addon: "call_assistant", name: "1,000 minutes" },
       tiers: CALL_ASSISTANT_TIERS.map((t) => ({ key: t.tier, addon: t.addon, name: t.name, monthlyCents: t.monthlyCents, annualCents: t.annualCents, includedMinutes: t.includedMinutes, includedNumbers: t.includedNumbers, preview: ADDONS[t.addon].preview === true })),
       canManage: true,
       engine: { configured: true, reachable: false, models: false, checkedAt: "2026-10-02T00:00:00.000Z" },
@@ -121,7 +125,7 @@ class VoiceMock {
 
     if (path === "/status") return json(this.statusResponse());
     if (this.opts.enabled === false) {
-      return json({ code: "plan_required", requiredPlan: "pro", addon: "call_assistant", message: "AI Call Assistant is an add-on." }, 402);
+      return json({ code: "call_assistant_required", addon: "call_assistant", href: "/pricing#call-assistant", message: "AI Call Assistant is a separate service with its own subscription." }, 402);
     }
     if (path === "/profile" && method === "GET") return json(this.profileResponse());
     if (path === "/profile" && method === "PUT") {
@@ -482,11 +486,11 @@ test.describe("Call Assistant — Overview and Simulator", () => {
     await expect(page.getByTestId("badge-overview-preview")).toHaveCount(0);
     await expect(page.getByText("Pricing is being finalized")).toHaveCount(0);
     // The tier, the tiers to move between, and this month's spam (owner, 2026-10-02).
-    await expect(page.getByTestId("text-overview-tier")).toHaveText("Solo — 5,000 minutes and 1 local number a month");
+    await expect(page.getByTestId("text-overview-tier")).toHaveText("1,000 minutes a month and 1 local number");
     for (const t of CALL_ASSISTANT_TIERS) await expect(page.getByTestId(`row-overview-tier-${t.tier}`)).toContainText(t.name);
     await expect(page.getByTestId("row-overview-tier-solo")).toContainText("Current");
     await expect(page.getByTestId("row-overview-tier-fleet")).toContainText("Upgrade");
-    // Four tiers (owner, 2026-10-02): Lite is below Solo; Crew and Fleet pay 5¢ a minute over, Lite and Solo 10¢.
+    // Four tiers (owner, 2026-10-08): 500 minutes below 1,000; every tier 50¢ a minute over.
     await expect(page.locator('[data-testid^="row-overview-tier-"]')).toHaveCount(4);
     await expect(page.getByTestId("row-overview-tier-lite")).toContainText("Downgrade");
     for (const t of CALL_ASSISTANT_TIERS) await expect(page.getByTestId(`row-overview-tier-${t.tier}`)).toContainText(`${t.overageCentsPerMinute}¢/min over`);
@@ -551,8 +555,9 @@ test.describe("Call Assistant — Overview and Simulator", () => {
     await gotoCrm(page, "/call-assistant?tab=studio");
     await expect(page.getByTestId("plan-required-callAssistant")).toBeVisible();
     await expect(page.getByTestId("tabs-call-assistant")).toHaveCount(0);
-    // On sale (launched): the prompt links Billing to buy it — no "Coming soon", no disabled "Not available yet".
-    await expect(page.getByTestId("link-call-assistant-billing")).toHaveAttribute("href", "/settings?tab=billing");
+    // On sale (launched): the prompt links the service's own pricing — no "Coming soon", no disabled "Not available yet".
+    await expect(page.getByTestId("link-call-assistant-billing")).toHaveAttribute("href", "/pricing#call-assistant");
+    await expect(page.getByTestId("plan-required-callAssistant")).toContainText("Separate service");
     await expect(page.getByTestId("button-call-assistant-unavailable")).toHaveCount(0);
     await expect(page.getByTestId("badge-call-assistant-preview")).toHaveCount(0);
     await expect(page.getByTestId("plan-required-callAssistant")).not.toContainText("Pricing is being finalized");
@@ -565,7 +570,7 @@ test.describe("Call Assistant — paused for a payment", () => {
     // The CRM's voice API answered as server/voice/billing.ts does for a past_due owner (mocked: no subscription is touched).
     const status = {
       enabled: false, paused: true, pausedReason: "payment_needed", billingHref: "/settings?tab=billing", subscriptionStatus: "past_due",
-      addon: { key: "call_assistant", name: ADDONS.call_assistant.name, preview: ADDONS.call_assistant.preview === true, availableOn: ADDONS.call_assistant.availableOn, monthlyCents: ADDONS.call_assistant.monthlyCents, annualCents: ADDONS.call_assistant.annualCents },
+      addon: { key: "call_assistant", name: ADDONS.call_assistant.name, preview: ADDONS.call_assistant.preview === true, monthlyCents: ADDONS.call_assistant.monthlyCents, annualCents: ADDONS.call_assistant.annualCents },
       plan: "pro", allowance: { numbers: 1, minutes: 500 }, units: { callAssistant: 1, callNumber: 0 },
       pricing: { includedMinutes: 500, overageCentsPerMinute: 15, numberMinDays: 14 },
       engine: { configured: true, reachable: true, models: true, checkedAt: new Date().toISOString() },
@@ -599,7 +604,7 @@ test.describe("Call Assistant — paused for a payment", () => {
     await expect(page.getByTestId("text-call-assistant-paused")).toHaveText("Paused — update your payment method");
     await expect(page.getByTestId("link-call-assistant-paused-billing")).toHaveAttribute("href", "/settings?tab=billing");
     await expect(page.getByTestId("plan-required-callAssistant")).toHaveCount(0);
-    await expect(page.getByTestId("text-overview-price")).toContainText(callAssistantIntroShort());
+    await expect(page.getByTestId("text-overview-price")).toContainText(CALL_ASSISTANT_SEPARATE_LINE);
 
     await page.getByTestId("tab-call-assistant-numbers").click();
     await expect(page.getByTestId("banner-call-assistant-paused")).toBeVisible();

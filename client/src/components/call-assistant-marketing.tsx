@@ -13,7 +13,7 @@
  * Honest copy only: the product is launching, so there are no call counts,
  * customers or testimonials here. Every price comes from the price book
  * through shared/plan-copy.ts (callAssistantPricing), and "Coming soon" shows
- * for as long as the add-on is `preview` in shared/plans.ts.
+ * for as long as the service is `preview` in shared/plans.ts.
  */
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
@@ -22,7 +22,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { VOICE_PERSONAS, VOICE_PERSONA_LIST, type VoicePersona } from "@shared/voice-personas";
-import { callAssistantPricing, callAssistantIntroShort, callAssistantSpamAllowanceLine, joinNames } from "@shared/plan-copy";
+import { callAssistantPricing, callAssistantSpamAllowanceLine } from "@shared/plan-copy";
 // The editorial primitives (buttons, panel hairlines, the section kicker) live
 // in feature-landing/primitives.tsx, shared with every /features page.
 import { BTN_LG, BTN_PRIMARY, Kicker, PANEL_RULE, PANEL_RULE_STRONG } from "@/components/feature-landing/primitives";
@@ -198,12 +198,7 @@ export function personaNames(gender: VoicePersona["gender"]): string {
   return names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 
-/** "<intro>/mo for your first <N> months, then <regular>/mo — or <annual>/yr" — the owner's launch price, from the price book. */
-export function introPriceShort(): string {
-  return callAssistantIntroShort();
-}
-
-/** "Coming soon" while the add-on is `preview` in the price book; nothing once it's for sale. */
+/** "Coming soon" while the service is `preview` in the price book; nothing once it's for sale. */
 export function ComingSoonTag({ onNavy = false, className = "" }: { onNavy?: boolean; className?: string }) {
   if (!callAssistantPricing().comingSoon) return null;
   return (
@@ -218,7 +213,7 @@ export function ComingSoonTag({ onNavy = false, className = "" }: { onNavy?: boo
 
 /**
  * The landing page's Call Assistant section: the voices on a navy grid panel,
- * the highlights in a hairline grid, the launch price and a way in to
+ * the highlights in a hairline grid, the price and a way in to
  * /call-assistant.
  */
 export function CallAssistantSection() {
@@ -287,21 +282,21 @@ export function CallAssistantSection() {
           </div>
         </div>
 
-        {/* The launch price and the way in. */}
+        {/* The price and the way in. */}
         <div className="mt-6 flex flex-col lg:flex-row lg:items-center justify-between gap-5 rounded-2xl border border-mkt-rule bg-mkt-paper-2 p-6 lg:px-8">
           <div>
             <div className="flex flex-wrap items-center gap-3">
               <p className="font-display font-semibold text-[1.5rem] sm:text-[1.75rem] leading-tight text-mkt-ink" data-testid="text-call-assistant-landing-price">
-                <span className="font-sans text-[15px] font-medium text-mkt-ink-soft">Solo </span>{price.intro}<span className="font-sans text-sm font-medium text-mkt-muted">/mo</span>{" "}
-                <span className="block sm:inline font-sans text-[15px] font-medium text-mkt-ink-soft">for your first {price.introMonths} months, then {price.regular}/mo — or {price.annual}/yr</span>
+                <span className="font-sans text-[15px] font-medium text-mkt-ink-soft">From </span>{price.from}<span className="font-sans text-sm font-medium text-mkt-muted">/mo</span>{" "}
+                <span className="block sm:inline font-sans text-[15px] font-medium text-mkt-ink-soft">({price.fromTier}) — or yearly with {price.annualFreeMonths === 1 ? "one month" : `${price.annualFreeMonths} months`} free</span>
               </p>
               <ComingSoonTag />
             </div>
             <p className="mt-1.5 text-[14px] text-mkt-ink-soft" data-testid="text-call-assistant-landing-tiers">
               {price.tiers.map((t, i) => (
-                <span key={t.tier}>{i > 0 ? (i === price.tiers.length - 1 ? " and " : ", ") : `Regular prices from ${price.from}/mo. ${price.tierCountWord.replace(/^./, (c) => c.toUpperCase())} tiers: `}<strong className="font-semibold text-mkt-ink">{t.name}</strong> ({t.minutes} min, {t.numbersLabel})</span>
+                <span key={t.tier}>{i > 0 ? (i === price.tiers.length - 1 ? " and " : ", ") : `${price.tierCountWord.replace(/^./, (c) => c.toUpperCase())} tiers: `}<strong className="font-semibold text-mkt-ink">{t.name}</strong> ({t.monthly}/mo, {t.numbersLabel})</span>
               ))}
-              . {joinNames(price.tiers.filter((t) => t.lowerOverage).map((t) => t.name))} pay less per extra minute. The first {price.freeSpamCalls} spam calls each month are free on every tier. An add-on for the {price.plans} plans.
+              . Above the included minutes, {price.overageLine}. The first {price.freeSpamCalls} spam calls each month are free on every tier. A separate service with its own subscription: no ConstructHUB plan needed.
             </p>
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">

@@ -457,6 +457,8 @@ export async function registerRoutes(
   // AI Call Assistant (docs/call-assistant/SPEC.md): org-scoped voice tables,
   // the CRM routes under /api/crm/voice/* and the engine's internal API under
   // /api/voice-internal/*. The engine itself is the Python service in voice/.
+  // A voice schema failure fails the boot (audit #6): the app never runs without the voice tables and routes
+  // (metering and the Call Assistant subscription would silently stop) — the error is logged and rethrown.
   try {
     const { ensureVoiceSchema } = await import("./voice/schema");
     await ensureVoiceSchema();
@@ -466,7 +468,8 @@ export async function registerRoutes(
     const { startEngineHealthWatch } = await import("./voice/billing");
     startEngineHealthWatch();
   } catch (e: any) {
-    console.error("Failed to initialize the Call Assistant module:", e?.message || e);
+    console.error("Failed to initialize the Call Assistant module (the voice schema or routes) — refusing to boot without it:", e?.message || e);
+    throw e;
   }
 
   // Gabe's support line (server/support): customer numbers, the verified phone flow and the admin ticket desk.

@@ -38,7 +38,7 @@ import { sendWithFallback } from "../email";
 import { EMAIL_LOG_DDL } from "./schema";
 import { PRIMARY_DOMAIN, siteBaseUrl } from "../site-context";
 import {
-  PLANS, ADDONS, ADDON_KEYS, planPriceCents, addonPriceCents, type AddonKey, type BillingInterval,
+  PLANS, ADDONS, ADDON_KEYS, planPriceCents, addonPriceCents, isCallAssistantAddon, type AddonKey, type BillingInterval,
 } from "@shared/plans";
 import { describeSubscription, roleOfPrice, agencyLocationTiers, tieredAmountCents } from "../billing/prices";
 import { subscriptionPeriodEnd, cancellationOf } from "../billing/sync";
@@ -370,7 +370,8 @@ function labelForRole(price: Stripe.Price | null, fallback: string | null): stri
   const role = roleOfPrice(price);
   switch (role?.kind) {
     case "plan": return `ConstructHUB ${PLANS[role.key].name} plan (${intervalWord(role.interval)})`;
-    case "addon": return `${ADDONS[role.key].name} (${intervalWord(role.interval)})`;
+    // The AI Call Assistant's lines are its own subscription's (a separate service), named as the service.
+    case "addon": return isCallAssistantAddon(role.key) ? `ConstructHUB ${ADDONS[role.key].name} (${intervalWord(role.interval)})` : `${ADDONS[role.key].name} (${intervalWord(role.interval)})`;
     case "agency_locations": return `Agency locations above ${PLANS.agency.limits.locations} (${intervalWord(role.interval)})`;
     case "setup": return `${ADDONS[role.key].name} setup (one time)`;
     // The CRM is its own subscription: its receipt lines say so.

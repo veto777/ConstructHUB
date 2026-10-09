@@ -7,8 +7,8 @@ import {
   PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, AGENCY_SELF_SERVE_MAX_LOCATIONS,
   TRIAL_DAYS, SALES_THRESHOLD_CENTS, MODULE_NAMES, ANNUAL_MONTHS, planForModule, showsPrice,
   CALL_ASSISTANT_TIERS, CALL_ASSISTANT_NAME, CALL_ASSISTANT_FREE_SPAM_CALLS, CALL_ASSISTANT_ESTIMATE_MINUTES_PER_CALL,
-  CALL_ASSISTANT_OVERAGE_RATES, callAssistantTier,
-  type Plan, type PlanKey, type ModuleKey, type CallAssistantTier, type CallAssistantTierKey, type AddonKey,
+  CALL_ASSISTANT_OVERAGE_RATES, CALL_ASSISTANT_OVERAGE_CENTS_PER_MINUTE, CALL_ASSISTANT_ANNUAL_MONTHS, CALL_ASSISTANT_FROM_CENTS, CALL_ASSISTANT_PRICING_HREF, isCallAssistantAddon,
+  type Plan, type PlanKey, type ModuleKey, type CallAssistantTier, type CallAssistantTierKey, type AddonKey, type Addon,
 } from "./plans";
 import { CRM_ADDONS, CRM_EXTRA_SEAT_ANNUAL_CENTS, CRM_EXTRA_SEAT_MONTHLY_CENTS, CRM_PLANS, CRM_PLAN_KEYS, CRM_TRIAL_DAYS } from "./crm-plans";
 
@@ -101,48 +101,45 @@ function agencyBandsAnnualLine(): string {
   return joinNames(parts);
 }
 
-/** "Extra location — $19/month or $190/year (Starter, Pro and Growth)". */
+/** The platform's own add-ons: the AI Call Assistant's are the lines of its separate subscription, listed with the service instead. */
+export const PLATFORM_ADDONS: readonly Addon[] = Object.values(ADDONS).filter((a) => !isCallAssistantAddon(a.key));
+
+/** "Extra location — $19/month or $190/year (Starter, Pro and Growth)" — the platform's add-ons. */
 export function addonLines(): string[] {
-  return Object.values(ADDONS).map((addon) => {
+  return PLATFORM_ADDONS.map((addon) => {
     const setup = addon.setupCents ? ` plus a ${formatUsd(addon.setupCents)} one-time setup fee` : "";
     const on = joinNames(addon.availableOn.map((key) => PLANS[key].name));
-    const intro = addon.introMonthlyCents ? ` Launch price: ${callAssistantIntroLine()} (the intro is for monthly billing).` : "";
     // A `preview` add-on is listed but refused at checkout (shared/plans.ts), so say so.
     const preview = addon.preview ? " Coming soon: listed, not for sale yet." : "";
-    return `${addon.name} — ${formatUsd(addon.monthlyCents)}/month or ${formatUsd(addon.annualCents)}/year${setup} (${on}). ${addon.description}${intro}${preview}`;
+    return `${addon.name} — ${formatUsd(addon.monthlyCents)}/month or ${formatUsd(addon.annualCents)}/year${setup} (${on}). ${addon.description}${preview}`;
   });
 }
 
 // ── AI Call Assistant ────────────────────────────────────────────────────────
 
 /**
- * AI Call Assistant pricing — four tiers (owner, 2026-10-02), every figure
- * from the price book (shared/plans.ts CALL_ASSISTANT_TIERS, the same table
- * the add-ons, Stripe prices and entitlements are built from):
- *
- *   Lite  — the smallest tier, no intro;
- *   Solo  — the launch intro "$99 a month for the first 3 months" (monthly
- *           billing only), then its monthly price — or its own yearly price;
- *   Crew, Fleet — more minutes and numbers, a lower overage per minute, no intro;
- *   every tier — its own overage per minute, extra numbers, and
- *           CALL_ASSISTANT_FREE_SPAM_CALLS spam calls a month that never count.
- *
- * Yearly prices are add-on annual prices, so they show even above the sales
- * threshold (like the plans' own annual prices). Every surface renders through
- * the helpers below: the landing page, /call-assistant, the pricing page, the
- * CRM Overview, Settings and Gabe's knowledge.
+ * AI Call Assistant pricing — a SEPARATE SERVICE on its own subscription
+ * (owner, 2026-10-08), four tiers, every figure from the price book
+ * (shared/plans.ts CALL_ASSISTANT_TIERS, the same table the Stripe prices and
+ * the entitlements are built from): a tier's minutes and local numbers a
+ * month, one overage rate on every tier, yearly billing at
+ * CALL_ASSISTANT_ANNUAL_MONTHS × monthly (one month free), no intro price, and
+ * CALL_ASSISTANT_FREE_SPAM_CALLS spam calls a month that never count. Above the
+ * top tier there is no listed price: "Talk to a sales rep". Yearly prices are
+ * the service's own prices, so they show even above the sales threshold (like
+ * the plans' yearly prices). Every surface renders through the helpers below:
+ * the landing page, /call-assistant, the pricing page, the Call Assistant's
+ * Overview, Settings and Gabe's knowledge.
  */
-const SOLO = callAssistantTier("solo");
 const CHEAPEST = CALL_ASSISTANT_TIERS[0];
+const TOP = CALL_ASSISTANT_TIERS[CALL_ASSISTANT_TIERS.length - 1];
 
-/** The Solo tier's launch intro (the only intro; monthly billing, first time the service is added). */
-export const CALL_ASSISTANT_INTRO: { readonly monthlyCents: number; readonly months: number } = {
-  monthlyCents: SOLO.introMonthlyCents ?? SOLO.monthlyCents,
-  months: SOLO.introMonths ?? 0,
-};
-
-/** "Pro, Growth and Agency" — the plans the tiers are sold on. */
-export const CALL_ASSISTANT_PLANS = joinNames(ADDONS[SOLO.addon].availableOn.map((key) => PLANS[key].name));
+/** "$249/mo" — the cheapest tier's monthly price, for "a separate service, from $249/mo". */
+export const CALL_ASSISTANT_FROM_PRICE = `${formatUsd(CALL_ASSISTANT_FROM_CENTS)}/mo`;
+/** How many months yearly billing gives free: 12 − CALL_ASSISTANT_ANNUAL_MONTHS. */
+export const CALL_ASSISTANT_ANNUAL_FREE_MONTHS = 12 - CALL_ASSISTANT_ANNUAL_MONTHS;
+/** The one sentence every surface uses for how the service is sold. */
+export const CALL_ASSISTANT_SEPARATE_LINE = `The ${CALL_ASSISTANT_NAME} is a separate service with its own subscription, from ${CALL_ASSISTANT_FROM_PRICE}: no ConstructHUB plan includes it, and none is needed to buy it.`;
 
 const count = (n: number) => n.toLocaleString("en-US");
 const numbersLabel = (n: number) => `${n} local number${n === 1 ? "" : "s"}`;
@@ -152,32 +149,27 @@ const estimatedCalls = (t: CallAssistantTier) => Math.round(t.includedMinutes / 
 export type CallAssistantTierFacts = {
   tier: CallAssistantTierKey;
   addon: AddonKey;
-  /** "Solo". */
+  /** "500 minutes" — the tier is named by the minutes it includes. */
   name: string;
-  /** "AI Call Assistant — Solo" (the add-on's name). */
+  /** "AI Call Assistant — 500 minutes" (the add-on's name). */
   fullName: string;
   monthly: string;
   annual: string;
   monthlyCents: number;
   annualCents: number;
-  /** Solo only: "$99" for the first `introMonths` months on monthly billing. */
-  intro: string | null;
-  introMonths: number | null;
   minutes: string;
   includedMinutes: number;
   numbers: number;
   numbersLabel: string;
-  /** "about 1,000 calls a month" at CALL_ASSISTANT_ESTIMATE_MINUTES_PER_CALL. */
+  /** "about 250 calls a month" at CALL_ASSISTANT_ESTIMATE_MINUTES_PER_CALL. */
   estimatedCalls: string;
-  /** A minute above the included ones: "$0.05", "5¢" and the cents. */
+  /** A minute above the included ones: "$0.50", "50¢" and the cents. */
   overage: string;
   overageShort: string;
   overageCents: number;
-  /** Below the highest overage rate (Crew and Fleet): the cards badge it. */
-  lowerOverage: boolean;
 };
 
-/** "10¢" — a per-minute rate under a dollar, the short form for tier cards. */
+/** "50¢" — a per-minute rate under a dollar, the short form for tier cards. */
 export function formatCentsShort(cents: number): string {
   return cents < 100 ? `${cents}¢` : formatUsd(cents);
 }
@@ -187,93 +179,84 @@ export function callAssistantTiers(): CallAssistantTierFacts[] {
   return CALL_ASSISTANT_TIERS.map((t) => ({
     tier: t.tier, addon: t.addon, name: t.name, fullName: ADDONS[t.addon].name,
     monthly: formatUsd(t.monthlyCents), annual: formatUsd(t.annualCents), monthlyCents: t.monthlyCents, annualCents: t.annualCents,
-    intro: t.introMonthlyCents ? formatUsd(t.introMonthlyCents) : null, introMonths: t.introMonthlyCents ? t.introMonths ?? null : null,
     minutes: count(t.includedMinutes), includedMinutes: t.includedMinutes,
     numbers: t.includedNumbers, numbersLabel: numbersLabel(t.includedNumbers),
     estimatedCalls: `about ${count(estimatedCalls(t))} calls a month`,
     overage: formatUsd(t.overageCentsPerMinute), overageShort: formatCentsShort(t.overageCentsPerMinute), overageCents: t.overageCentsPerMinute,
-    lowerOverage: t.overageCentsPerMinute < CALL_ASSISTANT_OVERAGE_RATES[0],
   }));
 }
 
-/** The tiers grouped by overage rate, highest rate first: [[10, ["Lite", "Solo"]], [5, ["Crew", "Fleet"]]]. */
+/** The tiers grouped by overage rate, highest rate first: [[50, [every tier]]] today. */
 function overageGroups(): [number, string[]][] {
   return CALL_ASSISTANT_OVERAGE_RATES.map((rate) => [rate, CALL_ASSISTANT_TIERS.filter((t) => t.overageCentsPerMinute === rate).map((t) => t.name)]);
 }
 
-/** "$0.10 a minute on Lite and Solo, $0.05 on Crew and Fleet" — the overage, per tier, from the price book. */
+/** "$0.50 a minute on every tier" — the overage, from the price book (per tier, should the rates ever differ again). */
 export function callAssistantOverageLine(): string {
-  return overageGroups().map(([rate, names], i) => `${formatUsd(rate)}${i === 0 ? " a minute" : ""} on ${joinNames(names)}`).join(", ");
+  const groups = overageGroups();
+  if (groups.length === 1) return `${formatUsd(groups[0][0])} a minute on every tier`;
+  return groups.map(([rate, names], i) => `${formatUsd(rate)}${i === 0 ? " a minute" : ""} on ${joinNames(names)}`).join(", ");
 }
 
-/** Every Call Assistant price fact, formatted, for page copy. `intro`/`regular`/`annual` are Solo's (the entry tier). */
+/** "More than 5,000 minutes a month is quoted by a sales rep: there is no listed price above the 5,000 minutes tier." */
+export function callAssistantAboveTopLine(): string {
+  return `More than ${count(TOP.includedMinutes)} minutes a month is quoted by a sales rep (${SALES_REP_LABEL}): there is no listed price above the ${TOP.name} tier.`;
+}
+
+/** Every Call Assistant price fact, formatted, for page copy. */
 export function callAssistantPricing() {
-  const solo = ADDONS[SOLO.addon];
   return {
     name: CALL_ASSISTANT_NAME,
-    intro: formatUsd(CALL_ASSISTANT_INTRO.monthlyCents),
-    introMonths: CALL_ASSISTANT_INTRO.months,
-    /** Solo's monthly price after the intro. */
-    regular: formatUsd(solo.monthlyCents),
-    /** Solo's annual price (no intro on annual billing). */
-    annual: formatUsd(solo.annualCents),
-    /** Solo's numbers and minutes. */
-    includedNumbers: SOLO.includedNumbers,
-    includedMinutes: count(SOLO.includedMinutes),
     /** "four" — how many tiers, as a word for headings. */
     tierCountWord: ["zero", "one", "two", "three", "four", "five", "six"][CALL_ASSISTANT_TIERS.length] ?? String(CALL_ASSISTANT_TIERS.length),
-    /**
-     * The cheapest tier's REGULAR monthly price and name ($149, Lite). Solo's intro ($99 for 3 months) is
-     * lower, so copy says "Regular prices from $149/mo", never a bare "From $149/mo" next to the intro.
-     */
+    /** The cheapest tier's monthly price and name ($249, 500 minutes): "from $249/mo". */
     from: formatUsd(CHEAPEST.monthlyCents),
     fromTier: CHEAPEST.name,
-    /** "$0.10 a minute on Lite and Solo, $0.05 on Crew and Fleet" — overage is per tier. */
+    fromPrice: CALL_ASSISTANT_FROM_PRICE,
+    /** The top tier: the most that is listed; above it, a sales rep. */
+    top: formatUsd(TOP.monthlyCents),
+    topTier: TOP.name,
+    topMinutes: count(TOP.includedMinutes),
+    /** Yearly = this many monthly prices (one month free). */
+    annualMonths: CALL_ASSISTANT_ANNUAL_MONTHS,
+    annualFreeMonths: CALL_ASSISTANT_ANNUAL_FREE_MONTHS,
+    /** "$0.50" — a minute above the included ones, every tier. */
+    overage: formatUsd(CALL_ASSISTANT_OVERAGE_RATES[0]),
     overageLine: callAssistantOverageLine(),
     extraNumber: formatUsd(ADDONS.call_number.monthlyCents),
+    extraNumberAnnual: formatUsd(ADDONS.call_number.annualCents),
     /** "500" — spam calls a month that never count toward minutes, every tier. */
     freeSpamCalls: count(CALL_ASSISTANT_FREE_SPAM_CALLS),
-    plans: CALL_ASSISTANT_PLANS,
-    planKeys: solo.availableOn,
+    separateLine: CALL_ASSISTANT_SEPARATE_LINE,
+    pricingHref: CALL_ASSISTANT_PRICING_HREF,
     tiers: callAssistantTiers(),
-    /** Listed but not for sale yet (the numbers+billing lane drops the flag at launch). */
+    /** Listed but not for sale yet (every tier `preview` in the price book). */
     comingSoon: CALL_ASSISTANT_TIERS.every((t) => ADDONS[t.addon].preview === true),
   };
 }
 
-/** "$99/month for your first 3 months, then $249/month — or $1,999/year" — Solo's launch price. */
-export function callAssistantIntroLine(): string {
-  const p = callAssistantPricing();
-  return `${p.intro}/month for your first ${p.introMonths} months, then ${p.regular}/month — or ${p.annual}/year`;
-}
-
-/** "$99/mo for your first 3 months, then $249/mo — or $1,999/yr" — Solo's launch price, the short form next to a price. */
-export function callAssistantIntroShort(): string {
-  const p = callAssistantPricing();
-  return `${p.intro}/mo for your first ${p.introMonths} months, then ${p.regular}/mo — or ${p.annual}/yr`;
-}
-
-/** "Lite $149/month or $1,199/year (1,000 minutes a month and 1 local number, then $0.10 a minute), Solo …, Crew … and Fleet …". */
+/**
+ * "500 minutes a month with 1 local number for $249/month or $2,739/year, …;
+ * above the included minutes, $0.50 a minute on every tier".
+ */
 export function callAssistantTiersLine(): string {
-  return joinNames(callAssistantTiers().map((t) => `${t.name} ${t.monthly}/month or ${t.annual}/year (${t.minutes} minutes a month and ${t.numbersLabel}, then ${t.overage} a minute)`));
+  const tiers = joinNames(callAssistantTiers().map((t) => `${t.minutes} minutes a month with ${t.numbersLabel} for ${t.monthly}/month or ${t.annual}/year`));
+  return `${tiers}; above the included minutes, ${callAssistantOverageLine()}`;
 }
 
-/** "Lite $149/month (1,000 minutes), Solo $249/month (2,000 minutes), …" — the short form, for answers with a length cap. */
+/** "500 minutes $249/month, 1,000 minutes $349/month, …" — the short form, for answers with a length cap. */
 export function callAssistantTiersShortLine(): string {
-  return joinNames(callAssistantTiers().map((t) => `${t.name} ${t.monthly}/month (${t.minutes} minutes)`));
+  return joinNames(callAssistantTiers().map((t) => `${t.name} ${t.monthly}/month`));
 }
 
 /**
- * "Yearly: Solo $1,999/yr, Crew $3,599/yr and Fleet $6,399/yr when your plan
- * is billed yearly (add-ons follow your plan's billing); the $99/mo intro for
- * your first 3 months is Solo on monthly billing" — add-ons always ride on the
- * plan's interval (server/billing/order.ts), so yearly is never a choice for
- * the add-on alone.
+ * "Yearly billing is 11 times the monthly price, so one month is free: 500
+ * minutes $2,739/yr, …. The Call Assistant is billed on its own subscription,
+ * apart from any plan." — the service's yearly rule (the plans use ANNUAL_MONTHS).
  */
 export function callAssistantYearlyNote(): string {
-  const p = callAssistantPricing();
-  const yearly = joinNames(p.tiers.map((t) => `${t.name} ${t.annual}/yr`));
-  return `${yearly} when your plan is billed yearly (add-ons follow your plan's billing); the ${p.intro}/mo intro for your first ${p.introMonths} months is ${SOLO.name} on monthly billing`;
+  const yearly = joinNames(callAssistantTiers().map((t) => `${t.name} ${t.annual}/yr`));
+  return `Yearly billing is ${CALL_ASSISTANT_ANNUAL_MONTHS} times the monthly price, so ${CALL_ASSISTANT_ANNUAL_FREE_MONTHS === 1 ? "one month is" : `${CALL_ASSISTANT_ANNUAL_FREE_MONTHS} months are`} free: ${yearly}. The ${CALL_ASSISTANT_NAME} is billed on its own subscription, apart from any plan`;
 }
 
 /**
@@ -321,21 +304,36 @@ export function callAssistantSpamAllowanceLine(): string {
   return `the first ${count(CALL_ASSISTANT_FREE_SPAM_CALLS)} spam calls each month never count toward your minutes, on every tier`;
 }
 
-/** "Lite includes 1 local number, Solo 1, Crew 5 and Fleet 20" — local numbers per tier, from the price book. */
+/** "the 500 minutes tier includes 1 local number, the 1,000 minutes tier 1, the 2,000 minutes tier 2 and the 5,000 minutes tier 5" — from the price book. */
 export function callAssistantTierNumbersLine(): string {
   const [first, ...rest] = callAssistantTiers();
-  return joinNames([`${first.name} includes ${first.numbersLabel}`, ...rest.map((t) => `${t.name} ${t.numbers}`)]);
+  return joinNames([`the ${first.name} tier includes ${first.numbersLabel}`, ...rest.map((t) => `the ${t.name} tier ${t.numbers}`)]);
 }
 
-/** "minutes above a tier's included ones are $0.10 a minute on Lite and Solo, $0.05 on Crew and Fleet; extra numbers $5/month each; the first 500 spam calls …". */
+/** "minutes above a tier's included ones are $0.50 a minute on every tier; extra numbers are $5/month each; and the first 500 spam calls …". */
 export function callAssistantIncludesLine(): string {
   const p = callAssistantPricing();
   return `minutes above a tier's included ones are ${p.overageLine}; extra numbers are ${p.extraNumber}/month each; and ${callAssistantSpamAllowanceLine()}`;
 }
 
-/** How overage is billed — for the FAQ, Limits & usage and Gabe. Each call at the rate of the tier it was taken on. */
+/**
+ * How overage is counted — for the FAQ, Limits & usage and Gabe: the rate, never a promise about when it is
+ * charged (static copy cannot read the overage switch; callAssistantOverageStatusLine says what happens now).
+ */
 export function callAssistantOverageRule(): string {
-  return `Each tier includes its minutes every calendar month. Above them, it's ${callAssistantOverageLine()}, on your next invoice. Each call is billed at the rate of the tier you're on when it ends, so a mid-month change of tier never reprices calls already taken.`;
+  return `Each tier includes its minutes every calendar month. Above them, it's ${callAssistantOverageLine()}. Each call is counted at the rate in force when it ends, so a mid-month change of tier never reprices calls already taken.`;
+}
+
+/**
+ * What happens to minutes above the plan RIGHT NOW, from the server's overage switch
+ * (CALL_ASSISTANT_OVERAGE_BILLING, carried as `overageBilling` on the billing status): off — counted, shown,
+ * not charged yet; on — charged at the rate on the next invoice. The rate words stay either way.
+ */
+export function callAssistantOverageStatusLine(state: "on" | "off" | null | undefined, centsPerMinute = CALL_ASSISTANT_OVERAGE_CENTS_PER_MINUTE): string {
+  const rate = `${formatCentsShort(centsPerMinute)} a minute`;
+  return state === "on"
+    ? `Minutes above your plan are ${rate}, on your next invoice.`
+    : `Minutes above your plan are counted but not charged yet; the rate is ${rate}.`;
 }
 
 /** What counts as a minute — for the FAQ and Gabe. */
@@ -343,28 +341,26 @@ export function callAssistantMinuteRule(): string {
   return "Every started minute of a call the assistant answers counts, the way phone carriers bill. Calls from a blocked number are rejected before answering and use no minutes.";
 }
 
-/** Which tier fits, as estimates (calls of about CALL_ASSISTANT_ESTIMATE_MINUTES_PER_CALL minutes). */
+/** Which tier fits, as estimates (calls of about CALL_ASSISTANT_ESTIMATE_MINUTES_PER_CALL minutes); above the top tier, a sales rep. */
 export function callAssistantTierAdvice(): string {
   const tiers = callAssistantTiers();
-  const groups = overageGroups();
-  const lower = groups.length > 1 ? ` On ${joinNames(groups[groups.length - 1][1])}, minutes above the included ones also cost less: ${formatUsd(groups[groups.length - 1][0])} a minute instead of ${formatUsd(groups[0][0])}.` : "";
-  return `At about ${CALL_ASSISTANT_ESTIMATE_MINUTES_PER_CALL} minutes a call, ${joinNames(tiers.map((t) => `${t.name} covers ${t.estimatedCalls}`))}.${lower} These are estimates: your calls may run shorter or longer, and you can move between tiers any time in Settings → Billing.`;
+  return `At about ${CALL_ASSISTANT_ESTIMATE_MINUTES_PER_CALL} minutes a call, ${joinNames(tiers.map((t) => `${t.name} covers ${t.estimatedCalls}`))}. These are estimates: your calls may run shorter or longer, and you can move between tiers any time in Settings → Billing. ${callAssistantAboveTopLine()}`;
 }
 
 /**
- * Whether the add-on can be bought today, in Gabe's words. The price book's
+ * Where and how the service is bought, in Gabe's words. The price book's
  * `preview` flag decides, so the knowledge pack and the preset answers stay
  * honest without a copy change.
  */
 export function callAssistantAvailabilityLine(): string {
   return callAssistantPricing().comingSoon
-    ? "It is coming soon: it is listed on Pricing but is not for sale yet, and there is no launch date to give. Create an account now and add it from Settings → Billing once it is live."
-    : `Add it from Settings → Billing on the ${CALL_ASSISTANT_PLANS} plans.`;
+    ? "It is coming soon: it is listed on Pricing but is not for sale yet, and there is no launch date to give. Create an account now and buy it from Pricing once it is live."
+    : `Buy it on Pricing (${CALL_ASSISTANT_PRICING_HREF}) as its own subscription, with or without a ConstructHUB plan; change tiers any time in Settings → Billing.`;
 }
 
-/** Add-ons whose yearly price is their own, not ANNUAL_MONTHS × monthly: ", except the AI Call Assistant, which is $1,999/year". */
+/** Platform add-ons whose yearly price is their own, not ANNUAL_MONTHS × monthly (none today: the Call Assistant is its own service). */
 export function annualExceptionsLine(): string {
-  const odd = Object.values(ADDONS).filter((a) => a.annualCents !== a.monthlyCents * ANNUAL_MONTHS);
+  const odd = PLATFORM_ADDONS.filter((a) => a.annualCents !== a.monthlyCents * ANNUAL_MONTHS);
   if (!odd.length) return "";
   return `, except ${joinNames(odd.map((a) => `the ${a.name}, which is ${formatUsd(a.annualCents)}/year`))}`;
 }
@@ -418,9 +414,10 @@ ${plans}
 
 Only the ${PLANS.agency.name} plan includes: ${joinNames(AGENCY_ONLY_MODULES)}.
 The CRM (clients, estimates, invoices, payments, pipeline) is a SEPARATE product with its own subscription: none of the plans above includes it, and a CRM subscription does not include the tools above. CRM pricing: ${crmPlansLine()}. CRM yearly prices are their own, not ${ANNUAL_MONTHS} times the monthly price. A first CRM subscription starts with a ${CRM_TRIAL_DAYS}-day trial. ${crmAddonsLine()}.
+The ${CALL_ASSISTANT_NAME} (an AI receptionist on a local number) is a SEPARATE SERVICE with its own subscription, not a plan add-on: none of the plans above or the CRM plans includes it, and no plan is needed to buy it. ${callAssistantPricing().tierCountWord.replace(/^./, (c) => c.toUpperCase())} tiers, one per account: ${callAssistantTiersLine()}. ${callAssistantYearlyNote()}. Extra local numbers are ${callAssistantPricing().extraNumber}/month each, and ${callAssistantSpamAllowanceLine()}. There is no intro or launch price. ${callAssistantAboveTopLine()}
 Competitor Intel is included with ${COMPETITOR_INTEL_PLANS}. Click Guard, IP Tracker and VPN Shield are included with ${PROTECTED_SITE_PLANS}. Texting is sent from the CRM and is included with ${TEXTING_EITHER_LINE}.
 
-### Add-ons (single features are sold only as add-ons to a plan)
+### Add-ons (single features are sold only as add-ons to a plan; the AI Call Assistant is a separate service, above)
 ${addonLines().map((line) => `- ${line}`).join("\n")}
 
 ### Services and anything priced at ${SALES_THRESHOLD_LABEL} or more

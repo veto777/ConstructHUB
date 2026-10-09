@@ -3,20 +3,19 @@
  * (SPEC.md § CRM API → Overview / Usage). OWNER: numbers+billing lane.
  *
  * Fixed by the architect:
- *   - the add-on block in shared/plans.ts (the four tiers in
- *     CALL_ASSISTANT_TIERS — call_assistant_lite, call_assistant = Solo,
- *     call_assistant_crew, call_assistant_fleet, each with its own overage
- *     rate — call_number, CALL_ASSISTANT_FREE_SPAM_CALLS) — the lane
- *     owns it from here on, and removes `preview` only when the owner confirms;
+ *   - the price book block in shared/plans.ts (the four tiers in
+ *     CALL_ASSISTANT_TIERS — call_assistant_lite, call_assistant,
+ *     call_assistant_crew, call_assistant_fleet — call_number,
+ *     CALL_ASSISTANT_FREE_SPAM_CALLS);
  *   - voice_usage is the meter (server/voice/schema.ts): minutes per org per
  *     month, included snapshot, overage billed to Stripe (billing-usage.ts);
- *   - GET /api/crm/voice/status is the one route that answers WITHOUT the add-on
- *     (skipModule), so the Overview tab can show the plan prompt itself.
+ *   - GET /api/crm/voice/status is the one route that answers WITHOUT the
+ *     service (skipModule), so the Overview tab can show the buy prompt itself.
  *
- * Buying the add-on itself is the EXISTING add-on machinery
- * (POST /api/stripe/addons → server/billing/order.ts checkAddonsForPlan →
- * Stripe subscription items): nothing voice-specific is needed there, and the
- * `preview` flag is what keeps it refused until the owner confirms pricing.
+ * Buying the service is its OWN subscription (owner, 2026-10-08: a separate
+ * service, sold with or without a platform plan): server/voice/subscription.ts
+ * (checkout, in-place tier and extra-number changes, the webhook). Nothing here
+ * sells anything.
  */
 import type { Express } from "express";
 import { eq } from "drizzle-orm";
@@ -25,8 +24,8 @@ import { voiceProfiles } from "@shared/schema";
 import { voiceContext, type GetUser } from "./context";
 import { moduleEnabled, modulePaused, BILLING_HREF } from "../entitlements";
 import {
-  ADDONS, CALL_ASSISTANT_TIERS, CALL_ASSISTANT_NAME, CALL_ASSISTANT_FREE_SPAM_CALLS, CALL_NUMBER_MIN_DAYS,
-  callAssistantTier, callAssistantTierOf,
+  ADDONS, CALL_ASSISTANT_TIERS, CALL_ASSISTANT_NAME, CALL_ASSISTANT_FREE_SPAM_CALLS, CALL_NUMBER_MIN_DAYS, CALL_ASSISTANT_PRICING_HREF,
+  CALL_ASSISTANT_FROM_CENTS, callAssistantTier, callAssistantTierOf,
 } from "@shared/plans";
 import { voiceInternalConfigured } from "./internal-auth";
 import { voiceEngineUrl } from "./proxy";
@@ -36,7 +35,7 @@ const engineHost = () => { try { return new URL(voiceEngineUrl()).host; } catch 
 import { listOrgNumbers, numberView, numberAllowance, countsAgainstAllowance, numbersMockEnabled } from "./numbers";
 import { signalwireConfig } from "./numbers-signalwire";
 import { releaseIsFinal } from "./number-release";
-import { getVoiceUsageRow, listVoiceUsage, summarizeVoiceUsage, voiceMonthKey } from "./billing-usage";
+import { getVoiceUsageRow, listVoiceUsage, summarizeVoiceUsage, voiceMonthKey, voiceOverageBillingState } from "./billing-usage";
 import { externalReceptionist } from "./ingest";
 
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -94,11 +93,12 @@ export function startEngineHealthWatch(intervalMs = 5 * 60_000): ReturnType<type
 export function registerVoiceBillingRoutes(app: Express, getDevUser: GetUser): void {
   /**
    * Overview status. Answers for every org member; `enabled` is false (with
-   * the add-on to buy) when the owner's subscription lacks the add-on. With
-   * it, the numbers, the profile's state and this month's minutes come too.
-   * `paused` (enabled false) = the add-on is bought but the subscription needs
-   * a payment: the assistant doesn't answer, the numbers are held, and the
-   * Overview says "Paused — update your payment method" (billingHref).
+   * where to buy the service) when the owner has no running Call Assistant
+   * subscription. With one, the numbers, the profile's state and this month's
+   * minutes come too. `paused` (enabled false) = the service is bought but its
+   * subscription needs a payment: the assistant doesn't answer, the numbers
+   * are held, and the Overview says "Paused — update your payment method"
+   * (billingHref).
    */
   app.get("/api/crm/voice/status", async (req: any, res) => {
     const v = await voiceContext(req, res, getDevUser, { skipModule: true });
@@ -106,19 +106,27 @@ export function registerVoiceBillingRoutes(app: Express, getDevUser: GetUser): v
     const enabled = moduleEnabled(v.ent, "callAssistant");
     const paused = modulePaused(v.ent, "callAssistant");
     res.setHeader("Cache-Control", "no-store");
-    // A paused add-on keeps showing what it bought (the stored row).
+    // A paused subscription keeps showing what it bought (the stored row).
     const heldAddons = Object.keys(v.ent.addons).length ? v.ent.addons : v.ent.storedAddons;
     const tier = callAssistantTierOf(heldAddons);
-    const entry = ADDONS[tier?.addon ?? "call_assistant"];
+    // The cheapest tier is the one a prompt offers when none is held.
+    const entry = ADDONS[tier?.addon ?? CALL_ASSISTANT_TIERS[0].addon];
     const base = {
       enabled,
       paused,
       pausedReason: paused ? ("payment_needed" as const) : null,
       billingHref: BILLING_HREF,
-      subscriptionStatus: v.ent.subscriptionStatus,
-      // `addon` is the held tier's add-on (Solo when none is held: the one a prompt offers).
-      addon: { key: entry.key, name: CALL_ASSISTANT_NAME, preview: entry.preview === true, availableOn: entry.availableOn, monthlyCents: entry.monthlyCents, annualCents: entry.annualCents, extraNumber: { key: ADDONS.call_number.key, name: ADDONS.call_number.name, monthlyCents: ADDONS.call_number.monthlyCents, preview: ADDONS.call_number.preview === true } },
-      /** The held tier (null without one — a platform admin has the add-on, unlimited minutes, without holding a tier). */
+      /** The Call Assistant's OWN subscription status (the service is sold apart from the platform plan). */
+      subscriptionStatus: v.ent.callAssistant.status,
+      /** A separate service: bought on its own section of Pricing, with or without a platform plan. */
+      separateService: true as const,
+      /** "off": minutes above the tier are metered and shown but not charged (CALL_ASSISTANT_OVERAGE_BILLING, default off). */
+      overageBilling: voiceOverageBillingState(),
+      pricingHref: CALL_ASSISTANT_PRICING_HREF,
+      fromCents: CALL_ASSISTANT_FROM_CENTS,
+      // `addon` is the held tier's add-on (the cheapest tier when none is held: the one a prompt offers).
+      addon: { key: entry.key, name: CALL_ASSISTANT_NAME, preview: entry.preview === true, monthlyCents: entry.monthlyCents, annualCents: entry.annualCents, extraNumber: { key: ADDONS.call_number.key, name: ADDONS.call_number.name, monthlyCents: ADDONS.call_number.monthlyCents, preview: ADDONS.call_number.preview === true } },
+      /** The held tier (null without one — a platform admin has the service, unlimited minutes, without holding a tier). */
       tier: tier ? { key: tier.tier, addon: tier.addon, name: tier.name } : null,
       tiers: CALL_ASSISTANT_TIERS.map((t) => ({
         key: t.tier, addon: t.addon, name: t.name, monthlyCents: t.monthlyCents, annualCents: t.annualCents,
@@ -128,8 +136,8 @@ export function registerVoiceBillingRoutes(app: Express, getDevUser: GetUser): v
       allowance: v.allowance,
       units: { callAssistant: tier ? 1 : 0, tier: tier?.tier ?? null, callNumber: heldAddons.call_number ?? 0 },
       pricing: {
-        // Without a held tier: Solo's (the tier a prompt offers; an admin's own minutes are unlimited — `allowance`).
-        includedMinutes: (tier ?? callAssistantTier("solo")).includedMinutes, overageCentsPerMinute: (tier ?? callAssistantTier("solo")).overageCentsPerMinute,
+        // Without a held tier: the cheapest tier's (the one a prompt offers; an admin's own minutes are unlimited — `allowance`).
+        includedMinutes: (tier ?? callAssistantTier("lite")).includedMinutes, overageCentsPerMinute: (tier ?? callAssistantTier("lite")).overageCentsPerMinute,
         numberMinDays: CALL_NUMBER_MIN_DAYS, freeSpamCalls: CALL_ASSISTANT_FREE_SPAM_CALLS,
       },
       // The engine's internal address never goes to the browser; only whether it answers.

@@ -10,7 +10,8 @@
  * Honest copy for a launching product: no call counts, customers or
  * testimonials. What it does comes from docs/call-assistant/SPEC.md; every
  * price from the price book via shared/plan-copy.ts; "Coming soon" shows for
- * as long as the add-on is `preview` in shared/plans.ts.
+ * as long as the service is `preview` in shared/plans.ts. The service is sold
+ * on its own subscription (owner, 2026-10-08), apart from the platform plans.
  */
 import { useEffect, useState } from "react";
 import { Link } from "wouter";
@@ -24,12 +25,13 @@ import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chr
 import { TalkToSalesDialog } from "@/components/talk-to-sales";
 import {
   BTN_LG, BTN_OUTLINE, BTN_OUTLINE_ON_NAVY, BTN_PRIMARY, CALL_ASSISTANT_PATH, CA_HIGHLIGHTS, ComingSoonTag, Kicker,
-  PersonaCard, introPriceShort, personaNames,
+  PersonaCard, personaNames,
 } from "@/components/call-assistant-marketing";
-import { PLANS } from "@shared/plans";
+import { CALL_ASSISTANT_PRICING_HREF, CALL_ASSISTANT_TIERS } from "@shared/plans";
 import {
-  CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_SPAM, CALL_ASSISTANT_SPAM_BLOCK_TITLE, SALES_REP_LABEL, callAssistantMinuteRule, callAssistantOverageRule, callAssistantPricing, callAssistantSpamAllowanceLine,
-  callAssistantTierAdvice, callAssistantYearlyNote, formatUsd, joinNames,
+  CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_SEPARATE_LINE, CALL_ASSISTANT_SPAM, CALL_ASSISTANT_SPAM_BLOCK_TITLE, SALES_REP_LABEL,
+  callAssistantAboveTopLine, callAssistantMinuteRule, callAssistantOverageRule, callAssistantPricing, callAssistantSpamAllowanceLine,
+  callAssistantTierAdvice, callAssistantYearlyNote,
 } from "@shared/plan-copy";
 import { VOICE_PERSONAS, VOICE_PERSONA_LIST } from "@shared/voice-personas";
 import { ROUTE_META } from "@shared/route-meta";
@@ -154,8 +156,12 @@ function faqs(): { q: string; a: string }[] {
       a: "Yes. The Simulator lets you chat with your assistant by text using your draft settings. Publish when you're happy, and pause it any time.",
     },
     {
+      q: "Do I need a ConstructHUB plan?",
+      a: `No. ${CALL_ASSISTANT_SEPARATE_LINE} Buy it on its own, or beside a plan or a CRM plan; change tiers or add numbers any time in Settings → Billing.`,
+    },
+    {
       q: "What if I cancel?",
-      a: `You remove the add-on in Settings → Billing like any other add-on. ${CALL_ASSISTANT_NUMBER_RULES.cancel} Your own numbers were never moved: turn off forwarding with your carrier and calls ring through to you as before.`,
+      a: `Cancel it in Settings → Billing → Manage billing (Stripe's billing portal), like any subscription. ${CALL_ASSISTANT_NUMBER_RULES.cancel} Your own numbers were never moved: turn off forwarding with your carrier and calls ring through to you as before.`,
     },
     {
       q: "What if a payment fails?",
@@ -178,6 +184,10 @@ function faqs(): { q: string; a: string }[] {
       a: callAssistantTierAdvice(),
     },
     {
+      q: "What if I need more than the top tier?",
+      a: callAssistantAboveTopLine(),
+    },
+    {
       q: "What won't the assistant do?",
       a: "It won't quote prices unless you allow price ranges, book appointments (booking isn't available yet), make outbound calls, give out your team's phone numbers or pretend to be a person. It speaks English today.",
     },
@@ -185,7 +195,7 @@ function faqs(): { q: string; a: string }[] {
   if (p.comingSoon) {
     list.push({
       q: "When can I buy it?",
-      a: "It's coming soon: listed on Pricing, not for sale yet, and we don't have a launch date to share. Create your account now and add it in Settings → Billing once it's live.",
+      a: "It's coming soon: listed on Pricing, not for sale yet, and we don't have a launch date to share. Create your account now and buy it from Pricing once it's live.",
     });
   }
   return list;
@@ -207,8 +217,9 @@ export default function CallAssistantLandingPage() {
   const price = callAssistantPricing();
   const tierCountWord = price.tierCountWord;
   const TierCountWord = tierCountWord.replace(/^./, (c) => c.toUpperCase());
-  /** "Crew and Fleet" — the tiers with the lower overage rate. */
-  const lowerOverageTiers = joinNames(price.tiers.filter((t) => t.lowerOverage).map((t) => t.name));
+  /** The tier the page recommends (the second one). */
+  const featuredTier = CALL_ASSISTANT_TIERS[1]?.tier;
+  const freeMonths = price.annualFreeMonths === 1 ? "one month" : `${price.annualFreeMonths} months`;
   useMetaDescription(ROUTE_META[CALL_ASSISTANT_PATH].description);
 
   // Signed out: create an account. Signed in: the Call Assistant dashboard on this platform (never the CRM).
@@ -248,9 +259,8 @@ export default function CallAssistantLandingPage() {
                 {salesCta(BTN_OUTLINE, "button-ca-sales-hero")}
               </div>
               <p className="mt-5 text-[15px] text-mkt-ink-soft" data-testid="text-ca-hero-price">
-                Regular prices from <strong className="font-semibold text-mkt-ink">{price.from}/mo</strong> ({price.fromTier}).
-                {" "}Solo: <strong className="font-semibold text-mkt-ink">{price.intro}/mo</strong> for your first {price.introMonths} months, then {price.regular}/mo — or {price.annual}/yr.
-                {" "}{lowerOverageTiers} for busier phones, at a lower rate per extra minute.
+                From <strong className="font-semibold text-mkt-ink">{price.from}/mo</strong> ({price.fromTier}), or yearly with {freeMonths} free.
+                {" "}A separate service with its own subscription: no ConstructHUB plan needed.
                 {" "}<a href="#pricing" className="font-semibold text-mkt-orange-ink underline decoration-2 decoration-mkt-orange-soft underline-offset-4 hover:decoration-mkt-orange">Compare the {tierCountWord} tiers</a>
               </p>
             </div>
@@ -440,13 +450,13 @@ export default function CallAssistantLandingPage() {
               <h2 className={H2}>{TierCountWord} Tiers. <em className="text-mkt-orange-ink">Pick Your Call Volume.</em></h2>
             </div>
             <p className="mt-5 text-center text-[16px] text-mkt-ink-soft max-w-2xl mx-auto" data-testid="text-call-assistant-price">
-              {TierCountWord} tiers, one per account, regular prices from {price.from}/mo. Solo starts at {introPriceShort()}.
+              {TierCountWord} tiers, one per account, from {price.from}/mo. {price.separateLine}
             </p>
             <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-4 gap-5" data-testid="card-ca-pricing">
               {price.tiers.map((t) => (
                 <div
                   key={t.tier}
-                  className={`relative bg-mkt-card border rounded-2xl p-6 xl:p-7 flex flex-col ${t.intro ? "border-mkt-ink" : "border-mkt-rule"}`}
+                  className={`relative bg-mkt-card border rounded-2xl p-6 xl:p-7 flex flex-col ${t.tier === featuredTier ? "border-mkt-ink" : "border-mkt-rule"}`}
                   data-testid={`card-ca-tier-${t.tier}`}
                 >
                   <div className="flex flex-wrap items-center gap-2.5">
@@ -454,10 +464,10 @@ export default function CallAssistantLandingPage() {
                     <ComingSoonTag />
                   </div>
                   <div className="mt-4 font-display font-semibold text-[2.6rem] leading-none text-mkt-ink" data-testid={`text-ca-tier-price-${t.tier}`}>
-                    {t.intro ?? t.monthly}<span className="font-sans text-base font-medium text-mkt-muted ml-1">/mo</span>
+                    {t.monthly}<span className="font-sans text-base font-medium text-mkt-muted ml-1">/mo</span>
                   </div>
                   <p className="mt-2 text-[14px] text-mkt-ink-soft min-h-[2.6em]" data-testid={`text-ca-tier-terms-${t.tier}`}>
-                    {t.intro ? `for your first ${t.introMonths} months, then ${t.monthly}/mo — or ${t.annual}/yr` : `or ${t.annual}/yr`}
+                    or {t.annual}/yr ({freeMonths} free)
                   </p>
                   <ul className="mt-5 pt-5 border-t border-mkt-rule space-y-2.5 text-[15px] text-mkt-ink">
                     <li className="flex gap-3"><CheckCircle2 className="h-[18px] w-[18px] mt-0.5 text-mkt-orange-ink shrink-0" /> {t.minutes} call minutes a month</li>
@@ -465,14 +475,7 @@ export default function CallAssistantLandingPage() {
                     <li className="flex gap-3 text-mkt-ink-soft"><CheckCircle2 className="h-[18px] w-[18px] mt-0.5 text-mkt-orange-ink shrink-0" /> Fits {t.estimatedCalls} (estimate)</li>
                     <li className="flex gap-3" data-testid={`text-ca-tier-overage-${t.tier}`}>
                       <CheckCircle2 className="h-[18px] w-[18px] mt-0.5 text-mkt-orange-ink shrink-0" />
-                      <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        {t.overageShort}/min over
-                        {t.lowerOverage && (
-                          <span className="inline-flex items-center rounded-full bg-mkt-orange px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-white" data-testid={`badge-ca-tier-lower-overage-${t.tier}`}>
-                            Lower overage
-                          </span>
-                        )}
-                      </span>
+                      <span>{t.overageShort}/min over</span>
                     </li>
                   </ul>
                 </div>
@@ -494,16 +497,10 @@ export default function CallAssistantLandingPage() {
                   <li className="flex gap-3"><CheckCircle2 className="h-[18px] w-[18px] mt-0.5 text-mkt-orange-ink shrink-0" /> Move between tiers any time; the difference is prorated</li>
                 </ul>
                 <p className="mt-6 pt-5 border-t border-mkt-rule text-[14px] text-mkt-ink-soft leading-relaxed" data-testid="text-ca-plans">
-                  An add-on for the{" "}
-                  {price.planKeys.map((key, i) => (
-                    <span key={key}>
-                      {i > 0 && (i === price.planKeys.length - 1 ? " and " : ", ")}
-                      <strong className="font-semibold text-mkt-ink">{PLANS[key].name}</strong> ({formatUsd(PLANS[key].monthlyCents)}/mo)
-                    </span>
-                  ))}{" "}
-                  plans, not a plan of its own.{" "}
-                  <Link href="/pricing#add-ons" className="font-semibold text-mkt-orange-ink underline decoration-2 decoration-mkt-orange-soft underline-offset-4 hover:decoration-mkt-orange" data-testid="link-ca-pricing">
-                    Compare plans and add-ons
+                  <strong className="font-semibold text-mkt-ink">A separate service</strong>, billed on its own subscription: no ConstructHUB plan or CRM plan is needed, and none includes it.
+                  {" "}{callAssistantAboveTopLine()}{" "}
+                  <Link href={CALL_ASSISTANT_PRICING_HREF} className="font-semibold text-mkt-orange-ink underline decoration-2 decoration-mkt-orange-soft underline-offset-4 hover:decoration-mkt-orange" data-testid="link-ca-pricing">
+                    Buy it on Pricing
                   </Link>
                 </p>
               </div>
@@ -554,7 +551,7 @@ export default function CallAssistantLandingPage() {
               Let Every Call Be Answered
             </h2>
             <p className="mt-5 text-[17px] leading-relaxed text-mkt-navy-muted max-w-xl mx-auto">
-              Regular prices from {price.from}/mo with {price.fromTier}. Solo from {introPriceShort()}; {lowerOverageTiers} for busier phones. Spam screened on every call. An add-on for the {price.plans} plans, with every call in your CRM.
+              From {price.from}/mo with {price.fromTier}, or yearly with {freeMonths} free. Spam screened on every call. A separate service with its own subscription, no ConstructHUB plan needed, with every lead filed for your CRM.
             </p>
             <div className="mt-9 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
               {primaryCta("cta")}

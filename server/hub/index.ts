@@ -1,17 +1,18 @@
 /**
  * Wires the Hub (the ConstructHUB corner assistant) into the app with its
- * production dependencies: the TruthCoder client, growth_budgets limits,
- * hub_stats counts and the hub_preset_answers cache. Endpoints are in
- * routes.ts; the rules each module enforces are in its header comment.
+ * production dependencies: the model client (TruthCoder, or OpenAI when
+ * HUB_AI_PROVIDER=openai — ai.ts), growth_budgets limits, hub_stats counts and
+ * the hub_preset_answers cache. Endpoints are in routes.ts; the rules each
+ * module enforces are in its header comment.
  */
 import type { Express } from "express";
-import { aiModel } from "../ai-config";
 import { ipKey } from "../growth-limits";
 import { requirePlatformAdmin } from "../crm/admin";
 import { createHub } from "./routes";
-import { hubAiClient, hubTimeoutMs, providerOk } from "./ai";
+import { hubAiClient, hubModel, hubProviderInfo, hubTimeoutMs, logProvider, providerOk } from "./ai";
 import { isBuilder, originOk } from "./access";
-import { ensureHubSchema, hubStatsRollup, pgBudget, pgPresetStore, pgStats } from "./store";
+import { ensureHubSchema, hubStatsRollup, pgBudget, pgPresetStore, pgStats, pgUsage } from "./store";
+import { TokenMeter } from "./usage";
 import { logError } from "./stats";
 
 export function registerHubRoutes(app: Express): void {
@@ -21,16 +22,21 @@ export function registerHubRoutes(app: Express): void {
     budget: pgBudget,
     stats: pgStats,
     presets: pgPresetStore,
-    model: () => aiModel(),
+    model: () => hubModel(),
     providerOk: () => providerOk(),
     timeoutMs: hubTimeoutMs,
     ipKey,
     originOk,
     isBuilder,
+    // The daily token counter on hub_usage_days: one row per UTC day, shared by every process, kept across restarts.
+    tokens: new TokenMeter(pgUsage),
   });
   app.use(hub.router);
+  // One boot line: provider, model, host and whether a key is set — never the key.
+  logProvider();
 
-  // Platform admin: Hub outcome counts for the last 30 days (no text, no people).
+  // Platform admin: Hub outcome counts for the last 30 days (no text, no people), plus the
+  // provider Gabe is on (mode, model, host, key set or not — never the key) and today's token counts.
   app.get("/api/admin/hub-stats", async (req: any, res) => {
     try {
       const admin = await requirePlatformAdmin(req, res, (r: any, s: any) => {
@@ -40,7 +46,7 @@ export function registerHubRoutes(app: Express): void {
       });
       if (!admin) return;
       res.setHeader("Cache-Control", "no-store");
-      res.json({ days: 30, rows: await hubStatsRollup(30) });
+      res.json({ days: 30, rows: await hubStatsRollup(30), provider: { ...hubProviderInfo(), ...(await hub.status()) } });
     } catch (err) {
       logError("admin_stats", err);
       if (!res.headersSent) res.status(500).json({ message: "Could not load Hub stats." });

@@ -17,8 +17,8 @@
  */
 import type Stripe from "stripe";
 import {
-  PLANS, ADDONS, AGENCY_LOCATION_BANDS, ANNUAL_MONTHS,
-  planPriceCents, addonPriceCents, isPlanKey, isAddonKey, isBillingInterval,
+  PLANS, ADDONS, AGENCY_LOCATION_BANDS, ANNUAL_MONTHS, CALL_ASSISTANT_NAME,
+  planPriceCents, addonPriceCents, isPlanKey, isAddonKey, isBillingInterval, isCallAssistantAddon,
   type PlanKey, type AddonKey, type BillingInterval,
 } from "@shared/plans";
 import {
@@ -97,8 +97,18 @@ export function planPriceSpec(plan: PlanKey, interval: BillingInterval): PriceSp
   };
 }
 
+/**
+ * An add-on's price. The AI Call Assistant's add-ons (its tiers and the extra
+ * number) are the lines of the Call Assistant's OWN subscription
+ * (server/voice/subscription.ts), so their Stripe product is named as the
+ * service, not as a plan add-on; the lookup key pattern is the same, so a
+ * price change still makes a new Price from the cents, never by hand.
+ */
 export function addonPriceSpec(addon: AddonKey, interval: BillingInterval): PriceSpec {
   const cents = addonPriceCents(addon, interval);
+  const name = isCallAssistantAddon(addon)
+    ? (ADDONS[addon].name.startsWith(CALL_ASSISTANT_NAME) ? `ConstructHUB ${ADDONS[addon].name}` : `ConstructHUB ${CALL_ASSISTANT_NAME} — ${ADDONS[addon].name}`)
+    : `ConstructHUB add-on — ${ADDONS[addon].name}`;
   return {
     lookupKey: `${PREFIX}_addon_${addon}_${interval}_${cents}`,
     role: { kind: "addon", key: addon, interval },
@@ -106,7 +116,7 @@ export function addonPriceSpec(addon: AddonKey, interval: BillingInterval): Pric
       currency: "usd",
       unit_amount: cents,
       recurring: { interval },
-      product_data: { name: `ConstructHUB add-on — ${ADDONS[addon].name}` },
+      product_data: { name },
     },
   };
 }

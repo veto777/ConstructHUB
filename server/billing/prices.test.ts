@@ -41,6 +41,27 @@ describe("price specs come only from shared/plans.ts", () => {
     expect(addonSetupPriceSpec("extra_seat")).toBeNull();
   });
 
+  it("the AI Call Assistant's prices: lookup keys from the 2026-10-08 cents, named as the service (never a plan add-on)", () => {
+    // A changed price is a new lookup key, so the launch-era Stripe Prices are never reused: no manual Stripe work.
+    expect(addonPriceSpec("call_assistant_lite", "month")).toMatchObject({
+      lookupKey: "chub_v1_addon_call_assistant_lite_month_24900",
+      role: { kind: "addon", key: "call_assistant_lite", interval: "month" },
+      params: { unit_amount: 24900, recurring: { interval: "month" }, product_data: { name: "ConstructHUB AI Call Assistant — 500 minutes" } },
+    });
+    expect(addonPriceSpec("call_assistant", "year").lookupKey).toBe("chub_v1_addon_call_assistant_year_383900");
+    expect(addonPriceSpec("call_assistant_crew", "month").lookupKey).toBe("chub_v1_addon_call_assistant_crew_month_44900");
+    expect(addonPriceSpec("call_assistant_fleet", "year")).toMatchObject({ lookupKey: "chub_v1_addon_call_assistant_fleet_year_1098900", params: { unit_amount: 1_098_900 } });
+    expect(addonPriceSpec("call_number", "year")).toMatchObject({ lookupKey: "chub_v1_addon_call_number_year_5000", params: { product_data: { name: "ConstructHUB AI Call Assistant — Extra Call Assistant number" } } });
+    // The platform's own add-ons keep their naming.
+    expect(addonPriceSpec("competitor_pack", "month").params.product_data?.name).toBe("ConstructHUB add-on — Competitor scan pack");
+    const keys = (["call_assistant_lite", "call_assistant", "call_assistant_crew", "call_assistant_fleet", "call_number"] as const)
+      .flatMap((k) => [addonPriceSpec(k, "month").lookupKey, addonPriceSpec(k, "year").lookupKey]);
+    for (const old of ["chub_v1_addon_call_assistant_lite_month_14900", "chub_v1_addon_call_assistant_lite_year_119900", "chub_v1_addon_call_assistant_month_24900",
+      "chub_v1_addon_call_assistant_year_199900", "chub_v1_addon_call_assistant_crew_year_359900", "chub_v1_addon_call_assistant_fleet_month_79900", "chub_v1_addon_call_number_year_5500"]) {
+      expect(keys, old).not.toContain(old);
+    }
+  });
+
   it("non-Agency plans stop short of 10 locations", () => {
     expect(maxExtraLocations("starter")).toBe(8);
     expect(maxExtraLocations("growth")).toBe(6);

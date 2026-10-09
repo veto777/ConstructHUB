@@ -41,6 +41,10 @@ import { afterSubscriptionChange, previewCallNumberReleases } from "./voice/numb
 import {
   registerCrmBillingRoutes, isCrmSubscription, isCrmCheckoutSession, applyCrmSubscription, endCrmSubscription,
 } from "./crm/billing";
+import {
+  registerCallAssistantBillingRoutes, isCallAssistantSubscription, isCallAssistantCheckoutSession,
+  syncCallAssistantSubscription,
+} from "./voice/subscription";
 
 export { PaymentsNotConfiguredError };
 
@@ -257,6 +261,12 @@ export function registerStripeRoutes(app: Express) {
     sendStripeError,
     recentAuthOk,
   });
+  // So is the AI Call Assistant (owner, 2026-10-08): its own subscription, with or without a platform plan.
+  registerCallAssistantBillingRoutes(app, {
+    getOrCreateCustomer: (userId, email) => getOrCreateCustomer(userId, email),
+    sendStripeError,
+    recentAuthOk,
+  });
 
   app.get("/api/stripe/plans", (_req: Request, res: Response) => {
     res.json(priceBook());
@@ -309,10 +319,11 @@ export function registerStripeRoutes(app: Express) {
         // trial is for a customer who never had a subscription.
         let trial = trialEligible(row);
         if (row?.stripeCustomerId) {
-          // The CRM is its own subscription on the same customer (server/crm/billing.ts):
-          // it is neither "the plan" nor a reason to withhold the platform trial.
+          // The CRM and the AI Call Assistant are their own subscriptions on the same customer
+          // (server/crm/billing.ts, server/voice/subscription.ts): neither is "the plan" nor a
+          // reason to withhold the platform trial.
           const all = await stripe.subscriptions.list({ customer: customerId, status: "all", limit: 20 });
-          const history = { data: all.data.filter((s) => !isCrmSubscription(s)) };
+          const history = { data: all.data.filter((s) => !isCrmSubscription(s) && !isCallAssistantSubscription(s)) };
           const live = history.data.find((s) => LIVE_STATUSES.has(s.status));
           if (live) {
             // Record it (as the webhook will), so the account gets what it pays
@@ -328,11 +339,13 @@ export function registerStripeRoutes(app: Express) {
         // tab is expired first, so finishing both can't start two subscriptions.
         const open = await stripe.checkout.sessions.list({ customer: customerId, status: "open", limit: 10 });
         for (const stale of open.data) {
-          if (stale.mode === "subscription" && !isCrmCheckoutSession(stale)) await stripe.checkout.sessions.expire(stale.id);
+          if (stale.mode === "subscription" && !isCrmCheckoutSession(stale) && !isCallAssistantCheckoutSession(stale)) await stripe.checkout.sessions.expire(stale.id);
         }
         const metadata = orderMetadata(user.id, order);
         // Intro price for an add-on bought with the plan (Checkout takes one session-level coupon; it
         // applies only to that add-on's product). Recorded now, counted only once the session completes.
+        // No add-on carries an intro since 2026-10-08 (the Call Assistant's ended with its repricing), so
+        // this finds none and makes no Stripe call; it stays for the next add-on that gets one.
         const [intro] = await introsForOrder(stripe as unknown as StripeForIntro, user.id, {}, order.addons, order.interval);
 
         const session = await stripe.checkout.sessions.create({
@@ -773,6 +786,14 @@ export function registerStripeRoutes(app: Express) {
             const crmSub = await stripe.subscriptions.retrieve(session.subscription as string);
             await applyCrmSubscription(crmSub, userId);
             sendBillingEmail = false;
+          } else if (userId && session.subscription && isCallAssistantCheckoutSession(session)) {
+            // The AI Call Assistant is a separate service: its subscription is recorded in
+            // call_assistant_subscriptions, never on the platform row — read from Stripe under the
+            // account's lock (syncCallAssistantSubscription) — and the number-release decision runs
+            // after it (a returning customer's scheduled release is cancelled).
+            await syncCallAssistantSubscription({ id: session.subscription as string }, userId);
+            await afterSubscriptionChange(userId);
+            sendBillingEmail = false;
           } else if (userId && session.subscription) {
             // Plan, interval, add-ons and Agency locations are read from the
             // subscription's items (prices we created), not from metadata.
@@ -826,7 +847,7 @@ export function registerStripeRoutes(app: Express) {
         }
         case "customer.subscription.trial_will_end": {
           const sub = event.data.object as Stripe.Subscription;
-          if (isCrmSubscription(sub)) { sendBillingEmail = false; break; }
+          if (isCrmSubscription(sub) || isCallAssistantSubscription(sub)) { sendBillingEmail = false; break; }
           const [tracked] = await db.select().from(subscriptions).where(eq(subscriptions.stripeCustomerId, sub.customer as string)).limit(1);
           eventUserId = await onTrialWillEnd(event, tracked?.plan ?? null);
           break;
@@ -838,6 +859,17 @@ export function registerStripeRoutes(app: Express) {
           if (isCrmSubscription(payload)) {
             // As below, the row takes the subscription as Stripe has it NOW.
             eventUserId = await applyCrmSubscription(await stripe.subscriptions.retrieve(payload.id));
+            sendBillingEmail = false;
+            break;
+          }
+          if (isCallAssistantSubscription(payload)) {
+            // The Call Assistant's own subscription, as Stripe has it NOW, read under the account's
+            // lock (a late past_due must not pause a paying customer's assistant, and a stale
+            // "active" must not restore one); then the number-release decision: an ended
+            // subscription (canceled / unpaid / incomplete_expired) releases the org's numbers,
+            // past_due only pauses the assistant and keeps them.
+            eventUserId = await syncCallAssistantSubscription(payload);
+            await afterSubscriptionChange(eventUserId);
             sendBillingEmail = false;
             break;
           }
@@ -883,6 +915,14 @@ export function registerStripeRoutes(app: Express) {
           const customerId = sub.customer as string;
           if (isCrmSubscription(sub)) {
             eventUserId = await endCrmSubscription(sub);
+            sendBillingEmail = false;
+            break;
+          }
+          if (isCallAssistantSubscription(sub)) {
+            // Cancelled (Stripe's state, read under the lock): the end and its settlement job are recorded
+            // together, and the Call Assistant numbers are released (now, or once SignalWire's minimum days pass).
+            eventUserId = await syncCallAssistantSubscription(sub);
+            await afterSubscriptionChange(eventUserId);
             sendBillingEmail = false;
             break;
           }

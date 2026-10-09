@@ -23,6 +23,7 @@ import { checkConversation, signTurn, type InTurn } from "./turns";
 import { Breaker, HUB_LIMITS, Semaphore, globalDailyCap, keys, maxConcurrency, type Budget } from "./limits";
 import { latencyBucket, logError, logLine, type HubOutcome, type HubTier, type StatsSink } from "./stats";
 import { requiredFactsOk, templateAnswer, appTemplateAnswer, presetList, type PresetStore } from "./presets";
+import { dailyTokenCap, estimateTokens, MemoryUsageStore, TokenMeter, type TokenReservation } from "./usage";
 import type { HubAi, HubCompletion } from "./ai";
 
 export type HubDeps = {
@@ -39,6 +40,10 @@ export type HubDeps = {
   /** Signed in with a verified email (or the local dev bypass). */
   isBuilder: (req: Request) => boolean;
   now?: () => number;
+  /** Token counts per UTC day (cost guard); on hub_usage_days in production (index.ts), in memory by default. */
+  tokens?: TokenMeter;
+  /** The daily token cap (HUB_AI_DAILY_TOKEN_CAP by default; null = off). */
+  dailyTokenCap?: () => number | null;
 };
 
 const MAX_USER_CHARS = 500;
@@ -60,7 +65,7 @@ export const chatBody = z.object({
 }).strict().refine((b) => b.messages.reduce((n, m) => n + m.content.length, 0) <= MAX_TOTAL_CHARS, { message: "too long" });
 export const presetBody = z.object({ presetId: z.enum(PRESET_IDS) }).strict();
 
-type Upstream = { ok: true; completion: HubCompletion; ms: number } | { ok: false; kind: "timeout" | "upstream" | "client"; ms: number };
+type Upstream = { ok: true; completion: HubCompletion; ms: number } | { ok: false; kind: "timeout" | "upstream" | "client" | "capped"; ms: number };
 
 export function createHub(deps: HubDeps) {
   const now = deps.now ?? Date.now;
@@ -68,6 +73,15 @@ export function createHub(deps: HubDeps) {
   const semaphore = new Semaphore(maxConcurrency);
   const memo = new Map<string, string>();
   const generating = new Map<string, Promise<void>>();
+  // Cost guard: today's token counts, and whether they have reached the daily cap. At the cap
+  // chat is off site and no preset is generated; cached and template answers still serve. The
+  // counter can't be read (database down): closed while a cap is set, open without one.
+  const tokens = deps.tokens ?? new TokenMeter(new MemoryUsageStore(), now);
+  const tokenCap = deps.dailyTokenCap ?? dailyTokenCap;
+  const capped = async (): Promise<boolean> => {
+    try { return await tokens.capped(tokenCap()); }
+    catch (err) { logError("usage_read", err); return tokenCap() !== null; }
+  };
 
   const tierOf = (req: Request): HubTier => (deps.isBuilder(req) ? "builder" : "browse");
   const note = (tier: HubTier, outcome: HubOutcome, reason: string, started: number) => {
@@ -75,9 +89,24 @@ export function createHub(deps: HubDeps) {
     logLine(outcome, reason, now() - started);
   };
 
-  /** One model call with a hard timeout. Counts toward the breaker; never retried. */
+  /**
+   * One model call with a hard timeout. Counts toward the breaker; never retried. Its tokens
+   * are reserved on today's counter BEFORE it is dispatched (a conservative estimate, so
+   * calls in flight together can't run past the cap by more than one reservation) and
+   * settled to the provider's counts afterwards; a call whose counts never arrive keeps its
+   * reservation.
+   */
   async function callModel(body: ReturnType<typeof buildRequest>): Promise<Upstream> {
     const started = now();
+    let reservation: TokenReservation | null = null;
+    try {
+      reservation = await tokens.reserve(estimateTokens(body), tokenCap());
+      if (!reservation) return { ok: false, kind: "capped", ms: now() - started };
+    } catch (err) {
+      // The counter can't be written: no call while a cap is set; uncounted without one.
+      logError("usage_reserve", err);
+      if (tokenCap() !== null) return { ok: false, kind: "capped", ms: now() - started };
+    }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), deps.timeoutMs());
     try {
@@ -86,6 +115,11 @@ export function createHub(deps: HubDeps) {
         new Promise<never>((_, reject) => controller.signal.addEventListener("abort", () => reject(Object.assign(new Error("timeout"), { name: "HubTimeout" })))),
       ]);
       breaker.success();
+      // Token counts from the response replace the reservation, and are logged as numbers only (never the text).
+      if (completion.usage) {
+        if (reservation) await tokens.settle(reservation, completion.usage).catch((err) => logError("usage_settle", err));
+        logLine("usage", `in${completion.usage.prompt}-out${completion.usage.completion}`, now() - started);
+      }
       return { ok: true, completion, ms: now() - started };
     } catch (err: any) {
       const timedOut = controller.signal.aborted || /timeout/i.test(String(err?.name ?? ""));
@@ -112,7 +146,7 @@ export function createHub(deps: HubDeps) {
     const job = (async () => {
       const started = now();
       try {
-        if (!deps.providerOk() || breaker.isOpen()) return;
+        if (!deps.providerOk() || breaker.isOpen() || await capped()) return;
         if (!(await deps.budget.take(keys.presetGen(presetId, hash), HUB_LIMITS.presetGeneration.limit, HUB_LIMITS.presetGeneration.windowMs))) return;
         const release = semaphore.tryAcquire(`preset:${presetId}`);
         if (!release) return;
@@ -182,8 +216,9 @@ export function createHub(deps: HubDeps) {
     return true;
   };
 
-  router.get("/api/hub/presets", (req, res) => {
+  router.get("/api/hub/presets", async (req, res) => {
     const builder = deps.isBuilder(req);
+    const chat = builder && deps.providerOk() && !(await capped());
     // The iPhone apps sell nothing (App Store 3.1.3(f)): the chip list there drops the
     // questions whose answer is plans/pricing/buying ("How much does it cost?", "talk to
     // sales"…). Tapping one still gets the fixed line (POST /preset), so old app builds
@@ -195,7 +230,7 @@ export function createHub(deps: HubDeps) {
         primary: PRIMARY_PRESETS.filter((id) => !APP_SALES_PRESETS.has(id)),
         welcome: WELCOME_PRESETS.filter((id) => !APP_SALES_PRESETS.has(id)),
         tier: builder ? "builder" : "browse",
-        chat: builder && deps.providerOk(),
+        chat,
         maxChars: MAX_USER_CHARS,
       });
     }
@@ -204,7 +239,7 @@ export function createHub(deps: HubDeps) {
       primary: PRIMARY_PRESETS,
       welcome: WELCOME_PRESETS,
       tier: builder ? "builder" : "browse",
-      chat: builder && deps.providerOk(),
+      chat,
       maxChars: MAX_USER_CHARS,
     });
   });
@@ -263,6 +298,8 @@ export function createHub(deps: HubDeps) {
       if (!convo.ok) { note(tier, "tampered", "sig", started); return void res.status(400).json({ code: "tampered", message: "This chat can't continue. Start a new one." }); }
       if (convo.capped) { note(tier, "limit", "convo_cap", started); return void res.json({ reply: REPLIES.R_CONVO_CAP, code: "convo_cap", reset: true }); }
       if (!deps.providerOk()) { note(tier, "offline", "provider", started); return void res.status(503).json({ reply: inApp ? REPLIES.R_APP_OFFLINE : REPLIES.R_OFFLINE, code: "offline" }); }
+      // 4.5 — today's token cap (cost guard): same "off site" answer, so the widget needs nothing new.
+      if (await capped()) { note(tier, "offline", "token_cap", started); return void res.status(503).json({ reply: inApp ? REPLIES.R_APP_OFFLINE : REPLIES.R_OFFLINE, code: "offline" }); }
 
       // 5. per-minute (before the pre-filter, so probing is throttled too)
       if (!(await deps.budget.take(keys.minute(userId), HUB_LIMITS.chatPerMinute.limit, HUB_LIMITS.chatPerMinute.windowMs))) {
@@ -319,7 +356,7 @@ export function createHub(deps: HubDeps) {
           note(tier, "busy", "global_daily", started); return void res.status(503).json({ reply: REPLIES.R_BUSY, code: "busy" });
         }
 
-        // 11. TruthCoder
+        // 11. the model (TruthCoder, or OpenAI when HUB_AI_PROVIDER=openai — see ai.ts)
         // Earlier questions that were refused (and their fixed replies) never reach the model.
         const turns: VisitorTurn[] = [];
         for (let i = 0; i < messages.length; i++) {
@@ -330,6 +367,8 @@ export function createHub(deps: HubDeps) {
         result = await callModel(buildRequest(deps.model(), buildMessages(turns, pageKey as PageKey | undefined)));
       } finally { release(); }
       if (!result.ok) {
+        // The cap was reached by calls in flight since step 4.5: the same "off site" answer.
+        if (result.kind === "capped") { note(tier, "offline", "token_cap", started); return void res.status(503).json({ reply: inApp ? REPLIES.R_APP_OFFLINE : REPLIES.R_OFFLINE, code: "offline" }); }
         if (result.kind === "timeout") { note(tier, "timeout", "model", started); return void res.status(503).json({ reply: REPLIES.R_TIMEOUT, code: "timeout" }); }
         note(tier, "busy", result.kind, started);
         return void res.status(503).json({ reply: REPLIES.R_BUSY, code: "busy" });
@@ -355,5 +394,12 @@ export function createHub(deps: HubDeps) {
     }
   });
 
-  return { router, warm, presetAnswer, generatePreset, breaker, semaphore };
+  /** For the admin card: whether chat is on right now, the cap, and today's token counts (numbers only; null when the counter can't be read). */
+  const status = async () => ({
+    online: deps.providerOk() && !(await capped()),
+    tokenCap: tokenCap(),
+    tokens: await tokens.today().catch((err) => { logError("usage_read", err); return null; }),
+  });
+
+  return { router, warm, presetAnswer, generatePreset, breaker, semaphore, tokens, status };
 }

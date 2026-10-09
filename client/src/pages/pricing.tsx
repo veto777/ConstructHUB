@@ -17,7 +17,7 @@ import {
   Wrench, Globe, Megaphone, Briefcase, Search, MessageSquare, Settings2,
 } from "lucide-react";
 import {
-  PLANS, PLAN_KEYS, ADDONS, TRIAL_DAYS, AGENCY_LOCATION_BANDS, AGENCY_SELF_SERVE_MAX_LOCATIONS, CALL_ASSISTANT_NAME, CALL_ASSISTANT_TIER_ADDONS,
+  PLANS, PLAN_KEYS, ADDONS, TRIAL_DAYS, AGENCY_LOCATION_BANDS, AGENCY_SELF_SERVE_MAX_LOCATIONS, CALL_ASSISTANT_NAME, isCallAssistantAddon,
   type AddonKey, type BillingInterval, type PlanKey,
 } from "@shared/plans";
 import {
@@ -31,9 +31,9 @@ import { ToastAction } from "@/components/ui/toast";
 import { apiErrorCode } from "@/lib/plan-errors";
 import { useCart } from "@/contexts/cart-context";
 import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
-import { CRM_FROM_PRICE, callAssistantIntroShort, callAssistantPricing, callAssistantYearlyNote } from "@shared/plan-copy";
+import { CRM_FROM_PRICE, CALL_ASSISTANT_FROM_PRICE } from "@shared/plan-copy";
 import { FOUNDING_OFFER_LINE } from "@shared/pricing-terms";
-import { CallAssistantTierCards } from "@/components/call-assistant-tiers";
+import { CallAssistantPlanCards } from "@/components/call-assistant-tiers";
 import { StandingGator } from "@/components/mascot";
 import { H2, Kicker, LEAD, TEXT_LINK } from "@/components/feature-landing/primitives";
 import { CrmPlanCards } from "@/components/crm-plans";
@@ -169,10 +169,18 @@ export default function PricingPage() {
       void queryClient.invalidateQueries({ queryKey: ["/api/crm/me"] });
       trackConversion("crm_purchase");
       toast({ title: "Your CRM plan is active", description: "The ConstructHUB CRM is open. It is billed separately from any ConstructHUB platform plan." });
-    } else if (params.get("canceled") || params.get("crm_canceled")) {
+    } else if (params.get("call_assistant_success")) {
+      void queryClient.invalidateQueries({ queryKey: ["/api/call-assistant/billing/subscription"] });
+      void queryClient.invalidateQueries({ queryKey: ["/api/entitlements"] });
+      void queryClient.invalidateQueries({ queryKey: ["/api/crm/voice/status"] });
+      void queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      trackConversion("call_assistant_purchase");
+      toast({ title: `Your ${CALL_ASSISTANT_NAME} is active`, description: "Set it up under Call Assistant in the sidebar. It is billed on its own subscription, separately from any ConstructHUB plan." });
+    } else if (params.get("canceled") || params.get("crm_canceled") || params.get("call_assistant_canceled")) {
       toast({ title: "Checkout canceled", description: "No charges were made." });
     } else return;
     params.delete("success"); params.delete("canceled"); params.delete("crm_success"); params.delete("crm_canceled");
+    params.delete("call_assistant_success"); params.delete("call_assistant_canceled");
     const qs = params.toString();
     window.history.replaceState({}, "", `/pricing${qs ? `?${qs}` : ""}${window.location.hash}`);
   }, [toast]);
@@ -325,7 +333,7 @@ export default function PricingPage() {
             </h1>
             <p className="mt-5 text-base sm:text-lg text-mkt-ink-soft max-w-[36rem] mx-auto lg:mx-0 leading-relaxed" data-testid="text-trial">
               A new account starts any plan with a {TRIAL_DAYS}-day free trial. Cancel before it ends and you pay nothing.
-              The CRM is a separate product with its own plans, from {CRM_FROM_PRICE}.
+              The CRM is a separate product with its own plans, from {CRM_FROM_PRICE}, and the {CALL_ASSISTANT_NAME} is a separate service, from {CALL_ASSISTANT_FROM_PRICE}.
             </p>
             <div
               role="radiogroup"
@@ -501,6 +509,19 @@ export default function PricingPage() {
           <div className="mt-10"><CrmPlanCards interval={interval} signedIn={!!user} /></div>
         </section>
 
+        {/* The AI Call Assistant: a separate service on its own subscription (shared/plans.ts CALL_ASSISTANT_TIERS, server/voice/subscription.ts). */}
+        <section id="call-assistant" className="scroll-mt-16" aria-labelledby="call-assistant-heading" data-testid="section-call-assistant-plans">
+          <div className="text-center max-w-3xl mx-auto">
+            <h2 id="call-assistant-heading" className={H2} data-testid="text-call-assistant-heading">{CALL_ASSISTANT_NAME}: <em className="text-mkt-orange-ink">a separate service</em></h2>
+            <p className={`${LEAD} mt-4`}>
+              An AI receptionist on a local number: it answers 24/7, screens spam and files every real caller as a lead. It has its own
+              subscription: no ConstructHUB plan or CRM plan includes it, and none is needed to buy it. Pick the tier that fits your call volume.{" "}
+              <Link href="/call-assistant" className={TEXT_LINK} data-testid="link-addon-call-assistant">How it works →</Link>
+            </p>
+          </div>
+          <div className="mt-10"><CallAssistantPlanCards interval={interval} signedIn={!!user} /></div>
+        </section>
+
         <section id="comparison" className="scroll-mt-16" aria-labelledby="comparison-heading">
           <SectionHead n="01" kicker="Compare" lede="What each plan includes, side by side.">
             <h2 id="comparison-heading" className={H2} data-testid="text-comparison-heading">Compare <em className="text-mkt-orange-ink">plans</em></h2>
@@ -667,19 +688,7 @@ export default function PricingPage() {
           >
             <h2 id="addons-heading" className={H2} data-testid="text-addons-heading">Add-ons: <em className="text-mkt-orange-ink">pay per feature</em></h2>
           </SectionHead>
-          {/* The AI Call Assistant: four tiers, one per subscription (shared/plans.ts CALL_ASSISTANT_TIERS). */}
-          <div className="mt-10 max-w-5xl mx-auto space-y-3" id="call-assistant-tiers" data-testid="block-addon-call-assistant">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h3 className="font-display font-semibold text-[1.4rem] leading-tight text-mkt-ink">{CALL_ASSISTANT_NAME}: pick a tier</h3>
-              <Link href="/call-assistant" className={TEXT_LINK} data-testid="link-addon-call-assistant">How it works →</Link>
-            </div>
-            <p className="text-[14px] font-semibold text-mkt-orange-ink" data-testid="text-addon-intro-call_assistant">
-              {/* The intro is Solo, monthly-only; on the yearly toggle say what yearly is (add-ons follow the plan's billing). */}
-              {interval === "year" ? callAssistantYearlyNote() : `Regular prices from ${callAssistantPricing().from}/mo (${callAssistantPricing().fromTier}). Solo launch price: ${callAssistantIntroShort()}`}
-            </p>
-            <CallAssistantTierCards interval={interval} />
-          </div>
-          <div className="mt-8 overflow-x-auto rounded-2xl border border-mkt-rule bg-mkt-card max-w-5xl mx-auto">
+          <div className="mt-10 overflow-x-auto rounded-2xl border border-mkt-rule bg-mkt-card max-w-5xl mx-auto">
             <table className="w-full text-[14px]" data-testid="table-addons">
               <thead>
                 <tr className="border-b border-mkt-rule">
@@ -689,7 +698,8 @@ export default function PricingPage() {
                 </tr>
               </thead>
               <tbody>
-                {(Object.keys(ADDONS) as AddonKey[]).filter((k) => !CALL_ASSISTANT_TIER_ADDONS.includes(k)).map((k) => {
+                {/* The AI Call Assistant's lines (its tiers, the extra number) are its own subscription's, listed in its section above. */}
+                {(Object.keys(ADDONS) as AddonKey[]).filter((k) => !isCallAssistantAddon(k)).map((k) => {
                   const addon = ADDONS[k];
                   return (
                     <tr key={k} className="border-b border-dotted border-mkt-rule last:border-0" data-testid={`row-addon-${k}`}>

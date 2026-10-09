@@ -19,7 +19,7 @@
 import type { Express, Request, Response } from "express";
 import express from "express";
 import { z } from "zod";
-import { db } from "../db";
+import { db, pool } from "../db";
 import { voiceCalls, type VoiceCallRow, type VoiceTranscriptTurn, type VoiceCallEvent } from "@shared/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { CALL_OUTCOMES, ESCALATION_KINDS, type CallOutcome } from "@shared/voice-profile";
@@ -147,6 +147,34 @@ async function claimCall(callId: string): Promise<"claimed" | "processed" | "bus
   if (claimed.rows.length) return "claimed";
   const [row] = await db.select({ flags: voiceCalls.flags }).from(voiceCalls).where(eq(voiceCalls.id, callId)).limit(1);
   return (row?.flags as Record<string, unknown> | null)?.processedAt ? "processed" : "busy";
+}
+
+/** What acknowledging a call needs of a pool: a client for its transaction (a test hands in a failing one). */
+export type AckPool = { connect(): Promise<{ query: (text: string, values?: unknown[]) => Promise<{ rows: any[] }>; release(err?: Error): void }> };
+
+/**
+ * Acknowledge a processed call: its durable meter task (a `voice_call_meter` row, pending; a repeat is a no-op),
+ * the outcome and minutes on the call row (what the retry worker recovers from), and the processed flag — in ONE
+ * transaction, so the flag never exists without the task. Throws when the write fails: the call stays unprocessed.
+ */
+export async function acknowledgeCall(a: { callId: string; orgId: string; accountUserId: number; outcome: string | null; billedMinutes: number; at: Date; patch: Record<string, unknown> }, p: AckPool = pool): Promise<void> {
+  const client = await p.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `INSERT INTO voice_call_meter (call_id, org_id, account_user_id, outcome, billed_minutes, started_at, state)
+       VALUES ($1, $2, $3, $4, $5, $6, 'pending') ON CONFLICT (call_id) DO NOTHING`,
+      [a.callId, a.orgId, a.accountUserId, a.outcome, a.billedMinutes, a.at]);
+    await client.query(
+      `UPDATE voice_calls SET outcome = $2, billed_minutes = $3, flags = (coalesce(flags, '{}'::jsonb) - 'processingAt') || $4::jsonb WHERE id = $1`,
+      [a.callId, a.outcome, a.billedMinutes, JSON.stringify(a.patch)]);
+    await client.query("COMMIT");
+  } catch (e) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
 }
 
 /** Merge keys into voice_calls.flags in SQL (never a read-modify-write of the whole object). */
@@ -288,21 +316,26 @@ async function processFinishedCall(callId: string, report: EndReport): Promise<F
   }
   result.outcome = outcome;
 
-  // Minutes: exactly once per call (this function runs once per call — see the claim).
-  try {
-    // The month a call belongs to is its start (billing-usage.ts).
-    await meterCallUsage({ orgId: ctx.org.id, accountUserId: ctx.org.ownerUserId, billedMinutes, outcome, at: row.startedAt ?? row.endedAt ?? new Date() });
-    patch.metered = billedMinutes;
-  } catch (e: any) {
-    console.error("[voice] usage metering failed:", e?.message || e);
-    void recordFailure("call_assistant", "Call Assistant usage metering", e, { callId: row.id, orgId: ctx.org.id, billedMinutes });
-    patch.meterError = String(e?.message || e).slice(0, 300);
-  }
-
+  // Minutes: exactly once per call. The call is ACKNOWLEDGED (processedAt) only together with its durable meter
+  // task — the voice_call_meter row (keyed by the call) and the processed flag are one transaction
+  // (acknowledgeCall); if that write fails the call stays unprocessed, finishCall drops the claim and the engine's
+  // retry runs this again. The count itself follows; a failure there leaves the record pending (flags.meterPending
+  // stays true) for the retry worker (billing-usage.ts retryPendingVoiceMeters), which also recovers from the call
+  // rows themselves, so a failed meter is never acknowledged as done.
+  const at = row.startedAt ?? row.endedAt ?? new Date();
   patch.processedAt = new Date().toISOString();
   patch.result = result;
-  await db.update(voiceCalls).set({ outcome }).where(eq(voiceCalls.id, row.id));
-  await mergeCallFlags(row.id, patch, { dropKeys: ["processingAt"] });
+  patch.meterPending = true;
+  await acknowledgeCall({ callId: row.id, orgId: ctx.org.id, accountUserId: ctx.org.ownerUserId, outcome, billedMinutes, at, patch });
+  try {
+    // The month a call belongs to is its start (billing-usage.ts).
+    await meterCallUsage({ callId: row.id, orgId: ctx.org.id, accountUserId: ctx.org.ownerUserId, billedMinutes, outcome, at });
+    await mergeCallFlags(row.id, { metered: billedMinutes, meterPending: false });
+  } catch (e: any) {
+    console.error("[voice] usage metering failed (the meter record stays pending for the retry):", e?.message || e);
+    void recordFailure("call_assistant", "Call Assistant usage metering", e, { callId: row.id, orgId: ctx.org.id, billedMinutes });
+    await mergeCallFlags(row.id, { meterError: String(e?.message || e).slice(0, 300) }).catch(() => {});
+  }
   // The issue desk: one-way audio suspicion, engine errors, an `error` outcome (ops/call-assistant.ts).
   recordCallReportIssues({ id: row.id, orgId: ctx.org.id }, {
     durationSeconds, outcome, transcript: report.transcript, events: report.events as any,

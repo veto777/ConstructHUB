@@ -1,8 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 import { ADDONS, PLANS, PLAN_KEYS } from "../shared/plans";
 import {
-  CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_SPAM, CALL_ASSISTANT_SPAM_BLOCK_TITLE, SALES_REP_LABEL, callAssistantIntroShort, callAssistantPricing, callAssistantTierAdvice,
-  callAssistantYearlyNote, callAssistantOverageRule, joinNames, planPriceLine, CRM_SEATS_LINE,
+  CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_SPAM, CALL_ASSISTANT_SPAM_BLOCK_TITLE, SALES_REP_LABEL, callAssistantPricing, callAssistantTierAdvice,
+  callAssistantYearlyNote, callAssistantOverageRule, callAssistantAboveTopLine, planPriceLine, CRM_SEATS_LINE,
 } from "../shared/plan-copy";
 import { VOICE_PERSONA_LIST } from "../shared/voice-personas";
 
@@ -66,36 +66,31 @@ test("landing: plans from the price book, services go to a sales rep", async ({ 
   await expect(page.getByText("Create a Free Account")).toHaveCount(0);
 });
 
-test("AI Call Assistant: the launch price from the price book on every surface, and the ways in", async ({ page }) => {
+test("AI Call Assistant: a separate service, every figure from the price book on every surface, and the ways in", async ({ page }) => {
   const p = callAssistantPricing();
-  const short = callAssistantIntroShort();
 
   // Signed in, /call-assistant is the dashboard (owner, 2026-10-02: it lives on the platform, not the CRM); the sales
   // page is what a signed-out visitor gets, so it is read from the signed-out server.
   const signedOut = process.env.PC_SIGNED_OUT_URL || "http://127.0.0.1:8198";
   await page.context().addCookies([{ name: "ch_consent", value: "denied", url: signedOut }]);
   await page.goto(`${signedOut}/call-assistant`);
-  // Owner, 2026-10-02: "$99 a month for the first 3 months" … "annually price can be $1999".
-  expect(short).toBe(`${p.intro}/mo for your first ${p.introMonths} months, then ${p.regular}/mo — or ${p.annual}/yr`);
-  expect(p.annual).toBe("$1,999");
-  // Owner, 2026-10-02: "lets do 1000 min for $149 a month so 4 tiers instead of 3".
+  // Owner, 2026-10-08: four tiers named by their minutes, one overage rate, yearly 11 × monthly, no intro, a separate service.
   expect(p.tiers.map((t) => t.tier)).toEqual(["lite", "solo", "crew", "fleet"]);
-  await expect(page.getByTestId("text-call-assistant-price")).toHaveText(`Four tiers, one per account, regular prices from ${p.from}/mo. Solo starts at ${short}.`);
-  await expect(page.getByTestId("text-ca-hero-price")).toContainText(`Regular prices from ${p.from}/mo (${p.fromTier})`);
-  await expect(page.getByTestId("text-ca-hero-price")).toContainText(`${p.regular}/mo — or ${p.annual}/yr`);
-  await expect(page.getByTestId("text-ca-hero-price")).toContainText(`Solo: ${p.intro}/mo for your first ${p.introMonths} months`);
-  // Every figure from the price book; Crew and Fleet: "for the crew and fleet the cost per minute is 5 not 10 cents".
+  expect([p.from, p.top, p.annualMonths, p.annualFreeMonths]).toEqual(["$249", "$999", 11, 1]);
+  await expect(page.getByTestId("text-call-assistant-price")).toHaveText(`Four tiers, one per account, from ${p.from}/mo. ${p.separateLine}`);
+  await expect(page.getByTestId("text-ca-hero-price")).toContainText(`From ${p.from}/mo (${p.fromTier}), or yearly with one month free.`);
+  await expect(page.getByTestId("text-ca-hero-price")).toContainText("A separate service with its own subscription: no ConstructHUB plan needed.");
+  // Every figure from the price book; one overage rate on every tier (no "lower overage" badge any more).
   for (const t of p.tiers) {
     await expect(page.getByTestId(`text-ca-tier-overage-${t.tier}`)).toContainText(`${t.overageShort}/min over`);
-    await expect(page.getByTestId(`badge-ca-tier-lower-overage-${t.tier}`)).toHaveCount(t.lowerOverage ? 1 : 0);
+    await expect(page.getByTestId(`badge-ca-tier-lower-overage-${t.tier}`)).toHaveCount(0);
     const card = page.getByTestId(`card-ca-tier-${t.tier}`);
     await expect(card).toContainText(`${t.minutes} call minutes a month`);
     await expect(card).toContainText(t.numbersLabel);
     await expect(card).toContainText(t.estimatedCalls);
-    await expect(page.getByTestId(`text-ca-tier-price-${t.tier}`)).toHaveText(`${t.intro ?? t.monthly}/mo`);
-    await expect(page.getByTestId(`text-ca-tier-terms-${t.tier}`)).toContainText(`${t.annual}/yr`);
+    await expect(page.getByTestId(`text-ca-tier-price-${t.tier}`)).toHaveText(`${t.monthly}/mo`);
+    await expect(page.getByTestId(`text-ca-tier-terms-${t.tier}`)).toHaveText(`or ${t.annual}/yr (one month free)`);
   }
-  await expect(page.getByTestId("text-ca-tier-terms-solo")).toHaveText(`for your first ${p.introMonths} months, then ${p.regular}/mo — or ${p.annual}/yr`);
   const every = page.getByTestId("card-ca-every-tier");
   await expect(every).toContainText(`The first ${p.freeSpamCalls} spam calls each month free`);
   await expect(every).toContainText(`Above your included minutes: ${p.overageLine}`);
@@ -110,23 +105,23 @@ test("AI Call Assistant: the launch price from the price book on every surface, 
   await expect(page.getByTestId("text-ca-spam-free")).toContainText(`${p.freeSpamCalls} free spam calls every month, on every tier: they never count toward your minutes`);
   const order = await page.evaluate(() => ["section-ca-spam", "section-ca-how", "section-ca-pricing"].map((id) => document.querySelector(`[data-testid="${id}"]`)!.getBoundingClientRect().top));
   expect(order[0]).toBeLessThan(order[1]);
-  // The FAQ says the owner's number rules plainly.
+  // The FAQ says the owner's number rules plainly, the yearly rule, and that no plan is needed.
   const faq = page.getByTestId("section-ca-faq");
   await expect(faq).toContainText(CALL_ASSISTANT_NUMBER_RULES.ownNumbers);
   await expect(faq).toContainText(CALL_ASSISTANT_NUMBER_RULES.cancel);
   await expect(faq).toContainText(CALL_ASSISTANT_NUMBER_RULES.payment);
-  // Add-ons follow the plan's billing: $1,999/yr is not a choice for the add-on alone.
-  await expect(faq).toContainText(`Yes: ${callAssistantYearlyNote()}.`);
-  for (const q of ["What counts as a minute?", "Do spam calls use my minutes?", "Which tier do I need?"]) await expect(faq).toContainText(q);
+  await expect(faq).toContainText(`Yes. ${callAssistantYearlyNote()}.`);
+  for (const q of ["What counts as a minute?", "Do spam calls use my minutes?", "Which tier do I need?", "Do I need a ConstructHUB plan?", "What if I need more than the top tier?"]) await expect(faq).toContainText(q);
   await expect(faq).toContainText(callAssistantTierAdvice());
   await expect(faq).toContainText(callAssistantOverageRule());
-  expect(callAssistantYearlyNote()).toBe(`${joinNames(p.tiers.map((t) => `${t.name} ${t.annual}/yr`))} when your plan is billed yearly (add-ons follow your plan's billing); the ${p.intro}/mo intro for your first ${p.introMonths} months is Solo on monthly billing`);
+  await expect(faq).toContainText(p.separateLine);
   await expect(page.locator('[data-testid^="item-ca-spam-"]')).toHaveCount(3);
   for (const persona of VOICE_PERSONA_LIST) await expect(page.getByTestId(`card-persona-${persona.id}`)).toContainText(persona.name);
   await expect(page.locator('[data-testid^="step-ca-"]')).toHaveCount(4);
-  for (const key of p.planKeys) await expect(page.getByTestId("text-ca-plans")).toContainText(PLANS[key].name);
-  await expect(page.getByTestId("link-ca-pricing")).toHaveAttribute("href", "/pricing#add-ons");
-  // "Coming soon" for as long as the price book keeps the add-on in preview.
+  await expect(page.getByTestId("text-ca-plans")).toContainText("A separate service");
+  await expect(page.getByTestId("text-ca-plans")).toContainText(callAssistantAboveTopLine());
+  await expect(page.getByTestId("link-ca-pricing")).toHaveAttribute("href", "/pricing#call-assistant");
+  // "Coming soon" for as long as the price book keeps the service in preview.
   if (p.comingSoon) await expect(page.getByTestId("badge-call-assistant-coming-soon").first()).toBeVisible();
   else await expect(page.getByTestId("badge-call-assistant-coming-soon")).toHaveCount(0);
   await page.getByTestId("button-ca-sales-hero").click();
@@ -134,46 +129,47 @@ test("AI Call Assistant: the launch price from the price book on every surface, 
 
   await page.goto("/landing");
   await expect(page.getByTestId("section-call-assistant")).toBeVisible();
-  await expect(page.getByTestId("text-call-assistant-landing-price")).toContainText(`${p.intro}/mo`);
-  await expect(page.getByTestId("text-call-assistant-landing-price")).toContainText(`then ${p.regular}/mo — or ${p.annual}/yr`);
-  for (const t of p.tiers) await expect(page.getByTestId("text-call-assistant-landing-tiers")).toContainText(`${t.name} (${t.minutes} min, ${t.numbersLabel})`);
-  await expect(page.getByTestId("text-call-assistant-landing-tiers")).toContainText(`Regular prices from ${p.from}/mo. Four tiers:`);
-  await expect(page.getByTestId("text-call-assistant-landing-tiers")).toContainText("Crew and Fleet pay less per extra minute");
+  await expect(page.getByTestId("text-call-assistant-landing-price")).toContainText(`From ${p.from}/mo`);
+  await expect(page.getByTestId("text-call-assistant-landing-price")).toContainText(`(${p.fromTier}) — or yearly with one month free`);
+  for (const t of p.tiers) await expect(page.getByTestId("text-call-assistant-landing-tiers")).toContainText(`${t.name} (${t.monthly}/mo, ${t.numbersLabel})`);
+  await expect(page.getByTestId("text-call-assistant-landing-tiers")).toContainText("Four tiers:");
+  await expect(page.getByTestId("text-call-assistant-landing-tiers")).toContainText(`Above the included minutes, ${p.overageLine}.`);
   await expect(page.getByTestId("text-call-assistant-landing-tiers")).toContainText(`The first ${p.freeSpamCalls} spam calls each month are free on every tier`);
+  await expect(page.getByTestId("text-call-assistant-landing-tiers")).toContainText("A separate service with its own subscription: no ConstructHUB plan needed.");
   await expect(page.getByTestId("link-call-assistant-learn-more")).toHaveAttribute("href", "/call-assistant");
   await expect(page.getByTestId("link-footer-call-assistant")).toHaveAttribute("href", "/call-assistant");
 
   await page.goto("/pricing");
-  await expect(page.getByTestId("text-addon-intro-call_assistant")).toContainText(callAssistantIntroShort());
-  await expect(page.getByTestId("text-addon-intro-call_assistant")).toContainText(`Regular prices from ${p.from}/mo (${p.fromTier})`);
+  // Its own section (a separate service), not the add-on table: four tier cards with a buy button each, the extra-number picker.
+  await expect(page.getByTestId("section-call-assistant-plans")).toBeVisible();
+  await expect(page.getByTestId("text-call-assistant-heading")).toContainText("a separate service");
   await expect(page.getByTestId("link-addon-call-assistant")).toHaveAttribute("href", "/call-assistant");
-  // Four tier cards above the add-on table; the tiers are not rows of it.
   await expect(page.locator('[data-testid^="card-call-assistant-tier-"]')).toHaveCount(4);
   for (const t of p.tiers) {
     await expect(page.getByTestId(`text-call-assistant-tier-overage-${t.tier}`)).toContainText(`${t.overageShort}/min over`);
-    await expect(page.getByTestId(`badge-call-assistant-tier-lower-overage-${t.tier}`)).toHaveCount(t.lowerOverage ? 1 : 0);
+    await expect(page.getByTestId(`badge-call-assistant-tier-lower-overage-${t.tier}`)).toHaveCount(0);
     await expect(page.getByTestId(`text-call-assistant-tier-price-${t.tier}`)).toHaveText(`${t.monthly}/mo`);
     await expect(page.getByTestId(`card-call-assistant-tier-${t.tier}`)).toContainText(`${t.minutes} call minutes a month`);
     await expect(page.getByTestId(`card-call-assistant-tier-${t.tier}`)).toContainText(`${t.numbersLabel} included`);
+    await expect(page.getByTestId(`button-call-assistant-subscribe-${t.tier}`)).toHaveText(`Choose ${t.name}`);
     await expect(page.getByTestId(`row-addon-${t.addon}`)).toHaveCount(0);
   }
-  await expect(page.getByTestId("text-call-assistant-tier-intro-solo")).toHaveText(`Launch price: ${p.intro}/mo for your first ${p.introMonths} months`);
+  await expect(page.getByTestId("row-addon-call_number")).toHaveCount(0);
+  await expect(page.getByTestId("block-call-assistant-extra-numbers")).toContainText(`Extra local numbers (${p.extraNumber}/mo each)`);
   await expect(page.getByTestId("text-call-assistant-tiers-every")).toContainText(`the first ${p.freeSpamCalls} spam calls each month are free (they never count toward your minutes)`);
   await expect(page.getByTestId("text-call-assistant-tiers-every")).toContainText(`Above the included minutes, ${p.overageLine}.`);
-  await expect(page.getByTestId("row-addon-call_number")).toBeVisible();
-  // "Coming soon" on the tier cards and the extra-number row only while the price book keeps them in preview (launched: none).
+  await expect(page.getByTestId("text-call-assistant-tiers-every")).toContainText(callAssistantAboveTopLine());
+  await expect(page.getByTestId("text-call-assistant-separate")).toContainText(p.separateLine);
+  await expect(page.getByTestId("text-call-assistant-separate")).toContainText(callAssistantYearlyNote());
+  // "Coming soon" on the tier cards only while the price book keeps them in preview (launched: none).
   await expect(page.getByTestId("section-call-assistant-tiers").getByText("Coming soon", { exact: true })).toHaveCount(p.comingSoon ? p.tiers.length : 0);
-  await expect(page.getByTestId("text-call-assistant-tier-preview")).toHaveCount(p.comingSoon ? 1 : 0);
-  await expect(page.getByTestId("badge-addon-preview-call_number")).toHaveCount(ADDONS.call_number.preview ? 1 : 0);
-  // The tiers' annual prices show on yearly billing even though they are over $1,000 (add-on annuals are exempt).
+  // The tiers' yearly prices show on yearly billing even though the top one is over $1,000 (listed yearly prices are exempt).
   await page.getByTestId("button-interval-year").click();
   for (const t of p.tiers) {
     await expect(page.getByTestId(`text-call-assistant-tier-price-${t.tier}`)).toHaveText(`${t.annual}/yr`);
     await expect(page.getByTestId(`text-call-assistant-tier-price-${t.tier}`)).not.toContainText(SALES_REP_LABEL);
   }
-  // … and the note no longer offers the monthly intro as if it applied to yearly billing.
-  await expect(page.getByTestId("text-addon-intro-call_assistant")).toHaveText(callAssistantYearlyNote());
-  await expect(page.getByTestId("text-call-assistant-tier-intro-solo")).toHaveCount(0);
+  await expect(page.getByTestId("block-call-assistant-extra-numbers")).toContainText(`Extra local numbers (${p.extraNumberAnnual}/yr each)`);
 
   // Signed in (dev bypass): the main sidebar has the entry, with the NEW badge.
   await page.goto("/");

@@ -37,11 +37,15 @@ product with its own plans, from $39/mo." Never say the CRM is "included".
 | Growth (`:187`) | $199 | $1,990 | 3 locations · 3 protected websites · 5,000 permit searches · 1 client-texting number included |
 | Agency (`:217`) | $349 | $3,490 | 10 client locations then per-location bands · agency workspace · Google Ads & LSA manager · Cloudflare + Search Console · Domains + Gmail alerts |
 
-Add-ons (`shared/plans.ts:401-406`): extra location $19/mo, extra protected website $15/mo, client
-texting number $29/mo, competitor scan pack $39/mo. **AI Call Assistant** tiers
-(`shared/plans.ts:354-359`, sold on Pro / Growth / Agency only, line 383): Lite $149/mo (2,000 min,
-1 number), Solo $249/mo ($99 for the first 3 months on monthly billing; 5,000 min), Crew $449/mo
-(10,000 min, 5 numbers), Fleet $799/mo (25,000 min, 20 numbers); overage 10¢ / 10¢ / 5¢ / 5¢ a minute.
+Add-ons (`shared/plans.ts` `ADDONS`): extra location $19/mo, extra protected website $15/mo, client
+texting number $29/mo, competitor scan pack $39/mo. **AI Call Assistant** — a SEPARATE SERVICE on its
+own subscription since 2026-10-08 (`shared/plans.ts` `CALL_ASSISTANT_TIERS`, `server/voice/subscription.ts`):
+not included in any plan or CRM plan, and bought with or without one. Four tiers, named by their
+minutes: 500 minutes $249/mo (1 number), 1,000 minutes $349/mo (1 number), 2,000 minutes $449/mo
+(2 numbers), 5,000 minutes $999/mo (5 numbers); overage 50¢ a minute on every tier; yearly = 11 ×
+monthly (one month free: $2,739 / $3,839 / $4,939 / $10,989); extra local number $5/mo; no intro price;
+more than 5,000 minutes a month is "Talk to a sales rep". The earlier Lite/Solo/Crew/Fleet prices, the
+$99 intro and the 10¢/5¢ overage are history — never quote them.
 SEO data beyond the plan's allowance is prepaid credit in packs of $25 / $50 / $100
 (`shared/seo-credits.ts:19`).
 
@@ -87,7 +91,7 @@ Evidence for every row: its help entry in `shared/help/registry.ts` and its feat
 | Social Media | Compose a post, adjust per network, publish now or on a schedule. | Live page; needs each network connected. | Every plan. | Not verified with real networks here. |
 | Click Guard / IP Tracker / VPN Shield | Record ad clicks on a website, flag repeat and VPN traffic, and build an IP exclusion list. | Live. | Pro and up (1 / 3 / 10 websites). | No "stops click fraud" absolute. |
 | Competitor Intel | Scans of competitors' public ad activity. | Live (flag on since 2026-09-28). | Pro and up (2 / 8 / 20 scans). | Say "public ad activity", never "spy" (`HANDOFF.md:823`). |
-| AI Call Assistant | An AI receptionist on your own local number that answers, screens spam, takes the lead and texts the right person. | Live and purchasable since 2026-10-02 (`HANDOFF.md:347-352`). | Add-on, Pro and up, from $149/mo. | It is an add-on, not in any plan. |
+| AI Call Assistant | An AI receptionist on your own local number that answers, screens spam, takes the lead and texts the right person. | Live and purchasable since 2026-10-02; repriced and split into its own subscription 2026-10-08. | A separate service with its own subscription, from $249/mo (500 minutes); no plan needed. | It is a separate service, not an add-on and not in any plan or CRM plan. Never the old prices or the intro. |
 | Cloudflare / Search Console | Connect a Cloudflare account or Search Console and apply previewed rules / read search data. | Live page. "No real connect has been run yet" (`HANDOFF.md:91-93`). | **Agency only.** | **Do not film** — never exercised with a real account; Google shows an unverified-app warning for this scope. |
 | Agency workspace, Ads & LSA manager, Domains, Mail alerts, LSA Leads | Tools for agencies running many client profiles. | Live pages. Google Ads API token: Basic access pending (owner memory note). | Agency only. | Not for a contractor-facing trailer. |
 | Master Class, Guides, Reinstatement | State-by-state guides to starting a construction business; a suspended-profile service. | Live. | Master Class bundle $2,499 (`server/catalog.ts:42`). | No outcome promises. |

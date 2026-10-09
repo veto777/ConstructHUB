@@ -10,11 +10,13 @@
  * Idempotent per call: internal-calls.ts calls it exactly once, under the
  * end-report claim.
  */
-import { billedMinutesFor, recordVoiceCallUsage } from "./billing-usage";
+import { billedMinutesFor, meterVoiceCall } from "./billing-usage";
 
 export { billedMinutesFor };
 
 export type CallUsage = {
+  /** voice_calls.id — the meter record is per call, so a call is counted exactly once however often it is reported. */
+  callId: string;
   orgId: string;
   /** crm_orgs.owner_user_id — the subscription that holds the add-on. */
   accountUserId: number;
@@ -23,7 +25,7 @@ export type CallUsage = {
   at?: Date;
 };
 
-/** Add one finished call to the org's month. Returns the month row after the write. */
+/** Add one finished call to the org's month, exactly once (the meter record). Returns the month row after the write. */
 export function meterCallUsage(u: CallUsage) {
-  return recordVoiceCallUsage({ orgId: u.orgId, accountUserId: u.accountUserId, outcome: u.outcome, billedMinutes: u.billedMinutes, at: u.at });
+  return meterVoiceCall({ callId: u.callId, orgId: u.orgId, accountUserId: u.accountUserId, outcome: u.outcome, billedMinutes: u.billedMinutes, at: u.at });
 }

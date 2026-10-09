@@ -144,7 +144,7 @@ export async function heldNumberCount(orgId: string, tx: { select: typeof db.sel
   return Number(row?.n ?? 0);
 }
 
-/** The numbers the tier itself includes (Lite 1, Solo 1, Crew 5, Fleet 20); every one above that is a call_number unit. */
+/** The numbers the tier itself includes (shared/plans.ts CALL_ASSISTANT_TIERS); every one above that is a call_number unit. */
 function includedNumbers(v: VoiceContext): number {
   return Math.max(0, v.allowance.numbers - (v.ent.addons.call_number ?? 0));
 }
@@ -159,11 +159,11 @@ export function numberAllowance(v: VoiceContext, held: number) {
 }
 
 function limitBody(v: VoiceContext, held: number) {
-  const plan = v.ent.accessPlan ? PLANS[v.ent.accessPlan].name : "your";
-  const sells = !!v.ent.accessPlan && ADDONS.call_number.availableOn.includes(v.ent.accessPlan);
+  // Extra numbers are a line of the Call Assistant's own subscription (server/voice/subscription.ts): a held
+  // tier can always add one; a platform admin without a tier has the admin ceiling and nothing to buy.
   const n = v.allowance.numbers;
   const tier = callAssistantTierOf(v.ent.addons);
-  const tierName = tier?.name ?? null;
+  const sells = !!tier;
   const bigger = tier ? CALL_ASSISTANT_TIERS.find((t) => t.includedNumbers > tier.includedNumbers) ?? null : null;
   return {
     feature: "voiceNumbers",
@@ -171,8 +171,8 @@ function limitBody(v: VoiceContext, held: number) {
     used: held,
     upgradePlan: null,
     addon: sells ? ("call_number" as const) : null,
-    message: `Your ${CALL_ASSISTANT_NAME}${tierName ? ` ${tierName} tier` : ""} includes ${n} number${n === 1 ? "" : "s"} and all ${n === 1 ? "of it is" : "are"} in use.` +
-      (sells ? ` To add another, add the ${ADDONS.call_number.name} add-on in Settings → Billing (${(ADDONS.call_number.monthlyCents / 100).toFixed(2).replace(/\.00$/, "")} dollars a month each)${bigger ? `, or move to ${bigger.name} (${bigger.includedNumbers} numbers included)` : ""}.` : ` The ${plan} plan cannot add more.`),
+    message: `Your ${CALL_ASSISTANT_NAME}${tier ? ` (${tier.name} tier)` : ""} includes ${n} number${n === 1 ? "" : "s"} and all ${n === 1 ? "of it is" : "are"} in use.` +
+      (sells ? ` To add another, add an ${ADDONS.call_number.name} in Settings → Billing (${(ADDONS.call_number.monthlyCents / 100).toFixed(2).replace(/\.00$/, "")} dollars a month each)${bigger ? `, or move to the ${bigger.name} tier (${bigger.includedNumbers} numbers included)` : ""}.` : " This account cannot add more.")
   };
 }
 

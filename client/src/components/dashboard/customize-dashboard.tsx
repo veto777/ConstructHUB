@@ -214,7 +214,7 @@ export function CustomizeDashboard({ open, onOpenChange, data, flagOff }: {
                 {row.lockedPlan && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground" data-testid={`badge-customize-locked-${key}`}>
                     {/* The iPhone apps sell nothing (App Store 3.1.3(f)): no plan name or "Add-on" hint. */}
-                    <Lock className="h-3 w-3" aria-hidden="true" /> {inNativeApp() ? "Not on this account" : row.addon ? "Add-on" : `${row.lockedPlan} plan`}
+                    <Lock className="h-3 w-3" aria-hidden="true" /> {inNativeApp() ? "Not on this account" : row.addon ? "Separate service" : `${row.lockedPlan} plan`}
                   </span>
                 )}
                 {row.comingSoon && <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Coming soon</span>}

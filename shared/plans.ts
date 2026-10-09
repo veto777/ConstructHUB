@@ -11,6 +11,9 @@
  *   - 2026-10-07: the CRM is a SEPARATE PRODUCT (shared/crm-plans.ts). No
  *     platform plan grants CRM seats, and no CRM plan grants platform tools.
  *     Every plan states what it does NOT include, shown at checkout.
+ *   - 2026-10-08: the AI Call Assistant is a SEPARATE SERVICE too, on its own
+ *     subscription (CALL_ASSISTANT_TIERS below, server/voice/subscription.ts):
+ *     no platform plan includes it, and it is bought with or without one.
  *   - Anything priced at $1,000 or more is "Talk to a sales rep", never a price.
  * Money is in cents.
  */
@@ -131,8 +134,9 @@ export type Plan = {
   features: string[];
   /**
    * What this plan does NOT include, shown at checkout verbatim before the
-   * buyer pays (owner order 2026-10-07). The CRM leads every list: it is a
-   * separate product and no platform plan grants it.
+   * buyer pays (owner order 2026-10-07). The CRM leads every list and the AI
+   * Call Assistant follows it: both are separate products that no platform
+   * plan grants.
    */
   notIncluded: string[];
   limits: PlanLimits;
@@ -140,6 +144,82 @@ export type Plan = {
 };
 
 const NO_MODULES: PlanModules = { agencyWorkspace: false, adsManager: false, cloudflareSearchConsole: false, domainsMailAlerts: false };
+
+// ── AI Call Assistant: a SEPARATE SERVICE ───────────────────────────────────
+// Owner, 2026-10-08 (late evening): the AI Call Assistant is sold on its own
+// subscription (server/voice/subscription.ts), the way the CRM is
+// (shared/crm-plans.ts): no platform plan includes it, and it can be bought
+// with no platform plan at all. Four tiers, one per account, named by what
+// they include:
+//   500 minutes $249/mo (1 number) · 1,000 minutes $349/mo (1 number) ·
+//   2,000 minutes $449/mo (2 numbers) · 5,000 minutes $999/mo (5 numbers).
+// Every tier: $0.50 a minute above the included minutes. Yearly billing is
+// CALL_ASSISTANT_ANNUAL_MONTHS (11) times the monthly price — one month free,
+// a smaller discount than the plans' two months (ANNUAL_MONTHS). No intro
+// price. More than 5,000 minutes a month is a sales conversation (the $1,000+
+// rule, SALES_THRESHOLD_CENTS), never a listed price. The first
+// CALL_ASSISTANT_FREE_SPAM_CALLS spam calls a month never count, as before.
+// The tier keys (lite / solo / crew / fleet) and the add-on keys are kept so
+// every voice code path keeps working; the names and numbers are the new ones.
+// Nobody held a tier when the prices changed (production: 0 rows), so there is
+// nothing to grandfather. NOT part of the founding member price lock
+// (shared/pricing-terms.ts): that covers the plans and the Agency bands only.
+
+export type CallAssistantTierKey = "lite" | "solo" | "crew" | "fleet";
+export type CallAssistantTier = {
+  tier: CallAssistantTierKey;
+  /** The add-on key that sells this tier (the second tier keeps the original `call_assistant` key). */
+  addon: AddonKey;
+  /** "500 minutes" — the tier is named by the minutes it includes. */
+  name: string;
+  monthlyCents: number;
+  /** CALL_ASSISTANT_ANNUAL_MONTHS × monthlyCents (not the plans' ANNUAL_MONTHS). */
+  annualCents: number;
+  /** Call minutes included each calendar month (UTC). */
+  includedMinutes: number;
+  /** Local numbers included (more are the call_number add-on). */
+  includedNumbers: number;
+  /**
+   * What a minute above `includedMinutes` costs, in cents — the same on every
+   * tier (CALL_ASSISTANT_OVERAGE_CENTS_PER_MINUTE). A call is billed at the
+   * rate in force when it is recorded (server/voice/billing-usage.ts).
+   */
+  overageCentsPerMinute: number;
+};
+/** Yearly Call Assistant billing: this many months of the monthly price (one month free). */
+export const CALL_ASSISTANT_ANNUAL_MONTHS = 11;
+/** A minute above a tier's included minutes, in cents, on every tier (owner, 2026-10-08: 50 cents). */
+export const CALL_ASSISTANT_OVERAGE_CENTS_PER_MINUTE = 50;
+const callAssistantTierDef = (tier: CallAssistantTierKey, addon: AddonKey, monthlyCents: number, includedMinutes: number, includedNumbers: number): CallAssistantTier => ({
+  tier, addon, name: `${includedMinutes.toLocaleString("en-US")} minutes`, monthlyCents,
+  annualCents: monthlyCents * CALL_ASSISTANT_ANNUAL_MONTHS, includedMinutes, includedNumbers,
+  overageCentsPerMinute: CALL_ASSISTANT_OVERAGE_CENTS_PER_MINUTE,
+});
+/**
+ * Cheapest first; the order is the upgrade order. Yearly: $2,739 / $3,839 /
+ * $4,939 / $10,989 (11 × monthly). The top tier is the most that is listed.
+ */
+export const CALL_ASSISTANT_TIERS: readonly CallAssistantTier[] = [
+  callAssistantTierDef("lite", "call_assistant_lite", 24900, 500, 1),
+  callAssistantTierDef("solo", "call_assistant", 34900, 1000, 1),
+  callAssistantTierDef("crew", "call_assistant_crew", 44900, 2000, 2),
+  callAssistantTierDef("fleet", "call_assistant_fleet", 99900, 5000, 5),
+];
+export const CALL_ASSISTANT_TIER_ADDONS: readonly AddonKey[] = CALL_ASSISTANT_TIERS.map((t) => t.addon);
+/** The product's name; each tier's add-on is "<this> — <tier name>". */
+export const CALL_ASSISTANT_NAME = "AI Call Assistant";
+/** The cheapest tier's monthly price: the "from" price every "separate service" line quotes. */
+export const CALL_ASSISTANT_FROM_CENTS = Math.min(...CALL_ASSISTANT_TIERS.map((t) => t.monthlyCents));
+/** Where the Call Assistant is bought: its own section of the pricing page. */
+export const CALL_ASSISTANT_PRICING_HREF = "/pricing#call-assistant";
+/** `code` on the 402 a Call Assistant route answers without the service (server/entitlements.ts sendModuleRequired). */
+export const CALL_ASSISTANT_REQUIRED_CODE = "call_assistant_required";
+/**
+ * The "not included" line every platform plan AND every CRM plan carries
+ * (shown at checkout): the Call Assistant is a separate service, with its
+ * real starting price — the CRM line's pattern.
+ */
+export const CALL_ASSISTANT_NOT_INCLUDED_LINE = `The ${CALL_ASSISTANT_NAME} — answers your phone 24/7, screens spam and files the lead (a separate service, from $${CALL_ASSISTANT_FROM_CENTS / 100}/mo)`;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FOUNDING MEMBERS KEEP THEIR PRICE (owner, 2026-10-08). An account marked
@@ -165,6 +245,7 @@ export const PLANS: Record<PlanKey, Plan> = {
     ],
       notIncluded: [
         "The ConstructHUB CRM — estimates, invoices, scheduling and the client portal (a separate product, from $39/mo)",
+        CALL_ASSISTANT_NOT_INCLUDED_LINE,
         SEO_NOT_INCLUDED_LINE,
         "Click Guard, IP Tracker and VPN Shield (Pro and up)",
         "Competitor Intel scans (Pro and up)",
@@ -198,6 +279,7 @@ export const PLANS: Record<PlanKey, Plan> = {
     ],
       notIncluded: [
         "The ConstructHUB CRM — estimates, invoices, scheduling and the client portal (a separate product, from $39/mo)",
+        CALL_ASSISTANT_NOT_INCLUDED_LINE,
         SEO_NOT_INCLUDED_LINE,
         "More than 1 Google Business Profile location (Growth and up)",
         "A client-texting number on our carrier (bring your own, or add one)",
@@ -229,6 +311,7 @@ export const PLANS: Record<PlanKey, Plan> = {
     ],
       notIncluded: [
         "The ConstructHUB CRM — estimates, invoices, scheduling and the client portal (a separate product, from $39/mo)",
+        CALL_ASSISTANT_NOT_INCLUDED_LINE,
         SEO_NOT_INCLUDED_LINE,
         "Agency workspace and client workspaces (Agency only)",
         "Google Ads & LSA manager, Cloudflare + Search Console, Domains + Gmail alerts (Agency only)",
@@ -261,6 +344,7 @@ export const PLANS: Record<PlanKey, Plan> = {
     ],
       notIncluded: [
         "The ConstructHUB CRM — estimates, invoices, scheduling and the client portal (a separate product, from $39/mo)",
+        CALL_ASSISTANT_NOT_INCLUDED_LINE,
         "A client-texting number on our carrier (bring your own, or add one)",
       ],
     limits: {
@@ -328,76 +412,30 @@ export type Addon = {
   /**
    * Mutually exclusive add-ons: a subscription holds at most ONE unit of ONE
    * add-on of a group (the Call Assistant tiers). Asking for another member
-   * of the group is a switch (server/billing/order.ts applyExclusiveSwitch):
-   * the old one is removed on the same subscription update, prorated.
+   * of the group is a switch (server/billing/order.ts mergeAddonRequest,
+   * server/voice/subscription.ts): the old one is removed on the same
+   * subscription update, prorated.
    */
   exclusiveGroup?: "call_assistant_tier";
   /**
    * Introductory monthly price for the first `introMonths` months, once per
    * customer, when the add-on is first added on MONTHLY billing
-   * (server/billing/intro.ts: a Stripe coupon worth monthlyCents −
-   * introMonthlyCents a month). Annual billing has no intro: its price is
-   * `annualCents` from the first invoice.
+   * (server/billing/intro.ts). No add-on carries one today — the AI Call
+   * Assistant's launch intro ended with the 2026-10-08 repricing — so the
+   * fields stay for the records server/billing/intro.ts keeps, nothing more.
    */
   introMonthlyCents?: number;
   introMonths?: number;
 };
-// ── AI Call Assistant tiers ─────────────────────────────────────────────────
-// Owner, 2026-10-02: three tiers ("companies that will get 3-5k min used a
-// month"), overage "we can charge 10 cents", and "all plans cover 500 spam
-// calls that aren't charged". Then, the same day: "for the crew and fleet the
-// cost per minute is 5 not 10 cents for overages. We want to incentivize them
-// to upgrade and lets do 1000 min for $149 a month so 4 tiers instead of 3" —
-// Lite below Solo, and overage priced PER TIER. Carrier cost for scale:
-// SignalWire bills us about $0.0096 per inbound minute (rounded up per call).
 
-export type CallAssistantTierKey = "lite" | "solo" | "crew" | "fleet";
-export type CallAssistantTier = {
-  tier: CallAssistantTierKey;
-  /** The add-on key that sells this tier (Solo keeps the original `call_assistant`). */
-  addon: AddonKey;
-  name: string;
-  monthlyCents: number;
-  /** Its own yearly price (not ANNUAL_MONTHS × monthly). */
-  annualCents: number;
-  /** Call minutes included each calendar month (UTC). */
-  includedMinutes: number;
-  /** Local numbers included (more are the call_number add-on). */
-  includedNumbers: number;
-  /**
-   * What a minute above `includedMinutes` costs on this tier, in cents. A call
-   * is billed at the rate of the tier in force when it is recorded
-   * (server/voice/billing-usage.ts recordVoiceCallUsage), so a mid-month
-   * switch bills each call at its own tier's rate.
-   */
-  overageCentsPerMinute: number;
-  /** Monthly-billing intro, first time the Call Assistant is added (Solo only). */
-  introMonthlyCents?: number;
-  introMonths?: number;
-};
-/**
- * Cheapest first. The order is the upgrade order.
- * Lite's $149/mo is the owner's (2026-10-02); its $1,199/yr was confirmed by the owner on 2026-10-04 ("thats fine").
- * Included minutes, owner 2026-10-04: "i need to change to 2000 for lite then 5000, 10,000 and 25,000"
- * (was 1,000 / 2,000 / 5,000 / 12,000; prices unchanged).
- */
-export const CALL_ASSISTANT_TIERS: readonly CallAssistantTier[] = [
-  { tier: "lite", addon: "call_assistant_lite", name: "Lite", monthlyCents: 14900, annualCents: 119900, includedMinutes: 2000, includedNumbers: 1, overageCentsPerMinute: 10 },
-  { tier: "solo", addon: "call_assistant", name: "Solo", monthlyCents: 24900, annualCents: 199900, includedMinutes: 5000, includedNumbers: 1, overageCentsPerMinute: 10, introMonthlyCents: 9900, introMonths: 3 },
-  { tier: "crew", addon: "call_assistant_crew", name: "Crew", monthlyCents: 44900, annualCents: 359900, includedMinutes: 10000, includedNumbers: 5, overageCentsPerMinute: 5 },
-  { tier: "fleet", addon: "call_assistant_fleet", name: "Fleet", monthlyCents: 79900, annualCents: 639900, includedMinutes: 25000, includedNumbers: 20, overageCentsPerMinute: 5 },
-];
-export const CALL_ASSISTANT_TIER_ADDONS: readonly AddonKey[] = CALL_ASSISTANT_TIERS.map((t) => t.addon);
-/** The product's name; each tier's add-on is "<this> — <tier name>". */
-export const CALL_ASSISTANT_NAME = "AI Call Assistant";
 /**
  * The overage rate for a call when no tier is held at that moment (a platform
  * admin without a tier — whose minutes are unlimited, so it never applies; a
- * call that ends just after a cancellation keeps the month's snapshot): Solo's,
- * the entry tier a prompt offers.
+ * call that ends just after a cancellation keeps the month's snapshot): the
+ * one rate every tier has.
  */
-export const CALL_ASSISTANT_DEFAULT_OVERAGE_CENTS = CALL_ASSISTANT_TIERS.find((t) => t.tier === "solo")!.overageCentsPerMinute;
-/** Every distinct overage rate, highest first (for copy and the Stripe price lookup). */
+export const CALL_ASSISTANT_DEFAULT_OVERAGE_CENTS = CALL_ASSISTANT_OVERAGE_CENTS_PER_MINUTE;
+/** Every distinct overage rate, highest first (one today; the meter and the Stripe price lookup are per rate). */
 export const CALL_ASSISTANT_OVERAGE_RATES: readonly number[] = [...new Set(CALL_ASSISTANT_TIERS.map((t) => t.overageCentsPerMinute))].sort((a, b) => b - a);
 /**
  * Spam calls per org per calendar month (UTC) whose minutes never count
@@ -410,7 +448,13 @@ export const CALL_ASSISTANT_FREE_SPAM_CALLS = 500;
 /** For "which tier do I need": the average call length the estimates assume (an estimate, not a promise). */
 export const CALL_ASSISTANT_ESTIMATE_MINUTES_PER_CALL = 2;
 
-const CALL_ASSISTANT_SOLD_ON: PlanKey[] = ["pro", "growth", "agency"];
+/**
+ * The Call Assistant's add-ons are sold on NO platform plan: they are the
+ * lines of the Call Assistant's own subscription (server/voice/subscription.ts).
+ * `availableOn` is empty so the platform checkout refuses them
+ * (server/billing/order.ts checkAddonsForPlan) and no plan page lists them.
+ */
+const CALL_ASSISTANT_SOLD_ON: PlanKey[] = [];
 
 function callAssistantTierAddon(key: CallAssistantTierKey): Addon {
   const t = CALL_ASSISTANT_TIERS.find((x) => x.tier === key)!;
@@ -418,13 +462,12 @@ function callAssistantTierAddon(key: CallAssistantTierKey): Addon {
   return {
     key: t.addon,
     name: `${CALL_ASSISTANT_NAME} — ${t.name}`,
-    description: `An AI receptionist that answers your phone 24/7, screens out spam, fills in the lead for your CRM and texts the right person. ${t.name}: ${numbers} and ${t.includedMinutes.toLocaleString("en-US")} call minutes / month, then $${(t.overageCentsPerMinute / 100).toFixed(2)} / minute; the first ${CALL_ASSISTANT_FREE_SPAM_CALLS} spam calls each month never count.`,
+    description: `An AI receptionist that answers your phone 24/7, screens out spam, fills in the lead for your CRM and texts the right person. ${t.includedMinutes.toLocaleString("en-US")} call minutes a month and ${numbers}, then $${(t.overageCentsPerMinute / 100).toFixed(2)} a minute; the first ${CALL_ASSISTANT_FREE_SPAM_CALLS} spam calls each month never count.`,
     monthlyCents: t.monthlyCents,
     annualCents: t.annualCents,
     availableOn: CALL_ASSISTANT_SOLD_ON,
     grants: {},
     exclusiveGroup: "call_assistant_tier",
-    ...(t.introMonthlyCents ? { introMonthlyCents: t.introMonthlyCents, introMonths: t.introMonths } : {}),
   };
 }
 
@@ -434,24 +477,23 @@ export const ADDONS: Record<AddonKey, Addon> = {
   protected_site: { key: "protected_site", name: "Extra protected website", description: "Click Guard + IP Tracker + VPN Shield for one more website.", monthlyCents: 1500, annualCents: 15000, availableOn: ["pro", "growth", "agency"], grants: { protectedSites: 1 } },
   texting_number: { key: "texting_number", name: "Client texting number", description: "A registered texting number on our carrier for texting your clients; texts count against your plan's monthly text allowance.", monthlyCents: 2900, annualCents: 29000, setupCents: 2900, availableOn: ["pro", "agency"], grants: {} },
   competitor_pack: { key: "competitor_pack", name: "Competitor scan pack", description: "10 more Competitor Intel scans each month.", monthlyCents: 3900, annualCents: 39000, availableOn: ["pro", "growth", "agency"], grants: { competitorScans: 10 } },
-  // ── Call Assistant (docs/call-assistant/SPEC.md) ─────────────────────────
-  // Four tiers (owner, 2026-10-02: "We should offer 3 different tiers for the
-  // call assistant because there are companies that will get 3-5k min used a
-  // month", then "lets do 1000 min for $149 a month so 4 tiers instead of 3"),
-  // one per subscription (exclusiveGroup), built by callAssistantTierAddon
-  // below from CALL_ASSISTANT_TIERS. Solo keeps the original `call_assistant`
-  // key — same price, same Stripe lookup keys and intro grants — so a row that
-  // already holds `call_assistant` IS Solo with no migration. Lite, Crew and
-  // Fleet are their own add-on keys (own Stripe prices, chub_v1_addon_<key>_…).
-  // Owner, 2026-10-02: "$99 a month for the first 3 months" (Solo, monthly
-  // billing only), "annually price can be $1999" (Solo). The annual prices are
-  // NOT ANNUAL_MONTHS × monthly: each is its own number.
+  // ── Call Assistant (docs/call-assistant/SPEC.md) — a separate service ────
+  // The four tiers (CALL_ASSISTANT_TIERS above), one per account
+  // (exclusiveGroup), and the extra number: the lines of the Call Assistant's
+  // OWN Stripe subscription (server/voice/subscription.ts), never of a platform
+  // plan's. The second tier keeps the original `call_assistant` key, so every
+  // code path that reads `call_assistant` still reads a tier. Each key has its
+  // own Stripe price, found by lookup key from the cents (server/billing/prices.ts
+  // addonPriceSpec), so the 2026-10-08 prices made new Stripe Prices on the next
+  // checkout — nothing manual. The tiers' yearly prices are
+  // CALL_ASSISTANT_ANNUAL_MONTHS (11) × monthly; the extra number stays at the
+  // plans' 10 × ($5/mo, $50/yr — unchanged), like every other add-on.
   // The number is part of the service (owner, 2026-10-02): when the
   // subscription ends or the tier is removed, the org's numbers are released
   // (server/voice/number-release.ts); a failed payment pauses the assistant
   // (ADDON_MODULE_RUN_STATUSES) but keeps the number. Launched (owner,
-  // 2026-10-02: "the call assistant is live not coming soon"): no tier is
-  // `preview` any more — every tier and the extra number are for sale.
+  // 2026-10-02: "the call assistant is live not coming soon"): nothing here is
+  // `preview` — every tier and the extra number are for sale.
   call_assistant_lite: callAssistantTierAddon("lite"),
   call_assistant: callAssistantTierAddon("solo"),
   call_assistant_crew: callAssistantTierAddon("crew"),
@@ -459,10 +501,35 @@ export const ADDONS: Record<AddonKey, Addon> = {
   call_number: {
     key: "call_number", name: "Extra Call Assistant number",
     description: "One more local number for the AI Call Assistant (a second location or a tracking line).",
-    monthlyCents: 500, annualCents: 5000, availableOn: ["pro", "growth", "agency"], grants: {},
+    // $50/yr: the old contract (10 × monthly, like the plans). The owner's 2026-10-08 repricing named the four
+    // tiers only; the extra number's prices are unchanged (Codex audit #4).
+    monthlyCents: 500, annualCents: 5000, availableOn: CALL_ASSISTANT_SOLD_ON, grants: {},
     requires: CALL_ASSISTANT_TIER_ADDONS,
   },
 };
+
+/** Every add-on that is a line of the Call Assistant's own subscription (the tiers and the extra number). */
+export const CALL_ASSISTANT_ADDONS: readonly AddonKey[] = [...CALL_ASSISTANT_TIER_ADDONS, "call_number"];
+export const isCallAssistantAddon = (key: AddonKey): boolean => CALL_ASSISTANT_ADDONS.includes(key);
+/** The add-on quantities a Call Assistant subscription holds, in the shape every voice code path reads ({ call_assistant_crew: 1, call_number: 2 }). */
+export function callAssistantAddonsOf(tier: CallAssistantTierKey | null | undefined, extraNumbers = 0): Partial<Record<AddonKey, number>> {
+  const out: Partial<Record<AddonKey, number>> = {};
+  const held = tier ? CALL_ASSISTANT_TIERS.find((t) => t.tier === tier) : null;
+  if (!held) return out;
+  out[held.addon] = 1;
+  // An extra number needs a tier (ADDONS.call_number.requires): without one it buys nothing.
+  if (extraNumbers > 0) out.call_number = Math.floor(extraNumbers);
+  return out;
+}
+/** A quantities map without the Call Assistant's add-ons: what a PLATFORM subscription may carry (a stale row never grants the service). */
+export function withoutCallAssistantAddons(addons: Partial<Record<AddonKey, number>>): Partial<Record<AddonKey, number>> {
+  const out: Partial<Record<AddonKey, number>> = {};
+  for (const [key, qty] of Object.entries(addons) as [AddonKey, number][]) if (!isCallAssistantAddon(key)) out[key] = qty;
+  return out;
+}
+/** A stored tier key as CallAssistantTierKey, or null for anything else. */
+export const callAssistantTierKey = (value: unknown): CallAssistantTierKey | null =>
+  CALL_ASSISTANT_TIERS.some((t) => t.tier === value) ? (value as CallAssistantTierKey) : null;
 
 /** SignalWire keeps a purchased number for at least this long before it can be released. */
 export const CALL_NUMBER_MIN_DAYS = 14;

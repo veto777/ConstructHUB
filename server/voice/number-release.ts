@@ -5,15 +5,16 @@
  *    of the service you don't keep the number. And the only thing that can
  *    keep a customer from leaving."
  *
- * So when the subscription ENDS (Stripe deleted it, or its status is canceled /
- * unpaid / incomplete_expired, or a trial grant ran out) or the Call Assistant
- * tier is removed, every number the org holds is released on SignalWire; when
- * a smaller tier (Fleet → Crew → Solo → Lite) or a lower call_number add-on quantity
- * pays for fewer numbers than the org holds, the NEWEST
- * extra numbers go the same way (the oldest — normally the included one — is
- * kept). A failed payment (past_due) never releases anything: the assistant is
- * paused (server/entitlements.ts ADDON_MODULE_RUN_STATUSES) and the number is
- * held, so fixing the card restores the agent.
+ * So when the Call Assistant's OWN subscription ENDS (Stripe deleted it, or its
+ * status is canceled / unpaid / incomplete_expired — the service is sold apart
+ * from the platform plans, server/voice/subscription-store.ts) or it no longer
+ * holds a tier, every number the org holds is released on SignalWire; when a
+ * smaller tier (5,000 → 2,000 → 1,000 → 500 minutes) or a lower call_number
+ * quantity pays for fewer numbers than the org holds, the NEWEST extra numbers
+ * go the same way (the oldest — normally the included one — is kept). A failed
+ * payment (past_due) never releases anything: the assistant is paused
+ * (server/entitlements.ts ADDON_MODULE_RUN_STATUSES) and the number is held,
+ * so fixing the card restores the agent. The platform plan plays no part.
  *
  * SignalWire keeps a bought number for at least CALL_NUMBER_MIN_DAYS
  * (voice_numbers.release_eligible_at). A number past that date is released at
@@ -52,12 +53,14 @@
  *     bell notification ("Your Call Assistant number +1… was released because
  *     the subscription ended").
  *
- * Entry points: afterSubscriptionChange(userId) from the Stripe webhook and the
- * add-on routes (server/stripe.ts); startVoiceNumberReleaseWorker() at boot
+ * Entry points: afterSubscriptionChange(userId) from the Stripe webhook
+ * (server/stripe.ts) and the Call Assistant's own billing routes
+ * (server/voice/subscription.ts); startVoiceNumberReleaseWorker() at boot
  * (server/voice/index.ts) for the scheduled ones and any missed webhook.
  */
 import { pool } from "../db";
-import { accountSubscriptionRow, activePlanKey, grantExpired, parseAddons } from "../entitlements";
+import { accountSubscriptionRow } from "../entitlements";
+import { callAssistantSubscriptionOf, type CallAssistantSubscriptionState } from "./subscription-store";
 import { isPlatformAdminEmail } from "../admin";
 import { recordActivity } from "../crm/activity";
 import {
@@ -90,7 +93,7 @@ export function releaseIsFinal(row: { status?: string | null; release_reason?: s
 /** "…because the subscription ended" — the owner-facing why. */
 export function releaseReasonText(reason: string | null | undefined): string {
   switch (reason) {
-    case "addon_removed": return `the ${CALL_ASSISTANT_NAME} add-on was removed`;
+    case "addon_removed": return `the ${CALL_ASSISTANT_NAME} tier was removed from the subscription`;
     case "over_allowance": return `the subscription no longer pays for it (a smaller ${CALL_ASSISTANT_NAME} tier or fewer ${ADDONS.call_number.name} add-ons)`;
     case "payment_failed": return "the subscription's payment was not recovered";
     default: return "the subscription ended";
@@ -100,44 +103,37 @@ export function releaseReasonText(reason: string | null | undefined): string {
 /** How many numbers an account's orgs may keep, and why the rest go; null = leave its numbers alone. */
 export type NumberKeep = { keep: number; reason: ReleaseReason };
 
-type SubscriptionLike = {
-  plan?: string | null;
-  status?: string | null;
-  addons?: unknown;
-  stripe_subscription_id?: string | null;
-  current_period_end?: Date | string | null;
-};
+/** The slice of the Call Assistant subscription the decision reads: its Stripe status and its lines as a quantities map. */
+export type CallAssistantSubscriptionLike = Pick<CallAssistantSubscriptionState, "status" | "addons">;
 
 /**
- * The release decision for an account's deciding subscription row (the one
- * getEntitlements reads):
+ * The release decision for an account's Call Assistant subscription (the row
+ * getEntitlements reads, server/voice/subscription-store.ts):
  *   - platform admin → null (never touched);
- *   - no subscription, an ended one (NUMBER_RELEASE_STATUSES) or an expired
- *     grant → keep 0, "subscription_ended" — except `unpaid` (Stripe stopped
- *     retrying a failed payment) → keep 0, "payment_failed", which a fixed
- *     card can still undo;
- *   - active / trialing / past_due → keep what the add-ons pay for (the
- *     held tier's numbers — Lite 1, Solo 1, Crew 5, Fleet 20 — + every call_number
- *     unit, so a downgrade releases the newest extras); no tier → "addon_removed";
+ *   - no subscription or an ended one (NUMBER_RELEASE_STATUSES) → keep 0,
+ *     "subscription_ended" — except `unpaid` (Stripe stopped retrying a
+ *     failed payment) → keep 0, "payment_failed", which a fixed card can still
+ *     undo;
+ *   - active / trialing / past_due → keep what the subscription pays for (the
+ *     held tier's numbers — 1 / 1 / 2 / 5, shared/plans.ts CALL_ASSISTANT_TIERS
+ *     — + every call_number unit, so a downgrade releases the newest extras);
+ *     no tier → "addon_removed";
  *   - anything else (incomplete, paused, a row we can't read) → null: hold,
  *     never guess a release.
  */
-export function numbersKeptFor(row: SubscriptionLike | null | undefined, admin: boolean, now = new Date()): NumberKeep | null {
+export function numbersKeptFor(sub: CallAssistantSubscriptionLike | null | undefined, admin: boolean): NumberKeep | null {
   if (admin) return null;
-  if (!row || !row.status) return { keep: 0, reason: "subscription_ended" };
-  if (grantExpired(row, now)) return { keep: 0, reason: "subscription_ended" };
-  if (row.status === "unpaid") return { keep: 0, reason: "payment_failed" };
-  if (NUMBER_RELEASE_STATUSES.includes(row.status)) return { keep: 0, reason: "subscription_ended" };
-  // A failed payment (past_due) pauses the plan (shared/plans.ts ACCESS_STATUSES) while Stripe retries the card, but
-  // the numbers are held as if paid: a failed payment never releases one (only `unpaid`, above, does).
-  const held = row.status === "past_due" ? { ...row, status: "active" } : row;
-  if (!ACCESS_STATUSES.includes(held.status!)) return null;
-  const plan = activePlanKey(held as typeof row, now);
-  if (!plan) return null;
-  const addons = parseAddons(row.addons);
-  // The held tier (Lite 1, Solo 1, Crew 5, Fleet 20 numbers) plus every extra number; a tier the plan doesn't sell counts as none.
+  if (!sub || !sub.status) return { keep: 0, reason: "subscription_ended" };
+  if (sub.status === "unpaid") return { keep: 0, reason: "payment_failed" };
+  if (NUMBER_RELEASE_STATUSES.includes(sub.status)) return { keep: 0, reason: "subscription_ended" };
+  // A failed payment (past_due) pauses the assistant (shared/plans.ts ADDON_MODULE_RUN_STATUSES) while Stripe retries
+  // the card, but the numbers are held as if paid: a failed payment never releases one (only `unpaid`, above, does).
+  const status = sub.status === "past_due" ? "active" : sub.status;
+  if (!ACCESS_STATUSES.includes(status)) return null;
+  const addons = sub.addons ?? {};
+  // The held tier's numbers plus every extra number.
   const { tier, numbers } = callAssistantIncluded(addons);
-  if (!tier || !ADDONS[tier.addon].availableOn.includes(plan)) return { keep: 0, reason: "addon_removed" };
+  if (!tier) return { keep: 0, reason: "addon_removed" };
   return { keep: numbers + (addons.call_number ?? 0), reason: "over_allowance" };
 }
 
@@ -266,7 +262,7 @@ export async function scheduleAccountCallNumbers(userId: number, deps: ReleaseDe
   if (!orgs.length) return empty;
   const now = deps.now ?? new Date();
   const row = await accountSubscriptionRow(userId);
-  const decision = numbersKeptFor(row, isPlatformAdminEmail(row?.email), now);
+  const decision = numbersKeptFor(callAssistantSubscriptionOf(row), isPlatformAdminEmail(row?.email));
   if (!decision) return { ...empty, orgIds: orgs.map((o) => o.id) };
   const out: AccountSchedule = { decision, orgIds: [], scheduled: 0, restored: 0, due: 0 };
   for (const org of orgs) {
@@ -292,9 +288,10 @@ export async function previewCallNumberReleases(userId: number, change: { cancel
   if (!orgs.length) return [];
   const row = await accountSubscriptionRow(userId);
   const admin = isPlatformAdminEmail(row?.email);
+  const sub = callAssistantSubscriptionOf(row);
   const decision: NumberKeep | null = admin ? null
     : change.cancel ? { keep: 0, reason: "subscription_ended" }
-    : numbersKeptFor(row ? { ...row, addons: mergeAddonRequest(parseAddons(row.addons), (change.addons ?? {}) as Partial<Record<AddonKey, number>>) } : null, false);
+    : numbersKeptFor({ status: sub.status, addons: mergeAddonRequest(sub.addons, (change.addons ?? {}) as Partial<Record<AddonKey, number>>) }, false);
   if (!decision) return [];
   const out: ReleasePreview = [];
   for (const org of orgs) {

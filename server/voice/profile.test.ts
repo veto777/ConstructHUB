@@ -271,7 +271,12 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Agent Studio over 
   async function account(addons: Record<string, number> | null): Promise<{ id: number; cookie: string }> {
     const { rows: [u] } = await pool.query("insert into users(email, display_name, email_verified) values ($1, 'Voice Studio Test', true) returning id", [`voice-studio-${randomUUID()}@example.invalid`]);
     users.push(u.id);
-    if (addons) await pool.query("insert into subscriptions(user_id, plan, status, stripe_subscription_id, addons) values ($1, 'pro', 'active', $2, $3)", [u.id, `sub_vs_${randomUUID()}`, JSON.stringify(addons)]);
+    // A platform plan, and — a separate service with its own subscription — the Call Assistant's row when a tier is asked for.
+    if (addons) await pool.query("insert into subscriptions(user_id, plan, status, stripe_subscription_id, addons) values ($1, 'pro', 'active', $2, '{}'::jsonb)", [u.id, `sub_vs_${randomUUID()}`]);
+    if (addons?.call_assistant) {
+      await pool.query("insert into call_assistant_subscriptions(user_id, tier, extra_numbers, status, stripe_subscription_id, stripe_customer_id, billing_interval) values ($1, 'solo', $2, 'active', $3, $4, 'month')",
+        [u.id, addons.call_number ?? 0, `sub_vsca_${randomUUID()}`, `cus_vsca_${randomUUID()}`]);
+    }
     const sid = randomUUID(); sids.push(sid);
     await pool.query("insert into session(sid, sess, expire) values ($1, $2, now() + interval '1 hour')", [sid, JSON.stringify({ cookie: { maxAge: 3600000 }, passport: { user: u.id } })]);
     const sig = createHmac("sha256", sessionSecret).update(sid).digest("base64").replace(/=+$/, "");
@@ -337,6 +342,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Agent Studio over 
     await new Promise((r) => stub?.close(r));
     const noAddonOrgs = (await pool.query("select id from crm_orgs where owner_user_id = any($1::int[])", [users])).rows.map((r) => r.id);
     await dropOrgRows(noAddonOrgs);
+    await pool.query("delete from call_assistant_subscriptions where user_id = any($1::int[])", [users]);
     await pool.query("delete from subscriptions where user_id = any($1::int[])", [users]);
     await pool.query("delete from session where sid = any($1::text[])", [sids]);
     await pool.query("delete from users where id = any($1::int[])", [users]);
@@ -348,7 +354,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Agent Studio over 
     expect((await api("/api/crm/voice/profile", null)).status).toBe(401);
     const r402 = await api("/api/crm/voice/profile", noAddon);
     expect(r402.status).toBe(402);
-    expect(r402.body).toMatchObject({ code: "plan_required", addon: "call_assistant" });
+    expect(r402.body).toMatchObject({ code: "call_assistant_required", addon: "call_assistant", href: "/pricing#call-assistant" });
     // A field member of the paying org reads (the owner's add-on pays) but cannot edit.
     expect((await api("/api/crm/voice/profile", field)).status).toBe(200);
     expect((await api("/api/crm/voice/profile", field, "PUT", { profile: {} })).status).toBe(403);
@@ -423,9 +429,9 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Agent Studio over 
     expect((await api("/api/crm/voice/profile/resume", owner, "POST")).body).toEqual({ status: "live" });
     expect((await internal(`/api/voice-internal/profile?to=${encodeURIComponent(inbound)}`)).status).toBe(200);
 
-    // The add-on lapses: the published, live profile no longer answers calls.
-    const { rows: [sub] } = await pool.query("select addons from subscriptions where user_id = $1", [owner.id]);
-    await pool.query("update subscriptions set addons = '{}'::jsonb where user_id = $1", [owner.id]);
+    // The service's subscription loses its tier: the published, live profile no longer answers calls.
+    const { rows: [sub] } = await pool.query("select tier from call_assistant_subscriptions where user_id = $1", [owner.id]);
+    await pool.query("update call_assistant_subscriptions set tier = null where user_id = $1", [owner.id]);
     try {
       const lapsed = await internal(`/api/voice-internal/profile?to=${encodeURIComponent(inbound)}`);
       expect(lapsed.status).toBe(423);
@@ -434,14 +440,14 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Agent Studio over 
       expect(lapsed.body.say).toMatch(/no longer answered by our assistant/);
       expect(lapsed.body.say).not.toMatch(/try again later/);
     } finally {
-      await pool.query("update subscriptions set addons = $2::jsonb where user_id = $1", [owner.id, JSON.stringify(sub.addons)]);
+      await pool.query("update call_assistant_subscriptions set tier = $2 where user_id = $1", [owner.id, sub.tier]);
     }
     expect((await internal(`/api/voice-internal/profile?to=${encodeURIComponent(inbound)}`)).status).toBe(200);
 
-    // Owner, 2026-10-02: "As soon as they stop paying the agent stops working." A failed renewal
-    // (past_due — the plan pauses too, owner 2026-10-04) pauses the assistant on the
-    // very next call: no cache between the subscription row and the engine's per-call fetch.
-    await pool.query("update subscriptions set status = 'past_due' where user_id = $1", [owner.id]);
+    // Owner, 2026-10-02: "As soon as they stop paying the agent stops working." A failed renewal of the
+    // Call Assistant's OWN subscription (past_due) pauses the assistant on the very next call: no cache
+    // between the subscription row and the engine's per-call fetch. The platform plan is untouched.
+    await pool.query("update call_assistant_subscriptions set status = 'past_due' where user_id = $1", [owner.id]);
     try {
       const unpaid = await internal(`/api/voice-internal/profile?to=${encodeURIComponent(inbound)}`);
       expect(unpaid.status).toBe(423);
@@ -462,13 +468,16 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Agent Studio over 
       expect(nums.status).toBe(200);
       expect(nums.body.paused).toBe(true);
       expect((await api("/api/crm/voice/numbers/search?state=WA", owner)).body.code).toBe("payment_required");
-      // The plan is paused too until the payment goes through (owner, 2026-10-04), and the app says so.
-      expect((await api("/api/entitlements", owner)).body).toMatchObject({ plan: null, paymentNeeded: true, subscriptionStatus: "past_due", addonModules: { callAssistant: false }, addonModulesPaused: { callAssistant: true } });
+      // The platform plan is a different subscription: it stays on; only the service is paused, and the app says so.
+      expect((await api("/api/entitlements", owner)).body).toMatchObject({ plan: "pro", paymentNeeded: false, subscriptionStatus: "active", addonModules: { callAssistant: false }, addonModulesPaused: { callAssistant: true } });
     } finally {
-      await pool.query("update subscriptions set status = 'active' where user_id = $1", [owner.id]);
+      await pool.query("update call_assistant_subscriptions set status = 'active' where user_id = $1", [owner.id]);
     }
     expect((await internal(`/api/voice-internal/profile?to=${encodeURIComponent(inbound)}`)).status).toBe(200);
     expect((await api("/api/crm/voice/status", owner)).body).toMatchObject({ enabled: true, paused: false });
+    // The overage switch rides on the status (Codex #6): this child runs with it off (the default), so the Overview
+    // and Limits & usage say "counted but not charged yet" (both states: stripe-billing.test.ts, pricing-copy.test.ts).
+    expect((await api("/api/crm/voice/status", owner)).body.overageBilling).toBe("off");
 
     // A number being released (subscription ended / no longer paid for) stops answering at once.
     await pool.query("update voice_numbers set status = 'releasing', release_reason = 'over_allowance' where phone_number = $1", [inbound]);

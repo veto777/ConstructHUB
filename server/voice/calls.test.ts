@@ -23,6 +23,7 @@ import net from "node:net";
 import path from "node:path";
 import pg from "pg";
 import { cleanup, fakePhone, made, makeAccount, makeNumber, setProfile, type Account } from "./calls-fixtures";
+import { callAssistantTier } from "@shared/plans";
 
 process.env.DATABASE_URL = process.env.CRM_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
@@ -221,7 +222,8 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Call Assistant cal
       expect(call.flags.processedAt).toBeTruthy();
       expect(call.flags.processingAt).toBeUndefined();
       expect(call.flags.alertedKinds).toEqual(["urgent"]);
-      expect(await usage(A.orgId)).toMatchObject({ calls: 1, minutes: 3, included_minutes: 5000, overage_minutes: 0, account_user_id: A.userId }); // Solo
+      // The meter's snapshot is the held tier's included minutes (the fixture's 1,000 minutes tier), from the price book.
+      expect(await usage(A.orgId)).toMatchObject({ calls: 1, minutes: 3, included_minutes: callAssistantTier("solo").includedMinutes, overage_minutes: 0, account_user_id: A.userId });
     });
 
     it("two end reports racing for one call: exactly one does the work, minutes counted once", async () => {
@@ -296,10 +298,10 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Call Assistant cal
   });
 
   describe("browser → app", () => {
-    it("an org without the add-on gets the standard 402 plan prompt", async () => {
+    it("an org without the service gets the 402 that names it (a separate service, its own pricing link)", async () => {
       const r = await crm(n, "GET", "/calls");
       expect(r.status).toBe(402);
-      expect(r.body).toMatchObject({ code: "plan_required", addon: "call_assistant" });
+      expect(r.body).toMatchObject({ code: "call_assistant_required", addon: "call_assistant", href: "/pricing#call-assistant" });
     });
 
     it("lists the org's calls without spam; spam=1 shows spam and blocked; filters work", async () => {

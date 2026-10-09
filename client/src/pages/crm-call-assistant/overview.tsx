@@ -10,7 +10,7 @@ import { EmptyState, MetricCard, StatusPill } from "@/components/crm-ui";
 import { prettyPhone } from "@/lib/voice-studio";
 import { inNativeApp } from "@/lib/app-shell";
 import { CALL_ASSISTANT_FREE_SPAM_CALLS } from "@shared/plans";
-import { callAssistantIntroShort, callAssistantTiers, formatUsd } from "@shared/plan-copy";
+import { CALL_ASSISTANT_SEPARATE_LINE, callAssistantOverageStatusLine, callAssistantTiers, formatUsd } from "@shared/plan-copy";
 import type { VoiceStatus } from "./index";
 import { CallAssistantPausedBanner } from "./paused-banner";
 import { CallResults, type ResultsPick } from "./results";
@@ -139,7 +139,7 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
             <div>
               <div className="g-stat__label">Your tier</div>
               <div className="g-card__title g-card__title--md" data-testid="text-overview-tier">
-                {heldTier ? `${heldTier.name} — ${heldTier.minutes} minutes and ${heldTier.numbersLabel} a month` : "No tier on this account"}
+                {heldTier ? `${heldTier.name} a month and ${heldTier.numbersLabel}` : "No tier on this account"}
               </div>
             </div>
             {status.canManage !== false && (
@@ -156,7 +156,7 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
                     {t === heldTier ? "Current" : heldIndex < 0 ? "" : i > heldIndex ? "Upgrade" : "Downgrade"}
                   </span>
                 </div>
-                <span className="text-xs text-muted-foreground">{t.monthly}/mo · {t.minutes} min · {t.numbersLabel} · {t.overageShort}/min over</span>
+                <span className="text-xs text-muted-foreground">{t.monthly}/mo · {t.numbersLabel} · {t.overageShort}/min over</span>
               </li>
             ))}
           </ul>
@@ -176,15 +176,15 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
               <span className="text-sm text-muted-foreground tabular-nums" data-testid="text-overview-minutes-pct">{unlimitedMinutes ? "Unlimited" : `${pct}%`}</span>
             </div>
             {!unlimitedMinutes && <Progress value={pct} aria-label="Minutes used this month" data-testid="progress-overview-minutes" />}
-            {/* Billing copy — the per-minute price and the launch price stay out of the app (it sells nothing). */}
+            {/* Billing copy — the per-minute price stays out of the app (it sells nothing). */}
             {!inNativeApp() && (
             <details className="text-sm"><summary className="cursor-pointer py-2">Billing details</summary>
             <p className="text-xs text-muted-foreground">
-              {status.usage?.month ? `For ${status.usage.month}. ` : ""}Minutes are billed per started minute. The first {freeSpamLimit.toLocaleString("en-US")} spam calls each month never count toward your minutes; blocked numbers are rejected before answering and cost nothing.
+              {status.usage?.month ? `For ${status.usage.month}. ` : ""}Every started minute of an answered call counts. <span data-testid="text-overview-overage-status">{callAssistantOverageStatusLine(status.overageBilling, status.pricing.overageCentsPerMinute)}</span> The first {freeSpamLimit.toLocaleString("en-US")} spam calls each month never count toward your minutes; blocked numbers are rejected before answering and cost nothing.
               {status.addon.preview ? " Pricing is being finalized." : ""}
             </p>
             <p className="text-xs" data-testid="text-overview-price">
-              <span className="font-medium">{status.addon.name}:</span> Solo {callAssistantIntroShort()} (the intro price is for monthly billing and applies once, when the add-on is first added).
+              <span className="font-medium">{status.addon.name}:</span> {CALL_ASSISTANT_SEPARATE_LINE} Change tiers or add numbers in Settings → Billing.
             </p>
             </details>
             )}

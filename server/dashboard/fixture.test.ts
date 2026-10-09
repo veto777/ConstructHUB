@@ -42,17 +42,18 @@ describe("tileAccess", () => {
     expect(tileAccess(def("cloudflare"), starter)).toEqual({ entitled: false, requiredPlan: "agency", module: "cloudflareSearchConsole" });
   });
 
-  it("opens Agency modules on the Agency plan; the call assistant (on sale) is locked until its add-on is bought", () => {
+  it("opens Agency modules on the Agency plan; the call assistant (a separate service) is locked until its own subscription runs — no plan is 'required'", () => {
     const agency = { accessPlan: "agency" as const, allowances: PLANS.agency.limits, modules: ALL, hasCrmOrg: true };
     expect(tileAccess(def("adsManager"), agency).entitled).toBe(true);
-    // Launched: a plain lock naming the add-on, never "coming soon".
-    expect(tileAccess(def("callAssistant"), agency)).toEqual({ entitled: false, requiredPlan: "pro", addon: "call_assistant" });
-    expect(tileAccess(def("callAssistant"), { ...agency, addonModules: { callAssistant: false } })).toEqual({ entitled: false, requiredPlan: "pro", addon: "call_assistant" });
+    // Launched: a plain lock naming the service, never "coming soon", and never a plan (owner, 2026-10-08: bought on its own).
+    expect(tileAccess(def("callAssistant"), agency)).toEqual({ entitled: false, addon: "call_assistant" });
+    expect(tileAccess(def("callAssistant"), { ...agency, addonModules: { callAssistant: false } })).toEqual({ entitled: false, addon: "call_assistant" });
+    expect(tileAccess(def("callAssistant"), { accessPlan: null, allowances: null, modules: NONE, hasCrmOrg: false, addonModules: { callAssistant: true } })).toEqual({ entitled: true, addon: "call_assistant" });
     // "Coming soon" follows the price book: while an add-on is `preview`, its tile is coming soon.
     const saved = ADDONS.call_assistant.preview;
     try {
       ADDONS.call_assistant.preview = true;
-      expect(tileAccess(def("callAssistant"), agency)).toEqual({ entitled: false, requiredPlan: "pro", addon: "call_assistant", comingSoon: true });
+      expect(tileAccess(def("callAssistant"), agency)).toEqual({ entitled: false, addon: "call_assistant", comingSoon: true });
       // A bought add-on opens whatever the flag says.
       expect(tileAccess(def("callAssistant"), { ...agency, addonModules: { callAssistant: true } })).toEqual({ entitled: true, addon: "call_assistant" });
     } finally {
@@ -83,11 +84,15 @@ describe("sample payloads", () => {
       expect(p.tiles.map((t) => t.key)).toEqual([...DASHBOARD_TILE_KEYS]);
       for (const t of p.tiles) {
         expect(new Set(t.metrics.map((x) => x.key)).size).toBe(t.metrics.length);
-        if (t.status === "locked") expect(t.requiredPlan && !t.entitled && t.metrics.length === 0).toBe(true);
+        if (t.status === "locked") expect((t.requiredPlan || t.addon) && !t.entitled && t.metrics.length === 0).toBeTruthy();
         if (t.status === "error" || t.status === "empty") expect(t.metrics).toEqual([]);
       }
-      // The AI Call Assistant is on sale and none of the samples bought it: a plain lock, never "coming soon".
-      expect(p.tiles.find((t) => t.key === "callAssistant")).toMatchObject({ status: "locked", entitled: false, requiredPlan: "pro", addon: "call_assistant", metrics: [] });
+      // The AI Call Assistant is on sale and none of the samples bought it: a plain lock, never "coming soon", and — a
+      // separate service — no plan named: the way forward is its own pricing section.
+      const ca = p.tiles.find((t) => t.key === "callAssistant")!;
+      expect(ca).toMatchObject({ status: "locked", entitled: false, addon: "call_assistant", metrics: [], cta: { label: "See Call Assistant pricing", href: "/pricing#call-assistant" } });
+      expect(ca.requiredPlan).toBeUndefined();
+      expect(ca.message).toMatch(/separate service with its own subscription, from \$249\/mo/);
       expect(p.account.usage.every((u) => u.limit !== 0)).toBe(true);
       expect(p.account.resetsAt).toBe("2026-11-01T00:00:00.000Z");
     });

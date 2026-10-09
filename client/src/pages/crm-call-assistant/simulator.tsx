@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EmptyState } from "@/components/crm-ui";
 import { apiRequest } from "@/lib/queryClient";
-import { planRequiredFrom } from "@/components/plan-required";
+import { callAssistantGateFrom } from "@/components/plan-required";
 import { cn } from "@/lib/utils";
 import {
   DECISION_ACTION_LABELS, ESCALATION_KIND_LABELS, isFirstRun, mergeSimulatorEvents, parseApiError, simulatorErrorText, toE164,
@@ -88,7 +88,7 @@ export function SimulatorPanel() {
   const reset = () => { setSession(null); setMessages([]); setSlots({}); setEvents([]); setEnded(null); setLastError(null); };
 
   const canStart = !!profile.data && !(source === "published" && profile.data.publishedVersion == null);
-  const gate = (profile.isError && planRequiredFrom(profile.error)) ? profile.error : (start.isError && planRequiredFrom(start.error)) ? start.error : null;
+  const gate = (profile.isError && callAssistantGateFrom(profile.error)) ? profile.error : (start.isError && callAssistantGateFrom(start.error)) ? start.error : null;
   if (gate) return <div data-testid="panel-call-assistant-simulator" className="pt-4"><CallAssistantPlanRequired error={gate} /></div>;
   const lastDecision = [...messages].reverse().find((m) => m.decision)?.decision;
 

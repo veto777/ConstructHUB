@@ -1,12 +1,14 @@
 /**
  * The Call Assistant number is part of the service (owner, 2026-10-02): an
- * ended subscription or a removed add-on releases the org's numbers; fewer
- * call_number add-ons release the newest extras; a failed payment (past_due)
- * never releases anything. Against the lane's development DB with a FAKE
+ * ended subscription or a removed tier releases the org's numbers; fewer
+ * extra numbers release the newest extras; a failed payment (past_due) never
+ * releases anything. The subscription is the Call Assistant's OWN
+ * (call_assistant_subscriptions — a separate service since 2026-10-08; the
+ * platform plan plays no part). Against the lane's development DB with a FAKE
  * carrier (every release is recorded, nothing reaches SignalWire), and only
  * this file's own accounts/orgs are ever swept.
  */
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { randomInt, randomUUID } from "node:crypto";
 import { pool } from "../db";
 import { ensureVoiceSchema } from "./schema";
@@ -16,8 +18,16 @@ import {
 } from "./number-release";
 import { heldNumberCount } from "./numbers";
 import { lookupNumber } from "./profile-store";
-import { ADMIN_EMAILS, isPlatformAdminEmail } from "../admin";
-import { CALL_NUMBER_MIN_DAYS } from "@shared/plans";
+import { isPlatformAdminEmail } from "../admin";
+import { CALL_NUMBER_MIN_DAYS, callAssistantTierOf } from "@shared/plans";
+
+// A throwaway "number-release-admin-…@example.invalid" account counts as a platform admin (the real
+// ADMIN_EMAILS are never seeded into a lane DB), the way server/voice/billing.test.ts does it.
+vi.mock("../admin", async (importOriginal) => {
+  const real = await importOriginal<typeof import("../admin")>();
+  const testAdmin = (email?: string | null) => !!email && /^number-release-admin-.*@example\.invalid$/i.test(email);
+  return { ...real, isPlatformAdminEmail: (email?: string | null) => real.isPlatformAdminEmail(email) || testAdmin(email), isPlatformAdmin: (user: any) => real.isPlatformAdmin(user) || testAdmin(user?.email) };
+});
 
 const DAY = 86_400_000;
 const users: number[] = [];
@@ -39,13 +49,17 @@ const deps = (now = new Date()) => ({ carrierFor: fakeCarrier, now });
 /** A test-only number in the 555-01xx fictional range, unique per run. */
 const testPhone = () => `+1206555${String(randomInt(0, 10000)).padStart(4, "0")}`;
 
-async function account(sub: { status: string; addons?: Record<string, number>; plan?: string } | null, email?: string) {
+/** The tier and extra numbers a Call Assistant subscription holds, from the quantities map the tests speak in. */
+const lines = (addons: Record<string, number> = {}) => ({ tier: callAssistantTierOf(addons)?.tier ?? null, extraNumbers: addons.call_number ?? 0 });
+
+async function account(sub: { status: string; addons?: Record<string, number> } | null, email?: string) {
   const { rows: [u] } = await pool.query("insert into users(email, display_name, email_verified) values ($1, 'Number Release Test', true) returning id",
     [email ?? `number-release-${randomUUID()}@example.invalid`]);
   users.push(u.id);
   if (sub) {
-    await pool.query("insert into subscriptions(user_id, plan, status, stripe_subscription_id, stripe_customer_id, addons) values ($1, $2, $3, $4, $5, $6)",
-      [u.id, sub.plan ?? "pro", sub.status, `sub_nr_${randomUUID()}`, `cus_nr_${randomUUID()}`, JSON.stringify(sub.addons ?? {})]);
+    const { tier, extraNumbers } = lines(sub.addons);
+    await pool.query("insert into call_assistant_subscriptions(user_id, tier, extra_numbers, status, stripe_subscription_id, stripe_customer_id, billing_interval) values ($1, $2, $3, $4, $5, $6, 'month')",
+      [u.id, tier, extraNumbers, sub.status, `sub_nr_${randomUUID()}`, `cus_nr_${randomUUID()}`]);
   }
   const { rows: [o] } = await pool.query("insert into crm_orgs(name, owner_user_id, phone, state, industry) values ('Vitest Number Release', $1, '(206) 555-0142', 'WA', 'Siding') returning id", [u.id]);
   orgs.push(o.id);
@@ -65,9 +79,14 @@ async function number(orgId: string, ageDays: number, extra: { isTest?: boolean;
   return { phone, sid, bought };
 }
 const row = async (phone: string) => (await pool.query("select * from voice_numbers where phone_number = $1", [phone])).rows[0];
-const setSub = (userId: number, set: { status?: string; addons?: Record<string, number>; plan?: string }) => pool.query(
-  "update subscriptions set status = coalesce($2, status), addons = coalesce($3::jsonb, addons), plan = coalesce($4, plan) where user_id = $1",
-  [userId, set.status ?? null, set.addons ? JSON.stringify(set.addons) : null, set.plan ?? null]);
+/** A change to the account's Call Assistant subscription, as the webhook writes it: the status, and/or the tier + extras. */
+const setSub = async (userId: number, set: { status?: string; addons?: Record<string, number> }) => {
+  if (set.status) await pool.query("update call_assistant_subscriptions set status = $2 where user_id = $1", [userId, set.status]);
+  if (set.addons) {
+    const { tier, extraNumbers } = lines(set.addons);
+    await pool.query("update call_assistant_subscriptions set tier = $2, extra_numbers = $3 where user_id = $1", [userId, tier, extraNumbers]);
+  }
+};
 const notifications = async (orgId: string) => (await pool.query("select title, body, link, member_id from crm_notifications where org_id = $1 and type = 'call.number_released' order by created_at", [orgId])).rows;
 async function activity(orgId: string, action: string) {
   // recordActivity is fire-and-forget: poll briefly for the row.
@@ -83,18 +102,20 @@ beforeAll(async () => {
   const url = new URL(process.env.DATABASE_URL!);
   if (!["localhost", "127.0.0.1"].includes(url.hostname) || !/^\/constructhub_dev(?:_a\d+)?$/.test(url.pathname)) throw new Error("Requires a local ConstructHUB development lane DB");
   await ensureVoiceSchema();
+  const { callAssistantSchemaReady } = await import("./subscription-store");
+  await callAssistantSchemaReady();
 });
 afterAll(async () => {
   for (const t of ["voice_numbers", "crm_notifications", "crm_activity_log", "crm_members"]) await pool.query(`delete from ${t} where org_id = any($1::text[])`, [orgs]);
   await pool.query("delete from crm_orgs where id = any($1::text[])", [orgs]);
-  await pool.query("delete from subscriptions where user_id = any($1::int[])", [users]);
+  await pool.query("delete from call_assistant_subscriptions where user_id = any($1::int[])", [users]);
   await pool.query("delete from users where id = any($1::int[])", [users]);
 });
 beforeEach(() => { carrier.released.length = 0; carrier.fail = 0; });
 
 describe("the release decision (pure)", () => {
-  const sub = (status: string, addons: Record<string, number> = { call_assistant: 1 }, extra: Record<string, unknown> = {}) =>
-    ({ plan: "pro", status, addons, stripe_subscription_id: "sub_x", current_period_end: null, ...extra });
+  /** The Call Assistant subscription as the decision reads it: its status and its lines as a quantities map. */
+  const sub = (status: string, addons: Record<string, number> = { call_assistant: 1 }) => ({ status, addons });
 
   it("ended subscriptions keep nothing; past_due, incomplete and paused hold everything; admins are never touched", () => {
     for (const status of ["canceled", "incomplete_expired", "inactive"]) {
@@ -103,34 +124,30 @@ describe("the release decision (pure)", () => {
     // Stripe stopped retrying a failed payment: released too, but a fixed card can still undo it.
     expect(numbersKeptFor(sub("unpaid"), false)).toEqual({ keep: 0, reason: "payment_failed" });
     expect(numbersKeptFor(null, false)).toEqual({ keep: 0, reason: "subscription_ended" });
-    expect(numbersKeptFor({ status: null }, false)).toEqual({ keep: 0, reason: "subscription_ended" });
+    expect(numbersKeptFor({ status: null, addons: {} }, false)).toEqual({ keep: 0, reason: "subscription_ended" });
     // A failed payment pauses the assistant but NEVER releases the number.
     expect(numbersKeptFor(sub("past_due", { call_assistant: 1, call_number: 2 }), false)).toEqual({ keep: 3, reason: "over_allowance" });
     for (const status of ["incomplete", "paused", "something_new"]) expect(numbersKeptFor(sub(status), false)).toBeNull();
     expect(numbersKeptFor(sub("canceled"), true)).toBeNull();
-    // A trial grant that ran out ended too.
-    expect(numbersKeptFor(sub("trialing", { call_assistant: 1 }, { stripe_subscription_id: null, current_period_end: new Date(Date.now() - DAY) }), false))
-      .toEqual({ keep: 0, reason: "subscription_ended" });
   });
 
-  it("an active subscription keeps the held tier's numbers plus every call_number unit", () => {
+  it("an active subscription keeps the held tier's numbers plus every extra number; the platform plan plays no part", () => {
     expect(numbersKeptFor(sub("active", { call_assistant: 1 }), false)).toEqual({ keep: 1, reason: "over_allowance" });
     expect(numbersKeptFor(sub("trialing", { call_assistant: 1, call_number: 3 }), false)).toEqual({ keep: 4, reason: "over_allowance" });
-    // Crew includes 5 numbers, Fleet 20: a downgrade keeps fewer (the newest extras go; not final — upgrading back restores them).
-    expect(numbersKeptFor(sub("active", { call_assistant_crew: 1 }), false)).toEqual({ keep: 5, reason: "over_allowance" });
-    expect(numbersKeptFor(sub("active", { call_assistant_fleet: 1, call_number: 2 }), false)).toEqual({ keep: 22, reason: "over_allowance" });
-    expect(numbersKeptFor(sub("active", { call_assistant_crew: 1 }, { plan: "starter" }), false)).toEqual({ keep: 0, reason: "addon_removed" });
+    // The 2,000 minutes tier includes 2 numbers, 5,000 minutes 5: a downgrade keeps fewer (the newest extras go; not final — upgrading back restores them).
+    expect(numbersKeptFor(sub("active", { call_assistant_crew: 1 }), false)).toEqual({ keep: 2, reason: "over_allowance" });
+    expect(numbersKeptFor(sub("active", { call_assistant_fleet: 1, call_number: 2 }), false)).toEqual({ keep: 7, reason: "over_allowance" });
+    // A live subscription with no tier line (the tier was removed) pays for no number.
     expect(numbersKeptFor(sub("active", {}), false)).toEqual({ keep: 0, reason: "addon_removed" });
     expect(numbersKeptFor(sub("active", { call_number: 2 }), false)).toEqual({ keep: 0, reason: "addon_removed" });
-    // A plan that doesn't sell the add-on pays for no number.
-    expect(numbersKeptFor(sub("active", { call_assistant: 1 }, { plan: "starter" }), false)).toEqual({ keep: 0, reason: "addon_removed" });
-    // Lite includes 1 number, like Solo: a Fleet → Lite downgrade keeps 1 (plus extras); past_due holds; a cancel keeps none.
+    // The 500 minutes tier includes 1 number: a 5,000 → 500 downgrade keeps 1 (plus extras); past_due holds; a cancel keeps none.
     expect(numbersKeptFor(sub("active", { call_assistant_lite: 1 }), false)).toEqual({ keep: 1, reason: "over_allowance" });
     expect(numbersKeptFor(sub("active", { call_assistant_lite: 1, call_number: 1 }), false)).toEqual({ keep: 2, reason: "over_allowance" });
     expect(numbersKeptFor(sub("past_due", { call_assistant_lite: 1 }), false)).toEqual({ keep: 1, reason: "over_allowance" });
     expect(numbersKeptFor(sub("canceled", { call_assistant_lite: 1 }), false)).toEqual({ keep: 0, reason: "subscription_ended" });
     expect(releaseReasonText("subscription_ended")).toBe("the subscription ended");
     expect(releaseReasonText("payment_failed")).toBe("the subscription's payment was not recovered");
+    expect(releaseReasonText("addon_removed")).toBe("the AI Call Assistant tier was removed from the subscription");
   });
 
   it("a cancellation (or an attempted release) is final; a payment problem or fewer extras is not", () => {
@@ -157,8 +174,8 @@ describe("cancel → the number is released", () => {
     expect((await scheduleAccountCallNumbers(a.userId, deps())).scheduled).toBe(0);
     expect((await row(n.phone)).status).toBe("active");
 
-    // customer.subscription.deleted writes canceledRowUpdate() (status canceled, plan free, add-ons {}).
-    await setSub(a.userId, { status: "canceled", plan: "free", addons: {} });
+    // customer.subscription.deleted → endCallAssistantSubscription (status canceled, tier gone).
+    await setSub(a.userId, { status: "canceled", addons: {} });
     const s = await scheduleAccountCallNumbers(a.userId, deps());
     expect(s).toMatchObject({ decision: { keep: 0, reason: "subscription_ended" }, scheduled: 1, due: 1 });
     expect(await row(n.phone)).toMatchObject({ status: "releasing", release_reason: "subscription_ended" });
@@ -187,7 +204,7 @@ describe("cancel → the number is released", () => {
   it("not yet eligible: scheduled, stops answering, then the job releases it once the 14 days have passed", async () => {
     const a = await account({ status: "active", addons: { call_assistant: 1 } });
     const n = await number(a.orgId, 3);
-    await setSub(a.userId, { status: "canceled", plan: "free", addons: {} });
+    await setSub(a.userId, { status: "canceled", addons: {} });
 
     const s = await afterSubscriptionChange(a.userId, deps());
     expect(s).toMatchObject({ scheduled: 1, due: 0 });
@@ -220,15 +237,15 @@ describe("cancel → the number is released", () => {
     expect(carrier.released).toEqual([n.sid]);
   });
 
-  it("removing the add-on (subscription still active) releases the number too", async () => {
-    const a = await account({ status: "active", addons: { call_assistant: 1, extra_seat: 1 } });
+  it("a subscription that loses its tier (still active) releases the number too", async () => {
+    const a = await account({ status: "active", addons: { call_assistant: 1 } });
     const n = await number(a.orgId, 20);
-    await setSub(a.userId, { addons: { extra_seat: 1 } });
+    await setSub(a.userId, { addons: {} });
     const s = await scheduleAccountCallNumbers(a.userId, deps());
     expect(s.decision).toEqual({ keep: 0, reason: "addon_removed" });
     await releaseDueCallNumbers({ ...deps(), orgIds: s.orgIds });
     expect(await row(n.phone)).toMatchObject({ status: "released", release_reason: "addon_removed" });
-    expect((await notifications(a.orgId)).at(-1)!.title).toBe(`Your Call Assistant number ${n.phone} was released because the AI Call Assistant add-on was removed`);
+    expect((await notifications(a.orgId)).at(-1)!.title).toBe(`Your Call Assistant number ${n.phone} was released because the AI Call Assistant tier was removed from the subscription`);
   });
 });
 
@@ -290,24 +307,17 @@ describe("a failed payment never releases", () => {
 
 describe("what is never touched", () => {
   it("numbers of another org, the build's test number, and a platform admin's org", async () => {
-    const a = await account({ status: "canceled", plan: "free" });
+    const a = await account({ status: "canceled" });
     const mine = await number(a.orgId, 30);
     const testLine = await number(a.orgId, 30, { isTest: true });
     const other = await account({ status: "active", addons: { call_assistant: 1 } });
     const theirs = await number(other.orgId, 30);
     const noNumbers = await account(null);
-    // A platform admin's org (when the dev DB has the admin user): its numbers are never released.
-    // (dev@constructhub.local is a platform admin on a dev box with DEV_AUTH_BYPASS_USER1=true.)
-    const { rows: candidates } = await pool.query("select id, email from users where lower(email) = any($1::text[]) order by id limit 5",
-      [[...ADMIN_EMAILS, "dev@constructhub.local"].map((e) => e.toLowerCase())]);
-    const adminUser = candidates.find((u) => isPlatformAdminEmail(u.email));
-    expect(adminUser, "a platform admin user in the lane DB").toBeTruthy();
-    let adminOrg: string | null = null, adminPhone: string | null = null;
-    if (adminUser) {
-      const { rows: [o] } = await pool.query("insert into crm_orgs(name, owner_user_id, phone, state, industry) values ('Vitest Admin Org', $1, '(206) 555-0143', 'WA', 'Siding') returning id", [adminUser.id]);
-      orgs.push(o.id); adminOrg = o.id;
-      adminPhone = (await number(o.id, 30)).phone;
-    }
+    // A platform admin's org: its numbers are never released, whatever its (absent) subscription says. The admin
+    // is this file's own throwaway account (the ../admin mock above), so no lane DB has to carry a real admin.
+    const admin = await account(null, `number-release-admin-${randomUUID()}@example.invalid`);
+    expect(isPlatformAdminEmail((await pool.query("select email from users where id = $1", [admin.userId])).rows[0].email)).toBe(true);
+    const adminPhone = (await number(admin.orgId, 30)).phone;
 
     const s = await scheduleAccountCallNumbers(a.userId, deps());
     expect(s.orgIds).toEqual([a.orgId]);
@@ -315,10 +325,8 @@ describe("what is never touched", () => {
     expect(carrier.released).toEqual([mine.sid]);
     expect((await row(testLine.phone)).status).toBe("active");
     expect((await row(theirs.phone)).status).toBe("active");
-    if (adminUser && adminOrg && adminPhone) {
-      expect(await scheduleAccountCallNumbers(Number(adminUser.id), deps())).toMatchObject({ decision: null, scheduled: 0 });
-      expect((await row(adminPhone)).status).toBe("active");
-    }
+    expect(await scheduleAccountCallNumbers(admin.userId, deps())).toMatchObject({ decision: null, scheduled: 0 });
+    expect((await row(adminPhone)).status).toBe("active");
     // An account with no numbers costs one query and decides nothing.
     expect(await scheduleAccountCallNumbers(noNumbers.userId, deps())).toMatchObject({ orgIds: [], scheduled: 0 });
   });
@@ -328,12 +336,12 @@ describe("a cancellation is final (owner: \"you don't keep the number\")", () =>
   it("a customer who cancels and subscribes again within the 14 days does not get the young number back; they can buy a new one", async () => {
     const a = await account({ status: "active", addons: { call_assistant: 1 } });
     const n = await number(a.orgId, 3);
-    await setSub(a.userId, { status: "canceled", plan: "free", addons: {} });
+    await setSub(a.userId, { status: "canceled", addons: {} });
     expect(await scheduleAccountCallNumbers(a.userId, deps())).toMatchObject({ scheduled: 1, due: 0 });
     expect(await row(n.phone)).toMatchObject({ status: "releasing", release_reason: "subscription_ended" });
 
     // A new checkout a few days later (checkout.session.completed → afterSubscriptionChange).
-    await setSub(a.userId, { status: "active", plan: "pro", addons: { call_assistant: 1 } });
+    await setSub(a.userId, { status: "active", addons: { call_assistant: 1 } });
     expect(await scheduleAccountCallNumbers(a.userId, deps())).toMatchObject({ restored: 0, scheduled: 0 });
     expect(await row(n.phone)).toMatchObject({ status: "releasing", release_reason: "subscription_ended" });
     // The old number no longer counts against the allowance: the returning customer can buy a new one now.
@@ -358,12 +366,12 @@ describe("a cancellation is final (owner: \"you don't keep the number\")", () =>
     await scheduleAccountCallNumbers(b.userId, deps());
     expect((await row(m.phone)).release_reason).toBe("payment_failed");
     // Stripe then cancels the unpaid subscription: the release is final from here on.
-    await setSub(b.userId, { status: "canceled", plan: "free", addons: {} });
+    await setSub(b.userId, { status: "canceled", addons: {} });
     expect(await scheduleAccountCallNumbers(b.userId, deps())).toMatchObject({ scheduled: 0 });
     const r = await row(m.phone);
     expect(r).toMatchObject({ status: "releasing", release_reason: "subscription_ended" });
     expect(new Date(r.release_eligible_at).getTime()).toBe(m.bought.getTime() + CALL_NUMBER_MIN_DAYS * DAY);
-    await setSub(b.userId, { status: "active", plan: "pro", addons: { call_assistant: 1 } });
+    await setSub(b.userId, { status: "active", addons: { call_assistant: 1 } });
     expect(await scheduleAccountCallNumbers(b.userId, deps())).toMatchObject({ restored: 0 });
     expect((await row(m.phone)).status).toBe("releasing");
   });
@@ -412,7 +420,7 @@ describe("the off switch and the Billing preview", () => {
   it("VOICE_NUMBER_RELEASE_WORKER_ENABLED=false stops the background release after a webhook; decisions still run", async () => {
     const a = await account({ status: "active", addons: { call_assistant: 1 } });
     const n = await number(a.orgId, 30);
-    await setSub(a.userId, { status: "canceled", plan: "free", addons: {} });
+    await setSub(a.userId, { status: "canceled", addons: {} });
     const off = await afterSubscriptionChange(a.userId, { ...deps(), env: { NODE_ENV: "production", VOICE_NUMBER_RELEASE_WORKER_ENABLED: "false" } });
     expect(off).toMatchObject({ scheduled: 1, due: 1 });
     await new Promise((r) => setTimeout(r, 300));
@@ -440,32 +448,33 @@ describe("the off switch and the Billing preview", () => {
   });
 
   it("a smaller tier keeps fewer numbers: the preview names the newest ones, the switch schedules them (not final), upgrading back restores them", async () => {
-    // Fleet includes 20 numbers, Crew 5; the org holds 7 (oldest first).
-    const a = await account({ status: "active", addons: { call_assistant_fleet: 1 } });
+    // The 5,000 minutes tier includes 5 numbers (+ 2 extras = 7), 2,000 minutes 2, 1,000 minutes 1; the org holds 7 (oldest first).
+    const a = await account({ status: "active", addons: { call_assistant_fleet: 1, call_number: 2 } });
     const held = [];
     for (const age of [70, 60, 50, 40, 30, 20, 3]) held.push(await number(a.orgId, age));
+    // → 2,000 minutes (as the confirm step asks it: just the new tier; the extras stay): keeps 2 + 2, names the 3 newest.
     expect(await previewCallNumberReleases(a.userId, { addons: { call_assistant_crew: 1 } }))
-      .toEqual(held.slice(5).map((n) => ({ phoneNumber: n.phone, orgName: "Vitest Number Release" })));
-    // Fleet → Solo (as the confirm step asks it: just the new tier) names the 6 newest; an upgrade names none.
-    expect((await previewCallNumberReleases(a.userId, { addons: { call_assistant: 1 } })).map((n) => n.phoneNumber)).toEqual(held.slice(1).map((n) => n.phone));
+      .toEqual(held.slice(4).map((n) => ({ phoneNumber: n.phone, orgName: "Vitest Number Release" })));
+    // → 1,000 minutes names the 4 newest; the held tier names none.
+    expect((await previewCallNumberReleases(a.userId, { addons: { call_assistant: 1 } })).map((n) => n.phoneNumber)).toEqual(held.slice(3).map((n) => n.phone));
     expect(await previewCallNumberReleases(a.userId, { addons: { call_assistant_fleet: 1 } })).toEqual([]);
     expect(carrier.released).toEqual([]);
 
-    // The switch lands (webhook / add-on route): Solo keeps the oldest; the rest stop answering, over_allowance.
-    await setSub(a.userId, { addons: { call_assistant: 1 } });
+    // The switch lands (webhook / the change route): 1,000 minutes keeps the three oldest; the rest stop answering, over_allowance.
+    await setSub(a.userId, { addons: { call_assistant: 1, call_number: 2 } });
     const s1 = await scheduleAccountCallNumbers(a.userId, deps());
-    expect(s1).toMatchObject({ decision: { keep: 1, reason: "over_allowance" }, scheduled: 6 });
-    expect((await row(held[0].phone)).status).toBe("active");
-    for (const n of held.slice(1)) expect(await row(n.phone)).toMatchObject({ status: "releasing", release_reason: "over_allowance" });
-    // Back up to Crew before they are released: the five oldest are kept again (a downgrade is not a cancellation).
-    await setSub(a.userId, { addons: { call_assistant_crew: 1 } });
+    expect(s1).toMatchObject({ decision: { keep: 3, reason: "over_allowance" }, scheduled: 4 });
+    for (const n of held.slice(0, 3)) expect((await row(n.phone)).status).toBe("active");
+    for (const n of held.slice(3)) expect(await row(n.phone)).toMatchObject({ status: "releasing", release_reason: "over_allowance" });
+    // Back up to 2,000 minutes before they are released: the fourth is kept again (a downgrade is not a cancellation).
+    await setSub(a.userId, { addons: { call_assistant_crew: 1, call_number: 2 } });
     const s2 = await scheduleAccountCallNumbers(a.userId, deps());
-    expect(s2).toMatchObject({ decision: { keep: 5, reason: "over_allowance" }, restored: 4 });
-    expect((await row(held[4].phone)).status).toBe("active");
-    expect((await row(held[5].phone)).status).toBe("releasing");
+    expect(s2).toMatchObject({ decision: { keep: 4, reason: "over_allowance" }, restored: 1 });
+    expect((await row(held[3].phone)).status).toBe("active");
+    expect((await row(held[4].phone)).status).toBe("releasing");
   });
 
-  it("Fleet → Lite keeps the oldest number and schedules the rest (not final); a Lite cancel releases them all", async () => {
+  it("5,000 → 500 minutes keeps the oldest number and schedules the rest (not final); a cancel then releases them all", async () => {
     const a = await account({ status: "active", addons: { call_assistant_fleet: 1 } });
     const held = [];
     for (const age of [70, 60, 3]) held.push(await number(a.orgId, age));

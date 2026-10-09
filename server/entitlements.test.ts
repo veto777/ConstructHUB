@@ -122,7 +122,7 @@ describe("platform admin all-access matrix (admin vs agency vs pro)", () => {
     expect(ent.allowances!.autoPublishAiReplies).toBe(true);
     expect(Object.values(ent.modules).every(Boolean)).toBe(true);
     expect(ent.addonModules.callAssistant).toBe(true);
-    expect(callAssistantAllowance(ent)).toEqual({ numbers: ADMIN_CALL_ASSISTANT_NUMBERS, minutes: -1, overageCentsPerMinute: 10 });
+    expect(callAssistantAllowance(ent)).toEqual({ numbers: ADMIN_CALL_ASSISTANT_NUMBERS, minutes: -1, overageCentsPerMinute: 50 });
     // The gates: a location at any count fits; the agency workspace is on.
     expect(fitsLimit(ent.allowances!.locations, 10_000, 50)).toBe(true);
     expect(ent.modules.agencyWorkspace).toBe(true);
@@ -138,13 +138,14 @@ describe("platform admin all-access matrix (admin vs agency vs pro)", () => {
     expect(agency.addonModules.callAssistant).toBe(false);
     expect(callAssistantAllowance(agency)).toEqual({ numbers: 0, minutes: 0, overageCentsPerMinute: 0 });
 
-    mocks.row = customer("pro", { addons: { call_assistant: 1 } });
+    // The AI Call Assistant is its own subscription (the call_assistant_* columns the account query joins in).
+    mocks.row = customer("pro", { call_assistant_tier: "solo", call_assistant_status: "active", call_assistant_extra_numbers: 0 });
     const pro = await getEntitlements(7);
     expect(pro.isPlatformAdmin).toBe(false);
     expect(pro.allowances).toEqual(PLANS.pro.limits);
     for (const k of USAGE_CAPS) expect(pro.allowances![k], k).not.toBe(-1);
     expect(Object.values(pro.modules).some(Boolean)).toBe(false);
-    expect(callAssistantAllowance(pro)).toEqual({ numbers: 1, minutes: 5000, overageCentsPerMinute: 10 }); // Solo: the price book's tier
+    expect(callAssistantAllowance(pro)).toEqual({ numbers: 1, minutes: 1000, overageCentsPerMinute: 50 }); // the 1,000 minutes tier: the price book's
     // A full pro location count is still refused.
     expect(fitsLimit(pro.allowances!.locations, 1)).toBe(false);
   });

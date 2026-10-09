@@ -97,7 +97,8 @@ describe("dashboard for a platform admin", () => {
     expect(usage.protectedSites).toBeUndefined();
     const keys = dashboardAttention(p.tiles, p.account).map((a) => a.key);
     expect(keys).toEqual(expect.arrayContaining(["usage.locations", "usage.searches"]));
-    // Not an admin and no add-on bought: the (launched) AI Call Assistant is locked like any tile — not "coming soon".
-    expect(p.tiles.find((t) => t.key === "callAssistant")).toMatchObject({ status: "locked", entitled: false, requiredPlan: "pro", addon: "call_assistant", metrics: [] });
+    // Not an admin and the service not bought: the (launched) AI Call Assistant is locked like any tile — not "coming soon", no plan named.
+    expect(p.tiles.find((t) => t.key === "callAssistant")).toMatchObject({ status: "locked", entitled: false, addon: "call_assistant", metrics: [] });
+    expect(p.tiles.find((t) => t.key === "callAssistant")!.requiredPlan).toBeUndefined();
   });
 });

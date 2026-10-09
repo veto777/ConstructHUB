@@ -20,7 +20,8 @@ export const latencyBucket = (ms: number) => (ms < 5_000 ? "<5s" : ms < 15_000 ?
 /** Reasons are P-codes, O-codes, limit names or latency buckets: short fixed tokens only. */
 export const safeReason = (reason: string) => (/^[\w<>=.-]{1,24}$/.test(reason) ? reason : "-");
 
-export function logLine(outcome: HubOutcome | "error" | "warm", reason: string, ms: number): void {
+/** "usage": one line per model call with the token counts the provider reported ("in6512-out143"), never text. */
+export function logLine(outcome: HubOutcome | "error" | "warm" | "usage", reason: string, ms: number): void {
   console.log(`hub: ${outcome} ${safeReason(reason)} ${Math.round(ms)}`);
 }
 

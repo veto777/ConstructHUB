@@ -6,7 +6,7 @@
  */
 import {
   PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, AGENCY_SELF_SERVE_MAX_LOCATIONS,
-  MODULE_NAMES, agencyMonthlyCents, effectivePlanKey, showsPrice,
+  MODULE_NAMES, agencyMonthlyCents, effectivePlanKey, showsPrice, isCallAssistantAddon,
   type Addon, type AddonKey, type AddonModuleKey, type BillingInterval, type ModuleKey, type Plan, type PlanKey, type PlanLimits,
 } from "@shared/plans";
 
@@ -47,8 +47,9 @@ export function addonPlanNames(addon: Addon): string {
   return PLAN_KEYS.filter((k) => addon.availableOn.includes(k)).map((k) => PLANS[k].name).join(", ");
 }
 
+/** The platform add-ons a plan sells. The AI Call Assistant's (its tiers, the extra number) are never among them: a separate subscription. */
 export function addonsForPlan(plan: PlanKey): Addon[] {
-  return (Object.keys(ADDONS) as AddonKey[]).map((k) => ADDONS[k]).filter((a) => a.availableOn.includes(plan));
+  return (Object.keys(ADDONS) as AddonKey[]).map((k) => ADDONS[k]).filter((a) => !isCallAssistantAddon(a.key) && a.availableOn.includes(plan));
 }
 
 // ── Agency locations ────────────────────────────────────────────────────────
@@ -139,6 +140,8 @@ export type EntitlementsInfo = {
   modules: Record<ModuleKey, boolean>;
   /** Add-on modules that are on (every one for platform admins). */
   addonModules?: Partial<Record<AddonModuleKey, boolean>>;
+  /** Bought but paused for a payment (the AI Call Assistant's own subscription). */
+  addonModulesPaused?: Partial<Record<AddonModuleKey, boolean>>;
   addons: Partial<Record<AddonKey, number>>;
   locations: UsageMeter;
   usage: Partial<Record<UsageKey, UsageMeter>>;

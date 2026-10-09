@@ -61,8 +61,11 @@ export type DashboardGate =
    * the viewer's own allowance for `limit` decides.
    */
   | { kind: "crmAllowance"; limit: "teamTextSegments" }
-  /** An add-on not sold yet: the tile is always "coming_soon" in this build. */
-  | { kind: "addon"; addon: AddonKey | "call_assistant"; requiredPlan: PlanKey };
+  /**
+   * The AI Call Assistant: a separate service on its own subscription (shared/plans.ts), so no plan is
+   * "required" — the tile is locked until that subscription runs ("coming_soon" while the price book says `preview`).
+   */
+  | { kind: "addon"; addon: AddonKey | "call_assistant" };
 
 export type DashboardTileDef = {
   key: DashboardTileKey;
@@ -113,7 +116,7 @@ export const DASHBOARD_TILES: readonly DashboardTileDef[] = [
   { key: "crmSchedule", group: "run", title: "Schedule", description: "Appointments and crew visits.", href: "/crm/schedule", surface: "portal", gate: { kind: "crm" } },
   { key: "crmLeads", group: "run", title: "Leads & follow-ups", description: "New leads and the follow-ups that are due.", href: "/crm/pipeline", surface: "portal", gate: { kind: "crm" } },
   { key: "texting", group: "run", title: "Texting", description: "Team alerts and client texts from your CRM.", href: "/crm/settings", surface: "portal", gate: { kind: "crmAllowance", limit: "teamTextSegments" } },
-  { key: "callAssistant", group: "run", title: "AI Call Assistant", description: "An assistant that answers your calls 24/7 and files the lead in your CRM.", href: "/call-assistant", surface: "app", gate: { kind: "addon", addon: "call_assistant", requiredPlan: "pro" } },
+  { key: "callAssistant", group: "run", title: "AI Call Assistant", description: "An assistant that answers your calls 24/7 and files the lead in your CRM — a separate service with its own subscription.", href: "/call-assistant", surface: "app", gate: { kind: "addon", addon: "call_assistant" } },
   { key: "agency", group: "run", title: "Agency workspace", description: "Client workspaces, team roles and bulk actions.", href: "/agency", surface: "app", gate: { kind: "module", module: "agencyWorkspace" } },
   // ── Learn ────────────────────────────────────────────────────────────────
   { key: "masterClass", group: "learn", title: "Master Class", description: "The contractor marketing course.", href: "/master-class", surface: "app", gate: { kind: "none" } },

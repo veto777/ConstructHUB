@@ -330,15 +330,36 @@ number - that is the entire purpose of the service you don't keep the number." `
 
 ## 14. Pricing (shared/plans.ts)
 
+**Current (owner, 2026-10-08): the AI Call Assistant is a SEPARATE SERVICE** with its own Stripe subscription
+(`call_assistant_subscriptions`, `server/voice/subscription.ts`), bought with or without a platform plan; no plan
+includes it. Four tiers, one per account, every figure from `CALL_ASSISTANT_TIERS`:
+
+| tier key | add-on key | name | monthly | yearly (11 ×) | includes | overage |
+|---|---|---|---|---|---|---|
+| `lite` | `call_assistant_lite` | 500 minutes | $249 | $2,739 | 500 min + 1 number | $0.50/min |
+| `solo` | `call_assistant` | 1,000 minutes | $349 | $3,839 | 1,000 min + 1 number | $0.50/min |
+| `crew` | `call_assistant_crew` | 2,000 minutes | $449 | $4,939 | 2,000 min + 2 numbers | $0.50/min |
+| `fleet` | `call_assistant_fleet` | 5,000 minutes | $999 | $10,989 | 5,000 min + 5 numbers | $0.50/min |
+
+Extra number (`call_number`): $5/mo, $50/yr (10 ×, the old contract — unchanged; the 2026-10-08 repricing named the four tiers only).
+No intro price, no trial; above 5,000 minutes a month is "talk to a sales rep", never a listed price. Yearly is
+11 × monthly (one month free; the platform plans stay 10 ×). Overage is billed per started minute at the rate in
+force when the call ends, on the Call Assistant's own subscription (`billing-usage.ts`); when the subscription
+ends, every outstanding month is settled first, and the sweep bills every finished month, not only last month.
+
+<details><summary>Historical — 2026-10-02 pricing (superseded 2026-10-08, kept for the record)</summary>
+
 | add-on | monthly | annual | includes | on |
 |---|---|---|---|---|
 | `call_assistant` "AI Call Assistant" | $249 (intro $99 × 3 months, monthly billing only) | **$1,999** (owner, 2026-10-02; no intro) | 1 number + 500 min/mo, then $0.15/min overage | pro, growth, agency |
 | `call_number` "Extra Call Assistant number" | $5 | $50 (10×) | one more number (requires call_assistant) | pro, growth, agency |
 
-Every surface reads "$99/mo for your first 3 months, then $249/mo — or $1,999/yr" from the price book
-(`shared/plan-copy.ts callAssistantIntroShort/Line`). $1,999 is above the $1,000 sales threshold but is an
-add-on annual price, exempt like plan annuals (pricing page, Hub output filter). The intro coupon
-(`server/billing/intro.ts`) is monthly-only.
+Every surface read "$99/mo for your first 3 months, then $249/mo — or $1,999/yr" from the price book
+(`shared/plan-copy.ts callAssistantIntroShort/Line`). $1,999 was above the $1,000 sales threshold but an
+add-on annual price, exempt like plan annuals. The intro coupon (`server/billing/intro.ts`) was monthly-only and
+is no longer granted (the module stays for the grants it recorded).
+
+</details>
 
 **Stop paying → the agent stops — FIXED (owner, 2026-10-02):** the `callAssistant` module is on only while the
 subscription is `active` or `trialing` (`ADDON_MODULE_RUN_STATUSES`), though the plan keeps `past_due` access.
@@ -417,7 +438,10 @@ voice route answers 402. Numbers/Studio edits need `manageSettings` (the panels 
 
 - Pricing (§14): $249/mo incl. 1 number + 500 min, $0.15/min overage, $5/mo per extra number — confirm or change.
   (Answered 2026-10-02: $99/mo × 3 intro on monthly billing; annual $1,999 with no intro; a cancelled
-  subscription loses its number; a failed payment pauses the agent.)
+  subscription loses its number; a failed payment pauses the agent.
+  **Re-answered 2026-10-08 — historical above:** a separate service, four tiers 500/1,000/2,000/5,000 minutes at
+  $249/$349/$449/$999, 50¢ overage everywhere, yearly 11 ×, no intro; see §14. Still open: the extra number's
+  yearly price, $55 (11 ×) or $50 (10 ×).)
 - Spanish: STT/TTS support for `languages: ["es"]` is a later lane; keep the field but hide the option until then?
 - Appointments: keep OFF for v1 (schema present, booking tools not built) — confirm.
 - Telegram alerts: the CRM has no Telegram channel; v1 uses SMS/email/in-app. Add Telegram to the CRM later?
@@ -449,7 +473,9 @@ The lanes' contract extensions, recorded in `LANE-NOTES-*.md`, as merged:
 - **Numbers** — `VOICE_NUMBERS_MOCK=true` (dev/e2e only), purchase failures kept as `failed` rows, release through
   the carrier that holds the row. Overage sweep `startVoiceOverageWorker` (production + Stripe +
   `VOICE_OVERAGE_WORKER_ENABLED=true`), started from `registerVoiceRoutes`.
-- **Intro price** (owner, 2026-10-02) — `call_assistant` is $99/mo for the first 3 months, then the regular price:
+- ~~**Intro price** (owner, 2026-10-02) — `call_assistant` is $99/mo for the first 3 months, then the regular price:
   a Stripe coupon (`duration: repeating`, 3 months, `amount_off` = regular − $99) applied once per customer when the
-  add-on is first added (§14 pricing stays the placeholder until the owner confirms it).
+  add-on is first added (§14 pricing stays the placeholder until the owner confirms it).~~ **Superseded 2026-10-08:**
+  there is no intro price; the service is bought on its own subscription at the §14 prices from the first invoice.
+  `server/billing/intro.ts` stays only for the grants it recorded and is never called from the Call Assistant checkout.
 

@@ -7,6 +7,7 @@
  * end (recordCancellation) is written beside them, and withBillingLock keeps
  * one account's billing changes from running at the same time.
  */
+import { BillingRequestError } from "./order";
 import type Stripe from "stripe";
 import { pool } from "../db";
 import type { subscriptions } from "@shared/schema";
@@ -202,13 +203,29 @@ const billingQueues = new Map<number, Promise<void>>();
  * process (constructhub.service), and Stripe-side checks in the routes cover
  * what a lock can't (a subscription the webhook hasn't reported yet).
  */
-export async function withBillingLock<T>(userId: number, fn: () => Promise<T>): Promise<T> {
+export const BILLING_QUEUE_WAIT_MS = 30_000;
+export async function withBillingLock<T>(userId: number, fn: () => Promise<T>, waitMs = BILLING_QUEUE_WAIT_MS): Promise<T> {
   const prior = billingQueues.get(userId) ?? Promise.resolve();
   let release!: () => void;
   const mine = new Promise<void>((resolve) => { release = resolve; });
   const tail = prior.then(() => mine);
   billingQueues.set(userId, tail);
-  await prior;
+  // The wait for the turn is bounded: a request stuck behind a slow one is told "busy, try again"
+  // (503) rather than left hanging; its own turn is then released at once so the next waiter moves.
+  let timer: NodeJS.Timeout | undefined;
+  const timedOut = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new BillingRequestError(503, "Billing is busy with another change to this account. Try again in a moment.", "billing_busy")), waitMs);
+    timer.unref?.();
+  });
+  try {
+    await Promise.race([prior, timedOut]);
+  } catch (e) {
+    clearTimeout(timer);
+    // Our place in the queue is given up without running: the waiter behind us follows the one before us.
+    prior.then(release, release);
+    throw e;
+  }
+  clearTimeout(timer);
   try {
     return await fn();
   } finally {

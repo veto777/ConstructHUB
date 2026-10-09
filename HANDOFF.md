@@ -2,6 +2,196 @@
 
 _Last updated 2026-08-24. Repo: `veto777/ConstructHUB` (private). Local: `/home/veto/ConstructHUB` on the tower._
 
+## ☎️ 2026-10-08 (late evening) — the AI Call Assistant is a SEPARATE SERVICE, repriced (branch `billing/call-assistant`, NOT deployed)
+- **Owner decisions:** the Call Assistant is sold on its **own subscription**, like the CRM (`fd964e1`, `069ffdf`): no platform plan
+  includes it, and it is bought **with or without a platform plan**. New tiers (keys lite/solo/crew/fleet kept so the voice code paths
+  stand; names and numbers new): **500 minutes $249/mo (1 number) · 1,000 minutes $349/mo (1 number) · 2,000 minutes $449/mo
+  (2 numbers) · 5,000 minutes $999/mo (5 numbers)**. **Overage 50¢ a minute on every tier** (the 10¢/5¢ rates were below cost).
+  **Yearly = 11 × monthly** (one month free — a smaller discount than the plans' 10 ×; `CALL_ASSISTANT_ANNUAL_MONTHS`) for the four
+  tiers; the extra number is unchanged at $5/mo, $50/yr (10 ×). **No intro offer** (the $99 × 3 Solo intro is gone; `server/billing/intro.ts` stays for the grants it
+  recorded and is inert — `intro.test.ts` pins that). **More than 5,000 minutes = "Talk to a sales rep"**, never a listed price. Nobody
+  held a tier in production (0 rows), so nothing is grandfathered. **Not part of the founding member price lock** (plans + Agency bands
+  only; said in `shared/pricing-terms.ts priceSnapshot` and `founding-baseline.test.ts`).
+- **How it works:** `call_assistant_subscriptions` (one row per account; DDL in `server/voice/subscription-store.ts`, listed in
+  `scripts/apply-schema-migration.ts`, created on first use). Routes `server/voice/subscription.ts`: `GET /api/call-assistant/billing/plans`,
+  `GET …/subscription`, `POST …/checkout` (Stripe Checkout on the same customer, `metadata.product = "call_assistant"`, no trial, no
+  coupon), `POST …/change` (tier / interval / extra numbers re-priced in place, prorated, `error_if_incomplete`, then the number-release
+  decision). Prices are the existing add-on Prices found/created by lookup key from the cents (`chub_v1_addon_call_assistant_*_<cents>`),
+  so the new cents made new Stripe Prices on the first checkout — no manual Stripe work. The webhook (`server/stripe.ts`) hands every event
+  for one (`isCallAssistantSubscription`: `metadata.product`, or a tier line with no plan line) to `applyCallAssistantSubscription` /
+  `endCallAssistantSubscription` and then `afterSubscriptionChange` (numbers released when it ends, past_due only pauses — unchanged
+  rules); the platform checkout ignores these subscriptions (never "has_subscription", never withholds the trial) and refuses the Call
+  Assistant's add-on keys (`availableOn: []`, `checkAddonsForPlan`). `getEntitlements` joins the row into the one account query
+  (`call_assistant_*` columns): `addonModules.callAssistant` is on while THAT subscription holds a tier and is active/trialing, paused on a
+  payment-needed status, and its tier + extra numbers are merged into `ent.addons`, so `callAssistantAllowance`, the meter
+  (`billing-usage.ts`, overage now billed on the Call Assistant's own subscription), number release (`numbersKeptFor` reads the service's
+  row) and every voice route work as before. A Call Assistant key left on a platform row grants nothing (`withoutCallAssistantAddons`).
+  The CRM-plan gate no longer covers `/api/crm/voice/*` (the service gates on its own subscription). 402 without it is now
+  `call_assistant_required` (+ `href: /pricing#call-assistant`), not `plan_required`.
+- **Copy:** every plan (platform and CRM) carries "The AI Call Assistant — … (a separate service, from $249/mo)" in `notIncluded`;
+  Pricing has its own `#call-assistant` section (`CallAssistantPlanCards`: review dialog → checkout, switches in place); Settings → Billing
+  has a Call Assistant card (tier picker, extra numbers, cancel via the portal); `/call-assistant`, the Hub pack (section 30 "a separate
+  service", `output-filter` refuses "an add-on to the … plan" / "the … plan includes the Call Assistant" and every old amount),
+  help, dashboard lock ("Separate service", no required plan), Terms, `docs/brand/FACT-BASE.md`.
+- **Judgment calls to confirm with the owner:** tier names are the minutes ("500 minutes" …) — the brief said names change but gave none;
+  the extra number's yearly price stays the old contract's $50/yr (10 ×; the repricing named the four tiers only — audit #4 put it back
+  from the $55 the first pass had set); the service has NO trial (it costs real minutes); a Call Assistant customer
+  without a CRM plan can run the assistant (leads are still filed into their org's CRM data; the Calls tab shows every call).
+- **Codex audit #1 fixes (2026-10-09, `callassist-audit-1.md`):** (1) one live subscription per account under a race — the open
+  Checkout Session id is kept on the row (`open_checkout_session_id`, additive ALTER in `CALL_ASSISTANT_SUBSCRIPTION_DDL`) and re-read by
+  id before another checkout (finished → it is the subscription, open → reused or expired first; an expire that fails means it just
+  completed), Stripe's lists are paginated, and a second LIVE subscription the webhook sees never replaces the tracked one: it is
+  cancelled at Stripe when it is ours (`subscriptions.cancel` with `prorate` + `invoice_now` — the unused time becomes customer credit,
+  never a refund by itself) and logged + recorded as an ops issue either way. (2) Overage never lost: ending a subscription settles every
+  outstanding month first (`settleVoiceOverageForAccount`, before the tier is cleared), an ended subscription's minutes are billed to its
+  customer as an item invoiced right away (the row keeps its customer/subscription ids), and the sweep covers EVERY finished month.
+  (3) Gabe's daily token cap is durable and atomic: `hub_usage_days` (day PK; one conditional upsert reserves prompt-estimate + max_tokens
+  BEFORE dispatch, settled to the provider's counts after; timeouts keep the reservation; the cap can be overshot by at most one
+  reservation). (4) Output filter: a Call Assistant price is bound to the service and its tier (any other amount in a Call Assistant
+  sentence, a tier at another tier's price, a priced tier above 5,000 minutes → O9); spelled-out and subject-first customer counts → O10.
+  (5) OpenAI model allowlist enforced in every environment (TruthCoder dev behaviour unchanged). (7) The admin checkout test uses a real
+  admin fixture and asserts zero Stripe calls. (8) SPEC §14 / ui-map / this file: old tiers marked historical.
+- **Codex audit #2 fixes (2026-10-09, `callassist-audit-2.md`) — the cure for every check-then-write is `server/billing/locks.ts`**
+  (the SEO lane's advisory-lock sections lifted as a generic copy: `withCallAssistantLock(userId, fn)` = `pg_advisory_xact_lock` on a
+  dedicated pooled connection, savepoints for nesting, `BillingBusyError` 503 on contention; same tests in `server/billing/locks.test.ts`).
+  (1) The checkout route, the webhook handlers for the service, the duplicate reconciliation and every overage claim run under that
+  lock; each checkout attempt is persisted first (`open_checkout_attempt_id/_order`) with a stable Stripe idempotency key
+  (`chub-ca-checkout-<attempt>`); a duplicate whose cancellation fails is remembered on the row (`duplicate_subscription_id`,
+  `duplicate_retry_needed`), recorded as a critical ops issue and THROWN — the webhook answers 400, its ledger claim is released and
+  Stripe retries; `retryDuplicateCancellations` runs at boot + every 6 h (`startCallAssistantReconcileWorker`). (2) Overage is claimed
+  before it is billed: `voice_overage_claims` (one row per org-month-rate range, UNIQUE on the range start, state pending → queued →
+  invoiced / failed-retried-as-is, keeps the Stripe item/invoice ids); the monthly report, the sweep and settle-on-end all go through
+  `reportVoiceOverage` → claims, so two settlements never bill overlapping minutes; "queued" (item on the subscription's next invoice)
+  and "invoiced" are tracked apart, and ending the subscription invoices every queued claim now on the kept customer
+  (`invoiceQueuedVoiceOverage`). (3) The token cap admits a reservation only when `existing + reservation ≤ cap` (the first of the day
+  included; one conditional `INSERT … SELECT … ON CONFLICT … WHERE`), the estimate is an upper bound (chars ÷ 2.5 + framing + max_tokens);
+  `server/hub/store.test.ts` proves it against real Postgres with 10 parallel reservations. (4) Output filter: the service's context
+  carries under a "Call Assistant" heading and into "It costs …" sentences, the dash form ("10,000 minutes — $999/month") is bound, the
+  extra number's $5/month, $50/year count only in the extra number's own clause (audit #7: every amount in a Call Assistant
+  sentence is bound to the product clause it sits in — a plan, the CRM, an add-on, the extra number) and the 50¢ only beside "minute", and "one"/"a single" count ("We have
+  one customer"). (5) SPEC §20 intro bullet, ui-map pricing add-ons and the home-settings Call Assistant row carry supersession notes.
+  Lane tests with the real lock: `server/voice/subscription-lock.test.ts` (two live subscriptions in parallel → one tracked, one
+  cancelled; a failed cancel remembered, thrown and retried) and `server/voice/billing.test.ts` (concurrent settle → one claim; a late
+  call → only the delta; a failed claim retried as is; a queued claim invoiced at the end).
+- **Codex audit #3 fixes (2026-10-09, `callassist-audit-3.md`) — one pattern for every crash window: claim under the lock → the
+  Stripe call outside it → record the outcome under the lock, and reconcile an uncertain outcome against Stripe before ever creating
+  again.** (1) Every subscription transition is `syncCallAssistantSubscription`: resolve the account → take the shared lock → read
+  the subscription from Stripe INSIDE it → apply the whole transition (a stale "active" behind a cancellation never restores
+  access); the webhook, the change route and the checkout's "finished session" path all go through it. (2) `voice_overage_claims`
+  is the unit of work and carries everything immutable (customer, subscription and interval as of the claim, rate, minutes,
+  idempotency key; the claim id goes into the Stripe item's metadata); the claim and the meter marker are one transaction
+  (`reported` = claimed); Stripe is called outside the lock with the claim's own parameters; a claim left `creating` is reconciled
+  by reading the customer's invoice items for its id before anything is created; a lease (`leased_until`) keeps two processors off
+  one claim; a CHECK on the range plus an overlap check in the claim function sit beside the UNIQUE. (3) An end is recorded in the
+  same transaction as a `voice_settle_jobs` row; the job (`runVoiceSettlement`) claims every outstanding month invoice-now on the
+  job's customer, re-aims the subscription's unfinished claims, invoices every queued claim, and is retried by every sweep
+  (`sweepVoiceOverage`: finished months, unfinished claims, orphaned queued claims → jobs, pending/failed jobs); a failed settlement
+  is recorded on the job + ops issue, never swallowed. (4) Bounded: Stripe client `timeout` 20 s (`STRIPE_TIMEOUT_MS`), the
+  in-process billing queue waits 30 s at most (503 `billing_busy`), lock sections do database work only. (5) No tokenizer package
+  is installed, so the reservation is a documented bound — half a token per ASCII byte, a whole token per every other byte
+  (the byte-fallback worst case), + 32 framing + max_tokens (≥ chars ÷ 2) — and a settlement above the reservation is counted. (6) Filter: the service's section survives blank lines until another heading-like
+  line; "one paying/active/happy customer" is refused. (7) ui-map landing/hero price lines marked historical; this file's cap text.
+- **Codex audit #4 (2026-10-09, `callassist-audit-4.md`) — the last round, and the SAFETY SWITCH.** `CALL_ASSISTANT_OVERAGE_BILLING`
+  = `on` | `off`, **default OFF**: minutes and overage are metered and shown (Limits & usage, the billing card says "Minutes above your
+  plan are not charged yet", the admin card), but no Stripe item or invoice is ever created and no settlement job runs — the minutes
+  stay on the meter (`voice_usage.overage_minutes` above `overage_reported_minutes`: NO claim is created while off) and a
+  subscription's end still writes its settlement job, which waits; turning the switch on and restarting starts the backlog sweep
+  (10 minutes after boot, then every 6 h) that claims and bills them. Tier subscriptions, checkout and entitlements are not
+  affected. Why off: the overage machinery is the part of this work the audits kept finding holes in; the owner can go live on the
+  tiers alone and switch overage on once the sweep has been watched on real invoices. One boot line names the state.
+  Fixes: (1) a checkout or tier change is an ATTEMPT ROW (`call_assistant_checkout_attempts`, one in flight per account by a partial
+  unique index, taken under the account lock with its Stripe idempotency key, Stripe outside the lock, completion conditional on the
+  attempt's id + state; a competing request resumes the same session or gets 409 `checkout_in_progress`). (2) Claim reconciliation
+  reads every page and FAILS CLOSED (`reconcile_incomplete`, the claim waits); the claim's UUID is in the item's metadata and an item
+  is adopted only when customer, subscription, org, month, quantity, rate, kind and UUID all match. (3) Claims and settle jobs are
+  scoped to the subscription they were created under (`voice_usage.stripe_subscription_id` records the month's latest subscription;
+  a settlement claims only its own subscription's months and claims; `billed_on_customer` is separate from the origin id, which is
+  never changed). (4) Settle jobs are leased atomically with a token that fences stale writes, complete only when every claim of the
+  subscription is verified invoiced and no month is outstanding, and are append-only (new work → a new job); `markInvoiced` marks only
+  the claims whose items the invoice's own lines carry (`invoices.listLineItems`). (5) One row per duplicate subscription
+  (`call_assistant_duplicate_cancellations`), each completed by its own id. (6) CHECKs: `minutes = to − from`, `rate > 0`; an EXCLUDE
+  constraint on overlapping ranges per (org, month, rate) via `btree_gist` when the database user can create the extension (the
+  throwaway test DB user can; on vb7 the boot DDL tries and the admin card reports whether it is in place; the application check stands
+  either way). (7) Token reservation = one token per UTF-8 byte + 8 per message + max_tokens. (8) Filter: the service stays the subject
+  across paragraphs until another product is named or a heading changes the subject; "one local/new/first customer" refused.
+  (9) Extra number yearly back to $50. (10) This section.
+  **What the tests prove, and what they do not.** Proven (lane DB, real advisory lock, a fake Stripe that models invoice membership and
+  item listing): two live subscriptions arriving together leave one tracked and one cancelled; a stale "active" behind a cancellation
+  never restores access; a failed duplicate cancellation is persisted, thrown and retried; two reports of one month at once create one
+  claim and one item; a late call bills only the delta; a failed claim is retried as it is; a claim sent before and left without its
+  item adopts the matching item at Stripe and never creates a second; a retry bills the claim's stored subscription; an ended
+  subscription's queued claims are invoiced on its customer from the invoice's lines; a failed settlement is recorded and finished by
+  the sweep; the token counter never passes the cap at admission (10 parallel reservations). NOT proven: behaviour against real Stripe
+  (idempotency-key expiry, pagination at scale, invoice line shapes beyond the pinned API version); that the token reservation is a
+  strict upper bound for every input (one token per byte is the byte-level BPE property, not a measured count — no tokenizer is
+  installed); that the EXCLUDE constraint exists on vb7 (depends on `btree_gist`); and nothing here certifies that unrelated prices are
+  byte-for-byte unchanged beyond `founding-baseline.test.ts`. The duplicate's first payment is credited, never refunded, by this code.
+- **Codex audit #5 (2026-10-09, `callassist-audit-5.md`) — the service SHIPS with overage billing OFF.** Fixed: (1) the fresh-schema
+  blocker — the claims CREATE TABLE named `minutes` in a CHECK before the column existed, so a new database stopped creating the voice
+  schema (no `voice_usage.stripe_subscription_id`, no settle jobs: metering broke even with billing off); the CREATE now declares every
+  column it constrains, the ALTERs come first and the constraints last, the lazy schema helpers rethrow (the boot logs it loudly), and
+  `server/voice/fresh-schema.test.ts` creates the schema on an EMPTY throwaway database and meters one call end to end. (4) A change
+  attempt left `creating` is reconciled against Stripe (applied → closed; not applied → resumed under its own key); only a definite 4xx
+  closes an attempt as failed, a timeout leaves it `creating`. (5) A checkout whose `creating → open` write loses rereads the attempt
+  and returns the recorded session (never expires it); stale-session cleanup skips the attempt's own session (its metadata names the
+  attempt). (9) Metering is a per-call record (`voice_call_meter`, keyed by the call): written before the call is marked processed,
+  moved to `done` in the same transaction as the count (exactly once), a failed meter stays pending (`flags.meterPending`) and the
+  metering retry worker (every 15 min, independent of the overage switch) finishes it. (8) Filter: list markers are consumed before
+  the subject is tracked; a service price must match its billing unit ("$249/year" refused). (10) Activation: the switch on + Stripe
+  configured is all the sweep needs; `VOICE_OVERAGE_WORKER_ENABLED=false` is only a kill switch.
+  **Call Assistant overage: NOT PROVEN — keep `CALL_ASSISTANT_OVERAGE_BILLING=off`.** Open, in the auditor's words:
+  · #2 "Settlement changes a previously attempted Stripe request before reconciliation. `billed_on_customer` is changed and also
+    overridden in memory. If Stripe created a subscription-bound item but its response was lost, reconciliation now expects an
+    unattached item and rejects the original. Retrying uses the same key with different parameters; after key expiry, duplicate
+    creation becomes possible. Fix: retain the original request immutably, reconcile it first, then perform a separately tracked
+    settlement operation."
+  · #3 "Deferred minutes can be assigned to a replacement subscription. The meter stores only the latest subscription for the entire
+    org-month. Cancel A while OFF, buy B, then make another call: A's accumulated usage now names B. Even an untouched historical month
+    is claimed using the account's current subscription. The sweep reports historical months before processing settlement jobs. A's
+    job can therefore finish without settling A's usage. Fix: persist usage ownership per subscription/call and derive every claim from
+    that immutable ownership."
+  · #6 "Recorded jobs are not guaranteed exactly-once execution. Both enqueue and orphan recovery use INSERT … WHERE NOT EXISTS without
+    an open-job unique index. Concurrent sweeps can create different jobs for the same subscription; their per-row leases do not
+    exclude each other. Long jobs also have no lease renewal, and job fencing does not check whether its UPDATE succeeded. Fix: enforce
+    one open job per subscription, renew leases, and stop work when ownership is lost. Make external effects idempotent rather than
+    claiming exactly-once execution."
+  · #7 "'Full-request matching' still trusts metadata for the rate. The check compares metadata and quantity, but never verifies the
+    item's actual amount, currency or price. An item retaining the metadata after a price/amount edit is adopted as correct. Fix:
+    persist and compare the actual Stripe price/request economics, not merely the descriptive metadata."
+  Also open: turning ON does not guarantee exactly-once processing of recorded jobs, and Stripe keeps collecting items created during
+  an earlier ON period. With the switch off none of these paths runs.
+- **Checks:** `server/voice/addon.test.ts`, `server/voice/subscription.test.ts`, `server/stripe-billing.test.ts`, `server/pricing-copy.test.ts`,
+  `server/hub/output-filter.test.ts`, `server/billing/prices.test.ts`, `server/billing/intro.test.ts`, `server/entitlements.test.ts`,
+  `server/billing/founding-baseline.test.ts`; the lane-DB suites (`number-release`, `numbers`, `profile`, `calls`, `voice/billing`) were
+  moved to the new table but not run here (no lane DB in the worktree).
+
+## 🐊 2026-10-08 — Gabe on OpenAI (branch `hub/openai-provider`, NOT deployed; waits for the owner's key)
+- **Why:** TruthCoder's GPU pods are down, so Gabe fails for everyone. Owner's decision 2026-10-08: run Gabe on
+  OpenAI's cheapest model, switched by env only; TruthCoder stays the default and the other AI features are untouched.
+- **Model:** `gpt-5.4-nano` (verified 2026-10-08 on OpenAI's model page developers.openai.com/api/docs/models/gpt-5.4-nano:
+  default snapshot `gpt-5.4-nano-2026-03-17`, $0.20 / $1.25 per 1M input / output tokens, $0.02 cached input, reasoning
+  effort "none" by default). The owner's fallback `gpt-5.4-mini` ($0.75 / $4.50) is on the pin too. Note: OpenAI's pricing
+  page also lists the older `gpt-5-nano` at $0.05 / $0.40 — cheaper still; the owner named 5.4 nano, so that is the default.
+- **Env to set on the server** (`.env`, then restart `constructhub.service`):
+  `HUB_AI_PROVIDER=openai` · `HUB_OPENAI_API_KEY=<Gabe's own OpenAI key>` · optional `HUB_AI_MODEL=gpt-5.4-nano` (default;
+  `gpt-5.4-mini` is the other accepted id; any other id also needs `HUB_OPENAI_MODELS=<comma list>` or Gabe stays off site)
+  · optional `HUB_AI_DAILY_TOKEN_CAP=<prompt+completion tokens per UTC day>` (unset = off; durable and atomic: one row per UTC
+  day in `hub_usage_days`, shared by every process and kept across restarts; a call reserves an upper-bound estimate before it is
+  made and is admitted only while `existing + reservation ≤ cap`, then settles to the provider's counts). **Without the key Gabe is off site exactly as today** (chat says "Gabe is off site", presets serve
+  templates) and no call is attempted. Boot logs one line `hub: provider openai model gpt-5.4-nano host api.openai.com key set|missing`.
+- **Cost per question:** about 6,500 input + up to 400 output tokens → ≈ $0.0013 + $0.0005 = **≈ $0.002 (0.2¢)** on
+  gpt-5.4-nano (≈ 0.7¢ on gpt-5.4-mini); at the global cap of 1,500 model calls a day that is ≤ $2.70/day (≤ $10/day on mini).
+  Prompt caching may lower the input part. Each call logs `hub: usage in<prompt>-out<completion> <ms>` (counts only), and
+  the admin page (/admin → Hub assistant) shows provider, model, key set/missing, chat on/off and today's token counts.
+  A sensible cap: `HUB_AI_DAILY_TOKEN_CAP=3500000` ≈ 500 questions ≈ $0.90/day on nano.
+- **Request shape on OpenAI** (server/hub/ai.ts `providerBody`): `max_completion_tokens: 400` + `reasoning_effort: "none"`;
+  `temperature`, `top_p` and `stop` are left out because the GPT-5 family answers 400 to them on Chat Completions (a 4xx
+  never opens the breaker, so Gabe would fail on every question). The TruthCoder request is byte-identical to before.
+- **Switch back:** remove `HUB_AI_PROVIDER` (or set anything but `openai`), restart. The preset cache is keyed by model,
+  so TruthCoder's cached answers are still there.
+- **Tests:** `npx vitest run server/hub` (ai.test.ts: both pins, request shape per provider, usage counts, daily cap;
+  routes.test.ts "cost guard"; output-filter.test.ts "OpenAI-style answers").
+
 ## 💲 2026-10-08 — SEO tools are Agency-only; grandfathering; founding member offer (branch `seo/pricing-a`, NOT deployed)
 - **Owner decisions:** the SEO tools (site explorer, rank tracker, keyword research, backlinks) are included with **Agency only** for new
   sign-ups; everyone who has them today keeps them; a **founding member** offer locks a customer's plan price for life while the offer is open
@@ -340,6 +530,8 @@ where possible. See "Live deployment" below for the runbook; owner-pending items
   Left for submission: the ConstructHUB App Store Connect API key (owner login), app records, signing, TestFlight,
   APNs key, demo accounts, review notes, screenshots. AI = TruthCoder (own models) — confirm no outside forwarding.
 - **Call Assistant minutes** (owner): Lite 2,000 · Solo 5,000 · Crew 10,000 · Fleet 25,000 (prices unchanged).
+  **Superseded 2026-10-08** — see the top entry "the AI Call Assistant is a SEPARATE SERVICE, repriced": 500 / 1,000 /
+  2,000 / 5,000 minutes at $249 / $349 / $449 / $999.
 - **Permit portals 659 → 6,400** (verified 641 → 4,187). Pipeline: research lanes (Claude A/C/D, Kimi, Codex) write
   gated candidates → `server/data/_permit-candidates.json` → `PERMIT_BUILD_CONCURRENCY=24 PERMIT_BUILD_ONLY_NEW=1 npx tsx
   scripts/build-permit-portals.ts` → spot-check wrong-service links → commit `permit-portals.json` → deploy (boot seeding
@@ -376,7 +568,9 @@ where possible. See "Live deployment" below for the runbook; owner-pending items
   and a word-spacing fix for buttons and inputs. Every page has 0 px overflow at 390 px. Testids are kept.
 
 ## 🧰 2026-10-02 evening — what is live now (all deployed to vb11; dump-first each time)
-- **Call Assistant is LAUNCHED (purchasable).** Four tiers in `shared/plans.ts` CALL_ASSISTANT_TIERS: Lite $149
+- **Call Assistant is LAUNCHED (purchasable).** _(Prices and the add-on model below are SUPERSEDED by the 2026-10-08 late-evening entry
+  at the top: a separate service, 500/1,000/2,000/5,000 minutes at $249/$349/$449/$999, 50¢ overage, 11 × yearly, no intro.)_
+  Four tiers in `shared/plans.ts` CALL_ASSISTANT_TIERS: Lite $149
   (2,000 min, 1 number), Solo $249 ($99 × 3 monthly intro; 5,000 min, 1 number), Crew $449 (10,000 min, 5 numbers),
   Fleet $799 (25,000 min, 20 numbers) — minutes raised by the owner 2026-10-04 (was 1,000/2,000/5,000/12,000). Overage 10¢ Lite/Solo, 5¢ Crew/Fleet. 500 spam calls/month free on every tier.
   The two "NOT deployed" entries below are merged, live and superseded by these numbers. Lite yearly $1,199 confirmed by the owner

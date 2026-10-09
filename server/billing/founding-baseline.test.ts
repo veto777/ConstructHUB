@@ -59,6 +59,16 @@ describe("founding member price baseline", () => {
     expect(snapshot, MESSAGE).toEqual(FOUNDING_BASELINE);
   });
 
+  it("covers the plans and the Agency bands only: the AI Call Assistant (a separate service, repriced 2026-10-08) is not in the snapshot", () => {
+    // The founding lock is the plans' promise. The Call Assistant has its own subscription and its own price
+    // book (shared/plans.ts CALL_ASSISTANT_TIERS); its 2026-10-08 repricing moved no founding member and is
+    // not something foundingPrice() answers for.
+    const { capturedAt: _at, ...snapshot } = priceSnapshot();
+    expect(Object.keys(snapshot).sort()).toEqual(["agencyBands", "agencyIncludedLocations", "annualMonths", "plans"]);
+    expect(Object.keys(snapshot.plans).sort()).toEqual([...PLAN_KEYS].sort());
+    expect(JSON.stringify(snapshot)).not.toMatch(/call_assistant|callAssistant|minutes/i);
+  });
+
   it("the Agency quote at every band boundary, monthly and yearly, is what it was", () => {
     for (const [locations, want] of Object.entries(AGENCY_QUOTES_BASELINE)) {
       expect(agencyPriceCents(Number(locations), "month"), `${locations} locations monthly: ${MESSAGE}`).toBe(want.month);

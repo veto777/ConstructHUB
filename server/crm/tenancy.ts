@@ -123,7 +123,10 @@ export async function requireOrg(req: any, res: any, userId: number): Promise<Or
  * say why, and sell the plan. Beta accounts and ConstructHUB staff pass
  * (getCrmEntitlements). CRM_REQUIRE_PLAN=0 switches the gate off (the demo).
  */
-const CRM_OPEN_PATHS = [/^\/api\/crm\/me(\/|$)/, /^\/api\/crm\/billing(\/|$)/, /^\/api\/crm\/orgs(\/|$)/];
+// The AI Call Assistant's routes (/api/crm/voice/*) are a separate service with its own subscription
+// (owner, 2026-10-08): they gate on THAT subscription (server/voice/context.ts voiceContext), never on a
+// CRM plan, so a Call Assistant customer without the CRM can run their assistant.
+const CRM_OPEN_PATHS = [/^\/api\/crm\/me(\/|$)/, /^\/api\/crm\/billing(\/|$)/, /^\/api\/crm\/orgs(\/|$)/, /^\/api\/crm\/voice(\/|$)/];
 async function crmPlanOk(req: any, res: any, ctx: OrgContext): Promise<boolean> {
   if (process.env.CRM_REQUIRE_PLAN === "0") return true;
   const path = String(req?.originalUrl || req?.path || "").split("?")[0];

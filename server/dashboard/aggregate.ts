@@ -24,7 +24,7 @@ import { makeContext, type DashboardContext } from "./context";
 import { accountHeader, accountUsage, resetsAt, unreadNotifications } from "./account";
 import { buildChecklist } from "./checklist";
 import { buildRecent } from "./recent";
-import { CTA_START, COMING_SOON_MESSAGE, failedMessage, lockedMessage, timeoutMessage } from "./copy";
+import { CTA_START, COMING_SOON_MESSAGE, SEPARATE_SERVICE_CTA, failedMessage, lockedMessage, timeoutMessage } from "./copy";
 import { tileSource, type TileOutcome, type TileSources } from "./tiles";
 import { splitDashboardTiles, type DashboardLayout } from "@shared/dashboard-prefs";
 import { readDashboardLayout } from "./prefs";
@@ -189,7 +189,7 @@ async function computeTile(
     ...(access.addon ? { addon: access.addon } : {}),
   };
   if (access.comingSoon) {
-    return { ...base, status: "coming_soon", message: COMING_SOON_MESSAGE, cta: { label: "See add-ons", href: "/pricing#add-ons", surface: "app" } };
+    return { ...base, status: "coming_soon", message: COMING_SOON_MESSAGE, cta: SEPARATE_SERVICE_CTA };
   }
   if (!access.entitled && opts.workspace && DELEGATED_TILES.has(def.key)) {
     // A teammate in the owner's workspace already uses this page under the owner's plan:
@@ -199,7 +199,8 @@ async function computeTile(
     return { ...rest, status: "empty", message: `You're working in ${owner} workspace. Open it to see the numbers there.`, cta: { label: "Open", ...page } };
   }
   if (!access.entitled) {
-    return { ...base, status: "locked", message: lockedMessage(access.requiredPlan), cta: { label: "See plans", href: "/pricing", surface: "app" } };
+    // The AI Call Assistant (addon gate): a separate service, so no plan is named and the way forward is its own pricing.
+    return { ...base, status: "locked", message: lockedMessage(access.requiredPlan, access.addon), cta: access.addon ? SEPARATE_SERVICE_CTA : { label: "See plans", href: "/pricing", surface: "app" } };
   }
 
   const source = tileSource(def.key, opts.sources);

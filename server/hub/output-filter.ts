@@ -5,12 +5,19 @@
  * check is never repaired and sent, it is replaced by R_FALLBACK. The only
  * repairs are the strip / rewrite / truncate steps marked below.
  *
+ * Provider-neutral: the O2 strip removes TruthCoder's tool-call and reasoning markup and is a
+ * no-op on a plain markdown answer, so an OpenAI-style reply (bold, bullets, a numbered list)
+ * passes through as written and every content check still applies to it — fixtures in
+ * output-filter.test.ts, "OpenAI-style answers".
+ *
  * Pure: no DB, no request, no model.
  */
-import { PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, ANNUAL_MONTHS, GBP_REINSTATEMENT_CENTS, SALES_THRESHOLD_CENTS, TRIAL_DAYS, CALL_ASSISTANT_TIERS, type PlanKey } from "@shared/plans";
-import { CRM_PLANS, CRM_PLAN_KEYS, CRM_TRIAL_DAYS } from "@shared/crm-plans";
+import {
+  PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, ANNUAL_MONTHS, GBP_REINSTATEMENT_CENTS, SALES_THRESHOLD_CENTS, TRIAL_DAYS,
+  CALL_ASSISTANT_TIERS, CALL_ASSISTANT_OVERAGE_CENTS_PER_MINUTE, type PlanKey,
+} from "@shared/plans";
+import { CRM_PLANS, CRM_PLAN_KEYS, CRM_TRIAL_DAYS, CRM_EXTRA_SEAT_MONTHLY_CENTS, CRM_EXTRA_SEAT_ANNUAL_CENTS } from "@shared/crm-plans";
 import { hubLinkFor } from "@shared/hub-links";
-import { CALL_ASSISTANT_INTRO } from "@shared/plan-copy";
 import { DFY_CATALOG, COURSE_BUNDLE } from "../catalog";
 import {
   cleanText, HOST_SOURCE, OWN_HOST_RE, BRACKET_DOT_RE, SPELLED_DOMAIN_RE, EMAIL_OBFUSCATED_RE, EMAIL_SPACED_RE,
@@ -79,8 +86,8 @@ const PLAN_NAMES = PLAN_KEYS.map((k) => PLANS[k].name);
 // names are sold names too (shared/crm-plans.ts).
 const CRM_PLAN_WORDS = ["CRM", ...CRM_PLAN_KEYS.flatMap((k) => CRM_PLANS[k].name.split(" "))];
 const PLAN_WORD_OK = new Set([
-  // The AI Call Assistant's tiers ("the Solo tier") are sold names too (shared/plans.ts CALL_ASSISTANT_TIERS).
-  ...PLAN_NAMES, ...CRM_PLAN_WORDS, ...CALL_ASSISTANT_TIERS.map((t) => t.name), "Every", "Each", "Any", "Which", "This", "That", "Your", "The", "No", "Paid", "Monthly", "Annual",
+  // The AI Call Assistant's tiers ("the 500 minutes tier", "the Call Assistant tier") are sold names too (shared/plans.ts CALL_ASSISTANT_TIERS).
+  ...PLAN_NAMES, ...CRM_PLAN_WORDS, ...CALL_ASSISTANT_TIERS.map((t) => t.name), "Assistant", "Every", "Each", "Any", "Which", "This", "That", "Your", "The", "No", "Paid", "Monthly", "Annual",
   "Yearly", "Pricing", "A", "An", "One", "Our", "My", "Their", "Current", "New", "Same", "Right", "Cheapest", "Higher",
   "Lower", "Bigger", "Larger", "Smaller", "Other", "Different", "Cloudflare", "Blotato", "Google", "Stripe",
   "ConstructHUB", "ConstructHub", "Change", "Choose", "Switch", "Pick", "Select", "Compare", "Upgrade", "Downgrade", "Cancel",
@@ -136,6 +143,10 @@ export const NOT_SOLD: RegExp[] = [
   // (\b does not see "à" as a word character, so the boundary is written out.)
   /\bseo (add-?ons?|addon)\b/i, /\b(rank[- ]?track\w*|keyword[- ]research|backlinks?) (add-?ons?|addon)\b/i, /(?:^|[^\p{L}])[àa][ -]la[ -]carte(?![\p{L}])/iu,
   /\b(add-?ons?|addon|upgrade) for (the |your )?(seo|rank[- ]?track\w*|keyword[- ]research|backlinks?)\b/i,
+  // Owner, 2026-10-08: the AI Call Assistant is a separate service with its own subscription — never "an add-on to
+  // the Pro plan", and no plan or CRM plan includes it.
+  /\bcall assistant\b[^.]{0,40}\b(an? )?(add-?on|addon) (to|for|on|of) (the |a |any |your |every )?(?:[\w,]+[- ]){0,6}plans?\b/i,
+  /\b(starter|pro|growth|agency|every|any|all|each|crm)( plan)?s? (include|includes|come with|comes with|gets?|has|have)\b[^.]{0,30}\bcall assistant\b/i,
 ];
 /** A sentence about the SEO tools (for the amounts it may carry). */
 const SEO_TOPIC = /\b(seo|rank[- ]?track\w*|keyword[- ]research|backlinks?)\b/i;
@@ -151,24 +162,48 @@ const ADDON_PRICE_CENTS: ReadonlySet<number> = new Set(Object.values(ADDONS).fla
 const addonCueWithoutSeo = (s: string) => ADDON_CUE.test(s.replace(/\bseo data\b|\bdata credit\b/gi, " "));
 /**
  * The founding member offer has no public number of places, no customer count and no deadline
- * (owner, 2026-10-08). A count is read by its SUBJECT, not its wording: a number (or "thousands of")
- * within two words of a people / places noun — "We have 500 founding members", "over 1,000
- * customers", "only 200 spots left", "the first 10,000 sign-ups". The one such number the pack
- * states is a plan's seat allowance ("10 agency seats", "2 extra seats"): "seats" counts only
- * next to a scarcity word.
+ * (owner, 2026-10-08). A count is read by its SUBJECT, not its wording: a number — in digits or
+ * spelled out ("twelve", "two thousand", "a dozen", "thousands of") — within two words of a
+ * people / places noun — "We have 500 founding members", "over 1,000 customers", "only 200 spots
+ * left", "the first 10,000 sign-ups", "twelve customers" — or the subject first and its number
+ * after ("our customers number 12,000", "customer count: twelve thousand", "contractors, 2,000 of
+ * them"). The one such number the pack states is a plan's seat allowance ("10 agency seats",
+ * "2 extra seats"): "seats" counts only next to a scarcity word.
  */
 const COUNT_SUBJECT = String.raw`(customers?|users?|members?|founding members?|founders?|subscribers?|contractors?|companies|businesses|agencies|people|sign-?ups?|spots?|places?|slots?|seats?)`;
-const COUNT_WORDS = String.raw`(\d[\d,]*|thousands|hundreds|dozens|millions|a thousand|a hundred|a few (?:hundred|thousand))`;
+const SMALL_NUMBER = String.raw`(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)`;
+const BIG_NUMBER = String.raw`(?:hundred|thousand|million)`;
+/**
+ * "one" counts too ("We have one customer") — but only before a customer-y subject, never before the
+ * allowance words ("one user per seat", "one place to see every call"), see COUNT_ONE_SUBJECT.
+ */
+const COUNT_WORDS = String.raw`(\d[\d,]*|${SMALL_NUMBER}(?:[- ]${SMALL_NUMBER})?(?: ${BIG_NUMBER})?|(?:a|one|several|many|a few|a couple of) (?:${BIG_NUMBER}|dozen)(?: ${BIG_NUMBER})?|(?:hundreds|thousands|millions|dozens)(?: of thousands)?|(?:one|a single|just one|only one|exactly one))`;
+const COUNT_ONE_SUBJECT = /^(customers?|members?|founding members?|founders?|subscribers?|contractors?|companies|businesses|agencies|sign-?ups?)$/i;
+const ONE_WORD = /^(one|a single|just one|only one|exactly one)$/i;
 /** The words such a claim puts between the number and its subject ("500 happy paying customers"); any other word means the number counts something else ("30 sites contractors should be on"). */
-const COUNT_ADJ = String.raw`(?:founding|founder|new|paying|happy|active|early|loyal|satisfied|real|local|small|registered|signed-up|verified|more|extra|additional|other|agency|team|crm|included)`;
+const COUNT_ADJ = String.raw`(?:founding|founder|new|first|paying|happy|active|early|loyal|satisfied|real|local|small|big|registered|signed-up|verified|more|extra|additional|other|agency|team|crm|included)`;
+/** The words that make a count of ONE a product quantity, not a customer claim ("one team member", "one extra seat"); every other adjective ("one local / new / first / paying customer") is a claim. */
+const QUANTITY_ADJ = /^(?:\s*(?:more|extra|additional|other|agency|team|crm|included))+\s*$/i;
 const COUNT_CLAIM = new RegExp(String.raw`\b${COUNT_WORDS}\s+(?:of\s+)?((?:${COUNT_ADJ}\s+){0,2})${COUNT_SUBJECT}\b`, "gi");
+/** Subject first: "customers number 12,000", "the customer count is twelve thousand", "contractors: over 2,000", "members now total 5,000". */
+const COUNT_REVERSED = new RegExp(String.raw`\b${COUNT_SUBJECT}\b(?: base| count| total| number)?(?:\s+(?:on|in|at|across|using|of) (?:the |our |this )?\w+)?(?:\s+(?:now|already|currently|today))?\s*(?::|—|–|-|\bis\b|\bare\b|\b(?:has|have|had) (?:now |already )?(?:reached|passed|surpassed|hit|topped)\b|\bnumbers?\b|\bnumbering\b|\btotals?\b|\btotaling\b|\bstands? at\b|\breach(?:ed|es)?\b|\bexceeds?\b|\btops?\b|\bpassed\b|\bsurpassed\b|\bhit\b|\bof\b)\s+(?:at |around |about |over |more than |nearly |roughly |some |already |now )*${COUNT_WORDS}\b`, "gi");
+/** "contractors, 2,000 of them". */
+const COUNT_OF_THEM = new RegExp(String.raw`\b${COUNT_SUBJECT}\b[^.]{0,20}?\b${COUNT_WORDS} of (?:them|whom|which)\b`, "gi");
 const SCARCE = /\b(left|remaining|available|only|first|limited|last|open)\b/i;
 /** True when the sentence states how many customers / members / spots there are ("seats": only with a scarcity word next to the number). */
 function statesCount(s: string): boolean {
-  for (const m of s.matchAll(COUNT_CLAIM)) {
-    if (/^seats?$/i.test(m[3]) && !SCARCE.test(s.slice(Math.max(0, m.index! - 24), m.index! + m[0].length + 24))) continue;
-    return true;
-  }
+  const seatsOnly = (subject: string, m: RegExpMatchArray) =>
+    /^seats?$/i.test(subject) && !SCARCE.test(s.slice(Math.max(0, m.index! - 24), m.index! + m[0].length + 24));
+  // A count of one is a customer count with a customer-y subject, bare or with any claim word ("one customer",
+  // "a single contractor", "one paying / local / new / first customer") — never a product quantity ("one user
+  // per seat", "one team member", "one extra seat").
+  // …and "one contractor account" / "one customer record" counts a thing of the customer's, not customers.
+  const compound = (m: RegExpMatchArray) => /^\s+(?:accounts?|plans?|seats?|locations?|profiles?|records?|numbers?|logins?|portals?|dashboards?)\b/i.test(s.slice(m.index! + m[0].length));
+  const oneOk = (count: string, subject: string, m: RegExpMatchArray, adjectives = "") =>
+    !ONE_WORD.test(count) || (COUNT_ONE_SUBJECT.test(subject) && !QUANTITY_ADJ.test(adjectives) && !compound(m));
+  for (const m of s.matchAll(COUNT_CLAIM)) if (!seatsOnly(m[3], m) && oneOk(m[1], m[3], m, m[2])) return true;
+  for (const m of s.matchAll(COUNT_REVERSED)) if (!seatsOnly(m[1], m) && oneOk(m[2], m[1], m)) return true;
+  for (const m of s.matchAll(COUNT_OF_THEM)) if (!seatsOnly(m[1], m) && oneOk(m[2], m[1], m)) return true;
   return false;
 }
 const DAY_WORDS = String.raw`(\d|tonight|today|tomorrow|midnight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december|this (week|month|weekend|year)|next (week|month|year)|end of (the )?(week|month|year))`;
@@ -301,9 +336,9 @@ const BOUND_AFTER = new RegExp(String.raw`${AMOUNT}\s*${UNIT}?\s*(?:for|on) (?:t
 const BOTH_ALL = /\b(both|all( of them| three| four)?)\b[^.$]{0,25}\$|\$[^.]{0,25}\b(both|all)\b|\b(are|cost|costs|run|priced at) (both|all)\b/i;
 /** The sentence is about an add-on, a location band, the texting setup fee or reinstatement. */
 const ADDON_CUE = /\b(add-?ons?|addon|extra (agency |crm )?(locations?|seats?|protected websites?|websites?)|additional (locations?|seats?|websites?)|per[- ]location|each (additional |extra )?location|for locations|locations? (above|over|\d)|texting number|texts|setup fee|one-time|scan pack|competitor scans?|per seat|protected websites?|reinstatement|per project|bands?|call assistant|call minutes?|per minute|extra .{0,30}number|seo data|data credit)\b/i;
-/** Add-on, band and service amounts (never a plan's own price), including the Call Assistant's launch price. */
+/** Add-on, band and service amounts (never a plan's own price), the Call Assistant's tiers, extra number and overage among them. */
 const ADDON_CENTS: ReadonlySet<number> = (() => {
-  const cents = new Set<number>([GBP_REINSTATEMENT_CENTS, CALL_ASSISTANT_INTRO.monthlyCents]);
+  const cents = new Set<number>([GBP_REINSTATEMENT_CENTS]);
   for (const addon of Object.values(ADDONS)) {
     cents.add(addon.monthlyCents); cents.add(addon.annualCents);
     if (addon.setupCents) cents.add(addon.setupCents);
@@ -319,6 +354,183 @@ const ADDON_CENTS: ReadonlySet<number> = (() => {
 function priceOk(plan: PlanInfo, cents: number, unit: string | undefined): boolean {
   if (!unit) return cents === plan.monthlyCents || cents === plan.annualCents;
   return cents === (/yr|year|annum|annual/i.test(unit) ? plan.annualCents : plan.monthlyCents);
+}
+
+// ---------------------------------------------------------------- O9 Call Assistant price binding
+/**
+ * The AI Call Assistant's prices are bound to the service and to its tiers (Codex audits
+ * 2026-10-09): in a sentence about the Call Assistant every $ amount must be one of ITS
+ * amounts — a tier's monthly or yearly price, the extra number's (only where the sentence says
+ * "extra number"), the overage rate (only beside "minute") — unless the sentence also names
+ * the plan (or the CRM, or another add-on) the amount belongs to. "The AI Call Assistant
+ * costs $29/month" is refused although $29 is a listed price, and so is "costs $5/month".
+ * A minutes figure next to a price must be a tier with that price: "the 500 minutes tier is
+ * $349/month" is refused, and so is any priced tier the price book doesn't list ("10,000
+ * minutes — $999/month": above 5,000 minutes is a sales conversation, never a price). The
+ * service is the subject of a line under a Call Assistant heading, and of a sentence that
+ * continues one about it ("It costs …", "The price is …"), not only of the sentence that
+ * names it (callAssistantSentences).
+ */
+const CA_TOPIC = /\b(call assistant|assistant tier|assistant'?s? (?:price|tier|minutes|subscription)|minutes? tiers?|call minutes?|included minutes|extra (?:local |phone )?numbers?|ai receptionist|answers? (?:the|your) phone)\b/i;
+/** A line that is only the service's name ("**AI Call Assistant**", "### Call Assistant pricing:"): the lines under it are about it. */
+const CA_HEADING = /^\s*(?:#+\s*)?(?:[-*•]\s*)?(?:\*\*)?\s*(?:the )?(?:AI )?Call Assistant(?:'s)?(?: tiers?| pricing| prices?| plans?| subscription)?\s*(?:\*\*)?\s*:?\s*$/i;
+/**
+ * Any other heading-like line ends the service's section: a markdown heading, a bold-only line, a short label
+ * ending in a colon, a line that is only a plan's name (the bold may already be stripped: "Pro"), or a section
+ * word on its own ("Pricing", "Plans", "Add-ons", "CRM").
+ */
+const OTHER_HEADING = new RegExp(String.raw`^\s*(?:#+\s+\S|(?:[-*•]\s*)?\*\*[^*\n]{1,60}\*\*\s*:?\s*$|[A-Z][\w &/'-]{0,40}:\s*$|(?:\*\*)?\s*(?:${PLAN_KEYS.map((k) => PLANS[k].name).join("|")})(?: plan)?\s*(?:\*\*)?\s*:?\s*$|(?:\*\*)?\s*(?:pricing|prices|plans|add-?ons|the crm|crm|crm plans|done[- ]for[- ]you|services|seo|faq|summary|notes?|other products?)\s*(?:\*\*)?\s*:?\s*$)`, "i");
+/** A sentence that continues the one before it about the service: "It costs …", "The price is …", "Each tier …". */
+const CA_CONTINUES = /^(?:it|its|it's|this|that|the service|the price|the prices|pricing|prices|tiers|the tiers|each tier|every tier|a tier|the subscription|the cost|costs?)\b/i;
+const CA_TIER_BY_MINUTES = new Map(CALL_ASSISTANT_TIERS.map((t) => [t.includedMinutes, t]));
+/** The service's own amounts, each bound to its billing unit: a monthly price with "/year" (or the reverse) is wrong (checkCallAssistantPrices). */
+const CA_TIER_MONTHLY_CENTS: ReadonlySet<number> = new Set(CALL_ASSISTANT_TIERS.map((t) => t.monthlyCents));
+const CA_TIER_ANNUAL_CENTS: ReadonlySet<number> = new Set(CALL_ASSISTANT_TIERS.map((t) => t.annualCents));
+const yearlyUnit = (unit: string | undefined) => !!unit && /yr|year|annum|annual/i.test(unit);
+/** A tier amount with the unit it is sold at: monthly with a monthly unit or none, yearly with a yearly unit or none. */
+const caTierAmountOk = (cents: number, unit: string | undefined) =>
+  (CA_TIER_MONTHLY_CENTS.has(cents) && (!unit || !yearlyUnit(unit))) || (CA_TIER_ANNUAL_CENTS.has(cents) && (!unit || yearlyUnit(unit)));
+/** A list marker at the start of a line ("- ", "* ", "1. ", "2) "): consumed before the subject is tracked. */
+const LIST_MARKER = /^\s*(?:[-*•]|\d{1,3}[.)])\s+/;
+const CA_NUMBER_CENTS: ReadonlySet<number> = new Set([ADDONS.call_number.monthlyCents, ADDONS.call_number.annualCents]);
+/** The dash before an amount joins it to what precedes ("10,000 minutes — $999/month"): read as "at". */
+const CA_DASH_PRICE = /\s*[—–-]\s*(?=\$\s?\d)/g;
+
+/** A sentence that names another product changes the subject: a platform plan, the CRM, the SEO tools, done-for-you. */
+const OTHER_PRODUCT = new RegExp(String.raw`\b(?:${PLAN_KEYS.map((k) => PLANS[k].name).join("|")}|CRM|SEO|rank[- ]?track\w*|done[- ]for[- ]you|Click Guard|Master Class)\b`);
+/**
+ * Sentences for the Call Assistant check, each carrying the service's name when it is still the subject:
+ * under a Call Assistant heading (across blank lines, until another heading-like line — "**Other product**",
+ * "### Pricing", "Plans:" — starts a new section), or after a sentence about the service, across paragraphs
+ * ("The Call Assistant answers your calls.\n\nIt costs …"), until another product is named or a heading
+ * changes the subject.
+ */
+function callAssistantSentences(text: string): string[] {
+  const out: string[] = [];
+  let head = false, previous = false;
+  for (const raw of text.split("\n")) {
+    if (CA_HEADING.test(raw)) { head = true; previous = false; continue; }
+    if (OTHER_HEADING.test(raw)) { head = false; previous = false; continue; }
+    if (!raw.trim()) continue;
+    const line = raw.replace(LIST_MARKER, "");
+    for (const sentence of sentencesOf(line)) {
+      const about = CA_TOPIC.test(sentence);
+      if (!about && OTHER_PRODUCT.test(sentence)) { previous = false; out.push(sentence); continue; }
+      const carried: boolean = head || (previous && !about && CA_CONTINUES.test(sentence));
+      out.push(carried ? `Call Assistant: ${sentence}` : sentence);
+      previous = about || carried;
+    }
+  }
+  return out;
+}
+const CRM_CENTS: ReadonlySet<number> = new Set([
+  ...CRM_PLAN_KEYS.flatMap((k) => [CRM_PLANS[k].monthlyCents, CRM_PLANS[k].annualCents, Math.round(CRM_PLANS[k].annualCents / 12)]),
+  CRM_EXTRA_SEAT_MONTHLY_CENTS, CRM_EXTRA_SEAT_ANNUAL_CENTS,
+]);
+/**
+ * In a sentence about the Call Assistant, an amount that is not the service's own is allowed only where it sits in
+ * ANOTHER product's clause: the product named right before it ("Pro is $79/month", "the CRM: $39/month", "Pro
+ * ($79/month, $790/year)", "extra numbers are $5/month or $50/year each") or right after it ("$79/month for Pro",
+ * "$19/month per location"), and the amounts chained to that one ("or $790/year"). Naming a product somewhere in
+ * the sentence exempts nothing: "The Call Assistant works with CRM and costs $39/month" prices the service.
+ */
+type CaBinder = { before: RegExp; after: RegExp; ok: (name: string, cents: number, unit: string | undefined) => boolean };
+const CA_BIND_CONNECT = String.raw`(?:[:(—–=-]|is|are|costs?|runs?|adds?|at|starts? at|comes in at|is priced at|is just|is only|only|just|for)?`;
+const CA_BIND_CHAIN = new RegExp(String.raw`^\s*(?:,|·|\bor\b|\band\b)\s*(?:or |and )?${AMOUNT}\s*${UNIT}?`, "i");
+const caBinder = (nameAlt: string, ok: CaBinder["ok"]): CaBinder => ({
+  before: new RegExp(String.raw`\b(${nameAlt})\b(?:\*\*)?\s*${CA_BIND_CONNECT}\s*(?:just |only |from )?${AMOUNT}\s*${UNIT}?`, "gi"),
+  after: new RegExp(String.raw`${AMOUNT}\s*${UNIT}?\s*(?:each\s+)?(?:for|on|per) (?:the |a |an |each |every |one )?(${nameAlt})\b`, "gi"),
+  ok,
+});
+const CA_BINDERS: readonly CaBinder[] = [
+  caBinder(String.raw`(?:${PLAN_ALT})(?: plan| tier)?`, (name, cents, unit) => {
+    const plan = PLAN_BY_NAME.get(name.toLowerCase().replace(/ (?:plan|tier)$/, ""));
+    return !!plan && priceOk(plan, cents, unit);
+  }),
+  caBinder(String.raw`(?:the )?CRM(?: (?:Basic|Essentials|Max))?(?: plans?| subscriptions?| seats?)?`, (_n, cents) => CRM_CENTS.has(cents)),
+  caBinder(
+    String.raw`extra (?:agency |crm )?(?:locations?|seats?|protected websites?|websites?)|additional (?:locations?|seats?|websites?)|locations?|seats?|protected websites?|websites?|(?:client )?texting numbers?|(?:the )?setup fee|competitor scan packs?|scan packs?|competitor scans?|reinstatement`,
+    (_n, cents) => ADDON_PRICE_CENTS.has(cents) || cents === GBP_REINSTATEMENT_CENTS),
+  caBinder(String.raw`(?:extra|additional|another|second) (?:call assistant |local |phone )?numbers?|(?:local |phone )?numbers?`, (_n, cents) => CA_NUMBER_CENTS.has(cents)),
+];
+/** The positions (of the "$") of the amounts in `sentence` that sit in another product's clause, at that product's price. */
+function caBoundElsewhere(sentence: string): Set<number> {
+  const at = new Set<number>();
+  for (const b of CA_BINDERS) {
+    for (const m of sentence.matchAll(b.before)) {
+      if (!b.ok(m[1], toCents(m[2]), m[3])) continue;
+      at.add(m.index! + m[0].indexOf("$"));
+      // The amounts chained to it belong to the same product ("Pro ($79/month, $790/year)").
+      for (let end = m.index! + m[0].length; ;) {
+        const c = sentence.slice(end).match(CA_BIND_CHAIN);
+        if (!c || !b.ok(m[1], toCents(c[1]), c[2])) break;
+        at.add(end + c.index! + c[0].indexOf("$"));
+        end += c.index! + c[0].length;
+      }
+    }
+    for (const m of sentence.matchAll(b.after)) if (b.ok(m[3], toCents(m[1]), m[2])) at.add(m.index!);
+  }
+  return at;
+}
+/** "500 minutes", "1,000 call minutes", "5,000 included minutes". */
+const CA_MINUTES = /\b(\d[\d,]*)\s*(?:call |included )?minutes?\b/gi;
+/** A rate, not a tier price: "$0.50 a minute", "$0.50/min", "50 cents per minute". */
+const PER_MINUTE_UNIT = /^\s*(?:a|per|each|\/)\s*min(?:ute)?s?\b/i;
+/** What ends the clause a minutes figure prices: a stop, or the next thing priced ("extra numbers are $5/mo"). */
+const CA_CLAUSE_END = /[.;:—–]|\bextra\b|\bthen\b|\babove\b|\bover\b|\bbeyond\b|\bspam\b/i;
+const caUnitOk = (tier: { monthlyCents: number; annualCents: number }, cents: number, unit: string | undefined) =>
+  !unit ? cents === tier.monthlyCents || cents === tier.annualCents : cents === (/yr|year|annum|annual/i.test(unit) ? tier.annualCents : tier.monthlyCents);
+
+/** The amounts in `text` with their unit, skipping per-minute rates. */
+function pricedAmounts(text: string): { cents: number; unit: string | undefined }[] {
+  const out: { cents: number; unit: string | undefined }[] = [];
+  for (const m of text.matchAll(AMOUNT_UNIT)) {
+    if (!m[2] && PER_MINUTE_UNIT.test(text.slice(m.index! + m[0].length))) continue;
+    out.push({ cents: toCents(m[1]), unit: m[2] });
+  }
+  return out;
+}
+/** The one amount right before a minutes figure, joined to it ("$249/month for", "$999/mo buys", "$349 a month —"). */
+const CA_PRICE_THEN_MINUTES = new RegExp(String.raw`${AMOUNT}\s*${UNIT}?\s*(?:[—–:]|\b(?:for|gets? you|you(?: will|'ll)? get|gives you|buys?(?: you)?|includes?|covers?|comes with|with|at|is|a month for|per month for))?\s*(?:the |a |about |up to |your )?$`, "i");
+/** The next minutes figure ends the clause the one before it prices ("500 minutes at $249/month, 1,000 minutes at $349/month"). */
+const CA_NEXT_MINUTES = /\b\d[\d,]*\s*(?:call |included )?minutes?\b/i;
+/** A minutes figure this small is a cadence or a wait ("every 15 minutes", "valid 10 minutes"), never a tier's allowance. */
+const CA_TIER_MINUTES_MIN = 100;
+
+function checkCallAssistantPrices(raw: string): void {
+  const sentence = raw.replace(CA_DASH_PRICE, " at ");
+  const topic = CA_TOPIC.test(sentence);
+  // 1. A minutes figure prices the clause after it ("500 minutes … $249/month or $2,739/year") and the
+  //    amount joined to it before ("$249/month for 500 minutes", "$999/mo buys 5,000 minutes"): each such
+  //    amount must be that tier's price for its unit, and a figure that is no tier may carry no price.
+  for (const m of sentence.matchAll(CA_MINUTES)) {
+    const minutes = Number(m[1].replace(/,/g, ""));
+    if (!topic && minutes < CA_TIER_MINUTES_MIN) continue;
+    const tier = CA_TIER_BY_MINUTES.get(minutes) ?? null;
+    const after = sentence.slice(m.index! + m[0].length, m.index! + m[0].length + 90).split(CA_CLAUSE_END)[0].split(CA_NEXT_MINUTES)[0];
+    const beforeAll = sentence.slice(Math.max(0, m.index! - 60), m.index!);
+    const before = beforeAll.slice(beforeAll.search(/[^.;:—–]*$/));
+    const joined = before.match(CA_PRICE_THEN_MINUTES);
+    const bound = [...pricedAmounts(after), ...(joined ? pricedAmounts(joined[0]) : [])];
+    for (const { cents, unit } of bound) {
+      if (cents === SALES_THRESHOLD_CENTS) continue;
+      if (!tier || !caUnitOk(tier, cents, unit)) block("O9");
+    }
+  }
+  // 2. In a sentence about the service, every amount is one of its own — or sits in the clause of another
+  //    product it is the price of (a plan, the CRM, another add-on, the extra number: caBoundElsewhere). Each
+  //    amount is bound where it stands; naming a product elsewhere in the sentence exempts nothing.
+  if (!topic) return;
+  const elsewhere = caBoundElsewhere(sentence);
+  const minute = /\bminutes?\b/i.test(sentence);
+  for (const m of sentence.matchAll(AMOUNT_UNIT)) {
+    const cents = toCents(m[1]);
+    if (caTierAmountOk(cents, m[2]) || cents === SALES_THRESHOLD_CENTS) continue;
+    // The overage rate only beside "minute": "costs $0.50" is not the service's price.
+    if (minute && cents === CALL_ASSISTANT_OVERAGE_CENTS_PER_MINUTE) continue;
+    if (elsewhere.has(m.index!)) continue;
+    block("O9");
+  }
 }
 
 /** Sentences for O9, with the lines under a bare plan heading read as that plan's ("**Pro**\n- $29/month"). */
@@ -498,8 +710,10 @@ function checkContent(linkless: string, opts: FilterOptions, book: KnowledgeBook
   for (const m of linkless.matchAll(/\b(\d+)\s?(cents?\b|¢)/gi)) if (!book.allowedCents.has(Number(m[1]))) block("O8");
   if (/\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million)\b[\w\s-]{0,30}\b(dollars|bucks)\b/i.test(linkless)) block("O8");
 
-  // O9 — plan-price binding (on the one money notation)
+  // O9 — plan-price binding (on the one money notation), and the Call Assistant's own (with the service's
+  // context carried under its headings and into the sentences that continue one about it)
   for (const s of planSentences(money)) checkPlanPrices(s);
+  for (const s of callAssistantSentences(money)) checkCallAssistantPrices(s);
 
   // O10 — commercial claims
   for (const re of COMMERCIAL) if (re.test(linkless)) block("O10");

@@ -64,12 +64,12 @@ BUILDER NOTES (strip every HTML comment before the pack reaches the model).
 
 ## 1. What ConstructHUB is
 
-ConstructHUB (constructhub.us) is an online platform for construction contractors and for agencies that market contractors. One account covers the following; the CRM is a separate product with its own plans (section 3), and a platform plan does not include it:
+ConstructHUB (constructhub.us) is an online platform for construction contractors and for agencies that market contractors. One account covers the following; the CRM is a separate product with its own plans (section 3), and the AI Call Assistant is a separate service with its own subscription (section 30) — a platform plan includes neither:
 
 - **Growth tools** (the main app at constructhub.us): permit office directory and permit search, property records finder, Google Business Profile tools (Locations, Profile Guard, reviews and AI replies, Posts & Photos, ranking grid, citations), Site Scan, Social Media, website and ad-traffic protection (Click Guard, IP Tracker, VPN Shield), Competitor Intel, the ConstructHUB SEO tools ({{AGENCY_PLAN}} plan), and {{AGENCY_PLAN}}-plan agency tools.
 - **The ConstructHub CRM** (opens at portal.constructhub.us): clients, estimates with e-signature, invoices, online payments into your own Stripe account, price book, pipeline, projects, schedule, team roles, messaging and texting.
 - **A client portal**: every client you add to the CRM gets a private page where they read estimates, sign, pay, message you and see their documents.
-- **The AI Call Assistant** (an add-on, {{CALL_ASSISTANT_STATUS}}): an AI receptionist that answers your business calls on a local number and files every real caller as a lead in the CRM (section 30).
+- **The AI Call Assistant** ({{CALL_ASSISTANT_STATUS}}): an AI receptionist that answers your business calls on a local number and files every real caller as a lead in the CRM (section 30).
 - **Education**: free guides (LSA Guide, Ad Fraud page, setup Guides) and the paid Master Class.
 - **Services**: done-for-you work (business formation, websites, SEO and ads) quoted by a sales rep, and a Google Business Profile reinstatement service.
 
@@ -95,7 +95,7 @@ There is no free plan. Without a plan you can still browse the public pages: Pri
 ### Managing your plan (Settings → Billing)
 - See your plan, billing interval, renewal or trial-end date, add-ons, and this month's usage: permit searches, ranking-grid credits, Site Scans and Competitor Intel scans. Monthly counts reset at the start of each month (UTC).
 - **Change plan or billing interval:** Pricing → **Switch to [plan]**. This changes your existing subscription (it never starts a second one). The change is prorated and invoiced right away; a reduction becomes account credit. If your card can't be charged, nothing changes.
-- **Add-ons:** Settings → Billing (or Pricing → Add-ons → **Manage add-ons**) once you are subscribed to a plan that sells that add-on.
+- **Add-ons:** Settings → Billing (or Pricing → Add-ons → **Manage add-ons**) once you are subscribed to a plan that sells that add-on. The AI Call Assistant is not an add-on: it is its own subscription, bought on Pricing and changed (tier, extra numbers) in Settings → Billing.
 - **Card, invoices and cancellation:** Settings → Billing → **Manage billing** opens Stripe's billing portal.
 - **Failed payment:** the plan's features pause until the payment goes through. Update the card in Manage billing; as soon as the payment is collected everything comes back, with nothing to buy again.
 - **Reached a limit?** The message says which add-on or which plan raises it.
@@ -117,8 +117,8 @@ There is no free plan. Without a plan you can still browse the public pages: Pri
 ### How to read the price book
 - **Published self-serve prices** are every plan's monthly and yearly price, the {{AGENCY_PLAN}} per-location bands (up to the self-serve maximum) and the add-on prices. Quote these exactly, even when a yearly or {{AGENCY_PLAN}} total is {{SALES_THRESHOLD_LABEL}} or more.
 - **"{{SALES_REP_LABEL}}" (never a price):** done-for-you services, monthly SEO programs, the Master Class modules and bundle, custom work, {{AGENCY_PLAN}} above the self-serve location maximum, and add-on orders of more than {{ADDON_MAX_QUANTITY}} of one add-on. Point people to Pricing → Done-for-you services ({{SALES_HREF}}).
-- Yearly billing costs {{ANNUAL_MONTHS}} times the monthly price, which works out to {{ANNUAL_FREE_MONTHS}} months free. The exceptions are the AI Call Assistant tiers and the CRM plans, which have their own yearly prices (listed above).
-- Single tools are not sold on their own. You choose a plan, then raise individual limits with add-ons.
+- Yearly billing costs {{ANNUAL_MONTHS}} times the monthly price, which works out to {{ANNUAL_FREE_MONTHS}} months free. The exceptions are the CRM plans, which have their own yearly prices (listed above), and the AI Call Assistant, whose yearly price is {{CALL_ASSISTANT_YEARLY_NOTE}}.
+- Single tools are not sold on their own. You choose a plan, then raise individual limits with add-ons. The two separate products — the CRM and the AI Call Assistant — are each bought on their own, with or without a plan.
 - Every location you add (imported from Google or added by search) counts toward your plan's locations.
 - Profile Guard checks: {{GUARD_CADENCE_LINE}}.
 - AI review replies: every plan drafts replies for you to approve; publishing them automatically is included with {{AUTO_REPLY_PLANS}}.
@@ -500,7 +500,7 @@ The price is {{GBP_REINSTATEMENT_PRICE}} per project, also shown on the Reinstat
 
 **Invoices:** convert an approved estimate into an invoice, send it with a secure payment link, record payments and give receipts (marked PAID IN FULL when settled). Filter by status to chase overdue invoices.
 
-**AI Call Assistant:** an add-on that answers the company's phone and files each caller as a lead in Clients. Its page is **Call Assistant** in the main ConstructHUB sidebar, not in the CRM (section 30).
+**AI Call Assistant:** a separate service (its own subscription, section 30) that answers the company's phone and files each caller as a lead in Clients. Its page is **Call Assistant** in the main ConstructHUB sidebar, not in the CRM.
 
 **Payments:**
 1. CRM → **Payments** → connect your own Stripe account (Stripe Connect). Money goes straight to your Stripe account; ConstructHUB never holds it.
@@ -596,7 +596,7 @@ For contractors who'd rather have the work done for them. Every one of these is 
 - **Is Blotato included?** No. It's a separate subscription you buy from Blotato.
 - **Which plan should I pick?** One profile and the basics: the cheapest plan. Click-fraud protection, Competitor Intel, texting and auto-published AI replies: the plans listed for those features in section 3. Several locations: the plan with more locations. A team in the CRM: that is the CRM plan, chosen separately by its seats. An agency managing many clients: {{AGENCY_PLAN}}. Compare them on Pricing → Compare plans.
 - **Who else uses ConstructHUB?** That isn't something you can share. Talk about features instead.
-- **Can ConstructHUB answer my phone?** That is what the AI Call Assistant add-on does ({{CALL_ASSISTANT_STATUS}}): it answers calls on a local number, files the lead in the CRM and texts the right person for emergencies. See section 30.
+- **Can ConstructHUB answer my phone?** That is what the AI Call Assistant does ({{CALL_ASSISTANT_STATUS}}): it answers calls on a local number, files the lead in the CRM and texts the right person for emergencies. See section 30.
 
 ## 29. Glossary
 
@@ -611,11 +611,11 @@ For contractors who'd rather have the work done for them. Every one of these is 
 - **ACH:** a bank transfer payment.
 - **10DLC:** the US carrier registration a business needs to text customers from its own number.
 
-## 30. AI Call Assistant (add-on)
+## 30. AI Call Assistant (a separate service)
 
 An AI receptionist for the contractor's own phone line. It answers every call, day or night, collects the lead the way the contractor wants, files it in the CRM and gets urgent calls to the right person. Page: [AI Call Assistant](/call-assistant). Signed in, it lives under **Call Assistant** in the main ConstructHUB sidebar (tabs: Overview, Numbers, Agent Studio, Simulator, Calls); the CRM is a separate product and only receives the leads.
 
-**Price and availability:** {{CALL_ASSISTANT_TIER_COUNT}} tiers, one per account: {{CALL_ASSISTANT_TIERS_LINE}}. Solo's launch price is {{CALL_ASSISTANT_INTRO_LINE}}. The intro price is Solo on monthly billing; yearly billing is the yearly price from the start, and {{CALL_ASSISTANT_NO_INTRO_TIERS}} have no intro. On every tier, {{CALL_ASSISTANT_INCLUDES_LINE}}. It is an add-on to the {{CALL_ASSISTANT_PLANS}} plans, not a plan of its own; the contractor can move between tiers any time in Settings → Billing (the difference is prorated, and a smaller tier keeps fewer numbers). {{CALL_ASSISTANT_AVAILABILITY}}
+**Price and availability:** {{CALL_ASSISTANT_SEPARATE_LINE}} It is not an add-on and not part of any plan or CRM plan. {{CALL_ASSISTANT_TIER_COUNT}} tiers, one per account: {{CALL_ASSISTANT_TIERS_LINE}}. {{CALL_ASSISTANT_YEARLY_NOTE}}. There is no intro or launch price. On every tier, {{CALL_ASSISTANT_INCLUDES_LINE}}. The contractor can move between tiers any time in Settings → Billing (the difference is prorated, and a smaller tier keeps fewer numbers). {{CALL_ASSISTANT_ABOVE_TOP}} {{CALL_ASSISTANT_AVAILABILITY}}
 
 **Which tier:** {{CALL_ASSISTANT_TIER_ADVICE}} **What counts as a minute:** {{CALL_ASSISTANT_MINUTE_RULE}} **Minutes over:** {{CALL_ASSISTANT_OVERAGE_RULE}}
 
@@ -623,7 +623,7 @@ An AI receptionist for the contractor's own phone line. It answers every call, d
 
 **Getting a phone number:**
 1. **Call Assistant** (main sidebar) → **Numbers** → pick a state, and optionally an area code or a city.
-2. Choose one of the available local numbers; ConstructHUB buys it for you and connects it to the assistant. {{CALL_ASSISTANT_TIER_NUMBERS}}; each extra number is its own add-on (a second location or a tracking line).
+2. Choose one of the available local numbers; ConstructHUB buys it for you and connects it to the assistant. {{CALL_ASSISTANT_TIER_NUMBERS}}; each extra number (a second location or a tracking line) is added to the Call Assistant subscription in Settings → Billing.
 3. Keep your existing numbers: forward them to the new number from your phone carrier (for example only when you don't answer, after hours, or always). Nothing is ported, so your numbers stay yours. The Numbers tab shows how to set up forwarding with common carriers.
 
 **If you cancel or a payment fails:** {{CALL_ASSISTANT_RULE_OWN_NUMBERS}} {{CALL_ASSISTANT_RULE_CANCEL}} {{CALL_ASSISTANT_RULE_PAYMENT}}

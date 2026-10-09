@@ -1,12 +1,13 @@
 import { useEffect } from "react";
 import { copyrightNotice } from "@/lib/marketing";
 import { LegalPage } from "@/components/legal-page";
-import { ADDONS, PLANS, PLAN_KEYS } from "@shared/plans";
+import { ADDONS, PLANS, PLAN_KEYS, isCallAssistantAddon } from "@shared/plans";
 import { CRM_TRIAL_DAYS } from "@shared/crm-plans";
 import { inNativeApp } from "@/lib/app-shell";
 import {
   AGENCY_ONLY_MODULES, CRM_SEATS_LINE, CRM_STARTING_PLAN, SALES_REP_LABEL, SALES_THRESHOLD_LABEL, TRIAL_LABEL,
   agencyBandsLine, annualExceptionsLine, formatUsd, joinNames, planPriceLine,
+  callAssistantTiersLine, callAssistantYearlyNote,
 } from "@shared/plan-copy";
 
 /** Shown under the title; update whenever these Terms change. */
@@ -56,6 +57,7 @@ export default function TermsOfUsePage() {
             </ul>
             <p className="mb-2">The {PLANS.agency.name} plan includes {PLANS.agency.limits.locations} locations. Additional locations are billed at {agencyBandsLine()}. Only the {PLANS.agency.name} plan includes the {joinNames(AGENCY_ONLY_MODULES)}.</p>
             <p className="mb-2">The ConstructHUB CRM is a separate product with its own subscription plans and is not included in any of the plans above. CRM plans start at {formatUsd(CRM_STARTING_PLAN.monthlyCents)}/month ({CRM_STARTING_PLAN.name}); the CRM plan sets the number of CRM seats ({CRM_SEATS_LINE}). CRM plans have their own annual prices, and a first CRM subscription starts with a {CRM_TRIAL_DAYS}-day trial. What each plan includes, and its usage limits, are listed on the Pricing page.</p>
+            <p className="mb-2">The AI Call Assistant is a separate service with its own subscription and is not included in any of the plans above or in any CRM plan; no plan is needed to buy it. Its tiers: {callAssistantTiersLine()}. {callAssistantYearlyNote()}. Extra local numbers are billed on the same subscription. It has no trial and no introductory price. Its local number is part of the service and is released when the subscription ends.</p>
             <p className="mb-2">There is no free plan. A new subscription starts with a {TRIAL_LABEL}. When the trial ends, the subscription continues at the plan price unless you cancel before then.</p>
             <p>All subscription plans automatically renew at the end of each billing cycle unless canceled before the renewal date. You may cancel your subscription at any time through your account settings, and cancellation will take effect at the end of the current billing period. No partial refunds are issued for unused portions of the current billing cycle unless otherwise stated.</p>
             </>}
@@ -64,9 +66,9 @@ export default function TermsOfUsePage() {
           <section data-testid="section-add-ons">
             <h2 className="text-xl font-semibold mb-3">4. Add-ons</h2>
             {inNativeApp() ? <p>Add-ons aren't sold in the ConstructHUB apps. Add-ons on your account follow the same terms as your plan.</p> : <>
-            <p className="mb-2">Individual tools are not sold on their own. You can add the following to an eligible plan; add-ons are billed with your plan, monthly or annually (10 times the monthly price{annualExceptionsLine()}):</p>
+            <p className="mb-2">Individual tools are not sold on their own. You can add the following to an eligible plan; add-ons are billed with your plan, monthly or annually (10 times the monthly price{annualExceptionsLine()}). The AI Call Assistant is not an add-on: see section 3.</p>
             <ul className="list-disc pl-6 space-y-1">
-              {Object.values(ADDONS).map((addon) => (
+              {Object.values(ADDONS).filter((addon) => !isCallAssistantAddon(addon.key)).map((addon) => (
                 <li key={addon.key}>
                   <strong>{addon.name}</strong> &mdash; {formatUsd(addon.monthlyCents)}/month
                   {addon.setupCents ? <> plus a {formatUsd(addon.setupCents)} one-time setup fee</> : null}

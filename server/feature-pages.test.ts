@@ -207,7 +207,12 @@ describe("feature page prices", () => {
     expect(ca.comingSoon).toBe(ADDONS.call_assistant.preview === true);
     expect(ca.price).toBe(formatUsd(cheapestTier));
     expect(ca.from).toBe(true);
-    for (const t of CALL_ASSISTANT_TIERS) expect(ca.priceNote).toContain(`${t.name}: ${formatUsd(t.monthlyCents)}/mo`);
+    for (const t of CALL_ASSISTANT_TIERS) expect(ca.priceNote).toContain(`${t.name}: ${formatUsd(t.monthlyCents)}/mo or ${formatUsd(t.annualCents)}/yr`);
+    // A separate service (owner, 2026-10-08): no plan includes or sells it, and the page links its own pricing.
+    expect(ca.headline).toBe("Separate service");
+    expect(ca.priceNote).toContain("no ConstructHUB plan includes it, and none is needed to buy it");
+    expect(ca.rows.map((r) => r.included)).toEqual(PLAN_KEYS.map(() => false));
+    expect(ca.link).toEqual({ label: "See Call Assistant pricing", href: "/pricing#call-assistant" });
     // A single add-on keeps its own price.
     expect(featurePriceSummary({ kind: "addon", addon: "competitor_pack" }).price).toBe(formatUsd(ADDONS.competitor_pack.monthlyCents));
     expect(allowanceValue(PLANS.starter, { limit: "permitSearches", unit: "permit searches", period: "month" })).toBe(`${PLANS.starter.limits.permitSearches} permit searches a month`);
@@ -320,9 +325,10 @@ describe("featurePlanGap: signed-in CTA for an account whose plan lacks the feat
     expect(featurePlanGap(featurePageByKey("siteScan")!.pricing, ent("starter"))).toBeNull();
     expect(featurePlanGap(featurePageByKey("cloudflare")!.pricing, ent(null))).toBeNull();
   });
-  it("sends an add-on to the add-ons list unless its module is on", () => {
+  it("sends the AI Call Assistant (a separate service) to its own pricing unless its module is on", () => {
     const spec = { kind: "addon", addon: "call_assistant" } as const;
-    expect(featurePlanGap(spec, ent("pro"))).toMatchObject({ label: "See add-ons", href: "/pricing#add-ons" });
+    expect(featurePlanGap(spec, ent("pro"))).toMatchObject({ label: "See Call Assistant pricing", href: "/pricing#call-assistant" });
+    expect(featurePlanGap(spec, ent("agency"))).toMatchObject({ href: "/pricing#call-assistant", note: "A separate service, not part of your Agency plan." });
     expect(featurePlanGap(spec, ent("pro", { addonModules: { callAssistant: true } }))).toBeNull();
   });
 });

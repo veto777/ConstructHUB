@@ -3,7 +3,8 @@
  * standard sentences for the non-"ok" states. Shared by the aggregator and the
  * sample payloads (fixture.ts) so both read the same.
  */
-import { PLANS, type PlanKey } from "@shared/plans";
+import { PLANS, CALL_ASSISTANT_PRICING_HREF, type PlanKey } from "@shared/plans";
+import { CALL_ASSISTANT_SEPARATE_LINE } from "@shared/plan-copy";
 import type { DashboardTileKey } from "@shared/dashboard";
 
 /** The setup call to action on an "empty" tile. */
@@ -17,10 +18,17 @@ export const CTA_START: Partial<Record<DashboardTileKey, string>> = {
   masterClass: "Start learning",
 };
 
-export const lockedMessage = (plan: PlanKey | undefined) =>
-  `Included with the ${plan ? PLANS[plan].name : "a paid"} plan.`;
+/**
+ * The AI Call Assistant is a separate service on its own subscription (shared/plans.ts,
+ * owner 2026-10-08): its lock names no plan and its way forward is its own pricing section.
+ */
+export const SEPARATE_SERVICE_MESSAGE = CALL_ASSISTANT_SEPARATE_LINE;
+export const SEPARATE_SERVICE_CTA = { label: "See Call Assistant pricing", href: CALL_ASSISTANT_PRICING_HREF, surface: "app" as const };
 
-export const COMING_SOON_MESSAGE = "Coming soon as an add-on for the Pro, Growth and Agency plans.";
+export const lockedMessage = (plan: PlanKey | undefined, addon?: string) =>
+  addon ? SEPARATE_SERVICE_MESSAGE : `Included with the ${plan ? PLANS[plan].name : "a paid"} plan.`;
+
+export const COMING_SOON_MESSAGE = "Coming soon: a separate service with its own subscription.";
 
 export const timeoutMessage = (title: string) => `${title} didn't answer in time. Open the page for live numbers.`;
 export const failedMessage = (title: string) => `${title} couldn't load its numbers right now. Open the page for live numbers.`;

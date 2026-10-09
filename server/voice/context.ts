@@ -5,13 +5,15 @@
  *   if (!v) return;                      // 401 / 402 / 403 already sent
  *   v.ctx.org, v.ctx.member, v.ent, v.allowance
  *
- * Order of checks: session (401) → org membership (requireOrg) → the
- * callAssistant add-on module on the ORG OWNER's subscription (402
- * plan_required with `addon: "call_assistant"`, the standard body the client's
- * plan prompt understands) → optional CRM permission (403).
+ * Order of checks: session (401) → org membership (requireOrg; the CRM-plan
+ * gate does not cover these routes) → the callAssistant module on the ORG
+ * OWNER's Call Assistant subscription — a separate service with its own
+ * subscription, owner 2026-10-08 (402 call_assistant_required with
+ * `addon: "call_assistant"` and the pricing link, the body the client's
+ * Call Assistant prompt understands) → optional CRM permission (403).
  *
  * The entitlement is the org owner's, not the signed-in member's: a field
- * member of a paying org may read the call log; the owner's add-on pays.
+ * member of a paying org may read the call log; the owner's subscription pays.
  *
  * A bought add-on whose subscription needs a payment (past_due, unpaid, …) is
  * PAUSED (owner, 2026-10-02: "As soon as they stop paying the agent stops

@@ -13,7 +13,7 @@ import { AGENCY_SELF_SERVE_MAX_LOCATIONS, ANNUAL_MONTHS, PLANS, PLAN_KEYS } from
 import {
   planPriceLine, agencyBandsLine, joinNames, planNamesWhere, AGENCY_ONLY_MODULES, CRM_SEATS_LINE,
   PROTECTED_SITE_PLANS, SALES_HREF, SALES_REP_LABEL, TRIAL_LABEL,
-  CALL_ASSISTANT_PLANS, CALL_ASSISTANT_NUMBER_RULES, callAssistantAvailabilityLine, callAssistantIncludesLine, callAssistantIntroLine, callAssistantPricing,
+  CALL_ASSISTANT_SEPARATE_LINE, CALL_ASSISTANT_NUMBER_RULES, callAssistantAvailabilityLine, callAssistantIncludesLine, callAssistantPricing,
   callAssistantTierNumbersLine, callAssistantTiersShortLine,
 } from "@shared/plan-copy";
 import { HUB_PRESETS, PRESET_IDS, type PresetId } from "@shared/hub-presets";
@@ -61,9 +61,9 @@ export function templateAnswer(presetId: PresetId): string {
     case "master-class":
       return `The **Master Class** is a step-by-step course on starting and growing a construction business, with 50 state-by-state guides and checklists. Its four modules are Business Formation & Licensing, GMB Setup & Optimization, Website & Online Presence, and SEO & Directory Domination. The overview is free to read, and any Master Class purchase also unlocks the full Google Ads Guide. It is not included in any plan; modules are quoted by a sales rep: [${SALES_REP_LABEL}](${SALES_HREF}).`;
     case "call-assistant":
-      return `The **AI Call Assistant** is an AI receptionist for your business line. It answers every call on a local number, day or night, in a woman's or man's voice you pick (${PERSONA_NAMES}). It asks the questions you set in the **Agent Studio**, files each real lead in the ConstructHub CRM with a summary, transcript and recording, texts or emails the teammate you choose for emergencies, and screens out spam: forward your line 'always' and you never answer a spam call again.\n${callAssistantPricing().tierCountWord.replace(/^./, (c) => c.toUpperCase())} tiers: ${callAssistantTiersShortLine()}. Solo's launch price: ${callAssistantIntroLine()}. Then ${callAssistantIncludesLine()}. It is an add-on to the ${CALL_ASSISTANT_PLANS} plans. ${callAssistantAvailabilityLine()} See [AI Call Assistant](/call-assistant).`;
+      return `The **AI Call Assistant** is an AI receptionist for your business line. It answers every call on a local number, day or night, in a woman's or man's voice you pick (${PERSONA_NAMES}). It asks the questions you set in the **Agent Studio**, files each real lead in the ConstructHub CRM with a summary, transcript and recording, texts or emails the teammate you choose for emergencies, and screens out spam: forward your line 'always' and you never answer a spam call again.\n${callAssistantPricing().tierCountWord.replace(/^./, (c) => c.toUpperCase())} tiers, one per account: ${callAssistantTiersShortLine()}. Then ${callAssistantIncludesLine()}. ${CALL_ASSISTANT_SEPARATE_LINE} ${callAssistantAvailabilityLine()} See [AI Call Assistant](/call-assistant).`;
     case "call-number":
-      return `1. The **AI Call Assistant** is an add-on to the ${CALL_ASSISTANT_PLANS} plans. ${callAssistantAvailabilityLine()}\n2. Open **Call Assistant** in the ConstructHUB sidebar → **Numbers**, pick a state (and an area code or city if you like) and choose a local number. ConstructHUB buys it for you. ${callAssistantTierNumbersLine()}; extra numbers are ${callAssistantPricing().extraNumber}/month each.\n3. Keep your existing numbers: forward them to the new number from your phone carrier, only when you don't answer, after hours or always. Nothing is ported, and the Numbers tab shows how for common carriers.\n4. ${CALL_ASSISTANT_NUMBER_RULES.cancel} ${CALL_ASSISTANT_NUMBER_RULES.payment}\nSee [AI Call Assistant](/call-assistant).`;
+      return `1. ${CALL_ASSISTANT_SEPARATE_LINE} ${callAssistantAvailabilityLine()}\n2. Open **Call Assistant** in the ConstructHUB sidebar → **Numbers**, pick a state (and an area code or city if you like) and choose a local number. ConstructHUB buys it for you. ${callAssistantTierNumbersLine()}; extra numbers are ${callAssistantPricing().extraNumber}/month each, added in Settings → Billing.\n3. Keep your existing numbers: forward them to the new number from your phone carrier, only when you don't answer, after hours or always. Nothing is ported, and the Numbers tab shows how for common carriers.\n4. ${CALL_ASSISTANT_NUMBER_RULES.cancel} ${CALL_ASSISTANT_NUMBER_RULES.payment}\nSee [AI Call Assistant](/call-assistant).`;
   }
 }
 
@@ -110,9 +110,11 @@ export function requiredFactsOk(presetId: PresetId, answer: string): boolean {
     case "agency":
       return /\bAgency\b/.test(answer) && new RegExp(`\\b${PLANS.agency.limits.locations}\\b`).test(answer) && new RegExp(`\\b${AGENCY_SELF_SERVE_MAX_LOCATIONS}\\b`).test(answer) && /sales rep/i.test(answer);
     case "call-assistant": {
-      // The launch price as the pack words it, and "coming soon" while the price book says so.
+      // Every tier's monthly price and the overage as the pack words them, "separate" (never "an add-on to a plan"),
+      // and "coming soon" while the price book says so.
       const p = callAssistantPricing();
-      return answer.includes(`${p.intro}/month`) && answer.includes(p.regular) && answer.includes(p.annual) && (!p.comingSoon || COMING_SOON.test(answer));
+      return p.tiers.every((t) => answer.includes(t.monthly)) && answer.includes(p.overage) && /\bseparate\b/i.test(answer)
+        && (!p.comingSoon || COMING_SOON.test(answer));
     }
     case "call-number":
       return /\bstate\b/i.test(answer) && /\bforward/i.test(answer) && (!callAssistantPricing().comingSoon || COMING_SOON.test(answer));

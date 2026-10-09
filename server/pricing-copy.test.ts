@@ -5,14 +5,15 @@ import {
   PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, SALES_THRESHOLD_CENTS, TRIAL_DAYS,
 } from "@shared/plans";
 import { CRM_PLANS, CRM_PLAN_KEYS } from "@shared/crm-plans";
+import * as planCopy from "@shared/plan-copy";
 import {
-  pricingKnowledge, formatUsd, priceOrSalesRep, joinNames, agencyBandsLine, addonLines,
+  pricingKnowledge, formatUsd, priceOrSalesRep, joinNames, agencyBandsLine, addonLines, annualExceptionsLine, PLATFORM_ADDONS,
   AGENCY_ONLY_MODULES, COMPETITOR_INTEL_PLANS, CRM_SEATS_LINE, CRM_TEXTING_PLANS, CLIENT_NUMBER_INCLUDED_PLANS, SALES_REP_LABEL, STARTING_MONTHLY_CENTS,
-  CALL_ASSISTANT_INTRO, CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_SPAM, callAssistantIntroLine, callAssistantIntroShort, callAssistantPricing, callAssistantYearlyNote,
+  CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_SPAM, CALL_ASSISTANT_SEPARATE_LINE, CALL_ASSISTANT_FROM_PRICE, callAssistantPricing, callAssistantYearlyNote, callAssistantAboveTopLine,
   callAssistantTiers, callAssistantTiersLine, callAssistantTierAdvice, callAssistantSpamAllowanceLine, callAssistantIncludesLine, callAssistantMinuteRule, callAssistantTierNumbersLine, CALL_ASSISTANT_SPAM_BLOCK_TITLE,
-  callAssistantOverageLine, callAssistantOverageRule, callAssistantTiersShortLine, formatCentsShort,
+  callAssistantOverageLine, callAssistantOverageRule, callAssistantOverageStatusLine, callAssistantTiersShortLine, callAssistantAvailabilityLine, formatCentsShort,
 } from "@shared/plan-copy";
-import { CALL_ASSISTANT_TIERS, CALL_ASSISTANT_FREE_SPAM_CALLS, CALL_ASSISTANT_OVERAGE_RATES } from "@shared/plans";
+import { CALL_ASSISTANT_TIERS, CALL_ASSISTANT_FREE_SPAM_CALLS, CALL_ASSISTANT_OVERAGE_RATES, CALL_ASSISTANT_ANNUAL_MONTHS } from "@shared/plans";
 import { SPAM_STRIKES_TO_BLOCK } from "./voice/spam";
 import { FORWARDING_ADVICE } from "./voice/numbers";
 import { knowledgeBook, priceBookCents } from "./hub/knowledge";
@@ -75,83 +76,107 @@ describe("plan copy helpers", () => {
     expect(line).toMatch(/above 500 locations .*sales rep/);
   });
 
-  it("lists every add-on with its price and plans", () => {
+  it("lists every PLATFORM add-on with its price and plans (the AI Call Assistant's lines are its own subscription's, listed with the service)", () => {
     const lines = addonLines();
-    expect(lines).toHaveLength(Object.keys(ADDONS).length);
-    for (const addon of Object.values(ADDONS)) {
+    expect(lines).toHaveLength(PLATFORM_ADDONS.length);
+    expect(PLATFORM_ADDONS.length).toBe(Object.keys(ADDONS).length - 5);
+    for (const addon of PLATFORM_ADDONS) {
       expect(lines.some((l) => l.startsWith(`${addon.name} — ${formatUsd(addon.monthlyCents)}/month`))).toBe(true);
     }
+    expect(lines.join(" ")).not.toMatch(/Call Assistant/);
+    // Every platform add-on is 10 × monthly yearly, so there is no exception to state.
+    expect(annualExceptionsLine()).toBe("");
   });
 });
 
-describe("AI Call Assistant launch price", () => {
+describe("AI Call Assistant: a separate service (owner, 2026-10-08)", () => {
   const root = path.resolve(import.meta.dirname, "..");
 
-  it("is one constant, then the price book's regular price — or the annual price", () => {
-    expect(callAssistantIntroLine()).toBe(
-      `${formatUsd(CALL_ASSISTANT_INTRO.monthlyCents)}/month for your first ${CALL_ASSISTANT_INTRO.months} months, then ${formatUsd(ADDONS.call_assistant.monthlyCents)}/month — or ${formatUsd(ADDONS.call_assistant.annualCents)}/year`,
-    );
-    expect(callAssistantIntroShort()).toBe(
-      `${formatUsd(CALL_ASSISTANT_INTRO.monthlyCents)}/mo for your first ${CALL_ASSISTANT_INTRO.months} months, then ${formatUsd(ADDONS.call_assistant.monthlyCents)}/mo — or ${formatUsd(ADDONS.call_assistant.annualCents)}/yr`,
-    );
-    // Owner, 2026-10-02: "$99 a month for the first 3 months" … "annually price can be $1999".
-    expect(callAssistantIntroShort()).toBe("$99/mo for your first 3 months, then $249/mo — or $1,999/yr");
+  it("four tiers, every figure from the price book: 500 / 1,000 / 2,000 / 5,000 minutes, one overage rate, yearly 11 × monthly, no intro", () => {
+    const tiers = callAssistantTiers();
+    expect(tiers.map((t) => [t.name, t.monthly, t.annual, t.minutes, t.numbersLabel, t.overage, t.overageShort])).toEqual([
+      ["500 minutes", "$249", "$2,739", "500", "1 local number", "$0.50", "50¢"],
+      ["1,000 minutes", "$349", "$3,839", "1,000", "1 local number", "$0.50", "50¢"],
+      ["2,000 minutes", "$449", "$4,939", "2,000", "2 local numbers", "$0.50", "50¢"],
+      ["5,000 minutes", "$999", "$10,989", "5,000", "5 local numbers", "$0.50", "50¢"],
+    ]);
+    // ~2 min a call.
+    expect(tiers.map((t) => t.estimatedCalls)).toEqual(["about 250 calls a month", "about 500 calls a month", "about 1,000 calls a month", "about 2,500 calls a month"]);
+    expect(callAssistantTiersLine()).toBe("500 minutes a month with 1 local number for $249/month or $2,739/year, 1,000 minutes a month with 1 local number for $349/month or $3,839/year, 2,000 minutes a month with 2 local numbers for $449/month or $4,939/year and 5,000 minutes a month with 5 local numbers for $999/month or $10,989/year; above the included minutes, $0.50 a minute on every tier");
+    expect(callAssistantTiersShortLine()).toBe("500 minutes $249/month, 1,000 minutes $349/month, 2,000 minutes $449/month and 5,000 minutes $999/month");
+    expect(callAssistantYearlyNote()).toBe("Yearly billing is 11 times the monthly price, so one month is free: 500 minutes $2,739/yr, 1,000 minutes $3,839/yr, 2,000 minutes $4,939/yr and 5,000 minutes $10,989/yr. The AI Call Assistant is billed on its own subscription, apart from any plan");
+    expect(callAssistantTierAdvice()).toBe("At about 2 minutes a call, 500 minutes covers about 250 calls a month, 1,000 minutes covers about 500 calls a month, 2,000 minutes covers about 1,000 calls a month and 5,000 minutes covers about 2,500 calls a month. These are estimates: your calls may run shorter or longer, and you can move between tiers any time in Settings → Billing. More than 5,000 minutes a month is quoted by a sales rep (Talk to a sales rep): there is no listed price above the 5,000 minutes tier.");
+    expect(callAssistantAboveTopLine()).toBe("More than 5,000 minutes a month is quoted by a sales rep (Talk to a sales rep): there is no listed price above the 5,000 minutes tier.");
     const p = callAssistantPricing();
-    expect(p.annual).toBe("$1,999");
-    // Add-ons follow the plan's billing interval (server/billing/order.ts): yearly is not a choice for the add-on alone.
-    expect(callAssistantYearlyNote()).toBe("Lite $1,199/yr, Solo $1,999/yr, Crew $3,599/yr and Fleet $6,399/yr when your plan is billed yearly (add-ons follow your plan's billing); the $99/mo intro for your first 3 months is Solo on monthly billing");
-    expect(p.extraNumber).toBe(formatUsd(ADDONS.call_number.monthlyCents));
+    expect([p.from, p.fromTier, p.fromPrice, p.top, p.topTier, p.topMinutes, p.tierCountWord, p.overage, p.overageLine, p.extraNumber, p.extraNumberAnnual, p.freeSpamCalls, p.annualMonths, p.annualFreeMonths])
+      .toEqual(["$249", "500 minutes", "$249/mo", "$999", "5,000 minutes", "5,000", "four", "$0.50", "$0.50 a minute on every tier", "$5", "$50", "500", 11, 1]);
     expect(p.comingSoon).toBe(ADDONS.call_assistant.preview === true);
-    expect(addonLines().find((l) => l.startsWith(ADDONS.call_assistant.name))).toContain(`Launch price: ${callAssistantIntroLine()} (the intro is for monthly billing).`);
-    expect(knowledgeBook().pack).toContain(callAssistantIntroLine());
-    expect(knowledgeBook().pack).toContain("The intro price is Solo on monthly billing");
+    expect(p.separateLine).toBe(CALL_ASSISTANT_SEPARATE_LINE);
+    expect(p.pricingHref).toBe("/pricing#call-assistant");
+    expect(CALL_ASSISTANT_SEPARATE_LINE).toBe("The AI Call Assistant is a separate service with its own subscription, from $249/mo: no ConstructHUB plan includes it, and none is needed to buy it.");
+    expect(CALL_ASSISTANT_FROM_PRICE).toBe("$249/mo");
+    expect(CALL_ASSISTANT_ANNUAL_MONTHS).toBe(11);
+    expect(callAssistantOverageLine()).toBe(p.overageLine);
+    expect(CALL_ASSISTANT_OVERAGE_RATES.map(formatCentsShort)).toEqual(["50¢"]);
+    expect(callAssistantSpamAllowanceLine()).toBe("the first 500 spam calls each month never count toward your minutes, on every tier");
+    expect(callAssistantTierNumbersLine()).toBe("the 500 minutes tier includes 1 local number, the 1,000 minutes tier 1, the 2,000 minutes tier 2 and the 5,000 minutes tier 5");
+    expect(callAssistantIncludesLine()).toBe("minutes above a tier's included ones are $0.50 a minute on every tier; extra numbers are $5/month each; and the first 500 spam calls each month never count toward your minutes, on every tier");
+    // Static copy (the FAQ, Gabe's pack) names the rate and never promises when it is charged: that depends on the
+    // server's overage switch, which only callAssistantOverageStatusLine (the signed-in surfaces) reads.
+    expect(callAssistantOverageRule()).toBe("Each tier includes its minutes every calendar month. Above them, it's $0.50 a minute on every tier. Each call is counted at the rate in force when it ends, so a mid-month change of tier never reprices calls already taken.");
+    expect(callAssistantOverageRule()).not.toMatch(/invoice|billed/);
+    expect(callAssistantOverageStatusLine("off")).toBe("Minutes above your plan are counted but not charged yet; the rate is 50¢ a minute.");
+    expect(callAssistantOverageStatusLine(undefined)).toBe(callAssistantOverageStatusLine("off"));
+    expect(callAssistantOverageStatusLine("on")).toBe("Minutes above your plan are 50¢ a minute, on your next invoice.");
+    expect(callAssistantOverageStatusLine("off", 10)).toContain("10¢ a minute");
+    expect(callAssistantMinuteRule()).toMatch(/every started minute/i);
+    expect(callAssistantAvailabilityLine()).toBe("Buy it on Pricing (/pricing#call-assistant) as its own subscription, with or without a ConstructHUB plan; change tiers any time in Settings → Billing.");
+    // No intro price: the helpers that carried it are gone, and no tier has one.
+    for (const gone of ["callAssistantIntroLine", "callAssistantIntroShort", "CALL_ASSISTANT_INTRO", "CALL_ASSISTANT_PLANS"]) expect((planCopy as any)[gone], gone).toBeUndefined();
+    for (const t of CALL_ASSISTANT_TIERS) expect(ADDONS[t.addon].introMonthlyCents, t.tier).toBeUndefined();
+    for (const line of [callAssistantTiersLine(), callAssistantYearlyNote(), callAssistantTierAdvice(), CALL_ASSISTANT_SEPARATE_LINE, pricingKnowledge()]) {
+      expect(line).not.toMatch(/launch price is|\$99\b|first 3 months|an add-on to the (Pro|Growth|Agency)/i);
+    }
   });
 
-  it("four tiers, every figure from the price book (owner, 2026-10-02)", () => {
-    const tiers = callAssistantTiers();
-    expect(tiers.map((t) => [t.name, t.monthly, t.annual, t.minutes, t.numbersLabel, t.intro, t.overage, t.overageShort, t.lowerOverage])).toEqual([
-      ["Lite", "$149", "$1,199", "2,000", "1 local number", null, "$0.10", "10¢", false],
-      ["Solo", "$249", "$1,999", "5,000", "1 local number", "$99", "$0.10", "10¢", false],
-      ["Crew", "$449", "$3,599", "10,000", "5 local numbers", null, "$0.05", "5¢", true],
-      ["Fleet", "$799", "$6,399", "25,000", "20 local numbers", null, "$0.05", "5¢", true],
-    ]);
-    // ~2 min a call: Lite ~1,000, Solo ~2,500, Crew ~5,000, Fleet ~12,500.
-    expect(tiers.map((t) => t.estimatedCalls)).toEqual(["about 1,000 calls a month", "about 2,500 calls a month", "about 5,000 calls a month", "about 12,500 calls a month"]);
-    expect(callAssistantTiersLine()).toBe("Lite $149/month or $1,199/year (2,000 minutes a month and 1 local number, then $0.10 a minute), Solo $249/month or $1,999/year (5,000 minutes a month and 1 local number, then $0.10 a minute), Crew $449/month or $3,599/year (10,000 minutes a month and 5 local numbers, then $0.05 a minute) and Fleet $799/month or $6,399/year (25,000 minutes a month and 20 local numbers, then $0.05 a minute)");
-    expect(callAssistantTiersShortLine()).toBe("Lite $149/month (2,000 minutes), Solo $249/month (5,000 minutes), Crew $449/month (10,000 minutes) and Fleet $799/month (25,000 minutes)");
-    expect(callAssistantTierAdvice()).toMatch(/^At about 2 minutes a call, Lite covers about 1,000 calls a month, Solo covers about 2,500 calls a month, Crew covers about 5,000 calls a month and Fleet covers about 12,500 calls a month\. On Crew and Fleet, minutes above the included ones also cost less: \$0\.05 a minute instead of \$0\.10\. These are estimates/);
-    const p = callAssistantPricing();
-    expect([p.from, p.fromTier, p.tierCountWord, p.overageLine, p.extraNumber, p.freeSpamCalls]).toEqual(["$149", "Lite", "four", "$0.10 a minute on Lite and Solo, $0.05 on Crew and Fleet", "$5", "500"]);
-    expect(callAssistantOverageLine()).toBe(p.overageLine);
-    expect(CALL_ASSISTANT_OVERAGE_RATES.map(formatCentsShort)).toEqual(["10¢", "5¢"]);
-    expect(callAssistantSpamAllowanceLine()).toBe("the first 500 spam calls each month never count toward your minutes, on every tier");
-    // Tier numbers come from the price book, on Limits & usage and in Gabe's knowledge alike.
-    expect(callAssistantTierNumbersLine()).toBe("Lite includes 1 local number, Solo 1, Crew 5 and Fleet 20");
-    expect(callAssistantIncludesLine()).toBe("minutes above a tier's included ones are $0.10 a minute on Lite and Solo, $0.05 on Crew and Fleet; extra numbers are $5/month each; and the first 500 spam calls each month never count toward your minutes, on every tier");
-    expect(callAssistantOverageRule()).toBe("Each tier includes its minutes every calendar month. Above them, it's $0.10 a minute on Lite and Solo, $0.05 on Crew and Fleet, on your next invoice. Each call is billed at the rate of the tier you're on when it ends, so a mid-month change of tier never reprices calls already taken.");
-    expect(callAssistantMinuteRule()).toMatch(/every started minute/i);
-    // Every tier is in the Hub's knowledge and in the add-on lines it quotes.
+  it("the Hub's knowledge pack states every figure, the price book allows them, and the old prices are gone", () => {
     const pack = knowledgeBook().pack;
-    expect(pack).toContain(callAssistantTiersLine());
-    expect(pack).toContain(callAssistantTierAdvice());
-    expect(pack).toContain(CALL_ASSISTANT_SPAM.block);
-    expect(pack).toContain(CALL_ASSISTANT_SPAM.forwarding);
-    expect(pack).toContain(callAssistantTierNumbersLine());
-    expect(pack).toContain(callAssistantOverageRule());
+    for (const line of [callAssistantTiersLine(), callAssistantTierAdvice(), callAssistantYearlyNote(), callAssistantAboveTopLine(), callAssistantTierNumbersLine(),
+      callAssistantOverageRule(), CALL_ASSISTANT_SEPARATE_LINE, CALL_ASSISTANT_SPAM.block, CALL_ASSISTANT_SPAM.forwarding]) expect(pack).toContain(line);
     expect(pack).toContain("four tiers, one per account");
-    expect(pack).toContain("Lite, Crew and Fleet have no intro");
+    expect(pack).toContain("There is no intro or launch price");
+    expect(pack).toContain("## 30. AI Call Assistant (a separate service)");
+    expect(pack).not.toMatch(/launch price is|for your first 3 months|an add-on to the|\(an add-on,|Call Assistant add-on\b/);
     expect(pack).not.toContain("{{");
-    for (const t of CALL_ASSISTANT_TIERS) {
-      expect(addonLines().some((l) => l.startsWith(`${ADDONS[t.addon].name} — ${formatUsd(t.monthlyCents)}/month or ${formatUsd(t.annualCents)}/year`))).toBe(true);
-      expect(priceBookCents().has(t.monthlyCents) && priceBookCents().has(t.annualCents)).toBe(true);
-    }
-    for (const rate of CALL_ASSISTANT_OVERAGE_RATES) expect(priceBookCents().has(rate)).toBe(true);
-    // Gabe may name a tier and quote its price and overage.
-    expect(filterReply("The Crew tier is $449/month with 10,000 minutes; Fleet is $799/month.").ok).toBe(true);
-    expect(filterReply("The Lite tier is $149/month with 2,000 minutes, then $0.10 a minute; on Crew extra minutes are $0.05.").ok).toBe(true);
-    expect(filterReply("The Lite tier is $129/month.").ok).toBe(false);
-    expect(filterReply("The Fleet tier costs $6,399/year on yearly billing.").ok).toBe(true);
-    expect(filterReply("The Crew tier is $399/month.").ok).toBe(false);
+    expect(pricingKnowledge()).toContain("a SEPARATE SERVICE with its own subscription, not a plan add-on");
+    // Every tier's monthly and yearly price, the overage and the extra number are listed amounts.
+    for (const t of CALL_ASSISTANT_TIERS) expect(priceBookCents().has(t.monthlyCents) && priceBookCents().has(t.annualCents), t.tier).toBe(true);
+    expect(priceBookCents().has(50)).toBe(true);
+    expect(priceBookCents().has(ADDONS.call_number.annualCents)).toBe(true);
+    // The old prices are not: $799, the $99 intro, $1,199 / $1,999 / $3,599 / $6,399 a year, 10¢ and 5¢ a minute.
+    // ($149 stays listed by coincidence: CRM Max's yearly price works out to $149 a month.)
+    for (const c of [79_900, 9_900, 119_900, 199_900, 359_900, 639_900, 10, 5]) expect(priceBookCents().has(c), String(c)).toBe(false);
+    // $249 and $449 stay listed: they are the new 500 and 2,000 minutes tiers.
+    expect(priceBookCents().has(24_900) && priceBookCents().has(44_900)).toBe(true);
+    // Gabe may name a tier and quote its price, its overage and its yearly price; an old or made-up price is refused.
+    expect(filterReply("The 2,000 minutes tier is $449/month with 2 local numbers; 5,000 minutes is $999/month.").ok).toBe(true);
+    expect(filterReply("The 500 minutes tier is $249/month, then $0.50 a minute over, or $2,739/year on yearly billing.").ok).toBe(true);
+    expect(filterReply(`${CALL_ASSISTANT_SEPARATE_LINE}`).ok).toBe(true);
+    expect(filterReply("The Lite tier is $149/month with 2,000 minutes.").ok).toBe(false);
+    expect(filterReply("The Fleet tier costs $799/month or $6,399/year.").ok).toBe(false);
+    expect(filterReply("Solo is $99/month for your first 3 months.").ok).toBe(false);
+    expect(filterReply("Extra minutes are 10 cents each.").ok).toBe(false);
+    expect(filterReply("The AI Call Assistant is an add-on to the Pro plan.").ok).toBe(false);
+    expect(filterReply("The Agency plan includes the AI Call Assistant.").ok).toBe(false);
+  });
+
+  it("yearly prices above the $1,000 threshold still show: they are listed prices, not a sales quote", () => {
+    expect(ADDONS.call_assistant_fleet.annualCents).toBeGreaterThanOrEqual(SALES_THRESHOLD_CENTS);
+    expect(pricingKnowledge()).toContain(`${formatUsd(ADDONS.call_assistant_fleet.annualCents)}/year`);
+    expect(priceBookCents().has(ADDONS.call_assistant_fleet.annualCents)).toBe(true);
+    expect(filterReply(`On yearly billing the 5,000 minutes tier is ${formatUsd(ADDONS.call_assistant_fleet.annualCents)}/year.`).ok).toBe(true);
+    // A made-up yearly price is still refused.
+    expect(filterReply("The AI Call Assistant costs $1,899/year.").ok).toBe(false);
   });
 
   it("the spam promise only says what the code does", () => {
@@ -178,22 +203,7 @@ describe("AI Call Assistant launch price", () => {
     const page = fs.readFileSync(path.join(root, "client/src/pages/call-assistant-landing.tsx"), "utf8");
     for (const key of ["headline", "lead", "screen", "block", "forwarding", "report"] as const) expect(page).toContain(`CALL_ASSISTANT_SPAM.${key}`);
     expect(page).toContain("CALL_ASSISTANT_SPAM_BLOCK_TITLE");
-    for (const q of ["What counts as a minute?", "Do spam calls use my minutes?", "Which tier do I need?"]) expect(page).toContain(q);
-  });
-
-  it("$1,999/yr is an add-on annual price, so it shows despite the $1,000 sales threshold", () => {
-    expect(ADDONS.call_assistant.annualCents).toBeGreaterThanOrEqual(SALES_THRESHOLD_CENTS);
-    // The price-book helpers print it (the threshold applies to services, not plan/add-on annual prices) …
-    expect(addonLines().find((l) => l.startsWith(ADDONS.call_assistant.name))).toContain(`or ${formatUsd(ADDONS.call_assistant.annualCents)}/year`);
-    // … the knowledge pack says yearly is NOT 10 × monthly for this add-on …
-    expect(pricingKnowledge()).toContain(`the ${ADDONS.call_assistant.name}, which is ${formatUsd(ADDONS.call_assistant.annualCents)}/year`);
-    expect(pricingKnowledge()).toContain(`except the ${ADDONS.call_assistant_lite.name}, which is ${formatUsd(ADDONS.call_assistant_lite.annualCents)}/year`);
-    // … and the Hub's output filter lets Gabe say it.
-    expect(priceBookCents().has(ADDONS.call_assistant.annualCents)).toBe(true);
-    expect(filterReply(`The AI Call Assistant is ${callAssistantIntroLine()}.`).ok).toBe(true);
-    expect(filterReply(`On yearly billing the AI Call Assistant add-on costs ${formatUsd(ADDONS.call_assistant.annualCents)}/year on the Pro plan.`).ok).toBe(true);
-    // A made-up yearly price is still refused.
-    expect(filterReply("The AI Call Assistant add-on costs $1,899/year.").ok).toBe(false);
+    for (const q of ["What counts as a minute?", "Do spam calls use my minutes?", "Which tier do I need?", "Do I need a ConstructHUB plan?", "What if I need more than the top tier?"]) expect(page).toContain(q);
   });
 
   it("the number rules (owner, 2026-10-02) are stated on the FAQ, the Numbers tab and in Gabe's knowledge", () => {
@@ -214,19 +224,32 @@ describe("AI Call Assistant launch price", () => {
     "client/src/components/call-assistant-marketing.tsx", "client/src/pages/pricing.tsx",
     "client/src/pages/crm-call-assistant/overview.tsx", "client/src/pages/crm-call-assistant/index.tsx",
     "client/src/pages/crm-call-assistant/numbers.tsx", "client/src/pages/crm-call-assistant/calls.tsx",
-    "client/src/components/call-assistant-tiers.tsx", "client/src/pages/settings/plan-billing.tsx", "client/src/pages/settings/limits-usage.tsx",
+    "client/src/components/call-assistant-tiers.tsx", "client/src/components/call-assistant-billing-card.tsx",
+    "client/src/pages/settings/plan-billing.tsx", "client/src/pages/settings/limits-usage.tsx", "client/src/pages/settings/billing/subscriptions-panel.tsx",
+    "client/src/pages/terms-of-use.tsx",
   ])("%s types no Call Assistant price, minutes or spam allowance (it renders them from the price book)", (file) => {
     const src = fs.readFileSync(path.join(root, file), "utf8");
     const cents = [
-      CALL_ASSISTANT_INTRO.monthlyCents, ADDONS.call_number.monthlyCents, ...CALL_ASSISTANT_OVERAGE_RATES,
+      ADDONS.call_number.monthlyCents, ADDONS.call_number.annualCents, ...CALL_ASSISTANT_OVERAGE_RATES,
       ...CALL_ASSISTANT_TIERS.flatMap((t) => [t.monthlyCents, t.annualCents]),
     ];
-    for (const c of cents) expect(src).not.toMatch(new RegExp(`\\${formatUsd(c).replace(".", "\\.")}(?![\\d,])`));
-    // Nor a per-minute overage typed in cents ("5¢", "10 cents").
+    for (const c of cents) expect(src, formatUsd(c)).not.toMatch(new RegExp(`\\${formatUsd(c).replace(".", "\\.")}(?![\\d,])`));
+    // Nor a per-minute overage typed in cents ("50¢", "50 cents").
     for (const rate of CALL_ASSISTANT_OVERAGE_RATES) expect(src).not.toMatch(new RegExp(`(?<![\\d.])${rate}(¢| ?cents)`));
-    // Tier minutes and the free spam calls, typed as copy ("2,000 minutes", "500 spam calls").
+    // Tier minutes and the free spam calls, typed as copy ("500 minutes", "500 spam calls").
     for (const t of CALL_ASSISTANT_TIERS) expect(src).not.toMatch(new RegExp(`\\b${t.includedMinutes.toLocaleString("en-US")} (call )?min`));
     expect(src).not.toMatch(new RegExp(`\\b${CALL_ASSISTANT_FREE_SPAM_CALLS} spam`));
+    // And never the old model's words: a launch intro, or "an add-on for the … plans".
+    expect(src).not.toMatch(/launch price|for your first \d+ months|an add-on for the/i);
+  });
+
+  it("the Call Assistant's own section is the one place Pricing sells it; nothing else on the page lists its lines", () => {
+    const pricing = fs.readFileSync(path.join(root, "client/src/pages/pricing.tsx"), "utf8");
+    expect(pricing).toContain('id="call-assistant"');
+    expect(pricing).toContain("CallAssistantPlanCards");
+    expect(pricing).toContain("isCallAssistantAddon(k)");
+    expect(pricing).not.toContain("CallAssistantTierCards interval");
+    expect(pricing).toContain("call_assistant_success");
   });
 });
 

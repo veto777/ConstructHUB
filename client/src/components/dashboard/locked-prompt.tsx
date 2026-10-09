@@ -1,5 +1,5 @@
 import { ArrowRight, Lock } from "lucide-react";
-import { MODULE_NAMES, PLANS, type ModuleKey, type PlanKey } from "@shared/plans";
+import { MODULE_NAMES, PLANS, CALL_ASSISTANT_PRICING_HREF, type ModuleKey, type PlanKey } from "@shared/plans";
 import type { DashboardSurface } from "@shared/dashboard";
 import { featureIntroPath } from "@shared/feature-pages";
 import { DashLink, FOCUS_RING } from "./dash-link";
@@ -15,11 +15,13 @@ import { inNativeApp } from "@/lib/app-shell";
  * can decide before looking at plans.
  */
 export function LockedPrompt({
-  tileKey, requiredPlan, module, href = "/pricing", surface = "app", compact = false,
+  tileKey, requiredPlan, module, addon, href = "/pricing", surface = "app", compact = false,
 }: {
   tileKey: string;
   requiredPlan?: PlanKey;
   module?: ModuleKey;
+  /** The AI Call Assistant: a separate service on its own subscription, so no plan is named. */
+  addon?: string;
   href?: string;
   surface?: DashboardSurface;
   compact?: boolean;
@@ -27,7 +29,8 @@ export function LockedPrompt({
   if (inNativeApp()) return <AppLocked name={module ? MODULE_NAMES[module] : "This"} testId={`locked-${tileKey}`} compact />;
   const planName = requiredPlan ? PLANS[requiredPlan].name : null;
   const intro = featureIntroPath(tileKey);
-  const tooltip = module ? `${MODULE_NAMES[module]} is included with the ${planName ?? "a paid"} plan` : undefined;
+  const tooltip = module ? `${MODULE_NAMES[module]} is included with the ${planName ?? "a paid"} plan` : addon ? "A separate service with its own subscription" : undefined;
+  const plansHref = addon ? CALL_ASSISTANT_PRICING_HREF : href;
   return (
     <div
       className={`flex ${compact ? "flex-row flex-wrap items-center gap-x-3 gap-y-2" : "flex-col items-start gap-2"} rounded-lg border border-dashed bg-muted/40 px-3 py-2.5`}
@@ -37,7 +40,7 @@ export function LockedPrompt({
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
         <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
         <span>
-          {planName ? <>Included with the <strong className="font-semibold text-foreground">{planName}</strong> plan.</> : "Included with a paid plan."}
+          {addon ? "A separate service with its own subscription." : planName ? <>Included with the <strong className="font-semibold text-foreground">{planName}</strong> plan.</> : "Included with a paid plan."}
         </span>
       </p>
       <div className="flex flex-wrap items-center gap-x-4">
@@ -52,12 +55,12 @@ export function LockedPrompt({
           </DashLink>
         )}
         <DashLink
-          href={href}
+          href={plansHref}
           surface={surface}
           className={`inline-flex min-h-10 sm:min-h-8 items-center gap-1 rounded-md text-sm font-medium ${intro ? "text-muted-foreground hover:text-foreground" : "text-primary"} hover:underline underline-offset-4 ${FOCUS_RING}`}
           data-testid={`link-tile-${tileKey}-plans`}
         >
-          See plans {!intro && <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />}
+          {addon ? "See pricing" : "See plans"} {!intro && <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />}
         </DashLink>
       </div>
     </div>

@@ -75,7 +75,7 @@ function StatusPill({ tile }: { tile: DashboardTile }) {
         <Badge variant="outline" className="gap-1 font-medium text-muted-foreground" data-testid={`status-${tile.key}`}>
           <Lock className="h-3 w-3" aria-hidden="true" />
           {/* The iPhone apps sell nothing (App Store 3.1.3(f)): no plan name on the lock. */}
-          {inNativeApp() ? "Not on this account" : tile.requiredPlan ? PLANS[tile.requiredPlan].name : "Paid plan"}
+          {inNativeApp() ? "Not on this account" : tile.addon ? "Separate service" : tile.requiredPlan ? PLANS[tile.requiredPlan].name : "Paid plan"}
         </Badge>
       );
     case "coming_soon":
@@ -140,7 +140,7 @@ export function DashboardTileCard({ tile }: { tile: DashboardTile }) {
         ) : tile.status === "locked" ? (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">{tile.description}</p>
-            <LockedPrompt tileKey={tile.key} requiredPlan={tile.requiredPlan} module={tile.module} href={tile.cta?.href} surface={tile.cta?.surface} />
+            <LockedPrompt tileKey={tile.key} requiredPlan={tile.requiredPlan} module={tile.module} addon={tile.addon} href={tile.cta?.href} surface={tile.cta?.surface} />
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">

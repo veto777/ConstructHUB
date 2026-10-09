@@ -22,6 +22,7 @@
  * Money is in cents.
  */
 import { JOBCAM_INCLUDED_GB } from "./jobcam-storage";
+import { CALL_ASSISTANT_NOT_INCLUDED_LINE } from "./plans";
 
 /**
  * JobCam (job photos & video) on the CRM — owner, 2026-10-07: "this JobCam is
@@ -88,13 +89,16 @@ export type CrmPlan = {
   limits: CrmPlanLimits;
 };
 
-/** Every CRM plan excludes the whole platform app; tier-specific gaps are added per plan. */
+/**
+ * Every CRM plan excludes the whole platform app and the AI Call Assistant (a
+ * separate service of its own, shared/plans.ts); tier-specific gaps are added per plan.
+ */
 const PLATFORM_NOT_INCLUDED: readonly string[] = [
   "Google Business Profile tools — Profile Guard, review alerts, AI replies, ranking grid",
   "Click Guard, IP Tracker and VPN Shield (click-fraud protection)",
   "Permit and property-record search",
   "Site Scans, Competitor Intel and ConstructHUB SEO",
-  "The AI Call Assistant",
+  CALL_ASSISTANT_NOT_INCLUDED_LINE,
 ];
 
 export const CRM_PLANS: Record<CrmPlanKey, CrmPlan> = {

@@ -2854,6 +2854,8 @@ export const voiceUsage = pgTable("voice_usage", {
   overageCentsPerMinute: integer("overage_cents_per_minute"),
   overageReportedAt: timestamp("overage_reported_at"),
   stripeUsageRecordId: text("stripe_usage_record_id"),
+  /** The Call Assistant subscription the month's latest call was under (a settlement claims only its own subscription's months). */
+  stripeSubscriptionId: text("stripe_subscription_id"),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (t) => [uniqueIndex("voice_usage_org_month_key").on(t.orgId, t.month)]);
 

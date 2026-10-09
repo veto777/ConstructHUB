@@ -6,7 +6,8 @@
  * and the entitlement gates don't.
  */
 import {
-  ADDONS, ADDON_MODULES, GBP_REINSTATEMENT_CENTS, PLANS, PLAN_KEYS, TRIAL_DAYS, planForModule, showsPrice,
+  ADDONS, ADDON_MODULES, GBP_REINSTATEMENT_CENTS, PLANS, PLAN_KEYS, TRIAL_DAYS, CALL_ASSISTANT_ANNUAL_MONTHS, CALL_ASSISTANT_PRICING_HREF,
+  planForModule, showsPrice, isCallAssistantAddon,
   type AddonModuleKey, type CountLimitKey, type ModuleKey, type Plan, type PlanKey, type PlanLimits,
 } from "../plans";
 import { CRM_ADDONS, CRM_PLANS, CRM_PLAN_KEYS, CRM_TRIAL_DAYS } from "../crm-plans";
@@ -16,7 +17,7 @@ import type { FeatureAllowance, FeaturePricing } from "./types";
 export type FeaturePriceRow = { label: string; value: string; included: boolean };
 
 export type FeaturePriceSummary = {
-  /** "Included in every plan", "Included from the Pro plan", "Agency plan", "Add-on", … */
+  /** "Included in every plan", "Included from the Pro plan", "Agency plan", "Add-on", "Separate service", … */
   headline: string;
   /** The figure under the headline ("$29"), or null when there is none to show. */
   price: string | null;
@@ -116,22 +117,19 @@ export function featurePriceSummary(spec: FeaturePricing): FeaturePriceSummary {
       const addon = ADDONS[spec.addon];
       const setup = addon.setupCents ? ` plus a ${formatUsd(addon.setupCents)} one-time setup fee` : "";
       const soldOn = `the ${joinNames(addon.availableOn.map((k) => PLANS[k].name))} plan${addon.availableOn.length > 1 ? "s" : ""}`;
-      // An add-on sold in tiers (the AI Call Assistant: one tier per subscription) is priced from its
-      // cheapest tier, and the note lists every tier — never one middle tier's price as if it were the price.
-      const tiers = addon.exclusiveGroup
+      // The AI Call Assistant is a SEPARATE SERVICE sold in tiers on its own subscription (owner, 2026-10-08):
+      // priced from its cheapest tier, the note lists every tier — never one middle tier's price as if it were
+      // the price — and no platform plan "includes" or "sells" it: the rows say so for every plan.
+      const tiers = isCallAssistantAddon(spec.addon) && addon.exclusiveGroup
         ? Object.values(ADDONS).filter((a) => a.exclusiveGroup === addon.exclusiveGroup).sort((a, b) => a.monthlyCents - b.monthlyCents)
         : [];
       if (tiers.length > 1) {
         return {
-          headline: "Add-on",
+          headline: "Separate service",
           price: formatUsd(tiers[0].monthlyCents), per: PER_MONTH, from: true,
-          priceNote: `${joinNames(tiers.map((t) => `${t.name}: ${formatUsd(t.monthlyCents)}/mo or ${formatUsd(t.annualCents)}/yr`))}. One tier per subscription, added to ${soldOn}.`,
-          rows: PLAN_KEYS.map((key) => ({
-            label: PLANS[key].name,
-            value: addon.availableOn.includes(key) ? "Available as an add-on" : "Not available",
-            included: addon.availableOn.includes(key),
-          })),
-          plans: [], comingSoon: tiers.every((t) => t.preview === true), link: { label: "See add-ons", href: "/pricing#add-ons" }, note,
+          priceNote: `${joinNames(tiers.map((t) => `${t.name}: ${formatUsd(t.monthlyCents)}/mo or ${formatUsd(t.annualCents)}/yr`))} (yearly is ${CALL_ASSISTANT_ANNUAL_MONTHS} times the monthly price). One tier per account, on its own subscription: no ConstructHUB plan includes it, and none is needed to buy it.`,
+          rows: PLAN_KEYS.map((key) => ({ label: PLANS[key].name, value: "Not included — a separate service", included: false })),
+          plans: [], comingSoon: tiers.every((t) => t.preview === true), link: { label: "See Call Assistant pricing", href: CALL_ASSISTANT_PRICING_HREF }, note,
         };
       }
       return {
@@ -274,7 +272,8 @@ export function featurePlanGap(spec: FeaturePricing, ent: FeatureEntitlementsInp
     case "addon": {
       const module = (Object.keys(ADDON_MODULES) as AddonModuleKey[]).find((k) => ADDON_MODULES[k] === spec.addon);
       if (!module || ent.addonModules?.[module]) return null;
-      return { label: "See add-ons", href: "/pricing#add-ons", note: `Not on your ${current} plan yet: it's an add-on.` };
+      // The AI Call Assistant is a separate service: no plan upgrade would add it, so point at its own pricing.
+      return { label: "See Call Assistant pricing", href: CALL_ASSISTANT_PRICING_HREF, note: `A separate service, not part of your ${current} plan.` };
     }
     default:
       return null;

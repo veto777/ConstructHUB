@@ -1,7 +1,9 @@
 /**
- * The Call Assistant add-on module (architect-owned): the price book block,
- * the add-on-module entitlement and the 402 body every /api/crm/voice/* route
- * answers without it. Pure functions — no server, no DB.
+ * The Call Assistant module (architect-owned): the price book block, the
+ * module entitlement from the service's OWN subscription (owner, 2026-10-08:
+ * a separate service, bought with or without a platform plan) and the 402
+ * every /api/crm/voice/* route answers without it. Pure functions — no server,
+ * no DB.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ row: undefined as any }));
@@ -15,174 +17,232 @@ vi.mock("../db", () => ({
   db: {},
 }));
 import {
-  getEntitlements, addonModulesFor, moduleEnabled, modulePaused, callAssistantAllowance, ADMIN_CALL_ASSISTANT_NUMBERS, sendModuleRequired, requireModule, allowancesFor,
+  getEntitlements, addonModulesFor, addonModulesPausedFor, moduleEnabled, modulePaused, callAssistantAllowance, ADMIN_CALL_ASSISTANT_NUMBERS,
+  sendModuleRequired, requireModule, allowancesFor,
 } from "../entitlements";
 import {
-  ADDONS, ADDON_MODULES, ADDON_MODULE_UNLOCKED_BY, PLANS, PLAN_KEYS, MODULE_NAMES, planForModule, moduleName, isAddonModule,
-  CALL_ASSISTANT_TIERS, CALL_ASSISTANT_TIER_ADDONS, callAssistantTier,
+  ADDONS, ADDON_MODULES, ADDON_MODULE_UNLOCKED_BY, PLANS, PLAN_KEYS, MODULE_NAMES, ANNUAL_MONTHS, SALES_THRESHOLD_CENTS, moduleName, isAddonModule,
+  CALL_ASSISTANT_TIERS, CALL_ASSISTANT_TIER_ADDONS, CALL_ASSISTANT_ADDONS, CALL_ASSISTANT_ANNUAL_MONTHS, CALL_ASSISTANT_OVERAGE_CENTS_PER_MINUTE,
+  CALL_ASSISTANT_OVERAGE_RATES, CALL_ASSISTANT_DEFAULT_OVERAGE_CENTS, CALL_ASSISTANT_FROM_CENTS, CALL_ASSISTANT_NOT_INCLUDED_LINE,
+  callAssistantTier, callAssistantAddonsOf, withoutCallAssistantAddons, isCallAssistantAddon,
 } from "@shared/plans";
+import { CRM_PLANS, CRM_PLAN_KEYS } from "@shared/crm-plans";
 import { checkAddonsForPlan, BillingRequestError } from "../billing/order";
-import { AGENCY_ONLY_MODULES, addonLines } from "@shared/plan-copy";
+import { AGENCY_ONLY_MODULES, PLATFORM_ADDONS, addonLines } from "@shared/plan-copy";
 import { voiceProfileSchema, defaultVoiceProfile, decisionSchema, DEFAULT_INTAKE_QUESTIONS } from "@shared/voice-profile";
 import { VOICE_PERSONAS, VOICE_PERSONA_IDS } from "@shared/voice-personas";
 import { compileVoiceProfile } from "./prompt-compiler";
 import { VOICE_SCHEMA_DDL, VOICE_TABLES } from "./schema";
 
 const res = () => { const r: any = { status: vi.fn(() => r), json: vi.fn(() => r), setHeader: vi.fn() }; return r; };
+/** The platform subscription row as accountSubscriptionRow joins it (no Call Assistant columns: none bought). */
 const customer = (plan: string | null, extra: Record<string, unknown> = {}) =>
   ({ email: "owner@example.invalid", plan, status: plan ? "active" : null, stripe_subscription_id: plan ? "sub_fixture" : null, current_period_end: null, ...extra });
+/** The Call Assistant's own subscription, as the call_assistant_* columns the same query joins in (server/voice/subscription-store.ts). */
+const callAssistant = (tier: string | null, status: string, extraNumbers = 0) => ({
+  call_assistant_tier: tier, call_assistant_status: status, call_assistant_extra_numbers: extraNumbers,
+  call_assistant_interval: "month", call_assistant_subscription_id: "sub_ca_fixture",
+});
 
 beforeEach(() => { mocks.row = undefined; });
 
-describe("price book: the Call Assistant add-ons", () => {
-  it("are sold on Pro, Growth and Agency, grant no count limits, and are for sale (launched: no longer preview)", () => {
-    for (const key of [...CALL_ASSISTANT_TIER_ADDONS, "call_number"] as const) {
-      expect(ADDONS[key].availableOn).toEqual(["pro", "growth", "agency"]);
-      expect(ADDONS[key].grants).toEqual({});
-      // Owner, 2026-10-02: "the call assistant is live not coming soon".
-      expect(ADDONS[key].preview ?? false).toBe(false);
-      expect(ADDONS[key].setupCents).toBeUndefined();
+describe("price book: the AI Call Assistant, a separate service (owner, 2026-10-08)", () => {
+  it("four tiers named by their minutes, one overage rate, yearly at 11 × monthly, no intro, nothing above the top tier", () => {
+    expect(CALL_ASSISTANT_TIERS.map((t) => [t.tier, t.addon, t.name, t.monthlyCents, t.annualCents, t.includedMinutes, t.includedNumbers, t.overageCentsPerMinute])).toEqual([
+      ["lite", "call_assistant_lite", "500 minutes", 24_900, 273_900, 500, 1, 50],
+      ["solo", "call_assistant", "1,000 minutes", 34_900, 383_900, 1_000, 1, 50],
+      ["crew", "call_assistant_crew", "2,000 minutes", 44_900, 493_900, 2_000, 2, 50],
+      ["fleet", "call_assistant_fleet", "5,000 minutes", 99_900, 1_098_900, 5_000, 5, 50],
+    ]);
+    // Yearly = 11 × monthly (one month free): a smaller discount than the plans' 10 × (two months), which is untouched.
+    expect(CALL_ASSISTANT_ANNUAL_MONTHS).toBe(11);
+    expect(ANNUAL_MONTHS).toBe(10);
+    for (const t of CALL_ASSISTANT_TIERS) {
+      expect(t.annualCents).toBe(t.monthlyCents * CALL_ASSISTANT_ANNUAL_MONTHS);
+      // The top tier is $999: listed. More minutes than it is a sales conversation, never a tier.
+      expect(t.monthlyCents).toBeLessThan(SALES_THRESHOLD_CENTS);
+      const a = ADDONS[t.addon];
+      expect(a).toMatchObject({ key: t.addon, name: `AI Call Assistant — ${t.name}`, monthlyCents: t.monthlyCents, annualCents: t.annualCents, availableOn: [], exclusiveGroup: "call_assistant_tier", grants: {} });
+      expect(a.introMonthlyCents).toBeUndefined();
+      expect(a.introMonths).toBeUndefined();
+      expect(a.preview ?? false).toBe(false);
+      expect(a.setupCents).toBeUndefined();
+      expect(a.description).toContain(`${t.includedMinutes.toLocaleString("en-US")} call minutes a month`);
+      expect(a.description).toContain("then $0.50 a minute");
     }
-    // Owner, 2026-10-02: "annually price can be $1999 for this service" — its own number, not 10 × monthly.
-    expect(ADDONS.call_assistant.annualCents).toBe(199_900);
-    expect(ADDONS.call_number.annualCents).toBe(ADDONS.call_number.monthlyCents * 10);
-    // An extra number needs any one tier.
-    expect(ADDONS.call_number.requires).toEqual(["call_assistant_lite", "call_assistant", "call_assistant_crew", "call_assistant_fleet"]);
-    for (const t of CALL_ASSISTANT_TIERS) expect(ADDONS[t.addon].description).toContain(`${t.includedMinutes.toLocaleString("en-US")} call minutes`);
-    expect(callAssistantTier("solo").includedNumbers).toBe(1);
-    // Every add-on line the Hub assistant quotes still comes from the price book, preview ones included.
-    expect(addonLines()).toHaveLength(Object.keys(ADDONS).length);
+    // Owner, 2026-10-08: 50 cents a minute on every tier (the 10¢ / 5¢ rates were below cost).
+    expect(CALL_ASSISTANT_OVERAGE_CENTS_PER_MINUTE).toBe(50);
+    expect(CALL_ASSISTANT_OVERAGE_RATES).toEqual([50]);
+    expect(CALL_ASSISTANT_DEFAULT_OVERAGE_CENTS).toBe(50);
+    expect(CALL_ASSISTANT_FROM_CENTS).toBe(24_900);
+    expect(callAssistantTier("fleet").includedNumbers).toBe(5);
+    // The extra number is a line of the same subscription, at the old contract's yearly price (10 × monthly; the repricing named the tiers only) too, and it needs a tier.
+    expect(ADDONS.call_number).toMatchObject({ key: "call_number", monthlyCents: 500, annualCents: 5_000, availableOn: [], grants: {}, requires: CALL_ASSISTANT_TIER_ADDONS });
+    expect(CALL_ASSISTANT_TIER_ADDONS).toEqual(["call_assistant_lite", "call_assistant", "call_assistant_crew", "call_assistant_fleet"]);
+    expect(CALL_ASSISTANT_ADDONS).toEqual([...CALL_ASSISTANT_TIER_ADDONS, "call_number"]);
+    for (const key of CALL_ASSISTANT_ADDONS) expect(isCallAssistantAddon(key)).toBe(true);
+    expect(isCallAssistantAddon("extra_seat")).toBe(false);
+    expect(callAssistantAddonsOf("crew", 2)).toEqual({ call_assistant_crew: 1, call_number: 2 });
+    expect(callAssistantAddonsOf("lite")).toEqual({ call_assistant_lite: 1 });
+    expect(callAssistantAddonsOf(null, 2)).toEqual({});
+    expect(withoutCallAssistantAddons({ call_assistant: 1, call_number: 2, extra_seat: 3 })).toEqual({ extra_seat: 3 });
+  });
+
+  it("no plan sells it — every platform plan AND every CRM plan says so at checkout, with the real starting price", () => {
+    expect(CALL_ASSISTANT_NOT_INCLUDED_LINE).toBe("The AI Call Assistant — answers your phone 24/7, screens spam and files the lead (a separate service, from $249/mo)");
+    for (const key of PLAN_KEYS) {
+      // The CRM leads the list (owner, 2026-10-07); the Call Assistant follows it.
+      expect(PLANS[key].notIncluded[0], key).toMatch(/ConstructHUB CRM/);
+      expect(PLANS[key].notIncluded[1], key).toBe(CALL_ASSISTANT_NOT_INCLUDED_LINE);
+      expect(PLANS[key].features.join(" "), key).not.toMatch(/Call Assistant/);
+    }
+    for (const key of CRM_PLAN_KEYS) expect(CRM_PLANS[key].notIncluded, key).toContain(CALL_ASSISTANT_NOT_INCLUDED_LINE);
+    // The platform's add-on list is the platform's: none of the Call Assistant's lines is on it.
+    expect(PLATFORM_ADDONS.map((a) => a.key)).toEqual(["extra_location", "extra_seat", "protected_site", "texting_number", "competitor_pack"]);
+    expect(addonLines()).toHaveLength(PLATFORM_ADDONS.length);
+    expect(addonLines().join("\n")).not.toMatch(/Call Assistant/);
   });
 
   it("is an add-on module, not a plan module: the Agency-only list is unchanged", () => {
     expect(ADDON_MODULES.callAssistant).toBe("call_assistant");
-    expect(ADDON_MODULE_UNLOCKED_BY.callAssistant).toEqual(["call_assistant_lite", "call_assistant", "call_assistant_crew", "call_assistant_fleet"]);
+    expect(ADDON_MODULE_UNLOCKED_BY.callAssistant).toEqual(CALL_ASSISTANT_TIER_ADDONS);
     expect(isAddonModule("callAssistant")).toBe(true);
     expect(isAddonModule("adsManager")).toBe(false);
     expect(Object.keys(MODULE_NAMES)).not.toContain("callAssistant");
     expect(AGENCY_ONLY_MODULES).toHaveLength(4);
-    expect(planForModule("callAssistant")).toBe("pro");
     expect(moduleName("callAssistant")).toBe("AI Call Assistant");
     for (const k of PLAN_KEYS) expect((PLANS[k].modules as any).callAssistant).toBeUndefined();
   });
 
-  it("checkout sells every tier on Pro, Growth and Agency, still refuses it on Starter, and refuses an extra number without a tier", () => {
+  it("the platform checkout refuses every Call Assistant line on every plan and sends the buyer to the service's own checkout", () => {
     const refusal = (fn: () => void): any => { try { fn(); } catch (e) { return e; } return null; };
-    for (const plan of ["pro", "growth", "agency"] as const) {
-      for (const key of CALL_ASSISTANT_TIER_ADDONS) {
-        expect(() => checkAddonsForPlan(plan, { [key]: 1 }), `${plan} + ${key}`).not.toThrow();
-        expect(() => checkAddonsForPlan(plan, { [key]: 1, call_number: 2 }), `${plan} + ${key} + 2 numbers`).not.toThrow();
+    for (const plan of PLAN_KEYS) {
+      for (const key of CALL_ASSISTANT_ADDONS) {
+        const e = refusal(() => checkAddonsForPlan(plan, { [key]: 1 }));
+        expect(e, `${plan} + ${key}`).toBeInstanceOf(BillingRequestError);
+        expect(e).toMatchObject({ status: 400, code: "addon_unavailable" });
+        expect(e.message).toMatch(/isn't a plan add-on/);
+        expect(e.message).toMatch(/separate service with its own subscription, from \$249\/mo/);
+        expect(e.message).toContain("/pricing#call-assistant");
       }
     }
-    for (const key of [...CALL_ASSISTANT_TIER_ADDONS, "call_number"] as const) {
-      const e = refusal(() => checkAddonsForPlan("starter", { [key]: 1 }));
-      expect(e, `starter + ${key}`).toBeInstanceOf(BillingRequestError);
-      expect(e).toMatchObject({ status: 400, code: "addon_unavailable" });
-      expect(e.message).toMatch(/isn't available on the Starter plan/);
-    }
-    // An extra number needs a tier on the same subscription.
-    const noTier = refusal(() => checkAddonsForPlan("pro", { call_number: 1 }));
-    expect(noTier).toBeInstanceOf(BillingRequestError);
-    expect(noTier).toMatchObject({ status: 400, code: "addon_unavailable" });
-    expect(noTier.message).toMatch(/needs one of these add-ons/);
+    // The platform's own add-ons are untouched.
     expect(() => checkAddonsForPlan("growth", { competitor_pack: 1 })).not.toThrow();
-    // The preview rule stays for the next listed-only add-on: a preview add-on is refused (409), nothing charged.
-    const saved = ADDONS.call_assistant.preview;
-    try {
-      ADDONS.call_assistant.preview = true;
-      const e = refusal(() => checkAddonsForPlan("pro", { call_assistant: 1 }));
-      expect(e).toBeInstanceOf(BillingRequestError);
-      expect(e).toMatchObject({ status: 409, code: "addon_unavailable" });
-      expect(e.message).toMatch(/isn't available yet/);
-    } finally {
-      if (saved === undefined) delete ADDONS.call_assistant.preview; else ADDONS.call_assistant.preview = saved;
-    }
-    expect(() => checkAddonsForPlan("pro", { call_assistant: 1 })).not.toThrow();
+    expect(() => checkAddonsForPlan("starter", { protected_site: 1 })).toThrow(/isn't available on the Starter plan/);
   });
 });
 
-describe("entitlements: the callAssistant add-on module", () => {
-  it("is on only when the add-on is on the subscription, the plan sells it and the subscription is paid up", () => {
-    expect(addonModulesFor("pro", { call_assistant: 1 }, "active")).toEqual({ callAssistant: true });
-    // Any tier unlocks the module.
-    expect(addonModulesFor("pro", { call_assistant_crew: 1 }, "active")).toEqual({ callAssistant: true });
-    expect(addonModulesFor("growth", { call_assistant_fleet: 1 }, "trialing")).toEqual({ callAssistant: true });
-    expect(addonModulesFor("pro", { call_number: 2 }, "active")).toEqual({ callAssistant: false });
-    expect(addonModulesFor("pro", { call_assistant: 1 }, "trialing")).toEqual({ callAssistant: true });
-    expect(addonModulesFor("pro", { call_assistant: 1 }, "past_due")).toEqual({ callAssistant: false });
-    expect(addonModulesFor("pro", { call_assistant: 1 }, null)).toEqual({ callAssistant: false });
-    expect(addonModulesFor("pro", {}, "active")).toEqual({ callAssistant: false });
-    expect(addonModulesFor("starter", { call_assistant: 1 }, "active")).toEqual({ callAssistant: false });
-    expect(addonModulesFor(null, { call_assistant: 1 }, "active")).toEqual({ callAssistant: false });
-    expect(addonModulesFor(null, {}, null, true)).toEqual({ callAssistant: true });
-    expect(addonModulesFor(null, {}, "past_due", true)).toEqual({ callAssistant: true });
-    // The add-on raises no count limit.
+describe("entitlements: the callAssistant module comes from the service's own subscription", () => {
+  it("is on while that subscription holds a tier and is active or trialing; paused on a payment-needed status; never from a plan", () => {
+    expect(addonModulesFor({ tier: "lite", status: "active" })).toEqual({ callAssistant: true });
+    expect(addonModulesFor({ tier: "fleet", status: "trialing" })).toEqual({ callAssistant: true });
+    expect(addonModulesFor({ tier: "solo", status: "past_due" })).toEqual({ callAssistant: false });
+    expect(addonModulesFor({ tier: "solo", status: "canceled" })).toEqual({ callAssistant: false });
+    expect(addonModulesFor({ tier: null, status: "active" })).toEqual({ callAssistant: false });
+    expect(addonModulesFor(null)).toEqual({ callAssistant: false });
+    expect(addonModulesFor(null, true)).toEqual({ callAssistant: true });
+    expect(addonModulesFor({ tier: "solo", status: "past_due" }, true)).toEqual({ callAssistant: true });
+    expect(addonModulesPausedFor({ tier: "solo", status: "past_due" })).toEqual({ callAssistant: true });
+    expect(addonModulesPausedFor({ tier: "crew", status: "unpaid" })).toEqual({ callAssistant: true });
+    expect(addonModulesPausedFor({ tier: null, status: "past_due" })).toEqual({ callAssistant: false });
+    expect(addonModulesPausedFor({ tier: "solo", status: "canceled" })).toEqual({ callAssistant: false });
+    expect(addonModulesPausedFor({ tier: "solo", status: "active" })).toEqual({ callAssistant: false });
+    expect(addonModulesPausedFor({ tier: "solo", status: "past_due" }, true)).toEqual({ callAssistant: false });
+    // The tiers raise no platform count limit.
     expect(allowancesFor("pro", { call_assistant: 2, call_number: 3 })).toEqual(PLANS.pro.limits);
   });
 
   it("buys the held tier's numbers and minutes plus extra numbers; platform admins get unlimited minutes and up to 5 numbers", () => {
     const allowance = (addons: Record<string, number>, isPlatformAdmin = false) =>
       callAssistantAllowance({ addonModules: { callAssistant: true }, addons, isPlatformAdmin });
-    // Each tier's own overage rate rides along (the meter prices each call at it).
-    expect(allowance({ call_assistant_lite: 1 })).toEqual({ numbers: 1, minutes: 2000, overageCentsPerMinute: 10 });
-    expect(allowance({ call_assistant: 1, call_number: 3 })).toEqual({ numbers: 1 + 3, minutes: 5000, overageCentsPerMinute: 10 });
-    expect(allowance({ call_assistant_crew: 1 })).toEqual({ numbers: 5, minutes: 10_000, overageCentsPerMinute: 5 });
-    expect(allowance({ call_assistant_fleet: 1, call_number: 1 })).toEqual({ numbers: 21, minutes: 25_000, overageCentsPerMinute: 5 });
+    expect(allowance({ call_assistant_lite: 1 })).toEqual({ numbers: 1, minutes: 500, overageCentsPerMinute: 50 });
+    expect(allowance({ call_assistant: 1, call_number: 3 })).toEqual({ numbers: 1 + 3, minutes: 1_000, overageCentsPerMinute: 50 });
+    expect(allowance({ call_assistant_crew: 1 })).toEqual({ numbers: 2, minutes: 2_000, overageCentsPerMinute: 50 });
+    expect(allowance({ call_assistant_fleet: 1, call_number: 1 })).toEqual({ numbers: 6, minutes: 5_000, overageCentsPerMinute: 50 });
     expect(callAssistantAllowance({ addonModules: { callAssistant: false }, addons: { call_assistant: 2 }, isPlatformAdmin: false })).toEqual({ numbers: 0, minutes: 0, overageCentsPerMinute: 0 });
-    expect(allowance({}, true)).toEqual({ numbers: ADMIN_CALL_ASSISTANT_NUMBERS, minutes: -1, overageCentsPerMinute: 10 });
+    expect(allowance({}, true)).toEqual({ numbers: ADMIN_CALL_ASSISTANT_NUMBERS, minutes: -1, overageCentsPerMinute: 50 });
     expect(ADMIN_CALL_ASSISTANT_NUMBERS).toBe(5);
-    // An admin who holds a bigger tier keeps it: the admin ceiling is a floor, never a cut.
-    expect(allowance({ call_assistant_fleet: 1 }, true)).toEqual({ numbers: 20, minutes: -1, overageCentsPerMinute: 5 });
-    expect(allowance({ call_assistant: 1, call_number: 6 }, true)).toEqual({ numbers: 7, minutes: -1, overageCentsPerMinute: 10 });
-    expect(allowance({ call_assistant_lite: 1 }, true)).toEqual({ numbers: ADMIN_CALL_ASSISTANT_NUMBERS, minutes: -1, overageCentsPerMinute: 10 });
+    // An admin who holds more keeps it: the admin ceiling is a floor, never a cut.
+    expect(allowance({ call_assistant_fleet: 1, call_number: 2 }, true)).toEqual({ numbers: 7, minutes: -1, overageCentsPerMinute: 50 });
+    expect(allowance({ call_assistant_lite: 1 }, true)).toEqual({ numbers: ADMIN_CALL_ASSISTANT_NUMBERS, minutes: -1, overageCentsPerMinute: 50 });
   });
 
-  it("getEntitlements reports addonModules beside modules, and legacy Platinum has no add-on", async () => {
-    mocks.row = customer("growth", { addons: { call_assistant: 1 } });
+  it("getEntitlements: a standalone subscription with NO platform plan turns the module on; a platform plan alone never does", async () => {
+    mocks.row = { email: "owner@example.invalid", plan: null, status: null, stripe_subscription_id: null, current_period_end: null, ...callAssistant("crew", "active", 1) };
+    const alone = await getEntitlements(7);
+    expect(alone.plan).toBeNull();
+    expect(alone.allowances).toBeNull();
+    expect(alone.addonModules).toEqual({ callAssistant: true });
+    expect(alone.addonModulesPaused).toEqual({ callAssistant: false });
+    expect(alone.addons).toEqual({ call_assistant_crew: 1, call_number: 1 });
+    expect(alone.callAssistant).toMatchObject({ tier: "crew", status: "active", extraNumbers: 1, interval: "month", stripeSubscriptionId: "sub_ca_fixture" });
+    expect(moduleEnabled(alone, "callAssistant")).toBe(true);
+    expect(callAssistantAllowance(alone)).toEqual({ numbers: 3, minutes: 2_000, overageCentsPerMinute: 50 });
+
+    // A platform plan with a Call Assistant key left on its row by an older build grants nothing.
+    mocks.row = customer("growth", { addons: { call_assistant: 1, competitor_pack: 1 } });
     const growth = await getEntitlements(7);
-    expect(growth.addonModules).toEqual({ callAssistant: true });
-    expect(moduleEnabled(growth, "callAssistant")).toBe(true);
-    expect(moduleEnabled(growth, "adsManager")).toBe(false);
+    expect(growth.plan).toBe("growth");
+    expect(growth.addonModules).toEqual({ callAssistant: false });
+    expect(growth.addons).toEqual({ competitor_pack: 1 });
+    expect(growth.storedAddons).toEqual({ competitor_pack: 1 });
+    expect(growth.callAssistant.status).toBeNull();
+    expect(callAssistantAllowance(growth)).toEqual({ numbers: 0, minutes: 0, overageCentsPerMinute: 0 });
+
+    // Both products on one account: the plan's add-ons and the service's lines in one map.
+    mocks.row = customer("pro", { addons: { protected_site: 2 }, ...callAssistant("solo", "active") });
+    const both = await getEntitlements(7);
+    expect(both.plan).toBe("pro");
+    expect(both.addons).toEqual({ protected_site: 2, call_assistant: 1 });
+    expect(both.addonModules.callAssistant).toBe(true);
+    expect(both.allowances?.protectedSites).toBe(PLANS.pro.limits.protectedSites + 2);
+
+    // The legacy Platinum grant has no service.
     mocks.row = customer("platinum", { stripe_subscription_id: null });
     const platinum = await getEntitlements(7);
     expect(platinum.modules).toEqual({ agencyWorkspace: true, adsManager: true, cloudflareSearchConsole: true, domainsMailAlerts: true });
     expect(platinum.addonModules).toEqual({ callAssistant: false });
   });
 
-  // Owner, 2026-10-02: "As soon as they stop paying the agent stops working." The plan keeps
-  // past_due access (Stripe retries); the add-on module does not.
+  // Owner, 2026-10-02: "As soon as they stop paying the agent stops working." The Call Assistant's OWN
+  // subscription status decides; the platform plan is neither needed nor touched.
   it.each([
     ["active", true, false], ["trialing", true, false],
     ["past_due", false, true], ["unpaid", false, true], ["incomplete", false, true], ["paused", false, true],
     ["canceled", false, false], ["incomplete_expired", false, false],
   ] as const)("status %s: module on = %s, paused for payment = %s", async (status, on, paused) => {
-    mocks.row = customer("pro", { status, addons: { call_assistant: 1, call_number: 2 } });
+    mocks.row = customer("pro", callAssistant("solo", status, 2));
     const ent = await getEntitlements(7);
     expect(ent.addonModules).toEqual({ callAssistant: on });
     expect(ent.addonModulesPaused).toEqual({ callAssistant: paused });
     expect(moduleEnabled(ent, "callAssistant")).toBe(on);
     expect(modulePaused(ent, "callAssistant")).toBe(paused);
-    expect(ent.subscriptionStatus).toBe(status);
-    // A paused add-on still shows what it bought (its numbers are held); an ended one shows nothing.
+    expect(ent.callAssistant.status).toBe(status);
+    // The platform plan stays on whatever the service's status is (and the other way round).
+    expect(ent.plan).toBe("pro");
+    expect(ent.subscriptionStatus).toBe("active");
+    // A paused subscription still shows what it bought (its numbers are held); an ended one shows nothing.
     expect(callAssistantAllowance(ent)).toEqual(on || paused
       ? { numbers: 3, minutes: callAssistantTier("solo").includedMinutes, overageCentsPerMinute: callAssistantTier("solo").overageCentsPerMinute }
       : { numbers: 0, minutes: 0, overageCentsPerMinute: 0 });
-    // past_due pauses the plan too (owner, 2026-10-04); the add-on shows "paused for payment", not "ended".
-    if (status === "past_due") expect(ent.plan).toBeNull();
+    expect(ent.addons).toEqual(on ? { call_assistant: 1, call_number: 2 } : {});
+    expect(ent.storedAddons).toEqual({ call_assistant: 1, call_number: 2 });
   });
 
-  it("platform admins keep the module whatever their own subscription says", async () => {
+  it("platform admins keep the module whatever their own subscriptions say", async () => {
     const { ADMIN_EMAILS } = await import("../admin");
-    mocks.row = customer("pro", { email: ADMIN_EMAILS[1], status: "past_due", addons: { call_assistant: 1 } });
+    mocks.row = customer("pro", { email: ADMIN_EMAILS[1], ...callAssistant("solo", "past_due") });
     const ent = await getEntitlements(7);
     expect(ent.addonModules).toEqual({ callAssistant: true });
     expect(ent.addonModulesPaused).toEqual({ callAssistant: false });
+    mocks.row = { email: ADMIN_EMAILS[1], plan: null, status: null, stripe_subscription_id: null };
+    expect((await getEntitlements(7)).addonModules).toEqual({ callAssistant: true });
   });
 
-  it("requireModule answers 402 payment_required (not plan_required) for a paused add-on", async () => {
+  it("requireModule answers 402 payment_required (not the buy prompt) for a paused subscription", async () => {
     const mw = requireModule("callAssistant");
     const next = vi.fn();
-    mocks.row = customer("pro", { status: "past_due", addons: { call_assistant: 1 } });
+    mocks.row = customer(null, callAssistant("lite", "past_due"));
     const r = res(); await mw({ user: { id: 7 } } as any, r, next);
     expect(next).not.toHaveBeenCalled();
     expect(r.status).toHaveBeenCalledWith(402);
@@ -190,22 +250,24 @@ describe("entitlements: the callAssistant add-on module", () => {
     expect(r.json.mock.calls[0][0].message).toMatch(/Update your payment method/);
   });
 
-  it("answers the standard plan_required body with the add-on named", async () => {
+  it("answers 402 call_assistant_required — a separate service, its own pricing link, no plan named", async () => {
     const r = res();
     sendModuleRequired(r, "callAssistant");
     expect(r.status).toHaveBeenCalledWith(402);
     expect(r.json).toHaveBeenCalledWith({
-      code: "plan_required", requiredPlan: "pro", addon: "call_assistant",
-      message: "AI Call Assistant is an add-on for the Pro, Growth and Agency plans. Add it in Settings → Billing to use it.",
+      code: "call_assistant_required", addon: "call_assistant", href: "/pricing#call-assistant",
+      message: "AI Call Assistant is a separate service with its own subscription, from $249/mo — no ConstructHUB plan needed. Choose a tier on Pricing to use it.",
     });
-    // The middleware: 401 signed out, 402 without the add-on, next() with it.
+    expect(JSON.stringify(r.json.mock.calls[0][0])).not.toMatch(/requiredPlan|plan_required/);
+    // The middleware: 401 signed out, 402 without the service (even on Agency), next() with it (even with no plan).
     const mw = requireModule("callAssistant");
     const next = vi.fn();
     const r401 = res(); await mw({} as any, r401, next); expect(r401.status).toHaveBeenCalledWith(401);
-    mocks.row = customer("pro");
+    mocks.row = customer("agency");
     const r402 = res(); await mw({ user: { id: 7 } } as any, r402, next); expect(r402.status).toHaveBeenCalledWith(402);
+    expect(r402.json.mock.calls[0][0].code).toBe("call_assistant_required");
     expect(next).not.toHaveBeenCalled();
-    mocks.row = customer("pro", { addons: { call_assistant: 1 } });
+    mocks.row = customer(null, callAssistant("solo", "active"));
     const rOk = res(); await mw({ user: { id: 7 } } as any, rOk, next); expect(next).toHaveBeenCalledTimes(1);
   });
 });
@@ -258,6 +320,6 @@ describe("profile contract", () => {
 
   it("the DDL creates every table the spec names, idempotently", () => {
     for (const t of VOICE_TABLES) expect(VOICE_SCHEMA_DDL.some((s) => s.includes(`CREATE TABLE IF NOT EXISTS ${t} (`))).toBe(true);
-    for (const s of VOICE_SCHEMA_DDL) expect(s).toMatch(/IF NOT EXISTS|ADD COLUMN IF NOT EXISTS|CREATE OR REPLACE/);
+    for (const s of VOICE_SCHEMA_DDL) expect(s).toMatch(/IF NOT EXISTS|IF EXISTS|ADD COLUMN IF NOT EXISTS|CREATE OR REPLACE/);
   });
 });

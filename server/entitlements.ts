@@ -23,12 +23,16 @@
  * still retrying the card) has NO plan access: the plan pauses until the
  * payment goes through, the same rule as the add-on modules below.
  *
- * Add-on MODULES (the AI Call Assistant) are stricter: they run only while the
- * subscription is active or trialing (ADDON_MODULE_RUN_STATUSES). Owner,
- * 2026-10-02: "As soon as they stop paying the agent stops working." On a
- * payment-needed status (past_due, unpaid, incomplete, paused) the module is
- * off and `addonModulesPaused` says why, so the CRM can say "update your
- * payment method" instead of "buy the add-on".
+ * Add-on MODULES (the AI Call Assistant) come from the Call Assistant's OWN
+ * subscription (server/voice/subscription-store.ts, owner 2026-10-08: a
+ * separate service, bought with or without a platform plan) and are stricter:
+ * the module runs only while THAT subscription is active or trialing
+ * (ADDON_MODULE_RUN_STATUSES). Owner, 2026-10-02: "As soon as they stop
+ * paying the agent stops working." On a payment-needed status (past_due,
+ * unpaid, incomplete, paused) the module is off and `addonModulesPaused` says
+ * why, so the app can say "update your payment method" instead of "buy it".
+ * The platform plan plays no part: a stale Call Assistant key on the platform
+ * row's add-ons is ignored (withoutCallAssistantAddons).
  */
 import type { Request, Response, NextFunction } from "express";
 import { pool } from "./db";
@@ -36,12 +40,17 @@ import { isPlatformAdminEmail } from "./admin";
 import { forgetDashboard } from "./dashboard/cache";
 import {
   PLANS, PLAN_KEYS, ADDONS, AGENCY_SELF_SERVE_MAX_LOCATIONS, ACCESS_STATUSES, effectivePlanKey, planForModule, MODULE_NAMES,
-  ADDON_MODULES, isAddonModule, moduleName, ADDON_MODULE_UNLOCKED_BY, callAssistantIncluded,
-  ADDON_MODULE_RUN_STATUSES, PAYMENT_NEEDED_STATUSES, storedPlanKey, UNLIMITED, SEO_GRANDFATHERED_LIMITS,
+  ADDON_MODULES, isAddonModule, moduleName, callAssistantIncluded, withoutCallAssistantAddons,
+  ADDON_MODULE_RUN_STATUSES, PAYMENT_NEEDED_STATUSES, UNLIMITED, SEO_GRANDFATHERED_LIMITS,
+  CALL_ASSISTANT_FROM_CENTS, CALL_ASSISTANT_PRICING_HREF, CALL_ASSISTANT_REQUIRED_CODE,
   type PlanKey, type PlanLimits, type ModuleKey, type PlanModules, type AddonKey, type CountLimitKey,
   type AddonModuleKey, type AnyModuleKey,
 } from "@shared/plans";
 import { parseFoundingPrices, type FoundingPrices } from "@shared/pricing-terms";
+import {
+  CALL_ASSISTANT_JOIN_COLUMNS, callAssistantSchemaReady, callAssistantSubscriptionOf,
+  type CallAssistantJoinedColumns, type CallAssistantSubscriptionState,
+} from "./voice/subscription-store";
 
 export type Entitlements = {
   /** The account's own active plan (legacy keys mapped, expired grants dropped). */
@@ -59,10 +68,10 @@ export type Entitlements = {
   allowances: PlanLimits | null;
   modules: PlanModules;
   /**
-   * Modules an add-on unlocks (shared/plans.ts ADDON_MODULES): on when the
-   * add-on is on the subscription, the plan sells it and the subscription is
-   * active or trialing (ADDON_MODULE_RUN_STATUSES — never past_due). Platform
-   * admins get them all, like the plan modules.
+   * Modules an add-on unlocks (shared/plans.ts ADDON_MODULES): the AI Call
+   * Assistant is on when ITS OWN subscription holds a tier and is active or
+   * trialing (ADDON_MODULE_RUN_STATUSES — never past_due); no platform plan
+   * is needed. Platform admins get them all, like the plan modules.
    */
   addonModules: Record<AddonModuleKey, boolean>;
   /**
@@ -72,14 +81,21 @@ export type Entitlements = {
    * that grants anything.
    */
   addonModulesPaused: Record<AddonModuleKey, boolean>;
+  /**
+   * Add-on quantities in force: the platform plan's add-ons (while the plan is
+   * on) plus the Call Assistant's tier and extra numbers (while its own
+   * subscription runs), in one map so every voice gate reads one shape.
+   */
   addons: Partial<Record<AddonKey, number>>;
   /**
-   * Add-on quantities on the stored row whatever its status (a paused add-on
+   * Add-on quantities as stored whatever the status (a paused Call Assistant
    * keeps its numbers on display). Display only — every gate reads `addons`.
    */
   storedAddons: Partial<Record<AddonKey, number>>;
-  /** The deciding subscription row's status (null without one). */
+  /** The deciding PLATFORM subscription row's status (null without one). */
   subscriptionStatus: string | null;
+  /** The account's Call Assistant subscription (server/voice/subscription-store.ts): status, tier, extra numbers. */
+  callAssistant: CallAssistantSubscriptionState;
   isPlatformAdmin: boolean;
   /** End of a Stripe-less grant (trial code); null for Stripe-managed or open-ended rows. */
   grantEndsAt: Date | null;
@@ -102,34 +118,33 @@ const ALL_MODULES: PlanModules = { agencyWorkspace: true, adsManager: true, clou
 const NO_MODULES: PlanModules = { agencyWorkspace: false, adsManager: false, cloudflareSearchConsole: false, domainsMailAlerts: false };
 const ADDON_MODULE_KEYS = Object.keys(ADDON_MODULES) as AddonModuleKey[];
 
+/** The slice of the Call Assistant subscription the module gates read. */
+export type CallAssistantModuleInput = Pick<CallAssistantSubscriptionState, "status" | "tier">;
+
 /**
- * Which add-on modules a plan + add-on set unlocks under a subscription status
- * (every one for platform admins). The status is required: an add-on module
- * runs only while the subscription is active or trialing.
+ * Which add-on modules the Call Assistant's own subscription unlocks (every
+ * one for platform admins): the module runs only while that subscription
+ * holds a tier and is active or trialing. The platform plan is not consulted:
+ * the service is bought with or without one (owner, 2026-10-08).
  */
-export function addonModulesFor(plan: PlanKey | null, addons: Partial<Record<AddonKey, number>>, status: string | null | undefined, admin = false): Record<AddonModuleKey, boolean> {
+export function addonModulesFor(callAssistant: CallAssistantModuleInput | null | undefined, admin = false): Record<AddonModuleKey, boolean> {
   const out = {} as Record<AddonModuleKey, boolean>;
-  const running = ADDON_MODULE_RUN_STATUSES.includes(status ?? "");
-  for (const key of ADDON_MODULE_KEYS) {
-    out[key] = admin || (running && !!plan && ADDON_MODULE_UNLOCKED_BY[key].some((addon) => (addons[addon] ?? 0) > 0 && ADDONS[addon].availableOn.includes(plan)));
-  }
+  const running = ADDON_MODULE_RUN_STATUSES.includes(callAssistant?.status ?? "") && !!callAssistant?.tier;
+  for (const key of ADDON_MODULE_KEYS) out[key] = admin || running;
   return out;
 }
 
 /**
- * Add-on modules that are bought but paused for a payment: the stored row
- * carries the add-on on a plan that sells it, and its status says a payment is
- * needed (past_due, unpaid, incomplete, paused). Never for platform admins
- * (their modules are on) and never for an ended subscription (that is "not
+ * Add-on modules that are bought but paused for a payment: the Call Assistant
+ * subscription holds a tier and its status says a payment is needed
+ * (past_due, unpaid, incomplete, paused). Never for platform admins (their
+ * modules are on) and never for an ended subscription (that is "not
  * subscribed", not "paused").
  */
-export function addonModulesPausedFor(storedPlan: string | null | undefined, storedAddons: Partial<Record<AddonKey, number>>, status: string | null | undefined, admin = false): Record<AddonModuleKey, boolean> {
+export function addonModulesPausedFor(callAssistant: CallAssistantModuleInput | null | undefined, admin = false): Record<AddonModuleKey, boolean> {
   const out = {} as Record<AddonModuleKey, boolean>;
-  const plan = storedPlanKey(storedPlan);
-  const needsPayment = PAYMENT_NEEDED_STATUSES.includes(status ?? "");
-  for (const key of ADDON_MODULE_KEYS) {
-    out[key] = !admin && needsPayment && !!plan && ADDON_MODULE_UNLOCKED_BY[key].some((addon) => (storedAddons[addon] ?? 0) > 0 && ADDONS[addon].availableOn.includes(plan));
-  }
+  const paused = PAYMENT_NEEDED_STATUSES.includes(callAssistant?.status ?? "") && !!callAssistant?.tier;
+  for (const key of ADDON_MODULE_KEYS) out[key] = !admin && paused;
   return out;
 }
 
@@ -139,14 +154,15 @@ export function moduleEnabled(ent: Pick<Entitlements, "modules" | "addonModules"
 }
 
 /**
- * The Call Assistant allowance the subscription buys: numbers = the held
+ * The Call Assistant allowance its subscription buys: numbers = the held
  * tier's numbers (shared/plans.ts CALL_ASSISTANT_TIERS) plus every call_number
  * unit; minutes per month = the tier's included minutes; overageCentsPerMinute
- * = the tier's own overage rate (0 with no allowance: the meter then keeps the
+ * = the tier's overage rate (0 with no allowance: the meter then keeps the
  * month's snapshot). Platform admins get unlimited minutes (-1: never overage)
  * and up to ADMIN_CALL_ASSISTANT_NUMBERS numbers (or what their tier holds, if
  * more) — a ceiling, because every number is a real carrier number; their rate
- * is their tier's, or Solo's with none (moot while minutes are unlimited).
+ * is their tier's, or the price book's one rate with none (moot while minutes
+ * are unlimited).
  */
 export function callAssistantAllowance(ent: Pick<Entitlements, "addonModules" | "addons" | "isPlatformAdmin"> & Partial<Pick<Entitlements, "addonModulesPaused" | "storedAddons">>): { numbers: number; minutes: number; overageCentsPerMinute: number } {
   // A paused add-on (payment needed) still shows what it bought: its numbers are held, not released.
@@ -273,19 +289,23 @@ type PricingTermsColumns = {
 };
 
 /**
- * The account's email, its deciding subscription row (SUBSCRIPTION_ORDER;
- * every column, the billing ones included) and its pricing terms
- * (account_pricing_terms, one LEFT JOIN — null columns without a row), or
- * undefined for an unknown user. A user without a subscription row comes back
- * with the subscription columns null.
+ * The account's email, its deciding platform subscription row
+ * (SUBSCRIPTION_ORDER; every column, the billing ones included), its pricing
+ * terms (account_pricing_terms) and its Call Assistant subscription
+ * (call_assistant_subscriptions, as call_assistant_* columns) — one query,
+ * each a LEFT JOIN with null columns where there is no row — or undefined for
+ * an unknown user. A user without a subscription row comes back with the
+ * subscription columns null.
  */
-export async function accountSubscriptionRow(userId: number): Promise<(SubscriptionRow & PricingTermsColumns & { email?: string | null; addons?: unknown; id?: number | null }) | undefined> {
+export async function accountSubscriptionRow(userId: number): Promise<(SubscriptionRow & PricingTermsColumns & CallAssistantJoinedColumns & { email?: string | null; addons?: unknown; id?: number | null }) | undefined> {
+  await callAssistantSchemaReady();
   const { rows: [row] } = await pool.query(
-    `SELECT u.email, s.*, t.seo_grandfathered_at, t.seo_grandfathered_plan, t.founding_member_at, t.founding_prices FROM users u
+    `SELECT u.email, s.*, t.seo_grandfathered_at, t.seo_grandfathered_plan, t.founding_member_at, t.founding_prices, ${CALL_ASSISTANT_JOIN_COLUMNS} FROM users u
        LEFT JOIN LATERAL (
          SELECT * FROM subscriptions x WHERE x.user_id = u.id ${SUBSCRIPTION_ORDER}
        ) s ON true
        LEFT JOIN account_pricing_terms t ON t.user_id = u.id
+       LEFT JOIN call_assistant_subscriptions c ON c.user_id = u.id
       WHERE u.id = $1`, [userId, ACCESS_STATUSES]);
   return row;
 }
@@ -311,13 +331,19 @@ export function withSeoGrandfathering(allowances: PlanLimits, plan: PlanKey): Pl
 }
 
 export async function getEntitlements(userId: number, now = new Date()): Promise<Entitlements> {
-  // s.* includes subscriptions.addons (the billing columns); t.* the account's pricing terms.
+  // s.* includes subscriptions.addons (the billing columns); t.* the account's pricing terms; c.* the Call Assistant's row.
   const row = await accountSubscriptionRow(userId);
   const admin = isPlatformAdminEmail(row?.email);
   const plan = activePlanKey(row, now);
   const accessPlan = admin ? TOP_PLAN : plan;
-  const storedAddons = parseAddons(row?.addons);
-  const addons = plan ? storedAddons : {};
+  // The Call Assistant is its own subscription: its tier and extra numbers are merged into the add-on
+  // map while that subscription runs (paused: on the stored map only), and a Call Assistant key left on
+  // the platform row by an older build grants nothing.
+  const callAssistant = callAssistantSubscriptionOf(row);
+  const addonModules = addonModulesFor(callAssistant, admin);
+  const platformStored = withoutCallAssistantAddons(parseAddons(row?.addons));
+  const storedAddons = { ...platformStored, ...callAssistant.addons };
+  const addons = { ...(plan ? platformStored : {}), ...(addonModules.callAssistant ? callAssistant.addons : {}) };
   const status = row?.status ?? null;
   const grantEnd = row && !row.stripe_subscription_id && row.current_period_end ? new Date(row.current_period_end) : null;
   // Grandfathering follows the plan the account is on now, while it has one. Admins are unlimited regardless.
@@ -334,11 +360,12 @@ export async function getEntitlements(userId: number, now = new Date()): Promise
     limits: accessPlan ? PLANS[accessPlan].limits : null,
     allowances,
     modules: admin ? ALL_MODULES : plan ? PLANS[plan].modules : NO_MODULES,
-    addonModules: addonModulesFor(plan, addons, status, admin),
-    addonModulesPaused: addonModulesPausedFor(grantExpired(row, now) ? null : row?.plan, storedAddons, status, admin),
+    addonModules,
+    addonModulesPaused: addonModulesPausedFor(callAssistant, admin),
     addons,
     storedAddons,
     subscriptionStatus: status,
+    callAssistant,
     isPlatformAdmin: admin,
     grantEndsAt: plan && grantEnd ? grantEnd : null,
     seoGrandfathered,
@@ -625,17 +652,18 @@ export const planPausedMessage = (module: ModuleKey) =>
 
 /**
  * The 402 for a module the account lacks. A plan module names the plan that
- * includes it; an add-on module names the add-on and where to buy it (the
- * body carries `addon` so the client can link Settings → Billing).
+ * includes it (plan_required). An add-on module — the AI Call Assistant — is a
+ * separate service with its own subscription, so its body is its own code
+ * (CALL_ASSISTANT_REQUIRED_CODE), names the add-on and links its pricing
+ * section; no plan is "required".
  */
 export function sendModuleRequired(res: Response, module: AnyModuleKey) {
   if (!isAddonModule(module)) return sendPlanRequired(res, planForModule(module), MODULE_NAMES[module]);
-  const addon = ADDON_MODULES[module];
-  const on = ADDONS[addon].availableOn.map((k) => PLANS[k].name);
-  const plans = on.length > 1 ? `${on.slice(0, -1).join(", ")} and ${on[on.length - 1]}` : on[0] ?? "";
-  return sendPlanRequired(res, planForModule(module), moduleName(module), {
-    addon,
-    message: `${moduleName(module)} is an add-on for the ${plans} plans. Add it in Settings → Billing to use it.`,
+  return res.status(402).json({
+    code: CALL_ASSISTANT_REQUIRED_CODE,
+    addon: ADDON_MODULES[module],
+    href: CALL_ASSISTANT_PRICING_HREF,
+    message: `${moduleName(module)} is a separate service with its own subscription, from $${(CALL_ASSISTANT_FROM_CENTS / 100).toFixed(0)}/mo — no ConstructHUB plan needed. Choose a tier on Pricing to use it.`,
   });
 }
 

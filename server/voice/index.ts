@@ -23,7 +23,7 @@ import { registerVoiceBillingRoutes } from "./billing";
 import { registerVoiceProfileRoutes } from "./profile";
 import { registerVoiceSimulatorRoutes } from "./simulator";
 import { registerVoiceCallRoutes } from "./calls";
-import { startVoiceOverageWorker } from "./billing-usage";
+import { startVoiceMeterRetryWorker, startVoiceOverageWorker } from "./billing-usage";
 import { startVoiceNumberReleaseWorker } from "./number-release";
 import { startVoiceSpamReportWorker } from "./spam-report";
 
@@ -39,8 +39,10 @@ export function registerVoiceRoutes(app: Express, getDevUser: GetUser): void {
   registerVoiceProfileRoutes(app, getDevUser);
   registerVoiceSimulatorRoutes(app, getDevUser);
   registerVoiceCallRoutes(app, getDevUser); // also starts the escalation reminder worker (off unless VOICE_ESCALATION_WORKER_ENABLED=true)
-  // Overage minutes → Stripe (off unless production + STRIPE_SECRET_KEY + VOICE_OVERAGE_WORKER_ENABLED=true).
+  // Overage minutes → Stripe: off unless CALL_ASSISTANT_OVERAGE_BILLING=on (+ STRIPE_SECRET_KEY; VOICE_OVERAGE_WORKER_ENABLED=false kills it).
   startVoiceOverageWorker();
+  // Calls whose metering failed are metered again (exactly once each); independent of the overage switch.
+  startVoiceMeterRetryWorker();
   // Numbers of ended subscriptions / removed add-ons → released on SignalWire once eligible
   // (on in production unless VOICE_NUMBER_RELEASE_WORKER_ENABLED=false; number-release.ts).
   startVoiceNumberReleaseWorker();

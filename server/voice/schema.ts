@@ -232,6 +232,139 @@ export const VOICE_SCHEMA_DDL: readonly string[] = [
      created_at timestamp DEFAULT now(),
      UNIQUE (org_id, week_start)
    )`,
+  // Overage claims (server/voice/billing-usage.ts): one row per range of an org-month's overage
+  // minutes at one rate, written under the account's lock BEFORE its Stripe invoice item, so two
+  // settlements can never bill overlapping minutes; keeps the item / invoice and its state.
+  `CREATE TABLE IF NOT EXISTS voice_overage_claims (
+     id integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+     org_id text NOT NULL,
+     account_user_id integer NOT NULL,
+     month text NOT NULL,
+     cents_per_minute integer NOT NULL,
+     from_minutes integer NOT NULL,
+     to_minutes integer NOT NULL,
+     minutes integer,
+     state text NOT NULL DEFAULT 'creating',
+     stripe_customer_id text,
+     stripe_subscription_id text,
+     billing_interval text,
+     invoice_now boolean NOT NULL DEFAULT false,
+     billed_on_customer boolean NOT NULL DEFAULT false,
+     idempotency_key text,
+     attempts integer NOT NULL DEFAULT 0,
+     leased_until timestamp,
+     lease_token uuid,
+     claim_uid uuid NOT NULL DEFAULT gen_random_uuid(),
+     stripe_invoice_item_id text,
+     stripe_invoice_id text,
+     error text,
+     created_at timestamp NOT NULL DEFAULT now(),
+     updated_at timestamp NOT NULL DEFAULT now(),
+     UNIQUE (org_id, month, cents_per_minute, from_minutes),
+     CONSTRAINT voice_overage_claims_range_check CHECK (from_minutes >= 0 AND to_minutes > from_minutes),
+     CONSTRAINT voice_overage_claims_rate_check CHECK (cents_per_minute > 0),
+     CONSTRAINT voice_overage_claims_minutes_check CHECK (minutes IS NULL OR minutes = to_minutes - from_minutes)
+   )`,
+  // (Audit #5: every column the CREATE's constraints name is declared in the CREATE itself — a fresh database
+  // creates the table in one statement; the ALTER … ADD COLUMN IF NOT EXISTS lines below only bring a table
+  // created by an earlier version up to it, and the constraints are added LAST, after every column exists.)
+  `CREATE INDEX IF NOT EXISTS voice_overage_claims_account_state_idx ON voice_overage_claims (account_user_id, state)`,
+  // Audit #3: a claim is the unit of work and carries its whole Stripe request — the interval and
+  // whether it is invoiced now (as of the claim), its minutes, its idempotency key, its attempts.
+  `ALTER TABLE voice_overage_claims ADD COLUMN IF NOT EXISTS billing_interval text`,
+  `ALTER TABLE voice_overage_claims ADD COLUMN IF NOT EXISTS invoice_now boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE voice_overage_claims ADD COLUMN IF NOT EXISTS minutes integer`,
+  `ALTER TABLE voice_overage_claims ADD COLUMN IF NOT EXISTS idempotency_key text`,
+  `ALTER TABLE voice_overage_claims ADD COLUMN IF NOT EXISTS attempts integer NOT NULL DEFAULT 0`,
+  // While a processor holds a claim (its Stripe call in flight) no other processor takes it; a lease
+  // that ran out (a crash) frees it for reconciliation; the token fences a stale processor's writes.
+  `ALTER TABLE voice_overage_claims ADD COLUMN IF NOT EXISTS leased_until timestamp`,
+  `ALTER TABLE voice_overage_claims ADD COLUMN IF NOT EXISTS lease_token uuid`,
+  // Audit #4: a globally unique claim id goes into the Stripe item's metadata (reconciliation adopts an item by
+  // it); the subscription a claim was created under is its origin — billed_on_customer says the item is
+  // invoiced on the customer instead of queued for that subscription's invoice (invoice_now is the older name).
+  `ALTER TABLE voice_overage_claims ADD COLUMN IF NOT EXISTS claim_uid uuid NOT NULL DEFAULT gen_random_uuid()`,
+  `ALTER TABLE voice_overage_claims ADD COLUMN IF NOT EXISTS billed_on_customer boolean NOT NULL DEFAULT false`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS voice_overage_claims_uid_idx ON voice_overage_claims (claim_uid)`,
+  `CREATE INDEX IF NOT EXISTS voice_overage_claims_subscription_idx ON voice_overage_claims (stripe_subscription_id, state)`,
+  // A range is never empty or negative, the rate is positive, and the billed quantity IS the range (the claim
+  // function also refuses an overlap before inserting). Added once to a table created before they existed.
+  `DO $$ BEGIN
+     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'voice_overage_claims_range_check') THEN
+       ALTER TABLE voice_overage_claims ADD CONSTRAINT voice_overage_claims_range_check CHECK (from_minutes >= 0 AND to_minutes > from_minutes);
+     END IF;
+     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'voice_overage_claims_rate_check') THEN
+       ALTER TABLE voice_overage_claims ADD CONSTRAINT voice_overage_claims_rate_check CHECK (cents_per_minute > 0);
+     END IF;
+     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'voice_overage_claims_minutes_check') THEN
+       ALTER TABLE voice_overage_claims ADD CONSTRAINT voice_overage_claims_minutes_check CHECK (minutes IS NULL OR minutes = to_minutes - from_minutes);
+     END IF;
+   END $$`,
+  // Non-overlapping ranges as a DATABASE invariant, per org, month and rate (an account's orgs each have their
+  // own meter): an EXCLUDE constraint on int4range, which needs btree_gist for the equality columns. The
+  // extension is created when this database user may (a superuser, or one with CREATE on the database and
+  // the extension trusted); when it cannot be, the application check stands alone and the admin card says so
+  // (server/voice/billing-usage.ts voiceOverageAdminStatus).
+  `DO $$ BEGIN
+     BEGIN
+       CREATE EXTENSION IF NOT EXISTS btree_gist;
+     EXCEPTION WHEN OTHERS THEN
+       RAISE NOTICE 'btree_gist not available: %', SQLERRM;
+     END;
+     IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'btree_gist')
+        AND NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'voice_overage_claims_no_overlap') THEN
+       ALTER TABLE voice_overage_claims ADD CONSTRAINT voice_overage_claims_no_overlap
+         EXCLUDE USING gist (org_id WITH =, month WITH =, cents_per_minute WITH =, int4range(from_minutes, to_minutes) WITH &&);
+     END IF;
+   END $$`,
+  // The subscription a month's latest call was under (settlement claims only its own subscription's months).
+  `ALTER TABLE voice_usage ADD COLUMN IF NOT EXISTS stripe_subscription_id text`,
+  // The metering record of one call (audit #5): written before the call is marked processed, moved to
+  // `done` in the same transaction as the meter's upsert — so a call is counted exactly once, and one
+  // whose metering failed stays `pending` for the retry worker (server/voice/billing-usage.ts).
+  `CREATE TABLE IF NOT EXISTS voice_call_meter (
+     call_id varchar PRIMARY KEY,
+     org_id varchar NOT NULL,
+     account_user_id integer NOT NULL,
+     outcome text,
+     billed_minutes integer NOT NULL DEFAULT 0,
+     started_at timestamp,
+     state text NOT NULL DEFAULT 'pending',
+     attempts integer NOT NULL DEFAULT 0,
+     error text,
+     created_at timestamp NOT NULL DEFAULT now(),
+     updated_at timestamp NOT NULL DEFAULT now(),
+     metered_at timestamp
+   )`,
+  `CREATE INDEX IF NOT EXISTS voice_call_meter_state_idx ON voice_call_meter (state)`,
+  // The settlement a subscription's end owes, written in the same transaction as the end
+  // (server/voice/subscription.ts) and run by the sweep until it is done.
+  `CREATE TABLE IF NOT EXISTS voice_settle_jobs (
+     id integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+     account_user_id integer NOT NULL,
+     stripe_subscription_id text NOT NULL,
+     stripe_customer_id text,
+     billing_interval text,
+     state text NOT NULL DEFAULT 'pending',
+     attempts integer NOT NULL DEFAULT 0,
+     error text,
+     leased_until timestamp,
+     lease_token uuid,
+     created_at timestamp NOT NULL DEFAULT now(),
+     updated_at timestamp NOT NULL DEFAULT now(),
+     done_at timestamp
+   )`,
+  `CREATE INDEX IF NOT EXISTS voice_settle_jobs_state_idx ON voice_settle_jobs (state)`,
+  `CREATE INDEX IF NOT EXISTS voice_settle_jobs_subscription_idx ON voice_settle_jobs (stripe_subscription_id, state)`,
+  // Audit #4: jobs are append-only (a done job is never reopened; new work gets a new job), so a subscription
+  // may have several; the lease keeps a webhook and a sweep off one job together, the token fences stale writes.
+  `ALTER TABLE voice_settle_jobs ADD COLUMN IF NOT EXISTS leased_until timestamp`,
+  `ALTER TABLE voice_settle_jobs ADD COLUMN IF NOT EXISTS lease_token uuid`,
+  `DO $$ BEGIN
+     IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'voice_settle_jobs_stripe_subscription_id_key') THEN
+       ALTER TABLE voice_settle_jobs DROP CONSTRAINT voice_settle_jobs_stripe_subscription_id_key;
+     END IF;
+   END $$`,
   // ── end lane: numbers+billing ──
 
   // ── lane: studio-backend — append here ──

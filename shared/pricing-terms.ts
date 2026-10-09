@@ -49,7 +49,13 @@ export type AccountPricingTerms = {
   foundingPrices: FoundingPrices | null;
 };
 
-/** The price snapshot a new founding member keeps: taken from the price book now. */
+/**
+ * The price snapshot a new founding member keeps: taken from the price book
+ * now. It covers the PLANS and the Agency location bands only. The AI Call
+ * Assistant (shared/plans.ts CALL_ASSISTANT_TIERS) is a separate service on its
+ * own subscription and is NOT part of the lock: its prices are not copied
+ * here, and foundingPrice() never answers for it.
+ */
 export function priceSnapshot(now = new Date()): FoundingPrices {
   const plans = {} as Record<PlanKey, FoundingPlanPrice>;
   for (const key of PLAN_KEYS) plans[key] = { monthlyCents: PLANS[key].monthlyCents, annualCents: PLANS[key].annualCents };

@@ -145,8 +145,9 @@ describe("buildDashboard (development database)", () => {
     expect(tile(p, "agency")).toMatchObject({ status: "locked", requiredPlan: "agency", module: "agencyWorkspace" });
     // The CRM is included with every plan; no plan and no org → locked to the first plan.
     expect(tile(p, "crm")).toMatchObject({ status: "locked", requiredPlan: "starter" });
-    // The AI Call Assistant is on sale: without a plan it is locked to the first plan that sells the add-on.
-    expect(tile(p, "callAssistant")).toMatchObject({ status: "locked", entitled: false, requiredPlan: "pro", addon: "call_assistant", metrics: [] });
+    // The AI Call Assistant is a separate service on its own subscription: locked, and no plan is "required".
+    expect(tile(p, "callAssistant")).toMatchObject({ status: "locked", entitled: false, addon: "call_assistant", metrics: [] });
+    expect(tile(p, "callAssistant").requiredPlan).toBeUndefined();
     // Ungated tiles still work.
     expect(tile(p, "property").status).toBe("ok");
     expect(tile(p, "social").status).toBe("empty");

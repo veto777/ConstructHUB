@@ -233,7 +233,7 @@ test.describe("signed-in dashboard: sample scenarios", () => {
     // "Coming soon", and never "Pro" / "On a higher plan" for an account whose plan already sells it.
     await expect(tile(page, "callAssistant")).toHaveAttribute("data-status", "locked");
     await expect(tile(page, "callAssistant")).not.toContainText("Coming soon");
-    await expect(page.getByTestId("status-callAssistant")).toHaveText("Add-on");
+    await expect(page.getByTestId("status-callAssistant")).toHaveText("Separate service");
     await expect(tile(page, "callAssistant")).toHaveAttribute("title", "AI Call Assistant is an add-on for the Pro, Growth and Agency plans");
     await expect(tile(page, "callAssistant").getByTestId("link-tile-callAssistant-intro")).toHaveAttribute("href", "/call-assistant");
     await expect(page.getByTestId("locked-row-run")).toContainText("Not on your plan");
@@ -544,7 +544,7 @@ test.describe("signed-in dashboard: clear tasks and customize", () => {
       await expect(sheet.getByTestId(`customize-tile-${def.key}`)).toBeVisible();
     }
     await expect(sheet.getByTestId("badge-customize-locked-cloudflare")).toContainText("Agency plan");
-    await expect(sheet.getByTestId("badge-customize-locked-callAssistant")).toHaveText("Add-on");
+    await expect(sheet.getByTestId("badge-customize-locked-callAssistant")).toHaveText("Separate service");
     await expect.poll(async () => (await sheet.boundingBox())!.x).toBeLessThanOrEqual(1440 - 447);
     await viewShot(page, "controls-customize-1440");
 

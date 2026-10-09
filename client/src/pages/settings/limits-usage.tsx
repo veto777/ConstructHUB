@@ -8,14 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { GooglePill } from "@/components/google";
 import { TalkToSalesDialog } from "@/components/talk-to-sales";
 import { apiErrorMessage } from "@/lib/queryClient";
-import { ADDONS, PLANS, CALL_ASSISTANT_FREE_SPAM_CALLS, type AddonKey, type BillingInterval, type PlanKey, type PlanLimits } from "@shared/plans";
+import { ADDONS, ADDON_MAX_QUANTITY, PLANS, CALL_ASSISTANT_FREE_SPAM_CALLS, CALL_ASSISTANT_NAME, CALL_ASSISTANT_PRICING_HREF, type AddonKey, type BillingInterval, type PlanKey, type PlanLimits } from "@shared/plans";
 import { CallAssistantTierPicker } from "@/components/call-assistant-tiers";
-import { callAssistantOverageLine, callAssistantTierNumbersLine } from "@shared/plan-copy";
+import { CALL_ASSISTANT_SEPARATE_LINE, callAssistantOverageLine, callAssistantTierNumbersLine, callAssistantOverageStatusLine } from "@shared/plan-copy";
 import {
   AGENCY_INCLUDED_LOCATIONS, addonPriceCents, formatUsd, intervalSuffix, type EntitlementsInfo, type UsageMeter,
 } from "@/lib/pricing-display";
 import { LoadingCard, formatCount, useOptionalQuery } from "./shared";
-import { useAddonChange, useBillingActions, useEntitlements, useSubscription } from "./use-billing";
+import { useAddonChange, useBillingActions, useCallAssistantChange, useCallAssistantSubscription, useEntitlements, useSubscription } from "./use-billing";
 import type { SettingsSectionProps } from "./types";
 import { formatJobcamTier, formatJobcamUsage } from "@shared/jobcam-storage";
 
@@ -62,6 +62,8 @@ type VoiceStatusLite = {
   paused?: boolean;
   allowance: { numbers: number; minutes: number };
   pricing: { includedMinutes: number; overageCentsPerMinute: number; freeSpamCalls?: number };
+  /** "off": minutes above the plan are counted and shown but not charged yet (the server's overage switch). */
+  overageBilling?: "on" | "off";
   /** The held Call Assistant tier (server/voice/billing.ts). */
   tier?: { key: string; addon: string; name: string } | null;
   numberAllowance?: { used: number };
@@ -96,8 +98,12 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
   const ent = useEntitlements();
   const { data: subscription, view } = useSubscription();
   const { addon: addonMutation, salesTopic, setSalesTopic } = useBillingActions();
-  // Fewer Call Assistant add-ons than numbers held asks first (the numbers are released, not kept).
   const addonChange = useAddonChange(addonMutation);
+  // The AI Call Assistant is its own subscription (server/voice/subscription.ts): its tier and extra numbers change
+  // there, and a change that pays for fewer numbers than the account holds asks first (the numbers are released, not kept).
+  const { data: callAssistant } = useCallAssistantSubscription();
+  const callAssistantMutation = useCallAssistantChange();
+  const callAssistantChange = useAddonChange(callAssistantMutation);
 
   const entitlements = ent.data;
   const plan: PlanKey | null = entitlements?.accessPlan ?? null;
@@ -115,9 +121,8 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
     "/api/crm/jobcam/usage", !!allowances && crmMe.data?.crm?.jobcam === true);
   const templates = useQuery<unknown[]>({ queryKey: ["/api/review-templates"], enabled: !!allowances && allowances.reviewTemplates !== 0 });
   const apiKeys = useOptionalQuery<ApiKeysPlan>("/api/account/api-keys", hasApi);
-  // Call Assistant add-on (numbers+billing lane): only where the plan can buy it.
-  const callAssistantSold = !!entitlements?.accessPlan && ADDONS.call_assistant.availableOn.includes(entitlements.accessPlan);
-  const voice = useOptionalQuery<VoiceStatusLite>("/api/crm/voice/status", callAssistantSold);
+  // The Call Assistant's status answers for every account (a separate service, with or without a plan).
+  const voice = useOptionalQuery<VoiceStatusLite>("/api/crm/voice/status", !!entitlements);
 
   if (ent.isLoading) return <LoadingCard label="Loading your limits…" />;
   if (ent.error) {
@@ -289,20 +294,24 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
     },
   ];
 
-  if (callAssistantSold) {
+  {
     const vs = voice.data ?? null;
     const on = vs?.enabled === true;
     const paused = !on && vs?.paused === true;
     const minutes = on ? vs!.allowance.minutes : 0;
     const numbers = on ? vs!.allowance.numbers : 0;
     const overage = on && vs!.usage && vs!.usage.overageMinutes > 0 ? vs!.usage : null;
+    const caLive = !!callAssistant?.hasLiveSubscription && !admin;
+    const caInterval: BillingInterval = callAssistant?.interval ?? "month";
+    const extraNumbers = callAssistant?.extraNumbers ?? 0;
+    const caPending = callAssistantMutation.isPending ? callAssistantMutation.variables?.addon ?? null : null;
     groups.push({
       title: "AI Call Assistant",
       rows: [
         {
           key: "callAssistantMinutes",
           label: "Call Assistant minutes",
-          included: on ? perMonth(minutes, unl) : paused ? "Paused" : "Add-on",
+          included: on ? perMonth(minutes, unl) : paused ? "Paused" : "Not subscribed",
           excluded: !on,
           used: !on ? null : vs!.usage ? vs!.usage.minutes : 0,
           ceiling: on && minutes > 0 ? minutes : undefined,
@@ -312,36 +321,66 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
             : paused
             ? "Paused: the subscription's payment didn't go through. Update your payment method in Billing and the assistant answers again; your number is held meanwhile."
             : overage
-            ? `${formatCount(overage.overageMinutes)} minutes over the included ones this month: ${formatUsd(overage.overageCents)} so far, each call at the rate of the tier it was taken on (now ${formatUsd(vs!.pricing.overageCentsPerMinute)}/min), on your next invoice.`
-            : `Every started minute of an answered call counts; blocked spam costs nothing. Above the included minutes: ${on ? `${formatUsd(vs!.pricing.overageCentsPerMinute)}/min on your tier (${callAssistantOverageLine()})` : callAssistantOverageLine()}.`,
+            ? `${formatCount(overage.overageMinutes)} minutes over the included ones this month: ${formatUsd(overage.overageCents)} so far, each call at the rate in force when it was taken. ${callAssistantOverageStatusLine(vs!.overageBilling, vs!.pricing.overageCentsPerMinute)}`
+            : on
+            ? `Every started minute of an answered call counts; blocked spam costs nothing. Above the included minutes: ${callAssistantOverageLine()}.`
+            : CALL_ASSISTANT_SEPARATE_LINE,
           action: (
             <div className="w-full space-y-2" data-testid="row-limit-call-assistant-tier">
               <p className="text-xs text-muted-foreground">
-                {vs?.tier ? `Your tier: ${vs.tier.name}.` : "Pick a tier."} Every tier: the first {formatCount(vs?.pricing.freeSpamCalls ?? CALL_ASSISTANT_FREE_SPAM_CALLS)} spam calls each month never count toward your minutes.
+                {vs?.tier ? `Your tier: ${vs.tier.name}.` : caLive ? "Pick a tier." : ""} Every tier: the first {formatCount(vs?.pricing.freeSpamCalls ?? CALL_ASSISTANT_FREE_SPAM_CALLS)} spam calls each month never count toward your minutes.
                 {vs?.usage?.spamCallsThisMonth ? ` ${formatCount(vs.usage.spamCallsThisMonth)} spam calls stopped this month.` : ""}
               </p>
-              <CallAssistantTierPicker
-                compact
-                addons={subscription?.addons as Partial<Record<AddonKey, number>> | undefined}
-                interval={interval}
-                editable={editable && !addonChange.checking}
-                pending={pendingAddon}
-                onSwitch={(addon) => void addonChange.request({ addon, quantity: 1 }, 0)}
-              />
+              {caLive ? (
+                <CallAssistantTierPicker
+                  compact
+                  addons={callAssistant?.addons}
+                  interval={caInterval}
+                  editable={!callAssistantChange.checking}
+                  pending={caPending}
+                  onSwitch={(addon) => void callAssistantChange.request({ addon, quantity: 1 }, 0)}
+                />
+              ) : !admin && !paused ? (
+                <GooglePill variant="solid" label={`See ${CALL_ASSISTANT_NAME} pricing`} onClick={() => navigate(CALL_ASSISTANT_PRICING_HREF)} testId="button-limits-call-assistant-pricing" />
+              ) : null}
             </div>
           ),
         },
         {
           key: "callAssistantNumbers",
           label: "Call Assistant phone numbers",
-          included: on ? countText(numbers, unl) : "Add-on",
+          included: on ? countText(numbers, unl) : "Not subscribed",
           excluded: !on,
           used: !on ? null : vs!.numberAllowance ? vs!.numberAllowance.used : undefined,
           ceiling: on && numbers > 0 ? numbers : undefined,
           hint: admin
             ? `Platform admins can hold up to ${formatCount(numbers)} numbers: each one is a real carrier number. Buy and release them in Call Assistant → Numbers.`
             : `${callAssistantTierNumbersLine()}; buy and release them in Call Assistant → Numbers.`,
-          addon: on ? "call_number" : undefined,
+          // Extra numbers are a line of the Call Assistant's own subscription, not a plan add-on.
+          action: caLive ? (
+            <div className="flex w-full flex-wrap items-center justify-between gap-3" data-testid="row-limit-addon-call_number">
+              <div className="min-w-0 text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">{ADDONS.call_number.name}</span> · {formatUsd(addonPriceCents(ADDONS.call_number, caInterval))}{intervalSuffix(caInterval)} each
+              </div>
+              <div className="flex items-center gap-2">
+                <Button size="icon" variant="outline" className="h-10 w-10" aria-label={`Remove one ${ADDONS.call_number.name}`}
+                  disabled={callAssistantMutation.isPending || callAssistantChange.checking || extraNumbers === 0}
+                  onClick={() => void callAssistantChange.request({ addon: "call_number", quantity: extraNumbers - 1 }, extraNumbers)}
+                  data-testid="button-limit-addon-dec-call_number">
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <span className="w-8 text-center text-sm font-semibold tabular-nums" aria-live="polite" data-testid="text-limit-addon-qty-call_number">
+                  {caPending === "call_number" ? <Loader2 className="h-4 w-4 animate-spin mx-auto" /> : extraNumbers}
+                </span>
+                <Button size="icon" variant="outline" className="h-10 w-10" aria-label={`Add one ${ADDONS.call_number.name}`}
+                  disabled={callAssistantMutation.isPending || extraNumbers >= ADDON_MAX_QUANTITY}
+                  onClick={() => callAssistantMutation.mutate({ addon: "call_number", quantity: extraNumbers + 1 })}
+                  data-testid="button-limit-addon-inc-call_number">
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ) : undefined,
         },
       ],
     });
@@ -502,6 +541,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
       ))}
 
       {addonChange.dialog}
+      {callAssistantChange.dialog}
       <TalkToSalesDialog
         open={salesTopic !== null}
         onOpenChange={(open) => { if (!open) setSalesTopic(null); }}
@@ -511,7 +551,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
   );
 }
 
-/** Exposed for tests: the limit keys this page renders, in order (every PlanLimits field, the Call Assistant pair on plans that sell it, and the API pair when present). */
+/** Exposed for tests: the limit keys this page renders, in order (every PlanLimits field, the Call Assistant pair — a separate service, always listed — and the API pair when present). */
 export const LIMIT_ROW_KEYS: readonly (keyof PlanLimits | "jobcamStorage" | "callAssistantMinutes" | "callAssistantNumbers" | "apiUnitsPerMonth" | "apiRatePerMinute")[] = [
   "locations", "guardCadenceMinutes", "gridCredits", "reviewTemplates", "autoPublishAiReplies",
   "protectedSites", "siteScans", "competitorScans",

@@ -59,13 +59,14 @@ export function tileAccess(def: DashboardTileDef, ent: TileAccessInput): TileAcc
       // (a crew seat) has no plan of their own and still uses it.
       return ent.hasCrmOrg || ent.accessPlan ? { entitled: true } : { entitled: false, requiredPlan: PLAN_KEYS[0] };
     case "addon": {
-      // The add-on module is on (a platform admin, or the add-on bought and running): the
-      // tile opens it, as requireModule would let the account in. Otherwise "coming soon".
+      // The add-on module is on (a platform admin, or the Call Assistant's own subscription running): the
+      // tile opens it, as requireModule would let the account in. Otherwise locked — with no "required plan",
+      // because the service is bought on its own subscription, with or without a plan (owner, 2026-10-08).
       const module = (Object.keys(ADDON_MODULES) as AddonModuleKey[]).find((k) => ADDON_MODULES[k] === gate.addon);
       if (module && ent.addonModules?.[module]) return { entitled: true, addon: gate.addon };
       // Not bought: "coming soon" only while the add-on is still `preview` in the price book;
       // once it is for sale the tile is locked like any other and links to its page.
-      return { entitled: false, requiredPlan: gate.requiredPlan, addon: gate.addon, ...(ADDONS[gate.addon as AddonKey]?.preview ? { comingSoon: true } : {}) };
+      return { entitled: false, addon: gate.addon, ...(ADDONS[gate.addon as AddonKey]?.preview ? { comingSoon: true } : {}) };
     }
   }
 }

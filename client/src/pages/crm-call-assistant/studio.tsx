@@ -5,7 +5,7 @@ import { Loader2, Sparkles } from "lucide-react";
 import { CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/crm-ui";
 import { apiErrorMessage } from "@/lib/queryClient";
-import { planRequiredFrom } from "@/components/plan-required";
+import { callAssistantGateFrom } from "@/components/plan-required";
 import { isFirstRun, type VoiceProfileResponse } from "@/lib/voice-studio";
 import { PROFILE_KEY } from "./studio/api";
 import { SetupWizard } from "./studio/wizard";
@@ -25,7 +25,7 @@ export function StudioPanel({ canManage }: { canManage: boolean }) {
   let body: React.ReactNode;
   if (profile.isLoading) {
     body = <div className="flex items-center gap-2 py-10 justify-center text-sm text-muted-foreground" data-testid="studio-loading"><Loader2 className="h-4 w-4 animate-spin" /> Loading your assistant…</div>;
-  } else if (profile.isError && planRequiredFrom(profile.error)) {
+  } else if (profile.isError && callAssistantGateFrom(profile.error)) {
     body = <div className="pt-4"><CallAssistantPlanRequired error={profile.error} /></div>;
   } else if (profile.isError || !profile.data) {
     const notReady = /^501:/.test(String((profile.error as any)?.message ?? ""));

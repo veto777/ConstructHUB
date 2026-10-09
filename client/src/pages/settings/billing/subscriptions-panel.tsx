@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiErrorMessage } from "@/lib/queryClient";
-import { ADDONS, PLANS, TRIAL_DAYS, type AddonKey, type BillingInterval } from "@shared/plans";
+import { ADDONS, PLANS, TRIAL_DAYS, CALL_ASSISTANT_NAME, isCallAssistantAddon, type AddonKey, type BillingInterval } from "@shared/plans";
+import { CALL_ASSISTANT_SUBSCRIPTION_KEY, type CallAssistantSubscriptionInfo } from "@/components/call-assistant-tiers";
 import {
   PAYMENT_PROBLEM_STATUSES, addonPriceCents, agencyQuote, describeSubscription, formatUsd, intervalSuffix, intervalWord,
   planPriceCents, type EntitlementsInfo, type SubscriptionInfo,
@@ -48,6 +49,8 @@ export function SubscriptionsPanel({ onChangePlan, onManageBilling, showActions 
   const portal = useBillingPortal();
   const { data: subscription, isLoading, error } = useQuery<SubscriptionWithStart>({ queryKey: ["/api/stripe/subscription"] });
   const { data: entitlements } = useQuery<EntitlementsInfo>({ queryKey: ["/api/entitlements"] });
+  // The AI Call Assistant is its own subscription (server/voice/subscription.ts): one line of its own on the statement.
+  const { data: callAssistant } = useQuery<CallAssistantSubscriptionInfo>({ queryKey: CALL_ASSISTANT_SUBSCRIPTION_KEY });
   const view = describeSubscription(subscription);
   const plan = view.live && view.planKey ? PLANS[view.planKey] : null;
   const interval: BillingInterval = view.interval ?? "month";
@@ -93,9 +96,14 @@ export function SubscriptionsPanel({ onChangePlan, onManageBilling, showActions 
 
   const addonRows = plan
     ? (Object.keys(ADDONS) as AddonKey[])
+        .filter((key) => !isCallAssistantAddon(key))
         .map((key) => ({ addon: ADDONS[key], qty: Math.max(0, Number(subscription?.addons?.[key] ?? 0) || 0) }))
         .filter((r) => r.qty > 0)
     : [];
+  const caLive = !!callAssistant?.hasLiveSubscription && !!callAssistant.tierName;
+  const caInterval: BillingInterval = callAssistant?.interval ?? "month";
+  const caTierCents = callAssistant?.addon ? (caInterval === "year" ? ADDONS[callAssistant.addon].annualCents : ADDONS[callAssistant.addon].monthlyCents) : 0;
+  const caCents = caTierCents + (callAssistant?.extraNumbers ?? 0) * addonPriceCents(ADDONS.call_number, caInterval);
   // Add-on prices depend on the interval; when the server doesn't report one
   // (older subscriptions) the quantities are shown without a guessed price.
   const priced = view.interval !== null;
@@ -181,6 +189,16 @@ export function SubscriptionsPanel({ onChangePlan, onManageBilling, showActions 
                     </li>
                   ))}
                 </ul>
+              )}
+            </Row>
+            <Row label={CALL_ASSISTANT_NAME}>
+              {caLive ? (
+                <span data-testid="text-subscription-call-assistant">
+                  {callAssistant!.tierName} tier{callAssistant!.extraNumbers ? ` + ${callAssistant!.extraNumbers} extra number${callAssistant!.extraNumbers === 1 ? "" : "s"}` : ""}
+                  <span className="text-muted-foreground"> · its own subscription, billed {intervalWord(caInterval)}: {formatUsd(caCents)}{intervalSuffix(caInterval)}</span>
+                </span>
+              ) : (
+                <span className="text-muted-foreground" data-testid="text-subscription-call-assistant">Not subscribed (a separate service, bought on Pricing)</span>
               )}
             </Row>
             {total !== null && (

@@ -18,7 +18,7 @@ import { createHmac, randomUUID, randomInt } from "node:crypto";
 import http from "node:http";
 import net from "node:net";
 import pg from "pg";
-import { ADDONS, CALL_ASSISTANT_TIERS, CALL_NUMBER_MIN_DAYS } from "@shared/plans";
+import { ADDONS, CALL_ASSISTANT_TIERS, CALL_NUMBER_MIN_DAYS, callAssistantTierOf } from "@shared/plans";
 
 process.env.STRIPE_SECRET_KEY ||= "sk_test_dummy_for_module_import";
 process.env.DATABASE_URL = process.env.CRM_TEST_DATABASE_URL ?? process.env.DATABASE_URL ?? "postgres://constructhub_dev:crmdev_local_only@127.0.0.1:5432/constructhub_dev";
@@ -235,7 +235,9 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("number routes (aux
   async function account(plan: string, addons: Record<string, number> = {}): Promise<Account> {
     const { rows: [user] } = await db.query("insert into users(email,display_name,email_verified) values($1,'P-Voice numbers',true) returning id", [`p-voice-numbers-${randomUUID()}@example.invalid`]);
     users.push(user.id);
-    await db.query("insert into subscriptions(user_id,plan,status,stripe_subscription_id,addons) values($1,$2,'active',$3,$4)", [user.id, plan, `sub_p_${randomUUID()}`, JSON.stringify(addons)]);
+    // The platform plan (never the Call Assistant's row: a separate service with its own subscription).
+    await db.query("insert into subscriptions(user_id,plan,status,stripe_subscription_id,addons) values($1,$2,'active',$3,'{}'::jsonb)", [user.id, plan, `sub_p_${randomUUID()}`]);
+    if (Object.keys(addons).length) await setCallAssistant(user.id, addons);
     const sid = randomUUID(); sids.push(sid);
     await db.query("insert into session(sid,sess,expire) values($1,$2,now()+interval '1 hour')", [sid, JSON.stringify({ cookie: { maxAge: 3600000 }, passport: { user: user.id } })]);
     const sig = createHmac("sha256", secret).update(sid).digest("base64").replace(/=+$/, "");
@@ -245,7 +247,13 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("number routes (aux
     orgs.push(who.org!);
     return who;
   }
-  const setAddons = (who: Account, addons: Record<string, number>) => db.query("update subscriptions set addons=$2 where user_id=$1", [who.id, JSON.stringify(addons)]);
+  /** The account's Call Assistant subscription (server/voice/subscription-store.ts) from the tier / call_number map the tests speak in. */
+  const setCallAssistant = (userId: number, addons: Record<string, number>) => db.query(
+    `insert into call_assistant_subscriptions(user_id, tier, extra_numbers, status, stripe_subscription_id, stripe_customer_id, billing_interval)
+     values ($1, $2, $3, 'active', $4, $5, 'month')
+     on conflict (user_id) do update set tier = excluded.tier, extra_numbers = excluded.extra_numbers, status = 'active'`,
+    [userId, callAssistantTierOf(addons)?.tier ?? null, addons.call_number ?? 0, `sub_ca_${randomUUID()}`, `cus_ca_${randomUUID()}`]);
+  const setAddons = (who: Account, addons: Record<string, number>) => setCallAssistant(who.id, addons);
 
   beforeAll(async () => {
     if (!/^\/constructhub_dev(?:_a\d+)?$/.test(new URL(process.env.DATABASE_URL!).pathname)) throw new Error("Requires a ConstructHUB development lane DB");
@@ -285,6 +293,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("number routes (aux
     await db.query("delete from voice_usage where org_id=any($1::text[])", [orgs]);
     await db.query("delete from crm_members where org_id=any($1::text[])", [orgs]);
     await db.query("delete from crm_orgs where id=any($1::text[])", [orgs]);
+    await db.query("delete from call_assistant_subscriptions where user_id=any($1::int[])", [users]);
     await db.query("delete from subscriptions where user_id=any($1::int[])", [users]);
     await db.query("delete from users where id=any($1::int[])", [users]);
     await db.query("delete from session where sid=any($1::text[])", [sids]);
@@ -292,20 +301,21 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("number routes (aux
   });
   beforeEach(() => { stub.hits.length = 0; });
 
-  it("every numbers route answers the standard 402 with the add-on named until the owner buys it; status still answers", async () => {
+  it("every numbers route answers 402 call_assistant_required (a separate service: no plan named) until the owner buys it; status still answers", async () => {
     for (const [method, path, body] of [["GET", "/api/crm/voice/numbers"], ["GET", "/api/crm/voice/numbers/search?state=WA"], ["POST", "/api/crm/voice/numbers", { phoneNumber: num("0100") }], ["DELETE", "/api/crm/voice/numbers/x"], ["GET", "/api/crm/voice/usage"]] as const) {
       const r = await api(path, noAddon, method, body);
       expect(r.status, `${method} ${path}`).toBe(402);
-      expect(r.body).toMatchObject({ code: "plan_required", requiredPlan: "pro", addon: "call_assistant" });
+      expect(r.body).toMatchObject({ code: "call_assistant_required", addon: "call_assistant", href: "/pricing#call-assistant" });
+      expect(r.body.requiredPlan).toBeUndefined();
       // Launched: the 402 says how to buy it, never "not for sale".
-      expect(r.body.message).toMatch(/Add it in Settings → Billing/);
+      expect(r.body.message).toMatch(/separate service with its own subscription.*Choose a tier on Pricing/);
       expect(r.body.message).not.toMatch(/available yet|not for sale|coming soon/i);
     }
     expect((await api("/api/crm/voice/numbers", null)).status).toBe(401);
     const status = await api("/api/crm/voice/status", noAddon);
     expect(status.status).toBe(200);
-    // The add-on and the extra number are for sale (preview: false): the owner can buy them from here.
-    expect(status.body).toMatchObject({ enabled: false, addon: { key: "call_assistant", preview: false, extraNumber: { key: "call_number", preview: false } }, allowance: { numbers: 0, minutes: 0 }, numbers: [], usage: null });
+    // The service and the extra number are for sale (preview: false); the cheapest tier is the one offered.
+    expect(status.body).toMatchObject({ enabled: false, separateService: true, pricingHref: "/pricing#call-assistant", addon: { key: "call_assistant_lite", preview: false, extraNumber: { key: "call_number", preview: false } }, allowance: { numbers: 0, minutes: 0 }, numbers: [], usage: null });
     expect(status.body.tiers.map((t: any) => [t.addon, t.preview])).toEqual(CALL_ASSISTANT_TIERS.map((t) => [t.addon, false]));
     expect(stub.hits).toHaveLength(0);
   });
@@ -449,22 +459,22 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("number routes (aux
   it("the Overview status and the usage route carry the numbers and this month's minutes", async () => {
     const status = await api("/api/crm/voice/status", pro);
     expect(status.status).toBe(200);
-    expect(status.body).toMatchObject({ enabled: true, allowance: { numbers: 2, minutes: 5000 }, units: { callAssistant: 1, tier: "solo", callNumber: 1 }, tier: { key: "solo", addon: "call_assistant", name: "Solo" }, numberAllowance: { used: 1 }, profile: null, numbersProvider: { configured: true, mock: false } });
-    expect(status.body.tiers.map((t: any) => [t.key, t.includedMinutes, t.includedNumbers, t.overageCentsPerMinute])).toEqual([["lite", 2000, 1, 10], ["solo", 5000, 1, 10], ["crew", 10000, 5, 5], ["fleet", 25000, 20, 5]]);
-    expect(status.body.pricing).toMatchObject({ includedMinutes: 5000, overageCentsPerMinute: 10, freeSpamCalls: 500 });
+    expect(status.body).toMatchObject({ enabled: true, subscriptionStatus: "active", allowance: { numbers: 2, minutes: 1000 }, units: { callAssistant: 1, tier: "solo", callNumber: 1 }, tier: { key: "solo", addon: "call_assistant", name: "1,000 minutes" }, numberAllowance: { used: 1 }, profile: null, numbersProvider: { configured: true, mock: false } });
+    expect(status.body.tiers.map((t: any) => [t.key, t.includedMinutes, t.includedNumbers, t.overageCentsPerMinute])).toEqual([["lite", 500, 1, 50], ["solo", 1000, 1, 50], ["crew", 2000, 2, 50], ["fleet", 5000, 5, 50]]);
+    expect(status.body.pricing).toMatchObject({ includedMinutes: 1000, overageCentsPerMinute: 50, freeSpamCalls: 500 });
     // The engine is probed, not assumed; its internal address never reaches the browser.
     expect(status.body.engine).toMatchObject({ reachable: false, models: false });
     expect(status.body.engine).not.toHaveProperty("url");
     expect(status.body.engine).not.toHaveProperty("publicBase");
     expect(status.body.numbers.map((n: any) => n.status)).toEqual(["active"]);
     const month = new Date().toISOString().slice(0, 7);
-    expect(status.body.usage).toMatchObject({ month, calls: 0, minutes: 0, includedMinutes: 5000, remainingMinutes: 5000, overageMinutes: 0, overageCentsPerMinute: 10, spamCallsThisMonth: 0, freeSpamCallsLimit: 500 });
-    await db.query("insert into voice_usage(org_id,account_user_id,month,calls,minutes,included_minutes,overage_minutes,spam_calls,blocked_calls,spam_free_calls,spam_free_minutes) values($1,$2,$3,4,5020,5000,20,2,1,2,3)", [pro.org, pro.id, month]);
+    expect(status.body.usage).toMatchObject({ month, calls: 0, minutes: 0, includedMinutes: 1000, remainingMinutes: 1000, overageMinutes: 0, overageCentsPerMinute: 50, spamCallsThisMonth: 0, freeSpamCallsLimit: 500 });
+    await db.query("insert into voice_usage(org_id,account_user_id,month,calls,minutes,included_minutes,overage_minutes,spam_calls,blocked_calls,spam_free_calls,spam_free_minutes) values($1,$2,$3,4,1020,1000,20,2,1,2,3)", [pro.org, pro.id, month]);
     const usage = await api("/api/crm/voice/usage", pro);
     expect(usage.status).toBe(200);
-    expect(usage.body).toMatchObject({ month, calls: 4, minutes: 5020, includedMinutes: 5000, remainingMinutes: 0, overageMinutes: 20, overageCents: 200, allowance: { minutes: 5000 }, spamCallsThisMonth: 3, freeSpamCalls: 2, freeSpamMinutes: 3 });
+    expect(usage.body).toMatchObject({ month, calls: 4, minutes: 1020, includedMinutes: 1000, remainingMinutes: 0, overageMinutes: 20, overageCents: 1000, allowance: { minutes: 1000 }, spamCallsThisMonth: 3, freeSpamCalls: 2, freeSpamMinutes: 3 });
     expect(usage.body.history).toHaveLength(1);
-    // A month that switched tiers: each rate bucket at its own rate (10 min at 10¢ + 10 min at 5¢), not 20 × the current rate.
+    // A month recorded under earlier rates: each rate bucket at its own rate (10 min at 10¢ + 10 min at 5¢), never 20 × the current rate.
     await db.query(`update voice_usage set overage_rate_minutes = '{"10": 10, "5": 10}'::jsonb where org_id = $1 and month = $2`, [pro.org, month]);
     expect((await api("/api/crm/voice/usage", pro)).body).toMatchObject({ overageMinutes: 20, overageCents: 150, overageByRate: [{ centsPerMinute: 10, minutes: 10 }, { centsPerMinute: 5, minutes: 10 }] });
     expect((await api("/api/crm/voice/usage?month=2026-13", pro)).status).toBe(400);

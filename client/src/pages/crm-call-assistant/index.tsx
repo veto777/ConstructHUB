@@ -10,11 +10,11 @@ import { CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CrmPage, CrmPageHeader } from "@/components/crm-ui";
-import { planRequiredFrom } from "@/components/plan-required";
+import { callAssistantGateFrom } from "@/components/plan-required";
 import { AppLocked } from "@/components/app-locked";
 import { inNativeApp } from "@/lib/app-shell";
-import { ADDONS, PLANS, CALL_ASSISTANT_NAME } from "@shared/plans";
-import { callAssistantIntroShort, callAssistantSpamAllowanceLine, callAssistantTiers, joinNames } from "@shared/plan-copy";
+import { ADDONS, CALL_ASSISTANT_NAME, CALL_ASSISTANT_PRICING_HREF, CALL_ASSISTANT_TIERS } from "@shared/plans";
+import { CALL_ASSISTANT_SEPARATE_LINE, callAssistantAboveTopLine, callAssistantSpamAllowanceLine, callAssistantTiers } from "@shared/plan-copy";
 import { OverviewPanel } from "./overview";
 import { CallAssistantPausedBanner } from "./paused-banner";
 import { NumbersPanel } from "./numbers";
@@ -29,12 +29,15 @@ import { CallsPanel } from "./calls";
  * lane's (LANES.md): numbers.tsx and calls.tsx → their server lanes,
  * overview/studio/simulator → studio-frontend.
  *
- * Plan gate: GET /api/crm/voice/status answers for every member; `enabled`
- * is false when the org owner's subscription lacks the add-on, and every
- * other /api/crm/voice/* route answers the standard 402 plan_required body
- * (with `addon: "call_assistant"`). The gate card below is the one prompt.
+ * Gate: GET /api/crm/voice/status answers for every member; `enabled` is
+ * false when the org owner has no running Call Assistant subscription — a
+ * separate service with its own subscription (owner, 2026-10-08), bought on
+ * its own section of Pricing with or without a platform plan — and every
+ * other /api/crm/voice/* route answers 402 call_assistant_required (with
+ * `addon: "call_assistant"` and the pricing link). The gate card below is the
+ * one prompt.
  *
- * Paused: the add-on is bought but the subscription needs a payment
+ * Paused: the service is bought but its subscription needs a payment
  * (`paused: true`). The tabs stay readable, a banner says "Paused — update
  * your payment method" with a link to Billing, and edits answer 402
  * payment_required (owner, 2026-10-02: "As soon as they stop paying the agent
@@ -55,7 +58,9 @@ export type VoiceStatus = {
   subscriptionStatus?: string | null;
   /** An automatic number release: "releasing" = a fixed card still keeps it; "released" = gone (or final). */
   numberRelease?: "releasing" | "released" | null;
-  addon: { key: string; name: string; preview: boolean; availableOn: string[] };
+  addon: { key: string; name: string; preview: boolean };
+  /** A separate service: where it is bought. */
+  pricingHref?: string;
   canManage?: boolean;
   /** The held tier (absent on an older server; null without one). */
   tier?: { key: string; addon: string; name: string } | null;
@@ -63,6 +68,8 @@ export type VoiceStatus = {
   plan: string | null;
   allowance: { numbers: number; minutes: number; overageCentsPerMinute?: number };
   pricing: { includedMinutes: number; overageCentsPerMinute: number; freeSpamCalls?: number };
+  /** "off": minutes above the plan are counted and shown but not charged yet (the server's overage switch). */
+  overageBilling?: "on" | "off";
   engine: { configured: boolean; reachable: boolean; models: boolean; checkedAt: string };
   numbers: unknown[];
   profile: { status: string; publishedVersion: number | null } | null;
@@ -81,16 +88,15 @@ function tabFromSearch(): CallAssistantTab {
   return (CALL_ASSISTANT_TABS as readonly string[]).includes(t ?? "") ? (t as CallAssistantTab) : "overview";
 }
 
-/** The standard plan prompt for the add-on module: honest copy from the price book, one way to Billing. */
+/** The prompt for an account without the service: honest copy from the price book, one way to its pricing. */
 export function CallAssistantPlanRequired({ error, status }: { error?: unknown; status?: VoiceStatus | null }) {
   // The iPhone apps sell nothing (owner, 2026-10-04 — App Store 3.1.3(f)): a locked tool only says it
-  // isn't on this account — no tier prices, no "Add it in Billing", no plan names.
+  // isn't on this account — no tier prices, no "See pricing", no plan names.
   if (inNativeApp()) return <AppLocked name={CALL_ASSISTANT_NAME} testId="plan-required-callAssistant" />;
-  const body = planRequiredFrom(error);
-  const addon = ADDONS.call_assistant;
-  const plans = joinNames(addon.availableOn.map((k) => PLANS[k].name));
-  const preview = status?.addon.preview ?? addon.preview === true;
-  const message = body?.message || `${CALL_ASSISTANT_NAME} is an add-on for the ${plans} plans. Add it in Settings → Billing to use it.`;
+  const body = callAssistantGateFrom(error);
+  const preview = status?.addon.preview ?? ADDONS[CALL_ASSISTANT_TIERS[0].addon].preview === true;
+  const message = body?.message || CALL_ASSISTANT_SEPARATE_LINE;
+  const pricingHref = status?.pricingHref ?? CALL_ASSISTANT_PRICING_HREF;
   const tiers = callAssistantTiers();
   return (
     <Section flush testId="plan-required-callAssistant">
@@ -98,17 +104,17 @@ export function CallAssistantPlanRequired({ error, status }: { error?: unknown; 
         <div className="flex flex-wrap items-center gap-2">
           <Lock className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
           <h2 id="call-assistant-gate" className="g-card__title g-card__title--md">{CALL_ASSISTANT_NAME}</h2>
-          <span className="g-chip g-chip--sm">Add-on</span>
+          <span className="g-chip g-chip--sm">Separate service</span>
           {preview && <span className="g-chip g-chip--sm" data-testid="badge-call-assistant-preview">Coming soon</span>}
         </div>
         <p className="text-sm" data-testid="text-plan-required-message">{message}</p>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* a disabled <a> still navigates: while the add-on is in preview there is no link at all */}
+        {/* a disabled <a> still navigates: while the service is in preview there is no link at all */}
         {preview ? (
           <GooglePill variant="solid" className="w-full sm:w-auto" disabled label="Not available yet" testId="button-call-assistant-unavailable" />
         ) : (
-          <GooglePill variant="solid" className="w-full sm:w-auto" href="/settings?tab=billing" label="Add it in Billing" testId="link-call-assistant-billing" />
+          <GooglePill variant="solid" className="w-full sm:w-auto" href={pricingHref} label="See Call Assistant pricing" testId="link-call-assistant-billing" />
         )}
         <details><summary className="cursor-pointer py-2 text-sm font-medium">What’s included</summary><ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
           <li>Answers every call, 24/7, in a voice and name you choose, and says it is a virtual assistant when asked.</li>
@@ -121,13 +127,13 @@ export function CallAssistantPlanRequired({ error, status }: { error?: unknown; 
           {tiers.map((t) => (
             <li key={t.tier} className="rounded-md border p-2.5" data-testid={`text-plan-required-tier-${t.tier}`}>
               <span className="font-semibold">{t.name}</span> · {t.monthly}/mo
-              <span className="block text-xs text-muted-foreground">{t.minutes} minutes / month · {t.numbersLabel} · {t.overageShort}/min over</span>
+              <span className="block text-xs text-muted-foreground">{t.numbersLabel} · {t.overageShort}/min over · or {t.annual}/yr</span>
             </li>
           ))}
         </ul>
-        <p className="text-sm">
-          Solo launch price: <span className="font-semibold" data-testid="text-plan-required-intro">{callAssistantIntroShort()}</span>. {callAssistantSpamAllowanceLine()}. On the {plans} plans.
-          {preview ? " Pricing is being finalized; it cannot be added yet." : ""}
+        <p className="text-sm" data-testid="text-plan-required-separate">
+          {callAssistantSpamAllowanceLine().replace(/^./, (c) => c.toUpperCase())}. {callAssistantAboveTopLine()}
+          {preview ? " Pricing is being finalized; it cannot be bought yet." : ""}
         </p>
 
       </CardContent>
@@ -176,7 +182,7 @@ export default function CrmCallAssistantPage() {
         flush
       />
 
-      {status.isError && planRequiredFrom(status.error) ? (
+      {status.isError && callAssistantGateFrom(status.error) ? (
         <CallAssistantPlanRequired error={status.error} />
       ) : status.data && !enabled && !paused ? (
         <CallAssistantPlanRequired status={status.data} />

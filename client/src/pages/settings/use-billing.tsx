@@ -7,6 +7,7 @@ import { VerificationCancelled } from "@/components/recent-auth";
 import { apiErrorCode } from "@/lib/plan-errors";
 import { ADDONS, CALL_ASSISTANT_NAME, CALL_ASSISTANT_TIER_ADDONS, callAssistantTierForAddon, type AddonKey } from "@shared/plans";
 import { CALL_ASSISTANT_NUMBER_RULES } from "@shared/plan-copy";
+import { CALL_ASSISTANT_SUBSCRIPTION_KEY, refreshCallAssistantBilling, type CallAssistantSubscriptionInfo } from "@/components/call-assistant-tiers";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -35,6 +36,40 @@ export function refreshBilling() {
   void queryClient.invalidateQueries({ queryKey: ["/api/entitlements"] });
   void queryClient.invalidateQueries({ queryKey: ["/api/agency/me"] });
   void queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+  void queryClient.invalidateQueries({ queryKey: CALL_ASSISTANT_SUBSCRIPTION_KEY });
+}
+
+/** The account's AI Call Assistant subscription — its own subscription, apart from the platform plan (server/voice/subscription.ts). */
+export function useCallAssistantSubscription() {
+  return useQuery<CallAssistantSubscriptionInfo>({ queryKey: CALL_ASSISTANT_SUBSCRIPTION_KEY });
+}
+
+/**
+ * Tier switches and extra-number changes on the Call Assistant's own
+ * subscription (POST /api/call-assistant/billing/change). The change is given
+ * in the add-on shape the confirm step reads (useAddonChange): a tier's add-on
+ * key with quantity 1 is a switch to that tier, `call_number` with a quantity
+ * is the new extra-number total.
+ */
+export function useCallAssistantChange() {
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (v: { addon: AddonKey; quantity: number }) => {
+      const body = CALL_ASSISTANT_TIER_ADDONS.includes(v.addon) ? { tier: v.addon } : { extraNumbers: v.quantity };
+      return (await apiRequest("POST", "/api/call-assistant/billing/change", body)).json();
+    },
+    onSuccess: (_data, v) => {
+      refreshBilling();
+      refreshCallAssistantBilling();
+      const tier = callAssistantTierForAddon(v.addon);
+      toast({ title: `${CALL_ASSISTANT_NAME} updated`, description: tier ? `Now on the ${tier.name} tier.` : `${ADDONS[v.addon].name}: ${v.quantity}` });
+    },
+    onError: (err, v) => {
+      if (err instanceof VerificationCancelled) return;
+      refreshCallAssistantBilling();
+      toast({ title: `Couldn't update your ${CALL_ASSISTANT_NAME}`, description: `${ADDONS[v.addon].name}: ${apiErrorMessage(err)}`, variant: "destructive" });
+    },
+  });
 }
 
 export function useBillingActions() {
@@ -93,12 +128,14 @@ export async function fetchNumberReleasePreview(query: string): Promise<NumberPr
 /**
  * Add-on +/- with a confirm step where it matters (owner, 2026-10-02: the
  * number is part of the service and "the only thing that can keep a customer
- * from leaving"): fewer Call Assistant / extra-number add-ons than the numbers
- * the account holds stops those numbers now and releases them, so the
+ * from leaving"): a smaller Call Assistant tier or fewer extra numbers than the
+ * numbers the account holds stops those numbers now and releases them, so the
  * customer sees which numbers, and that they can't be kept, before it happens.
- * Every other change goes straight through. Render `dialog` once.
+ * Every other change goes straight through. `addon` is the mutation the change
+ * is sent to: the platform add-on route, or the Call Assistant's own change
+ * route (useCallAssistantChange). Render `dialog` once.
  */
-export function useAddonChange(addon: ReturnType<typeof useBillingActions>["addon"]) {
+export function useAddonChange(addon: { mutate: (change: AddonChange) => void }) {
   const [confirm, setConfirm] = useState<{ change: AddonChange; numbers: NumberPreview | null } | null>(null);
   const [checking, setChecking] = useState(false);
 

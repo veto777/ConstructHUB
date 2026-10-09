@@ -12,6 +12,8 @@ import { PRESET_IDS } from "@shared/hub-presets";
 import { createHub, type HubDeps } from "./routes";
 import { originOk, isBuilder } from "./access";
 import { providerOk } from "./ai";
+import { DAY } from "./limits";
+import { estimateTokens, TokenMeter } from "./usage";
 import { signTurn } from "./turns";
 import { templateAnswer } from "./presets";
 import { REPLIES } from "./replies";
@@ -490,5 +492,110 @@ describe("access and provider pin (pure)", () => {
     expect(providerOk({ ...prod, AI_MODEL: "truthcode-api", HUB_EXPECTED_MODEL: "truthcode:38, truthcode-api" })).toBe(true);
     expect(providerOk({ ...prod, HUB_AI_HOSTS: "truthcoder.com", AI_INTEGRATIONS_OPENAI_BASE_URL: "https://truthcoder.com/api" })).toBe(true);
     expect(providerOk({ NODE_ENV: "development" })).toBe(true);
+  });
+});
+
+describe("cost guard: token counts and the daily cap (owner 2026-10-08, Gabe on OpenAI)", () => {
+  it("the token counts in a response are metered and logged as numbers only", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    env.ai.queue.push({ ...env.ai.fallback, usage: { prompt: 6512, completion: 143 } });
+    const r = await env.say("How do I set up Click Guard?");
+    expect(r.status).toBe(200);
+    expect(r.data.kind).toBe("answer");
+    expect(await env.hub.tokens.today()).toMatchObject({ calls: 1, prompt: 6512, completion: 143, total: 6655 });
+    const lines = log.mock.calls.map((c) => String(c[0]));
+    expect(lines.some((l) => /^hub: usage in6512-out143 \d+$/.test(l))).toBe(true);
+    expect(lines.join("\n")).not.toContain("Click Guard");
+    expect(await env.hub.status()).toMatchObject({ online: true, tokenCap: null, tokens: { calls: 1, total: 6655 } });
+  });
+
+  it("a response without usage still answers and counts as a call, keeping its reservation (the estimate); no usage line is logged", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    expect((await env.say("How do I set up Click Guard?")).status).toBe(200);
+    const reserved = estimateTokens(env.ai.calls[0]);
+    expect(reserved.completion).toBe(400);
+    expect(reserved.prompt).toBeGreaterThan(1000);
+    expect(await env.hub.tokens.today()).toMatchObject({ calls: 1, prompt: reserved.prompt, completion: reserved.completion });
+    expect(log.mock.calls.some((c) => /^hub: usage/.test(String(c[0])))).toBe(false);
+  });
+
+  /** A day whose cap sits just above this prompt's reservation: one call fits exactly, a second never can. */
+  async function capJustAbove(usage?: { prompt: number; completion: number }) {
+    await env.close();
+    let cap: number | null = null;
+    env = setup({ dailyTokenCap: () => cap });
+    // Learn the reservation on an uncapped day, then cap the next day.
+    expect((await env.say("How do I set up Click Guard?")).status).toBe(200);
+    const reserved = estimateTokens(env.ai.calls[0]);
+    env.clock.t += DAY;
+    cap = reserved.prompt + reserved.completion + 10;
+    return { reserved, cap };
+  }
+
+  it("at the cap chat is off site and no preset is generated; templates still serve; the next UTC day clears it — and the counter never passes the cap", async () => {
+    const { reserved, cap } = await capJustAbove();
+    // The provider's counts settle the reservation to exactly the cap (they can only ever be below it).
+    env.ai.queue.push({ ...env.ai.fallback, usage: { prompt: reserved.prompt - 20, completion: reserved.completion + 30 } });
+    expect((await env.say("How do I set up Click Guard?")).status).toBe(200);
+    expect(await env.hub.status()).toMatchObject({ online: false, tokenCap: cap, tokens: { calls: 1, total: cap } });
+    // Chat: the same "off site" answer the widget already knows, counted under its own reason; nothing reserved.
+    const capped = await env.say("What does Pro include?");
+    expect(capped.status).toBe(503);
+    expect(capped.data).toEqual({ reply: REPLIES.R_OFFLINE, code: "offline" });
+    expect(env.stats.at(-1)).toMatchObject({ outcome: "offline", reason: "token_cap" });
+    expect(env.ai.calls).toHaveLength(2);
+    expect((await env.hub.tokens.today()).total).toBeLessThanOrEqual(cap);
+    const flags = await (await fetch(`${env.base}/api/hub/presets`, { headers: { "x-test-user": "42" } })).json();
+    expect(flags).toMatchObject({ tier: "builder", chat: false });
+    // Presets: the template serves and no generation is started.
+    const calls = env.ai.calls.length;
+    const preset = await env.post("/api/hub/preset", { presetId: "pricing" });
+    expect(preset.status).toBe(200);
+    expect(preset.data.kind).toBe("template");
+    await new Promise((r) => setTimeout(r, 20));
+    expect(env.ai.calls.length).toBe(calls);
+    expect(env.presets.puts).toEqual([]);
+    // Next UTC day: the meter starts over and chat is back.
+    env.clock.t += DAY;
+    expect(await env.hub.status()).toMatchObject({ online: true, tokens: { calls: 0, total: 0 } });
+    expect((await env.say("What does Pro include?")).status).toBe(200);
+  });
+
+  it("the cap holds under concurrency: each call reserves its estimate BEFORE dispatch, so calls in flight together never take the day past the cap; a timed-out call keeps its reservation", async () => {
+    const { reserved, cap } = await capJustAbove();
+    env.ai.queue.push("hang", "hang", "hang");
+    // Three accounts at once (the concurrency gate allows three, one per account). Every one passes the
+    // cap check at the gate (the day is at zero); only the FIRST reservation fits — the other two would
+    // take the day past the cap and are refused before any model call.
+    const results = await Promise.all([41, 42, 43].map((u) => env.say("How do I set up Click Guard?", u)));
+    expect(results.map((r) => r.status)).toEqual([503, 503, 503]);
+    expect(results.map((r) => r.data.code).sort()).toEqual(["offline", "offline", "timeout"]);
+    expect(env.ai.calls).toHaveLength(2); // the learning call, then the one admitted
+    expect(env.stats.filter((s) => s.reason === "token_cap")).toHaveLength(2);
+    expect(env.stats.filter((s) => s.outcome === "timeout")).toHaveLength(1);
+    const day = await env.hub.tokens.today();
+    // The one call timed out: no counts came back, so its reservation stands as the day's total — under the cap.
+    expect(day).toMatchObject({ calls: 1, prompt: reserved.prompt, completion: reserved.completion });
+    expect(day.total).toBeLessThanOrEqual(cap);
+    // And nothing more fits today.
+    expect((await env.say("What does Pro include?", 44)).status).toBe(503);
+    expect(env.ai.calls).toHaveLength(2);
+    expect((await env.hub.tokens.today()).total).toBeLessThanOrEqual(cap);
+  });
+
+  it("the counter failing: no call while a cap is set (busy, never an uncounted call); uncounted but answered without one", async () => {
+    await env.close();
+    const broken = { reserve: async () => { throw new Error("db down"); }, settle: async () => {}, today: async () => { throw new Error("db down"); } };
+    env = setup({ dailyTokenCap: () => 1000, tokens: new TokenMeter(broken, () => env.clock.t) });
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const r = await env.say("How do I set up Click Guard?");
+    expect(r.status).toBe(503);
+    expect(env.ai.calls).toHaveLength(0);
+    expect(await env.hub.status()).toMatchObject({ online: false, tokenCap: 1000, tokens: null });
+    await env.close();
+    env = setup({ dailyTokenCap: () => null, tokens: new TokenMeter(broken, () => env.clock.t) });
+    expect((await env.say("How do I set up Click Guard?")).status).toBe(200);
+    expect(env.ai.calls).toHaveLength(1);
+    expect(log.mock.calls.some((c) => /^hub: error usage_reserve\b/.test(String(c[0])))).toBe(true);
   });
 });

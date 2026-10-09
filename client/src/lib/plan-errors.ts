@@ -1,6 +1,7 @@
 /**
  * The server's plan answers (server/entitlements.ts, server/stripe.ts):
  *   402 { code: "plan_required", requiredPlan, message }     — the plan doesn't include this
+ *   402 { code: "call_assistant_required", addon, href }      — the AI Call Assistant's own subscription is missing
  *   403 { code: "limit_reached", upgradePlan, addon, message } — this month's allowance is used
  *   402 { code: "payment_failed", message }                   — the card couldn't be charged
  *
@@ -12,7 +13,7 @@
  * In the iPhone apps none of this fires: the apps sell nothing (owner, 2026-10-04),
  * so plan answers read as neutral sentences and carry no link.
  */
-import { ADDONS, PLANS, isAddonKey, isPlanKey } from "@shared/plans";
+import { ADDONS, PLANS, CALL_ASSISTANT_PRICING_HREF, CALL_ASSISTANT_REQUIRED_CODE, isAddonKey, isCallAssistantAddon, isPlanKey } from "@shared/plans";
 import { inNativeApp } from "./app-shell";
 
 export type PlanPrompt = { label: string; href: string };
@@ -27,9 +28,12 @@ export function planPromptFromBody(body: unknown): PlanPrompt | null {
   if (b.code === "plan_required") {
     return { label: isPlanKey(b.requiredPlan) ? `See ${PLANS[b.requiredPlan].name}` : "See plans", href: "/pricing" };
   }
+  // The AI Call Assistant is a separate service: its own section of Pricing, not a plan.
+  if (b.code === CALL_ASSISTANT_REQUIRED_CODE) return { label: "See Call Assistant pricing", href: CALL_ASSISTANT_PRICING_HREF };
   if (b.code === "limit_reached") {
-    // An add-on raises the limit without changing plan; it is bought on the subscription in Settings → Billing.
-    if (isAddonKey(b.addon)) return { label: `Add ${ADDONS[b.addon].name.toLowerCase()}`, href: BILLING_SETTINGS_HREF };
+    // An add-on raises the limit without changing plan; it is bought on the subscription in Settings → Billing
+    // (an extra Call Assistant number on the Call Assistant's own subscription, same place).
+    if (isAddonKey(b.addon)) return { label: isCallAssistantAddon(b.addon) ? "Add a number in Billing" : `Add ${ADDONS[b.addon].name.toLowerCase()}`, href: BILLING_SETTINGS_HREF };
     if (isPlanKey(b.upgradePlan)) return { label: `See ${PLANS[b.upgradePlan].name}`, href: "/pricing" };
     // Nothing to buy (e.g. Agency above self-serve): the message itself says to talk to a sales rep.
     return null;

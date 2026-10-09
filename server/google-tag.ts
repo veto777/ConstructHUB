@@ -35,6 +35,8 @@ export function googleTagSnippet(env: NodeJS.ProcessEnv = process.env): string {
       signup: conversion(env.GOOGLE_ADS_CONVERSION_SIGNUP),
       purchase: conversion(env.GOOGLE_ADS_CONVERSION_PURCHASE),
       crm_purchase: conversion(env.GOOGLE_ADS_CONVERSION_CRM),
+      // The AI Call Assistant's own subscription (a separate service); unset = no Ads conversion, the GA4 purchase event still fires.
+      call_assistant_purchase: conversion(env.GOOGLE_ADS_CONVERSION_CALL_ASSISTANT),
     },
   };
   return [

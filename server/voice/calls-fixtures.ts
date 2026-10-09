@@ -23,8 +23,9 @@ export function fakePhone(): string {
 }
 
 /**
- * A paying account: user + subscription (plan, optional call_assistant
- * add-on) + CRM org + active owner member with a mobile.
+ * A paying account: user + platform subscription (plan) + the Call Assistant's
+ * own subscription (a separate service, server/voice/subscription-store.ts;
+ * `addon: false` leaves it out) + CRM org + active owner member with a mobile.
  */
 export async function makeAccount(pool: pg.Pool, bag: Made, opts: {
   plan?: string | null; addon?: boolean; orgName?: string; customFields?: Record<string, unknown>; timezone?: string;
@@ -35,8 +36,14 @@ export async function makeAccount(pool: pg.Pool, bag: Made, opts: {
   const plan = opts.plan === undefined ? "pro" : opts.plan;
   if (plan) {
     await pool.query(
-      "insert into subscriptions(user_id, plan, status, stripe_subscription_id, addons) values ($1, $2, 'active', $3, $4::jsonb)",
-      [u.id, plan, `sub_voice_${randomUUID()}`, JSON.stringify(opts.addon === false ? {} : { call_assistant: 1 })],
+      "insert into subscriptions(user_id, plan, status, stripe_subscription_id, addons) values ($1, $2, 'active', $3, '{}'::jsonb)",
+      [u.id, plan, `sub_voice_${randomUUID()}`],
+    );
+  }
+  if (opts.addon !== false) {
+    await pool.query(
+      "insert into call_assistant_subscriptions(user_id, tier, extra_numbers, status, stripe_subscription_id, stripe_customer_id, billing_interval) values ($1, 'solo', 0, 'active', $2, $3, 'month')",
+      [u.id, `sub_voiceca_${randomUUID()}`, `cus_voiceca_${randomUUID()}`],
     );
   }
   const { rows: [org] } = await pool.query(
@@ -103,6 +110,7 @@ export async function cleanup(pool: pg.Pool, bag: Made): Promise<void> {
   }
   if (users.length) {
     await pool.query("delete from growth_budgets where key like any($1)", [users.map((u) => `quota:user:${u}:%`)]);
+    await pool.query("delete from call_assistant_subscriptions where user_id = any($1::int[])", [users]).catch(() => {});
     await pool.query("delete from subscriptions where user_id = any($1::int[])", [users]);
     await pool.query("delete from users where id = any($1::int[])", [users]);
   }

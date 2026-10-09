@@ -7,7 +7,8 @@
 import type Stripe from "stripe";
 import {
   PLANS, ADDONS, ADDON_KEYS, ADDON_MAX_QUANTITY, AGENCY_SELF_SERVE_MAX_LOCATIONS, LEGACY_PLAN_MAP, TALK_TO_SALES_CODE,
-  isPlanKey, isAddonKey, isBillingInterval, addonAvailableOn, agencyExtraLocations, maxExtraLocations,
+  CALL_ASSISTANT_NAME, CALL_ASSISTANT_FROM_CENTS, CALL_ASSISTANT_PRICING_HREF,
+  isPlanKey, isAddonKey, isBillingInterval, isCallAssistantAddon, addonAvailableOn, agencyExtraLocations, maxExtraLocations,
   type PlanKey, type AddonKey, type BillingInterval,
 } from "@shared/plans";
 import {
@@ -72,12 +73,23 @@ export function parseAddonQuantities(raw: unknown): AddonQuantities {
   return out;
 }
 
-/** Refuse add-ons the plan doesn't offer, and extra locations that would make it an Agency-sized account. */
+/**
+ * Refuse add-ons the plan doesn't offer, and extra locations that would make
+ * it an Agency-sized account. The AI Call Assistant's add-ons (its tiers and
+ * the extra number) are sold on no plan at all: they are the lines of the Call
+ * Assistant's own subscription (server/voice/subscription.ts), so a platform
+ * order that names one is refused and sent to that checkout.
+ */
 export function checkAddonsForPlan(plan: PlanKey, addons: AddonQuantities): void {
   const name = PLANS[plan].name;
   for (const key of ADDON_KEYS) {
     const quantity = addons[key] ?? 0;
     if (quantity <= 0) continue;
+    if (isCallAssistantAddon(key)) {
+      throw new BillingRequestError(400,
+        `${ADDONS[key].name} isn't a plan add-on. The ${CALL_ASSISTANT_NAME} is a separate service with its own subscription, from $${CALL_ASSISTANT_FROM_CENTS / 100}/mo: choose a tier on Pricing (${CALL_ASSISTANT_PRICING_HREF}).`,
+        "addon_unavailable");
+    }
     if (!addonAvailableOn(key, plan)) {
       let why = "";
       if (key === "texting_number" && PLANS[plan].limits.clientTexting === "included") why = ` ${name} already includes a client-texting number.`;

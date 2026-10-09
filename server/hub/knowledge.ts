@@ -19,7 +19,8 @@ import {
 import {
   pricingKnowledge, joinNames, planNamesWhere, formatUsd, TRIAL_LABEL, SALES_REP_LABEL, SALES_THRESHOLD_LABEL,
   SALES_HREF, PROTECTED_SITE_PLANS, COMPETITOR_INTEL_PLANS, TEXTING_PLANS, CRM_SEATS_LINE, TEXTING_EITHER_LINE, CLIENT_NUMBER_INCLUDED_PLANS,
-  CALL_ASSISTANT_INTRO, CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_PLANS, callAssistantAvailabilityLine, callAssistantPricing, callAssistantIncludesLine, callAssistantIntroLine,
+  CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_SEPARATE_LINE, CALL_ASSISTANT_FROM_PRICE, callAssistantAvailabilityLine, callAssistantPricing, callAssistantIncludesLine,
+  callAssistantYearlyNote, callAssistantAboveTopLine,
   CALL_ASSISTANT_SPAM, callAssistantMinuteRule, callAssistantOverageRule, callAssistantSpamAllowanceLine, callAssistantTierAdvice, callAssistantTierNumbersLine, callAssistantTiersLine,
 } from "@shared/plan-copy";
 import { VOICE_PERSONA_LIST } from "@shared/voice-personas";
@@ -63,7 +64,10 @@ export function knowledgeTokens(): Record<string, string> {
     GBP_REINSTATEMENT_PRICE: formatUsd(GBP_REINSTATEMENT_CENTS),
     ANNUAL_MONTHS: String(ANNUAL_MONTHS),
     ANNUAL_FREE_MONTHS: String(12 - ANNUAL_MONTHS),
-    CALL_ASSISTANT_INTRO_LINE: callAssistantIntroLine(),
+    CALL_ASSISTANT_SEPARATE_LINE,
+    CALL_ASSISTANT_FROM_PRICE,
+    CALL_ASSISTANT_YEARLY_NOTE: callAssistantYearlyNote(),
+    CALL_ASSISTANT_ABOVE_TOP: callAssistantAboveTopLine(),
     CALL_ASSISTANT_RULE_OWN_NUMBERS: CALL_ASSISTANT_NUMBER_RULES.ownNumbers,
     CALL_ASSISTANT_RULE_CANCEL: CALL_ASSISTANT_NUMBER_RULES.cancel,
     CALL_ASSISTANT_RULE_PAYMENT: CALL_ASSISTANT_NUMBER_RULES.payment,
@@ -73,16 +77,14 @@ export function knowledgeTokens(): Record<string, string> {
     CALL_ASSISTANT_MINUTE_RULE: callAssistantMinuteRule(),
     CALL_ASSISTANT_OVERAGE_RULE: callAssistantOverageRule(),
     CALL_ASSISTANT_TIER_COUNT: callAssistantPricing().tierCountWord,
-    CALL_ASSISTANT_NO_INTRO_TIERS: joinNames(callAssistantPricing().tiers.filter((t) => !t.intro).map((t) => t.name)),
     CALL_ASSISTANT_SPAM_SCREEN: CALL_ASSISTANT_SPAM.screen,
     CALL_ASSISTANT_SPAM_BLOCK: CALL_ASSISTANT_SPAM.block,
     CALL_ASSISTANT_SPAM_REPORT: CALL_ASSISTANT_SPAM.report,
     CALL_ASSISTANT_SPAM_FORWARDING: CALL_ASSISTANT_SPAM.forwarding,
     CALL_ASSISTANT_TIER_NUMBERS: callAssistantTierNumbersLine(),
     CALL_ASSISTANT_SPAM_FREE: callAssistantSpamAllowanceLine().replace(/^./, (c) => c.toUpperCase()),
-    CALL_ASSISTANT_PLANS,
     CALL_ASSISTANT_AVAILABILITY: callAssistantAvailabilityLine(),
-    CALL_ASSISTANT_STATUS: callAssistantPricing().comingSoon ? "coming soon, not for sale yet" : `sold on the ${CALL_ASSISTANT_PLANS} plans`,
+    CALL_ASSISTANT_STATUS: callAssistantPricing().comingSoon ? "coming soon, not for sale yet" : `a separate service with its own subscription, from ${CALL_ASSISTANT_FROM_PRICE}`,
     // "Janice, Sofia and Maya (women's voices) and Gabe, Marcus and Ethan (men's voices)".
     CALL_ASSISTANT_PERSONAS: `${joinNames(VOICE_PERSONA_LIST.filter((p) => p.gender === "female").map((p) => p.name))} (women's voices) and ${joinNames(VOICE_PERSONA_LIST.filter((p) => p.gender === "male").map((p) => p.name))} (men's voices)`,
   };
@@ -212,12 +214,14 @@ export function dollarAmounts(text: string): number[] {
 
 /**
  * Every amount the price book can state, in cents: plan monthly/annual, add-on
- * monthly/annual/setup and the per-unit prices in their descriptions, Agency
- * band rates (monthly and annual), the sales threshold, the reinstatement price
- * and the AI Call Assistant's launch price (shared/plan-copy.ts CALL_ASSISTANT_INTRO).
+ * monthly/annual/setup and the per-unit prices in their descriptions (the AI
+ * Call Assistant's tiers, extra number and overage among them — a separate
+ * service, but its prices are listed prices), Agency band rates (monthly and
+ * annual), the sales threshold and the reinstatement price. No intro or
+ * launch price exists any more.
  */
 export function priceBookCents(): Set<number> {
-  const cents = new Set<number>([SALES_THRESHOLD_CENTS, GBP_REINSTATEMENT_CENTS, CALL_ASSISTANT_INTRO.monthlyCents]);
+  const cents = new Set<number>([SALES_THRESHOLD_CENTS, GBP_REINSTATEMENT_CENTS]);
   for (const key of PLAN_KEYS) { cents.add(PLANS[key].monthlyCents); cents.add(PLANS[key].annualCents); }
   for (const addon of Object.values(ADDONS)) {
     cents.add(addon.monthlyCents); cents.add(addon.annualCents);

@@ -14,6 +14,8 @@ import {
   MODULE_NAMES,
   PLANS,
   PLAN_KEYS,
+  CALL_ASSISTANT_PRICING_HREF,
+  CALL_ASSISTANT_REQUIRED_CODE,
   planForModule,
   showsPrice,
   type ModuleKey,
@@ -22,6 +24,26 @@ import {
 
 /** The server's 402 body for "your plan doesn't include this" (server/entitlements.ts → sendPlanRequired). */
 export type PlanRequiredBody = { code: "plan_required"; requiredPlan: PlanKey; message: string };
+/** The server's 402 for the AI Call Assistant without its own subscription (server/entitlements.ts → sendModuleRequired). */
+export type CallAssistantRequiredBody = { code: typeof CALL_ASSISTANT_REQUIRED_CODE; addon: string; href: string; message: string };
+
+/** Reads the Call Assistant's own 402 out of an apiRequest error; null for anything else. */
+export function callAssistantRequiredFrom(error: unknown): CallAssistantRequiredBody | null {
+  const raw = typeof (error as any)?.message === "string" ? (error as any).message : "";
+  const match = /^402:\s*([\s\S]*)$/.exec(raw);
+  if (!match) return null;
+  try {
+    const body = JSON.parse(match[1]);
+    if (body?.code === CALL_ASSISTANT_REQUIRED_CODE) {
+      return { code: CALL_ASSISTANT_REQUIRED_CODE, addon: String(body.addon ?? ""), href: typeof body.href === "string" ? body.href : CALL_ASSISTANT_PRICING_HREF, message: String(body.message ?? "") };
+    }
+  } catch { /* not our JSON body */ }
+  return null;
+}
+
+/** Either gate the Call Assistant pages can hit: its own 402, or a plan gate from an older server. */
+export const callAssistantGateFrom = (error: unknown): PlanRequiredBody | CallAssistantRequiredBody | null =>
+  callAssistantRequiredFrom(error) ?? planRequiredFrom(error);
 
 /**
  * Reads a plan_required answer out of an apiRequest / default-queryFn error ("402: {json}").

@@ -63,22 +63,23 @@ function LockedRow({ group, tiles, spaced }: { group: DashboardGroupKey | "all";
       data-testid={`locked-row-${group}`}
     >
       <p id={labelId} className="flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground">
-        <Lock className="h-3.5 w-3.5" aria-hidden="true" /> {anyAddon ? "Not on your plan" : "On a higher plan"}
+        <Lock className="h-3.5 w-3.5" aria-hidden="true" /> {anyAddon ? "Not on your account" : "On a higher plan"}
         <span className="hidden sm:inline">· open any to see what it does</span>
       </p>
       <ul className="flex min-w-0 flex-1 flex-wrap gap-2" aria-labelledby={labelId}>
         {tiles.map((t) => {
           const Icon = TILE_ICONS[t.key] ?? LayoutGrid;
           const plan = t.requiredPlan ? PLANS[t.requiredPlan].name : "Paid plan";
+          // The AI Call Assistant is a separate service on its own subscription: no plan name on its chip.
           const addon = t.addon ? ADDONS[t.addon as AddonKey] : undefined;
-          const addonPlans = addon ? joinNames(addon.availableOn.map((k) => PLANS[k].name)) : null;
+          const addonPlans = addon ? "separate" : null;
           const intro = featureIntroPath(t.key);
           const chip = (
             <>
               <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
               <span className="font-medium">{t.title}</span>
               <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground" data-testid={`status-${t.key}`}>
-                {addonPlans ? "Add-on" : <><span className="sr-only">Included with the </span>{plan}<span className="sr-only"> plan</span></>}
+                {addonPlans ? "Separate service" : <><span className="sr-only">Included with the </span>{plan}<span className="sr-only"> plan</span></>}
               </span>
             </>
           );
@@ -86,7 +87,7 @@ function LockedRow({ group, tiles, spaced }: { group: DashboardGroupKey | "all";
             <li
               key={t.key}
               className="inline-flex"
-              title={addonPlans ? `${t.title} is an add-on for the ${addonPlans} plans` : t.module ? `${MODULE_NAMES[t.module]} is included with the ${plan} plan` : `Included with the ${plan} plan`}
+              title={addonPlans ? `${t.title} is a separate service with its own subscription` : t.module ? `${MODULE_NAMES[t.module]} is included with the ${plan} plan` : `Included with the ${plan} plan`}
               data-testid={`tile-${t.key}`}
               data-status="locked"
             >
