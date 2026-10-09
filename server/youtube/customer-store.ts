@@ -295,13 +295,26 @@ async function refund(userId: number, day: unknown): Promise<void> {
 
 /* ── Background worker only (no request reaches these) ────────────────────── */
 
-/** Lease the oldest queued video. A second worker skips a leased row. */
+/** Lease the oldest entitled owner's queued video. A second worker skips a leased row. */
 export async function claimNextUpload(): Promise<VideoRow | null> {
-  const { rows: [r] } = await (await pool()).query(
+  const db = await pool();
+  // Resolve all owners before LIMIT so paused uploads cannot starve subscribers.
+  const { rows: owners } = await db.query("SELECT DISTINCT user_id FROM youtube_customer_videos WHERE state = 'queued'");
+  const { usersWithModule } = await import("../entitlements");
+  const entitled = await usersWithModule(owners.map((r) => r.user_id), "socialPublishing");
+  if (!entitled.size) return null;
+  const { rows: [r] } = await db.query(
     `UPDATE youtube_customer_videos SET state = 'uploading', lease_until = now() + interval '15 minutes', updated_at = now()
-      WHERE id = (SELECT id FROM youtube_customer_videos WHERE state = 'queued' ORDER BY queued_at, id FOR UPDATE SKIP LOCKED LIMIT 1)
-      RETURNING *`);
+      WHERE id = (SELECT id FROM youtube_customer_videos WHERE state = 'queued' AND user_id = ANY($1::int[]) ORDER BY queued_at, id FOR UPDATE SKIP LOCKED LIMIT 1)
+      RETURNING *`, [[...entitled]]);
   return r ? row(r) : null;
+}
+
+/** Release an undispatched lease, preserving the file, queue order and quota reservation. */
+export async function requeueUpload(id: string): Promise<void> {
+  await (await pool()).query(
+    `UPDATE youtube_customer_videos SET state = 'queued', lease_until = NULL, updated_at = now()
+      WHERE id = $1 AND state = 'uploading'`, [id]);
 }
 
 /** Still working: push the lease out and record how far the upload is. */
