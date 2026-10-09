@@ -7,16 +7,17 @@ import {
   resolvePriceId, resetPriceCache, describeSubscription, roleOfPrice,
 } from "./prices";
 import { ensureBillingSchema, BILLING_SUBSCRIPTION_DDL, BILLING_COLUMNS, BILLING_LEDGER_DDL, BILLING_LEDGER_TABLES, FULFILMENT_DDL, FULFILMENT_INDEXES, BILLING_INTRO_DDL } from "./schema";
-import { PLANS, ADDONS, ANNUAL_MONTHS, agencyMonthlyCents, agencyPriceCents, agencyExtraLocations, maxExtraLocations } from "@shared/plans";
+import { PLANS, ADDONS, ANNUAL_MONTHS, LEGACY_AGENCY_BASE_CENTS, agencyMonthlyCents, agencyPriceCents, agencyExtraLocations, maxExtraLocations } from "@shared/plans";
 
-describe("Agency location bands in Stripe", () => {
+describe("Agency location bands in Stripe (LEGACY — read 2026-09-30 Agency rows only)", () => {
   it("the graduated tiers reproduce agencyMonthlyCents for every self-serve count, monthly and yearly", () => {
     const month = agencyLocationTiers("month");
     const year = agencyLocationTiers("year");
     for (let locations = 1; locations <= 500; locations++) {
       const extra = agencyExtraLocations(locations);
-      expect(PLANS.agency.monthlyCents + tieredAmountCents(month, extra)).toBe(agencyMonthlyCents(locations));
-      expect(PLANS.agency.annualCents + tieredAmountCents(year, extra)).toBe(agencyPriceCents(locations, "year"));
+      // The bands sit on the 2026-09-30 Agency base ($349); the `agency` key is Unlimited now.
+      expect(LEGACY_AGENCY_BASE_CENTS + tieredAmountCents(month, extra)).toBe(agencyMonthlyCents(locations));
+      expect(LEGACY_AGENCY_BASE_CENTS * ANNUAL_MONTHS + tieredAmountCents(year, extra)).toBe(agencyPriceCents(locations, "year"));
     }
   });
 
@@ -62,10 +63,8 @@ describe("price specs come only from shared/plans.ts", () => {
     }
   });
 
-  it("non-Agency plans stop short of 10 locations", () => {
-    expect(maxExtraLocations("starter")).toBe(8);
-    expect(maxExtraLocations("growth")).toBe(6);
-    expect(maxExtraLocations("agency")).toBe(0);
+  it("the extra-location add-on is retired: nothing may be added on any plan", () => {
+    for (const key of Object.keys(PLANS) as (keyof typeof PLANS)[]) expect(maxExtraLocations(key)).toBe(0);
   });
 });
 
@@ -102,7 +101,7 @@ describe("resolvePriceId", () => {
     stripe.store.push({ id: "price_tampered", lookup_key: spec.lookupKey, currency: "usd", unit_amount: 1, recurring: { interval: "month" } });
     const id = await resolvePriceId(stripe, spec);
     expect(id).not.toBe("price_tampered");
-    expect(stripe.prices.create.mock.calls[0][0].unit_amount).toBe(7900);
+    expect(stripe.prices.create.mock.calls[0][0].unit_amount).toBe(9900);
   });
 
   it("reuses a matching tiered band price", async () => {

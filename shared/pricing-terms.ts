@@ -89,7 +89,9 @@ export function parseFoundingPrices(raw: unknown): FoundingPrices | null {
     agencyBands.push({ upTo, centsPerLocation });
   }
   const agencyIncludedLocations = Number(r.agencyIncludedLocations), annualMonths = Number(r.annualMonths);
-  if (!Number.isInteger(agencyIncludedLocations) || agencyIncludedLocations < 0 || !Number.isInteger(annualMonths) || annualMonths <= 0) return null;
+  // -1 (Unlimited has no included-count) is a valid stored value: the bands it
+  // fed are legacy and foundingPrice() reads the plans only.
+  if (!Number.isInteger(agencyIncludedLocations) || agencyIncludedLocations < -1 || !Number.isInteger(annualMonths) || annualMonths <= 0) return null;
   return { plans: out, agencyBands, agencyIncludedLocations, annualMonths, capturedAt: typeof r.capturedAt === "string" ? r.capturedAt : "" };
 }
 

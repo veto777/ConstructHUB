@@ -15,7 +15,7 @@ import {
   sendLocationLimit, raiseHint, cheapestPlanWhere, TOP_PLAN, hasModule, usersWithModule, planPausedMessage,
   platformAdminAllowances, ADMIN_NON_CAP_LIMITS, ADMIN_CALL_ASSISTANT_NUMBERS, callAssistantAllowance,
 } from "./entitlements";
-import { ADDONS, PLANS, AGENCY_SELF_SERVE_MAX_LOCATIONS, LEGACY_PLAN_MAP, fitsLimit, SEO_GRANDFATHERED_LIMITS, SEO_PLAN_LIMITS } from "@shared/plans";
+import { ADDONS, PLANS, LEGACY_PLAN_MAP, fitsLimit, SEO_GRANDFATHERED_LIMITS, SEO_PLAN_LIMITS } from "@shared/plans";
 import { withSeoGrandfathering } from "./entitlements";
 import { seoIncluded, seoAllowanceTest } from "./seo/plan";
 
@@ -34,14 +34,17 @@ describe("plan resolution", () => {
       expect(ent.storedPlan).toBe(legacy);
       expect(ent.allowances?.competitorScans).toBe(PLANS[now].limits.competitorScans);
     }
-    // The one Stripe-less Platinum grant (no end date) keeps full Agency entitlements.
+    // The one Stripe-less Platinum grant (no end date) keeps full Unlimited entitlements.
     mocks.row = customer("platinum", { stripe_subscription_id: null });
     const platinum = await getEntitlements(7);
     expect(platinum.accessPlan).toBe("agency");
-    expect(platinum.modules).toEqual({ agencyWorkspace: true, adsManager: true, cloudflareSearchConsole: true, domainsMailAlerts: true });
-    // Gold is Growth: no Agency modules.
+    expect(platinum.modules).toEqual(PLANS.agency.modules);
+    expect(Object.values(platinum.modules).every(Boolean)).toBe(true);
+    // Gold is Agency ($199): every premium module, still no white label.
     mocks.row = customer("gold");
-    expect((await getEntitlements(7)).modules.adsManager).toBe(false);
+    const gold = await getEntitlements(7);
+    expect(gold.modules.adsManager).toBe(true);
+    expect(gold.modules.whiteLabel).toBe(false);
   });
 
   it("a failed payment (past_due) pauses the plan until Stripe collects (owner, 2026-10-04)", async () => {
@@ -133,7 +136,7 @@ describe("platform admin all-access matrix (admin vs agency vs pro)", () => {
     const agency = await getEntitlements(7);
     expect(agency.isPlatformAdmin).toBe(false);
     expect(agency.allowances).toEqual(allowancesFor("agency"));
-    expect(agency.allowances).toEqual({ ...PLANS.agency.limits, locations: AGENCY_SELF_SERVE_MAX_LOCATIONS });
+    expect(agency.allowances).toEqual(PLANS.agency.limits);   // Unlimited: no self-serve cap override
     expect(agency.modules).toEqual(PLANS.agency.modules);
     expect(agency.addonModules.callAssistant).toBe(false);
     expect(callAssistantAllowance(agency)).toEqual({ numbers: 0, minutes: 0, overageCentsPerMinute: 0 });
@@ -144,10 +147,10 @@ describe("platform admin all-access matrix (admin vs agency vs pro)", () => {
     expect(pro.isPlatformAdmin).toBe(false);
     expect(pro.allowances).toEqual(PLANS.pro.limits);
     for (const k of USAGE_CAPS) expect(pro.allowances![k], k).not.toBe(-1);
-    expect(Object.values(pro.modules).some(Boolean)).toBe(false);
+    expect(pro.modules).toEqual(PLANS.pro.modules);
     expect(callAssistantAllowance(pro)).toEqual({ numbers: 1, minutes: 1000, overageCentsPerMinute: 50 }); // the 1,000 minutes tier: the price book's
-    // A full pro location count is still refused.
-    expect(fitsLimit(pro.allowances!.locations, 1)).toBe(false);
+    // A full pro location count is still refused (25 used, one more does not fit).
+    expect(fitsLimit(pro.allowances!.locations, 25)).toBe(false);
   });
 });
 
@@ -162,14 +165,16 @@ describe("add-ons", () => {
   });
 
   it("applies only the add-ons the plan sells", () => {
-    // Extra seat is an AGENCY add-on now (the CRM sells its own seats), so Pro ignores it.
-    expect(allowancesFor("pro", { protected_site: 2, extra_seat: 1, competitor_pack: 1 })).toMatchObject({ protectedSites: 3, agencySeats: 0, competitorScans: 12 });
-    expect(allowancesFor("agency", { extra_seat: 2 })).toMatchObject({ agencySeats: PLANS.agency.limits.agencySeats + 2 });
-    // Starter can't buy protected sites or competitor packs.
-    expect(allowancesFor("starter", { protected_site: 2, competitor_pack: 3 })).toMatchObject({ protectedSites: 0, competitorScans: 0 });
-    expect(allowancesFor("growth", { extra_location: 2 }).locations).toBe(5);
-    // Agency grows by the location bands (self-serve cap), not by Extra location add-ons.
-    expect(allowancesFor("agency", { extra_location: 5 }).locations).toBe(AGENCY_SELF_SERVE_MAX_LOCATIONS);
+    // Every count add-on sells on Pro: seats, protected sites and scans all move.
+    expect(allowancesFor("pro", { protected_site: 2, extra_seat: 1, competitor_pack: 1 })).toMatchObject({ protectedSites: 12, agencySeats: 6, competitorScans: 20 });
+    // Extra seat is not sold on Unlimited (its seats are unlimited); Agency ($199) takes two.
+    expect(allowancesFor("agency", { extra_seat: 2 })).toMatchObject({ agencySeats: PLANS.agency.limits.agencySeats });
+    expect(allowancesFor("growth", { extra_seat: 2 })).toMatchObject({ agencySeats: PLANS.growth.limits.agencySeats + 2 });
+    // Starter sells protected sites and competitor packs (1 and 3 included, then the add-on units).
+    expect(allowancesFor("starter", { protected_site: 2, competitor_pack: 3 })).toMatchObject({ protectedSites: 3, competitorScans: 31 });
+    // The retired extra-location add-on raises nothing anywhere (stored rows still read, grant nothing).
+    expect(allowancesFor("growth", { extra_location: 2 }).locations).toBe(PLANS.growth.limits.locations);
+    expect(allowancesFor("agency", { extra_location: 5 }).locations).toBe(-1);
     expect(parseAddons({ extra_seat: 2, protected_site: -1, bogus: 3, competitor_pack: "1.5" })).toEqual({ extra_seat: 2 });
     expect(parseAddons("nonsense")).toEqual({});
   });
@@ -177,8 +182,8 @@ describe("add-ons", () => {
   it("reads purchased add-ons from the subscription row", async () => {
     mocks.row = customer("growth", { addons: { competitor_pack: 2, extra_seat: 3 } });
     const ent = await getEntitlements(7);
-    expect(ent.allowances).toMatchObject({ competitorScans: 28, agencySeats: 0 });
-    expect(ent.limits?.competitorScans).toBe(8);
+    expect(ent.allowances).toMatchObject({ competitorScans: 40, agencySeats: 13 });
+    expect(ent.limits?.competitorScans).toBe(20);
   });
 });
 
@@ -186,8 +191,11 @@ describe("module helpers", () => {
   it("hasModule follows the plan (and platform-admin access)", async () => {
     mocks.row = customer("agency");
     expect(await hasModule(7, "adsManager")).toBe(true);
-    mocks.row = customer("growth");
+    // Team is below Pro: no premium modules. Agency ($199, the growth key) has them.
+    mocks.row = customer("team");
     expect(await hasModule(7, "adsManager")).toBe(false);
+    mocks.row = customer("growth");
+    expect(await hasModule(7, "adsManager")).toBe(true);
   });
 
   it("usersWithModule answers a whole batch in one query, with the same rules", async () => {
@@ -208,13 +216,13 @@ describe("module helpers", () => {
     });
     const before = query.mock.calls.length;
     const allowed = await usersWithModule([1, 2, 3, 4, 5, 6, 6, Number.NaN], "domainsMailAlerts");
-    expect([...allowed].sort()).toEqual([1, 5, 6]);   // 3 is past_due: paused until paid
+    expect([...allowed].sort()).toEqual([1, 2, 5, 6]);   // 3 is past_due: paused until paid; 2 is growth (Pro-and-up module)
     expect(query.mock.calls.length - before).toBe(1);
     expect(await usersWithModule([], "adsManager")).toEqual(new Set());
   });
 
   it("planPausedMessage names the module and the plan that includes it", () => {
-    expect(planPausedMessage("cloudflareSearchConsole")).toBe("Not run: Cloudflare + Search Console is included with the Agency plan.");
+    expect(planPausedMessage("cloudflareSearchConsole")).toBe("Not run: Cloudflare + Search Console is included with the Pro plan.");
   });
 });
 
@@ -229,13 +237,15 @@ describe("gates and messages", () => {
     expect(none.status).toHaveBeenCalledWith(402);
     expect(none.json.mock.calls[0][0]).toMatchObject({ code: "plan_required", requiredPlan: "starter" });
 
+    // Solo includes one Competitor Intel scan; asking for more than the plan
+    // carries names the first plan that carries it (Pro, 10).
     mocks.row = customer("starter");
     const starter = res();
-    expect(await requirePlan(starter, 7, "Competitor Intel", (a) => a.competitorScans > 0)).toBeNull();
+    expect(await requirePlan(starter, 7, "Competitor Intel", (a) => a.competitorScans > 5)).toBeNull();
     expect(starter.json.mock.calls[0][0]).toMatchObject({ code: "plan_required", requiredPlan: "pro", message: "Competitor Intel is included with the Pro plan. Upgrade in Pricing to use it." });
 
     mocks.row = customer("premium");
-    expect((await requirePlan(res(), 7, "Competitor Intel", (a) => a.competitorScans > 0))?.plan).toBe("pro");
+    expect((await requirePlan(res(), 7, "Competitor Intel", (a) => a.competitorScans > 5))?.plan).toBe("pro");
   });
 
   it("names the limit and how to raise it", async () => {
@@ -244,17 +254,17 @@ describe("gates and messages", () => {
     sendLocationLimit(starter, await getEntitlements(7), 1);
     expect(starter.status).toHaveBeenCalledWith(403);
     expect(starter.json.mock.calls[0][0]).toMatchObject({
-      code: "limit_reached", feature: "locations", limit: 1, used: 1, upgradePlan: "growth", addon: "extra_location",
-      message: "Your Starter plan covers 1 Google Business Profile location and 1 is in use. To raise it, add the Extra location add-on or move to Growth (3 locations).",
+      code: "limit_reached", feature: "locations", limit: 1, used: 1, upgradePlan: "team", addon: null,
+      message: "Your Solo plan covers 1 Google Business Profile location and 1 is in use. To raise it, move to Team (10 locations).",
     });
-    mocks.row = customer("agency");
+    mocks.row = customer("growth");
     const agency = res();
-    sendLocationLimit(agency, await getEntitlements(7), 500, 3);
-    expect(agency.json.mock.calls[0][0].message).toBe("Your Agency plan covers 500 Google Business Profile locations and 500 are in use. You selected 3 new locations. Above 500 locations, talk to a sales rep for a quote.");
+    sendLocationLimit(agency, await getEntitlements(7), 100, 3);
+    expect(agency.json.mock.calls[0][0].message).toBe("Your Agency plan covers 100 Google Business Profile locations and 100 are in use. You selected 3 new locations. To raise it, move to Unlimited.");
 
     mocks.row = customer("pro");
     const hint = raiseHint(await getEntitlements(7), "protectedSites", ["website"], "protected_site");
-    expect(hint).toEqual({ text: "To raise it, add the Extra protected website add-on or move to Growth (3 websites).", upgradePlan: "growth", addon: "protected_site" });
+    expect(hint).toEqual({ text: "To raise it, add the Extra protected website add-on or move to Agency (25 websites).", upgradePlan: "growth", addon: "protected_site" });
     expect(cheapestPlanWhere((l) => l.autoPublishAiReplies)).toBe("pro");
   });
 });
@@ -270,11 +280,11 @@ describe("SEO grandfathering and founding members (account_pricing_terms, owner 
     expect(ent.allowances?.seoKeywords).toBe(0);
     expect(ent.allowances?.seoCreditCents).toBe(0);
     expect(seoIncluded(ent)).toBe(false);
-    expect(cheapestPlanWhere(seoAllowanceTest)).toBe("agency");
+    expect(cheapestPlanWhere(seoAllowanceTest)).toBe("growth");
     const r = res();
     expect(await requirePlan(r, 7, "SEO tools", seoAllowanceTest)).toBeNull();
     expect(r.status).toHaveBeenCalledWith(402);
-    expect(r.json.mock.calls[0][0]).toMatchObject({ code: "plan_required", requiredPlan: "agency" });
+    expect(r.json.mock.calls[0][0]).toMatchObject({ code: "plan_required", requiredPlan: "growth" });
     expect(r.json.mock.calls[0][0].message).toMatch(/Agency plan/);
   });
 
@@ -306,10 +316,10 @@ describe("SEO grandfathering and founding members (account_pricing_terms, owner 
     mocks.row = customer("agency", grandfathered);
     let ent = await getEntitlements(7);
     expect(ent.seoGrandfathered).toBe(true);
-    expect([ent.allowances?.seoKeywords, ent.allowances?.seoCreditCents]).toEqual([1000, 4000]);
+    expect([ent.allowances?.seoKeywords, ent.allowances?.seoCreditCents]).toEqual([5000, 6000]);
     mocks.row = customer("agency");
     ent = await getEntitlements(7);
-    expect([ent.allowances?.seoKeywords, ent.allowances?.seoCreditCents]).toEqual([1000, 4000]);
+    expect([ent.allowances?.seoKeywords, ent.allowances?.seoCreditCents]).toEqual([5000, 6000]);
     mocks.row = { email: "support@constructhub.us", plan: "starter", status: "active", stripe_subscription_id: "sub_a", ...grandfathered };
     ent = await getEntitlements(7);
     expect(ent.isPlatformAdmin).toBe(true);
@@ -343,7 +353,8 @@ describe("SEO grandfathering and founding members (account_pricing_terms, owner 
   });
 
   it("exposes a founding member's locked prices, and reads a broken snapshot as none", async () => {
-    const prices = { plans: { starter: { monthlyCents: 2900, annualCents: 29000 }, pro: { monthlyCents: 7900, annualCents: 79000 }, growth: { monthlyCents: 19900, annualCents: 199000 }, agency: { monthlyCents: 34900, annualCents: 349000 } }, agencyBands: [{ upTo: 10, centsPerLocation: 0 }], agencyIncludedLocations: 10, annualMonths: 10, capturedAt: "2026-10-08T12:00:00.000Z" };
+    // A 2026-10-08 snapshot (the four-plan book): every current plan key must be present or the snapshot reads as none.
+    const prices = { plans: { starter: { monthlyCents: 2900, annualCents: 29000 }, team: { monthlyCents: 4900, annualCents: 49000 }, pro: { monthlyCents: 7900, annualCents: 79000 }, growth: { monthlyCents: 19900, annualCents: 199000 }, agency: { monthlyCents: 34900, annualCents: 349000 } }, agencyBands: [{ upTo: 10, centsPerLocation: 0 }], agencyIncludedLocations: 10, annualMonths: 10, capturedAt: "2026-10-08T12:00:00.000Z" };
     mocks.row = customer("pro", { founding_member_at: new Date("2026-10-08T12:00:00Z"), founding_prices: prices });
     let ent = await getEntitlements(7);
     expect(ent.foundingMember?.since.toISOString()).toBe("2026-10-08T12:00:00.000Z");

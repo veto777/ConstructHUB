@@ -1,26 +1,30 @@
 /**
  * The founding member promise (owner, 2026-10-08): a founding member keeps the
- * plan prices of the day they subscribed, for life. Checkout does NOT read the
- * stored snapshot yet (shared/pricing-terms.ts foundingPrice has no billing
- * caller) — by design, because the price book has not changed since the offer
- * began, so the snapshot and the live price are the same number. This test
- * pins that fact, for every input a quote is computed from: the plan prices,
- * the Agency bands, the locations Agency includes and the annual multiplier
- * (server/billing/prices.ts agencyLocationTiers), and the Agency quotes at
- * every band boundary on both intervals. The day it fails is the day that is
- * no longer true.
+ * plan prices of the day they subscribed, for life. Checkout and plan changes
+ * bill from the stored snapshot (shared/pricing-terms.ts foundingPrice, wired
+ * into server/billing/order.ts on 2026-10-09) — never from the live book, so
+ * a repricing moves no founding member. Members marked before 2026-10-09 keep
+ * their stored 2026-10-08 snapshot (the four-plan book); this test pins the
+ * book a NEW snapshot captures today: the plan prices, the legacy Agency
+ * bands, the locations Agency includes and the annual multiplier, and the
+ * Agency quotes at every band boundary on both intervals.
  */
 import { describe, expect, it } from "vitest";
 import { AGENCY_LOCATION_BANDS, ANNUAL_MONTHS, PLANS, PLAN_KEYS, agencyPriceCents } from "@shared/plans";
 import { priceSnapshot } from "@shared/pricing-terms";
 
-/** The price book as it was when the founding offer opened (2026-10-08). Do not "fix" this constant to make the test pass. */
+/**
+ * The price book as it is from the 2026-10-09 five-plan ladder. Do not "fix"
+ * this constant to make the test pass: it exists so a price change fails here
+ * loudly — and the check above makes sure the billing path reads the snapshot.
+ */
 const FOUNDING_BASELINE = {
   plans: {
     starter: { monthlyCents: 2900, annualCents: 29000 },
-    pro: { monthlyCents: 7900, annualCents: 79000 },
+    team: { monthlyCents: 4900, annualCents: 49000 },
+    pro: { monthlyCents: 9900, annualCents: 99000 },
     growth: { monthlyCents: 19900, annualCents: 199000 },
-    agency: { monthlyCents: 34900, annualCents: 349000 },
+    agency: { monthlyCents: 44900, annualCents: 449000 },
   },
   agencyBands: [
     { upTo: 10, centsPerLocation: 0 },
@@ -28,11 +32,12 @@ const FOUNDING_BASELINE = {
     { upTo: 250, centsPerLocation: 1000 },
     { upTo: 500, centsPerLocation: 700 },
   ],
-  agencyIncludedLocations: 10,
+  // The `agency` key is Unlimited since the ladder: no included count (-1).
+  agencyIncludedLocations: -1,
   annualMonths: 10,
 } as const;
 
-/** Agency quotes at the band boundaries, monthly and yearly, as they were on 2026-10-08. */
+/** Agency quotes at the band boundaries, monthly and yearly — the bands are 2026-09-30 legacy maths and never change. */
 const AGENCY_QUOTES_BASELINE: Record<number, { month: number; year: number }> = {
   10: { month: 34900, year: 349000 },
   11: { month: 36400, year: 364000 },
@@ -43,10 +48,10 @@ const AGENCY_QUOTES_BASELINE: Record<number, { month: number; year: number }> = 
   500: { month: 469900, year: 4699000 },
 };
 
-const MESSAGE = "a price changed: founding members must be billed from foundingPrice() first — wire shared/pricing-terms.ts into server/billing/order.ts before changing PLANS";
+const MESSAGE = "a price changed: founding members are billed from foundingPrice() (server/billing/order.ts) — confirm the snapshot is read on every checkout/change path, then re-baseline this constant";
 
 describe("founding member price baseline", () => {
-  it("the live price book still equals the baseline the founding offer opened with", () => {
+  it("the live price book equals the baseline a new founding snapshot captures", () => {
     const live = {
       plans: Object.fromEntries(PLAN_KEYS.map((k) => [k, { monthlyCents: PLANS[k].monthlyCents, annualCents: PLANS[k].annualCents }])),
       agencyBands: AGENCY_LOCATION_BANDS.map((b) => ({ upTo: b.upTo, centsPerLocation: b.centsPerLocation })),
@@ -54,7 +59,7 @@ describe("founding member price baseline", () => {
       annualMonths: ANNUAL_MONTHS,
     };
     expect(live, MESSAGE).toEqual(FOUNDING_BASELINE);
-    // …and so a snapshot taken today is the same as one taken the day the offer opened.
+    // …and so a snapshot taken today is the same as the baseline.
     const { capturedAt: _at, ...snapshot } = priceSnapshot();
     expect(snapshot, MESSAGE).toEqual(FOUNDING_BASELINE);
   });
