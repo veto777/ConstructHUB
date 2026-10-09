@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import PDFDocument from "pdfkit";
 import { pool } from "../db";
+import { hasModule, sendModuleRequired } from "../entitlements";
 import { takeBudget, rateLimit, ipKey } from "../growth-limits";
 import { reserveQuotaFor, refundReservation } from "../growth-quotas";
 import { logActivity } from "../account-events";
@@ -260,6 +261,7 @@ export function registerSiteScanRoutes(
   // Saves white-label PDF branding (agency name, logo normalized to ≤600×300 PNG via
   // sharp) into sitescan_branding. "Save PDF branding" — site-scan.tsx.
   owner("post", "/api/sitescan/branding", async (req, res, user) => {
+    if (!(await hasModule(user, "whiteLabel"))) return sendModuleRequired(res, "whiteLabel");
     const b = z
       .object({
         name: z.string().trim().min(1).max(120),
@@ -636,10 +638,9 @@ export function registerSiteScanRoutes(
       .setHeader("Content-Disposition", 'attachment; filename="site-scan.pdf"');
     const {
       rows: [brand],
-    } = await pool.query(
-      "SELECT name,logo FROM sitescan_branding WHERE user_id=$1",
-      [user],
-    );
+    } = (await hasModule(user, "whiteLabel"))
+      ? await pool.query("SELECT name,logo FROM sitescan_branding WHERE user_id=$1", [user])
+      : { rows: [] };
     const doc = new PDFDocument({ margin: 45 });
     doc.pipe(res);
     if (brand?.logo)
