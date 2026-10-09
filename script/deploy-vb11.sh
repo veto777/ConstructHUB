@@ -80,6 +80,26 @@ fi
 "${SSH[@]}" "cd $APP_DIR && npx --no-install playwright-core install chromium-headless-shell >/dev/null" \
   || { echo "ABORT: could not install the headless browser playwright-core needs" >&2; exit 1; }
 
+echo "== pre-deploy dump =="
+# HANDOFF's runbook says "pg_dump first" and sessions did it by hand into $APP_DIR/backups — and never pruned:
+# 88 dumps / 549 MB on 2026-10-09, on the disk that filled (review C1/M13). The deploy now takes the dump itself
+# (custom format, ~7 MB today) and keeps the newest KEEP_DUMPS (10) of backups/*.dump|*.sql.gz, deleting the rest.
+# Hand-made dumps named pre-*.dump count towards the 10 — copy one elsewhere first to keep it longer.
+KEEP_DUMPS="${KEEP_DUMPS:-10}"
+"${SSH[@]}" "bash -s" "$APP_DIR" "$KEEP_DUMPS" <<'REMOTE'
+set -euo pipefail
+cd "$1"; keep="$2"
+mkdir -p backups
+url="$(grep '^DATABASE_URL=' .env | head -1 | cut -d= -f2- | tr -d "\"'")"
+[ -n "$url" ] || { echo "ABORT: DATABASE_URL missing from .env" >&2; exit 1; }
+f="backups/pre-deploy-$(date -u +%Y%m%dT%H%M%SZ).dump"
+pg_dump "$url" -Fc -f "$f"
+echo "dumped $(du -h "$f" | cut -f1) to $f"
+# newest first; everything after the first $keep goes
+ls -1t backups/*.dump backups/*.sql.gz 2>/dev/null | tail -n +"$((keep + 1))" | while read -r old; do rm -f -- "$old" && echo "pruned $old"; done
+echo "$(ls -1 backups/*.dump backups/*.sql.gz 2>/dev/null | wc -l) dump(s) kept, $(du -sh backups | cut -f1)"
+REMOTE
+
 echo "== restart =="
 # Nothing new on the server -> no restart (DEPLOY_FORCE_RESTART=1 restarts anyway). Every restart closes the port
 # for the boot's length, and the app drains in-flight requests first (server/shutdown.ts: up to SHUTDOWN_DRAIN_MS,

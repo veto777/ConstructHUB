@@ -176,6 +176,9 @@ process.on("unhandledRejection", (reason) => {
     );
     // SIGTERM (a deploy's restart): stop accepting, finish in-flight requests and tracked paid work (up to
     // SHUTDOWN_DRAIN_MS, 20 s), close the pools, exit — instead of dying mid-request.
+    // Free disk space: read at boot and every 15 min; low space is logged, recorded on the issue desk and shown on
+    // /admin/issues (server/ops/disk.ts) — the volume filled and crashed Postgres on 2026-10-09 with no warning.
+    (await import("./ops/disk")).startDiskWatch();
     const { closeAllPools } = await import("./db");
     installGracefulShutdown({ server: httpServer, closePools: closeAllPools, log: (line) => log(line.replace(/^\[shutdown\] /, ""), "shutdown") });
   } catch (err) {

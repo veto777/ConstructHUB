@@ -36,6 +36,7 @@ import { OPS_INTERNAL_PATH, requireIssueDesk } from "./internal-auth";
 import { registerClientErrorRoute, type ClientErrorOptions } from "./client-errors";
 import { completeRun, type sendRunDigest } from "./digest";
 import { maskEmailAddress } from "./scrub";
+import { lastDiskStatus } from "./disk";
 import type { Queryable } from "./schema";
 
 type GetUser = (req: any, res: any) => any;
@@ -98,7 +99,8 @@ export function registerOpsIssueRoutes(app: Express, getDevUser: GetUser, opts: 
     res.setHeader("Cache-Control", "no-store");
     const parsed = listQuery.safeParse(req.query);
     if (!parsed.success) return res.status(400).json({ message: "Unknown status or source filter" });
-    try { res.json(await listIssues(parsed.data, q)); } catch (e) { failed(res, "list the issues", e); }
+    // `host.disk`: the newest free-space reading (server/ops/disk.ts), for the banner at the top of /admin/issues.
+    try { res.json({ ...(await listIssues(parsed.data, q)), host: { disk: lastDiskStatus() } }); } catch (e) { failed(res, "list the issues", e); }
   });
 
   app.get("/api/admin/issues/:id", async (req: Request, res: Response) => {

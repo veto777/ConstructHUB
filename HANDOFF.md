@@ -54,6 +54,13 @@ Source: review 4 of 6 (reliability), findings C1/H1-H5/M7/M13. One commit per it
   (`SEO_RETENTION_CRAWL_PAGES_DAYS`; the report stays — the audit lists such a crawl as not readable). Knobs:
   `SEO_PRUNE_CAP`, `SEO_PRUNE_HOUR_UTC`. Last successful night: `seo_meta` key `retention_pruned_on`. Log line
   `[seo] retention: …`; a failed statement goes to the issue desk and the night is retried on the next tick.
+- **Disk** (C1/M13). `script/deploy-vb11.sh` now takes the pre-deploy dump itself (`backups/pre-deploy-<utc>.dump`,
+  custom format) and keeps the newest **10** of `backups/*.dump|*.sql.gz` (`KEEP_DUMPS`), deleting older ones — hand
+  dumps count towards the 10. The app reads free space at boot and every 15 min (`server/ops/disk.ts`,
+  `DISK_WATCH_PATH` = cwd, `DISK_WARN_FREE_GB` 10, `DISK_WATCH_MINUTES` 15): under the line it logs `[disk] LOW`,
+  records a `health` issue (critical under 5 GB) and /admin/issues shows a banner. The 2026-10-09 fill was 88 dumps
+  (549 MB), 11 GB of `tmp/` uploads, 26.6 MB/day of journal (fixed above) and 14 GB in `/tmp` — `tmp/` and `/tmp` are
+  still unbounded: an owner decision on upload retention is pending.
 
 ## ☎️ 2026-10-08 (late evening) — the AI Call Assistant is a SEPARATE SERVICE, repriced (branch `billing/call-assistant`, NOT deployed)
 - **Owner decisions:** the Call Assistant is sold on its **own subscription**, like the CRM (`fd964e1`, `069ffdf`): no platform plan
