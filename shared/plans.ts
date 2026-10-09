@@ -365,7 +365,7 @@ export const PLANS: Record<PlanKey, Plan> = {
       "3 team seats",
       "Profile Guard checks every 30 min",
       "20 review reply templates",
-      "Review reminders to your customers by text and email",
+      "Review reminders to your customers (email; text coming soon)",
       "50 permit searches / month",
       "Click Guard + IP Tracker + VPN Shield — 3 websites",
       "5 Site Scans / month",

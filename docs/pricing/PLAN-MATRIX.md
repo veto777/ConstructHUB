@@ -18,7 +18,7 @@ Money is in US dollars. Yearly platform billing is 10× the monthly price (two m
 | AI review replies publish automatically | ❌ | ❌ | ✅ | ✅ | ✅ |
 | AI posts and photo captions on a schedule | ❌ | ❌ | ✅ | ✅ | ✅ |
 | Review reply templates | 5 | 20 | 20 | 50 | 🟣 Unlimited |
-| Review reminders to customers (text + email) | ❌ | ✅ | ✅ | ✅ | ✅ |
+| Review reminders to customers (email; text coming soon) | ❌ | ✅ | ✅ | ✅ | ✅ |
 | **Permits & property** |  |  |  |  |  |
 | Permit searches / month | 10 | 50 | 100 | 200 | 🟣 Unlimited |
 | Permit alerts for new filings in a territory | ❌ | ❌ | ❌ | 🕒 Coming | 🕒 Coming |
