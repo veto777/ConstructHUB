@@ -7,7 +7,7 @@ import { CLIENT_NUMBER_INCLUDED_PLANS, CRM_TEXTING_PLANS, CRM_TEXT_SEGMENTS_LINE
  * Texting — team alert texts and client texts from the CRM (Settings → SMS, /crm/settings).
  *
  * Every claim below is backed by the code in `sources`:
- *   - the plan gate (plans with team text alerts or client texting: Pro, Growth, Agency) and the monthly
+ *   - the plan gate (every platform plan has team text alerts; client texting needs a number) and the monthly
  *     allowance in segments, reserved before each send, refunded when the carrier refuses, texts skipped until
  *     the 1st (UTC) when spent: server/crm/sms.ts (planIncludesTexting, orgSmsEntitled, reserveSmsSegments,
  *     sendSms), server/growth-quotas.ts (texts → teamTextSegments)
@@ -24,8 +24,9 @@ import { CLIENT_NUMBER_INCLUDED_PLANS, CRM_TEXTING_PLANS, CRM_TEXT_SEGMENTS_LINE
  *   - client replies are not shown in the CRM: the inbound route only handles STOP/START/HELP and
  *     AI Call Assistant escalation replies
  *   - usage on the dashboard: server/dashboard/account.ts ("Texts" row)
- *   - the client-texting number: Growth includes one (limits.clientTexting "included"), the Client texting
- *     number add-on on the plans in ADDONS.texting_number.availableOn: shared/plans.ts
+ *   - the client-texting number: Agency includes one and Unlimited two (limits.clientTexting "included",
+ *     textingNumbersIncluded), the Client texting number add-on on the plans in
+ *     ADDONS.texting_number.availableOn: shared/plans.ts
  * Plan names and numbers come from the price book (allowanceLine, plan-copy helpers), never typed.
  */
 

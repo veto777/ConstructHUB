@@ -27,7 +27,7 @@ import { joinNames, planNamesWhere } from "../plan-copy";
 
 const GUARDED: FeatureAllowance = { limit: "locations", unit: "guarded locations", period: "count" };
 
-/** "every 15 minutes on Starter, Pro and Growth and every 30 minutes on Agency", from the price book. */
+/** "every 60 minutes on Solo, every 30 on Team, every 15 on Pro and Agency, every 5 on Unlimited", from the price book. */
 const CADENCE_LINE = joinNames(
   [...new Set(PLAN_KEYS.map((k) => PLANS[k].limits.guardCadenceMinutes))]
     .sort((a, b) => a - b)

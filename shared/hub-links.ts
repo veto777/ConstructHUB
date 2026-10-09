@@ -13,7 +13,7 @@ export type HubLink = { path: string; label: string; public: boolean; variants?:
 
 export const HUB_LINKS: readonly HubLink[] = [
   { path: "/", label: "ConstructHUB home", public: true },
-  { path: "/pricing", label: "Pricing", public: true, variants: ["#plans", "#crm", "#comparison", "#agency", "#add-ons", "#services"] },
+  { path: "/pricing", label: "Pricing", public: true, variants: ["#plans", "#crm", "#comparison", "#call-assistant", "#add-ons", "#services"] },
   { path: "/auth", label: "Create an account", public: true },
   { path: "/databases", label: "Database Directory", public: true },
   { path: "/property", label: "Property Records", public: true },

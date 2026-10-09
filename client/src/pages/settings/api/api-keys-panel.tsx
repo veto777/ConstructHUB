@@ -22,6 +22,8 @@ import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { VerificationCancelled } from "@/components/recent-auth";
 import { Copy, Check, KeyRound, Loader2, MoreHorizontal, ShieldAlert, Sparkles } from "lucide-react";
 import { copyToClipboard, daysUntil, formatCount, formatDate, formatDateTime } from "../billing/format";
+import { PLANS, PLAN_KEYS } from "@shared/plans";
+import { joinNames } from "@shared/plan-copy";
 import {
   API_SCOPES, EXPIRY_CHOICES, maskedKey,
   type ApiKeyItem, type ApiKeysResponse, type ApiScope, type CreateApiKeyBody, type CreateApiKeyResponse,
@@ -55,7 +57,7 @@ function parseLimit(input: string): number | null {
  * Settings → API keys. The Ahrefs-style table (title, prefix…suffix, scope,
  * units consumed, limit, added, last used, expires, menu) with a Generate
  * dialog, the once-only reveal of a new key, rename / limit / revoke, the
- * monthly unit quota and the Starter upgrade card. Creating a key is a
+ * monthly unit quota and the upgrade card for a plan without API units. Creating a key is a
  * sensitive action: the server asks for step-up verification (403 reauth) and
  * apiRequest runs the verification dialog and retries.
  */
@@ -137,7 +139,9 @@ export function ApiKeysPanel({ onUpgrade, docsHref = "/developers" }: ApiKeysPan
                   <div>
                     <p className="font-semibold">API access starts with Pro</p>
                     <p className="text-sm text-muted-foreground">
-                      Your plan doesn't include the API. Pro, Growth and Agency include a monthly unit allowance for reading and updating your data.
+                      Your plan doesn't include the API.{" "}
+                      {joinNames(PLAN_KEYS.filter((k) => PLANS[k].limits.apiUnitsPerMonth > 0).map((k) => PLANS[k].name))} include a
+                      monthly unit allowance for reading and updating your data.
                     </p>
                   </div>
                 </div>

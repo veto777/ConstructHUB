@@ -671,7 +671,7 @@ export const INFO_CONTENT: Record<string, InfoEntry> = {
     body: [
       "Your subscription, read from Stripe — never a plan name typed into the page: what you're on, what it costs, when it renews, and the add-ons riding on it.",
       "Add-on + and − change your subscription right away: a change is prorated and invoiced, a reduction becomes account credit, and if the card can't be charged nothing changes. Cards, invoices and cancellation live in Stripe's secure portal under Manage billing.",
-      "Example: a second office opens. Add one Extra location here, pay the prorated difference for the rest of the month, and the new Google Business Profile links the same afternoon.",
+      "Example: a second office opens. Add a protected website here, pay the prorated difference for the rest of the month, and Click Guard is watching the new site the same afternoon.",
     ],
   },
 

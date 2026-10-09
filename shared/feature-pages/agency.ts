@@ -1,5 +1,5 @@
 import type { FeaturePage } from "./types";
-import { ADDONS, AGENCY_SELF_SERVE_MAX_LOCATIONS, PLANS } from "../plans";
+import { ADDONS, PLANS, planForModule } from "../plans";
 
 /**
  * Agency workspace (/agency) — the Agency plan's multi-client workspace.
@@ -11,7 +11,8 @@ import { ADDONS, AGENCY_SELF_SERVE_MAX_LOCATIONS, PLANS } from "../plans";
  *   - roles owner / admin / manager / viewer, all clients or chosen clients, viewers read-only, only the owner
  *     grants access, members need a ConstructHUB login: server/agency/routes.ts PUT /team, server/agency/access.ts,
  *     client/src/pages/agency.tsx (Team tab copy)
- *   - seats shared with the CRM team (crmSeats + Extra seat): server/crm/tenancy.ts getOwnerSeatUsage
+ *   - seats on the agency workspace team (agencySeats + the Extra team seat add-on):
+ *     PLANS.growth.limits.agencySeats, ADDONS.extra_seat
  *   - bulk actions (sync, link & sync, unlink, assign client, Guard mode, AI reply settings, post/photo batch,
  *     Site Scans), select a page or all matching, queued with a Jobs log: server/agency/jobs.ts bulkInput,
  *     client/src/components/agency-workspace.tsx
@@ -25,11 +26,13 @@ import { ADDONS, AGENCY_SELF_SERVE_MAX_LOCATIONS, PLANS } from "../plans";
  *     auto-accept with unmatched invitations left unassigned: server/agency/onboarding.ts, server/agency/schema.ts,
  *     client/src/pages/agency.tsx
  *   - workspace switcher for members of several agencies: client/src/pages/agency.tsx
- *   - location pricing: shared/plans.ts limits.locations, AGENCY_LOCATION_BANDS, AGENCY_SELF_SERVE_MAX_LOCATIONS
+ *   - flat location limits: each plan includes a location count (shared/plans.ts limits.locations), and outgrowing
+ *     it is a move up the ladder — since 2026-10-09 there is no per-location pricing and no location bands.
  * Numbers that live in the price book are read from it (PLANS, ADDONS), never typed.
  */
 
-const AGENCY = PLANS.agency;
+// The cheapest plan that unlocks the workspace — the Agency plan ($199, key "growth") today.
+const AGENCY = PLANS[planForModule("agencyWorkspace")];
 
 const page: FeaturePage = {
   key: "agency",
@@ -127,7 +130,7 @@ const page: FeaturePage = {
     kind: "module",
     module: "agencyWorkspace",
     allowance: { limit: "locations", unit: "client locations", period: "count" },
-    note: "Locations above the included ones are priced per location; very large portfolios are quoted by a sales rep.",
+    note: "Outgrow the included locations or seats and you move up a plan — there is no per-location pricing.",
   },
   faqs: [
     {
@@ -136,7 +139,7 @@ const page: FeaturePage = {
     },
     {
       q: "How many locations and team seats are included?",
-      a: `The ${AGENCY.name} plan includes ${AGENCY.limits.locations} client locations and ${AGENCY.limits.agencySeats} agency team seats. More locations are priced per location up to ${AGENCY_SELF_SERVE_MAX_LOCATIONS}, then quoted by a sales rep; more seats are the ${ADDONS.extra_seat.name} add-on.`,
+      a: `The ${AGENCY.name} plan includes ${AGENCY.limits.locations} client locations and ${AGENCY.limits.agencySeats} agency team seats. Outgrow either and you move up a plan — there is no per-location pricing; an extra seat on the way up is the ${ADDONS.extra_seat.name} add-on.`,
     },
     {
       q: "Do my clients have to share a password or connect anything?",
