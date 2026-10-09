@@ -100,7 +100,7 @@ function RibbonTab({
       <span
         className={cn(
           "flex h-7 w-12 items-center justify-center rounded-full transition-colors",
-          active && "bg-white/10",
+          active && "bg-primary/10",
         )}
       >
         <Icon className="h-[22px] w-[22px]" strokeWidth={1.8} />
@@ -110,7 +110,7 @@ function RibbonTab({
   );
   const cls = cn(
     "flex flex-1 flex-col items-center gap-1 py-1.5 transition-colors",
-    active ? "text-sidebar-primary" : "text-sidebar-foreground/70 hover:text-sidebar-foreground",
+    active ? "text-primary" : "text-muted-foreground hover:text-foreground",
   );
   return href ? (
     <Link href={href} data-testid={testid} className={cls} aria-current={active ? "page" : undefined}>
@@ -145,7 +145,7 @@ export function CrmRibbon() {
     <>
       <nav
         data-testid="crm-ribbon"
-        className="fixed inset-x-0 bottom-0 z-50 flex border-t border-sidebar-border bg-sidebar text-sidebar-foreground md:hidden"
+        className="fixed inset-x-0 bottom-0 z-50 flex border-t border-border/60 bg-background/85 backdrop-blur-xl md:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         {/* The person's four tabs (Settings → Phone tab bar, or More → Customize the bar); More always stays last. */}
