@@ -11,7 +11,10 @@
  */
 import { describe, expect, it } from "vitest";
 import { AGENCY_LOCATION_BANDS, ANNUAL_MONTHS, PLANS, PLAN_KEYS, agencyPriceCents } from "@shared/plans";
-import { priceSnapshot } from "@shared/pricing-terms";
+import { FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT, priceSnapshot } from "@shared/pricing-terms";
+
+// A start on the five-plan book (the live one): the boundary is the deploy time, which may be in the future when this runs.
+const ON_LIVE_BOOK = new Date(Date.parse(FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT) + 3_600_000);
 
 /**
  * The price book as it is from the 2026-10-09 five-plan ladder. Do not "fix"
@@ -60,7 +63,7 @@ describe("founding member price baseline", () => {
     };
     expect(live, MESSAGE).toEqual(FOUNDING_BASELINE);
     // …and so a snapshot taken today is the same as the baseline.
-    const { capturedAt: _at, ...snapshot } = priceSnapshot();
+    const { capturedAt: _at, ...snapshot } = priceSnapshot(ON_LIVE_BOOK);
     expect(snapshot, MESSAGE).toEqual(FOUNDING_BASELINE);
   });
 
@@ -68,7 +71,7 @@ describe("founding member price baseline", () => {
     // The founding lock is the plans' promise. The Call Assistant has its own subscription and its own price
     // book (shared/plans.ts CALL_ASSISTANT_TIERS); its 2026-10-08 repricing moved no founding member and is
     // not something foundingPrice() answers for.
-    const { capturedAt: _at, ...snapshot } = priceSnapshot();
+    const { capturedAt: _at, ...snapshot } = priceSnapshot(ON_LIVE_BOOK);
     expect(Object.keys(snapshot).sort()).toEqual(["agencyBands", "agencyIncludedLocations", "annualMonths", "plans"]);
     expect(Object.keys(snapshot.plans).sort()).toEqual([...PLAN_KEYS].sort());
     expect(JSON.stringify(snapshot)).not.toMatch(/call_assistant|callAssistant|minutes/i);

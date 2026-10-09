@@ -10,9 +10,10 @@ const js = ts.transpileModule(section, { compilerOptions: { target: ts.ScriptTar
 const handlers = new Map<string, (...args: any[]) => Promise<any>>();
 const save = vi.fn(), render = vi.fn(), query = vi.fn(), send = vi.fn();
 const denied = vi.fn((res, module) => res.status(402).json({ module }));
-new Function("route", "pool", "ownedSite", "buildSiteReport", "getSchedule", "reportHighlights", "reportIsEmpty", "optedOut", "renderReportPdf", "scheduleInput", "saveSchedule", "sendModuleRequired", "takeBudget", "sendSiteReport", "MAX_RECIPIENTS", js)(
+new Function("route", "pool", "ownedSite", "buildSiteReport", "getSchedule", "reportHighlights", "reportIsEmpty", "optedOut", "renderReportPdf", "scheduleInput", "saveSchedule", "sendModuleRequired", "takeBudget", "sendSiteReport", "MAX_RECIPIENTS", "ensureRecipients", "recipientStatuses", "limitsFor", js)(
   (_method: string, path: string, fn: any) => handlers.set(path, fn), { query }, async () => ({ id: 2, domain: "example.com" }), async () => ({ domain: "example.com" }), async () => ({}), () => [], () => false, async () => [], render,
   { parse: (x: any) => x, pick: () => ({ parse: (x: any) => x }) }, save, denied, async () => true, send, 10,
+  async () => ({ limited: [], confirmationsSent: [], status: {} }), async () => ({}), () => ({ distinctRecipients: 50 }),
 );
 const response = () => { const res: any = {}; for (const key of ["status", "json", "type", "setHeader", "send"]) res[key] = vi.fn(() => res); return res; };
 const access = (scheduledReports: boolean, whiteLabel = false) => ({ modules: { scheduledReports, whiteLabel } });
@@ -20,6 +21,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   query.mockResolvedValue({ rows: [{ name: "Saved brand", logo: "saved-logo" }] });
   render.mockResolvedValue(Buffer.from("pdf"));
+  save.mockImplementation(async (_user: number, _site: number, input: any) => input);
 });
 it.each(["weekly", "monthly"])("refuses enabling %s for Solo plus SEO", async (frequency) => {
   const res = response();

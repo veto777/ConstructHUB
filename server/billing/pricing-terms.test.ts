@@ -26,15 +26,17 @@ const member = (prices: unknown, at: Date | string | null = "2026-10-08T12:00:00
   ({ seoGrandfatheredAt: null, seoGrandfatheredPlan: null, foundingMemberAt: at, foundingPrices: prices as FoundingPrices | null });
 const T = (iso: string) => new Date(iso);
 
+// A start on the five-plan book: the boundary is the deploy time, so derive it rather than assume a date.
+const AFTER_BOUNDARY = new Date(Date.parse(FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT) + 12 * 3_600_000).toISOString();
 describe("the price snapshot a founding member keeps", () => {
   it("copies every plan's two prices and the Agency bands from the price book, with the time it was taken", () => {
-    const snap = snapshotAt("2026-10-09T12:00:00Z");
+    const snap = snapshotAt(AFTER_BOUNDARY);
     for (const key of PLAN_KEYS) expect(snap.plans[key]).toEqual({ monthlyCents: PLANS[key].monthlyCents, annualCents: PLANS[key].annualCents });
     expect(snap.agencyBands).toEqual(AGENCY_LOCATION_BANDS.map((b) => ({ upTo: b.upTo, centsPerLocation: b.centsPerLocation })));
     // Everything an Agency location charge is computed from (server/billing/prices.ts agencyLocationTiers).
     expect(snap.agencyIncludedLocations).toBe(PLANS.agency.limits.locations);
     expect(snap.annualMonths).toBe(ANNUAL_MONTHS);
-    expect(snap.capturedAt).toBe("2026-10-09T12:00:00.000Z");
+    expect(snap.capturedAt).toBe(AFTER_BOUNDARY);
     // A copy, not a reference: the stored row cannot follow a later edit of PLANS.
     expect(snap.plans.starter).not.toBe(PLANS.starter);
     expect(parseFoundingPrices(JSON.parse(JSON.stringify(snap)))).toEqual(snap);
@@ -385,7 +387,7 @@ describe("boot reconciliation", () => {
     expect(text).toContain("THEN $1::jsonb->'legacy' ELSE $1::jsonb->'current' END");
     expect(text).toContain(`jsonb_build_object('capturedAt', to_char(s.start_date::timestamptz AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))`);
     const books = JSON.parse(values[0] as string);
-    expect(books.legacy).toEqual(snapshotAt("2026-10-08T23:59:59.999Z"));
+    expect(books.legacy).toEqual(snapshotAt(new Date(Date.parse(FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT) - 1).toISOString()));
     expect(books.current).toEqual(snapshotAt(FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT));
     expect(foundingPrice(member(books.legacy), "pro", "month")).toBe(7900);
     expect(foundingPrice(member(books.current), "pro", "month")).toBe(9900);

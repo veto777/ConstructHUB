@@ -32,7 +32,7 @@ vi.mock("../account/email", async (actual) => ({
   ...(await actual<typeof import("../account/email")>()),
   sendTransactionalEmail: vi.fn(async (_u: number, _kind: string, _key: string, email: any) => { mail.sent.push({ to: email.to, from: email.from, subject: email.subject, attachments: email.attachments?.length ?? 0 }); return true; }),
 }));
-vi.mock("../entitlements", () => ({ getEntitlements: async () => ({ allowances: { seoKeywords: 50 } }) }));
+vi.mock("../entitlements", () => ({ getEntitlements: async () => ({ allowances: { seoKeywords: 50 }, modules: { scheduledReports: true, whiteLabel: true } }) }));
 vi.mock("./site-report", async (actual) => ({
   ...(await actual<typeof import("./site-report")>()),
   buildSiteReport: async () => ({ domain: "example.com", generatedAt: "2026-10-09T12:00:00Z", rankings: null, comparedWith: null, backlinks: null, audit: null, searchConsole: null, work: null, ai: null, visibility: null } as any),

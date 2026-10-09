@@ -1387,7 +1387,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const input = scheduleInput.parse(req.body);
     if (input.frequency !== "off" && !ent.modules.scheduledReports) return sendModuleRequired(res, "scheduledReports");
     if (input.frequency !== "off" && !input.recipients.length) return res.status(400).json({ message: "Add at least one email address to send the report to." });
-    const standing = await ensureRecipients(user, input.recipients, { brand: ent.modules.whiteLabel ? (await brandOf(user))?.name ?? null : null, ent });
+    const standing = await ensureRecipients(user, input.recipients, { brand: (await brandOf(user, ent))?.name ?? null, ent });
     if (standing.limited.length) return res.status(403).json({ message: `You can send reports to up to ${limitsFor(ent).distinctRecipients} different addresses in total. Not added: ${standing.limited.join(", ")}.` });
     const saved = await saveSchedule(user, site.id, input);
     res.json({ ...saved, recipientStatus: await recipientStatuses(user, saved.recipients ?? []), confirmationsSent: standing.confirmationsSent });
