@@ -142,9 +142,9 @@ export const NOT_SOLD: RegExp[] = [
   // old "no public api / no api access" entries went with it. Affirmative iPhone-app claims
   // still block on the mobile rule above.
   /\bzapier\b/i, /\baffiliate program\b/i, /\bpartner program\b/i, /\b(phone|live chat|24\/7) support\b/i,
-  // Owner, 2026-10-08: the SEO tools come with the Agency plan only; nothing SEO is sold à la carte and no such price exists.
+  // SEO suite add-ons are sold; individual rank-tracking, keyword and backlink add-ons are not.
   // (\b does not see "à" as a word character, so the boundary is written out.)
-  /\bseo (add-?ons?|addon)\b/i, /\b(rank[- ]?track\w*|keyword[- ]research|backlinks?) (add-?ons?|addon)\b/i, /(?:^|[^\p{L}])[àa][ -]la[ -]carte(?![\p{L}])/iu,
+  /\b(rank[- ]?track\w*|keyword[- ]research|backlinks?) (add-?ons?|addon)\b/i, /(?:^|[^\p{L}])[àa][ -]la[ -]carte(?![\p{L}])/iu,
   /\b(add-?ons?|addon|upgrade) for (the |your )?(seo|rank[- ]?track\w*|keyword[- ]research|backlinks?)\b/i,
   // Owner, 2026-10-08: the AI Call Assistant is a separate service with its own subscription — never "an add-on to
   // the Pro plan", and no plan or CRM plan includes it.
@@ -164,7 +164,8 @@ const SEO_CREDIT_CENTS: ReadonlySet<number> = new Set([
   ADDONS.seo_pro.grants.seoCreditCents ?? 0,
 ]);
 const SEO_CREDIT_CUE = /\b(credits?|prepaid|packs?|data|allowance)\b/i;
-/** An add-on's own prices (never the SEO data amounts ADDON_CENTS also carries). */
+/** SEO suite add-on prices only: an unrelated add-on's price cannot price SEO. */
+const SEO_ADDON_PRICE_CENTS: ReadonlySet<number> = new Set(Object.values(ADDONS).filter((a) => a.exclusiveGroup === "seo_addon").flatMap((a) => [a.monthlyCents, a.annualCents]));
 const ADDON_PRICE_CENTS: ReadonlySet<number> = new Set(Object.values(ADDONS).flatMap((a) => [a.monthlyCents, a.annualCents, ...(a.setupCents ? [a.setupCents] : [])]));
 /** ADDON_CUE without the SEO data words, so "SEO data" alone never opens the add-on exemption. */
 const addonCueWithoutSeo = (s: string) => ADDON_CUE.test(s.replace(/\bseo data\b|\bdata credit\b/gi, " "));
@@ -771,7 +772,7 @@ function checkContent(linkless: string, opts: FilterOptions, book: KnowledgeBook
       const agency = /\bAgency\b/.test(s), credit = SEO_CREDIT_CUE.test(s), addon = addonCueWithoutSeo(s);
       for (const m of s.matchAll(/\$\s?(\d[\d,]*(?:\.\d{1,2})?)/g)) {
         const cents = toCents(m[1]);
-        if (cents === SALES_THRESHOLD_CENTS || (agency && SEO_PLAN_CENTS.has(cents)) || (credit && SEO_CREDIT_CENTS.has(cents)) || (addon && ADDON_PRICE_CENTS.has(cents))) continue;
+        if (cents === SALES_THRESHOLD_CENTS || (agency && SEO_PLAN_CENTS.has(cents)) || (credit && SEO_CREDIT_CENTS.has(cents)) || (addon && SEO_ADDON_PRICE_CENTS.has(cents))) continue;
         block("O10");
       }
     }

@@ -2,8 +2,7 @@ import { chatInput, rateLimit, siteChatGate } from "./growth-limits";
 import type { Express, Request, Response } from "express";
 import { aiModel } from "./ai-config";
 import { aiClient, aiComplete, aiErrorTag, NO_TOOLS_RULE, type ChatClient } from "./ai-output";
-import { PLANS } from "@shared/plans";
-import { pricingKnowledge, PROTECTED_SITE_PLANS, SALES_REP_LABEL, SALES_THRESHOLD_LABEL } from "@shared/plan-copy";
+import { planNamesWhere, pricingKnowledge, PROTECTED_SITE_PLANS, SALES_REP_LABEL, SALES_THRESHOLD_LABEL } from "@shared/plan-copy";
 
 // Created on first use so importing this module (e.g. to test the prompt)
 // never needs an API key. AI_TIMEOUT_MS per call, at most one SDK retry.
@@ -153,7 +152,7 @@ ConstructHUB's Google Click Guard is a click fraud protection system. Users add 
 
 ## Which ConstructHUB plans include what
 - Click Guard (with IP Tracker and VPN Shield) is included with the ${PROTECTED_SITE_PLANS} plans; each plan covers a set number of websites and more are an add-on.
-- The Google Ads & LSA manager is part of the ${PLANS.agency.name} plan only.
+- The Google Ads & LSA manager is part of the ${planNamesWhere((plan) => plan.modules.adsManager)} plans.
 - The Google Ads Master Class guide is unlocked by any Master Class purchase. The Master Class and every done-for-you service (Google Ads management, SEO, websites) are priced at ${SALES_THRESHOLD_LABEL} or more: never quote a price for them — say "${SALES_REP_LABEL}".
 
 ${pricingKnowledge()}

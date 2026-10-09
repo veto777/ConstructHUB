@@ -7,7 +7,7 @@ import {
 import { CRM_PLANS, CRM_PLAN_KEYS } from "@shared/crm-plans";
 import * as planCopy from "@shared/plan-copy";
 import {
-  pricingKnowledge, formatUsd, priceOrSalesRep, joinNames, addonLines, annualExceptionsLine, PLATFORM_ADDONS,
+  planNamesWhere, pricingKnowledge, formatUsd, priceOrSalesRep, joinNames, addonLines, annualExceptionsLine, PLATFORM_ADDONS,
   AGENCY_ONLY_MODULES, COMPETITOR_INTEL_PLANS, CRM_SEATS_LINE, CRM_TEXTING_PLANS, CLIENT_NUMBER_INCLUDED_PLANS, SALES_REP_LABEL, STARTING_MONTHLY_CENTS,
   CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_SPAM, CALL_ASSISTANT_SEPARATE_LINE, CALL_ASSISTANT_FROM_PRICE, TEXTING_PLANS, callAssistantPricing, callAssistantYearlyNote, callAssistantAboveTopLine,
   callAssistantTiers, callAssistantTiersLine, callAssistantTierAdvice, callAssistantSpamAllowanceLine, callAssistantIncludesLine, callAssistantMinuteRule, callAssistantTierNumbersLine, CALL_ASSISTANT_SPAM_BLOCK_TITLE,
@@ -301,9 +301,9 @@ describe("AI assistant prompts use the price book", () => {
     expect(text).toContain("$599 per project");
   });
 
-  it("ads consultant keeps the Ads & LSA manager on the top plan and points to sales", () => {
-    // server/ads-consultant.ts words this with the price book's name for the agency key ("Unlimited").
-    expect(ADS_CONSULTANT_KNOWLEDGE).toContain(`The Google Ads & LSA manager is part of the ${PLANS.agency.name} plan only.`);
+  it("ads consultant derives Ads & LSA manager access from the price book", () => {
+    // The module is included on Pro and above.
+    expect(ADS_CONSULTANT_KNOWLEDGE).toContain(`The Google Ads & LSA manager is part of the ${planNamesWhere((plan) => plan.modules.adsManager)} plans.`);
     expect(ADS_CONSULTANT_PROMPT).toMatch(/Never invent a product, package, discount or price/);
   });
 });

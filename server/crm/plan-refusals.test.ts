@@ -89,33 +89,28 @@ describe("CRM seat refusals", () => {
   });
 });
 
-describe("One seat pool for the CRM team and the Agency team", () => {
-  // The pool is CRM seats + the platform plan's agencySeats while the Agency workspace module is on:
-  // CRM Basic (1) + Agency's agencySeats (10) = 11. Unlimited's agencySeats (-1) would leave it uncapped.
-  const poolSize = CRM_PLANS.crm_basic.limits.seats + PLANS.growth.limits.agencySeats;
+describe("Separate seat pools for the CRM team and the Agency team", () => {
+  const poolSize = PLANS.growth.limits.agencySeats;
 
-  it("lets only one of two simultaneous additions (a CRM invitation and an Agency member) take the last seat", async () => {
+  it("refuses a full CRM pool while letting an Agency member take the last platform seat", async () => {
     const owner = await account("growth", { plan: "crm_basic" });
-    // Owner + one pending invitation.
-    expect((await call(owner, "/api/crm/invitations", { email: `i-invitee-${randomUUID()}@example.invalid` })).status).toBe(201);
     const member = async () => {
       const id = await account();
       return (await pool.query("SELECT email FROM users WHERE id=$1", [id])).rows[0].email as string;
     };
-    for (let i = 0; i < poolSize - 3; i++) {
-      const r = await call(owner, "/api/agency/team", { email: await member(), role: "viewer" }, "PUT");
-      expect(r.status).toBe(200);
+    for (let i = 0; i < poolSize - 2; i++) {
+      expect((await call(owner, "/api/agency/team", { email: await member(), role: "viewer" }, "PUT")).status).toBe(200);
     }
     const [crm, agency] = await Promise.all([
-      call(owner, "/api/crm/invitations", { email: `i-invitee-${randomUUID()}@example.invalid` }),
+      call(owner, "/api/crm/invitations", { email: "i-invitee-" + randomUUID() + "@example.invalid" }),
       call(owner, "/api/agency/team", { email: await member(), role: "viewer" }, "PUT"),
     ]);
-    const outcomes = [crm, agency];
-    expect(outcomes.filter((r) => r.status === 200 || r.status === 201)).toHaveLength(1);
-    const refused = outcomes.find((r) => r.status === 402 || r.status === 403)!;
-    // The Agency ($199) platform plan sells the Extra seat add-on: it raises agencySeats, so the refusal names it.
-    expect(refused.data).toMatchObject({ code: "limit_reached", feature: "crmSeats", limit: poolSize, used: poolSize, addon: "extra_seat" });
-    expect(refused.data.message).toContain("Add an extra seat for $17/mo.");
+    expect(crm.status).toBe(402);
+    expect(crm.data).toMatchObject({ code: "limit_reached", feature: "crmSeats", limit: 1, used: 1, addon: null });
+    expect(agency.status).toBe(200);
+    const full = await call(owner, "/api/agency/team", { email: await member(), role: "viewer" }, "PUT");
+    expect(full.status).toBe(403);
+    expect(full.data).toMatchObject({ code: "limit_reached", feature: "agencySeats", limit: poolSize, used: poolSize, addon: "extra_seat" });
     await pool.query("DELETE FROM agency_members WHERE user_id=$1", [owner]);
     await pool.query("DELETE FROM agency_workspaces WHERE user_id=$1", [owner]);
   });
@@ -133,12 +128,13 @@ describe("One seat pool for the CRM team and the Agency team", () => {
     const outcome = await Promise.race([all, new Promise<"wedged">((resolve) => setTimeout(() => resolve("wedged"), 15_000))]);
     expect(outcome).not.toBe("wedged");
     const results = outcome as Awaited<typeof all>;
-    // The owner holds one seat; the other seats go to exactly that many of the 14, and the rest are refused.
-    expect(results.filter((r) => r.status === 200 || r.status === 201)).toHaveLength(poolSize - 1);
+    // CRM Basic is full; the five platform members use only the platform pool.
+    expect(results.filter((r) => r.status === 200 || r.status === 201)).toHaveLength(emails.length);
     for (const r of results.filter((r) => r.status !== 200 && r.status !== 201))
-      expect(r.data).toMatchObject({ code: "limit_reached", feature: "crmSeats", limit: poolSize, used: poolSize, addon: "extra_seat" });
+      expect(r.data).toMatchObject({ code: "limit_reached", feature: "crmSeats", limit: 1, used: 1, addon: null });
     const { getOwnerSeatUsage } = await import("./tenancy");
-    expect((await getOwnerSeatUsage(owner)).used).toBe(poolSize);
+    expect((await getOwnerSeatUsage(owner)).used).toBe(1);
+    expect((await getOwnerSeatUsage(owner, { product: "platform" })).used).toBe(1 + emails.length);
     await pool.query("DELETE FROM agency_member_clients WHERE user_id=$1", [owner]);
     await pool.query("DELETE FROM agency_members WHERE user_id=$1", [owner]);
     await pool.query("DELETE FROM agency_workspaces WHERE user_id=$1", [owner]);

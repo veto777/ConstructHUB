@@ -1307,7 +1307,7 @@ Counts /privacy: 13 mapped elements — 12 OK, 1 UNCLEAR. (15 section containers
 | Element (visible label / testid) | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
 |---|---|---|---|---|---|---|
 | `list-plans` (4 plan lines from PLANS) | dynamic list | planPriceLine(key) for each PLAN_KEY | terms-of-use.tsx:49-53, plan-copy.ts:59-63 | shared/plans.ts PLANS | values recomputed from PLANS; annual=10× verified | OK |
-| Agency locations sentence (10 included + agencyBandsLine) | dynamic text | Per-location pricing bands | terms-of-use.tsx:54, plan-copy.ts:73 | AGENCY_LOCATION_BANDS (plans.ts:178-183: $15/$10/$7 per location over 10, up to 500) | matches PLANS.agency.limits.locations=10 | OK |
+| ~~Agency locations sentence (10 included + agencyBandsLine)~~ | retired | Per-location bands retired by the 2026-10-09 five-plan price book; agencyBandsLine deleted. terms-of-use.tsx now states the flat-ladder rule | — | — | — | RETIRED |
 | CRM seats line | dynamic text | seats per plan | terms-of-use.tsx:55, plan-copy.ts:65 | PLANS.limits.crmSeats (1/3/10/10) | recomputed | OK |
 | Trial sentence | dynamic text | "no free plan… starts with a 1-day trial" | terms-of-use.tsx:56 | TRIAL_DAYS=1 (plans.ts:411) | recomputed | OK |
 | §4 Add-ons list (from ADDONS) | dynamic list | name — $/month (+setup fee) (availableOn) | terms-of-use.tsx:63-71 | ADDONS record (plans.ts:330) | recomputed | OK |

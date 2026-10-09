@@ -3442,17 +3442,17 @@ export async function registerRoutes(
   });
 
   // The paid Google Ads playbook, one section at a time. Same entitlement rule as the guide
-  // index: any course purchase unlocks it (dev bypass mirrors the client's dev preview).
+  // index: an included Master Class or any course purchase unlocks it (with the dev preview bypass).
   app.get("/api/google-ads-guide/:slug", async (req, res) => {
     try {
       const slug = String(req.params.slug);
       const section = Object.hasOwn(GOOGLE_ADS_GUIDE_SECTIONS, slug) ? GOOGLE_ADS_GUIDE_SECTIONS[slug] : undefined;
       if (!section) return res.status(404).json({ message: "Guide section not found" });
       const user = req.user ? getDevUser(req, res) : null;
-      const purchased = !!user && (await db.select({ id: coursePurchases.id }).from(coursePurchases)
-        .where(eq(coursePurchases.userId, user.id)).limit(1)).length > 0;
+      const { getCourseAccess } = await import("./course-access");
+      const access = await getCourseAccess(user?.id ?? null);
       // The title is public (it is listed on the guide index); the section text is not.
-      if (!purchased && !DEV_AUTH_BYPASS) return res.status(403).json({ message: "Purchase required", title: section.title });
+      if (!access.included && access.purchases.length === 0 && !DEV_AUTH_BYPASS) return res.status(403).json({ message: "Purchase required", title: section.title });
       res.setHeader("Cache-Control", "private, no-store");
       res.json({
         slug,

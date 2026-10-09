@@ -408,7 +408,7 @@ export function AppSidebar() {
     queryKey: ["/api/entitlements"],
     enabled: !!user,
   });
-  const { data: agencyMe } = useQuery<{ entitled?: boolean } | null>({
+  const { data: agencyMe } = useQuery<{ entitled?: boolean; teamEntitled?: boolean } | null>({
     queryKey: ["/api/agency/me"],
     enabled: !!user,
   });
@@ -422,9 +422,9 @@ export function AppSidebar() {
   const planBadgeFor: PlanBadgeFor = (url) => {
     const module = MODULE_BY_URL[url];
     if (!module || !user) return null;
-    const allowed = module === "agencyWorkspace" ? agencyMe?.entitled : entitlements?.modules?.[module];
+    const allowed = module === "agencyWorkspace" ? agencyMe?.teamEntitled : entitlements?.modules?.[module];
     // Unknown (loading or failed) shows nothing rather than a wrong lock.
-    return allowed === false ? PLANS[planForModule(module)].name : null;
+    return allowed === false ? PLANS[module === "agencyWorkspace" ? "team" : planForModule(module)].name : null;
   };
 
   const activeCount = dbCounts?.total ?? 0;

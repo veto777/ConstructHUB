@@ -120,6 +120,9 @@ export default function PricingPage() {
   });
   const { data: user, isPending: userPending } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const view = describeSubscription(subscription);
+  // The old banded Agency and flat Unlimited share a key; the API exposes the stored billed count.
+  const legacyBand = view.planKey === "agency" && (subscription?.agencyLocations ?? subscription?.locations) != null;
+  const legacyPlan = view.isLegacy || legacyBand;
   // The founding member offer (server/billing/pricing-terms.ts): its one line shows only once the server has said
   // the offer is open. Never in the prerendered snapshot — the build's shell server refuses /api, so this reads
   // null there — because the owner closes the offer whenever they choose and a snapshot would go stale. For the
@@ -263,12 +266,13 @@ export default function PricingPage() {
   const startLabel = (plan: PlanKey) => `Choose ${PLANS[plan].name}`;
 
   const isCurrent = (plan: PlanKey) =>
-    view.live && !view.isLegacy && view.planKey === plan && (view.interval === null || view.interval === interval);
+    view.live && !legacyPlan && view.planKey === plan && (view.interval === null || view.interval === interval);
 
   const ctaLabel = (plan: PlanKey) => {
+    if (legacyPlan && view.live && plan === "agency") return `Move to ${PLANS[plan].name}`;
     if (isCurrent(plan)) return "Current plan";
     if (!view.live) return startLabel(plan);
-    if (view.planKey === plan && !view.isLegacy) return `Switch to ${intervalWord(interval)} billing`;
+    if (view.planKey === plan && !legacyPlan) return `Switch to ${intervalWord(interval)} billing`;
     return `Switch to ${PLANS[plan].name}`;
   };
 
@@ -305,7 +309,7 @@ export default function PricingPage() {
   }, [pageSettled, navCount]);
 
   // Add-ons ride on a Stripe subscription to one of the current plans (a legacy plan switches first).
-  const addonsEditable = view.changesInPlace && !view.isLegacy;
+  const addonsEditable = view.changesInPlace && !legacyPlan;
   const monthsFree = annualMonthsFree();
   // Monthly / Annual switch. Shown in the hero and again above the plan cards; both drive the same
   // interval, so the Business Tools and CRM tabs always price the same period.
@@ -337,7 +341,7 @@ export default function PricingPage() {
     </div>
   );
 
-  const confirmFrom = view.displayName ? `Your ${view.displayName} subscription${view.interval ? ` (billed ${intervalWord(view.interval)})` : ""}` : "Your subscription";
+  const confirmFrom = view.displayName ? `Your ${legacyBand ? "Legacy Agency" : view.displayName} subscription${view.interval ? ` (billed ${intervalWord(view.interval)})` : ""}` : "Your subscription";
   // Retired add-ons (empty availableOn, not a preview — e.g. the old extra-location line) are not sold: they read
   // stored subscriptions on the server, they are never listed here.
   const listedAddons = (Object.keys(ADDONS) as AddonKey[]).filter((k) => !isCallAssistantAddon(k) && (ADDONS[k].availableOn.length > 0 || ADDONS[k].preview));
@@ -386,12 +390,12 @@ export default function PricingPage() {
           <div className="flex flex-wrap items-center justify-center gap-3 text-sm -mt-2" data-testid="banner-current-plan">
             <Badge variant="outline" className="px-3 py-1 text-sm rounded-full border-mkt-ink text-mkt-ink bg-mkt-card" data-testid="badge-current-plan">
               <Check className="w-3.5 h-3.5 mr-1 text-mkt-orange-ink" />
-              Your plan: {view.displayName}
+              Your plan: {legacyBand ? "Legacy Agency" : view.displayName}
               {view.interval ? ` · ${intervalWord(view.interval)}` : ""}
             </Badge>
-            {view.isLegacy && view.planKey && (
+            {legacyPlan && view.planKey && (
               <span className="text-mkt-ink-soft" data-testid="text-legacy-match">
-                Your features now match {PLANS[view.planKey].name}.
+                {legacyBand ? "Move to Unlimited to replace legacy location billing." : `Your features now match ${PLANS[view.planKey].name}.`}
               </span>
             )}
             {PAYMENT_PROBLEM_STATUSES.includes(subscription?.status ?? "") && (
@@ -459,8 +463,8 @@ export default function PricingPage() {
                           </div>
                           <span className="font-display italic text-mkt-muted text-lg leading-none pt-1 shrink-0 xl:hidden 2xl:inline" aria-hidden>{String(index + 1).padStart(2, "0")}</span>
                         </div>
-                        {view.live && view.planKey === key && view.isLegacy && (
-                          <p className="mt-2 text-[12px] text-mkt-muted" data-testid={`text-legacy-${key}`}>Your {view.displayName} features match this plan</p>
+                        {view.live && view.planKey === key && legacyPlan && (
+                          <p className="mt-2 text-[12px] text-mkt-muted" data-testid={`text-legacy-${key}`}>{legacyBand ? "Move from legacy location billing to flat Unlimited" : `Your ${view.displayName} features match this plan`}</p>
                         )}
                         <p className="text-[14.5px] text-mkt-ink-soft pt-3 leading-relaxed">{plan.tagline}</p>
                         <div className="pt-5 font-display font-semibold text-mkt-ink leading-none" data-testid={`text-price-${key}`}>
@@ -681,7 +685,7 @@ export default function PricingPage() {
       <AlertDialogContent data-testid="dialog-change-plan">
         <AlertDialogHeader>
           <AlertDialogTitle>
-            {confirm && (view.planKey === confirm.plan && !view.isLegacy
+            {confirm && (view.planKey === confirm.plan && !legacyPlan
               ? `Switch to ${intervalWord(confirm.interval)} billing?`
               : `Switch to ${PLANS[confirm.plan].name}?`)}
           </AlertDialogTitle>

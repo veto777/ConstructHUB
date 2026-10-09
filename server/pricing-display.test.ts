@@ -154,7 +154,7 @@ describe("pricing display: comparison tables (shared/plan-matrix.ts)", () => {
     expect(byKey.gridWatches.label).toBe("Weekly scheduled grid watches");
     // The label carries the Unlimited bullet's price note only when the bullet states one (plan-matrix.ts derives it).
     const masterClassBullet = PLANS.agency.features.find((f) => /master class/i.test(f)) ?? "";
-    expect(byKey.masterClass.label).toBe(`Master Class course${masterClassBullet.match(/\(\$[\d,]+\)/)?.[0] ?? ""}`);
+    expect(byKey.masterClass.label).toBe(`Master Class course ${masterClassBullet.match(/\(\$[\d,]+\)/)?.[0] ?? ""}`);
     expect(byKey.gridScans.label).toBe("Grid scans / month");
     expect(byKey.publicApi.label).toBe("Public API (units / month)");
     // The grid-scans row counts credits, not scans — the footnote under the table says so.

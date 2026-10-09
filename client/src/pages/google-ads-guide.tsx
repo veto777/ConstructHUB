@@ -144,13 +144,13 @@ export default function GoogleAdsGuidePage() {
     queryKey: ["/api/auth/me"],
   });
 
-  const { data: purchases = [] } = useQuery<{ moduleId: string; purchasedAt: string }[]>({
-    queryKey: ["/api/course-purchases"],
+  const { data: access } = useQuery<{ included: boolean; purchases: { moduleId: string; purchasedAt: string }[] }>({
+    queryKey: ["/api/course-access"],
     enabled: !!user,
   });
 
   const isDev = import.meta.env.DEV;
-  const hasAccess = isDev || purchases.length > 0;
+  const hasAccess = isDev || access?.included === true || (access?.purchases.length ?? 0) > 0;
 
   if (!hasAccess) {
     return (
@@ -185,7 +185,7 @@ export default function GoogleAdsGuidePage() {
               </p>
               <GooglePill icon={GraduationCap} variant="solid" href="/master-class" label="Go to Master Class" testId="link-master-class" className="px-8" />
               <p className="text-xs text-muted-foreground mt-3">
-                Any Master Class purchase unlocks the Google Ads content
+                An included Master Class or any Master Class purchase unlocks the Google Ads content
               </p>
             </CardContent>
           </Card>

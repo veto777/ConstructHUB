@@ -476,8 +476,14 @@ describe("formatting can't hide what a visitor reads (checks run on the delivere
   });
 });
 
-describe("owner 2026-10-08: SEO tools are Agency-only, nothing SEO à la carte, the founding offer has no count or deadline", () => {
-  it("an SEO add-on, an SEO price outside the price book, à la carte: blocked (O10)", () => {
+describe("SEO suites and individual-feature claims; founding offer has no count or deadline", () => {
+  it("allows the sold SEO suite add-on prices", () => {
+    for (const amount of ["$29/month", "$79/month", "$290/year", "$790/year"]) {
+      const text = `The SEO add-on costs ${amount}.`;
+      expect(delivered(text)).toBe(text);
+    }
+  });
+  it("an SEO price outside the price book and à la carte: blocked (O10)", () => {
     blocked("The SEO add-on costs $19/month.", "O10");
     blocked("You can add the rank tracking add-on to Starter.", "O10");
     blocked("You can buy rank tracking à la carte.", "O10");

@@ -487,9 +487,9 @@ export const PLANS: Record<PlanKey, Plan> = {
       "50 Competitor Intel scans / month",
       "Team text alerts — 5,000 segments / month",
       "Unlimited review reply templates",
-      "The Master Class course included",
+      "The Master Class course ($2,499) included",
       "GBP reinstatement help at half the standard rate",
-      "Two seats on every new product we launch",
+      "Two seats on every new product we launch (Call Assistant minutes excluded)",
       "Named support contact, onboarding call, first access to new features",
     ],
     notIncluded: [

@@ -44,9 +44,9 @@ Money is in US dollars. Yearly platform billing is 10× the monthly price (two m
 | White-label reports | ❌ | ❌ | ❌ | ❌ | ✅ |
 | **Hub & extras** |  |  |  |  |  |
 | Gabe questions / month | 100 | 300 | 1,000 | 3,000 | 🟣 Unlimited |
-| Master Class course | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Master Class course ($2,499) | ❌ | ❌ | ❌ | ❌ | ✅ |
 | GBP reinstatement help / project | $599 | $599 | $599 | $599 | $299.50 — half price |
-| Two seats on every new product we launch | ❌ | ❌ | ❌ | ❌ | 2 seats |
+| Two seats on every new product we launch | ❌ | ❌ | ❌ | ❌ | 2 seats (Call Assistant minutes excluded) |
 | Support | Email support | Email support | Priority email support | Priority support with a phone callback | Named support contact, onboarding call, first access to new features |
 
 ## CRM (Customer Relations Management) — a separate product

@@ -90,7 +90,7 @@ export default function GoogleAdsGuideSection() {
   const { data: user } = useQuery<{ id: number } | null>({
     queryKey: ["/api/auth/me"],
   });
-  // The server applies the entitlement rule (any course purchase unlocks the playbook,
+  // The server applies the entitlement rule (an included Master Class or any course purchase unlocks the playbook,
   // same as the guide index); the page only renders what it is given.
   const { data: result, isLoading, isError, refetch, isFetching } = useQuery<SectionResult>({
     queryKey: ["/api/google-ads-guide", sectionSlug],
@@ -141,7 +141,7 @@ export default function GoogleAdsGuideSection() {
                 {result.title || "Google Ads Playbook"}
               </h2>
               <p className="g-text-2 text-sm mb-6 max-w-md mx-auto">
-                This section of the Google Ads playbook is included with any Master Class purchase.
+                This section of the Google Ads playbook is included with Master Class plan access or any Master Class purchase.
               </p>
               <GooglePill icon={GraduationCap} variant="solid" href="/master-class" label="Go to Master Class" testId="link-master-class" className="px-8" />
               {!user && (

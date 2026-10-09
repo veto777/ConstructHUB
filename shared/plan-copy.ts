@@ -4,7 +4,7 @@
  * copy can never drift from what checkout and entitlements enforce.
  */
 import {
-  PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, AGENCY_SELF_SERVE_MAX_LOCATIONS,
+  PLANS, PLAN_KEYS, ADDONS,
   TRIAL_DAYS, SALES_THRESHOLD_CENTS, MODULE_NAMES, ANNUAL_MONTHS, planForModule, showsPrice,
   CALL_ASSISTANT_TIERS, CALL_ASSISTANT_NAME, CALL_ASSISTANT_FREE_SPAM_CALLS, CALL_ASSISTANT_ESTIMATE_MINUTES_PER_CALL,
   CALL_ASSISTANT_OVERAGE_RATES, CALL_ASSISTANT_OVERAGE_CENTS_PER_MINUTE, CALL_ASSISTANT_ANNUAL_MONTHS, CALL_ASSISTANT_FROM_CENTS, CALL_ASSISTANT_PRICING_HREF, isCallAssistantAddon,
@@ -74,26 +74,6 @@ export const CRM_SEATS_LINE = joinNames(CRM_PLAN_KEYS.map((key) => `${CRM_PLANS[
 export const AGENCY_ONLY_MODULES: string[] = (Object.keys(MODULE_NAMES) as ModuleKey[])
   .filter((module) => planForModule(module) === "agency")
   .map((module) => MODULE_NAMES[module]);
-
-/**
- * Graduated Agency location bands (the 2026-09-30 ladder): kept ONLY so the
- * legacy callers that read old subscriptions keep compiling — server/hub/
- * presets.ts's agency answer and the band tests. Retired 2026-10-09: the new
- * price book has no per-location pricing (Unlimited has no location cap), so
- * no current copy — the pricing page, the knowledge pack, the emails — words
- * bands any more.
- */
-export function agencyBandsLine(): string {
-  const parts: string[] = [];
-  let from = 1;
-  for (const band of AGENCY_LOCATION_BANDS) {
-    if (band.centsPerLocation > 0) {
-      parts.push(`${formatUsd(band.centsPerLocation)}/month each for locations ${from}–${band.upTo}`);
-    }
-    from = band.upTo + 1;
-  }
-  return `${joinNames(parts)}; above ${AGENCY_SELF_SERVE_MAX_LOCATIONS} locations the Agency plan is quoted by a sales rep`;
-}
 
 /** The platform's own add-ons: not the AI Call Assistant's (its own subscription) and not retired lines
  * (an add-on sold on no plan and not a preview, like the old extra-location one, reads stored subscriptions only). */
@@ -405,10 +385,14 @@ export const crmPlansLine = () => CRM_PLAN_KEYS.map((k) => {
 export function pricingKnowledge(): string {
   const plans = PLAN_KEYS.map((key) => {
     const plan = PLANS[key];
+    // Keep the owner's benefit wording on Pricing, but omit sales-only value annotations
+    // from assistant prompts, which must send course-price questions to a sales rep.
+    const features = plan.features.map((feature) => feature.replace(/\s*\(\$([\d,]+)\)/g,
+      (note, dollars: string) => Number(dollars.replaceAll(",", "")) * 100 >= SALES_THRESHOLD_CENTS ? "" : note));
     // Each feature its own sentence: the filter reads a sales-only item next to any
     // amount in one sentence as quoting that item a price (O11), and a plan list can
     // carry both (the Unlimited plan includes the Master Class and lists its SEO data).
-    return `- **${plan.name}** — ${planPriceLine(key)}. ${plan.tagline}\n  Includes: ${plan.features.join(". ")}.`;
+    return `- **${plan.name}** — ${planPriceLine(key)}. ${plan.tagline}\n  Includes: ${features.join(". ")}.`;
   }).join("\n");
   return `## Plans and pricing (the ConstructHUB price book)
 There is no free plan. A new subscription starts with a ${TRIAL_LABEL}. Plans are billed monthly, or yearly at ${ANNUAL_MONTHS} times the monthly price. Every add-on is billed the same way: monthly, or yearly at ${ANNUAL_MONTHS} times its monthly price${annualExceptionsLine()}. Outgrow a plan's locations or seats and you move up a plan — there is no per-location pricing.

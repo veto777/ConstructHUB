@@ -99,7 +99,7 @@ describe("price book: the AI Call Assistant, a separate service (owner, 2026-10-
     }
     for (const key of CRM_PLAN_KEYS) expect(CRM_PLANS[key].notIncluded, key).toContain(CALL_ASSISTANT_NOT_INCLUDED_LINE);
     // The platform's add-on list is the platform's: none of the Call Assistant's lines is on it.
-    expect(PLATFORM_ADDONS.map((a) => a.key)).toEqual(["extra_location", "extra_seat", "protected_site", "texting_number", "competitor_pack", "grid_pack", "seo_basic", "seo_pro"]);
+    expect(PLATFORM_ADDONS.map((a) => a.key)).toEqual(["extra_seat", "protected_site", "texting_number", "competitor_pack", "grid_pack", "seo_basic", "seo_pro"]);
     expect(addonLines()).toHaveLength(PLATFORM_ADDONS.length);
     expect(addonLines().join("\n")).not.toMatch(/Call Assistant/);
   });
