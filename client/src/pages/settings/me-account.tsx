@@ -616,6 +616,7 @@ function AccountSection({ user }: { user: SettingsUser | undefined }) {
               {user?.accountId || "—"}
             </code>
           </div>
+          <SupportNumbersRow />
           <div className="flex flex-wrap items-center justify-between gap-2 py-3 border-b border-border/50">
             <div>
               <p className="text-sm font-medium">Member since</p>
@@ -1062,5 +1063,23 @@ function BetaAccessSection({ user }: { user: SettingsUser | undefined }) {
         </Card>
       )}
     </>
+  );
+}
+
+
+/** The numbers a caller reads to Gabe on the support line (server/support): the customer number, and a CRM number per CRM account. */
+function SupportNumbersRow() {
+  const { data } = useQuery<{ customerNumber: string; crmNumbers: string[] }>({ queryKey: ["/api/support/my-numbers"] });
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 py-3 border-b border-border/50">
+      <div>
+        <p className="text-sm font-medium">Customer number</p>
+        <p className="text-xs text-muted-foreground mt-0.5">Read this to Gabe when you call support{data?.crmNumbers?.length ? " (CRM accounts: the CRM number)" : ""}</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <code className="text-xs bg-muted px-2.5 py-1 rounded font-mono" data-testid="text-customer-number">{data?.customerNumber || "—"}</code>
+        {(data?.crmNumbers ?? []).map((n) => <code key={n} className="text-xs bg-muted px-2.5 py-1 rounded font-mono" data-testid={`text-crm-number-${n}`}>{n}</code>)}
+      </div>
+    </div>
   );
 }

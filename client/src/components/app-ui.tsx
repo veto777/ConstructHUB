@@ -15,7 +15,7 @@
  */
 import { Children, cloneElement, isValidElement, useState, type ReactElement, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import {
+import { Ticket,
   AlertTriangle, ArrowRight, CheckCircle2, Info, SlidersHorizontal, XCircle, type LucideIcon,
   LayoutDashboard, Search, Database, Home, CalendarClock, History, Camera, Images, Eye, Grid3x3, Swords, Briefcase,
   MapPin, Store, Globe, MailWarning, Newspaper, Megaphone, BookOpen, Cloud, LineChart, ScanSearch, GraduationCap,
@@ -64,7 +64,7 @@ const PAGE_ICONS: [string, LucideIcon, Accent][] = [
   ["/cloudflare", Cloud, "orange"], ["/search-console", LineChart, "orange"], ["/site-scan", ScanSearch, "orange"], ["/seo", TrendingUp, "orange"],
   ["/vpn-shield", ShieldCheck, "orange"], ["/ip-tracker", Fingerprint, "orange"], ["/social-media", Megaphone, "orange"],
   ["/guides", BookOpen, "orange"], ["/master-class", GraduationCap, "orange"], ["/settings", Settings, "orange"],
-  ["/admin/access", KeyRound, "orange"], ["/admin/issues", Bug, "orange"], ["/admin/feature-pages", LayoutGrid, "orange"],
+  ["/admin/access", KeyRound, "orange"], ["/admin/issues", Bug, "orange"], ["/admin/tickets", Ticket, "orange"], ["/admin/feature-pages", LayoutGrid, "orange"],
   ["/crm-app", Kanban, "orange"], ["/", LayoutDashboard, "orange"],
 ];
 function pageIconFor(path: string): { icon: LucideIcon; accent: Accent } | null {

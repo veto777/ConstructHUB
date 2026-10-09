@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { inNativeApp } from "@/lib/app-shell";
-import {
+import { Ticket,
   Cloud, Search, Database, Clock, FileText, Building, Camera, LogIn, LogOut,
   Eye, Grid3X3, CreditCard, Shield, MapPin, GraduationCap, ChevronRight,
   HardHat, Globe, ShieldAlert, ExternalLink, ShieldCheck, BadgeCheck,
@@ -618,6 +618,17 @@ export function AppSidebar() {
                         )}
 
                       </span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {/* Support tickets: opened by Gabe on the support line after the caller verified (server/support). */}
+              {user?.isPlatformAdmin === true && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild data-active={location.startsWith("/admin/tickets")}>
+                    <Link href="/admin/tickets" data-testid="link-nav-admin-tickets" className="flex items-center gap-2 w-full">
+                      <Ticket className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-muted-foreground" />
+                      <span>Tickets</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

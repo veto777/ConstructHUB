@@ -462,6 +462,16 @@ export async function registerRoutes(
     console.error("Failed to initialize the Call Assistant module:", e?.message || e);
   }
 
+  // Gabe's support line (server/support): customer numbers, the verified phone flow and the admin ticket desk.
+  try {
+    const { ensureSupportSchema } = await import("./support/schema");
+    await ensureSupportSchema();
+    const { registerSupportRoutes } = await import("./support/service");
+    registerSupportRoutes(app, getDevUser);
+  } catch (e: any) {
+    console.error("Failed to initialize the support line:", e?.message || e);
+  }
+
   // Google Local Services Ads (multi-tenant LSA lead system).
   try {
     const { ensureLsaSchema } = await import("./lsa/schema-ensure");

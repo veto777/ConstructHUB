@@ -47,6 +47,13 @@ export function registerVoiceInternalProfileRoutes(app: Express): void {
     const to = normalizeE164(typeof req.query.to === "string" ? req.query.to : null);
     if (!to) return res.status(400).json({ code: "bad_request", message: "to must be an E.164 number" });
     const from = typeof req.query.from === "string" ? req.query.from : null;
+    // The dedicated support line (SUPPORT_LINE_NUMBER) is not an org's number: the engine runs Gabe's support
+    // flow (server/support) for it — every rule in the app, the engine only carries the audio.
+    const supportLine = normalizeE164(process.env.SUPPORT_LINE_NUMBER || "");
+    if (supportLine && to === supportLine) {
+      res.setHeader("Cache-Control", "no-store");
+      return res.json({ kind: "support", status: "live", org: { id: "constructhub-support", name: "ConstructHUB Support", timezone: "America/New_York" }, number: { id: "support", label: "Support line", phoneNumber: to, isTest: false }, caller: { number: normalizeE164(from), blocked: false, strikes: 0, customer: null } });
+    }
     const found = await lookupNumber(to);
     if (!found) return res.status(404).json({ code: "unknown_number" });
     const { number, org, profile } = found;

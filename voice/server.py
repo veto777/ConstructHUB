@@ -43,6 +43,7 @@ from aiohttp import web
 import audio
 from app_client import AppClient, CallProfile, ProfileUnavailable
 from brain import Brain
+from support_brain import SupportBrain
 from config import settings
 from decision import SAY_MAX
 from speech import DEFAULT_VOCAB, STT, TTS, VAD, load_personas, persona_voice, sentences, verify_personas
@@ -453,12 +454,18 @@ class Call:
         async def on_event(payload: dict[str, Any]) -> dict[str, Any]:
             return await self.app.call_event(sid, payload)
 
-        self.brain = Brain(c, self.frm, on_event=on_event, caller_info=p.caller, timezone=(p.org or {}).get("timezone"), provider=self.provider)
+        if p.kind == "support":
+            # ConstructHUB's own support line: the app's state machine answers every turn (server/support).
+            self.voice = persona_voice(PERSONAS, "gabe", "am_michael")
+            self.brain = SupportBrain(self.app, sid, self.frm, voice=self.voice)
+        else:
+            self.brain = Brain(c, self.frm, on_event=on_event, caller_info=p.caller, timezone=(p.org or {}).get("timezone"), provider=self.provider)
         self.vad = VAD()
         self.sender_task = asyncio.create_task(self.sender())
         self.stats_task = asyncio.create_task(self.stats())
         self.cap_task = asyncio.create_task(self.cap_watch())
-        await self.app.call_started({"callSid": sid, "to": self.to, "from": self.frm, "numberId": p.number.get("id"),
+        if p.kind != "support":
+          await self.app.call_started({"callSid": sid, "to": self.to, "from": self.frm, "numberId": p.number.get("id"),
                                      "startedAt": self.started_at.isoformat(timespec="seconds"), "engine": settings.engine_name,
                                      "model": self.brain.model_name, "persona": (c.get("persona") or {}).get("id", ""),
                                      "profileVersion": p.version})
@@ -834,6 +841,15 @@ class Call:
             except Exception as ex:  # noqa: BLE001
                 log.warning("recording write failed: %s", ex)
                 wav_path = None
+        if getattr(self.profile, "kind", "") == "support":
+            # Not an org's call: no voice_calls row, no lead, no recording kept (the support line stores its own state).
+            if wav_path and wav_path.exists():
+                try:
+                    wav_path.unlink()
+                except OSError:
+                    pass
+            log.info("support call %s finished (%ss)", sid, dur)
+            return
         report = await self.brain.report(datetime.now(timezone.utc), dur)
         res = await self.app.call_finished(sid, report)
         log.info("call %s finished: %s (%ss) → %s", sid, report["outcome"], dur, json.dumps(res)[:200])

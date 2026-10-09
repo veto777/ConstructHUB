@@ -35,11 +35,13 @@ class CallProfile:
     version: int
     compiled: dict[str, Any]
     caller: dict[str, Any]
+    kind: str = "assistant"   # "support" = ConstructHUB's own support line (support_brain.py)
 
     @classmethod
     def from_json(cls, j: dict[str, Any]) -> "CallProfile":
         return cls(org=j["org"], number=j["number"], status=j["status"], version=int(j.get("version") or 0),
-                   compiled=j["compiled"], caller=j.get("caller") or {"blocked": False})
+                   compiled=j.get("compiled") or {}, caller=j.get("caller") or {"blocked": False},
+                   kind=j.get("kind") or "assistant")
 
 
 class AppClient:
