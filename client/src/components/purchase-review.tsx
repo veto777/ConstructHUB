@@ -19,6 +19,8 @@ export type PurchaseReview = {
   price: string;
   /** e.g. "7-day free trial for a first CRM subscription. Cancel any time." */
   note?: string;
+  /** One line set apart above the lists (the founding member offer while it is open). */
+  highlight?: string;
   included: readonly string[];
   notIncluded: readonly string[];
 };
@@ -43,6 +45,11 @@ export function PurchaseReviewDialog({ review, pending, confirmLabel = "Continue
                 This is the <strong>{review.product}</strong>. {review.note}
               </AlertDialogDescription>
             </AlertDialogHeader>
+            {review.highlight && (
+              <p className="rounded-md border border-emerald-600/40 bg-emerald-600/5 px-3 py-2 text-[13px] font-medium" data-testid="text-review-highlight">
+                {review.highlight}
+              </p>
+            )}
             <div className="grid gap-5 sm:grid-cols-2 text-[14px]">
               <div data-testid="list-review-included">
                 <p className="font-semibold mb-2">What you get</p>

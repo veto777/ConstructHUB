@@ -1,6 +1,7 @@
 /**
  * /api/seo/* — ConstructHUB SEO's API. Session auth through the platform's
- * getDevUser, plan-gated like Site Scan (server/seo/plan.ts). Every row is
+ * getDevUser, plan-gated on the SEO allowance (server/seo/plan.ts: the Agency
+ * plan, or an account grandfathered on another plan). Every row is
  * scoped to the signed-in account. Agency delegation is NOT wired here:
  * /api/seo is outside registerAgencyAccess's allowlist (server/agency/
  * middleware.ts), so an agency member sees their own SEO data, not a client's.

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { SEO_MARKUP, SEO_CREDIT_PACKS, isSeoCreditPack, retailCents, splitCharge, creditUsd } from "@shared/seo-credits";
-import { PLANS, PLAN_KEYS, SEO_PLAN_LIMITS, seoDataBullet } from "@shared/plans";
+import { PLANS, PLAN_KEYS, SEO_PLAN_LIMITS, SEO_GRANDFATHERED_LIMITS, SEO_NOT_INCLUDED_LINE, seoDataBullet } from "@shared/plans";
 import { outOfCreditMessage } from "./credits";
 import { SEO_PRICES } from "./routes";
 import { EXPLORER_TYPICAL_USD, EXPLORER_ESTIMATE_USD } from "./explorer";
@@ -17,16 +17,18 @@ describe("SEO data credit (owner, 2026-10-07)", () => {
     for (const usd of [0.012, 0.024036, 0.1272, 1, 2.5]) expect(retailCents(usd) / 100).toBeGreaterThanOrEqual(usd * SEO_MARKUP - 1e-9);
   });
 
-  it("plans include $10, $20, $40 and $40 of SEO data a month, and say so in their bullets", () => {
-    expect(PLAN_KEYS.map((k) => SEO_PLAN_LIMITS[k].seoCreditCents)).toEqual([1000, 2000, 4000, 4000]);
-    for (const key of PLAN_KEYS) {
-      expect(PLANS[key].limits.seoCreditCents).toBe(SEO_PLAN_LIMITS[key].seoCreditCents);
-      expect(PLANS[key].features).toContain(seoDataBullet(key));
+  it("Agency includes $40 of SEO data a month and says so; Starter, Pro and Growth include none and say so (owner, 2026-10-08)", () => {
+    expect(PLAN_KEYS.map((k) => SEO_PLAN_LIMITS[k].seoCreditCents)).toEqual([0, 0, 0, 4000]);
+    for (const key of PLAN_KEYS) expect(PLANS[key].limits.seoCreditCents).toBe(SEO_PLAN_LIMITS[key].seoCreditCents);
+    expect(PLANS.agency.features).toContain(seoDataBullet("agency"));
+    expect(seoDataBullet("agency")).toBe("SEO data: $40 / month included");
+    for (const key of ["starter", "pro", "growth"] as const) {
+      expect(PLANS[key].features.some((f) => /SEO data/.test(f)), key).toBe(false);
+      expect(PLANS[key].notIncluded, key).toContain(SEO_NOT_INCLUDED_LINE);
     }
-    expect(seoDataBullet("starter")).toBe("SEO data: $10 / month included");
-    expect(seoDataBullet("growth")).toBe("SEO data: $40 / month included");
-    // $10 at the customer's price is $2.50 of data per Starter subscriber per month.
-    expect(SEO_PLAN_LIMITS.starter.seoCreditCents / SEO_MARKUP).toBe(250);
+    // What a grandfathered Starter keeps: $10 at the customer's price is $2.50 of data a month.
+    expect(SEO_GRANDFATHERED_LIMITS.starter.seoCreditCents).toBe(1000);
+    expect(SEO_GRANDFATHERED_LIMITS.starter.seoCreditCents / SEO_MARKUP).toBe(250);
   });
 
   it("extra credit is sold in prepaid packs of $25, $50 and $100, and nothing else", () => {
@@ -52,9 +54,10 @@ describe("SEO data credit (owner, 2026-10-07)", () => {
     expect(SEO_PRICES.keywordResearch).toBe(8);
     expect(SEO_PRICES.competitorGap).toBe(10);
     expect(SEO_PRICES.rankChecksPer100).toBe(24);
-    // A Starter allowance covers about eight Site Explorer reports, or a hundred report pages.
-    expect(Math.floor(SEO_PLAN_LIMITS.starter.seoCreditCents / SEO_PRICES.explorerReport)).toBe(8);
-    expect(Math.floor(SEO_PLAN_LIMITS.starter.seoCreditCents / SEO_PRICES.reportPage)).toBe(100);
+    // A grandfathered Starter allowance covers about eight Site Explorer reports, or a hundred report pages; Agency's four times that.
+    expect(Math.floor(SEO_GRANDFATHERED_LIMITS.starter.seoCreditCents / SEO_PRICES.explorerReport)).toBe(8);
+    expect(Math.floor(SEO_GRANDFATHERED_LIMITS.starter.seoCreditCents / SEO_PRICES.reportPage)).toBe(100);
+    expect(Math.floor(SEO_PLAN_LIMITS.agency.seoCreditCents / SEO_PRICES.reportPage)).toBe(400);
     // The reservation is never smaller than the price shown.
     expect(retailCents(EXPLORER_ESTIMATE_USD)).toBeGreaterThanOrEqual(SEO_PRICES.explorerReport);
   });

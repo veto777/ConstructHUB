@@ -62,6 +62,7 @@ export type PlanLimits = {
    * count), and the monthly SEO data allowance in cents AT THE CUSTOMER'S
    * PRICE (shared/seo-credits.ts: every lookup costs SEO_MARKUP x wholesale;
    * more is bought as prepaid credit). Numbers in SEO_PLAN_LIMITS below.
+   * seoKeywords 0 means the plan has no SEO tools at all (server/seo/plan.ts).
    */
   seoKeywords: number;
   seoCreditCents: number;
@@ -69,20 +70,39 @@ export type PlanLimits = {
 
 /**
  * ConstructHUB SEO allowances per plan — the ONE place these numbers live.
- * seoCreditCents is the owner's decision of 2026-10-07: $10 of SEO data a month
- * at the customer's price on Starter, twice that on Pro, four times on Growth
- * and Agency; anything beyond is prepaid credit (shared/seo-credits.ts).
- * seoKeywords (tracked keywords) is still OWNER TO CONFIRM. A plan whose Site
- * Scans are 0 and not per-location has no SEO tools at all (server/seo/plan.ts).
+ * Owner, 2026-10-08: the SEO tools are included with the Agency plan only.
+ * Starter, Pro and Growth sold from now on have none (0 / 0), so the SEO gate
+ * (server/seo/plan.ts: seoKeywords !== 0) is off for them. seoCreditCents is
+ * the monthly SEO data allowance at the customer's price (owner, 2026-10-07:
+ * $40 on Agency); anything beyond is prepaid credit (shared/seo-credits.ts).
+ * Accounts that had the SEO tools before the change keep them:
+ * SEO_GRANDFATHERED_LIMITS below, applied by server/entitlements.ts.
  */
 export const SEO_PLAN_LIMITS: Record<PlanKey, Pick<PlanLimits, "seoKeywords" | "seoCreditCents">> = {
+  starter: { seoKeywords: 0, seoCreditCents: 0 },
+  pro: { seoKeywords: 0, seoCreditCents: 0 },
+  growth: { seoKeywords: 0, seoCreditCents: 0 },
+  agency: { seoKeywords: 1000, seoCreditCents: 4000 },
+};
+/**
+ * What a grandfathered account keeps on each plan — the SEO allowances Starter,
+ * Pro and Growth carried before 2026-10-08 (owner, 2026-10-07: $10 / $20 / $40
+ * of SEO data a month; 50 / 200 / 1,000 tracked keywords). An account marked
+ * seo_grandfathered_at (server/billing/pricing-terms.ts) gets these on
+ * whatever plan it is on now, while it has one; the overlay only ever raises
+ * an allowance (Agency's own numbers already match). Not a public price:
+ * never shown on the pricing page.
+ */
+export const SEO_GRANDFATHERED_LIMITS: Record<PlanKey, Pick<PlanLimits, "seoKeywords" | "seoCreditCents">> = {
   starter: { seoKeywords: 50, seoCreditCents: 1000 },
   pro: { seoKeywords: 200, seoCreditCents: 2000 },
   growth: { seoKeywords: 1000, seoCreditCents: 4000 },
   agency: { seoKeywords: 1000, seoCreditCents: 4000 },
 };
-/** The plan bullet for the SEO data allowance: "SEO data: $10 / month included". */
+/** The plan bullet for the SEO data allowance: "SEO data: $40 / month included" (Agency: the plan that includes the SEO tools). */
 export const seoDataBullet = (plan: PlanKey) => `SEO data: $${SEO_PLAN_LIMITS[plan].seoCreditCents / 100} / month included`;
+/** The "not included" line on every plan without the SEO tools: names the plan that has them, no price. */
+export const SEO_NOT_INCLUDED_LINE = "SEO tools — rank tracking, keyword research, backlinks (Agency)";
 
 /** The numeric limits (the ones an add-on can raise). */
 export type CountLimitKey = { [K in keyof PlanLimits]: PlanLimits[K] extends number ? K : never }[keyof PlanLimits];
@@ -121,6 +141,15 @@ export type Plan = {
 
 const NO_MODULES: PlanModules = { agencyWorkspace: false, adsManager: false, cloudflareSearchConsole: false, domainsMailAlerts: false };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// FOUNDING MEMBERS KEEP THEIR PRICE (owner, 2026-10-08). An account marked
+// founding_member_at (server/billing/pricing-terms.ts) stores its own copy of
+// these prices — founding_prices — at the moment it joined, and keeps it for
+// life. Changing monthlyCents / annualCents / AGENCY_LOCATION_BANDS below must
+// NEVER move a founding member: read their price with shared/pricing-terms.ts
+// foundingPrice(terms, plan, interval), never from PLANS directly, before any
+// repricing. The offer has no public number of places and no deadline.
+// ─────────────────────────────────────────────────────────────────────────────
 export const PLANS: Record<PlanKey, Plan> = {
   starter: {
     key: "starter", name: "Starter", monthlyCents: 2900, annualCents: 29000,
@@ -132,11 +161,11 @@ export const PLANS: Record<PlanKey, Plan> = {
       "5 ranking-grid credits / month",
       "2 Site Scans / month",
       "100 permit searches / month",
-      seoDataBullet("starter"),
       "Email support",
     ],
       notIncluded: [
         "The ConstructHUB CRM — estimates, invoices, scheduling and the client portal (a separate product, from $39/mo)",
+        SEO_NOT_INCLUDED_LINE,
         "Click Guard, IP Tracker and VPN Shield (Pro and up)",
         "Competitor Intel scans (Pro and up)",
         "Automatic AI review replies — Starter drafts them for you to approve",
@@ -163,13 +192,13 @@ export const PLANS: Record<PlanKey, Plan> = {
       "15 ranking-grid credits / month",
       "5 Site Scans / month",
       "500 permit searches / month",
-      seoDataBullet("pro"),
       "Team text alerts — 500 segments / month",
       "Client texting with your own SignalWire number (or the texting add-on)",
       "Priority email support",
     ],
       notIncluded: [
         "The ConstructHUB CRM — estimates, invoices, scheduling and the client portal (a separate product, from $39/mo)",
+        SEO_NOT_INCLUDED_LINE,
         "More than 1 Google Business Profile location (Growth and up)",
         "A client-texting number on our carrier (bring your own, or add one)",
         "Agency workspace, Google Ads & LSA manager, Cloudflare + Search Console (Agency only)",
@@ -194,13 +223,13 @@ export const PLANS: Record<PlanKey, Plan> = {
       "30 ranking-grid credits / month",
       "15 Site Scans / month",
       "5,000 permit searches / month",
-      seoDataBullet("growth"),
       "Team text alerts — 1,500 segments / month",
       "1 client-texting number included",
       "Priority support + onboarding call",
     ],
       notIncluded: [
         "The ConstructHUB CRM — estimates, invoices, scheduling and the client portal (a separate product, from $39/mo)",
+        SEO_NOT_INCLUDED_LINE,
         "Agency workspace and client workspaces (Agency only)",
         "Google Ads & LSA manager, Cloudflare + Search Console, Domains + Gmail alerts (Agency only)",
       ],
@@ -226,6 +255,7 @@ export const PLANS: Record<PlanKey, Plan> = {
       "Click Guard + IP Tracker + VPN Shield — 10 websites",
       "20 Competitor Intel scans / month",
       "2 ranking-grid credits and 1 Site Scan per location / month",
+      "SEO tools: site explorer, rank tracker, keyword research, backlinks",
       seoDataBullet("agency"),
       "Priority support + onboarding",
     ],

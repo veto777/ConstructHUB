@@ -1,11 +1,13 @@
 /**
  * ConstructHUB SEO data credit — what a customer pays for SEO data.
  *
- * Owner decisions (2026-10-07):
+ * Owner decisions (2026-10-07, and 2026-10-08 for who has the tools):
  *   - Every lookup is priced at SEO_MARKUP x what the data source charges us.
- *   - Each plan includes a monthly allowance at that customer price
- *     (shared/plans.ts `seoCreditCents`: Starter $10, Pro $20, Growth and
- *     Agency $40). It resets on the 1st (UTC) and does not roll over.
+ *   - The SEO tools are included with the Agency plan, with a monthly
+ *     allowance at that customer price (shared/plans.ts `seoCreditCents`:
+ *     $40). It resets on the 1st (UTC) and does not roll over. An account that
+ *     had the tools on Starter, Pro or Growth before 2026-10-08 keeps its old
+ *     allowance (shared/plans.ts SEO_GRANDFATHERED_LIMITS).
  *   - Beyond the allowance a customer buys prepaid credit in packs
  *     (SEO_CREDIT_PACKS). Purchased credit is spent only after the month's
  *     allowance is used up, and it does not expire.

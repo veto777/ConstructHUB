@@ -15,7 +15,9 @@ import {
   sendLocationLimit, raiseHint, cheapestPlanWhere, TOP_PLAN, hasModule, usersWithModule, planPausedMessage,
   platformAdminAllowances, ADMIN_NON_CAP_LIMITS, ADMIN_CALL_ASSISTANT_NUMBERS, callAssistantAllowance,
 } from "./entitlements";
-import { ADDONS, PLANS, AGENCY_SELF_SERVE_MAX_LOCATIONS, LEGACY_PLAN_MAP, fitsLimit } from "@shared/plans";
+import { ADDONS, PLANS, AGENCY_SELF_SERVE_MAX_LOCATIONS, LEGACY_PLAN_MAP, fitsLimit, SEO_GRANDFATHERED_LIMITS, SEO_PLAN_LIMITS } from "@shared/plans";
+import { withSeoGrandfathering } from "./entitlements";
+import { seoIncluded, seoAllowanceTest } from "./seo/plan";
 
 const res = () => { const r: any = { status: vi.fn(() => r), json: vi.fn(() => r) }; return r; };
 const customer = (plan: string | null, extra: Record<string, unknown> = {}) =>
@@ -253,5 +255,106 @@ describe("gates and messages", () => {
     const hint = raiseHint(await getEntitlements(7), "protectedSites", ["website"], "protected_site");
     expect(hint).toEqual({ text: "To raise it, add the Extra protected website add-on or move to Growth (3 websites).", upgradePlan: "growth", addon: "protected_site" });
     expect(cheapestPlanWhere((l) => l.autoPublishAiReplies)).toBe("pro");
+  });
+});
+
+describe("SEO grandfathering and founding members (account_pricing_terms, owner 2026-10-08)", () => {
+  const grandfathered = { seo_grandfathered_at: new Date("2026-10-08T12:00:00Z"), seo_grandfathered_plan: "starter" };
+
+  it("a Starter sold after the change has no SEO tools, and the 402 names Agency", async () => {
+    mocks.row = customer("starter");
+    const ent = await getEntitlements(7);
+    expect(ent.seoGrandfathered).toBe(false);
+    expect(ent.foundingMember).toBeNull();
+    expect(ent.allowances?.seoKeywords).toBe(0);
+    expect(ent.allowances?.seoCreditCents).toBe(0);
+    expect(seoIncluded(ent)).toBe(false);
+    expect(cheapestPlanWhere(seoAllowanceTest)).toBe("agency");
+    const r = res();
+    expect(await requirePlan(r, 7, "SEO tools", seoAllowanceTest)).toBeNull();
+    expect(r.status).toHaveBeenCalledWith(402);
+    expect(r.json.mock.calls[0][0]).toMatchObject({ code: "plan_required", requiredPlan: "agency" });
+    expect(r.json.mock.calls[0][0].message).toMatch(/Agency plan/);
+  });
+
+  it("a grandfathered Starter keeps 50 keywords and $10 of data; on Pro it keeps Pro's old numbers; a legacy key maps first", async () => {
+    mocks.row = customer("starter", grandfathered);
+    let ent = await getEntitlements(7);
+    expect(ent.seoGrandfathered).toBe(true);
+    expect(ent.allowances?.seoKeywords).toBe(50);
+    expect(ent.allowances?.seoCreditCents).toBe(1000);
+    expect(seoIncluded(ent)).toBe(true);
+    // The published limits are untouched: only this account's allowances carry the overlay.
+    expect(ent.limits?.seoKeywords).toBe(SEO_PLAN_LIMITS.starter.seoKeywords);
+
+    mocks.row = customer("pro", grandfathered);
+    ent = await getEntitlements(7);
+    expect([ent.allowances?.seoKeywords, ent.allowances?.seoCreditCents]).toEqual([200, 2000]);
+
+    mocks.row = customer("business", grandfathered); // legacy → pro
+    ent = await getEntitlements(7);
+    expect(ent.accessPlan).toBe("pro");
+    expect([ent.allowances?.seoKeywords, ent.allowances?.seoCreditCents]).toEqual([200, 2000]);
+
+    mocks.row = customer("growth", grandfathered);
+    ent = await getEntitlements(7);
+    expect([ent.allowances?.seoKeywords, ent.allowances?.seoCreditCents]).toEqual([1000, 4000]);
+  });
+
+  it("Agency has its own numbers, grandfathered or not; a platform admin stays unlimited", async () => {
+    mocks.row = customer("agency", grandfathered);
+    let ent = await getEntitlements(7);
+    expect(ent.seoGrandfathered).toBe(true);
+    expect([ent.allowances?.seoKeywords, ent.allowances?.seoCreditCents]).toEqual([1000, 4000]);
+    mocks.row = customer("agency");
+    ent = await getEntitlements(7);
+    expect([ent.allowances?.seoKeywords, ent.allowances?.seoCreditCents]).toEqual([1000, 4000]);
+    mocks.row = { email: "support@constructhub.us", plan: "starter", status: "active", stripe_subscription_id: "sub_a", ...grandfathered };
+    ent = await getEntitlements(7);
+    expect(ent.isPlatformAdmin).toBe(true);
+    expect([ent.allowances?.seoKeywords, ent.allowances?.seoCreditCents]).toEqual([-1, -1]);
+    expect(seoIncluded(ent)).toBe(true);
+  });
+
+  it("grandfathering follows the plan the account is on now — without a plan there is nothing to keep", async () => {
+    for (const row of [customer("starter", { ...grandfathered, status: "canceled" }), customer("pro", { ...grandfathered, status: "past_due" }),
+      customer("growth", { ...grandfathered, stripe_subscription_id: null, current_period_end: new Date("2020-01-01T00:00:00Z") })]) {
+      mocks.row = row;
+      const ent = await getEntitlements(7);
+      expect(ent.plan).toBeNull();
+      expect(ent.seoGrandfathered).toBe(false);
+      expect(ent.allowances).toBeNull();
+      expect(seoIncluded(ent)).toBe(false);
+    }
+  });
+
+  it("the overlay only ever raises: bigger numbers and unlimited are left alone", () => {
+    const base = { ...PLANS.starter.limits, seoKeywords: 5000, seoCreditCents: 9000 };
+    expect(withSeoGrandfathering(base, "starter")).toMatchObject({ seoKeywords: 5000, seoCreditCents: 9000 });
+    const unlimited = { ...PLANS.starter.limits, seoKeywords: -1, seoCreditCents: -1 };
+    expect(withSeoGrandfathering(unlimited, "pro")).toMatchObject({ seoKeywords: -1, seoCreditCents: -1 });
+    expect(withSeoGrandfathering(PLANS.growth.limits, "growth")).toMatchObject(SEO_GRANDFATHERED_LIMITS.growth);
+    expect(withSeoGrandfathering(PLANS.agency.limits, "agency")).toEqual(PLANS.agency.limits);
+    // Nothing else moves.
+    const { seoKeywords: _k, seoCreditCents: _c, ...rest } = withSeoGrandfathering(PLANS.starter.limits, "starter");
+    const { seoKeywords: _k2, seoCreditCents: _c2, ...want } = PLANS.starter.limits;
+    expect(rest).toEqual(want);
+  });
+
+  it("exposes a founding member's locked prices, and reads a broken snapshot as none", async () => {
+    const prices = { plans: { starter: { monthlyCents: 2900, annualCents: 29000 }, pro: { monthlyCents: 7900, annualCents: 79000 }, growth: { monthlyCents: 19900, annualCents: 199000 }, agency: { monthlyCents: 34900, annualCents: 349000 } }, agencyBands: [{ upTo: 10, centsPerLocation: 0 }], agencyIncludedLocations: 10, annualMonths: 10, capturedAt: "2026-10-08T12:00:00.000Z" };
+    mocks.row = customer("pro", { founding_member_at: new Date("2026-10-08T12:00:00Z"), founding_prices: prices });
+    let ent = await getEntitlements(7);
+    expect(ent.foundingMember?.since.toISOString()).toBe("2026-10-08T12:00:00.000Z");
+    expect(ent.foundingMember?.prices).toEqual(prices);
+    mocks.row = customer("pro", { founding_member_at: new Date("2026-10-08T12:00:00Z"), founding_prices: { plans: { starter: { monthlyCents: "x" } } } });
+    ent = await getEntitlements(7);
+    expect(ent.foundingMember?.prices).toBeNull();
+    // A founding member who let the plan lapse is still a founding member (the mark is theirs); it says nothing about SEO.
+    mocks.row = customer("pro", { status: "canceled", founding_member_at: new Date("2026-10-08T12:00:00Z"), founding_prices: prices });
+    ent = await getEntitlements(7);
+    expect(ent.plan).toBeNull();
+    expect(ent.foundingMember).not.toBeNull();
+    expect(ent.seoGrandfathered).toBe(false);
   });
 });

@@ -12,7 +12,7 @@
  * has no recording.
  */
 import { YOUTUBE_HOLDS } from "./holds";
-import { MODULE_NAMES, PLANS, planForModule, type ModuleKey } from "../plans";
+import { MODULE_NAMES, PLANS, PLAN_KEYS, planForModule, type ModuleKey } from "../plans";
 import { CALL_ASSISTANT_PLANS, COMPETITOR_INTEL_PLANS, PROTECTED_SITE_PLANS, callAssistantAvailabilityLine } from "../plan-copy";
 import type { HelpDraft, HelpEntry, HelpGroup } from "./types";
 import * as moreEntries from "./entries/index";
@@ -27,6 +27,13 @@ const moduleNeed = (module: ModuleKey) => `The ${planOf(module)} plan, which inc
 const EDGE = moduleNeed("cloudflareSearchConsole");
 const IDENTITY = "Sensitive buttons ask you to confirm it’s you first (password, authenticator code or an emailed code).";
 const PROTECTED = `Included with the ${PROTECTED_SITE_PLANS} plans; the number of protected websites depends on the plan.`;
+/**
+ * The SEO tools: the cheapest plan whose allowances include them (shared/plans.ts
+ * SEO_PLAN_LIMITS — a keyword allowance of 0 means none), named from the plan
+ * model. Accounts that had the tools before the change keep them (server/billing/pricing-terms.ts).
+ */
+const SEO_TOOLS_PLAN = PLANS[PLAN_KEYS.find((k) => PLANS[k].limits.seoKeywords !== 0) ?? PLAN_KEYS[PLAN_KEYS.length - 1]].name;
+const SEO_NEED = `The ${SEO_TOOLS_PLAN} plan. Accounts that already have the SEO tools keep them.`;
 
 /** The CRM is a separate product (shared/crm-plans.ts): its pages need a CRM plan, not a platform plan. */
 export const CRM_NEED = "A ConstructHub CRM plan — the CRM is a separate product with its own plans.";
@@ -636,7 +643,7 @@ const entries: Draft[] = [
       "Use the other tabs to research keywords, backlinks and competitors, and track the ones worth going after.",
     ],
     howItWorks: "Checks are queued and run in the background. Keywords, research searches and backlink refreshes are counted against your plan’s allowances, shown on the page. If the page says rank tracking is being switched on, checks cannot run yet. Connecting the property in Search Console adds clicks and impressions to the overview.",
-    needs: ["A plan that includes Site Scans."],
+    needs: [SEO_NEED],
   },
   {
     key: "ip-tracker", group: "Tools", route: "/ip-tracker", title: "IP Tracker",

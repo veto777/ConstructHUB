@@ -23,7 +23,9 @@ let schemaReady: Promise<void> | null = null;
  * Adds the billing columns once per process (boot calls it from
  * registerStripeRoutes; billing routes await it). A failure is logged and
  * retried on the next call rather than failing the caller here — the query
- * that needs the columns reports its own error.
+ * that needs the columns reports its own error. The account pricing terms
+ * (./pricing-terms.ts) are NOT in here on purpose: their cutover must fail
+ * boot when it fails, so server/index.ts awaits ensurePricingTerms itself.
  */
 export function billingSchemaReady(): Promise<void> {
   schemaReady ??= Promise.resolve()

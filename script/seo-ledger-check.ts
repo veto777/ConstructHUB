@@ -28,6 +28,8 @@ const state = async (user = 1) => {
 
 async function main() {
   await ensureSeoSchema();
+  // A queued run checks the account's plan again before it is posted (server/seo/jobs.ts); this database has no plans.
+  seoJobDeps.entitled = async () => true;
   let allowance = 1000;
   budgetDeps.allowanceCents = async () => allowance;
 

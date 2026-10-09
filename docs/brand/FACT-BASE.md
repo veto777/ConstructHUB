@@ -32,7 +32,7 @@ product with its own plans, from $39/mo." Never say the CRM is "included".
 
 | Plan | Monthly | Annual | What the price book says (first lines) |
 | --- | --- | --- | --- |
-| Starter (`:126`) | $29 | $290 | 1 Google Business Profile location · Profile Guard edit alerts · review alerts, AI reply drafts · 5 ranking-grid credits · 2 Site Scans · 100 permit searches / month · SEO data $10 / month |
+| Starter (`:126`) | $29 | $290 | 1 Google Business Profile location · Profile Guard edit alerts · review alerts, AI reply drafts · 5 ranking-grid credits · 2 Site Scans · 100 permit searches / month · no SEO tools (Agency only for new sales since 2026-10-08; the old $10 / month SEO data allowance is historical, kept only by grandfathered accounts) |
 | Pro (`:156`) | $79 | $790 | + Click Guard / IP Tracker / VPN Shield for 1 website · 2 Competitor Intel scans · 500 permit searches · team text alerts 500 segments |
 | Growth (`:187`) | $199 | $1,990 | 3 locations · 3 protected websites · 5,000 permit searches · 1 client-texting number included |
 | Agency (`:217`) | $349 | $3,490 | 10 client locations then per-location bands · agency workspace · Google Ads & LSA manager · Cloudflare + Search Console · Domains + Gmail alerts |
@@ -83,7 +83,7 @@ Evidence for every row: its help entry in `shared/help/registry.ts` and its feat
 | GMB Ranking Grid | Runs one search phrase from a grid of points across the service area and maps where the business comes up. | Live. | 5 / 15 / 30 credits a month; Agency 2 per location. | No ranking promise. |
 | Photo Optimizer / Media Library | Batch watermark, rename and describe job photos; keep them in folders. | Live. | Every plan. | The home page itself says geotags "don't promise a ranking benefit". |
 | Site Scan | Reads a website the way a search engine does and scores technical health, speed, local signals, content and AI readiness, with steps to fix. | Live. A free 60-second scan is offered signed out (home page). | 2 / 5 / 15 scans a month; Agency 1 per location. | — |
-| SEO (Site Explorer, rank tracking, keywords, backlinks) | Look up any domain's authority, backlinks, keywords and competitors; track rankings. | **Partly live.** Site Explorer shipped 2026-10-07; "Still to do: backlinks full depth → keyword research full depth → rank tracking → AI visibility → reports" (`HANDOFF.md:60-62`). | Sold as data credit: $10 / $20 / $40 / $40 a month in the plan, then prepaid packs. | **Never name the data vendor.** Do not film until the upgrades are finished (owner). |
+| SEO (Site Explorer, rank tracking, keywords, backlinks) | Look up any domain's authority, backlinks, keywords and competitors; track rankings. | **Partly live.** Site Explorer shipped 2026-10-07; "Still to do: backlinks full depth → keyword research full depth → rank tracking → AI visibility → reports" (`HANDOFF.md:60-62`). | Agency plan only for new sales since 2026-10-08, with $40 of SEO data a month, then prepaid packs. The old Starter / Pro / Growth allowances ($10 / $20 / $40) are historical: only accounts grandfathered before that date keep them. | **Never name the data vendor.** Never say the SEO tools come with every plan. Do not film until the upgrades are finished (owner). |
 | Social Media | Compose a post, adjust per network, publish now or on a schedule. | Live page; needs each network connected. | Every plan. | Not verified with real networks here. |
 | Click Guard / IP Tracker / VPN Shield | Record ad clicks on a website, flag repeat and VPN traffic, and build an IP exclusion list. | Live. | Pro and up (1 / 3 / 10 websites). | No "stops click fraud" absolute. |
 | Competitor Intel | Scans of competitors' public ad activity. | Live (flag on since 2026-09-28). | Pro and up (2 / 8 / 20 scans). | Say "public ad activity", never "spy" (`HANDOFF.md:823`). |
@@ -154,7 +154,7 @@ Each has the evidence and the **only wording the evidence supports**.
 | D7 | Job photos live in the same CRM as the estimate, the schedule and the invoice. | JobCam is a CRM feature filed to the project (`/crm/jobcam`) | "Job photos are filed to the same job as the estimate and the invoice." Add honestly: "JobCam is part of the top CRM plan, or an add-on." |
 | D8 | Online payments go to the contractor's own Stripe account and ConstructHUB adds no fee of its own. | help entry `crm-payments`; live /features/crm | "Card and bank payments go straight to your own Stripe account. ConstructHUB adds no fee on top of Stripe's." |
 | D9 | One company covers permit lookup, the Google listing, reviews, a website scan, a CRM and job photos. | sections 1b, 1c | "Permits, your Google listing, reviews, estimates, scheduling, invoices and job photos — from one company." |
-| D10 | SEO lookups (site explorer, keywords, rank tracking, backlinks, site audit, content gap) sit in the same product as the Google listing and permit tools, with an SEO data allowance in every plan. | section 3a; `shared/plans.ts:78-85` | "The SEO a local contractor actually uses, next to your Google listing and your permits." Never "as powerful as", never "our index". **Not usable in a recorded video until the SEO upgrades are finished.** |
+| D10 | SEO lookups (site explorer, keywords, rank tracking, backlinks, site audit, content gap) sit in the same product as the Google listing and permit tools. Since 2026-10-08 they are included with the Agency plan only (accounts that already had them keep them); never say "every plan". | section 3a; `shared/plans.ts` SEO_PLAN_LIMITS | "The SEO a local contractor actually uses, next to your Google listing and your permits." Never "as powerful as", never "our index". **Not usable in a recorded video until the SEO upgrades are finished.** |
 
 **What did NOT survive.**
 
@@ -198,9 +198,9 @@ tracker · Site audit · Backlinks · Competitors.**
 | Reports | Tables behind the overview: keywords, paid keywords, pages, competitors, backlinks (all / new / lost / broken), referring domains, anchors, best by links. | `server/seo/reports.ts` |
 | Keywords explorer | Matching terms, related terms, questions; one keyword's volume, difficulty, cost per click, intent, monthly trend and top results. | `server/seo/reports.ts` |
 | Content gap / Link intersect | Keywords up to three competitors rank for and you do not; sites that link to the competitors and not to you. | `server/seo/gap.ts` |
-| Rank tracker | Weekly checks of the keywords you choose, desktop and mobile, with history and a visibility estimate. Tracked keywords by plan: 50 / 200 / 1,000 / 1,000 (the number is still "owner to confirm", `shared/plans.ts:75`). | `server/seo/rank-history.ts`, `shared/plans.ts:78-83` |
+| Rank tracker | Weekly checks of the keywords you choose, desktop and mobile, with history and a visibility estimate. Tracked keywords: 1,000 on Agency, the plan that includes the SEO tools for new sales since 2026-10-08; the old 50 / 200 / 1,000 on Starter / Pro / Growth are historical, kept only by grandfathered accounts (`shared/plans.ts` SEO_GRANDFATHERED_LIMITS). | `server/seo/rank-history.ts`, `shared/plans.ts` SEO_PLAN_LIMITS |
 | Site audit | Health score and issue list with change since the last crawl, read from the crawls Site Scan runs; uses a Site Scan, not SEO data. | `server/seo/audit.ts` |
-| SEO data credit | Each plan includes a monthly allowance at the customer's price ($10 / $20 / $40 / $40); beyond it, prepaid packs of $25 / $50 / $100 that do not expire. | `shared/plans.ts:78-85`, `shared/seo-credits.ts:19` |
+| SEO data credit | The Agency plan includes $40 of SEO data a month at the customer's price; beyond it, prepaid packs of $25 / $50 / $100 that do not expire. Historical / grandfathered only: $10 / $20 / $40 on Starter / Pro / Growth for accounts that had the tools before 2026-10-08. | `shared/plans.ts` SEO_PLAN_LIMITS and SEO_GRANDFATHERED_LIMITS, `shared/seo-credits.ts:19` |
 
 **What must never be said about it.** ConstructHUB does **not** run its own web crawler or keep its own
 index of the web: the search and backlink data is **licensed from a data provider** — the provider is
@@ -260,7 +260,7 @@ The three CRM competitors' pricing pages were read again **without a summariser*
    We are not a replacement for either, and must not sound like one. The only honest angle: *a local
    contractor gets the SEO lookups they actually use — where do I rank, what do people search, who
    links to my competitor — inside the same product as their Google listing and permit tools, on a
-   plan that starts at $29 a month with $10 of SEO data in it.* Both of them also have a **free tier**,
+   plan built for agencies — Agency, $349 a month, which includes the SEO tools and $40 of SEO data; the $29 plan with $10 of SEO data is historical (new sales since 2026-10-08 get SEO on Agency only; earlier accounts are grandfathered).* Both of them also have a **free tier**,
    and Ahrefs has a $29 plan; "cheaper than Ahrefs" as a blanket claim is **false**.
 2. **CRM.** Jobber, Housecall Pro and Leap all do leads, estimates with online approval, scheduling,
    invoices and payments. Jobber and Housecall Pro also sell marketing add-ons and an AI receptionist.

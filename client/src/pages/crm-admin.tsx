@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import {
   ShieldCheck, Users, Building2, UserCircle, FileText, Receipt, CreditCard, Activity,
-  Search, Mail, Copy, Check, Loader2, Rocket, Ban, MessageCircle, HardDrive, Youtube,
+  Search, Mail, Copy, Check, Loader2, Rocket, Ban, MessageCircle, HardDrive, Youtube, Star,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { marketingUrl } from "@/lib/site";
@@ -110,6 +110,93 @@ function PlanPill({ plan, beta }: { plan: { plan: string; status: string }; beta
     <StatusPill tone={active ? "success" : "neutral"}>
       {active ? plan.plan : "free"}
     </StatusPill>
+  );
+}
+
+// ── Founding member offer ────────────────────────────────────────────────────
+
+/** GET /api/admin/founding-offer (server/billing/pricing-terms-routes.ts). The count is for admins only. */
+type FoundingOffer = {
+  open: boolean;
+  /** Every stretch the offer was open, oldest first; the last one has no `to` while it is open. */
+  periods: { from: string | null; to: string | null }[];
+  updatedAt: string | null;
+  updatedBy: { id: number; email: string | null } | null;
+  foundingMembers: number;
+};
+
+/**
+ * The owner's switch for the founding member offer: while it is open, every
+ * new Stripe subscription keeps its plan price for life. Closing it stops new
+ * marking and changes nothing for those already marked. Nothing public ever
+ * shows the count or a deadline — it is on this card only.
+ */
+function FoundingOfferCard({ enabled }: { enabled: boolean }) {
+  const { toast } = useToast();
+  const { data, isError } = useQuery<FoundingOffer>({ queryKey: ["/api/admin/founding-offer"], enabled });
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/admin/founding-offer"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/pricing/founding-offer"] });
+  };
+  const setOpen = useMutation({
+    mutationFn: async (open: boolean) => (await apiRequest("POST", "/api/admin/founding-offer", { open })).json(),
+    onSuccess: (r: FoundingOffer & { message: string }) => {
+      refresh();
+      toast({ title: r.open ? "Founding member offer reopened" : "Founding member offer closed", description: r.message });
+    },
+    onError: (e: any) => { refresh(); toast({ title: "Couldn't change the offer", description: apiErrorMessage(e), variant: "destructive" }); },
+  });
+  if (!enabled) return null;
+  return (
+    <Card data-testid="card-founding-offer" id="card-founding-offer" className="scroll-mt-6">
+      <CardContent className="p-4 sm:p-5 space-y-3">
+        <SectionTitle icon={Star} title="Founding member offer"
+          description="While it is open, every new subscription keeps its plan price for life. Close it whenever you choose; everyone already marked keeps their price. Nothing public shows a count or a deadline." />
+        {isError ? (
+          <p className="text-sm text-destructive" role="alert">Couldn't load the offer.</p>
+        ) : !data ? (
+          <p className="text-sm text-muted-foreground">Loading…</p>
+        ) : (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-1 text-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusPill tone={data.open ? "success" : "neutral"} data-testid="pill-founding-offer">{data.open ? "Open" : "Closed"}</StatusPill>
+                <span data-testid="text-founding-members">
+                  {data.foundingMembers.toLocaleString("en-US")} founding member{data.foundingMembers === 1 ? "" : "s"}
+                </span>
+              </div>
+              {data.periods.length > 0 && (
+                <p className="text-xs text-muted-foreground" data-testid="text-founding-offer-period">
+                  {(() => { const last = data.periods[data.periods.length - 1]; return data.open ? `Open since ${last.from ? day(last.from) : "the beginning"}.` : `Closed since ${day(last.to)}.`; })()}
+                  {" "}A customer qualifies by the day their subscription started, so one that signs up while the offer is open keeps their price even if the webhook arrives after a close.
+                </p>
+              )}
+              {data.updatedAt && (
+                <p className="text-xs text-muted-foreground" data-testid="text-founding-offer-changed">
+                  Last changed {day(data.updatedAt)}{data.updatedBy?.email ? ` by ${data.updatedBy.email}` : ""}.
+                </p>
+              )}
+            </div>
+            {data.open ? (
+              <Button size="sm" variant="destructive" disabled={setOpen.isPending} data-testid="button-close-founding-offer"
+                onClick={() => confirmAction({
+                  id: "close-founding-offer",
+                  title: "Close the founding member offer?",
+                  description: "From now on a new subscription is not a founding member and does not keep its price. Everyone already marked keeps theirs. You can reopen the offer later.",
+                  confirmLabel: "Close offer",
+                  onConfirm: () => setOpen.mutate(false),
+                })}>
+                {setOpen.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}Close offer
+              </Button>
+            ) : (
+              <Button size="sm" variant="outline" disabled={setOpen.isPending} onClick={() => setOpen.mutate(true)} data-testid="button-reopen-founding-offer">
+                {setOpen.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}Reopen offer
+              </Button>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -571,6 +658,9 @@ export default function CrmAdminPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* ── Founding member offer (the owner's switch; the count is admin-only) ── */}
+      <FoundingOfferCard enabled={isAdmin && gateOpen} />
 
       {/* ── JobCam storage ───────────────────────────────────────────────── */}
       <JobcamStorageAdminCard enabled={isAdmin && gateOpen} />

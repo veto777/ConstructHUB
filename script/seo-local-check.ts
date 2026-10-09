@@ -7,6 +7,8 @@ import { pool } from "../server/db";
 import { ensureSeoSchema } from "../server/seo/schema";
 import { budgetDeps } from "../server/seo/budget";
 import { enqueueRankRun, postQueuedRun, collectRunningRuns, settleOwedRankAlerts, seoJobDeps } from "../server/seo/jobs";
+// A queued run checks the account's plan again before it is posted (server/seo/jobs.ts); this database has no plans.
+seoJobDeps.entitled = async () => true;
 import { dataforseoDeps } from "../server/seo/dataforseo";
 import { searchLocations, locationByCode } from "../server/seo/locations";
 import { raiseRankAlerts, raiseLinkAlerts, listAlerts, unreadAlerts, markAlertsRead } from "../server/seo/alerts";

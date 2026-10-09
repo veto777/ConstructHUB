@@ -28,7 +28,7 @@ import { runDueKeywordSnapshots } from "./keyword-watch";
 import { runDueMentionChecks } from "./mention-watch";
 import { isConfigured, serpTaskPost, serpTaskGet, backlinksSummary, backlinksList, MAX_TASKS_PER_POST, claimDeadline, type Deadline, type PostedRankTask, type Device, lostLinks, type LostLink } from "./dataforseo";
 import { estimateRankCheckUsd, estimateBacklinkSnapshotUsd, devicesOf, serpUsd, type DeviceSet, estimateLostLinksUsd, LOST_LINK_ROWS } from "./pricing";
-import { seoIncluded, SEO_NOT_READY_MESSAGE } from "./plan";
+import { seoIncluded, SEO_NOT_READY_MESSAGE, SEO_PLAN_SKIPPED_MESSAGE } from "./plan";
 import { seoLocks } from "./locks";
 import { raiseLinkAlerts, rankAlertPlan, saveRankAlerts, deliverAlert, type RunCoverage } from "./alerts";
 
@@ -110,6 +110,14 @@ export async function postQueuedRun(runId?: string): Promise<boolean> {
     const { rows: keywords } = await pool.query("SELECT id, keyword, location_code FROM seo_keywords WHERE site_id=$1 ORDER BY id", [run.site_id]);
     if (!site || !keywords.length) {
       await finishRun(run.id, "failed", keywords.length ? "Site is gone" : "No keywords to check");
+      return true;
+    }
+    // A run is posted later than it was queued: the account's plan is checked again here, before any reservation,
+    // so an account that lost the SEO tools in between (a trial that ended, a plan change) is charged nothing —
+    // the run closes with the reason, the way an unconfigured source closes it below.
+    if (!(await seoJobDeps.entitled(run.user_id))) {
+      console.warn(`[seo] run ${run.id} skipped: user ${run.user_id}'s plan no longer includes the SEO tools`);
+      await finishRun(run.id, "failed", SEO_PLAN_SKIPPED_MESSAGE);
       return true;
     }
     if (!isConfigured()) {

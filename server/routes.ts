@@ -261,6 +261,9 @@ export async function registerRoutes(
           planName: ent.accessPlan ? PLANS[ent.accessPlan].name : null,
           isPlatformAdmin: ent.isPlatformAdmin, grantEndsAt: ent.grantEndsAt,
           limits: ent.limits, allowances: ent.allowances, modules: ent.modules, addonModules: ent.addonModules, addonModulesPaused: ent.addonModulesPaused, addons: ent.addons,
+          // Pricing terms (server/billing/pricing-terms.ts): the SEO tools kept from before they were Agency-only, and a founding member's locked price.
+          seoGrandfathered: ent.seoGrandfathered,
+          foundingMember: ent.foundingMember ? { since: ent.foundingMember.since, prices: ent.foundingMember.prices } : null,
           // A failed payment pauses the plan (shared/plans.ts ACCESS_STATUSES): the shell's banner says so.
           subscriptionStatus: ent.subscriptionStatus ?? null,
           paymentNeeded: !ent.isPlatformAdmin && PAYMENT_NEEDED_STATUSES.includes(ent.subscriptionStatus ?? ""),
@@ -293,6 +296,10 @@ export async function registerRoutes(
   const { ensureAccessGrantsSchema, registerAccessGrantRoutes } = await import("./access-grants");
   await ensureAccessGrantsSchema();
   registerAccessGrantRoutes(app, getDevUser);
+  // The founding member offer: public "is it open", and the owner's switch + count on /admin
+  // (the tables and the one-time SEO cutover ran with billingSchemaReady at boot).
+  const { registerPricingTermsRoutes } = await import("./billing/pricing-terms-routes");
+  registerPricingTermsRoutes(app, getDevUser);
   // The company YouTube channel (/admin/youtube): one site-level connection the tutorial uploader uses.
   const { ensureYoutubeSchema } = await import("./youtube/schema");
   await ensureYoutubeSchema();

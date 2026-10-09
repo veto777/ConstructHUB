@@ -236,8 +236,8 @@ export function priceBookCents(): Set<number> {
   cents.add(CRM_EXTRA_SEAT_MONTHLY_CENTS); cents.add(CRM_EXTRA_SEAT_ANNUAL_CENTS);
   // The CRM's own add-ons (JobCam), monthly and yearly.
   for (const addon of Object.values(CRM_ADDONS)) { cents.add(addon.monthlyCents); cents.add(addon.annualCents); }
-  // SEO data: each plan's monthly allowance and the prepaid credit packs (shared/seo-credits.ts).
-  for (const key of PLAN_KEYS) cents.add(SEO_PLAN_LIMITS[key].seoCreditCents);
+  // SEO data: the monthly allowance of each plan that has the tools (0 on the others) and the prepaid credit packs (shared/seo-credits.ts).
+  for (const key of PLAN_KEYS) if (SEO_PLAN_LIMITS[key].seoCreditCents > 0) cents.add(SEO_PLAN_LIMITS[key].seoCreditCents);
   for (const pack of SEO_CREDIT_PACKS) cents.add(pack);
   return cents;
 }

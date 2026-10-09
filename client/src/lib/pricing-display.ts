@@ -143,6 +143,10 @@ export type EntitlementsInfo = {
   locations: UsageMeter;
   usage: Partial<Record<UsageKey, UsageMeter>>;
   resetsAt: string;
+  /** The account kept the SEO tools from before they became Agency-only (server/billing/pricing-terms.ts). */
+  seoGrandfathered?: boolean;
+  /** A founding member keeps the prices it joined at; null = not one. */
+  foundingMember?: { since: string; prices: unknown } | null;
 };
 
 /** The monthly meters Settings → Billing shows, in display order. */

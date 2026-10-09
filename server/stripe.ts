@@ -22,7 +22,7 @@ import {
 import {
   billingSchemaReady, hasLiveStripeSubscription, trialEligible, eventAppliesToRow, subscriptionRowUpdate,
   canceledRowUpdate, subscriptionSummary, LIVE_STATUSES, recordCancellation, cancellationFor, cancellationOf,
-  withBillingLock,
+  withBillingLock, subscriptionStartOf,
 } from "./billing/sync";
 import { startAgencyLocationSync } from "./billing/agency-sync";
 import { recordBillingEvent, releaseBillingEvent, attributeBillingEvent } from "./billing/ledger";
@@ -34,6 +34,9 @@ import { stripeConfigured } from "./billing/client";
 import { onStripeBillingEvent } from "./account/billing-emails";
 import { forgetDashboard } from "./dashboard/cache";
 import { introsForOrder, attachIntrosToItems, recordIntro, markIntrosUsedByHeldAddons, type StripeForIntro } from "./billing/intro";
+import { noteSubscriptionTerms } from "./billing/pricing-terms";
+import { requirePlan } from "./entitlements";
+import { SEO_FEATURE, seoAllowanceTest } from "./seo/plan";
 import { afterSubscriptionChange, previewCallNumberReleases } from "./voice/number-release";
 import {
   registerCrmBillingRoutes, isCrmSubscription, isCrmCheckoutSession, applyCrmSubscription, endCrmSubscription,
@@ -140,20 +143,45 @@ async function liveSubscription(userId: number) {
     // The row missed the webhook that ended it. Record what Stripe says, so
     // create-checkout stops answering has_subscription and the customer can
     // start a new plan instead of being refused by both routes.
-    await writeSubscriptionRow({ id: row.id }, sub);
+    await writeSubscriptionRow({ id: row.id }, row.userId, sub);
     await afterSubscriptionChange(row.userId);
     throw NO_SUBSCRIPTION();
   }
   return { row, sub, current: describeSubscription(sub.items.data) };
 }
 
-/** Record a Stripe subscription on the row: the drizzle columns, then its cancellation state (plain-SQL columns). */
-async function writeSubscriptionRow(where: { id: number } | { userId: number }, sub: Stripe.Subscription, fallbackPlan?: string | null) {
+/**
+ * Record a Stripe subscription on the row: the drizzle columns, then its
+ * cancellation state (plain-SQL columns), then the account's pricing terms
+ * (server/billing/pricing-terms.ts, by the subscription's START date: SEO
+ * grandfathering when it started before the cutover, the founding member mark
+ * when it started in an open offer period and is active or trialing — this is
+ * the ONE path every Stripe subscription write takes, so a trial code or an
+ * admin grant never gets either). `userId` is the account the row belongs to.
+ */
+async function writeSubscriptionRow(where: { id: number } | { userId: number }, userId: number, sub: Stripe.Subscription, fallbackPlan?: string | null) {
   const set = subscriptionRowUpdate(sub, fallbackPlan);
   await db.update(subscriptions).set(set)
     .where("id" in where ? eq(subscriptions.id, where.id) : eq(subscriptions.userId, where.userId));
   await recordCancellation(where, sub);
+  await notePricingTerms(userId, set, subscriptionStartOf(sub));
   return set;
+}
+
+/**
+ * The pricing-terms marks. Never fails the caller: the row is written, the
+ * next subscription write applies the same start-date rules again, and boot's
+ * reconciliation (pricing-terms.ts reconcilePricingTerms) heals from the
+ * stored start_date — nothing is decided by when this ran.
+ */
+async function notePricingTerms(userId: number, set: ReturnType<typeof subscriptionRowUpdate>, startedAt: Date | null) {
+  try {
+    const marks = await noteSubscriptionTerms(userId, set, startedAt);
+    if (marks.grandfathered) console.log(`[billing] user ${userId} keeps the SEO tools (subscription ${set.stripeSubscriptionId} started before the cutover).`);
+    if (marks.founding) console.log(`[billing] user ${userId} is a founding member (subscription ${set.stripeSubscriptionId}): plan prices locked.`);
+  } catch (e: any) {
+    console.error(`[billing] pricing terms bookkeeping for user ${userId} failed (boot reconciles it):`, e?.message || e);
+  }
 }
 
 /** Holding Crew or Fleet uses the Solo intro up (server/billing/intro.ts). Never fails the caller: the next write retries it. */
@@ -186,7 +214,7 @@ async function applyToSubscription(userId: number, row: SubscriptionRow, sub: St
     metadata: { userId: String(userId), plan: order.plan, interval: order.interval },
   });
   for (const intro of intros) await recordIntro(userId, intro.addon, intro.couponId, updated.id);
-  const set = await writeSubscriptionRow({ id: row.id }, updated);
+  const set = await writeSubscriptionRow({ id: row.id }, userId, updated);
   await noteIntrosUsed(userId, set);
   // Fewer Call Assistant numbers paid for (or the add-on removed): the extras are released.
   await afterSubscriptionChange(userId);
@@ -289,7 +317,7 @@ export function registerStripeRoutes(app: Express) {
           if (live) {
             // Record it (as the webhook will), so the account gets what it pays
             // for now and Pricing can change that subscription in place.
-            await writeSubscriptionRow({ id: row.id }, live);
+            await writeSubscriptionRow({ id: row.id }, user.id, live);
             throw hasSubscription(live.status);
           }
           if (history.data.length) trial = false;
@@ -459,10 +487,13 @@ export function registerStripeRoutes(app: Express) {
 
   // SEO data credit: a prepaid pack (shared/seo-credits.ts). A one-time payment; the
   // webhook adds the credit (server/seo/credits.ts fulfilSeoCredits), never this route.
+  // Gated like every SEO route (server/seo/plan.ts): an account without the SEO tools
+  // has nothing to spend credit on, so it cannot buy any — the 402 names the plan.
   app.post("/api/seo/credits/checkout", async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
       if (!user) return res.status(401).json({ message: "Login required" });
+      if (!(await requirePlan(res, user.id, SEO_FEATURE, seoAllowanceTest))) return;
       const cents = Number(req.body?.cents);
       if (!isSeoCreditPack(cents)) {
         return res.status(400).json({ message: `Choose a credit pack: ${SEO_CREDIT_PACKS.map(creditUsd).join(", ")}.` });
@@ -753,7 +784,7 @@ export function registerStripeRoutes(app: Express) {
               // this should not happen; if it does, both bill — say so loudly.
               console.error(`[billing] user ${userId} now has two live subscriptions (${tracked.stripeSubscriptionId} and ${stripeSubscription.id}); tracking the new one — cancel the other in Stripe.`);
             }
-            const set = await writeSubscriptionRow({ userId }, stripeSubscription, session.metadata?.plan);
+            const set = await writeSubscriptionRow({ userId }, userId, stripeSubscription, session.metadata?.plan);
             await noteIntrosUsed(userId, set);
             emitSubscriptionStarted(userId, stripeSubscription, set.plan ?? tracked?.plan ?? null);
             // A returning customer's scheduled number release is cancelled when the add-on is back.
@@ -830,7 +861,7 @@ export function registerStripeRoutes(app: Express) {
             // What we had before this event, for "set to end" / "resumed"
             // when Stripe's previous_attributes don't say.
             const stored = existingSub.stripeSubscriptionId === sub.id ? await cancellationFor(existingSub.id) : null;
-            const set = await writeSubscriptionRow({ id: existingSub.id }, sub);
+            const set = await writeSubscriptionRow({ id: existingSub.id }, existingSub.userId, sub);
             await noteIntrosUsed(existingSub.userId, set);
             if (event.type === "customer.subscription.updated") {
               // previous_attributes describe this event's snapshot, so the change is read from it.

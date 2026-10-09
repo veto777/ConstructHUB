@@ -1063,6 +1063,25 @@ wording (labels, headings, links), orange for every chart and bar, green / red o
 - Checked on the vb11 rig at 1440 px, 390 px and in dark mode: no sideways scroll, no page errors; before / after
   sheets sent to the owner before anything went live.
 
+## Pricing: SEO tools Agency-only, grandfathering, founding members (2026-10-08, owner decisions)
+
+- SEO tools are included with Agency only for new sign-ups (gate: the SEO allowance itself, seoKeywords !== 0);
+  Starter / Pro / Growth list them under "Not included (Agency)". The SEO credit checkout and queued rank runs check
+  the same gate.
+- Every account on a plan at the one-time cutover keeps its SEO tools (SEO_GRANDFATHERED_LIMITS: the old 50 / 200 /
+  1,000 keywords and $10 / $20 / $40 of data); a Stripe subscription that started before the cutover but whose webhook
+  lands after it is grandfathered too. The cutover runs once, at boot, under a lock; a failure stops boot.
+- Founding members: paying Stripe customers (active, trialing, or past_due at the cutover; afterwards a subscription
+  that started inside an open offer period). Grants and unpaid sign-ups keep SEO but are not founding members. The
+  offer's open periods are stored; the owner closes / reopens it on /admin (count shown to admins only).
+- Public: one line on the pricing page and the checkout review, only after a live check says the offer is open (never
+  in the prerendered page); no count, no deadline, no new price. Gabe's filter refuses customer counts, invented SEO
+  prices and the data vendor's name.
+- Not built yet (owner prices pending): the a la carte catalogue and an SEO add-on. Founding prices are stored but not
+  yet used to charge - a test fails if a plan price changes before shared/pricing-terms.ts is wired into checkout.
+- Audits: Codex pricing audit #1 (9 defects) and #2 (9 more) - fixed but two deliberate non-fixes recorded in HANDOFF
+  (a close-and-sign-up in the same instant; eligibility read as "started inside an open period, paying when recorded").
+
 ## Verification log
 - 2026-10-08: all 11 domain reports, 3 keyword lists, a filtered keyword report and the keyword overview were run against
   live data for alpineexteriorswa.com / "siding contractor" with zero failures (builder's own check, not an independent audit).
@@ -1154,3 +1173,4 @@ wording (labels, headings, links), orange for every chart and bar, green / red o
 - 10/8 final close-out (seo/ahrefs-68): 452 tests across server/seo and the crawler's suites; full repository suite - nothing newly failing but the other session's CRM test; real Postgres - 22 scripts passing (new: locks 17/17, deadline 16/16, alerts 15/15; ledger 46/46, local 40/40, gsc breakdown 21/21, audit compare 22/22). Browser (vb11, commit checked): an unchosen town blocks "Track these" with a linked message and sends nothing; alerts "Showing 4 of 4"; the report PDF downloaded with DejaVu embedded; Site audit pickers; 1440 and 390 px, no overflow, no page errors.
 - 10/8 Kimi audit #1 fixes: 454 tests across server/seo and the crawler's suites; real Postgres - 23 scripts passing (new: kimi 17/17 - one snapshot when both paths buy at once, the charge capped at the hold, an answer without a cost kept at the estimate, the 5-minute window, AI duplicates, the site cap).
 - 10/8 visual redesign of every SEO screen (seo/visual-2): 412 tests across server/seo and shared; full repository suite - nothing newly failing but the other session's CRM test. Browser (vb11, commit checked): ten screens at 1440 / 390 px and dark mode, no overflow, no page errors; one local grid scan opened.
+- 10/8 pricing (seo/pricing-a): hub, billing, entitlements, SEO and shared suites 1,004 tests (two billing files need a dev database, as on main); real Postgres - pricing 59/59 and all 23 SEO scripts. Browser (vb11): pricing page 1440 / 390 px with the founding line, no overflow, no errors; cutover logged on boot.

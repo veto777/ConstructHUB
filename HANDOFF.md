@@ -2,6 +2,37 @@
 
 _Last updated 2026-08-24. Repo: `veto777/ConstructHUB` (private). Local: `/home/veto/ConstructHUB` on the tower._
 
+## 💲 2026-10-08 — SEO tools are Agency-only; grandfathering; founding member offer (branch `seo/pricing-a`, NOT deployed)
+- **Owner decisions:** the SEO tools (site explorer, rank tracker, keyword research, backlinks) are included with **Agency only** for new
+  sign-ups; everyone who has them today keeps them; a **founding member** offer locks a customer's plan price for life while the offer is open
+  (no public number of places, no deadline — the owner closes it from `/admin` → "Founding member offer"). À la carte / an SEO add-on for other
+  plans is NOT built and has NO price: do not invent one.
+- **How it works:** `shared/plans.ts` `SEO_PLAN_LIMITS` is 0/0 on Starter/Pro/Growth (the gate is `seoKeywords !== 0`, `server/seo/plan.ts`);
+  the old numbers live in `SEO_GRANDFATHERED_LIMITS`. `account_pricing_terms` + `pricing_settings` (`server/billing/pricing-terms-schema.ts`,
+  listed in `scripts/apply-schema-migration.ts`). **At boot `server/index.ts` awaits `ensurePricingTerms()`** (`server/billing/pricing-terms.ts`,
+  after `billingSchemaReady`, NOT inside it: a failure fails boot). It runs, in ONE transaction under an advisory lock, the two CREATE TABLEs
+  and — once ever — the cutover: every account whose deciding subscription row is not over (a live Stripe sub incl. past_due, or an unexpired
+  grant) gets `seo_grandfathered_at`; the marker `seo_agency_only_cutover` stores the transaction's `ranAt` and it never runs again. Then
+  `reconcilePricingTerms` heals from stored `start_date`s. **Grandfathered ≠ founding:** only Stripe rows that were active, trialing or past_due
+  at the cutover also got `founding_member_at` + `founding_prices`; grants and non-paying Stripe rows (incomplete / unpaid / paused) are
+  grandfathered only. `getEntitlements` lays the grandfathered allowances over the account's current plan (`seoGrandfathered`, `foundingMember`).
+  Every Stripe subscription write (`server/stripe.ts` `writeSubscriptionRow` → `noteSubscriptionTerms`) applies the same two rules by the
+  subscription's **start date**: grandfathered when it started before `ranAt`; a founding member when it started inside one of the offer's open
+  periods (`pricing_settings.founding_offer = { open, periods }`, closed/reopened from `/admin`) and is active or trialing when recorded — never a
+  trial code or an admin grant. **No Stripe price, checkout amount or subscription changed**; `foundingPrice()` (`shared/pricing-terms.ts`) is what
+  a future repricing must read before touching a founding member.
+- **Deliberately not fixed (audit #2, 2026-10-08):** the owner's close is not serialized against a marking statement running in the same instant —
+  at worst one extra founding member from that instant, never a lost one; and eligibility is "started inside an open period and active/trialing
+  when recorded" — a sign-up whose first activation is recorded after the close still qualifies by its start, one cancelled before its first webhook
+  gets no mark (nothing to lock). Both are written by `noteFoundingMember`.
+- **Checks:** `script/seo-pricing-check.ts` (real Postgres); `server/billing/pricing-terms.test.ts`; `server/entitlements.test.ts`;
+  `server/hub/output-filter.test.ts` (no SEO à la carte price, no founding count or deadline, no vendor name).
+- **Owner-pending:** founding prices are stored but NOT yet read at checkout — by design, because no price has changed since the
+  offer began. `server/billing/founding-baseline.test.ts` pins today's PLANS prices and the Agency bands and fails the moment one
+  moves: before any price change, wire `foundingPrice()` (`shared/pricing-terms.ts`) into `server/billing/order.ts` (plan,
+  interval and Agency-band quotes) and decide how a founding member's add-ons are priced. Also owner-pending: whether the offer's
+  snapshot should ever be re-taken (today it is the price book at marking time, equal to the sign-up date's prices).
+
 ## 🧯 2026-10-07 (night) — all open issues fixed; Report an issue; issue desk runs the deployed code (deployed 2215501)
 - **Why the bell was full:** the issue desk had written EIGHT fix branches (`issue/1,30,321,322,332,344,422,432`) since
   10-02 and none was ever merged — "fix ready" was a dead end. Shipped the two real fixes by cherry-pick and closed

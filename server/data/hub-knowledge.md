@@ -66,7 +66,7 @@ BUILDER NOTES (strip every HTML comment before the pack reaches the model).
 
 ConstructHUB (constructhub.us) is an online platform for construction contractors and for agencies that market contractors. One account covers the following; the CRM is a separate product with its own plans (section 3), and a platform plan does not include it:
 
-- **Growth tools** (the main app at constructhub.us): permit office directory and permit search, property records finder, Google Business Profile tools (Locations, Profile Guard, reviews and AI replies, Posts & Photos, ranking grid, citations), Site Scan, Social Media, website and ad-traffic protection (Click Guard, IP Tracker, VPN Shield), Competitor Intel, and {{AGENCY_PLAN}}-plan agency tools.
+- **Growth tools** (the main app at constructhub.us): permit office directory and permit search, property records finder, Google Business Profile tools (Locations, Profile Guard, reviews and AI replies, Posts & Photos, ranking grid, citations), Site Scan, Social Media, website and ad-traffic protection (Click Guard, IP Tracker, VPN Shield), Competitor Intel, the ConstructHUB SEO tools ({{AGENCY_PLAN}} plan), and {{AGENCY_PLAN}}-plan agency tools.
 - **The ConstructHub CRM** (opens at portal.constructhub.us): clients, estimates with e-signature, invoices, online payments into your own Stripe account, price book, pipeline, projects, schedule, team roles, messaging and texting.
 - **A client portal**: every client you add to the CRM gets a private page where they read estimates, sign, pay, message you and see their documents.
 - **The AI Call Assistant** (an add-on, {{CALL_ASSISTANT_STATUS}}): an AI receptionist that answers your business calls on a local number and files every real caller as a lead in the CRM (section 30).
@@ -125,6 +125,7 @@ There is no free plan. Without a plan you can still browse the public pages: Pri
 - Saved review-request templates per plan: {{REVIEW_TEMPLATES_LINE}}.
 - Ranking-grid credits a scan costs (one credit per 25 grid points, rounded up): {{GRID_CREDIT_COSTS}}.
 - On {{AGENCY_PLAN}}, ranking-grid credits and Site Scans are given per billed location, and {{AGENCY_PLAN}} team seats are shared with the CRM team.
+- The ConstructHUB SEO tools (site explorer, rank tracker, keyword research, backlinks) are included with the {{AGENCY_PLAN}} plan, with a monthly SEO data allowance; more SEO data is bought as prepaid credit on the SEO page. Accounts that already had the SEO tools before they became {{AGENCY_PLAN}}-only keep them. The other plans do not include them.
 - The full side-by-side table is on Pricing → **Compare plans**.
 
 ## 4. Permits & Databases

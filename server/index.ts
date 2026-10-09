@@ -127,6 +127,14 @@ process.on("unhandledRejection", (reason) => {
     // waits for it here.
     const { billingSchemaReady } = await import("./billing/sync");
     await billingSchemaReady();
+    // Account pricing terms (server/billing/pricing-terms.ts): the tables, the
+    // one-time SEO cutover and the reconciliation of late subscription webhooks.
+    // Awaited here, outside billingSchemaReady's retry-later catch, so a failure
+    // fails boot like seedDatabase above: serving requests on a rolled-back
+    // cutover would deny existing customers their SEO tools and could
+    // grandfather accounts that signed up after it.
+    const { ensurePricingTerms } = await import("./billing/pricing-terms");
+    await ensurePricingTerms();
     await setupAuth(app);
     await registerRoutes(httpServer, app);
 

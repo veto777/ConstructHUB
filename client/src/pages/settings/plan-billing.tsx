@@ -20,6 +20,7 @@ import {
   type EntitlementsInfo,
 } from "@/lib/pricing-display";
 import { CALL_ASSISTANT_NUMBER_RULES } from "@shared/plan-copy";
+import { FOUNDING_MEMBER_LINE } from "@shared/pricing-terms";
 import { fetchNumberReleasePreview, useAddonChange, useBillingActions, useEntitlements, useSubscription } from "./use-billing";
 import type { SettingsSectionProps } from "./types";
 
@@ -138,6 +139,13 @@ export function PlanBillingSection(_props: SettingsSectionProps) {
                   )}
                   {periodText && (
                     <p className="text-xs text-muted-foreground" data-testid="text-plan-period">{periodText}</p>
+                  )}
+                  {/* Pricing terms the account keeps (server/billing/pricing-terms.ts): the locked price, the SEO tools from before. */}
+                  {entitlements?.foundingMember && (
+                    <p className="text-xs font-medium text-primary" data-testid="text-founding-member">{FOUNDING_MEMBER_LINE}</p>
+                  )}
+                  {entitlements?.seoGrandfathered && plan.key !== "agency" && (
+                    <p className="text-xs text-muted-foreground" data-testid="text-seo-grandfathered">Your plan keeps the SEO tools it had.</p>
                   )}
                   {PAYMENT_PROBLEM_STATUSES.includes(status) && (
                     <p className="text-xs text-destructive" role="alert">Your last payment didn't go through. Update your card in Manage billing.</p>

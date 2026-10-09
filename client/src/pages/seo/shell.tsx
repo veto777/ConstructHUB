@@ -161,6 +161,7 @@ function PlanGate({ requiredPlan, message }: { requiredPlan: keyof typeof PLANS;
     <div className="g-callout" data-testid="seo-plan-gate">
       <h3>ConstructHUB SEO is included with the {PLANS[requiredPlan].name} plan</h3>
       <p>{message}</p>
+      <p className="mt-1">Accounts that already have the SEO tools keep them.</p>
       <div className="mt-3"><Link href="/pricing" className="g-pill g-pill--solid">See {PLANS[requiredPlan].name}</Link></div>
     </div>
   );

@@ -32,6 +32,7 @@ import { apiErrorCode } from "@/lib/plan-errors";
 import { useCart } from "@/contexts/cart-context";
 import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
 import { CRM_FROM_PRICE, callAssistantIntroShort, callAssistantPricing, callAssistantYearlyNote } from "@shared/plan-copy";
+import { FOUNDING_OFFER_LINE } from "@shared/pricing-terms";
 import { CallAssistantTierCards } from "@/components/call-assistant-tiers";
 import { StandingGator } from "@/components/mascot";
 import { H2, Kicker, LEAD, TEXT_LINK } from "@/components/feature-landing/primitives";
@@ -87,6 +88,12 @@ const LOCATION_EVENTS = ["pushState", "replaceState", "popstate", "hashchange"] 
 
 type PlanRequest = { plan: PlanKey; interval: BillingInterval; locations?: number };
 
+/** GET /api/pricing/founding-offer → { open }; null when the server does not answer it (the prerender shell, an outage). */
+async function fetchFoundingOffer(): Promise<{ open: boolean } | null> {
+  const r = await fetch("/api/pricing/founding-offer", { credentials: "include", cache: "no-store" });
+  return r.ok ? ((await r.json()) as { open: boolean }) : null;
+}
+
 const planBody = (r: PlanRequest) => ({ plan: r.plan, interval: r.interval, ...(r.plan === "agency" ? { locations: r.locations ?? AGENCY_INCLUDED_LOCATIONS } : {}) });
 
 function planRequestPrice(r: PlanRequest): string {
@@ -119,6 +126,34 @@ export default function PricingPage() {
   });
   const { data: user, isPending: userPending } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const view = describeSubscription(subscription);
+  // The founding member offer (server/billing/pricing-terms.ts): its one line shows only once the server has said
+  // the offer is open. Never in the prerendered snapshot — the build's shell server refuses /api, so this reads
+  // null there — because the owner closes the offer whenever they choose and a snapshot would go stale. For the
+  // same reason an open page asks again every minute while it is visible and whenever the window regains focus.
+  const { data: foundingOffer, isError: foundingError } = useQuery<{ open: boolean } | null>({
+    queryKey: ["/api/pricing/founding-offer"],
+    queryFn: fetchFoundingOffer,
+    staleTime: 30_000, retry: false, refetchInterval: 60_000, refetchOnWindowFocus: true,
+  });
+  // A failed refetch is "not open": the last successful answer is not kept on show.
+  const foundingOpen = !foundingError && foundingOffer?.open === true;
+  // The checkout review asks the server again the moment it opens, shows the line only while BOTH that answer and the
+  // polled state say open (a close while the dialog is up takes the line away), and asks once more right before the
+  // card form: a page left open across the close must not promise a locked price on the way to payment.
+  const [reviewFoundingOpen, setReviewFoundingOpen] = useState(false);
+  useEffect(() => {
+    setReviewFoundingOpen(false);
+    if (!review) return;
+    let current = true;
+    fetchFoundingOffer()
+      .then((r) => {
+        if (!current) return;
+        queryClient.setQueryData(["/api/pricing/founding-offer"], r);
+        setReviewFoundingOpen(r?.open === true);
+      })
+      .catch(() => { if (current) setReviewFoundingOpen(false); });
+    return () => { current = false; };
+  }, [review]);
 
   // Back from Stripe Checkout: say what happened once, then drop the flag.
   useEffect(() => {
@@ -362,6 +397,12 @@ export default function PricingPage() {
         )}
 
         <div>
+          {foundingOpen && (
+            <p className="mb-6 text-center text-[15px] font-semibold text-mkt-ink" data-testid="text-founding-offer">
+              <Star className="inline w-4 h-4 mr-1.5 -mt-0.5 text-mkt-orange-ink" aria-hidden />
+              {FOUNDING_OFFER_LINE}
+            </p>
+          )}
           <div id="plans" className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 pt-3 scroll-mt-16">
             {PLAN_KEYS.map((key, index) => {
               const plan = PLANS[key];
@@ -719,12 +760,23 @@ export default function PricingPage() {
         product: "ConstructHUB platform",
         price: planRequestPrice(review),
         note: `A new account's first plan starts with the ${TRIAL_DAYS}-day trial. The CRM is a separate product and is not part of this plan.`,
+        highlight: reviewFoundingOpen && foundingOpen ? FOUNDING_OFFER_LINE : undefined,
         included: PLANS[review.plan].features,
         notIncluded: PLANS[review.plan].notIncluded,
       } : null}
       pending={checkoutMutation.isPending}
       onClose={() => setReview(null)}
-      onConfirm={() => { if (review) { trackEvent("begin_checkout", { item_category: "platform", plan: review.plan }); checkoutMutation.mutate(review); } }}
+      onConfirm={() => {
+        if (!review) return;
+        void (async () => {
+          // Asked once more right before the card form; a close in the meantime drops the line (the purchase itself goes ahead).
+          const fresh = await fetchFoundingOffer().catch(() => null);
+          queryClient.setQueryData(["/api/pricing/founding-offer"], fresh);
+          setReviewFoundingOpen(fresh?.open === true);
+          trackEvent("begin_checkout", { item_category: "platform", plan: review.plan });
+          checkoutMutation.mutate(review);
+        })();
+      }}
     />
     <AlertDialog open={!!confirm} onOpenChange={(open) => { if (!open && !changePlanMutation.isPending) setConfirm(null); }}>
       <AlertDialogContent data-testid="dialog-change-plan">

@@ -37,10 +37,11 @@ import { forgetDashboard } from "./dashboard/cache";
 import {
   PLANS, PLAN_KEYS, ADDONS, AGENCY_SELF_SERVE_MAX_LOCATIONS, ACCESS_STATUSES, effectivePlanKey, planForModule, MODULE_NAMES,
   ADDON_MODULES, isAddonModule, moduleName, ADDON_MODULE_UNLOCKED_BY, callAssistantIncluded,
-  ADDON_MODULE_RUN_STATUSES, PAYMENT_NEEDED_STATUSES, storedPlanKey, UNLIMITED,
+  ADDON_MODULE_RUN_STATUSES, PAYMENT_NEEDED_STATUSES, storedPlanKey, UNLIMITED, SEO_GRANDFATHERED_LIMITS,
   type PlanKey, type PlanLimits, type ModuleKey, type PlanModules, type AddonKey, type CountLimitKey,
   type AddonModuleKey, type AnyModuleKey,
 } from "@shared/plans";
+import { parseFoundingPrices, type FoundingPrices } from "@shared/pricing-terms";
 
 export type Entitlements = {
   /** The account's own active plan (legacy keys mapped, expired grants dropped). */
@@ -82,6 +83,19 @@ export type Entitlements = {
   isPlatformAdmin: boolean;
   /** End of a Stripe-less grant (trial code); null for Stripe-managed or open-ended rows. */
   grantEndsAt: Date | null;
+  /**
+   * The account had the SEO tools before they became Agency-only (owner,
+   * 2026-10-08) and has a plan now: its allowances carry
+   * SEO_GRANDFATHERED_LIMITS for that plan (server/billing/pricing-terms.ts).
+   * False without a plan — grandfathering follows the plan the account is on,
+   * while it has one. Platform admins are unlimited either way.
+   */
+  seoGrandfathered: boolean;
+  /**
+   * A founding member keeps the prices in `prices` for life
+   * (shared/pricing-terms.ts foundingPrice). null = not one.
+   */
+  foundingMember: { since: Date; prices: FoundingPrices | null } | null;
 };
 
 const ALL_MODULES: PlanModules = { agencyWorkspace: true, adsManager: true, cloudflareSearchConsole: true, domainsMailAlerts: true };
@@ -250,23 +264,54 @@ export function allowancesFor(plan: PlanKey, addons: Partial<Record<AddonKey, nu
   return out;
 }
 
+/** The account_pricing_terms columns accountSubscriptionRow carries beside the subscription (server/billing/pricing-terms.ts). */
+type PricingTermsColumns = {
+  seo_grandfathered_at?: Date | string | null;
+  seo_grandfathered_plan?: string | null;
+  founding_member_at?: Date | string | null;
+  founding_prices?: unknown;
+};
+
 /**
- * The account's email and its deciding subscription row (SUBSCRIPTION_ORDER;
- * every column, the billing ones included), or undefined for an unknown user.
- * A user without a subscription row comes back with the subscription columns null.
+ * The account's email, its deciding subscription row (SUBSCRIPTION_ORDER;
+ * every column, the billing ones included) and its pricing terms
+ * (account_pricing_terms, one LEFT JOIN — null columns without a row), or
+ * undefined for an unknown user. A user without a subscription row comes back
+ * with the subscription columns null.
  */
-export async function accountSubscriptionRow(userId: number): Promise<(SubscriptionRow & { email?: string | null; addons?: unknown; id?: number | null }) | undefined> {
+export async function accountSubscriptionRow(userId: number): Promise<(SubscriptionRow & PricingTermsColumns & { email?: string | null; addons?: unknown; id?: number | null }) | undefined> {
   const { rows: [row] } = await pool.query(
-    `SELECT u.email, s.* FROM users u
+    `SELECT u.email, s.*, t.seo_grandfathered_at, t.seo_grandfathered_plan, t.founding_member_at, t.founding_prices FROM users u
        LEFT JOIN LATERAL (
          SELECT * FROM subscriptions x WHERE x.user_id = u.id ${SUBSCRIPTION_ORDER}
        ) s ON true
+       LEFT JOIN account_pricing_terms t ON t.user_id = u.id
       WHERE u.id = $1`, [userId, ACCESS_STATUSES]);
   return row;
 }
 
+/** A limit raised to at least `floor`: unlimited (-1) stays unlimited; nothing is ever lowered. */
+const raisedTo = (current: number, floor: number): number => (current === UNLIMITED ? current : Math.max(current, floor));
+
+/**
+ * The allowances with the grandfathered SEO numbers laid over them: an account
+ * that had the SEO tools before 2026-10-08 keeps SEO_GRANDFATHERED_LIMITS for
+ * the plan it is on now (a legacy stored key already mapped to its current
+ * plan). Only ever raises seoKeywords / seoCreditCents; Agency's own numbers
+ * are the same, so Agency is left as it is. Pure.
+ */
+export function withSeoGrandfathering(allowances: PlanLimits, plan: PlanKey): PlanLimits {
+  if (plan === PER_LOCATION_PLAN) return allowances;
+  const kept = SEO_GRANDFATHERED_LIMITS[plan];
+  return {
+    ...allowances,
+    seoKeywords: raisedTo(allowances.seoKeywords, kept.seoKeywords),
+    seoCreditCents: raisedTo(allowances.seoCreditCents, kept.seoCreditCents),
+  };
+}
+
 export async function getEntitlements(userId: number, now = new Date()): Promise<Entitlements> {
-  // s.* includes subscriptions.addons (the billing columns).
+  // s.* includes subscriptions.addons (the billing columns); t.* the account's pricing terms.
   const row = await accountSubscriptionRow(userId);
   const admin = isPlatformAdminEmail(row?.email);
   const plan = activePlanKey(row, now);
@@ -275,12 +320,19 @@ export async function getEntitlements(userId: number, now = new Date()): Promise
   const addons = plan ? storedAddons : {};
   const status = row?.status ?? null;
   const grantEnd = row && !row.stripe_subscription_id && row.current_period_end ? new Date(row.current_period_end) : null;
+  // Grandfathering follows the plan the account is on now, while it has one. Admins are unlimited regardless.
+  const seoGrandfathered = !!row?.seo_grandfathered_at && !!plan;
+  const base = admin ? platformAdminAllowances() : accessPlan ? allowancesFor(accessPlan, addons) : null;
+  const allowances = base && !admin && seoGrandfathered && accessPlan ? withSeoGrandfathering(base, accessPlan) : base;
+  const foundingMember = row?.founding_member_at
+    ? { since: new Date(row.founding_member_at), prices: parseFoundingPrices(row.founding_prices) }
+    : null;
   return {
     plan,
     storedPlan: row?.plan ?? null,
     accessPlan,
     limits: accessPlan ? PLANS[accessPlan].limits : null,
-    allowances: admin ? platformAdminAllowances() : accessPlan ? allowancesFor(accessPlan, addons) : null,
+    allowances,
     modules: admin ? ALL_MODULES : plan ? PLANS[plan].modules : NO_MODULES,
     addonModules: addonModulesFor(plan, addons, status, admin),
     addonModulesPaused: addonModulesPausedFor(grantExpired(row, now) ? null : row?.plan, storedAddons, status, admin),
@@ -289,6 +341,8 @@ export async function getEntitlements(userId: number, now = new Date()): Promise
     subscriptionStatus: status,
     isPlatformAdmin: admin,
     grantEndsAt: plan && grantEnd ? grantEnd : null,
+    seoGrandfathered,
+    foundingMember,
   };
 }
 
@@ -396,7 +450,8 @@ export const inUse = (n: number) => `${n.toLocaleString("en-US")} ${n === 1 ? "i
 /** The plan a trial code grants for its window. */
 export const TRIAL_CODE_PLAN: PlanKey = "agency";
 /** Stripe subscription statuses that have ended: the row may be replaced by a trial. */
-const STRIPE_ENDED = new Set(["canceled", "incomplete_expired", "inactive"]);
+export const STRIPE_ENDED_STATUSES: readonly string[] = ["canceled", "incomplete_expired", "inactive"];
+const STRIPE_ENDED = new Set(STRIPE_ENDED_STATUSES);
 /**
  * A Stripe subscription that is not over (paying, trialing, or waiting on a
  * payment): a trial code or an admin grant must never replace it.

@@ -68,6 +68,9 @@ type VoiceStatusLite = {
   usage: { minutes: number; overageMinutes: number; overageCents: number; spamCallsThisMonth?: number } | null;
 };
 
+/** The SEO rows on a plan without the tools (owner, 2026-10-08): where they are, no price, no count. */
+const SEO_AGENCY_HINT = "SEO tools are included with the Agency plan. Accounts that already have them keep them.";
+
 /** How a -1 limit reads: platform admins are simply unlimited; a plan's -1 is fair use. */
 const FAIR_USE = "Unlimited (fair use)";
 export const ADMIN_UNLIMITED = "Unlimited";
@@ -219,14 +222,17 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
           hint: isAgency ? `${formatCount(allowances.siteScansPerLocation)} per location each month.` : undefined,
         }, unl),
         meterRow("competitorScans", "Competitor Intel scans", usage.competitorScans, allowances.competitorScans, { addon: "competitor_pack" }, unl),
-        // ConstructHUB SEO (rank tracker, keyword research, backlinks): plan units from shared/plans.ts SEO_PLAN_LIMITS.
+        // ConstructHUB SEO (rank tracker, keyword research, backlinks): included with the Agency plan (shared/plans.ts
+        // SEO_PLAN_LIMITS); an account that had the tools before keeps them (server/entitlements.ts seoGrandfathered).
         {
           key: "seoKeywords", label: "SEO: tracked keywords",
           included: countText(allowances.seoKeywords, unl),
           excluded: allowances.seoKeywords === 0,
           used: allowances.seoKeywords === 0 ? null : seo.data ? Math.max(0, seo.data.usage.keywords.used) : undefined,
           ceiling: allowances.seoKeywords > 0 ? allowances.seoKeywords : undefined,
-          hint: seo.data && !seo.data.configured ? "Rank tracking is being switched on for your account — check back shortly." : "Checked on Google every week.",
+          hint: allowances.seoKeywords === 0 ? SEO_AGENCY_HINT
+            : seo.data && !seo.data.configured ? "Rank tracking is being switched on for your account — check back shortly."
+            : `${entitlements?.seoGrandfathered ? "Your plan keeps the SEO tools it had. " : ""}Checked on Google every week.`,
         },
         {
           key: "seoCreditCents", label: "SEO data",
@@ -234,7 +240,8 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
           excluded: allowances.seoCreditCents === 0,
           used: allowances.seoCreditCents === 0 ? null : seo.data?.credits ? seo.data.credits.includedUsedCents / 100 : undefined,
           ceiling: allowances.seoCreditCents > 0 ? allowances.seoCreditCents / 100 : undefined,
-          hint: seo.data?.credits && seo.data.credits.walletCents > 0
+          hint: allowances.seoCreditCents === 0 ? SEO_AGENCY_HINT
+            : seo.data?.credits && seo.data.credits.walletCents > 0
             ? `Site explorer, keyword research, backlinks and rank checks, in dollars. Plus $${(seo.data.credits.walletCents / 100).toFixed(2)} purchased credit.`
             : "Site explorer, keyword research, backlinks and rank checks, in dollars. More can be added as prepaid credit on the SEO page.",
         },

@@ -6,8 +6,10 @@
 import { describe, expect, it } from "vitest";
 import { PLANS, PLAN_KEYS } from "@shared/plans";
 import { formatUsd, planPriceLine } from "@shared/plan-copy";
+import { FOUNDING_OFFER_LINE } from "@shared/pricing-terms";
 import { PRESET_IDS } from "@shared/hub-presets";
 import { filterOutput, MAX_REPLY_CHARS } from "./output-filter";
+import { knowledgeBook } from "./knowledge";
 import { CANARY, hardRulesText, promptInstructionText, systemPrompt, TRAILING_REMINDER } from "./prompt";
 import { REPLIES } from "./replies";
 import { requiredFactsOk, templateAnswer } from "./presets";
@@ -16,6 +18,11 @@ const TEST_CANARY = "hub-9f3a7c2e4b1d";
 const run = (content: string, opts: { publicOnly?: boolean; finishReason?: string } = {}) =>
   filterOutput({ content, finishReason: opts.finishReason ?? "stop" }, { publicOnly: opts.publicOnly ?? false });
 const blocked = (content: string, code: string, publicOnly = false) => expect(run(content, { publicOnly })).toEqual({ ok: false, code });
+/** The filter with extra amounts allowed in the knowledge book (to reach a later check for an amount the pack never states). */
+const withCents = (cents: number[]) => (content: string) => {
+  const book = knowledgeBook();
+  return filterOutput({ content, finishReason: "stop" }, { publicOnly: false, book: { ...book, allowedCents: new Set([...book.allowedCents, ...cents]) } });
+};
 const delivered = (content: string, publicOnly = false) => {
   const r = run(content, { publicOnly });
   expect(r.ok, JSON.stringify(r)).toBe(true);
@@ -464,5 +471,71 @@ describe("formatting can't hide what a visitor reads (checks run on the delivere
     expect(delivered(heading)).toBe(heading);
     expect(delivered("Cañon City permits are in the [Database Directory](/databases).")).toBe("Cañon City permits are in the [Database Directory](/databases).");
     expect(delivered("Use the **Click Guard** _tracking_ script.")).toBe("Use the **Click Guard** tracking script.");
+  });
+});
+
+describe("owner 2026-10-08: SEO tools are Agency-only, nothing SEO à la carte, the founding offer has no count or deadline", () => {
+  it("an SEO add-on, an SEO price outside the price book, à la carte: blocked (O10)", () => {
+    blocked("The SEO add-on costs $19/month.", "O10");
+    blocked("You can add the rank tracking add-on to Starter.", "O10");
+    blocked("You can buy rank tracking à la carte.", "O10");
+    blocked("Rank tracking a la carte is coming.", "O10");
+    blocked("An SEO plan is $19/month.", "O10");
+    blocked("Keyword research is $15 a month on any plan.", "O10");
+    blocked("Backlinks cost $5 per site.", "O10");
+    blocked("You can get an add-on for SEO on any plan.", "O10");
+    // Codex #2: the Agency amount without Agency named, a plain SEO price, and written-out money.
+    blocked("The SEO upgrade costs $349/month.", "O10");
+    blocked("SEO is included for $349/month.", "O10");
+    blocked("SEO costs $19 a month.", "O10");
+    blocked("SEO costs 19 dollars per month.", "O10");
+    blocked("SEO costs USD 19 a month.", "O10");
+    blocked("SEO is 19 bucks a month.", "O10");
+    blocked("Rank tracking costs 15 dollars on Starter.", "O9");
+    // $25 is not an amount the knowledge pack's text states (O8 reads the pack, not the price book), so O8 fires
+    // first; with that amount allowed, the SEO rule is what blocks the add-on.
+    blocked("The SEO add-on costs $25/month.", "O8");
+    expect(withCents([2500])("The SEO add-on costs $25/month.")).toEqual({ ok: false, code: "O10" });
+    expect(withCents([2500])("An SEO upgrade is $25 a month.")).toEqual({ ok: false, code: "O10" });
+  });
+
+  it("a number of places, a customer count or a deadline for the founding offer: blocked (O10)", () => {
+    blocked("Only the first 10,000 sign-ups get founding member pricing.", "O10");
+    blocked("Just 500 spots are left for founding members.", "O10");
+    blocked("The founding offer is limited to 1,000 customers.", "O10");
+    blocked("The founding offer is limited to 1,000.", "O10");
+    blocked("Over 2,000 contractors already use ConstructHUB.", "O10");
+    blocked("Thousands of contractors trust ConstructHUB.", "O10");
+    // Codex #2: a count by its subject, however it is worded.
+    blocked("We have 500 founding members.", "O10");
+    blocked("Over 1,000 customers use ConstructHUB.", "O10");
+    blocked("Only 200 spots left.", "O10");
+    blocked("There are 1,200 users on the platform.", "O10");
+    blocked("Our 2,000 subscribers love it.", "O10");
+    blocked("Only 10 seats remaining for founders.", "O10");
+    blocked("The founding offer ends on Friday.", "O10");
+    blocked("Lock in your price before the offer closes this month.", "O10");
+    blocked("Hurry, founding member pricing won't last.", "O10");
+  });
+
+  it("the data vendor, however it is spaced, and our wholesale cost: blocked (O13)", () => {
+    blocked("We buy the data from DataForSEO.", "O13");
+    blocked("Data For SEO powers the rank tracker.", "O13");
+    blocked("Our wholesale cost is far below what you pay.", "O13");
+  });
+
+  it("the real wording still passes: the Agency price, SEO data credit, the founding line, a negation", () => {
+    expect(delivered(FOUNDING_OFFER_LINE)).toBe(FOUNDING_OFFER_LINE);
+    expect(delivered(`The SEO tools are included with the Agency plan at ${formatUsd(PLANS.agency.monthlyCents)}/month.`)).toContain("Agency plan");
+    expect(delivered("Agency includes 10 agency seats and $40 of SEO data a month.")).toContain("$40 of SEO data");
+    expect(delivered("SEO data credit comes in prepaid packs of $50 and $100, and it does not expire.")).toContain("$50 and $100");
+    expect(withCents([2500])("SEO data credit comes in prepaid packs of $25, $50 and $100.")).toMatchObject({ ok: true });
+    expect(delivered("There is no SEO add-on: the SEO tools come with the Agency plan, and accounts that already have them keep them.")).toContain("no SEO add-on");
+    expect(delivered("Founding member pricing has no deadline and no number of places; the owner closes the offer when they choose.")).toContain("no deadline");
+    expect(delivered("You get 100 permit searches a month on Starter, and 10 agency seats are included with Agency.")).toContain("10 agency seats");
+    expect(delivered("The Agency plan has 10 agency seats; 2 extra seats are $15/month each.")).toContain("2 extra seats");
+    expect(delivered("Pro is $79/month, or 790 dollars a year.")).toContain("790 dollars");
+    expect(delivered("Starter includes 1 Google Business Profile location and 100 permit searches a month.")).toContain("100 permit searches");
+    expect(delivered("Monthly SEO packages are quoted by a sales rep: anything priced at $1,000 or more is never quoted here.")).toContain("sales rep");
   });
 });

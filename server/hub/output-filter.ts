@@ -132,6 +132,51 @@ export const NOT_SOLD: RegExp[] = [
   /\bwhite[- ]label(ed|ing)? (reseller|resale|program|platform|app|version|product|dashboard|crm|software)\b/i,
   /\bresell(er|ing)? (program|plan|rights)\b/i, /\b(iphone|android|ios|mobile|native) (apps?|applications?)\b/i, /\bpublic api\b/i,
   /\bapi access\b/i, /\bzapier\b/i, /\baffiliate program\b/i, /\bpartner program\b/i, /\b(phone|live chat|24\/7) support\b/i,
+  // Owner, 2026-10-08: the SEO tools come with the Agency plan only; nothing SEO is sold à la carte and no such price exists.
+  // (\b does not see "à" as a word character, so the boundary is written out.)
+  /\bseo (add-?ons?|addon)\b/i, /\b(rank[- ]?track\w*|keyword[- ]research|backlinks?) (add-?ons?|addon)\b/i, /(?:^|[^\p{L}])[àa][ -]la[ -]carte(?![\p{L}])/iu,
+  /\b(add-?ons?|addon|upgrade) for (the |your )?(seo|rank[- ]?track\w*|keyword[- ]research|backlinks?)\b/i,
+];
+/** A sentence about the SEO tools (for the amounts it may carry). */
+const SEO_TOPIC = /\b(seo|rank[- ]?track\w*|keyword[- ]research|backlinks?)\b/i;
+/** In a sentence about SEO, an amount may only be the price of a plan that includes the tools… */
+const SEO_PLAN_CENTS: ReadonlySet<number> = new Set(
+  PLAN_KEYS.filter((k) => PLANS[k].limits.seoKeywords !== 0).flatMap((k) => [PLANS[k].monthlyCents, PLANS[k].annualCents]));
+/** …or, next to a credit / data word, the monthly SEO data allowance or a prepaid pack (shared/seo-credits.ts). */
+const SEO_CREDIT_CENTS: ReadonlySet<number> = new Set([...SEO_CREDIT_PACKS, ...PLAN_KEYS.map((k) => SEO_PLAN_LIMITS[k].seoCreditCents).filter((c) => c > 0)]);
+const SEO_CREDIT_CUE = /\b(credits?|prepaid|packs?|data|allowance)\b/i;
+/** An add-on's own prices (never the SEO data amounts ADDON_CENTS also carries). */
+const ADDON_PRICE_CENTS: ReadonlySet<number> = new Set(Object.values(ADDONS).flatMap((a) => [a.monthlyCents, a.annualCents, ...(a.setupCents ? [a.setupCents] : [])]));
+/** ADDON_CUE without the SEO data words, so "SEO data" alone never opens the add-on exemption. */
+const addonCueWithoutSeo = (s: string) => ADDON_CUE.test(s.replace(/\bseo data\b|\bdata credit\b/gi, " "));
+/**
+ * The founding member offer has no public number of places, no customer count and no deadline
+ * (owner, 2026-10-08). A count is read by its SUBJECT, not its wording: a number (or "thousands of")
+ * within two words of a people / places noun — "We have 500 founding members", "over 1,000
+ * customers", "only 200 spots left", "the first 10,000 sign-ups". The one such number the pack
+ * states is a plan's seat allowance ("10 agency seats", "2 extra seats"): "seats" counts only
+ * next to a scarcity word.
+ */
+const COUNT_SUBJECT = String.raw`(customers?|users?|members?|founding members?|founders?|subscribers?|contractors?|companies|businesses|agencies|people|sign-?ups?|spots?|places?|slots?|seats?)`;
+const COUNT_WORDS = String.raw`(\d[\d,]*|thousands|hundreds|dozens|millions|a thousand|a hundred|a few (?:hundred|thousand))`;
+/** The words such a claim puts between the number and its subject ("500 happy paying customers"); any other word means the number counts something else ("30 sites contractors should be on"). */
+const COUNT_ADJ = String.raw`(?:founding|founder|new|paying|happy|active|early|loyal|satisfied|real|local|small|registered|signed-up|verified|more|extra|additional|other|agency|team|crm|included)`;
+const COUNT_CLAIM = new RegExp(String.raw`\b${COUNT_WORDS}\s+(?:of\s+)?((?:${COUNT_ADJ}\s+){0,2})${COUNT_SUBJECT}\b`, "gi");
+const SCARCE = /\b(left|remaining|available|only|first|limited|last|open)\b/i;
+/** True when the sentence states how many customers / members / spots there are ("seats": only with a scarcity word next to the number). */
+function statesCount(s: string): boolean {
+  for (const m of s.matchAll(COUNT_CLAIM)) {
+    if (/^seats?$/i.test(m[3]) && !SCARCE.test(s.slice(Math.max(0, m.index! - 24), m.index! + m[0].length + 24))) continue;
+    return true;
+  }
+  return false;
+}
+const DAY_WORDS = String.raw`(\d|tonight|today|tomorrow|midnight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december|this (week|month|weekend|year)|next (week|month|year)|end of (the )?(week|month|year))`;
+/** A limit with no subject, a deadline for the offer, urgency. */
+const FOUNDING_LIMITS: RegExp[] = [
+  /\b(limited to|capped at|a cap of|maximum of)\s+\d[\d,]*\b/i,
+  new RegExp(String.raw`\b(founding|founders?'?|lifetime|locked[- ]in|offer)\b[^.]{0,60}\b(ends?|expires?|expiring|deadline|closes?|closing|until|through|before)\b[^.]{0,20}\b${DAY_WORDS}\b`, "i"),
+  /\b(hurry|act (fast|now)|while (supplies|spots|places|seats|it) lasts?|before (it'?s|they'?re) gone|don'?t miss out)\b/i,
 ];
 
 // O11
@@ -170,6 +215,9 @@ const LEAKS: RegExp[] = [
   /127\.0\.0\.1/, /\bvb\d/i, /ai_integrations/i, /\bapi[_ ]?key\s*(is|=|:)\s*\S/i, /\b(sk|pk|rk)[-_][A-Za-z0-9_-]{12,}/,
   // The provider's agent tools, which the model sometimes "calls" as text (cleanAiText strips them; none may remain).
   /\b(web_research|web_search|tool_calls?)\b/i, /\bfunction=/i,
+  // The SEO data vendor and our wholesale cost (owner white-label rule, server/seo/README-white-label.md): never named,
+  // however the name is spaced ("Data For SEO") — checked on the text as the browser shows it too.
+  /\bdata\s?for\s?seo\b/i, /\bwholesale (cost|costs|price|prices|rate|rates|data)\b/i,
   // The model talking about its task instead of doing it ("the system prompt", "let me re-read the rules", "**Wait...**").
   ...REASONING_LEAK,
 ];
@@ -262,8 +310,8 @@ const ADDON_CENTS: ReadonlySet<number> = (() => {
     for (const c of dollarAmounts(addon.description)) cents.add(c);
   }
   for (const band of AGENCY_LOCATION_BANDS) if (band.centsPerLocation > 0) { cents.add(band.centsPerLocation); cents.add(band.centsPerLocation * ANNUAL_MONTHS); }
-  // SEO data: the monthly allowance each plan includes and the prepaid credit packs.
-  for (const key of PLAN_KEYS) cents.add(SEO_PLAN_LIMITS[key].seoCreditCents);
+  // SEO data: the monthly allowance of each plan that has the tools (0 on the others) and the prepaid credit packs.
+  for (const key of PLAN_KEYS) if (SEO_PLAN_LIMITS[key].seoCreditCents > 0) cents.add(SEO_PLAN_LIMITS[key].seoCreditCents);
   for (const pack of SEO_CREDIT_PACKS) cents.add(pack);
   return cents;
 })();
@@ -418,8 +466,14 @@ function tidy(input: string): string {
  * the text as written and again as the browser shows it, with **bold** markers removed, so
  * "$**5**", "Open**AI**" and "bob@**acme**.com" are read the way a visitor reads them.
  */
+/** "19 dollars", "USD 19", "19 bucks" as "$19": every price check reads one notation. */
+function asDollars(text: string): string {
+  return text.replace(/\b(\d[\d,]*(?:\.\d{1,2})?)\s?(?:dollars|usd|bucks)\b/gi, "$$$1").replace(/\busd\s?\$?(\d[\d,]*(?:\.\d{1,2})?)/gi, "$$$1");
+}
+
 function checkContent(linkless: string, opts: FilterOptions, book: KnowledgeBook, canary: string): void {
-  const sentences = sentencesOf(linkless);
+  const money = asDollars(linkless);
+  const sentences = sentencesOf(money);
 
   // O7 — contact details and identifiers, and a named business said to be a ConstructHUB customer
   for (const re of CONTACT) if (re.test(linkless)) block("O7");
@@ -430,12 +484,12 @@ function checkContent(linkless: string, opts: FilterOptions, book: KnowledgeBook
   for (const m of linkless.matchAll(ANY_HOST)) if (!OWN_HOST_RE.test(m[1])) block("O6");
   if (BRACKET_DOT.test(linkless) || SPELLED_DOMAIN.test(linkless)) block("O6");
 
-  // O8 — money
-  for (const m of linkless.matchAll(/\$\s?(\d[\d,]*(?:\.\d{1,2})?)(\s?[kKmM]\b)?/g)) {
+  // O8 — money (on the one notation: a written-out "19 dollars" is checked as "$19")
+  for (const m of money.matchAll(/\$\s?(\d[\d,]*(?:\.\d{1,2})?)(\s?[kKmM]\b)?/g)) {
     if (m[2]) block("O8");
     const cents = toCents(m[1]);
     if (!book.allowedCents.has(cents)) block("O8");
-    if (cents === SALES_THRESHOLD_CENTS && !/^\s*(or more|and up|and above|\+)/i.test(linkless.slice(m.index! + m[0].length))) block("O8");
+    if (cents === SALES_THRESHOLD_CENTS && !/^\s*(or more|and up|and above|\+)/i.test(money.slice(m.index! + m[0].length))) block("O8");
   }
   for (const m of linkless.matchAll(/\b(\d[\d,]*(?:\.\d{1,2})?)\s?(dollars|usd|bucks)\b|\busd\s?\$?(\d[\d,]*(?:\.\d{1,2})?)/gi)) {
     if (!book.allowedCents.has(toCents(m[1] ?? m[3]))) block("O8");
@@ -444,9 +498,8 @@ function checkContent(linkless: string, opts: FilterOptions, book: KnowledgeBook
   for (const m of linkless.matchAll(/\b(\d+)\s?(cents?\b|¢)/gi)) if (!book.allowedCents.has(Number(m[1]))) block("O8");
   if (/\b(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million)\b[\w\s-]{0,30}\b(dollars|bucks)\b/i.test(linkless)) block("O8");
 
-  // O9 — plan-price binding
-  const asDollars = linkless.replace(/\b(\d[\d,]*(?:\.\d{1,2})?)\s?(?:dollars|usd|bucks)\b/gi, "$$$1").replace(/\busd\s?\$?(\d[\d,]*(?:\.\d{1,2})?)/gi, "$$$1");
-  for (const s of planSentences(asDollars)) checkPlanPrices(s);
+  // O9 — plan-price binding (on the one money notation)
+  for (const s of planSentences(money)) checkPlanPrices(s);
 
   // O10 — commercial claims
   for (const re of COMMERCIAL) if (re.test(linkless)) block("O10");
@@ -479,6 +532,19 @@ function checkContent(linkless: string, opts: FilterOptions, book: KnowledgeBook
     if (FREE_STRETCH.test(s) && !YEARLY.test(s) && !NEG.test(s)) block("O10");
     if (DISCOUNT.test(s) && DISCOUNT_PLAN_CONTEXT.test(s) && !DISCOUNT_CRM_CONTEXT.test(s) && !YEARLY.test(s) && !NEG.test(s)) block("O10");
     if (PROMO_TOKEN.test(s) && PROMO_CONTEXT.test(s)) block("O10");
+    // A price next to anything SEO is allowed only as the Agency plan's own price in a sentence that names Agency,
+    // or, in a sentence about credit, as the SEO data allowance or a prepaid pack; a real add-on's price only with an
+    // add-on cue that is not "SEO data" itself. "The SEO upgrade costs $349/month" and "SEO costs $19 a month" are refused.
+    if (SEO_TOPIC.test(s)) {
+      const agency = /\bAgency\b/.test(s), credit = SEO_CREDIT_CUE.test(s), addon = addonCueWithoutSeo(s);
+      for (const m of s.matchAll(/\$\s?(\d[\d,]*(?:\.\d{1,2})?)/g)) {
+        const cents = toCents(m[1]);
+        if (cents === SALES_THRESHOLD_CENTS || (agency && SEO_PLAN_CENTS.has(cents)) || (credit && SEO_CREDIT_CENTS.has(cents)) || (addon && ADDON_PRICE_CENTS.has(cents))) continue;
+        block("O10");
+      }
+    }
+    // A count of customers / members / places, a limit, or a deadline for the founding offer (none exists).
+    if (statesCount(s) || FOUNDING_LIMITS.some((re) => re.test(s))) block("O10");
   }
 
   // O11 — a sales-only item next to a price
