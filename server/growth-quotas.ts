@@ -16,7 +16,7 @@ import {
 } from "./entitlements";
 import { PLANS, gridCreditCost, type PlanKey, type PlanLimits, type AddonKey } from "@shared/plans";
 
-export type MeteredFeature = "searches" | "rankings" | "siteScans" | "competitorScans" | "photos" | "texts";
+export type MeteredFeature = "searches" | "rankings" | "siteScans" | "competitorScans" | "photos" | "texts" | "gabeQuestions";
 
 type Meter = {
   /** Upgrade prompt subject: "<what> is included with the Starter plan". */
@@ -43,6 +43,10 @@ export const METERS: Record<MeteredFeature, Meter> = {
   // texting-number add-on is a carrier number, not segments (shared/plans.ts),
   // so nothing raises this but the plan.
   texts: { what: "Texting", unit: ["text segment"], limit: "teamTextSegments" },
+  // Gabe (the Hub assistant) questions per calendar month (shared/plans.ts
+  // gabeQuestions, -1 unlimited): server/hub/routes.ts reserves here before a
+  // model call. The Hub's per-user/day and global/day budgets stay on top.
+  gabeQuestions: { what: "Gabe, the Hub assistant", unit: ["question", "questions"], limit: "gabeQuestions" },
   // ConstructHUB SEO is not metered here: it is charged as SEO data credit (server/seo/credits.ts).
 };
 

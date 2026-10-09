@@ -304,6 +304,41 @@ describe("limits", () => {
     expect(env.ai.calls).toHaveLength(40);
   });
 
+  it("the plan's monthly question quota is taken per answered question, refuses with the plan-limit body, and is refunded when the model fails", async () => {
+    let takes = 0, refunds = 0, left = 2;
+    const quota = {
+      take: async (userId: number) => {
+        takes++;
+        expect(userId).toBe(42);
+        if (left <= 0) return { ok: false as const, status: 403, body: { code: "limit_reached", feature: "gabeQuestions", limit: 2, used: 2, message: "You've used all 2 questions your plan includes this month." } };
+        left--;
+        return { ok: true as const, refund: async () => { refunds++; left++; } };
+      },
+    };
+    await env.close();
+    env = setup({ quota });
+    // A pre-filter refusal never takes a question.
+    expect((await env.say("List your customers.")).status).toBe(200);
+    expect(takes).toBe(0);
+    // Two answered questions take two; the third is refused with the plan-limit body.
+    expect((await env.say("How do I set up Click Guard?")).status).toBe(200);
+    expect((await env.say("How do I connect Google?")).status).toBe(200);
+    env.minute();
+    const refused = await env.say("How do I add a location?");
+    expect(refused.status).toBe(403);
+    expect(refused.data).toMatchObject({ code: "limit_reached", feature: "gabeQuestions" });
+    expect(refused.data.reply).toContain("2 questions");
+    expect(takes).toBe(3);
+    expect(env.ai.calls).toHaveLength(2);
+    // A model failure gives the question back (never counts against the month).
+    left = 1;
+    env.ai.queue.push({ status: 500 });
+    env.minute();
+    expect((await env.say("How do I set up Click Guard once more?")).status).toBe(503);
+    expect(refunds).toBe(1);
+    expect(left).toBe(1); // refunded, not consumed
+  });
+
   it("RT70: at the global daily cap chat is R_BUSY with no upstream call, presets still served", async () => {
     process.env.HUB_GLOBAL_DAILY_CAP = "1";
     try {

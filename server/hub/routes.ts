@@ -44,6 +44,15 @@ export type HubDeps = {
   tokens?: TokenMeter;
   /** The daily token cap (HUB_AI_DAILY_TOKEN_CAP by default; null = off). */
   dailyTokenCap?: () => number | null;
+  /**
+   * The plan's monthly Gabe question budget (shared/plans.ts limits.gabeQuestions,
+   * -1 unlimited): taken only once a model call will happen, refunded when the
+   * call fails, and a spent month answers 402/403 with the plan-limit body.
+   * Production wires server/growth-quotas.ts (index.ts); omitted in tests (no DB).
+   */
+  quota?: {
+    take: (userId: number) => Promise<{ ok: true; refund: () => Promise<void> } | { ok: false; status: number; body: Record<string, unknown> }>;
+  };
 };
 
 const MAX_USER_CHARS = 500;
@@ -344,8 +353,18 @@ export function createHub(deps: HubDeps) {
       if (!release) { note(tier, "busy", "concurrency", started); return void res.status(503).json({ reply: REPLIES.R_BUSY, code: "busy" }); }
 
       let result: Upstream;
+      let quota: { ok: true; refund: () => Promise<void> } | { ok: false; status: number; body: Record<string, unknown> } | null = null;
       try {
-        // 10. daily budgets — taken only now that a model call will happen (the finally below releases the slot)
+        // 10. the plan's monthly Gabe questions first: a spent month names the plan
+        // and the reset, and costs none of the daily budgets below.
+        if (deps.quota) {
+          quota = await deps.quota.take(userId);
+          if (!quota.ok) {
+            note(tier, "limit", "plan_quota", started);
+            return void res.status(quota.status).json({ ...quota.body, reply: typeof (quota.body as { message?: unknown }).message === "string" ? (quota.body as { message: string }).message : REPLIES.R_LIMIT });
+          }
+        }
+        // 10b. daily budgets — taken only now that a model call will happen (the finally below releases the slot)
         if (!(await deps.budget.take(keys.userDaily(userId), HUB_LIMITS.userDaily.limit, HUB_LIMITS.userDaily.windowMs))) {
           note(tier, "limit", "user_daily", started); return void res.status(429).json({ reply: REPLIES.R_LIMIT, code: "limit" });
         }
@@ -367,6 +386,8 @@ export function createHub(deps: HubDeps) {
         result = await callModel(buildRequest(deps.model(), buildMessages(turns, pageKey as PageKey | undefined)));
       } finally { release(); }
       if (!result.ok) {
+        // The model call never produced an answer: the question is given back.
+        if (quota?.ok) await quota.refund().catch((err) => logError("quota_refund", err));
         // The cap was reached by calls in flight since step 4.5: the same "off site" answer.
         if (result.kind === "capped") { note(tier, "offline", "token_cap", started); return void res.status(503).json({ reply: inApp ? REPLIES.R_APP_OFFLINE : REPLIES.R_OFFLINE, code: "offline" }); }
         if (result.kind === "timeout") { note(tier, "timeout", "model", started); return void res.status(503).json({ reply: REPLIES.R_TIMEOUT, code: "timeout" }); }

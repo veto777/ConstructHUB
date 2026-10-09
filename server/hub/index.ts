@@ -7,6 +7,7 @@
  */
 import type { Express } from "express";
 import { ipKey } from "../growth-limits";
+import { refundReservation, reserveQuotaFor } from "../growth-quotas";
 import { requirePlatformAdmin } from "../crm/admin";
 import { createHub } from "./routes";
 import { hubAiClient, hubModel, hubProviderInfo, hubTimeoutMs, logProvider, providerOk } from "./ai";
@@ -30,6 +31,16 @@ export function registerHubRoutes(app: Express): void {
     isBuilder,
     // The daily token counter on hub_usage_days: one row per UTC day, shared by every process, kept across restarts.
     tokens: new TokenMeter(pgUsage),
+    // The plan's monthly Gabe questions (limits.gabeQuestions, -1 unlimited): a spent month
+    // answers 402/403 with the plan-limit body; a failed model call gives the question back.
+    // The per-user/day and global/day budgets above stay on top of this meter.
+    quota: {
+      take: async (userId: number) => {
+        const r = await reserveQuotaFor(userId, "gabeQuestions", 1);
+        if (!r.ok) return { ok: false as const, status: r.status, body: r.body };
+        return { ok: true as const, refund: () => refundReservation(r.reservation, 1) };
+      },
+    },
   });
   app.use(hub.router);
   // One boot line: provider, model, host and whether a key is set — never the key.
