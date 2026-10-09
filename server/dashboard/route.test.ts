@@ -130,13 +130,13 @@ describe("GET /api/dashboard (child server from this checkout)", () => {
     expect(metric(r.body, "gbp", "locations")).toBe(2);
   });
 
-  it("Starter: Cloudflare locked to Agency, and no CRM org is created", async () => {
+  it("Starter: Cloudflare locked to Pro, and no CRM org is created", async () => {
     const orgs = async () => Number((await pool.query("SELECT count(*) n FROM crm_orgs")).rows[0].n);
     const before = await orgs();
     const r = await get("/api/dashboard", await session(s!.starter));
     expect(r.status).toBe(200);
     expect(await orgs()).toBe(before);
-    expect(r.body.tiles.find((t) => t.key === "cloudflare")).toMatchObject({ status: "locked", entitled: false, requiredPlan: "agency", metrics: [] });
+    expect(r.body.tiles.find((t) => t.key === "cloudflare")).toMatchObject({ status: "locked", entitled: false, requiredPlan: "pro", metrics: [] });
     expect(r.body.tiles.find((t) => t.key === "crm")).toMatchObject({ status: "empty", cta: { href: "/crm-app" } });
   });
 

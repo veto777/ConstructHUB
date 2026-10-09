@@ -313,11 +313,11 @@ describe("POST site-scans — start a Site Scan", () => {
     expect(none.data.error).toMatchObject({ code: "plan_required", requiredPlan: "starter" });
     expect((await pool.query("SELECT count(*)::int n FROM sitescan_jobs WHERE user_id=$1", [noPlan])).rows[0].n).toBe(0);
 
-    // Pro includes 5 a month.
-    await pool.query("INSERT INTO growth_budgets(key,period,used) VALUES($1,'0',5) ON CONFLICT(key,period) DO UPDATE SET used=5", [quotaKey(owner, "siteScans")]);
+    // Pro includes 15 a month.
+    await pool.query("INSERT INTO growth_budgets(key,period,used) VALUES($1,'0',15) ON CONFLICT(key,period) DO UPDATE SET used=15", [quotaKey(owner, "siteScans")]);
     const full = await call(scans, { user: owner }, { url: "https://example.com" });
     expect(full.status).toBe(429);
-    expect(full.data.error).toMatchObject({ code: "quota_exceeded", scope: "feature", feature: "siteScans", limit: 5, used: 5 });
+    expect(full.data.error).toMatchObject({ code: "quota_exceeded", scope: "feature", feature: "siteScans", limit: 15, used: 15 });
     expect(Number(full.retryAfter)).toBeGreaterThan(0);
     await pool.query("UPDATE growth_budgets SET used=1 WHERE key=$1 AND period='0'", [quotaKey(owner, "siteScans")]);
 

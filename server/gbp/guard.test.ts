@@ -32,7 +32,7 @@ beforeAll(async()=>{
   await ensureGbpSchema();await ensureAccountEventsSchema();await ensureProfileGuardSchema();await ensureProfileGuardSchema();
   const {rows}=await pool.query("INSERT INTO users(email,password_hash) VALUES('guard-'||gen_random_uuid()||'@example.invalid',$1),('guard-'||gen_random_uuid()||'@example.invalid',null) RETURNING id",[await bcrypt.hash('test-password',4)]);[user,other]=rows.map(r=>r.id);
   id=(await pool.query("INSERT INTO business_locations(user_id,business_name,gbp_account_name,gbp_location_name,place_id) VALUES($1,'Guard fixture','accounts/guardfixture','locations/guardfixture','fixture-place') RETURNING id",[user])).rows[0].id;
-  // The worker checks only owners with an active plan; the fixture owner is on Starter (checks every 15 minutes).
+  // The worker checks only owners with an active plan; the fixture owner is on Starter (checks every 60 minutes).
   await pool.query("INSERT INTO subscriptions(user_id,plan,status) VALUES($1,'starter','active')",[user]);
 });
 afterAll(async()=>{await pool.query('DELETE FROM subscriptions WHERE user_id=ANY($1)',[[user,other]]);await pool.query('DELETE FROM business_locations WHERE user_id=ANY($1)',[[user,other]]);await pool.query('DELETE FROM users WHERE id=ANY($1)',[[user,other]]);await pool.end();});
@@ -126,22 +126,22 @@ describe('Profile Guard with real lane Postgres and mocked Google',()=>{
     await expect(writeOwnerProfile(user, id, {title: 'Requested new name'}, ignored)).rejects.toMatchObject({status: 503});
     expect((await pool.query('SELECT snapshot FROM gbp_guard WHERE location_id=$1', [id])).rows[0].snapshot).toEqual(before);
   });
-  it('watch toggles and Off avoid unwanted alerts/writes; worker respects 15 minutes',async()=>{
+  it('watch toggles and Off avoid unwanted alerts/writes; worker respects the plan cadence (Solo: every 60 minutes)',async()=>{
     await configureGuard(user,id,'notify',['title']);live.phoneNumbers={primaryPhone:'unwatched'};const n=(await changes()).length;await checkGuard(user,id,client);expect(await changes()).toHaveLength(n);
     const check=vi.fn();await runGuardWorker(check,user);expect(check).not.toHaveBeenCalled();
-    await pool.query("UPDATE gbp_guard SET last_attempt=now()-interval '16 minutes' WHERE location_id=$1",[id]);await runGuardWorker(check,user);expect(check).toHaveBeenCalledWith(user,id);
+    await pool.query("UPDATE gbp_guard SET last_attempt=now()-interval '61 minutes' WHERE location_id=$1",[id]);await runGuardWorker(check,user);expect(check).toHaveBeenCalledWith(user,id);
     await configureGuard(user,id,'off',['title']);http.mockClear();await checkGuard(user,id,client);expect(http).not.toHaveBeenCalled();
   });
-  it('worker follows the owner\'s plan: no plan is never checked, Agency every 30 minutes',async()=>{
+  it('worker follows the owner\'s plan: no plan is never checked, Unlimited every 5 minutes',async()=>{
     await configureGuard(user,id,'notify',['title']);
     const check=vi.fn(),due=(minutes:number)=>pool.query("UPDATE gbp_guard SET last_attempt=now()-make_interval(mins=>$2) WHERE location_id=$1",[id,minutes]);
     const plan=(value:string,status='active')=>pool.query('UPDATE subscriptions SET plan=$2,status=$3 WHERE user_id=$1',[user,value,status]);
     try {
       await plan('starter','canceled');await due(60);await runGuardWorker(check,user);expect(check).not.toHaveBeenCalled();
-      await plan('agency');await due(16);await runGuardWorker(check,user);expect(check).not.toHaveBeenCalled();
-      await due(31);await runGuardWorker(check,user);expect(check).toHaveBeenCalledWith(user,id);
-      // A legacy Platinum row follows Agency's cadence through the plan map.
-      check.mockClear();await plan('platinum');await due(20);await runGuardWorker(check,user);expect(check).not.toHaveBeenCalled();
+      await plan('agency');await due(4);await runGuardWorker(check,user);expect(check).not.toHaveBeenCalled();
+      await due(6);await runGuardWorker(check,user);expect(check).toHaveBeenCalledWith(user,id);
+      // A legacy Platinum row follows Unlimited's 5-minute cadence through the plan map.
+      check.mockClear();await plan('platinum');await due(6);await runGuardWorker(check,user);expect(check).toHaveBeenCalledWith(user,id);
     } finally {await plan('starter');await configureGuard(user,id,'off',['title']);}
   });
   it('preserves pending evidence when a field is unwatched, then retires it only after observing restoration', async () => {

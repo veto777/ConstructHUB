@@ -35,11 +35,13 @@ describe("tileAccess", () => {
   it("locks plan-gated tiles without a plan, and opens them with one", () => {
     const none = { accessPlan: null, allowances: null, modules: NONE, hasCrmOrg: false };
     expect(tileAccess(def("gbp"), none)).toEqual({ entitled: false, requiredPlan: "starter" });
+    expect(tileAccess(def("clickGuard"), none)).toEqual({ entitled: false, requiredPlan: "starter" });
     expect(tileAccess(def("property"), none)).toEqual({ entitled: true });
     const starter = { accessPlan: "starter" as const, allowances: PLANS.starter.limits, modules: NONE, hasCrmOrg: true };
     expect(tileAccess(def("gbp"), starter).entitled).toBe(true);
-    expect(tileAccess(def("clickGuard"), starter)).toEqual({ entitled: false, requiredPlan: "pro" });
-    expect(tileAccess(def("cloudflare"), starter)).toEqual({ entitled: false, requiredPlan: "agency", module: "cloudflareSearchConsole" });
+    // Solo includes 1 protected website: Click Guard opens on it (the cheapest plan that allows any).
+    expect(tileAccess(def("clickGuard"), starter)).toEqual({ entitled: true });
+    expect(tileAccess(def("cloudflare"), starter)).toEqual({ entitled: false, requiredPlan: "pro", module: "cloudflareSearchConsole" });
   });
 
   it("opens Agency modules on the Agency plan; the call assistant (a separate service) is locked until its own subscription runs — no plan is 'required'", () => {
@@ -70,9 +72,12 @@ describe("tileAccess", () => {
     const crew = { accessPlan: null, allowances: null, modules: NONE, hasCrmOrg: true };
     expect(tileAccess(def("crm"), crew).entitled).toBe(true);
     expect(tileAccess(def("texting"), crew).entitled).toBe(true);
-    // Without an org, the viewer's own plan decides texting.
+    // Without an org, the viewer's own plan decides texting — Solo includes 200 team text segments.
     const starter = { accessPlan: "starter" as const, allowances: PLANS.starter.limits, modules: NONE, hasCrmOrg: false };
-    expect(tileAccess(def("texting"), starter)).toEqual({ entitled: false, requiredPlan: cheapestPlanAllowing("teamTextSegments") });
+    expect(tileAccess(def("texting"), starter)).toEqual({ entitled: true });
+    // Without any plan (and no org), the cheapest plan with a text allowance is named.
+    expect(tileAccess(def("texting"), { accessPlan: null, allowances: null, modules: NONE, hasCrmOrg: false }))
+      .toEqual({ entitled: false, requiredPlan: cheapestPlanAllowing("teamTextSegments") });
   });
 });
 

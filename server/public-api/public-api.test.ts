@@ -92,7 +92,7 @@ describe("openapi.json", () => {
     expect(doc.components.schemas).toHaveProperty("Error");
     expect(doc.components.securitySchemes.apiKey.scheme).toBe("bearer");
     expect(doc.tags.map((t: any) => t.name)).toContain("widgets");
-    expect(doc["x-limits"].unitsPerMonth).toEqual({ starter: 0, pro: 10_000, growth: 50_000, agency: 250_000 });
+    expect(doc["x-limits"].unitsPerMonth).toEqual({ starter: 0, team: 0, pro: 50_000, growth: 250_000, agency: -1 });
     expect(doc.info.description).toMatch(/never runs TruthCoder AI/);
   });
 });
@@ -155,7 +155,7 @@ describe("authentication", () => {
     expect(me).toMatchObject({
       userId: uid,
       key: { id: k.id, scopes: ["read"], monthlyUnitLimit: 900, usedThisMonth: 0 },
-      plan: { key: "growth", unitsPerMonth: 50_000, usedThisMonth: 0, ratePerMinute: 60 },
+      plan: { key: "growth", unitsPerMonth: 250_000, usedThisMonth: 0, ratePerMinute: 60 },
     });
     expect(me.resources).toEqual(expect.arrayContaining(["acct-widgets", "acct-nested/items"]));
     expect(JSON.stringify(me)).not.toContain(k.token.split("_")[2]);
@@ -225,7 +225,7 @@ describe("plan and quota", () => {
     await new Promise((r) => setTimeout(r, 50));
     expect(await unitsThisMonth(k.id)).toBe(20);
     const remaining = await call("/api/v1/me", { token: k.token });
-    expect(remaining.headers.get("x-units-remaining")).toBe(String(10_000 - 20 - 1));
+    expect(remaining.headers.get("x-units-remaining")).toBe(String(50_000 - 20 - 1));
   });
 
   it("stops a key at its own monthly limit (429 quota_exceeded, scope key)", async () => {
@@ -252,33 +252,33 @@ describe("plan and quota", () => {
   it("stops the whole account at the plan's units (scope plan), across keys", async () => {
     const uid = await account("pro");
     const a = await key(uid, ["read"]), b = await key(uid, ["read"]);
-    await recordUnits(a.id, uid, 9_998);
-    expect((await call("/api/v1/me", { token: b.token })).status).toBe(200); // 9_999
-    const last = await call("/api/v1/me", { token: b.token }); // 10_000
+    await recordUnits(a.id, uid, 49_998);
+    expect((await call("/api/v1/me", { token: b.token })).status).toBe(200); // 49_999
+    const last = await call("/api/v1/me", { token: b.token }); // 50_000
     expect(last.status).toBe(200);
     expect(last.headers.get("x-units-remaining")).toBe("0");
     const over = await call("/api/v1/me", { token: a.token });
     expect(over.status).toBe(429);
-    expect((await over.json()).error).toMatchObject({ code: "quota_exceeded", scope: "plan", limit: 10_000, used: 10_000 });
+    expect((await over.json()).error).toMatchObject({ code: "quota_exceeded", scope: "plan", limit: 50_000, used: 50_000 });
   });
 });
 
 describe("rate limit", () => {
-  it("allows 60 requests a minute per key, then 429 rate_limited with Retry-After", async () => {
+  it("allows the plan's requests a minute per key (120 on Unlimited), then 429 rate_limited with Retry-After", async () => {
     const uid = await account("agency");
     const k = await key(uid, ["read"]);
     let last: Response | null = null;
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 120; i++) {
       last = await call("/api/v1/acct-widgets?n=0", { token: k.token });
       expect(last.status, `request ${i + 1}`).toBe(200);
     }
     expect(last!.headers.get("x-ratelimit-remaining")).toBe("0");
     const blocked = await call("/api/v1/acct-widgets?n=0", { token: k.token });
     expect(blocked.status).toBe(429);
-    expect((await blocked.json()).error).toMatchObject({ code: "rate_limited", limit: 60 });
+    expect((await blocked.json()).error).toMatchObject({ code: "rate_limited", limit: 120 });
     expect(Number(blocked.headers.get("retry-after"))).toBeGreaterThan(0);
     expect(Number(blocked.headers.get("retry-after"))).toBeLessThanOrEqual(60);
-    expect(await unitsThisMonth(k.id)).toBe(60);
+    expect(await unitsThisMonth(k.id)).toBe(120);
     // A second key on the same account has its own window.
     const k2 = await key(uid, ["read"]);
     expect((await call("/api/v1/acct-widgets?n=0", { token: k2.token })).status).toBe(200);

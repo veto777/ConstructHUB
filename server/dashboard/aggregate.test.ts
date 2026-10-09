@@ -8,7 +8,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
-import { AGENCY_SELF_SERVE_MAX_LOCATIONS, PLANS } from "@shared/plans";
+import { PLANS, UNLIMITED } from "@shared/plans";
 import { DASHBOARD_TILE_KEYS, type DashboardPayload, type DashboardTile, type DashboardTileKey } from "@shared/dashboard";
 import { buildDashboard, withTimeout, DashboardTimeout } from "./aggregate";
 import { createDashboardCache } from "./cache";
@@ -139,10 +139,10 @@ describe("buildDashboard (development database)", () => {
     for (const key of ["gbp", "reviews", "profileGuard", "rankingGrid", "gbpContent", "siteScan", "media", "permits"] as const) {
       expect(tile(p, key)).toMatchObject({ status: "locked", entitled: false, requiredPlan: "starter", metrics: [], cta: { href: "/pricing" } });
     }
-    expect(tile(p, "clickGuard")).toMatchObject({ status: "locked", requiredPlan: "pro" });
-    expect(tile(p, "competitors")).toMatchObject({ status: "locked", requiredPlan: "pro" });
-    expect(tile(p, "cloudflare")).toMatchObject({ status: "locked", requiredPlan: "agency", module: "cloudflareSearchConsole" });
-    expect(tile(p, "agency")).toMatchObject({ status: "locked", requiredPlan: "agency", module: "agencyWorkspace" });
+    expect(tile(p, "clickGuard")).toMatchObject({ status: "locked", requiredPlan: "starter" });
+    expect(tile(p, "competitors")).toMatchObject({ status: "locked", requiredPlan: "starter" });
+    expect(tile(p, "cloudflare")).toMatchObject({ status: "locked", requiredPlan: "pro", module: "cloudflareSearchConsole" });
+    expect(tile(p, "agency")).toMatchObject({ status: "locked", requiredPlan: "growth", module: "agencyWorkspace" });
     // The CRM is included with every plan; no plan and no org → locked to the first plan.
     expect(tile(p, "crm")).toMatchObject({ status: "locked", requiredPlan: "starter" });
     // The AI Call Assistant is a separate service on its own subscription: locked, and no plan is "required".
@@ -182,13 +182,16 @@ describe("buildDashboard (development database)", () => {
   it("Starter: its own meters, and the Pro and Agency features locked", async () => {
     const { payload: p } = await buildDashboard(s.starter, { log: quiet });
     const l = PLANS.starter.limits;
-    expect(p.account).toMatchObject({ plan: "starter", planName: "Starter", status: "active", firstName: "Sam" });
+    expect(p.account).toMatchObject({ plan: "starter", planName: "Solo", status: "active", firstName: "Sam" });
     expect(p.account.renewsAt).toMatch(/^\d{4}-/);
-    expect(p.account.usage.map((u) => u.key)).toEqual(["searches", "rankings", "siteScans", "locations"]);
+    // Solo includes every one of these (limit 0 meters are left out): searches, grid credits,
+    // Site Scans, Competitor Intel scans, team texts, locations and protected websites.
+    expect(p.account.usage.map((u) => u.key)).toEqual(["searches", "rankings", "siteScans", "competitorScans", "texts", "locations", "protectedSites"]);
     expect(p.account.usage.find((u) => u.key === "searches")).toMatchObject({ used: 0, limit: l.permitSearches });
-    expect(tile(p, "cloudflare")).toMatchObject({ status: "locked", requiredPlan: "agency" });
-    expect(tile(p, "clickGuard")).toMatchObject({ status: "locked", requiredPlan: "pro" });
-    expect(tile(p, "texting")).toMatchObject({ status: "locked", requiredPlan: "pro" });
+    expect(tile(p, "cloudflare")).toMatchObject({ status: "locked", requiredPlan: "pro" });
+    // Solo includes 1 protected website and 200 team text segments: both tiles open (nothing set up yet).
+    expect(tile(p, "clickGuard")).toMatchObject({ status: "empty", entitled: true });
+    expect(tile(p, "texting")).toMatchObject({ status: "empty", entitled: true, cta: { label: "Set up the CRM", href: "/crm-app", surface: "app" } });
     // Nothing set up: "empty" with a setup CTA, not zeros.
     expect(tile(p, "gbp")).toMatchObject({ status: "empty", cta: { label: "Connect Google", href: "/locations" } });
     expect(tile(p, "siteScan").status).toBe("empty");
@@ -197,7 +200,8 @@ describe("buildDashboard (development database)", () => {
     // Activity leads; the month's quota (also the header's meter) comes last.
     expect(tile(p, "permits").metrics.map((m) => m.key)).toEqual(["searches7d", "lastSearch", "searches"]);
     expect(tile(p, "permits").metrics[2]).toMatchObject({ key: "searches", value: 0, limit: l.permitSearches });
-    expect(p.checklist.map((c) => c.key)).toEqual(["connectGoogle", "addLocation", "turnOnGuard", "runSiteScan", "requestReviews", "setUpCrm", "inviteTeammate"]);
+    // Solo includes a protected website and client texting (BYO/add-on), so both are on the checklist.
+    expect(p.checklist.map((c) => c.key)).toEqual(["connectGoogle", "addLocation", "turnOnGuard", "runSiteScan", "requestReviews", "protectWebsite", "setUpCrm", "inviteTeammate", "addTextingNumber"]);
   });
 
   it("Agency with data: every number is the account's own", async () => {
@@ -207,12 +211,12 @@ describe("buildDashboard (development database)", () => {
     expect(cacheable).toBe(true);
     expect(ms).toBeLessThan(1500);
 
-    expect(p.account).toMatchObject({ plan: "agency", planName: "Agency", status: "active", firstName: "Dana", displayName: "Dana Agency", unreadNotifications: 1 });
+    expect(p.account).toMatchObject({ plan: "agency", planName: "Unlimited", status: "active", firstName: "Dana", displayName: "Dana Agency", unreadNotifications: 1 });
     expect(p.account.usage.find((u) => u.key === "searches")).toMatchObject({ used: 7, limit: PLANS.agency.limits.permitSearches });
     expect(p.account.usage.find((u) => u.key === "crmSeats")).toMatchObject({ surface: "portal" });
 
     expect(value(p, "gbp", "locations")).toBe(2);
-    expect(tile(p, "gbp").metrics.find((m) => m.key === "locations")?.limit).toBe(AGENCY_SELF_SERVE_MAX_LOCATIONS);
+    expect(tile(p, "gbp").metrics.find((m) => m.key === "locations")?.limit).toBe(UNLIMITED);
     // Results lead the tiles; quotas the header already meters come last.
     expect(tile(p, "gbp").metrics[0].key).toBe("googleAccounts");
     expect(tile(p, "clickGuard").metrics.map((m) => m.key)).toEqual(["suspicious30d", "blockedIps", "sites"]);

@@ -94,7 +94,8 @@ describe("dashboard for a platform admin", () => {
     const usage = Object.fromEntries(p.account.usage.map((u) => [u.key, u]));
     expect(usage.locations).toMatchObject({ used: 3, limit: PLANS.starter.limits.locations });
     expect(usage.searches).toMatchObject({ used: 150, limit: PLANS.starter.limits.permitSearches });
-    expect(usage.protectedSites).toBeUndefined();
+    // Solo includes 1 protected website: the meter shows (used 1 of 1 — a full standing count is not flagged).
+    expect(usage.protectedSites).toMatchObject({ used: 1, limit: PLANS.starter.limits.protectedSites });
     const keys = dashboardAttention(p.tiles, p.account).map((a) => a.key);
     expect(keys).toEqual(expect.arrayContaining(["usage.locations", "usage.searches"]));
     // Not an admin and the service not bought: the (launched) AI Call Assistant is locked like any tile — not "coming soon", no plan named.

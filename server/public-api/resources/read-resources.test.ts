@@ -236,10 +236,10 @@ describe("account", () => {
     expect(r.status).toBe(200);
     const d = r.body.data;
     expect(d.account).toMatchObject({ id: A, companyName: "ACCT A Co" });
-    expect(d.plan).toMatchObject({ key: "agency", name: "Agency", isPlatformAdmin: false });
-    expect(d.limits.locations).toBeGreaterThan(0);
+    expect(d.plan).toMatchObject({ key: "agency", name: "Unlimited", isPlatformAdmin: false });
+    expect(d.limits.locations).toBe(-1); // Unlimited: no location cap
     expect(d.modules.agencyWorkspace).toBe(true);
-    expect(d.api).toMatchObject({ enabled: true, unitsPerMonth: 250_000, ratePerMinute: 60 });
+    expect(d.api).toMatchObject({ enabled: true, unitsPerMonth: -1, ratePerMinute: 120 });
     expect(d.api.key).toMatchObject({ id: keyOf(A), name: "ACCT test", prefix: prefixOf(A), suffix: "wxyz", scopes: ["read"], monthlyUnitLimit: 500 });
     expect(JSON.stringify(d)).not.toContain("secret_hash");
     expect(d.api.remaining).toBeLessThanOrEqual(500);
@@ -251,7 +251,7 @@ describe("account", () => {
   it("shows Pro's quota, and no API for an account without a plan — with its workspaces", async () => {
     const b = await api("/api/v1/account", B);
     expect(b.body.data.plan.key).toBe("pro");
-    expect(b.body.data.api).toMatchObject({ enabled: true, unitsPerMonth: 10_000 });
+    expect(b.body.data.api).toMatchObject({ enabled: true, unitsPerMonth: 50_000 });
     expect(b.body.data.api.key.monthlyUnitLimit).toBeNull();
     const m = await api("/api/v1/account", M);
     expect(m.body.data.plan.key).toBeNull();
@@ -512,7 +512,7 @@ describe("metering hint", () => {
     const acct = await api("/api/v1/account", B);
     expect(acct.body.data.api.usedThisMonth).toBeGreaterThanOrEqual(3);
     expect(acct.body.data.api.key.unitsThisMonth).toBe(acct.body.data.api.usedThisMonth);
-    expect(acct.body.data.api.remaining).toBe(10_000 - acct.body.data.api.usedThisMonth);
+    expect(acct.body.data.api.remaining).toBe(50_000 - acct.body.data.api.usedThisMonth);
   });
   it("counts a page of 100+ rows as extra units", async () => {
     const many = Array.from({ length: 120 }, (_, i) => `(${B},${locB},'Bulk ${i}',4,'2026-08-01T00:00:00Z','x')`).join(",");

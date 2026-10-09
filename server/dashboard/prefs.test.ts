@@ -300,7 +300,7 @@ describe("dashboard prefs (development database)", () => {
   it("a locked tile stays locked whether it is shown or hidden", async () => {
     await saveDashboardLayout(s.starter, normalizeDashboardLayout({ hidden: ["cloudflare"] }));
     const hidden = (await buildDashboard(s.starter, { log: quiet })).payload;
-    expect(hidden.hiddenTiles).toEqual([{ key: "cloudflare", entitled: false, requiredPlan: "agency" }]);
+    expect(hidden.hiddenTiles).toEqual([{ key: "cloudflare", entitled: false, requiredPlan: "pro" }]);
     await resetDashboardLayout(s.starter);
     const shown = (await buildDashboard(s.starter, { log: quiet })).payload;
     expect(shown.tiles.find((t) => t.key === "cloudflare")).toMatchObject({ status: "locked", entitled: false, metrics: [] });

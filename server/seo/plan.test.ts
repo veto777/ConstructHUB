@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { PLANS, PLAN_KEYS, SEO_PLAN_LIMITS, SEO_GRANDFATHERED_LIMITS, SEO_NOT_INCLUDED_LINE, UNLIMITED } from "@shared/plans";
 import { keywordsFit, seoAllowanceTest, SEO_ENV_VARS, SEO_NOT_READY_MESSAGE } from "./plan";
 
-describe("ConstructHUB SEO plan units (shared/plans.ts SEO_PLAN_LIMITS — Agency only, owner 2026-10-08)", () => {
+describe("ConstructHUB SEO plan units (shared/plans.ts SEO_PLAN_LIMITS — a taste on Agency, the suite on Unlimited, owner 2026-10-09)", () => {
   it("every plan carries the SEO limits from the one table", () => {
     for (const key of PLAN_KEYS) {
       const l = PLANS[key].limits;
@@ -10,22 +10,33 @@ describe("ConstructHUB SEO plan units (shared/plans.ts SEO_PLAN_LIMITS — Agenc
       expect(l.seoCreditCents).toBe(SEO_PLAN_LIMITS[key].seoCreditCents);
     }
   });
-  it("Agency: 1,000 tracked keywords and $40 of SEO data a month; Starter, Pro and Growth: none", () => {
+  it("Unlimited: 5,000 tracked keywords and $60 of SEO data a month; Agency ($199): a 250-keyword taste with $10; Solo, Team and Pro: none", () => {
     expect(SEO_PLAN_LIMITS.starter).toEqual({ seoKeywords: 0, seoCreditCents: 0 });
+    expect(SEO_PLAN_LIMITS.team).toEqual({ seoKeywords: 0, seoCreditCents: 0 });
     expect(SEO_PLAN_LIMITS.pro).toEqual({ seoKeywords: 0, seoCreditCents: 0 });
-    expect(SEO_PLAN_LIMITS.growth).toEqual({ seoKeywords: 0, seoCreditCents: 0 });
-    expect(SEO_PLAN_LIMITS.agency).toEqual({ seoKeywords: 1000, seoCreditCents: 4000 });
+    expect(SEO_PLAN_LIMITS.growth).toEqual({ seoKeywords: 250, seoCreditCents: 1000 });
+    expect(SEO_PLAN_LIMITS.agency).toEqual({ seoKeywords: 5000, seoCreditCents: 6000 });
   });
-  it("a grandfathered account keeps what its plan had before: 50 / $10, 200 / $20, 1,000 / $40", () => {
+  it("a grandfathered account keeps what its plan had before: 50 / $10, 200 / $20, 1,000 / $40 — and the overlay only ever raises", () => {
     expect(SEO_GRANDFATHERED_LIMITS.starter).toEqual({ seoKeywords: 50, seoCreditCents: 1000 });
+    expect(SEO_GRANDFATHERED_LIMITS.team).toEqual({ seoKeywords: 50, seoCreditCents: 1000 });
     expect(SEO_GRANDFATHERED_LIMITS.pro).toEqual({ seoKeywords: 200, seoCreditCents: 2000 });
     expect(SEO_GRANDFATHERED_LIMITS.growth).toEqual({ seoKeywords: 1000, seoCreditCents: 4000 });
-    expect(SEO_GRANDFATHERED_LIMITS.agency).toEqual(SEO_PLAN_LIMITS.agency);
-    // The kept numbers are never below what the plan publishes, so the overlay only ever raises.
+    expect(SEO_GRANDFATHERED_LIMITS.agency).toEqual({ seoKeywords: 1000, seoCreditCents: 4000 });
+    // The overlay only ever raises: the effective allowance (the larger of the published and the
+    // kept numbers) is never below either one. Growth's kept 1,000 / $40 raises its published
+    // 250 / $10; Unlimited's published 5,000 / $60 is above the kept 1,000 / $40, so it stays.
     for (const key of PLAN_KEYS) {
-      expect(SEO_GRANDFATHERED_LIMITS[key].seoKeywords).toBeGreaterThanOrEqual(SEO_PLAN_LIMITS[key].seoKeywords);
-      expect(SEO_GRANDFATHERED_LIMITS[key].seoCreditCents).toBeGreaterThanOrEqual(SEO_PLAN_LIMITS[key].seoCreditCents);
+      const published = SEO_PLAN_LIMITS[key], kept = SEO_GRANDFATHERED_LIMITS[key];
+      expect(Math.max(published.seoKeywords, kept.seoKeywords), key).toBeGreaterThanOrEqual(published.seoKeywords);
+      expect(Math.max(published.seoKeywords, kept.seoKeywords), key).toBeGreaterThanOrEqual(kept.seoKeywords);
+      expect(Math.max(published.seoCreditCents, kept.seoCreditCents), key).toBeGreaterThanOrEqual(published.seoCreditCents);
+      expect(Math.max(published.seoCreditCents, kept.seoCreditCents), key).toBeGreaterThanOrEqual(kept.seoCreditCents);
     }
+    expect(Math.max(SEO_PLAN_LIMITS.growth.seoKeywords, SEO_GRANDFATHERED_LIMITS.growth.seoKeywords)).toBe(1000);
+    expect(Math.max(SEO_PLAN_LIMITS.growth.seoCreditCents, SEO_GRANDFATHERED_LIMITS.growth.seoCreditCents)).toBe(4000);
+    expect(Math.max(SEO_PLAN_LIMITS.agency.seoKeywords, SEO_GRANDFATHERED_LIMITS.agency.seoKeywords)).toBe(5000);
+    expect(Math.max(SEO_PLAN_LIMITS.agency.seoCreditCents, SEO_GRANDFATHERED_LIMITS.agency.seoCreditCents)).toBe(6000);
   });
   it("never shrink going up the ladder (so raiseHint always finds a bigger plan below the top)", () => {
     for (let i = 1; i < PLAN_KEYS.length; i++) {
@@ -34,8 +45,8 @@ describe("ConstructHUB SEO plan units (shared/plans.ts SEO_PLAN_LIMITS — Agenc
       expect(upper.seoCreditCents).toBeGreaterThanOrEqual(lower.seoCreditCents);
     }
   });
-  it("the gate is the keyword allowance: Agency passes, the other plans do not, Site Scans alone no longer open the tools", () => {
-    for (const key of PLAN_KEYS) expect(seoAllowanceTest(PLANS[key].limits), key).toBe(key === "agency");
+  it("the gate is the keyword allowance: Agency and Unlimited pass, the plans below Agency do not, Site Scans alone no longer open the tools", () => {
+    for (const key of PLAN_KEYS) expect(seoAllowanceTest(PLANS[key].limits), key).toBe(key === "growth" || key === "agency");
     // Starter has Site Scans and still no SEO tools.
     expect(PLANS.starter.limits.siteScans).toBeGreaterThan(0);
     expect(seoAllowanceTest(PLANS.starter.limits)).toBe(false);
@@ -43,15 +54,17 @@ describe("ConstructHUB SEO plan units (shared/plans.ts SEO_PLAN_LIMITS — Agenc
     expect(seoAllowanceTest({ ...PLANS.starter.limits, seoKeywords: 50 })).toBe(true);
     expect(seoAllowanceTest({ ...PLANS.starter.limits, seoKeywords: UNLIMITED })).toBe(true);
   });
-  it("the plans without the tools say so in one plain line that names Agency and no price or count", () => {
-    for (const key of ["starter", "pro", "growth"] as const) {
+  it("the plans without the tools say so in one plain line that names Unlimited; the plans with them carry an SEO bullet", () => {
+    for (const key of ["starter", "team", "pro"] as const) {
       expect(PLANS[key].notIncluded, key).toContain(SEO_NOT_INCLUDED_LINE);
       expect(PLANS[key].features.some((f) => /\bSEO\b/.test(f)), key).toBe(false);
     }
+    // Agency ($199) has the taste and Unlimited the suite: neither carries the "not included" line, both an SEO bullet.
+    expect(PLANS.growth.notIncluded).not.toContain(SEO_NOT_INCLUDED_LINE);
+    expect(PLANS.growth.features.some((f) => /\bSEO\b/.test(f))).toBe(true);
     expect(PLANS.agency.notIncluded).not.toContain(SEO_NOT_INCLUDED_LINE);
-    expect(PLANS.agency.features.some((f) => /^SEO tools:/.test(f))).toBe(true);
-    expect(SEO_NOT_INCLUDED_LINE).toMatch(/Agency/);
-    expect(SEO_NOT_INCLUDED_LINE).not.toMatch(/\$|\d/);
+    expect(PLANS.agency.features.some((f) => /\bSEO\b/.test(f))).toBe(true);
+    expect(SEO_NOT_INCLUDED_LINE).toMatch(/Unlimited/);
   });
 });
 

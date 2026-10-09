@@ -17,12 +17,13 @@ describe("SEO data credit (owner, 2026-10-07)", () => {
     for (const usd of [0.012, 0.024036, 0.1272, 1, 2.5]) expect(retailCents(usd) / 100).toBeGreaterThanOrEqual(usd * SEO_MARKUP - 1e-9);
   });
 
-  it("Agency includes $40 of SEO data a month and says so; Starter, Pro and Growth include none and say so (owner, 2026-10-08)", () => {
-    expect(PLAN_KEYS.map((k) => SEO_PLAN_LIMITS[k].seoCreditCents)).toEqual([0, 0, 0, 4000]);
+  it("Unlimited includes $60 of SEO data a month and says so; Agency ($199) a $10 taste; Solo, Team and Pro include none and say so (owner, 2026-10-09)", () => {
+    expect(PLAN_KEYS.map((k) => SEO_PLAN_LIMITS[k].seoCreditCents)).toEqual([0, 0, 0, 1000, 6000]);
     for (const key of PLAN_KEYS) expect(PLANS[key].limits.seoCreditCents).toBe(SEO_PLAN_LIMITS[key].seoCreditCents);
-    expect(PLANS.agency.features).toContain(seoDataBullet("agency"));
-    expect(seoDataBullet("agency")).toBe("SEO data: $40 / month included");
-    for (const key of ["starter", "pro", "growth"] as const) {
+    expect(seoDataBullet("agency")).toBe("SEO data: $60 / month included");
+    expect(PLANS.agency.features.some((f) => /\$60 of SEO data/.test(f))).toBe(true);
+    expect(PLANS.growth.features.some((f) => /\$10 of SEO data/.test(f))).toBe(true);
+    for (const key of ["starter", "team", "pro"] as const) {
       expect(PLANS[key].features.some((f) => /SEO data/.test(f)), key).toBe(false);
       expect(PLANS[key].notIncluded, key).toContain(SEO_NOT_INCLUDED_LINE);
     }
@@ -54,10 +55,12 @@ describe("SEO data credit (owner, 2026-10-07)", () => {
     expect(SEO_PRICES.keywordResearch).toBe(8);
     expect(SEO_PRICES.competitorGap).toBe(10);
     expect(SEO_PRICES.rankChecksPer100).toBe(24);
-    // A grandfathered Starter allowance covers about eight Site Explorer reports, or a hundred report pages; Agency's four times that.
+    // A grandfathered Starter allowance covers about eight Site Explorer reports, or a hundred report pages;
+    // the Agency taste ($10) a hundred report pages; Unlimited's $60 four times the grandfathered Starter's.
     expect(Math.floor(SEO_GRANDFATHERED_LIMITS.starter.seoCreditCents / SEO_PRICES.explorerReport)).toBe(8);
     expect(Math.floor(SEO_GRANDFATHERED_LIMITS.starter.seoCreditCents / SEO_PRICES.reportPage)).toBe(100);
-    expect(Math.floor(SEO_PLAN_LIMITS.agency.seoCreditCents / SEO_PRICES.reportPage)).toBe(400);
+    expect(Math.floor(SEO_PLAN_LIMITS.growth.seoCreditCents / SEO_PRICES.reportPage)).toBe(100);
+    expect(Math.floor(SEO_PLAN_LIMITS.agency.seoCreditCents / SEO_PRICES.reportPage)).toBe(600);
     // The reservation is never smaller than the price shown.
     expect(retailCents(EXPLORER_ESTIMATE_USD)).toBeGreaterThanOrEqual(SEO_PRICES.explorerReport);
   });

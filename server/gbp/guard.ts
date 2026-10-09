@@ -169,9 +169,10 @@ export async function writeOwnerProfile(userId:number,id:number,fields:Record<st
 const FASTEST_GUARD_MINUTES=Math.min(...PLAN_KEYS.map(k=>PLANS[k].limits.guardCadenceMinutes));
 let busy=false;
 /**
- * Checks guarded locations at the cadence of their owner's plan (guardCadenceMinutes: every 15 minutes, every
- * 30 on Agency). Owners with no active plan are not checked, so a lapsed account spends no Google quota; their
- * guard settings stay and checks resume with a plan. `onlyUser` narrows a run to one owner (tests).
+ * Checks guarded locations at the cadence of their owner's plan (guardCadenceMinutes: every 60 minutes
+ * on Solo, 30 on Team, 15 on Pro and Agency, 5 on Unlimited). Owners with no active plan are not checked,
+ * so a lapsed account spends no Google quota; their guard settings stay and checks resume with a plan.
+ * `onlyUser` narrows a run to one owner (tests).
  */
 export async function runGuardWorker(check=checkGuard,onlyUser?:number) {
   if(busy)return;busy=true;
