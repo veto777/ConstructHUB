@@ -85,6 +85,17 @@ export function eventAppliesToRow(
  * (no role metadata) keeps its stored plan unless `fallbackPlan` — our own
  * checkout metadata — names a known one.
  */
+/** Durable marker survives a zero-quantity band. Old $349 Agency prices predate the marker. */
+export function legacyAgencyBilling(sub: Stripe.Subscription): boolean {
+  const shape = describeSubscription(sub.items?.data ?? []);
+  if (shape.plan !== "agency") return false;
+  if (sub.metadata?.legacy_agency_billing === "false") return false;
+  if (sub.metadata?.legacy_agency_billing === "true" || shape.agencyItem) return true;
+  const price = shape.planItem?.price;
+  return price?.unit_amount === (shape.interval === "year" ? 349000 : 34900)
+    || /_plan_agency_(month_34900|year_349000)$/.test(price?.lookup_key ?? "");
+}
+
 export function subscriptionRowUpdate(sub: Stripe.Subscription, fallbackPlan?: string | null): SubscriptionSet {
   const shape = describeSubscription(sub.items?.data ?? []);
   const set: SubscriptionSet = {
@@ -100,7 +111,7 @@ export function subscriptionRowUpdate(sub: Stripe.Subscription, fallbackPlan?: s
     // The band item only exists on legacy 2026-09-30 Agency rows; Unlimited (the `agency` key
     // since 2026-10-09) has no billed location count. Read the legacy included count, never
     // PLANS.agency.limits.locations (-1).
-    set.agencyLocations = shape.plan === "agency" && shape.agencyExtraLocations > 0
+    set.agencyLocations = legacyAgencyBilling(sub)
       ? LEGACY_AGENCY_INCLUDED_LOCATIONS + shape.agencyExtraLocations
       : null;
   } else {

@@ -18,7 +18,7 @@ vi.mock("../db", () => ({
 import { syncAgencyLocations, agencySyncOffReason } from "./agency-sync";
 import { resetPriceCache } from "./prices";
 
-const planItem = { id: "si_plan", quantity: 1, price: { id: "price_agency", metadata: { chub_kind: "plan", chub_key: "agency" }, recurring: { interval: "month" } } };
+const planItem = { id: "si_plan", quantity: 1, price: { id: "price_agency", unit_amount: 34900, metadata: { chub_kind: "plan", chub_key: "agency" }, recurring: { interval: "month" } } };
 const bandItem = (quantity: number) => ({ id: "si_band", quantity, price: { id: "price_band", metadata: { chub_kind: "agency_locations" }, recurring: { interval: "month" } } });
 
 function fakeStripe(items: any[], status = "active") {
@@ -75,7 +75,7 @@ describe("Agency location sync", () => {
     const yearly = (item: any) => ({ ...item, price: { ...item.price, recurring: { interval: "year" } } });
     const stripe = fakeStripe([yearly(planItem), yearly(bandItem(5))]);
     await syncAgencyLocations({ stripe, log });
-    expect(stripe.subscriptions.update.mock.calls[0][1]).toEqual({ items: [{ id: "si_band", quantity: 20 }], proration_behavior: "always_invoice" });
+    expect(stripe.subscriptions.update.mock.calls[0][1]).toEqual({ metadata: { legacy_agency_billing: "true" }, items: [{ id: "si_band", quantity: 20 }], proration_behavior: "always_invoice" });
   });
 
   it("is idempotent: a matching quantity is left alone", async () => {
@@ -134,4 +134,40 @@ describe("Agency location sync", () => {
     expect(agencySyncOffReason({ NODE_ENV: "development", STRIPE_SECRET_KEY: "sk_x", AGENCY_SYNC_ALLOW_NONPROD: "1" })).toBeNull();
     expect(agencySyncOffReason({ NODE_ENV: "production", STRIPE_SECRET_KEY: "sk_x" })).toBeNull();
   });
+});
+
+it("keeps the legacy marker through a drop to ten, webhook sync, and growth back to thirty", async () => {
+  const { subscriptionRowUpdate } = await import("./sync");
+  let sub: any = { id: "sub_agency", status: "active", metadata: {}, items: { data: [planItem, bandItem(20)] } };
+  const stripe = fakeStripe([]);
+  stripe.subscriptions.retrieve.mockImplementation(async () => sub);
+  stripe.subscriptions.update.mockImplementation(async (_id: string, params: any) => {
+    sub = { ...sub, metadata: { ...sub.metadata, ...params.metadata }, items: { data: [planItem] } };
+    return sub;
+  });
+  mocks.linked.set(42, 10);
+  expect((await syncAgencyLocations({ stripe, log }))?.changed).toBe(1);
+  expect(subscriptionRowUpdate(sub).agencyLocations).toBe(10);
+  mocks.linked.set(42, 30);
+  expect((await syncAgencyLocations({ stripe, log }))?.changed).toBe(1);
+  expect(stripe.subscriptions.update.mock.calls[1][1].items).toEqual([{ price: expect.any(String), quantity: 20 }]);
+});
+
+it("a stale daily-sync selection cannot restore bands after explicit migration", async () => {
+  const stripe = fakeStripe([planItem]);
+  stripe.subscriptions.retrieve.mockResolvedValue({ id: "sub_agency", status: "active", metadata: { legacy_agency_billing: "false" }, items: { data: [planItem] } });
+  mocks.linked.set(42, 30);
+  expect((await syncAgencyLocations({ stripe, log }))?.changed).toBe(0);
+  expect(stripe.subscriptions.update).not.toHaveBeenCalled();
+});
+
+it("recovers an erased local legacy marker, but never bills a new Unlimited subscription", async () => {
+  mocks.subs[0].agency_locations = null;
+  mocks.linked.set(42, 30);
+  const stripe = fakeStripe([planItem]);
+  expect((await syncAgencyLocations({ stripe, log }))?.changed).toBe(1);
+  stripe.subscriptions.update.mockClear();
+  stripe.subscriptions.retrieve.mockResolvedValue({ id: "sub_agency", status: "active", items: { data: [{ ...planItem, price: { ...planItem.price, unit_amount: 44900 } }] } });
+  expect((await syncAgencyLocations({ stripe, log }))?.changed).toBe(0);
+  expect(stripe.subscriptions.update).not.toHaveBeenCalled();
 });

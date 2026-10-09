@@ -15,7 +15,7 @@ import { pool } from "../db";
 import { AGENCY_SELF_SERVE_MAX_LOCATIONS, agencyExtraLocations, LEGACY_AGENCY_INCLUDED_LOCATIONS } from "@shared/plans";
 import { stripe as appStripe, stripeConfigured } from "./client";
 import { describeSubscription, agencyLocationsPriceSpec, resolvePriceId } from "./prices";
-import { LIVE_STATUSES, billingSchemaReady, withBillingLock } from "./sync";
+import { LIVE_STATUSES, billingSchemaReady, withBillingLock, legacyAgencyBilling } from "./sync";
 import { recordFailure } from "../ops/issues";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -52,23 +52,23 @@ export async function syncAgencyLocations(opts: { stripe?: Stripe; log?: Log } =
   const stripe = opts.stripe ?? appStripe;
   await billingSchemaReady();
   const { rows } = await pool.query(
-    `SELECT id, user_id, stripe_subscription_id FROM subscriptions
-      WHERE plan = 'agency' AND stripe_subscription_id IS NOT NULL AND status = ANY($1)
-        AND agency_locations IS NOT NULL`,
+    `SELECT id, user_id, stripe_subscription_id, agency_locations FROM subscriptions
+      WHERE plan = 'agency' AND stripe_subscription_id IS NOT NULL AND status = ANY($1)`,
     [[...LIVE_STATUSES]]);
-  // The bands are legacy: only a stored billed count (a 2026-09-30 Agency row) is synced.
-  // Unlimited — the `agency` key since 2026-10-09 — has no location cap and never lands here.
+  // Read Stripe even when a previous webhook erased the local marker. Only legacy
+  // subscriptions are billed; new Unlimited subscriptions are skipped below.
   const included = LEGACY_AGENCY_INCLUDED_LOCATIONS;
   const result: AgencySyncResult = { checked: 0, changed: 0, failed: 0 };
   /** One subscription; true when its Stripe items changed. */
-  const syncOne = async (row: { id: number; user_id: number; stripe_subscription_id: string }): Promise<boolean> => {
+  const syncOne = async (row: { id: number; user_id: number; stripe_subscription_id: string; agency_locations?: number | null }): Promise<boolean> => {
     const sub = await stripe.subscriptions.retrieve(row.stripe_subscription_id);
-    if (!LIVE_STATUSES.has(sub.status)) return false;
+    if (!LIVE_STATUSES.has(sub.status) || sub.metadata?.legacy_agency_billing === "false") return false;
     const shape = describeSubscription(sub.items.data);
     if (shape.plan !== "agency" || !shape.interval) {
       log(`Agency location sync: user ${row.user_id} subscription ${sub.id} has no Agency plan item — skipped.`);
       return false;
     }
+    if (!legacyAgencyBilling(sub) && row.agency_locations == null) return false;
     const linked = await linkedGbpLocationCount(row.user_id);
     if (linked > AGENCY_SELF_SERVE_MAX_LOCATIONS) {
       log(`Agency location sync: user ${row.user_id} has ${linked} linked locations — above ${AGENCY_SELF_SERVE_MAX_LOCATIONS}, needs a sales quote; billing ${AGENCY_SELF_SERVE_MAX_LOCATIONS}.`);
@@ -85,7 +85,7 @@ export async function syncAgencyLocations(opts: { stripe?: Stripe; log?: Log } =
     if (shape.agencyItem && extra === 0) change = { id: shape.agencyItem.id, deleted: true };
     else if (shape.agencyItem) change = { id: shape.agencyItem.id, quantity: extra };
     else change = { price: await resolvePriceId(stripe, agencyLocationsPriceSpec(shape.interval)), quantity: extra };
-    await stripe.subscriptions.update(sub.id, { items: [change], proration_behavior: agencyProrationBehavior(shape.interval) });
+    await stripe.subscriptions.update(sub.id, { metadata: { legacy_agency_billing: "true" }, items: [change], proration_behavior: agencyProrationBehavior(shape.interval) });
     await pool.query(`UPDATE subscriptions SET agency_locations = $2 WHERE id = $1`, [row.id, billed]);
     log(`Agency location sync: user ${row.user_id} now billed for ${billed} locations (was ${included + shape.agencyExtraLocations}; ${linked} linked).`);
     return true;

@@ -31,7 +31,7 @@ export type FoundingPlanPrice = { monthlyCents: number; annualCents: number };
  * shared/plans.ts had them at the moment the account became a founding member.
  */
 export type FoundingPrices = {
-  plans: Record<PlanKey, FoundingPlanPrice>;
+  plans: Record<Exclude<PlanKey, "team">, FoundingPlanPrice> & Partial<Record<"team", FoundingPlanPrice>>;
   agencyBands: { upTo: number; centsPerLocation: number }[];
   /** PLANS.agency.limits.locations: locations the Agency price includes before the bands apply. */
   agencyIncludedLocations: number;
@@ -77,6 +77,7 @@ export function parseFoundingPrices(raw: unknown): FoundingPrices | null {
   const out = {} as Record<PlanKey, FoundingPlanPrice>;
   for (const key of PLAN_KEYS) {
     const p = (plans as Record<string, unknown>)[key] as Record<string, unknown> | undefined;
+    if (key === "team" && p === undefined) continue; // Absent from original four-plan snapshots.
     const monthlyCents = Number(p?.monthlyCents), annualCents = Number(p?.annualCents);
     if (!Number.isInteger(monthlyCents) || monthlyCents < 0 || !Number.isInteger(annualCents) || annualCents < 0) return null;
     out[key] = { monthlyCents, annualCents };
@@ -105,7 +106,8 @@ export function parseFoundingPrices(raw: unknown): FoundingPrices | null {
 export function foundingPrice(terms: AccountPricingTerms | null | undefined, plan: PlanKey, interval: BillingInterval): number {
   if (!isPlanKey(plan)) throw new Error(`Unknown plan: ${String(plan)}`);
   const snapshot = terms?.foundingMemberAt ? parseFoundingPrices(terms.foundingPrices) : null;
-  if (snapshot) return interval === "year" ? snapshot.plans[plan].annualCents : snapshot.plans[plan].monthlyCents;
+  const price = snapshot?.plans[plan];
+  if (price) return interval === "year" ? price.annualCents : price.monthlyCents;
   return planPriceCents(plan, interval);
 }
 

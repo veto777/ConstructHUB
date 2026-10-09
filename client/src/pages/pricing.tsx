@@ -221,6 +221,13 @@ export default function PricingPage() {
     },
   });
 
+  const changeQuote = useQuery<{ recurringCents: number; interval: BillingInterval }>({
+    queryKey: ["/api/stripe/change-plan-preview", confirm],
+    enabled: !!confirm,
+    staleTime: 0,
+    queryFn: async () => (await apiRequest("POST", "/api/stripe/change-plan-preview", planBody(confirm!))).json(),
+  });
+
   const changePlanMutation = useMutation({
     mutationFn: async (r: PlanRequest) => (await apiRequest("POST", "/api/stripe/change-plan", planBody(r))).json(),
     onSuccess: (data, r) => {
@@ -672,7 +679,8 @@ export default function PricingPage() {
             {confirm && (
               <>
                 {confirmFrom} changes to {PLANS[confirm.plan].name} at{" "}
-                {planRequestPrice(confirm)}, billed {intervalWord(confirm.interval)}. No second subscription is created; you can review charges in Manage billing.
+                {changeQuote.isFetching ? "Calculating total…" : changeQuote.isError ? "Total unavailable — try again before confirming." : changeQuote.data ?
+                  `${formatUsd(changeQuote.data.recurringCents)}${intervalSuffix(confirm.interval)}` : "Calculating total…"}, including retained add-ons, billed {intervalWord(confirm.interval)} before tax and discounts. Prorated charges apply immediately. No second subscription is created.
               </>
             )}
           </AlertDialogDescription>
@@ -681,7 +689,7 @@ export default function PricingPage() {
           <AlertDialogCancel disabled={changePlanMutation.isPending}>Cancel</AlertDialogCancel>
           <AlertDialogAction
             onClick={(e) => { e.preventDefault(); if (confirm) changePlanMutation.mutate(confirm); }}
-            disabled={changePlanMutation.isPending}
+            disabled={changePlanMutation.isPending || changeQuote.isFetching || changeQuote.isError || !changeQuote.data}
             data-testid="button-confirm-change-plan"
           >
             {changePlanMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-1" />}

@@ -17,13 +17,13 @@ import {
 import { stripe, PaymentsNotConfiguredError } from "./billing/client";
 import { describeSubscription } from "./billing/prices";
 import {
-  BillingRequestError, parsePlanOrder, parsePlanKey, parseInterval, parseAddonQuantities, checkAddonsForPlan, mergeAddonRequest,
-  checkoutLineItems, subscriptionChange, type PlanOrder, type AddonQuantities,
+  BillingRequestError, parsePlanOrder, parsePlanKey, parseInterval, parseAddonQuantities,
+  checkoutLineItems, subscriptionChange, subscriptionOrderTotal, type PlanOrder, type AddonQuantities,
 } from "./billing/order";
 import {
   billingSchemaReady, hasLiveStripeSubscription, trialEligible, eventAppliesToRow, subscriptionRowUpdate,
   canceledRowUpdate, subscriptionSummary, LIVE_STATUSES, recordCancellation, cancellationFor, cancellationOf,
-  withBillingLock, subscriptionStartOf,
+  withBillingLock, subscriptionStartOf, legacyAgencyBilling,
 } from "./billing/sync";
 import { startAgencyLocationSync } from "./billing/agency-sync";
 import { recordBillingEvent, releaseBillingEvent, attributeBillingEvent } from "./billing/ledger";
@@ -127,6 +127,8 @@ const orderMetadata = (userId: number, order: PlanOrder) => ({
   interval: order.interval,
   addons: JSON.stringify(order.addons),
   locations: order.agencyLocations === null ? "" : String(order.agencyLocations),
+  // A new Unlimited checkout can carry a founding $349 base; it still has no bands.
+  legacy_agency_billing: String(order.agencyLocations !== null),
 });
 
 const NO_SUBSCRIPTION = () => new BillingRequestError(409,
@@ -206,7 +208,7 @@ async function noteIntrosUsed(userId: number, set: ReturnType<typeof subscriptio
 async function applyToSubscription(userId: number, row: SubscriptionRow, sub: Stripe.Subscription, current: ReturnType<typeof describeSubscription>, order: PlanOrder) {
   // Founding members are billed from their stored price snapshot, never the live book.
   const change = await subscriptionChange(stripe, current, order, row.plan, (await getEntitlements(userId)).foundingMember);
-  if (!change.items.length && !change.addInvoiceItems.length) {
+  if (!change.items.length && !change.addInvoiceItems.length && !order.changePlan) {
     return { changed: false, subscription: subscriptionSummary(row, cancellationOf(sub)) };
   }
   // An add-on added for the first time with an intro price (shared/plans.ts) gets its coupon on that item.
@@ -217,7 +219,7 @@ async function applyToSubscription(userId: number, row: SubscriptionRow, sub: St
     ...(change.addInvoiceItems.length ? { add_invoice_items: change.addInvoiceItems } : {}),
     proration_behavior: "always_invoice",
     payment_behavior: "error_if_incomplete",
-    metadata: { userId: String(userId), plan: order.plan, interval: order.interval },
+    metadata: { userId: String(userId), plan: order.plan, interval: order.interval, legacy_agency_billing: String(order.agencyLocations !== null) },
   });
   for (const intro of intros) await recordIntro(userId, intro.addon, intro.couponId, updated.id);
   const set = await writeSubscriptionRow({ id: row.id }, userId, updated);
@@ -377,12 +379,30 @@ export function registerStripeRoutes(app: Express) {
    * Existing subscriber switches plan / interval / Agency locations (and may
    * set add-on quantities in the same call). Updates the one subscription.
    */
+  // Same order rules as the mutation; no Stripe writes or price creation for a quote.
+  app.post("/api/stripe/change-plan-preview", async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      if (!user) return res.status(401).json({ message: "Login required" });
+      const quote = await withBillingLock(user.id, async () => {
+        const { row, sub, current } = await liveSubscription(user.id);
+        const order = parsePlanOrder(req.body ?? {}, {
+          plan: current.plan ?? row.plan, interval: current.interval, addons: current.addons,
+          agencyLocations: sub.metadata?.legacy_agency_billing !== "false" && (legacyAgencyBilling(sub) || row.agencyLocations != null)
+            ? LEGACY_AGENCY_INCLUDED_LOCATIONS + current.agencyExtraLocations : null,
+        });
+        return { recurringCents: subscriptionOrderTotal(current, order, (await getEntitlements(user.id)).foundingMember, row.plan), interval: order.interval };
+      });
+      res.json(quote);
+    } catch (err: any) { sendStripeError(res, err); }
+  });
+
   app.post("/api/stripe/change-plan", async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
       if (!user) return res.status(401).json({ message: "Login required" });
       // Cheap validation before any Stripe call or step-up prompt.
-      parsePlanKey(req.body?.plan);
+      if (req.body?.plan !== undefined) parsePlanKey(req.body.plan);
       parseInterval(req.body?.interval);
       parseAddonQuantities(req.body?.addons);
       if (!(await recentAuthOk(req, res))) return;
@@ -391,12 +411,11 @@ export function registerStripeRoutes(app: Express) {
       const changed = await withBillingLock(user.id, async () => {
         const { row, sub, current } = await liveSubscription(user.id);
         const order = parsePlanOrder(req.body ?? {}, {
+          plan: current.plan ?? row.plan,
           interval: current.interval,
           addons: current.addons,
-          // Legacy banded rows keep their billed count; an Unlimited sub has no band item (null).
-          agencyLocations: current.plan === "agency" && current.agencyExtraLocations > 0
-            ? LEGACY_AGENCY_INCLUDED_LOCATIONS + current.agencyExtraLocations
-            : null,
+          agencyLocations: sub.metadata?.legacy_agency_billing !== "false" && (legacyAgencyBilling(sub) || row.agencyLocations != null)
+            ? LEGACY_AGENCY_INCLUDED_LOCATIONS + current.agencyExtraLocations : null,
         });
         return applyToSubscription(user.id, row, sub, current, order);
       });
@@ -431,18 +450,11 @@ export function registerStripeRoutes(app: Express) {
           throw new BillingRequestError(409,
             "Your subscription is on an older plan. Switch to a current plan first (Change plan), then add add-ons.", "legacy_plan");
         }
-        // Asking for another Call Assistant tier is a switch: the held one goes in the same (prorated) update.
-        const addons = Object.fromEntries(
-          Object.entries(mergeAddonRequest(current.addons, requested)).filter(([, qty]) => (qty ?? 0) > 0));
-        checkAddonsForPlan(current.plan, addons);
-        const order: PlanOrder = {
-          plan: current.plan,
-          interval: current.interval,
-          addons,
-          agencyLocations: current.plan === "agency" && current.agencyExtraLocations > 0
-            ? LEGACY_AGENCY_INCLUDED_LOCATIONS + current.agencyExtraLocations
-            : null,
-        };
+        const order = parsePlanOrder({ addons: requested }, {
+          plan: current.plan, interval: current.interval, addons: current.addons,
+          agencyLocations: sub.metadata?.legacy_agency_billing !== "false" && (legacyAgencyBilling(sub) || row.agencyLocations != null)
+            ? LEGACY_AGENCY_INCLUDED_LOCATIONS + current.agencyExtraLocations : null,
+        });
         return applyToSubscription(user.id, row, sub, current, order);
       });
       // Add-ons change allowances (texts, sites): the dashboard rebuilds on the next load.

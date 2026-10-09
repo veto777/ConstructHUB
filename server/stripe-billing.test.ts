@@ -151,7 +151,7 @@ const lineItems = () => mocks.checkout.mock.calls[0][0].line_items as { price: s
 function item(id: string, priceId: string, quantity = 1, role?: { kind: string; key?: string }, interval = "month") {
   return {
     id, quantity,
-    price: { id: priceId, recurring: { interval }, metadata: role ? { chub_kind: role.kind, chub_key: role.key ?? "", chub_interval: interval } : {} },
+    price: { ...mocks.prices.get(priceId), id: priceId, recurring: { interval }, metadata: role ? { chub_kind: role.kind, chub_key: role.key ?? "", chub_interval: interval } : {} },
   };
 }
 function subscription(items: any[], extra: any = {}) {
@@ -203,7 +203,7 @@ beforeEach(() => {
       else items.push(onPrice(`si_new_${n}`, change.price, change.quantity));
     });
     // Stripe's state changes with the update: what retrieve answers from here on (the transition reads it under the lock).
-    const next = subscription(items, { id, metadata: mocks.current.metadata });
+    const next = subscription(items, { id, metadata: { ...mocks.current.metadata, ...params.metadata } });
     mocks.current = next;
     return next;
   });
@@ -493,14 +493,12 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
     expect(res.body.subscription).toMatchObject({ plan: "growth", effectivePlan: "growth" });
   });
 
-  it("refuses to carry an add-on the new plan doesn't offer (Unlimited includes protected sites)", async () => {
+  it("removes a held add-on included by the new plan (Unlimited includes protected sites)", async () => {
     await seedProSubscription([item("si_site", "price_chub_v1_addon_protected_site_month_1500", 1, { kind: "addon", key: "protected_site" }, "month")]);
     mocks.rows.push([liveRow()]);
     const res = await request("/api/stripe/change-plan", { plan: "agency" });
-    expect(res.code).toBe(400);
-    expect(res.body.code).toBe("addon_unavailable");
-    expect(res.body.message).toMatch(/isn't available on the Unlimited plan/);
-    expect(mocks.update).not.toHaveBeenCalled();
+    expect(res.code).toBe(200);
+    expect(mocks.update.mock.calls[0][1].items).toContainEqual({ id: "si_site", deleted: true });
   });
 
   it("month → year reprices every item to its yearly price", async () => {
@@ -1571,4 +1569,59 @@ describe("webhook → billing emails: one call per verified platform event, afte
     expect(mocks.sql.some((s) => /DELETE FROM billing_events/.test(s.text) && s.values[0] === "evt_fail")).toBe(true);
     expect(mocks.billingEmail).not.toHaveBeenCalled();
   });
+});
+
+describe("price rebuild legacy billing routes", () => {
+  function legacyAgency(extra = 10) {
+    const base = item("si_plan", "price_old_agency", 1, { kind: "plan", key: "agency" });
+    (base.price as any).unit_amount = 34900;
+    mocks.current = subscription([base, ...(extra ? [item("si_band", "price_old_band", extra, { kind: "agency_locations" })] : [])]);
+  }
+  it("annual Unlimited preview and migration agree; band removal and marker change are atomic", async () => {
+    legacyAgency();
+    mocks.rows.push([liveRow({ plan: "agency", agencyLocations: 20 })]);
+    expect((await request("/api/stripe/change-plan-preview", { plan: "agency", interval: "year" })).body)
+      .toEqual({ recurringCents: 449000, interval: "year" });
+    expect(mocks.update).not.toHaveBeenCalled();
+    mocks.rows.push([liveRow({ plan: "agency", agencyLocations: 20 })]);
+    expect((await request("/api/stripe/change-plan", { plan: "agency", interval: "year" })).code).toBe(200);
+    expect(mocks.update.mock.calls[0][1]).toMatchObject({
+      metadata: { legacy_agency_billing: "false" },
+      items: [{ id: "si_plan", price: "price_chub_v1_plan_agency_year_449000", quantity: 1 }, { id: "si_band", deleted: true }],
+    });
+    expect(mocks.updates.at(-1)).toMatchObject({ agencyLocations: null });
+  });
+  it("interval-only changes retain the legacy base and marker with no band item", async () => {
+    legacyAgency(0);
+    mocks.rows.push([liveRow({ plan: "agency", agencyLocations: 10 })]);
+    expect((await request("/api/stripe/change-plan", { interval: "year" })).code).toBe(200);
+    expect(mocks.update.mock.calls[0][1]).toMatchObject({
+      metadata: { legacy_agency_billing: "true" },
+      items: [{ id: "si_plan", price: "price_chub_v1_plan_agency_year_349000", quantity: 1 }],
+    });
+    expect(mocks.updates.at(-1)).toMatchObject({ agencyLocations: 10 });
+  });
+  it("confirmation includes retained add-ons", async () => {
+    legacyAgency(0);
+    mocks.current.items.data.push(item("si_grid", "price_grid", 2, { kind: "addon", key: "grid_pack" }));
+    mocks.rows.push([liveRow({ plan: "agency", agencyLocations: 10 })]);
+    expect((await request("/api/stripe/change-plan-preview", { plan: "agency", interval: "year" })).body)
+      .toEqual({ recurringCents: 449000 + 2 * ADDONS.grid_pack.annualCents, interval: "year" });
+  });
+});
+
+it("new Unlimited checkout explicitly marks flat billing even if a founding lock supplies the old base", async () => {
+  mocks.rows.push([customerRow()]);
+  expect((await request("/api/stripe/create-checkout", { plan: "agency" })).code).toBe(200);
+  expect(mocks.checkout.mock.calls[0][0].subscription_data.metadata.legacy_agency_billing).toBe("false");
+});
+
+it("an add-on edit trusts Stripe's completed migration even if the database still has the old count", async () => {
+  const base = item("si_plan", "price_founder_unlimited", 1, { kind: "plan", key: "agency" });
+  (base.price as any).unit_amount = 34900;
+  mocks.current = subscription([base], { metadata: { legacy_agency_billing: "false" } });
+  mocks.rows.push([liveRow({ plan: "agency", agencyLocations: 30 })]);
+  expect((await request("/api/stripe/addons", { addons: { grid_pack: 1 } })).code).toBe(200);
+  expect(mocks.update.mock.calls[0][1].items).toEqual([{ price: `price_chub_v1_addon_grid_pack_month_${ADDONS.grid_pack.monthlyCents}`, quantity: 1 }]);
+  expect(mocks.updates.at(-1)).toMatchObject({ agencyLocations: null });
 });

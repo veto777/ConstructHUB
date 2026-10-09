@@ -6,14 +6,14 @@
  */
 import type Stripe from "stripe";
 import {
-  PLANS, ADDONS, ADDON_KEYS, ADDON_MAX_QUANTITY, AGENCY_SELF_SERVE_MAX_LOCATIONS, LEGACY_PLAN_MAP, TALK_TO_SALES_CODE,
+  ANNUAL_MONTHS, addonPriceCents, PLANS, ADDONS, ADDON_KEYS, ADDON_MAX_QUANTITY, AGENCY_SELF_SERVE_MAX_LOCATIONS, LEGACY_PLAN_MAP, TALK_TO_SALES_CODE,
   CALL_ASSISTANT_NAME, CALL_ASSISTANT_FROM_CENTS, CALL_ASSISTANT_PRICING_HREF, LEGACY_AGENCY_INCLUDED_LOCATIONS,
   isPlanKey, isAddonKey, isBillingInterval, isCallAssistantAddon, addonAvailableOn, agencyExtraLocations, maxExtraLocations,
   type PlanKey, type AddonKey, type BillingInterval,
 } from "@shared/plans";
 import { foundingPrice, type FoundingPrices } from "@shared/pricing-terms";
 import {
-  planPriceSpec, addonPriceSpec, addonSetupPriceSpec, agencyLocationsPriceSpec, resolvePriceId, roleOfPrice,
+  agencyLocationTiers, tieredAmountCents, planPriceSpec, addonPriceSpec, addonSetupPriceSpec, agencyLocationsPriceSpec, resolvePriceId, roleOfPrice,
   type SubscriptionShape,
 } from "./prices";
 
@@ -51,6 +51,8 @@ export type PlanOrder = {
   addons: AddonQuantities;
   /** LEGACY: billed locations of a stored 2026-09-30 Agency row (bands). Null on new checkouts. */
   agencyLocations: number | null;
+  /** Explicit plan move, including legacy Agency to Unlimited (same key). */
+  changePlan?: boolean;
 };
 
 const planList = () => Object.values(PLANS).map((p) => p.name).join(", ");
@@ -204,19 +206,31 @@ function orderAgencyLocations(raw: unknown, stored: number | null): number | nul
  */
 export function parsePlanOrder(
   body: any,
-  current: { interval?: BillingInterval | null; addons?: AddonQuantities; agencyLocations?: number | null } = {},
+  current: { plan?: string | null; interval?: BillingInterval | null; addons?: AddonQuantities; agencyLocations?: number | null } = {},
 ): PlanOrder {
-  const plan = parsePlanKey(body?.plan);
+  const plan = parsePlanKey(body?.plan ?? current.plan);
   const interval = parseInterval(body?.interval, current.interval ?? "month");
-  const addons = positive(mergeAddonRequest(current.addons ?? {}, parseAddonQuantities(body?.addons)));
-  checkAddonsForPlan(plan, addons);
+  const changePlan = current.plan !== undefined && (plan !== current.plan
+    || (body?.plan !== undefined && current.agencyLocations != null));
+  const held = { ...current.addons };
+  if (changePlan) for (const key of ADDON_KEYS) {
+    if (!addonAvailableOn(key, plan)) delete held[key];
+  }
+  const requested = parseAddonQuantities(body?.addons);
+  const addons = positive(mergeAddonRequest(held, requested));
+  // Retired holdings survive edits; validate newly purchased quantities.
+  const validation = changePlan || !current.plan ? addons : { ...addons };
+  if (!changePlan && current.plan) for (const key of ADDON_KEYS) {
+    if (!addonAvailableOn(key, plan) && (addons[key] ?? 0) <= (current.addons?.[key] ?? 0)) delete validation[key];
+  }
+  checkAddonsForPlan(plan, validation);
   // The Agency bands are retired: a NEW Unlimited checkout carries no location count and no band
-  // line. A stored subscription that still bills locations (a 2026-09-30 Agency row) keeps its
-  // count through a change — body.locations overrides it, otherwise the current count stays.
+  // line. Explicitly selecting Unlimited migrates a legacy Agency subscription;
+  // omit plan for interval-only edits that retain its base and bands.
   const agencyLocations = plan === "agency"
-    ? orderAgencyLocations(body?.locations, current.agencyLocations ?? null)
+    ? orderAgencyLocations(body?.locations, changePlan ? null : current.agencyLocations ?? null)
     : null;
-  return { plan, interval, addons, agencyLocations };
+  return { plan, interval, addons, agencyLocations, ...(current.plan !== undefined ? { changePlan } : {}) };
 }
 
 type LineItem = Stripe.Checkout.SessionCreateParams.LineItem;
@@ -235,6 +249,32 @@ export async function checkoutLineItems(stripe: Stripe, order: PlanOrder, terms?
     if (setup) items.push({ price: await resolvePriceId(stripe, setup), quantity });
   }
   return items;
+}
+
+/** Keep the existing base for add-on/interval edits; plan moves use the locked price book. */
+export function subscriptionPlanCents(current: SubscriptionShape, order: PlanOrder, terms?: CheckoutTerms): number {
+  if (!order.changePlan && current.plan === order.plan && current.planItem) {
+    const cents = current.planItem.price.unit_amount;
+    if (typeof cents !== "number") throw SALES_SET_UP();
+    const locked = terms?.prices?.plans[order.plan];
+    if (locked && cents === (current.interval === "year" ? locked.annualCents : locked.monthlyCents)) {
+      return order.interval === "year" ? locked.annualCents : locked.monthlyCents;
+    }
+    const multiplier = terms?.prices?.annualMonths ?? ANNUAL_MONTHS;
+    return current.interval === order.interval ? cents
+      : order.interval === "year" ? cents * multiplier : Math.round(cents / multiplier);
+  }
+  return planCentsFor(terms, order.plan, order.interval);
+}
+
+/** Recurring subtotal before tax/discounts, excluding the immediate prorated invoice. */
+export function subscriptionOrderTotal(current: SubscriptionShape, order: PlanOrder, terms?: CheckoutTerms, storedPlan?: string | null): number {
+  const foreign = current.otherItems.filter(item => !roleOfPrice(item.price));
+  const legacy = !current.planItem && foreign.length === 1 && !!storedPlan && Object.hasOwn(LEGACY_PLAN_MAP, storedPlan);
+  if (foreign.length && !legacy) throw SALES_SET_UP();
+  return subscriptionPlanCents(current, order, terms)
+    + tieredAmountCents(agencyLocationTiers(order.interval), agencyExtraLocations(order.agencyLocations ?? 0))
+    + ADDON_KEYS.reduce((sum, key) => sum + (current.interval === order.interval ? current.addonItems[key]?.price.unit_amount ?? addonPriceCents(key, order.interval) : addonPriceCents(key, order.interval)) * (order.addons[key] ?? 0), 0);
 }
 
 type ItemChange = Stripe.SubscriptionUpdateParams.Item;
@@ -284,8 +324,9 @@ export async function subscriptionChange(stripe: Stripe, current: SubscriptionSh
   const kept = foreign.filter((item) => item !== planSlot);
   if (kept.some((item) => item.price?.recurring?.interval && item.price.recurring.interval !== order.interval)) throw SALES_SET_UP();
 
-  const planCents = planCentsFor(terms, order.plan, order.interval);
-  const planPrice = await resolvePriceId(stripe, planPriceSpec(order.plan, order.interval, planCents));
+  const preserve = !order.changePlan && current.plan === order.plan && planSlot;
+  const planPrice = preserve && current.interval === order.interval ? planSlot.price.id
+    : await resolvePriceId(stripe, planPriceSpec(order.plan, order.interval, subscriptionPlanCents(current, order, terms)));
   if (!planSlot) items.push({ price: planPrice, quantity: 1 });
   else if (planSlot.price.id !== planPrice || (planSlot.quantity ?? 1) !== 1) items.push({ id: planSlot.id, price: planPrice, quantity: 1 });
   for (const duplicate of duplicates) items.push({ id: duplicate.id, deleted: true });
@@ -294,7 +335,9 @@ export async function subscriptionChange(stripe: Stripe, current: SubscriptionSh
   items.push(...await slotChange(current.agencyItem, extra, () => resolvePriceId(stripe, agencyLocationsPriceSpec(order.interval))));
   for (const key of ADDON_KEYS) {
     items.push(...await slotChange(current.addonItems[key] ?? null, order.addons[key] ?? 0,
-      () => resolvePriceId(stripe, addonPriceSpec(key, order.interval))));
+      () => current.interval === order.interval && current.addonItems[key]
+        ? Promise.resolve(current.addonItems[key]!.price.id)
+        : resolvePriceId(stripe, addonPriceSpec(key, order.interval))));
   }
 
   const addInvoiceItems: InvoiceItem[] = [];
