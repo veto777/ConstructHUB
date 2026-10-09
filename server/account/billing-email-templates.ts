@@ -321,6 +321,37 @@ export function subscriptionStartedEmail(facts: SubscriptionFacts, baseUrl: stri
   return { subject, html, text };
 }
 
+/**
+ * Three days before a trial converts (Stripe's customer.subscription.trial_will_end): the date, the first charge and
+ * how to cancel. The product is whatever the subscription is — a platform plan ("Pro") or the CRM ("CRM Basic") —
+ * so a CRM customer gets the same notice before their first charge (2026-10-09; the event used to be dropped for
+ * CRM subscriptions).
+ */
+export function trialEndingEmail(facts: SubscriptionFacts, baseUrl: string): EmailMessage {
+  const base = baseUrl.replace(/\/+$/, "");
+  const ends = dateWords(facts.trialEnd) ?? "soon";
+  const subject = `Your ${BRAND} ${facts.planName} trial ends ${ends}`;
+  const charge = facts.recurringCents !== null ? `${money(facts.recurringCents, facts.currency)}${facts.interval ? ` for the first ${facts.interval}` : ""}` : "the plan's price";
+  const rows: LayoutRow[] = [
+    ["Plan", `${facts.planName}${facts.interval ? ` — billed ${intervalWord(facts.interval)}` : ""}`],
+    ["Trial ends", ends],
+    ["First charge", `${facts.recurringCents !== null ? `${money(facts.recurringCents, facts.currency)} on ` : ""}${dateWords(facts.nextChargeAt ?? facts.trialEnd) ?? ends}`],
+  ];
+  for (const extra of facts.extras) rows.push(["Includes", extra]);
+  const { html, text } = emailLayout({
+    baseUrl: base,
+    title: subject,
+    intro: [
+      `Your free trial of the ${facts.planName} plan ends on ${ends}. On that day the card on file is charged ${charge}, and the plan continues without interruption.`,
+      "Nothing to do if you want to keep it. To stop before the charge, cancel under Settings → Billing & Plans — cancel before the trial ends and you pay nothing.",
+    ],
+    rows,
+    cta: { label: "Manage billing", url: billingLink(base) },
+    note: "This is the one notice before the first charge; a receipt is emailed when the invoice is paid.",
+  });
+  return { subject, html, text };
+}
+
 export function receiptEmail(invoice: InvoiceFacts, baseUrl: string): EmailMessage {
   const base = baseUrl.replace(/\/+$/, "");
   const label = invoice.number ? `Receipt ${invoice.number}` : "Receipt";

@@ -23,7 +23,9 @@ describe("the CRM is a separate product", () => {
       expect(crmPlanPriceCents(key, "year")).toBe(ours.annualCents);
     }
     expect(CRM_EXTRA_SEAT_MONTHLY_CENTS).toBeLessThanOrEqual(3500 / 2);
-    expect(CRM_TRIAL_DAYS).toBe(14);
+    // The trial length is the constant's (owner, 2026-10-07: 7 days, down from 14) — never a literal here, and every
+    // piece of copy that names it reads the constant (the help entries once said "14-day" after the change).
+    expect(Number.isInteger(CRM_TRIAL_DAYS) && CRM_TRIAL_DAYS >= 7 && CRM_TRIAL_DAYS <= 30).toBe(true);
   });
 
   it("no platform plan grants CRM seats, and the platform's seat add-on is Agency-only", () => {

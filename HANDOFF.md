@@ -61,6 +61,12 @@ Source: review 4 of 6 (reliability), findings C1/H1-H5/M7/M13. One commit per it
   records a `health` issue (critical under 5 GB) and /admin/issues shows a banner. The 2026-10-09 fill was 88 dumps
   (549 MB), 11 GB of `tmp/` uploads, 26.6 MB/day of journal (fixed above) and 14 GB in `/tmp` — `tmp/` and `/tmp` are
   still unbounded: an owner decision on upload retention is pending.
+- **CRM trial leftovers** (`shared/crm-plans.ts` CRM_TRIAL_DAYS = 7 since 10/7). `crm-plans.test.ts` no longer asserts
+  14; the three "brand vs" help entries read the constant. Stripe's `customer.subscription.trial_will_end` for a CRM
+  subscription was dropped (`server/stripe.ts`): it now reaches the new trial-ending email (`billing.trial_ending`,
+  `server/account/billing-email-templates.ts trialEndingEmail`) — the product and price come from the subscription
+  (CRM Basic $39 + seats, or a platform plan), one notice per trial, nothing for a non-trialing redelivery. Platform
+  trials get the same email (there was none before either).
 
 ## ☎️ 2026-10-08 (late evening) — the AI Call Assistant is a SEPARATE SERVICE, repriced (branch `billing/call-assistant`, NOT deployed)
 - **Owner decisions:** the Call Assistant is sold on its **own subscription**, like the CRM (`fd964e1`, `069ffdf`): no platform plan
