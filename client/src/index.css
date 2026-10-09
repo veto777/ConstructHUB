@@ -1489,3 +1489,13 @@ html.in-app .app-status-pad {
   background-size: 100% env(safe-area-inset-top);
   background-repeat: no-repeat;
 }
+/* The site added to the Home Screen (a PWA) runs under the status bar too (black-translucent), with the clock and
+   battery always WHITE — so the same pad, on a navy strip (owner 2026-10-08: "You fixed the app but not the PWA"). */
+@media (display-mode: standalone) {
+  html:not(.in-app) .app-status-pad {
+    padding-top: env(safe-area-inset-top);
+    background-image: linear-gradient(#0d1b3d, #0d1b3d);
+    background-size: 100% env(safe-area-inset-top);
+    background-repeat: no-repeat;
+  }
+}

@@ -233,7 +233,7 @@ function ShareEstimateCard({ token }: { token: string }) {
 function BrandBar({ company }: { company: any }) {
   const dark = (company?.theme?.base ?? "black") === "black";
   return (
-    <header className="sticky top-0 z-30 border-b" data-testid="estimate-brandbar"
+    <header className="app-status-pad sticky top-0 z-30 border-b" data-testid="estimate-brandbar"
       style={{ backgroundColor: company?.theme?.baseHex ?? "#111827" }}>
       <div className="max-w-3xl mx-auto px-4 h-14 flex items-center gap-3">
         {company?.logoUrl ? (

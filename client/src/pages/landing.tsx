@@ -266,7 +266,7 @@ export default function LandingPage() {
     <div className="mkt-editorial min-h-screen bg-mkt-paper text-mkt-ink overflow-x-clip">
 
       {/* Nav — a navy masthead with an orange rule under it. */}
-      <nav className={`sticky top-0 z-50 transition-transform duration-300 bg-mkt-navy border-b-[3px] border-mkt-orange ${navVisible ? "translate-y-0" : "-translate-y-full"}`}>
+      <nav className={`app-status-pad sticky top-0 z-50 transition-transform duration-300 bg-mkt-navy border-b-[3px] border-mkt-orange ${navVisible ? "translate-y-0" : "-translate-y-full"}`}>
         <SiteNavBar signedIn={!!user} next="/" />
       </nav>
 
