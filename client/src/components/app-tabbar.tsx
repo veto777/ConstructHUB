@@ -12,12 +12,12 @@ import { PLATFORM_TAB_ICONS, activeTabKey, useTabPrefs } from "@/lib/tab-prefs";
  * app"; default Home, Calls, Reviews, Locations) and "Menu", which opens the full sidebar. Phones only (below md).
  */
 const tabClass = (active: boolean) =>
-  cn("flex flex-1 flex-col items-center gap-1 py-1.5 min-h-[52px] transition-colors", active ? "text-primary" : "text-muted-foreground hover:text-foreground");
+  cn("flex flex-1 flex-col items-center gap-1 py-1.5 min-h-[52px] transition-colors", active ? "text-sidebar-primary" : "text-sidebar-foreground/70 hover:text-sidebar-foreground");
 
 function TabFace({ icon: Icon, label, active }: { icon: typeof Menu; label: string; active: boolean }) {
   return (
     <>
-      <span className={cn("flex h-7 w-12 items-center justify-center rounded-full transition-colors", active && "bg-primary/10")}>
+      <span className={cn("flex h-7 w-12 items-center justify-center rounded-full transition-colors", active && "bg-white/10")}>
         <Icon className="h-[22px] w-[22px]" strokeWidth={1.8} />
       </span>
       <span className="text-[10px] font-semibold leading-none">{label}</span>
@@ -33,7 +33,7 @@ export function AppTabBar() {
   const active = activeTabKey(tabs, location);
   return (
     <nav data-testid="app-tabbar" aria-label="Main"
-      className="fixed inset-x-0 bottom-0 z-40 flex border-t border-border/60 bg-background/90 backdrop-blur-xl md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 flex border-t border-sidebar-border bg-sidebar text-sidebar-foreground md:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
       {tabs.map((t) => (
         <Link key={t.key} href={t.href} data-testid={`tabbar-${t.key}`} className={tabClass(active === t.key)} aria-current={active === t.key ? "page" : undefined}>

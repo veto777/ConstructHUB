@@ -27,13 +27,14 @@
   --card: 0 0% 100%;
   --card-foreground: 215 50% 13%;
   --card-border: 215 20% 90%;
-  --sidebar: 215 45% 14%;
-  --sidebar-foreground: 210 20% 90%;
-  --sidebar-border: 215 40% 18%;
+  /* The brand blue of the Instagram highlight circles, #0b2f7a (owner 2026-10-08) — sidebar and the phone tab bars. */
+  --sidebar: 220 83% 26%;
+  --sidebar-foreground: 214 60% 95%;
+  --sidebar-border: 220 62% 34%;
   --sidebar-primary: 228 91% 63%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 215 40% 18%;
-  --sidebar-accent-foreground: 210 20% 85%;
+  --sidebar-accent: 220 66% 34%;
+  --sidebar-accent-foreground: 0 0% 100%;
   --sidebar-ring: 228 91% 63%;
   --popover: 0 0% 100%;
   --popover-foreground: 215 50% 13%;
@@ -98,13 +99,13 @@
   --card: 222 30% 16%;
   --card-foreground: 210 20% 92%;
   --card-border: 220 25% 20%;
-  --sidebar: 222 32% 12%;
-  --sidebar-foreground: 210 20% 90%;
-  --sidebar-border: 220 25% 20%;
+  --sidebar: 220 83% 22%;
+  --sidebar-foreground: 214 60% 95%;
+  --sidebar-border: 220 62% 30%;
   --sidebar-primary: 228 91% 67%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 220 28% 19%;
-  --sidebar-accent-foreground: 210 20% 85%;
+  --sidebar-accent: 220 66% 30%;
+  --sidebar-accent-foreground: 0 0% 100%;
   --sidebar-ring: 228 91% 67%;
   --popover: 222 30% 17%;
   --popover-foreground: 210 20% 92%;
