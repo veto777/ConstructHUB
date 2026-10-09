@@ -1,0 +1,13 @@
+#!/bin/bash
+# Fresh throwaway db seotest on 127.0.0.1:15434, then every SEO real-Postgres check script in order.
+export PATH=$HOME/.nvm/versions/node/v20.19.6/bin:$PATH
+cd <your checkout>
+P="psql -h 127.0.0.1 -p 15434 -U test -q"
+$P -d postgres -c "drop database if exists seotest" -c "create database seotest"
+$P -d seotest -c "create table users(id serial primary key, email text, company_name text); insert into users(email,company_name) values ('a','A Co'),('b','B Co')"
+export DATABASE_URL=postgres://test@127.0.0.1:15434/seotest
+for s in ${@:-ledger local ai-waiting grid tasks render ai-summary keyword-watch link-opps mentions mention-watch frequency outgoing report-schedule gsc-breakdown audit-compare report-uncertain dashboard rank-tags locks deadline alerts kimi}; do
+  out=$(timeout 300 npx tsx script/seo-$s-check.ts 2>&1)
+  echo "== $s: $(echo "$out" | grep -c "^PASS") pass, $(echo "$out" | grep -c "^FAIL") fail; $(echo "$out" | grep -i "checks passed" | tail -1)"
+  echo "$out" | grep -E "^FAIL|Error|fail" | head -8
+done

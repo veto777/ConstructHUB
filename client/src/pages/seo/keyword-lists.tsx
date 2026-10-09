@@ -119,9 +119,9 @@ function KeywordTable({ rows, picked, toggle, setPicked, market, onRemove, testI
           {grouped && (
             <tr data-testid={`${testId}-topic`}>
               <td>{setPicked && <input type="checkbox" aria-label={`Select all ${g.rows.length} keywords ${g.term ? `about ${g.term}` : "in no group"}`} checked={g.rows.every((r) => picked.has(r.keyword))} ref={(el) => { if (el) el.indeterminate = !g.rows.every((r) => picked.has(r.keyword)) && g.rows.some((r) => picked.has(r.keyword)); }} onChange={(e) => pickGroup(g.rows, e.target.checked)} />}</td>
-              {/* The term opens its own overview; the counts open only this group's rows. */}
+              {/* The term opens its own overview; "Other keywords" (no term of its own) and the counts open only this group's rows. */}
               <th scope="rowgroup" colSpan={cols - 1} className="text-left">
-                {g.term ? <Link href={seoLinks.keywords(g.term, marketParams(market))} className={`${FIG_LINK} g-text font-medium`} title={`"${g.term}" in the Keywords explorer (nothing is bought)`} data-testid="link-topic-term">{g.term}</Link> : <span className="g-text font-medium">Other keywords</span>}
+                {g.term ? <Link href={seoLinks.keywords(g.term, marketParams(market))} className={`${FIG_LINK} g-text font-medium`} title={`"${g.term}" in the Keywords explorer (nothing is bought)`} data-testid="link-topic-term">{g.term}</Link> : <Link href={at("other")} className={`${FIG_LINK} g-text font-medium`} title="Only the keywords in no group" data-testid="link-topic-other">Other keywords</Link>}
                 {" "}<Link href={at(g.term ?? "other")} className={`${TEXT_LINK} font-normal`} title="Only this group's keywords" data-testid="link-topic-rows">· {groupWords(g)}</Link>
               </th>
             </tr>
@@ -133,7 +133,7 @@ function KeywordTable({ rows, picked, toggle, setPicked, market, onRemove, testI
               <td className="num" data-label="Volume / mo"><Link href={kw(r, { section: "volume" })} className={BLOCK_LINK} title="This keyword's search volume by month" data-testid="link-keyword-volume"><BarFigure value={r.volume} max={maxVolume} color={PALETTE.keywords} /></Link></td>
               <td className="num" data-label="Difficulty"><Link href={kw(r, { section: "serp" })} className={BLOCK_LINK} title="Who ranks for it — the pages the difficulty is worked out from" data-testid="link-keyword-difficulty"><KdBadge value={r.difficulty} /></Link></td>
               <td className="num" data-label="CPC"><Link href={kw(r, { section: "cpc" })} className={FIG_LINK} title="This keyword's cost per click and bids" data-testid="link-keyword-cpc">{r.cpc == null ? "—" : `$${r.cpc.toFixed(2)}`}</Link></td>
-              <td data-label="Intent" className="g-text-2 capitalize">{r.intent ? <Link href={kw(r, { section: "ideas", table: "matchingTerms", intent: (INTENTS as readonly string[]).includes(r.intent) ? r.intent : undefined })} className={FIG_LINK} title="Keyword ideas with this intent" data-testid="link-keyword-intent">{r.intent}</Link> : "—"}</td>
+              <td data-label="Intent" className="g-text-2 capitalize">{r.intent ? <Link href={kw(r, { section: "ideas", table: "matchingTerms", intent: (INTENTS as readonly string[]).includes(r.intent) ? r.intent : undefined })} className={FIG_LINK} title={(INTENTS as readonly string[]).includes(r.intent) ? "Keyword ideas with this intent" : "Keyword ideas — the ideas table has no filter for this intent, so every idea is shown"} data-testid="link-keyword-intent">{r.intent}</Link> : "—"}</td>
               {onRemove && <td className="num"><button type="button" className="g-pill g-pill--danger !min-h-11 !px-2" onClick={() => onRemove(r.keyword)} aria-label={`Remove ${r.keyword}`}><Trash2 /></button></td>}
             </tr>
           ))}
@@ -185,7 +185,7 @@ export function BulkKeywords({ status, site, onTrack, initial = "", market, onMa
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {market && onMarket && <MarketPicker value={market} onChange={(m) => { setAsked([]); clear(); onMarket(m); }} />}
           <Button type="submit" disabled={!draft.length} data-testid="button-bulk-prepare">Analyse {draft.length ? `${Math.min(draft.length, MAX_BULK)} keyword${draft.length === 1 ? "" : "s"}` : "keywords"}</Button>
-          <span className="g-text-2 text-[13px]">{draft.length > MAX_BULK ? `Only the first ${MAX_BULK} of ${fmtNum(draft.length)} are analysed at once. ` : ""}{price != null && draft.length ? <>About <Link href={seoLinks.usage()} className={TEXT_LINK} title="Usage and credit: what lookups cost and what is left this month" data-testid="link-bulk-price">{money(bulkPrice(status, Math.min(draft.length, MAX_BULK)))}</Link> of your SEO data; reopening the same set within a day is free. {market?.label ?? "United States"}, Google.</> : "Volume, difficulty, cost per click and intent for each. United States, Google."}</span>
+          <span className="g-text-2 text-[13px]">{draft.length > MAX_BULK ? `Only the first ${MAX_BULK} of ${fmtNum(draft.length)} are analysed at once. ` : ""}{price != null && draft.length ? <>About <Link href={seoLinks.usage()} className={TEXT_LINK} title="Usage and credit: what lookups cost and what is left this month" data-testid="link-bulk-price">{money(bulkPrice(status, Math.min(draft.length, MAX_BULK)))}</Link> of your SEO data; reopening the same set within a day is free. {market?.label ?? "United States"}, Google.</> : `Volume, difficulty, cost per click and intent for each. ${market?.label ?? "United States"}, Google.`}</span>
         </div>
       </form>
       <div className="mt-4">

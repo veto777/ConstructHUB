@@ -3,13 +3,14 @@
  * first-page results overlap heavily — candidates for one topic, to be looked at, not a verdict. Free. Groups in
  * which clearly different pages of the site rank come first. The device is the page's (the address); the opened
  * group (`group`) and "all groups" (`groupsAll`) are in the address too. Each keyword opens its row in the table,
- * each volume the keywords explorer, each address of yours the site explorer's pages.
+ * each volume the keywords explorer, each address of yours the site explorer's pages. A `group` that names none of
+ * these groups is said in a chip (data-testid="active-filter") with a clear — never quietly ignored.
  */
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { apiErrorMessage } from "@/lib/queryClient";
-import { fmtDate, fmtNum, type SeoSite } from "./shell";
+import { ActiveFilter, fmtDate, fmtNum, type SeoSite } from "./shell";
 import { AddToPlan, type PlanTask } from "./plan-button";
 import { seoLinks, setParam, setParams } from "./links";
 import { hrefWith, pageParts, useRankParams, type RankTo } from "./rank-params";
@@ -49,8 +50,11 @@ export function SerpGroupsPanel({ site }: { site: SeoSite }) {
   // Where a count of keywords leads: the table on the device these groups were read on.
   const scope: RankTo = site.devices === "both" ? { device: d.device as "desktop" | "mobile" } : {};
   const to = (x: RankTo = {}) => seoLinks.rankTracker(site.id, { ...scope, ...x });
+  // A group the address opens that is not among these (the keywords or their results changed since the link was made, or another device): said, with a clear.
+  const missing = open != null && !d.groups.some((g) => g.members[0].keywordId === open)
+    ? <ActiveFilter onClear={() => setParam("group", null)} clearLabel="Clear">The results group the address opens is not among these groups on {d.device} — the keywords or their results may have changed since the link was made — so none is opened</ActiveFilter> : null;
   if (d.compared < 2) return (
-    <section className="mb-5 scroll-mt-16" data-testid="serp-groups">{head}
+    <section className="mb-5 scroll-mt-16" data-testid="serp-groups">{head}{missing}
       <p className="g-text-2 text-[13px]" data-testid="serp-groups-too-few">Not enough to compare on {d.device}: {d.compared === 0 ? "no keyword" : "only one keyword"} has a saved first page of results from the last five weeks{d.skipped > 0 ? <> (<Link href={to({ checked: true })} className={LINK} title="The keywords with a saved check" data-testid="link-serp-skipped">{fmtNum(d.skipped)}</Link> {d.skipped === 1 ? "was" : "were"} checked without one)</> : ""}. It fills in after the next rank check.</p>
     </section>
   );
@@ -80,6 +84,7 @@ export function SerpGroupsPanel({ site }: { site: SeoSite }) {
   return (
     <section className="mb-5 scroll-mt-16" data-testid="serp-groups">
       {head}
+      {missing}
       <p className="g-text-2 mb-2 max-w-3xl text-[13px]" data-testid="text-serp-groups-basis">
         From the first-page results (up to ten) saved for <Link href={to({ checked: true })} className={LINK} title="The keywords with a saved check" data-testid="link-serp-compared">{fmtNum(d.compared)} keyword{d.compared === 1 ? "" : "s"}</Link> on {d.device}{d.checkedOn ? (d.oldest && d.oldest !== d.checkedOn ? <>, each at its own newest check between {dateLink(d.oldest, "link-serp-oldest")} and {dateLink(d.checkedOn, "link-serp-newest")} — so results from different days can be compared</> : <>, checked {dateLink(d.checkedOn, "link-serp-newest")}</>) : ""}. Keywords are put together when at least {d.shared} of their first-page results are the same addresses as the group's first keyword (the others are compared with it, not with each other). Heavy overlap suggests the searches are close in meaning — a prompt to look at whether one page or separate pages should serve them, not Google's own grouping. Keywords tracked in different towns are never compared.{d.skipped > 0 ? <> <Link href={to({ checked: true })} className={LINK} title="The keywords with a saved check (a saved first page is not kept for every one)" data-testid="link-serp-skipped">{fmtNum(d.skipped)} keyword{d.skipped === 1 ? " has" : "s have"}</Link> no saved result page to compare.</> : ""} A keyword opens its row in the table above; an address of yours opens in Site explorer.
       </p>

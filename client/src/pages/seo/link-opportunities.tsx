@@ -4,9 +4,10 @@
  *
  * Every figure is a link (links.ts): a page to its row on the pages tab, a keyword and its position to the rank
  * tracker, a volume to Keywords explorer, a count of what was left out to the closest view that holds it. `page` in
- * the address outlines the suggestions on or to that page and the chip says so (or that there are none).
+ * the address outlines the suggestions on or to that page and the chip says so (or that there are none); `all` lists
+ * every suggestion, not the first 50 ("Show all" is a link to it).
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Download, Loader2 } from "lucide-react";
 import { Link } from "wouter";
@@ -28,7 +29,7 @@ const csvCell = (v: string | number | null) => { const s = v == null ? "" : Stri
 const pathOf = (u: string) => { try { const x = new URL(u); return (x.pathname || "/") + x.search; } catch { return u; } };
 const device = (d: string | null) => (d === "desktop" || d === "mobile" ? d : undefined);
 
-export function LinkOpportunitiesView({ site, crawlId, pageHref, pageParam, here, go, foreign }: {
+export function LinkOpportunitiesView({ site, crawlId, pageHref, pageParam, here, go, foreign, all = false }: {
   site: SeoSite;
   /** The newest finished crawl (part of the question). */
   crawlId?: string | null;
@@ -41,12 +42,13 @@ export function LinkOpportunitiesView({ site, crawlId, pageHref, pageParam, here
   /** An address on the audit for this site, keeping the crawl shown. */
   go: (p: AuditParams) => string;
   foreign?: Foreign;
+  /** Every row listed, not the first 50 (the address's `all`, links.ts audit). */
+  all?: boolean;
 }) {
   const q = useQuery<Data | null>({
     queryKey: [`/api/seo/sites/${site.id}/audit/link-opportunities`, crawlId ?? null], refetchOnMount: "always", retry: false,
     queryFn: async ({ queryKey, signal }) => { try { const r = await fetch(queryKey[0] as string, { credentials: "include", signal }); if (r.status === 404) return null; if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message ?? "The request failed"); return await r.json(); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
   });
-  const [shown, setShown] = useState(50);
   const firstRef = useRef<HTMLTableRowElement>(null);
   // The newest crawl could not be read: said (the server never answers with an older crawl instead).
   const unreadable = q.data && typeof q.data === "object" && "unreadable" in (q.data as object) ? (q.data as unknown as { scannedAt: string | null }) : null;
@@ -55,7 +57,8 @@ export function LinkOpportunitiesView({ site, crawlId, pageHref, pageParam, here
   const onPage = (i: Item) => !!pageParam && (pathOf(i.from) === pageParam || pathOf(i.to) === pageParam);
   const hits = d ? d.items.filter(onPage).length : 0;
   const firstHit = d && pageParam ? d.items.findIndex(onPage) : -1;
-  useEffect(() => { if (firstHit >= shown) setShown(firstHit + 1); }, [firstHit, shown]);
+  // The rows listed: every one with `all`, else the first 50 — and always as far as the first suggestion on the page asked for.
+  const shown = all ? Infinity : Math.max(50, firstHit + 1);
   useEffect(() => { if (firstHit >= 0 && firstHit < shown) firstRef.current?.scrollIntoView({ block: "nearest" }); }, [firstHit, shown, pageParam]);
   // What narrowed the view, said from the address at once (also while the crawl is read), and whether the page is in
   // any suggestion once it is.
@@ -129,7 +132,7 @@ export function LinkOpportunitiesView({ site, crawlId, pageHref, pageParam, here
                   ))}
                 </tbody>
               </table>
-              {d.items.length > shown && <button type="button" className={`g-link ${FIG} mt-2 text-[13px]`} onClick={() => setShown(d.items.length)} data-testid="button-link-opps-all">Show all {fmtNum(d.items.length)}</button>}
+              {d.items.length > shown && <Link href={here({ all: true })} className={`g-link ${FIG} mt-2 text-[13px]`} data-testid="button-link-opps-all">Show all {fmtNum(d.items.length)}</Link>}
               {d.more > 0 && <p className="g-text-2 mt-1 text-[12px]"><Link href={tracker} className={`g-text-2 ${FIG}`} title="The keywords they come from, in the rank tracker; the list here stops at the first found" data-testid="link-link-opps-more">{fmtNum(d.more)} more were found than are listed</Link>.</p>}
             </div>
           )}

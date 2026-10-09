@@ -26,6 +26,11 @@ describe("the addresses (links.ts, appended only)", () => {
     expect(seoLinks.plan(3, { due: "soon" })).toBe("/seo/plan?site=3&due=soon");
     expect(seoLinks.plan(3, { owner: "Sam Lee" })).toBe("/seo/plan?site=3&owner=Sam+Lee");
   });
+  it("round 3: one grid outline per colour, the alerts' reveals, the site's planner", () => {
+    for (const show of ["4-10", "11-20", "notFound"] as const) expect(seoLinks.localGrid(3, { scan: 9, show })).toBe(`/seo/local-grid?site=3&scan=9&show=${show}`);
+    expect(seoLinks.alerts({ site: 3, all: "41,42", more: 2 })).toBe("/seo/alerts?site=3&all=41%2C42&more=2");
+    expect(seoLinks.servicePlanner(3)).toBe("/seo/keywords?view=area&site=3");
+  });
   it("the app pages and Google's own listing — no hand-written address anywhere", () => {
     expect(seoLinks.appSettings({ tab: "notifications" })).toBe("/settings?tab=notifications");
     expect(seoLinks.siteScan()).toBe("/site-scan");
@@ -63,6 +68,32 @@ describe("usage: every paid lookup opens the page that spent it, and nothing is 
     expect(spentOn("Backlink snapshot — alpine.example (refresh)", sites)).toBe("/seo/backlinks?site=1");
     expect(spentOn("Competitor gap — alpine.example vs rival.com", sites)).toBe("/seo/competitors?site=1&competitor=rival.com");
     expect(spentOn('Mentions watch — "Alpine Exteriors"', sites)).toBe("/seo/mentions?site=1");
+  });
+  it("round 3: the six paid kinds that were words open the page that spent them", () => {
+    // Every report table the server names ("<name> — <target>") opens that report.
+    const routes = fs.readFileSync(path.resolve(import.meta.dirname, "routes.ts"), "utf8");
+    const block = /const REPORT_NAMES: Record<string, string> = \{([\s\S]*?)\n\};/.exec(routes)?.[1] ?? "";
+    const names = [...block.matchAll(/(\w+): "([^"]+)"/g)].map((m) => [m[1], m[2]] as const);
+    expect(names.length).toBeGreaterThanOrEqual(18);
+    for (const [key, name] of names) {
+      const idea = ["matchingTerms", "relatedTerms", "questions"].includes(key);
+      expect(spentOn(`${name} — ${idea ? "roof repair" : "alpine.example"}`, sites), name).toBe(idea ? seoLinks.keywords("roof repair", { table: key }) : seoLinks.explorer("alpine.example", key));
+    }
+    expect(spentOn("Organic keywords — rival.com", sites)).toBe("/seo/explorer?domain=rival.com&view=keywords");
+    expect(spentOn("Ads — rival.com", sites)).toBe("/seo/explorer?domain=rival.com&view=ads");
+    expect(spentOn("Directories — alpine.example, a.com, b.com", sites)).toBe("/seo/explorer?domain=alpine.example&view=directories&rivals=a.com%2Cb.com");
+    expect(spentOn("Directories — alpine.example", sites)).toBe("/seo/explorer?domain=alpine.example&view=directories&rivals=none");
+    expect(spentOn("Directories — a.com (second try for alpine.example, a.com)", sites)).toBe("/seo/explorer?domain=alpine.example&view=directories&rivals=a.com");
+    // An older second try names no comparison: nothing is guessed.
+    expect(spentOn("Directories — a.com (second try)", sites)).toBeNull();
+    expect(spentOn("Service-area planner — beta.example (3 × 5)", sites)).toBe("/seo/keywords?view=area&site=2");
+    expect(spentOn("Service-area planner — gone.example (3 × 5)", sites)).toBeNull();
+    expect(spentOn("Opportunities — alpine.example", sites)).toBe("/seo/explorer?domain=alpine.example&view=opportunities");
+    expect(spentOn("Bulk keyword analysis — 12 keywords", sites)).toBe("/seo/keywords?view=bulk");
+    // Labels that only look like "<name> — <target>" stay words.
+    expect(spentOn("Content explorer — missing figures for 3 pages (second try)", sites)).toBeNull();
+    expect(routes).toContain("`Directories — ${again.join(\", \")} (second try for ${sites.join(\", \")})`");
+    for (const l of ["`Directories — ${sites.join(\", \")}`", "`Service-area planner — ${site.domain} (", "`Opportunities — ${domain}`", "`Bulk keyword analysis — ${keywords.length} keyword"]) expect(routes, l).toContain(l);
   });
   it("the server's labels carry the site and the monthly question's id", () => {
     const routes = fs.readFileSync(path.resolve(import.meta.dirname, "routes.ts"), "utf8"), monthly = fs.readFileSync(path.resolve(import.meta.dirname, "ai-monthly.ts"), "utf8");
@@ -129,8 +160,17 @@ describe("the screens: every figure a link, honest chips, 44 px targets", () => 
     for (const t of ["link-report-all-keywords", "link-report-due-soon", "link-report-connect-gsc", "link-report-branding", "button-report-all-keywords"]) expect(reports).toContain(t);
   });
 
+  it("reports, round 3: the Keywords checked bar links like the tiles, the section chip also on an empty report, a 44 px PDF pill", () => {
+    expect(reports).toContain('testId="report-checked-dist"');
+    expect(reports).toContain('segmentHref={(part) => part === "4-10" ? seoLinks.rankTracker(site.id, { positions: "4-10", device: dev }) : seoLinks.rankTracker(site.id, { band: part === "top3" ? "top3" : "rest", device: dev })}');
+    for (const k of ['key: "top3"', 'key: "4-10"', 'key: "rest"']) expect(reports).toContain(k);
+    expect(reports).toContain('{section && r && <ActiveFilter');
+    expect(reports).toContain("is not in this report — the report has no numbers for");
+    expect(reports).toContain('className="g-pill !min-h-11 w-full justify-center sm:w-auto"');
+  });
+
   it("local grid: failed points, honest chip on a failed scan, Google's reviews on Google", () => {
-    expect(grid).toContain('show === "failed" ? !!p.failed');
+    expect(grid).toContain('case "failed": return !!p.failed;');
     expect(grid).toContain('href={here({ show: "failed" })}');
     expect(grid).toContain("const waiting = !shown && openId != null && view.data?.status !== \"failed\" && !view.isError;");
     expect(grid).toContain("failed and ${failed === 1 ? \"is\" : \"are\"} not outlined");
@@ -138,6 +178,18 @@ describe("the screens: every figure a link, honest chips, 44 px targets", () => 
     expect(grid).toContain("href={seoLinks.googleMaps(l)}");
     expect(grid).toContain('data-testid="link-grid-pin-maps"');
     expect(grid).toContain("at(previous.id, { show: \"found\" })");
+  });
+
+  it("local grid, round 3: the key outlines one colour each, the picked point its colour, no-website rows say so in words", () => {
+    expect(grid).toContain('["#f9ab00", "4–10", "4-10"], ["#e8710a", "11–20", "11-20"], ["#c5221f", "20+ not found", "notFound"]');
+    expect(grid).not.toContain('"4–10", "found"');
+    expect(grid).toContain('case "4-10": return p.rank !== null && p.rank >= 4 && p.rank <= 10;');
+    expect(grid).toContain('case "notFound": return !p.failed && p.rank === null;');
+    expect(grid).toContain("here({ show: bandOf(selected), cell: cell ?? undefined })");
+    expect(grid).toContain('data-testid={`link-grid-key-${s}`}');
+    // Visible words on a phone (a title never shows there), and no guessed link.
+    expect(grid).toContain('· no website to open</span>');
+    expect(grid).toContain("<>{l.name} <span className=\"g-text-2 text-[12px] font-normal\">(no website in Google's listing)</span></>");
   });
 
   it("AI visibility: every parameter read, nothing silently dropped, clear clears all", () => {
@@ -159,6 +211,15 @@ describe("the screens: every figure a link, honest chips, 44 px targets", () => 
     expect(summary).toContain('data-testid="link-ai-sources-basis"');
   });
 
+  it("AI visibility, round 3: a question opened alone is said, so its clear is there", () => {
+    expect(ai).toContain("const questionWords = filtering || !d ? \"\" : promptParam !== null");
+    expect(ai).toContain("One question: \"${shown.prompt}\"");
+    expect(ai).toContain("— no saved answers to it for");
+    expect(ai).toContain("so the newest question is shown");
+    expect(ai).toMatch(/const chips = \[\s*questionWords,/);
+    expect(summary).toContain('data-label={x.directory ? "Action plan" : undefined}');
+  });
+
   it("alerts: per-item scans and checks, ?alert= / ?undelivered=, the keyword watch kept", () => {
     expect(alerts).not.toContain("a.items[0]");
     expect(alerts).toContain("items.length === 1 ? items[0] : undefined");
@@ -169,7 +230,7 @@ describe("the screens: every figure a link, honest chips, 44 px targets", () => 
     expect(alerts).toContain("id={`alert-${a.id}`}");
     expect(alerts).toContain("...(alertId === a.id ? HIGHLIGHT : {})");
     expect(alerts).toContain("— not among the");
-    expect(alerts).toContain('clearParams(["kind", "site", "alert", "undelivered"], false)');
+    expect(alerts).toContain('clearParams(["kind", "site", "alert", "undelivered", "more", "all"], false)');
     expect(alerts).toContain('<TabStrip label="Which alerts"');
     expect(alerts).toContain('className="g-pill g-pill--sm !min-h-11" disabled={read.isPending}');
     // The rank tracker's keyword-watch link stays (seoLinks.alerts now / before).
@@ -177,6 +238,24 @@ describe("the screens: every figure a link, honest chips, 44 px targets", () => 
     for (const t of ["link-alert-date-", "link-alert-move-", "link-alert-scan-", "link-alert-check-", "link-alerts-undelivered", "link-alerts-settings"]) expect(alerts).toContain(t);
     // The server keeps both scans' ids with a grid alert.
     expect(fs.readFileSync(path.resolve(import.meta.dirname, "grid-monitor.ts"), "utf8")).toContain("scanId: now.id, wasScanId: before.id");
+  });
+
+  it("alerts, round 3: the reveals are addresses, the counts keep `undelivered`, a bad value is said", () => {
+    // "Show all" and "Show more" are links (the back button undoes them); no local reveal state is left.
+    expect(alerts).not.toContain("setAll(");
+    expect(alerts).not.toMatch(/<button[^>]*data-testid="button-rank-alert-all"/);
+    expect(alerts).toMatch(/<Link href=\{allHref\}[^>]*data-testid="button-rank-alert-all"/);
+    expect(alerts).toMatch(/<Link href=\{allHref\}[^>]*data-testid="link-kw-alert-all"/);
+    expect(alerts).toContain("const allHref = (id: number) => here({ all: allIds.has(id) ? [...allIds].filter((x) => x !== id) : [...allIds, id] });");
+    expect(alerts).toMatch(/<Link href=\{here\(\{ more: shownPages \+ 1 \}\)\} className=\{`g-pill !min-h-11 \$\{FOCUS_RING\}`\} data-testid="button-alerts-more">/);
+    expect(alerts).toContain('const moreParam = params.get("more");');
+    expect(alerts).toContain("if (last) more.mutate({ url, before: last.id, key: loadKey });");
+    expect(alerts).toContain('data-testid="button-alerts-more-retry"');
+    expect(alerts).toContain("setParams({ site: e.target.value === \"site\" ? site.id : null, more: null })");
+    // "Showing N of M": N keeps the undelivered narrowing it counts.
+    expect(alerts).toContain('<Link href={undeliveredOnly ? seoLinks.alerts({ site: scopeSite, kind: kind === "all" ? undefined : kind, undelivered: true }) : tabHref(kind)} className={QUIET_LINK} data-testid="link-alerts-listed">');
+    expect(alerts).toContain('undelivered="${undeliveredParam}" — not true or false, so not applied');
+    expect(alerts).toContain('marked "Not sent" — or "Email not sent" when the bell entry went out and only the email failed.');
   });
 
   it("action plan: every parameter said (also ?status=open), due soon and owner, origins that exist", () => {
@@ -205,6 +284,15 @@ describe("the screens: every figure a link, honest chips, 44 px targets", () => 
     expect(mentions).toContain('className="g-pill g-pill--sm !min-h-11 ml-auto" disabled={!rows.length} onClick={exportCsv} data-testid="button-mentions-export"');
   });
 
+  it("mentions, round 3: a check is named only once it is known to be shown; the watch rows' link words link", () => {
+    expect(mentionsPage).toContain("const known = checkState !== null && checkState.check === check ? checkState : null;");
+    expect(mentionsPage).toContain(": missing || !known ? \"\" :");
+    expect(mentionsPage).toContain("onCheck={(s) => setCheckState({ ...s, check })}");
+    expect(mentionsPage).toContain("in the monthly watch below");
+    expect(mentions).toContain('<label className="flex min-h-11 items-center gap-2"><input type="checkbox"');
+    expect(mentions).toContain('data-testid={`link-mentions-watch-link-${r.domain}`}');
+  });
+
   it("usage, batch, competitors", () => {
     expect(usage).toContain('import { spentOn } from "./usage-links";');
     expect(usage).toContain("set aside — still running");
@@ -215,5 +303,10 @@ describe("the screens: every figure a link, honest chips, 44 px targets", () => 
     expect(competitors).toContain('seoLinks.keywords(g.keyword, { section: "cpc" })');
     expect(competitors).toContain('clearParams(["competitor"], false); setCompetitor(""); gap.reset();');
     expect(competitors).toContain('className="g-pill !min-h-11" disabled={track.isPending}');
+    // Round 3: the batch meta line links (the table; the month it was charged), the Track cell has its phone label.
+    expect(batch).toContain('href={seoLinks.usage({ month: page.fetchedAt.slice(0, 7) })}');
+    for (const t of ["link-batch-count", "link-batch-as-of"]) expect(batch).toContain(`data-testid="${t}"`);
+    expect(batch).toContain('<table id="table-batch"');
+    expect(competitors).toContain('<td className="num" data-label="Rank tracker">');
   });
 });

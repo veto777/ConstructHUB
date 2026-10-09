@@ -1,0 +1,8 @@
+#!/bin/bash
+# vb11: restart the screenshots app on :8189 at the checked-out commit.
+cd ~/ConstructHUB-seoshots
+export W=$HOME/seo-shots-work TUTORIAL_WORK_DIR=$HOME/seo-shots-work
+PID=$(ss -ltnpH 'sport = :8189' | grep -oE 'pid=[0-9]+' | cut -d= -f2); [ -n "$PID" ] && kill $PID; sleep 2
+export SHOTS_DFS_LOGIN=<read from the live .env>; export SHOTS_DFS_PASSWORD=<read from the live .env>
+git log --oneline -1
+npx tsx scripts/seoshots-app.tmp.ts 2>&1 | tail -1

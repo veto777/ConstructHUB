@@ -5,6 +5,8 @@
  * shows for it — and, for the overview, what month / from / to / series / quick ask (overviewWords). Pure — no
  * React, no window — so server/seo/explorer-links.test.ts can run it. report-table.tsx reads a report's filters from
  * here on arrival and writes them back when "Apply filters" is pressed, so a link and a picked filter are one thing.
+ * Round 3: the order the address picked (`sort`) is said in the chip too, and the page of rows (`offset`, `limit`)
+ * is read here (pageFromAddress) — paging is the address, so the back button undoes a page turn.
  */
 import type { Movement, PositionBand } from "./links";
 
@@ -63,6 +65,21 @@ export const SORTS_BY_DATE: ReadonlySet<TableKey> = new Set<TableKey>(["backlink
 /** The band of one position, for a position cell: the same words the distribution bars use. */
 export const bandOfPosition = (pos: number | null | undefined): { band?: PositionBand; pos?: string } | null =>
   pos == null || pos < 1 ? null : pos <= 3 ? { band: "top3" } : pos <= 10 ? { pos: "4-10" } : pos <= 20 ? { pos: "11-20" } : pos <= 50 ? { pos: "21-50" } : pos <= 100 ? { pos: "51-100" } : { pos: "101-" };
+
+/** The rows a full report shows per page (its Rows picker); the first of these that is the default is never written. */
+export const LIMITS = [25, 50, 100] as const;
+export const DEFAULT_LIMIT = 50;
+/** The furthest first row a report is paged to (the source gives no row past 10,000). */
+export const MAX_OFFSET = 9900;
+/**
+ * The address's `limit` and `offset` (links.ts) as a page of rows: a page size the picker offers (else the default),
+ * and a first row that is a whole number of pages in and no further than `max` (else the first page). Pure.
+ */
+export function pageFromAddress(p: { limit?: string | null; offset?: string | null }, limits: readonly number[] = LIMITS, fallback: number = DEFAULT_LIMIT, max: number = MAX_OFFSET): { limit: number; offset: number } {
+  const l = Number(p.limit), limit = limits.includes(l) ? l : fallback;
+  const o = p.offset && /^\d{1,6}$/.test(p.offset) ? Number(p.offset) : 0;
+  return { limit, offset: o > 0 && o % limit === 0 && o <= max ? o : 0 };
+}
 
 /** The positions a band covers (from, to): the same words the distribution bars use. notFound has no rows in a site report. */
 export const BAND_RANGE: Record<PositionBand, [number, number | undefined] | null> = {
@@ -223,6 +240,12 @@ export function filterWords(table: TableKey, f: Filters, scope: Scope | null, p:
   if ((table === "keywords" || table === "paidKeywords") && own(MOVE_WORDS, p.move)) w.push(`Keywords that ${MOVE_WORDS[p.move as Movement]} since last month — the saved report counts them but doesn't list which, so every keyword is shown`);
   // The list's real order is said with the month (links.ts `sort`): a month never changes the order, and the chip never promises one the list doesn't have.
   if (p.month && /^\d{4}-\d{2}$/.test(p.month)) { const order = sortWords(table, sort); w.push(`${monthWords(p.month)} picked on the chart — this list isn't split by month${order ? `; it is ordered by “${order.toLowerCase()}”` : ""}`); }
+  // The order the address picked (links.ts `sort`, which the Sort picker writes), said when it is not the list's
+  // first — and an order this list doesn't offer is said as such. With a month, the month's words already name it.
+  else if (p.sort) {
+    if (!SORT_LABELS[table].some(([k]) => k === p.sort)) w.push(`“${p.sort}” is not an order this list offers, so it is ordered by “${sortWords(table, null)}”`);
+    else if (p.sort !== SORT_LABELS[table][0][0]) w.push(`Ordered by “${sortWords(table, p.sort)}”`);
+  }
   if (p.source && (table === "backlinks" || table === "newBacklinks" || table === "lostBacklinks" || table === "brokenBacklinks")) w.push(`Opened from ${p.source}: the links can't be narrowed to one linking site yet — every linking site is shown; the Linking page column names each`);
   if (own(WHY, p.why)) w.push(WHY[p.why]);
   return w;
@@ -238,9 +261,11 @@ export const OVERVIEW_PARAMS = ["month", "from", "to", "series", "quick"] as con
  * What the address asks of the overview (links.ts: `month` marks a month on the charts and opens the comparison,
  * `from` / `to` are the months compared, `series` the chart figure, `quick` the first-look table), in a visitor's
  * words for the chip (data-testid="active-filter"). A word that names nothing here is said, never quietly dropped.
- * Empty when the address asks nothing. Pure.
+ * `drawn` — once the report is on screen — is the chart figures drawn (a chart needs two months of figures): a
+ * `series` whose chart isn't drawn is said as not shown, never named as if it were on screen. Empty when the address
+ * asks nothing. Pure.
  */
-export function overviewWords(p: Record<string, string | undefined>): string[] {
+export function overviewWords(p: Record<string, string | undefined>, drawn?: ReadonlySet<string>): string[] {
   const w: string[] = [];
   const isMonth = (v: string | undefined): v is string => !!v && /^\d{4}-\d{2}$/.test(v);
   const notMonth = (v: string) => `“${v}” is not a month (YYYY-MM), so it was not used`;
@@ -250,7 +275,9 @@ export function overviewWords(p: Record<string, string | undefined>): string[] {
     if (p.from) w.push(isMonth(p.from) ? `Comparing from ${monthWords(p.from)}` : notMonth(p.from));
     if (p.to) w.push(isMonth(p.to) ? `Comparing to ${monthWords(p.to)}` : notMonth(p.to));
   }
-  if (p.series) w.push(own(SERIES_WORDS, p.series) ? `Chart figure: ${SERIES_WORDS[p.series]}` : `“${p.series}” is not a chart figure here, so the first figure is shown`);
+  if (p.series) w.push(!own(SERIES_WORDS, p.series) ? `“${p.series}” is not a chart figure here, so the first figure is shown`
+    : drawn && !drawn.has(p.series) ? `Chart figure ${SERIES_WORDS[p.series]} is not shown: its chart isn't drawn for this site (it needs two months of figures or more)`
+    : `Chart figure: ${SERIES_WORDS[p.series]}`);
   if (p.quick) w.push(own(QUICK_WORDS, p.quick) ? `First look: ${QUICK_WORDS[p.quick]}` : `“${p.quick}” is not a first-look table here, so Organic keywords is shown`);
   return w;
 }

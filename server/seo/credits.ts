@@ -10,7 +10,14 @@
  *   seo_credit_usage      per account per month: allowance used, purchased credit used
  *   seo_credit_wallets    purchased credit left
  *   seo_credit_purchases  one row per paid Stripe checkout (the session id is unique,
- *                         so a redelivered webhook never credits twice)
+ *                         so a redelivered webhook never credits twice), with its PaymentIntent
+ *                         and how much of it was refunded or lost to a dispute
+ *   seo_credit_ledger     every movement of purchased credit, with the Stripe ids
+ *   seo_credit_disputes   one row per Stripe dispute on a pack (credit-reversals.ts)
+ *
+ * The wallet: balance_cents = purchased credit that can be spent; frozen_cents = on hold while a dispute about its
+ * payment is open; owed_cents = credit taken back after it was spent (a refund or a lost dispute) — while anything is
+ * owed, lookups that cost credit are refused, and the next pack bought pays it first.
  */
 import type { PoolClient } from "pg";
 import { pool } from "../db";
@@ -53,6 +60,39 @@ export const CREDIT_SCHEMA_DDL = [
     created_at timestamptz NOT NULL DEFAULT now()
   )`,
   `CREATE INDEX IF NOT EXISTS seo_reservations_open ON seo_reservations(created_at) WHERE settled_at IS NULL`,
+  // Review M-3: refunds, disputes and failed bank debits (server/seo/credit-reversals.ts).
+  `ALTER TABLE seo_credit_wallets ADD COLUMN IF NOT EXISTS frozen_cents integer NOT NULL DEFAULT 0 CHECK (frozen_cents >= 0)`,
+  `ALTER TABLE seo_credit_wallets ADD COLUMN IF NOT EXISTS owed_cents integer NOT NULL DEFAULT 0 CHECK (owed_cents >= 0)`,
+  `ALTER TABLE seo_credit_purchases ADD COLUMN IF NOT EXISTS stripe_payment_intent text`,
+  `ALTER TABLE seo_credit_purchases ADD COLUMN IF NOT EXISTS refunded_cents integer NOT NULL DEFAULT 0`,
+  `ALTER TABLE seo_credit_purchases ADD COLUMN IF NOT EXISTS disputed_lost_cents integer NOT NULL DEFAULT 0`,
+  `ALTER TABLE seo_credit_purchases ADD COLUMN IF NOT EXISTS reversed_at timestamptz`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS seo_credit_purchases_pi ON seo_credit_purchases(stripe_payment_intent) WHERE stripe_payment_intent IS NOT NULL`,
+  `CREATE TABLE IF NOT EXISTS seo_credit_disputes (
+    dispute_id text PRIMARY KEY,
+    purchase_id integer NOT NULL REFERENCES seo_credit_purchases(id) ON DELETE CASCADE,
+    user_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status text NOT NULL,
+    amount_cents integer NOT NULL,
+    held_cents integer NOT NULL DEFAULT 0,
+    lost_cents integer NOT NULL DEFAULT 0,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE TABLE IF NOT EXISTS seo_credit_ledger (
+    id bigserial PRIMARY KEY,
+    user_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    purchase_id integer REFERENCES seo_credit_purchases(id) ON DELETE SET NULL,
+    kind text NOT NULL,
+    wallet_delta integer NOT NULL DEFAULT 0,
+    frozen_delta integer NOT NULL DEFAULT 0,
+    owed_delta integer NOT NULL DEFAULT 0,
+    stripe_event_id text,
+    stripe_object_id text,
+    stripe_payment_intent text,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS seo_credit_ledger_user ON seo_credit_ledger(user_id, created_at DESC)`,
 ];
 
 const monthKey = (d = new Date()) => d.toISOString().slice(0, 7);
@@ -65,9 +105,34 @@ export function outOfCreditMessage(needCents: number, availableCents: number): s
 }
 
 export class SeoCreditShort extends Error {
-  constructor(readonly needCents: number, readonly availableCents: number) {
-    super(outOfCreditMessage(needCents, availableCents));
+  constructor(readonly needCents: number, readonly availableCents: number, message = outOfCreditMessage(needCents, availableCents)) {
+    super(message);
     this.name = "SeoCreditShort";
+  }
+}
+
+/** What the customer reads while credit is owed (a refunded or disputed pack whose credit was already used). */
+export function owedCreditMessage(owedCents: number): string {
+  return `A payment for SEO data credit was refunded or disputed after that credit had been used, so your SEO data credit is ` +
+    `${creditUsd(owedCents)} below zero. SEO lookups are paused until it is settled: add credit and the ${creditUsd(owedCents)} is settled first. ` +
+    `Questions? Email support@constructhub.us.`;
+}
+/** What the customer reads while some purchased credit is on hold. */
+export function frozenCreditMessage(frozenCents: number): string {
+  return `${creditUsd(frozenCents)} of your purchased SEO data credit is on hold while a dispute about its payment is open. ` +
+    `It can't be used until the dispute is decided.`;
+}
+/** The plain-words line the account shows about its credit, or null when there is nothing to say. */
+export function creditNotice(owedCents: number, frozenCents: number): string | null {
+  if (owedCents > 0) return owedCreditMessage(owedCents) + (frozenCents > 0 ? ` ${frozenCreditMessage(frozenCents)}` : "");
+  return frozenCents > 0 ? frozenCreditMessage(frozenCents) : null;
+}
+
+/** Credit is owed: no lookup that costs credit runs until it is settled. */
+export class SeoCreditOwed extends SeoCreditShort {
+  constructor(needCents: number, readonly owedCents: number) {
+    super(needCents, 0, owedCreditMessage(owedCents));
+    this.name = "SeoCreditOwed";
   }
 }
 
@@ -77,10 +142,13 @@ export type CreditReservation = { userId: number; month: string; fromIncluded: n
 export async function creditStatus(userId: number, allowanceCents: number): Promise<SeoCredits> {
   const { rows: [row] } = await pool.query(
     `SELECT coalesce((SELECT included_cents FROM seo_credit_usage WHERE user_id=$1 AND month=$2),0)::int AS used,
-            coalesce((SELECT balance_cents FROM seo_credit_wallets WHERE user_id=$1),0)::int AS wallet`, [userId, monthKey()]);
-  const used = Number(row?.used ?? 0), wallet = Number(row?.wallet ?? 0);
-  if (allowanceCents === UNLIMITED) return { includedCents: UNLIMITED, includedUsedCents: used, walletCents: wallet, availableCents: UNLIMITED };
-  return { includedCents: allowanceCents, includedUsedCents: Math.min(used, allowanceCents), walletCents: wallet, availableCents: Math.max(0, allowanceCents - used) + wallet };
+            coalesce((SELECT balance_cents FROM seo_credit_wallets WHERE user_id=$1),0)::int AS wallet,
+            coalesce((SELECT frozen_cents FROM seo_credit_wallets WHERE user_id=$1),0)::int AS frozen,
+            coalesce((SELECT owed_cents FROM seo_credit_wallets WHERE user_id=$1),0)::int AS owed`, [userId, monthKey()]);
+  const used = Number(row?.used ?? 0), wallet = Number(row?.wallet ?? 0), frozen = Number(row?.frozen ?? 0), owed = Number(row?.owed ?? 0);
+  const extra = { frozenCents: frozen, owedCents: owed, notice: creditNotice(owed, frozen) };
+  if (allowanceCents === UNLIMITED) return { includedCents: UNLIMITED, includedUsedCents: used, walletCents: wallet, availableCents: UNLIMITED, ...extra };
+  return { includedCents: allowanceCents, includedUsedCents: Math.min(used, allowanceCents), walletCents: wallet, availableCents: owed > 0 ? 0 : Math.max(0, allowanceCents - used) + wallet, ...extra };
 }
 
 /**
@@ -97,7 +165,13 @@ export async function reserveCredits(userId: number, allowanceCents: number, cen
     await client.query(`INSERT INTO seo_credit_usage(user_id, month) VALUES($1,$2) ON CONFLICT DO NOTHING`, [userId, month]);
     await client.query(`INSERT INTO seo_credit_wallets(user_id) VALUES($1) ON CONFLICT DO NOTHING`, [userId]);
     const { rows: [u] } = await client.query(`SELECT included_cents FROM seo_credit_usage WHERE user_id=$1 AND month=$2 FOR UPDATE`, [userId, month]);
-    const { rows: [w] } = await client.query(`SELECT balance_cents FROM seo_credit_wallets WHERE user_id=$1 FOR UPDATE`, [userId]);
+    const { rows: [w] } = await client.query(`SELECT balance_cents, owed_cents FROM seo_credit_wallets WHERE user_id=$1 FOR UPDATE`, [userId]);
+    // Credit is owed (a refunded or disputed pack that was already spent): nothing that costs credit runs, the
+    // month's allowance included, until it is settled (review M-3).
+    if (Number(w.owed_cents) > 0) {
+      await client.query("ROLLBACK");
+      throw new SeoCreditOwed(cents, Number(w.owed_cents));
+    }
     const left = Math.max(0, allowanceCents - Number(u.included_cents)), wallet = opts.allowanceOnly ? 0 : Number(w.balance_cents);
     const split = splitCharge(cents, left, wallet);
     if (split.short > 0) {
@@ -181,7 +255,7 @@ export async function settleCredits(r: CreditReservation | null, actualCents: nu
  * paid credit pack. The amount is what Stripe says was paid for a pack we sell —
  * never a number read from metadata alone.
  */
-export async function fulfilSeoCredits(session: { id: string; mode?: string | null; payment_status?: string | null; amount_total?: number | null; metadata?: Record<string, string> | null }, userId: number): Promise<number> {
+export async function fulfilSeoCredits(session: { id: string; mode?: string | null; payment_status?: string | null; amount_total?: number | null; payment_intent?: string | { id: string } | null; metadata?: Record<string, string> | null }, userId: number, eventId: string | null = null): Promise<number> {
   if (session.metadata?.type !== "seo_credits" || session.mode !== "payment" || session.payment_status !== "paid") return 0;
   const cents = Number(session.metadata?.cents);
   if (!SEO_CREDIT_PACKS.includes(cents) || session.amount_total !== cents) {
@@ -190,12 +264,20 @@ export async function fulfilSeoCredits(session: { id: string; mode?: string | nu
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    const pi = typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id ?? null;
     const { rows } = await client.query(
-      `INSERT INTO seo_credit_purchases(user_id, cents, stripe_session_id) VALUES($1,$2,$3) ON CONFLICT (stripe_session_id) DO NOTHING RETURNING id`, [userId, cents, session.id]);
+      `INSERT INTO seo_credit_purchases(user_id, cents, stripe_session_id, stripe_payment_intent) VALUES($1,$2,$3,$4) ON CONFLICT (stripe_session_id) DO NOTHING RETURNING id`, [userId, cents, session.id, pi]);
     if (rows.length) {
-      await client.query(
-        `INSERT INTO seo_credit_wallets(user_id, balance_cents) VALUES($1,$2)
-         ON CONFLICT (user_id) DO UPDATE SET balance_cents=seo_credit_wallets.balance_cents+EXCLUDED.balance_cents, updated_at=now()`, [userId, cents]);
+      // What is owed (a pack refunded or disputed after its credit was used) is settled first; the rest is credit.
+      await client.query(`INSERT INTO seo_credit_wallets(user_id) VALUES($1) ON CONFLICT DO NOTHING`, [userId]);
+      const { rows: [w] } = await client.query(`SELECT owed_cents FROM seo_credit_wallets WHERE user_id=$1 FOR UPDATE`, [userId]);
+      const settles = Math.min(Number(w.owed_cents), cents);
+      await client.query(`UPDATE seo_credit_wallets SET balance_cents=balance_cents+$2, owed_cents=owed_cents-$3, updated_at=now() WHERE user_id=$1`, [userId, cents - settles, settles]);
+      for (const [kind, wallet, owed] of [["purchase", cents, 0], ["owed_settled", -settles, -settles]] as const)
+        if (wallet || owed)
+          await client.query(
+            `INSERT INTO seo_credit_ledger(user_id, purchase_id, kind, wallet_delta, owed_delta, stripe_event_id, stripe_object_id, stripe_payment_intent) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
+            [userId, rows[0].id, kind, wallet, owed, eventId, session.id, pi]);
     }
     await client.query("COMMIT");
     if (rows.length) console.log(`[seo] credit: user ${userId} bought ${creditUsd(cents)} (checkout ${session.id})`);

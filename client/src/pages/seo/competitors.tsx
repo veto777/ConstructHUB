@@ -76,7 +76,7 @@ export default function SeoCompetitorsPage() {
                     <td className="num" data-label="Difficulty"><Link href={seoLinks.keywords(g.keyword)} className={FIGURE_LINK}>{kd(g.difficulty)}</Link></td>
                     <td className="num" data-label="CPC">{g.cpc == null ? "—" : <Link href={seoLinks.keywords(g.keyword, { section: "cpc" })} className={FIGURE_LINK} data-testid={`link-gap-cpc-${g.keyword.replace(/\W+/g, "-")}`}>{`$${g.cpc.toFixed(2)}`}</Link>}</td>
                     <td data-label="Their page" className="max-w-[260px] truncate">{g.competitorUrl ? <a href={g.competitorUrl} className={TEXT_LINK} target="_blank" rel="noreferrer">{g.competitorUrl.replace(/^https?:\/\/(www\.)?/, "")}</a> : "—"}</td>
-                    <td className="num"><button type="button" className="g-pill !min-h-11" disabled={track.isPending} onClick={() => track.mutate(g)} data-testid={`button-track-${g.keyword.replace(/\W+/g, "-")}`}>Track</button></td>
+                    <td className="num" data-label="Rank tracker"><button type="button" className="g-pill !min-h-11" disabled={track.isPending} onClick={() => track.mutate(g)} data-testid={`button-track-${g.keyword.replace(/\W+/g, "-")}`}>Track</button></td>
                   </tr>
                 ))}
               </tbody>

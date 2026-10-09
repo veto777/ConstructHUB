@@ -85,3 +85,16 @@ describe("seoLinks: the parameters appended for the second pass (owner 2026-10-0
     expect(seoLinks.usage({ month: "2026-10" })).toBe("/seo/usage?month=2026-10");
   });
 });
+
+describe("seoLinks: the parameters appended for round 3 (Kimi round 2)", () => {
+  it("explorer: a report's page of rows — the first page and the default size are no words", () => {
+    expect(seoLinks.explorer("mysite.com", "referringDomains", { offset: 50, limit: 100 })).toBe("/seo/explorer?domain=mysite.com&view=referringDomains&offset=50&limit=100");
+    expect(seoLinks.explorer("mysite.com", "linkIntersect", { competitors: "a.com", offset: 50 })).toBe("/seo/explorer?domain=mysite.com&view=linkIntersect&competitors=a.com&offset=50");
+    expect(seoLinks.explorer("mysite.com", "keywords", { offset: undefined })).toBe("/seo/explorer?domain=mysite.com&view=keywords");
+  });
+  it("keywords: the ideas table's order and page, and the Service × town grid's row and column", () => {
+    expect(seoLinks.keywords("roof repair", { table: "questions", sort: "difficulty", offset: 25, limit: 25 })).toBe("/seo/keywords?keyword=roof+repair&table=questions&sort=difficulty&offset=25&limit=25");
+    expect(seoLinks.keywords("", { view: "area", show: "gaps", service: "roof repair" })).toBe("/seo/keywords?view=area&show=gaps&service=roof+repair");
+    expect(seoLinks.keywords("", { view: "area", town: "mount vernon" })).toBe("/seo/keywords?view=area&town=mount+vernon");
+  });
+});

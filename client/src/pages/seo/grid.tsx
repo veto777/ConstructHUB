@@ -31,12 +31,12 @@ type ScanRow = { id: number; keyword: string; size: number; spacing: number; sta
 type State = { id: number; status: "running" | "done" | "failed"; scan: Scan | null; error: string | null };
 type Watch = { id: number; keyword: string; size: number; spacing: number; every: "weekly" | "monthly"; nextAt: string };
 type Data = { pin: Pin | null; scans: ScanRow[]; watches?: Watch[]; maxWatches?: number; running: { id: number; keyword: string; size: number; spacing: number; at: string } | null; sizes: number[]; spacings: number[]; depth: number; suggestion: string };
-type Show = "top3" | "found" | "checked" | "failed";
+type Show = "top3" | "found" | "checked" | "failed" | "4-10" | "11-20" | "notFound";
 
 const miles = (n: number) => `${n} mile${n === 1 ? "" : "s"}`;
 /** The parameters this page owns: dropped when the site changes (they belong to a scan of the site before). */
 const OWN_PARAMS = ["scan", "cell", "show"];
-const SHOWS: Show[] = ["top3", "found", "checked", "failed"];
+const SHOWS: Show[] = ["top3", "found", "checked", "failed", "4-10", "11-20", "notFound"];
 /** Colour and words for a position. Every colour carries its number, and the text on it meets normal contrast. */
 function tone(p: Point): { bg: string; fg: string; label: string; words: string } {
   if (p.failed) return { bg: "var(--g-divider)", fg: "var(--g-text)", label: "?", words: "the lookup failed, so the position is unknown" };
@@ -51,9 +51,26 @@ function whereIs(p: Point, size: number, spacing: number): string {
   const parts = [ns ? `${miles(Math.abs(ns))} ${ns > 0 ? "north" : "south"}` : "", ew ? `${miles(Math.abs(ew))} ${ew > 0 ? "east" : "west"}` : ""].filter(Boolean);
   return parts.length ? `${parts.join(", ")} of the business` : "at the business";
 }
-/** Whether a point counts for a figure: in the first 3, found (in the first N), checked at all (the position score averages those), or failed. */
-const counts = (p: Point, show: Show) => (show === "top3" ? p.rank !== null && p.rank <= 3 : show === "found" ? p.rank !== null : show === "failed" ? !!p.failed : !p.failed);
-const SHOW_WORDS: Record<Show, string> = { top3: "the points where you are in the first 3", found: "the points where you are found", checked: "every point that could be checked — the position score is their average", failed: "the points whose lookup failed" };
+/**
+ * Whether a point counts for a figure: in the first 3, found (in the first N), checked at all (the position score
+ * averages those), or failed — and, for the colour key, one colour's points: 4th to 10th, 11th or lower (still found),
+ * not found (checked, not in the results read). Exactly the points `tone` paints that colour.
+ */
+const counts = (p: Point, show: Show) => {
+  switch (show) {
+    case "top3": return p.rank !== null && p.rank <= 3;
+    case "4-10": return p.rank !== null && p.rank >= 4 && p.rank <= 10;
+    case "11-20": return p.rank !== null && p.rank > 10;
+    case "found": return p.rank !== null;
+    case "notFound": return !p.failed && p.rank === null;
+    case "failed": return !!p.failed;
+    case "checked": return !p.failed;
+  }
+};
+const SHOW_WORDS: Record<Show, string> = { top3: "the points where you are in the first 3", found: "the points where you are found", checked: "every point that could be checked — the position score is their average", failed: "the points whose lookup failed",
+  "4-10": "the points where you are 4th to 10th", "11-20": "the points where you are 11th or lower (still found)", notFound: "the points where you are not in the local results the lookup read" };
+/** The colour a point is painted, as the `show` value that outlines every point of that colour. */
+const bandOf = (p: Point): Show => (p.failed ? "failed" : p.rank === null ? "notFound" : p.rank <= 3 ? "top3" : p.rank <= 10 ? "4-10" : "11-20");
 /** The same listing in the same place? Only then is one scan comparable with another. */
 const sameCenter = (a: Center | null | undefined, b: Center | null | undefined) =>
   !!a && !!b && Math.abs(a.lat - b.lat) < 1e-4 && Math.abs(a.lng - b.lng) < 1e-4 && (a.cid ?? null) === (b.cid ?? null)
@@ -185,7 +202,7 @@ export default function SeoLocalGridPage() {
   const chip = scanParam === null ? null : openId == null ? `"${scanParam}" is not a scan number` : [
     shown ? `Scan: "${shown.keyword}" · ${fmtDate(shown.fetchedAt)}` : view.data?.status === "failed" ? `Scan #${openId} — it didn't finish, so there is nothing to outline or pick` : view.isError ? `Scan #${openId} — couldn't be opened` : view.data?.status === "running" ? `Scan #${openId} — still running` : `Scan #${openId} — opening`,
     cellParam !== null && cell == null ? `"${cellParam}" is not a point number (0 to ${shown ? shown.points.length - 1 : "the last point"})` : shown && selected ? `point ${whereIs(selected, shown.size, shown.spacing)}` : shown && cell != null ? `point ${cell} — there is no such point in this scan (its points are 0 to ${shown.points.length - 1})` : !shown && cellParam !== null && waiting ? `point ${cellParam} — waits for the scan` : "",
-    shown && show ? `${outlined} of ${shown.summary.points} outlined: ${SHOW_WORDS[show]}${show === "checked" && failed ? ` (${failed} point${failed === 1 ? "" : "s"} failed and ${failed === 1 ? "is" : "are"} not outlined)` : ""}` : !shown && show && waiting ? `${SHOW_WORDS[show]} — waits for the scan` : showParam !== null && !show ? `"${showParam}" is not something to outline (top3, found, checked, failed)` : "",
+    shown && show ? `${outlined} of ${shown.summary.points} outlined: ${SHOW_WORDS[show]}${show === "checked" && failed ? ` (${failed} point${failed === 1 ? "" : "s"} failed and ${failed === 1 ? "is" : "are"} not outlined)` : ""}` : !shown && show && waiting ? `${SHOW_WORDS[show]} — waits for the scan` : showParam !== null && !show ? `"${showParam}" is not something to outline (${SHOWS.join(", ")})` : "",
   ].filter(Boolean).join(" · ");
 
   return (
@@ -219,7 +236,7 @@ export default function SeoLocalGridPage() {
                     <li key={`${l.cid ?? l.name}-${i}`} className="flex flex-wrap items-center gap-2 rounded-lg border p-3" style={{ borderColor: "var(--g-divider)" }}>
                       <MapPin className="g-text-2 h-4 w-4 shrink-0" aria-hidden />
                       <div className="min-w-0 flex-1">
-                        <div className="g-text text-[14px] font-medium">{l.domain ? <Link href={seoLinks.explorer(l.domain)} className={FIGURE_LINK} title={`Open ${l.domain} in Site explorer`}>{l.name}</Link> : l.name}</div>
+                        <div className="g-text text-[14px] font-medium">{l.domain ? <Link href={seoLinks.explorer(l.domain)} className={FIGURE_LINK} title={`Open ${l.domain} in Site explorer`}>{l.name}</Link> : <>{l.name} <span className="g-text-2 text-[12px] font-normal">(no website in Google's listing)</span></>}</div>
                         <div className="g-text-2 text-[12px]">{[l.address ? <a key="a" href={seoLinks.googleMaps(l)} target="_blank" rel="noreferrer" className={QUIET_LINK} title="This listing on Google Maps">{l.address}</a> : null, l.domain ? <Link key="d" href={seoLinks.explorer(l.domain)} className={QUIET_LINK}>{l.domain}</Link> : null, l.rating != null ? <a key="r" href={seoLinks.googleMaps(l)} target="_blank" rel="noreferrer" className={QUIET_LINK} title="Google's own stars and reviews, on the listing on Google Maps (no view here holds them)">{`${l.rating} stars${l.reviews != null ? ` (${fmtNum(l.reviews)} reviews, on Google)` : " on Google"}`} ↗</a> : null].filter(Boolean).map((x, k, all) => <span key={k}>{x}{k < all.length - 1 ? " · " : ""}</span>)}{!l.address && !l.domain && l.rating == null ? "No address shown" : null}</div>
                       </div>
                       <Button size="sm" className="!min-h-11" disabled={pinIt.isPending} onClick={() => pinIt.mutate({ siteId: found!.siteId, l })} aria-label={`This is my business: ${l.name}${l.address ? `, ${l.address}` : ""}`} data-testid={`button-grid-pin-${i}`}>This is my business</Button>
@@ -312,14 +329,14 @@ export default function SeoLocalGridPage() {
                   <div className="g-text-2 mt-1 text-center text-[11px]">South</div>
                   {/* The key: each colour's points can be outlined where a figure counts them. */}
                   <ul className="g-text-2 mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[12px]" aria-label="What the colours mean">
-                    {([["#188038", "1–3", "top3"], ["#f9ab00", "4–10", "found"], ["#e8710a", "11–20", "found"], ["#c5221f", "20+ not found", "checked"], ["var(--g-divider)", "? unknown", "failed"]] as const).map(([c, l, s]) => <li key={l} className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded-full" style={{ background: c }} aria-hidden /> <Link href={here({ show: s })} className={QUIET_LINK} title={s === "top3" ? "Outline the points in the first 3" : s === "found" ? "Outline every point where you are found" : s === "checked" ? "Outline every point checked" : "Outline the points whose lookup failed"}>{l}</Link></li>)}
+                    {([["#188038", "1–3", "top3"], ["#f9ab00", "4–10", "4-10"], ["#e8710a", "11–20", "11-20"], ["#c5221f", "20+ not found", "notFound"], ["var(--g-divider)", "? unknown", "failed"]] as const).map(([c, l, s]) => <li key={l} className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded-full" style={{ background: c }} aria-hidden /> <Link href={here({ show: s })} className={QUIET_LINK} title={`Outline ${SHOW_WORDS[s]}`} data-testid={`link-grid-key-${s}`}>{l}</Link></li>)}
                   </ul>
                 </div>
                 <div className="min-w-0">
                   {selected ? (
                     <div className="mb-4 rounded-xl border p-3" style={CARD} data-testid="grid-cell-detail" role="status">
                       <Heading level={3} className="!mb-0 !text-[14px]">{whereIs(selected, shown.size, shown.spacing).replace(/^./, (c) => c.toUpperCase())}</Heading>
-                      <p className="g-text-2 text-[13px]">You: <Link href={here({ show: selected.failed ? "failed" : selected.rank === null ? "checked" : selected.rank <= 3 ? "top3" : "found", cell: cell ?? undefined })} className={QUIET_LINK}>{tone(selected).words}</Link>{selected.by && selected.by !== "id" ? ` (recognised by your ${selected.by})` : ""}.</p>
+                      <p className="g-text-2 text-[13px]">You: <Link href={here({ show: bandOf(selected), cell: cell ?? undefined })} className={QUIET_LINK} title={`Outline ${SHOW_WORDS[bandOf(selected)]}`} data-testid="link-grid-cell-band">{tone(selected).words}</Link>{selected.by && selected.by !== "id" ? ` (recognised by your ${selected.by})` : ""}.</p>
                       {selected.top.length > 0 && <ol className="g-text mt-2 list-decimal pl-5 text-[13px]">{selected.top.map((t) => { const rival = shown.rivals.find((r) => r.name === t.name); return <li key={t.rank}>{rival?.ours ? <Link href={seoLinks.rankTracker(site.id, { mapPack: true })} className={TEXT_LINK}>{t.name}</Link> : rival?.domain ? <Link href={seoLinks.explorer(rival.domain)} className={TEXT_LINK} title={`Open ${rival.domain} in Site explorer`}>{t.name}</Link> : <>{t.name} <span className="g-text-2">(no website in Google's listing)</span></>}</li>; })}</ol>}
                     </div>
                   ) : <p className="g-text-2 mb-4 text-[13px]">Select a point to see who is in the first three there.</p>}
@@ -328,7 +345,7 @@ export default function SeoLocalGridPage() {
                     <div className="overflow-x-auto"><table className="g-table" data-testid="table-grid-rivals">
                       <thead><tr><th>Business</th><th className="num">In the first 3</th><th className="num">Found</th><th className="num">Average position where found</th><th className="num">Reviews</th></tr></thead>
                       {/* A business with a website opens in Site explorer, its figures too (no view holds a rival's points); your own row and figures open your points here, and your map-pack keywords in the rank tracker. Reviews are Google's, not ours to open. */}
-                      <tbody>{shown.rivals.map((r, i) => { const rival = r.domain ? seoLinks.explorer(r.domain) : null; const cellOf = (s: Show, text: string) => r.ours ? <Link href={here({ show: s })} className={FIGURE_LINK}>{text}</Link> : rival ? <Link href={rival} className={FIGURE_LINK} title={`${r.name} in Site explorer`}>{text}</Link> : <span title="No website in Google's listing, so there is nowhere to open">{text}</span>; return (
+                      <tbody>{shown.rivals.map((r, i) => { const rival = r.domain ? seoLinks.explorer(r.domain) : null; const cellOf = (s: Show, text: string) => r.ours ? <Link href={here({ show: s })} className={FIGURE_LINK}>{text}</Link> : rival ? <Link href={rival} className={FIGURE_LINK} title={`${r.name} in Site explorer`}>{text}</Link> : <span title="No website in Google's listing, so there is nowhere to open">{text}<span className="g-text-2 text-[11px] max-sm:ml-1 sm:sr-only"> · no website to open</span></span>; return (
                         <tr key={`${r.name}-${i}`} style={r.ours ? { background: "var(--g-hover, rgba(26,115,232,.06))" } : undefined}>
                           <td>{r.ours ? <Link href={seoLinks.rankTracker(site.id, { mapPack: true })} className={TEXT_LINK} data-testid="link-grid-rival-you">{r.name}</Link> : rival ? <Link href={rival} className={TEXT_LINK} title={`Open ${r.domain} in Site explorer`} data-testid={`link-grid-rival-${i}`}>{r.name}</Link> : <>{r.name} <span className="g-text-2 text-[12px]">(no website in Google's listing)</span></>}{r.ours && <span className="g-chip g-chip--sm ml-2">You</span>}{r.domain && <span className="g-text-2 block text-[12px]"><Link href={seoLinks.explorer(r.domain)} className={QUIET_LINK}>{r.domain}</Link></span>}</td>
                           <td className="num" data-label="In the first 3"><MiniBar value={r.top3} total={shown.summary.checked} className="mr-2" />{cellOf("top3", `${r.top3} of ${shown.summary.checked}`)}</td>

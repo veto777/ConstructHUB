@@ -214,7 +214,7 @@ export function AiSummaryPanel({ site }: { site: SeoSite }) {
                     <tr key={x.domain}>
                       <td className="max-w-[14rem] truncate"><Link href={seoLinks.explorer(x.domain)} className={TEXT_LINK} title={`Open ${x.domain} in Site explorer`}>{x.domain}</Link>{x.rival && <> <Link href={seoLinks.rankTracker(id, { panel: "competitors" })} className={`${QUIET_LINK} g-text-2 text-[12px]`}>· a competitor you follow</Link></>}{x.directory && <span className="g-text-2 text-[12px]"> · a directory or profile site</span>}</td>
                       <td className="num" data-label="Answers"><MiniBar value={x.answers} total={s.now.answers} className="mr-2" /><Link href={nowWith({ source: x.domain })} className={figure} data-testid={`link-ai-source-${x.domain}`}>{fmtNum(x.answers)}</Link></td><td className="num" data-label="Questions"><Link href={nowWith({ source: x.domain })} className={figure}>{fmtNum(x.questions)}</Link></td>
-                      <td className="num">{x.directory && <AddToPlan siteId={site.id} label="Plan" testId={`button-plan-ai-${x.domain}`} tasks={[task(x)]} />}</td>
+                      <td className="num" data-label={x.directory ? "Action plan" : undefined}>{x.directory && <AddToPlan siteId={site.id} label="Plan" testId={`button-plan-ai-${x.domain}`} tasks={[task(x)]} />}</td>
                     </tr>
                   ))}
                 </tbody>

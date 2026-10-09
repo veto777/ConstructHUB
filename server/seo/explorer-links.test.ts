@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import fs from "fs";
 import path from "path";
 import { seoLinks } from "../../client/src/pages/seo/links";
-import { addressFromFilters, BAND_RANGE, bandOfPosition, filtersFromAddress, filterWords, OVERVIEW_PARAMS, overviewWords, pathOfUrl, sortKeyOf, SORTS_BY_DATE, sortWords } from "../../client/src/pages/seo/explorer-filters";
+import { addressFromFilters, BAND_RANGE, bandOfPosition, DEFAULT_LIMIT, filtersFromAddress, filterWords, LIMITS, MAX_OFFSET, OVERVIEW_PARAMS, overviewWords, pageFromAddress, pathOfUrl, sortKeyOf, SORTS_BY_DATE, sortWords } from "../../client/src/pages/seo/explorer-filters";
 
 const read = (rel: string) => fs.readFileSync(path.resolve(import.meta.dirname, "../../client/src/pages/seo", rel), "utf8");
 /** Comments aside; only code counts. */
@@ -176,8 +176,11 @@ describe("the explorer screen (source guards)", () => {
     expect(explorer).toMatch(/\(report \|\| standalone\) &&/);
   });
   it("the country goes with every link: the picker writes it, a link reads it, another site opens as a new history entry", () => {
-    // The market picker writes the new country (it does not erase it); a link's country, with its language, is honoured on arrival.
-    expect(explorer).toMatch(/setParams\(\{ \.\.\.NARROWING, \.\.\.marketParams\(m\) \}, true\)/);
+    // The market picker writes the new country as a NEW history entry (Back returns to the country before: the entry left
+    // is first made to name its own) and keeps the view and its filters — only the page of rows starts again (round 3).
+    expect(explorer).toMatch(/if \(!params\.get\("locationCode"\)\) setParams\(\{ locationCode: market\.locationCode, languageCode: market\.languageCode \}, true\);/);
+    expect(explorer).toMatch(/setReport\(null\); setMarket\(m\); setParams\(\{ locationCode: m\.locationCode, languageCode: m\.languageCode, offset: null \}\);/);
+    expect(explorer).not.toMatch(/NARROWING/);
     expect(explorer).toMatch(/findMarket\(lc, lang \?\? market\.languageCode\)/);
     // Every address of this site, of another site and of a keyword carries the country (and its language).
     expect(explorer).toMatch(/const to = \(v: string, p: ExplorerParams = \{\}\) => seoLinks\.explorer\(shown, v, \{ \.\.\.marketParams\(market\), \.\.\.p \}\)/);
@@ -234,7 +237,8 @@ describe("the explorer screen (source guards)", () => {
     expect(viz).toMatch(/ReferenceDot/);
     expect(explorer.match(/active=\{seriesParam\} onSeries=\{\(k\) => setParam\("series", k\)\} monthHref=\{\(m\) => here\(\{ month: m \}\)\}/g)?.length).toBe(2);
     // The first-look tabs and the comparison's pickers write the address, so each is a place a link can land on.
-    expect(explorer).toMatch(/<Link key=\{t\} href=\{here\(\{ quick: t \}\)\} aria-current=\{quick === t \? "page" : undefined\}[^\n]*data-testid=\{`tab-explorer-\$\{t\}`\}/);
+    // The default first look (Organic keywords) is no word in the address (round 3: it was written by its own tab).
+    expect(explorer).toMatch(/<Link key=\{t\} href=\{here\(\{ quick: t === "keywords" \? undefined : t \}\)\} aria-current=\{quick === t \? "page" : undefined\}[^\n]*data-testid=\{`tab-explorer-\$\{t\}`\}/);
     expect(explorer).not.toMatch(/setTable\(/);
     expect(explorer).toMatch(/onChange=\{\(e\) => setParam\("from", e\.target\.value\)\} data-testid="select-compare-from"/);
     expect(explorer).toMatch(/onChange=\{\(e\) => setParam\("to", e\.target\.value\)\} data-testid="select-compare-to"/);
@@ -324,17 +328,17 @@ describe("the explorer screen (source guards)", () => {
   });
   it("the reports honour the address (filters, scope and order) and say what narrowed them", () => {
     expect(table).toMatch(/filtersFromAddress\(table, address, domain\)/);
-    expect(table).toMatch(/setParams\(addressFromFilters\(table, next, nextScope\)\)/);
+    expect(table).toMatch(/setParams\(\{ \.\.\.addressFromFilters\(table, next, nextScope\), offset: null \}\)/);
     expect(table).toMatch(/data-testid="active-filter"/);
     expect(table).toMatch(/data-testid="button-clear-filters"/);
     expect(table).toMatch(/filterWords\(table, filters, scope, address, sortKey\)/);
     expect(explorer).toMatch(/<ReportView key=\{`[^`]*`\} linked market=\{market\} table=\{reportTable\} domain=\{shown\} siteId=\{trackedSite\?\.id\}/);
     // The order lives in the address too: read on arrival, written by the picker (the default is no word).
     expect(table).toMatch(/useState\(\(\) => sortKeyOf\(table, linked \? address\.sort : null\)\)/);
-    expect(table).toMatch(/const chooseSort = \(key: string\) => \{ setSort\(key\); setOffset\(0\); if \(linked\) setParam\("sort", key === SORT_LABELS\[table\]\[0\]\[0\] \? null : key\); \}/);
+    expect(table).toMatch(/const chooseSort = \(key: string\) => \{ setSort\(key\); if \(linked\) setParams\(\{ sort: key === SORT_LABELS\[table\]\[0\]\[0\] \? null : key, offset: null \}\); else setOwnOffset\(0\); \}/);
     expect(table).toMatch(/onChange=\{\(e\) => chooseSort\(e\.target\.value\)\} data-testid="report-sort"/);
     // "Show the whole site" clears the scope on the page AND in the address — in both places it is offered.
-    expect(table).toMatch(/const wholeSite = \(\) => \{[^\n]*if \(linked\) setParams\(\{ path: null, section: null \}\); \}/);
+    expect(table).toMatch(/const wholeSite = \(\) => \{[^\n]*if \(linked\) setParams\(\{ path: null, section: null, offset: null \}\); else setOwnOffset\(0\); \}/);
     expect(table).toMatch(/onClick=\{wholeSite\} data-testid="button-scope-clear"/);
     expect(table).toMatch(/onClick=\{wholeSite\} data-testid="button-scope-clear-empty"/);
     // The country (with its language) and the tracked site go to every cell.
@@ -478,5 +482,74 @@ describe("the explorer screen (source guards)", () => {
     expect(table).toMatch(/className=\{FIG\}/);
     expect(table).toMatch(/<Fig href=/);
     expect(explorer).toMatch(/className=\{`inline-flex min-h-\[44px\] items-center rounded-md[^`]*focus-visible:outline[^`]*\$\{view === key \? "font-medium" : "g-text-2 underline/);
+  });
+});
+
+describe("round 3 (Kimi round 2): paging, the order, the chart figure, the market picker, Directories", () => {
+  const explorer = code(read("explorer.tsx")), table = code(read("report-table.tsx")), dirs = code(read("directories.tsx"));
+  it("the builder writes the page of rows; the first page and the default size are no words", () => {
+    expect(seoLinks.explorer("example.com", "backlinks", { offset: 50 })).toBe("/seo/explorer?domain=example.com&view=backlinks&offset=50");
+    expect(words(seoLinks.explorer("example.com", "keywords", { offset: 100, limit: 100 }))).toMatchObject({ offset: "100", limit: "100" });
+    expect(seoLinks.explorer("example.com", "keywords", { offset: undefined, limit: undefined })).toBe("/seo/explorer?domain=example.com&view=keywords");
+  });
+  it("the address as a page of rows: a size the picker offers, a whole number of pages in, never past the source's last row", () => {
+    expect(LIMITS).toEqual([25, 50, 100]); expect(DEFAULT_LIMIT).toBe(50); expect(MAX_OFFSET).toBe(9900);
+    expect(pageFromAddress({})).toEqual({ limit: 50, offset: 0 });
+    expect(pageFromAddress({ offset: "50" })).toEqual({ limit: 50, offset: 50 });
+    expect(pageFromAddress({ offset: "75", limit: "25" })).toEqual({ limit: 25, offset: 75 });
+    expect(pageFromAddress({ offset: "75" })).toEqual({ limit: 50, offset: 0 });
+    expect(pageFromAddress({ limit: "30" })).toEqual({ limit: 50, offset: 0 });
+    expect(pageFromAddress({ offset: "-50" })).toEqual({ limit: 50, offset: 0 });
+    expect(pageFromAddress({ offset: "9950" })).toEqual({ limit: 50, offset: 0 });
+    expect(pageFromAddress({ offset: "9900" })).toEqual({ limit: 50, offset: 9900 });
+    expect(pageFromAddress({ offset: "1e2" })).toEqual({ limit: 50, offset: 0 });
+    expect(pageFromAddress({ offset: "100" }, [50], 50)).toEqual({ limit: 50, offset: 100 });
+  });
+  it("the order the address picked is said in the chip — the default is no word, an order the list lacks is said, a month already names it", () => {
+    const chip = (t: Parameters<typeof filterWords>[0], p: Record<string, string>) => { const { filters, scope } = filtersFromAddress(t, p, "example.com"); return filterWords(t, filters, scope, p, sortKeyOf(t, p.sort)); };
+    expect(chip("matchingTerms", { sort: "difficulty" })).toEqual(["Ordered by “Easiest”"]);
+    expect(chip("keywords", { sort: "cpc" })).toEqual(["Ordered by “Highest CPC”"]);
+    expect(chip("keywords", { sort: "traffic" })).toEqual([]);
+    expect(chip("keywords", { sort: "nope" })).toEqual(["“nope” is not an order this list offers, so it is ordered by “Most traffic”"]);
+    expect(chip("backlinks", { sort: "constructor" })).toEqual(["“constructor” is not an order this list offers, so it is ordered by “Strongest sites”"]);
+    expect(chip("referringDomains", { sort: "newest", band: "top3" })).toEqual(["Ordered by “Newest”"]);
+    expect(chip("backlinks", { sort: "newest", month: "2026-08" })).toEqual(["Aug 2026 picked on the chart — this list isn't split by month; it is ordered by “newest”"]);
+  });
+  it("a chart figure is named only when its chart is drawn", () => {
+    expect(overviewWords({ series: "backlinks" })).toEqual(["Chart figure: Backlinks"]);
+    expect(overviewWords({ series: "backlinks" }, new Set(["traffic", "keywords", "top10", "domains", "backlinks", "new", "lost"]))).toEqual(["Chart figure: Backlinks"]);
+    expect(overviewWords({ series: "backlinks" }, new Set(["traffic", "keywords", "top10"]))).toEqual(["Chart figure Backlinks is not shown: its chart isn't drawn for this site (it needs two months of figures or more)"]);
+    expect(overviewWords({ series: "nope" }, new Set())).toEqual(["“nope” is not a chart figure here, so the first figure is shown"]);
+    // The screen passes the figures drawn (each chart needs two months; a figure two months of its own) once the report is on screen.
+    expect(explorer).toMatch(/const drawn = report \? new Set\(\[\.\.\.\(hist\.length > 1 \? performance : \[\]\), \.\.\.\(links\.length > 1 \? growth : \[\]\)\]\.filter\(\(x\) => x\.points\.length >= 2\)\.map\(\(x\) => x\.key\)\) : undefined;/);
+    expect(explorer).toMatch(/overviewWords\(Object\.fromEntries\(OVERVIEW_PARAMS\.map\(\(k\) => \[k, params\.get\(k\) \?\? undefined\]\)\), drawn\)/);
+  });
+  it("a full report's page of rows is the address: Previous / Next and the Rows picker write it, the chip's Clear drops the order too, the date is a link", () => {
+    expect(table).toMatch(/const paged = linked \? pageFromAddress\(address\) : null;/);
+    expect(table).toMatch(/const setOffset = \(n: number\) => \{ if \(linked\) setParam\("offset", n > 0 \? n : null\); else setOwnOffset\(n\); \};/);
+    expect(table).toMatch(/const setLimit = \(n: number\) => \{ if \(linked\) setParams\(\{ limit: n === DEFAULT_LIMIT \? null : n, offset: null \}\);/);
+    expect(table).toMatch(/onChange=\{\(e\) => setLimit\(Number\(e\.target\.value\)\)\} data-testid="report-limit"/);
+    expect(table).toMatch(/onClick=\{\(\) => setOffset\(Math\.max\(0, offset - limit\)\)\} data-testid="button-prev-page"/);
+    expect(table).toMatch(/onClick=\{\(\) => setOffset\(offset \+ limit\)\} data-testid="button-next-page"/);
+    expect(table).not.toMatch(/useState<25 \| 50 \| 100>/);
+    expect(table).toMatch(/setParams\(\{ \.\.\.addressFromFilters\(table, \{\}, null\), month: null, sort: null, offset: null \}\)/);
+    expect(table).toMatch(/<Fig href=\{seoLinks\.usage\(\{ month: page\.fetchedAt\.slice\(0, 7\) \}\)\} testId="link-report-as-of"/);
+    // Never buys on arrival: a page opened by link only peeks; its rows wait for the button.
+    expect(table).not.toMatch(/useEffect\([^)]*run\.mutate/);
+  });
+  it("a page row's figures say whose keywords open when the page isn't on this site", () => {
+    expect(explorer).toMatch(/const whose = path \? "the keywords of this page" : `\$\{report\.domain\}'s keywords \(this page's address isn't on/);
+    expect(cellOf(explorer, "link-page-traffic")).toContain("words={`${fmtNum(p.traffic)} visits a month — ${whose}`}");
+    expect(cellOf(explorer, "link-page-value")).toContain("— ${whose}, by ad price");
+  });
+  it("Directories: the competitors compared are said in a chip with a clear; the date and the price open the Usage page", () => {
+    expect(dirs).toMatch(/import \{ ActiveFilter, api/);
+    expect(dirs).toMatch(/\{rivalsRaw != null && \(\s*<ActiveFilter onClear=\{\(\) => setParams\(\{ rivals: null, only: null \}\)\} clearLabel="Start over">/);
+    expect(dirs).toContain("compared with ${arrived.join(\", \")}");
+    expect(dirs).toContain("on its own — no competitor compared");
+    expect(dirs).toContain("left out: ${leftOut.join(\", \")}");
+    expect(dirs).toMatch(/<Fig href=\{seoLinks\.usage\(\{ month: d\.fetchedAt\.slice\(0, 7\) \}\)\} testId="link-directories-as-of"/);
+    expect(dirs).toMatch(/<Fig href=\{seoLinks\.usage\(\)\} testId="link-directories-price"/);
+    expect(dirs).not.toMatch(/· as of \{fmtDate\(d\.fetchedAt\)\} ·/);
   });
 });

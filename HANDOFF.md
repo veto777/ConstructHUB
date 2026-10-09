@@ -2,6 +2,66 @@
 
 _Last updated 2026-08-24. Repo: `veto777/ConstructHUB` (private). Local: `/home/veto/ConstructHUB` on the tower._
 
+## 💳 2026-10-09 — refunds and disputes on SEO credit packs now reach the wallet (review M-3, branch `fix-review-high`, NOT deployed)
+
+> **OWNER/OPERATOR ACTION: enable these event types on the live webhook endpoint** (Stripe Dashboard → Developers →
+> Webhooks → the constructhub.us endpoint → "Select events"). Until they are enabled nothing below runs and the credit
+> behaves exactly as before (no error, no change) — but a refund or chargeback then still leaves the credit in place.
+> - `charge.refunded`
+> - `charge.refund.updated`
+> - `charge.dispute.created`
+> - `charge.dispute.updated`
+> - `charge.dispute.closed`
+> - `charge.dispute.funds_withdrawn`
+> - `charge.dispute.funds_reinstated`
+> - `checkout.session.async_payment_failed`
+> - `checkout.session.async_payment_succeeded` (bank debits are credited on this one — check it is on too)
+> No new secret or env var: the same endpoint and signing secret (the webhook still verifies the raw body and fails closed).
+
+- **What was wrong:** the webhook credited a pack once paid and never looked again. A refund or a chargeback left the credit
+  in the wallet to keep or spend; Stripe took the money (and a dispute fee) back.
+- **Now (`server/seo/credit-reversals.ts`, called from the webhook switch in `server/stripe.ts`):** every pack is found by its
+  PaymentIntent (stored at purchase from now on; older packs are found through their checkout session and backfilled).
+  Refund, full or partial → the same share of the credit is taken back; a refund that later fails gives it back. Dispute opened →
+  the disputed credit is put **on hold** (cannot be spent); won → released; lost → removed. A failed bank debit was never credited
+  (credit is granted only once Stripe says paid); one that somehow was is taken back. Each is read from Stripe as it is now, so
+  duplicate and out-of-order events move nothing twice. A refund for a pack not credited yet is retried (400), never skipped.
+- **Credit already spent:** the rest is recorded as **owed** (`seo_credit_wallets.owed_cents`). While anything is owed, lookups that
+  cost credit are refused — the month's allowance included — and the SEO pages and Settings → Limits & usage say why in plain
+  words; the next pack bought settles it first. Every movement is a row in `seo_credit_ledger` with the Stripe event, object and
+  PaymentIntent ids. A dispute raises an ops issue (critical when it opens). Prices and packs are unchanged; the credit checkout
+  now also tags its PaymentIntent with the pack's metadata.
+- **Schema:** added at boot by the SEO schema (`CREDIT_SCHEMA_DDL`): wallet `frozen_cents` / `owed_cents`, purchase
+  `stripe_payment_intent` / `refunded_cents` / `disputed_lost_cents` / `reversed_at`, tables `seo_credit_disputes`, `seo_credit_ledger`.
+- **Not done:** packs refunded or disputed BEFORE this ships are not looked at again (no backfill job); check the Stripe
+  dashboard's refunds/disputes for `ConstructHUB SEO data credit` payments since 2026-10-07 and adjust by hand if any exist.
+
+## 🪑 2026-10-09 — the support line can no longer take customers' Call Assistant seats (review S-2, branch `fix-review-high`, NOT deployed)
+
+- **What was wrong:** support calls and customers' Call Assistant calls shared the engine's 6 seats (`VOICE_MAX_ACTIVE_CALLS`). Six
+  calls to the public support number filled them; a customer's call was then answered "we can't take your call right now" and hung up.
+  Worse, the public `/media` socket took a seat the moment it connected — before proving it was a call — so six idle sockets did the
+  same with no phone at all. A dead stream (no audio from the carrier) kept its seat until the 15-minute cap.
+- **Which path is live (from the code, not from prod env):** the support number's voice URL is the GPU engine (`voice/server.py`,
+  profile `kind: "support"`); the keypad line in the app (`/api/support/ivr`, also the old `/api/support/voice`) is the overflow and the
+  number's fallback. The spoken LaML Gather line of 10-08 no longer exists in the code — there is nothing else to fix.
+- **Now (`voice/server.py` `seats()` / `seat_free()` / `reap()`):**
+  - One pool of seats, two budgets. The support line may hold at most `VOICE_SUPPORT_MAX_CALLS` (default **2**, never all of them);
+    every other seat can only go to a customer's call. **This changes the owner's 10-08 rule "the 7th caller goes to the keypad line":
+    it is now the 3rd support caller** (set `VOICE_SUPPORT_MAX_CALLS` higher to give support more, at customers' expense).
+  - Support calls per hour: 4 per caller number, 40 overall (`VOICE_SUPPORT_CALLS_PER_CALLER_HOUR`, `VOICE_SUPPORT_CALLS_PER_HOUR`;
+    in the engine's memory — a restart forgets them, the seat cap still holds). Over any limit → the keypad line, no seat.
+  - A support call ends at 8 minutes (`VOICE_SUPPORT_MAX_CALL_SECONDS=480`) with a spoken wrap-up, and after 60 s without a word
+    from the caller (`VOICE_SUPPORT_IDLE_SECONDS`). The hang-up never waits on the goodbye being spoken.
+  - A `/media` socket holds no seat until its `start` is accepted, must start within 10 s, and waiting sockets are bounded.
+  - A reaper (every 5 s) frees every stuck seat: no audio for 45 s (`VOICE_ZOMBIE_SECONDS`), past the time cap, a wrap-up or the
+    after-call paperwork that never finishes, a set-up that never greeted. The carrier's status callback (completed / failed /
+    no-answer…) frees the seat at once. After-call paperwork now survives the connection being dropped.
+- **Operator:** nothing is required — the defaults apply on the next engine deploy (`voice/deploy/restart-when-idle.sh`). The engine's
+  `/health` (with the bearer) shows the support settings. Engine tests: `cd voice && .venv/bin/python -m pytest selftest -q` (101).
+- **Left as found (separate review items):** the keypad line itself has no cap on calls at once or per caller (S-11), and the
+  per-account code budgets can be used up by a stranger (S-10).
+
 ## ☎️ 2026-10-08 (late evening) — the AI Call Assistant is a SEPARATE SERVICE, repriced (branch `billing/call-assistant`, NOT deployed)
 - **Owner decisions:** the Call Assistant is sold on its **own subscription**, like the CRM (`fd964e1`, `069ffdf`): no platform plan
   includes it, and it is bought **with or without a platform plan**. New tiers (keys lite/solo/crew/fleet kept so the voice code paths
@@ -260,6 +320,33 @@ _Last updated 2026-08-24. Repo: `veto777/ConstructHUB` (private). Local: `/home/
 - **First tutorial video exists** (Database Directory, 89 s, Janice voice): vb11
   `~/ConstructHUB-seo/analysis/video-out/database-directory/walkthrough.mp4`; tooling `scripts/tutorials/*` on branch
   `tutorial-video-1` (not merged yet: player wiring + R2 upload in progress).
+
+## 🛡 2026-10-09 — Site Scan: a hostile robots.txt can no longer stall the site (review S-1, branch `fix-robots-matcher`, NOT deployed)
+
+- **What was wrong:** `server/sitescan/robots.ts` turned each `*` of a robots rule into a backtracking `.*` regular expression and the
+  crawler runs inside the web process. Anyone could point the free public scan (`POST /api/sitescan/public/start`, no account) at a site
+  whose robots.txt froze every request for every customer (reviewer: 4 stars, 200-character path = 21.7 s), and the job was leased again
+  after each restart (up to 5 times).
+- **Now:** rules are matched by a plain two-pointer wildcard walk (no regular expression is built from the file), as Google reads them:
+  longest rule wins, Allow wins a tie, `$` ends, case-sensitive, percent-encoding compared in one spelling. Bounds (`ROBOTS_LIMITS`): the
+  first 500 KiB, 5,000 rules, 2,048-character rules and addresses, 50 sitemaps, and a work limit per answer and per rule set — past a
+  bound the answer is "not allowed". Findings read robots.txt once per bot (it was once per page).
+- **Time limits (`server/sitescan/worker.ts`):** every uninterruptible step on what a site sent (robots.txt, sitemap, page, building the
+  report) is marked in the row (`sitescan_jobs.cpu_step`), timed, and followed by a turn of the event loop. Over its time → the scan is
+  failed (`fail_reason='cpu_stall'`, an ops issue "Site Scan stalled the web process") and never leased again. A scan whose worker went
+  away inside a step is failed the same way at the next tick; one that went away between steps is taken again once (`abandoned`).
+  A failed scan is never retried. Whole-scan wall clock: 30 min signed in, 3 min free. Customers' scans are leased before free ones.
+  New columns are added at boot by `ensureSiteScanSchema` (`cpu_step`, `abandoned`, `fail_reason`) — no manual migration.
+- **Free public scan limits** (`FREE_SCAN_LIMITS`): 3/day per visitor address, 2/day per email, 3/day per website, 20/hour and 100/day
+  overall, and at most 5 free scans waiting at once ("busy, try again in a few minutes").
+- **Optional env (defaults are fine):** `SITESCAN_STEP_BUDGET_MS` (5000), `SITESCAN_REPORT_BUDGET_MS` (20000),
+  `SITESCAN_SCAN_BUDGET_MS` (1800000), `SITESCAN_FREE_SCAN_BUDGET_MS` (180000). `SITESCAN_WORKER_DISABLED=true` still stops the worker.
+- **Recommended next (not done here):** the crawl still shares the web process. Its remaining uninterruptible work (HTML parsing of a
+  page up to 2 MB, the per-page checkpoint that serialises the whole crawl state) is bounded and timed, not removed. Move the worker into
+  its own process (the same `runSiteScanWorker` loop under a second systemd unit with `SITESCAN_WORKER_DISABLED=true` on the web unit) —
+  no new job system is needed, the leases already work across processes.
+- **Tests:** `server/sitescan/robots.test.ts` (reviewer's cases in milliseconds; 50,000 random rules/paths against a reference matcher;
+  ordinary robots files), `scan-guard.test.ts` (no DB), and 6 lease/limit tests in `integration.test.ts` (need the dev database).
 
 ## 🔎 2026-10-07 — SEO: Site Explorer + SEO data credit (4x markup, plan allowance, prepaid packs)
 - **Data source is live:** DataForSEO account `support@constructhub.us` created by the owner 2026-10-07, `DATAFORSEO_LOGIN` /
@@ -1102,7 +1189,7 @@ date + 60 days. Evidence for all of the above: Gmail screenshots in `attached_as
       expired estimates not counted in client bid tabs, org-wide stats vs divisions,
       adopt `eslint-plugin-react-hooks` (the pipeline blank-screen class).
 - [x] **GBP API access — APPROVED 2026-09-23** (application #3, case `1-4033000042334`; timeline above).
-- [ ] **Enable the Business Profile APIs** in project `construction-hub-489119` (owner console click,
+- [x] **Enable the Business Profile APIs** — DONE (verified live 2026-10-09: 2 grants with all 4 scopes, Profile Guard and reviews run through the API) in project `construction-hub-489119` (owner console click,
       links in the timeline section) — then build the GBP integration (OAuth scope `business.manage`,
       account/location listing, info edits, review display + owner replies, performance metrics).
 - [x] Deploy — **DONE 2026-07-10** (live at constructhub.us, see "Live deployment").

@@ -258,6 +258,45 @@ describe("every figure on the rank tracker is a link that lands on its data (aud
     expect(history).toContain("`link-only-check-${first.date}`");
   });
 
+  it("round 3: a row's movement glyph is a link to every keyword that moved the same way, on that device", () => {
+    expect(page).toContain('const moveOf = (p: Position): Movement | null => (p?.previousOn ? (["new", "lost", "up", "down", "unchanged"] as const).find((m) => moved(p, m)) ?? null : null);');
+    expect(page).toContain("<Fig href={to({ ...(d === device ? onDevice : { device: d }), move: m })} id={d === o.devices[0] ? `move-${r.id}` : `move-${r.id}-${d}`}");
+    expect(page).toContain("<Move now={p.position} before={p.previous} hadBefore={!!p.previousOn} /></Fig>");
+  });
+
+  it("round 3 (live crawl): gsc / gscSort / gscAll on a site with no Search Console connected still get a chip — honest, with Connect and Clear", () => {
+    expect(page).toContain("{o?.searchConsole ? <GscBreakdownView site={site} /> : (params.gsc || params.gscSort || params.gscAll) && (");
+    const at = page.indexOf('data-testid="gsc-not-connected"');
+    expect(at).toBeGreaterThan(-1);
+    const chip = page.slice(at, page.indexOf("</p>", at));
+    expect(chip).toContain('data-testid="active-filter"');
+    expect(chip).toContain("Search Console property isn't connected, so there is no breakdown to show.");
+    expect(chip).toMatch(/<Link href=\{seoLinks\.searchConsole\(\)\}[^>]*data-testid="link-gsc-connect-chip">Connect it<\/Link>/);
+    expect(chip).toMatch(/<Link href=\{hrefWith\(\{ gsc: null, gscSort: null, gscAll: null \}\)\}[^>]*data-testid="link-clear-gsc">Clear<\/Link>/);
+    // Still no setParam on this page: the Clear is a link (one history entry), as the table chip's is.
+    expect(page).not.toMatch(/\bsetParam\(/);
+  });
+
+  it("round 3: a group or a row the address opens that isn't listed is said in a chip with a clear, never quietly ignored", () => {
+    expect(groups).toContain("const missing = open != null && !d.groups.some((g) => g.members[0].keywordId === open)");
+    expect(groups).toContain('<ActiveFilter onClear={() => setParam("group", null)} clearLabel="Clear">');
+    expect(groups).toContain("{head}{missing}");
+    expect(groups).toMatch(/\{head\}\s*\{missing\}/);
+    expect(competing).toContain("const missing = open != null && !d.items.some((i) => i.keywordId === open)");
+    expect(competing).toContain('<ActiveFilter onClear={() => setParam("competing", null)} clearLabel="Clear">');
+    expect(competing).toMatch(/<SectionTitle>The page Google shows for each search<\/SectionTitle>\s*\{missing\}/);
+    expect(competing).toContain("<>{missing}<p ");
+  });
+
+  it("round 3: the keyword watch on a phone — 44 px snapshot pickers, tables as labelled cards rather than sideways scroll", () => {
+    expect(watch).toContain('const PICK = "g-input g-select !min-h-11 !w-auto min-w-0 max-w-full";');
+    expect(watch).toMatch(/<select className=\{PICK\} value=\{nowSnap\.id\} data-testid="select-kw-now"/);
+    expect(watch).toMatch(/<select className=\{PICK\} value=\{beforeSnap\.id\} data-testid="select-kw-before"/);
+    expect(watch).not.toMatch(/className="g-select /);
+    expect(watch.match(/<div className="sm:overflow-x-auto">/g)).toHaveLength(2);
+    expect(watch).not.toMatch(/<div className="overflow-x-auto">/);
+  });
+
   it("the keyword watch (on Alerts): the pair, the list and 'show all' are the address, every figure leads somewhere, and 'Open this comparison' is a link", () => {
     expect(watch).toContain('const watchParam = address.get("watch")');
     expect(watch).toContain('address.get("watchAll")');

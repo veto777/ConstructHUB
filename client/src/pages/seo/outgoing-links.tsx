@@ -4,9 +4,10 @@
  *
  * Every figure is a link (links.ts): a website to Site explorer, a page of the site to its row on the pages tab, a
  * checked address to the live address (the check's words say "open it yourself"), a count to the list that holds it.
- * `page` in the address outlines the rows that start on that page and the chip says so (or that there are none).
+ * `page` in the address outlines the rows that start on that page and the chip says so (or that there are none);
+ * `all` lists every website, not the first 50 ("Show all" is a link to it).
  */
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Download, Loader2 } from "lucide-react";
 import { Link } from "wouter";
@@ -38,7 +39,7 @@ const hostOf = (u: string) => { try { return new URL(u).hostname.toLowerCase().r
 
 /** A cell's label for screen readers (the phone layout hides the table header). */
 const Label = ({ children }: { children: string }) => <span className="sr-only">{children}: </span>;
-export function OutgoingLinksView({ site, crawlId, pageHref, pageParam, here, go, foreign }: {
+export function OutgoingLinksView({ site, crawlId, pageHref, pageParam, here, go, foreign, all = false }: {
   site: SeoSite;
   /** The newest finished crawl (part of the question). */
   crawlId?: string | null;
@@ -51,12 +52,13 @@ export function OutgoingLinksView({ site, crawlId, pageHref, pageParam, here, go
   /** An address on the audit for this site, keeping the crawl shown. */
   go: (p: AuditParams) => string;
   foreign?: Foreign;
+  /** Every row listed, not the first 50 (the address's `all`, links.ts audit). */
+  all?: boolean;
 }) {
   const q = useQuery<Data | null>({
     queryKey: [`/api/seo/sites/${site.id}/audit/outgoing`, crawlId ?? null], refetchOnMount: "always", retry: false,
     queryFn: async ({ queryKey, signal }) => { try { const r = await fetch(queryKey[0] as string, { credentials: "include", signal }); if (r.status === 404) return null; if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message ?? "The request failed"); return await r.json(); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
   });
-  const [shown, setShown] = useState(50);
   const firstRef = useRef<HTMLElement>(null);
   // The newest crawl could not be read: said (the server never answers with an older crawl instead).
   const unreadable = q.data && typeof q.data === "object" && "unreadable" in (q.data as object) ? (q.data as unknown as { scannedAt: string | null }) : null;
@@ -65,7 +67,8 @@ export function OutgoingLinksView({ site, crawlId, pageHref, pageParam, here, go
   const rowOnPage = (x: Domain) => !!pageParam && x.examples.some((e) => path(e.from) === pageParam);
   const hitsBroken = d ? d.broken.filter(brokenOnPage).length : 0, hitsRows = d ? d.linkedDomains.filter(rowOnPage).length : 0;
   const firstRow = d && pageParam && !hitsBroken ? d.linkedDomains.findIndex(rowOnPage) : -1;
-  useEffect(() => { if (firstRow >= shown) setShown(firstRow + 1); }, [firstRow, shown]);
+  // The rows listed: every one with `all`, else the first 50 — and always as far as the first row from the page asked for.
+  const shown = all ? Infinity : Math.max(50, firstRow + 1);
   useEffect(() => { if (hitsBroken || (firstRow >= 0 && firstRow < shown)) firstRef.current?.scrollIntoView({ block: "nearest" }); }, [hitsBroken, firstRow, shown, pageParam]);
   // What narrowed the view, said from the address at once (also while the crawl is read), and whether any listed link
   // starts on the page once it is.
@@ -112,7 +115,7 @@ export function OutgoingLinksView({ site, crawlId, pageHref, pageParam, here, go
             {d.broken.map((b, n) => (
               <li key={b.to} className="flex flex-wrap items-center gap-x-2 [overflow-wrap:anywhere]" data-testid={`row-outgoing-broken-${b.to}`} ref={brokenOnPage(b) && d.broken.findIndex(brokenOnPage) === n ? (firstRef as React.RefObject<HTMLLIElement>) : undefined} style={brokenOnPage(b) ? HIGHLIGHT : undefined}>
                 <Link href={seoLinks.explorer(hostOf(b.to))} className={`g-link ${FIG}`} title={`${hostOf(b.to)} in Site explorer`} data-testid={`link-outgoing-broken-${b.to}`}>{b.to.replace(/^https?:\/\//, "")}</Link>
-                <a href={b.to} target="_blank" rel="noreferrer" className={`g-link ${FIG}`} aria-label={`Open ${b.to} in a new tab`}>↗</a>
+                <a href={b.to} target="_blank" rel="noreferrer" className={`g-link ${FIG} min-w-11 text-center`} aria-label={`Open ${b.to} in a new tab`} data-testid={`link-outgoing-open-${b.to}`}>↗</a>
                 <span className="g-text-2">— <a href={b.to} target="_blank" rel="noreferrer" className={`g-text-2 ${FIG}`} title="What the check saw; open the address yourself to see what it does now" data-testid={`link-outgoing-answer-${b.to}`}>{b.status === null ? "" : `${b.status}, `}{ANSWER[b.answer]}</a> · linked from {b.from.map((f, i) => <Fragment key={f}>{i > 0 ? ", " : ""}<Link href={pageHref(path(f))} className={`g-link ${FIG}`} title={`${f} — its row on the pages tab`} data-testid={`link-outgoing-from-${path(f)}`}>{path(f)}</Link></Fragment>)}{b.fromCount > b.from.length ? <> and <Link href={pages} className={`g-text-2 ${FIG}`} title="The crawled pages; which of the rest link here is not kept by the crawl" data-testid={`link-outgoing-from-more-${b.to}`}>{fmtNum(b.fromCount - b.from.length)} more</Link></> : ""}</span>
                 {broken(b.answer) && <AddToPlan siteId={site.id} label="Plan" testId={`button-plan-outgoing-${b.to}`} tasks={[task(b)]} />}
               </li>
@@ -135,7 +138,7 @@ export function OutgoingLinksView({ site, crawlId, pageHref, pageParam, here, go
               ); })}
             </tbody>
           </table>
-          {d.linkedDomains.length > shown && <button type="button" className={`g-link ${FIG} mt-2 text-[13px]`} onClick={() => setShown(d.linkedDomains.length)} data-testid="button-outgoing-all">Show all {fmtNum(d.linkedDomains.length)}</button>}
+          {d.linkedDomains.length > shown && <Link href={here({ all: true })} className={`g-link ${FIG} mt-2 text-[13px]`} data-testid="button-outgoing-all">Show all {fmtNum(d.linkedDomains.length)}</Link>}
           {d.more > 0 && <p className="g-text-2 mt-1 text-[12px]"><Link href={pages} className={`g-text-2 ${FIG}`} title="The crawled pages these links are on; the websites beyond the ones listed are only in the count" data-testid="link-outgoing-more">{fmtNum(d.more)} more websites than are listed</Link>.</p>}
         </div>
       )}

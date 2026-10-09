@@ -19,6 +19,9 @@ describe("the audit address (links.ts)", () => {
     expect(seoLinks.audit(3, { tab: "pages", status: "4xx", at: "crawl-a", vs: "crawl-b" })).toBe("/seo/audit?site=3&tab=pages&status=4xx&at=crawl-a&vs=crawl-b");
     expect(seoLinks.audit(3, { severity: "warning", area: "Content", issue: "missing-title" })).toBe("/seo/audit?site=3&severity=warning&area=Content&issue=missing-title");
     expect(seoLinks.audit(3, { tab: "pages", show: "thin", page: "/services?x=1" })).toBe("/seo/audit?site=3&tab=pages&show=thin&page=%2Fservices%3Fx%3D1");
+    // Round 3: the reveals are addresses (appended, nothing renamed).
+    expect(seoLinks.audit(3, { issue: "missing-title", all: true })).toBe("/seo/audit?site=3&issue=missing-title&all=true");
+    expect(seoLinks.audit(3, { tab: "pages", more: 300 })).toBe("/seo/audit?site=3&tab=pages&more=300");
   });
 });
 
@@ -56,7 +59,7 @@ describe("the audit screen honours the address and links every figure", () => {
     expect(audit).toContain("setParams({ at: null, vs: null, issue: null, page: null }, true)");
     expect(audit).not.toMatch(/useState<Severity \| "all">|useState<"issues"/);
     // `result` is appended to the audit builder (links.ts: append only).
-    expect(links).toMatch(/audit: \(siteId: number, p: \{[^}]*page\?: string; result\?: string \}/);
+    expect(links).toMatch(/audit: \(siteId: number, p: \{[^}]*page\?: string; result\?: string; all\?: boolean; more\?: number \}/);
     expect(seoLinks.audit(3, { tab: "rendering", result: "differ", page: "/a" })).toBe("/seo/audit?site=3&tab=rendering&result=differ&page=%2Fa");
   });
 
@@ -127,7 +130,12 @@ describe("the audit screen honours the address and links every figure", () => {
     expect(pages).toContain("matches(r, i) || r.path === page");
     // A page or an issue this crawl has not got is said so — never "One page opened" over a table without it.
     expect(pages).toContain("pageFound ? `One page opened: ${page}` : `${page} — not in this crawl`");
-    expect(pages).toContain("issueKnown ? `Pages listed under “${issueTitles[issue]}”` : `an issue this crawl did not find (${issue})`");
+    // An issue this crawl has not got is said in words — its raw key is never printed (round 3).
+    expect(pages).toContain('issueKnown ? `Pages listed under “${issueTitles[issue]}”` : "an issue this crawl did not find"');
+    expect(pages).toContain("Nothing is listed under that issue in the crawl of");
+    expect(audit).toContain('narrowed.push(openIssue ? `${openIssue.title} — its affected pages` : "An issue this crawl did not find")');
+    expect(audit).toContain("Nothing is listed under that issue in the crawl of");
+    for (const src of [audit, pages]) { expect(src).not.toContain("did not find (${"); expect(src).not.toContain("Nothing is listed under “${"); }
     // Every pill is a link, a pill with no pages too (it lands on the empty list, said).
     expect(pages).not.toMatch(/aria-disabled="true" data-testid=\{`filter-pages/);
     expect(pages).toContain('seoLinks.explorer(site.domain, "pages", { path: r.path })');
@@ -172,6 +180,30 @@ describe("the audit screen honours the address and links every figure", () => {
     for (const t of ["link-render-page-", "link-render-verdict-", "link-render-status-", "link-render-final-", "link-render-title-html-", "link-render-title-browser-", "link-render-h1-html-", "link-render-h1-browser-", "link-render-external-", "link-render-images-", "link-render-interactive-", "link-render-pick-"]) expect(render, t).toContain(`data-testid={\`${t}`);
     // The page limit is the check's own, explained on the page — not a plan limit on Usage.
     expect(render).toMatch(/href=\{`\$\{here\(\{\}\)\}#render-limit`\}[^>]*data-testid="link-render-max"/);
+  });
+
+  it("round 3: the reveals are links to addresses, the compare lists' dates are crawls, ↗ is a 44 px target", () => {
+    // No local reveal state: "Show all" / "Show more" write `all` / `more`, so the back button undoes them.
+    for (const [name, src] of [["audit", audit], ["pages", pages], ["links", opps], ["outgoing", outgoing]] as const) { expect(src, name).not.toMatch(/setShowAll\(|setShown\(/); expect(src, name).not.toMatch(/const \[shown, setShown\]|const \[showAll, setShowAll\]/); }
+    expect(audit).toContain('const showAll = ["true", "1"].includes(P.get("all") ?? "");');
+    expect(audit).toContain("<Link href={here({ all: showAll ? undefined : true })} className={PILL} aria-expanded={showAll} data-testid={`link-issue-all-${i.key}`}>");
+    expect(audit).toContain("foreign={foreign} all={showAll} />");
+    expect(audit).toContain("foreign={foreign} more={moreRows} />");
+    expect(pages).toContain('<Link href={here({ more: shown + 200 })} className="g-pill mt-3 max-sm:!min-h-11" data-testid="button-pages-more">');
+    expect(pages).toContain("const shown = Math.max(more && more > 100 ? more : 100, openAt + 1);");
+    expect(opps).toContain('<Link href={here({ all: true })} className={`g-link ${FIG} mt-2 text-[13px]`} data-testid="button-link-opps-all">');
+    expect(outgoing).toContain('<Link href={here({ all: true })} className={`g-link ${FIG} mt-2 text-[13px]`} data-testid="button-outgoing-all">');
+    for (const src of [opps, outgoing]) expect(src).toMatch(/const shown = all \? Infinity : Math\.max\(50, first(Hit|Row) \+ 1\);/);
+    // The compare lists' headings: the crawl shown keeps itself (`at`), the one compared with opens on its own.
+    expect(audit).toContain("data-testid={`link-page-changes-then-${t}`}");
+    expect(audit).toContain("shownLink(`link-page-changes-now-${t}`)");
+    expect(audit).not.toContain("`Reached on ${fmtDate(shownDate)}, not before`");
+    // A lone ↗ is as wide as it is tall.
+    expect(outgoing).toContain("className={`g-link ${FIG} min-w-11 text-center`} aria-label={`Open ${b.to} in a new tab`}");
+    expect(audit.match(/min-w-11 shrink-0 text-center/g)?.length).toBe(2);
+    // The rendering row's chevron says what it is on a phone (card mode).
+    expect(render).toContain('<td data-label="Details"><Link href={href} className={CHEVRON}');
+    expect(render).toContain('<span className="text-[12px] sm:hidden">{isOpen ? "Hide details" : "Details"}</span>');
   });
 
   it("no figure is left as bare text, and no address is written by hand", () => {

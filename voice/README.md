@@ -44,7 +44,7 @@ python server.py                         # http://127.0.0.1:8152/health
 
 ```bash
 cd voice
-.venv/bin/python -m pytest selftest -q            # 64 tests, ~15 s, no GPU/network/AI (stub provider, fake VAD/STT/TTS, mock app)
+.venv/bin/python -m pytest selftest -q            # 101 tests, ~40 s, no GPU/network/AI (stub provider, fake VAD/STT/TTS, mock app)
 .venv/bin/python sim.py --profile tests/profiles/sample.json --script tests/scripts/booking.txt   # real AI provider, text only
 ```
 

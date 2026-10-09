@@ -1,0 +1,21 @@
+import { chromium } from "playwright";
+// Usage: npx tsx scripts/shotv2.tmp.ts <name> <path> [waitMs] [modes=1440l,390l,1440d]
+const [name, path, waitMs = "2500", modes = "1440l,390l,1440d"] = process.argv.slice(2);
+(async () => { const b = await chromium.launch({ headless: true });
+  for (const m of modes.split(",")) {
+    const width = Number(m.slice(0, -1)); const dark = m.endsWith("d");
+    const ctx = await b.newContext({ viewport: { width, height: Number(process.env.H ?? 2400) }, deviceScaleFactor: width < 500 ? 2 : 1 });
+    await ctx.addInitScript(dark ? "localStorage.setItem('theme','dark');localStorage.setItem('hub.welcomeSeen','1')" : "localStorage.setItem('theme','light');localStorage.setItem('hub.welcomeSeen','1')");
+    const p = await ctx.newPage();
+    const errs: string[] = []; p.on("pageerror", (e) => errs.push(e.message.slice(0, 200)));
+    await p.goto("http://127.0.0.1:8189" + path, { waitUntil: "networkidle", timeout: 120000 });
+    await p.waitForTimeout(Number(waitMs));
+    if (process.env.CLICK) { await p.locator(process.env.CLICK).first().click(); await p.waitForTimeout(Number(waitMs)); }
+    const el = p.locator(process.env.SEL ?? "main").first(); if (process.env.SEL) await el.scrollIntoViewIfNeeded();
+    const out = `/tmp/v2-${name}-${m}.png`;
+    await el.screenshot({ path: out });
+    console.log(`[${name} ${m}] ${out} overflow:`, await p.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth"),
+      "inner-overflow:", await p.evaluate("(()=>{const m=document.querySelector('main');return m?m.scrollWidth-m.clientWidth:-1})()"), "errors:", errs.length, errs[0] ?? "");
+    await ctx.close();
+  }
+  await b.close(); })().catch((e) => { console.error("FAILED", String(e).slice(0, 600)); process.exit(1); });

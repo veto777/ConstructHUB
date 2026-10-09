@@ -7,6 +7,7 @@ import { getBaseUrl } from "./auth";
 import { appReturnBaseUrl } from "./site-context";
 import { SEO_CREDIT_PACKS, isSeoCreditPack, creditUsd } from "@shared/seo-credits";
 import { fulfilSeoCredits } from "./seo/credits";
+import { applySeoCreditEvent, type ReversalStripe } from "./seo/credit-reversals";
 import { DFY_CATALOG, COURSE_BUNDLE, SEO_CONTRACT_REQUIRED_IDS, isSalesOnly, sendTalkToSales } from "./catalog";
 import { bundleOverlaps, BUNDLE_NAMES } from "@shared/cart-bundles";
 import {
@@ -240,9 +241,9 @@ async function recentAuthOk(req: Request, res: Response): Promise<boolean> {
  * purchase ledger row and its receipt event (recordOneTimePurchase checks the
  * payment status itself). An unpaid completion writes neither.
  */
-async function applyOneTimeCheckout(session: Stripe.Checkout.Session, userId: number): Promise<void> {
+async function applyOneTimeCheckout(session: Stripe.Checkout.Session, userId: number, eventId: string | null = null): Promise<void> {
   // A prepaid SEO data credit pack (POST /api/seo/credits/checkout): credited once per session.
-  await fulfilSeoCredits(session, userId);
+  await fulfilSeoCredits(session, userId, eventId);
   const result = await fulfilOneTimePurchase(session, userId);
   if (!result.fulfilled && result.reason === "unpaid") {
     console.log(`[billing] checkout ${session.id} (user ${userId}) completed ${session.payment_status}: nothing granted until Stripe reports it paid.`);
@@ -524,6 +525,8 @@ export function registerStripeRoutes(app: Express) {
         success_url: `${base}/seo?credits=success`,
         cancel_url: `${base}/seo?credits=canceled`,
         metadata: { userId: String(user.id), type: "seo_credits", cents: String(cents) },
+        // The same tags on the payment, so a refund or dispute of it can be told apart (credit-reversals.ts).
+        payment_intent_data: { metadata: { userId: String(user.id), type: "seo_credits", cents: String(cents) } },
       });
       res.json({ url: session.url });
     } catch (err: any) {
@@ -779,7 +782,7 @@ export function registerStripeRoutes(app: Express) {
             // is paid. A card is paid here; a bank debit completes unpaid and
             // is granted by async_payment_succeeded below, through the same
             // path — never from the metadata alone.
-            await applyOneTimeCheckout(session, userId);
+            await applyOneTimeCheckout(session, userId, event.id);
           } else if (userId && session.subscription && isCrmCheckoutSession(session)) {
             // The CRM is a separate product: its subscription is recorded in
             // crm_subscriptions and never touches the platform row.
@@ -821,7 +824,7 @@ export function registerStripeRoutes(app: Express) {
           const userId = parseInt(session.metadata?.userId || "0");
           if (userId && session.mode === "payment") {
             eventUserId = userId;
-            await applyOneTimeCheckout(session, userId);
+            await applyOneTimeCheckout(session, userId, event.id);
           }
           break;
         }
@@ -833,6 +836,25 @@ export function registerStripeRoutes(app: Express) {
           const userId = parseInt(session.metadata?.userId || "0");
           if (userId) eventUserId = userId;
           console.warn(`[billing] checkout ${session.id} (user ${userId || "unknown"}): delayed payment failed — nothing granted.`);
+          // An SEO credit pack is only credited once paid; one that somehow was is taken back (credit-reversals.ts).
+          await applySeoCreditEvent(event, stripe as unknown as ReversalStripe);
+          break;
+        }
+        // Refunds and disputes (chargebacks) on an SEO data credit pack take the credit back, put it on hold while a
+        // dispute is open, or release it when the dispute is won (server/seo/credit-reversals.ts). Each is read from
+        // Stripe as it is now, so a late or repeated event changes nothing twice. Anything else refunded or disputed
+        // (a course, a subscription invoice) is not an SEO credit pack and is left as before. These event types must
+        // be enabled on the live webhook endpoint (HANDOFF.md); until they are, nothing here runs.
+        case "charge.refunded":
+        case "charge.refund.updated":
+        case "charge.dispute.created":
+        case "charge.dispute.updated":
+        case "charge.dispute.closed":
+        case "charge.dispute.funds_withdrawn":
+        case "charge.dispute.funds_reinstated": {
+          const r = await applySeoCreditEvent(event, stripe as unknown as ReversalStripe);
+          eventUserId = r.userId;
+          sendBillingEmail = false;
           break;
         }
         case "invoice.paid":

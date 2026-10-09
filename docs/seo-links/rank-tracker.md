@@ -12,8 +12,9 @@ narrowing, so a count made over the narrowed rows links to those rows) and `href
 panel's own parameter changed). The keyword watch (`keyword-watch.tsx`, on Alerts) is at the end of this file.
 
 Below, `rt(…)` is `seoLinks.rankTracker(siteId, …)`, `ex(…)` is `seoLinks.explorer(…)`, `kw(…)` is `seoLinks.keywords(…)`.
-Every link carries a `data-testid` that is unique on the page (`link-<figure>`, with the row's id, and a tag or domain
-made id-safe by `slug()` so two tags never share one). Nothing is bought on arrival: no parameter starts a check or a lookup.
+Every link carries a `data-testid` that is unique on the page (`link-<figure>`, with the row's id; a tag made id-safe
+by `slug()` so two tags never share one; a domain — one word with no spaces — as it is, e.g. `link-voice-example.com`
+in `rank-competitors.tsx`, where `id()` is used only for the figures beside it). Nothing is bought on arrival: no parameter starts a check or a lookup.
 Guard: `server/seo/rank-tracker-ui.test.ts` (source pins of the rows below, and the pure parameter reader).
 
 ## The chip
@@ -104,6 +105,7 @@ The keyword watch's chip is at the end of this file.
 | … — every date (first – last ranked, "on <date>", "not found in the check of", "ranked again on", "last on") and "at position N" in the opened row | `rt({ keyword, device, panel: "history", date })` | History: the check of <date> |
 | … — Volume | `kw(keyword)` | — |
 | … — Page changes (a link), the chevron (a button) | opens the row's pages: `hrefWith({ competing: keywordId })` / `setParam("competing", keywordId)` (the opened row is the address) | — |
+| … — a `competing` that names no row listed here (round 3) | a chip (`active-filter`) under the panel's title: "The keyword the address opens is not among those listed here — … — so no row is opened", its **Clear** → `setParam("competing", null)` | (that chip) |
 | … — Last shown, each page in the opened row, each address of a "may be one page" group (`link-competing-variant-<id>-<g>-<n>`) | `ex(host, "pages", { path })` | — |
 | … — "Show N keywords where the page changed / shown under addresses that differ" | `hrefWith({ competingShow: "changed" \| "variants" })` (hiding it also closes a row opened in it); a row the address opens in a further list opens that list | — |
 | **Searches with largely the same results** — "saved for N keywords", "N keywords have no saved result page", "(N were checked without one)" | `rt({ checked: true, device })` | Keywords with a saved check |
@@ -118,6 +120,7 @@ The keyword watch's chip is at the end of this file.
 | … — your address (one), a member's page | `ex(host, "pages", { path })` | — |
 | … — device buttons | `setParams({ device, group: null })` | — |
 | … — "Show all N groups" / "Show the first 8" | `hrefWith({ groupsAll: true \| null })` | — |
+| … — a `group` that names none of these groups (round 3) | a chip (`active-filter`) under the panel's heading: "The results group the address opens is not among these groups on <device> — … — so none is opened", its **Clear** → `setParam("group", null)` | (that chip) |
 | **Search Console breakdown** — Pages / Searches tabs | `hrefWith({ gsc: "query" \| null, gscAll: null })` (the table's narrowing stays) | — |
 | … — "Show: Most clicks / Biggest gain / Biggest fall" | `setParam("gscSort", "gain" \| "loss" \| null)` (back to most clicks, in place, when the windows are not comparable) | — |
 | … — "N pages / searches" in the basis line, "the busiest N listed", "Show all N" | `hrefWith({ gscAll: true })` (when Google returned more than are kept, the title says the busiest are listed) | — |
@@ -137,6 +140,7 @@ The keyword watch's chip is at the end of this file.
 | … — "· <town>" after the keyword | `rt({ location, device })` | Keywords checked from “…” |
 | … — a tag after the keyword | `rt({ tag, device })` — the device named in the address is kept (audit §3.3); `link-row-tag-<id>-<slug>` | Keywords tagged “…” |
 | … — position badge (and the Checked date) | opens the keyword's history (`button-history-<id>`, `button-checked-<id>`) | — |
+| … — the movement beside a position ("▲3", "▼2", "new", "lost", "·") (`link-move-<id>`, `link-move-<id>-<device>` for the second device) | `rt({ move, device })` — every keyword that moved the same way on that device (the same `moved()` the narrowing uses: "new" before "up", "lost" before "down"); no glyph (no check before) is no link | Keywords up since the check before (newly found ones included) · … |
 | … — Map pack "#N" / "not found in it" | `rt({ mapPack: true, device })` | Keywords whose results show a map pack |
 | … — Map pack "no map" | `rt({ noMap: true, device })` | Keywords whose results show no map pack |
 | … — a SERP feature chip (Map, AI, Snippet, Questions, Videos, Images, Ads, Shopping, News, Panel) | `rt({ feature: <type>, device })` | Keywords whose results show <feature> |
@@ -172,9 +176,9 @@ The keyword watch's chip is at the end of this file.
 | `series` | The History panel's figure: `visibility`, `position`, `top3`, `top10`, `map`. Said in the panel's chip. |
 | `date` | A check day (`YYYY-MM-DD`): the History numbers table opens with that row highlighted and scrolled to; the panel's chip names it. |
 | `panel` | Scrolls to `history`, `tags`, `competitors`, `groups`, `gsc`, `competing`, or `keywords` (the table). A panel that is not on the page (no Search Console, no tags) is simply not scrolled to. |
-| `gsc`, `gscSort`, `gscAll` | The Search Console breakdown's tab (`query`; pages otherwise), its order (`gain` \| `loss`; most clicks otherwise) and "show all". |
-| `group`, `groupsAll` | The opened results group (its first keyword's id) and "all groups" in Searches with largely the same results. |
-| `competing`, `competingShow` | The opened row (keyword id) and the further lists (`changed` \| `variants`) in The page Google shows for each search. |
+| `gsc`, `gscSort`, `gscAll` | The Search Console breakdown's tab (`query`; pages otherwise), its order (`gain` \| `loss`; most clicks otherwise) and "show all". When the site has no Search Console property connected the breakdown isn't drawn, so the page still answers the address with a chip (`gsc-not-connected`, `active-filter`): "Search Console breakdown · by search: <site>'s Search Console property isn't connected, so there is no breakdown to show." with **Connect it** (`link-gsc-connect-chip` → `seoLinks.searchConsole()`) and **Clear** (`link-clear-gsc` → `hrefWith({ gsc: null, gscSort: null, gscAll: null })`). |
+| `group`, `groupsAll` | The opened results group (its first keyword's id) and "all groups" in Searches with largely the same results. An id that opens none of the groups is said in the panel's chip, with a clear. |
+| `competing`, `competingShow` | The opened row (keyword id) and the further lists (`changed` \| `variants`) in The page Google shows for each search. An id that names none of the rows is said in the panel's chip, with a clear. |
 
 Any narrowing parameter (or `device`) without `panel` scrolls to the table's heading and chip on arrival, once per address.
 Every control on the page writes the same parameters (`setParam` / `setParams`, push — or is itself a link built with
@@ -191,7 +195,9 @@ Every link on the screen uses `viz-rank.tsx`'s `LINK` (or `LINK_BLOCK` for a tru
 dotted underline that needs no hover (solid on hover and `focus-visible`; the focus ring is `google.css`'s), and at
 phone width an inline-flex box 44 px tall. Row buttons (`TAP`: the position badge, the Checked date, the group and row
 reveals), the device pills, SERP chips, the table's remove button and the panels' pills are 44 px tall at phone width
-(`max-sm:!min-h-11`), 32 px in the desktop table. An older check in History has a list of dated links (`list-checks`),
+(`max-sm:!min-h-11`). On a desktop they keep their own size, which is smaller: the row buttons 32 px (`TAP`'s
+`!min-h-8`), the trend charts' figure pills 28 px (`!min-h-7`), a SERP chip the height of its 11 px label (about 18 px,
+`serp-features.tsx` `CHIP`) — a mouse, not a thumb. An older check in History has a list of dated links (`list-checks`),
 so the chart's points are never the only way to it. The distribution bar's segments draw a 10 px stripe inside a hit
 area 44 px tall at phone width, and its legend repeats them as links in words.
 
@@ -207,6 +213,8 @@ The pair compared, the list shown and "show all" are the address — `seoLinks.a
 the snapshot pickers write `now` / `before` (`setParams`, one history entry), the tabs are links (`?watch=added | gone | pages`)
 and "Show all N" is `?watchAll=true`. A pair that is not the site's is answered by the server ("That snapshot is not on
 record for this site") with a link to the newest two. Nothing is bought by arriving; the snapshot button is the one buyer.
+On a phone (round 3) the two snapshot pickers are 44 px tall (`PICK`: the screens' `g-input g-select`, `!min-h-11`) and
+both tables scroll sideways only from 640 px — under it they are labelled cards (every cell has its `data-label`).
 
 Chip (`data-testid="active-filter"`, inside the panel): "Keyword watch: the snapshots of Oct 1 and Sep 1 · the searches
 no longer seen · every row"; an unknown `watch` is said ("“foo” is not a list here, so the first is shown"). Its

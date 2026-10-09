@@ -693,3 +693,89 @@ it("an exhausted user cannot drain the global PageSpeed budget without provider 
   expect(job.report.psi).toHaveLength(2);
   expect(job.report.scores.categories.performance).toBeNull();
 });
+
+// ---- Review S-1: a scan that stalled the web process is failed, not leased again (the rules, against Postgres) ----
+const quiet = () => pool.query("UPDATE sitescan_jobs SET status='failed' WHERE status IN ('queued','running') AND url LIKE 'https://sitescan-%'");
+const scanRow = async (id: string) => (await pool.query("SELECT status,fail_reason,error,abandoned,attempts,cpu_step FROM sitescan_jobs WHERE id=$1", [id])).rows[0];
+it("a scan whose worker went away in the middle of a step is failed with the reason and never run again", async () => {
+  await quiet();
+  const id = await enqueue(null, "https://sitescan-poison.test/", 1, 0);
+  await pool.query("UPDATE sitescan_jobs SET status='running',lease_token=$2,lease_until=now()-interval '1 minute',attempts=1,cpu_step='robots.txt' WHERE id=$1", [id, randomUUID()]);
+  const crawl = vi.fn(async () => emptyState("https://sitescan-poison.test/"));
+  for (let i = 0; i < 3; i++) await runSiteScanWorker({ crawl, http: vi.fn(), pageSpeed: vi.fn() });
+  expect(crawl).not.toHaveBeenCalled();
+  expect(await scanRow(id)).toMatchObject({ status: "failed", fail_reason: "cpu_stall", attempts: 1, cpu_step: "robots.txt" });
+  expect((await scanRow(id)).error).toContain("will not be retried");
+});
+it("a live scan inside a step (its lease still running) is left alone", async () => {
+  await quiet();
+  const id = await enqueue(null, "https://sitescan-live.test/", 1, 0);
+  await pool.query("UPDATE sitescan_jobs SET status='running',lease_token=$2,lease_until=now()+interval '2 minutes',attempts=1,cpu_step='page x' WHERE id=$1", [id, randomUUID()]);
+  const crawl = vi.fn(async () => emptyState("https://sitescan-live.test/"));
+  await runSiteScanWorker({ crawl, http: vi.fn(), pageSpeed: vi.fn() });
+  expect(crawl).not.toHaveBeenCalled();
+  expect(await scanRow(id)).toMatchObject({ status: "running", fail_reason: null });
+  await pool.query("UPDATE sitescan_jobs SET status='failed' WHERE id=$1", [id]);
+});
+it("a scan abandoned between steps is taken again once; a second abandonment fails it", async () => {
+  await quiet();
+  const id = await enqueue(null, "https://sitescan-abandoned.test/", 1, 0);
+  // The worker "goes away": the lease runs out with nobody holding it, and nothing marks the scan failed.
+  const vanish = vi.fn(async () => {
+    await pool.query("UPDATE sitescan_jobs SET lease_token=$2,lease_until=now()-interval '1 minute' WHERE id=$1", [id, randomUUID()]);
+    throw new Error("process gone");
+  });
+  await runSiteScanWorker({ crawl: vanish as any, http: vi.fn(), pageSpeed: vi.fn() }); // first run, from 'queued'
+  expect(await scanRow(id)).toMatchObject({ status: "running", abandoned: 0, attempts: 1 });
+  await runSiteScanWorker({ crawl: vanish as any, http: vi.fn(), pageSpeed: vi.fn() }); // taken again: once
+  expect(await scanRow(id)).toMatchObject({ status: "running", abandoned: 1, attempts: 2 });
+  await runSiteScanWorker({ crawl: vanish as any, http: vi.fn(), pageSpeed: vi.fn() }); // not a third time
+  await runSiteScanWorker({ crawl: vanish as any, http: vi.fn(), pageSpeed: vi.fn() });
+  expect(vanish).toHaveBeenCalledTimes(2);
+  expect(await scanRow(id)).toMatchObject({ status: "failed", fail_reason: "abandoned", attempts: 2 });
+});
+it("a step that overran fails the scan as a stall, in the row, and it is not leased again", async () => {
+  await quiet();
+  const id = await enqueue(null, "https://sitescan-slowstep.test/", 1, 0);
+  const before = process.env.SITESCAN_STEP_BUDGET_MS;
+  process.env.SITESCAN_STEP_BUDGET_MS = "15";
+  const slow = vi.fn(async (...a: any[]) => {
+    await a[7]("page https://sitescan-slowstep.test/", () => { const end = performance.now() + 50; while (performance.now() < end); });
+    return emptyState("https://sitescan-slowstep.test/");
+  });
+  try {
+    for (let i = 0; i < 3; i++) await runSiteScanWorker({ crawl: slow as any, http: vi.fn(), pageSpeed: vi.fn() });
+  } finally {
+    if (before === undefined) delete process.env.SITESCAN_STEP_BUDGET_MS; else process.env.SITESCAN_STEP_BUDGET_MS = before;
+  }
+  expect(slow).toHaveBeenCalledTimes(1);
+  expect(await scanRow(id)).toMatchObject({ status: "failed", fail_reason: "cpu_stall", cpu_step: "page https://sitescan-slowstep.test/", attempts: 1 });
+});
+it("a customer's scan is leased before a free scan that was queued earlier", async () => {
+  await quiet();
+  const free = await enqueue(null, "https://sitescan-free-first.test/", 1, 0);
+  await pool.query("UPDATE sitescan_jobs SET created_at=now()-interval '1 hour' WHERE id=$1", [free]);
+  const paid = await enqueue(1, "https://sitescan-customer.test/", 1, 0);
+  const order: string[] = [];
+  const crawl = vi.fn(async (url: string) => { order.push(url); throw new Error("stop here"); });
+  await runSiteScanWorker({ crawl: crawl as any, http: vi.fn(), pageSpeed: vi.fn() });
+  await runSiteScanWorker({ crawl: crawl as any, http: vi.fn(), pageSpeed: vi.fn() });
+  expect(order).toEqual(["https://sitescan-customer.test/", "https://sitescan-free-first.test/"]);
+  expect((await scanRow(paid)).fail_reason).toBe("error");
+});
+it("the free public scan is refused while free scans are already waiting, and per website", async () => {
+  const { FREE_SCAN_LIMITS, freeScanGate } = await import("./routes");
+  await quiet();
+  await pool.query("DELETE FROM growth_budgets WHERE key LIKE 'sitescan:lead-%'");
+  const who = (n: number) => ({ ip: "s1-ip-" + n, email: "s1-mail-" + n, host: "s1-host" });
+  for (let i = 0; i < FREE_SCAN_LIMITS.perSiteDay; i++) expect(await freeScanGate(who(i))).toBe("ok");
+  expect(await freeScanGate(who(99))).toBe("limit"); // the same website, whoever asks
+  const ids: string[] = [];
+  for (let i = 0; i < FREE_SCAN_LIMITS.waiting; i++) ids.push(await enqueue(null, `https://sitescan-waiting-${i}.test/`, 1, 0));
+  const start = await call("post", "/api/sitescan/public/start", { user: null, body: { url: "https://sitescan-one-more.test/", email: "sitescan-s1@example.invalid", captchaToken: "fixture" } });
+  expect(start.status).toBe(429);
+  expect(start.body.message).toMatch(/busy/);
+  expect((await pool.query("SELECT 1 FROM sitescan_jobs WHERE url='https://sitescan-one-more.test/'")).rowCount).toBe(0);
+  await pool.query("UPDATE sitescan_jobs SET status='failed' WHERE id=ANY($1::uuid[])", [ids]);
+  await pool.query("DELETE FROM growth_budgets WHERE key LIKE 'sitescan:lead-%'");
+});

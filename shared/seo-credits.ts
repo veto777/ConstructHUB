@@ -36,8 +36,14 @@ export type SeoCredits = {
   includedUsedCents: number;
   /** Purchased credit left. */
   walletCents: number;
-  /** What can still be spent right now (allowance left + purchased); -1 = unlimited. */
+  /** What can still be spent right now (allowance left + purchased); -1 = unlimited; 0 while credit is owed. */
   availableCents: number;
+  /** Purchased credit on hold while a dispute about its payment is open (not in walletCents). */
+  frozenCents?: number;
+  /** Credit taken back after it was spent (a refunded or lost-dispute pack); lookups are paused while > 0. */
+  owedCents?: number;
+  /** What the account says about frozen or owed credit, in plain words; null when nothing. */
+  notice?: string | null;
 };
 
 /** How a charge is split: the month's allowance first, then purchased credit. Pure. */

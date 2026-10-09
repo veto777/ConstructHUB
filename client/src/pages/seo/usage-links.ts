@@ -45,5 +45,35 @@ export function spentOn(what: string, sites: SeoSite[]): string | null {
   }
   if ((m = /^Mentions watch — "(.+)"$/.exec(what))) { const s = sites.find((x) => (x.businessName ?? "").trim().toLowerCase() === m![1].trim().toLowerCase()) ?? only; return s ? seoLinks.mentions(s.id) : null; }
   if (/^Mentions( watch)? — /.test(what)) return only ? seoLinks.mentions(only.id) : null;
+  // Round 3: the six paid kinds the ledger used to leave as words.
+  // Directories: the site and the competitors compared, in the order the comparison was saved under ("none": alone).
+  // A second try names the sites it retried and, on newer rows, the whole comparison ("… (second try for a, b)"); an
+  // older second try names no comparison, so it opens nothing.
+  if ((m = /^Directories — (.+?)( \(second try(?: for (.+))?\))?$/.exec(what))) {
+    const list = (m[2] ? m[3] : m[1])?.split(", ").filter(Boolean) ?? [];
+    if (!list.length) return null;
+    return seoLinks.explorer(list[0], "directories", { rivals: list.slice(1).join(",") || "none" });
+  }
+  if ((m = /^Service-area planner — (\S+) \(/.exec(what))) { const s = byDomain(m[1]); return s ? seoLinks.servicePlanner(s.id) : null; }
+  if ((m = /^Opportunities — (\S+)$/.exec(what))) return seoLinks.explorer(m[1], "opportunities");
+  // The label keeps how many keywords, not which: the page it was made on.
+  if (/^Bulk keyword analysis — /.test(what)) return seoLinks.keywords("", { view: "bulk" });
+  // One page of a Site explorer / Keywords explorer table: "<the table's name> — <domain or keyword>".
+  if ((m = /^(.+?) — (.+)$/.exec(what))) {
+    if (Object.prototype.hasOwnProperty.call(REPORT_VIEWS, m[1])) return seoLinks.explorer(m[2], REPORT_VIEWS[m[1]]);
+    if (Object.prototype.hasOwnProperty.call(IDEA_TABLES, m[1])) return seoLinks.keywords(m[2], { table: IDEA_TABLES[m[1]] });
+  }
   return null;
 }
+
+/**
+ * The report tables as the ledger names them (server/seo/routes.ts REPORT_NAMES: "<name> — <target>") and the Site
+ * explorer view each opens (explorer.tsx's menu keys). The test checks every name the server writes is here.
+ */
+const REPORT_VIEWS: Record<string, string> = {
+  "Organic keywords": "keywords", "Paid keywords": "paidKeywords", "Top pages": "pages", "Organic competitors": "competitors", Backlinks: "backlinks", "New backlinks": "newBacklinks",
+  "Lost backlinks": "lostBacklinks", "Broken backlinks": "brokenBacklinks", "Referring domains": "referringDomains", Anchors: "anchors", "Best pages by links": "bestByLinks", "Referring IPs": "referringIps",
+  "Sites with similar links": "linkCompetitors", Subdomains: "subdomains", Ads: "ads",
+};
+/** Keywords explorer's idea tables (a keyword's, not a site's): the `table` each opens. */
+const IDEA_TABLES: Record<string, string> = { "Matching terms": "matchingTerms", "Related terms": "relatedTerms", Questions: "questions" };

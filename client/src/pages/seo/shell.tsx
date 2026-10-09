@@ -30,7 +30,9 @@ export const api = async (method: string, url: string, body?: unknown) => (await
 export type Unit = { used: number; limit: number };
 export type SeoUsage = { keywords: Unit };
 /** SEO data credit, in cents at the customer's price (shared/seo-credits.ts). -1 = unlimited. */
-export type SeoCreditsInfo = { includedCents: number; includedUsedCents: number; walletCents: number; availableCents: number };
+export type SeoCreditsInfo = { includedCents: number; includedUsedCents: number; walletCents: number; availableCents: number;
+  /** On hold while a dispute about a credit payment is open; owed after a refunded/disputed pack's credit was used. */
+  frozenCents?: number; owedCents?: number; notice?: string | null };
 export type SeoPrices = { explorerReport: number; reportPage: number; adsReport?: number; gridLocate?: number; gridPer100?: number; keywordOverview: number; keywordResearch: number; competitorGap: number; backlinkRefresh: number; rankChecksPer100: number; linkIntersect?: number; bulkBase?: number; bulkPer100?: number; searchVolumes?: number; aiChatgpt?: number; aiGemini?: number; aiPerplexity?: number; aiMentions?: number; batchBase?: number; batchPer100?: number; contentSearch?: number; mentions?: number; mentionsRetry?: number };
 export type SeoStatus = {
   configured: boolean;
@@ -124,13 +126,14 @@ export function useSiteMissing(sites: SeoSite[] | undefined): number | null {
 
 /**
  * What narrowed this view, in the visitor's words, with a way to clear it (data-testid="active-filter"). A page shows
- * one whenever a parameter of the address narrows, opens or highlights something on it.
+ * one whenever a parameter of the address narrows, opens or highlights something on it. The chip and its clear are
+ * both 44 px tall.
  */
 export function ActiveFilter({ children, onClear, clearLabel = "Show everything" }: { children: ReactNode; onClear: () => void; clearLabel?: string }) {
   return (
     <p className="mb-3 flex flex-wrap items-center gap-2 text-[13px]" role="status" data-testid="active-filter">
-      <span className="g-chip min-h-10 !whitespace-normal py-1 [overflow-wrap:anywhere]" style={{ textTransform: "none" }}>{children}</span>
-      <button type="button" className="g-pill g-pill--sm" onClick={onClear} data-testid="button-clear-filter"><X /> {clearLabel}</button>
+      <span className="g-chip min-h-11 !whitespace-normal py-1 [overflow-wrap:anywhere]" style={{ textTransform: "none" }}>{children}</span>
+      <button type="button" className="g-pill g-pill--sm !min-h-11" onClick={onClear} data-testid="button-clear-filter"><X /> {clearLabel}</button>
     </p>
   );
 }
@@ -172,6 +175,37 @@ export function useHash(): string {
   );
 }
 
+/**
+ * Phone sizes for every SEO page, set once on the page frame so no page has to (owner's rule: a 44 px target at 390 px).
+ * Below 640 px: every button is at least 44 × 44, and every pill (a button or a link dressed as one), text box and
+ * select at least 44 px tall; a <details> summary is a 44 px line; a page's own tab strip (a `.g-tabs` that is not a
+ * TabStrip — the keyword views and ideas, opportunities, the Search Console breakdown, the keyword watch, the explorer's
+ * first look) wraps instead of scrolling sideways, every tab 44 px tall, and its scrollbar shows wherever it does
+ * scroll; a checkbox is a 20 px box with a 44 × 44 tap area (in a label, the whole label line is 44 px too) — ticked,
+ * or half-picked with a dash, in the accent with the mark in the page's own colour (white light, near-black dark). On
+ * a desktop buttons keep the 40 px floor and checkboxes their own look. Tailwind reads these classes as written, so
+ * each one is spelled out in full.
+ */
+const PHONE_SIZES = [
+  "[&_button]:min-h-10 max-sm:[&_button]:min-h-11 max-sm:[&_button]:min-w-11",
+  "max-sm:[&_.g-pill]:min-h-11 max-sm:[&_.g-input]:min-h-11 max-sm:[&_select]:min-h-11",
+  "max-sm:[&_summary]:min-h-11 max-sm:[&_summary]:content-center",
+  "[&_.g-tabs:not([data-tab-strip])]:[scrollbar-width:thin] max-sm:[&_.g-tabs:not([data-tab-strip])]:flex-wrap",
+  "[&_.g-tabs:not([data-tab-strip])>a]:flex [&_.g-tabs:not([data-tab-strip])>a]:min-h-11 [&_.g-tabs:not([data-tab-strip])>a]:items-center",
+  "max-sm:[&_label:has(input[type=checkbox])]:min-h-11",
+  "max-sm:[&_input[type=checkbox]]:m-0 max-sm:[&_input[type=checkbox]]:size-11 max-sm:[&_input[type=checkbox]]:shrink-0 max-sm:[&_input[type=checkbox]]:cursor-pointer max-sm:[&_input[type=checkbox]]:appearance-none",
+  "max-sm:[&_input[type=checkbox]]:rounded-[16px] max-sm:[&_input[type=checkbox]]:border-[12px] max-sm:[&_input[type=checkbox]]:border-transparent max-sm:[&_input[type=checkbox]]:bg-clip-padding",
+  "max-sm:[&_input[type=checkbox]]:bg-[color:var(--g-surface)] max-sm:[&_input[type=checkbox]]:[box-shadow:inset_0_0_0_2px_var(--g-text-2)]",
+  "max-sm:[&_input[type=checkbox]:checked]:bg-[color:var(--g-accent)] max-sm:[&_input[type=checkbox]:checked]:[box-shadow:none]",
+  "max-sm:[&_input[type=checkbox]:indeterminate]:bg-[color:var(--g-accent)] max-sm:[&_input[type=checkbox]:indeterminate]:[box-shadow:none]",
+  "max-sm:[&_input[type=checkbox]:checked]:bg-[url(data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2020%2020%22%3E%3Cpath%20d=%22M5%2010.5l3.5%203.5L15%207%22%20fill=%22none%22%20stroke=%22%23fff%22%20stroke-width=%222.5%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22/%3E%3C/svg%3E)]",
+  "max-sm:[&_input[type=checkbox]:indeterminate]:bg-[url(data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2020%2020%22%3E%3Cpath%20d=%22M5%2010h10%22%20fill=%22none%22%20stroke=%22%23fff%22%20stroke-width=%222.5%22%20stroke-linecap=%22round%22/%3E%3C/svg%3E)]",
+  "dark:max-sm:[&_input[type=checkbox]:checked]:bg-[url(data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2020%2020%22%3E%3Cpath%20d=%22M5%2010.5l3.5%203.5L15%207%22%20fill=%22none%22%20stroke=%22%23202124%22%20stroke-width=%222.5%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22/%3E%3C/svg%3E)]",
+  "dark:max-sm:[&_input[type=checkbox]:indeterminate]:bg-[url(data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2020%2020%22%3E%3Cpath%20d=%22M5%2010h10%22%20fill=%22none%22%20stroke=%22%23202124%22%20stroke-width=%222.5%22%20stroke-linecap=%22round%22/%3E%3C/svg%3E)]",
+  "max-sm:[&_input[type=checkbox]]:bg-center max-sm:[&_input[type=checkbox]]:bg-no-repeat",
+  "max-sm:[&_input[type=checkbox]:focus-visible]:[outline-offset:-10px] max-sm:[&_input[type=checkbox]:disabled]:cursor-default max-sm:[&_input[type=checkbox]:disabled]:opacity-50",
+].join(" ");
+
 export function SeoShell({ title, description, actions, children, site, onSite, sites, status, picker = true }: {
   title: string; description: string; actions?: ReactNode; children: ReactNode;
   /** false on pages that are not about one tracked site (Site explorer takes any domain). */
@@ -183,7 +217,7 @@ export function SeoShell({ title, description, actions, children, site, onSite, 
   const bar = <>{picker && !sites.isError && <SitePicker site={site} onSite={onSite} sites={sites} />}<UsageLine status={status} /></>;
   return (
     <GoogleSurface page accent="brand" className="tool-page" testId="seo-surface">
-      <AppPage className="before:hidden [&_button]:min-h-10 !space-y-3 !pt-2 sm:!pt-3">
+      <AppPage className={`before:hidden !space-y-3 !pt-2 sm:!pt-3 ${PHONE_SIZES}`}>
         {/* The section's global input — the site switcher, "Add a site", the balance — lives in the tool bar's second
             row (components/tool/shell.tsx); outside a tool shell it renders here. */}
         {!gate && (slot ? createPortal(bar, slot) : <div className="mb-3 flex flex-wrap items-center gap-2">{bar}</div>)}
@@ -264,7 +298,12 @@ function UsageLine({ status }: { status: ReturnType<typeof useSeoStatus> }) {
         </span>
         {canBuy && !adding && <button type="button" className="g-pill g-pill--sm" onClick={() => setAdding(true)} data-testid="button-add-credit"><Plus /> Add credit</button>}
       </p>
-      {!unlimited && c.availableCents === 0 && !adding && (
+      {c.notice && (
+        <p className="mt-1 text-[13px]" style={c.owedCents ? { color: "var(--g-red)" } : undefined} role="status" data-testid="text-seo-credit-notice">
+          {c.notice}
+        </p>
+      )}
+      {!unlimited && c.availableCents === 0 && !c.owedCents && !adding && (
         <p className="mt-1 text-[13px]" style={{ color: "var(--g-red)" }} role="status" data-testid="text-seo-out-of-credit">
           You've used this month's SEO data. {canBuy ? "Add credit to keep running lookups, or wait for the 1st." : "It comes back on the 1st."}
         </p>

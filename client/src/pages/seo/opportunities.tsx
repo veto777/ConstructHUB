@@ -12,12 +12,14 @@
  * lost) to the site's organic keywords in Site explorer narrowed to the search (the keyword database the figure comes
  * from; the place before is kept nowhere else, and the words say so), a page's figures to that page in Site explorer,
  * the date to that month's lookups on the Usage page. Arriving never buys: the saved copy opens, or the button waits.
+ * The page of a list is the address too (links.ts `offset`, pages of 50 — round 3): Previous / Next are links, so
+ * the back button undoes a page turn. Every link carries the country with its language (marketParams).
  */
 import { AddToPlan } from "./plan-button";
 import { Link } from "wouter";
 import { seoLinks, setParam, setParams } from "./links";
 import { marketParams } from "./keyword-links";
-import { pathOfUrl } from "./explorer-filters";
+import { pageFromAddress, pathOfUrl } from "./explorer-filters";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, Loader2, Play } from "lucide-react";
@@ -27,7 +29,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ActiveFilter, api, Empty, fmtDate, fmtNum, isNotRunYet, kd, money, useAddress, type SeoStatus } from "./shell";
 import { AddToList } from "./keyword-lists";
 import { BLOCK_LINK, FIG_LINK, LINK_CUE, TEXT_LINK, TileLink } from "./viz-keywords";
-import { DEFAULT_MARKET, type SeoMarket } from "@shared/seo-markets";
+import { type SeoMarket } from "@shared/seo-markets";
 
 type Kw = { keyword: string; position: number; fell: number | null; volume: number | null; difficulty: number | null; cpc: number | null; traffic: number; url: string; home: boolean };
 type PageRow = { url: string; key: string; home: boolean; keywords: number; traffic: number; top3: number; top10: number; best: { keyword: string; position: number; volume: number | null } };
@@ -72,7 +74,9 @@ export function OpportunitiesView({ domain, status, market, onTrack, planSiteId 
   const oppParam = address.get("opp"), pathParam = address.get("path")?.trim() || null;
   const tab: Tab = TABS.find((t) => t === oppParam) ?? "within";
   const [picked, setPicked] = useState<Set<string>>(new Set());
-  const [page, setPage] = useState(0);
+  // The page of the list is the address's (links.ts `offset`, a multiple of 50); the first page is no word.
+  const offsetParam = pageFromAddress({ offset: address.get("offset") }, [PER_PAGE], PER_PAGE).offset;
+  const page = offsetParam / PER_PAGE;
   const body = useMemo(() => ({ domain, locationCode: market.locationCode, languageCode: market.languageCode }), [domain, market.locationCode, market.languageCode]);
   const queryKey = ["/api/seo/opportunities", body];
   const saved = useQuery<{ page: Data } | null>({
@@ -99,8 +103,8 @@ export function OpportunitiesView({ domain, status, market, onTrack, planSiteId 
   /** Pages list: the page whose searches are listed — the address's, when it is among the pages returned (the chip says when it is not). */
   const opened = tab === "pages" && pathParam ? pages.find((p) => pagePath(p) === pathParam) ?? null : null;
   const openPage = opened?.key ?? null;
-  // Another list, site or page starts at the first page of rows with nothing ticked; so does a new set of rows (looked up again).
-  useEffect(() => { setPicked(new Set()); setPage(0); }, [tab, domain, openPage, d?.fetchedAt]);
+  // Another list, site, page of the site or page of rows starts with nothing ticked; so does a new set of rows (looked up again).
+  useEffect(() => { setPicked(new Set()); }, [tab, domain, openPage, d?.fetchedAt, offsetParam]);
   const list: Kw[] = useMemo(() => {
     if (tab === "within") return rows.filter((r) => r.position >= 4);
     if (tab === "falling") return rows.filter((r) => r.fell !== null && r.fell >= 3);
@@ -114,9 +118,11 @@ export function OpportunitiesView({ domain, status, market, onTrack, planSiteId 
   const chosen = list.filter((r) => picked.has(r.keyword));
   const toggle = (k: string) => setPicked((s) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n; });
   const count = (t: Tab) => (d ? (t === "within" ? d.summary.withinCount : t === "falling" ? d.summary.fallingCount : t === "pages" ? d.summary.pages : d.summary.homeCount) : 0);
-  const loc = market.locationCode !== DEFAULT_MARKET.locationCode ? { locationCode: market.locationCode } : {};
+  const loc = marketParams(market);
   /** This view showing another list (or one page's searches): what the tiles, the tabs and a page's links write. */
   const here = (opp: Tab, path?: string) => seoLinks.explorer(domain, "opportunities", { opp, path, ...loc });
+  /** This list (as the address names it — no list word when it names none) at the page of rows starting at `from`: what Previous / Next write. */
+  const pageAt = (from: number) => seoLinks.explorer(domain, "opportunities", { opp: oppParam === tab ? tab : undefined, path: opened ? pagePath(opened) : undefined, ...loc, offset: from || undefined });
   /** The site's organic keywords in Site explorer, narrowed — the keyword database a position comes from (its own lookup: a saved page opens free, else its Run button waits). */
   const organic = (p: { contains?: string; path?: string; band?: "top3" | "top10" | "top20" }) => seoLinks.explorer(domain, "keywords", { ...p, ...loc });
   /** A keyword's overview in the Keywords explorer, or one part of it. */
@@ -174,7 +180,7 @@ export function OpportunitiesView({ domain, status, market, onTrack, planSiteId 
           </p>
           <nav className="g-tabs" aria-label="Opportunities">
             {([["within", "Within reach"], ["falling", "Losing ground"], ["pages", "Pages"], ["home", "Home page"]] as const).map(([t, label]) => (
-              <Link key={t} href={here(t)} className="inline-flex min-h-11 items-center gap-1" aria-current={tab === t ? "page" : undefined} data-testid={`tab-opp-${t}`}>{label} <span className="g-text-2 tabular-nums underline decoration-dotted decoration-1 underline-offset-4">{fmtNum(count(t))}</span></Link>
+              <Link key={t} href={here(t)} className="inline-flex min-h-11 items-center gap-1 rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--g-blue)]" aria-current={tab === t ? "page" : undefined} data-testid={`tab-opp-${t}`}><span className="underline decoration-dotted decoration-1 underline-offset-4">{label}</span> <span className="g-text-2 tabular-nums underline decoration-dotted decoration-1 underline-offset-4">{fmtNum(count(t))}</span></Link>
             ))}
           </nav>
           <p className="g-text-2 mb-3 text-[13px]" data-testid="text-opp-note">{NOTE[tab]}</p>
@@ -228,9 +234,10 @@ export function OpportunitiesView({ domain, status, market, onTrack, planSiteId 
           )}
           {total > PER_PAGE && (
             <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px]" data-testid="opp-paging">
-              <button type="button" className={PILL} disabled={at === 0} onClick={() => { setPage(at - 1); setPicked(new Set()); }} data-testid="button-opp-prev">← Previous</button>
-              <button type="button" className={PILL} disabled={from + PER_PAGE >= total} onClick={() => { setPage(at + 1); setPicked(new Set()); }} data-testid="button-opp-next">Next →</button>
-              <span className="g-text-2"><Link href={here(tab, opened ? pagePath(opened) : undefined)} className={TEXT_LINK} title="This list's own address (it opens at its first fifty)" data-testid="link-opp-paging">{fmtNum(from + 1)}–{fmtNum(Math.min(total, from + PER_PAGE))} of {fmtNum(total)}</Link> · paging is free</span>
+              {/* The pages are addresses (links.ts `offset`): a link to share, and Back undoes a page turn. */}
+              {at === 0 ? <span className={`${PILL} opacity-50`} aria-disabled data-testid="button-opp-prev">← Previous</span> : <Link href={pageAt(from - PER_PAGE)} className={`${PILL} ${LINK_CUE}`} data-testid="button-opp-prev">← Previous</Link>}
+              {from + PER_PAGE >= total ? <span className={`${PILL} opacity-50`} aria-disabled data-testid="button-opp-next">Next →</span> : <Link href={pageAt(from + PER_PAGE)} className={`${PILL} ${LINK_CUE}`} data-testid="button-opp-next">Next →</Link>}
+              <span className="g-text-2"><Link href={pageAt(from)} className={TEXT_LINK} title="This page of the list — its own address" data-testid="link-opp-paging">{fmtNum(from + 1)}–{fmtNum(Math.min(total, from + PER_PAGE))} of {fmtNum(total)}</Link> · paging is free</span>
             </div>
           )}
           <p className="g-text-2 mt-2 text-[12px]">Positions and visits are estimates from the keyword database for {market.label}, not live checks; track a keyword to have it checked every week. The data keeps one page per search, so it cannot show two of your pages competing for the same one, nor prove that no other page ranks.</p>
