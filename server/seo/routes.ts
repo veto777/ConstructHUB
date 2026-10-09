@@ -41,7 +41,7 @@ import {
   isConfigured, normalizeDomain, labsKeywordSuggestions, labsDomainIntersection, adsSearchVolume, DataForSeoError, claimDeadline,
 } from "./dataforseo";
 import { estimateLabsUsd, estimateAdsVolumeUsd, estimateRankCheckUsd, estimateBacklinkSnapshotUsd, serpKeywordMultiplier, estimateLostLinksUsd } from "./pricing";
-import { creditStatus, outOfCreditMessage } from "./credits";
+import { creditStatus, outOfCreditMessage, owedCreditMessage } from "./credits";
 import { retailCents, SEO_CREDIT_PACKS } from "@shared/seo-credits";
 import {
   reportInput, reportRequest, TooManyFilters, SCOPED_TABLES, isKeywordTable, reportCacheKey, cacheKey, cached, saveCached, fetchReportPage, fetchKeywordOverview,
@@ -528,7 +528,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const credits = await creditStatus(user, ent.allowances?.seoCreditCents ?? 0);
     const need = retailCents(estimate.usd);
     if (credits.availableCents !== -1 && need > credits.availableCents) {
-      return res.status(402).json({ code: "seo_credits", message: outOfCreditMessage(need, credits.availableCents), packs: SEO_CREDIT_PACKS });
+      return res.status(402).json({ code: "seo_credits", message: credits.owedCents ? owedCreditMessage(credits.owedCents) : outOfCreditMessage(need, credits.availableCents), packs: SEO_CREDIT_PACKS });
     }
     const run = await enqueueRankRun(site, "manual");
     if (!run.reused) void postQueuedRun(run.id).catch((e) => console.error("[seo] run-now post failed", e?.message ?? e));

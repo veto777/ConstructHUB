@@ -114,7 +114,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
   // Standing counts come from the lists each gate counts; a list that can't load leaves the count "not reported".
   const domains = useQuery<unknown[]>({ queryKey: ["/api/click-guard/domains"], enabled: !!allowances && allowances.protectedSites !== 0 });
   // ConstructHUB SEO: tracked keywords are a standing count the SEO status reports; the two monthly meters come with the entitlements.
-  const seo = useOptionalQuery<{ configured: boolean; usage: { keywords: UsageMeter }; credits?: { includedUsedCents: number; walletCents: number } }>("/api/seo/status", !!allowances && allowances.seoKeywords !== 0);
+  const seo = useOptionalQuery<{ configured: boolean; usage: { keywords: UsageMeter }; credits?: { includedUsedCents: number; walletCents: number; notice?: string | null } }>("/api/seo/status", !!allowances && allowances.seoKeywords !== 0);
   const crmMe = useQuery<{ seats?: { used: number; limit: number }; crm?: { jobcam?: boolean } }>({ queryKey: ["/api/crm/me"], enabled: !!allowances });
   // JobCam storage (the CRM's job photos & video): the same numbers as the meter in JobCam.
   const jobcam = useOptionalQuery<{ bytes: number; tierGb: number; limitBytes: number; nextTierGb: number | null; full: boolean }>(
@@ -245,7 +245,9 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
           excluded: allowances.seoCreditCents === 0,
           used: allowances.seoCreditCents === 0 ? null : seo.data?.credits ? seo.data.credits.includedUsedCents / 100 : undefined,
           ceiling: allowances.seoCreditCents > 0 ? allowances.seoCreditCents / 100 : undefined,
+          // A refunded or disputed credit pack: the account says what happened and what to do, in plain words.
           hint: allowances.seoCreditCents === 0 ? SEO_AGENCY_HINT
+            : seo.data?.credits?.notice ? seo.data.credits.notice
             : seo.data?.credits && seo.data.credits.walletCents > 0
             ? `Site explorer, keyword research, backlinks and rank checks, in dollars. Plus $${(seo.data.credits.walletCents / 100).toFixed(2)} purchased credit.`
             : "Site explorer, keyword research, backlinks and rank checks, in dollars. More can be added as prepaid credit on the SEO page.",

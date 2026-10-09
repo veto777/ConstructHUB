@@ -28,7 +28,9 @@ export const api = async (method: string, url: string, body?: unknown) => (await
 export type Unit = { used: number; limit: number };
 export type SeoUsage = { keywords: Unit };
 /** SEO data credit, in cents at the customer's price (shared/seo-credits.ts). -1 = unlimited. */
-export type SeoCreditsInfo = { includedCents: number; includedUsedCents: number; walletCents: number; availableCents: number };
+export type SeoCreditsInfo = { includedCents: number; includedUsedCents: number; walletCents: number; availableCents: number;
+  /** On hold while a dispute about a credit payment is open; owed after a refunded/disputed pack's credit was used. */
+  frozenCents?: number; owedCents?: number; notice?: string | null };
 export type SeoPrices = { explorerReport: number; reportPage: number; adsReport?: number; gridLocate?: number; gridPer100?: number; keywordOverview: number; keywordResearch: number; competitorGap: number; backlinkRefresh: number; rankChecksPer100: number; linkIntersect?: number; bulkBase?: number; bulkPer100?: number; searchVolumes?: number; aiChatgpt?: number; aiGemini?: number; aiPerplexity?: number; aiMentions?: number; batchBase?: number; batchPer100?: number; contentSearch?: number; mentions?: number; mentionsRetry?: number };
 export type SeoStatus = {
   configured: boolean;
@@ -316,7 +318,12 @@ function UsageLine({ status }: { status: ReturnType<typeof useSeoStatus> }) {
         </span>
         {canBuy && !adding && <button type="button" className="g-pill g-pill--sm ml-1" onClick={() => setAdding(true)} data-testid="button-add-credit"><Plus /> Add credit</button>}
       </p>
-      {!unlimited && c.availableCents === 0 && !adding && (
+      {c.notice && (
+        <p className="mt-1 text-[13px]" style={c.owedCents ? { color: "var(--g-red)" } : undefined} role="status" data-testid="text-seo-credit-notice">
+          {c.notice}
+        </p>
+      )}
+      {!unlimited && c.availableCents === 0 && !c.owedCents && !adding && (
         <p className="mt-1 text-[13px]" style={{ color: "var(--g-red)" }} role="status" data-testid="text-seo-out-of-credit">
           You've used this month's SEO data. {canBuy ? "Add credit to keep running lookups, or wait for the 1st." : "It comes back on the 1st."}
         </p>

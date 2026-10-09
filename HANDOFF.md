@@ -2,6 +2,40 @@
 
 _Last updated 2026-08-24. Repo: `veto777/ConstructHUB` (private). Local: `/home/veto/ConstructHUB` on the tower._
 
+## 💳 2026-10-09 — refunds and disputes on SEO credit packs now reach the wallet (review M-3, branch `fix-review-high`, NOT deployed)
+
+> **OWNER/OPERATOR ACTION: enable these event types on the live webhook endpoint** (Stripe Dashboard → Developers →
+> Webhooks → the constructhub.us endpoint → "Select events"). Until they are enabled nothing below runs and the credit
+> behaves exactly as before (no error, no change) — but a refund or chargeback then still leaves the credit in place.
+> - `charge.refunded`
+> - `charge.refund.updated`
+> - `charge.dispute.created`
+> - `charge.dispute.updated`
+> - `charge.dispute.closed`
+> - `charge.dispute.funds_withdrawn`
+> - `charge.dispute.funds_reinstated`
+> - `checkout.session.async_payment_failed`
+> - `checkout.session.async_payment_succeeded` (bank debits are credited on this one — check it is on too)
+> No new secret or env var: the same endpoint and signing secret (the webhook still verifies the raw body and fails closed).
+
+- **What was wrong:** the webhook credited a pack once paid and never looked again. A refund or a chargeback left the credit
+  in the wallet to keep or spend; Stripe took the money (and a dispute fee) back.
+- **Now (`server/seo/credit-reversals.ts`, called from the webhook switch in `server/stripe.ts`):** every pack is found by its
+  PaymentIntent (stored at purchase from now on; older packs are found through their checkout session and backfilled).
+  Refund, full or partial → the same share of the credit is taken back; a refund that later fails gives it back. Dispute opened →
+  the disputed credit is put **on hold** (cannot be spent); won → released; lost → removed. A failed bank debit was never credited
+  (credit is granted only once Stripe says paid); one that somehow was is taken back. Each is read from Stripe as it is now, so
+  duplicate and out-of-order events move nothing twice. A refund for a pack not credited yet is retried (400), never skipped.
+- **Credit already spent:** the rest is recorded as **owed** (`seo_credit_wallets.owed_cents`). While anything is owed, lookups that
+  cost credit are refused — the month's allowance included — and the SEO pages and Settings → Limits & usage say why in plain
+  words; the next pack bought settles it first. Every movement is a row in `seo_credit_ledger` with the Stripe event, object and
+  PaymentIntent ids. A dispute raises an ops issue (critical when it opens). Prices and packs are unchanged; the credit checkout
+  now also tags its PaymentIntent with the pack's metadata.
+- **Schema:** added at boot by the SEO schema (`CREDIT_SCHEMA_DDL`): wallet `frozen_cents` / `owed_cents`, purchase
+  `stripe_payment_intent` / `refunded_cents` / `disputed_lost_cents` / `reversed_at`, tables `seo_credit_disputes`, `seo_credit_ledger`.
+- **Not done:** packs refunded or disputed BEFORE this ships are not looked at again (no backfill job); check the Stripe
+  dashboard's refunds/disputes for `ConstructHUB SEO data credit` payments since 2026-10-07 and adjust by hand if any exist.
+
 ## 🪑 2026-10-09 — the support line can no longer take customers' Call Assistant seats (review S-2, branch `fix-review-high`, NOT deployed)
 
 - **What was wrong:** support calls and customers' Call Assistant calls shared the engine's 6 seats (`VOICE_MAX_ACTIVE_CALLS`). Six
