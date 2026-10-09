@@ -39,7 +39,7 @@ import { pool } from "./db";
 import { isPlatformAdminEmail } from "./admin";
 import { forgetDashboard } from "./dashboard/cache";
 import {
-  PLANS, PLAN_KEYS, ADDONS, AGENCY_SELF_SERVE_MAX_LOCATIONS, ACCESS_STATUSES, effectivePlanKey, planForModule, MODULE_NAMES,
+  PLANS, PLAN_KEYS, ADDONS, AGENCY_SELF_SERVE_MAX_LOCATIONS, NO_PLAN_MODULES, ACCESS_STATUSES, effectivePlanKey, planForModule, MODULE_NAMES,
   ADDON_MODULES, isAddonModule, moduleName, callAssistantIncluded, withoutCallAssistantAddons,
   ADDON_MODULE_RUN_STATUSES, PAYMENT_NEEDED_STATUSES, UNLIMITED, SEO_GRANDFATHERED_LIMITS,
   CALL_ASSISTANT_FROM_CENTS, CALL_ASSISTANT_PRICING_HREF, CALL_ASSISTANT_REQUIRED_CODE,
@@ -114,8 +114,8 @@ export type Entitlements = {
   foundingMember: { since: Date; prices: FoundingPrices | null } | null;
 };
 
-const ALL_MODULES: PlanModules = { agencyWorkspace: true, adsManager: true, cloudflareSearchConsole: true, domainsMailAlerts: true };
-const NO_MODULES: PlanModules = { agencyWorkspace: false, adsManager: false, cloudflareSearchConsole: false, domainsMailAlerts: false };
+const ALL_MODULES: PlanModules = Object.fromEntries(Object.keys(NO_PLAN_MODULES).map((k) => [k, true])) as PlanModules;
+const NO_MODULES: PlanModules = NO_PLAN_MODULES;
 const ADDON_MODULE_KEYS = Object.keys(ADDON_MODULES) as AddonModuleKey[];
 
 /** The slice of the Call Assistant subscription the module gates read. */
@@ -183,7 +183,7 @@ export const ADMIN_CALL_ASSISTANT_NUMBERS = 5;
 
 /** The most complete plan: what platform admins run with. */
 export const TOP_PLAN: PlanKey = PLAN_KEYS[PLAN_KEYS.length - 1];
-/** The plan billed per location through AGENCY_LOCATION_BANDS, self-serve up to AGENCY_SELF_SERVE_MAX_LOCATIONS. */
+/** LEGACY: the plan that WAS billed per location through AGENCY_LOCATION_BANDS (2026-09-30 ladder). Since 2026-10-09 it is Unlimited: no location cap, no bands sold. */
 export const PER_LOCATION_PLAN: PlanKey = "agency";
 
 /**
@@ -269,7 +269,6 @@ export function parseAddons(raw: unknown): Partial<Record<AddonKey, number>> {
 /** A plan's limits with the add-ons that plan sells applied. */
 export function allowancesFor(plan: PlanKey, addons: Partial<Record<AddonKey, number>> = {}): PlanLimits {
   const out: PlanLimits = { ...PLANS[plan].limits };
-  if (plan === PER_LOCATION_PLAN) out.locations = AGENCY_SELF_SERVE_MAX_LOCATIONS;
   for (const key of Object.keys(ADDON_GRANTS) as AddonKey[]) {
     const qty = addons[key] ?? 0;
     if (!qty || !ADDONS[key].availableOn.includes(plan)) continue;
@@ -460,9 +459,8 @@ export async function billedLocationCount(userId: number): Promise<number> {
 export function sendLocationLimit(res: Response, ent: Entitlements, used: number, adding = 1) {
   const limit = ent.allowances?.locations ?? 0;
   const plan = ent.accessPlan ? PLANS[ent.accessPlan].name : "current";
-  const raise = ent.accessPlan === PER_LOCATION_PLAN
-    ? { text: `Above ${plural(AGENCY_SELF_SERVE_MAX_LOCATIONS, "location")}, talk to a sales rep for a quote.`, upgradePlan: null, addon: null }
-    : raiseHint(ent, "locations", ["location"], "extra_location");
+  // 2026-10-09: no extra-location add-on — the answer is always the next plan up (Unlimited has no cap).
+  const raise = raiseHint(ent, "locations", ["location"]);
   const wanted = adding > 1 ? ` You selected ${plural(adding, "new location")}.` : "";
   return sendLimitReached(res, {
     feature: "locations", limit, used,

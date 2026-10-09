@@ -45,7 +45,7 @@ export const MAX_KEY_UNIT_LIMIT = 1_000_000_000;
 export const API_KEYS_PATH = "/settings?tab=api-keys";
 
 /** The contract's API allowance per plan, used until shared/plans.ts publishes apiUnitsPerMonth. */
-const CONTRACT_API_UNITS: Record<PlanKey, number> = { starter: 0, pro: 10_000, growth: 50_000, agency: 250_000 };
+const CONTRACT_API_UNITS: Record<PlanKey, number> = { starter: 0, team: 0, pro: 50_000, growth: 250_000, agency: -1 };
 const CONTRACT_API_RATE_PER_MINUTE = 60;
 type ApiLimits = PlanLimits & { apiUnitsPerMonth?: number; apiRatePerMinute?: number };
 

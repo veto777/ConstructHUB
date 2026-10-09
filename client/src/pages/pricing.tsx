@@ -50,6 +50,7 @@ const SECTION_X = "px-4 sm:px-6 lg:px-8";
 
 const PLAN_STYLE: Record<PlanKey, { icon: any; card: string; ribbon: string; button: string }> = {
   starter: { icon: Zap, card: "border border-mkt-rule hover:border-mkt-ink", ribbon: "", button: OUTLINE_BUTTON },
+  team: { icon: Zap, card: "border border-mkt-rule hover:border-mkt-ink", ribbon: "", button: OUTLINE_BUTTON },
   pro: {
     icon: Star, card: "border-2 border-mkt-orange", ribbon: "bg-mkt-orange text-white",
     button: ORANGE_BUTTON,

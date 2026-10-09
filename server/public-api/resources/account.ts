@@ -12,7 +12,7 @@ import { OPENAPI, dateTime, handler, nullableInt, nullableString, resource, send
  * Contract values for PlanLimits.apiUnitsPerMonth / apiRatePerMinute (lane 1 adds them to
  * shared/plans.ts). Read from the entitlements when present; these mirror the contract otherwise.
  */
-export const API_UNITS_PER_MONTH: Record<PlanKey, number> = { starter: 0, pro: 10_000, growth: 50_000, agency: 250_000 };
+export const API_UNITS_PER_MONTH: Record<PlanKey, number> = { starter: 0, team: 0, pro: 50_000, growth: 250_000, agency: -1 };
 export const API_RATE_PER_MINUTE = 60;
 
 export function apiAllowances(ent: { accessPlan: PlanKey | null; allowances: Record<string, unknown> | null }) {

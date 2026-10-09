@@ -10,7 +10,7 @@
  *   new     — Starter plan, signed up today: checklist open, most tiles empty
  *   noplan  — no active plan: plan-gated tiles locked
  */
-import { PLANS, type PlanKey, type PlanLimits, type PlanModules } from "@shared/plans";
+import { PLANS, type PlanKey, type PlanLimits, type PlanModules, NO_PLAN_MODULES } from "@shared/plans";
 import {
   DASHBOARD_TILES, dashboardAttention,
   type DashboardAccount, type DashboardChecklistItem, type DashboardMetric, type DashboardPayload, type DashboardRecentItem,
@@ -23,7 +23,7 @@ import { CTA_START, COMING_SOON_MESSAGE, SEPARATE_SERVICE_CTA, lockedMessage } f
 export type DashboardFixtureScenario = "full" | "new" | "noplan";
 export const DASHBOARD_FIXTURE_SCENARIOS: readonly DashboardFixtureScenario[] = ["full", "new", "noplan"];
 
-const NO_MODULES: PlanModules = { agencyWorkspace: false, adsManager: false, cloudflareSearchConsole: false, domainsMailAlerts: false };
+const NO_MODULES: PlanModules = NO_PLAN_MODULES;
 
 const m = (key: string, label: string, value: DashboardMetric["value"], format: DashboardMetric["format"], extra: Partial<DashboardMetric> = {}): DashboardMetric =>
   ({ key, label, value, format, ...extra });

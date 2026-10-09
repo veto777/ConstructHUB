@@ -66,8 +66,18 @@ export const pollUnlessPlanRequired =
   (ms: number) => (query: { state: { error: unknown } }) =>
     planRequiredFrom(query.state.error) ? false : ms;
 
-/** What each Agency-only module does, in the product's own terms (keep in step with the module's pages). */
+/** What each plan module does, in the product's own terms (keep in step with the module's pages). */
 const MODULE_DETAILS: Record<ModuleKey, string[]> = {
+  autoPosts: ["AI posts and photo captions written and published on a schedule you set."],
+  reviewReminders: ["Review reminders to your customers by text and email, with the link to your Google profile."],
+  propertyRecords: ["Property records lookup: owner, parcel and permit history for an address."],
+  socialPublishing: ["Publish to YouTube and your social accounts from one place."],
+  csvExport: ["Download any report or list as a CSV file."],
+  scheduledReports: ["Client reports emailed on a schedule under your name."],
+  permitAlerts: ["An alert when a new permit is filed in a territory you watch."],
+  gridWatches: ["A ranking grid that re-runs every week or month and shows what moved."],
+  whiteLabel: ["Reports and client pages under your own brand, not ours."],
+  masterClass: ["The complete Master Class course, included."],
   agencyWorkspace: [
     "Client workspaces with folders, tags and per-client location lists.",
     "Team roles (owner, admin, manager, viewer), with access to every client or only the ones you assign.",
