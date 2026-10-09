@@ -17,7 +17,7 @@
  */
 import type Stripe from "stripe";
 import {
-  PLANS, ADDONS, AGENCY_LOCATION_BANDS, ANNUAL_MONTHS, CALL_ASSISTANT_NAME,
+  PLANS, ADDONS, AGENCY_LOCATION_BANDS, ANNUAL_MONTHS, CALL_ASSISTANT_NAME, LEGACY_AGENCY_INCLUDED_LOCATIONS,
   planPriceCents, addonPriceCents, isPlanKey, isAddonKey, isBillingInterval, isCallAssistantAddon,
   type PlanKey, type AddonKey, type BillingInterval,
 } from "@shared/plans";
@@ -54,7 +54,9 @@ type Tier = { up_to: number | "inf"; unit_amount: number };
  * daily sync never bill past AGENCY_SELF_SERVE_MAX_LOCATIONS.
  */
 export function agencyLocationTiers(interval: BillingInterval): Tier[] {
-  const included = PLANS.agency.limits.locations;
+  // The bands belong to the 2026-09-30 Agency plan ($349, 10 included); the `agency` key is
+  // Unlimited now, so the legacy included count comes from AGENCY_LOCATION_BANDS, never PLANS.
+  const included = LEGACY_AGENCY_INCLUDED_LOCATIONS;
   const multiplier = interval === "year" ? ANNUAL_MONTHS : 1;
   const paid = AGENCY_LOCATION_BANDS.filter((band) => band.centsPerLocation > 0);
   return paid.map((band, i) => ({
@@ -83,8 +85,7 @@ function roleMetadata(role: PriceRole): Record<string, string> {
   };
 }
 
-export function planPriceSpec(plan: PlanKey, interval: BillingInterval): PriceSpec {
-  const cents = planPriceCents(plan, interval);
+export function planPriceSpec(plan: PlanKey, interval: BillingInterval, cents: number = planPriceCents(plan, interval)): PriceSpec {
   return {
     lookupKey: `${PREFIX}_plan_${plan}_${interval}_${cents}`,
     role: { kind: "plan", key: plan, interval },
@@ -193,7 +194,7 @@ export function agencyLocationsPriceSpec(interval: BillingInterval): PriceSpec {
       billing_scheme: "tiered",
       tiers_mode: "graduated",
       tiers,
-      product_data: { name: `ConstructHUB Agency — locations above ${PLANS.agency.limits.locations}` },
+      product_data: { name: `ConstructHUB Agency — locations above ${LEGACY_AGENCY_INCLUDED_LOCATIONS}` },
     },
   };
 }

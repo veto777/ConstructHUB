@@ -225,7 +225,8 @@ export async function registerRoutes(
         const { rows: [r] } = await pool.query("SELECT count(*)::int n FROM gbp_guard WHERE user_id=$1 AND mode<>'off' AND location_id<>$2", [user.id, Number.isSafeInteger(id) ? id : 0]);
         const limit = ent.allowances!.locations;
         if (!fitsLimit(limit, r.n)) {
-          const raise = raiseHint(ent, "locations", ["location"], "extra_location");
+          // 2026-10-09: the extra-location add-on is retired — the hint is always the next plan up.
+          const raise = raiseHint(ent, "locations", ["location"]);
           return void sendLimitReached(res, {
             feature: "guardedLocations", limit, used: r.n, upgradePlan: raise.upgradePlan, addon: raise.addon,
             message: `Profile Guard is on for ${plural(r.n, "location")}, and your ${PLANS[ent.accessPlan!].name} plan covers ${plural(limit, "location")}. Turn Guard off on another location first. ${raise.text}`.trim(),

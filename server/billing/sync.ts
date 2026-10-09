@@ -11,7 +11,7 @@ import { BillingRequestError } from "./order";
 import type Stripe from "stripe";
 import { pool } from "../db";
 import type { subscriptions } from "@shared/schema";
-import { PLANS, LEGACY_PLAN_MAP, ACCESS_STATUSES, isPlanKey } from "@shared/plans";
+import { LEGACY_PLAN_MAP, ACCESS_STATUSES, isPlanKey, LEGACY_AGENCY_INCLUDED_LOCATIONS } from "@shared/plans";
 import { activePlanKey, grantExpired } from "../entitlements";
 import { describeSubscription } from "./prices";
 import { ensureBillingSchema } from "./schema";
@@ -97,7 +97,12 @@ export function subscriptionRowUpdate(sub: Stripe.Subscription, fallbackPlan?: s
     set.plan = shape.plan;
     set.stripePriceId = shape.planItem.price.id;
     set.addons = shape.addons as Record<string, number>;
-    set.agencyLocations = shape.plan === "agency" ? PLANS.agency.limits.locations + shape.agencyExtraLocations : null;
+    // The band item only exists on legacy 2026-09-30 Agency rows; Unlimited (the `agency` key
+    // since 2026-10-09) has no billed location count. Read the legacy included count, never
+    // PLANS.agency.limits.locations (-1).
+    set.agencyLocations = shape.plan === "agency" && shape.agencyExtraLocations > 0
+      ? LEGACY_AGENCY_INCLUDED_LOCATIONS + shape.agencyExtraLocations
+      : null;
   } else {
     if (fallbackPlan && (isPlanKey(fallbackPlan) || fallbackPlan in LEGACY_PLAN_MAP)) set.plan = fallbackPlan;
     set.stripePriceId = sub.items?.data?.[0]?.price?.id ?? null;

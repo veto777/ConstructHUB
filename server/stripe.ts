@@ -12,7 +12,7 @@ import { DFY_CATALOG, COURSE_BUNDLE, SEO_CONTRACT_REQUIRED_IDS, isSalesOnly, sen
 import { bundleOverlaps, BUNDLE_NAMES } from "@shared/cart-bundles";
 import {
   PLANS as PRICE_BOOK, PLAN_KEYS, ADDON_KEYS, ADDONS, AGENCY_LOCATION_BANDS, AGENCY_SELF_SERVE_MAX_LOCATIONS,
-  ANNUAL_MONTHS, TRIAL_DAYS, SALES_THRESHOLD_CENTS, CALL_ASSISTANT_TIER_ADDONS,
+  ANNUAL_MONTHS, TRIAL_DAYS, SALES_THRESHOLD_CENTS, CALL_ASSISTANT_TIER_ADDONS, LEGACY_AGENCY_INCLUDED_LOCATIONS,
 } from "@shared/plans";
 import { stripe, PaymentsNotConfiguredError } from "./billing/client";
 import { describeSubscription } from "./billing/prices";
@@ -36,7 +36,7 @@ import { onStripeBillingEvent, userIdForStripeObject } from "./account/billing-e
 import { forgetDashboard } from "./dashboard/cache";
 import { introsForOrder, attachIntrosToItems, recordIntro, markIntrosUsedByHeldAddons, type StripeForIntro } from "./billing/intro";
 import { noteSubscriptionTerms } from "./billing/pricing-terms";
-import { requirePlan } from "./entitlements";
+import { requirePlan, getEntitlements } from "./entitlements";
 import { SEO_FEATURE, seoAllowanceTest } from "./seo/plan";
 import { afterSubscriptionChange, previewCallNumberReleases } from "./voice/number-release";
 import {
@@ -204,7 +204,8 @@ async function noteIntrosUsed(userId: number, set: ReturnType<typeof subscriptio
  * rejects the update and nothing changes (error_if_incomplete).
  */
 async function applyToSubscription(userId: number, row: SubscriptionRow, sub: Stripe.Subscription, current: ReturnType<typeof describeSubscription>, order: PlanOrder) {
-  const change = await subscriptionChange(stripe, current, order, row.plan);
+  // Founding members are billed from their stored price snapshot, never the live book.
+  const change = await subscriptionChange(stripe, current, order, row.plan, (await getEntitlements(userId)).foundingMember);
   if (!change.items.length && !change.addInvoiceItems.length) {
     return { changed: false, subscription: subscriptionSummary(row, cancellationOf(sub)) };
   }
@@ -335,7 +336,7 @@ export function registerStripeRoutes(app: Express) {
           if (history.data.length) trial = false;
         }
 
-        const line_items = await checkoutLineItems(stripe, order);
+        const line_items = await checkoutLineItems(stripe, order, (await getEntitlements(user.id)).foundingMember);
         // One open plan checkout per customer: a checkout left open in another
         // tab is expired first, so finishing both can't start two subscriptions.
         const open = await stripe.checkout.sessions.list({ customer: customerId, status: "open", limit: 10 });
@@ -392,7 +393,10 @@ export function registerStripeRoutes(app: Express) {
         const order = parsePlanOrder(req.body ?? {}, {
           interval: current.interval,
           addons: current.addons,
-          agencyLocations: current.plan === "agency" ? PRICE_BOOK.agency.limits.locations + current.agencyExtraLocations : null,
+          // Legacy banded rows keep their billed count; an Unlimited sub has no band item (null).
+          agencyLocations: current.plan === "agency" && current.agencyExtraLocations > 0
+            ? LEGACY_AGENCY_INCLUDED_LOCATIONS + current.agencyExtraLocations
+            : null,
         });
         return applyToSubscription(user.id, row, sub, current, order);
       });
@@ -435,7 +439,9 @@ export function registerStripeRoutes(app: Express) {
           plan: current.plan,
           interval: current.interval,
           addons,
-          agencyLocations: current.plan === "agency" ? PRICE_BOOK.agency.limits.locations + current.agencyExtraLocations : null,
+          agencyLocations: current.plan === "agency" && current.agencyExtraLocations > 0
+            ? LEGACY_AGENCY_INCLUDED_LOCATIONS + current.agencyExtraLocations
+            : null,
         };
         return applyToSubscription(user.id, row, sub, current, order);
       });

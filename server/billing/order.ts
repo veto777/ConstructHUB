@@ -7,10 +7,11 @@
 import type Stripe from "stripe";
 import {
   PLANS, ADDONS, ADDON_KEYS, ADDON_MAX_QUANTITY, AGENCY_SELF_SERVE_MAX_LOCATIONS, LEGACY_PLAN_MAP, TALK_TO_SALES_CODE,
-  CALL_ASSISTANT_NAME, CALL_ASSISTANT_FROM_CENTS, CALL_ASSISTANT_PRICING_HREF,
+  CALL_ASSISTANT_NAME, CALL_ASSISTANT_FROM_CENTS, CALL_ASSISTANT_PRICING_HREF, LEGACY_AGENCY_INCLUDED_LOCATIONS,
   isPlanKey, isAddonKey, isBillingInterval, isCallAssistantAddon, addonAvailableOn, agencyExtraLocations, maxExtraLocations,
   type PlanKey, type AddonKey, type BillingInterval,
 } from "@shared/plans";
+import { foundingPrice, type FoundingPrices } from "@shared/pricing-terms";
 import {
   planPriceSpec, addonPriceSpec, addonSetupPriceSpec, agencyLocationsPriceSpec, resolvePriceId, roleOfPrice,
   type SubscriptionShape,
@@ -24,6 +25,23 @@ export class BillingRequestError extends Error {
   }
 }
 
+/**
+ * The account's founding-member terms at checkout — the exact shape
+ * server/entitlements.ts `foundingMember` carries (`since` is the mark date,
+ * `prices` the parsed snapshot). Founding members are billed from their stored
+ * price snapshot for life; pass this on every price resolution so a
+ * price-book change never moves them.
+ */
+export type CheckoutTerms = { since: Date; prices: FoundingPrices | null } | null | undefined;
+
+/** The plan price an account pays: its founding snapshot when it has one, else the book. */
+const planCentsFor = (terms: CheckoutTerms, plan: PlanKey, interval: BillingInterval): number =>
+  foundingPrice(
+    terms
+      ? { seoGrandfatheredAt: null, seoGrandfatheredPlan: null, foundingMemberAt: terms.since, foundingPrices: terms.prices }
+      : null,
+    plan, interval);
+
 export type AddonQuantities = Partial<Record<AddonKey, number>>;
 
 export type PlanOrder = {
@@ -31,7 +49,7 @@ export type PlanOrder = {
   interval: BillingInterval;
   /** Only positive quantities. */
   addons: AddonQuantities;
-  /** Agency: locations billed (at least the included 10). Null for other plans. */
+  /** LEGACY: billed locations of a stored 2026-09-30 Agency row (bands). Null on new checkouts. */
   agencyLocations: number | null;
 };
 
@@ -91,10 +109,9 @@ export function checkAddonsForPlan(plan: PlanKey, addons: AddonQuantities): void
         "addon_unavailable");
     }
     if (!addonAvailableOn(key, plan)) {
-      let why = "";
-      if (key === "texting_number" && PLANS[plan].limits.clientTexting === "included") why = ` ${name} already includes a client-texting number.`;
-      else if (key === "extra_location" && plan === "agency") why = " Agency is billed by location count instead.";
-      throw new BillingRequestError(400, `${ADDONS[key].name} isn't available on the ${name} plan.${why}`, "addon_unavailable");
+      // Retired add-ons (extra_location) and every Call Assistant key land here:
+      // empty availableOn refuses at checkout while stored rows still read.
+      throw new BillingRequestError(400, `${ADDONS[key].name} isn't available on the ${name} plan.`, "addon_unavailable");
     }
     // A preview add-on is listed on the pricing page but not for sale yet
     // (shared/plans.ts `preview`): nothing is charged for it.
@@ -128,8 +145,9 @@ export function checkAddonsForPlan(plan: PlanKey, addons: AddonQuantities): void
 }
 
 /** Agency location count: whole number ≥ 1; above the self-serve maximum is a sales quote. */
-export function parseAgencyLocations(raw: unknown, fallback: number): number {
+export function parseAgencyLocations(raw: unknown, fallback: number | null): number | null {
   const value = raw === undefined || raw === null || raw === "" ? fallback : raw;
+  if (value === null) return null;
   if (typeof value !== "number" || !Number.isInteger(value) || value < 1) {
     throw new BillingRequestError(400, "Locations must be a whole number, 1 or more.");
   }
@@ -138,7 +156,9 @@ export function parseAgencyLocations(raw: unknown, fallback: number): number {
       `More than ${AGENCY_SELF_SERVE_MAX_LOCATIONS} locations is quoted by a sales rep. Talk to a sales rep — nothing was charged.`,
       TALK_TO_SALES_CODE);
   }
-  return Math.max(value, PLANS.agency.limits.locations);
+  // The bands are legacy: the included count they bill against is the 2026-09-30 Agency's 10,
+  // never PLANS.agency.limits.locations (Unlimited is -1).
+  return Math.max(value, LEGACY_AGENCY_INCLUDED_LOCATIONS);
 }
 
 /**
@@ -176,17 +196,21 @@ export function parsePlanOrder(
   const interval = parseInterval(body?.interval, current.interval ?? "month");
   const addons = positive(mergeAddonRequest(current.addons ?? {}, parseAddonQuantities(body?.addons)));
   checkAddonsForPlan(plan, addons);
+  // The Agency bands are retired: a NEW Unlimited checkout carries no location count and no band
+  // line. A stored subscription that still bills locations (a 2026-09-30 Agency row) keeps its
+  // count through a change — body.locations overrides it, otherwise the current count stays.
   const agencyLocations = plan === "agency"
-    ? parseAgencyLocations(body?.locations, current.agencyLocations ?? PLANS.agency.limits.locations)
+    ? parseAgencyLocations(body?.locations, current.agencyLocations ?? null)
     : null;
   return { plan, interval, addons, agencyLocations };
 }
 
 type LineItem = Stripe.Checkout.SessionCreateParams.LineItem;
 
-/** Checkout line items: plan, Agency band item (if any), recurring add-ons, one-time setup fees. */
-export async function checkoutLineItems(stripe: Stripe, order: PlanOrder): Promise<LineItem[]> {
-  const items: LineItem[] = [{ price: await resolvePriceId(stripe, planPriceSpec(order.plan, order.interval)), quantity: 1 }];
+/** Checkout line items: plan, legacy Agency band item (stored rows only — never on a new checkout), recurring add-ons, one-time setup fees. */
+export async function checkoutLineItems(stripe: Stripe, order: PlanOrder, terms?: CheckoutTerms): Promise<LineItem[]> {
+  const planCents = planCentsFor(terms, order.plan, order.interval);
+  const items: LineItem[] = [{ price: await resolvePriceId(stripe, planPriceSpec(order.plan, order.interval, planCents)), quantity: 1 }];
   const extra = order.plan === "agency" ? agencyExtraLocations(order.agencyLocations ?? 0) : 0;
   if (extra > 0) items.push({ price: await resolvePriceId(stripe, agencyLocationsPriceSpec(order.interval)), quantity: extra });
   for (const key of ADDON_KEYS) {
@@ -233,7 +257,7 @@ const SALES_SET_UP = () => new BillingRequestError(409,
  * `storedPlan` is the account's subscriptions.plan as stored (a legacy row keeps
  * its legacy key: the webhook never rewrites the plan of a legacy price).
  */
-export async function subscriptionChange(stripe: Stripe, current: SubscriptionShape, order: PlanOrder, storedPlan?: string | null):
+export async function subscriptionChange(stripe: Stripe, current: SubscriptionShape, order: PlanOrder, storedPlan?: string | null, terms?: CheckoutTerms):
   Promise<{ items: ItemChange[]; addInvoiceItems: InvoiceItem[] }> {
   const items: ItemChange[] = [];
   const foreign = current.otherItems.filter((item) => !roleOfPrice(item.price));
@@ -246,7 +270,8 @@ export async function subscriptionChange(stripe: Stripe, current: SubscriptionSh
   const kept = foreign.filter((item) => item !== planSlot);
   if (kept.some((item) => item.price?.recurring?.interval && item.price.recurring.interval !== order.interval)) throw SALES_SET_UP();
 
-  const planPrice = await resolvePriceId(stripe, planPriceSpec(order.plan, order.interval));
+  const planCents = planCentsFor(terms, order.plan, order.interval);
+  const planPrice = await resolvePriceId(stripe, planPriceSpec(order.plan, order.interval, planCents));
   if (!planSlot) items.push({ price: planPrice, quantity: 1 });
   else if (planSlot.price.id !== planPrice || (planSlot.quantity ?? 1) !== 1) items.push({ id: planSlot.id, price: planPrice, quantity: 1 });
   for (const duplicate of duplicates) items.push({ id: duplicate.id, deleted: true });

@@ -12,7 +12,7 @@
  */
 import type Stripe from "stripe";
 import { pool } from "../db";
-import { PLANS, AGENCY_SELF_SERVE_MAX_LOCATIONS, agencyExtraLocations } from "@shared/plans";
+import { AGENCY_SELF_SERVE_MAX_LOCATIONS, agencyExtraLocations, LEGACY_AGENCY_INCLUDED_LOCATIONS } from "@shared/plans";
 import { stripe as appStripe, stripeConfigured } from "./client";
 import { describeSubscription, agencyLocationsPriceSpec, resolvePriceId } from "./prices";
 import { LIVE_STATUSES, billingSchemaReady, withBillingLock } from "./sync";
@@ -53,9 +53,12 @@ export async function syncAgencyLocations(opts: { stripe?: Stripe; log?: Log } =
   await billingSchemaReady();
   const { rows } = await pool.query(
     `SELECT id, user_id, stripe_subscription_id FROM subscriptions
-      WHERE plan = 'agency' AND stripe_subscription_id IS NOT NULL AND status = ANY($1)`,
+      WHERE plan = 'agency' AND stripe_subscription_id IS NOT NULL AND status = ANY($1)
+        AND agency_locations IS NOT NULL`,
     [[...LIVE_STATUSES]]);
-  const included = PLANS.agency.limits.locations;
+  // The bands are legacy: only a stored billed count (a 2026-09-30 Agency row) is synced.
+  // Unlimited — the `agency` key since 2026-10-09 — has no location cap and never lands here.
+  const included = LEGACY_AGENCY_INCLUDED_LOCATIONS;
   const result: AgencySyncResult = { checked: 0, changed: 0, failed: 0 };
   /** One subscription; true when its Stripe items changed. */
   const syncOne = async (row: { id: number; user_id: number; stripe_subscription_id: string }): Promise<boolean> => {

@@ -493,6 +493,13 @@ export const AGENCY_LOCATION_BANDS: readonly { upTo: number; centsPerLocation: n
 ];
 /** Above this many locations the Agency plan is quoted by sales. */
 export const AGENCY_SELF_SERVE_MAX_LOCATIONS = 500;
+/**
+ * Locations the legacy (2026-09-30) Agency price included before the graduated
+ * bands applied. Since 2026-10-09 the `agency` key is Unlimited (no cap), so
+ * the band maths and every stored row read THIS constant — never
+ * PLANS.agency.limits.locations (-1).
+ */
+export const LEGACY_AGENCY_INCLUDED_LOCATIONS = AGENCY_LOCATION_BANDS[0].upTo;
 
 /** Monthly Agency bill for a location count (base + graduated bands); null above self-serve. */
 export function agencyMonthlyCents(locations: number): number | null {

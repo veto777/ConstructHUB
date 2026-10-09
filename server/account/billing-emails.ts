@@ -38,7 +38,7 @@ import { sendWithFallback } from "../email";
 import { EMAIL_LOG_DDL } from "./schema";
 import { PRIMARY_DOMAIN, siteBaseUrl } from "../site-context";
 import {
-  PLANS, ADDONS, ADDON_KEYS, planPriceCents, addonPriceCents, isCallAssistantAddon, type AddonKey, type BillingInterval,
+  PLANS, ADDONS, ADDON_KEYS, planPriceCents, addonPriceCents, isCallAssistantAddon, LEGACY_AGENCY_INCLUDED_LOCATIONS, type AddonKey, type BillingInterval,
 } from "@shared/plans";
 import { describeSubscription, roleOfPrice, agencyLocationTiers, tieredAmountCents } from "../billing/prices";
 import { subscriptionPeriodEnd, cancellationOf } from "../billing/sync";
@@ -375,7 +375,8 @@ function labelForRole(price: Stripe.Price | null, fallback: string | null): stri
     case "plan": return `ConstructHUB ${PLANS[role.key].name} plan (${intervalWord(role.interval)})`;
     // The AI Call Assistant's lines are its own subscription's (a separate service), named as the service.
     case "addon": return isCallAssistantAddon(role.key) ? `ConstructHUB ${ADDONS[role.key].name} (${intervalWord(role.interval)})` : `${ADDONS[role.key].name} (${intervalWord(role.interval)})`;
-    case "agency_locations": return `Agency locations above ${PLANS.agency.limits.locations} (${intervalWord(role.interval)})`;
+    // The bands are legacy (2026-09-30 Agency): the count they bill against is the legacy 10.
+    case "agency_locations": return `Agency locations above ${LEGACY_AGENCY_INCLUDED_LOCATIONS} (${intervalWord(role.interval)})`;
     case "setup": return `${ADDONS[role.key].name} setup (one time)`;
     // The CRM is its own subscription: its receipt lines say so.
     case "crm_plan": return `ConstructHUB ${CRM_PLANS[role.key].name} plan (${intervalWord(role.interval)})`;
@@ -411,10 +412,10 @@ export function subscriptionFacts(sub: Stripe.Subscription): SubscriptionFacts {
         extras.push(`${ADDONS[key].name} × ${qty}`);
       }
     }
-    if (shape.plan === "agency") {
-      const included = PLANS.agency.limits.locations;
+    if (shape.plan === "agency" && shape.agencyExtraLocations > 0) {
+      const included = LEGACY_AGENCY_INCLUDED_LOCATIONS;
       recurringCents += tieredAmountCents(agencyLocationTiers(interval), shape.agencyExtraLocations);
-      extras.push(`${included + shape.agencyExtraLocations} locations (${included} included${shape.agencyExtraLocations ? ` + ${shape.agencyExtraLocations} extra` : ""})`);
+      extras.push(`${included + shape.agencyExtraLocations} locations (${included} included + ${shape.agencyExtraLocations} extra)`);
     }
   } else if (crmRole(items) && interval) {
     // The CRM product: its plan, extra seats and add-ons by our own prices (the platform's shape knows none of them).
@@ -521,7 +522,7 @@ export function describeChanges(before: Stripe.SubscriptionItem[] | null | undef
     else if (!now) changes.push(`${ADDONS[key].name}: removed`);
     else changes.push(`${ADDONS[key].name}: ${was} → ${now}`);
   }
-  const included = PLANS.agency.limits.locations;
+  const included = LEGACY_AGENCY_INCLUDED_LOCATIONS;
   if ((prev.plan === "agency" || next.plan === "agency") && prev.agencyExtraLocations !== next.agencyExtraLocations) {
     changes.push(`Locations: ${prev.plan === "agency" ? included + prev.agencyExtraLocations : "—"} → ${next.plan === "agency" ? included + next.agencyExtraLocations : "—"}`);
   }
