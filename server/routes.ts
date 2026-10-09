@@ -3428,9 +3428,14 @@ export async function registerRoutes(
 
   // The signed-in user's Master Class purchases (course_purchases); the guide index uses
   // any row to unlock the paid playbook. google-ads-guide.tsx.
-  app.get("/api/course-purchases", async (req, res) => {
+  app.get(["/api/course-purchases", "/api/course-access"], async (req, res) => {
     // Signed out: no purchases (getDevUser would already have sent a 401, so it isn't asked).
     const user = req.user ? getDevUser(req, res) : null;
+    res.setHeader("Cache-Control", "private, no-store");
+    if (req.path === "/api/course-access") {
+      const { getCourseAccess } = await import("./course-access");
+      return res.json(await getCourseAccess(user?.id ?? null));
+    }
     if (!user) return res.json([]);
     const purchases = await db.select().from(coursePurchases).where(eq(coursePurchases.userId, user.id));
     res.json(purchases);

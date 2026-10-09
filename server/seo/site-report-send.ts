@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
  * (server/seo/jobs.ts runs it). These emails go to addresses the customer
  * typed, so every one carries a link that stops them for that address, an
  * address that used it is never mailed again by that account, and nothing is
- * sent once the account no longer has the SEO tools.
+ * sent once the account no longer has SEO tools and scheduled-report access.
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { pool } from "../db";
@@ -58,13 +58,18 @@ export function reportEmail(r: SiteReport, opts: { brandName?: string | null; se
  * for the site yet) is not sent; an address that opted out is skipped.
  */
 export async function sendSiteReport(userId: number, siteId: number, recipients: string[], period: string, opts: { workSince?: Date | null; workUntil?: Date | null; strict?: boolean } = {}): Promise<{ sent: number; skipped: number; failed: number; empty: boolean; optedOut: string[]; uncertain: string[] }> {
+  const ent = await getEntitlements(userId);
+  if (!seoIncluded(ent) || !ent.modules.scheduledReports) {
+    throw new Error("Scheduled client reports are not included in this account's active plan.");
+  }
   const report = await buildSiteReport(userId, siteId, opts);
   if (!report || reportIsEmpty(report)) return { sent: 0, skipped: recipients.length, failed: 0, empty: true, optedOut: [], uncertain: [] };
   const out = new Set(await optedOut(userId));
-  const [{ rows: [brand] }, { rows: [me] }] = await Promise.all([
+  const [{ rows: [savedBrand] }, { rows: [me] }] = await Promise.all([
     pool.query("SELECT name, logo FROM sitescan_branding WHERE user_id=$1", [userId]).catch(() => ({ rows: [] as any[] })),
     pool.query("SELECT company_name FROM users WHERE id=$1", [userId]).catch(() => ({ rows: [] as any[] })),
   ]);
+  const brand = ent.modules.whiteLabel ? savedBrand : null;
   const pdf = await renderReportPdf(report, brand ?? null);
   let sent = 0, skipped = 0, failed = 0;
   const refused: string[] = [], unsure: string[] = [];
@@ -131,8 +136,8 @@ const LEASE = "1 hour";
  * Scheduled reports that are due. A due schedule is leased (pushed an hour on),
  * the emails go out, and only then does it move to its real next date — so a
  * crash or a failed send is retried, and the per-recipient, per-period dedupe
- * key keeps a retry from mailing anyone twice. An account without the SEO
- * tools is not mailed; its schedule waits a day and is looked at again.
+ * key keeps a retry from mailing anyone twice. An account without SEO or
+ * scheduled-report access is not mailed; its schedule waits a day and is looked at again.
  */
 export async function sendDueReports(): Promise<number> {
   // This pass's lease: a pass whose lease ran out and was taken over can neither finish the occurrence nor move its date.
@@ -148,7 +153,8 @@ export async function sendDueReports(): Promise<number> {
   let sent = 0;
   for (const s of due) {
     try {
-      if (!seoIncluded(await getEntitlements(s.user_id))) { await pool.query("UPDATE seo_report_schedules SET next_send_at = now() + interval '1 day' WHERE site_id=$1 AND lease_token=$2", [s.site_id, token]); continue; }
+      const ent = await getEntitlements(s.user_id);
+      if (!seoIncluded(ent) || !ent.modules.scheduledReports) { await pool.query("UPDATE seo_report_schedules SET next_send_at = now() + interval '1 day' WHERE site_id=$1 AND lease_token=$2", [s.site_id, token]); continue; }
       // The work done in this occurrence (from where the last one ended), so none falls between two reports and none is
       // told twice; a plan that cannot be read stops the send and it is tried again.
       const r = await sendSiteReport(s.user_id, s.site_id, s.recipients, s.work_period, { workSince: new Date(s.work_since), workUntil: new Date(s.work_cutoff), strict: true });

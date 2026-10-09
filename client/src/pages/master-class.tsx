@@ -224,8 +224,8 @@ export default function MasterClassPage() {
     queryKey: ["/api/master-class-modules"],
   });
 
-  const { data: purchases } = useQuery<CoursePurchase[]>({
-    queryKey: ["/api/course-purchases"],
+  const { data: courseAccess } = useQuery<{ included: boolean; purchases: CoursePurchase[] }>({
+    queryKey: ["/api/course-access"],
   });
 
   // Anything at or above the sales threshold is "Talk to a sales rep" — no
@@ -239,7 +239,9 @@ export default function MasterClassPage() {
 
   const { addItem, isInCart } = useCart();
   const isDev = import.meta.env.DEV;
-  const hasBundle = purchases?.some(p => p.isBundle) ?? false;
+  const purchases = courseAccess?.purchases;
+  const included = courseAccess?.included ?? false;
+  const hasBundle = included || (purchases?.some(p => p.isBundle) ?? false);
   const purchasedModuleIds = new Set(purchases?.map(p => p.moduleId).filter(Boolean) ?? []);
   const isTabUnlocked = (tab: string): boolean => {
     if (isDev) return true;
@@ -2504,7 +2506,7 @@ export default function MasterClassPage() {
                 )}
                 {hasBundle ? (
                   <Button size="lg" className="w-full sm:w-auto" disabled data-testid="button-enrolled-bundle">
-                    <CheckCircle2 className="h-4 w-4 mr-2" /> Bundle purchased
+                    <CheckCircle2 className="h-4 w-4 mr-2" /> {included ? "Included in your plan" : "Bundle purchased"}
                   </Button>
                 ) : !bundlePriceShown ? (
                   <TalkToSalesButton
@@ -2563,7 +2565,7 @@ export default function MasterClassPage() {
                     <div className={`  p-4 sm:p-6 text-foreground relative`}>
                       {isPurchased && (
                         <Badge className="absolute top-3 right-3 bg-muted text-foreground gap-1" data-testid={`badge-purchased-${mod.category}`}>
-                          <CheckCircle2 className="h-3 w-3" /> Purchased
+                          <CheckCircle2 className="h-3 w-3" /> {included ? "Included in your plan" : "Purchased"}
                         </Badge>
                       )}
                       <ModIcon className="h-8 w-8 mb-3 opacity-80" />

@@ -1332,31 +1332,35 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   reportDeps.searchConsole = async (userId, domain) => searchConsoleSummary(userId, domain);
 
   // ── Reports: the site's SEO report on screen, as a PDF and by email. Saved numbers only — nothing is bought. ──
-  const brandOf = async (user: number) => (await pool.query("SELECT name, logo FROM sitescan_branding WHERE user_id=$1", [user]).catch(() => ({ rows: [] as any[] }))).rows[0] ?? null;
-  route("get", "/api/seo/sites/:id/report", async (req, res, user) => {
+  const brandOf = async (user: number, ent: Entitlements) => ent.modules.whiteLabel
+    ? (await pool.query("SELECT name, logo FROM sitescan_branding WHERE user_id=$1", [user]).catch(() => ({ rows: [] as any[] }))).rows[0] ?? null
+    : null;
+  route("get", "/api/seo/sites/:id/report", async (req, res, user, ent) => {
     const site = await ownedSite(user, req.params.id);
     const report = await buildSiteReport(user, site.id);
     if (!report) return res.status(404).json({ message: "Site not found" });
-    const [schedule, brand, { rows: [me] }] = await Promise.all([getSchedule(user, site.id), brandOf(user), pool.query("SELECT email FROM users WHERE id=$1", [user])]);
+    const [schedule, brand, { rows: [me] }] = await Promise.all([getSchedule(user, site.id), brandOf(user, ent), pool.query("SELECT email FROM users WHERE id=$1", [user])]);
     res.setHeader("Cache-Control", "no-store");
     res.json({ report, highlights: reportHighlights(report), empty: reportIsEmpty(report), schedule, brandName: brand?.name ?? null, accountEmail: me?.email ?? null, optedOut: await optedOut(user) });
   });
-  route("get", "/api/seo/sites/:id/report.pdf", async (req, res, user) => {
+  route("get", "/api/seo/sites/:id/report.pdf", async (req, res, user, ent) => {
     const site = await ownedSite(user, req.params.id);
     const report = await buildSiteReport(user, site.id);
     if (!report) return res.status(404).json({ message: "Site not found" });
-    const pdf = await renderReportPdf(report, await brandOf(user));
+    const pdf = await renderReportPdf(report, await brandOf(user, ent));
     res.setHeader("Cache-Control", "no-store");
     res.type("application/pdf").setHeader("Content-Disposition", `attachment; filename="seo-report-${site.domain.replace(/[^a-z0-9.-]/gi, "-")}.pdf"`).send(pdf);
   });
-  route("post", "/api/seo/sites/:id/report/schedule", async (req, res, user) => {
+  route("post", "/api/seo/sites/:id/report/schedule", async (req, res, user, ent) => {
     const site = await ownedSite(user, req.params.id);
     const input = scheduleInput.parse(req.body);
+    if (input.frequency !== "off" && !ent.modules.scheduledReports) return sendModuleRequired(res, "scheduledReports");
     if (input.frequency !== "off" && !input.recipients.length) return res.status(400).json({ message: "Add at least one email address to send the report to." });
     res.json(await saveSchedule(user, site.id, input));
   });
   // "Send now". Ten sends a day per account: this emails addresses the customer typed.
-  route("post", "/api/seo/sites/:id/report/send", async (req, res, user) => {
+  route("post", "/api/seo/sites/:id/report/send", async (req, res, user, ent) => {
+    if (!ent.modules.scheduledReports) return sendModuleRequired(res, "scheduledReports");
     const site = await ownedSite(user, req.params.id);
     const { recipients } = scheduleInput.pick({ recipients: true }).parse(req.body);
     if (!recipients.length) return res.status(400).json({ message: "Add at least one email address." });
