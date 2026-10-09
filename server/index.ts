@@ -176,8 +176,8 @@ process.on("unhandledRejection", (reason) => {
     );
     // SIGTERM (a deploy's restart): stop accepting, finish in-flight requests and tracked paid work (up to
     // SHUTDOWN_DRAIN_MS, 20 s), close the pools, exit — instead of dying mid-request.
-    const { pool } = await import("./db");
-    installGracefulShutdown({ server: httpServer, closePools: () => pool.end(), log: (line) => log(line.replace(/^\[shutdown\] /, ""), "shutdown") });
+    const { closeAllPools } = await import("./db");
+    installGracefulShutdown({ server: httpServer, closePools: closeAllPools, log: (line) => log(line.replace(/^\[shutdown\] /, ""), "shutdown") });
   } catch (err) {
     console.error("Fatal startup error:", err);
     process.exit(1);

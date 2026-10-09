@@ -393,10 +393,24 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const site = await ownedSite(user, req.params.id);
     const [{ rows: keywords }, { rows: checks }, { rows: runs }, gsc] = await Promise.all([
       pool.query("SELECT id, keyword, tags, search_volume, cpc::float8 AS cpc, difficulty, location_name FROM seo_keywords WHERE site_id=$1 ORDER BY keyword, location_name NULLS FIRST", [site.id]),
+      // The newest two checks per keyword and device, each pair read through seo_rank_checks_kw_device_on — not a
+      // window sort over the site's whole history with its SERP JSON (review H3). Only the previous check's position
+      // and date are used, so the heavy columns are read for the newest row alone.
       pool.query(
-        `SELECT keyword_id, device, position, url, checked_on::text AS checked_on, serp_features, local_position, local_pack, serp_top FROM (
-           SELECT c.*, row_number() OVER (PARTITION BY keyword_id, device ORDER BY checked_on DESC) rn
-           FROM seo_rank_checks c WHERE c.site_id=$1) x WHERE rn<=2 ORDER BY keyword_id, device, checked_on DESC`, [site.id]),
+        `SELECT k.id AS keyword_id, d.device, c.position, c.url, c.checked_on::text AS checked_on, c.serp_features, c.local_position, c.local_pack, c.serp_top
+           FROM seo_keywords k
+           CROSS JOIN (VALUES ('desktop'), ('mobile')) AS d(device)
+           CROSS JOIN LATERAL (SELECT position, url, checked_on, serp_features, local_position, local_pack, serp_top, 1 AS rn
+                                 FROM seo_rank_checks WHERE keyword_id=k.id AND device=d.device ORDER BY checked_on DESC, id DESC LIMIT 1) c
+          WHERE k.site_id=$1
+         UNION ALL
+         SELECT k.id, d.device, p.position, p.url, p.checked_on::text, '[]'::jsonb, p.local_position, NULL::jsonb, NULL::jsonb
+           FROM seo_keywords k
+           CROSS JOIN (VALUES ('desktop'), ('mobile')) AS d(device)
+           CROSS JOIN LATERAL (SELECT position, url, checked_on, local_position
+                                 FROM seo_rank_checks WHERE keyword_id=k.id AND device=d.device ORDER BY checked_on DESC, id DESC OFFSET 1 LIMIT 1) p
+          WHERE k.site_id=$1
+         ORDER BY keyword_id, device, checked_on DESC`, [site.id]),
       pool.query("SELECT id, trigger, status, total, checked, error, partial, created_at, started_at, finished_at FROM seo_rank_runs WHERE site_id=$1 ORDER BY created_at DESC LIMIT 5", [site.id]),
       searchConsoleSummary(user, site.domain),
     ]);

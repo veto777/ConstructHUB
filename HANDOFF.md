@@ -35,6 +35,25 @@ Source: review 4 of 6 (reliability), findings C1/H1-H5/M7/M13. One commit per it
   is off for that process (`/api/seo` → 503 `seo_unavailable`, no SEO worker, a critical issue on /admin/issues) and
   the CRM and everything else boot. `FORCE_SEO_SCHEMA=1` runs the list regardless. `scripts/apply-schema-migration.ts`
   still spreads the list (it does not write the hash; the next boot then runs the idempotent list once and stores it).
+- **Pool limits + the SEO lock pool** (`server/db.ts`, `server/seo/locks.ts`, H4/M8). `PG_POOL_MAX` (10),
+  `PG_CONNECT_TIMEOUT_MS` (10 000 — a caller waiting longer for a connection gets an error, not a site-wide stall),
+  `PG_STATEMENT_TIMEOUT_MS` (120 000, every session; above the 75 s advisory-lock wait). `pool.on("error")` logs an
+  idle client's error instead of an uncaughtException (28 of them at the 05:41 Postgres crash). SEO sections and the
+  SEO tick hold their advisory locks on a pool of their own (`SEO_LOCK_POOL_MAX`, 5): a vendor call never pins an
+  app-pool connection. `closeAllPools()` closes every pool at shutdown.
+- **Rank queries read the window they show** (H3): overview, dashboard and tags fetch the newest 1-2 checks per
+  keyword × device through the new index `seo_rank_checks_kw_device_on (keyword_id, device, checked_on DESC, id DESC)`
+  (built CONCURRENTLY by the gated DDL) instead of a window sort over a site's whole history with its SERP JSON.
+- **Retention** (`server/seo/retention.ts`, nightly from the SEO tick, 03:00-03:59 UTC, never at boot, ≤ 5,000 rows
+  per table per night so an old database is pruned over several nights). Summaries forever, raw detail bounded:
+  rank checks keep position/url/local_position/date for good, their SERP detail (serp_top, local_pack, rivals,
+  serp_features) is cleared after **180 d** (`SEO_RETENTION_RANK_DETAIL_DAYS`; the longest reader is the 120-day
+  report); closed rank runs deleted after **365 d** (`SEO_RETENTION_RUNS_DAYS`; checks keep their rows, run_id → NULL);
+  backlink/keyword snapshot lists cleared and mention checks deleted after **365 d** (`SEO_RETENTION_SNAPSHOT_DAYS`;
+  summaries, counts and costs stay); completed crawls lose `state->'pages'` after **180 d**
+  (`SEO_RETENTION_CRAWL_PAGES_DAYS`; the report stays — the audit lists such a crawl as not readable). Knobs:
+  `SEO_PRUNE_CAP`, `SEO_PRUNE_HOUR_UTC`. Last successful night: `seo_meta` key `retention_pruned_on`. Log line
+  `[seo] retention: …`; a failed statement goes to the issue desk and the night is retried on the next tick.
 
 ## ☎️ 2026-10-08 (late evening) — the AI Call Assistant is a SEPARATE SERVICE, repriced (branch `billing/call-assistant`, NOT deployed)
 - **Owner decisions:** the Call Assistant is sold on its **own subscription**, like the CRM (`fd964e1`, `069ffdf`): no platform plan

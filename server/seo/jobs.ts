@@ -29,7 +29,8 @@ import { runDueMentionChecks } from "./mention-watch";
 import { isConfigured, serpTaskPost, serpTaskGet, backlinksSummary, backlinksList, MAX_TASKS_PER_POST, claimDeadline, type Deadline, type PostedRankTask, type Device, lostLinks, type LostLink } from "./dataforseo";
 import { estimateRankCheckUsd, estimateBacklinkSnapshotUsd, devicesOf, serpUsd, type DeviceSet, estimateLostLinksUsd, LOST_LINK_ROWS } from "./pricing";
 import { seoIncluded, SEO_NOT_READY_MESSAGE, SEO_PLAN_SKIPPED_MESSAGE } from "./plan";
-import { seoLocks } from "./locks";
+import { seoLocks, seoLockPool } from "./locks";
+import { pruneSeoHistory } from "./retention";
 import { raiseLinkAlerts, rankAlertPlan, saveRankAlerts, deliverAlert, type RunCoverage } from "./alerts";
 
 import { publicFailure } from "./public-errors";
@@ -590,7 +591,8 @@ async function settleLinkAlerts(siteId: number): Promise<void> {
 
 /** One scheduler pass; only one instance at a time across processes. */
 export async function seoTick(): Promise<void> {
-  const client = await pool.connect();
+  // The tick's lock is held for the whole pass (minutes): on the locks' own pool, so it never pins an app connection.
+  const client = await seoLockPool.connect();
   try {
     const { rows: [{ locked }] } = await client.query("SELECT pg_try_advisory_lock($1) AS locked", [LOCK_KEY]);
     if (!locked) return;
@@ -607,6 +609,8 @@ export async function seoTick(): Promise<void> {
       await runDueBacklinkSnapshots();
       await runDueKeywordSnapshots().catch((e) => console.error("[seo] keyword snapshots failed", e?.message ?? e));
       await runDueMentionChecks().catch((e) => console.error("[seo] mentions watch failed", e?.message ?? e));
+      // Nightly, in the quiet hour, capped per table (server/seo/retention.ts): summaries forever, raw detail for a bounded time.
+      await pruneSeoHistory().catch((e) => { console.error("[seo] retention failed", e?.message ?? e); void recordFailure("job", "SEO history retention", e); });
       // A scan takes a minute or two, so it is started here and left to finish on its own (it leases its watch, the
       // database allows one running scan per site, and it never runs two passes at once).
       void runDueGridWatches().catch((e) => console.error("[seo] repeating grids failed", e?.message ?? e));

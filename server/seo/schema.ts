@@ -286,6 +286,9 @@ export const SEO_SCHEMA_DDL = [
    )`,
   // Last of all: the mentions watch's alert kind (the full list again, so it holds whatever ran before it).
   ...MENTION_WATCH_ALERT_DDL,
+  // The newest N checks per keyword and device (overview, dashboard, tags) walk this instead of sorting a site's
+  // whole history (review H3). Built CONCURRENTLY at boot like every index here.
+  `CREATE INDEX IF NOT EXISTS seo_rank_checks_kw_device_on ON seo_rank_checks(keyword_id, device, checked_on DESC, id DESC)`,
 ];
 
 /**
