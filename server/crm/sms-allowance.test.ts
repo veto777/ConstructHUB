@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   org: { id: "org", ownerUserId: 7, customFields: {} as any },
   used: 0, assigned: false,
   numbers: [] as string[], transaction: vi.fn(),
+  assignments: null as null | { orgId: string; ownerId: number; number: string }[],
   reserve: vi.fn(), execute: vi.fn(), update: vi.fn(), query: vi.fn(),
 }));
 vi.mock("../db", () => ({
@@ -57,9 +58,15 @@ beforeEach(() => {
   state.used = 0;
   state.assigned = false;
   state.numbers = [];
+  state.assignments = null;
   state.execute.mockImplementation(async (q) => {
-    const { sql: query } = new PgDialect().sqlToQuery(q);
+    const { sql: query, params } = new PgDialect().sqlToQuery(q);
     if (!query.includes("GROUP BY")) return { rows: [] };
+    if (state.assignments) {
+      const remaining = state.assignments.filter(a => a.ownerId === params[0]
+        && (!query.includes("AND id <>") || a.orgId !== params[1]));
+      return { rows: [...new Set(remaining.map(a => a.number))].map(number => ({ number })) };
+    }
     const numbers = state.numbers.length ? state.numbers : Array.from({ length: state.used }, (_, i) => state.assigned && i === 0 ? number : "+1555999" + i);
     return { rows: numbers.map(number => ({ number })) };
   });
@@ -158,10 +165,38 @@ describe("dedicated sender allocation", () => {
     expect((await save()).statusCode).toBe(403);
     expect(state.update).not.toHaveBeenCalled();
   });
-  it("refuses a different dedicated number at capacity", async () => {
-    state.org.customFields = { sms: { mode: "dedicated", fromNumber: "+15559998888" } };
-    state.used = 1;
-    expect((await save()).statusCode).toBe(403);
+  it("replaces a dedicated number at capacity under the owner lock", async () => {
+    const oldNumber = "+15559998888";
+    state.org.customFields = { sms: { mode: "dedicated", fromNumber: oldNumber }, unrelated: true };
+    state.assignments = [{ orgId: "org", ownerId: 7, number: oldNumber },
+      { orgId: "other-owner", ownerId: 8, number: oldNumber }];
+    expect((await save()).statusCode).toBe(200);
+    expect(state.update).toHaveBeenCalledWith(expect.objectContaining({
+      customFields: expect.objectContaining({ unrelated: true, sms: expect.objectContaining({ fromNumber: number }) }),
+    }));
+    const statements = state.execute.mock.calls.map(([q]) => new PgDialect().sqlToQuery(q));
+    expect(statements[0]).toMatchObject({ sql: "SELECT pg_advisory_xact_lock($1, $2)", params: [7165, 7] });
+    expect(statements[1].sql).toContain("AND id <> $2");
+    expect(statements[1].params).toEqual([7, "org"]);
+  });
+  it("refuses a second org's new number at capacity", async () => {
+    state.assignments = [{ orgId: "first-org", ownerId: 7, number: "+15559998888" }];
+    const res = await save();
+    expect(res.statusCode).toBe(403);
+    expect(res.body).toMatchObject({ limit: 1, used: 1 });
+    expect(state.update).not.toHaveBeenCalled();
+  });
+  it("keeps a shared old number in the count when replacing an assignment", async () => {
+    const oldNumber = "+15559998888";
+    state.org.customFields = { sms: { mode: "dedicated", fromNumber: oldNumber } };
+    state.assignments = ["org", "second-org", "third-org"].map(orgId => ({ orgId, ownerId: 7, number: oldNumber }));
+    const res = await save();
+    expect(res.statusCode).toBe(403);
+    expect(res.body).toMatchObject({ limit: 1, used: 1 });
+    expect(state.update).not.toHaveBeenCalled();
+    // The remaining orgs share one distinct number, so one extra slot suffices.
+    plans("starter", "crm_max", 1);
+    expect((await save()).statusCode).toBe(200);
   });
   it("allows reuse of a number already dedicated elsewhere on this account", async () => {
     state.org.customFields = { sms: { mode: "byo", fromNumber: number } };
