@@ -6,6 +6,7 @@ import { SocialError } from "./client";
 import { connection, clientFactory, createPosts, destinationKey, generateDue, ownedBusiness, saveSettings, userLock, type Generate, generateText } from "./service";
 import { syncGbpSources } from "./gbp-sources";
 import { logActivity } from "../account-events";
+import { getEntitlements, planPausedMessage } from "../entitlements";
 
 export const pageInput = z.object({
   search: z.string().trim().max(200).default(""),
@@ -111,6 +112,13 @@ export async function runAgencyWorker(generate:Generate=generateText, sync=syncG
       try {
         const fresh=await c.query("SELECT id FROM social_bulk_jobs WHERE id=$1 AND state='queued'",[job.id]);
         if(!fresh.rowCount)continue;
+        const { modules } = await getEntitlements(job.user_id);
+        const missing = !modules.socialPublishing ? "socialPublishing"
+          : ['settings','generate'].includes(job.kind) && !modules.autoPosts ? "autoPosts" : null;
+        if (missing) {
+          await c.query("UPDATE social_bulk_jobs SET state='cancelled',error=$2 WHERE id=$1 AND state='queued'",[job.id,planPausedMessage(missing)]);
+          continue;
+        }
         const b=await ownedBusiness(job.user_id,job.business_id);
         const input=bulkInput.parse(job.payload);
         if(['post','settings'].includes(job.kind)) {

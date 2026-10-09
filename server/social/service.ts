@@ -25,7 +25,7 @@ export {
 import { aiModel } from "../ai-config";
 import { AiAnswerError, aiClient, aiComplete, NO_TOOLS_RULE, type ChatClient } from "../ai-output";
 import { recordFailure } from "../ops/issues";
-import { usersWithModule } from "../entitlements";
+import { getEntitlements, usersWithModule } from "../entitlements";
 export async function connect(
   userId: number,
   key: string,
@@ -363,6 +363,8 @@ export async function workerUser(
   businessId: number | null = null,
 ) {
   return userLock(userId, async (c) => {
+    const { modules } = await getEntitlements(userId);
+    if (!modules.socialPublishing) return;
     await notifyPostEvents(c,userId,businessId);
     const { client } = await connection(userId, make, businessId);
     // A process may have died after submitting but before saving the acknowledgement. Never re-POST it.
@@ -371,7 +373,7 @@ export async function workerUser(
       [userId,businessId],
     );
     try {
-      await generateDue(c, userId, generate, false, businessId);
+      if (modules.autoPosts) await generateDue(c, userId, generate, false, businessId);
     } catch (e) {
       await c.query(
         "UPDATE social_settings SET last_error=$2,next_at=now()+interval '1 hour' WHERE user_id=$1 AND business_id IS NOT DISTINCT FROM $3",
@@ -524,26 +526,30 @@ export async function runSocialWorker(
   try {
     const { runAgencyWorker } = await import("./agency");
     await runAgencyWorker(generate,sync);
+    const work = `
+      SELECT user_id,business_id,next_at AS due,true AS generation FROM social_settings WHERE settings->>'enabled'='true' AND next_at<=now()
+      UNION ALL SELECT user_id,business_id,due_at AS due,false AS generation FROM social_posts WHERE state IN ('queued','submitted','submitting') AND due_at<=now()
+      UNION ALL SELECT user_id,business_id,updated_at AS due,false AS generation FROM social_posts WHERE state IN ('published','failed','uncertain') AND notified_at IS NULL
+    `;
+    // Resolve every due owner before limiting groups. Paused owners retain their
+    // work without occupying the oldest 30 slots. Shared rules handle legacy keys.
+    const { rows: owners } = await pool.query(`SELECT DISTINCT user_id FROM (${work}) work`);
+    const entitled = await usersWithModule(owners.map((r) => r.user_id), "socialPublishing");
+    if (!entitled.size) return;
+    const generators = await usersWithModule([...entitled], "autoPosts");
     const { rows } = await pool.query(
-      `SELECT user_id,business_id,min(due) FROM (
-        SELECT user_id,business_id,next_at AS due FROM social_settings WHERE settings->>'enabled'='true' AND next_at<=now()
-        UNION ALL SELECT user_id,business_id,due_at AS due FROM social_posts WHERE state IN ('queued','submitted','submitting') AND due_at<=now()
-        UNION ALL SELECT user_id,business_id,updated_at AS due FROM social_posts WHERE state IN ('published','failed','uncertain') AND notified_at IS NULL
-      ) work GROUP BY user_id,business_id ORDER BY min(due) LIMIT 30`,
+      `SELECT user_id,business_id,min(due) FROM (${work}) work
+       WHERE user_id=ANY($1::int[]) AND (NOT generation OR user_id=ANY($2::int[]))
+       GROUP BY user_id,business_id ORDER BY min(due) LIMIT 30`,
+      [[...entitled], [...generators]],
     );
-    // The Social Media tool is a Pro-and-up module (shared/plans.ts socialPublishing;
-    // autoPosts starts at the same plan, so this one batch check covers both): an
-    // owner whose plan no longer includes it keeps their queued work but nothing
-    // generates or publishes until the plan returns.
-    const entitled = await usersWithModule(rows.map((r) => r.user_id), "socialPublishing");
     for (const r of rows)
-      if (entitled.has(r.user_id))
-        try {
-          await workerUser(r.user_id, make, generate, r.business_id);
-        } catch {
-          await pool.query("UPDATE social_settings SET next_at=now()+interval '1 hour',last_error='Connection unavailable; check Blotato settings' WHERE user_id=$1 AND business_id IS NOT DISTINCT FROM $2",[r.user_id,r.business_id]);
-          await pool.query("UPDATE social_posts SET due_at=now()+interval '1 hour' WHERE user_id=$1 AND business_id IS NOT DISTINCT FROM $2 AND state IN ('queued','submitted','submitting')",[r.user_id,r.business_id]);
-        }
+      try {
+        await workerUser(r.user_id, make, generate, r.business_id);
+      } catch {
+        await pool.query("UPDATE social_settings SET next_at=now()+interval '1 hour',last_error='Connection unavailable; check Blotato settings' WHERE user_id=$1 AND business_id IS NOT DISTINCT FROM $2",[r.user_id,r.business_id]);
+        await pool.query("UPDATE social_posts SET due_at=now()+interval '1 hour' WHERE user_id=$1 AND business_id IS NOT DISTINCT FROM $2 AND state IN ('queued','submitted','submitting')",[r.user_id,r.business_id]);
+      }
   } finally {
     busy = false;
   }
