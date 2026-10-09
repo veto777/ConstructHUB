@@ -33,7 +33,7 @@ import {
   type CrmNotificationPref,
 } from "@shared/schema";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { requireOrg, requirePermission } from "./tenancy";
+import { requireOrg, requireSmsOrg, requirePermission } from "./tenancy";
 import { logActivity } from "./activity";
 import { sendWithFallback } from "../email";
 import { getBaseUrl } from "../auth";
@@ -311,6 +311,59 @@ export function resolveSmsSender(customFields: unknown): SmsSender | null {
   return platform ? { ...platform, mode: "platform" } : null;
 }
 
+/** All allocation writers use the same owner-scoped transaction lock. */
+export const TEXTING_NUMBER_LOCK = 7165;
+async function lockTextingOwner(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], ownerId: number) {
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(${TEXTING_NUMBER_LOCK}, ${ownerId})`);
+}
+
+/** Stable number order keeps the same assignments when an allowance shrinks. */
+async function dedicatedNumbers(q: Pick<typeof db, "execute">, ownerId: number): Promise<string[]> {
+  const { rows } = await q.execute(sql`
+    SELECT custom_fields->'sms'->>'fromNumber' AS number
+      FROM crm_orgs WHERE owner_user_id=${ownerId}
+       AND custom_fields->'sms'->>'mode'='dedicated'
+       AND custom_fields->'sms'->>'fromNumber' IS NOT NULL
+     GROUP BY custom_fields->'sms'->>'fromNumber'
+     ORDER BY min(created_at), custom_fields->'sms'->>'fromNumber'`);
+  return rows.map(r => String(r.number));
+}
+
+/** Keep saved settings/data, but stop using carrier numbers no longer paid for. */
+export async function reconcileTextingNumbers(ownerId: number): Promise<void> {
+  const [ent, crm] = await Promise.all([getEntitlements(ownerId), getCrmEntitlements(ownerId)]);
+  const allowance = textingNumbersAllowance(ent, crm);
+  clearSmsEntitlementCache();
+  if (allowance === UNLIMITED) return;
+  await db.transaction(async tx => {
+    await lockTextingOwner(tx, ownerId);
+    const excess = (await dedicatedNumbers(tx, ownerId)).slice(allowance);
+    for (const number of excess) {
+      await tx.execute(sql`UPDATE crm_orgs
+        SET custom_fields=jsonb_set(custom_fields, '{sms,mode}', '"platform"'::jsonb), updated_at=now()
+        WHERE owner_user_id=${ownerId} AND custom_fields->'sms'->>'mode'='dedicated'
+          AND custom_fields->'sms'->>'fromNumber'=${number}`);
+    }
+  });
+}
+
+/** Uncached: stale caller settings cannot authorize a removed number. */
+export async function dedicatedSmsAllowed(orgId: string | undefined, number: string): Promise<boolean> {
+  if (!orgId || orgId === "*") return false;
+  try {
+    const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, orgId)).limit(1);
+    const current = orgSmsConfig(org?.customFields);
+    if (!org || current.mode !== "dedicated" || current.fromNumber !== number) return false;
+    const [ent, crm] = await Promise.all([getEntitlements(org.ownerUserId), getCrmEntitlements(org.ownerUserId)]);
+    const allowance = textingNumbersAllowance(ent, crm);
+    if (allowance === UNLIMITED) return true;
+    return (await dedicatedNumbers(db, org.ownerUserId)).slice(0, allowance).includes(number);
+  } catch (e: any) {
+    console.error("[sms] dedicated allowance check failed:", e?.message || e);
+    return false;
+  }
+}
+
 /** Client/homeowner texting is only allowed when the org brought its OWN
  *  registered number/account — never on the shared platform number. */
 export function orgCanTextClients(customFields: unknown): boolean {
@@ -433,6 +486,10 @@ export async function sendSms(
   orgId?: string,
 ): Promise<SmsResult> {
   const sender = resolveSmsSender(orgCustomFields);
+  if (sender?.mode === "dedicated" && !await dedicatedSmsAllowed(orgId, sender.from)) {
+    // Do not silently reroute a client-facing text onto the shared number.
+    return { ok: false, provider: "signalwire", sid: null, error: "Dedicated texting number is outside your current allowance. Update Text messaging settings." };
+  }
   if (orgId && orgId !== "*" && !(await orgSmsEntitled(orgId))) {
     return { ok: false, provider: sender ? "signalwire" : "log", sid: null, error: SMS_NEEDS_PLAN };
   }
@@ -763,7 +820,7 @@ export function registerCrmSmsRoutes(app: Express, getDevUser: GetUser): void {
   app.get("/api/crm/sms/status", async (req: any, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
-    const ctx = await requireOrg(req, res, user.id);
+    const ctx = await requireSmsOrg(req, res, user.id);
     if (!ctx) return;
     res.json(await orgSmsStatus(ctx.org));
   });
@@ -777,7 +834,7 @@ export function registerCrmSmsRoutes(app: Express, getDevUser: GetUser): void {
   app.put("/api/crm/sms/sender", async (req: any, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
-    const ctx = await requireOrg(req, res, user.id);
+    const ctx = await requireSmsOrg(req, res, user.id);
     if (!ctx) return;
     if (!requirePermission(res, ctx, "manageIntegrations")) return;
     if (!(await orgSmsEntitled(ctx.org.id))) return res.status(402).json(smsPlanRequired());
@@ -801,63 +858,61 @@ export function registerCrmSmsRoutes(app: Express, getDevUser: GetUser): void {
       return res.status(400).json({ message: "Your own account needs a space URL and project id." });
     }
 
-    const cf = { ...((ctx.org.customFields as Record<string, any> | null) ?? {}) };
-    const prior = orgSmsConfig(cf);
-    // A dedicated number is one of our carrier numbers: how many the account may
-    // hold is the platform and CRM included numbers plus texting_number
-    // add-ons (-1 unlimited). Assigning a number that is new to the account at a
-    // full count is a 403; keeping or re-entering an already-assigned number is
-    // always allowed.
-    if (p.mode === "dedicated" && from && (prior.mode !== "dedicated" || from !== prior.fromNumber)) {
-      const ownerId = ctx.org.ownerUserId ?? user.id;
-      const [ownerEnt, ownerCrm] = await Promise.all([getEntitlements(ownerId), getCrmEntitlements(ownerId)]);
-      const allowance = textingNumbersAllowance(ownerEnt, ownerCrm);
-      if (allowance !== UNLIMITED) {
-        const { rows: [used] } = await db.execute(sql`
-          SELECT count(DISTINCT custom_fields->'sms'->>'fromNumber')::int AS n,
-                 coalesce(bool_or(custom_fields->'sms'->>'fromNumber'=${from}), false) AS assigned
-            FROM crm_orgs
-           WHERE owner_user_id=${ownerId}
-             AND custom_fields->'sms'->>'mode'='dedicated'
-             AND custom_fields->'sms'->>'fromNumber' IS NOT NULL`);
-        const usedN = Number((used as any)?.n ?? 0);
-        if (!(used as any)?.assigned && usedN >= allowance) {
+    const ownerId = ctx.org.ownerUserId;
+    const [ownerEnt, ownerCrm] = await Promise.all([getEntitlements(ownerId), getCrmEntitlements(ownerId)]);
+    const allowance = textingNumbersAllowance(ownerEnt, ownerCrm);
+    const row = await db.transaction(async tx => {
+      await lockTextingOwner(tx, ownerId);
+      const [fresh] = await tx.select().from(crmOrgs).where(eq(crmOrgs.id, ctx.org.id)).limit(1);
+      if (!fresh) return null;
+      const cf = { ...((fresh.customFields as Record<string, any> | null) ?? {}) };
+      const prior = orgSmsConfig(cf);
+      if (p.mode === "dedicated" && from) {
+        const numbers = await dedicatedNumbers(tx, ownerId);
+        const allowed = allowance === UNLIMITED || numbers.slice(0, allowance).includes(from)
+          || (!numbers.includes(from) && numbers.length < allowance);
+        if (!allowed) {
           const raise = raiseHint(ownerEnt, "textingNumbersIncluded", ["client-texting number"], "texting_number");
-          return sendLimitReached(res, {
-            feature: "textingNumbers", limit: allowance, used: usedN, upgradePlan: raise.upgradePlan, addon: raise.addon,
-            message: `Your account includes ${allowance === 0 ? "no client-texting numbers" : `${allowance} client-texting number${allowance === 1 ? "" : "s"}`} on our carrier, and ${usedN.toLocaleString("en-US")} ${usedN === 1 ? "is" : "are"} in use. ${raise.text}`.trim(),
+          sendLimitReached(res, {
+            feature: "textingNumbers", limit: allowance, used: numbers.length,
+            upgradePlan: raise.upgradePlan, addon: raise.addon,
+            message: `Your account includes ${allowance} client-texting number${allowance === 1 ? "" : "s"}; ${numbers.length} in use. ${raise.text}`.trim(),
           });
+          return null;
         }
       }
-    }
-    if (p.mode === "platform") {
-      delete cf.sms;
-    } else {
-      cf.sms = {
-        mode: p.mode,
-        fromNumber: from,
-        spaceUrl: p.mode === "byo" ? p.spaceUrl : null,
-        projectId: p.mode === "byo" ? p.projectId : null,
-        // Keep the stored token when the form leaves it blank (edit without
-        // re-typing); clear it when switching away from BYO.
-        apiTokenEnc: p.mode === "byo"
-          ? (p.apiToken ? encryptSmsSecret(p.apiToken) : prior.apiTokenEnc ?? null)
-          : null,
-      };
-      if (p.mode === "byo" && !cf.sms.apiTokenEnc) {
-        return res.status(400).json({ message: "Your own account needs an API token." });
+      if (p.mode === "platform") {
+        delete cf.sms;
+      } else {
+        cf.sms = {
+          mode: p.mode,
+          fromNumber: from,
+          spaceUrl: p.mode === "byo" ? p.spaceUrl : null,
+          projectId: p.mode === "byo" ? p.projectId : null,
+          // Keep the stored token when the form leaves it blank (edit without
+          // re-typing); clear it when switching away from BYO.
+          apiTokenEnc: p.mode === "byo"
+            ? (p.apiToken ? encryptSmsSecret(p.apiToken) : prior.apiTokenEnc ?? null)
+            : null,
+        };
+        if (p.mode === "byo" && !cf.sms.apiTokenEnc) {
+          res.status(400).json({ message: "Your own account needs an API token." });
+          return null;
+        }
       }
-    }
-    const [row] = await db.update(crmOrgs)
-      .set({ customFields: cf, updatedAt: new Date() })
-      .where(eq(crmOrgs.id, ctx.org.id)).returning();
+      const [row] = await tx.update(crmOrgs)
+        .set({ customFields: cf, updatedAt: new Date() })
+        .where(eq(crmOrgs.id, ctx.org.id)).returning();
+      return row;
+    });
+    if (!row) return;
     res.json(await orgSmsStatus(row));
   });
 
   app.post("/api/crm/sms/test", async (req: any, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
-    const ctx = await requireOrg(req, res, user.id);
+    const ctx = await requireSmsOrg(req, res, user.id);
     if (!ctx) return;
     if (!requirePermission(res, ctx, "manageIntegrations")) return;
     if (!(await orgSmsEntitled(ctx.org.id))) return res.status(402).json(smsPlanRequired());

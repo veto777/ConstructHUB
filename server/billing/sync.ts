@@ -158,9 +158,16 @@ export async function recordCancellation(where: { id: number } | { userId: numbe
   const c: Cancellation = sub ? cancellationOf(sub) : { cancelAtPeriodEnd: null, cancelAt: null };
   const [column, value] = "id" in where ? ["id", where.id] : ["user_id", where.userId];
   // The start date is written from the live subscription and kept when the subscription ended (sub null).
-  await pool.query(
-    `UPDATE subscriptions SET cancel_at_period_end = $2, cancel_at = $3, start_date = COALESCE($4, start_date) WHERE ${column} = $1`,
+  const { rows } = await pool.query(
+    `UPDATE subscriptions SET cancel_at_period_end = $2, cancel_at = $3, start_date = COALESCE($4, start_date) WHERE ${column} = $1 RETURNING user_id`,
     [value, c.cancelAtPeriodEnd, c.cancelAt, sub ? subscriptionStartOf(sub) : null]);
+  // This runs after the subscription row is persisted by add-on changes,
+  // plan changes and webhooks. Use effective entitlements, including legacy
+  // grants and CRM numbers, rather than interpreting Stripe prices here.
+  if (rows.length) {
+    const { reconcileTextingNumbers } = await import("../crm/sms");
+    for (const row of rows) await reconcileTextingNumbers(row.user_id);
+  }
 }
 
 /** The stored cancellation state (and start date) of a row (null = never synced from Stripe). */
