@@ -145,7 +145,7 @@ describe("pricing display: comparison tables (shared/plan-matrix.ts)", () => {
   it("labels the rows in the owner's wording (the approved comparison table)", () => {
     expect(byKey.clientWorkspaces.label).toBe("Client workspaces, roles, bulk actions, email onboarding");
     expect(byKey.autoPosts.label).toBe("AI posts and photo captions on a schedule");
-    expect(byKey.reviewReminders.label).toBe("Review reminders to customers (text + email)");
+    expect(byKey.reviewReminders.label).toBe("Review reminders to customers (email; text coming soon)");
     expect(byKey.permitAlerts.label).toBe("Permit alerts for new filings in a territory");
     expect(byKey.adsLsaManager.label).toBe("Google Ads and LSA manager, IP exclusions");
     expect(byKey.cloudflareDomains.label).toBe("Cloudflare, Search Console, Domains, Gmail forwarding");

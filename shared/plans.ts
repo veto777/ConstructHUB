@@ -148,7 +148,7 @@ export type PlanModules = {
   domainsMailAlerts: boolean;
   /** AI posts and photo captions published on a schedule. */
   autoPosts: boolean;
-  /** Review reminders to customers by text and email (server/review-reminders.ts). */
+  /** Review reminders to customers by email; text is coming (server/review-reminders.ts). */
   reviewReminders: boolean;
   /** Property records lookup (the database directory). */
   propertyRecords: boolean;

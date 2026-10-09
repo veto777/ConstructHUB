@@ -135,3 +135,17 @@ This branch (`pricing/rebuild-ui`) is UI + docs; the price book itself is
 
 Never merge or deploy from this worktree — Lane B only changes client,
 shared, docs, scripts and tests.
+
+## Deploying a new price book
+
+Founding members lock the prices of the book that was in force when their
+subscription **started**, not when a webhook was processed
+(`shared/pricing-terms.ts`, `priceSnapshot(startedAt)`).
+
+When a new ladder goes live:
+
+1. In the deploy commit, set `FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT` (or the next
+   dated book's boundary) to the production deploy time in UTC.
+2. Keep the previous book frozen as a dated constant; never edit it.
+3. Existing snapshots are never rewritten.
+
