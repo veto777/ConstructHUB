@@ -11,7 +11,7 @@
  */
 import { ANNUAL_MONTHS, PLANS, PLAN_KEYS } from "@shared/plans";
 import {
-  planPriceLine, joinNames, planNamesWhere, AGENCY_ONLY_MODULES, CRM_SEATS_LINE,
+  planPriceLine, joinNames, planNamesWhere, CRM_SEATS_LINE,
   PROTECTED_SITE_PLANS, SALES_HREF, SALES_REP_LABEL, TRIAL_LABEL,
   CALL_ASSISTANT_SEPARATE_LINE, CALL_ASSISTANT_NUMBER_RULES, callAssistantAvailabilityLine, callAssistantIncludesLine, callAssistantPricing,
   callAssistantTierNumbersLine, callAssistantTiersShortLine,
@@ -47,7 +47,10 @@ export function templateAnswer(presetId: PresetId): string {
     case "agency":
       // The 2026-10-09 ladder: Agency is the growth key ($199, 100 locations, 10 client
       // workspaces); Unlimited (the agency key) is the no-caps plan above it.
-      return `The **Agency** plan is ${planPriceLine("growth")}: ${PLANS.growth.limits.locations} Google Business Profile locations, ${PLANS.growth.limits.clientWorkspaces} client workspaces and ${PLANS.growth.limits.agencySeats} team seats, with ${PLANS.growth.limits.textingNumbersIncluded} client-texting number included and a taste of the SEO tools.\nThe **Unlimited** plan is ${planPriceLine("agency")}: no caps on locations, seats or client workspaces, ${PLANS.agency.limits.textingNumbersIncluded} client-texting numbers, the full SEO suite, white-label reports and the Master Class.\nOnly Unlimited includes the ${joinNames(AGENCY_ONLY_MODULES)}. See [Pricing](/pricing).`;
+      // The Unlimited plan's price stands in its own sentence: "Master Class" next to a
+      // price is O11 (a sales-only service), and an SEO-topic sentence may not carry a
+      // plan price unless it names Agency (the SEO amounts are Agency's own).
+      return `The **Agency** plan is ${planPriceLine("growth")}: ${PLANS.growth.limits.locations} Google Business Profile locations, ${PLANS.growth.limits.clientWorkspaces} client workspaces and ${PLANS.growth.limits.agencySeats} team seats, with ${PLANS.growth.limits.textingNumbersIncluded} client-texting number included and a taste of the SEO tools.\nThe **Unlimited** plan is ${planPriceLine("agency")}: no caps on locations, seats or client workspaces, and ${PLANS.agency.limits.textingNumbersIncluded} client-texting numbers.\nUnlimited also includes the full SEO suite, white-label reports and the Master Class course. See [Pricing](/pricing).`;
     case "done-for-you":
       return `Yes. For contractors who'd rather have the work done for them, there is business formation and contractor license help, a Google Business Profile and contractor website, SEO and ad campaigns, monthly SEO packages, and the Complete Business Build. Every one of these is quoted by a sales rep, so there is no price here. Open [${SALES_REP_LABEL}](${SALES_HREF}), fill in your name, email and what you need, and a rep replies by email.`;
     case "permits":

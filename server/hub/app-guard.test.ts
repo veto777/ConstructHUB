@@ -75,7 +75,7 @@ describe("appPrefilterOverride / appAnswerBlocked", () => {
     expect(appPrefilterOverride("R_DATA")).toBeNull();
   });
   it("blocks model answers that state a price or point at Pricing", () => {
-    expect(appAnswerBlocked("**Pro** is $79/month.")).toBe(true);
+    expect(appAnswerBlocked("**Pro** is $99/month.")).toBe(true);
     expect(appAnswerBlocked("See [Pricing](/pricing) for plans.")).toBe(true);
     expect(appAnswerBlocked("Connect Google under Locations.")).toBe(false);
   });
@@ -116,7 +116,7 @@ function setup(over: Partial<HubDeps> = {}) {
   };
   const ai = {
     calls: [] as HubRequest[],
-    fallback: { content: "**Pro** is $79/month or $790/year. See [Pricing](/pricing).", finishReason: "stop" },
+    fallback: { content: "**Pro** is $99/month or $990/year. See [Pricing](/pricing).", finishReason: "stop" },
     complete(body: HubRequest): Promise<any> {
       ai.calls.push(body);
       return Promise.resolve(ai.fallback);
@@ -188,7 +188,7 @@ describe("app guard on the routes", () => {
   it("does not touch browser requests", async () => {
     const out = await env.chat("How much does the Pro plan cost?", BROWSER_UA);
     expect(env.ai.calls.length).toBe(1);
-    expect(out.data.reply).toContain("$79");
+    expect(out.data.reply).toContain("$99");
   });
 
   it("sales presets get the fixed line in the app, never the template", async () => {

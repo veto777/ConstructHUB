@@ -51,7 +51,7 @@ describe("plan bullets match the limits", () => {
       expect(bullet, key).toContain(limit === -1 ? "fair use" : limit.toLocaleString("en-US"));
       expect(bullet, key).not.toMatch(limit === -1 ? /\d+ permit/ : /fair use/);
     }
-    expect(PLANS.growth.features).toContain("5,000 permit searches / month");
+    expect(PLANS.growth.features).toContain(`${PLANS.growth.limits.permitSearches.toLocaleString("en-US")} permit searches / month`);
   });
 
   it("grid credit cost lives in the price book (the server and client read one function)", () => {

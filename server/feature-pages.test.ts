@@ -186,7 +186,8 @@ describe("feature page prices", () => {
     expect(s.price).toBe(formatUsd(PLANS[cheapest].monthlyCents));
     expect(s.rows.map((r) => r.label)).toEqual(PLAN_KEYS.map((k) => PLANS[k].name));
     expect(s.rows.find((r) => r.label === PLANS.starter.name)!.value).toBe(`${PLANS.starter.limits.siteScans} Site Scans a month`);
-    expect(s.rows.find((r) => r.label === PLANS.agency.name)!.value).toBe(`${PLANS.agency.limits.siteScansPerLocation} Site Scan per location a month`);
+    // Unlimited's siteScans is -1 (no cap) on the 2026-10-09 book; per-location figures are legacy-only.
+    expect(s.rows.find((r) => r.label === PLANS.agency.name)!.value).toBe("Unlimited (fair use)");
     // The FAQ's allowance sentence is built from the same limits.
     const faq = featurePageByKey("siteScan")!.faqs.map((f) => f.a).join(" ");
     expect(faq).toContain(allowanceLine({ limit: "siteScans", perLocation: "siteScansPerLocation", unit: "Site Scans", period: "month" }));
@@ -194,13 +195,20 @@ describe("feature page prices", () => {
   });
 
   it("modules name their only plan, allowances start at the cheapest plan that has one, add-ons say coming soon while in preview", () => {
+    const cfPlans = PLAN_KEYS.filter((k) => PLANS[k].modules.cloudflareSearchConsole);
     const cf = featurePriceSummary({ kind: "module", module: "cloudflareSearchConsole" });
-    expect(cf.headline).toBe(`${PLANS.agency.name} plan`);
-    expect(cf.price).toBe(formatUsd(PLANS.agency.monthlyCents));
+    // Cloudflare + Search Console starts at Pro on the 2026-10-09 ladder, so a multi-plan
+    // module says "Included from…", not "<Name> plan" (the only-plan shape).
+    expect(cf.headline).toBe(cfPlans.length === 1 ? `${PLANS[cfPlans[0]].name} plan` : `Included from the ${PLANS[cfPlans[0]].name} plan`);
+    expect(cf.price).toBe(formatUsd(PLANS[cfPlans[0]].monthlyCents));
+    // Every 2026-10-09 plan protects at least one website, so this allowance reads "Included in
+    // every plan"; an allowance that starts higher (tracked keywords, Agency) names its plan.
     const guard = featurePriceSummary({ kind: "allowance", allowance: { limit: "protectedSites", unit: "websites", period: "count" } });
-    const first = PLAN_KEYS.find((k) => PLANS[k].limits.protectedSites !== 0)!;
-    expect(guard.headline).toBe(`Included from the ${PLANS[first].name} plan`);
+    expect(guard.headline).toBe("Included in every plan");
     expect(guard.rows.find((r) => r.label === PLANS.starter.name)!.included).toBe(PLANS.starter.limits.protectedSites !== 0);
+    const keywords = PLAN_KEYS.find((k) => PLANS[k].limits.seoKeywords !== 0)!;
+    expect(featurePriceSummary({ kind: "allowance", allowance: { limit: "seoKeywords", unit: "tracked keywords", period: "count" } }).headline)
+      .toBe(`Included from the ${PLANS[keywords].name} plan`);
     // The AI Call Assistant is sold in tiers: the page shows the cheapest tier's price as "from", never one middle tier's.
     const ca = featurePriceSummary({ kind: "addon", addon: "call_assistant" });
     const cheapestTier = Math.min(...CALL_ASSISTANT_TIERS.map((t) => t.monthlyCents));
@@ -315,9 +323,13 @@ describe("featurePlanGap: signed-in CTA for an account whose plan lacks the feat
   });
   it("offers the cheapest plan that has a module or an allowance, and says the current plan lacks it", () => {
     expect(featurePlanGap(featurePageByKey("cloudflare")!.pricing, ent("starter")))
-      .toEqual({ label: "Upgrade to Agency", href: "/pricing", note: "Not in your Starter plan." });
-    expect(featurePlanGap(featurePageByKey("clickGuard")!.pricing, ent("starter")))
-      .toEqual({ label: "Upgrade to Pro", href: "/pricing", note: "Not in your Starter plan." });
+      .toEqual({ label: `Upgrade to ${PLANS.pro.name}`, href: "/pricing", note: `Not in your ${PLANS.starter.name} plan.` });
+    // Click Guard starts at Solo now (1 protected website), so the gap case for an allowance
+    // uses the agency workspace, which starts at Agency.
+    expect(featurePlanGap(featurePageByKey("agency")!.pricing, ent("starter")))
+      .toEqual({ label: `Upgrade to ${PLANS.growth.name}`, href: "/pricing", note: `Not in your ${PLANS.starter.name} plan.` });
+    // …and Click Guard on Solo is not a gap at all.
+    expect(featurePlanGap(featurePageByKey("clickGuard")!.pricing, ent("starter"))).toBeNull();
   });
   it("is null when the plan includes it, for features every plan has, and for accounts with no plan of their own", () => {
     expect(featurePlanGap(featurePageByKey("clickGuard")!.pricing, ent("pro"))).toBeNull();
@@ -328,7 +340,7 @@ describe("featurePlanGap: signed-in CTA for an account whose plan lacks the feat
   it("sends the AI Call Assistant (a separate service) to its own pricing unless its module is on", () => {
     const spec = { kind: "addon", addon: "call_assistant" } as const;
     expect(featurePlanGap(spec, ent("pro"))).toMatchObject({ label: "See Call Assistant pricing", href: "/pricing#call-assistant" });
-    expect(featurePlanGap(spec, ent("agency"))).toMatchObject({ href: "/pricing#call-assistant", note: "A separate service, not part of your Agency plan." });
+    expect(featurePlanGap(spec, ent("agency"))).toMatchObject({ href: "/pricing#call-assistant", note: `A separate service, not part of your ${PLANS.agency.name} plan.` });
     expect(featurePlanGap(spec, ent("pro", { addonModules: { callAssistant: true } }))).toBeNull();
   });
 });

@@ -450,7 +450,7 @@ export const PLANS: Record<PlanKey, Plan> = {
     features: [
       "Everything in Agency",
       "Unlimited locations, seats, client workspaces and websites",
-      "Unlimited permit searches, Site Scans and Gabe questions",
+      "Unlimited (fair use) permit searches, Site Scans and Gabe questions",
       "Profile Guard checks every 5 min",
       "The full SEO suite — 5,000 tracked keywords and $60 of SEO data / month",
       "White-label reports under your own brand",
@@ -459,9 +459,9 @@ export const PLANS: Record<PlanKey, Plan> = {
       "50 Competitor Intel scans / month",
       "Team text alerts — 5,000 segments / month",
       "Unlimited review reply templates",
-      "The Master Class course included ($2,499)",
-      "GBP reinstatement help at half price",
-      "Two seats on every new product we launch (Call Assistant minutes excluded)",
+      "The Master Class course included",
+      "GBP reinstatement help at half the standard rate",
+      "Two seats on every new product we launch",
       "Named support contact, onboarding call, first access to new features",
     ],
     notIncluded: [

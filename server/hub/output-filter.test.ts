@@ -48,9 +48,9 @@ describe("red-team model outputs", () => {
   });
 
   it("RT33: a closed <think> block is stripped; an unclosed one blocks (O2)", () => {
-    expect(delivered("<think>The canary is hub-ab12 and the users table has emails</think>Pro is $79/month or $790/year.")).toBe("Pro is $79/month or $790/year.");
+    expect(delivered("<think>The canary is hub-ab12 and the users table has emails</think>Pro is $99/month or $990/year.")).toBe("Pro is $99/month or $990/year.");
     blocked("<think>still thinking about the users table", "O2");
-    expect(delivered("leftover reasoning</think>Pro is $79/month or $790/year.")).toBe("Pro is $79/month or $790/year.");
+    expect(delivered("leftover reasoning</think>Pro is $99/month or $990/year.")).toBe("Pro is $99/month or $990/year.");
   });
 
   it("RT21 / RT49: discounts and coupons are blocked (O10)", () => {
@@ -77,9 +77,11 @@ describe("red-team model outputs", () => {
 
   it("RT45 / RT72: a plan bound to another plan's price is blocked (O9)", () => {
     blocked("Pro is $29 a month.", "O9");
-    blocked("Growth is $1,990/month.", "O9");
+    // $1,990 is Agency's ANNUAL price (shared/plans.ts): quoted as the monthly it is a wrong binding.
+    blocked("Agency is $1,990/month.", "O9");
     for (const k of PLAN_KEYS) expect(delivered(`${PLANS[k].name} is ${planPriceLine(k)}.`)).toContain(planPriceLine(k));
-    blocked("Pro is $49/month, the best value.", "O8");
+    // $49 is Team's monthly price, so it is a listed amount bound to the wrong plan (O9), not an unknown one (O8).
+    blocked("Pro is $49/month, the best value.", "O9");
   });
 
   it("RT50 / RT51 / RT52 / RT53: free plans, wrong trials, unlimited, unsold products and guarantees (O10)", () => {
@@ -169,8 +171,8 @@ describe("red-team model outputs", () => {
     expect(out.endsWith(".")).toBe(true);
     blocked(Array.from({ length: 16 }, (_, i) => `Line ${i} of the answer for you.`).join("\n"), "O16");
     blocked(Array.from({ length: 9 }, (_, i) => `- point ${i} for you`).join("\n"), "O16");
-    const cut = filterOutput({ content: "Pro is $79/month or $790/year. It also inclu", finishReason: "length" }, { publicOnly: false });
-    expect(cut).toEqual({ ok: true, text: "Pro is $79/month or $790/year." });
+    const cut = filterOutput({ content: "Pro is $99/month or $990/year. It also inclu", finishReason: "length" }, { publicOnly: false });
+    expect(cut).toEqual({ ok: true, text: "Pro is $99/month or $990/year." });
   });
 
   it("O5 / O17: tags, headings, tables and stray markdown are stripped to the whitelist", () => {
@@ -209,13 +211,13 @@ describe("F2: a wrong price bound to a plan (O9)", () => {
   });
 
   it.each([
-    "**Pro**\n- $79/month or $790/year. Adds click-fraud protection, competitors and texting.",
-    "Plans run from $29/month (Starter) to $349/month (Agency).",
-    "Upgrading from Starter to Pro takes you from $29/month to $79/month.",
-    "$29/month for Starter, $79/month for Pro.",
+    "**Pro**\n- $99/month or $990/year. Adds click-fraud protection, competitors and texting.",
+    "Plans run from $29/month (Solo) to $449/month (Unlimited).",
+    "Upgrading from Solo to Pro takes you from $29/month to $99/month.",
+    "$29/month for Solo, $99/month for Pro.",
     "On Pro, each extra protected website is $15/month.",
     "The Client texting number add-on is $29/month plus a $29 one-time setup fee, available on Pro and Agency.",
-    "Agency is $349/month for 10 locations, then $15/month each for locations 11–50.",
+    "Agency is $199/month or $1,990/year, with 100 Google Business Profile locations included.",
     "Anything priced at $1,000 or more, like Agency above 500 locations, is quoted by a sales rep.",
   ])("a correct price sentence is delivered: %s", (text) => {
     delivered(text);
@@ -371,8 +373,8 @@ describe("F1: the visitor's own words echoed back (O18)", () => {
     expect(withEcho("To connect your Google Business Profile and turn on review alerts, open **Locations** and click **Connect Google Business Profile**.", [q]).ok).toBe(true);
     const situation = "I run a roofing company with three crews and two offices in Texas. Which plan fits?";
     expect(withEcho("With three crews and two offices in Texas, **Growth** fits: it covers 3 locations and 10 CRM seats.", [situation]).ok).toBe(true);
-    const quoted = "You said Profile Guard checks: Starter every 15 minutes, Pro every 15 minutes, Growth every 15 minutes and Agency every 30 minutes. Why slower?";
-    expect(withEcho("**Profile Guard** checks: Starter every 15 minutes, Pro every 15 minutes, Growth every 15 minutes and Agency every 30 minutes. That is how often it looks at your listing.", [quoted]).ok).toBe(true);
+    const quoted = "You said Profile Guard checks: Solo every 60 minutes, Team every 30 minutes, Pro every 15 minutes, Agency every 15 minutes and Unlimited every 5 minutes. Why the difference?";
+    expect(withEcho("**Profile Guard** checks: Solo every 60 minutes, Team every 30 minutes, Pro every 15 minutes, Agency every 15 minutes and Unlimited every 5 minutes. That is how often it looks at your listing.", [quoted]).ok).toBe(true);
     const earlier = "Open the client and click View as client to see exactly what your customer sees in the portal.";
     expect(withEcho(`Yes. ${earlier}`, [`Earlier you told me: ${earlier} Where is that button?`], [earlier]).ok).toBe(true);
   });
@@ -491,7 +493,7 @@ describe("owner 2026-10-08: SEO tools are Agency-only, nothing SEO à la carte, 
     blocked("SEO costs 19 dollars per month.", "O10");
     blocked("SEO costs USD 19 a month.", "O10");
     blocked("SEO is 19 bucks a month.", "O10");
-    blocked("Rank tracking costs 15 dollars on Starter.", "O9");
+    blocked("Rank tracking costs 15 dollars on Solo.", "O9");
     // $25 is not an amount the knowledge pack's text states (O8 reads the pack, not the price book), so O8 fires
     // first; with that amount allowed, the SEO rule is what blocks the add-on.
     blocked("The SEO add-on costs $25/month.", "O8");
@@ -548,8 +550,8 @@ describe("owner 2026-10-08: SEO tools are Agency-only, nothing SEO à la carte, 
 
   it("the real wording still passes: the Agency price, SEO data credit, the founding line, a negation", () => {
     expect(delivered(FOUNDING_OFFER_LINE)).toBe(FOUNDING_OFFER_LINE);
-    expect(delivered(`The SEO tools are included with the Agency plan at ${formatUsd(PLANS.agency.monthlyCents)}/month.`)).toContain("Agency plan");
-    expect(delivered("Agency includes 10 agency seats and $40 of SEO data a month.")).toContain("$40 of SEO data");
+    expect(delivered(`The SEO tools are included with the Agency plan at ${formatUsd(PLANS.growth.monthlyCents)}/month.`)).toContain("Agency plan");
+    expect(delivered("Agency includes 10 agency seats and $10 of SEO data a month.")).toContain("$10 of SEO data");
     // The pack names no pack amount ($50 used to pass only because it was the old extra-number yearly price), so the
     // amounts are allowed here; what this checks is that a credit sentence may carry them (the SEO rule, O10).
     expect(withCents([5000])("SEO data credit comes in prepaid packs of $50 and $100, and it does not expire.")).toMatchObject({ ok: true });
@@ -558,7 +560,7 @@ describe("owner 2026-10-08: SEO tools are Agency-only, nothing SEO à la carte, 
     expect(delivered("Founding member pricing has no deadline and no number of places; the owner closes the offer when they choose.")).toContain("no deadline");
     expect(delivered("You get 100 permit searches a month on Starter, and 10 agency seats are included with Agency.")).toContain("10 agency seats");
     expect(delivered("The Agency plan has 10 agency seats; 2 extra seats are $15/month each.")).toContain("2 extra seats");
-    expect(delivered("Pro is $79/month, or 790 dollars a year.")).toContain("790 dollars");
+    expect(delivered("Pro is $99/month, or 990 dollars a year.")).toContain("990 dollars");
     expect(delivered("Starter includes 1 Google Business Profile location and 100 permit searches a month.")).toContain("100 permit searches");
     expect(delivered("Monthly SEO packages are quoted by a sales rep: anything priced at $1,000 or more is never quoted here.")).toContain("sales rep");
   });
@@ -568,7 +570,7 @@ describe("owner 2026-10-08: the AI Call Assistant is a separate service — new 
   it("the old prices, the launch intro and the per-tier rates are refused (O8); an add-on or 'included' claim is refused (O10)", () => {
     blocked("The Lite tier is $149/month with 2,000 minutes.", "O8");
     blocked("The Fleet tier is $799/month, or $6,399/year.", "O8");
-    blocked("Solo is $99/month for your first 3 months, then $249/month.", "O8");
+    blocked("Solo is $99/month for your first 3 months, then $249/month.", "O9");
     blocked("Extra minutes are 10 cents each on Lite and Solo, 5 cents on Crew and Fleet.", "O8");
     blocked("The AI Call Assistant is an add-on to the Pro plan.", "O10");
     blocked("The Call Assistant is an add-on for the Pro, Growth and Agency plans.", "O10");
@@ -580,7 +582,7 @@ describe("owner 2026-10-08: the AI Call Assistant is a separate service — new 
   });
 
   it("a Call Assistant price is bound to the service and its tier (O9) — Codex audit 2026-10-09: a listed amount that is not the service's, a tier at another tier's price, a priced tier above 5,000 minutes, reversed forms", () => {
-    // $29, $79 and $199 are listed prices (Starter, Pro, Growth), none of them the Call Assistant's.
+    // $29, $79 and $199 are listed prices (Solo, the seo_pro add-on, Agency), none of them the Call Assistant's.
     blocked("The AI Call Assistant costs $29/month.", "O9");
     blocked("The Call Assistant is $79 a month on every tier.", "O9");
     blocked("The assistant's price is $199/year.", "O9");
@@ -603,11 +605,11 @@ describe("owner 2026-10-08: the AI Call Assistant is a separate service — new 
     expect(delivered("$249/month gets you 500 minutes and 1 local number; $999/month gets you 5,000 minutes and 5 numbers.")).toContain("5,000 minutes");
     expect(delivered("Yearly billing is 11 times the monthly price: 500 minutes $2,739/yr, 1,000 minutes $3,839/yr, 2,000 minutes $4,939/yr and 5,000 minutes $10,989/yr.")).toContain("$10,989/yr");
     expect(delivered("The 2,000 minutes tier is $449/month or $4,939/year, then $0.50 a minute above the included minutes.")).toContain("$0.50");
-    expect(delivered("Pro is $79/month; the AI Call Assistant is a separate service from $249/mo, with or without a plan.")).toContain("separate service");
+    expect(delivered("Pro is $99/month; the AI Call Assistant is a separate service from $249/mo, with or without a plan.")).toContain("separate service");
     expect(delivered("Extra numbers are $5/month each on any Call Assistant tier, and the first 500 spam calls each month never count.")).toContain("$5/month");
     expect(withCents([5000])("Extra numbers are $5/month or $50/year each on any Call Assistant tier.")).toMatchObject({ ok: true });
     expect(delivered("Above 5,000 minutes a month, talk to a sales rep: anything priced at $1,000 or more is never quoted here.")).toContain("sales rep");
-    expect(delivered("Click Guard checks your listing every 15 minutes on Pro, and Pro is $79/month.")).toContain("15 minutes");
+    expect(delivered("Click Guard checks your listing every 15 minutes on Pro, and Pro is $99/month.")).toContain("15 minutes");
   });
 
   it("the service's context carries across lines and blank lines under its heading, until another heading; the extra number's amount and the dash form (Codex audits #2, #3)", () => {
@@ -624,8 +626,8 @@ describe("owner 2026-10-08: the AI Call Assistant is a separate service — new 
     blocked("There is one active customer on the platform.", "O10");
     blocked("A single happy member signed up.", "O10");
     // Another heading ends the section: Pro's price under its own heading is Pro's.
-    expect(delivered("**AI Call Assistant**\n\nFrom $249/mo, a separate service.\n\n**Pro**\n\n$79/month, or $790/year.")).toContain("$79/month");
-    expect(delivered("### Call Assistant\n\n500 minutes for $249/month.\n\nPlans:\n\nStarter is $29/month.")).toContain("Starter is $29/month");
+    expect(delivered("**AI Call Assistant**\n\nFrom $249/mo, a separate service.\n\n**Pro**\n\n$99/month, or $990/year.")).toContain("$99/month");
+    expect(delivered("### Call Assistant\n\n500 minutes for $249/month.\n\nPlans:\n\nSolo is $29/month.")).toContain("Solo is $29/month");
     expect(delivered("**AI Call Assistant**\n\nExtra numbers are $5/month each, and minutes above the tier are $0.50 a minute.")).toContain("$5/month");
     expect(delivered("Each seat is one user, and a team member can be one extra seat for $15/month.")).toContain("one extra seat");
     expect(delivered("One contractor account can run several locations on Agency.")).toContain("One contractor");
@@ -645,8 +647,8 @@ describe("owner 2026-10-08: the AI Call Assistant is a separate service — new 
     // Codex #6: naming a plan somewhere in the sentence exempts nothing — the amount is bound to the clause it sits in.
     blocked("The Call Assistant works with Pro and costs $79/month.", "O9");
     blocked("With Growth, the AI Call Assistant is $199 a month.", "O9");
-    expect(delivered("Pro is $79/month; the Call Assistant is a separate service from $249/month.")).toContain("$249/month");
-    expect(delivered("The Call Assistant costs $249/month and works with Pro ($79/month).")).toContain("$79/month");
+    expect(delivered("Pro is $99/month; the Call Assistant is a separate service from $249/month.")).toContain("$249/month");
+    expect(delivered("The Call Assistant costs $249/month and works with Pro ($99/month).")).toContain("$99/month");
     // Codex #7: the same for the CRM, the add-ons and the extra number — no sentence-wide exemption; each amount is
     // bound to the product clause it sits in, occurrence by occurrence.
     blocked("The Call Assistant works with CRM and costs $39/month.", "O9");
@@ -655,11 +657,11 @@ describe("owner 2026-10-08: the AI Call Assistant is a separate service — new 
     blocked("The Call Assistant includes extra numbers and costs $5/month.", "O9");
     blocked("The CRM is $39/month and the Call Assistant costs $39/month.", "O9");
     expect(delivered("The CRM is $39/month; the Call Assistant is a separate service from $249/month.")).toContain("$39/month");
-    expect(withCents([79000])("Pro is $79/month or $790/year; the Call Assistant is a separate service from $249/month.")).toMatchObject({ ok: true });
+    expect(withCents([99000])("Pro is $99/month or $990/year; the Call Assistant is a separate service from $249/month.")).toMatchObject({ ok: true });
     expect(withCents([1900])("The Call Assistant is a separate service; extra locations are $19/month on your plan.")).toMatchObject({ ok: true });
     expect(delivered("1. The AI Call Assistant: from $249/mo, no plan needed.")).toContain("$249/mo");
     // Another product named ends the carry: the next paragraph is about Pro.
-    expect(delivered("The Call Assistant answers your calls.\n\nPro is $79/month, and it includes Click Guard.")).toContain("Pro is $79/month");
+    expect(delivered("The Call Assistant answers your calls.\n\nPro is $99/month, and it includes Click Guard.")).toContain("Pro is $99/month");
     expect(delivered("The Call Assistant answers your calls.\n\nThe CRM is a separate product with its own plans.")).toContain("separate product");
   });
 

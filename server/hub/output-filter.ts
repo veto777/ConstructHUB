@@ -137,8 +137,11 @@ const TRIAL_LENGTHS: RegExp[] = [
 /** Owner-maintained: things ConstructHUB does not sell. Blocked unless negated in the same sentence. */
 export const NOT_SOLD: RegExp[] = [
   /\bwhite[- ]label(ed|ing)? (reseller|resale|program|platform|app|version|product|dashboard|crm|software)\b/i,
-  /\bresell(er|ing)? (program|plan|rights)\b/i, /\b(iphone|android|ios|mobile|native) (apps?|applications?)\b/i, /\bpublic api\b/i,
-  /\bapi access\b/i, /\bzapier\b/i, /\baffiliate program\b/i, /\bpartner program\b/i, /\b(phone|live chat|24\/7) support\b/i,
+  /\bresell(er|ing)? (program|plan|rights)\b/i, /\b(iphone|android|ios|mobile|native) (apps?|applications?)\b/i,
+  // The Public API IS sold since the 2026-10-09 ladder (Pro and up, apiUnitsPerMonth) — the
+  // old "no public api / no api access" entries went with it. Affirmative iPhone-app claims
+  // still block on the mobile rule above.
+  /\bzapier\b/i, /\baffiliate program\b/i, /\bpartner program\b/i, /\b(phone|live chat|24\/7) support\b/i,
   // Owner, 2026-10-08: the SEO tools come with the Agency plan only; nothing SEO is sold à la carte and no such price exists.
   // (\b does not see "à" as a word character, so the boundary is written out.)
   /\bseo (add-?ons?|addon)\b/i, /\b(rank[- ]?track\w*|keyword[- ]research|backlinks?) (add-?ons?|addon)\b/i, /(?:^|[^\p{L}])[àa][ -]la[ -]carte(?![\p{L}])/iu,
@@ -335,7 +338,7 @@ const BOUND_AFTER = new RegExp(String.raw`${AMOUNT}\s*${UNIT}?\s*(?:for|on) (?:t
 /** "Starter and Pro are both $29/month": one price for several plans is always wrong (no two plans cost the same). */
 const BOTH_ALL = /\b(both|all( of them| three| four)?)\b[^.$]{0,25}\$|\$[^.]{0,25}\b(both|all)\b|\b(are|cost|costs|run|priced at) (both|all)\b/i;
 /** The sentence is about an add-on, a location band, the texting setup fee or reinstatement. */
-const ADDON_CUE = /\b(add-?ons?|addon|extra (agency |crm )?(locations?|seats?|protected websites?|websites?)|additional (locations?|seats?|websites?)|per[- ]location|each (additional |extra )?location|for locations|locations? (above|over|\d)|texting number|texts|setup fee|one-time|scan pack|competitor scans?|per seat|protected websites?|reinstatement|per project|bands?|call assistant|call minutes?|per minute|extra .{0,30}number|seo data|data credit)\b/i;
+const ADDON_CUE = /\b(add-?ons?|addon|extra (agency |crm |team )?(locations?|seats?|protected websites?|websites?)|additional (locations?|seats?|websites?)|per[- ]location|each (additional |extra )?location|for locations|locations? (above|over|\d)|texting number|texts|setup fee|one-time|scan pack|competitor scans?|per seat|protected websites?|reinstatement|per project|bands?|call assistant|call minutes?|per minute|extra .{0,30}number|seo data|data credit)\b/i;
 /** Add-on, band and service amounts (never a plan's own price), the Call Assistant's tiers, extra number and overage among them. */
 const ADDON_CENTS: ReadonlySet<number> = (() => {
   const cents = new Set<number>([GBP_REINSTATEMENT_CENTS]);
@@ -718,9 +721,14 @@ function checkContent(linkless: string, opts: FilterOptions, book: KnowledgeBook
   // O10 — commercial claims. "Unlimited" is a sold plan name on the 2026-10-09
   // ladder (shared/plans.ts), never a claim: mask capitalized name mentions
   // (bare, or with "the/to/on/with" before it, or "plan/tier" after) so the
-  // sweep never reads the name as an "unlimited" promise. Lowercase "unlimited"
-  // and every other claim stay blocked.
-  const commercialText = linkless.replace(/\b(?:the |to |on |with |from )?Unlimited(?: plan| tier)?\b/g, "Top plan");
+  // sweep never reads the name as an "unlimited" promise. The plan's own
+  // tagline words the name in lowercase ("the only unlimited plan on the
+  // market") and the pack and the preset answers quote it verbatim, so the
+  // lowercase name next to "plan"/"tier" is masked too. Lowercase "unlimited"
+  // anywhere else ("unlimited locations") stays a blocked claim.
+  const commercialText = linkless
+    .replace(/\b(?:the |to |on |with |from )?Unlimited(?: plan| tier)?\b/g, "Top plan")
+    .replace(/\bunlimited (?:plan|tier)\b/g, "Top plan");
   for (const re of COMMERCIAL) if (re.test(commercialText)) block("O10");
   for (const m of linkless.matchAll(/\bfree (plan|tier|version|forever|month)/gi)) {
     const before = linkless.slice(0, m.index!).split(/\s+/).filter(Boolean).slice(-4).join(" ");

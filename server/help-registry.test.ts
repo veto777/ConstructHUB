@@ -8,7 +8,7 @@ import { createHash } from "crypto";
 import { indexes } from "../scripts/tutorials/gen-index";
 import { HELP_GROUPS as GROUPS } from "@shared/help/types";
 import { isKnownPath } from "@shared/app-routes";
-import { PLANS, PLAN_KEYS } from "@shared/plans";
+import { PLANS, PLAN_KEYS, planForModule } from "@shared/plans";
 import { VOICE_PERSONAS, VOICE_PERSONA_IDS } from "@shared/voice-personas";
 
 /**
@@ -232,9 +232,10 @@ describe("help registry", () => {
     const names = PLAN_KEYS.map((k) => PLANS[k].name).join("|");
     expect(src).not.toMatch(new RegExp(`\\b(${names}) plans?\\b`));
     expect(src).not.toMatch(/\$\d/);
-    // …and they resolve to real text.
+    // …and they resolve to real text: the module's plan is named from the plan model
+    // (cloudflareSearchConsole starts at Pro on the 2026-10-09 ladder).
     const cf = helpEntry("cloudflare")!;
-    expect(cf.needs!.join(" ")).toContain(`${PLANS.agency.name} plan`);
+    expect(cf.needs!.join(" ")).toContain(`${PLANS[planForModule("cloudflareSearchConsole")].name} plan`);
     expect(helpEntry("search-console")!.needs!.join(" ")).toContain("Cloudflare + Search Console");
   });
 
