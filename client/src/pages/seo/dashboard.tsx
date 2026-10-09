@@ -8,13 +8,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Area, AreaChart, ResponsiveContainer } from "recharts";
-import { Loader2, RefreshCw, Star } from "lucide-react";
+import { BarChart3, CheckCircle2, Circle, Loader2, RefreshCw, ScanSearch, Star, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { holdNote } from "./shell";
 import { api, canAfford, Empty, fmtDate, fmtNum, money, SeoShell, useSelectedSite, useSeoSites, useSeoStatus, type SeoSite } from "./shell";
+import { compact, DeltaBadge, DistributionBar, GradientSpark, MetricColumn, monthLabel, PALETTE, ScoreBadge, StatTile, TrendPanel } from "./viz";
 
 type SortKey = "added" | "name" | "traffic" | "authority" | "top10" | "tasks" | "health";
 const SORTS: [SortKey, string][] = [["added", "As added"], ["name", "Name"], ["traffic", "Most search traffic"], ["authority", "Highest authority"], ["top10", "Most keywords in the top 10"], ["tasks", "Most open tasks"], ["health", "Lowest site health first"]];
@@ -34,41 +34,8 @@ type Card = {
   } | null;
 };
 
-const compact = (n: number | null | undefined) =>
-  n == null ? "—" : Math.abs(n) >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : Math.abs(n) >= 10_000 ? `${(n / 1000).toFixed(1)}K` : Math.round(n).toLocaleString("en-US");
-
-/** Change from the first to the last point of a series: "+580" / "−24". */
-function Delta({ series }: { series: number[] | undefined }) {
-  if (!series || series.length < 2) return null;
-  const d = Math.round(series[series.length - 1] - series[0]);
-  if (!d) return null;
-  return <span className={`g-move ${d > 0 ? "g-move--up" : "g-move--down"} ml-1`} aria-label={`${d > 0 ? "Up" : "Down"} ${Math.abs(d)} over the period`}>{d > 0 ? "+" : "−"}{compact(Math.abs(d))}</span>;
-}
-
-function Spark({ data, color }: { data: number[] | undefined; color: string }) {
-  if (!data || data.length < 2) return <div className="h-10" />;
-  return (
-    <div className="h-10" aria-hidden>
-      <ResponsiveContainer>
-        <AreaChart data={data.map((v, i) => ({ i, v }))} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
-          <Area type="monotone" dataKey="v" stroke={color} fill={color} fillOpacity={0.15} strokeWidth={1.5} isAnimationActive={false} />
-        </AreaChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
-function Metric({ label, value, delta, spark, hint, testId }: { label: string; value: string; delta?: React.ReactNode; spark?: React.ReactNode; hint?: string; testId?: string }) {
-  return (
-    <div className="min-w-0" data-testid={testId}>
-      <div className="g-text-2 text-[12px]">{label}</div>
-      <div className="g-text text-[24px] leading-8 tabular-nums">{value}{delta}</div>
-      {spark}
-      {hint && <div className="g-text-2 text-[12px]">{hint}</div>}
-    </div>
-  );
-}
-
+/** A series' change from its first to its last point (null when there is no series to speak of). */
+const change = (xs: (number | null | undefined)[] | undefined) => { const v = (xs ?? []).filter((x): x is number => typeof x === "number"); return v.length > 1 ? v[v.length - 1] - v[0] : null; };
 /** One crawl's health; readable false = the crawl could not be read (score not known). pages = what the score is out of. */
 type HealthPoint = { jobId: string; at: string | null; readable: boolean; health: number | null; pages: number | null; errorPages: number | null; pageCap: number | null };
 const healthWords = (p: HealthPoint) => (!p.readable ? "could not be read" : p.health === null ? "no page scored" : `health ${p.health}, ${fmtNum(p.errorPages ?? 0)} of ${fmtNum(p.pages ?? 0)} pages with errors`);
@@ -91,16 +58,34 @@ function HealthTile({ audit, siteId }: { audit: Card["audit"]; siteId: number })
       + (prev && move === null ? " · the crawl before has no score" : "")
       + (sizesDiffer ? ` · the crawl before scored ${fmtNum(prev!.pages ?? 0)} pages${prev!.pageCap !== audit.pageCap ? ` (limit ${fmtNum(prev!.pageCap ?? 0)}, now ${fmtNum(audit.pageCap ?? 0)})` : ""} — a move can come from crawling different pages, not only from fixes` : "");
   return (
-    <div className="min-w-0">
-      <Metric label="Site health" value={audit?.health == null ? "—" : String(audit.health)} testId={`metric-health-${siteId}`}
-        delta={move ? <span className={`g-move ${move > 0 ? "g-move--up" : "g-move--down"} ml-1`} aria-label={`${move > 0 ? "Up" : "Down"} ${Math.abs(move)} since the crawl before`}>{move > 0 ? "+" : "−"}{Math.abs(move)}</span> : null}
-        spark={<Spark data={trend.filter((t) => t.health !== null).length === trend.length ? trend.map((t) => t.health as number) : undefined} color="#1e8e3e" />} hint={hint} />
+    <MetricColumn label="Health score" testId={`metric-health-${siteId}`}
+      value={<ScoreBadge value={audit?.health ?? null} label={audit?.health == null ? "No health score" : `Site health ${audit.health} out of 100`} />}
+      delta={move ? <DeltaBadge value={move} label={`${move > 0 ? "Up" : "Down"} ${Math.abs(move)} since the crawl before`} /> : null}
+      foot={hint}>
       {trend.length > 1 && (
         <details className="mt-1 text-[12px]" data-testid={`health-history-${siteId}`}>
           <summary className="g-link cursor-pointer">Last {trend.length} crawls</summary>
           <ul className="g-text-2 mt-1 space-y-0.5">{trend.slice().reverse().map((t) => <li key={t.jobId}>{fmtDate(t.at)}: {healthWords(t)}</li>)}</ul>
         </details>
       )}
+    </MetricColumn>
+  );
+}
+
+/** One step of filling a site's card: numbered, with its icon, what it gives, and whether it is done. */
+function StartStep({ n, done, icon, color, title, text, children }: { n: number; done: boolean; icon: React.ReactNode; color: string; title: string; text: string; children: React.ReactNode }) {
+  return (
+    <div className="relative flex min-w-0 flex-col gap-2 overflow-hidden rounded-xl border p-4" style={{ borderColor: "var(--g-divider)", background: "var(--g-surface)" }}>
+      <div className="flex items-center gap-2">
+        <span className="grid h-9 w-9 place-items-center rounded-lg" style={{ color, background: `color-mix(in srgb, ${color} 14%, transparent)` }} aria-hidden>{icon}</span>
+        <span className="g-text-2 text-[11px] font-medium uppercase tracking-wide">Step {n}</span>
+        <span className="ml-auto inline-flex items-center gap-1 text-[12px] font-medium" style={{ color: done ? "var(--g-green)" : "var(--g-text-2)" }}>
+          {done ? <CheckCircle2 className="h-4 w-4" aria-hidden /> : <Circle className="h-4 w-4" aria-hidden />}{done ? "Done" : "Not yet"}
+        </span>
+      </div>
+      <h3 className="text-[15px] font-semibold" style={{ color: "var(--g-blue)" }}>{title}</h3>
+      <p className="g-text-2 text-[13px] leading-5">{text}</p>
+      <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">{children}</div>
     </div>
   );
 }
@@ -207,18 +192,34 @@ export default function SeoDashboardPage() {
         </p>
       )}
       <datalist id="seo-groups">{groups.map(([k, g]) => <option key={k} value={g} />)}</datalist>
+      {shownCards.length >= 2 && (() => {
+        // Totals across the sites shown, each from the sites that have the figure (and saying how many those are).
+        const scored = shownCards.filter((c) => c.audit?.health != null), analysed = shownCards.filter((c) => c.report?.organicTraffic != null);
+        const avgHealth = scored.length ? Math.round(scored.reduce((n, c) => n + (c.audit!.health as number), 0) / scored.length) : null;
+        return (
+          <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="seo-portfolio">
+            <StatTile label="Sites" color={PALETTE.domains} value={fmtNum(shownCards.length)} foot={`${fmtNum(analysed.length)} analysed · ${fmtNum(scored.length)} crawled`} />
+            <StatTile label="Average site health" color={PALETTE.health} value={<ScoreBadge value={avgHealth} />} foot={scored.length ? `Of the ${fmtNum(scored.length)} site${scored.length === 1 ? "" : "s"} with a crawl` : "No site crawled yet"} />
+            <StatTile label="Tracked keywords" color={PALETTE.tracked} value={fmtNum(totals.keywords)} foot={totals.checked ? `${fmtNum(totals.top10)} in the top 10 in the newest checks` : "No check saved yet"} />
+            <StatTile label="Organic traffic (estimate)" color={PALETTE.traffic} value={analysed.length ? compact(analysed.reduce((n, c) => n + (c.report!.organicTraffic as number), 0)) : "—"} foot={analysed.length ? `Visits a month, ${fmtNum(analysed.length)} analysed site${analysed.length === 1 ? "" : "s"} added up` : "No site analysed yet"} />
+          </div>
+        );
+      })()}
       <div className="space-y-4" data-testid="seo-dashboard">
         {activeGroup !== "all" && shownCards.length === 0 && <Empty testId="seo-dashboard-group-empty"><h3>No sites here</h3><p>Choose another group above, or <button type="button" className="g-link" onClick={() => chooseGroup("all")}>show all sites</button>.</p></Empty>}
         {shownCards.map(({ site: s, rank, report: r, audit, openTasks }) => {
           const busy = analyse.isPending && analyse.variables === s.domain;
           return (
-            <section key={s.id} className="rounded-lg border p-4" style={{ borderColor: "var(--g-divider)", background: "var(--g-surface)" }} data-testid={`card-site-${s.id}`}>
-              <div className="mb-3 flex flex-wrap items-center gap-2">
+            <section key={s.id} className="rounded-xl border p-3 shadow-sm sm:p-5" style={{ borderColor: "var(--g-divider)", background: "var(--g-surface)" }} data-testid={`card-site-${s.id}`}>
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[16px] font-semibold uppercase" style={{ color: "var(--g-blue)", background: "var(--g-accent-soft)" }} aria-hidden>{s.domain.replace(/^www\./, "")[0]}</span>
                 <button type="button" className="rounded p-1" aria-pressed={!!s.starred} aria-label={s.starred ? `Remove the star from ${s.domain}` : `Star ${s.domain} to keep it on top`} title={s.starred ? "Starred — stays on top" : "Star to keep on top"} disabled={star.isPending} onClick={() => star.mutate({ id: s.id, starred: !s.starred })} data-testid={`button-star-${s.id}`}>
                   <Star className="h-4 w-4" style={s.starred ? { fill: "#f9ab00", color: "#f9ab00" } : { color: "var(--g-text-2)" }} aria-hidden />
                 </button>
-                <h2 className="g-text text-[18px] font-medium"><Link href={`/seo/explorer?domain=${encodeURIComponent(s.domain)}`} className="g-link">{s.domain}</Link></h2>
-                <span className="g-text-2 text-[12px]">{r ? `analysed ${fmtDate(r.fetchedAt)}` : "not analysed yet"}</span>
+                <div className="min-w-0">
+                  <h2 className="g-text text-[18px] font-semibold leading-6 [overflow-wrap:anywhere]"><Link href={`/seo/explorer?domain=${encodeURIComponent(s.domain)}`} className="g-link">{s.domain}</Link></h2>
+                  <span className="g-text-2 text-[12px]">{r ? `analysed ${fmtDate(r.fetchedAt)}` : "not analysed yet"}</span>
+                </div>
                 {editing === s.id ? (
                   <form className="flex w-full min-w-0 flex-wrap items-center gap-1 sm:w-auto" onSubmit={(e) => { e.preventDefault(); setSiteGroup.mutate({ id: s.id, group: groupDraft.trim() || null }); }} data-testid={`form-group-${s.id}`}>
                     <label className="sr-only" htmlFor={`group-${s.id}`}>Group for {s.domain}</label>
@@ -240,21 +241,55 @@ export default function SeoDashboardPage() {
                 </div>
               </div>
               {r ? (
-                <div className="grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-4 xl:grid-cols-7">
-                  <Metric label="Authority" value={r.authority == null ? "—" : String(r.authority)} delta={<Delta series={r.linkHistory?.map((h) => h.authority ?? 0)} />} spark={<Spark data={r.linkHistory?.map((h) => h.authority ?? 0)} color="#673ab7" />} testId={`metric-authority-${s.id}`} />
-                  <Metric label="Referring domains" value={compact(r.referringDomains)} delta={<Delta series={r.linkHistory?.map((h) => h.referringDomains)} />} spark={<Spark data={r.linkHistory?.map((h) => h.referringDomains)} color="#1a73e8" />} />
-                  <Metric label="Backlinks" value={compact(r.backlinks)} />
-                  <Metric label="Organic traffic (estimate)" value={compact(r.organicTraffic)} delta={<Delta series={r.history?.map((h) => h.traffic)} />} spark={<Spark data={r.history?.map((h) => h.traffic)} color="#e8710a" />} hint={`Visits a month, estimated from rankings${r.trafficValue != null ? ` · worth $${Math.round(r.trafficValue).toLocaleString("en-US")} / mo as ads` : ""}`} />
-                  <Metric label="Organic keywords" value={compact(r.organicKeywords)} delta={<Delta series={r.history?.map((h) => h.keywords)} />} spark={<Spark data={r.history?.map((h) => h.keywords)} color="#e8710a" />} hint={r.top10 != null ? `${fmtNum(r.top3)} in top 3 · ${fmtNum(r.top10)} in top 10` : undefined} />
-                  <HealthTile audit={audit} siteId={s.id} />
-                  <Metric label="Tracked keywords" value={fmtNum(s.keywordCount)} hint={rank.checked ? `${rank.top3} in top 3 · ${rank.top10} in top 10${rank.device ? ` on ${rank.device}` : ""} · ${rank.firstOn && rank.firstOn !== rank.checkedOn ? `checked ${fmtDate(rank.firstOn)} to ${fmtDate(rank.checkedOn)}` : `checked ${fmtDate(rank.checkedOn)}`}` : s.keywordCount ? `No check saved yet${s.nextRankCheckAt ? ` — the first automatic check is due ${fmtDate(s.nextRankCheckAt)}` : ""}; it is skipped while this month's included data is used up` : "None yet — add some in Rank tracker"} testId={`metric-tracked-${s.id}`} />
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-6 border-t pt-4 md:grid-cols-3 xl:grid-cols-6" style={{ borderColor: "var(--g-divider)" }}>
+                    <div className="min-w-0 border-[color:var(--g-divider)] px-1 sm:px-3 xl:[&:not(:first-child)]:border-l"><HealthTile audit={audit} siteId={s.id} /></div>
+                    <div className="min-w-0 border-[color:var(--g-divider)] px-1 sm:px-3 xl:[&:not(:first-child)]:border-l"><MetricColumn label="Authority" testId={`metric-authority-${s.id}`} value={r.authority == null ? "—" : String(r.authority)}
+                      delta={<DeltaBadge value={change(r.linkHistory?.map((h) => h.authority))} label="Change over the months shown" />}
+                      foot="0–100, from the sites linking to it"
+                      chart={<GradientSpark range height={48} points={r.linkHistory?.filter((h) => h.authority != null).map((h) => ({ label: monthLabel(h.month), value: h.authority as number }))} color={PALETTE.authority} />} /></div>
+                    <div className="min-w-0 border-[color:var(--g-divider)] px-1 sm:px-3 xl:[&:not(:first-child)]:border-l"><MetricColumn label="Referring domains" value={compact(r.referringDomains)}
+                      delta={<DeltaBadge value={change(r.linkHistory?.map((h) => h.referringDomains))} label="Change over the months shown" />}
+                      foot={`${compact(r.backlinks)} backlinks`}
+                      chart={<GradientSpark range height={48} points={r.linkHistory?.map((h) => ({ label: monthLabel(h.month), value: h.referringDomains }))} color={PALETTE.domains} />} /></div>
+                    <div className="min-w-0 border-[color:var(--g-divider)] px-1 sm:px-3 xl:[&:not(:first-child)]:border-l"><MetricColumn label="Organic traffic (est.)" value={compact(r.organicTraffic)}
+                      delta={<DeltaBadge value={change(r.history?.map((h) => h.traffic))} label="Change over the months shown" />}
+                      foot={`Visits a month, estimated from rankings${r.trafficValue != null ? ` · value $${Math.round(r.trafficValue).toLocaleString("en-US")} / mo` : ""}`}
+                      chart={<GradientSpark range height={48} points={r.history?.map((h) => ({ label: monthLabel(h.month), value: h.traffic }))} color={PALETTE.traffic} />} /></div>
+                    <div className="min-w-0 border-[color:var(--g-divider)] px-1 sm:px-3 xl:[&:not(:first-child)]:border-l"><MetricColumn label="Organic keywords" value={compact(r.organicKeywords)}
+                      delta={<DeltaBadge value={change(r.history?.map((h) => h.keywords))} label="Change over the months shown" />}
+                      chart={<GradientSpark range height={48} points={r.history?.map((h) => ({ label: monthLabel(h.month), value: h.keywords }))} color={PALETTE.keywords} />}>
+                      {r.top10 != null && r.top3 != null && r.organicKeywords != null && <div className="mt-1.5"><DistributionBar parts={[{ label: "Top 3", value: r.top3, color: PALETTE.top3 }, { label: "4–10", value: Math.max(0, r.top10 - r.top3), color: PALETTE.top10 }, { label: "11+", value: Math.max(0, r.organicKeywords - r.top10), color: PALETTE.rest }]} /></div>}
+                    </MetricColumn></div>
+                    <div className="min-w-0 border-[color:var(--g-divider)] px-1 sm:px-3 xl:[&:not(:first-child)]:border-l"><MetricColumn label="Tracked keywords" testId={`metric-tracked-${s.id}`} value={fmtNum(s.keywordCount)}
+                      foot={rank.checked ? `${rank.device ? `On ${rank.device}` : "Newest checks"} · ${rank.firstOn && rank.firstOn !== rank.checkedOn ? `checked ${fmtDate(rank.firstOn)} to ${fmtDate(rank.checkedOn)}` : `checked ${fmtDate(rank.checkedOn)}`}` : s.keywordCount ? `No check saved yet${s.nextRankCheckAt ? ` — the first automatic check is due ${fmtDate(s.nextRankCheckAt)}` : ""}; it is skipped while this month's included data is used up` : "None yet"}>
+                      {rank.checked > 0 ? <div className="mt-1.5"><DistributionBar parts={[{ label: "Top 3", value: rank.top3, color: PALETTE.top3 }, { label: "4–10", value: Math.max(0, rank.top10 - rank.top3), color: PALETTE.top10 }, { label: "Below 10 or not found", value: Math.max(0, rank.checked - rank.top10), color: PALETTE.rest }]} /></div>
+                        : !s.keywordCount && <Link href="/seo/rank-tracker" className="g-pill g-pill--sm mt-2 self-start" onClick={() => onSite(s.id)}>Add keywords</Link>}
+                    </MetricColumn></div>
+                  </div>
+                  <TrendPanel title="Over time" testId={`trend-${s.id}`} note="Monthly. Traffic and keywords are estimates from the keyword database; referring domains and authority come from the backlink index."
+                    series={[
+                      { key: "traffic", label: "Organic traffic (estimate)", color: PALETTE.traffic, points: (r.history ?? []).map((h) => ({ label: monthLabel(h.month), value: h.traffic })) },
+                      { key: "keywords", label: "Organic keywords", color: PALETTE.keywords, points: (r.history ?? []).map((h) => ({ label: monthLabel(h.month), value: h.keywords })) },
+                      { key: "domains", label: "Referring domains", color: PALETTE.domains, points: (r.linkHistory ?? []).map((h) => ({ label: monthLabel(h.month), value: h.referringDomains })) },
+                      { key: "authority", label: "Authority", color: PALETTE.authority, points: (r.linkHistory ?? []).filter((h) => h.authority != null).map((h) => ({ label: monthLabel(h.month), value: h.authority as number })) },
+                    ]} />
                 </div>
               ) : (
-                <div className="flex flex-wrap items-center gap-3">
-                  {audit && <div className="w-full max-w-[14rem]"><HealthTile audit={audit} siteId={s.id} /></div>}
-                  <p className="g-text-2 text-[14px]">No search numbers for this site yet. <b className="g-text font-medium">Analyse</b> builds its report: authority, backlinks, estimated search traffic, keywords and competitors.</p>
-                  <Button size="sm" disabled={busy || !configured || !affordable} onClick={() => analyse.mutate(s.domain)} data-testid={`button-analyse-empty-${s.id}`}>{busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}Analyse — about {price}</Button>
-                  <span className="g-text-2 text-[13px]">Tracked keywords: {fmtNum(s.keywordCount)}</span>
+                <div className="grid gap-3 md:grid-cols-3" data-testid={`start-${s.id}`}>
+                  {/* Three steps to fill this card; each says whether it is done. Nothing here is a figure until a step has run. */}
+                  <StartStep n={1} done={false} icon={<BarChart3 className="h-5 w-5" />} color={PALETTE.traffic} title="Analyse the site"
+                    text="Authority, backlinks, estimated search traffic, keywords and competitors — with two years of monthly history.">
+                    <Button size="sm" disabled={busy || !configured || !affordable} onClick={() => analyse.mutate(s.domain)} data-testid={`button-analyse-empty-${s.id}`}>{busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}Analyse — about {price}</Button>
+                  </StartStep>
+                  <StartStep n={2} done={(s.keywordCount ?? 0) > 0} icon={<Target className="h-5 w-5" />} color={PALETTE.traffic} title="Track your keywords"
+                    text={(s.keywordCount ?? 0) > 0 ? `${fmtNum(s.keywordCount)} tracked — checked every week by default.` : "Your services and towns: where the site is found in Google and the map pack, every week."}>
+                    <Link href="/seo/rank-tracker" className="g-pill g-pill--sm" onClick={() => onSite(s.id)}>Open Rank tracker</Link>
+                  </StartStep>
+                  <StartStep n={3} done={!!audit} icon={<ScanSearch className="h-5 w-5" />} color={PALETTE.traffic} title="Crawl the site"
+                    text={audit ? "Crawled — the health score and its issues are in Site audit." : "Broken pages, redirects, titles, speed and what a crawler can read."}>
+                    {audit ? <div className="w-full border-t pt-2" style={{ borderColor: "var(--g-divider)" }}><HealthTile audit={audit} siteId={s.id} /></div> : <Link href="/seo/audit" className="g-pill g-pill--sm" onClick={() => onSite(s.id)}>Open Site audit</Link>}
+                  </StartStep>
                 </div>
               )}
             </section>
