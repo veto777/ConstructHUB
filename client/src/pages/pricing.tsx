@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import {
   PLANS, PLAN_KEYS, ADDONS, TRIAL_DAYS, CALL_ASSISTANT_NAME, isCallAssistantAddon,
+  isComingFeature, FEATURE_BULLET_MODULE,
   type AddonKey, type BillingInterval, type PlanKey,
 } from "@shared/plans";
 import {
@@ -477,7 +478,15 @@ export default function PricingPage() {
                           {plan.features.map((feature) => (
                             <li key={feature} className="flex items-start gap-2.5 text-[14px] leading-snug text-mkt-ink">
                               <Check className="w-4 h-4 shrink-0 mt-0.5 text-mkt-orange-ink" />
-                              <span>{feature}</span>
+                              {/* A bullet whose module is in COMING_MODULES is promised but not built — badge it, the way the comparison table marks it "Coming" (shared/plans.ts isComingFeature). */}
+                              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+                                <span>{feature}</span>
+                                {isComingFeature(feature) && (
+                                  <Badge variant="outline" data-testid={`badge-coming-${FEATURE_BULLET_MODULE[feature]}`} className="font-sans text-[10px] rounded-full border-mkt-orange text-mkt-orange-ink">
+                                    Coming soon
+                                  </Badge>
+                                )}
+                              </div>
                             </li>
                           ))}
                           <li className="pt-3 text-[11.5px] font-bold uppercase tracking-[0.12em] text-mkt-muted">Not included</li>
@@ -650,7 +659,8 @@ export default function PricingPage() {
         price: planRequestPrice(review),
         note: `A new account's first plan starts with the ${TRIAL_DAYS}-day trial. The CRM is a separate product and is not part of this plan.`,
         highlight: reviewFoundingOpen && foundingOpen ? FOUNDING_OFFER_LINE : undefined,
-        included: PLANS[review.plan].features,
+        // Coming-soon bullets are flagged line by line so the review can badge them before the card is charged (shared/plans.ts isComingFeature).
+        included: PLANS[review.plan].features.map((text) => ({ text, comingSoon: isComingFeature(text) })),
         notIncluded: PLANS[review.plan].notIncluded,
       } : null}
       pending={checkoutMutation.isPending}

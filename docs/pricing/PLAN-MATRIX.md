@@ -38,15 +38,15 @@ Money is in US dollars. Yearly platform billing is 10× the monthly price (two m
 | Public API (units / month) | ❌ | ❌ | 50,000 | 250,000 | 🟣 Unlimited |
 | CSV export of every report | ❌ | ❌ | 🕒 Coming | 🕒 Coming | 🕒 Coming |
 | Scan & ranking history 🕒<br><sup>Retention is not enforced yet — nothing is deleted today.</sup> | 90 days | 90 days | 12 months | 🟣 Unlimited | 🟣 Unlimited |
-| Scheduled client email reports | ❌ | ❌ | ❌ | 🕒 Coming | 🕒 Coming |
+| Scheduled client email reports | ❌ | ❌ | ❌ | ✅ | ✅ |
 | SEO suite: rank tracker, explorer, keywords, backlinks | Add-on from $29 | Add-on from $29 | Add-on from $29 | 250 keywords + $10 data/mo | 5,000 keywords + $60 data/mo |
 | Weekly scheduled grid watches | ❌ | ❌ | ❌ | ✅ | ✅ |
 | White-label reports | ❌ | ❌ | ❌ | ❌ | ✅ |
 | **Hub & extras** |  |  |  |  |  |
 | Gabe questions / month | 100 | 300 | 1,000 | 3,000 | 🟣 Unlimited |
-| Master Class course ($2,499) | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Master Class course | ❌ | ❌ | ❌ | ❌ | ✅ |
 | GBP reinstatement help / project | $599 | $599 | $599 | $599 | $299.50 — half price |
-| Two seats on every new product we launch | ❌ | ❌ | ❌ | ❌ | 2 seats (Call Assistant minutes excluded) |
+| Two seats on every new product we launch | ❌ | ❌ | ❌ | ❌ | 2 seats |
 | Support | Email support | Email support | Priority email support | Priority support with a phone callback | Named support contact, onboarding call, first access to new features |
 
 ## CRM (Customer Relations Management) — a separate product

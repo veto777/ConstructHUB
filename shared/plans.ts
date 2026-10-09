@@ -156,7 +156,7 @@ export type PlanModules = {
   socialPublishing: boolean;
   /** CSV export of every report. COMING: no export exists yet (docs/pricing/README.md). */
   csvExport: boolean;
-  /** Scheduled client email reports. COMING. */
+  /** Scheduled client email reports — LIVE: server/seo/site-report-send.ts, sent by server/seo/jobs.ts. */
   scheduledReports: boolean;
   /** Permit alerts for new filings in a territory. COMING. */
   permitAlerts: boolean;
@@ -167,9 +167,37 @@ export type PlanModules = {
   /** The Master Class course included. */
   masterClass: boolean;
 };
-/** Modules the page lists as "Coming" — promised on the plan, not yet built. Drop a key here the day it ships. */
-export const COMING_MODULES: readonly ModuleKey[] = ["csvExport", "scheduledReports", "permitAlerts"];
+/**
+ * Modules the page lists as "Coming" — promised on the plan, not yet built.
+ * Drop a key here the day it ships. 2026-10-09: scheduledReports left the
+ * list — the scheduled client email report is built and shipping
+ * (server/seo/site-report-send.ts, run by server/seo/jobs.ts; schedules are
+ * saved from the SEO Reports page, server/seo/routes.ts).
+ */
+export const COMING_MODULES: readonly ModuleKey[] = ["csvExport", "permitAlerts"];
 export type ModuleKey = keyof PlanModules;
+
+/**
+ * The module a plan's feature bullet advertises — the ONE hook that carries
+ * COMING_MODULES onto every surface that renders plan bullets (the plan cards
+ * and the checkout purchase review on /pricing). A bullet keyed here wears a
+ * "Coming soon" badge while its module sits in COMING_MODULES; the day the
+ * module ships and leaves COMING_MODULES, every surface updates from this one
+ * map. Keyed by the exact bullet string: a bullet is plain text in
+ * Plan.features, and this map is the typed link between the words and the
+ * module. server/plans-coming-features.test.ts keeps it in sync.
+ */
+export const FEATURE_BULLET_MODULE: Partial<Record<string, ModuleKey>> = {
+  "CSV export of every report": "csvExport",
+  "Scheduled client email reports": "scheduledReports",
+  "Permit alerts for new filings in your territory": "permitAlerts",
+};
+
+/** Does this plan bullet advertise a module that is still in COMING_MODULES? Drives the "Coming soon" badge on the plan cards and the checkout purchase review — one mechanism, derived from COMING_MODULES. */
+export const isComingFeature = (line: string): boolean => {
+  const module = FEATURE_BULLET_MODULE[line];
+  return module != null && COMING_MODULES.includes(module);
+};
 
 export type Plan = {
   key: PlanKey;

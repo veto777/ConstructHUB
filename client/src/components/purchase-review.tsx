@@ -3,13 +3,17 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 
 /**
  * The last step before any plan is paid for (owner, 2026-10-07): say exactly
  * what the buyer is getting and what they are NOT getting, from the price book,
  * and make them confirm it. ConstructHUB and the CRM are two products — nobody
- * should find out which one they bought after the card is charged.
+ * should find out which one they bought after the card is charged. A promised
+ * but not-yet-live feature is flagged line by line and wears a "Coming soon"
+ * badge instead of reading like it works today.
  */
+export type PurchaseReviewFeature = { text: string; comingSoon?: boolean };
 export type PurchaseReview = {
   /** "ConstructHUB Pro" / "CRM Essentials". */
   name: string;
@@ -21,7 +25,8 @@ export type PurchaseReview = {
   note?: string;
   /** One line set apart above the lists (the founding member offer while it is open). */
   highlight?: string;
-  included: readonly string[];
+  /** Plain strings, or lines flagged comingSoon (shared/plans.ts COMING_MODULES) to wear the badge. */
+  included: readonly (string | PurchaseReviewFeature)[];
   notIncluded: readonly string[];
 };
 
@@ -54,11 +59,20 @@ export function PurchaseReviewDialog({ review, pending, confirmLabel = "Continue
               <div data-testid="list-review-included">
                 <p className="font-semibold mb-2">What you get</p>
                 <ul className="space-y-1.5">
-                  {review.included.map((line) => (
-                    <li key={line} className="flex items-start gap-2 leading-snug">
-                      <Check className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" /><span>{line}</span>
-                    </li>
-                  ))}
+                  {review.included.map((item) => {
+                    const line = typeof item === "string" ? { text: item } : item;
+                    return (
+                      <li key={line.text} className="flex items-start gap-2 leading-snug">
+                        <Check className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
+                        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+                          <span>{line.text}</span>
+                          {line.comingSoon && (
+                            <Badge variant="outline" className="rounded-full px-2 text-[10px] font-semibold uppercase tracking-wide">Coming soon</Badge>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
               <div data-testid="list-review-not-included">
