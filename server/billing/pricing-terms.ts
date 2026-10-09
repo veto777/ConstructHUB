@@ -360,11 +360,20 @@ export const FOUNDING_CUTOVER_STATUSES: readonly string[] = [...ACCESS_STATUSES,
  * exists keeps what it has (COALESCE), so running the statement twice could
  * never move a date.
  */
+/**
+ * The start the cutover snapshots by. A row this one-time statement selects
+ * already existed before the deploy, so one with no stored start date (the
+ * column is added without a backfill) was sold on the book before the
+ * five-plan boundary: date it just before that boundary, never at the
+ * cutover's own clock, which would lock today's higher prices.
+ */
+const CUTOVER_START_SQL = `COALESCE(s.start_date::timestamptz, '${FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT}'::timestamptz - interval '1 millisecond')`;
+
 export const SEO_CUTOVER_SQL = `
   INSERT INTO account_pricing_terms (user_id, seo_grandfathered_at, seo_grandfathered_plan, founding_member_at, founding_prices)
   SELECT u.id, $6::timestamptz, s.plan,
          CASE WHEN s.stripe_subscription_id IS NOT NULL AND s.status = ANY($5::text[]) THEN $6::timestamptz END,
-         CASE WHEN s.stripe_subscription_id IS NOT NULL AND s.status = ANY($5::text[]) THEN ${SNAPSHOT_AT_SQL("COALESCE(s.start_date::timestamptz, $6::timestamptz)")} END
+         CASE WHEN s.stripe_subscription_id IS NOT NULL AND s.status = ANY($5::text[]) THEN ${SNAPSHOT_AT_SQL(CUTOVER_START_SQL)} END
     FROM users u
     JOIN LATERAL (SELECT * FROM subscriptions x WHERE x.user_id = u.id ${SUBSCRIPTION_ORDER}) s ON true
    WHERE s.plan = ANY($3::text[])

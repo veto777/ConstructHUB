@@ -401,7 +401,9 @@ describe("boot reconciliation", () => {
     const reconciliation = fakeQ();
     await reconcilePricingTerms(reconciliation);
     expect(cutover.values[0]).toEqual(reconciliation.calls[1].values[0]);
-    expect(cutover.text).toContain(`CASE WHEN COALESCE(s.start_date::timestamptz, $6::timestamptz) < '${FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT}'::timestamptz`);
+    expect(cutover.text).toContain(`CASE WHEN COALESCE(s.start_date::timestamptz, '${FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT}'::timestamptz - interval '1 millisecond') < '${FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT}'::timestamptz`);
+    // An existing subscriber with no stored start date is dated before the boundary: the four-plan book.
+    expect(cutover.text).not.toContain("COALESCE(s.start_date::timestamptz, $6::timestamptz)");
     expect(cutover.text).toContain("THEN $1::jsonb->'legacy' ELSE $1::jsonb->'current' END");
     expect(cutover.text).toContain("founding_prices = COALESCE(account_pricing_terms.founding_prices, EXCLUDED.founding_prices)");
   });
