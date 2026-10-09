@@ -18,7 +18,7 @@
  * plan-comparison-table.tsx and the markdown generator agree on this).
  */
 import {
-  PLANS, PLAN_KEYS, ADDONS, COMING_MODULES, GBP_REINSTATEMENT_CENTS, isUnlimited,
+  PLANS, PLAN_KEYS, ADDONS, COMING_MODULES, GBP_REINSTATEMENT_CENTS, isUnlimited, gridCreditCost,
   type ModuleKey, type Plan, type PlanKey,
 } from "./plans";
 import {
@@ -66,21 +66,43 @@ const count = (v: number): PlanMatrixCell => (v === 0 ? false : isUnlimited(v) ?
 const moduleCell = (p: Plan, m: ModuleKey): PlanMatrixCell =>
   p.modules[m] ? (COMING_MODULES.includes(m) ? { coming: true } : true) : false;
 
-/** The plan's own support line, from its marketing bullets ("Email support", …). Plans above the one that
- *  states support inherit it through their "Everything in …" bullet, so the walk goes down the ladder. */
-const supportCell = (p: Plan): PlanMatrixCell => {
+/**
+ * The plan's effective marketing bullets: its own first, then every cheaper
+ * plan's down the ladder. Each plan's "Everything in …" bullet means it
+ * inherits all the lower plan's features (Team gets Solo's, Pro gets Team's,
+ * …), so a feature test runs against this list — never the plan's own bullets
+ * alone, which is what made Team look like it lacked review alerts and support.
+ */
+const inheritedFeatures = (p: Plan): string[] => {
   const i = PLAN_KEYS.indexOf(p.key);
-  for (let j = i; j >= 0; j--) {
-    const line = PLANS[PLAN_KEYS[j]].features.find((f) => /support/i.test(f));
-    if (line) return line;
-  }
-  return false;
+  return PLAN_KEYS.slice(0, i + 1).reverse().flatMap((k) => PLANS[k].features);
 };
 
-/** The cheapest plan whose own bullets state a feature — higher plans inherit it ("Everything in …"). */
-const statedFrom = (test: (line: string) => boolean): PlanKey => {
-  const from = PLAN_KEYS.find((k) => PLANS[k].features.some(test));
-  return from ?? PLAN_KEYS[PLAN_KEYS.length - 1];
+/** A feature the plan states itself or inherits down the ladder, as a boolean cell. */
+const inheritsFeature = (p: Plan, test: (line: string) => boolean): boolean => inheritedFeatures(p).some(test);
+
+/** The plan's own support line ("Priority email support", …), or the one it inherits — false only if the ladder states none. */
+const supportCell = (p: Plan): PlanMatrixCell => inheritedFeatures(p).find((f) => /support/i.test(f)) ?? false;
+
+/**
+ * Grid scans are metered in ranking-grid CREDITS, not one per scan — a bigger
+ * grid costs more than one credit (shared/plans.ts gridCreditCost: one credit
+ * per 25 grid points). One line, shown under the row in the docs and as the
+ * footnote under the table on /pricing.
+ */
+export const GRID_CREDITS_NOTE = `Grid scans are metered in credits — larger grids use more than one credit (7x7 = ${gridCreditCost(7)}, 9x9 = ${gridCreditCost(9)}).`;
+
+/** The Unlimited bullet behind the "seats on new products" row (there is no PlanLimits number for it). */
+const NEW_PRODUCT_BULLET = PLANS.agency.features.find((f) => /new product/i.test(f)) ?? "";
+// "Two seats on every new product we launch (Call Assistant minutes excluded)" → label + note, never typed here.
+const NEW_PRODUCT_LABEL = NEW_PRODUCT_BULLET.replace(/\s*\([^)]*\)\s*$/, "") || "Seats on every new product we launch";
+const NEW_PRODUCT_NOTE = NEW_PRODUCT_BULLET.match(/\(([^)]*)\)/)?.[1] ?? "";
+const NEW_PRODUCT_CELL = NEW_PRODUCT_NOTE ? `2 seats (${NEW_PRODUCT_NOTE})` : "2 seats";
+
+/** The Unlimited bullet's Master Class price note "($2,499)" — derived, not retyped. */
+const masterClassPriceNote = (): string => {
+  const bullet = PLANS.agency.features.find((f) => /master class/i.test(f)) ?? "";
+  return bullet.match(/\(\$[\d,]+\)/)?.[0] ?? "";
 };
 
 type RowDef = { key: string; label: string; note?: string; coming?: true; cell: (p: Plan) => PlanMatrixCell };
@@ -101,26 +123,26 @@ export function businessToolsMatrix(): PlanMatrixSection[] {
     // ── Locations & people ────────────────────────────────────────────────
     { key: "locations", label: "Google Business Profile locations", cell: (p) => count(p.limits.locations) },
     { key: "teamSeats", label: "Team seats", cell: (p) => count(p.limits.agencySeats) },
-    { key: "clientWorkspaces", label: "Client workspaces", cell: (p) => count(p.limits.clientWorkspaces) },
+    { key: "clientWorkspaces", label: "Client workspaces, roles, bulk actions, email onboarding", cell: (p) => count(p.limits.clientWorkspaces) },
     // ── Google Business Profile & reviews ─────────────────────────────────
     { key: "guardCadence", label: "Profile Guard check cadence", cell: (p) => `Every ${p.limits.guardCadenceMinutes} min` },
     {
       key: "reviewAlerts", label: "Review alerts + AI reply drafts",
-      // Stated on the cheapest plan; every plan above inherits it through its "Everything in …" bullet.
-      cell: (p) => PLAN_KEYS.indexOf(p.key) >= PLAN_KEYS.indexOf(statedFrom((f) => /review alerts/i.test(f))),
+      // Stated on Solo; every plan above inherits it through its "Everything in …" bullet.
+      cell: (p) => inheritsFeature(p, (f) => /review alerts/i.test(f)),
     },
     { key: "autoPublish", label: "AI review replies publish automatically", cell: (p) => p.limits.autoPublishAiReplies },
-    { key: "autoPosts", label: "AI posts on a schedule", cell: (p) => moduleCell(p, "autoPosts") },
+    { key: "autoPosts", label: "AI posts and photo captions on a schedule", cell: (p) => moduleCell(p, "autoPosts") },
     { key: "replyTemplates", label: "Review reply templates", cell: (p) => count(p.limits.reviewTemplates) },
-    { key: "reviewReminders", label: "Review reminders to customers", cell: (p) => moduleCell(p, "reviewReminders") },
+    { key: "reviewReminders", label: "Review reminders to customers (text + email)", cell: (p) => moduleCell(p, "reviewReminders") },
     // ── Permits & property ────────────────────────────────────────────────
     { key: "permitSearches", label: "Permit searches / month", cell: (p) => count(p.limits.permitSearches) },
-    { key: "permitAlerts", label: "Permit alerts for your territory", cell: (p) => moduleCell(p, "permitAlerts") },
+    { key: "permitAlerts", label: "Permit alerts for new filings in a territory", cell: (p) => moduleCell(p, "permitAlerts") },
     { key: "propertyRecords", label: "Property records lookup", cell: (p) => moduleCell(p, "propertyRecords") },
     // ── Websites & scans ──────────────────────────────────────────────────
     { key: "clickGuardSites", label: "Click Guard + IP Tracker + VPN Shield sites", cell: (p) => count(p.limits.protectedSites) },
     { key: "siteScans", label: "Site Scans / month", cell: (p) => count(p.limits.siteScans) },
-    { key: "gridScans", label: "Ranking-grid credits / month", cell: (p) => count(p.limits.gridCredits) },
+    { key: "gridScans", label: "Grid scans / month", note: GRID_CREDITS_NOTE, cell: (p) => count(p.limits.gridCredits) },
     { key: "competitorScans", label: "Competitor Intel scans / month", cell: (p) => count(p.limits.competitorScans) },
     // ── Texting ───────────────────────────────────────────────────────────
     { key: "teamTexts", label: "Team text alert segments / month", cell: (p) => count(p.limits.teamTextSegments) },
@@ -132,13 +154,13 @@ export function businessToolsMatrix(): PlanMatrixSection[] {
           : `Add-on ${usd(ADDONS.texting_number.monthlyCents)}`,
     },
     // ── Growth tools ──────────────────────────────────────────────────────
-    { key: "adsLsaManager", label: "Google Ads & LSA manager", cell: (p) => moduleCell(p, "adsManager") },
+    { key: "adsLsaManager", label: "Google Ads and LSA manager, IP exclusions", cell: (p) => moduleCell(p, "adsManager") },
     {
-      key: "cloudflareDomains", label: "Cloudflare + Search Console + Domains + Gmail",
+      key: "cloudflareDomains", label: "Cloudflare, Search Console, Domains, Gmail forwarding",
       cell: (p) => p.modules.cloudflareSearchConsole && p.modules.domainsMailAlerts,
     },
     { key: "socialPublishing", label: "YouTube & social publishing", cell: (p) => moduleCell(p, "socialPublishing") },
-    { key: "publicApi", label: "Public API units / month", cell: (p) => count(p.limits.apiUnitsPerMonth) },
+    { key: "publicApi", label: "Public API (units / month)", cell: (p) => count(p.limits.apiUnitsPerMonth) },
     { key: "csvExport", label: "CSV export of every report", cell: (p) => moduleCell(p, "csvExport") },
     {
       key: "history", label: "Scan & ranking history", coming: true,
@@ -150,27 +172,28 @@ export function businessToolsMatrix(): PlanMatrixSection[] {
         return days % 365 === 0 ? `${Math.round(days / 30.44)} months` : `${n(days)} days`;
       },
     },
-    { key: "scheduledReports", label: "Scheduled client reports", cell: (p) => moduleCell(p, "scheduledReports") },
+    { key: "scheduledReports", label: "Scheduled client email reports", cell: (p) => moduleCell(p, "scheduledReports") },
     {
-      key: "seoSuite", label: "ConstructHUB SEO suite",
+      key: "seoSuite", label: "SEO suite: rank tracker, explorer, keywords, backlinks",
       cell: (p) => {
         if (p.limits.seoKeywords <= 0) return `Add-on from ${usd(ADDONS.seo_basic.monthlyCents)}`;
         return `${n(p.limits.seoKeywords)} keywords + ${usd(p.limits.seoCreditCents)} data/mo`;
       },
     },
-    { key: "gridWatches", label: "Scheduled grid watches", cell: (p) => moduleCell(p, "gridWatches") },
+    { key: "gridWatches", label: "Weekly scheduled grid watches", cell: (p) => moduleCell(p, "gridWatches") },
     { key: "whiteLabel", label: "White-label reports", cell: (p) => moduleCell(p, "whiteLabel") },
     // ── Hub & extras ──────────────────────────────────────────────────────
     { key: "gabeQuestions", label: "Gabe questions / month", cell: (p) => count(p.limits.gabeQuestions) },
-    { key: "masterClass", label: "Master Class course", cell: (p) => moduleCell(p, "masterClass") },
+    { key: "masterClass", label: `Master Class course${masterClassPriceNote() ? ` ${masterClassPriceNote()}` : ""}`, cell: (p) => moduleCell(p, "masterClass") },
     {
       key: "gbpReinstatement", label: "GBP reinstatement help / project",
       cell: (p) => (p.key === "agency" ? `${usd(GBP_REINSTATEMENT_CENTS / 2)} — half price` : usd(GBP_REINSTATEMENT_CENTS)),
     },
     {
-      key: "newProductSeats", label: "Seats on every new product we launch",
-      // Not a PlanLimits number: the Unlimited card's own marketing bullet is the source ("Two seats on every new product…").
-      cell: (p) => (p.key === "agency" ? "2 seats" : false),
+      key: "newProductSeats", label: NEW_PRODUCT_LABEL,
+      // Not a PlanLimits number: the Unlimited card's own marketing bullet is the source — the label,
+      // the cell and the Call Assistant exclusion all derive from it (see the constants above the rows).
+      cell: (p) => (p.key === "agency" ? NEW_PRODUCT_CELL : false),
     },
     { key: "support", label: "Support", cell: (p) => supportCell(p) },
   ];

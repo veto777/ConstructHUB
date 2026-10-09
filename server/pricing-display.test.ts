@@ -121,7 +121,7 @@ describe("pricing display: comparison tables (shared/plan-matrix.ts)", () => {
     });
     expect(byKey.whiteLabel.cells).toEqual({ starter: false, team: false, pro: false, growth: false, agency: true });
     expect(byKey.masterClass.cells.agency).toBe(true);
-    expect(byKey.newProductSeats.cells).toEqual({ starter: false, team: false, pro: false, growth: false, agency: "2 seats" });
+    expect(byKey.newProductSeats.cells).toEqual({ starter: false, team: false, pro: false, growth: false, agency: "2 seats (Call Assistant minutes excluded)" });
     expect(byKey.gbpReinstatement.cells.starter).toBe("$599");
     expect(byKey.gbpReinstatement.cells.agency).toBe("$299.50 — half price");
     // Support is inherited down the ladder through each plan's "Everything in …" bullet.
@@ -131,6 +131,23 @@ describe("pricing display: comparison tables (shared/plan-matrix.ts)", () => {
     });
     // Every plan alerts on reviews and drafts replies.
     expect(Object.values(byKey.reviewAlerts.cells)).toEqual([true, true, true, true, true]);
+  });
+
+  it("labels the rows in the owner's wording (the approved comparison table)", () => {
+    expect(byKey.clientWorkspaces.label).toBe("Client workspaces, roles, bulk actions, email onboarding");
+    expect(byKey.autoPosts.label).toBe("AI posts and photo captions on a schedule");
+    expect(byKey.reviewReminders.label).toBe("Review reminders to customers (text + email)");
+    expect(byKey.permitAlerts.label).toBe("Permit alerts for new filings in a territory");
+    expect(byKey.adsLsaManager.label).toBe("Google Ads and LSA manager, IP exclusions");
+    expect(byKey.cloudflareDomains.label).toBe("Cloudflare, Search Console, Domains, Gmail forwarding");
+    expect(byKey.scheduledReports.label).toBe("Scheduled client email reports");
+    expect(byKey.seoSuite.label).toBe("SEO suite: rank tracker, explorer, keywords, backlinks");
+    expect(byKey.gridWatches.label).toBe("Weekly scheduled grid watches");
+    expect(byKey.masterClass.label).toBe("Master Class course ($2,499)");
+    expect(byKey.gridScans.label).toBe("Grid scans / month");
+    expect(byKey.publicApi.label).toBe("Public API (units / month)");
+    // The grid-scans row counts credits, not scans — the footnote under the table says so.
+    expect(byKey.gridScans.note).toMatch(/metered in credits/);
   });
 
   it("derives the CRM rows from CRM_PLANS (a separate product)", () => {

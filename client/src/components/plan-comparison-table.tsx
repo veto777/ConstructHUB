@@ -17,17 +17,22 @@ import {
 } from "@shared/plan-matrix";
 import { formatUsd, intervalSuffix } from "@/lib/pricing-display";
 
+function UnlimitedPill() {
+  return (
+    <span className="inline-block rounded-full bg-purple-600 px-2.5 py-1 text-[12px] font-semibold text-white dark:bg-purple-500" data-testid="pill-unlimited">
+      Unlimited
+    </span>
+  );
+}
+
 function CellValue({ value }: { value: PlanMatrixCell }) {
   if (value === true)
     return <Check className="w-5 h-5 mx-auto text-green-600 dark:text-green-500" strokeWidth={2.5} aria-label="Included" />;
   if (value === false)
     return <X className="w-5 h-5 mx-auto text-red-600 dark:text-red-500" strokeWidth={2.5} aria-label="Not included" />;
-  if (value === UNLIMITED_CELL)
-    return (
-      <span className="inline-block rounded-full bg-purple-600 px-2.5 py-1 text-[12px] font-semibold text-white dark:bg-purple-500" data-testid="pill-unlimited">
-        Unlimited
-      </span>
-    );
+  // "unlimited" AND a raw -1 limit (a cell that skipped the matrix's conversion) render as the
+  // pill — a -1 can never show up as the text "-1".
+  if (value === UNLIMITED_CELL || value === -1) return <UnlimitedPill />;
   if (typeof value === "object")
     return (
       <span className="inline-block rounded-full border border-dashed border-mkt-rule px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-mkt-muted">

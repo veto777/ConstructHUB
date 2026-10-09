@@ -36,6 +36,7 @@ import { StandingGator } from "@/components/mascot";
 import { H2, Kicker, LEAD, TEXT_LINK } from "@/components/feature-landing/primitives";
 import { CrmPlanCards } from "@/components/crm-plans";
 import { BusinessToolsComparison, CrmComparison } from "@/components/plan-comparison-table";
+import { GRID_CREDITS_NOTE } from "@shared/plan-matrix";
 import { CRM_ADDONS, CRM_EXTRA_SEAT_MONTHLY_CENTS } from "@shared/crm-plans";
 import { PurchaseReviewDialog } from "@/components/purchase-review";
 import { trackConversion, trackEvent } from "@/lib/gtag";
@@ -501,6 +502,9 @@ export default function PricingPage() {
                 </SectionHead>
                 <div className="mt-10">
                   <BusinessToolsComparison interval={interval} />
+                  <p className="mt-4 text-center text-[13px] text-mkt-muted" data-testid="text-grid-credits-note">
+                    {GRID_CREDITS_NOTE}
+                  </p>
                 </div>
               </section>
             </div>

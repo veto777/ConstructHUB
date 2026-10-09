@@ -11,42 +11,42 @@ Money is in US dollars. Yearly platform billing is 10× the monthly price (two m
 | **Locations & people** |  |  |  |  |  |
 | Google Business Profile locations | 1 | 10 | 25 | 100 | 🟣 Unlimited |
 | Team seats | 1 | 3 | 5 | 10 | 🟣 Unlimited |
-| Client workspaces | ❌ | ❌ | ❌ | 10 | 🟣 Unlimited |
+| Client workspaces, roles, bulk actions, email onboarding | ❌ | ❌ | ❌ | 10 | 🟣 Unlimited |
 | **Google Business Profile & reviews** |  |  |  |  |  |
 | Profile Guard check cadence | Every 60 min | Every 30 min | Every 15 min | Every 15 min | Every 5 min |
 | Review alerts + AI reply drafts | ✅ | ✅ | ✅ | ✅ | ✅ |
 | AI review replies publish automatically | ❌ | ❌ | ✅ | ✅ | ✅ |
-| AI posts on a schedule | ❌ | ❌ | ✅ | ✅ | ✅ |
+| AI posts and photo captions on a schedule | ❌ | ❌ | ✅ | ✅ | ✅ |
 | Review reply templates | 5 | 20 | 20 | 50 | 🟣 Unlimited |
-| Review reminders to customers | ❌ | ✅ | ✅ | ✅ | ✅ |
+| Review reminders to customers (text + email) | ❌ | ✅ | ✅ | ✅ | ✅ |
 | **Permits & property** |  |  |  |  |  |
 | Permit searches / month | 10 | 50 | 100 | 200 | 🟣 Unlimited |
-| Permit alerts for your territory | ❌ | ❌ | ❌ | 🕒 Coming | 🕒 Coming |
+| Permit alerts for new filings in a territory | ❌ | ❌ | ❌ | 🕒 Coming | 🕒 Coming |
 | Property records lookup | ❌ | ❌ | ✅ | ✅ | ✅ |
 | **Websites & scans** |  |  |  |  |  |
 | Click Guard + IP Tracker + VPN Shield sites | 1 | 3 | 10 | 25 | 🟣 Unlimited |
 | Site Scans / month | 2 | 5 | 15 | 50 | 🟣 Unlimited |
-| Ranking-grid credits / month | 3 | 10 | 20 | 40 | 150 |
+| Grid scans / month<br><sup>Grid scans are metered in credits — larger grids use more than one credit (7x7 = 2, 9x9 = 4).</sup> | 3 | 10 | 20 | 40 | 150 |
 | Competitor Intel scans / month | 1 | 5 | 10 | 20 | 50 |
 | **Texting** |  |  |  |  |  |
 | Team text alert segments / month | 200 | 500 | 1,000 | 2,000 | 5,000 |
 | Client-texting number on our carrier | Add-on $29 | Add-on $29 | Add-on $29 | 1 included | 2 included |
 | **Growth tools** |  |  |  |  |  |
-| Google Ads & LSA manager | ❌ | ❌ | ✅ | ✅ | ✅ |
-| Cloudflare + Search Console + Domains + Gmail | ❌ | ❌ | ✅ | ✅ | ✅ |
+| Google Ads and LSA manager, IP exclusions | ❌ | ❌ | ✅ | ✅ | ✅ |
+| Cloudflare, Search Console, Domains, Gmail forwarding | ❌ | ❌ | ✅ | ✅ | ✅ |
 | YouTube & social publishing | ❌ | ❌ | ✅ | ✅ | ✅ |
-| Public API units / month | ❌ | ❌ | 50,000 | 250,000 | 🟣 Unlimited |
+| Public API (units / month) | ❌ | ❌ | 50,000 | 250,000 | 🟣 Unlimited |
 | CSV export of every report | ❌ | ❌ | 🕒 Coming | 🕒 Coming | 🕒 Coming |
 | Scan & ranking history 🕒<br><sup>Retention is not enforced yet — nothing is deleted today.</sup> | 90 days | 90 days | 12 months | 🟣 Unlimited | 🟣 Unlimited |
-| Scheduled client reports | ❌ | ❌ | ❌ | 🕒 Coming | 🕒 Coming |
-| ConstructHUB SEO suite | Add-on from $29 | Add-on from $29 | Add-on from $29 | 250 keywords + $10 data/mo | 5,000 keywords + $60 data/mo |
-| Scheduled grid watches | ❌ | ❌ | ❌ | ✅ | ✅ |
+| Scheduled client email reports | ❌ | ❌ | ❌ | 🕒 Coming | 🕒 Coming |
+| SEO suite: rank tracker, explorer, keywords, backlinks | Add-on from $29 | Add-on from $29 | Add-on from $29 | 250 keywords + $10 data/mo | 5,000 keywords + $60 data/mo |
+| Weekly scheduled grid watches | ❌ | ❌ | ❌ | ✅ | ✅ |
 | White-label reports | ❌ | ❌ | ❌ | ❌ | ✅ |
 | **Hub & extras** |  |  |  |  |  |
 | Gabe questions / month | 100 | 300 | 1,000 | 3,000 | 🟣 Unlimited |
-| Master Class course | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Master Class course ($2,499) | ❌ | ❌ | ❌ | ❌ | ✅ |
 | GBP reinstatement help / project | $599 | $599 | $599 | $599 | $299.50 — half price |
-| Seats on every new product we launch | ❌ | ❌ | ❌ | ❌ | 2 seats |
+| Two seats on every new product we launch | ❌ | ❌ | ❌ | ❌ | 2 seats (Call Assistant minutes excluded) |
 | Support | Email support | Email support | Priority email support | Priority support with a phone callback | Named support contact, onboarding call, first access to new features |
 
 ## CRM (Customer Relations Management) — a separate product

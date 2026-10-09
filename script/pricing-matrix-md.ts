@@ -21,7 +21,8 @@ const usd = formatUsd;
 function mdCell(value: PlanMatrixCell): string {
   if (value === true) return "✅";
   if (value === false) return "❌";
-  if (value === UNLIMITED_CELL) return "🟣 Unlimited";
+  // "unlimited" and a raw -1 that skipped conversion both read as the pill — never the text "-1".
+  if (value === UNLIMITED_CELL || value === -1) return "🟣 Unlimited";
   if (typeof value === "object") return "🕒 Coming";
   return typeof value === "number" ? value.toLocaleString("en-US") : value;
 }

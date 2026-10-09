@@ -90,7 +90,7 @@ test.describe("pricing page", () => {
     await expect(page.getByTestId("cell-compare-clientTextingNumber-starter")).toHaveText("Add-on $29");
     await expect(page.getByTestId("cell-compare-clientTextingNumber-growth")).toHaveText("1 included");
     await expect(page.getByTestId("cell-compare-seoSuite-agency")).toHaveText("5,000 keywords + $60 data/mo");
-    await expect(page.getByTestId("cell-compare-newProductSeats-agency")).toHaveText("2 seats");
+    await expect(page.getByTestId("cell-compare-newProductSeats-agency")).toHaveText("2 seats (Call Assistant minutes excluded)");
   });
 
   test("Unlimited is the hero of the ladder", async ({ page }) => {
