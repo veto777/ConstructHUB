@@ -129,7 +129,7 @@ import { registerStripeRoutes } from "./stripe";
 import { cancellationOf, withBillingLock } from "./billing/sync";
 import { resetPriceCache } from "./billing/prices";
 import { COURSE_BUNDLE, DFY_CATALOG } from "./catalog";
-import { PLANS, ADDONS, AGENCY_LOCATION_BANDS, TRIAL_DAYS, agencyMonthlyCents } from "@shared/plans";
+import { PLANS, ADDONS, AGENCY_LOCATION_BANDS, TRIAL_DAYS, agencyMonthlyCents, LEGACY_AGENCY_BASE_CENTS } from "@shared/plans";
 
 const routes = new Map<string, Function>();
 registerStripeRoutes({
@@ -217,12 +217,13 @@ beforeEach(() => {
 const cancellationWrites = () => mocks.sql.filter((q) => /SET cancel_at_period_end/.test(q.text)).map((q) => q.values);
 
 describe("GET /api/stripe/plans", () => {
-  it("returns the shared price book — four plans, add-ons, Agency bands, a 1-day trial; no free or retired plans", async () => {
+  it("returns the shared price book — five plans, add-ons, the legacy Agency bands, a 1-day trial; no free or retired plans", async () => {
     const res = await request("GET /api/stripe/plans");
-    expect(res.body.plans.map((p: any) => p.key)).toEqual(["starter", "pro", "growth", "agency"]);
-    expect(res.body.plans.map((p: any) => [p.monthlyCents, p.annualCents])).toEqual([[2900, 29000], [7900, 79000], [19900, 199000], [34900, 349000]]);
+    expect(res.body.plans.map((p: any) => p.key)).toEqual(["starter", "team", "pro", "growth", "agency"]);
+    expect(res.body.plans.map((p: any) => [p.monthlyCents, p.annualCents])).toEqual([[2900, 29000], [4900, 49000], [9900, 99000], [19900, 199000], [44900, 449000]]);
     expect(res.body.addons.map((a: any) => a.key)).toEqual(Object.keys(ADDONS));
-    expect(res.body.agency).toEqual({ includedLocations: 10, bands: AGENCY_LOCATION_BANDS, selfServeMaxLocations: 500 });
+    // Unlimited has no location cap (-1); the graduated bands stay to read stored 2026-09-30 rows.
+    expect(res.body.agency).toEqual({ includedLocations: -1, bands: AGENCY_LOCATION_BANDS, selfServeMaxLocations: 500 });
     expect(res.body.trialDays).toBe(1);
     expect(res.body.salesThresholdCents).toBe(100000);
     expect(JSON.stringify(res.body)).not.toMatch(/platinum|gold|"free"/i);
@@ -239,10 +240,10 @@ describe("POST /api/stripe/create-checkout", () => {
     expect(args.customer).toBe("cus_test");
     expect(args.subscription_data.trial_period_days).toBe(TRIAL_DAYS);
     expect(args.metadata).toMatchObject({ userId: "42", type: "plan", plan: "pro", interval: "month" });
-    expect(lineItems()).toEqual([{ price: "price_chub_v1_plan_pro_month_7900", quantity: 1 }]);
+    expect(lineItems()).toEqual([{ price: "price_chub_v1_plan_pro_month_9900", quantity: 1 }]);
     const [params, options] = mocks.pricesCreate.mock.calls[0];
-    expect(params).toMatchObject({ currency: "usd", unit_amount: 7900, recurring: { interval: "month" }, lookup_key: "chub_v1_plan_pro_month_7900", transfer_lookup_key: true, metadata: { chub_kind: "plan", chub_key: "pro" } });
-    expect(options.idempotencyKey).toBe("chub-price-chub_v1_plan_pro_month_7900");
+    expect(params).toMatchObject({ currency: "usd", unit_amount: 9900, recurring: { interval: "month" }, lookup_key: "chub_v1_plan_pro_month_9900", transfer_lookup_key: true, metadata: { chub_kind: "plan", chub_key: "pro" } });
+    expect(options.idempotencyKey).toBe("chub-price-chub_v1_plan_pro_month_9900");
   });
 
   it("reuses an existing Stripe Price instead of creating another", async () => {
@@ -251,7 +252,7 @@ describe("POST /api/stripe/create-checkout", () => {
     resetPriceCache(); // a restart: the price is found by lookup key in Stripe
     await request("/api/stripe/create-checkout", { plan: "pro" });
     expect(mocks.pricesCreate).toHaveBeenCalledTimes(1);
-    expect(mocks.checkout.mock.calls[1][0].line_items[0].price).toBe("price_chub_v1_plan_pro_month_7900");
+    expect(mocks.checkout.mock.calls[1][0].line_items[0].price).toBe("price_chub_v1_plan_pro_month_9900");
   });
 
   it("annual billing is 10x monthly on a yearly price", async () => {
@@ -260,35 +261,27 @@ describe("POST /api/stripe/create-checkout", () => {
     expect(priceOf(lineItems()[0].price)).toMatchObject({ unit_amount: PLANS.growth.annualCents, recurring: { interval: "year" } });
   });
 
-  it("Agency with 25 locations: base + a graduated band price, quantity = locations above 10", async () => {
-    mocks.rows.push([customerRow()]);
-    expect((await request("/api/stripe/create-checkout", { plan: "agency", interval: "month", locations: 25 })).code).toBe(200);
-    const [base, band] = lineItems();
-    expect(priceOf(base.price).unit_amount).toBe(PLANS.agency.monthlyCents);
-    expect(band.quantity).toBe(15);
-    expect(priceOf(band.price)).toMatchObject({
-      billing_scheme: "tiered", tiers_mode: "graduated", recurring: { interval: "month" },
-      tiers: [{ up_to: 40, unit_amount: 1500 }, { up_to: 240, unit_amount: 1000 }, { up_to: "inf", unit_amount: 700 }],
-      metadata: { chub_kind: "agency_locations" },
-    });
-    // $349 + 15 × $15 = $574 — the price book's own number.
-    expect(PLANS.agency.monthlyCents + 15 * 1500).toBe(agencyMonthlyCents(25));
+  it("a NEW Unlimited checkout carries no band line and no locations metadata — a count a stale client still sends is validated but not billed", async () => {
+    // Unlimited has no location cap, so a new checkout never bills the retired Agency bands.
+    for (const locations of [25, 4]) {
+      mocks.rows.push([customerRow()]);
+      expect((await request("/api/stripe/create-checkout", { plan: "agency", interval: "month", locations })).code).toBe(200);
+      expect(lineItems()).toEqual([{ price: "price_chub_v1_plan_agency_month_44900", quantity: 1 }]);
+      expect(priceOf(lineItems()[0].price)).toMatchObject({ unit_amount: PLANS.agency.monthlyCents, recurring: { interval: "month" } });
+      expect(mocks.checkout.mock.calls[0][0].metadata.locations).toBe("");
+      mocks.checkout.mockClear();
+    }
+    // The graduated-band maths are legacy but unchanged ($349 base + 15 × $15 = $574):
+    // they still read and bill the stored 2026-09-30 Agency rows.
+    expect(agencyMonthlyCents(25)).toBe(LEGACY_AGENCY_BASE_CENTS + 15 * 1500);
   });
 
-  it("Agency annual uses the yearly band price (10x each band)", async () => {
+  it("Unlimited annual is a single yearly plan price — no band line, no locations metadata", async () => {
     mocks.rows.push([customerRow()]);
     await request("/api/stripe/create-checkout", { plan: "agency", interval: "year", locations: 60 });
-    const [base, band] = lineItems();
-    expect(priceOf(base.price).unit_amount).toBe(PLANS.agency.annualCents);
-    expect(band.quantity).toBe(50);
-    expect(priceOf(band.price).tiers).toEqual([{ up_to: 40, unit_amount: 15000 }, { up_to: 240, unit_amount: 10000 }, { up_to: "inf", unit_amount: 7000 }]);
-  });
-
-  it("Agency at or under 10 locations bills the base only", async () => {
-    mocks.rows.push([customerRow()]);
-    await request("/api/stripe/create-checkout", { plan: "agency", locations: 4 });
-    expect(lineItems()).toHaveLength(1);
-    expect(mocks.checkout.mock.calls[0][0].metadata.locations).toBe("10");
+    expect(lineItems()).toEqual([{ price: "price_chub_v1_plan_agency_year_449000", quantity: 1 }]);
+    expect(priceOf(lineItems()[0].price)).toMatchObject({ unit_amount: PLANS.agency.annualCents, recurring: { interval: "year" } });
+    expect(mocks.checkout.mock.calls[0][0].metadata.locations).toBe("");
   });
 
   it("Agency above 500 locations is talk-to-sales, before any Stripe call", async () => {
@@ -320,10 +313,13 @@ describe("POST /api/stripe/create-checkout", () => {
   });
 
   it.each([
-    [{ plan: "starter", addons: { protected_site: 1 } }, 400, /isn't available on the Starter plan/],
-    [{ plan: "growth", addons: { texting_number: 1 } }, 400, /already includes a client-texting number/],
-    [{ plan: "agency", addons: { extra_location: 1 } }, 400, /billed by location count/],
-    [{ plan: "starter", addons: { extra_location: 9 } }, 400, /Agency plan/],
+    // protected_site is sold on starter now; Unlimited includes unlimited protected sites, so it is not sold there.
+    [{ plan: "agency", addons: { protected_site: 1 } }, 400, /isn't available on the Unlimited plan/],
+    // extra_seat starts at Team.
+    [{ plan: "starter", addons: { extra_seat: 1 } }, 400, /isn't available on the Solo plan/],
+    // extra_location is retired (sold on no plan; stored rows still read).
+    [{ plan: "agency", addons: { extra_location: 1 } }, 400, /isn't available on the Unlimited plan/],
+    [{ plan: "starter", addons: { extra_location: 9 } }, 400, /isn't available on the Solo plan/],
     [{ plan: "pro", addons: { nope: 1 } }, 400, /Unknown add-on/],
     [{ plan: "pro", addons: { extra_seat: -1 } }, 400, /whole number/],
     [{ plan: "pro", addons: { extra_seat: 1.5 } }, 400, /whole number/],
@@ -340,9 +336,14 @@ describe("POST /api/stripe/create-checkout", () => {
     expect(mocks.checkout).not.toHaveBeenCalled();
   });
 
-  it("allows extra locations up to 9 in all on a non-Agency plan", async () => {
+  it("the retired extra-location add-on is refused on every plan (a bigger plan includes more)", async () => {
     mocks.rows.push([customerRow()]);
-    expect((await request("/api/stripe/create-checkout", { plan: "starter", addons: { extra_location: 8 } })).code).toBe(200);
+    const res = await request("/api/stripe/create-checkout", { plan: "starter", addons: { extra_location: 8 } });
+    expect(res.code).toBe(400);
+    expect(res.body).toMatchObject({ code: "addon_unavailable" });
+    expect(res.body.message).toMatch(/Extra location isn't available on the Solo plan/);
+    expect(mocks.pricesList).not.toHaveBeenCalled();
+    expect(mocks.checkout).not.toHaveBeenCalled();
   });
 
   it("an existing live subscription is never sent to a second checkout", async () => {
@@ -462,7 +463,7 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
     await request("/api/stripe/create-checkout", { plan: "pro", interval, addons: { texting_number: 1 } });
     mocks.checkout.mockClear();
     mocks.pricesCreate.mockClear();
-    const planPrice = `price_chub_v1_plan_pro_${interval}_${interval === "year" ? 79000 : 7900}`;
+    const planPrice = `price_chub_v1_plan_pro_${interval}_${interval === "year" ? 99000 : 9900}`;
     const textPrice = `price_chub_v1_addon_texting_number_${interval}_${interval === "year" ? 29000 : 2900}`;
     mocks.current = subscription([
       item("si_plan", planPrice, 1, { kind: "plan", key: "pro" }, interval),
@@ -492,12 +493,13 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
     expect(res.body.subscription).toMatchObject({ plan: "growth", effectivePlan: "growth" });
   });
 
-  it("refuses to carry an add-on the new plan doesn't offer (Growth includes a texting number)", async () => {
-    await seedProSubscription();
+  it("refuses to carry an add-on the new plan doesn't offer (Unlimited includes protected sites)", async () => {
+    await seedProSubscription([item("si_site", "price_chub_v1_addon_protected_site_month_1500", 1, { kind: "addon", key: "protected_site" }, "month")]);
     mocks.rows.push([liveRow()]);
-    const res = await request("/api/stripe/change-plan", { plan: "growth" });
+    const res = await request("/api/stripe/change-plan", { plan: "agency" });
     expect(res.code).toBe(400);
     expect(res.body.code).toBe("addon_unavailable");
+    expect(res.body.message).toMatch(/isn't available on the Unlimited plan/);
     expect(mocks.update).not.toHaveBeenCalled();
   });
 
@@ -506,20 +508,22 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
     mocks.rows.push([liveRow()]);
     expect((await request("/api/stripe/change-plan", { plan: "pro", interval: "year" })).code).toBe(200);
     expect(mocks.update.mock.calls[0][1].items).toEqual([
-      { id: "si_plan", price: "price_chub_v1_plan_pro_year_79000", quantity: 1 },
+      { id: "si_plan", price: "price_chub_v1_plan_pro_year_99000", quantity: 1 },
       { id: "si_text", price: "price_chub_v1_addon_texting_number_year_29000", quantity: 1 },
     ]);
     expect(mocks.update.mock.calls[0][1].add_invoice_items).toBeUndefined(); // no second setup fee
   });
 
-  it("switching to Agency adds the band item for the requested locations", async () => {
+  it("switching to Unlimited never adds a band line — there is no location count on the new book", async () => {
     await seedProSubscription();
     mocks.rows.push([liveRow()]);
     expect((await request("/api/stripe/change-plan", { plan: "agency", locations: 30 })).code).toBe(200);
     const items = mocks.update.mock.calls[0][1].items;
-    expect(items).toContainEqual({ id: "si_plan", price: "price_chub_v1_plan_agency_month_34900", quantity: 1 });
-    expect(items).toContainEqual({ price: expect.stringMatching(/^price_chub_v1_agencyloc_month_/), quantity: 20 });
-    expect(mocks.updates[0]).toMatchObject({ plan: "agency", agencyLocations: 30, addons: { texting_number: 1 } });
+    expect(items).toEqual([
+      { id: "si_plan", price: "price_chub_v1_plan_agency_month_44900", quantity: 1 },
+    ]);
+    expect(items.some((i: any) => String(i.price ?? "").startsWith("price_chub_v1_agencyloc"))).toBe(false);
+    expect(mocks.updates[0]).toMatchObject({ plan: "agency", agencyLocations: null, addons: { texting_number: 1 } });
   });
 
   it("an unchanged order touches nothing", async () => {
@@ -535,7 +539,7 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
     mocks.rows.push([liveRow({ plan: "premium" })]);
     expect((await request("/api/stripe/change-plan", { plan: "pro", interval: "year" })).code).toBe(200);
     expect(mocks.update.mock.calls[0][1].items).toEqual([
-      { id: "si_old", price: "price_chub_v1_plan_pro_year_79000", quantity: 1 },
+      { id: "si_old", price: "price_chub_v1_plan_pro_year_99000", quantity: 1 },
     ]);
   });
 
@@ -580,7 +584,7 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
   });
 
   it("a duplicate item on one of our own prices is removed", async () => {
-    await seedProSubscription([item("si_dup", "price_chub_v1_plan_pro_month_7900", 1, { kind: "plan", key: "pro" })]);
+    await seedProSubscription([item("si_dup", "price_chub_v1_plan_pro_month_9900", 1, { kind: "plan", key: "pro" })]);
     mocks.rows.push([liveRow()]);
     expect((await request("/api/stripe/change-plan", { plan: "pro", addons: { texting_number: 0 } })).code).toBe(200);
     expect(mocks.update.mock.calls[0][1].items).toEqual([{ id: "si_dup", deleted: true }, { id: "si_text", deleted: true }]);
@@ -623,7 +627,7 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
     const params = mocks.update.mock.calls[0][1];
     expect(params.items).toEqual([
       { price: "price_chub_v1_addon_texting_number_month_2900", quantity: 1 },
-      { price: "price_chub_v1_addon_competitor_pack_month_3900", quantity: 2 },
+      { price: "price_chub_v1_addon_competitor_pack_month_1900", quantity: 2 },
     ]);
     expect(params.add_invoice_items).toEqual([{ price: "price_chub_v1_setup_texting_number_2900", quantity: 1 }]);
     expect(mocks.checkout).not.toHaveBeenCalled();
@@ -638,11 +642,12 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
     // An add-on change re-decides the account's Call Assistant numbers (fewer paid for → extras released).
     expect(mocks.afterSubscriptionChange).toHaveBeenCalledWith(42);
 
+    // protected_site is sold on starter now; extra_seat starts at Team, so it is the refused one.
     mocks.current = subscription([item("si_plan", "price_x", 1, { kind: "plan", key: "starter" })]);
     mocks.rows.push([liveRow({ plan: "starter" })]);
-    const refused = await request("/api/stripe/addons", { addons: { protected_site: 1 } });
+    const refused = await request("/api/stripe/addons", { addons: { extra_seat: 1 } });
     expect(refused.code).toBe(400);
-    expect(refused.body.message).toMatch(/Starter/);
+    expect(refused.body.message).toMatch(/isn't available on the Solo plan/);
 
     mocks.current = subscription([item("si_old", "price_legacy_premium")]);
     mocks.rows.push([liveRow({ plan: "premium" })]);
@@ -675,7 +680,7 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
     mocks.rows.push([liveRow()]);
     const res = await request("/api/stripe/addons", { addon: "competitor_pack", quantity: 2 });
     expect(res.code).toBe(200);
-    expect(mocks.update.mock.calls[0][1].items).toEqual([{ price: "price_chub_v1_addon_competitor_pack_month_3900", quantity: 2 }]);
+    expect(mocks.update.mock.calls[0][1].items).toEqual([{ price: "price_chub_v1_addon_competitor_pack_month_1900", quantity: 2 }]);
     expect(mocks.updates[0].addons).toEqual({ competitor_pack: 2, texting_number: 1 });
 
     mocks.rows.push([liveRow()]);

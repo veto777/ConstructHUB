@@ -184,6 +184,20 @@ const positive = (addons: AddonQuantities): AddonQuantities =>
   Object.fromEntries(Object.entries(addons).filter(([, qty]) => (qty ?? 0) > 0)) as AddonQuantities;
 
 /**
+ * The location count an order carries. A stored 2026-09-30 Agency row keeps its
+ * billed count through a change (body.locations overrides it, validated; the
+ * current count stays when the request names none). A NEW Unlimited checkout
+ * carries none, ever: a stale client that still sends locations has them
+ * validated (garbage is still refused before Stripe is asked) but they are not
+ * billed — Unlimited has no location cap.
+ */
+function orderAgencyLocations(raw: unknown, stored: number | null): number | null {
+  if (stored !== null) return parseAgencyLocations(raw, stored);
+  if (raw !== undefined && raw !== null && raw !== "") parseAgencyLocations(raw, null);
+  return null;
+}
+
+/**
  * The whole order from a request body. `current` supplies what an existing
  * subscription already has (interval, add-ons, Agency locations) so a change
  * only needs to name what changes; request add-on quantities override it.
@@ -200,7 +214,7 @@ export function parsePlanOrder(
   // line. A stored subscription that still bills locations (a 2026-09-30 Agency row) keeps its
   // count through a change — body.locations overrides it, otherwise the current count stays.
   const agencyLocations = plan === "agency"
-    ? parseAgencyLocations(body?.locations, current.agencyLocations ?? null)
+    ? orderAgencyLocations(body?.locations, current.agencyLocations ?? null)
     : null;
   return { plan, interval, addons, agencyLocations };
 }

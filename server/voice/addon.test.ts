@@ -94,22 +94,24 @@ describe("price book: the AI Call Assistant, a separate service (owner, 2026-10-
       // The CRM leads the list (owner, 2026-10-07); the Call Assistant follows it.
       expect(PLANS[key].notIncluded[0], key).toMatch(/ConstructHUB CRM/);
       expect(PLANS[key].notIncluded[1], key).toBe(CALL_ASSISTANT_NOT_INCLUDED_LINE);
-      expect(PLANS[key].features.join(" "), key).not.toMatch(/Call Assistant/);
+      // A feature may reference the service only to exclude it (Unlimited: "Call Assistant minutes excluded").
+      expect(PLANS[key].features.join(" "), key).not.toMatch(/(AI )?Call Assistant(?! minutes excluded)/);
     }
     for (const key of CRM_PLAN_KEYS) expect(CRM_PLANS[key].notIncluded, key).toContain(CALL_ASSISTANT_NOT_INCLUDED_LINE);
     // The platform's add-on list is the platform's: none of the Call Assistant's lines is on it.
-    expect(PLATFORM_ADDONS.map((a) => a.key)).toEqual(["extra_location", "extra_seat", "protected_site", "texting_number", "competitor_pack"]);
+    expect(PLATFORM_ADDONS.map((a) => a.key)).toEqual(["extra_location", "extra_seat", "protected_site", "texting_number", "competitor_pack", "grid_pack", "seo_basic", "seo_pro"]);
     expect(addonLines()).toHaveLength(PLATFORM_ADDONS.length);
     expect(addonLines().join("\n")).not.toMatch(/Call Assistant/);
   });
 
-  it("is an add-on module, not a plan module: the Agency-only list is unchanged", () => {
+  it("is an add-on module, not a plan module: only Unlimited has modules of its own", () => {
     expect(ADDON_MODULES.callAssistant).toBe("call_assistant");
     expect(ADDON_MODULE_UNLOCKED_BY.callAssistant).toEqual(CALL_ASSISTANT_TIER_ADDONS);
     expect(isAddonModule("callAssistant")).toBe(true);
     expect(isAddonModule("adsManager")).toBe(false);
     expect(Object.keys(MODULE_NAMES)).not.toContain("callAssistant");
-    expect(AGENCY_ONLY_MODULES).toHaveLength(4);
+    // On the five-plan book only white-label reports and the Master Class are Unlimited-exclusive.
+    expect(AGENCY_ONLY_MODULES).toEqual(["White-label reports", "Master Class"]);
     expect(moduleName("callAssistant")).toBe("AI Call Assistant");
     for (const k of PLAN_KEYS) expect((PLANS[k].modules as any).callAssistant).toBeUndefined();
   });
@@ -126,9 +128,11 @@ describe("price book: the AI Call Assistant, a separate service (owner, 2026-10-
         expect(e.message).toContain("/pricing#call-assistant");
       }
     }
-    // The platform's own add-ons are untouched.
+    // The platform's own add-ons are untouched. protected_site is sold on starter now;
+    // it is not sold on Unlimited, which includes unlimited protected sites.
     expect(() => checkAddonsForPlan("growth", { competitor_pack: 1 })).not.toThrow();
-    expect(() => checkAddonsForPlan("starter", { protected_site: 1 })).toThrow(/isn't available on the Starter plan/);
+    expect(() => checkAddonsForPlan("starter", { protected_site: 1 })).not.toThrow();
+    expect(() => checkAddonsForPlan("agency", { protected_site: 1 })).toThrow(/isn't available on the Unlimited plan/);
   });
 });
 
@@ -197,10 +201,10 @@ describe("entitlements: the callAssistant module comes from the service's own su
     expect(both.addonModules.callAssistant).toBe(true);
     expect(both.allowances?.protectedSites).toBe(PLANS.pro.limits.protectedSites + 2);
 
-    // The legacy Platinum grant has no service.
+    // The legacy Platinum grant maps to Unlimited now — every module, still no service.
     mocks.row = customer("platinum", { stripe_subscription_id: null });
     const platinum = await getEntitlements(7);
-    expect(platinum.modules).toEqual({ agencyWorkspace: true, adsManager: true, cloudflareSearchConsole: true, domainsMailAlerts: true });
+    expect(platinum.modules).toEqual(PLANS.agency.modules);
     expect(platinum.addonModules).toEqual({ callAssistant: false });
   });
 
