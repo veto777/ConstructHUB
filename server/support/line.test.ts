@@ -132,3 +132,13 @@ describe("support line — Kimi audit fixes (2026-10-08)", () => {
   });
   it("Gabe never speaks a 6-digit run either", () => { expect(scrubSay("your code is 424242")).not.toMatch(/\d{6}/); });
 });
+
+describe("support line — Kimi round 2 (2026-10-08)", () => {
+  it("'I didn't get it' resends by the other channel, the same for a made-up account", async () => {
+    const { d, sent } = deps(); const a = freshState(), b = freshState();
+    await turn(a, "1 2 3 4 5 6 7 8", "+1", d); await turn(a, "text", "+1", d); const ra = await turn(a, "I didn't get it", "+1", d);
+    await turn(b, "8 7 6 5 4 3 2 1", "+1", d); await turn(b, "text", "+1", d); const rb = await turn(b, "I didn't get it", "+1", d);
+    expect(ra).toEqual(rb); expect(ra.say).toBe(LINES.sentNeutral("email"));
+    expect(sent).toEqual([{ channel: "sms", to: "+15555550123" }, { channel: "email", to: "owner@example.com" }]);
+  });
+});

@@ -113,12 +113,16 @@ const appUrl = () => (process.env.APP_URL || "https://constructhub.us").replace(
 
 export async function openTicket(s: CallState, callerNumber: string, callSid: string | null): Promise<{ number: string } | null> {
   if (!s.verified || s.userId === null) throw new Error("not verified");   // the state machine never gets here unverified
-  if (!(await takeBudget(`support:tickets:user:${s.userId}`, 5, 1, DAY))) return null;   // Kimi #6
   const i = s.intake, severity = !i.fallback && (i.category === "payment" || i.category === "data") ? "critical" : "high";
   const c = await pool.connect();
   let id: number, number: string;
   try {
     await c.query("BEGIN");
+    // Kimi #6 / round 2 N4: at most 5 tickets per account a day, counted inside the same transaction as the insert;
+    // and one ticket per call (a raced second "yes" finds the first).
+    await c.query(`SELECT pg_advisory_xact_lock(hashtext('support-ticket-user:' || $1))`, [s.userId]);
+    if (callSid) { const ex = (await c.query(`SELECT number FROM support_tickets WHERE call_sid = $1`, [callSid])).rows[0]; if (ex) { await c.query("ROLLBACK"); return { number: ex.number }; } }
+    if (Number((await c.query(`SELECT count(*) AS n FROM support_tickets WHERE user_id = $1 AND created_at > now() - interval '1 day'`, [s.userId])).rows[0].n) >= 5) { await c.query("ROLLBACK"); return null; }
     id = (await c.query(`SELECT nextval(pg_get_serial_sequence('support_tickets','id')) AS id`)).rows[0].id;
     number = `T-${String(id).padStart(5, "0")}`;
     await c.query(
@@ -157,27 +161,26 @@ export function registerSupportRoutes(app: Express, getDevUser: any) {
   app.post(`${VOICE_INTERNAL_PATH}/support/turn`, requireVoiceInternal, async (req, res) => {
     const { callSid, from, text } = req.body || {};
     if (!okSid(callSid) || typeof text !== "string") return res.status(400).json({ code: "bad_request" });
-    // Kimi #3: one turn at a time per call — a transaction-scoped advisory lock around load → turn → write.
-    const c = await pool.connect();
-    let r: { say: string; end: boolean };
+    const FAIL = { say: "Sorry, something went wrong on my end. Please email support at constructhub dot us. Goodbye.", end: true };
+    // Kimi round 2 N1: no lock or transaction is held during the AI call. Optimistic concurrency instead: the state
+    // carries a version; the write only lands if nobody else wrote since we read (the engine serializes turns, so a
+    // conflict means a duplicate request — it gets a neutral "please repeat").
     try {
-      await c.query("BEGIN");
-      await c.query(`SELECT pg_advisory_xact_lock(hashtext('support-call:' || $1))`, [callSid]);
-      const row = (await c.query(`SELECT state FROM support_calls WHERE call_sid = $1`, [callSid])).rows[0];
-      if (!row) { await c.query("ROLLBACK"); return res.status(409).json({ code: "not_started" }); }   // turn requires start
+      const row = (await pool.query(`SELECT state FROM support_calls WHERE call_sid = $1`, [callSid])).rows[0];
+      if (!row) return res.status(409).json({ code: "not_started" });   // a turn requires start
       const s: CallState = row.state?.step ? row.state : freshState();
+      const v0 = s.v ?? 0; s.v = v0 + 1;
       const caller = String(from || "");
       const deps: Deps = { now: () => Date.now(), findAccount, sendCode, hashCode, intakeTurn: (h) => intakeTurn(h, caller), openTicket: (st, cn) => openTicket(st, cn, callSid) };
+      let r: { say: string; end: boolean };
       try { r = await turn(s, text, caller, deps); }
-      catch (e: any) { console.error("[support] turn failed:", e?.message || e); r = { say: "Sorry, something went wrong on my end. Please email support at constructhub dot us. Goodbye.", end: true }; s.step = "done"; }
-      await c.query(`UPDATE support_calls SET state = $1, user_id = $2, verified_at = CASE WHEN $3 AND verified_at IS NULL THEN now() ELSE verified_at END, updated_at = now() WHERE call_sid = $4`, [JSON.stringify(s), s.verified ? s.userId : null, s.verified, callSid]);
-      await c.query("COMMIT");
-    } catch (e: any) {
-      await c.query("ROLLBACK").catch(() => {});
-      console.error("[support] turn transaction failed:", e?.message || e);
-      r = { say: "Sorry, something went wrong on my end. Please email support at constructhub dot us. Goodbye.", end: true };
-    } finally { c.release(); }
-    res.json(r);
+      catch (e: any) { console.error("[support] turn failed:", e?.message || e); r = FAIL; s.step = "done"; }
+      const w = await pool.query(
+        `UPDATE support_calls SET state = $1, user_id = $2, verified_at = CASE WHEN $3 AND verified_at IS NULL THEN now() ELSE verified_at END, updated_at = now()
+         WHERE call_sid = $4 AND COALESCE((state->>'v')::int, 0) = $5`, [JSON.stringify(s), s.verified ? s.userId : null, s.verified, callSid, v0]);
+      if (w.rowCount === 0) return res.json({ say: "Sorry, could you say that one more time?", end: false });
+      res.json(r);
+    } catch (e: any) { console.error("[support] turn failed:", e?.message || e); res.json(FAIL); }
   });
   app.post(`${VOICE_INTERNAL_PATH}/support/end`, requireVoiceInternal, async (req, res) => {
     const { callSid } = req.body || {};

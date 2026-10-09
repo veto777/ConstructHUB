@@ -16,6 +16,7 @@ export type Account = { userId: number; crmOrgId: string | null; email: string; 
 export type Category = "payment" | "login" | "technical" | "data" | "other";
 export type Intake = { category?: Category; title?: string; description?: string; steps?: string; device?: string; blocking?: boolean; /** Collected without the AI (it was down): severity is never "critical". */ fallback?: boolean };
 export type CallState = {
+  /** Version for the optimistic write (service.ts). */ v?: number;
   step: "ask_id" | "choose_channel" | "code_sent" | "intake" | "confirm" | "done";
   idTries: number; codeTries: number; codesSent: number; turns: number;
   userId: number | null; crmOrgId: string | null; ref: string | null; email: string | null; phones: string[];
@@ -119,6 +120,12 @@ export async function turn(s: CallState, callerText: string, callerNumber: strin
     case "choose_channel":
       return sendTo(/\b(text|sms|message|phone)\b/i.test(text) ? "sms" : "email");
     case "code_sent": {
+      // "I didn't get it" → resend by the other channel (Kimi round 2 N2: a failed delivery must not dead-end the call).
+      // Same for a real and a made-up account; it counts toward the 2 codes per call.
+      if (/\b(didn'?t (get|receive|come)|did not (get|receive)|no code|never (got|came)|resend|send (it )?again|other way|try (the )?(email|text))\b/i.test(text)) {
+        const other: Channel = /\btext|sms|phone\b/i.test(text) ? "sms" : /\bemail\b/i.test(text) ? "email" : s.channel === "sms" ? "email" : "sms";
+        return sendTo(other);
+      }
       const code = spokenDigits(text).slice(0, 6);
       if (s.codeExpires !== null && d.now() > s.codeExpires) return sendTo(s.channel ?? "email");
       const ok = code.length === 6 && s.codeHash !== null && d.hashCode(code) === s.codeHash;

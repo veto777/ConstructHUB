@@ -41,7 +41,8 @@ export async function ensureSupportSchema(): Promise<void> {
       updated_at timestamptz NOT NULL DEFAULT now()
     );
     CREATE INDEX IF NOT EXISTS support_tickets_status_idx ON support_tickets (status, created_at DESC);
-    CREATE INDEX IF NOT EXISTS support_tickets_user_idx ON support_tickets (user_id);
+    CREATE INDEX IF NOT EXISTS support_tickets_user_idx ON support_tickets (user_id, created_at);
+    CREATE UNIQUE INDEX IF NOT EXISTS support_tickets_call_uq ON support_tickets (call_sid) WHERE call_sid IS NOT NULL;
 
     -- One row per support call: the verification state machine lives here, server-side only.
     CREATE TABLE IF NOT EXISTS support_calls (
