@@ -23,11 +23,11 @@ const ON_LIVE_BOOK = new Date(Date.parse(FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT) + 3_
  */
 const FOUNDING_BASELINE = {
   plans: {
-    starter: { monthlyCents: 2900, annualCents: 29000 },
-    team: { monthlyCents: 4900, annualCents: 49000 },
-    pro: { monthlyCents: 9900, annualCents: 99000 },
-    growth: { monthlyCents: 19900, annualCents: 199000 },
-    agency: { monthlyCents: 44900, annualCents: 449000 },
+    starter: { monthlyCents: 2900, annualCents: 31900 },
+    team: { monthlyCents: 4900, annualCents: 53900 },
+    pro: { monthlyCents: 9900, annualCents: 108900 },
+    growth: { monthlyCents: 19900, annualCents: 218900 },
+    agency: { monthlyCents: 44900, annualCents: 493900 },
   },
   agencyBands: [
     { upTo: 10, centsPerLocation: 0 },
@@ -37,7 +37,7 @@ const FOUNDING_BASELINE = {
   ],
   // The `agency` key is Unlimited since the ladder: no included count (-1).
   agencyIncludedLocations: -1,
-  annualMonths: 10,
+  annualMonths: 11,
 } as const;
 
 /** Agency quotes at the band boundaries, monthly and yearly — the bands are 2026-09-30 legacy maths and never change. */

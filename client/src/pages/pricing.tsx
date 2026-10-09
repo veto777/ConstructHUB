@@ -333,7 +333,7 @@ export default function PricingPage() {
           {i === "month" ? "Monthly" : "Annual"}
           {i === "year" && (
             <span className={`ml-2 rounded-full border border-current px-1.5 py-0.5 text-[11px] font-semibold ${interval === i ? "text-mkt-orange dark:text-[#AE4A04]" : "text-mkt-orange-ink"}`}>
-              {monthsFree} months free
+              {monthsFree} {monthsFree === 1 ? "month" : "months"} free
             </span>
           )}
         </button>
@@ -453,28 +453,28 @@ export default function PricingPage() {
                           {PLAN_RIBBON[key]}
                         </div>
                       )}
-                      <div className="p-6 lg:p-7 xl:p-5 2xl:p-7 pb-0 lg:pb-0 xl:pb-0 2xl:pb-0">
+                      <div className="p-6 lg:p-7 xl:p-5 pb-0 lg:pb-0 xl:pb-0">
                         <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-center gap-3 xl:gap-2 2xl:gap-3 min-w-0">
-                            <div className="h-10 w-10 xl:h-8 xl:w-8 2xl:h-10 2xl:w-10 rounded-lg border border-mkt-rule bg-mkt-paper flex items-center justify-center text-mkt-ink shrink-0">
+                          <div className="flex items-center gap-3 xl:gap-2 min-w-0">
+                            <div className="h-10 w-10 xl:h-8 xl:w-8 rounded-lg border border-mkt-rule bg-mkt-paper flex items-center justify-center text-mkt-ink shrink-0">
                               <Icon className="w-[18px] h-[18px]" strokeWidth={1.75} />
                             </div>
-                            <h3 className="font-display font-semibold text-[1.45rem] xl:text-[1.25rem] 2xl:text-[1.45rem] leading-tight whitespace-nowrap text-mkt-ink">{plan.name}</h3>
+                            <h3 className="font-display font-semibold text-[1.45rem] xl:text-[1.25rem] leading-tight whitespace-nowrap text-mkt-ink">{plan.name}</h3>
                           </div>
-                          <span className="font-display italic text-mkt-muted text-lg leading-none pt-1 shrink-0 xl:hidden 2xl:inline" aria-hidden>{String(index + 1).padStart(2, "0")}</span>
+                          <span className="font-display italic text-mkt-muted text-lg leading-none pt-1 shrink-0 xl:hidden" aria-hidden>{String(index + 1).padStart(2, "0")}</span>
                         </div>
                         {view.live && view.planKey === key && legacyPlan && (
                           <p className="mt-2 text-[12px] text-mkt-muted" data-testid={`text-legacy-${key}`}>{legacyBand ? "Move from legacy location billing to flat Unlimited" : `Your ${view.displayName} features match this plan`}</p>
                         )}
                         <p className="text-[14.5px] text-mkt-ink-soft pt-3 leading-relaxed">{plan.tagline}</p>
-                        <div className="pt-5 font-display font-semibold text-mkt-ink leading-none" data-testid={`text-price-${key}`}>
-                          <span className="text-[2.9rem] xl:text-[2.3rem] 2xl:text-[2.9rem] whitespace-nowrap tracking-[-0.02em]">{formatUsd(planPriceCents(plan, interval))}</span>
+                        <div className="pt-5 font-display font-semibold text-mkt-ink leading-none whitespace-nowrap" data-testid={`text-price-${key}`}>
+                          <span className="text-[2.9rem] xl:text-[2.3rem] whitespace-nowrap tracking-[-0.02em]">{formatUsd(planPriceCents(plan, interval))}</span>
                           <span className="font-sans text-[15px] font-medium text-mkt-muted ml-1">{intervalSuffix(interval)}</span>
                         </div>
                         <p className="mt-3 text-[12.5px] leading-relaxed text-mkt-muted min-h-[2.5rem]" data-testid={`text-price-note-${key}`}>
                           {interval === "year"
                             ? `${formatUsd(Math.round(plan.annualCents / 12))}/mo billed yearly · save ${formatUsd(annualSavingsCents(plan))}`
-                            : `or ${formatUsd(plan.annualCents)}/yr (${monthsFree} months free)`}
+                            : `or ${formatUsd(plan.annualCents)}/yr (${monthsFree} ${monthsFree === 1 ? "month" : "months"} free)`}
                         </p>
                       </div>
                       <div className="flex flex-col flex-1 p-6 lg:p-7 pt-5 lg:pt-5">

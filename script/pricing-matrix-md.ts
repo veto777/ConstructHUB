@@ -93,7 +93,7 @@ const doc = `# Plan matrix
 
 _generated from \`shared/plan-matrix.ts\` on ${generated} — do not edit by hand. Regenerate with \`npm run pricing:matrix\` after any price-book change (shared/plans.ts, shared/crm-plans.ts). See docs/pricing/README.md._
 
-Money is in US dollars. Yearly platform billing is ${ANNUAL_MONTHS}× the monthly price (two months free); CRM yearly prices are their own. "🕒 Coming" marks a row or module that is promised on the plan but not live yet (shared/plans.ts \`COMING_MODULES\`). ⭐ = the hero plan. There is no per-location pricing and no extra-location add-on: outgrow a plan and you move up.
+Money is in US dollars. Yearly platform billing is ${ANNUAL_MONTHS}× the monthly price (${12 - ANNUAL_MONTHS} ${12 - ANNUAL_MONTHS === 1 ? "month" : "months"} free); CRM yearly prices are their own. "🕒 Coming" marks a row or module that is promised on the plan but not live yet (shared/plans.ts \`COMING_MODULES\`). ⭐ = the hero plan. There is no per-location pricing and no extra-location add-on: outgrow a plan and you move up.
 
 ## Business Tools (the ConstructHUB platform)
 

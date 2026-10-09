@@ -129,7 +129,7 @@ import { registerStripeRoutes } from "./stripe";
 import { cancellationOf, withBillingLock } from "./billing/sync";
 import { resetPriceCache } from "./billing/prices";
 import { COURSE_BUNDLE, DFY_CATALOG } from "./catalog";
-import { PLANS, ADDONS, AGENCY_LOCATION_BANDS, TRIAL_DAYS, agencyMonthlyCents, LEGACY_AGENCY_BASE_CENTS } from "@shared/plans";
+import { PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, TRIAL_DAYS, agencyMonthlyCents, LEGACY_AGENCY_BASE_CENTS } from "@shared/plans";
 
 const routes = new Map<string, Function>();
 registerStripeRoutes({
@@ -220,7 +220,7 @@ describe("GET /api/stripe/plans", () => {
   it("returns the shared price book — five plans, add-ons, the legacy Agency bands, a 1-day trial; no free or retired plans", async () => {
     const res = await request("GET /api/stripe/plans");
     expect(res.body.plans.map((p: any) => p.key)).toEqual(["starter", "team", "pro", "growth", "agency"]);
-    expect(res.body.plans.map((p: any) => [p.monthlyCents, p.annualCents])).toEqual([[2900, 29000], [4900, 49000], [9900, 99000], [19900, 199000], [44900, 449000]]);
+    expect(res.body.plans.map((p: any) => [p.monthlyCents, p.annualCents])).toEqual(PLAN_KEYS.map(k => [PLANS[k].monthlyCents, PLANS[k].annualCents]));
     expect(res.body.addons.map((a: any) => a.key)).toEqual(Object.keys(ADDONS));
     // Unlimited has no location cap (-1); the graduated bands stay to read stored 2026-09-30 rows.
     expect(res.body.agency).toEqual({ includedLocations: -1, bands: AGENCY_LOCATION_BANDS, selfServeMaxLocations: 500 });
@@ -255,7 +255,7 @@ describe("POST /api/stripe/create-checkout", () => {
     expect(mocks.checkout.mock.calls[1][0].line_items[0].price).toBe("price_chub_v1_plan_pro_month_9900");
   });
 
-  it("annual billing is 10x monthly on a yearly price", async () => {
+  it("annual billing uses the price book on a yearly price", async () => {
     mocks.rows.push([customerRow()]);
     expect((await request("/api/stripe/create-checkout", { plan: "growth", interval: "year" })).code).toBe(200);
     expect(priceOf(lineItems()[0].price)).toMatchObject({ unit_amount: PLANS.growth.annualCents, recurring: { interval: "year" } });
@@ -279,7 +279,7 @@ describe("POST /api/stripe/create-checkout", () => {
   it("Unlimited annual is a single yearly plan price — no band line, no locations metadata", async () => {
     mocks.rows.push([customerRow()]);
     await request("/api/stripe/create-checkout", { plan: "agency", interval: "year", locations: 60 });
-    expect(lineItems()).toEqual([{ price: "price_chub_v1_plan_agency_year_449000", quantity: 1 }]);
+    expect(lineItems()).toEqual([{ price: `price_chub_v1_plan_agency_year_${PLANS.agency.annualCents}`, quantity: 1 }]);
     expect(priceOf(lineItems()[0].price)).toMatchObject({ unit_amount: PLANS.agency.annualCents, recurring: { interval: "year" } });
     expect(mocks.checkout.mock.calls[0][0].metadata.locations).toBe("");
   });
@@ -463,8 +463,8 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
     await request("/api/stripe/create-checkout", { plan: "pro", interval, addons: { texting_number: 1 } });
     mocks.checkout.mockClear();
     mocks.pricesCreate.mockClear();
-    const planPrice = `price_chub_v1_plan_pro_${interval}_${interval === "year" ? 99000 : 9900}`;
-    const textPrice = `price_chub_v1_addon_texting_number_${interval}_${interval === "year" ? 29000 : 2900}`;
+    const planPrice = `price_chub_v1_plan_pro_${interval}_${interval === "year" ? PLANS.pro.annualCents : PLANS.pro.monthlyCents}`;
+    const textPrice = `price_chub_v1_addon_texting_number_${interval}_${interval === "year" ? ADDONS.texting_number.annualCents : ADDONS.texting_number.monthlyCents}`;
     mocks.current = subscription([
       item("si_plan", planPrice, 1, { kind: "plan", key: "pro" }, interval),
       item("si_text", textPrice, 1, { kind: "addon", key: "texting_number" }, interval),
@@ -506,8 +506,8 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
     mocks.rows.push([liveRow()]);
     expect((await request("/api/stripe/change-plan", { plan: "pro", interval: "year" })).code).toBe(200);
     expect(mocks.update.mock.calls[0][1].items).toEqual([
-      { id: "si_plan", price: "price_chub_v1_plan_pro_year_99000", quantity: 1 },
-      { id: "si_text", price: "price_chub_v1_addon_texting_number_year_29000", quantity: 1 },
+      { id: "si_plan", price: `price_chub_v1_plan_pro_year_${PLANS.pro.annualCents}`, quantity: 1 },
+      { id: "si_text", price: `price_chub_v1_addon_texting_number_year_${ADDONS.texting_number.annualCents}`, quantity: 1 },
     ]);
     expect(mocks.update.mock.calls[0][1].add_invoice_items).toBeUndefined(); // no second setup fee
   });
@@ -537,7 +537,7 @@ describe("POST /api/stripe/change-plan and /api/stripe/addons (no second subscri
     mocks.rows.push([liveRow({ plan: "premium" })]);
     expect((await request("/api/stripe/change-plan", { plan: "pro", interval: "year" })).code).toBe(200);
     expect(mocks.update.mock.calls[0][1].items).toEqual([
-      { id: "si_old", price: "price_chub_v1_plan_pro_year_99000", quantity: 1 },
+      { id: "si_old", price: `price_chub_v1_plan_pro_year_${PLANS.pro.annualCents}`, quantity: 1 },
     ]);
   });
 
@@ -1581,13 +1581,13 @@ describe("price rebuild legacy billing routes", () => {
     legacyAgency();
     mocks.rows.push([liveRow({ plan: "agency", agencyLocations: 20 })]);
     expect((await request("/api/stripe/change-plan-preview", { plan: "agency", interval: "year" })).body)
-      .toEqual({ recurringCents: 449000, interval: "year" });
+      .toEqual({ recurringCents: PLANS.agency.annualCents, interval: "year" });
     expect(mocks.update).not.toHaveBeenCalled();
     mocks.rows.push([liveRow({ plan: "agency", agencyLocations: 20 })]);
     expect((await request("/api/stripe/change-plan", { plan: "agency", interval: "year" })).code).toBe(200);
     expect(mocks.update.mock.calls[0][1]).toMatchObject({
       metadata: { legacy_agency_billing: "false" },
-      items: [{ id: "si_plan", price: "price_chub_v1_plan_agency_year_449000", quantity: 1 }, { id: "si_band", deleted: true }],
+      items: [{ id: "si_plan", price: `price_chub_v1_plan_agency_year_${PLANS.agency.annualCents}`, quantity: 1 }, { id: "si_band", deleted: true }],
     });
     expect(mocks.updates.at(-1)).toMatchObject({ agencyLocations: null });
   });
@@ -1606,7 +1606,7 @@ describe("price rebuild legacy billing routes", () => {
     mocks.current.items.data.push(item("si_grid", "price_grid", 2, { kind: "addon", key: "grid_pack" }));
     mocks.rows.push([liveRow({ plan: "agency", agencyLocations: 10 })]);
     expect((await request("/api/stripe/change-plan-preview", { plan: "agency", interval: "year" })).body)
-      .toEqual({ recurringCents: 449000 + 2 * ADDONS.grid_pack.annualCents, interval: "year" });
+      .toEqual({ recurringCents: PLANS.agency.annualCents + 2 * ADDONS.grid_pack.annualCents, interval: "year" });
   });
 });
 

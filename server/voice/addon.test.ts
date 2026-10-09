@@ -21,7 +21,7 @@ import {
   sendModuleRequired, requireModule, allowancesFor,
 } from "../entitlements";
 import {
-  ADDONS, ADDON_MODULES, ADDON_MODULE_UNLOCKED_BY, PLANS, PLAN_KEYS, MODULE_NAMES, ANNUAL_MONTHS, SALES_THRESHOLD_CENTS, moduleName, isAddonModule,
+  ADDONS, ADDON_MODULES, ADDON_MODULE_UNLOCKED_BY, PLANS, PLAN_KEYS, MODULE_NAMES, SALES_THRESHOLD_CENTS, moduleName, isAddonModule,
   CALL_ASSISTANT_TIERS, CALL_ASSISTANT_TIER_ADDONS, CALL_ASSISTANT_ADDONS, CALL_ASSISTANT_ANNUAL_MONTHS, CALL_ASSISTANT_OVERAGE_CENTS_PER_MINUTE,
   CALL_ASSISTANT_OVERAGE_RATES, CALL_ASSISTANT_DEFAULT_OVERAGE_CENTS, CALL_ASSISTANT_FROM_CENTS, CALL_ASSISTANT_NOT_INCLUDED_LINE,
   callAssistantTier, callAssistantAddonsOf, withoutCallAssistantAddons, isCallAssistantAddon,
@@ -54,9 +54,8 @@ describe("price book: the AI Call Assistant, a separate service (owner, 2026-10-
       ["crew", "call_assistant_crew", "2,000 minutes", 44_900, 493_900, 2_000, 2, 50],
       ["fleet", "call_assistant_fleet", "5,000 minutes", 99_900, 1_098_900, 5_000, 5, 50],
     ]);
-    // Yearly = 11 × monthly (one month free): a smaller discount than the plans' 10 × (two months), which is untouched.
+    // Voice keeps its independent annual multiplier and existing prices.
     expect(CALL_ASSISTANT_ANNUAL_MONTHS).toBe(11);
-    expect(ANNUAL_MONTHS).toBe(10);
     for (const t of CALL_ASSISTANT_TIERS) {
       expect(t.annualCents).toBe(t.monthlyCents * CALL_ASSISTANT_ANNUAL_MONTHS);
       // The top tier is $999: listed. More minutes than it is a sales conversation, never a tier.

@@ -83,7 +83,7 @@ import {
   type BillingEmailEvent, type StripeReader,
 } from "./billing-emails";
 import { emailLayout } from "./billing-email-templates";
-import { PLANS, ADDONS, agencyPriceCents, LEGACY_AGENCY_BASE_CENTS, ANNUAL_MONTHS } from "@shared/plans";
+import { PLANS, ADDONS, agencyPriceCents, LEGACY_AGENCY_BASE_CENTS, LEGACY_BAND_ANNUAL_MONTHS } from "@shared/plans";
 
 const USER = 42;
 const BASE = "https://app.example.invalid";
@@ -246,13 +246,13 @@ describe("subscription started", () => {
     const facts = subscriptionFacts(sub);
     expect(facts.planName).toBe("Unlimited");
     // The stored banded row still bills: the Unlimited yearly price + the legacy bands
-    // above the 2026-09-30 base ($349 × 10 = $349,000 a year) — 449,000 + 225,000 = 674,000.
-    expect(facts.recurringCents).toBe(PLANS.agency.annualCents + (agencyPriceCents(25, "year") - LEGACY_AGENCY_BASE_CENTS * ANNUAL_MONTHS));
+    // above the 2026-09-30 base, using its own legacy annual multiplier.
+    expect(facts.recurringCents).toBe(PLANS.agency.annualCents + (agencyPriceCents(25, "year") - LEGACY_AGENCY_BASE_CENTS * LEGACY_BAND_ANNUAL_MONTHS));
     expect(facts.extras).toEqual(["25 locations (10 included + 15 extra)"]);
     await handleBillingEmailEvent({ type: "billing.subscription_started", userId: USER, subscription: sub }, { baseUrl: BASE });
     expect(last().subject).toBe("Your ConstructHUB Unlimited plan is active");
-    expect(last().html).toContain("$6,740.00 / year");
-    expect(last().text).toContain("Next charge: $6,740.00 on January 1, 2030");
+    expect(last().html).toContain(`${((PLANS.agency.annualCents + 225000) / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })} / year`);
+    expect(last().text).toContain(`Next charge: ${((PLANS.agency.annualCents + 225000) / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })} on January 1, 2030`);
   });
   it("names a legacy subscription from its price without inventing a plan price", () => {
     const legacy = price("price_legacy", null, "month", 4900, { nickname: "Standard (legacy)" });

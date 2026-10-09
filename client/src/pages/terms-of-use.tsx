@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { copyrightNotice } from "@/lib/marketing";
 import { LegalPage } from "@/components/legal-page";
-import { PLANS, PLAN_KEYS } from "@shared/plans";
+import { PLANS, PLAN_KEYS, ANNUAL_MONTHS } from "@shared/plans";
 import { CRM_TRIAL_DAYS } from "@shared/crm-plans";
 import { inNativeApp } from "@/lib/app-shell";
 import {
@@ -49,7 +49,7 @@ export default function TermsOfUsePage() {
           <section data-testid="section-subscription-plans">
             <h2 className="text-xl font-semibold mb-3">3. Subscription Plans and Pricing</h2>
             {inNativeApp() ? <p>Paid plans aren't sold in the ConstructHUB apps. A paid plan on your account is governed by the plan, price and billing terms in effect when you subscribed, including automatic renewal and cancellation at the end of the billing period.</p> : <>
-            <p className="mb-2">ConstructHUB offers the following subscription plans, billed monthly or annually (the annual price is 10 times the monthly price):</p>
+            <p className="mb-2">ConstructHUB offers the following subscription plans, billed monthly or annually (the annual price is {ANNUAL_MONTHS} times the monthly price):</p>
             <ul className="list-disc pl-6 space-y-1 mb-3" data-testid="list-plans">
               {PLAN_KEYS.map((key) => (
                 <li key={key}><strong>{PLANS[key].name}</strong> &mdash; {planPriceLine(key)}</li>
@@ -66,7 +66,7 @@ export default function TermsOfUsePage() {
           <section data-testid="section-add-ons">
             <h2 className="text-xl font-semibold mb-3">4. Add-ons</h2>
             {inNativeApp() ? <p>Add-ons aren't sold in the ConstructHUB apps. Add-ons on your account follow the same terms as your plan.</p> : <>
-            <p className="mb-2">Individual tools are not sold on their own. You can add the following to an eligible plan; add-ons are billed with your plan, monthly or annually (10 times the monthly price{annualExceptionsLine()}). The AI Call Assistant is not an add-on: see section 3.</p>
+            <p className="mb-2">Individual tools are not sold on their own. You can add the following to an eligible plan; add-ons are billed with your plan, monthly or annually ({ANNUAL_MONTHS} times the monthly price{annualExceptionsLine()}). The AI Call Assistant is not an add-on: see section 3.</p>
             <ul className="list-disc pl-6 space-y-1">
               {PLATFORM_ADDONS.map((addon) => (
                 <li key={addon.key}>

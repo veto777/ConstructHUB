@@ -15,7 +15,7 @@ import pg from "pg";
 import { cleanup, made, makeAccount, makeCall } from "./calls-fixtures";
 import {
   ADDONS, PLANS, CALL_ASSISTANT_TIERS, CALL_ASSISTANT_FREE_SPAM_CALLS, CALL_ASSISTANT_DEFAULT_OVERAGE_CENTS, CALL_ASSISTANT_OVERAGE_RATES, CALL_NUMBER_MIN_DAYS,
-  CALL_ASSISTANT_ANNUAL_MONTHS, SALES_THRESHOLD_CENTS, ANNUAL_MONTHS, callAssistantTier, callAssistantTierOf, callAssistantIncluded,
+  CALL_ASSISTANT_ANNUAL_MONTHS, SALES_THRESHOLD_CENTS, callAssistantTier, callAssistantTierOf, callAssistantIncluded,
 } from "@shared/plans";
 
 // Throwaway "p-voice-admin-…@example.invalid" accounts count as platform admins (the real ADMIN_EMAILS are never used).
@@ -63,9 +63,8 @@ describe("Call Assistant price book: a separate service, four tiers (owner, 2026
         availableOn: [], exclusiveGroup: "call_assistant_tier", grants: {} });
       // Launched (owner, 2026-10-02: "the call assistant is live not coming soon"): every tier is for sale.
       expect(a.preview ?? false).toBe(false);
-      // Yearly is 11 × monthly (one month free), not the plans' 10 ×; it shows despite the $1,000 sales threshold (listed yearly prices are exempt).
+      // Voice yearly prices use their own multiplier and are exempt from the sales threshold.
       expect(a.annualCents).toBe(a.monthlyCents * CALL_ASSISTANT_ANNUAL_MONTHS);
-      expect(a.annualCents).not.toBe(a.monthlyCents * ANNUAL_MONTHS);
       expect(a.monthlyCents).toBeLessThan(SALES_THRESHOLD_CENTS);
       expect(a.setupCents).toBeUndefined();
       // No intro price any more.
@@ -77,7 +76,7 @@ describe("Call Assistant price book: a separate service, four tiers (owner, 2026
       expect(a.description).toContain(`the first ${CALL_ASSISTANT_FREE_SPAM_CALLS} spam calls each month never count`);
     }
     // The extra number keeps the old contract's yearly price (10 ×): the repricing named the four tiers only.
-    expect(ADDONS.call_number).toMatchObject({ key: "call_number", monthlyCents: 500, annualCents: 500 * ANNUAL_MONTHS, availableOn: [] });
+    expect(ADDONS.call_number).toMatchObject({ key: "call_number", monthlyCents: 500, annualCents: 5000, availableOn: [] });
     expect(ADDONS.call_number.preview ?? false).toBe(false);
     expect(ADDONS.call_number.requires).toEqual(["call_assistant_lite", "call_assistant", "call_assistant_crew", "call_assistant_fleet"]);
   });

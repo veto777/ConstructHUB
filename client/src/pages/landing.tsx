@@ -26,7 +26,7 @@ import { SHOW_COMPETITOR_INTEL } from "@/lib/features";
 import { GROWTH_TOOLS } from "@/lib/growth-tools";
 import { BRAND_NAME, copyrightNotice, formatCount, usePermitDirectoryCounts } from "@/lib/marketing";
 import { SiteNavBar } from "@/components/site-nav";
-import { PLANS, PLAN_KEYS } from "@shared/plans";
+import { PLANS, PLAN_KEYS, ANNUAL_MONTHS } from "@shared/plans";
 import { AGENCY_ONLY_MODULES, SALES_HREF, SALES_REP_LABEL, TRIAL_LABEL, formatUsd, joinNames } from "@shared/plan-copy";
 import { CALL_ASSISTANT_PATH, CallAssistantSection } from "@/components/call-assistant-marketing";
 import { callAssistantPricing } from "@shared/plan-copy";
@@ -479,7 +479,7 @@ export default function LandingPage() {
               </h2>
             </div>
             <p className="lg:col-span-5 text-[17px] text-mkt-ink-soft leading-relaxed lg:pb-1">
-              A new account's first plan starts with a {TRIAL_LABEL}. Pay monthly, or yearly at 10 times the monthly price. The CRM is a separate product with its own plans.
+              A new account's first plan starts with a {TRIAL_LABEL}. Pay monthly, or yearly at {ANNUAL_MONTHS} times the monthly price. The CRM is a separate product with its own plans.
             </p>
           </div>
 

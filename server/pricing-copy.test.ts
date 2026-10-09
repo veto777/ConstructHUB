@@ -81,7 +81,7 @@ describe("plan copy helpers", () => {
     // The retired extra-location add-on is never described to customers or the AI.
     expect(lines.join(" ")).not.toMatch(/Extra location/i);
     expect(PLATFORM_ADDONS.map((a) => a.key)).not.toContain("extra_location");
-    // Every platform add-on is 10 × monthly yearly, so there is no exception to state.
+    // Every sold platform add-on is ANNUAL_MONTHS × monthly yearly, so there is no exception to state.
     expect(annualExceptionsLine()).toBe("");
   });
 });
@@ -283,7 +283,7 @@ describe("AI assistant prompts use the price book", () => {
 
   it("hub assistant quotes no service at or above the sales threshold", () => {
     // The only amounts of $1,000 or more it may state are annual plan and
-    // add-on prices (10 × a listed monthly price) and the threshold itself
+    // add-on prices (ANNUAL_MONTHS × a listed monthly price) and the threshold itself
     // ("priced at $1,000 or more").
     const planAnnual = new Set([
       ...PLAN_KEYS.map((k) => PLANS[k].annualCents),

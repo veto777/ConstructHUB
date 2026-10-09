@@ -13,7 +13,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import {
-  PLANS, PLAN_KEYS, ADDONS, ADDON_MAX_QUANTITY, AGENCY_LOCATION_BANDS, ANNUAL_MONTHS, SALES_THRESHOLD_CENTS,
+  PLANS, PLAN_KEYS, ADDONS, ADDON_MAX_QUANTITY, AGENCY_LOCATION_BANDS, ANNUAL_MONTHS, LEGACY_BAND_ANNUAL_MONTHS, SALES_THRESHOLD_CENTS,
   GBP_REINSTATEMENT_CENTS, gridCreditCost,
 } from "@shared/plans";
 import {
@@ -236,7 +236,7 @@ export function priceBookCents(): Set<number> {
     for (const c of dollarAmounts(addon.description)) cents.add(c);
   }
   for (const band of AGENCY_LOCATION_BANDS) {
-    if (band.centsPerLocation > 0) { cents.add(band.centsPerLocation); cents.add(band.centsPerLocation * ANNUAL_MONTHS); }
+    if (band.centsPerLocation > 0) { cents.add(band.centsPerLocation); cents.add(band.centsPerLocation * LEGACY_BAND_ANNUAL_MONTHS); }
   }
   // The CRM's own price book (a separate product): each plan monthly, yearly and
   // the yearly price per month, and the extra seat.

@@ -346,7 +346,7 @@ includes it. Four tiers, one per account, every figure from `CALL_ASSISTANT_TIER
 
 Extra number (`call_number`): $5/mo, $50/yr (10 ×, the old contract — unchanged; the 2026-10-08 repricing named the four tiers only).
 No intro price, no trial; above 5,000 minutes a month is "talk to a sales rep", never a listed price. Yearly is
-11 × monthly (one month free; the platform plans stay 10 ×). Overage is billed per started minute at the rate in
+11 × monthly (one month free; platform plans use `ANNUAL_MONTHS`). Overage is billed per started minute at the rate in
 force when the call ends, on the Call Assistant's own subscription (`billing-usage.ts`); when the subscription
 ends, every outstanding month is settled first, and the sweep bills every finished month, not only last month.
 

@@ -70,9 +70,9 @@ describe("the price snapshot a founding member keeps", () => {
 
   it("uses the five-plan book at the inclusive cutover boundary", () => {
     const snap = snapshotAt(FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT);
-    expect(snap.plans.pro).toEqual({ monthlyCents: 9900, annualCents: 99000 });
-    expect(snap.plans.team).toEqual({ monthlyCents: 4900, annualCents: 49000 });
-    expect(snap.plans.agency).toEqual({ monthlyCents: 44900, annualCents: 449000 });
+    expect(snap.plans.pro).toEqual({ monthlyCents: 9900, annualCents: PLANS.pro.annualCents });
+    expect(snap.plans.team).toEqual({ monthlyCents: 4900, annualCents: PLANS.team.annualCents });
+    expect(snap.plans.agency).toEqual({ monthlyCents: 44900, annualCents: PLANS.agency.annualCents });
     expect(snap.agencyIncludedLocations).toBe(-1);
   });
 
@@ -221,7 +221,7 @@ describe("the founding member mark (noteFoundingMember)", () => {
     const snapshot = JSON.parse(q.calls[0].values[1] as string);
     expect(snapshot.capturedAt).toBe(start);
     expect(foundingPrice(member(snapshot), "pro", "month")).toBe(cents);
-    expect(foundingPrice(member(snapshot), "pro", "year")).toBe(cents * 10);
+    expect(foundingPrice(member(snapshot), "pro", "year")).toBe(cents * (T(start) < T(FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT) ? LEGACY_FOUNDING_PRICE_BOOK.annualMonths : ANNUAL_MONTHS));
   });
 
   it("preserves an existing snapshot on conflicts, including one stored before the membership mark", async () => {

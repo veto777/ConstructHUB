@@ -1,3 +1,5 @@
+> Historical UI audit: quoted prices and savings below describe the retired four-plan book at the time of inspection. Current platform annual pricing derives from `ANNUAL_MONTHS` (11); see [the generated plan matrix](../pricing/PLAN-MATRIX.md). Legacy Agency bands retain `LEGACY_BAND_ANNUAL_MONTHS` (10).
+
 # UI map — lane 6: government data pages and the public/marketing site
 
 Every element of every page in audit lane 6, what it does, and how it was verified.

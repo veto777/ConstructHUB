@@ -14,7 +14,7 @@
  *     Extra user $35/mo
  * Half of each, rounded to a clean price point, is the table below.
  *
- * NOTE: the platform's "annual = 10x monthly" rule (ANNUAL_MONTHS in plans.ts)
+ * NOTE: the platform's annual multiplier (ANNUAL_MONTHS in plans.ts)
  * does NOT apply here. Housecall Pro discounts annual ~25%, so matching it at
  * half required an explicit annual price per tier (~9x monthly). Read annual
  * prices from `annualCents`; never derive them with ANNUAL_MONTHS.

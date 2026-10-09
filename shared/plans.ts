@@ -3,7 +3,7 @@
  * server (checkout, entitlements, quotas) and the client (pricing page, upgrade
  * prompts). Owner decisions 2026-10-09 (the cost-based rebuild — docs/pricing/README.md):
  *   - Five plans: Solo $29 (1 location) / Team $49 (10) / Pro $99 (25) /
- *     Agency $199 (100) / Unlimited $449 (no caps). Annual = 10x monthly.
+ *     Agency $199 (100) / Unlimited $449 (no caps). Annual = ANNUAL_MONTHS × monthly.
  *     Plan KEYS keep their old names so stored subscriptions still resolve:
  *     starter = Solo, team = Team (new), pro = Pro, growth = Agency,
  *     agency = Unlimited. Never rename a key; rename `name`.
@@ -245,7 +245,7 @@ const CRM_NOT_INCLUDED_LINE = "The ConstructHUB CRM — estimates, invoices, sch
 //   2,000 minutes $449/mo (2 numbers) · 5,000 minutes $999/mo (5 numbers).
 // Every tier: $0.50 a minute above the included minutes. Yearly billing is
 // CALL_ASSISTANT_ANNUAL_MONTHS (11) times the monthly price — one month free,
-// a smaller discount than the plans' two months (ANNUAL_MONTHS). No intro
+// independently of the platform multiplier (ANNUAL_MONTHS). No intro
 // price. More than 5,000 minutes a month is a sales conversation (the $1,000+
 // rule, SALES_THRESHOLD_CENTS), never a listed price. The first
 // CALL_ASSISTANT_FREE_SPAM_CALLS spam calls a month never count, as before.
@@ -322,7 +322,7 @@ export const CALL_ASSISTANT_NOT_INCLUDED_LINE = `The ${CALL_ASSISTANT_NAME} — 
 // ─────────────────────────────────────────────────────────────────────────────
 export const PLANS: Record<PlanKey, Plan> = {
   starter: {
-    key: "starter", name: "Solo", monthlyCents: 2900, annualCents: 29000,
+    key: "starter", name: "Solo", monthlyCents: 2900, annualCents: 31900,
     tagline: "One Google profile, managed and protected.",
     features: [
       "1 Google Business Profile location",
@@ -357,7 +357,7 @@ export const PLANS: Record<PlanKey, Plan> = {
     modules: NO_MODULES,
   },
   team: {
-    key: "team", name: "Team", monthlyCents: 4900, annualCents: 49000,
+    key: "team", name: "Team", monthlyCents: 4900, annualCents: 53900,
     tagline: "Up to 10 locations and a small crew.",
     features: [
       "Everything in Solo",
@@ -392,7 +392,7 @@ export const PLANS: Record<PlanKey, Plan> = {
     modules: { ...NO_MODULES, reviewReminders: true },
   },
   pro: {
-    key: "pro", name: "Pro", monthlyCents: 9900, annualCents: 99000,
+    key: "pro", name: "Pro", monthlyCents: 9900, annualCents: 108900,
     tagline: "Every premium tool, for up to 25 locations.",
     features: [
       "Everything in Team",
@@ -435,7 +435,7 @@ export const PLANS: Record<PlanKey, Plan> = {
     modules: PRO_MODULES,
   },
   growth: {
-    key: "growth", name: "Agency", monthlyCents: 19900, annualCents: 199000,
+    key: "growth", name: "Agency", monthlyCents: 19900, annualCents: 218900,
     tagline: "Client workspaces for up to 100 locations.",
     features: [
       "Everything in Pro",
@@ -473,7 +473,7 @@ export const PLANS: Record<PlanKey, Plan> = {
     modules: AGENCY_MODULES,
   },
   agency: {
-    key: "agency", name: "Unlimited", monthlyCents: 44900, annualCents: 449000,
+    key: "agency", name: "Unlimited", monthlyCents: 44900, annualCents: 493900,
     tagline: "No caps. The only unlimited plan on the market.",
     features: [
       "Everything in Agency",
@@ -636,14 +636,14 @@ export const ADDONS: Record<AddonKey, Addon> = {
   // RETIRED 2026-10-09 (owner: "outgrow a plan, move up" — no extra-location add-on below Unlimited). Sold on no plan;
   // the key stays so a stored subscription that holds one still reads.
   extra_location: { key: "extra_location", name: "Extra location", description: "One more Google Business Profile location. No longer sold: a bigger plan includes more.", monthlyCents: 1900, annualCents: 19000, availableOn: [], grants: { locations: 1 } },
-  extra_seat: { key: "extra_seat", name: "Extra team seat", description: "One more team seat.", monthlyCents: 1500, annualCents: 15000, availableOn: ["team", "pro", "growth"], grants: { agencySeats: 1 } },
-  protected_site: { key: "protected_site", name: "Extra protected website", description: "Click Guard + IP Tracker + VPN Shield for one more website.", monthlyCents: 1500, annualCents: 15000, availableOn: ["starter", "team", "pro", "growth"], grants: { protectedSites: 1 } },
-  texting_number: { key: "texting_number", name: "Client texting number", description: "A registered texting number on our carrier for texting your clients; texts count against your plan's monthly text allowance.", monthlyCents: 2900, annualCents: 29000, setupCents: 2900, availableOn: ["starter", "team", "pro", "growth", "agency"], grants: {} },
-  competitor_pack: { key: "competitor_pack", name: "Competitor scan pack", description: "10 more Competitor Intel scans each month.", monthlyCents: 1900, annualCents: 19000, availableOn: ["starter", "team", "pro", "growth", "agency"], grants: { competitorScans: 10 } },
-  grid_pack: { key: "grid_pack", name: "Grid scan pack", description: "10 more ranking-grid credits each month.", monthlyCents: 1000, annualCents: 10000, availableOn: ["starter", "team", "pro", "growth", "agency"], grants: { gridCredits: 10 } },
+  extra_seat: { key: "extra_seat", name: "Extra team seat", description: "One more team seat.", monthlyCents: 1500, annualCents: 16500, availableOn: ["team", "pro", "growth"], grants: { agencySeats: 1 } },
+  protected_site: { key: "protected_site", name: "Extra protected website", description: "Click Guard + IP Tracker + VPN Shield for one more website.", monthlyCents: 1500, annualCents: 16500, availableOn: ["starter", "team", "pro", "growth"], grants: { protectedSites: 1 } },
+  texting_number: { key: "texting_number", name: "Client texting number", description: "A registered texting number on our carrier for texting your clients; texts count against your plan's monthly text allowance.", monthlyCents: 2900, annualCents: 31900, setupCents: 2900, availableOn: ["starter", "team", "pro", "growth", "agency"], grants: {} },
+  competitor_pack: { key: "competitor_pack", name: "Competitor scan pack", description: "10 more Competitor Intel scans each month.", monthlyCents: 1900, annualCents: 20900, availableOn: ["starter", "team", "pro", "growth", "agency"], grants: { competitorScans: 10 } },
+  grid_pack: { key: "grid_pack", name: "Grid scan pack", description: "10 more ranking-grid credits each month.", monthlyCents: 1000, annualCents: 11000, availableOn: ["starter", "team", "pro", "growth", "agency"], grants: { gridCredits: 10 } },
   // ── ConstructHUB SEO as an add-on (owner, 2026-10-09): the suite on any plan below Unlimited. One of the two per account.
-  seo_basic: { key: "seo_basic", name: "SEO suite — 1,000 keywords", description: "Site explorer, rank tracker, keyword research and backlinks: 1,000 tracked keywords and $20 of SEO data a month.", monthlyCents: 2900, annualCents: 29000, availableOn: ["starter", "team", "pro", "growth"], grants: { seoKeywords: 1000, seoCreditCents: 2000 }, exclusiveGroup: "seo_addon" },
-  seo_pro: { key: "seo_pro", name: "SEO suite — 5,000 keywords", description: "The full suite: 5,000 tracked keywords and $60 of SEO data a month (what Unlimited includes).", monthlyCents: 7900, annualCents: 79000, availableOn: ["starter", "team", "pro", "growth"], grants: { seoKeywords: 5000, seoCreditCents: 6000 }, exclusiveGroup: "seo_addon" },
+  seo_basic: { key: "seo_basic", name: "SEO suite — 1,000 keywords", description: "Site explorer, rank tracker, keyword research and backlinks: 1,000 tracked keywords and $20 of SEO data a month.", monthlyCents: 2900, annualCents: 31900, availableOn: ["starter", "team", "pro", "growth"], grants: { seoKeywords: 1000, seoCreditCents: 2000 }, exclusiveGroup: "seo_addon" },
+  seo_pro: { key: "seo_pro", name: "SEO suite — 5,000 keywords", description: "The full suite: 5,000 tracked keywords and $60 of SEO data a month (what Unlimited includes).", monthlyCents: 7900, annualCents: 86900, availableOn: ["starter", "team", "pro", "growth"], grants: { seoKeywords: 5000, seoCreditCents: 6000 }, exclusiveGroup: "seo_addon" },
   // ── Call Assistant (docs/call-assistant/SPEC.md) — a separate service ────
   // The four tiers (CALL_ASSISTANT_TIERS above), one per account
   // (exclusiveGroup), and the extra number: the lines of the Call Assistant's
@@ -654,7 +654,7 @@ export const ADDONS: Record<AddonKey, Addon> = {
   // addonPriceSpec), so the 2026-10-08 prices made new Stripe Prices on the next
   // checkout — nothing manual. The tiers' yearly prices are
   // CALL_ASSISTANT_ANNUAL_MONTHS (11) × monthly; the extra number stays at the
-  // plans' 10 × ($5/mo, $50/yr — unchanged), like every other add-on.
+  // old contract ($5/mo, $50/yr — unchanged), independently of platform add-ons.
   // The number is part of the service (owner, 2026-10-02): when the
   // subscription ends or the tier is removed, the org's numbers are released
   // (server/voice/number-release.ts); a failed payment pauses the assistant
@@ -668,7 +668,7 @@ export const ADDONS: Record<AddonKey, Addon> = {
   call_number: {
     key: "call_number", name: "Extra Call Assistant number",
     description: "One more local number for the AI Call Assistant (a second location or a tracking line).",
-    // $50/yr: the old contract (10 × monthly, like the plans). The owner's 2026-10-08 repricing named the four
+    // $50/yr: the old voice contract (unchanged). The owner's 2026-10-08 repricing named the four
     // tiers only; the extra number's prices are unchanged (Codex audit #4).
     monthlyCents: 500, annualCents: 5000, availableOn: CALL_ASSISTANT_SOLD_ON, grants: {},
     requires: CALL_ASSISTANT_TIER_ADDONS,
@@ -835,8 +835,10 @@ export const MODULE_NAMES: Record<ModuleKey, string> = {
 
 export const BILLING_INTERVALS: readonly BillingInterval[] = ["month", "year"];
 export const ADDON_KEYS = Object.keys(ADDONS) as AddonKey[];
-/** Annual billing is this many months of the monthly price — plans, add-ons and Agency bands alike. */
-export const ANNUAL_MONTHS = 10;
+/** Annual billing for new platform plans and add-ons; owner 2026-10-09: one month free. */
+export const ANNUAL_MONTHS = 11;
+/** The retired 2026-09-30 Agency location bands keep the yearly rule they were sold on. */
+export const LEGACY_BAND_ANNUAL_MONTHS = 10;
 /** The most of one add-on a self-serve order may hold; a bigger order is a sales conversation. */
 export const ADDON_MAX_QUANTITY = 100;
 /**
@@ -869,7 +871,7 @@ export function agencyExtraLocations(locations: number): number {
 export function agencyPriceCents(locations: number, interval: BillingInterval): number | null {
   const monthly = agencyMonthlyCents(locations);
   if (monthly === null) return null;
-  return interval === "year" ? monthly * ANNUAL_MONTHS : monthly;
+  return interval === "year" ? monthly * LEGACY_BAND_ANNUAL_MONTHS : monthly;
 }
 
 /**

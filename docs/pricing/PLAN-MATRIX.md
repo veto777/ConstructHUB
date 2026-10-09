@@ -2,11 +2,11 @@
 
 _generated from `shared/plan-matrix.ts` on 2026-10-09 — do not edit by hand. Regenerate with `npm run pricing:matrix` after any price-book change (shared/plans.ts, shared/crm-plans.ts). See docs/pricing/README.md._
 
-Money is in US dollars. Yearly platform billing is 10× the monthly price (two months free); CRM yearly prices are their own. "🕒 Coming" marks a row or module that is promised on the plan but not live yet (shared/plans.ts `COMING_MODULES`). ⭐ = the hero plan. There is no per-location pricing and no extra-location add-on: outgrow a plan and you move up.
+Money is in US dollars. Yearly platform billing is 11× the monthly price (1 month free); CRM yearly prices are their own. "🕒 Coming" marks a row or module that is promised on the plan but not live yet (shared/plans.ts `COMING_MODULES`). ⭐ = the hero plan. There is no per-location pricing and no extra-location add-on: outgrow a plan and you move up.
 
 ## Business Tools (the ConstructHUB platform)
 
-| Feature | **Solo**<br>$29/mo · $290/yr<br><sup>One Google profile, managed and protected.</sup> | **Team**<br>$49/mo · $490/yr<br><sup>Up to 10 locations and a small crew.</sup> | **Pro**<br>$99/mo · $990/yr<br><sup>Every premium tool, for up to 25 locations.</sup> | **Agency**<br>$199/mo · $1,990/yr<br><sup>Client workspaces for up to 100 locations.</sup> | **Unlimited** ⭐<br>$449/mo · $4,490/yr<br><sup>No caps. The only unlimited plan on the market.</sup> |
+| Feature | **Solo**<br>$29/mo · $319/yr<br><sup>One Google profile, managed and protected.</sup> | **Team**<br>$49/mo · $539/yr<br><sup>Up to 10 locations and a small crew.</sup> | **Pro**<br>$99/mo · $1,089/yr<br><sup>Every premium tool, for up to 25 locations.</sup> | **Agency**<br>$199/mo · $2,189/yr<br><sup>Client workspaces for up to 100 locations.</sup> | **Unlimited** ⭐<br>$449/mo · $4,939/yr<br><sup>No caps. The only unlimited plan on the market.</sup> |
 | --- | --- | --- | --- | --- | --- |
 | **Locations & people** |  |  |  |  |  |
 | Google Business Profile locations | 1 | 10 | 25 | 100 | 🟣 Unlimited |
@@ -68,13 +68,13 @@ Money is in US dollars. Yearly platform billing is 10× the monthly price (two m
 
 ## Add-ons
 
-- **Extra team seat** — $15/mo or $150/yr — on: Team, Pro, Agency
-- **Extra protected website** — $15/mo or $150/yr — on: Solo, Team, Pro, Agency
-- **Client texting number** — $29/mo or $290/yr + $29 setup — on: Solo, Team, Pro, Agency, Unlimited
-- **Competitor scan pack** — $19/mo or $190/yr — on: Solo, Team, Pro, Agency, Unlimited
-- **Grid scan pack** — $10/mo or $100/yr — on: Solo, Team, Pro, Agency, Unlimited
-- **SEO suite — 1,000 keywords** — $29/mo or $290/yr — on: Solo, Team, Pro, Agency
-- **SEO suite — 5,000 keywords** — $79/mo or $790/yr — on: Solo, Team, Pro, Agency
+- **Extra team seat** — $15/mo or $165/yr — on: Team, Pro, Agency
+- **Extra protected website** — $15/mo or $165/yr — on: Solo, Team, Pro, Agency
+- **Client texting number** — $29/mo or $319/yr + $29 setup — on: Solo, Team, Pro, Agency, Unlimited
+- **Competitor scan pack** — $19/mo or $209/yr — on: Solo, Team, Pro, Agency, Unlimited
+- **Grid scan pack** — $10/mo or $110/yr — on: Solo, Team, Pro, Agency, Unlimited
+- **SEO suite — 1,000 keywords** — $29/mo or $319/yr — on: Solo, Team, Pro, Agency
+- **SEO suite — 5,000 keywords** — $79/mo or $869/yr — on: Solo, Team, Pro, Agency
 - **Extra CRM seat** — $17/mo or $170/yr — on: CRM plans (self-serve up to 50)
 - **JobCam** — $39/mo or $468/yr — on: CRM Basic, CRM Essentials
 - **AI Call Assistant — 500 minutes** — $249/mo or $2,739/yr — the AI Call Assistant's own subscription (not a platform add-on)

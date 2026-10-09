@@ -7,7 +7,7 @@ import {
   resolvePriceId, resetPriceCache, describeSubscription, roleOfPrice,
 } from "./prices";
 import { ensureBillingSchema, BILLING_SUBSCRIPTION_DDL, BILLING_COLUMNS, BILLING_LEDGER_DDL, BILLING_LEDGER_TABLES, FULFILMENT_DDL, FULFILMENT_INDEXES, BILLING_INTRO_DDL } from "./schema";
-import { PLANS, ADDONS, ANNUAL_MONTHS, LEGACY_AGENCY_BASE_CENTS, agencyMonthlyCents, agencyPriceCents, agencyExtraLocations, maxExtraLocations } from "@shared/plans";
+import { PLANS, ADDONS, LEGACY_BAND_ANNUAL_MONTHS, LEGACY_AGENCY_BASE_CENTS, agencyMonthlyCents, agencyPriceCents, agencyExtraLocations, maxExtraLocations } from "@shared/plans";
 
 describe("Agency location bands in Stripe (LEGACY — read 2026-09-30 Agency rows only)", () => {
   it("the graduated tiers reproduce agencyMonthlyCents for every self-serve count, monthly and yearly", () => {
@@ -17,7 +17,7 @@ describe("Agency location bands in Stripe (LEGACY — read 2026-09-30 Agency row
       const extra = agencyExtraLocations(locations);
       // The bands sit on the 2026-09-30 Agency base ($349); the `agency` key is Unlimited now.
       expect(LEGACY_AGENCY_BASE_CENTS + tieredAmountCents(month, extra)).toBe(agencyMonthlyCents(locations));
-      expect(LEGACY_AGENCY_BASE_CENTS * ANNUAL_MONTHS + tieredAmountCents(year, extra)).toBe(agencyPriceCents(locations, "year"));
+      expect(LEGACY_AGENCY_BASE_CENTS * LEGACY_BAND_ANNUAL_MONTHS + tieredAmountCents(year, extra)).toBe(agencyPriceCents(locations, "year"));
     }
   });
 
@@ -29,13 +29,13 @@ describe("Agency location bands in Stripe (LEGACY — read 2026-09-30 Agency row
   it("the band price's lookup key changes when a band's price does", () => {
     const key = agencyLocationsPriceSpec("month").lookupKey;
     expect(key).toBe("chub_v1_agencyloc_month_40x1500-240x1000-infx700");
-    expect(agencyLocationsPriceSpec("year").lookupKey).toBe(`chub_v1_agencyloc_year_40x${1500 * ANNUAL_MONTHS}-240x${1000 * ANNUAL_MONTHS}-infx${700 * ANNUAL_MONTHS}`);
+    expect(agencyLocationsPriceSpec("year").lookupKey).toBe(`chub_v1_agencyloc_year_40x${1500 * LEGACY_BAND_ANNUAL_MONTHS}-240x${1000 * LEGACY_BAND_ANNUAL_MONTHS}-infx${700 * LEGACY_BAND_ANNUAL_MONTHS}`);
   });
 });
 
 describe("price specs come only from shared/plans.ts", () => {
   it("plans, add-ons and setup fees", () => {
-    expect(planPriceSpec("starter", "year")).toMatchObject({ lookupKey: "chub_v1_plan_starter_year_29000", params: { unit_amount: PLANS.starter.annualCents, recurring: { interval: "year" } } });
+    expect(planPriceSpec("starter", "year")).toMatchObject({ lookupKey: `chub_v1_plan_starter_year_${PLANS.starter.annualCents}`, params: { unit_amount: PLANS.starter.annualCents, recurring: { interval: "year" } } });
     expect(addonPriceSpec("competitor_pack", "month").params.unit_amount).toBe(ADDONS.competitor_pack.monthlyCents);
     expect(addonSetupPriceSpec("texting_number")).toMatchObject({ lookupKey: "chub_v1_setup_texting_number_2900", params: { unit_amount: 2900 } });
     expect(addonSetupPriceSpec("texting_number")!.params.recurring).toBeUndefined();

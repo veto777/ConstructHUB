@@ -1,3 +1,5 @@
+import { PLANS } from "@shared/plans";
+import { formatUsd } from "@shared/plan-copy";
 /**
  * The iPhone apps sell nothing (App Store 3.1.3(f)): inside the apps Gabe must
  * not quote prices or plans or suggest buying — deterministically, from the
@@ -116,7 +118,7 @@ function setup(over: Partial<HubDeps> = {}) {
   };
   const ai = {
     calls: [] as HubRequest[],
-    fallback: { content: "**Pro** is $99/month or $990/year. See [Pricing](/pricing).", finishReason: "stop" },
+    fallback: { content: `**Pro** is $99/month or ${formatUsd(PLANS.pro.annualCents)}/year. See [Pricing](/pricing).`, finishReason: "stop" },
     complete(body: HubRequest): Promise<any> {
       ai.calls.push(body);
       return Promise.resolve(ai.fallback);

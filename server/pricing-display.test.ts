@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import fs from "fs";
 import path from "path";
 import {
-  PLANS, PLAN_KEYS, ADDONS, SALES_THRESHOLD_CENTS, agencyMonthlyCents, showsPrice,
+  PLANS, PLAN_KEYS, ANNUAL_MONTHS, LEGACY_BAND_ANNUAL_MONTHS, ADDONS, SALES_THRESHOLD_CENTS, agencyMonthlyCents, showsPrice,
 } from "../shared/plans";
 import {
   businessToolsMatrix, businessToolsColumns, crmMatrixRows, crmMatrixColumns, UNLIMITED_CELL,
@@ -24,12 +24,12 @@ describe("pricing display: money", () => {
     expect(formatUsd(SALES_THRESHOLD_CENTS)).toBe("$1,000");
   });
 
-  it("annual is two months free on every plan, from the price book", () => {
-    expect(annualMonthsFree()).toBe(2);
+  it("annual savings follow ANNUAL_MONTHS on every plan, from the price book", () => {
+    expect(annualMonthsFree()).toBe(12 - ANNUAL_MONTHS);
     for (const k of PLAN_KEYS) {
       expect(planPriceCents(PLANS[k], "month")).toBe(PLANS[k].monthlyCents);
       expect(planPriceCents(PLANS[k], "year")).toBe(PLANS[k].annualCents);
-      expect(annualSavingsCents(PLANS[k])).toBe(PLANS[k].monthlyCents * 2);
+      expect(annualSavingsCents(PLANS[k])).toBe(PLANS[k].monthlyCents * (12 - ANNUAL_MONTHS));
     }
   });
 
@@ -57,7 +57,7 @@ describe("pricing display: Agency locations", () => {
       if (q.sales) throw new Error(`unexpected sales quote at ${n}`);
       expect(q.monthlyCents).toBe(agencyMonthlyCents(n));
       expect(q.lines.reduce((s, l) => s + l.subtotalCents, 0)).toBe(q.monthlyCents);
-      expect(q.annualCents).toBe(q.monthlyCents * 10);
+      expect(q.annualCents).toBe(q.monthlyCents * LEGACY_BAND_ANNUAL_MONTHS);
     }
   });
 

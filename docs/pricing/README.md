@@ -36,7 +36,7 @@ key, never reorder `PLAN_KEYS` (cheapest first is the upgrade order).
 Edit **only `shared/plans.ts`** (or `shared/crm-plans.ts` for the CRM):
 
 - A plan's price: `monthlyCents` / `annualCents` (annual is `ANNUAL_MONTHS`
-  × monthly = 10×, two months free, for plans and platform add-ons; the CRM
+  × monthly = 11×, one month free, for plans and platform add-ons; the CRM
   and the Call Assistant have their own yearly multiples).
 - A limit: the `limits` block of the plan (a `-1` means unlimited, fair use).
 - An add-on: the `ADDONS` record (`availableOn` is which plans can buy it,

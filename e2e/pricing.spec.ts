@@ -6,7 +6,7 @@
  * from shared/plans.ts, never a number typed into this file.
  */
 import { test, expect, type Page } from "@playwright/test";
-import { PLANS, PLAN_KEYS, ADDONS, CALL_ASSISTANT_TIER_ADDONS, TRIAL_DAYS, agencyMonthlyCents, type PlanKey } from "../shared/plans";
+import { PLANS, PLAN_KEYS, ANNUAL_MONTHS, LEGACY_BAND_ANNUAL_MONTHS, ADDONS, CALL_ASSISTANT_TIER_ADDONS, TRIAL_DAYS, agencyMonthlyCents, type PlanKey } from "../shared/plans";
 import { gotoCrm, watchPage } from "./helpers";
 
 const usd = (cents: number) => {
@@ -50,7 +50,7 @@ async function expectNoSideScroll(page: Page, anchorTestId: string) {
 }
 
 test.describe("pricing page", () => {
-  test("five plans from the price book, no free plan, annual toggle shows two months free", async ({ page }) => {
+  test("five plans from the price book, no free plan, annual toggle shows price-book savings", async ({ page }) => {
     const guards = watchPage(page);
     await mockBilling(page, NO_SUB);
     await gotoCrm(page, "/pricing");
@@ -70,7 +70,7 @@ test.describe("pricing page", () => {
       await expect(page.getByTestId(`text-price-${k}`)).toHaveText(`${usd(PLANS[k].annualCents)}/yr`);
       await expect(page.getByTestId(`text-price-note-${k}`)).toContainText(`save ${usd(PLANS[k].monthlyCents * 12 - PLANS[k].annualCents)}`);
     }
-    await expect(page.getByTestId("button-interval-year")).toContainText("2 months free");
+    await expect(page.getByTestId("button-interval-year")).toContainText(`${12 - ANNUAL_MONTHS} ${12 - ANNUAL_MONTHS === 1 ? "month" : "months"} free`);
     guards.assertClean("pricing plans");
   });
 
@@ -282,7 +282,7 @@ test.describe("settings billing", () => {
     const calls = await mockBilling(page, AGENCY_STRIPE);
     await gotoCrm(page, "/settings?tab=billing");
     await expect(page.getByTestId("text-current-plan")).toContainText(`${PLANS.agency.name} plan`);
-    await expect(page.getByTestId("text-plan-interval")).toHaveText(`Billed yearly · ${usd(agencyMonthlyCents(25)! * 10)}/yr for 25 locations`);
+    await expect(page.getByTestId("text-plan-interval")).toHaveText(`Billed yearly · ${usd(agencyMonthlyCents(25)! * LEGACY_BAND_ANNUAL_MONTHS)}/yr for 25 locations`);
     await expect(page.getByTestId("row-billing-locations")).toContainText("billed for 25 now");
     await expect(page.getByTestId("text-addon-qty-extra_seat")).toHaveText("2");
     await page.getByTestId("button-addon-inc-extra_seat").click();
@@ -293,7 +293,7 @@ test.describe("settings billing", () => {
     await expect(page.getByTestId("button-addon-dec-competitor_pack")).toBeDisabled();
 
     await page.getByTestId("input-billing-locations").fill("30");
-    await expect(page.getByTestId("text-billing-locations-quote")).toHaveText(`30 locations = ${usd(agencyMonthlyCents(30)! * 10)}/yr`);
+    await expect(page.getByTestId("text-billing-locations-quote")).toHaveText(`30 locations = ${usd(agencyMonthlyCents(30)! * LEGACY_BAND_ANNUAL_MONTHS)}/yr`);
     await page.getByTestId("button-billing-locations").click();
     await expect.poll(() => calls.changePlan).toEqual([{ plan: "agency", interval: "year", locations: 30 }]);
     expect(calls.checkout).toEqual([]);

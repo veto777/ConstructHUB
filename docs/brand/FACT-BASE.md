@@ -27,7 +27,7 @@ product with its own plans, from $39/mo." Never say the CRM is "included".
 
 ### 1a. Price book (quote these, with the file)
 
-**Business tools** — `shared/plans.ts:124-245`; annual = 10 × monthly (`ANNUAL_MONTHS`, line 564);
+**Business tools** — `shared/plans.ts:124-245`; annual = `ANNUAL_MONTHS` × monthly (currently 11; one month free);
 "A new account starts any plan with a 1-day free trial" (`TRIAL_DAYS = 1`, line 482; live /pricing).
 
 | Plan | Monthly | Annual | What the price book says (first lines) |

@@ -5,7 +5,7 @@
  * test suite can check it against the price book and the server catalog.
  */
 import {
-  PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, AGENCY_SELF_SERVE_MAX_LOCATIONS, LEGACY_AGENCY_BASE_CENTS,
+  PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, AGENCY_SELF_SERVE_MAX_LOCATIONS, LEGACY_AGENCY_BASE_CENTS, LEGACY_BAND_ANNUAL_MONTHS,
   agencyMonthlyCents, effectivePlanKey, showsPrice, isCallAssistantAddon,
   type Addon, type AddonKey, type AddonModuleKey, type BillingInterval, type ModuleKey, type Plan, type PlanKey, type PlanLimits,
 } from "@shared/plans";
@@ -33,7 +33,7 @@ export function annualSavingsCents(plan: Plan): number {
   return plan.monthlyCents * 12 - plan.annualCents;
 }
 
-/** Whole months free on annual billing, the same for every plan (10x monthly -> 2). */
+/** Whole months free on annual billing, the same for every plan (derived from the price book). */
 export function annualMonthsFree(): number {
   return Math.min(...PLAN_KEYS.map((k) => Math.floor(annualSavingsCents(PLANS[k]) / PLANS[k].monthlyCents)));
 }
@@ -67,8 +67,8 @@ export type AgencyQuote =
  */
 export const AGENCY_INCLUDED_LOCATIONS = AGENCY_LOCATION_BANDS[0].upTo;
 
-/** Annual is the same multiple of monthly for Agency as its base price (10x). */
-const AGENCY_ANNUAL_MULTIPLE = PLANS.agency.annualCents / PLANS.agency.monthlyCents;
+/** Retired Agency subscriptions keep the annual rule they were sold on. */
+const AGENCY_ANNUAL_MULTIPLE = LEGACY_BAND_ANNUAL_MONTHS;
 
 /** A location count typed by a person: a whole number, at least 1. */
 export function normalizeLocations(input: unknown): number {

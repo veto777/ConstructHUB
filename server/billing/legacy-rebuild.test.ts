@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from "vitest";
 vi.mock("../db", () => ({ pool: { query: vi.fn(async () => ({ rows: [] })) }, db: {} }));
 import { foundingPrice, parseFoundingPrices, priceSnapshot } from "@shared/pricing-terms";
-import { ADDONS } from "@shared/plans";
+import { ADDONS, PLANS, LEGACY_AGENCY_BASE_CENTS, LEGACY_BAND_ANNUAL_MONTHS } from "@shared/plans";
 import { describeSubscription, resetPriceCache } from "./prices";
 import { parsePlanOrder, subscriptionChange, subscriptionOrderTotal } from "./order";
 import { subscriptionRowUpdate } from "./sync";
@@ -40,14 +40,31 @@ it("keeps legacy Agency base and bands on add-on and interval-only edits", async
   expect(api.prices.create.mock.calls.some(([p]: any) => p.unit_amount === 349000)).toBe(true);
 });
 
+it.each([10, 30])("legacy Agency round-trips intervals at %s locations without changing the sold base", async locations => {
+  const base = item("agency", LEGACY_AGENCY_BASE_CENTS * LEGACY_BAND_ANNUAL_MONTHS);
+  base.price.recurring.interval = "year";
+  const band = item("band", 0, "agency_locations", locations - 10);
+  band.price.recurring.interval = "year";
+  const current = describeSubscription((locations > 10 ? [base, band] : [base]) as any);
+  const order = parsePlanOrder({ interval: "month" }, { ...current, agencyLocations: locations });
+  const expectedMonthly = LEGACY_AGENCY_BASE_CENTS + (locations - 10) * 1500;
+  expect(subscriptionOrderTotal(current, order)).toBe(expectedMonthly);
+  const api = stripe();
+  await subscriptionChange(api, current, order, "agency");
+  expect(api.prices.create.mock.calls.some(([p]: any) => p.unit_amount === LEGACY_AGENCY_BASE_CENTS)).toBe(true);
+  // Add-on-only edits keep the annual base; new add-ons use today's annual price.
+  const addons = parsePlanOrder({ addons: { grid_pack: 1 } }, { ...current, agencyLocations: locations });
+  expect(subscriptionOrderTotal(current, addons)).toBe(expectedMonthly * LEGACY_BAND_ANNUAL_MONTHS + ADDONS.grid_pack.annualCents);
+});
+
 it("explicit Unlimited migration removes the band and marker in the same subscription update", async () => {
   const current = legacy();
   const order = parsePlanOrder({ plan: "agency", interval: "year" }, { ...current, agencyLocations: 30 });
   expect(order.agencyLocations).toBeNull();
-  expect(subscriptionOrderTotal(current, order)).toBe(449000);
+  expect(subscriptionOrderTotal(current, order)).toBe(PLANS.agency.annualCents);
   const changes = await subscriptionChange(stripe(), current, order, "agency");
   expect(changes.items).toContainEqual({ id: "si_band", deleted: true });
-  expect(changes.items).toContainEqual({ id: "si_agency", price: "chub_v1_plan_agency_year_449000", quantity: 1 });
+  expect(changes.items).toContainEqual({ id: "si_agency", price: `chub_v1_plan_agency_year_${PLANS.agency.annualCents}`, quantity: 1 });
 });
 
 it.each([

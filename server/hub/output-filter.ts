@@ -13,8 +13,8 @@
  * Pure: no DB, no request, no model.
  */
 import {
-  PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, ANNUAL_MONTHS, GBP_REINSTATEMENT_CENTS, SALES_THRESHOLD_CENTS, TRIAL_DAYS,
-  CALL_ASSISTANT_TIERS, CALL_ASSISTANT_OVERAGE_CENTS_PER_MINUTE, type PlanKey,
+  PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, ANNUAL_MONTHS, LEGACY_BAND_ANNUAL_MONTHS, GBP_REINSTATEMENT_CENTS, SALES_THRESHOLD_CENTS, TRIAL_DAYS,
+  CALL_ASSISTANT_TIERS, CALL_ASSISTANT_ANNUAL_MONTHS, CALL_ASSISTANT_OVERAGE_CENTS_PER_MINUTE, type PlanKey,
 } from "@shared/plans";
 import { CRM_PLANS, CRM_PLAN_KEYS, CRM_TRIAL_DAYS, CRM_EXTRA_SEAT_MONTHLY_CENTS, CRM_EXTRA_SEAT_ANNUAL_CENTS } from "@shared/crm-plans";
 import { hubLinkFor } from "@shared/hub-links";
@@ -353,7 +353,7 @@ const ADDON_CENTS: ReadonlySet<number> = (() => {
     if (addon.setupCents) cents.add(addon.setupCents);
     for (const c of dollarAmounts(addon.description)) cents.add(c);
   }
-  for (const band of AGENCY_LOCATION_BANDS) if (band.centsPerLocation > 0) { cents.add(band.centsPerLocation); cents.add(band.centsPerLocation * ANNUAL_MONTHS); }
+  for (const band of AGENCY_LOCATION_BANDS) if (band.centsPerLocation > 0) { cents.add(band.centsPerLocation); cents.add(band.centsPerLocation * LEGACY_BAND_ANNUAL_MONTHS); }
   // SEO data: the monthly allowance of each plan that has the tools (0 on the others) and the prepaid credit packs.
   for (const key of PLAN_KEYS) if (SEO_PLAN_LIMITS[key].seoCreditCents > 0) cents.add(SEO_PLAN_LIMITS[key].seoCreditCents);
   for (const pack of SEO_CREDIT_PACKS) cents.add(pack);
@@ -762,7 +762,19 @@ function checkContent(linkless: string, opts: FilterOptions, book: KnowledgeBook
       const m = s.match(re);
       if (m && !NEG.test(`${s.slice(0, m.index)} ${s.slice(m.index! + m[0].length)}`)) block("O10");
     }
-    if (FREE_STRETCH.test(s) && !YEARLY.test(s) && !NEG.test(s)) block("O10");
+    const annualMonths = /\bcall assistant\b/i.test(s) ? CALL_ASSISTANT_ANNUAL_MONTHS : ANNUAL_MONTHS;
+    const freeStretch = s.match(FREE_STRETCH);
+    if (freeStretch && !NEG.test(s)) {
+      const count = Number(freeStretch[1]) || NUM_WORDS[freeStretch[1].toLowerCase()];
+      if (!YEARLY.test(s) || (!/\bCRM\b/i.test(s) && (!/^months?$/i.test(freeStretch[3]) || count !== 12 - annualMonths))) block("O10");
+    }
+    // A yearly context cannot make a retired platform multiplier truthful.
+    if (YEARLY.test(s) && !/\bCRM\b/i.test(s) && !NEG.test(s)) {
+      for (const m of s.matchAll(/\b(\d+|ten|eleven|twelve)\s*(?:times|[×x])\s*(?:the |its )?monthly(?: price)?/gi)) {
+        const count = Number(m[1]) || NUM_WORDS[m[1].toLowerCase()];
+        if (count !== annualMonths) block("O10");
+      }
+    }
     if (DISCOUNT.test(s) && DISCOUNT_PLAN_CONTEXT.test(s) && !DISCOUNT_CRM_CONTEXT.test(s) && !YEARLY.test(s) && !NEG.test(s)) block("O10");
     if (PROMO_TOKEN.test(s) && PROMO_CONTEXT.test(s)) block("O10");
     // A price next to anything SEO is allowed only as the Agency plan's own price in a sentence that names Agency,

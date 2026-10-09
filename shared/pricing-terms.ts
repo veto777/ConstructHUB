@@ -35,7 +35,7 @@ export type FoundingPrices = {
   agencyBands: { upTo: number; centsPerLocation: number }[];
   /** PLANS.agency.limits.locations: locations the Agency price includes before the bands apply. */
   agencyIncludedLocations: number;
-  /** ANNUAL_MONTHS: yearly = this many months of the monthly price, plans and bands alike. */
+  /** Annual multiplier of this dated book; only legacy books use it for location bands. */
   annualMonths: number;
   /** ISO subscription start time whose price book was captured. */
   capturedAt: string;
@@ -85,16 +85,16 @@ export const LEGACY_FOUNDING_PRICE_BOOK = Object.freeze({
 export const FIVE_PLAN_FOUNDING_PRICE_BOOK = Object.freeze({
   effectiveFrom: FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT,
   plans: Object.freeze({
-    starter: Object.freeze({ monthlyCents: 2900, annualCents: 29000 }),
-    team: Object.freeze({ monthlyCents: 4900, annualCents: 49000 }),
-    pro: Object.freeze({ monthlyCents: 9900, annualCents: 99000 }),
-    growth: Object.freeze({ monthlyCents: 19900, annualCents: 199000 }),
-    agency: Object.freeze({ monthlyCents: 44900, annualCents: 449000 }),
+    starter: Object.freeze({ monthlyCents: 2900, annualCents: 31900 }),
+    team: Object.freeze({ monthlyCents: 4900, annualCents: 53900 }),
+    pro: Object.freeze({ monthlyCents: 9900, annualCents: 108900 }),
+    growth: Object.freeze({ monthlyCents: 19900, annualCents: 218900 }),
+    agency: Object.freeze({ monthlyCents: 44900, annualCents: 493900 }),
   }),
   // Retain the serialized shape; new Unlimited subscriptions have no bands.
   agencyBands: LEGACY_FOUNDING_PRICE_BOOK.agencyBands,
   agencyIncludedLocations: -1,
-  annualMonths: 10,
+  annualMonths: 11,
 });
 
 /**

@@ -17,7 +17,7 @@
  */
 import type Stripe from "stripe";
 import {
-  PLANS, ADDONS, AGENCY_LOCATION_BANDS, ANNUAL_MONTHS, CALL_ASSISTANT_NAME, LEGACY_AGENCY_INCLUDED_LOCATIONS,
+  PLANS, ADDONS, AGENCY_LOCATION_BANDS, ANNUAL_MONTHS, LEGACY_BAND_ANNUAL_MONTHS, CALL_ASSISTANT_NAME, LEGACY_AGENCY_INCLUDED_LOCATIONS,
   planPriceCents, addonPriceCents, isPlanKey, isAddonKey, isBillingInterval, isCallAssistantAddon,
   type PlanKey, type AddonKey, type BillingInterval,
 } from "@shared/plans";
@@ -57,7 +57,7 @@ export function agencyLocationTiers(interval: BillingInterval): Tier[] {
   // The bands belong to the 2026-09-30 Agency plan ($349, 10 included); the `agency` key is
   // Unlimited now, so the legacy included count comes from AGENCY_LOCATION_BANDS, never PLANS.
   const included = LEGACY_AGENCY_INCLUDED_LOCATIONS;
-  const multiplier = interval === "year" ? ANNUAL_MONTHS : 1;
+  const multiplier = interval === "year" ? LEGACY_BAND_ANNUAL_MONTHS : 1;
   const paid = AGENCY_LOCATION_BANDS.filter((band) => band.centsPerLocation > 0);
   return paid.map((band, i) => ({
     up_to: i === paid.length - 1 ? "inf" : band.upTo - included,

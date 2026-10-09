@@ -6,7 +6,7 @@
  */
 import type Stripe from "stripe";
 import {
-  ANNUAL_MONTHS, addonPriceCents, PLANS, ADDONS, ADDON_KEYS, ADDON_MAX_QUANTITY, AGENCY_SELF_SERVE_MAX_LOCATIONS, LEGACY_PLAN_MAP, TALK_TO_SALES_CODE,
+  ANNUAL_MONTHS, LEGACY_BAND_ANNUAL_MONTHS, addonPriceCents, PLANS, ADDONS, ADDON_KEYS, ADDON_MAX_QUANTITY, AGENCY_SELF_SERVE_MAX_LOCATIONS, LEGACY_PLAN_MAP, TALK_TO_SALES_CODE,
   CALL_ASSISTANT_NAME, CALL_ASSISTANT_FROM_CENTS, CALL_ASSISTANT_PRICING_HREF, LEGACY_AGENCY_INCLUDED_LOCATIONS,
   isPlanKey, isAddonKey, isBillingInterval, isCallAssistantAddon, addonAvailableOn, agencyExtraLocations, maxExtraLocations,
   type PlanKey, type AddonKey, type BillingInterval,
@@ -260,7 +260,8 @@ export function subscriptionPlanCents(current: SubscriptionShape, order: PlanOrd
     if (locked && cents === (current.interval === "year" ? locked.annualCents : locked.monthlyCents)) {
       return order.interval === "year" ? locked.annualCents : locked.monthlyCents;
     }
-    const multiplier = terms?.prices?.annualMonths ?? ANNUAL_MONTHS;
+    const multiplier = order.plan === "agency" && order.agencyLocations != null
+      ? LEGACY_BAND_ANNUAL_MONTHS : terms?.prices?.annualMonths ?? ANNUAL_MONTHS;
     return current.interval === order.interval ? cents
       : order.interval === "year" ? cents * multiplier : Math.round(cents / multiplier);
   }
