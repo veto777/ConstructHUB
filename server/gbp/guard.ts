@@ -115,6 +115,15 @@ export async function checkGuard(userId:number,id:number,client?:GoogleClient) {
       if(live.name!==l.gbp_location_name || typeof live.title!=='string' || (updated.location && updated.location.name!==l.gbp_location_name)) throw new GoogleError('transient','Google returned an incomplete location',503);
       const diffs=differences(g.snapshot,g.watched,live,updated),observed:any={};
       for(const d of diffs) {
+        // An edit made from our listing editor that Google was still reviewing (listing-editor.ts): when
+        // the value lands it is the owner's, not a foreign change — adopt it into the approved snapshot.
+        const {rows:[ours]}=await pool.query("SELECT id,new_value FROM gbp_guard_changes WHERE user_id=$1 AND location_id=$2 AND field=$3 AND status='owner-pending' ORDER BY id DESC LIMIT 1",[userId,id,d.field]);
+        if(ours&&same(ours.new_value,d.new)) {
+          g.snapshot[d.field]=d.new; delete g.observed[d.field];
+          await pool.query('UPDATE gbp_guard SET snapshot=$3,updated_at=now() WHERE user_id=$1 AND location_id=$2',[userId,id,JSON.stringify(g.snapshot)]);
+          await pool.query("UPDATE gbp_guard_changes SET status='applied',resolved_at=now() WHERE id=$1 AND user_id=$2",[ours.id,userId]);
+          continue;
+        }
         observed[d.field]=d.new;
         if(Object.hasOwn(g.observed,d.field)&&same(g.observed[d.field],d.new)) {
           const pending=await pool.query("SELECT id FROM gbp_guard_changes WHERE user_id=$1 AND location_id=$2 AND field=$3 AND status='pending'",[userId,id,d.field]);

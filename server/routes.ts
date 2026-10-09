@@ -398,6 +398,9 @@ export async function registerRoutes(
   await ensureProfileGuardSchema();
   const { registerProfileGuardRoutes } = await import("./gbp/guard-routes");
   registerProfileGuardRoutes(app, getDevUser);
+  // Listing editor (/listing-editor): same auth and ownership rules as the profile PATCH above.
+  const { registerListingEditorRoutes } = await import("./gbp/listing-editor");
+  registerListingEditorRoutes(app, getDevUser);
   const { startGuardWorker } = await import("./gbp/guard");
   const { startReplyWorker } = await import("./gbp/review-automation");
   startGuardWorker();

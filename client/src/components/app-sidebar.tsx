@@ -6,7 +6,7 @@ import { Ticket,
   HardHat, Globe, ShieldAlert, ExternalLink, ShieldCheck, BadgeCheck,
   Settings, Skull, Megaphone, TrendingUp, Fingerprint, ShieldOff, Star, PlusCircle,
   Layers, Wrench, BookOpen, Rocket, FolderOpen, Users, PhoneCall,
-  KanbanSquare, ArrowRight, Bell, Lock, Phone, LayoutGrid, Store, KeyRound, Bug, PlayCircle,
+  KanbanSquare, ArrowRight, Bell, Lock, Phone, LayoutGrid, Store, KeyRound, Bug, PlayCircle, PenLine,
 } from "lucide-react";
 import { PLANS, planForModule, type ModuleKey } from "@shared/plans";
 import permitsLogo from "@assets/Permits_1772157993497.png";
@@ -247,6 +247,7 @@ const googleGroups: NavGroup[] = [
       { title: "Domains", url: "/domains", icon: Globe },
       { title: "Mail alerts", url: "/mail-alerts", icon: Bell },
       { title: "Posts & Photos", url: "/gbp-content", icon: Camera },
+      { title: "Listing editor", url: "/listing-editor", icon: PenLine },
       { title: "GMB Edit Monitor", url: "/gmb-monitor", icon: Eye },
       { title: "GMB Ranking Grid", url: "/ranking-grid", icon: Grid3X3, badge: "hot" as BadgeType },
       { title: "Photo Optimizer", url: "/photos", icon: Camera, subChildren: [
