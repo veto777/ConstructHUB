@@ -20,6 +20,12 @@ export async function ensureSiteScanSchema() {
     verified_at timestamptz, expires_at timestamptz NOT NULL DEFAULT now()+interval '7 days',created_at timestamptz NOT NULL DEFAULT now()
   );
   ALTER TABLE sitescan_jobs ADD COLUMN IF NOT EXISTS fix_done jsonb NOT NULL DEFAULT '{}'::jsonb;
+  -- Review S-1: a scan that stalled the process is failed, never run again. cpu_step = the uninterruptible step the
+  -- worker is inside right now (NULL between steps); abandoned = times a worker went away holding the lease;
+  -- fail_reason = why a failed scan failed ('cpu_stall' | 'abandoned' | 'retry_limit' | 'error').
+  ALTER TABLE sitescan_jobs ADD COLUMN IF NOT EXISTS cpu_step text;
+  ALTER TABLE sitescan_jobs ADD COLUMN IF NOT EXISTS abandoned integer NOT NULL DEFAULT 0;
+  ALTER TABLE sitescan_jobs ADD COLUMN IF NOT EXISTS fail_reason text;
   CREATE INDEX IF NOT EXISTS sitescan_jobs_client_history ON sitescan_jobs(user_id,url,completed_at DESC);
   CREATE TABLE IF NOT EXISTS sitescan_branding (
     user_id integer PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, name text NOT NULL, logo text
