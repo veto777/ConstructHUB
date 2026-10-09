@@ -76,6 +76,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("plan gates (auxili
     await pool.query("delete from review_templates where user_id=any($1::int[])", [users]);
     await pool.query("delete from seo_contracts where user_id=any($1::int[])", [users]);
     await pool.query("delete from gbp_guard where user_id=any($1::int[])", [users]);
+    await pool.query("delete from seo_sites where user_id=any($1::int[])", [users]);
     await pool.query("delete from business_locations where user_id=any($1::int[])", [users]);
     await pool.query("delete from beta_access_codes where id=any($1::int[])", [codes]);
     await pool.query("delete from growth_budgets where key like any($1)", [users.map(u => `quota:user:${u}:%`)]);
@@ -88,26 +89,28 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("plan gates (auxili
   it("reports the account's plan, allowances and usage", async () => {
     expect((await api("/api/entitlements", null)).status).toBe(401);
     const mine = await api("/api/entitlements", gold);
-    expect(mine.body).toMatchObject({ plan: "growth", storedPlan: "gold", accessPlan: "growth", planName: "Growth", isPlatformAdmin: false });
-    expect(mine.body.usage.competitorScans).toEqual({ used: 0, limit: 8 });
+    expect(mine.body).toMatchObject({ plan: "growth", storedPlan: "gold", accessPlan: "growth", planName: "Agency", isPlatformAdmin: false });
+    expect(mine.body.usage.competitorScans).toEqual({ used: 0, limit: 20 });
     expect((await api("/api/entitlements", none)).body).toMatchObject({ plan: null, accessPlan: null, allowances: null });
-    // The one Stripe-less Platinum row keeps Agency entitlements (modules included).
+    // The one Stripe-less Platinum row keeps Unlimited entitlements (modules included).
     expect((await api("/api/entitlements", platinum)).body).toMatchObject({ plan: "agency", modules: { agencyWorkspace: true, adsManager: true } });
   });
 
   it("Competitor Intel needs a plan with competitor scans and counts them monthly", async () => {
-    for (const who of [none, starter]) {
+    for (const who of [none]) {
       const r = await api("/api/competitors/scans", who);
       expect(r.status).toBe(402);
-      expect(r.body).toMatchObject({ code: "plan_required", requiredPlan: "pro" });
+      expect(r.body).toMatchObject({ code: "plan_required", requiredPlan: "starter" });
     }
+    // Starter has 1 scan a month; Agency (legacy Gold) has 20.
+    expect((await api("/api/competitors/scans", starter)).status).toBe(200);
     expect((await api("/api/competitors/scans", gold)).status).toBe(200);
-    // Pro includes 2 a month: with both used the next scan is refused and says how to get more.
-    await pool.query("insert into growth_budgets(key,period,used) values($1,'0',2)", [`quota:user:${pro.id}:competitorScans:${month()}`]);
+    // Pro includes 10 a month: with all used the next scan is refused and says how to get more.
+    await pool.query("insert into growth_budgets(key,period,used) values($1,'0',10)", [`quota:user:${pro.id}:competitorScans:${month()}`]);
     const full = await api("/api/competitors/scans", pro, "POST", { industry: "Roofing", location: "Tampa, FL" });
     expect(full.status).toBe(403);
-    expect(full.body).toMatchObject({ code: "limit_reached", feature: "competitorScans", limit: 2, upgradePlan: "growth", addon: "competitor_pack" });
-    expect(full.body.message).toBe("You've used all 2 Competitor Intel scans your Pro plan includes this month. The count resets on the 1st (UTC). To raise it, add the Competitor scan pack add-on or move to Growth (8 Competitor Intel scans).");
+    expect(full.body).toMatchObject({ code: "limit_reached", feature: "competitorScans", limit: 10, upgradePlan: "growth", addon: "competitor_pack" });
+    expect(full.body.message).toBe("You've used all 10 Competitor Intel scans your Pro plan includes this month. The count resets on the 1st (UTC). To raise it, add the Competitor scan pack add-on or move to Agency (20 Competitor Intel scans).");
     // A scan that fails (no Places key here) gives its scan back.
     const ok = await api("/api/competitors/scans", gold, "POST", { industry: "Roofing", location: "Tampa, FL" });
     expect(ok.status).toBe(200);
@@ -115,20 +118,20 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("plan gates (auxili
   });
 
   it("Click Guard, IP Tracker and VPN Shield share the plan's protected websites", async () => {
-    for (const who of [none, starter]) {
-      const r = await api("/api/click-guard/domains", who, "POST", { domain: "p-gates.example" });
-      expect(r.status).toBe(402);
-      expect(r.body.requiredPlan).toBe("pro");
-      expect(r.body.message).toBe("Click-fraud protection (Click Guard, IP Tracker and VPN Shield) is included with the Pro plan. Upgrade in Pricing to use it.");
-    }
-    expect((await api("/api/click-guard/domains", pro, "POST", { domain: "p-gates-one.example" })).status).toBe(200);
-    const second = await api("/api/click-guard/domains", pro, "POST", { domain: "p-gates-two.example" });
+    const r = await api("/api/click-guard/domains", none, "POST", { domain: "p-gates.example" });
+    expect(r.status).toBe(402);
+    expect(r.body.requiredPlan).toBe("starter");
+    expect(r.body.message).toBe("Click-fraud protection (Click Guard, IP Tracker and VPN Shield) is included with the Solo plan. Upgrade in Pricing to use it.");
+    // Solo protects one website; the second add names the add-on and the next plan.
+    expect((await api("/api/click-guard/domains", starter, "POST", { domain: "p-gates-one.example" })).status).toBe(200);
+    const second = await api("/api/click-guard/domains", starter, "POST", { domain: "p-gates-two.example" });
     expect(second.status).toBe(403);
-    expect(second.body).toMatchObject({ code: "limit_reached", feature: "protectedSites", limit: 1, used: 1, upgradePlan: "growth", addon: "protected_site" });
-    expect(second.body.message).toBe("Your Pro plan protects 1 website with Click Guard, IP Tracker and VPN Shield, and 1 is in use. To raise it, add the Extra protected website add-on or move to Growth (3 websites).");
-    // Growth (legacy Gold) protects 3: five concurrent adds, exactly three get through.
+    expect(second.body).toMatchObject({ code: "limit_reached", feature: "protectedSites", limit: 1, used: 1, upgradePlan: "team", addon: "protected_site" });
+    expect(second.body.message).toBe("Your Solo plan protects 1 website with Click Guard, IP Tracker and VPN Shield, and 1 is in use. To raise it, add the Extra protected website add-on or move to Team (3 websites).");
+    // Pro protects 10 and Growth (legacy Gold) 25: five concurrent adds on Growth all get through.
+    expect((await api("/api/click-guard/domains", pro, "POST", { domain: "p-gates-pro-one.example" })).status).toBe(200);
     const results = await Promise.all(["a", "b", "c", "d", "e"].map(x => api("/api/click-guard/domains", gold, "POST", { domain: `p-gates-race-${x}.example` })));
-    expect(results.map(r => r.status).sort()).toEqual([200, 200, 200, 403, 403]);
+    expect(results.map(r => r.status).sort()).toEqual([200, 200, 200, 200, 200]);
   });
 
   it("counts Google Business Profile locations against the plan", async () => {
@@ -136,7 +139,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("plan gates (auxili
     expect((await api("/api/locations", starter, "POST", { businessName: "P-Gates starter" })).status).toBe(200);
     const second = await api("/api/locations", starter, "POST", { businessName: "P-Gates starter two" });
     expect(second.status).toBe(403);
-    expect(second.body).toMatchObject({ code: "limit_reached", feature: "locations", limit: 1, used: 1, addon: "extra_location", upgradePlan: "growth" });
+    expect(second.body).toMatchObject({ code: "limit_reached", feature: "locations", limit: 1, used: 1, addon: null, upgradePlan: "team" });
     // A Business Profile import that would add a location is refused the same way, before the import runs.
     const imported = await api("/api/gbp/import", starter, "POST", { locations: [{ accountResource: "accounts/p-gates", gbpName: "locations/p-gates-new", grantSubject: "p-gates" }] });
     expect(imported.status).toBe(403);
@@ -154,7 +157,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("plan gates (auxili
     for (let i = 0; i < 5; i++) expect((await template(i, starter)).status).toBe(200);
     const sixth = await template(5, starter);
     expect(sixth.status).toBe(403);
-    expect(sixth.body).toMatchObject({ code: "limit_reached", feature: "reviewTemplates", limit: 5, upgradePlan: "pro" });
+    expect(sixth.body).toMatchObject({ code: "limit_reached", feature: "reviewTemplates", limit: 5, upgradePlan: "team" });
 
     // Saves racing at the limit: counted and inserted under one lock, so exactly the allowance lands.
     const racer = await account("starter");
@@ -188,10 +191,10 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("plan gates (auxili
   it("meters ranking grids in size-weighted credits", async () => {
     const grid = (gridSize: number, who: Account) => api("/api/ranking-grid/scans", who, "POST", { businessName: "P-Gates", placeId: "p-gates", lat: 27.95, lon: -82.46, keyword: "roofer", gridSize, gridDistance: 1 });
     expect((await grid(3, none)).status).toBe(402);
-    // A 15x15 grid costs 9 credits; Starter has 5.
+    // A 15x15 grid costs 9 credits; Solo has 3.
     const big = await grid(15, starter);
     expect(big.status).toBe(403);
-    expect(big.body).toMatchObject({ code: "limit_reached", feature: "rankings", limit: 5 });
+    expect(big.body).toMatchObject({ code: "limit_reached", feature: "rankings", limit: 3 });
     expect((await grid(3, starter)).status).toBe(200);
     // No Places key here, so the grid fails and its credit comes back.
     expect(await eventually(async () => (await used(starter.id, "rankings")) === 0)).toBe(true);
@@ -240,6 +243,42 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("plan gates (auxili
     expect((await api("/api/beta-codes/status", trial)).body.active).toBe(false);
     expect((await api("/api/competitors/scans", trial)).status).toBe(402);
     expect((await api("/api/stripe/subscription", trial)).body).toMatchObject({ plan: "agency", status: "inactive", effectivePlan: null });
+  });
+
+  it("the Team/Pro/Agency module ladder answers 402 below the plan that includes it", async () => {
+    // reviewReminders starts at Team: Solo is refused, Team and up read their settings.
+    const reminders = await api("/api/review-reminder-settings", starter);
+    expect(reminders.status).toBe(402);
+    expect(reminders.body).toMatchObject({ code: "plan_required", requiredPlan: "team" });
+    expect(reminders.body.message).toContain("Review reminders");
+    expect((await api("/api/review-reminder-settings", pro)).status).toBe(200);
+    expect((await api("/api/review-reminder-settings", null)).status).toBe(401);
+
+    // propertyRecords starts at Pro: the directory lookup routes are gated for Solo and Team.
+    const property = await api("/api/property-appraisers", starter);
+    expect(property.status).toBe(402);
+    expect(property.body).toMatchObject({ code: "plan_required", requiredPlan: "pro" });
+    expect((await api("/api/property-lookup", starter, "POST", { countyId: 1, address: "1 Main St" })).status).toBe(402);
+    expect((await api("/api/property-appraisers", pro)).status).toBe(200);
+    expect((await api("/api/property-appraisers", null)).status).toBe(401);
+
+    // socialPublishing and autoPosts start at Pro: the tool and its scheduled AI generation.
+    const social = await api("/api/social/businesses", starter);
+    expect(social.status).toBe(402);
+    expect(social.body).toMatchObject({ code: "plan_required", requiredPlan: "pro" });
+    expect((await api("/api/social/settings?businessId=1", starter, "PUT", { enabled: true })).status).toBe(402);
+    expect((await api("/api/social/youtube/status", starter)).status).toBe(402);
+    expect((await api("/api/social/businesses", pro)).status).toBe(200);
+
+    // gridWatches start at Agency: Pro with the SEO add-on has the data but no watches.
+    await pool.query("update subscriptions set addons=$2 where user_id=$1", [pro.id, { seo_basic: 1 }]);
+    const site = (await pool.query("insert into seo_sites(user_id,domain) values($1,'p-gates.example') returning id", [pro.id])).rows[0];
+    const watch = await api(`/api/seo/sites/${site.id}/grid/watch`, pro, "POST", { keyword: "roofer", size: 5, spacing: 0.5, every: "weekly" });
+    expect(watch.status).toBe(402);
+    expect(watch.body).toMatchObject({ code: "plan_required", requiredPlan: "growth" });
+    expect(watch.body.message).toContain("Scheduled grid watches");
+    await pool.query("update subscriptions set addons='{}'::jsonb where user_id=$1", [pro.id]);
+    await pool.query("delete from seo_sites where id=$1", [site.id]);
   });
 
   it("$1,000 and up is talk-to-sales on the SEO contract flow too — no contract to sign online, no checkout", async () => {

@@ -25,6 +25,7 @@ export {
 import { aiModel } from "../ai-config";
 import { AiAnswerError, aiClient, aiComplete, NO_TOOLS_RULE, type ChatClient } from "../ai-output";
 import { recordFailure } from "../ops/issues";
+import { usersWithModule } from "../entitlements";
 export async function connect(
   userId: number,
   key: string,
@@ -530,13 +531,19 @@ export async function runSocialWorker(
         UNION ALL SELECT user_id,business_id,updated_at AS due FROM social_posts WHERE state IN ('published','failed','uncertain') AND notified_at IS NULL
       ) work GROUP BY user_id,business_id ORDER BY min(due) LIMIT 30`,
     );
+    // The Social Media tool is a Pro-and-up module (shared/plans.ts socialPublishing;
+    // autoPosts starts at the same plan, so this one batch check covers both): an
+    // owner whose plan no longer includes it keeps their queued work but nothing
+    // generates or publishes until the plan returns.
+    const entitled = await usersWithModule(rows.map((r) => r.user_id), "socialPublishing");
     for (const r of rows)
-      try {
-        await workerUser(r.user_id, make, generate, r.business_id);
-      } catch {
-        await pool.query("UPDATE social_settings SET next_at=now()+interval '1 hour',last_error='Connection unavailable; check Blotato settings' WHERE user_id=$1 AND business_id IS NOT DISTINCT FROM $2",[r.user_id,r.business_id]);
-        await pool.query("UPDATE social_posts SET due_at=now()+interval '1 hour' WHERE user_id=$1 AND business_id IS NOT DISTINCT FROM $2 AND state IN ('queued','submitted','submitting')",[r.user_id,r.business_id]);
-      }
+      if (entitled.has(r.user_id))
+        try {
+          await workerUser(r.user_id, make, generate, r.business_id);
+        } catch {
+          await pool.query("UPDATE social_settings SET next_at=now()+interval '1 hour',last_error='Connection unavailable; check Blotato settings' WHERE user_id=$1 AND business_id IS NOT DISTINCT FROM $2",[r.user_id,r.business_id]);
+          await pool.query("UPDATE social_posts SET due_at=now()+interval '1 hour' WHERE user_id=$1 AND business_id IS NOT DISTINCT FROM $2 AND state IN ('queued','submitted','submitting')",[r.user_id,r.business_id]);
+        }
   } finally {
     busy = false;
   }

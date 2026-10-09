@@ -5,7 +5,7 @@ import { isConfigured as dataforseoConfigured, normalizeBusinessName } from "./s
 import { lookupPoint as lookupGridPoint, gridEstimateUsd } from "./seo/grid";
 import { withBudget, SeoBudgetError } from "./seo/budget";
 const gridRound6 = (n: number) => Math.round(n * 1e6) / 1e6;
-import { getEntitlements, requirePlan, sendPlanRequired, sendLimitReached, sendLocationLimit, raiseHint, cheapestPlanWhere, locationCount, plural, inUse, redeemTrialCode, endRevokedTrial, TOP_PLAN, TRIAL_CODE_PLAN } from "./entitlements";
+import { getEntitlements, requirePlan, requireModule, hasModule, usersWithModule, sendModuleRequired, sendPlanRequired, sendLimitReached, sendLocationLimit, raiseHint, cheapestPlanWhere, locationCount, plural, inUse, redeemTrialCode, endRevokedTrial, TOP_PLAN, TRIAL_CODE_PLAN } from "./entitlements";
 import { PAYMENT_NEEDED_STATUSES, PLANS, fitsLimit } from "@shared/plans";
 import { isSalesOnly, sendTalkToSales, salesInquirySubject } from "./catalog";
 import { isReviewSuppressed, unsubscribeRecipient, resubscribeRecipient } from "./review-suppression";
@@ -1011,8 +1011,10 @@ export async function registerRoutes(
   }
 
   // The Property Records page (/property): every county assessor/appraiser office (NETR-sourced
-  // seed data), enriched with the display link fields and its county.
-  app.get("/api/property-appraisers", async (_req, res) => {
+  // seed data), enriched with the display link fields and its county. Property records are a
+  // Pro-and-up tool (shared/plans.ts propertyRecords): signed-out visitors and lower plans get
+  // 401/402 from requireModule.
+  app.get("/api/property-appraisers", requireModule("propertyRecords"), async (_req, res) => {
     const appraisers = await storage.getPropertyAppraisers();
     const counties = await storage.getCounties();
     const countyMap = new Map(counties.map(c => [c.id, c]));
@@ -1025,15 +1027,15 @@ export async function registerRoutes(
 
   // The Property Records page (/property): one county's appraiser offices, with the display
   // link fields (portalUrl/searchUrl/linkStatus/lastVerifiedAt).
-  app.get("/api/property-appraisers/county/:countyId", async (req, res) => {
-    const countyId = parseInt(req.params.countyId);
+  app.get("/api/property-appraisers/county/:countyId", requireModule("propertyRecords"), async (req, res) => {
+    const countyId = parseInt(String(req.params.countyId));
     const appraisers = await storage.getPropertyAppraisersByCounty(countyId);
     res.json(appraisers.map(governmentLinksForDisplay));
   });
 
   // The Property Records page (/property): looks up a parcel/address in that county's records
   // and returns the county appraiser links (with their linkStatus) alongside.
-  app.post("/api/property-lookup", async (req, res) => {
+  app.post("/api/property-lookup", requireModule("propertyRecords"), async (req, res) => {
     try {
       const { address, countyId, parcelNumber } = req.body;
       if (!countyId) {
@@ -1071,8 +1073,8 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/property-records/:countyId", async (req, res) => {
-    const countyId = parseInt(req.params.countyId);
+  app.get("/api/property-records/:countyId", requireModule("propertyRecords"), async (req, res) => {
+    const countyId = parseInt(String(req.params.countyId));
     const records = await storage.getPropertyRecords(countyId);
     res.json(records);
   });
@@ -5252,7 +5254,9 @@ function main() {
         await sendReviewRequestEmail(clientEmail, clientName, companyName, companyLogoUrl, token, baseUrl, emailTheme, personalMessage || undefined, bccEmail || undefined);
 
         const reminderSettings = await storage.getReminderSettings(user.id);
-        if (reminderSettings?.enabled !== false) {
+        // Reminders are a Team-and-up feature: a plan without the module sends the
+        // request but never arms follow-ups (the scheduler would just cancel them).
+        if (reminderSettings?.enabled !== false && await hasModule(user.id, "reviewReminders")) {
           const firstReminderTime = calculateNextReminderTime(reminderSettings, 0);
           await storage.updateReviewRequest(request.id, { nextReminderAt: firstReminderTime });
         }
@@ -5594,7 +5598,8 @@ function main() {
         return res.json({ success: true, alreadyResponded: true, message: "Email resent. This customer already responded, so their answer is kept and no reminders were scheduled." });
       }
       const reminderSettings = await storage.getReminderSettings(user.id);
-      const nextTime = (reminderSettings?.enabled !== false) ? calculateNextReminderTime(reminderSettings, 0) : null;
+      const remindersIncluded = await hasModule(user.id, "reviewReminders");
+      const nextTime = (remindersIncluded && reminderSettings?.enabled !== false) ? calculateNextReminderTime(reminderSettings, 0) : null;
       await storage.updateReviewRequest(id, {
         status: "sent",
         remindersSent: 0,
@@ -5990,10 +5995,14 @@ function main() {
     res.json(await saveReferralSettings(user.id, parsed.data));
   });
 
+  // Review reminders are a Team-and-up tool (shared/plans.ts reviewReminders): the settings
+  // read/write answers 402 plan_required below Team. Sending review requests themselves is on
+  // every plan — only the follow-up reminders are gated.
   app.get("/api/review-reminder-settings", async (req, res) => {
     try {
       const user = (req as any).user;
       if (!user) return res.status(401).json({ message: "Login required" });
+      if (!(await hasModule(user.id, "reviewReminders"))) return sendModuleRequired(res, "reviewReminders");
       const settings = await storage.getReminderSettings(user.id);
       res.json(settings || {
         enabled: true,
@@ -6011,6 +6020,7 @@ function main() {
     try {
       const user = (req as any).user;
       if (!user) return res.status(401).json({ message: "Login required" });
+      if (!(await hasModule(user.id, "reviewReminders"))) return sendModuleRequired(res, "reviewReminders");
       const parsed = reminderSettingsInput.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ message: "Invalid reminder settings", errors: parsed.error.flatten() });
       const settings = await storage.upsertReminderSettings(user.id, parsed.data);
@@ -6084,8 +6094,16 @@ function main() {
   async function processReminders() {
     try {
       const pending = await storage.getPendingReminders();
+      // Review reminders are a Team-and-up feature (shared/plans.ts reviewReminders): one batch
+      // query, and owners whose plan no longer includes the module get their reminders cancelled
+      // (same handling as an explicit "off") instead of piling up unsent.
+      const allowed = await usersWithModule(pending.map((r) => r.userId), "reviewReminders");
       for (const request of pending) {
         try {
+          if (!allowed.has(request.userId)) {
+            await storage.updateReviewRequest(request.id, { nextReminderAt: null });
+            continue;
+          }
           const settings = await storage.getReminderSettings(request.userId);
           const maxReminders = settings?.maxReminders ?? 3;
           const enabled = settings?.enabled !== false;
@@ -6147,6 +6165,9 @@ function main() {
   async function processScheduledReviews() {
     try {
       const scheduled = await storage.getScheduledReviews();
+      // Arming follow-up reminders needs the reviewReminders module (Team and up); sending the
+      // scheduled request itself is on every plan.
+      const remindersAllowed = await usersWithModule(scheduled.map((r) => r.userId), "reviewReminders");
 
       for (const request of scheduled) {
         try {
@@ -6169,7 +6190,7 @@ function main() {
           );
 
           const reminderSettings = await storage.getReminderSettings(request.userId);
-          const firstReminderTime = (reminderSettings?.enabled !== false)
+          const firstReminderTime = (remindersAllowed.has(request.userId) && reminderSettings?.enabled !== false)
             ? calculateNextReminderTime(reminderSettings, 0)
             : null;
 

@@ -34,7 +34,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { pool } from "../db";
 import { isPlatformAdmin } from "../admin";
-import { requirePlan, sendLimitReached, raiseHint, plural, type Entitlements } from "../entitlements";
+import { requirePlan, sendLimitReached, sendModuleRequired, raiseHint, plural, type Entitlements } from "../entitlements";
 import { monthlyUsage, reserveQuotaFor, refundReservation, resetsAt } from "../growth-quotas";
 import { budgetStatus, withBudget, SeoBudgetError, monthlySpendByAccount, monthlyBudgetUsd, monthKey, BUDGET_PAUSED_MESSAGE } from "./budget";
 import {
@@ -719,7 +719,10 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     res.status(202).json({ id: scanId, running: true });
   }));
   // Repeat a scan every week or month (run by the scheduler from the month's included data only).
-  route("post", "/api/seo/sites/:id/grid/watch", (req, res, user) => serial(`gridwatch:${user}`, async () => {
+  // Scheduled grid watches are an Agency-and-up feature (shared/plans.ts gridWatches) — the SEO
+  // add-on buys data, not watches. Deleting a watch stays open so cleanup is never gated.
+  route("post", "/api/seo/sites/:id/grid/watch", (req, res, user, ent) => serial(`gridwatch:${user}`, async () => {
+    if (!ent.modules.gridWatches) return sendModuleRequired(res, "gridWatches");
     const site = await ownedSite(user, req.params.id);
     const input = watchInput.parse(req.body);
     if (hasOperator(input.keyword)) return res.status(400).json({ message: NO_OPERATORS });

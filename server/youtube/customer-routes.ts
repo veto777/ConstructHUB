@@ -1,13 +1,14 @@
 /**
- * A customer's own YouTube channel, in Social Media (/social-media). Any
- * signed-in account — the same door as the rest of the Social Media tool,
- * which has no plan gate — and always the account's OWN data: every handler
+ * A customer's own YouTube channel, in Social Media (/social-media). Part of the
+ * Social Media tool — a Pro-and-up module (shared/plans.ts socialPublishing, the
+ * same gate as server/social/routes.ts): every route here answers 402
+ * plan_required below Pro, and always the account's OWN data: every handler
  * passes the signed-in user's id to the store, and the store has no read
  * without one (customer-store.ts).
  *
  *   GET    /api/social/youtube/status              connected?, which channel, today's allowance
  *   GET    /api/social/youtube/connect             → Google consent (302; ?format=json answers { url })
- *   GET    /api/social/youtube/callback            ← Google; saves the connection or says why not, then → /social-media
+ *   GET    /api/social/youtube/callback            ← Google; saves the connection or says why not, then → /social-media (ungated: an in-flight OAuth handshake always lands)
  *   POST   /api/social/youtube/disconnect          revoke at Google + delete everything stored for this account
  *   GET    /api/social/youtube/videos              this account's videos and their upload status
  *   POST   /api/social/youtube/videos              open a file upload to our storage (multipart)
@@ -34,6 +35,7 @@ import { z } from "zod";
 import { appConnectUrl, finishAppConnection } from "../app-connections";
 import { logActivity } from "../account-events";
 import { rateLimit } from "../growth-limits";
+import { requireModule } from "../entitlements";
 import { originOk } from "../hub/access";
 import { oauthBaseUrl } from "../site-context";
 import {
@@ -98,6 +100,11 @@ export function registerCustomerYoutubeRoutes(app: Express, auth: GetUser, opts:
   const http = opts.http ?? fetch;
   const base = "/api/social/youtube";
   const gate = rateLimit("social-youtube", 40, 120);
+  // Publishing a customer's own YouTube channel is part of the Social Media tool —
+  // a Pro-and-up module (shared/plans.ts socialPublishing). The OAuth callback stays
+  // ungated so an in-flight Google handshake always lands (every other route is
+  // gated, so a connection made without the module buys nothing usable).
+  const socialGate = requireModule("socialPublishing");
   const storage = () => import("../jobcam/storage");
 
   /** The signed-in account, with the response already marked private. State-changing requests must come from our own pages. */
@@ -128,7 +135,7 @@ export function registerCustomerYoutubeRoutes(app: Express, auth: GetUser, opts:
     return Number.isInteger(n) && n >= 1 && n <= v.parts_total ? n : null;
   };
 
-  app.get(`${base}/status`, async (req, res) => {
+  app.get(`${base}/status`, socialGate, async (req, res) => {
     const user = who(req, res); if (!user) return;
     try {
       const [s, usage] = await Promise.all([customerStatus(user.id), dailyUsage(user.id)]);
@@ -152,7 +159,7 @@ export function registerCustomerYoutubeRoutes(app: Express, auth: GetUser, opts:
     } catch (e) { oops(res, "status", e); }
   });
 
-  app.get(`${base}/connect`, gate, async (req, res) => {
+  app.get(`${base}/connect`, socialGate, gate, async (req, res) => {
     const user = who(req, res); if (!user) return;
     const json = req.query.format === "json";
     if (!configured()) return void res.status(503).json({ message: customerMessage("not_configured") });
@@ -199,7 +206,7 @@ export function registerCustomerYoutubeRoutes(app: Express, auth: GetUser, opts:
     }
   });
 
-  app.post(`${base}/disconnect`, gate, async (req, res) => {
+  app.post(`${base}/disconnect`, socialGate, gate, async (req, res) => {
     const user = who(req, res, true); if (!user) return;
     try {
       const r = await purgeCustomerYoutube(user.id, http);
@@ -211,12 +218,12 @@ export function registerCustomerYoutubeRoutes(app: Express, auth: GetUser, opts:
     } catch (e) { oops(res, "disconnect", e); }
   });
 
-  app.get(`${base}/videos`, async (req, res) => {
+  app.get(`${base}/videos`, socialGate, async (req, res) => {
     const user = who(req, res); if (!user) return;
     try { res.json({ videos: (await listVideos(user.id)).map(publicVideo) }); } catch (e) { oops(res, "list", e); }
   });
 
-  app.post(`${base}/videos`, gate, async (req, res) => {
+  app.post(`${base}/videos`, socialGate, gate, async (req, res) => {
     const user = who(req, res, true); if (!user) return;
     try {
       const parsed = fileInput.safeParse(req.body ?? {});
@@ -238,7 +245,7 @@ export function registerCustomerYoutubeRoutes(app: Express, auth: GetUser, opts:
     } catch (e) { oops(res, "open upload", e); }
   });
 
-  app.get(`${base}/videos/:id/parts/:n`, async (req, res) => {
+  app.get(`${base}/videos/:id/parts/:n`, socialGate, async (req, res) => {
     const user = who(req, res); if (!user) return;
     try {
       const v = await ownVideo(req, res, user.id, ["receiving"]); if (!v) return;
@@ -250,7 +257,7 @@ export function registerCustomerYoutubeRoutes(app: Express, auth: GetUser, opts:
   });
 
   // Proxy path: the part body comes through this API into storage (the only path in local mode, the fallback when a direct PUT is blocked).
-  app.put(`${base}/videos/:id/parts/:n`, express.raw({ type: () => true, limit: VIDEO_PART_BYTES + 1024 * 1024 }), async (req, res) => {
+  app.put(`${base}/videos/:id/parts/:n`, socialGate, express.raw({ type: () => true, limit: VIDEO_PART_BYTES + 1024 * 1024 }), async (req, res) => {
     const user = who(req, res, true); if (!user) return;
     try {
       const v = await ownVideo(req, res, user.id, ["receiving"]); if (!v) return;
@@ -264,7 +271,7 @@ export function registerCustomerYoutubeRoutes(app: Express, auth: GetUser, opts:
   });
 
   // Direct path: the browser PUT the part to R2 and hands over the ETag.
-  app.post(`${base}/videos/:id/parts/:n`, async (req, res) => {
+  app.post(`${base}/videos/:id/parts/:n`, socialGate, async (req, res) => {
     const user = who(req, res, true); if (!user) return;
     try {
       const v = await ownVideo(req, res, user.id, ["receiving"]); if (!v) return;
@@ -275,7 +282,7 @@ export function registerCustomerYoutubeRoutes(app: Express, auth: GetUser, opts:
     } catch (e) { oops(res, "part record", e); }
   });
 
-  app.post(`${base}/videos/:id/complete`, gate, async (req, res) => {
+  app.post(`${base}/videos/:id/complete`, socialGate, gate, async (req, res) => {
     const user = who(req, res, true); if (!user) return;
     try {
       const v = await ownVideo(req, res, user.id); if (!v) return;
@@ -304,7 +311,7 @@ export function registerCustomerYoutubeRoutes(app: Express, auth: GetUser, opts:
     } catch (e) { oops(res, "complete", e); }
   });
 
-  app.post(`${base}/videos/:id/publish`, gate, async (req, res) => {
+  app.post(`${base}/videos/:id/publish`, socialGate, gate, async (req, res) => {
     const user = who(req, res, true); if (!user) return;
     try {
       const parsed = publishInput.safeParse(req.body ?? {});
@@ -332,7 +339,7 @@ export function registerCustomerYoutubeRoutes(app: Express, auth: GetUser, opts:
     } catch (e) { oops(res, "publish", e); }
   });
 
-  app.delete(`${base}/videos/:id`, gate, async (req, res) => {
+  app.delete(`${base}/videos/:id`, socialGate, gate, async (req, res) => {
     const user = who(req, res, true); if (!user) return;
     try {
       const v = await ownVideo(req, res, user.id); if (!v) return;

@@ -9,6 +9,8 @@ import { takeBudget, rateLimit } from '../growth-limits';
 import { logActivity } from '../account-events';
 import { guardRecentAuthOk } from '../gbp/guard-routes';
 import { accessFor, agencyPlan, agencyPlanRequired, clientAccess, dashboard, filters, listLocations, locationAccess, locationFilter, locationJoin, missing, positiveId, requireAdmin, requireWrite, workspaceEntitled, type AgencyAccess } from './access';
+import { getEntitlements, inUse, plural, raiseHint, sendLimitReached } from '../entitlements';
+import { PLANS } from '@shared/plans';
 import { bulkInput, queueBulk } from './jobs';
 import { createOnboarding, hash, instructions, onboardingLink } from './onboarding';
 import { getOwnerSeatUsage, seatLimitBody, withSeatLock, type SeatUsage } from '../crm/tenancy';
@@ -94,11 +96,33 @@ export function registerAgencyRoutes(app:Express) {
     res.json({items:rows,total:n.total,offset:f.offset,pageSize:50});
   });
   // Client form create: INSERT agency_clients (admin + all-client access required).
+  // Client workspaces are counted against the OWNER's plan (limits.clientWorkspaces,
+  // -1 = unlimited): Agency includes 10, Unlimited has no cap. The count and insert
+  // run under one advisory lock so racing creates can't pass a full count.
   // agency.tsx Clients tab.
   route('post','/clients',async(req,res,a)=>{
     requireAdmin(a);const b=clientInput.parse(req.body);
     if(!a.allClients)throw missing();
-    const {rows:[c]}=await pool.query('INSERT INTO agency_clients(user_id,name,contact_email,notes,tags,folder) VALUES($1,$2,$3,$4,$5,$6) RETURNING *',[a.owner,b.name,b.contactEmail,b.notes,b.tags,b.folder]);res.status(201).json(c);
+    const ent=await getEntitlements(a.owner);
+    const limit=ent.allowances?.clientWorkspaces ?? 0;
+    const c=await pool.connect();
+    let created;
+    try{
+      await c.query('BEGIN');
+      await c.query('SELECT pg_advisory_xact_lock(7171,$1)',[a.owner]);
+      const {rows:[n]}=await c.query('SELECT count(*)::int n FROM agency_clients WHERE user_id=$1',[a.owner]);
+      if(limit!==-1&&n.n>=limit){
+        await c.query('ROLLBACK');
+        const raise=raiseHint(ent,'clientWorkspaces',['client workspace']);
+        return void sendLimitReached(res,{feature:'clientWorkspaces',limit,used:n.n,upgradePlan:raise.upgradePlan,addon:raise.addon,
+          message:`Your ${PLANS[ent.accessPlan!].name} plan includes ${plural(limit,'client workspace')}, and ${inUse(n.n)}. ${raise.text}`.trim()});
+      }
+      const {rows:[row]}=await c.query('INSERT INTO agency_clients(user_id,name,contact_email,notes,tags,folder) VALUES($1,$2,$3,$4,$5,$6) RETURNING *',[a.owner,b.name,b.contactEmail,b.notes,b.tags,b.folder]);
+      await c.query('COMMIT');
+      created=row;
+    }catch(e){await c.query('ROLLBACK').catch(()=>{});throw e;}
+    finally{c.release();}
+    res.status(201).json(created);
   });
   // Client form update: UPDATE agency_clients (write role + client access required).
   // agency.tsx Clients tab "Save client".

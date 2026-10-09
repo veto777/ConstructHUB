@@ -18,8 +18,7 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { pool } from "../db";
-import { getEntitlements } from "../entitlements";
-import { seoIncluded } from "./plan";
+import { getEntitlements, planPausedMessage } from "../entitlements";
 import { withBudget, SeoBudgetError } from "./budget";
 import { isConfigured, claimDeadline, type Deadline } from "./dataforseo";
 import { SeoCustomerError } from "./public-errors";
@@ -83,8 +82,14 @@ export const GRID_WATCH_DDL = [
 ];
 
 export class WatchError extends SeoCustomerError {}
-/** Swappable for the real-database check (script/seo-grid-check.ts), which has no plans table to ask. */
-export const gridMonitorDeps = { entitled: async (userId: number) => seoIncluded(await getEntitlements(userId)) };
+/**
+ * Scheduled grid watches are an Agency-and-up feature (shared/plans.ts
+ * gridWatches) that run from the month's included SEO data: the module decides,
+ * not the SEO allowance (a Pro account with the SEO add-on has data but no
+ * watches). Swappable for the real-database check (script/seo-grid-check.ts),
+ * which has no plans table to ask.
+ */
+export const gridMonitorDeps = { entitled: async (userId: number) => (await getEntitlements(userId)).modules.gridWatches };
 
 /**
  * When the watch is next due after `after`, counted from its anchor: weekly = whole weeks on from the anchor;
@@ -298,7 +303,10 @@ export async function runDueGridWatches(): Promise<number> {
           if (prior?.status === "running" && prior.recent) continue; // still going somewhere: leave it under this lease
           await mine("run_scan_id = NULL");
         }
-        if (!(await gridMonitorDeps.entitled(w.user_id))) { await backOff("1 day"); continue; }
+        if (!(await gridMonitorDeps.entitled(w.user_id))) {
+          console.warn(`[seo] repeating grid ${w.id}: ${planPausedMessage("gridWatches")}`);
+          await backOff("1 day"); continue;
+        }
         const { rows: [site] } = await pool.query("SELECT id, domain, grid_pin FROM seo_sites WHERE id=$1 AND user_id=$2", [w.site_id, w.user_id]);
         const pin = site ? readPin(site.grid_pin) : null;
         if (!site || !pin) { await backOff("1 day"); continue; }

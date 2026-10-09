@@ -4,6 +4,7 @@ import type { Express, Request, Response } from "express";
 import { z } from "zod";
 import { pool } from "../db";
 import { rateLimit } from "../growth-limits";
+import { requireModule } from "../entitlements";
 import { autoSchema, opaqueId, publicMediaUrl } from "../../shared/social";
 import { SocialError } from "./client";
 import {
@@ -52,16 +53,23 @@ export function registerSocialRoutes(
 ) {
   const publicPost = ({connection_hash, request_hash, ...post}:any) => post;
   const gate = rateLimit("social", 60, 120);
+  // The whole Social Media tool is a Pro-and-up module (shared/plans.ts
+  // socialPublishing): every route answers 401/402 before touching Blotato.
+  // Extra middleware can gate a route further (autoPosts — the scheduled AI
+  // generation, also Pro and up).
   const route = (
     method: "get" | "post" | "put" | "delete",
     path: string,
     fn: (req: Request, res: Response, id: number, businessId: number | null) => Promise<any>,
+    extra: readonly ((req: Request, res: Response, next: (err?: any) => void) => void)[] = [],
   ) => {
     app[method](
       `/api/social${path}`,
       (req, res, next) => {
         if (auth(req, res)) next();
       },
+      requireModule("socialPublishing"),
+      ...extra,
       ...(method === "get" ? [] : [gate]),
       async (req, res) => {
         res.setHeader("Cache-Control", "no-store");
@@ -91,7 +99,13 @@ export function registerSocialRoutes(
     );
   };
   route("get", "/businesses", async (req,res,id) => res.json(await listBusinesses(id,req.query||{})));
-  route("post", "/bulk", async(req,res,id)=>res.status(202).json(await enqueueBulk(id,req.body)));
+  // Bulk jobs of kind 'settings'/'generate' are auto-posts work (the scheduled AI
+  // generation), not just publishing: they need the autoPosts module too.
+  const autoPostsForBulk = (req: Request, res: Response, next: (err?: any) => void) => {
+    if (["settings", "generate"].includes((req.body as any)?.kind)) return requireModule("autoPosts")(req, res, next);
+    next();
+  };
+  route("post", "/bulk", async(req,res,id)=>res.status(202).json(await enqueueBulk(id,req.body)), [autoPostsForBulk]);
   route("get", "/bulk", async(req,res,id)=>{
     const q=pageInput.parse(req.query||{});
     const {rows}=await pool.query(`SELECT j.id,j.business_id,j.request_id,j.kind,j.state,j.error,l.business_name FROM social_bulk_jobs j
@@ -200,14 +214,16 @@ export function registerSocialRoutes(
       )),
     );
   });
+  // Auto-posts settings (the schedule the worker publishes on) and on-demand AI
+  // generation are the autoPosts module on top of the social tool.
   route("put", "/settings", async (req, res, id, businessId) => {
     if(!businessId)throw new SocialError("Choose a business");
     res.json(await saveSettings(id, req.body, businessId));
-  });
+  }, [requireModule("autoPosts")]);
   route("post", "/generate", async(req,res,id,businessId)=>{
     if(!businessId)throw new SocialError("Choose a business");
     res.status(202).json(await enqueueBulk(id,{requestId:z.string().uuid().parse(req.body?.requestId),businessIds:[businessId],kind:'generate'}));
-  });
+  }, [requireModule("autoPosts")]);
   route("get", "/media", async(req,res,id,businessId)=>{
     const q=pageInput.parse(req.query||{});
     const {rows}=await pool.query(businessId ? `SELECT m.name AS id,COALESCE(m.description,m.category,'Business photo') AS name,m.google_url AS url

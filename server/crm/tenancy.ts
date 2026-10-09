@@ -327,7 +327,9 @@ export async function getOwnerSeatUsage(
   // teams as one set.
   const crm = await getCrmEntitlements(ownerUserId);
   const agencySeats = withAgencyTeam ? (ent.allowances?.agencySeats ?? 0) : 0;
-  const limit = crm.seats < 0 ? -1 : crm.seats + agencySeats;
+  // -1 (Unlimited's agencySeats, or an unlimited CRM plan) means no ceiling in
+  // either pool: an unlimited plus a finite count is still unlimited.
+  const limit = crm.seats < 0 || agencySeats < 0 ? -1 : crm.seats + agencySeats;
   const planName = crm.plan ? CRM_PLANS[crm.plan].name : withAgencyTeam && ent.accessPlan ? PLANS[ent.accessPlan].name : "none";
   const canAddSeat = limit < 0 || used < limit;
   const [one, many] = withAgencyTeam ? ["seat", "seats"] : ["CRM seat", "CRM seats"];
