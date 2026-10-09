@@ -13,6 +13,13 @@ export async function workspaceEntitled(owner: number, actor = owner) {
   if ((await getEntitlements(owner)).modules.agencyWorkspace) return true;
   return actor !== owner && (await getEntitlements(actor)).isPlatformAdmin;
 }
+/** Team seats are independent of the Agency client-workspace module. */
+export async function teamEntitled(owner: number, actor = owner) {
+  const seats = (await getEntitlements(owner)).allowances?.agencySeats ?? 0;
+  if (seats === -1 || seats > 1) return true;
+  return actor !== owner && (await getEntitlements(actor)).isPlatformAdmin;
+}
+export const teamPlanRequired = (res: Response) => sendPlanRequired(res, 'team', 'Team management');
 /**
  * Why one more location can't be added to the owner's account, in the words of the 403 that POST
  * /api/locations sends (sendLocationLimit: the Agency self-serve cap, then a sales quote), or null when it fits.

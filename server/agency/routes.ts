@@ -8,7 +8,7 @@ import { grantStatus } from '../gbp/grants';
 import { takeBudget, rateLimit } from '../growth-limits';
 import { logActivity } from '../account-events';
 import { guardRecentAuthOk } from '../gbp/guard-routes';
-import { accessFor, agencyPlan, agencyPlanRequired, clientAccess, dashboard, filters, listLocations, locationAccess, locationFilter, locationJoin, missing, positiveId, requireAdmin, requireWrite, workspaceEntitled, type AgencyAccess } from './access';
+import { accessFor, agencyPlan, agencyPlanRequired, clientAccess, dashboard, filters, listLocations, locationAccess, locationFilter, locationJoin, missing, positiveId, requireAdmin, requireWrite, workspaceEntitled, teamEntitled, teamPlanRequired, type AgencyAccess } from './access';
 import { getEntitlements, inUse, plural, raiseHint, sendLimitReached } from '../entitlements';
 import { PLANS } from '@shared/plans';
 import { bulkInput, queueBulk } from './jobs';
@@ -19,10 +19,10 @@ export async function requestAccess(req:Request):Promise<AgencyAccess> {
   if(!req.user)throw new GoogleError('auth','Not authenticated',401);
   const actor=req.user.id,owner=req.session?.agencyOwner;
   if(!owner||owner===actor)return accessFor(actor);
-  // A delegation the owner can no longer grant (their plan no longer includes the agency workspace, or the
+  // A delegation the owner can no longer grant (their plan no longer includes team access, or the
   // membership was removed) ends here: the member carries on as their own account instead of being locked out.
   const a=await accessFor(actor,owner).catch(e=>{if(e instanceof GoogleError&&e.status===404)return null;throw e;});
-  if(a&&await workspaceEntitled(a.owner,a.actor))return a;
+  if(a&&await teamEntitled(a.owner,a.actor))return a;
   if(req.session)delete req.session.agencyOwner;
   return accessFor(actor);
 }
@@ -53,29 +53,30 @@ export function agencyInputMessage(e:z.ZodError):string {
 }
 export const csvCell=(value:unknown)=>'"'+String(value??'').replace(/^[=+@\-\t\r]/,"'$&").replace(/"/g,'""')+'"';
 export function registerAgencyRoutes(app:Express) {
-  // Every agency route needs the workspace owner's Agency plan (402 plan_required otherwise), except /me and
-  // /workspace, which a member with no plan of their own uses to find and open a workspace they belong to.
-  const route=(method:'get'|'post'|'put'|'delete',path:string,fn:(req:Request,res:Response,a:AgencyAccess)=>Promise<any>,planGate=true)=>app[method]('/api/agency'+path,async(req,res)=>{
+  // Client-workspace routes need Agency access; team routes need platform team seats.
+  // /me and /workspace let members find and open a team without a plan of their own.
+  const route=(method:'get'|'post'|'put'|'delete',path:string,fn:(req:Request,res:Response,a:AgencyAccess)=>Promise<any>,planGate: boolean | 'team'=true)=>app[method]('/api/agency'+path,async(req,res)=>{
     try {const a=await requestAccess(req);res.setHeader('Cache-Control','no-store');
-      if(planGate&&!await workspaceEntitled(a.owner,a.actor))return void agencyPlanRequired(res);
+      if(planGate==='team'&&!await teamEntitled(a.owner,a.actor))return void teamPlanRequired(res);
+      if(planGate===true&&!await workspaceEntitled(a.owner,a.actor))return void agencyPlanRequired(res);
       if(method!=='get'&&!await takeBudget(`agency-route:${a.actor}`,100))throw new GoogleError('quota','Request limit reached',429);
       await fn(req,res,a);
     }catch(e){res.status(e instanceof z.ZodError?400:e instanceof GoogleError?e.status:500).json({message:e instanceof z.ZodError?agencyInputMessage(e):e instanceof GoogleError?e.message:'Agency operation failed'});}
   });
   // Answers every signed-in user (pages use `entitled` to choose the agency or the personal view); workspaces
-  // whose owner's plan no longer includes the agency workspace are not offered.
+  // whose owner's plan no longer includes team access are not offered.
   route('get','/me',async(req,res,a)=>{
     const {rows}=await pool.query('SELECT w.user_id,w.name FROM agency_workspaces w WHERE w.user_id=$1 OR EXISTS(SELECT 1 FROM agency_members m WHERE m.user_id=w.user_id AND m.member_id=$1) ORDER BY w.user_id LIMIT 50',[a.actor]);
-    const [entitled,open]=await Promise.all([workspaceEntitled(a.owner,a.actor),Promise.all(rows.map(w=>w.user_id===a.actor||workspaceEntitled(w.user_id,a.actor)))]);
+    const [entitled,open]=await Promise.all([workspaceEntitled(a.owner,a.actor),Promise.all(rows.map(w=>w.user_id===a.actor||teamEntitled(w.user_id,a.actor)))]);
     const {rows:[workspace]}=await pool.query('SELECT * FROM agency_workspaces WHERE user_id=$1',[a.owner]);
-    res.json({...a,workspace,workspaces:rows.filter((_,i)=>open[i]),entitled,...(entitled?{}:{requiredPlan:agencyPlan})});
+    res.json({...a,workspace,workspaces:rows.filter((_,i)=>open[i]),entitled,teamEntitled:await teamEntitled(a.owner,a.actor),...(entitled?{}:{requiredPlan:agencyPlan})});
   },false);
   // Workspace switcher: stores the chosen workspace owner in the session (membership and
   // its owner's plan verified). agency.tsx header select.
   route('post','/workspace',async(req,res,a)=>{
     const b=z.object({owner:positiveId}).strict().parse(req.body),t=await accessFor(a.actor,b.owner);
     // Returning to your own account is always allowed; opening someone else's workspace needs its owner's plan.
-    if(t.owner!==t.actor&&!await workspaceEntitled(t.owner,t.actor))return void agencyPlanRequired(res);
+    if(t.owner!==t.actor&&!await teamEntitled(t.owner,t.actor))return void teamPlanRequired(res);
     req.session.agencyOwner=b.owner;res.json({ok:true});
   },false);
   // Settings tab (owner): upserts agency_workspaces (name, auto_accept_all — whether the
@@ -135,31 +136,35 @@ export function registerAgencyRoutes(app:Express) {
   route('get','/team',async(req,res,a)=>{
     requireAdmin(a);const f=filters.parse(req.query);
     const {rows}=await pool.query(`SELECT m.member_id,m.role,m.all_clients,u.email,ARRAY(SELECT client_id FROM agency_member_clients mc WHERE mc.user_id=m.user_id AND mc.member_id=m.member_id ORDER BY client_id) client_ids,count(*) OVER()::int total FROM agency_members m JOIN users u ON u.id=m.member_id WHERE m.user_id=$1 AND u.email ILIKE $2 ORDER BY m.member_id LIMIT 50 OFFSET $3`,[a.owner,`%${f.q}%`,f.offset]);res.json({items:rows,total:rows[0]?.total??0});
-  });
+  },'team');
   // Adds/updates a team member: upserts agency_members + agency_member_clients under the
   // owner's seat lock (403 when plan seats are full). Member form — agency.tsx Team tab.
   route('put','/team',async(req,res,a)=>{
     // Only the owner can grant access; scoped admins cannot escalate themselves or other members.
     if(a.role!=='owner')throw missing();
     const b=z.object({email:z.string().email().max(254),role:z.enum(['admin','manager','viewer']),allClients:z.boolean().default(false),clientIds:z.array(positiveId).max(5000).default([])}).strict().parse(req.body);
+    if(!await workspaceEntitled(a.owner,a.actor)){
+      if(b.clientIds.length)return void agencyPlanRequired(res);
+      b.allClients=true;
+    }
     const {rows:[u]}=await pool.query('SELECT id FROM users WHERE lower(email)=lower($1)',[b.email]);if(!u||u.id===a.owner)throw new GoogleError('invalid','Choose another registered ConstructHUB user',400);
     const {rows:[n]}=await pool.query('SELECT count(*)::int n FROM agency_clients WHERE user_id=$1 AND id=ANY($2::int[])',[a.owner,[...new Set(b.clientIds)]]);
     if(n.n!==new Set(b.clientIds).size)throw missing();
     await pool.query('INSERT INTO agency_workspaces(user_id) VALUES($1) ON CONFLICT DO NOTHING',[a.owner]);
-    // Team seats share the owner's plan seats with the CRM team (crmSeats plus Extra seat add-ons). The seat lock
+    // Platform seats count the owner, team members and Extra seat add-ons. The seat lock
     // makes concurrent additions count one after another, all on the connection holding it; changing an existing
     // member's role takes no seat.
     const full=await withSeatLock(a.owner,async({client:c,ent}):Promise<SeatUsage|null>=>{
-      const seats=await getOwnerSeatUsage(a.owner,{adding:{userId:u.id},client:c,ent});
+      const seats=await getOwnerSeatUsage(a.owner,{adding:{userId:u.id},client:c,ent,product:"platform"});
       if(!seats.canAdd)return seats;
       await c.query('INSERT INTO agency_members(user_id,member_id,role,all_clients) VALUES($1,$2,$3,$4) ON CONFLICT(user_id,member_id) DO UPDATE SET role=$3,all_clients=$4',[a.owner,u.id,b.role,b.allClients]);await c.query('DELETE FROM agency_member_clients WHERE user_id=$1 AND member_id=$2',[a.owner,u.id]);await c.query('INSERT INTO agency_member_clients(user_id,member_id,client_id) SELECT $1,$2,unnest($3::int[]) ON CONFLICT DO NOTHING',[a.owner,u.id,b.clientIds]);
       return null;
     });
     if(full)return void res.status(403).json(seatLimitBody(full));
     await logActivity(req,a.owner,'agency.member_updated',{memberId:u.id,role:b.role});res.json({ok:true});
-  });
+  },'team');
   // Removes a team member (owner only): DELETE agency_members. agency.tsx Team tab.
-  route('delete','/team/:id',async(req,res,a)=>{if(a.role!=='owner')throw missing();await pool.query('DELETE FROM agency_members WHERE user_id=$1 AND member_id=$2',[a.owner,positiveId.parse(req.params.id)]);res.json({ok:true});});
+  route('delete','/team/:id',async(req,res,a)=>{if(a.role!=='owner')throw missing();await pool.query('DELETE FROM agency_members WHERE user_id=$1 AND member_id=$2',[a.owner,positiveId.parse(req.params.id)]);res.json({ok:true});},'team');
   // Workspace location list (?q/?status/?clientId filters, member visibility, 50/page):
   // business_locations joined with agency_clients. agency.tsx Locations tab and the
   // AgencyWorkspace strip — site-scan.tsx.
