@@ -46,8 +46,10 @@ export type HubDeps = {
   dailyTokenCap?: () => number | null;
   /**
    * The plan's monthly Gabe question budget (shared/plans.ts limits.gabeQuestions,
-   * -1 unlimited): taken only once a model call will happen, refunded when the
-   * call fails, and a spent month answers 402/403 with the plan-limit body.
+   * -1 unlimited): taken only once a model call will happen, and refunded whenever
+   * no model answer results — a daily-budget refusal below, a failed call or an
+   * exception — so retries during a 429/busy spell never burn the month's
+   * allowance. A spent month answers 402/403 with the plan-limit body.
    * Production wires server/growth-quotas.ts (index.ts); omitted in tests (no DB).
    */
   quota?: {
@@ -354,6 +356,10 @@ export function createHub(deps: HubDeps) {
 
       let result: Upstream;
       let quota: { ok: true; refund: () => Promise<void> } | { ok: false; status: number; body: Record<string, unknown> } | null = null;
+      // True only once the model produced a usable result. Every other exit from
+      // the block below — a daily-budget refusal, an exception, a failed call —
+      // gives the monthly question back in the finally.
+      let answered = false;
       try {
         // 10. the plan's monthly Gabe questions first: a spent month names the plan
         // and the reset, and costs none of the daily budgets below.
@@ -364,7 +370,8 @@ export function createHub(deps: HubDeps) {
             return void res.status(quota.status).json({ ...quota.body, reply: typeof (quota.body as { message?: unknown }).message === "string" ? (quota.body as { message: string }).message : REPLIES.R_LIMIT });
           }
         }
-        // 10b. daily budgets — taken only now that a model call will happen (the finally below releases the slot)
+        // 10b. daily budgets — taken only now that a model call will happen (the finally below
+        // releases the slot, and re-credits the monthly question when no call can be made)
         if (!(await deps.budget.take(keys.userDaily(userId), HUB_LIMITS.userDaily.limit, HUB_LIMITS.userDaily.windowMs))) {
           note(tier, "limit", "user_daily", started); return void res.status(429).json({ reply: REPLIES.R_LIMIT, code: "limit" });
         }
@@ -384,10 +391,16 @@ export function createHub(deps: HubDeps) {
           turns.push({ role: m.role, content: m.content });
         }
         result = await callModel(buildRequest(deps.model(), buildMessages(turns, pageKey as PageKey | undefined)));
-      } finally { release(); }
+        answered = result.ok;
+      } finally {
+        release();
+        // No model answer (a refusal above, an exception, or a failed call): the
+        // monthly question is given back — a retry must never cost an allowance
+        // it got no answer for.
+        if (!answered && quota?.ok) await quota.refund().catch((err) => logError("quota_refund", err));
+      }
       if (!result.ok) {
-        // The model call never produced an answer: the question is given back.
-        if (quota?.ok) await quota.refund().catch((err) => logError("quota_refund", err));
+        // The model call never produced an answer: the question was already given back above.
         // The cap was reached by calls in flight since step 4.5: the same "off site" answer.
         if (result.kind === "capped") { note(tier, "offline", "token_cap", started); return void res.status(503).json({ reply: inApp ? REPLIES.R_APP_OFFLINE : REPLIES.R_OFFLINE, code: "offline" }); }
         if (result.kind === "timeout") { note(tier, "timeout", "model", started); return void res.status(503).json({ reply: REPLIES.R_TIMEOUT, code: "timeout" }); }

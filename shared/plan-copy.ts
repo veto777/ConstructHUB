@@ -108,7 +108,12 @@ export function addonLines(): string[] {
     const on = joinNames(addon.availableOn.map((key) => PLANS[key].name));
     // A `preview` add-on is listed but refused at checkout (shared/plans.ts), so say so.
     const preview = addon.preview ? " Coming soon: listed, not for sale yet." : "";
-    return `${addon.name} — ${formatUsd(addon.monthlyCents)}/month or ${formatUsd(addon.annualCents)}/year${setup} (${on}). ${addon.description}${preview}`;
+    // The SEO suites' names and descriptions are SEO-topic, and the Hub's filter reads any amount
+    // in an SEO-topic sentence under the stricter SEO price rule (O10/O9): a bare plan list gives
+    // no add-on cue, so word their availability as "sold as an add-on on …" to keep the listed
+    // prices quotable there.
+    const onClause = addon.exclusiveGroup === "seo_addon" ? `, sold as an add-on on ${on}` : ` (${on})`;
+    return `${addon.name} — ${formatUsd(addon.monthlyCents)}/month or ${formatUsd(addon.annualCents)}/year${setup}${onClause}. ${addon.description}${preview}`;
   });
 }
 
@@ -400,7 +405,10 @@ export const crmPlansLine = () => CRM_PLAN_KEYS.map((k) => {
 export function pricingKnowledge(): string {
   const plans = PLAN_KEYS.map((key) => {
     const plan = PLANS[key];
-    return `- **${plan.name}** — ${planPriceLine(key)}. ${plan.tagline}\n  Includes: ${plan.features.join("; ")}.`;
+    // Each feature its own sentence: the filter reads a sales-only item next to any
+    // amount in one sentence as quoting that item a price (O11), and a plan list can
+    // carry both (the Unlimited plan includes the Master Class and lists its SEO data).
+    return `- **${plan.name}** — ${planPriceLine(key)}. ${plan.tagline}\n  Includes: ${plan.features.join(". ")}.`;
   }).join("\n");
   return `## Plans and pricing (the ConstructHUB price book)
 There is no free plan. A new subscription starts with a ${TRIAL_LABEL}. Plans are billed monthly, or yearly at ${ANNUAL_MONTHS} times the monthly price. Every add-on is billed the same way: monthly, or yearly at ${ANNUAL_MONTHS} times its monthly price${annualExceptionsLine()}. Outgrow a plan's locations or seats and you move up a plan — there is no per-location pricing.

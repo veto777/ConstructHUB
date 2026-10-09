@@ -339,6 +339,80 @@ describe("limits", () => {
     expect(left).toBe(1); // refunded, not consumed
   });
 
+  it("a daily-budget refusal after the monthly quota is taken gives the question back (a 429 retry costs no allowance)", async () => {
+    let takes = 0, refunds = 0;
+    const quota = {
+      take: async (userId: number) => {
+        takes++;
+        expect(userId).toBe(42);
+        return { ok: true as const, refund: async () => { refunds++; } };
+      },
+    };
+    await env.close();
+    env = setup({ quota });
+    // Spend this user's 40 daily model-call slots; the next question hits the user-daily budget AFTER
+    // the monthly quota was reserved.
+    for (let i = 0; i < 40; i++) await env.budget.take("hub:u:42:d", 40, 86_400_000);
+    env.minute();
+    const r = await env.say("How do I set up Click Guard?");
+    expect(r.status).toBe(429);
+    expect(r.data.reply).toBe(REPLIES.R_LIMIT);
+    expect(takes).toBe(1); // the monthly reservation was taken…
+    expect(refunds).toBe(1); // …and immediately given back
+    expect(env.ai.calls).toHaveLength(0); // no model call ever happened
+  });
+
+  it("the global daily cap refusal gives the monthly question back too (a busy retry costs no allowance)", async () => {
+    process.env.HUB_GLOBAL_DAILY_CAP = "1";
+    try {
+      let takes = 0, refunds = 0;
+      const quota = {
+        take: async () => {
+          takes++;
+          return { ok: true as const, refund: async () => { refunds++; } };
+        },
+      };
+      await env.close();
+      env = setup({ quota });
+      // The first question is answered: the reservation stands.
+      expect((await env.say("How do I set up Click Guard?")).status).toBe(200);
+      expect(takes).toBe(1);
+      expect(refunds).toBe(0);
+      // The second, from another user, is turned away by the global cap: 503 busy, and the question is refunded.
+      env.minute();
+      const r = await env.say("How do I connect Google?", 43);
+      expect(r.status).toBe(503);
+      expect(r.data.reply).toBe(REPLIES.R_BUSY);
+      expect(takes).toBe(2);
+      expect(refunds).toBe(1);
+      expect(env.ai.calls).toHaveLength(1);
+    } finally { delete process.env.HUB_GLOBAL_DAILY_CAP; }
+  });
+
+  it("an exception between the monthly quota and a model answer gives the question back", async () => {
+    let takes = 0, refunds = 0;
+    const quota = {
+      take: async () => {
+        takes++;
+        return { ok: true as const, refund: async () => { refunds++; } };
+      },
+    };
+    // The budget store failing on the DAILY keys (the per-minute gate above them still works):
+    // the request errors out (503 busy) after the quota was reserved.
+    const brokenBudget = {
+      take: async (key: string) => { if (/:d$/.test(key)) throw new Error("budget store down"); return true; },
+      used: async () => 0,
+    };
+    await env.close();
+    env = setup({ quota, budget: brokenBudget });
+    const r = await env.say("How do I set up Click Guard?");
+    expect(r.status).toBe(503);
+    expect(r.data.reply).toBe(REPLIES.R_BUSY);
+    expect(takes).toBe(1);
+    expect(refunds).toBe(1);
+    expect(env.ai.calls).toHaveLength(0);
+  });
+
   it("RT70: at the global daily cap chat is R_BUSY with no upstream call, presets still served", async () => {
     process.env.HUB_GLOBAL_DAILY_CAP = "1";
     try {

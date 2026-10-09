@@ -156,8 +156,13 @@ const SEO_TOPIC = /\b(seo|rank[- ]?track\w*|keyword[- ]research|backlinks?)\b/i;
 /** In a sentence about SEO, an amount may only be the price of a plan that includes the tools… */
 const SEO_PLAN_CENTS: ReadonlySet<number> = new Set(
   PLAN_KEYS.filter((k) => PLANS[k].limits.seoKeywords !== 0).flatMap((k) => [PLANS[k].monthlyCents, PLANS[k].annualCents]));
-/** …or, next to a credit / data word, the monthly SEO data allowance or a prepaid pack (shared/seo-credits.ts). */
-const SEO_CREDIT_CENTS: ReadonlySet<number> = new Set([...SEO_CREDIT_PACKS, ...PLAN_KEYS.map((k) => SEO_PLAN_LIMITS[k].seoCreditCents).filter((c) => c > 0)]);
+/** …or, next to a credit / data word, the monthly SEO data allowance or a prepaid pack (shared/seo-credits.ts) — the plan-included ones and the SEO add-ons' own grants alike. */
+const SEO_CREDIT_CENTS: ReadonlySet<number> = new Set([
+  ...SEO_CREDIT_PACKS,
+  ...PLAN_KEYS.map((k) => SEO_PLAN_LIMITS[k].seoCreditCents).filter((c) => c > 0),
+  ADDONS.seo_basic.grants.seoCreditCents ?? 0,
+  ADDONS.seo_pro.grants.seoCreditCents ?? 0,
+]);
 const SEO_CREDIT_CUE = /\b(credits?|prepaid|packs?|data|allowance)\b/i;
 /** An add-on's own prices (never the SEO data amounts ADDON_CENTS also carries). */
 const ADDON_PRICE_CENTS: ReadonlySet<number> = new Set(Object.values(ADDONS).flatMap((a) => [a.monthlyCents, a.annualCents, ...(a.setupCents ? [a.setupCents] : [])]));

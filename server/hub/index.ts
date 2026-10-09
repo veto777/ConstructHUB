@@ -32,8 +32,9 @@ export function registerHubRoutes(app: Express): void {
     // The daily token counter on hub_usage_days: one row per UTC day, shared by every process, kept across restarts.
     tokens: new TokenMeter(pgUsage),
     // The plan's monthly Gabe questions (limits.gabeQuestions, -1 unlimited): a spent month
-    // answers 402/403 with the plan-limit body; a failed model call gives the question back.
-    // The per-user/day and global/day budgets above stay on top of this meter.
+    // answers 402/403 with the plan-limit body; a call that produces no answer — a daily-budget
+    // refusal, a failure or an exception — gives the question back. The per-user/day and
+    // global/day budgets above stay on top of this meter.
     quota: {
       take: async (userId: number) => {
         const r = await reserveQuotaFor(userId, "gabeQuestions", 1);
