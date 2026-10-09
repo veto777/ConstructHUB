@@ -900,6 +900,14 @@ export function registerStripeRoutes(app: Express) {
           sendBillingEmail = synced?.applied === true;
           break;
         }
+        case "charge.refunded":
+        case "charge.dispute.created": {
+          // The referral program (server/referrals): a refund or chargeback before payout voids the referral.
+          sendBillingEmail = false;
+          const { onChargeReversed } = await import("./referrals/service");
+          await onChargeReversed(event);
+          break;
+        }
         case "customer.subscription.trial_will_end": {
           const sub = event.data.object as Stripe.Subscription;
           if (isCallAssistantSubscription(sub)) { sendBillingEmail = false; break; }

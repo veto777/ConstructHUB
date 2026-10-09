@@ -646,6 +646,9 @@ function AccountSection({ user }: { user: SettingsUser | undefined }) {
         </CardContent>
       </Card>
 
+      {/* The referral program (server/referrals). Not in the iPhone app: rewards are paid on web subscriptions. */}
+      {!inNativeApp() && <ReferralCard />}
+
       {/* Open for platform admins: inviting people is something the owner does from here (Dennis, 2026-10-02). */}
       {!inNativeApp() && <details className="border-t pt-4" open={user?.isPlatformAdmin === true || undefined}><summary className="cursor-pointer text-sm font-medium">Trials and invite codes</summary><div className="mt-4"><BetaAccessSection user={user} /></div></details>}
 
@@ -1081,5 +1084,53 @@ function SupportNumbersRow() {
         {(data?.crmNumbers ?? []).map((n) => <code key={n} className="text-xs bg-muted px-2.5 py-1 rounded font-mono" data-testid={`text-crm-number-${n}`}>{n}</code>)}
       </div>
     </div>
+  );
+}
+
+
+type ReferralReward = { id: number; kind: "month" | "annual30"; product: "platform" | "crm"; tier: string; amount_cents: number | null; status: "earned" | "applied" | "void"; earned_at: string; applied_at: string | null };
+type ReferralMe = { code: string; link: string; pricingLink: string; signedUp: number; counts: Record<string, number>; rewards: ReferralReward[]; rules: { monthsToQualify: number; annualSharePct: number; holdDays: number } };
+const REWARD_STATUS: Record<ReferralReward["status"], string> = { earned: "Waiting to apply", applied: "Applied", void: "Cancelled" };
+
+/** "Refer a contractor": the share link, how many signed up, and the rewards earned (server/referrals). */
+function ReferralCard() {
+  const { toast } = useToast();
+  const { data } = useQuery<ReferralMe>({ queryKey: ["/api/referrals/me"] });
+  const copy = async (text: string) => toast({ title: (await copyToClipboard(text)) ? "Link copied" : "Copy failed — select the link and copy it" });
+  const usd = (c: number | null) => (c == null ? "—" : `$${(c / 100).toFixed(2)}`);
+  return (
+    <Card data-testid="card-referrals">
+      <CardHeader><CardTitle className="text-base flex items-center gap-2"><Gift className="h-4 w-4" />Refer a contractor</CardTitle></CardHeader>
+      <CardContent className="space-y-4 text-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <code className="flex-1 min-w-0 truncate text-xs bg-muted px-2.5 py-1.5 rounded font-mono" data-testid="text-referral-link">{data?.link ?? "…"}</code>
+          <Button size="sm" variant="outline" disabled={!data} onClick={() => data && copy(data.link)} data-testid="button-copy-referral"><Copy className="mr-1 h-4 w-4" />Copy link</Button>
+        </div>
+        <p className="text-muted-foreground">
+          Share your link with another contractor. When they sign up for a new account and pay for {data?.rules.monthsToQualify ?? 3} months, you get a free month.
+          If they pay for a full year up front, you get {data?.rules.annualSharePct ?? 30}% off your own yearly plan (once a year).
+          Rewards are like for like: same product (ConstructHUB or the CRM) and worth the plan they bought, up to your own plan.
+          A reward is added {data?.rules.holdDays ?? 14} days after their qualifying payment.
+        </p>
+        <div className="flex flex-wrap gap-4" data-testid="text-referral-counts">
+          <span><strong>{data?.signedUp ?? 0}</strong> signed up</span>
+          <span><strong>{(data?.counts.qualified ?? 0) + (data?.counts.rewarded ?? 0)}</strong> qualified</span>
+          <span><strong>{data?.rewards.filter((r) => r.status === "applied").length ?? 0}</strong> rewards applied</span>
+        </div>
+        {(data?.rewards.length ?? 0) > 0 && (
+          <div className="divide-y rounded border">
+            {data!.rewards.map((r) => (
+              <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 p-2" data-testid={`row-referral-reward-${r.id}`}>
+                <span>{r.kind === "month" ? "Free month" : `${data!.rules.annualSharePct}% off your yearly plan`} · {r.product === "crm" ? "CRM" : "ConstructHUB"}</span>
+                <span className="text-muted-foreground">{usd(r.amount_cents)} · {REWARD_STATUS[r.status]}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {data?.rewards.some((r) => r.status === "earned") && (
+          <p className="text-xs text-muted-foreground">A waiting reward is applied as soon as you have a plan in that product (a yearly plan for the {data.rules.annualSharePct}% reward).</p>
+        )}
+      </CardContent>
+    </Card>
   );
 }

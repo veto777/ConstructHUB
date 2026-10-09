@@ -219,6 +219,8 @@ export async function setupAuth(app: Express) {
             .catch((err: any) => console.error("Failed to send welcome email:", err?.message || err));
           // First-touch campaign of this browser, if it accepted analytics (never blocks the login).
           void recordSignupAttribution(newUser.id, req.headers?.cookie);
+          // The referral program: a ?ref link this browser followed (server/referrals), new accounts only.
+          void import("./referrals/service").then((m) => m.attachReferral(newUser.id, newUser.email, req.headers?.cookie));
 
           done(null, newUser);
         } catch (err) {
@@ -462,6 +464,8 @@ export async function setupAuth(app: Express) {
 
       // First-touch campaign of this browser, if it accepted analytics (never blocks the sign-up).
       void recordSignupAttribution(newUser.id, req.headers.cookie);
+      // The referral program: a ?ref link this browser followed (server/referrals), new accounts only.
+      void import("./referrals/service").then((m) => m.attachReferral(newUser.id, newUser.email, req.headers.cookie));
 
       try {
         const baseUrl = getBaseUrl(req);

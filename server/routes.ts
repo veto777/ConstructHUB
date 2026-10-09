@@ -523,6 +523,15 @@ export async function registerRoutes(
     throw e;
   }
 
+  // The referral program (server/referrals): share codes, attribution at sign-up, rewards paid through Stripe.
+  try {
+    const { ensureReferralSchema, registerReferralRoutes } = await import("./referrals/service");
+    await ensureReferralSchema();
+    registerReferralRoutes(app, getDevUser);
+  } catch (e: any) {
+    console.error("Failed to initialize the referral program:", e?.message || e);
+  }
+
   // Gabe's support line (server/support): customer numbers, the verified phone flow and the admin ticket desk.
   try {
     const { ensureSupportSchema } = await import("./support/schema");

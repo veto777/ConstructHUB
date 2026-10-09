@@ -116,6 +116,7 @@ const AdminAccessPage = lazyPage(() => import("@/pages/admin-access"));
 const AdminCodeApiPage = lazyPage(() => import("@/pages/admin-code-api"));
 const AdminIssuesPage = lazyPage(() => import("@/pages/admin-issues"));
 const AdminTicketsPage = lazyPage(() => import("@/pages/admin-tickets"));
+const AdminReferralsPage = lazyPage(() => import("@/pages/admin-referrals"));
 const AdminYoutubePage = lazyPage(() => import("@/pages/admin-youtube"));
 // "Report an issue" (every footer): the platform page, and the same page inside the CRM frame.
 const ReportIssuePage = lazyPage(() => import("@/pages/report-issue"));
@@ -288,6 +289,7 @@ function DashboardRouter() {
       <Route path="/admin/issues" component={AdminIssuesPage} />
       <Route path="/admin/tickets" component={AdminTicketsPage} />
       <Route path="/admin/tickets/:id" component={AdminTicketsPage} />
+      <Route path="/admin/referrals" component={AdminReferralsPage} />
       {/* Platform admins: connect the company YouTube channel for tutorial uploads (the API answers 403 to anyone else). */}
       <Route path="/admin/youtube" component={AdminYoutubePage} />
       {/* Anyone, signed in or out: a report to the issue desk (POST /api/issues/report) and the reporter's own list. */}

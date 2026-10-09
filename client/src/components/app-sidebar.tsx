@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { inNativeApp } from "@/lib/app-shell";
-import { Ticket,
+import { Ticket, Gift,
   Cloud, Search, Database, Clock, FileText, Building, Camera, LogIn, LogOut,
   Eye, Grid3X3, CreditCard, Shield, MapPin, GraduationCap, ChevronRight,
   HardHat, Globe, ShieldAlert, ExternalLink, ShieldCheck, BadgeCheck,
@@ -698,6 +698,17 @@ export function AppSidebar() {
                         )}
 
                       </span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {/* Referral program: who referred whom and the rewards (server/referrals). */}
+              {user?.isPlatformAdmin === true && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild data-active={location.startsWith("/admin/referrals")}>
+                    <Link href="/admin/referrals" data-testid="link-nav-admin-referrals" className="flex items-center gap-2 w-full">
+                      <Gift className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-muted-foreground" />
+                      <span>Referrals</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

@@ -172,6 +172,8 @@ async function accountFor(claims: Record<string, any>, input: z.infer<typeof bod
     const displayName = [input.givenName, input.familyName].map((s) => s?.trim()).filter(Boolean).join(" ") || null;
     [user] = await db.insert(users).values({ email, displayName, accountId: generateAccountId(), emailVerified: true } as any).returning();
     created = true;
+    // The referral program: a ?ref link this browser followed (server/referrals), new accounts only.
+    void import("./referrals/service").then((m) => m.attachReferral(user!.id, email, req.headers.cookie));
     void sendWelcomeEmail(user.id, appBaseUrl(req)).catch((e: any) => console.error("[apple] welcome email failed:", e?.message || e));
   }
   if (!user) return null;
