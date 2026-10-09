@@ -156,6 +156,9 @@ export async function applyCrmSubscription(sub: Stripe.Subscription, hintUserId?
     ],
   );
   forgetCrmEntitlements(userId);
+  // A CRM plan change can add or remove an included texting number (CRM Max):
+  // bring dedicated senders back within the owner's allowance, as the platform sync does.
+  await reconcileCrmTexting(userId);
   return userId;
 }
 
@@ -166,7 +169,13 @@ export async function endCrmSubscription(sub: Stripe.Subscription): Promise<numb
     `UPDATE crm_subscriptions SET status = 'canceled', plan = NULL, extra_seats = 0, jobcam_addon = false, cancel_at_period_end = NULL, updated_at = now()
       WHERE stripe_subscription_id = $1 RETURNING user_id`, [sub.id]);
   forgetCrmEntitlements(row?.user_id);
+  if (row?.user_id) await reconcileCrmTexting(row.user_id);
   return row?.user_id ?? null;
+}
+
+async function reconcileCrmTexting(userId: number) {
+  const { reconcileTextingNumbers } = await import("./sms");
+  await reconcileTextingNumbers(userId);
 }
 
 function summary(row: CrmSubscriptionRow | undefined) {
