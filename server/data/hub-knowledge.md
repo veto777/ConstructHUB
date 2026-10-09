@@ -18,6 +18,11 @@ BUILDER NOTES (strip every HTML comment before the pack reaches the model).
      AGENCY_PLAN: PLANS.agency.name,
      AUTO_REPLY_PLANS: planNamesWhere((p) => p.limits.autoPublishAiReplies),
      DRAFT_ONLY_REPLY_PLANS: planNamesWhere((p) => !p.limits.autoPublishAiReplies),
+     ADS_MANAGER_PLANS: planNamesWhere((p) => p.modules.adsManager),
+     CLOUDFLARE_PLANS: planNamesWhere((p) => p.modules.cloudflareSearchConsole),
+     DOMAINS_MAIL_PLANS: planNamesWhere((p) => p.modules.domainsMailAlerts),
+     AGENCY_WORKSPACE_PLANS: planNamesWhere((p) => p.modules.agencyWorkspace),
+     MASTER_CLASS_PLANS: planNamesWhere((p) => p.modules.masterClass),
      CLIENT_TEXTING_INCLUDED_PLANS: planNamesWhere((p) => p.limits.clientTexting === "included"),
      TEXTING_ADDON_PLANS: joinNames(ADDONS.texting_number.availableOn.map((k) => PLANS[k].name)),
      GUARD_CADENCE_LINE: joinNames(PLAN_KEYS.map((k) => `${PLANS[k].name} every ${PLANS[k].limits.guardCadenceMinutes} minutes`)),
@@ -66,7 +71,7 @@ BUILDER NOTES (strip every HTML comment before the pack reaches the model).
 
 ConstructHUB (constructhub.us) is an online platform for construction contractors and for agencies that market contractors. One account covers the following; the CRM is a separate product with its own plans (section 3), and the AI Call Assistant is a separate service with its own subscription (section 30) — a platform plan includes neither:
 
-- **Growth tools** (the main app at constructhub.us): permit office directory and permit search, property records finder, Google Business Profile tools (Locations, Profile Guard, reviews and AI replies, Posts & Photos, ranking grid, citations), Site Scan, Social Media, website and ad-traffic protection (Click Guard, IP Tracker, VPN Shield), Competitor Intel, the ConstructHUB SEO tools ({{AGENCY_PLAN}} plan), and {{AGENCY_PLAN}}-plan agency tools.
+- **Growth tools** (the main app at constructhub.us): permit office directory and permit search, property records finder, Google Business Profile tools (Locations, Profile Guard, reviews and AI replies, Posts & Photos, ranking grid, citations), Site Scan, Social Media, website and ad-traffic protection (Click Guard, IP Tracker, VPN Shield), Competitor Intel, the ConstructHUB SEO tools (included with {{AGENCY_PLAN}}, or added on a smaller plan), and the agency workspace tools ({{AGENCY_WORKSPACE_PLANS}}).
 - **The ConstructHub CRM** (opens at portal.constructhub.us): clients, estimates with e-signature, invoices, online payments into your own Stripe account, price book, pipeline, projects, schedule, team roles, messaging and texting.
 - **A client portal**: every client you add to the CRM gets a private page where they read estimates, sign, pay, message you and see their documents.
 - **The AI Call Assistant** ({{CALL_ASSISTANT_STATUS}}): an AI receptionist that answers your business calls on a local number and files every real caller as a lead in the CRM (section 30).
@@ -85,7 +90,7 @@ It is built for people starting a contracting business and for established contr
 Creating an account is free and needs no card. Forgot your password? Use **Forgot password?** on the sign-in page to get a reset link by email.
 
 ### Choose a plan
-1. Open **Pricing** (left sidebar → Pricing & Plans → Subscription Plans, or /pricing). Pick monthly or yearly billing; for {{AGENCY_PLAN}}, enter how many client locations you need.
+1. Open **Pricing** (left sidebar → Pricing & Plans → Subscription Plans, or /pricing). Pick monthly or yearly billing; each plan's own location and seat counts are on the pricing cards.
 2. Click **Choose [plan]**. You go to Stripe's secure checkout and enter your card there.
 3. A first-time subscriber starts with a {{TRIAL_LABEL}} (one trial per customer; the system decides eligibility at checkout, so the button itself doesn't promise it). The card is charged when the trial ends.
 4. You come back to Pricing with a "You're subscribed" message. Your plan, renewal date and add-ons are in **Settings → Billing**.
@@ -115,8 +120,8 @@ There is no free plan. Without a plan you can still browse the public pages: Pri
 {{PRICING_KNOWLEDGE}}
 
 ### How to read the price book
-- **Published self-serve prices** are every plan's monthly and yearly price, the {{AGENCY_PLAN}} per-location bands (up to the self-serve maximum) and the add-on prices. Quote these exactly, even when a yearly or {{AGENCY_PLAN}} total is {{SALES_THRESHOLD_LABEL}} or more.
-- **"{{SALES_REP_LABEL}}" (never a price):** done-for-you services, monthly SEO programs, the Master Class modules and bundle, custom work, {{AGENCY_PLAN}} above the self-serve location maximum, and add-on orders of more than {{ADDON_MAX_QUANTITY}} of one add-on. Point people to Pricing → Done-for-you services ({{SALES_HREF}}).
+- **Published self-serve prices** are every plan's monthly and yearly price and the add-on prices. Quote these exactly, even when a yearly total is {{SALES_THRESHOLD_LABEL}} or more.
+- **"{{SALES_REP_LABEL}}" (never a price):** done-for-you services, monthly SEO programs, the Master Class modules and bundle, custom work, and add-on orders of more than {{ADDON_MAX_QUANTITY}} of one add-on. Point people to Pricing → Done-for-you services ({{SALES_HREF}}).
 - Yearly billing costs {{ANNUAL_MONTHS}} times the monthly price, which works out to {{ANNUAL_FREE_MONTHS}} months free. The exceptions are the CRM plans, which have their own yearly prices (listed above), and the AI Call Assistant, whose yearly price is {{CALL_ASSISTANT_YEARLY_NOTE}}.
 - Single tools are not sold on their own. You choose a plan, then raise individual limits with add-ons. The two separate products — the CRM and the AI Call Assistant — are each bought on their own, with or without a plan.
 - Every location you add (imported from Google or added by search) counts toward your plan's locations.
@@ -124,8 +129,8 @@ There is no free plan. Without a plan you can still browse the public pages: Pri
 - AI review replies: every plan drafts replies for you to approve; publishing them automatically is included with {{AUTO_REPLY_PLANS}}.
 - Saved review-request templates per plan: {{REVIEW_TEMPLATES_LINE}}.
 - Ranking-grid credits a scan costs (one credit per 25 grid points, rounded up): {{GRID_CREDIT_COSTS}}.
-- On {{AGENCY_PLAN}}, ranking-grid credits and Site Scans are given per billed location, and {{AGENCY_PLAN}} team seats are shared with the CRM team.
-- The ConstructHUB SEO tools (site explorer, rank tracker, keyword research, backlinks) are included with the {{AGENCY_PLAN}} plan, with a monthly SEO data allowance; more SEO data is bought as prepaid credit on the SEO page. Accounts that already had the SEO tools before they became {{AGENCY_PLAN}}-only keep them. The other plans do not include them.
+- Monthly allowances (ranking-grid credits, Site Scans, Competitor Intel scans, permit searches, team text segments) are per account, not per location, and the monthly counts are those the plan list shows. Team seats on a platform plan are separate from the CRM's seats (the CRM is its own product, section 24).
+- The ConstructHUB SEO tools (site explorer, rank tracker, keyword research, backlinks) are included with the {{AGENCY_PLAN}} plan, with a monthly SEO data allowance; more SEO data is bought as prepaid credit on the SEO page. The Agency plan includes a smaller taste (250 tracked keywords and $10 of SEO data a month). The plans below it get the full suite as an add-on (the SEO suite lines in the add-on list above). Accounts that already had the SEO tools before this arrangement keep them.
 - The full side-by-side table is on Pricing → **Compare plans**.
 
 ## 4. Permits & Databases
@@ -150,7 +155,7 @@ There is no free plan. Without a plan you can still browse the public pages: Pri
 
 **What it does:** Locations is where each business lives (yours, or your clients' if you're an agency). Linking a location to its Google Business Profile listing syncs its reviews, photos, services and Google performance numbers, and unlocks Profile Guard, AI replies and Posts & Photos.
 
-**Plan:** every plan; how many locations you can add depends on the plan (Extra location add-on; 10 or more locations is the {{AGENCY_PLAN}} plan).
+**Plan:** every plan; how many locations you can add depends on the plan, and outgrowing a plan means moving up to the next one — there is no per-location pricing and no extra-location add-on.
 
 **Connect Google:**
 1. Sidebar → Google Business → **Locations** → **Connect Google Business Profile**.
@@ -269,7 +274,7 @@ Needs a connected Google account and a linked location. Reviews sync with the lo
 4. Choose the grid size (3x3 up to 15x15) and the distance between points (0.5 to 20 miles). The page shows the total width covered and how many credits the scan uses.
 5. Start the scan, then **View Full Report**.
 
-**Plan:** every plan includes monthly ranking-grid credits (per billed location on {{AGENCY_PLAN}}), and they reset monthly. Credits per scan: {{GRID_CREDIT_COSTS}}.
+**Plan:** every plan includes monthly ranking-grid credits, and they reset monthly. Credits per scan: {{GRID_CREDIT_COSTS}}.
 
 **Honest limit:** a scan is a snapshot at that moment. Rankings move, and no ranking is guaranteed.
 
@@ -282,7 +287,7 @@ Needs a connected Google account and a linked location. Reviews sync with the lo
 - **AI search readiness:** rules for AI crawlers, llms.txt, FAQ content and structured data.
 - Category and overall scores, with **What raised or lowered these scores?**. Each finding explains its impact, why it matters (with a link to Google's developer guidance) and the fix steps, including starting points for WordPress, Elementor, Wix, Squarespace, GoDaddy, Webflow, Shopify and Duda sites.
 
-**Plan:** every plan has monthly Site Scans (per location on {{AGENCY_PLAN}}). There are also daily caps: up to 5 scans, 20 PageSpeed requests and 3 AI fix plans per day.
+**Plan:** every plan has monthly Site Scans. There are also daily caps: up to 5 scans, 20 PageSpeed requests and 3 AI fix plans per day.
 
 **Run a scan:**
 1. Sidebar → **Site Scan**. Choose a **Linked GBP location** (it fills in the website) or **No GBP comparison** and enter the website URL.
@@ -398,7 +403,7 @@ An IP with more than 10 flagged visits in an hour is added to **Blocked IPs**. Y
 
 ## 19. Google Ads tools, guides and LSA
 
-### Agency Ads & LSA manager ({{AGENCY_PLAN}} plan only)
+### Agency Ads & LSA manager ({{ADS_MANAGER_PLANS}})
 For agencies that run clients' Google Ads from a Google Ads manager (MCC) account. Open Google Ads → **Agency Ads & LSA**.
 1. **Connect MCC with Google.** If the page says setup is required, the connection isn't available yet; contact support.
 2. ConstructHUB discovers your client accounts and marks which run Local Services Ads.
@@ -420,7 +425,7 @@ Google Ads → **LSA Leads**. Connect your own Google account to pull in your Lo
 
 The guides are ConstructHUB's recommendations, not guarantees of results.
 
-## 20. Cloudflare and Google Search Console ({{AGENCY_PLAN}} plan only)
+## 20. Cloudflare and Google Search Console ({{CLOUDFLARE_PLANS}})
 
 Both are in the sidebar (**Cloudflare**, **Search Console**), each with Sites, Connections, Onboarding, Work queue and Guide tabs; Cloudflare also has Edge audit.
 
@@ -442,7 +447,7 @@ Both are in the sidebar (**Cloudflare**, **Search Console**), each with Sites, C
 
 **Honest limits:** Google provides its top rows, omits some anonymized queries and delays recent data. Google's Indexing API only covers job-posting and livestream pages, so normal pages rely on sitemaps.
 
-## 21. Domains and Mail alerts ({{AGENCY_PLAN}} plan only)
+## 21. Domains and Mail alerts ({{DOMAINS_MAIL_PLANS}})
 
 ### Domains (Google Business → Domains)
 Manage client domains' DNS and nameservers while the registration stays with the registrar.
@@ -461,11 +466,11 @@ Collects important provider emails about client accounts (Google Business Profil
 
 Unmatched mail is dropped and matched messages expire within 30 days. Sender matching is not proof an email is genuine, so open the provider's dashboard directly before acting on security or billing alerts. If the page says the inbound mail domain isn't configured, forwarding isn't available yet.
 
-## 22. Agency workspace ({{AGENCY_PLAN}} plan only)
+## 22. Agency workspace ({{AGENCY_WORKSPACE_PLANS}})
 
 Open **Agency** under Google Business. Tabs: Locations, Clients, Team, Onboarding, Jobs and Settings, plus a workspace switcher.
 - **Clients:** client records with contact email, notes, tags and an optional folder; assign locations to clients.
-- **Team:** add members who already have a ConstructHUB login, with roles owner, admin, manager or viewer, and give them access to all clients or only assigned ones. Seats are shared with the CRM team.
+- **Team:** add members who already have a ConstructHUB login, with roles owner, admin, manager or viewer, and give them access to all clients or only assigned ones. These seats are the platform plan's team seats; the CRM is a separate product with its own seats (section 24).
 - **Onboarding (Google manager access):** choose the client and the connected agency Google email, enter the exact business name and an address or Place ID, and click **Email manager instructions**. The client keeps ownership and adds the agency email as a **Manager** in their Business Profile settings → People and access; no client sign-in to ConstructHUB is needed. ConstructHUB spots the invitation, accepts clear matches, links the listing to that client and starts the first sync. Status goes sent → opened → invitation received → accepted → linked (or expired). Reminders go after three and six days, and requests expire after 30 days. **Auto-accept all** location invitations is an option (off by default).
 - **Bulk actions on Locations:** select the page or every matching location, then sync, link and sync, unlink, assign a client, set Profile Guard mode (each location needs an approved snapshot first), set AI replies for future reviews (including auto-publishing future 3 to 5 star replies), queue approved posts or photos, run Site Scans or export a CSV. The dashboard counts locations that are synced, need reconnecting, are unlinked, or have Guard alerts, unanswered reviews or failed posts.
 - **Jobs:** progress and failures for queued work.
@@ -571,7 +576,7 @@ A step-by-step course on starting and growing a construction business, with 50 s
 3. **Website & Online Presence:** a contractor website blueprint, service and location pages, lead capture, speed and mobile, portfolios and trust signals.
 4. **SEO & Directory Domination:** local SEO, citations, content and link building, Google Ads and LSA setup, and tracking.
 
-The overview is free to read; each module's full content unlocks when purchased, and any Master Class purchase also unlocks the full Google Ads Guide. The Master Class is not included in any plan. Modules and the bundle are "{{SALES_REP_LABEL}}": Pricing → Master Class, or {{SALES_HREF}}.
+The overview is free to read; each module's full content unlocks when purchased, and any Master Class purchase also unlocks the full Google Ads Guide. The Master Class course is included with {{MASTER_CLASS_PLANS}}. Modules and the bundle are "{{SALES_REP_LABEL}}": Pricing → Master Class, or {{SALES_HREF}}.
 
 ## 27. Done-for-you services and talking to sales
 

@@ -54,6 +54,13 @@ export function knowledgeTokens(): Record<string, string> {
     AGENCY_PLAN: PLANS.agency.name,
     AUTO_REPLY_PLANS: planNamesWhere((p) => p.limits.autoPublishAiReplies),
     DRAFT_ONLY_REPLY_PLANS: planNamesWhere((p) => !p.limits.autoPublishAiReplies),
+    // Module gates read from the price book (shared/plans.ts PlanModules), so the pack's
+    // "which plans" lines can never drift from what checkout and entitlements enforce.
+    ADS_MANAGER_PLANS: planNamesWhere((p) => p.modules.adsManager),
+    CLOUDFLARE_PLANS: planNamesWhere((p) => p.modules.cloudflareSearchConsole),
+    DOMAINS_MAIL_PLANS: planNamesWhere((p) => p.modules.domainsMailAlerts),
+    AGENCY_WORKSPACE_PLANS: planNamesWhere((p) => p.modules.agencyWorkspace),
+    MASTER_CLASS_PLANS: planNamesWhere((p) => p.modules.masterClass),
     CLIENT_TEXTING_INCLUDED_PLANS: planNamesWhere((p) => p.limits.clientTexting === "included"),
     TEXTING_EITHER_LINE, CLIENT_NUMBER_INCLUDED_PLANS,
     TEXTING_ADDON_PLANS: joinNames(ADDONS.texting_number.availableOn.map((k) => PLANS[k].name)),
