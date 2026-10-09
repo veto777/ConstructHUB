@@ -6,7 +6,7 @@
  * from shared/plans.ts, never a number typed into this file.
  */
 import { test, expect, type Page } from "@playwright/test";
-import { PLANS, PLAN_KEYS, ADDONS, CALL_ASSISTANT_TIER_ADDONS, MODULE_NAMES, TRIAL_DAYS, agencyMonthlyCents, type PlanKey } from "../shared/plans";
+import { PLANS, PLAN_KEYS, ADDONS, CALL_ASSISTANT_TIER_ADDONS, TRIAL_DAYS, agencyMonthlyCents, type PlanKey } from "../shared/plans";
 import { gotoCrm, watchPage } from "./helpers";
 
 const usd = (cents: number) => {
@@ -50,7 +50,7 @@ async function expectNoSideScroll(page: Page, anchorTestId: string) {
 }
 
 test.describe("pricing page", () => {
-  test("four plans from the price book, no free plan, annual toggle shows two months free", async ({ page }) => {
+  test("five plans from the price book, no free plan, annual toggle shows two months free", async ({ page }) => {
     const guards = watchPage(page);
     await mockBilling(page, NO_SUB);
     await gotoCrm(page, "/pricing");
@@ -74,37 +74,48 @@ test.describe("pricing page", () => {
     guards.assertClean("pricing plans");
   });
 
-  test("comparison table: the four agency modules are Agency-only", async ({ page }) => {
+  test("comparison table: checks, crosses, the Unlimited pill and Coming badges from the matrix", async ({ page }) => {
     await mockBilling(page, NO_SUB);
     await gotoCrm(page, "/pricing#comparison");
-    for (const m of Object.keys(MODULE_NAMES)) {
-      await expect(page.getByTestId(`row-compare-module-${m}`)).toContainText(MODULE_NAMES[m as keyof typeof MODULE_NAMES]);
-      for (const k of PLAN_KEYS) {
-        await expect(page.getByTestId(`cell-compare-module-${m}-${k}`).locator("svg")).toHaveAttribute("aria-label", k === "agency" ? "Included" : "Not included");
-      }
-    }
-    await expect(page.getByTestId("cell-compare-crmSeats-pro")).toHaveText(String(PLANS.pro.limits.crmSeats));
+    // Locations step up the ladder; Unlimited reads as the purple pill.
+    await expect(page.getByTestId("cell-compare-locations-starter")).toHaveText("1");
+    await expect(page.getByTestId("cell-compare-locations-agency")).toContainText("Unlimited");
+    await expect(page.getByTestId("cell-compare-autoPublish-starter").locator("svg")).toHaveAttribute("aria-label", "Not included");
+    await expect(page.getByTestId("cell-compare-autoPublish-pro").locator("svg")).toHaveAttribute("aria-label", "Included");
+    // Coming modules show the badge on the plans that promise them, nothing on the others.
+    await expect(page.getByTestId("cell-compare-permitAlerts-growth")).toContainText("Coming");
+    await expect(page.getByTestId("cell-compare-permitAlerts-starter").locator("svg")).toHaveAttribute("aria-label", "Not included");
+    await expect(page.getByTestId("cell-compare-csvExport-pro")).toContainText("Coming");
+    // Texting numbers and the SEO suite are worded from the price book.
+    await expect(page.getByTestId("cell-compare-clientTextingNumber-starter")).toHaveText("Add-on $29");
+    await expect(page.getByTestId("cell-compare-clientTextingNumber-growth")).toHaveText("1 included");
+    await expect(page.getByTestId("cell-compare-seoSuite-agency")).toHaveText("5,000 keywords + $60 data/mo");
+    await expect(page.getByTestId("cell-compare-newProductSeats-agency")).toHaveText("2 seats");
   });
 
-  test("agency calculator prices locations by band and hands 500+ to sales", async ({ page }) => {
-    const calls = await mockBilling(page, NO_SUB);
-    await gotoCrm(page, "/pricing#agency");
-    const input = page.getByTestId("input-agency-locations");
-    for (const n of [10, 25, 120, 500]) {
-      await input.fill(String(n));
-      await expect(page.getByTestId("text-agency-total")).toHaveText(`${n} locations = ${usd(agencyMonthlyCents(n)!)}/mo`);
-    }
-    await page.getByTestId("button-interval-year").click();
-    await input.fill("25");
-    await expect(page.getByTestId("text-agency-total")).toHaveText(`25 locations = ${usd(agencyMonthlyCents(25)! * 10)}/yr`);
-    await page.getByTestId("button-agency-start").click();
-    await expect.poll(() => calls.checkout).toEqual([{ plan: "agency", interval: "year", locations: 25 }]);
+  test("Unlimited is the hero of the ladder", async ({ page }) => {
+    await mockBilling(page, NO_SUB);
+    await gotoCrm(page, "/pricing");
+    const hero = page.getByTestId("card-plan-agency");
+    await expect(hero).toContainText("No caps");
+    await expect(hero).toContainText(`${usd(PLANS.agency.monthlyCents)}/mo`);
+    // No plan is a free plan, and no plan card prices per location.
+    await expect(page.locator('[data-testid="card-plan-free"]')).toHaveCount(0);
+    expect(await page.locator("#plans").innerText()).not.toMatch(/per location/i);
+  });
 
-    await input.fill("600");
-    await expect(page.getByTestId("text-agency-total")).toHaveText("600 locations = Talk to a sales rep");
-    await expect(page.getByTestId("button-agency-start")).toHaveCount(0);
-    await page.getByTestId("button-agency-sales").click();
-    await expect(page.getByTestId("dialog-talk-to-sales")).toContainText("Agency plan — 600 locations");
+  test("the CRM tab shows the CRM plans and their own comparison table", async ({ page }) => {
+    await mockBilling(page, NO_SUB);
+    await gotoCrm(page, "/pricing#crm");
+    await expect(page.getByTestId("section-crm-plans")).toBeVisible();
+    await expect(page.getByTestId("table-crm-comparison")).toBeVisible();
+    await expect(page.getByTestId("cell-compare-seats-crm_basic")).toHaveText("1");
+    await expect(page.getByTestId("cell-compare-jobcam-crm_max").locator("svg")).toHaveAttribute("aria-label", "Included");
+    await expect(page.getByTestId("cell-compare-jobcam-crm_basic")).toHaveText("Add-on $39");
+    await expect(page.getByTestId("cell-compare-teamTexts-crm_essentials")).toHaveText("500");
+    // Back to the Business Tools tab.
+    await page.getByTestId("tab-business").click();
+    await expect(page.getByTestId("table-plan-comparison")).toBeVisible();
   });
 
   test("add-ons table lists every add-on; the old individual-tools URL lands on it", async ({ page }) => {
@@ -113,7 +124,8 @@ test.describe("pricing page", () => {
     await expect(page).toHaveURL(/\/pricing#add-ons$/);
     await expect(page.getByTestId("text-addons-heading")).toBeInViewport();
     // The Call Assistant tiers have their own section (pricing.tsx); every other add-on is a row here.
-    for (const addon of Object.values(ADDONS).filter((a) => !CALL_ASSISTANT_TIER_ADDONS.includes(a.key))) {
+    // Retired add-ons (nothing for sale, like the old extra-location line) are not listed; the Call Assistant's are its own section.
+    for (const addon of Object.values(ADDONS).filter((a) => !CALL_ASSISTANT_TIER_ADDONS.includes(a.key) && (a.availableOn.length > 0 || a.preview))) {
       await expect(page.getByTestId(`row-addon-${addon.key}`)).toContainText(addon.name);
       await expect(page.getByTestId(`text-addon-price-${addon.key}`)).toContainText(`${usd(addon.monthlyCents)}/mo`);
     }
@@ -168,7 +180,7 @@ test.describe("pricing page", () => {
     await expect(page.getByTestId("button-subscribe-pro")).toBeDisabled();
     await page.getByTestId("button-subscribe-growth").click();
     const dialog = page.getByTestId("dialog-change-plan");
-    await expect(dialog).toContainText(`Growth at ${usd(PLANS.growth.monthlyCents)}/mo`);
+    await expect(dialog).toContainText(`${PLANS.growth.name} at ${usd(PLANS.growth.monthlyCents)}/mo`);
     await page.getByTestId("button-confirm-change-plan").click();
     await expect.poll(() => calls.changePlan).toEqual([{ plan: "growth", interval: "month" }]);
     // Same plan, other interval: a switch, still no checkout.
@@ -192,15 +204,15 @@ test.describe("pricing page: returning and Agency subscribers", () => {
     expect(calls.changePlan).toEqual([]);
   });
 
-  test("an Agency subscriber switching billing keeps the locations they pay for", async ({ page }) => {
+  test("an Unlimited subscriber switching billing changes the same subscription, never a second checkout", async ({ page }) => {
     const calls = await mockBilling(page, AGENCY_STRIPE);
     await gotoCrm(page, "/pricing?interval=year");
     await expect(page.getByTestId("button-subscribe-agency")).toHaveText("Current plan");
     await page.getByTestId("button-interval-month").click();
     await page.getByTestId("button-subscribe-agency").click();
-    await expect(page.getByTestId("dialog-change-plan")).toContainText(`with 25 locations at ${usd(agencyMonthlyCents(25)!)}/mo`);
+    await expect(page.getByTestId("dialog-change-plan")).toContainText("Switch to monthly billing?");
     await page.getByTestId("button-confirm-change-plan").click();
-    await expect.poll(() => calls.changePlan).toEqual([{ plan: "agency", interval: "month", locations: 25 }]);
+    await expect.poll(() => calls.changePlan).toEqual([{ plan: "agency", interval: "month" }]);
     expect(calls.checkout).toEqual([]);
   });
 });
@@ -315,7 +327,7 @@ test.describe("mobile 390", () => {
 
   test("pricing and billing never scroll sideways", async ({ page }) => {
     await mockBilling(page, PLATINUM_STRIPE);
-    for (const hash of ["", "#comparison", "#agency", "#add-ons", "#services"]) {
+    for (const hash of ["", "#plans", "#comparison", "#add-ons", "#services", "#crm", "#call-assistant"]) {
       await gotoCrm(page, `/pricing${hash}`);
       await expect(page.getByTestId("text-pricing-title")).toBeAttached();
       await expectNoSideScroll(page, "text-pricing-title");
@@ -351,7 +363,7 @@ const PRO_ENTITLEMENTS = {
   resetsAt: "2026-11-01T00:00:00.000Z",
 };
 const AGENCY_ENTITLEMENTS = {
-  ...PRO_ENTITLEMENTS, plan: "agency", storedPlan: "agency", accessPlan: "agency", planName: "Agency",
+  ...PRO_ENTITLEMENTS, plan: "agency", storedPlan: "agency", accessPlan: "agency", planName: PLANS.agency.name,
   limits: PLANS.agency.limits, allowances: PLANS.agency.limits, modules: PLANS.agency.modules,
   locations: { used: 25, limit: 500 },
 };
@@ -427,7 +439,7 @@ test.describe("pricing page: refusals with a next step", () => {
     await gotoCrm(page, "/pricing");
     await page.getByTestId("button-subscribe-growth").click();
     const dialog = page.getByTestId("dialog-change-plan");
-    await expect(dialog).toContainText(`Growth at ${usd(PLANS.growth.monthlyCents)}/mo`);
+    await expect(dialog).toContainText(`${PLANS.growth.name} at ${usd(PLANS.growth.monthlyCents)}/mo`);
     await page.getByTestId("button-confirm-change-plan").click();
     await expect.poll(() => calls.changePlan).toEqual([{ plan: "growth", interval: "month" }]);
   });

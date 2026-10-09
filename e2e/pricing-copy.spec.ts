@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { ADDONS, PLANS, PLAN_KEYS } from "../shared/plans";
 import {
   CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_SPAM, CALL_ASSISTANT_SPAM_BLOCK_TITLE, SALES_REP_LABEL, callAssistantPricing, callAssistantTierAdvice,
-  callAssistantYearlyNote, callAssistantOverageRule, callAssistantAboveTopLine, planPriceLine, CRM_SEATS_LINE,
+  callAssistantYearlyNote, callAssistantOverageRule, callAssistantAboveTopLine, planPriceLine, CRM_SEATS_LINE, COMPETITOR_INTEL_PLANS,
 } from "../shared/plan-copy";
 import { VOICE_PERSONA_LIST } from "../shared/voice-personas";
 
@@ -42,7 +42,7 @@ for (const viewport of [{ width: 1280, height: 900 }, { width: 390, height: 844 
 
 test("Terms list the new plans, add-ons, trial and sales-rep services", async ({ page }) => {
   await page.goto("/terms");
-  await expect(page.getByTestId("text-effective-date")).toHaveText("Last updated: September 30, 2026");
+  await expect(page.getByTestId("text-effective-date")).toHaveText("Last updated: October 7, 2026");
   const plans = page.getByTestId("list-plans");
   for (const key of PLAN_KEYS) await expect(plans).toContainText(`${PLANS[key].name} — ${planPriceLine(key)}`);
   await expect(page.getByTestId("section-subscription-plans")).toContainText("1-day trial");
@@ -60,7 +60,7 @@ test("landing: plans from the price book, services go to a sales rep", async ({ 
   await page.goto("/landing");
   for (const key of PLAN_KEYS) await expect(page.getByTestId(`card-plan-${key}`)).toContainText(PLANS[key].name);
   await expect(page.getByTestId("card-plan-starter")).toContainText("$29/month");
-  await expect(page.getByTestId("text-agency-modules")).toContainText("Google Ads & LSA manager");
+  await expect(page.getByTestId("text-agency-modules")).toContainText("Master Class");
   await expect(page.getByTestId("text-dfy-sales")).toHaveCount(3);
   await expect(page.getByTestId("link-dfy-pricing")).toHaveAttribute("href", "/pricing#services");
   await expect(page.getByText("Create a Free Account")).toHaveCount(0);
@@ -213,7 +213,7 @@ test("Competitor Intel: a 402 plan_required shows an honest upgrade prompt", asy
   await page.goto("/competitors");
   await expect(page.getByTestId("text-plan-required")).toHaveText("Competitor Intel is included with the Pro plan. Upgrade in Pricing to use it.");
   await expect(page.getByTestId("button-upgrade-plan")).toHaveText(/See the Pro plan/);
-  await expect(page.getByText("Pro, Growth and Agency")).toBeVisible();
+  await expect(page.getByText(COMPETITOR_INTEL_PLANS)).toBeVisible();
   await expect(page.getByTestId("button-start-scan")).toHaveCount(0);
 });
 
