@@ -1,7 +1,7 @@
 /**
  * Hub HTTP routes (guardrails §2, §5). Everything is injected (model client,
- * budgets, stats, preset store), so this file imports no database and the
- * route tests run against a stub model.
+ * budgets, stats, preset store); plan/access checks are loaded only for model
+ * calls. Route tests stub those checks and the model without a database.
  *
  *   GET  /api/hub/presets   chip list + this visitor's tier (browse | builder)
  *   POST /api/hub/preset    { presetId }  — anyone; cached/template answer, never a per-request model call
@@ -20,7 +20,7 @@ import { buildMessages, buildPresetMessages, buildRequest, knowledgeHash, type V
 import { filterOutput } from "./output-filter";
 import { REPLIES, replyText } from "./replies";
 import { checkConversation, signTurn, type InTurn } from "./turns";
-import { Breaker, HUB_LIMITS, Semaphore, globalDailyCap, keys, maxConcurrency, type Budget } from "./limits";
+import { Breaker, HUB_LIMITS, Semaphore, globalDailyCap, hubDailyLimits, keys, maxConcurrency, type Budget } from "./limits";
 import { latencyBucket, logError, logLine, type HubOutcome, type HubTier, type StatsSink } from "./stats";
 import { requiredFactsOk, templateAnswer, appTemplateAnswer, presetList, type PresetStore } from "./presets";
 import { dailyTokenCap, estimateTokens, MemoryUsageStore, TokenMeter, type TokenReservation } from "./usage";
@@ -361,10 +361,26 @@ export function createHub(deps: HubDeps) {
       // gives the monthly question back in the finally.
       let answered = false;
       try {
+        // Resolve delegated access through the same membership/plan checks as other
+        // workspace tools. Daily counters remain per actor; the allowance is the owner's.
+        let ownerId = userId;
+        if (req.session?.agencyOwner && req.session.agencyOwner !== userId) {
+          const { requestAccess } = await import("../agency/routes");
+          ownerId = (await requestAccess(req)).owner;
+        }
+        // Production always supplies quota; isolated Hub instances without a
+        // plan meter retain the default guards and need no entitlement database.
+        let monthlyGabeQuestions: number | null = null;
+        if (deps.quota) {
+          const { getEntitlements } = await import("../entitlements");
+          const ent = await getEntitlements(ownerId);
+          monthlyGabeQuestions = ent.allowances?.gabeQuestions ?? null;
+        }
+        const daily = hubDailyLimits(monthlyGabeQuestions);
         // 10. the plan's monthly Gabe questions first: a spent month names the plan
         // and the reset, and costs none of the daily budgets below.
         if (deps.quota) {
-          quota = await deps.quota.take(userId);
+          quota = await deps.quota.take(ownerId);
           if (!quota.ok) {
             note(tier, "limit", "plan_quota", started);
             return void res.status(quota.status).json({ ...quota.body, reply: typeof (quota.body as { message?: unknown }).message === "string" ? (quota.body as { message: string }).message : REPLIES.R_LIMIT });
@@ -372,10 +388,10 @@ export function createHub(deps: HubDeps) {
         }
         // 10b. daily budgets — taken only now that a model call will happen (the finally below
         // releases the slot, and re-credits the monthly question when no call can be made)
-        if (!(await deps.budget.take(keys.userDaily(userId), HUB_LIMITS.userDaily.limit, HUB_LIMITS.userDaily.windowMs))) {
+        if (!(await deps.budget.take(keys.userDaily(userId), daily.userDaily, HUB_LIMITS.userDaily.windowMs))) {
           note(tier, "limit", "user_daily", started); return void res.status(429).json({ reply: REPLIES.R_LIMIT, code: "limit" });
         }
-        if (!(await deps.budget.take(keys.ipDaily(deps.ipKey(req)), HUB_LIMITS.ipDaily.limit, HUB_LIMITS.ipDaily.windowMs))) {
+        if (!(await deps.budget.take(keys.ipDaily(deps.ipKey(req)), daily.ipDaily, HUB_LIMITS.ipDaily.windowMs))) {
           note(tier, "limit", "ip_daily", started); return void res.status(429).json({ reply: REPLIES.R_LIMIT, code: "limit" });
         }
         if (!(await deps.budget.take(keys.globalDaily(), globalDailyCap(), HUB_LIMITS.userDaily.windowMs))) {

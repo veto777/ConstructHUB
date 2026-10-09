@@ -4,7 +4,22 @@
  * covered end to end in routes.test.ts.
  */
 import { describe, expect, it } from "vitest";
-import { Breaker, Semaphore, globalDailyCap, maxConcurrency } from "./limits";
+import { Breaker, Semaphore, globalDailyCap, hubDailyLimits, maxConcurrency } from "./limits";
+import { PLANS } from "@shared/plans";
+
+describe("plan-aware daily caps", () => {
+  it.each([
+    ["starter", 40, 120], ["team", 40, 120], ["pro", 50, 120],
+    ["growth", 150, 150], ["agency", 200, 200],
+  ] as const)("%s uses its monthly allowance", (key, userDaily, ipDaily) => {
+    expect(hubDailyLimits(PLANS[key].limits.gabeQuestions)).toEqual({ userDaily, ipDaily });
+  });
+  it("keeps anonymous/default caps and rounds fractional allowances up", () => {
+    expect(hubDailyLimits()).toEqual({ userDaily: 40, ipDaily: 120 });
+    expect(hubDailyLimits(null)).toEqual({ userDaily: 40, ipDaily: 120 });
+    expect(hubDailyLimits(1001).userDaily).toBe(51);
+  });
+});
 
 describe("Semaphore", () => {
   it("allows `max` calls in flight and one per owner", () => {

@@ -23,6 +23,10 @@ import type { HubOutcome } from "./stats";
 
 type Step = HubCompletion | "hang" | { status: number };
 
+const planMocks = vi.hoisted(() => ({ entitlements: vi.fn(), access: vi.fn() }));
+vi.mock("../entitlements", () => ({ getEntitlements: planMocks.entitlements }));
+vi.mock("../agency/routes", () => ({ requestAccess: planMocks.access }));
+
 function setup(over: Partial<HubDeps> = {}) {
   const clock = { t: Date.UTC(2026, 8, 30, 12, 0, 0) };
   const budgetStore = new Map<string, number>();
@@ -70,6 +74,7 @@ function setup(over: Partial<HubDeps> = {}) {
     originOk,
     isBuilder: (req) => !!req.user && (req.user as any).emailVerified === true,
     now: () => clock.t,
+    quota: { take: async () => ({ ok: true, refund: async () => {} }) },
     ...over,
   });
   const app = express();
@@ -77,6 +82,7 @@ function setup(over: Partial<HubDeps> = {}) {
   app.use((req, _res, next) => {
     const id = req.get("x-test-user");
     if (id) (req as any).user = { id: Number(id), email: "owner-secret@example.invalid", displayName: "Secret Name", accountId: "ACCT-SECRET", emailVerified: !req.get("x-test-unverified") };
+    if (req.get("x-test-owner")) (req as any).session = { agencyOwner: Number(req.get("x-test-owner")) };
     next();
   });
   app.use(hub.router);
@@ -106,7 +112,11 @@ function setup(over: Partial<HubDeps> = {}) {
 }
 
 let env: ReturnType<typeof setup>;
-beforeEach(() => { env = setup(); });
+beforeEach(() => {
+  planMocks.entitlements.mockReset().mockResolvedValue({ allowances: null });
+  planMocks.access.mockReset();
+  env = setup();
+});
 afterEach(async () => { await env.close(); vi.restoreAllMocks(); });
 afterAll(() => { delete process.env.HUB_GLOBAL_DAILY_CAP; });
 
@@ -127,6 +137,8 @@ describe("tiers and request guards", () => {
     expect(r.data).toEqual({ presetsOnly: true, reply: REPLIES.R_SIGNIN });
     expect(env.ai.calls).toHaveLength(0);
     expect(env.budgetCalls).toHaveLength(0);
+    expect(planMocks.entitlements).not.toHaveBeenCalled();
+    expect(planMocks.access).not.toHaveBeenCalled();
   });
 
   it("an unverified account gets presets only", async () => {
@@ -302,6 +314,40 @@ describe("limits", () => {
     expect(r.status).toBe(429);
     expect(r.data.reply).toBe(REPLIES.R_LIMIT);
     expect(env.ai.calls).toHaveLength(40);
+  });
+
+  it.each([
+    ["starter", 40], ["team", 40], ["pro", 50], ["growth", 150], ["agency", 200],
+  ] as const)("%s can reach its daily cap through the IP guard", async (key, cap) => {
+    planMocks.entitlements.mockResolvedValue({ allowances: PLANS[key].limits });
+    for (let i = 0; i < cap; i++) {
+      if (i % 4 === 0) env.minute();
+      expect((await env.say("How do I set up Click Guard?")).status).toBe(200);
+    }
+    env.minute();
+    expect((await env.say("How do I set up Click Guard?")).status).toBe(429);
+    expect(env.stats.at(-1)?.reason).toBe("user_daily");
+    expect(env.ai.calls).toHaveLength(cap);
+  });
+
+  it.each([true, false])("uses validated workspace attribution (membership valid: %s)", async (valid) => {
+    await env.close();
+    const take = vi.fn().mockResolvedValue({ ok: true, refund: vi.fn().mockResolvedValue(undefined) });
+    env = setup({ quota: { take } });
+    planMocks.access.mockResolvedValue({ owner: valid ? 900 : 42 });
+    planMocks.entitlements.mockImplementation(async (id) => ({ allowances: PLANS[id === 900 ? "growth" : "starter"].limits }));
+    for (let i = 0; i < 40; i++) await env.budget.take("hub:u:42:d", 40, DAY);
+    const res = await fetch(env.base + "/api/hub/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: env.base, "x-test-user": "42", "x-test-owner": "900" },
+      body: JSON.stringify({ messages: [{ role: "user", content: "How do I set up Click Guard?" }] }),
+    });
+    expect(res.status).toBe(valid ? 200 : 429);
+    expect(planMocks.access).toHaveBeenCalledOnce();
+    expect(planMocks.entitlements).toHaveBeenCalledWith(valid ? 900 : 42);
+    expect(take).toHaveBeenCalledWith(valid ? 900 : 42);
+    expect(await env.budget.used("hub:u:900:d", DAY)).toBe(0);
+    expect(await env.budget.used("hub:u:42:d", DAY)).toBe(valid ? 41 : 40);
   });
 
   it("the plan's monthly question quota is taken per answered question, refuses with the plan-limit body, and is refunded when the model fails", async () => {

@@ -23,6 +23,14 @@ export const HUB_LIMITS = {
   ipDaily: { limit: 120, windowMs: DAY },
 };
 
+/** Spread the monthly Gabe allowance over 20 active days; unlimited has a 200/day
+ * fair-use guard. Missing plans retain the default, and IP caps never undercut users. */
+export function hubDailyLimits(monthlyGabeQuestions?: number | null) {
+  const userDaily = monthlyGabeQuestions === -1 ? 200
+    : Math.max(HUB_LIMITS.userDaily.limit, Math.ceil((monthlyGabeQuestions ?? 0) / 20));
+  return { userDaily, ipDaily: Math.max(HUB_LIMITS.ipDaily.limit, userDaily) };
+}
+
 export const globalDailyCap = () => {
   const n = Number(process.env.HUB_GLOBAL_DAILY_CAP);
   return Number.isInteger(n) && n > 0 ? n : 1500;
