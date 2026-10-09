@@ -60,11 +60,12 @@ beforeAll(async () => {
   for (const key of Object.keys({ starter: 0, team: 0, pro: 0, agency: 0, admin: 0, legacy: 0, canceled: 0, member: 0, lapsed: 0, lapsedMember: 0 }) as (keyof typeof users)[])
     users[key] = (await pool.query('INSERT INTO users(email) VALUES($1) RETURNING id', [`${key === 'admin' ? 'p3-admin' : `p3-gate-${key}`}-${randomUUID()}@example.invalid`])).rows[0].id;
   const agencyPlan = planForModule('agencyWorkspace');
-  // Team and Solo sit below the Pro modules; the lapsed owner drops to Team so the Pro-and-up
-  // modules (ads, cloudflare/search console, domains/mail) stop running for them too.
-  for (const [user, plan, status] of [[users.starter, PLANS.starter.key, 'active'], [users.team, PLANS.team.key, 'active'], [users.pro, PLANS.pro.key, 'active'], [users.agency, agencyPlan, 'active'], [users.legacy, 'platinum', 'active'], [users.canceled, agencyPlan, 'canceled'], [users.lapsed, PLANS.team.key, 'active']] as const)
+  // Team and Solo sit below the Pro modules; the lapsed owner drops to Solo so the Pro-and-up
+  // modules (ads, cloudflare/search console, domains/mail) stop running for them too — and,
+  // with no team seats of their own beyond the owner's, their team delegation ends as well.
+  for (const [user, plan, status] of [[users.starter, PLANS.starter.key, 'active'], [users.team, PLANS.team.key, 'active'], [users.pro, PLANS.pro.key, 'active'], [users.agency, agencyPlan, 'active'], [users.legacy, 'platinum', 'active'], [users.canceled, agencyPlan, 'canceled'], [users.lapsed, PLANS.starter.key, 'active']] as const)
     await pool.query('INSERT INTO subscriptions(user_id,plan,status) VALUES($1,$2,$3)', [user, plan, status]);
-  // An Agency workspace with a member (no plan of their own), and a workspace whose owner dropped to Team.
+  // An Agency workspace with a member (no plan of their own), and a workspace whose owner dropped to Solo.
   await pool.query("INSERT INTO agency_workspaces(user_id,name) VALUES($1,'P- gate agency'),($2,'P- lapsed agency')", [users.agency, users.lapsed]);
   await pool.query("INSERT INTO agency_members(user_id,member_id,role,all_clients) VALUES($1,$2,'manager',true),($3,$4,'manager',true)", [users.agency, users.member, users.lapsed, users.lapsedMember]);
   agencyLoc = (await pool.query("INSERT INTO business_locations(user_id,business_name) VALUES($1,'P- agency client location') RETURNING id", [users.agency])).rows[0].id;
@@ -232,7 +233,21 @@ describe('Agency workspace for owners and members', () => {
     expect((await call(users.member, '/api/agency/workspace', 'POST', { owner: users.member })).status).toBe(200);
     expect((await call(users.member, '/api/agency/me')).data.owner).toBe(users.member);
   });
-  it('ends a member\'s delegation when the owner\'s plan no longer includes the workspace, without locking them out', async () => {
+  it('keeps a member\'s delegation while the owner\'s plan includes team seats (Team and up), and ends it when they drop to Solo', async () => {
+    // Team includes 3 team seats (shared/plans.ts), so a Team owner's delegation keeps working:
+    // team seats are independent of the Agency client-workspace module (server/agency/access.ts).
+    await pool.query("UPDATE subscriptions SET plan=$2 WHERE user_id=$1", [users.lapsed, PLANS.team.key]);
+    try {
+      sessions.set(users.lapsedMember, { agencyOwner: users.lapsed });
+      const kept = await call(users.lapsedMember, '/api/locations?paged=true');
+      expect(kept.status).toBe(200);
+      expect(kept.data.total).toBe(1);   // the Team owner's location, through the delegation
+      expect(sessions.get(users.lapsedMember).agencyOwner).toBe(users.lapsed);
+      expect((await call(users.lapsedMember, '/api/agency/me')).data).toMatchObject({ owner: users.lapsed, entitled: false });
+    } finally {
+      await pool.query("UPDATE subscriptions SET plan=$2 WHERE user_id=$1", [users.lapsed, PLANS.starter.key]);
+    }
+    // Solo has no team seats beyond the owner's own: the delegation ends without locking the member out.
     sessions.set(users.lapsedMember, { agencyOwner: users.lapsed });
     const list = await call(users.lapsedMember, '/api/locations?paged=true');
     expect(list.status).toBe(200);
@@ -334,7 +349,7 @@ describe('Background workers skip owners whose plan no longer includes the modul
         expect(shown.status).toBe(200);
         expect(shown.data.items.map((m: any) => m.subject)).toEqual(['Gmail Forwarding Confirmation']);
       } finally {
-        await pool.query("UPDATE subscriptions SET plan=$2 WHERE user_id=$1", [users.lapsed, PLANS.team.key]);
+        await pool.query("UPDATE subscriptions SET plan=$2 WHERE user_id=$1", [users.lapsed, PLANS.starter.key]);
       }
       await pool.query("INSERT INTO mail_alert_grants(user_id,google_subject,email,access_token,refresh_token,expires_at,next_sync) VALUES($1,'p3-sub','p3@example.invalid',$2,$3,now()+interval '1 hour',now()-interval '1 minute')", [users.lapsed, encryptToken('fixture-access'), encryptToken('fixture-refresh')]);
       const http = vi.fn(async () => { throw Error('No Gmail calls expected for this owner'); });

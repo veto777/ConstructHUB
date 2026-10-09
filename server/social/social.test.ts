@@ -102,9 +102,16 @@ beforeAll(async () => {
     "INSERT INTO users(email) VALUES('social-test-'||gen_random_uuid()||'@example.invalid'),('social-test-'||gen_random_uuid()||'@example.invalid') RETURNING id",
   );
   [userId, otherId] = rows.map((r) => r.id);
+  // Social publishing starts at Pro (shared/plans.ts): the fixture owner publishes on a Pro
+  // plan, and the worker skips owners whose plan no longer includes the module.
+  await pool.query(
+    "INSERT INTO subscriptions(user_id,plan,status) VALUES($1,'pro','active')",
+    [userId],
+  );
 });
 afterAll(async () => {
   await pool.query("DELETE FROM business_locations WHERE user_id=$1", [userId]);
+  await pool.query("DELETE FROM subscriptions WHERE user_id=ANY($1)", [[userId, otherId]]);
   await pool.query("DELETE FROM users WHERE id=ANY($1)", [[userId, otherId]]);
   await pool.query("DELETE FROM growth_budgets WHERE key=$1", [
     `social-ai:${userId}`,
@@ -299,6 +306,22 @@ describe("real Postgres, mocked Blotato publishing", () => {
         )
       ).rows,
     ).toHaveLength(1);
+  });
+  it("the worker skips an owner whose plan does not include social publishing", async () => {
+    const [p] = await createPosts(userId, request());
+    // Hand the queued post to a plan-less owner: it stays queued and Blotato is never called.
+    await pool.query("UPDATE social_posts SET user_id=$1 WHERE id=$2", [otherId, p.id]);
+    try {
+      http.mockClear();
+      await workerUser(otherId, make);
+      expect(http).not.toHaveBeenCalled();
+      expect(
+        (await pool.query("SELECT state FROM social_posts WHERE id=$1", [p.id])).rows[0].state,
+      ).toBe("queued");
+    } finally {
+      await pool.query("UPDATE social_posts SET user_id=$1 WHERE id=$2", [userId, p.id]);
+      await changePost(userId, p.id, "cancel");
+    }
   });
   it("rejects changed retries and duplicate destinations without changing queued content", async () => {
     const input = request({ draft: true, tweaks: { twitter: "Fixture tweak", linkedin: "Unused tweak" } });

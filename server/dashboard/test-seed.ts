@@ -7,8 +7,10 @@
  *   starter  — Starter (Stripe, active), nothing set up
  *   agency   — Agency (Stripe, active) with Google, reviews, Guard, a grid, a
  *              Site Scan, Click Guard visits, searches, notifications and a CRM
- *              org (customer, lead, sold job, estimates, visits, team activity);
- *              also an admin member of `other`'s org (for the pinned-org test)
+ *              org (customer, lead, sold job, estimates, visits, team activity)
+ *              on the CRM Essentials plan (the CRM is a separate product:
+ *              shared/crm-plans.ts); also an admin member of `other`'s org (for
+ *              the pinned-org test)
  *   other    — Growth, with its OWN rows in every table the agency user's tiles
  *              read: none of them may ever show up on the agency dashboard
  *   teammate — no plan; on the agency user's Agency team (agency_members)
@@ -62,6 +64,9 @@ async function seed(pool: pg.Pool, tag: string, users: number[]): Promise<Seeded
   await plan(starter, "starter");
   await plan(agency, "agency");
   await plan(other, "growth");
+  // The CRM is a separate product (owner, 2026-10-07): the agency fixture's CRM seats come
+  // from its own CRM subscription, never from the platform plan.
+  await q("INSERT INTO crm_subscriptions(user_id,plan,status) VALUES($1,'crm_essentials','active')", [agency]);
 
   // ── Grow / Protect / Win rows for a user ────────────────────────────────
   async function growthRows(userId: number, n: { locations: number; reviews: [number, string, boolean][]; visits: number; searches: number }) {
@@ -165,6 +170,7 @@ export async function cleanupDashboardAccounts(pool: pg.Pool, s: Seeded | undefi
   }
   await q("DELETE FROM crm_members WHERE user_id = ANY($1::int[])", [users]);
   await q("DELETE FROM crm_orgs WHERE id = ANY($1::varchar[])", [orgs]);
+  await q("DELETE FROM crm_subscriptions WHERE user_id = ANY($1::int[])", [users]);
   await q("DELETE FROM click_visits WHERE domain_id IN (SELECT id FROM tracked_domains WHERE user_id = ANY($1::int[]))", [users]);
   for (const t of ["tracked_domains", "google_profile_reviews", "ranking_grid_scans", "search_queries", "review_requests", "subscriptions", "business_locations"]) {
     await q(`DELETE FROM ${t} WHERE user_id = ANY($1::int[])`, [users]);

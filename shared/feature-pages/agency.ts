@@ -31,7 +31,8 @@ import { ADDONS, PLANS, planForModule } from "../plans";
  * Numbers that live in the price book are read from it (PLANS, ADDONS), never typed.
  */
 
-// The cheapest plan that unlocks the workspace — the Agency plan ($199, key "growth") today.
+// The cheapest plan that unlocks the workspace — the Agency plan (key "growth") today;
+// the page prices from the price book, never from a typed amount.
 const AGENCY = PLANS[planForModule("agencyWorkspace")];
 
 const page: FeaturePage = {
