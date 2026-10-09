@@ -88,6 +88,7 @@ import { SHOW_COMPETITOR_INTEL, SHOW_GOOGLE_REVIEWS } from "@/lib/features";
 import { copyrightNotice } from "@/lib/marketing";
 import { reportIssueHref } from "@/lib/report-issue-link";
 import { useSeoHead } from "@/lib/seo-head";
+import { SeoToolLayout } from "@/components/seo-tool/layout";
 import { pageMetaFor } from "@shared/route-meta";
 
 // Pages only the CRM portal, the client portal, a customer's document link or a platform admin opens load
@@ -812,17 +813,9 @@ function AppContent() {
   if (location.startsWith("/lead-form/")) return <PublicLeadFormPage />;
   if (location.startsWith("/portal/")) return <PublicPortalPage />;
 
-  return (
-    <SidebarProvider style={sidebarStyle as React.CSSProperties} defaultOpen={sidebarDefaultOpen()}>
-      <div className="flex h-screen w-full">
-        <AppSidebar />
-        {/* The Google-style surface for every signed-in platform page (client/src/styles/google.css): Google's font,
-            hairlines and pill shapes with the brand orange as the accent; the Google Business pages nest a
-            <GoogleSurface> for Google's blue. The sidebar and tab bar keep their own look. */}
-        <div className="g-surface flex flex-col flex-1 min-w-0">
-          <header className="box-content flex items-center justify-between gap-2 px-4 h-14 pt-[env(safe-area-inset-top)] shrink-0 border-b border-border/40 bg-background sticky top-0 z-50">
-            <SidebarTrigger data-testid="button-sidebar-toggle" />
-            <div className="flex items-center gap-1.5">
+  // The app's own controls (top right) and the footer: the same in the normal layout and in a tool shell.
+  const controls = (
+    <>
               <RecentAuthModal /><NotificationBell />
               <Link href="/settings" data-testid="link-header-settings" aria-label="Settings"
                 className="inline-flex items-center justify-center rounded-md h-10 w-10 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
@@ -831,14 +824,10 @@ function AppContent() {
               {/* The iPhone apps sell nothing (owner, 2026-10-04 — App Store 3.1.3(f)): no cart there. */}
               {!inNativeApp() && <CartSheet />}
               <ThemeToggle />
-            </div>
-          </header>
-          <PaymentNeededBanner />
-          {/* Phones: bottom padding keeps content clear of the tab bar (AppTabBar); desktop is unchanged. */}
-          <main className="flex-1 min-h-0 overflow-auto flex flex-col pb-[calc(60px+env(safe-area-inset-bottom))] md:pb-0">
-            <div className="flex-1">
-              <DashboardRouter />
-            </div>
+    </>
+  );
+  const footer = (
+    <>
             {/* Phones: room below the line for the fixed Gabe launcher (56 px at bottom-4). */}
             <footer className="flex flex-wrap items-center justify-center gap-x-2 gap-y-2 border-t border-border/30 pt-4 pb-20 md:pb-4 px-4 text-xs text-muted-foreground" data-testid="footer-dashboard">
               <SocialLinks tone="app" className="basis-full" testId="social-dashboard-footer" />
@@ -854,6 +843,44 @@ function AppContent() {
               <span className="mx-2 text-border">&middot;</span>
               <span>{copyrightNotice()}</span>
             </footer>
+    </>
+  );
+  // Inside SEO the app sidebar is not shown: the SEO tool shell carries the navigation, and its "All tools" button is
+  // the way back to everything else (owner, 2026-10-09). On phones the sidebar stays as the sheet the tab bar's Menu opens.
+  if (location === "/seo" || location.startsWith("/seo/")) {
+    return (
+      <SidebarProvider style={sidebarStyle as React.CSSProperties} defaultOpen={sidebarDefaultOpen()}>
+        <div className="md:hidden"><AppSidebar /></div>
+        <SeoToolLayout actions={controls} banner={<PaymentNeededBanner />} footer={footer}>
+          <DashboardRouter />
+        </SeoToolLayout>
+        <AppTabBar />
+        <HubWidget surface="growth" signedIn />
+      </SidebarProvider>
+    );
+  }
+
+  return (
+    <SidebarProvider style={sidebarStyle as React.CSSProperties} defaultOpen={sidebarDefaultOpen()}>
+      <div className="flex h-screen w-full">
+        <AppSidebar />
+        {/* The Google-style surface for every signed-in platform page (client/src/styles/google.css): Google's font,
+            hairlines and pill shapes with the brand orange as the accent; the Google Business pages nest a
+            <GoogleSurface> for Google's blue. The sidebar and tab bar keep their own look. */}
+        <div className="g-surface flex flex-col flex-1 min-w-0">
+          <header className="box-content flex items-center justify-between gap-2 px-4 h-14 pt-[env(safe-area-inset-top)] shrink-0 border-b border-border/40 bg-background sticky top-0 z-50">
+            <SidebarTrigger data-testid="button-sidebar-toggle" />
+            <div className="flex items-center gap-1.5">
+              {controls}
+            </div>
+          </header>
+          <PaymentNeededBanner />
+          {/* Phones: bottom padding keeps content clear of the tab bar (AppTabBar); desktop is unchanged. */}
+          <main className="flex-1 min-h-0 overflow-auto flex flex-col pb-[calc(60px+env(safe-area-inset-bottom))] md:pb-0">
+            <div className="flex-1">
+              <DashboardRouter />
+            </div>
+            {footer}
           </main>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import type { HelpDraft } from "../../types";
+import { CRM_TRIAL_DAYS } from "../../../crm-plans";
 
 /** The Leap comparison's entry — docs/brand/VIDEO-SCRIPTS.md 5c; figures from docs/brand/sources/2026-10-08/. */
 const entry: HelpDraft = {
@@ -9,7 +10,7 @@ const entry: HelpDraft = {
     "Open constructhub.us/pricing and read each CRM plan’s price, its seats and its Not included list.",
     "Open Leap’s pricing page and compare the same number of people, on the same billing period.",
     "Compare the feature lists, not only the prices.",
-    "Start the 14-day CRM trial and run a real job through it.",
+    `Start the ${CRM_TRIAL_DAYS}-day CRM trial and run a real job through it.`,
   ],
   howItWorks: "Prices are list prices billed monthly, read from each company’s own pricing page on 8 October 2026; introductory offers are left out. Prices change, so check both pages on the day you decide. Leap is a trademark of its owner; ConstructHUB is not affiliated with it.",
   needs: ["Nothing to watch it. The CRM is a separate product with its own plans."],

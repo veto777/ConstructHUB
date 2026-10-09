@@ -37,13 +37,12 @@ export function ApiPanel({ tab, onTabChange, keys, usage }: ApiPanelProps = {}) 
     if (tab === undefined) setParam(next === "keys" ? null : next);
   };
   return (
-    <Tabs value={active} onValueChange={change} className="space-y-4 min-w-0 [&>div:first-child]:mx-0 [&>div:first-child]:px-0" data-testid="tabs-api">
-      <AppTabsList>
+    <Tabs value={active} onValueChange={change} className="space-y-4 min-w-0" data-testid="tabs-api">
+      <AppTabsList bleed={false}>
         {API_TABS.map((t) => (
           <TabsTrigger
             key={t.id}
             value={t.id}
-            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-3 py-2"
             data-testid={`tab-api-${t.id}`}
           >
             {t.label}

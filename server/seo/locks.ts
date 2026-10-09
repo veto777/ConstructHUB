@@ -27,7 +27,7 @@
  */
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "node:crypto";
-import { pool } from "../db";
+import * as dbModule from "../db";
 import { SeoRetryableError } from "./public-errors";
 
 /**
@@ -123,9 +123,21 @@ export function createSeoLocks(opts: { connect: () => Promise<LockClient>; slots
   return { withLock, holding: () => holding };
 }
 
-/** This process's locks on the app's pool: half of it at most may be held by sections (pg's default pool is 10). */
-const poolMax = (pool as unknown as { options?: { max?: number } }).options?.max ?? 10;
-export const seoLocks = createSeoLocks({ connect: () => pool.connect(), slots: Math.max(1, Math.floor(poolMax / 2)) });
+/**
+ * The sections' connections come from a pool of their own (SEO_LOCK_POOL_MAX, default 5), not the app's: a lock
+ * connection does nothing but hold the advisory lock while the vendor call runs (up to 60 s, several calls a
+ * section), and before 2026-10-09 (review H4) up to half the app's 10 connections sat idle in those transactions —
+ * every other customer's CRM page waited behind a slow data vendor. The app pool is never pinned by a vendor call
+ * now; the SEO tick's own lock (server/seo/jobs.ts seoTick) is taken here too. The pool's `max` is the slot count.
+ */
+const lockPoolMax = (() => { const n = Number(process.env.SEO_LOCK_POOL_MAX); return Number.isFinite(n) && n >= 2 ? Math.floor(n) : 5; })();
+/** The lock pool — or, in a check that stands in for ../db with a `pool` alone (no createPool), that stand-in. */
+function lockPool(): typeof dbModule.pool {
+  try { const create = (dbModule as Partial<typeof dbModule>).createPool; if (typeof create === "function") return create("seo-locks", lockPoolMax); } catch { /* a partial stand-in */ }
+  return dbModule.pool;
+}
+export const seoLockPool = lockPool();
+export const seoLocks = createSeoLocks({ connect: () => seoLockPool.connect(), slots: Math.max(1, lockPoolMax - 1) });
 
 /**
  * The routes' one-at-a-time helpers, on a lock. `once`: an identical request already in flight is joined, in this

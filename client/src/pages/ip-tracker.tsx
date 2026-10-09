@@ -17,6 +17,7 @@ import {
   AppPage, Section, StatusPill,
 } from "@/components/app-ui";
 import { GoogleSectionHeader, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
+import { ToolTabs } from "@/components/tool";
 import {
   Fingerprint, Globe, Eye, Users, Monitor, Smartphone, Tablet,
   Search, ChevronRight, MapPin,
@@ -1021,27 +1022,20 @@ export default function IpTrackerPage() {
         </div>
       )}
 
-      {/* Scrolls sideways on phones instead of wrapping. */}
-      <div className="-mx-4 overflow-x-auto px-4 scrollbar-none sm:mx-0 sm:px-0">
-        <div className="inline-flex h-10 w-max min-w-full gap-1 rounded-xl bg-muted p-1 sm:min-w-0" role="tablist">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              role="tab"
-              aria-selected={activeTab === tab.id}
-              className={`shrink-0 whitespace-nowrap rounded-lg px-3.5 text-sm font-medium transition-colors ${
-                activeTab === tab.id
-                  ? "bg-background text-primary font-semibold shadow-sm hover:bg-background"
-                  : "text-muted-foreground hover:bg-background/60 hover:text-foreground"
-              }`}
-              data-testid={`tab-${tab.id}`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      <ToolTabs as="tablist" label="IP tracker sections">
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            data-testid={`tab-${tab.id}`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </ToolTabs>
 
       {domainsLoading ? (
         <div className="flex justify-center py-12"><div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" /></div>

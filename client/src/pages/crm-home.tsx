@@ -20,7 +20,8 @@ import {
   AlertCircle, Inbox, FileText, Trophy, CalendarClock, ReceiptText,
   PhoneCall, UserPlus, FileWarning,
 } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsTrigger } from "@/components/ui/tabs";
+import { SegmentedTabsList as TabsList } from "@/components/tool";
 import {
   CrmPage, MetricCard, StatusPill, EmptyState, ErrorCard, statusTone,
 } from "@/components/crm-ui";
@@ -456,7 +457,7 @@ export default function CrmHomePage() {
           </CardHeader>
           <CardContent>
             <Tabs key={canSeeReporting ? "reporting" : "own"} defaultValue={canSeeReporting ? "team" : "projects"}>
-              <TabsList className="mb-2 h-8">
+              <TabsList wrapClassName="mb-2">
                 {canSeeReporting && (
                   <TabsTrigger value="team" className="text-xs" data-testid="tab-team-activity">Team Activity</TabsTrigger>
                 )}

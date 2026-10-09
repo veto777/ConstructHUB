@@ -2,6 +2,90 @@
 
 _Last updated 2026-08-24. Repo: `veto777/ConstructHUB` (private). Local: `/home/veto/ConstructHUB` on the tower._
 
+## 🧱 2026-10-09 — reliability fixes from the SEO review (branch `fix-reliability`, NOT deployed)
+Source: review 4 of 6 (reliability), findings C1/H1-H5/M7/M13. One commit per item; `npm run check` 0.
+- **Request log writes no response bodies** (`server/request-log.ts`, M7/C1). The journal carried every JSON body —
+  CRM customer lists with names, addresses, emails and phones — 21.3 of the unit's 26.6 MB/day, on the disk that
+  filled and crashed production Postgres at 05:40 UTC. A line is now `GET /api/x 200 in 12ms id=<cf-ray|fresh>`;
+  a 5xx adds one scrubbed message (≤ 200 chars, no emails / long numbers). Dev opt-in only: `LOG_RESPONSE_BODIES=1`.
+  **Operator:** also cap the journal — `journalctl --user --vacuum-size=500M` once, and `SystemMaxUse=1G` in
+  `~/.config/systemd/user/journald.conf.d/` (or the system `/etc/systemd/journald.conf`).
+- **Graceful shutdown** (`server/shutdown.ts`, H5). On SIGTERM/SIGINT the app closes the listener, runs its stop
+  hooks (SEO worker timer), drains in-flight requests and tracked paid work (grid scans, rendering checks) for up to
+  `SHUTDOWN_DRAIN_MS` (default 20 000), closes the pool, exits 0; a hard stop at drain + 10 s exits 1; a second
+  signal exits at once. Log lines start `[shutdown]`. What is left to the leases/reconciler is logged as "left behind".
+  **Operator step — the unit** (`~/.config/systemd/user/constructhub.service` on vb11; today `Restart=always`,
+  `RestartSec=5`, `KillMode=control-group`, `TimeoutStopSec=90s`). Recommended, not changed from this branch:
+  ```
+  [Service]
+  KillMode=mixed          # SIGTERM to the Node process only; its children (headless Chromium) get SIGKILL after it exits
+  KillSignal=SIGTERM
+  TimeoutStopSec=35s      # drain 20 s + pool close + margin; must stay ABOVE SHUTDOWN_DRAIN_MS + 10 s
+  Environment=SHUTDOWN_DRAIN_MS=20000
+  ```
+  then `systemctl --user daemon-reload` (takes effect at the next restart). `KillMode=control-group` also works:
+  every process in the cgroup gets SIGTERM at once, so a Chromium child dies with its request instead of after it.
+- **Deploy script** (`script/deploy-vb11.sh`): skips the restart when dist/, assets and dependencies are unchanged on
+  the server (`DEPLOY_FORCE_RESTART=1` to restart anyway); polls the port every second and prints how long it was
+  closed. 49 restarts in 24 h was the problem; a restart that ships nothing is now a no-op.
+- **SEO boot DDL** (`server/seo/schema.ts`, `server/seo/boot.ts`, H1). The ~170 statements run only when the list's
+  hash differs from `seed_state` key `seo-schema` (a normal boot runs zero DDL — look for `[seo] schema up to date`),
+  on one connection with `lock_timeout` 5 s / `statement_timeout` 60 s (`SEO_DDL_LOCK_TIMEOUT_MS`,
+  `SEO_DDL_STATEMENT_TIMEOUT_MS`), indexes built CONCURRENTLY. A failure no longer exits the process: the SEO module
+  is off for that process (`/api/seo` → 503 `seo_unavailable`, no SEO worker, a critical issue on /admin/issues) and
+  the CRM and everything else boot. `FORCE_SEO_SCHEMA=1` runs the list regardless. `scripts/apply-schema-migration.ts`
+  still spreads the list (it does not write the hash; the next boot then runs the idempotent list once and stores it).
+- **Pool limits + the SEO lock pool** (`server/db.ts`, `server/seo/locks.ts`, H4/M8). `PG_POOL_MAX` (10),
+  `PG_CONNECT_TIMEOUT_MS` (10 000 — a caller waiting longer for a connection gets an error, not a site-wide stall),
+  `PG_STATEMENT_TIMEOUT_MS` (120 000, every session; above the 75 s advisory-lock wait). `pool.on("error")` logs an
+  idle client's error instead of an uncaughtException (28 of them at the 05:41 Postgres crash). SEO sections and the
+  SEO tick hold their advisory locks on a pool of their own (`SEO_LOCK_POOL_MAX`, 5): a vendor call never pins an
+  app-pool connection. `closeAllPools()` closes every pool at shutdown.
+- **Rank queries read the window they show** (H3): overview, dashboard and tags fetch the newest 1-2 checks per
+  keyword × device through the new index `seo_rank_checks_kw_device_on (keyword_id, device, checked_on DESC, id DESC)`
+  (built CONCURRENTLY by the gated DDL) instead of a window sort over a site's whole history with its SERP JSON.
+- **Retention** (`server/seo/retention.ts`, nightly from the SEO tick, 03:00-03:59 UTC, never at boot, ≤ 5,000 rows
+  per table per night so an old database is pruned over several nights). Summaries forever, raw detail bounded:
+  rank checks keep position/url/local_position/date for good, their SERP detail (serp_top, local_pack, rivals,
+  serp_features) is cleared after **180 d** (`SEO_RETENTION_RANK_DETAIL_DAYS`; the longest reader is the 120-day
+  report); closed rank runs deleted after **365 d** (`SEO_RETENTION_RUNS_DAYS`; checks keep their rows, run_id → NULL);
+  backlink/keyword snapshot lists cleared and mention checks deleted after **365 d** (`SEO_RETENTION_SNAPSHOT_DAYS`;
+  summaries, counts and costs stay); completed crawls lose `state->'pages'` after **180 d**
+  (`SEO_RETENTION_CRAWL_PAGES_DAYS`; the report stays — the audit lists such a crawl as not readable). Knobs:
+  `SEO_PRUNE_CAP`, `SEO_PRUNE_HOUR_UTC`. Last successful night: `seo_meta` key `retention_pruned_on`. Log line
+  `[seo] retention: …`; a failed statement goes to the issue desk and the night is retried on the next tick.
+- **Disk** (C1/M13). `script/deploy-vb11.sh` now takes the pre-deploy dump itself (`backups/pre-deploy-<utc>.dump`,
+  custom format) and keeps the newest **10** of `backups/*.dump|*.sql.gz` (`KEEP_DUMPS`), deleting older ones — hand
+  dumps count towards the 10. The app reads free space at boot and every 15 min (`server/ops/disk.ts`,
+  `DISK_WATCH_PATH` = cwd, `DISK_WARN_FREE_GB` 10, `DISK_WATCH_MINUTES` 15): under the line it logs `[disk] LOW`,
+  records a `health` issue (critical under 5 GB) and /admin/issues shows a banner. The 2026-10-09 fill was 88 dumps
+  (549 MB), 11 GB of `tmp/` uploads, 26.6 MB/day of journal (fixed above) and 14 GB in `/tmp` — `tmp/` and `/tmp` are
+  still unbounded: an owner decision on upload retention is pending.
+- **CRM trial leftovers** (`shared/crm-plans.ts` CRM_TRIAL_DAYS = 7 since 10/7). `crm-plans.test.ts` no longer asserts
+  14; the three "brand vs" help entries read the constant. Stripe's `customer.subscription.trial_will_end` for a CRM
+  subscription was dropped (`server/stripe.ts`): it now reaches the new trial-ending email (`billing.trial_ending`,
+  `server/account/billing-email-templates.ts trialEndingEmail`) — the product and price come from the subscription
+  (CRM Basic $39 + seats, or a platform plan), one notice per trial, nothing for a non-trialing redelivery. Platform
+  trials get the same email (there was none before either).
+
+## 🗺️ 2026-10-09 — the plan's Ranking Grid runs on DataForSEO, not Google Places (branch `grid/dataforseo`, deployed same day)
+- **Owner decision 2026-10-09 ("We will use DataForSEO instead for both"):** the ranking grid behind the plans' grid credits
+  (`/api/ranking-grid/scans`, server/routes.ts `runRankingGridScan`) now makes one DataForSEO local-finder search per point
+  (`lookupPoint` in server/seo/grid.ts — the same source and request as the SEO section's Local grid), instead of a Google
+  Places Text Search per point. Why: Places was free only inside Google's 5,000 free calls a month (about 100 7×7 grids
+  across ALL customers), then $32 per 1,000 = $1.57 per 49-point grid; DataForSEO is $0.002 a point = $0.10 per grid at any
+  volume, and a local-finder search from the searcher's coordinates is the accurate one (a Places text search is a map view).
+- **Money:** the customer still pays with grid credits (unchanged); the data cost goes to the platform's monthly SEO data
+  cap/ledger only — new `BudgetOptions.platformOnly` (server/seo/budget.ts) skips the customer's SEO allowance/credit. So
+  the $100/month default cap (`SEO_MONTHLY_BUDGET_USD`) now also covers ranking grids; when it is hit the scan fails and
+  the credits are refunded (logged `[ranking-grid] … refused by the SEO data cap`). `GOOGLE_PLACES_API_KEY` is no longer
+  read by the grid (Competitor Intel and location lookup still use it).
+- **Matching:** results carry Google's `cid`, not a `place_id`, so the business is recognised by exact normalised name
+  within a mile of the pin until a point shows it, then by `cid` for the rest of the scan. Up to 6 points in parallel.
+- **Tests:** server/plan-gates.test.ts and growth-isolation.test.ts now blank `DATAFORSEO_LOGIN/PASSWORD` for the spawned
+  server (a scan must fail and refund there, never spend). Run with Node 20 (`~/.nvm/versions/node/v20.19.6/bin`) and the
+  a5 lane env; run the two server-spawning suites one at a time (together they collide on the port).
+
 ## 💳 2026-10-09 — refunds and disputes on SEO credit packs now reach the wallet (review M-3, branch `fix-review-high`, NOT deployed)
 
 > **OWNER/OPERATOR ACTION: enable these event types on the live webhook endpoint** (Stripe Dashboard → Developers →
@@ -59,8 +143,13 @@ _Last updated 2026-08-24. Repo: `veto777/ConstructHUB` (private). Local: `/home/
     no-answer…) frees the seat at once. After-call paperwork now survives the connection being dropped.
 - **Operator:** nothing is required — the defaults apply on the next engine deploy (`voice/deploy/restart-when-idle.sh`). The engine's
   `/health` (with the bearer) shows the support settings. Engine tests: `cd voice && .venv/bin/python -m pytest selftest -q` (101).
-- **Left as found (separate review items):** the keypad line itself has no cap on calls at once or per caller (S-11), and the
-  per-account code budgets can be used up by a stranger (S-10).
+- **Fixed 2026-10-09 (branch `fix-keypad-line`, review S-10/S-11 — `server/support/limits.ts`):** code budgets are per (caller, account),
+  so a stranger spends their own allowance (2/h, 6/day per pair; 3/h per caller; `SUPPORT_CODES_PER_HOUR`=300 line-wide, audible + ops issue;
+  `SUPPORT_CODE_CALLERS_PER_ACCOUNT_DAY`=4 distinct numbers per account, the next is refused silently — the phone on file never is). The
+  keypad line: `SUPPORT_IVR_MAX_CALLS`=10 at once, `SUPPORT_IVR_MAX_CALLS_PER_CALLER`=2, `SUPPORT_IVR_CALLS_PER_CALLER_DAY`=10 → "busy, try
+  later"; `SUPPORT_IVR_MAX_CALL_SECONDS`=360; `SUPPORT_LINE_DAILY_MINUTES`=600 for the whole line (keypad + spoken; metered per turn into
+  `growth_budgets`, settled by the carrier's status callback) → "call back tomorrow". Every trip is an ops issue (`support-line|…`). The two
+  new clips (`busy`, `minutes_out`) are read by the carrier's voice until `scripts/support/clips.py` is run on the GPU box (`AWAITING_AUDIO`).
 
 ## ☎️ 2026-10-08 (late evening) — the AI Call Assistant is a SEPARATE SERVICE, repriced (branch `billing/call-assistant`, NOT deployed)
 - **Owner decisions:** the Call Assistant is sold on its **own subscription**, like the CRM (`fd964e1`, `069ffdf`): no platform plan

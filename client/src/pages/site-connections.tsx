@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import { SiteConnectionGuide } from "./site-connection-guide";
 import { AppPage, Toolbar, Notice } from "@/components/app-ui";
+import { ToolTabs } from "@/components/tool";
 import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
 import { Search } from "lucide-react";
 import { HelpButton } from "@/components/help-button";
@@ -36,7 +37,7 @@ function Field({
   );
 }
 /**
- * The views as Google's filter pills (the selected one tinted); they wrap on phones. Plain buttons:
+ * The views as the shared tab bar (components/tool/tabs.tsx); it scrolls sideways, never wraps. Plain buttons:
  * e2e reaches tabs by role "button" (e.g. getByRole("button", { name: "Work queue" })).
  */
 function TabStrip({ tabs, active, onChange }: {
@@ -45,21 +46,20 @@ function TabStrip({ tabs, active, onChange }: {
   onChange: (t: string) => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-x-3 gap-y-2">
-      {tabs.map(({ tab: t, helpKey }) => (
-        // Each view with its "i" (what it's for, what it does, how to run it, how it works).
-        <span key={t} className="inline-flex items-center gap-1">
-          <GooglePill
-            label={t}
-            selected={t === active}
-            ariaPressed={t === active}
-            onClick={() => onChange(t)}
-            testId={`tab-connection-${t.toLowerCase().replace(/\s+/g, "-")}`}
-          />
-          <HelpButton k={helpKey} />
-        </span>
-      ))}
-    </div>
+    <ToolTabs as="group" label="Site connection views">
+      {tabs.flatMap(({ tab: t, helpKey }) => [
+        <GooglePill
+          key={t}
+          label={t}
+          selected={t === active}
+          ariaPressed={t === active}
+          onClick={() => onChange(t)}
+          testId={`tab-connection-${t.toLowerCase().replace(/\s+/g, "-")}`}
+        />,
+        // Each view with its "i" (what it's for, what it does, how to run it, how it works), beside its tab.
+        <span key={`${t}-help`} className="tool-tabs__aside"><HelpButton k={helpKey} /></span>,
+      ])}
+    </ToolTabs>
   );
 }
 /** The views of each page with their help-registry key (shared/help/registry.ts). */

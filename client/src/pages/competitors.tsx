@@ -201,7 +201,7 @@ export default function CompetitorsPage() {
     <GoogleSurface page><AppPage className="before:hidden">
       <PageHeader title={<span data-testid="text-competitors-title">Competitor intelligence</span>} description="Find competitors and compare their rankings and reviews." />
         <Tabs defaultValue="market-scan" className="space-y-6">
-          <AppTabsList className="bg-muted/50">
+          <AppTabsList>
             <TabsTrigger value="market-scan" className="flex items-center gap-1.5" data-testid="tab-market-scan">
               <Search className="w-4 h-4" />
               Market scan

@@ -41,8 +41,11 @@ export default defineConfig({
   resolve: {
     alias: {
       "@shared": path.resolve(import.meta.dirname, "shared"),
+      // The client's own alias, for the tests that render a client component to markup (server/seo/tool-*.test.ts).
+      "@": path.resolve(import.meta.dirname, "client/src"),
     },
   },
+  esbuild: { jsx: "automatic" },
   test: {
     include: ["server/**/*.test.ts"],
     globalSetup: ["./server/test-budget-setup.ts"],

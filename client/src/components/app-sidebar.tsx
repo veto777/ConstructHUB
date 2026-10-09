@@ -376,6 +376,9 @@ function CollapsibleNavGroup({ group, planBadgeFor = () => null }: { group: NavG
   );
 }
 
+/** The same lists, for the tool shell's "All tools" drawer (components/seo-tool/layout.tsx) — the sidebar itself is unchanged. */
+export const APP_NAV = { permitsGroup, googleGroups, googleReviewsItem, standaloneItems, pricingGroup, shownHere };
+
 export function AppSidebar() {
   const [location] = useLocation();
   const queryClient = useQueryClient();

@@ -9,7 +9,7 @@
  *     <Section title actions>…</Section>           the one card style
  *     <Toolbar search filters actions />           search + filters (a sheet on phones)
  *     <Notice tone>…</Notice>                      one quiet line, never a wall of text
- *     <AppTabsList>…</AppTabsList>                 tabs that scroll sideways on phones instead of wrapping
+ *     <AppTabsList>…</AppTabsList>                 the tab bar (components/tool): sticky, scrolls sideways, never wraps
  *     <EmptyState …/>                              re-exported from crm-ui
  * Tables: `appTable` / `appTableCards` (rows become cards below sm).
  */
@@ -25,7 +25,7 @@ import { Ticket,
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { TabsList } from "@/components/ui/tabs";
+import { ToolTabsList } from "@/components/tool";
 import { cn } from "@/lib/utils";
 export { EmptyState, StatusPill, ErrorCard, statusTone, crmTable as appTable, crmTableCards as appTableCards } from "@/components/crm-ui";
 
@@ -312,15 +312,13 @@ export function Notice({ tone = "info", title, children, action, testId }: {
 
 /* ── Tabs ───────────────────────────────────────────────────────────────────── */
 
-/** A TabsList that scrolls sideways on phones (never wraps to a second row) and sits flush on desktop. */
-export function AppTabsList({ children, className, ...rest }: React.ComponentProps<typeof TabsList>) {
-  return (
-    <div className="-mx-4 overflow-x-auto px-4 scrollbar-none sm:mx-0 sm:px-0">
-      <TabsList className={cn("inline-flex h-10 w-max min-w-full justify-start gap-1 rounded-xl bg-muted p-1 sm:min-w-0 [&>[data-state=active]]:text-primary [&>[data-state=active]]:font-semibold", className)} {...rest}>
-        {children}
-      </TabsList>
-    </div>
-  );
+/**
+ * A page's top tabs inside a shadcn <Tabs>: the shared tab bar (components/tool/tabs.tsx, styles/tool.css)
+ * — the active tab marked by an orange indicator, never wraps (scrolls sideways), sticks to the top of the page on long pages.
+ * `sticky={false}` / `bleed={false}` opt out where the tabs sit inside a card or a parent without the 16px phone gutter.
+ */
+export function AppTabsList({ children, ...rest }: React.ComponentProps<typeof ToolTabsList>) {
+  return <ToolTabsList {...rest}>{children}</ToolTabsList>;
 }
 
 /* ── Key/value rows ─────────────────────────────────────────────────────────── */

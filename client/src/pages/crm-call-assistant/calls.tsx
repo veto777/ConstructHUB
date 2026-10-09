@@ -1,4 +1,5 @@
 import { Toolbar } from "@/components/app-ui";
+import { SegmentedTabs, TabCount } from "@/components/tool";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
@@ -84,21 +85,21 @@ export function CallsPanel({ canManage }: { canManage: boolean }) {
         setOutcome(p);
         writeParams({ outcome: p });
       }} />
-      <div role="tablist" aria-label="Calls views" className="flex overflow-x-auto gap-1 rounded-xl bg-muted p-1">
+      <SegmentedTabs as="tablist" label="Calls views">
         <ViewButton active={view === "log"} onClick={() => pick("log")} testId="button-calls-view-log" icon={PhoneIncoming}>Calls</ViewButton>
         <ViewButton active={view === "spam"} onClick={() => pick("spam")} testId="button-calls-view-spam" icon={ShieldBan}>
           Spam blocked
           {spamThisMonth > 0 && (
-            <span className="ml-1.5 rounded-full bg-emerald-500/15 px-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400" data-testid="badge-spam-this-month">{spamThisMonth}</span>
+            <TabCount testId="badge-spam-this-month">{spamThisMonth}</TabCount>
           )}
         </ViewButton>
         <ViewButton active={view === "escalations"} onClick={() => pick("escalations")} testId="button-calls-view-escalations" icon={BellRing}>
           Escalations
           {openCount > 0 && (
-            <span className="ml-1.5 rounded-full bg-amber-500/15 px-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400" data-testid="badge-open-escalations">{openCount}</span>
+            <TabCount testId="badge-open-escalations">{openCount}</TabCount>
           )}
         </ViewButton>
-      </div>
+      </SegmentedTabs>
 
       {view === "log" && <CallLog onOpen={show} outcome={outcome} setOutcome={(o) => { setOutcome(o); writeParams({ outcome: o === "all" ? null : o }); }} />}
       {view === "spam" && <SpamView canManage={canManage} onOpen={show} />}
@@ -119,12 +120,8 @@ function ViewButton({ active, onClick, testId, icon: Icon, children }: {
       aria-selected={active}
       onClick={onClick}
       data-testid={testId}
-      className={cn(
-        "inline-flex shrink-0 min-h-10 items-center rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        active ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-      )}
     >
-      <Icon className="mr-1.5 h-4 w-4" aria-hidden="true" />
+      <Icon aria-hidden="true" />
       {children}
     </button>
   );

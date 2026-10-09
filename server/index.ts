@@ -70,36 +70,31 @@ export function log(message: string, source = "express") {
 import { watchHandledFailures, recordUnhandledError, recordProcessFailure } from "./ops/server-errors";
 app.use(watchHandledFailures);
 
+// The request log (server/request-log.ts): method, path, status, duration, request id. Never a response body in
+// production (the 2026-10-09 review found customer names and contact details in the journal, 21 MB a day); a 5xx
+// adds one short scrubbed error message. Development may echo bodies with LOG_RESPONSE_BODIES=1.
+import { formatRequestLogLine, requestIdFor, bodyEchoEnabled } from "./request-log";
+// Graceful shutdown (server/shutdown.ts): in-flight requests are counted here and drained on SIGTERM.
+import { installGracefulShutdown, trackRequests } from "./shutdown";
+app.use(trackRequests);
 app.use((req, res, next) => {
   const start = Date.now();
-  const isSiteScan = req.path.startsWith("/api/agency") || req.path.startsWith("/api/sitescan") || req.path.startsWith("/api/admin/sitescan");
-  const path = isSiteScan ? req.path.replace(/[a-f0-9]{64}/g, ":token") : req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
+  const requestId = requestIdFor(req.headers);
+  res.setHeader("X-Request-Id", requestId);
+  let capturedJsonResponse: unknown = undefined;
+  // The body is kept only when a line could use it: a 5xx's message, or a development echo.
   const originalResJson = res.json;
   res.json = function (bodyJson, ...args) {
-    if (!isSiteScan && !req.path.startsWith("/api/domains") && !req.path.startsWith("/api/mail-alerts")) capturedJsonResponse = bodyJson;
+    if (res.statusCode >= 500 || bodyEchoEnabled()) capturedJsonResponse = bodyJson;
     return originalResJson.apply(res, [bodyJson, ...args]);
   };
 
   res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      // Auth/consent bodies (QR seeds, recovery codes), social bodies (signed upload URLs), the public
-      // API's responses (account data handed to third-party tools) and the API-key endpoints (one-time
-      // secrets) never reach logs.
-      if (capturedJsonResponse && !path.startsWith("/api/auth/") && !path.startsWith("/api/gbp/connect") && !path.startsWith("/api/social") && !path.startsWith("/api/ads") && !path.startsWith("/api/cloudflare") && !path.startsWith("/api/gsc")
-        && !path.startsWith("/api/v1") && !path.startsWith("/api/account/api-keys")
-        // Call Assistant: transcripts, summaries and caller details never reach the request log
-        && !path.startsWith("/api/crm/voice") && !path.startsWith("/api/voice-internal")
-        // Issue desk: captured failures and Claude's reports stay out of the request log too
-        && !path.startsWith("/api/admin/issues") && !path.startsWith("/api/ops-internal") && !path.startsWith("/api/ops/")) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      log(logLine);
-    }
+    if (!req.path.startsWith("/api")) return;
+    log(formatRequestLogLine({
+      method: req.method, path: req.path, status: res.statusCode, durationMs: Date.now() - start, requestId,
+      body: res.statusCode >= 500 || bodyEchoEnabled() ? capturedJsonResponse : undefined,
+    }));
   });
 
   next();
@@ -179,6 +174,13 @@ process.on("unhandledRejection", (reason) => {
         log(`serving on port ${port}`);
       },
     );
+    // SIGTERM (a deploy's restart): stop accepting, finish in-flight requests and tracked paid work (up to
+    // SHUTDOWN_DRAIN_MS, 20 s), close the pools, exit — instead of dying mid-request.
+    // Free disk space: read at boot and every 15 min; low space is logged, recorded on the issue desk and shown on
+    // /admin/issues (server/ops/disk.ts) — the volume filled and crashed Postgres on 2026-10-09 with no warning.
+    (await import("./ops/disk")).startDiskWatch();
+    const { closeAllPools } = await import("./db");
+    installGracefulShutdown({ server: httpServer, closePools: closeAllPools, log: (line) => log(line.replace(/^\[shutdown\] /, ""), "shutdown") });
   } catch (err) {
     console.error("Fatal startup error:", err);
     process.exit(1);

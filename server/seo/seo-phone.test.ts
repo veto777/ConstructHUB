@@ -32,15 +32,15 @@ describe("the nav's addresses come from links.ts", () => {
     expect(seoLinks.usage()).toBe("/seo/usage");
   });
 
-  it("the 14 tabs are built, none hand-written", () => {
+  it("the 14 tools are built, none hand-written", () => {
+    // The SEO sections are the tool shell's navigation now (tab-ribbon, 2026-10-09): components/seo-tool/nav.ts.
+    const nav = code(fs.readFileSync(path.resolve(import.meta.dirname, "../../client/src/components/seo-tool/nav.ts"), "utf8"));
+    const home = nav.slice(nav.indexOf("const HOME = {"), nav.indexOf("} as const;", nav.indexOf("const HOME = {")));
+    for (const b of ["seoLinks.dashboard()", 'seoLinks.explorer("")', 'seoLinks.keywords("")', 'seoLinks.content("")', "seoLinks.rankTrackerHome()", "seoLinks.localGridHome()", "seoLinks.planHome()", "seoLinks.auditHome()", "seoLinks.aiHome()", "seoLinks.alerts()", "seoLinks.reportsHome()", "seoLinks.backlinksHome()", "seoLinks.batch()", "seoLinks.usage()"]) expect(home, b).toContain(b);
+    expect(nav).not.toMatch(/"\/seo/);
+    // The unread badge still finds the Alerts tool.
+    expect(fs.readFileSync(path.resolve(import.meta.dirname, "../../client/src/components/seo-tool/layout.tsx"), "utf8")).toContain("badges={{ alerts: status.data?.alertsUnread || undefined }}");
     const shell = code(read("shell.tsx"));
-    const tabs = shell.slice(shell.indexOf("const TABS = ["), shell.indexOf("];", shell.indexOf("const TABS = [")));
-    expect(tabs).not.toMatch(/href: "\//);
-    expect(tabs.match(/\{ href: /g)).toHaveLength(14);
-    for (const b of ["seoLinks.dashboard()", 'seoLinks.explorer("")', 'seoLinks.keywords("")', 'seoLinks.content("")', "seoLinks.rankTrackerHome()", "seoLinks.localGridHome()", "seoLinks.planHome()", "seoLinks.auditHome()", "seoLinks.aiHome()", "ALERTS_HOME", "seoLinks.reportsHome()", "seoLinks.backlinksHome()", "seoLinks.batch()", "seoLinks.usage()"]) expect(tabs).toContain(`{ href: ${b}, label: `);
-    expect(shell).toContain("const ALERTS_HOME = seoLinks.alerts();");
-    // The unread badge still finds the Alerts tab.
-    expect(shell).toContain("{t.href === ALERTS_HOME && (status.data?.alertsUnread ?? 0) > 0");
     expect(shell).not.toMatch(/href[=:] ?"\/seo/);
   });
 });
@@ -50,7 +50,7 @@ describe("the page frame lifts every control to 44 px on a phone", () => {
   const sizes = raw.slice(raw.indexOf("const PHONE_SIZES = ["), raw.indexOf('].join(" ");', raw.indexOf("const PHONE_SIZES = [")));
 
   it("is on the frame of every SEO page, written out in full", () => {
-    expect(shell).toContain("<AppPage className={`before:hidden ${PHONE_SIZES}`}>");
+    expect(shell).toContain("<AppPage className={`before:hidden !space-y-3 !pt-2 sm:!pt-3 ${PHONE_SIZES}`}>");
     // Tailwind reads the classes as written: no class is pieced together.
     expect(sizes).not.toContain("${");
     expect(sizes).not.toMatch(/\+\s*"/);
@@ -69,7 +69,9 @@ describe("the page frame lifts every control to 44 px on a phone", () => {
     expect(sizes).toContain("max-sm:[&_.g-tabs:not([data-tab-strip])]:flex-wrap");
     expect(sizes).toContain("[&_.g-tabs:not([data-tab-strip])]:[scrollbar-width:thin]");
     for (const c of ["flex", "min-h-11", "items-center"]) expect(sizes).toContain(`[&_.g-tabs:not([data-tab-strip])>a]:${c}`);
-    expect(shell).toMatch(/<nav className="g-tabs !mb-0 pr-10 !\[scrollbar-width:thin\][^"]*" aria-label=\{label\} data-tab-strip="">/);
+    // TabStrip is the shared segmented tabs: its own sideways scroll, edge fade and chevrons (components/tool/tabs.tsx),
+    // and no `.g-tabs` class, so the frame's wrap rule does not reach it.
+    expect(shell).toContain("<SegmentedTabs label={label} className={`mb-4 ${className}`}>{children}</SegmentedTabs>");
     // The six strips the audit found (§6.5) are plain `.g-tabs`, so the frame's rule reaches them with no page change.
     const strips: Array<[string, string]> = [["keywords.tsx", "Keywords explorer views"], ["keywords.tsx", "Keyword ideas"], ["opportunities.tsx", "Opportunities"], ["gsc-breakdown.tsx", "By page or search"], ["keyword-watch.tsx", "What changed"], ["explorer.tsx", "Report tables"]];
     for (const [file, label] of strips) {

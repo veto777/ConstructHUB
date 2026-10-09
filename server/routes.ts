@@ -1,6 +1,10 @@
 import { governmentLinksForDisplay, governmentLinksAvailable, canScrapeGovernmentPortal, governmentPermitForDisplay } from "@shared/government-links";
 import { getReferralSettings, saveReferralSettings, referralSettingsInput } from "./referral-settings";
 import { reserveMonthlyQuota, refundQuota, refundReservation, gridCreditCost, monthlyUsage, resetsAt, type QuotaReservation } from "./growth-quotas";
+import { isConfigured as dataforseoConfigured, normalizeBusinessName } from "./seo/dataforseo";
+import { lookupPoint as lookupGridPoint, gridEstimateUsd } from "./seo/grid";
+import { withBudget, SeoBudgetError } from "./seo/budget";
+const gridRound6 = (n: number) => Math.round(n * 1e6) / 1e6;
 import { getEntitlements, requirePlan, sendPlanRequired, sendLimitReached, sendLocationLimit, raiseHint, cheapestPlanWhere, locationCount, plural, inUse, redeemTrialCode, endRevokedTrial, TOP_PLAN, TRIAL_CODE_PLAN } from "./entitlements";
 import { PAYMENT_NEEDED_STATUSES, PLANS, fitsLimit } from "@shared/plans";
 import { isSalesOnly, sendTalkToSales, salesInquirySubject } from "./catalog";
@@ -413,11 +417,10 @@ export async function registerRoutes(
   startSiteScanWorker();
   // SEO toolset (server/seo): rank tracker, keyword research, backlinks,
   // competitor gap on DataForSEO pay-as-you-go, capped by SEO_MONTHLY_BUDGET_USD.
-  const { ensureSeoSchema } = await import("./seo/schema");
-  await ensureSeoSchema();
-  const { registerSeoRoutes } = await import("./seo/routes");
-  registerSeoRoutes(app, getDevUser);
-  (await import("./seo/jobs")).startSeoWorker();
+  // Guarded (server/seo/boot.ts): the schema step runs zero DDL when its stored hash matches, with lock and
+  // statement timeouts when it does not; a failure disables the SEO module for this process instead of the boot.
+  const { bootSeoModule } = await import("./seo/boot");
+  await bootSeoModule(app, getDevUser);
   const { registerGbpRoutes } = await import("./gbp/routes");
   registerGbpRoutes(app, getDevUser);
   const { startAgencyWorker } = await import("./agency/jobs");
@@ -2388,7 +2391,7 @@ export async function registerRoutes(
         }
       }
 
-      // Bigger grids make more Places calls, so they cost more credits.
+      // Bigger grids make more local-finder lookups, so they cost more credits.
       const credits = gridCreditCost(Number(gridSize || 3));
       if (!(await reserveMonthlyQuota(req, res, "rankings", credits))) return;
       const reservation: QuotaReservation | undefined = res.locals.growthQuota;
@@ -2407,7 +2410,7 @@ export async function registerRoutes(
       });
 
       // A grid that fails gives its credits back.
-      runRankingGridScan(scan.id, placeId, parseFloat(lat), parseFloat(lon), gridSize || 3, parseFloat(gridDistance || "1"), keyword)
+      runRankingGridScan(scan.id, user.id, String(businessName), parseFloat(lat), parseFloat(lon), gridSize || 3, parseFloat(gridDistance || "1"), keyword)
         .then(ok => { if (!ok) return refundReservation(reservation, credits); })
         .catch(err => console.error("Ranking grid scan error:", err));
 
@@ -2429,10 +2432,25 @@ export async function registerRoutes(
     }
   });
 
-  /** Runs a grid; resolves false when the scan failed (its credits are then refunded). */
-  async function runRankingGridScan(scanId: number, targetPlaceId: string, centerLat: number, centerLon: number, gridSize: number, distanceMiles: number, keyword: string): Promise<boolean> {
-    const apiKey = process.env.GOOGLE_PLACES_API_KEY;
-    if (!apiKey) {
+  /**
+   * Runs a grid; resolves false when the scan failed (its credits are then refunded).
+   *
+   * Owner decision 2026-10-09: the ranking grid uses DataForSEO's local-finder search (the same
+   * source as the SEO section's Local grid, server/seo/grid.ts), no longer Google Places Text
+   * Search. Each point is a local search made from the searcher's coordinates (a Places text
+   * search returns a map view and showed a business two miles away as "not found"), and it costs
+   * GRID_POINT_USD a point however many customers run grids — Places was free only inside
+   * Google's monthly free calls, then $32 per 1,000.
+   *
+   * The customer pays with the plan's ranking-grid credits (reserved by the route); the data cost
+   * is counted against the platform's monthly SEO data cap and ledger only (`platformOnly`),
+   * never their SEO allowance or purchased credit.
+   *
+   * The business is recognised by Google's listing id (cid) once one point has shown it; until
+   * then by its exact name within a mile of the pin (the grid is centred on the business itself).
+   */
+  async function runRankingGridScan(scanId: number, userId: number, businessName: string, centerLat: number, centerLon: number, gridSize: number, distanceMiles: number, keyword: string): Promise<boolean> {
+    if (!dataforseoConfigured()) {
       await storage.updateRankingGridScan(scanId, { status: "failed" });
       return false;
     }
@@ -2452,74 +2470,67 @@ export async function registerRoutes(
         }
       }
 
+      const ourName = normalizeBusinessName(businessName);
+      const nearPin = (l: { lat: number | null; lng: number | null }) =>
+        l.lat === null || l.lng === null ||
+        Math.hypot((l.lat - centerLat) * 69.0, (l.lng - centerLon) * 69.0 * Math.cos(centerLat * Math.PI / 180)) <= 1;
+      let targetCid: string | null = null;
       let totalRanked = 0;
       let rankSum = 0;
+      let returned = 0;
 
-      for (const pt of points) {
-        try {
-          const searchUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(keyword)}&location=${pt.lat},${pt.lon}&radius=5000&key=${apiKey}`;
-          const searchRes = await fetch(searchUrl);
-          const searchData = await searchRes.json() as any;
-
-          let rank: number | null = null;
-          let totalResults = 0;
-          const topCompetitors: Array<{ name: string; address: string; rank: number }> = [];
-
-          if (searchData.status === "OK" && searchData.results) {
-            totalResults = searchData.results.length;
-            for (let i = 0; i < searchData.results.length; i++) {
-              const place = searchData.results[i];
-              if (i < 5) {
-                topCompetitors.push({
-                  name: place.name || "",
-                  address: place.formatted_address || "",
-                  rank: i + 1,
-                });
+      const { costUsd } = await withBudget(userId, gridEstimateUsd(points.length), async () => {
+        let known = 0;
+        let firstError: unknown = null;
+        let next = 0;
+        const worker = async () => {
+          for (;;) {
+            const i = next++;
+            if (i >= points.length) return;
+            const pt = points[i];
+            let rank: number | null = null;
+            let totalResults = 0;
+            let topCompetitors: Array<{ name: string; address: string; rank: number }> | null = null;
+            try {
+              const r = await lookupGridPoint(keyword, { lat: pt.lat, lng: pt.lon });
+              known += r.costUsd;
+              returned++;
+              totalResults = r.listings.length;
+              topCompetitors = r.listings.slice(0, 5).map((l) => ({ name: l.name, address: l.address ?? "", rank: l.rank }));
+              for (const l of r.listings) {
+                const hit = targetCid && l.cid ? l.cid === targetCid
+                  : ourName.length >= 4 && normalizeBusinessName(l.name) === ourName && nearPin(l);
+                if (hit) { rank = l.rank; if (l.cid) targetCid = l.cid; break; }
               }
-              if (place.place_id === targetPlaceId) {
-                rank = i + 1;
-              }
+            } catch (err: any) {
+              firstError ??= err;
+              if (typeof err?.costUsd === "number") known += err.costUsd;
             }
+            await storage.createRankingGridResult({
+              scanId, gridRow: pt.row, gridCol: pt.col, lat: String(pt.lat), lon: String(pt.lon),
+              rank, totalResults, topCompetitors,
+            });
+            if (rank !== null) { totalRanked++; rankSum += rank; }
           }
-
-          await storage.createRankingGridResult({
-            scanId,
-            gridRow: pt.row,
-            gridCol: pt.col,
-            lat: String(pt.lat),
-            lon: String(pt.lon),
-            rank,
-            totalResults,
-            topCompetitors,
-          });
-
-          if (rank !== null) {
-            totalRanked++;
-            rankSum += rank;
-          }
-
-          await new Promise(resolve => setTimeout(resolve, 200));
-        } catch (err) {
-          await storage.createRankingGridResult({
-            scanId,
-            gridRow: pt.row,
-            gridCol: pt.col,
-            lat: String(pt.lat),
-            lon: String(pt.lon),
-            rank: null,
-            totalResults: 0,
-            topCompetitors: null,
-          });
+        };
+        await Promise.all(Array.from({ length: Math.min(6, points.length) }, worker));
+        if (returned === 0) {
+          throw Object.assign(new Error((firstError as any)?.message ?? "The local searches failed."), { costUsd: gridRound6(known), costUnknown: false, cause: firstError });
         }
-      }
+        // The customer paid in grid credits: nothing from their SEO allowance or credit.
+        return { data: null, costUsd: gridRound6(known), customerUsd: 0, costUnknown: false as const };
+      }, { platformOnly: true, label: `Ranking grid — "${keyword.slice(0, 80)}", ${gridSize} × ${gridSize} points` });
 
       const avgRank = totalRanked > 0 ? (rankSum / totalRanked).toFixed(1) : null;
       await storage.updateRankingGridScan(scanId, {
         status: "completed",
         averageRank: avgRank,
       });
+      console.info(`[ranking-grid] scan ${scanId} user=${userId} ${returned}/${points.length} points cost=$${costUsd.toFixed(4)}`);
       return true;
-    } catch (err) {
+    } catch (err: any) {
+      if (err instanceof SeoBudgetError) console.warn(`[ranking-grid] scan ${scanId} refused by the SEO data cap: ${err.detail}`);
+      else console.warn(`[ranking-grid] scan ${scanId} failed: ${err?.message ?? err}`);
       await storage.updateRankingGridScan(scanId, { status: "failed" });
       return false;
     }

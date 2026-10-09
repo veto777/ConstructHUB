@@ -69,9 +69,11 @@ export async function rankTags(site: { id: number; devices: string }, device?: "
   // Each keyword's newest saved day on this device and the saved day before it (one result per keyword, device and
   // day). Checks need not cover every keyword, so the comparison is made keyword by keyword and the dates it spans are returned.
   const { rows } = await pool.query(
-    `SELECT keyword_id, position, checked_on::text AS on, n::int FROM (
-       SELECT keyword_id, position, checked_on, row_number() OVER (PARTITION BY keyword_id ORDER BY checked_on DESC, id DESC) AS n
-         FROM seo_rank_checks WHERE site_id=$1 AND device=$2) r WHERE n <= 2`, [site.id, dev]);
+    `SELECT k.id AS keyword_id, c.position, c.checked_on::text AS on, c.n::int
+       FROM seo_keywords k
+       CROSS JOIN LATERAL (SELECT position, checked_on, row_number() OVER (ORDER BY checked_on DESC, id DESC) AS n
+                             FROM seo_rank_checks WHERE keyword_id=k.id AND device=$2 ORDER BY checked_on DESC, id DESC LIMIT 2) c
+      WHERE k.site_id=$1`, [site.id, dev]);
   const now: Pos = new Map(), before: Pos = new Map();
   const span = (n: number): CheckSpan | null => { const d = rows.filter((r: any) => r.n === n).map((r: any) => r.on as string).sort(); return d.length ? { from: d[0], to: d[d.length - 1], keywords: d.length } : null; };
   for (const r of rows) (r.n === 1 ? now : before).set(r.keyword_id, r.position);
