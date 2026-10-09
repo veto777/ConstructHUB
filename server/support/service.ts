@@ -1,7 +1,10 @@
 /**
  * The support line's real dependencies (line.ts `Deps`), its routes, and the admin ticket desk.
  *
- *  Engine → app (bearer VOICE_INTERNAL_SECRET, same as the Call Assistant):
+ *  The phone line (SignalWire LaML, 2026-10-08): the number's voice URL is POST /api/support/voice. SignalWire does the
+ *  listening and the speaking (Gather speech + keypad, Say) and posts each turn to /api/support/voice/turn — no GPU in
+ *  the path, so the line takes as many simultaneous calls as SignalWire carries; each turn is one short request here.
+ *  Engine → app (bearer VOICE_INTERNAL_SECRET, the older GPU-engine path, kept for fallback):
  *    POST /api/voice-internal/support/start  { callSid, from }          → { say }
  *    POST /api/voice-internal/support/turn   { callSid, from, text }    → { say, end }
  *    POST /api/voice-internal/support/end    { callSid }                → { ok }
@@ -19,12 +22,12 @@ import { ADMIN_EMAILS } from "../admin";
 import { requirePlatformAdmin } from "../crm/admin";
 import { sendWithFallback } from "../email";
 import { emailLayout } from "../account/email";
-import { sendSms } from "../crm/sms";
+import { sendSms, signalwireSignatureVerified } from "../crm/sms";
 import { takeBudget } from "../growth-limits";
 import { requireVoiceInternal, VOICE_INTERNAL_PATH } from "../voice/internal-auth";
 import { normalizeE164 } from "../voice/profile-store";
 import { customerNumberFor } from "./schema";
-import { freshState, turn, LINES, type Account, type CallState, type Channel, type Deps, type Intake } from "./line";
+import { freshState, turn, LINES, type Account, type CallState, type Channel, type Deps, type Intake, type Reply } from "./line";
 
 const HOUR = 3_600_000, DAY = 24 * HOUR;
 let warnedPepper = false;
@@ -92,7 +95,7 @@ Reply with ONLY this JSON: {"say":"...","ready":false,"intake":{"category":"paym
 Set ready=true when you have enough detail (usually after 2-4 questions); then "say" can be empty.`;
 
 let client: OpenAI | null = null;
-const ai = () => (client ??= new OpenAI({ baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL, apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || "none", maxRetries: 0, timeout: Math.min(20_000, aiTimeoutMs()) }));
+const ai = () => (client ??= new OpenAI({ baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL, apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || "none", maxRetries: 0, timeout: Math.min(7_000, aiTimeoutMs()) }));   // a phone turn can't wait longer
 export async function intakeTurn(history: { role: "caller" | "gabe"; text: string }[], callerNumber = "unknown"): Promise<{ say: string; intake: Intake; ready: boolean }> {
   if (!process.env.AI_INTEGRATIONS_OPENAI_BASE_URL) throw new Error("no AI configured");
   // Kimi #7: AI turns are budgeted (per caller 120/day, overall 3000/day); over budget = the deterministic intake.
@@ -150,8 +153,89 @@ async function loadCall(callSid: string, from: string): Promise<CallState> {
   return st && st.step ? st : freshState();
 }
 const okSid = (v: unknown): v is string => typeof v === "string" && /^[A-Za-z0-9_-]{8,80}$/.test(v);
+const FAIL: Reply = { say: "Sorry, something went wrong on my end. Please email support at constructhub dot us. Goodbye.", end: true };
+
+/**
+ * One caller turn against the stored call. Kimi round 2 N1: no lock or transaction is held during the AI call —
+ * optimistic concurrency instead: the state carries a version and the write only lands if nobody wrote since we read
+ * (turns arrive one at a time, so a conflict means a duplicate request; it gets a neutral "please repeat").
+ * null = no such call (a turn requires a start). Calls older than 2 hours are over.
+ */
+async function runTurn(callSid: string, text: string, callerFallback: string, silence: boolean): Promise<{ reply: Reply; state: CallState } | null> {
+  try {
+    const row = (await pool.query(`SELECT state, caller_number FROM support_calls WHERE call_sid = $1 AND created_at > now() - interval '2 hours'`, [callSid])).rows[0];
+    if (!row) return null;
+    const s: CallState = row.state?.step ? row.state : freshState();
+    const v0 = s.v ?? 0; s.v = v0 + 1;
+    const caller = row.caller_number || callerFallback;
+    const deps: Deps = { now: () => Date.now(), findAccount, sendCode, hashCode, intakeTurn: (h) => intakeTurn(h, caller), openTicket: (st, cn) => openTicket(st, cn, callSid) };
+    let r: Reply;
+    try { r = await turn(s, text, caller, deps, { silence }); }
+    catch (e: any) { console.error("[support] turn failed:", e?.message || e); r = FAIL; s.step = "done"; }
+    const w = await pool.query(
+      `UPDATE support_calls SET state = $1, user_id = $2, verified_at = CASE WHEN $3 AND verified_at IS NULL THEN now() ELSE verified_at END, updated_at = now()
+       WHERE call_sid = $4 AND COALESCE((state->>'v')::int, 0) = $5`, [JSON.stringify(s), s.verified ? s.userId : null, s.verified, callSid, v0]);
+    if (w.rowCount === 0) return { reply: { say: "Sorry, could you say that one more time?", end: false }, state: s };
+    return { reply: r, state: s };
+  } catch (e: any) { console.error("[support] turn failed:", e?.message || e); return { reply: FAIL, state: { ...freshState(), step: "done" } }; }
+}
+
+// ---- The phone line on SignalWire LaML -------------------------------------------------------------------------
+const xmlEsc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const ttsVoice = () => process.env.SUPPORT_TTS_VOICE || "Polly.Matthew-Neural";
+const HINTS = "customer number, CRM, C R M, code, email, text, yes, no, zero, one, two, three, four, five, six, seven, eight, nine, gmail dot com, payment, login, invoice";
+/** The LaML for a reply: speak it, then listen (keypad or speech); silence comes back as ?silence=1. */
+export function lamlFor(r: Reply, step: CallState["step"] | null): string {
+  const say = r.say ? `<Say voice="${ttsVoice()}">${xmlEsc(r.say)}</Say>` : "";
+  const head = `<?xml version="1.0" encoding="UTF-8"?><Response>`;
+  if (r.end) return `${head}${say}<Hangup/></Response>`;
+  const action = `${appUrl()}/api/support/voice/turn`;
+  // A number is being asked for: allow longer pauses between digit groups (the app also joins pieces itself).
+  const digits = step === "ask_id" || step === "code_sent";
+  const gather = `<Gather input="dtmf speech" action="${action}" method="POST" language="en-US" timeout="8" speechTimeout="${digits ? 2 : "auto"}" finishOnKey="#"${digits ? ` numDigits="${step === "code_sent" ? 6 : 8}"` : ""} hints="${xmlEsc(HINTS)}">${say}</Gather>`;
+  return `${head}${gather}<Redirect method="POST">${action}?silence=1</Redirect></Response>`;
+}
+
+/**
+ * Is this a real, live call to the support number? A matching SignalWire signature, or (no signing key configured)
+ * the call looked up on SignalWire's API: inbound, to SUPPORT_LINE_NUMBER, still ringing / in progress. Returns the
+ * caller's number from SignalWire, never from the request.
+ */
+async function verifiedInbound(req: any): Promise<{ from: string } | null> {
+  const sid = String(req.body?.CallSid || ""), line = normalizeE164(process.env.SUPPORT_LINE_NUMBER || "");
+  if (!okSid(sid) || !line) return null;
+  if (signalwireSignatureVerified(req)) return normalizeE164(req.body?.To) === line ? { from: String(req.body?.From || "") } : null;
+  const space = (process.env.SIGNALWIRE_SPACE_URL || "").replace(/^https?:\/\//, "").replace(/\/$/, ""), proj = process.env.SIGNALWIRE_PROJECT_ID, tok = process.env.SIGNALWIRE_API_TOKEN;
+  if (!space || !proj || !tok) return null;
+  try {
+    const r = await fetch(`https://${space}/api/laml/2010-04-01/Accounts/${proj}/Calls/${encodeURIComponent(sid)}.json`, { headers: { authorization: `Basic ${Buffer.from(`${proj}:${tok}`).toString("base64")}` }, signal: AbortSignal.timeout(5000) });
+    if (!r.ok) return null;
+    const c: any = await r.json();
+    if (normalizeE164(c.to) !== line || !String(c.direction || "").startsWith("inbound") || !["queued", "ringing", "in-progress"].includes(c.status)) return null;
+    return { from: String(c.from || "") };
+  } catch { return null; }
+}
 
 export function registerSupportRoutes(app: Express, getDevUser: any) {
+  // The support number's voice URL (SignalWire). Public; trusted only after verifiedInbound().
+  app.post("/api/support/voice", async (req, res) => {
+    res.type("text/xml");
+    const v = await verifiedInbound(req);
+    if (!v) return res.status(403).send(`<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>`);
+    await loadCall(String(req.body.CallSid), v.from);
+    res.send(lamlFor({ say: LINES.greet, end: false }, "ask_id"));
+  });
+  // Each turn. Trusted by the call's unguessable CallSid having been started by a verified call (support_calls row).
+  app.post("/api/support/voice/turn", async (req, res) => {
+    res.type("text/xml");
+    const sid = String(req.body?.CallSid || "");
+    const digits = typeof req.body?.Digits === "string" ? req.body.Digits.replace(/[^0-9]/g, "") : "";
+    const speech = typeof req.body?.SpeechResult === "string" ? req.body.SpeechResult : "";
+    const silence = req.query.silence === "1" || (!digits && !speech.trim());
+    const r = okSid(sid) ? await runTurn(sid, digits || speech, "", silence) : null;
+    if (!r) return res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>`);
+    res.send(lamlFor(r.reply, r.state.step));
+  });
   app.post(`${VOICE_INTERNAL_PATH}/support/start`, requireVoiceInternal, async (req, res) => {
     const { callSid, from } = req.body || {};
     if (!okSid(callSid)) return res.status(400).json({ code: "bad_request" });
@@ -161,26 +245,9 @@ export function registerSupportRoutes(app: Express, getDevUser: any) {
   app.post(`${VOICE_INTERNAL_PATH}/support/turn`, requireVoiceInternal, async (req, res) => {
     const { callSid, from, text } = req.body || {};
     if (!okSid(callSid) || typeof text !== "string") return res.status(400).json({ code: "bad_request" });
-    const FAIL = { say: "Sorry, something went wrong on my end. Please email support at constructhub dot us. Goodbye.", end: true };
-    // Kimi round 2 N1: no lock or transaction is held during the AI call. Optimistic concurrency instead: the state
-    // carries a version; the write only lands if nobody else wrote since we read (the engine serializes turns, so a
-    // conflict means a duplicate request — it gets a neutral "please repeat").
-    try {
-      const row = (await pool.query(`SELECT state FROM support_calls WHERE call_sid = $1`, [callSid])).rows[0];
-      if (!row) return res.status(409).json({ code: "not_started" });   // a turn requires start
-      const s: CallState = row.state?.step ? row.state : freshState();
-      const v0 = s.v ?? 0; s.v = v0 + 1;
-      const caller = String(from || "");
-      const deps: Deps = { now: () => Date.now(), findAccount, sendCode, hashCode, intakeTurn: (h) => intakeTurn(h, caller), openTicket: (st, cn) => openTicket(st, cn, callSid) };
-      let r: { say: string; end: boolean };
-      try { r = await turn(s, text, caller, deps); }
-      catch (e: any) { console.error("[support] turn failed:", e?.message || e); r = FAIL; s.step = "done"; }
-      const w = await pool.query(
-        `UPDATE support_calls SET state = $1, user_id = $2, verified_at = CASE WHEN $3 AND verified_at IS NULL THEN now() ELSE verified_at END, updated_at = now()
-         WHERE call_sid = $4 AND COALESCE((state->>'v')::int, 0) = $5`, [JSON.stringify(s), s.verified ? s.userId : null, s.verified, callSid, v0]);
-      if (w.rowCount === 0) return res.json({ say: "Sorry, could you say that one more time?", end: false });
-      res.json(r);
-    } catch (e: any) { console.error("[support] turn failed:", e?.message || e); res.json(FAIL); }
+    const r = await runTurn(callSid, text, String(from || ""), false);
+    if (!r) return res.status(409).json({ code: "not_started" });   // a turn requires start
+    res.json(r.reply);
   });
   app.post(`${VOICE_INTERNAL_PATH}/support/end`, requireVoiceInternal, async (req, res) => {
     const { callSid } = req.body || {};

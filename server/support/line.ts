@@ -22,6 +22,8 @@ export type CallState = {
   userId: number | null; crmOrgId: string | null; ref: string | null; email: string | null; phones: string[];
   channel: Channel | null; codeHash: string | null; codeExpires: number | null; verified: boolean;
   intake: Intake; aiTurns: { role: "caller" | "gabe"; text: string }[]; ticketNumber: string | null;
+  /** Digits heard so far for the step (a number said in pieces, owner's test 2026-10-08) and "CRM" heard. */
+  buf?: string; bufCrm?: boolean; silences?: number;
 };
 export type Reply = { say: string; end: boolean };
 export interface Deps {
@@ -43,23 +45,26 @@ export interface Deps {
 }
 
 export const LINES = {
-  greet: "Hi, this is Gabe with ConstructHUB support. I can open a support ticket for payment problems, login trouble, or something in the app that isn't working. First I need to verify your account. What's your customer number? You'll find it under Settings, and CRM accounts start with the letters C R M. If you don't have it, you can tell me the email on your account instead.",
-  askIdAgain: "Sorry, I didn't catch that. Please say your customer number one digit at a time, or the email address on your account.",
+  greet: "Hi, this is Gabe with ConstructHUB support. To verify your account, type your customer number on the keypad, or say it. If you don't have it, say the email on your account.",
+  askIdAgain: "Sorry, I didn't get that. Type your customer number on the keypad, or say the email on your account.",
   idGiveUp: "I couldn't match that. Please email support at constructhub dot us and we'll help you there. Goodbye.",
   sentNeutral: (ch: Channel) => ch === "sms"
-    ? "If that matches an account, I just texted a six-digit code to the phone on file, or emailed it if there's no phone on the account. It's good for ten minutes. Please read me the code when you have it."
-    : "If that matches an account, I just emailed a six-digit code to the email address on file. It's good for ten minutes. Please read me the code when you have it.",
-  chooseChannel: "I can email a six-digit code to the email on your account, or text it to the phone number on your account. Which would you like, email or text?",
+    ? "If that matches an account, I just texted a six-digit code to the phone on file, or emailed it if there's no phone. Type it on the keypad or read it to me."
+    : "If that matches an account, I just emailed a six-digit code to the email on file. Type it on the keypad or read it to me.",
+  chooseChannel: "Should I send your code by text or by email?",
   sendRefused: "I can't send another code right now. Please try again in an hour, or email support at constructhub dot us. Goodbye.",
-  badCode: "That code doesn't match. Please read me the six digits again.",
+  badCode: "That code doesn't match. Please type or say the six digits again.",
   codeExpired: "That code has expired. Let me send a new one.",
   codeGiveUp: "That's too many tries, so I can't verify this call. Please email support at constructhub dot us. Goodbye.",
-  verified: "Thanks, you're verified. Tell me what's going on, with as much detail as you can, and I'll write it up for the team.",
+  verified: "Thanks, you're verified. What's going on?",
   notSerious: "Thanks for explaining. That isn't something I open a ticket for on this line, but our how-to videos at constructhub dot us slash tutorials cover it, and you can email support at constructhub dot us anytime. Goodbye.",
-  confirm: (title: string) => `Here's what I have: ${title}. Should I open the ticket? Please say yes or no.`,
-  confirmNo: "No problem. Tell me what I should change.",
-  opened: (n: string) => `Done. Your ticket number is ${n.split("").join(" ")}. I've emailed you a confirmation, and the team will reply by email. Is there anything else? If not, you can hang up. Goodbye.`,
-  aiDown: "Please tell me what's wrong: is it about a payment, logging in, or something in the app not working? And describe what happens.",
+  confirm: (title: string) => `Here's what I have: ${title}. Should I open the ticket? Yes or no?`,
+  confirmAgain: "Sorry, should I open the ticket? Please say yes or no.",
+  confirmNo: "No problem. Tell me the issue again, the way you want it written.",
+  opened: (n: string) => `Done. Your ticket number is ${n.split("").join(" ")}. I've emailed you a confirmation, and the team will reply by email. Goodbye.`,
+  aiDown: "Please tell me what's wrong, in a sentence or two. Is it a payment, logging in, or something in the app not working?",
+  stillThere: "Are you still there?",
+  silentBye: "I haven't heard anything, so I'll let you go. Please call back or email support at constructhub dot us. Goodbye.",
   ticketCap: "You've already opened several tickets today, so I can't open another one on this line. Please email support at constructhub dot us and the team will pick it up. Goodbye.",
   tooLong: "I need to wrap up this call. Please email support at constructhub dot us with anything else. Goodbye.",
 };
@@ -78,20 +83,40 @@ export function parseIdentifier(text: string): { kind: "customer" | "crm" | "ema
   if (em && /@|\bat\b/.test(t)) return { kind: "email", value: em[0].replace(/\.$/, "") };
   const crm = /\b(c\s*r\s*m|crm|see are em|c r m)\b/.test(t);
   const digits = spokenDigits(t);
-  if (crm && digits.length === 7) return { kind: "crm", value: `CRM${digits}` };
-  if (!crm && digits.length === 8) return { kind: "customer", value: digits };
+  // CRM numbers are "CRM" + 7 digits, customer numbers 8 digits — so 7 digits on the keypad is a CRM number.
+  if (digits.length === 7 && (crm || /^\d{7}$/.test(t.trim()))) return { kind: "crm", value: `CRM${digits}` };
+  if (digits.length === 8) return { kind: "customer", value: digits };
   return null;
 }
-export const saidYes = (t: string) => /\b(yes|yeah|yep|yup|sure|correct|please do|go ahead|open it|do it|right)\b/i.test(t);
-export const saidNo = (t: string) => /\b(no|nope|nah|don't|do not|wait|change)\b/i.test(t);
+export const saidYes = (t: string) => /\b(yes|yeah|yep|yup|sure|correct|please do|go ahead|open it|do it|right|okay|ok|absolutely|definitely)\b/i.test(t) || /^\s*1\s*$/.test(t);
+export const saidNo = (t: string) => /\b(no|nope|nah|don't|do not|wait|change|cancel)\b/i.test(t) || /^\s*2\s*$/.test(t);
+const CAT_WORDS: Record<Category, string> = { payment: "a payment problem", login: "a login problem", technical: "something in the app not working", data: "missing data", other: "an issue" };
 const SERIOUS: Category[] = ["payment", "login", "data"];
 /** Serious = payment, login, data — or anything technical that blocks work. Code decides, not the AI. */
 export const isSerious = (i: Intake) => !!i.category && (SERIOUS.includes(i.category) || (i.category === "technical" && i.blocking === true));
 const MAX_TURNS = 40, CODE_TTL = 10 * 60_000;
 
-export async function turn(s: CallState, callerText: string, callerNumber: string, d: Deps): Promise<Reply> {
+/**
+ * One caller turn. `opts.silence`: the caller said nothing before the timeout. A reply with say "" means "keep
+ * listening" (the caller is part-way through a number; owner's test 2026-10-08: a code said in two breaths was
+ * judged on the first half and Gabe said "doesn't match", then "verified").
+ */
+export async function turn(s: CallState, callerText: string, callerNumber: string, d: Deps, opts: { silence?: boolean } = {}): Promise<Reply> {
   const text = (callerText || "").slice(0, 2000);
   if (s.step === "done") return { say: LINES.tooLong, end: true };
+  if (opts.silence) {
+    // A number left part-way: settle it now (7 digits = a CRM number). Otherwise nudge, then hang up.
+    if (s.buf || s.bufCrm) {
+      const t = s.buf ?? ""; s.buf = ""; s.bufCrm = false;
+      if (s.step === "ask_id" && t.length === 7) return turn(s, `crm ${t}`, callerNumber, d);
+      if (s.step === "ask_id") { if (++s.idTries >= 3) { s.step = "done"; return { say: LINES.idGiveUp, end: true }; } return { say: LINES.askIdAgain, end: false }; }
+      if (s.step === "code_sent") { if (++s.codeTries >= 3) { s.step = "done"; return { say: LINES.codeGiveUp, end: true }; } return { say: LINES.badCode, end: false }; }
+    }
+    s.silences = (s.silences ?? 0) + 1;
+    if (s.silences >= 3) { s.step = "done"; return { say: LINES.silentBye, end: true }; }
+    return { say: LINES.stillThere, end: false };
+  }
+  s.silences = 0;
   if (++s.turns > MAX_TURNS) { s.step = "done"; return { say: LINES.tooLong, end: true }; }
 
   const sendTo = async (ch: Channel): Promise<Reply> => {
@@ -109,7 +134,17 @@ export async function turn(s: CallState, callerText: string, callerNumber: strin
 
   switch (s.step) {
     case "ask_id": {
-      const id = parseIdentifier(text);
+      let id = parseIdentifier(text);
+      if (!id) {
+        // Part of a number: keep listening, judge it once it's whole.
+        const crm = s.bufCrm || /\b(c\s*r\s*m|crm|see are em)\b/i.test(text);
+        const all = (s.buf ?? "") + spokenDigits(text);
+        if (all.length > 0 && all.length < 7 || (all.length === 7 && !crm && !/^\d{7}$/.test(text.trim()))) { s.buf = all; s.bufCrm = crm; return { say: "", end: false }; }
+        if (all.length === 7 && crm) id = { kind: "crm", value: `CRM${all}` };
+        else if (all.length === 8) id = { kind: "customer", value: all };
+        else if (crm && !all.length) { s.bufCrm = true; return { say: "", end: false }; }
+      }
+      s.buf = ""; s.bufCrm = false;
       if (!id) { if (++s.idTries >= 3) { s.step = "done"; return { say: LINES.idGiveUp, end: true }; } return { say: LINES.askIdAgain, end: false }; }
       const acct = await d.findAccount(id);
       s.ref = id.kind === "email" ? "email" : id.value;
@@ -126,7 +161,9 @@ export async function turn(s: CallState, callerText: string, callerNumber: strin
         const other: Channel = /\btext|sms|phone\b/i.test(text) ? "sms" : /\bemail\b/i.test(text) ? "email" : s.channel === "sms" ? "email" : "sms";
         return sendTo(other);
       }
-      const code = spokenDigits(text).slice(0, 6);
+      const code = (s.buf ?? "") + spokenDigits(text);
+      if (code.length > 0 && code.length < 6) { s.buf = code; return { say: "", end: false }; }
+      s.buf = "";
       if (s.codeExpires !== null && d.now() > s.codeExpires) return sendTo(s.channel ?? "email");
       const ok = code.length === 6 && s.codeHash !== null && d.hashCode(code) === s.codeHash;
       if (!ok) { if (++s.codeTries >= 3) { s.step = "done"; return { say: LINES.codeGiveUp, end: true }; } return { say: LINES.badCode, end: false }; }
@@ -139,11 +176,13 @@ export async function turn(s: CallState, callerText: string, callerNumber: strin
       let r: { say: string; intake: Intake; ready: boolean };
       try { r = await d.intakeTurn(s.aiTurns.slice(-16)); }
       catch {
-        // AI down: collect deterministically — the first answer is the description, keywords pick the category.
-        s.intake.description = [s.intake.description, text].filter(Boolean).join(" ").slice(0, 2000);
-        s.intake.category = /pay|charge|card|invoice|bill|refund/i.test(s.intake.description) ? "payment" : /log ?in|password|locked|sign in/i.test(s.intake.description) ? "login" : /lost|missing|deleted|gone/i.test(s.intake.description) ? "data" : "technical";
-        s.intake.blocking = true; s.intake.title = s.intake.description.slice(0, 80); s.intake.fallback = true;
-        if (s.aiTurns.length < 2) { s.aiTurns.push({ role: "gabe", text: LINES.aiDown }); return { say: LINES.aiDown, end: false }; }
+        // AI down: collect deterministically. A real sentence is the description; "thanks" / "okay" gets the question.
+        const desc = [s.intake.description, text].filter(Boolean).join(" ").slice(0, 2000);
+        if (desc.split(/\s+/).filter(Boolean).length < 5 && !s.aiTurns.some((t) => t.role === "gabe" && t.text === LINES.aiDown)) {
+          s.aiTurns.push({ role: "gabe", text: LINES.aiDown }); return { say: LINES.aiDown, end: false };
+        }
+        const cat: Category = /pay|charge|card|invoice|bill|refund|subscription/i.test(desc) ? "payment" : /log ?in|password|locked|sign in|can'?t get in/i.test(desc) ? "login" : /lost|missing|deleted|gone|disappear/i.test(desc) ? "data" : "technical";
+        s.intake = { ...s.intake, description: desc, category: cat, blocking: true, fallback: true, title: CAT_WORDS[cat] };
         r = { say: "", intake: s.intake, ready: true };
       }
       s.intake = { ...s.intake, ...cleanIntake(r.intake) };
@@ -160,7 +199,9 @@ export async function turn(s: CallState, callerText: string, callerNumber: strin
         s.ticketNumber = t.number;
         return { say: LINES.opened(t.number), end: true };
       }
-      s.step = "intake"; s.aiTurns.push({ role: "caller", text }, { role: "gabe", text: LINES.confirmNo });
+      if (!saidNo(text)) return { say: LINES.confirmAgain, end: false };
+      // Start the description over: what they say next replaces it.
+      s.step = "intake"; s.intake = {}; s.aiTurns = [{ role: "gabe", text: LINES.confirmNo }];
       return { say: LINES.confirmNo, end: false };
     }
   }

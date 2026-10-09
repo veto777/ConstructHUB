@@ -104,8 +104,7 @@ describe("support line — the rules are code", () => {
   it("the AI being down still leads to a ticket, deterministically", async () => {
     const { d, tickets } = deps({ intakeTurn: async () => { throw new Error("down"); } });
     const s = freshState(); await turn(s, "1 2 3 4 5 6 7 8", "+1", d); await turn(s, "email", "+1", d); await turn(s, "424242", "+1", d);
-    await turn(s, "I was charged twice for my invoice", "+1", d);
-    expect((await turn(s, "it happened on october first", "+1", d)).say).toMatch(/Should I open the ticket/);
+    expect((await turn(s, "I was charged twice for my invoice", "+1", d)).say).toMatch(/Should I open the ticket/);
     await turn(s, "yes", "+1", d); expect(tickets.length).toBe(1);
   });
 });
@@ -140,5 +139,41 @@ describe("support line — Kimi round 2 (2026-10-08)", () => {
     await turn(b, "8 7 6 5 4 3 2 1", "+1", d); await turn(b, "text", "+1", d); const rb = await turn(b, "I didn't get it", "+1", d);
     expect(ra).toEqual(rb); expect(ra.say).toBe(LINES.sentNeutral("email"));
     expect(sent).toEqual([{ channel: "sms", to: "+15555550123" }, { channel: "email", to: "owner@example.com" }]);
+  });
+});
+
+describe("support line — owner's test call (2026-10-08)", () => {
+  it("a customer number said in pieces is judged once, whole", async () => {
+    const { d } = deps(); const s = freshState();
+    expect(await turn(s, "1 2 3 4", "+1", d)).toEqual({ say: "", end: false });
+    expect((await turn(s, "five six seven eight", "+1", d)).say).toBe(LINES.chooseChannel);
+    expect(s.userId).toBe(7); expect(s.idTries).toBe(0);
+  });
+  it("a code said in two breaths is not called wrong after the first half", async () => {
+    const { d } = deps(); const s = freshState();
+    await turn(s, "12345678", "+1", d); await turn(s, "email", "+1", d);
+    expect(await turn(s, "four two four", "+1", d)).toEqual({ say: "", end: false });
+    expect(s.codeTries).toBe(0);
+    expect((await turn(s, "two four two", "+1", d)).say).toBe(LINES.verified);
+  });
+  it("7 digits on the keypad is a CRM number; spoken 7 digits then silence too", async () => {
+    const { d } = deps(); const a = freshState(), b = freshState();
+    expect((await turn(a, "1234567", "+1", d)).say).toBe(LINES.chooseChannel); expect(a.userId).toBe(7);
+    expect((await turn(b, "one two three four five six seven", "+1", d)).say).toBe("");
+    expect((await turn(b, "", "+1", d, { silence: true })).say).toBe(LINES.chooseChannel); expect(b.userId).toBe(7);
+  });
+  it("silence: asks, then hangs up after three", async () => {
+    const { d } = deps(); const s = freshState();
+    expect((await turn(s, "", "+1", d, { silence: true })).say).toBe(LINES.stillThere);
+    await turn(s, "", "+1", d, { silence: true });
+    expect(await turn(s, "", "+1", d, { silence: true })).toEqual({ say: LINES.silentBye, end: true });
+  });
+  it("AI down: 'thank you' gets the question, a real sentence goes straight to the confirm", async () => {
+    const { d, tickets } = deps({ intakeTurn: async () => { throw new Error("down"); } }); const s = freshState();
+    await turn(s, "12345678", "+1", d); await turn(s, "email", "+1", d); await turn(s, "424242", "+1", d);
+    expect((await turn(s, "Thank you.", "+1", d)).say).toBe(LINES.aiDown);
+    expect((await turn(s, "my card was charged twice this month", "+1", d)).say).toBe(LINES.confirm("a payment problem"));
+    expect((await turn(s, "Can you let me speak?", "+1", d)).say).toBe(LINES.confirmAgain);
+    expect((await turn(s, "okay", "+1", d)).end).toBe(true); expect(tickets.length).toBe(1);
   });
 });
