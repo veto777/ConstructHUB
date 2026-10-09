@@ -17,7 +17,7 @@ import { crmOrgs, crmMembers, users, crmEffectivePermissions } from "@shared/sch
 import type { CrmPermission } from "@shared/schema";
 import { and, asc, eq } from "drizzle-orm";
 import { authorizeObjectRequest } from "./object-access";
-import { PLANS, type AddonKey, type PlanKey } from "@shared/plans";
+import { PLANS, ADDONS, type AddonKey, type PlanKey } from "@shared/plans";
 import { getEntitlements, raiseHint, cheapestPlanWhere, plural, inUse, type Entitlements } from "../entitlements";
 import { getCrmEntitlements, crmPlanRequiredBody } from "./entitlements";
 import { CRM_PLANS, cheapestCrmPlanWhere, CRM_EXTRA_SEAT_MONTHLY_CENTS, type CrmPlanKey } from "@shared/crm-plans";
@@ -347,6 +347,11 @@ export async function getOwnerSeatUsage(
     message += next
       ? ` ${next.name} includes ${plural(next.limits.seats, "seat")}, or add an extra seat for $${(CRM_EXTRA_SEAT_MONTHLY_CENTS / 100).toFixed(0)}/mo.`
       : ` Add an extra seat for $${(CRM_EXTRA_SEAT_MONTHLY_CENTS / 100).toFixed(0)}/mo.`;
+    // The Agency team is in the pool and the platform plan sells the Extra seat
+    // add-on: buying one raises agencySeats, so name it for the client's
+    // limit_reached handler (plan-errors.ts). Without the module the add-on
+    // buys nothing, and on Unlimited the pool never fills.
+    if (withAgencyTeam && ent.accessPlan && ADDONS.extra_seat.availableOn.includes(ent.accessPlan)) addon = "extra_seat";
   }
 
   return {

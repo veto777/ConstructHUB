@@ -58,6 +58,11 @@ beforeAll(async () => {
     throw new Error(`CRM dev server not reachable at ${BASE} (GET /api/crm/me → ${me.status}). Start it first.`);
   }
   cookie = me.cookie;
+  // CRM routes are gated on the owner's CRM entitlements, which the server
+  // caches for 30s — a suite that toggled the dev owner's beta flag or CRM row
+  // by SQL right before this one would otherwise leave a stale answer behind.
+  // The billing endpoint reloads the entitlements fresh.
+  await fetch(`${BASE}/api/crm/billing/subscription`);
 });
 
 /** Fresh customer + project per test, so reruns never collide. */

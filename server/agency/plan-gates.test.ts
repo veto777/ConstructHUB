@@ -1,7 +1,9 @@
 /**
- * The price book inside the agency module: Agency team seats share the owner's plan seats with the CRM team
- * (crmSeats plus Extra seat add-ons), queued Google syncs run only for owners with an active plan, and bulk
- * Site Scans spend the owner's monthly Site Scans. Real lane Postgres; no Google or provider calls.
+ * The price book inside the agency module: Agency team seats share one pool with the CRM team
+ * (the owner's CRM seats plus the platform plan's agencySeats while the Agency workspace module
+ * is on; Unlimited's -1 is uncapped), queued Google syncs run only for owners with an active
+ * plan, and bulk Site Scans spend the owner's monthly Site Scans. Real lane Postgres; no Google
+ * or provider calls.
  */
 import { beforeAll, afterAll, describe, it, expect, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
@@ -16,14 +18,17 @@ import { GBP_SCOPE } from '../gbp/client';
 import { takeBudget } from '../growth-limits';
 import { quotaKey } from '../growth-quotas';
 import { PLANS } from '@shared/plans';
+import { CRM_PLANS, CRM_EXTRA_SEAT_MONTHLY_CENTS } from '@shared/crm-plans';
 vi.mock('../email', () => ({ sendWithFallback: vi.fn(async () => ({ accepted: ['fixture@example.invalid'] })) }));
 
 const created: number[] = [];
 const orgs: string[] = [];
-const newUser = async (label: string, plan?: string) => {
+const newUser = async (label: string, plan?: string, crm?: { plan: string; extraSeats?: number }) => {
   const id = (await pool.query('INSERT INTO users(email) VALUES($1) RETURNING id', [`i-agency-${label}-${randomUUID()}@example.invalid`])).rows[0].id as number;
   created.push(id);
   if (plan) await pool.query("INSERT INTO subscriptions(user_id,plan,status) VALUES($1,$2,'active')", [id, plan]);
+  // The CRM is a separate product: CRM seats come from the account's own CRM subscription.
+  if (crm) await pool.query("INSERT INTO crm_subscriptions(user_id,plan,status,extra_seats) VALUES($1,$2,'active',$3)", [id, crm.plan, crm.extraSeats ?? 0]);
   return id;
 };
 const emailOf = async (id: number) => (await pool.query('SELECT email FROM users WHERE id=$1', [id])).rows[0].email as string;
@@ -47,6 +52,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await pool.query('DELETE FROM crm_members WHERE org_id=ANY($1::varchar[])', [orgs]);
   await pool.query('DELETE FROM crm_orgs WHERE id=ANY($1::varchar[])', [orgs]);
+  await pool.query('DELETE FROM crm_subscriptions WHERE user_id=ANY($1::int[])', [created]);
   await pool.query('DELETE FROM agency_jobs WHERE user_id=ANY($1::int[])', [created]);
   await pool.query('DELETE FROM sitescan_jobs WHERE user_id=ANY($1::int[])', [created]);
   await pool.query('DELETE FROM growth_budgets WHERE key=ANY($1::text[])', [created.flatMap(u => [quotaKey(u, 'siteScans'), `sitescan:scan:${u}`, `agency-route:${u}`])]);
@@ -56,10 +62,13 @@ afterAll(async () => {
   await pool.end();
 });
 
-describe('Agency team seats share the owner\'s plan seats with the CRM team', () => {
-  it('caps the team at crmSeats plus Extra seats, counts a person on both teams once, and never races past the cap', async () => {
-    const seats = PLANS.agency.limits.crmSeats;
-    const owner = await newUser('seat-owner', 'agency');
+describe('Agency team seats share one pool with the CRM team', () => {
+  // The pool is the owner's CRM seats + the platform plan's agencySeats while the Agency
+  // workspace module is on: CRM Essentials (5) + Agency's agencySeats (10) = 15.
+  const poolSize = CRM_PLANS.crm_essentials.limits.seats + PLANS.growth.limits.agencySeats;
+
+  it('caps the team at CRM seats plus agencySeats, counts a person on both teams once, and never races past the cap', async () => {
+    const owner = await newUser('seat-owner', 'growth', { plan: 'crm_essentials' });
     // The owner's CRM org already seats the owner and one office user.
     const office = await newUser('seat-office');
     const org = (await pool.query("INSERT INTO crm_orgs(name,owner_user_id) VALUES('I- seat fixture',$1) RETURNING *", [owner])).rows[0];
@@ -71,48 +80,66 @@ describe('Agency team seats share the owner\'s plan seats with the CRM team', ()
 
     const add = async (user: number, role = 'viewer') => call('put', '/api/agency/team', owner, { email: await emailOf(user), role });
     const team: number[] = [];
-    for (let i = 0; i < seats - 4; i++) { const u = await newUser(`seat-${i}`); team.push(u); expect((await add(u)).status).toBe(200); }
-    expect((await getOwnerSeatUsage(owner)).used).toBe(seats - 1);
+    for (let i = 0; i < poolSize - 4; i++) { const u = await newUser(`seat-${i}`); team.push(u); expect((await add(u)).status).toBe(200); }
+    expect((await getOwnerSeatUsage(owner)).used).toBe(poolSize - 1);
     // Two additions at once for the last seat: exactly one gets it.
     const [a, b] = [await newUser('race-a'), await newUser('race-b')];
     const race = await Promise.all([add(a), add(b)]);
     expect(race.map(r => r.status).sort()).toEqual([200, 403]);
     const refused = race.find(r => r.status === 403)!.data;
-    expect(refused).toMatchObject({ code: 'limit_reached', feature: 'crmSeats', limit: seats, used: seats, addon: 'extra_seat' });
-    expect(refused.message).toBe(`Your Agency plan includes ${seats} seats for the CRM and agency team together and ${seats} are in use. To raise it, add the Extra seat add-on.`);
+    expect(refused).toMatchObject({ code: 'limit_reached', feature: 'crmSeats', limit: poolSize, used: poolSize, addon: 'extra_seat' });
+    expect(refused.message).toBe(`Your CRM Essentials plan includes ${poolSize} seats and ${poolSize} are in use. Add an extra seat for $${CRM_EXTRA_SEAT_MONTHLY_CENTS / 100}/mo.`);
     const loser = race[0].status === 403 ? a : b;
 
     // At the cap: the CRM office user already holds a seat, and a role change takes none.
     expect((await add(office, 'manager')).status).toBe(200);
     expect((await add(team[0], 'admin')).status).toBe(200);
     const pooled = await getSeatUsage({ ...org, ownerUserId: owner });
-    expect(pooled).toMatchObject({ used: seats, limit: seats, canAddSeat: false });
-    // The CRM side sees the same pool (an invitation would get the same refusal body).
-    expect(pooled.message).toContain('for the CRM and agency team together');
+    expect(pooled).toMatchObject({ used: poolSize, limit: poolSize, canAddSeat: false });
+    // The CRM side sees the same shared pool: the unit is plain "seats" (the Agency team is in it), not "CRM seats".
+    expect(pooled.message).toBe(`Your CRM Essentials plan includes ${poolSize} seats and ${poolSize} are in use. Add an extra seat for $${CRM_EXTRA_SEAT_MONTHLY_CENTS / 100}/mo.`);
     expect((await getSeatUsage({ ...org, ownerUserId: owner }, { email: await emailOf(office) })).canAdd).toBe(true);
     expect((await getSeatUsage({ ...org, ownerUserId: owner }, { email: await emailOf(loser) })).canAdd).toBe(false);
 
     // One Extra seat add-on makes room for one more person.
     await pool.query(`UPDATE subscriptions SET addons='{"extra_seat":1}'::jsonb WHERE user_id=$1`, [owner]);
     expect((await add(loser)).status).toBe(200);
-    expect(await getOwnerSeatUsage(owner)).toMatchObject({ used: seats + 1, limit: seats + 1 });
+    expect(await getOwnerSeatUsage(owner)).toMatchObject({ used: poolSize + 1, limit: poolSize + 1 });
     // Removing a member frees their seat.
     expect((await call('delete', '/api/agency/team/:id', owner, {}, { id: String(loser) })).status).toBe(200);
-    expect((await getOwnerSeatUsage(owner)).used).toBe(seats);
+    expect((await getOwnerSeatUsage(owner)).used).toBe(poolSize);
     await pool.query('DELETE FROM agency_members WHERE user_id=$1', [owner]);
   });
 
+  it('never caps the pool on Unlimited (agencySeats -1 is unlimited)', async () => {
+    const owner = await newUser('seat-unlimited', 'agency', { plan: 'crm_basic' });
+    const org = (await pool.query("INSERT INTO crm_orgs(name,owner_user_id) VALUES('I- unlimited seats',$1) RETURNING *", [owner])).rows[0];
+    orgs.push(org.id);
+    await pool.query("INSERT INTO crm_members(org_id,user_id,email,role,status) VALUES($1,$2,$3,'owner','active')", [org.id, owner, await emailOf(owner)]);
+    const usage = await getSeatUsage({ ...org, ownerUserId: owner });
+    expect(usage).toMatchObject({ used: 1, limit: -1, remaining: -1, canAddSeat: true });
+    expect(usage.message).toContain('unlimited');
+    // Far more additions than any capped plan allows: every one succeeds.
+    for (let i = 0; i < 15; i++) {
+      const u = await newUser(`unlimited-${i}`);
+      expect((await call('put', '/api/agency/team', owner, { email: await emailOf(u), role: 'viewer' })).status).toBe(200);
+    }
+    expect((await getOwnerSeatUsage(owner)).used).toBe(16);
+    await pool.query('DELETE FROM agency_members WHERE user_id=$1', [owner]);
+    await pool.query('DELETE FROM agency_workspaces WHERE user_id=$1', [owner]);
+  });
+
   it('keeps CRM-only accounts on their CRM seats (no agency team counted without the Agency plan)', async () => {
-    const owner = await newUser('crm-only', 'pro');
+    const owner = await newUser('crm-only', 'pro', { plan: 'crm_essentials' });
     const org = (await pool.query("INSERT INTO crm_orgs(name,owner_user_id) VALUES('I- crm only',$1) RETURNING *", [owner])).rows[0];
     orgs.push(org.id);
     await pool.query("INSERT INTO crm_members(org_id,user_id,email,role,status) VALUES($1,$2,$3,'owner','active')", [org.id, owner, await emailOf(owner)]);
-    // A leftover agency team from an earlier Agency plan holds no seats now.
+    // A leftover agency team from an earlier Agency plan holds no seats now (no agencyWorkspace module on Pro).
     const leftover = await newUser('leftover');
     await pool.query("INSERT INTO agency_members(user_id,member_id,role) VALUES($1,$2,'viewer')", [owner, leftover]);
     const usage = await getSeatUsage({ ...org, ownerUserId: owner });
-    expect(usage).toMatchObject({ used: 1, limit: PLANS.pro.limits.crmSeats, canAddSeat: true });
-    expect(usage.message).toBe(`Your Pro plan includes ${PLANS.pro.limits.crmSeats} CRM seats and 1 is in use.`);
+    expect(usage).toMatchObject({ used: 1, limit: CRM_PLANS.crm_essentials.limits.seats, canAddSeat: true });
+    expect(usage.message).toBe(`Your CRM Essentials plan includes ${CRM_PLANS.crm_essentials.limits.seats} CRM seats and 1 is in use.`);
     await pool.query('DELETE FROM agency_members WHERE user_id=$1', [owner]);
   });
 });
@@ -161,13 +188,13 @@ describe('Bulk Site Scans spend the owner\'s monthly Site Scans', () => {
     await expect(performJob(job())).rejects.toMatchObject({ kind: 'quota' });
     expect(await used()).toBe(0);
     await pool.query('DELETE FROM growth_budgets WHERE key=$1', [`sitescan:scan:${owner}`]);
-    // Starter: 2 Site Scans a month.
+    // Solo: 2 Site Scans a month.
     expect((await performJob(job()) as any).id).toBeTruthy();
     expect((await performJob(job()) as any).id).toBeTruthy();
     expect(await used()).toBe(2);
     const refused = performJob(job());
     await expect(refused).rejects.toMatchObject({ kind: 'invalid', status: 403 });
-    await expect(refused).rejects.toThrow(/used all 2 Site Scans your Starter plan includes this month/);
+    await expect(refused).rejects.toThrow(/used all 2 Site Scans your Solo plan includes this month/);
     expect((await pool.query('SELECT count(*)::int n FROM sitescan_jobs WHERE user_id=$1', [owner])).rows[0].n).toBe(2);
   });
 });

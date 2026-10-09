@@ -11,6 +11,7 @@ import type { AddressInfo } from "node:net";
 import { randomUUID } from "node:crypto";
 import { pool } from "../db";
 import { PLANS } from "@shared/plans";
+import { CRM_PLANS, CRM_EXTRA_SEAT_MONTHLY_CENTS } from "@shared/crm-plans";
 
 vi.mock("../email", () => ({ sendWithFallback: vi.fn(async () => ({ accepted: ["fixture@example.invalid"] })) }));
 vi.mock("./sms", async (original) => ({ ...(await original<typeof import("./sms")>()), sendSms: vi.fn(async () => ({ ok: true, provider: "log", sid: null })) }));
@@ -22,10 +23,12 @@ async function call(user: number, path: string, body: unknown, method = "POST") 
   const r = await fetch(base + path, { method, headers: { "content-type": "application/json", "x-fixture-user": String(user), "x-forwarded-for": ip }, body: JSON.stringify(body) });
   return { status: r.status, data: await r.json().catch(() => null) };
 }
-const account = async (plan?: string) => {
+const account = async (plan?: string, crm?: { plan: string; status?: string; extraSeats?: number }) => {
   const id = (await pool.query("INSERT INTO users(email) VALUES($1) RETURNING id", [`i-crm-${randomUUID()}@example.invalid`])).rows[0].id as number;
   users.push(id);
   if (plan) await pool.query("INSERT INTO subscriptions(user_id,plan,status) VALUES($1,$2,'active')", [id, plan]);
+  // The CRM is a separate product: CRM seats live on the CRM subscription.
+  if (crm) await pool.query("INSERT INTO crm_subscriptions(user_id,plan,status,extra_seats) VALUES($1,$2,$3,$4)", [id, crm.plan, crm.status ?? "active", crm.extraSeats ?? 0]);
   return id;
 };
 
@@ -54,43 +57,52 @@ afterAll(async () => {
   await pool.query("DELETE FROM crm_orgs WHERE id=ANY($1::varchar[])", [orgs]);
   await pool.query("DELETE FROM growth_budgets WHERE key=ANY($1::text[])", [users.map((u) => `agency-route:${u}`)]);
   await pool.query("DELETE FROM subscriptions WHERE user_id=ANY($1::int[])", [users]);
+  await pool.query("DELETE FROM crm_subscriptions WHERE user_id=ANY($1::int[])", [users]);
   await pool.query("DELETE FROM users WHERE id=ANY($1::int[])", [users]);
   await pool.end();
 });
 
 describe("CRM seat refusals", () => {
-  it("answer limit_reached with the plan's seat count and the Extra seat add-on", async () => {
-    const owner = await account("starter");
+  it("answer limit_reached with the CRM plan's seat count and how to raise it", async () => {
+    // The CRM is a separate product: seats come from the CRM plan (CRM Basic: 1), not any platform plan.
+    const owner = await account(undefined, { plan: "crm_basic" });
     const first = await call(owner, "/api/crm/invitations", { email: `i-invitee-${randomUUID()}@example.invalid`, role: "field" });
-    const seats = PLANS.starter.limits.crmSeats;
+    const seats = CRM_PLANS.crm_basic.limits.seats;
     expect(first.status).toBe(402);
     expect(first.data).toMatchObject({
-      code: "limit_reached", feature: "crmSeats", limit: seats, used: 1, addon: "extra_seat", upgradePlan: "pro",
-      message: `Your Starter plan includes ${seats} CRM seat and 1 is in use. To raise it, add the Extra seat add-on or move to Pro (${PLANS.pro.limits.crmSeats} seats).`,
+      code: "limit_reached", feature: "crmSeats", limit: seats, used: 1, addon: null, upgradePlan: null,
+      message: `Your CRM Basic plan includes ${seats} CRM seat and 1 is in use. CRM Essentials includes ${CRM_PLANS.crm_essentials.limits.seats} seats, or add an extra seat for $${CRM_EXTRA_SEAT_MONTHLY_CENTS / 100}/mo.`,
     });
-    expect(first.data.seats).toMatchObject({ limit: seats, used: 1, canAddSeat: false });
+    expect(first.data.seats).toMatchObject({ limit: seats, used: 1, canAddSeat: false, upgradeCrmPlan: "crm_essentials" });
   });
 
-  it("point an account with no plan at the cheapest plan with more seats", async () => {
-    const owner = await account();
+  it("point an account with no CRM plan at the CRM plans", async () => {
+    // No CRM subscription: every CRM route answers crm_plan_required before any seat check.
+    const owner = await account("starter");
     const refused = await call(owner, "/api/crm/invitations", { email: `i-invitee-${randomUUID()}@example.invalid` });
     expect(refused.status).toBe(402);
-    expect(refused.data).toMatchObject({ code: "limit_reached", feature: "crmSeats", limit: 1, used: 1, addon: null, upgradePlan: "pro" });
-    expect(refused.data.message).toContain("The CRM is included with every paid plan, and Pro includes 3 seats.");
+    expect(refused.data).toMatchObject({
+      code: "crm_plan_required",
+      message: "The ConstructHUB CRM is its own subscription, separate from the ConstructHUB platform plans, from $39/mo. Choose a CRM plan to open it.",
+      href: "/pricing#crm",
+    });
   });
 });
 
 describe("One seat pool for the CRM team and the Agency team", () => {
+  // The pool is CRM seats + the platform plan's agencySeats while the Agency workspace module is on:
+  // CRM Basic (1) + Agency's agencySeats (10) = 11. Unlimited's agencySeats (-1) would leave it uncapped.
+  const poolSize = CRM_PLANS.crm_basic.limits.seats + PLANS.growth.limits.agencySeats;
+
   it("lets only one of two simultaneous additions (a CRM invitation and an Agency member) take the last seat", async () => {
-    const seats = PLANS.agency.limits.crmSeats;
-    const owner = await account("agency");
+    const owner = await account("growth", { plan: "crm_basic" });
     // Owner + one pending invitation.
     expect((await call(owner, "/api/crm/invitations", { email: `i-invitee-${randomUUID()}@example.invalid` })).status).toBe(201);
     const member = async () => {
       const id = await account();
       return (await pool.query("SELECT email FROM users WHERE id=$1", [id])).rows[0].email as string;
     };
-    for (let i = 0; i < seats - 3; i++) {
+    for (let i = 0; i < poolSize - 3; i++) {
       const r = await call(owner, "/api/agency/team", { email: await member(), role: "viewer" }, "PUT");
       expect(r.status).toBe(200);
     }
@@ -101,7 +113,9 @@ describe("One seat pool for the CRM team and the Agency team", () => {
     const outcomes = [crm, agency];
     expect(outcomes.filter((r) => r.status === 200 || r.status === 201)).toHaveLength(1);
     const refused = outcomes.find((r) => r.status === 402 || r.status === 403)!;
-    expect(refused.data).toMatchObject({ code: "limit_reached", feature: "crmSeats", limit: seats, used: seats, addon: "extra_seat" });
+    // The Agency ($199) platform plan sells the Extra seat add-on: it raises agencySeats, so the refusal names it.
+    expect(refused.data).toMatchObject({ code: "limit_reached", feature: "crmSeats", limit: poolSize, used: poolSize, addon: "extra_seat" });
+    expect(refused.data.message).toContain("Add an extra seat for $17/mo.");
     await pool.query("DELETE FROM agency_members WHERE user_id=$1", [owner]);
     await pool.query("DELETE FROM agency_workspaces WHERE user_id=$1", [owner]);
   });
@@ -109,8 +123,7 @@ describe("One seat pool for the CRM team and the Agency team", () => {
   it("answers every one of more simultaneous additions for one owner than the pg pool has connections", async () => {
     // A request waiting for the seat lock holds a pool connection (10 by default). Before the work under the lock
     // ran on the lock's own connection, 12 invitations at once wedged every query in the process.
-    const seats = PLANS.agency.limits.crmSeats;
-    const owner = await account("agency");
+    const owner = await account("growth", { plan: "crm_basic" });
     const emails = await Promise.all(Array.from({ length: 5 }, async () =>
       (await pool.query("SELECT email FROM users WHERE id=$1", [await account()])).rows[0].email as string));
     const all = Promise.all([
@@ -121,11 +134,11 @@ describe("One seat pool for the CRM team and the Agency team", () => {
     expect(outcome).not.toBe("wedged");
     const results = outcome as Awaited<typeof all>;
     // The owner holds one seat; the other seats go to exactly that many of the 14, and the rest are refused.
-    expect(results.filter((r) => r.status === 200 || r.status === 201)).toHaveLength(seats - 1);
+    expect(results.filter((r) => r.status === 200 || r.status === 201)).toHaveLength(poolSize - 1);
     for (const r of results.filter((r) => r.status !== 200 && r.status !== 201))
-      expect(r.data).toMatchObject({ code: "limit_reached", feature: "crmSeats", limit: seats, used: seats });
+      expect(r.data).toMatchObject({ code: "limit_reached", feature: "crmSeats", limit: poolSize, used: poolSize, addon: "extra_seat" });
     const { getOwnerSeatUsage } = await import("./tenancy");
-    expect((await getOwnerSeatUsage(owner)).used).toBe(seats);
+    expect((await getOwnerSeatUsage(owner)).used).toBe(poolSize);
     await pool.query("DELETE FROM agency_member_clients WHERE user_id=$1", [owner]);
     await pool.query("DELETE FROM agency_members WHERE user_id=$1", [owner]);
     await pool.query("DELETE FROM agency_workspaces WHERE user_id=$1", [owner]);
@@ -134,16 +147,17 @@ describe("One seat pool for the CRM team and the Agency team", () => {
 
 describe("Texting a client without a texting plan", () => {
   it("answers plan_required naming the cheapest texting plan", async () => {
-    const owner = await account("starter");
-    // The owner's org exists after their first CRM request.
+    // CRM Basic has no texting (Essentials and up do), and no platform plan grants any either.
+    const owner = await account(undefined, { plan: "crm_basic" });
+    // The owner's org exists after their first CRM request (the invitation itself is refused: the one seat is taken).
     await call(owner, "/api/crm/invitations", { email: `i-invitee-${randomUUID()}@example.invalid` });
     const org = (await pool.query("SELECT id FROM crm_orgs WHERE owner_user_id=$1", [owner])).rows[0].id;
     const customer = (await pool.query("INSERT INTO crm_customers(org_id,display_name,phone,portal_token) VALUES($1,'I- texting fixture','+15555550123',$2) RETURNING id", [org, randomUUID()])).rows[0].id;
     const refused = await call(owner, "/api/crm/messages", { customerId: customer, channel: "text", body: "On our way" });
     expect(refused.status).toBe(402);
     expect(refused.data).toEqual({
-      code: "plan_required", requiredPlan: "pro", planAllowsSms: false,
-      message: "Text messaging is included with the Pro, Growth and Agency plans. Upgrade in Pricing to turn it on.",
+      code: "plan_required", requiredPlan: "starter", planAllowsSms: false,
+      message: "Text messaging is included with the CRM Essentials and CRM Max plans. Change your CRM plan in Pricing to turn it on.",
     });
   });
 });

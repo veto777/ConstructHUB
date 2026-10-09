@@ -206,51 +206,65 @@ describe("beta invites", () => {
 });
 
 describe("beta accounts are unlimited", () => {
-  it("a beta owner gets limit -1 and an invitation that would 402 a 1-seat plan sails through", async () => {
+  it("a beta owner gets limit -1 and an invitation that would 402 once the flag drops sails through", async () => {
     const invitee = `vt-seat-${stamp}@example.com`;
-    // Shrink the dev owner's plan to a single seat so only the beta flag can
-    // let a second seat through; restore everything in finally. Platform admins
-    // run with the top plan's seats, so the owner is a non-admin for this test.
+    // Shrink the dev owner's platform plan to the smallest (legacy Standard → Solo) so only
+    // the beta flag can let a second seat through; restore everything in finally. Platform
+    // plans grant no CRM seats (the CRM is a separate product), and platform admins run
+    // with the top plan's seats, so the owner is a non-admin for this test.
     const { rows: before } = await q(`select plan, status from subscriptions where user_id = 1`);
-    await withDevEmail(`vt-seat-owner-${stamp}@example.com`, async () => {
-      try {
-        await q(`update subscriptions set plan = 'standard', status = 'active' where user_id = 1`);
-        await q(`update users set beta_at = now() where id = 1`);
+    try {
+      await withDevEmail(`vt-seat-owner-${stamp}@example.com`, async () => {
+        try {
+          await q(`update subscriptions set plan = 'standard', status = 'active' where user_id = 1`);
+          await q(`update users set beta_at = now() where id = 1`);
+          // CRM entitlements are cached for 30s server-side; the billing endpoint reloads
+          // them fresh, so the flag change is visible to the very next request.
+          await fetch(`${BASE}/api/crm/billing/subscription`);
 
-        const me = await (await fetch(`${BASE}/api/crm/me`)).json();
-        expect(me.seats.plan).toBe("beta");
-        expect(me.seats.limit).toBe(-1);
-        expect(me.seats.canAddSeat).toBe(true);
+          const me = await (await fetch(`${BASE}/api/crm/me`)).json();
+          expect(me.seats.plan).toBe("beta");
+          expect(me.seats.limit).toBe(-1);
+          expect(me.seats.canAddSeat).toBe(true);
 
-        const invite = await fetch(`${BASE}/api/crm/invitations`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ email: invitee, role: "field" }),
-        });
-        expect(invite.status).toBe(201);
+          const invite = await fetch(`${BASE}/api/crm/invitations`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ email: invitee, role: "field" }),
+          });
+          expect(invite.status).toBe(201);
 
-        // Same org, same 1-seat plan, flag removed: the very next invite 402s.
-        // Proves the beta flag — not the plan — is what let the seat through.
-        await q(`delete from crm_invitations where email = $1`, [invitee]);
-        await q(`delete from crm_members where email = $1 and status = 'invited'`, [invitee]);
-        await q(`update users set beta_at = null where id = 1`);
-        const unflagged = await (await fetch(`${BASE}/api/crm/me`)).json();
-        expect(unflagged.seats.limit).toBe(1);
-        const blocked = await fetch(`${BASE}/api/crm/invitations`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ email: `vt-seat2-${stamp}@example.com`, role: "field" }),
-        });
-        expect(blocked.status).toBe(402);
-      } finally {
-        await q(`delete from crm_invitations where email in ($1, $2)`, [invitee, `vt-seat2-${stamp}@example.com`]);
-        await q(`delete from crm_members where email in ($1, $2) and status = 'invited'`, [invitee, `vt-seat2-${stamp}@example.com`]);
-        await q(`update users set beta_at = null where id = 1`);
-        if (before.length) {
-          await q(`update subscriptions set plan = $1, status = $2 where user_id = 1`, [before[0].plan, before[0].status]);
+          // Same org, same platform plan, flag removed: the very next invite 402s.
+          // Proves the beta flag — not the plan — is what let the seat through.
+          await q(`delete from crm_invitations where email = $1`, [invitee]);
+          await q(`delete from crm_members where email = $1 and status = 'invited'`, [invitee]);
+          await q(`update users set beta_at = null where id = 1`);
+          await fetch(`${BASE}/api/crm/billing/subscription`);
+          const unflagged = await (await fetch(`${BASE}/api/crm/me`)).json();
+          // Without the beta flag there is no CRM plan and the platform plan grants no CRM
+          // seats: the pool is 0 (it was -1 a moment ago).
+          expect(unflagged.seats.limit).toBe(0);
+          const blocked = await fetch(`${BASE}/api/crm/invitations`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ email: `vt-seat2-${stamp}@example.com`, role: "field" }),
+          });
+          expect(blocked.status).toBe(402);
+        } finally {
+          await q(`delete from crm_invitations where email in ($1, $2)`, [invitee, `vt-seat2-${stamp}@example.com`]);
+          await q(`delete from crm_members where email in ($1, $2) and status = 'invited'`, [invitee, `vt-seat2-${stamp}@example.com`]);
+          await q(`update users set beta_at = null where id = 1`);
+          if (before.length) {
+            await q(`update subscriptions set plan = $1, status = $2 where user_id = 1`, [before[0].plan, before[0].status]);
+          }
         }
-      }
-    });
+      });
+    } finally {
+      // The SQL toggles above bypass the dev server's 30s CRM-entitlements
+      // cache: reload it so the next suite reads the restored owner, not the
+      // fixture state (a stale NO_CRM here 402s every CRM route that follows).
+      await fetch(`${BASE}/api/crm/billing/subscription`);
+    }
   });
 });
 

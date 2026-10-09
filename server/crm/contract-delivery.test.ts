@@ -125,6 +125,11 @@ describe("signed contract on approval (dev server)", () => {
     }
     cookie = me.cookie;
     orgId = me.body.org.id;
+    // CRM routes are gated on the owner's CRM entitlements, which the server
+    // caches for 30s — a suite that toggled the dev owner's beta flag or CRM row
+    // by SQL right before this one would otherwise leave a stale answer behind.
+    // The billing endpoint reloads the entitlements fresh.
+    await fetch(`${BASE}/api/crm/billing/subscription`);
 
     const stamp = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
     custEmail = `vitest.contract.${stamp}@example.com`;

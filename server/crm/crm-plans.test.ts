@@ -28,12 +28,14 @@ describe("the CRM is a separate product", () => {
     expect(Number.isInteger(CRM_TRIAL_DAYS) && CRM_TRIAL_DAYS >= 7 && CRM_TRIAL_DAYS <= 30).toBe(true);
   });
 
-  it("no platform plan grants CRM seats, and the platform's seat add-on is Agency-only", () => {
+  it("no platform plan grants CRM seats, and the platform's seat add-on is sold on Team, Pro and Agency only", () => {
     for (const key of PLAN_KEYS) {
       expect("crmSeats" in PLANS[key].limits, key).toBe(false);
       expect(PLANS[key].features.join(" "), key).not.toMatch(/\bCRM\b/);
     }
-    expect(ADDONS.extra_seat.availableOn).toEqual(["agency"]);
+    // Extra team seat ($15/mo): Team, Pro and Agency ($199) — not Solo, and Unlimited needs no add-on.
+    expect(ADDONS.extra_seat.availableOn).toEqual(["team", "pro", "growth"]);
+    expect(ADDONS.extra_seat.grants).toEqual({ agencySeats: 1 });
   });
 
   it("every plan of either product says what it does NOT include, and names the other product", () => {

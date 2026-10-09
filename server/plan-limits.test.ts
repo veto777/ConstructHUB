@@ -36,6 +36,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await pool.query("delete from business_locations where user_id=any($1::int[])", [users]);
   await pool.query("delete from crm_orgs where id=any($1::text[])", [orgs]);
+  await pool.query("delete from crm_subscriptions where user_id=any($1::int[])", [users]);
   await pool.query("delete from beta_access_codes where id=any($1::int[])", [codes]);
   await pool.query("delete from subscriptions where user_id=any($1::int[])", [users]);
   await pool.query("delete from users where id=any($1::int[])", [users]);
@@ -89,7 +90,7 @@ describe("trial codes", () => {
     await pool.query("update subscriptions set addons=$2, billing_interval='year', agency_locations=40 where user_id=$1", [expired, { competitor_pack: 3 }]);
     expect("trialEnd" in await redeemTrialCode(expired, await code(1))).toBe(true);
     expect(await sub(expired)).toMatchObject([{ plan: "agency", status: "trialing", addons: {}, billing_interval: null, agency_locations: null }]);
-    expect((await getEntitlements(expired)).allowances?.competitorScans).toBe(20);
+    expect((await getEntitlements(expired)).allowances?.competitorScans).toBe(50);
 
     const now = new Date();
     const long = await account();
@@ -149,33 +150,70 @@ describe("revoking a trial code ends only the trial it keeps alive", () => {
   });
 });
 
-describe("Agency per-location allowances follow billed locations", () => {
-  it("counts linked Business Profile locations (at least the 10 included), not Places-only rows", async () => {
+describe("Agency monthly allowances are flat, not per-location", () => {
+  it("reads the plan's flat limits from the stored row, raises them with an add-on, and drops them when the plan lapses", async () => {
     const owner = await account("agency");
+    // 12 linked Business Profile locations among 40 rows — linked locations multiply nothing anymore.
     await pool.query(
       `insert into business_locations(user_id,business_name,gbp_location_name)
        select $1::int,'P-billed '||i, case when i<=12 then 'locations/p-billed-'||$1::int||'-'||i end from generate_series(1,40) i`, [owner]);
     const usage: any = await monthlyUsage(owner, await getEntitlements(owner));
-    expect(usage.rankings.limit).toBe(24);
-    expect(usage.siteScans.limit).toBe(12);
+    expect(usage.rankings.limit).toBe(150); // Unlimited's flat grid credits
+    expect(usage.siteScans.limit).toBe(-1); // unlimited Site Scans
+    // An add-on raises the flat allowance.
+    await pool.query("update subscriptions set addons=$2 where user_id=$1", [owner, { grid_pack: 2 }]);
+    const raised: any = await monthlyUsage(owner, await getEntitlements(owner));
+    expect(raised.rankings.limit).toBe(170);
+    // A lapsed plan loses the allowances.
+    await pool.query("update subscriptions set status='canceled' where user_id=$1", [owner]);
+    const lapsed: any = await monthlyUsage(owner, await getEntitlements(owner));
+    expect(lapsed.rankings.limit).toBe(0);
+    expect(lapsed.siteScans.limit).toBe(0);
   });
 });
 
-describe("CRM seats follow the owner's plan", () => {
+describe("CRM seats follow the owner's CRM plan", () => {
   const org = async (owner: number) => {
     const { rows: [o] } = await pool.query("insert into crm_orgs(name,owner_user_id) values('P-seat fixture',$1) returning *", [owner]);
     orgs.push(o.id);
     return { ...o, ownerUserId: o.owner_user_id };
   };
-  it("uses crmSeats per plan, legacy plans through the map, and one owner seat without a plan", async () => {
-    expect(await getSeatUsage(await org(await account("starter")))).toMatchObject({ plan: "starter", planName: "Starter", limit: 1, canAddSeat: true });
-    expect(await getSeatUsage(await org(await account("premium")))).toMatchObject({ plan: "pro", limit: 3 });
-    expect(await getSeatUsage(await org(await account("gold")))).toMatchObject({ plan: "growth", limit: 10 });
+  const crmSub = async (owner: number, plan: string, extra: { status?: string; extraSeats?: number } = {}) => pool.query(
+    "insert into crm_subscriptions(user_id,plan,status,extra_seats) values($1,$2,$3,$4) on conflict (user_id) do update set plan=$2,status=$3,extra_seats=$4",
+    [owner, plan, extra.status ?? "active", extra.extraSeats ?? 0]);
+  it("reads CRM seats from the stored CRM row, and Extra seats raise them", async () => {
+    // The CRM is a separate product: seats come from the CRM subscription (shared/crm-plans.ts), never the platform plan.
+    const basic = await account("starter");
+    await crmSub(basic, "crm_basic");
+    expect(await getSeatUsage(await org(basic))).toMatchObject({ plan: "crm_basic", planName: "CRM Basic", limit: 1, canAddSeat: true });
+    const boosted = await account("starter");
+    await crmSub(boosted, "crm_basic", { extraSeats: 2 });
+    expect((await getSeatUsage(await org(boosted))).limit).toBe(3);
+    // A stored platform plan key is not a CRM plan key: no CRM seats from it.
+    const legacy = await account("pro");
+    await crmSub(legacy, "premium");
+    expect((await getSeatUsage(await org(legacy))).limit).toBe(0);
+  });
+
+  it("adds the platform plan's agencySeats to the pool while the Agency workspace module is on, and -1 is unlimited", async () => {
+    // Agency ($199): CRM Basic's 1 seat + the platform plan's 10 agencySeats.
+    const growth = await account("growth");
+    await crmSub(growth, "crm_basic");
+    expect(await getSeatUsage(await org(growth))).toMatchObject({ plan: "crm_basic", planName: "CRM Basic", limit: 11 });
+    // Unlimited's agencySeats are -1: the pool has no ceiling.
+    const unlimited = await account("agency");
+    await crmSub(unlimited, "crm_basic");
+    expect((await getSeatUsage(await org(unlimited))).limit).toBe(-1);
+  });
+
+  it("one seat message without any plan, and an expired CRM grant drops its seats", async () => {
     const none = await getSeatUsage(await org(await account()));
-    expect(none).toMatchObject({ plan: "none", limit: 1 });
-    expect(none.message).toContain("The CRM is included with every paid plan, and Pro includes 3 seats.");
-    const lapsed = await getSeatUsage(await org(await account("growth", { status: "canceled" })));
-    expect(lapsed.limit).toBe(1);
+    expect(none).toMatchObject({ plan: "none", limit: 0 });
+    expect(none.message).toContain("The ConstructHUB CRM is a separate subscription");
+    // A canceled CRM plan drops its seats; the platform plan's agencySeats remain in the pool.
+    const lapsed = await account("growth");
+    await crmSub(lapsed, "crm_essentials", { status: "canceled" });
+    expect((await getSeatUsage(await org(lapsed))).limit).toBe(10);
   });
 
   it("keeps beta owners unlimited", async () => {
