@@ -35,6 +35,7 @@ import { normalizeE164 } from "../voice/profile-store";
 import { customerNumberFor } from "./schema";
 import { freshState, turn, LINES, type Account, type CallState, type Category, type Channel, type Deps, type Intake, type Reply } from "./line";
 import { CLIPS, freshIvrState, ivrTurn, type ClipId, type IvrDeps, type IvrInput, type IvrReply } from "./ivr";
+import { codeSendGate } from "./limits";
 
 const HOUR = 3_600_000, DAY = 24 * HOUR;
 let warnedPepper = false;
@@ -63,18 +64,18 @@ export async function findAccount(ref: { kind: "customer" | "crm" | "email"; val
 
 /**
  * A fresh code to the account's own email / phone on file — or, with no account, the SAME budget work and nothing sent
- * (Kimi audit 2026-10-08 #1, #2, #4, #5). Budgets: per caller 3/hour; per account (or per unknown identifier) 2/hour and
- * 6/day; 300/hour overall. Only the caller/overall budgets refuse audibly (identical for hits and misses); an account-side
- * refusal sends nothing and says the same words. Delivery runs in the background so a hit is not slower than a miss.
+ * (Kimi audit 2026-10-08 #1, #2, #4, #5). Budgets (limits.ts, review S-10): per caller 3/hour; per (caller, account —
+ * or unknown identifier) 2/hour and 6/day, so a stranger spends their own allowance, never the customer's; per account
+ * at most a few distinct caller numbers a day; SUPPORT_CODES_PER_HOUR overall. Only the caller/overall budgets refuse
+ * audibly (identical for hits and misses); every other refusal sends nothing and says the same words. Delivery runs in
+ * the background so a hit is not slower than a miss.
  */
 export async function sendCode(acct: { userId: number; email: string; phones: string[] } | null, ref: string, channel: Channel, callerNumber: string): Promise<{ allowed: boolean; hash: string | null }> {
   const caller = normalizeE164(callerNumber) || "unknown";
-  if (!(await takeBudget(`support:code:caller:${caller}`, 3, 1, HOUR))) return { allowed: false, hash: null };
-  if (!(await takeBudget(`support:code:all`, 300, 1, HOUR))) return { allowed: false, hash: null };
-  const key = acct ? `acct:${acct.userId}` : `miss:${createHash("sha256").update(ref.toLowerCase()).digest("hex").slice(0, 24)}`;
-  const okHour = await takeBudget(`support:code:${key}:h`, 2, 1, HOUR), okDay = await takeBudget(`support:code:${key}:d`, 6, 1, DAY);
+  const gate = await codeSendGate(acct ? { userId: acct.userId, phones: acct.phones } : null, ref, caller);
+  if (gate === "refuse") return { allowed: false, hash: null };
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
-  if (!acct || !okHour || !okDay) return { allowed: true, hash: null };
+  if (!acct || gate !== "send") return { allowed: true, hash: null };
   const msg = `Your ConstructHUB support code is ${code}. It expires in 10 minutes. If you didn't just call ConstructHUB support, ignore this message.`;
   const deliver = async () => {
     if (channel === "sms" && acct.phones[0]) {
