@@ -14,8 +14,9 @@ import {
 } from "./client";
 import {
   claimNextUpload, customerRefreshTokenForRevoke, customerYoutubeStore, deleteAllVideos, deleteCustomerConnection, dueChecks, failVideo,
-  filesToDelete, finishUpload, heartbeat, interruptedUploads, markFileDeleted, markQuotaSpent, recordCheck, type VideoRow,
+  filesToDelete, finishUpload, heartbeat, interruptedUploads, markFileDeleted, markQuotaSpent, recordCheck, requeueUpload, type VideoRow,
 } from "./customer-store";
+import { getEntitlements } from "../entitlements";
 import { handleOf, keyIsOwn, storedVideoSource } from "./customer-media";
 
 /* ── Plain words ──────────────────────────────────────────────────────────── */
@@ -119,8 +120,20 @@ async function defaultNotify(v: VideoRow, outcome: "published" | "failed", messa
 
 const libDeps = (v: VideoRow, d: WorkerDeps): Deps => ({ store: customerYoutubeStore(v.user_id), http: d.http, retryDelayMs: d.retryDelayMs });
 
+/** Lookup failures also pause undispatched work without losing its file or queue position. */
+async function canDispatch(v: VideoRow): Promise<boolean> {
+  try {
+    if ((await getEntitlements(v.user_id)).modules.socialPublishing) return true;
+  } catch (e) {
+    console.error("[youtube] could not check publishing entitlement:", (e as Error)?.message);
+  }
+  await requeueUpload(v.id);
+  return false;
+}
+
 /** Send one leased video to its owner's channel. Every outcome ends in a state the customer can read. */
 export async function runUpload(v: VideoRow, d: WorkerDeps = {}): Promise<void> {
+  if (!await canDispatch(v)) return;
   const notify = d.notify ?? defaultNotify;
   const fail = async (code: string, message: string) => {
     await failVideo(v.id, code, message);
@@ -135,6 +148,8 @@ export async function runUpload(v: VideoRow, d: WorkerDeps = {}): Promise<void> 
     if (grant.channelId !== v.channel_id)
       return await fail("channel_changed", "The connected channel changed after this video was queued. Send it again to publish it on the new channel.");
     await getYoutubeAccessToken(deps);
+    // Re-check after token preparation, immediately before spending quota and dispatching.
+    if (!await canDispatch(v)) return;
     await markQuotaSpent(v.id);
     const source = storedVideoSource(v);
     const done = await uploadVideo({
