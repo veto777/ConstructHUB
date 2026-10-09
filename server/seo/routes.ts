@@ -54,6 +54,7 @@ import { seoAllowanceTest, keywordsFit, SEO_FEATURE, SEO_ENV_VARS, SEO_NOT_READY
 import { fetchDomainReport, latestReport, saveReport, recentReports, EXPLORER_ESTIMATE_USD, EXPLORER_TYPICAL_USD, REPORT_TTL_DAYS } from "./explorer";
 import { PLANS } from "@shared/plans";
 import { siteAudit, auditHealthByDomain, auditDomainKey, auditEvidence } from "./audit";
+import { ensureRecipients, recipientStatuses, confirmRecipient, refuseRecipient, parseConfirmToken, limitsFor, CONFIRM_TOKEN_DAYS } from "./report-recipients";
 import { auditPages } from "./audit-pages";
 import { linkOpportunities } from "./link-opportunities";
 import { rankHistory, keywordHistory } from "./rank-history";
@@ -1310,6 +1311,31 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     } catch (e: any) { console.error(`[seo] unsubscribe failed: ${e?.message ?? e}`); unsubscribePage(res, "Something went wrong", `<p style="line-height:1.6;color:#444">Please try again in a minute.</p>`, 500); }
   });
 
+  // The links in a recipient's confirmation email (server/seo/report-recipients.ts): no sign-in, a signed token bound
+  // to the account and the address. Opening only asks (scanners and previews open links); the button acts.
+  const confirmPage = (res: any, kind: "confirm" | "refuse", outcome: string, token: string) => {
+    const again = `<form method="post" action="/api/seo/report-${kind}?t=${encodeURIComponent(token)}"><button style="background:${kind === "confirm" ? "#1a73e8" : "#b3261e"};color:#fff;border:0;border-radius:8px;padding:12px 20px;font-size:15px;cursor:pointer">${kind === "confirm" ? "Yes, send me the reports" : "Block these reports"}</button></form>`;
+    const p = (t: string) => `<p style="line-height:1.6;color:#444">${t}</p>`;
+    if (outcome === "expired") return unsubscribePage(res, "This link has expired", p(`Confirmation links work for ${CONFIRM_TOKEN_DAYS} days. No reports were sent to you. Ask the sender to add your address again if you want them.`), 410);
+    if (outcome === "invalid") return unsubscribePage(res, "This link is not valid", p("It may have been cut off by your email program or already used. No reports are sent to an address that has not confirmed."), 400);
+    if (outcome === "ask") return unsubscribePage(res, kind === "confirm" ? "Get these SEO reports?" : "Block these SEO reports?",
+      p(kind === "confirm" ? "A ConstructHUB customer asked us to email you their SEO reports. Nothing is sent until you confirm." : "This address will not get SEO reports from any ConstructHUB customer. Nothing else is needed.") + again);
+    if (outcome === "confirmed" || outcome === "already") return unsubscribePage(res, "You will get the reports", p("Every report has a link to stop them. Nothing else is needed."));
+    return unsubscribePage(res, "You won't get these reports", p("Your address is blocked from SEO reports sent through ConstructHUB. Nothing else is needed."));
+  };
+  for (const kind of ["confirm", "refuse"] as const) {
+    app.get(`/api/seo/report-${kind}`, (req, res) => {
+      const token = String(req.query.t ?? "");
+      const p = parseConfirmToken(token);
+      confirmPage(res, kind, p.ok ? "ask" : p.reason, token);
+    });
+    app.post(`/api/seo/report-${kind}`, async (req, res) => {
+      const token = String(req.query.t ?? "");
+      try { confirmPage(res, kind, kind === "confirm" ? await confirmRecipient(token) : await refuseRecipient(token), token); }
+      catch (e: any) { console.error(`[seo] report ${kind} failed: ${e?.message ?? e}`); unsubscribePage(res, "Something went wrong", `<p style="line-height:1.6;color:#444">Please try again in a minute.</p>`, 500); }
+    });
+  }
+
   // The report reads Search Console through this file's own summary (the same one the rank tracker shows).
   reportDeps.searchConsole = async (userId, domain) => searchConsoleSummary(userId, domain);
 
@@ -1321,7 +1347,10 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (!report) return res.status(404).json({ message: "Site not found" });
     const [schedule, brand, { rows: [me] }] = await Promise.all([getSchedule(user, site.id), brandOf(user), pool.query("SELECT email FROM users WHERE id=$1", [user])]);
     res.setHeader("Cache-Control", "no-store");
-    res.json({ report, highlights: reportHighlights(report), empty: reportIsEmpty(report), schedule, brandName: brand?.name ?? null, accountEmail: me?.email ?? null, optedOut: await optedOut(user) });
+    // Where each saved address stands: confirmed, pending (confirmation sent), unconfirmed (saved before confirmations
+    // existed — the next send mails it the confirmation instead of the report), or blocked.
+    res.json({ report, highlights: reportHighlights(report), empty: reportIsEmpty(report), schedule, brandName: brand?.name ?? null, accountEmail: me?.email ?? null, optedOut: await optedOut(user),
+      recipients: await recipientStatuses(user, schedule.recipients ?? []), confirmDays: CONFIRM_TOKEN_DAYS });
   });
   route("get", "/api/seo/sites/:id/report.pdf", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
@@ -1331,13 +1360,19 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     res.setHeader("Cache-Control", "no-store");
     res.type("application/pdf").setHeader("Content-Disposition", `attachment; filename="seo-report-${site.domain.replace(/[^a-z0-9.-]/gi, "-")}.pdf"`).send(pdf);
   });
-  route("post", "/api/seo/sites/:id/report/schedule", async (req, res, user) => {
+  // Saving addresses: a new one is sent a confirmation email now and gets reports only once it confirms; the
+  // account's own addresses are confirmed on sight. Over the account's distinct-recipient limit: not saved.
+  route("post", "/api/seo/sites/:id/report/schedule", async (req, res, user, ent) => {
     const site = await ownedSite(user, req.params.id);
     const input = scheduleInput.parse(req.body);
     if (input.frequency !== "off" && !input.recipients.length) return res.status(400).json({ message: "Add at least one email address to send the report to." });
-    res.json(await saveSchedule(user, site.id, input));
+    const standing = await ensureRecipients(user, input.recipients, { brand: (await brandOf(user))?.name ?? null, ent });
+    if (standing.limited.length) return res.status(403).json({ message: `You can send reports to up to ${limitsFor(ent).distinctRecipients} different addresses in total. Not added: ${standing.limited.join(", ")}.` });
+    const saved = await saveSchedule(user, site.id, input);
+    res.json({ ...saved, recipientStatus: await recipientStatuses(user, saved.recipients ?? []), confirmationsSent: standing.confirmationsSent });
   });
-  // "Send now". Ten sends a day per account: this emails addresses the customer typed.
+  // "Send now". Ten sends a day per account: this emails addresses the customer typed — the confirmed ones; an
+  // unconfirmed address is mailed the confirmation instead (server/seo/report-recipients.ts).
   route("post", "/api/seo/sites/:id/report/send", async (req, res, user) => {
     const site = await ownedSite(user, req.params.id);
     const { recipients } = scheduleInput.pick({ recipients: true }).parse(req.body);

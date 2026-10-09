@@ -23,6 +23,8 @@ export type TransactionalEmail = {
   text?: string;
   /** Defaults to the account's email address. */
   to?: string;
+  /** Sender shown on the email ("Name" <address>); defaults to the platform sender. The transport may rewrite the address part. */
+  from?: string;
   attachments?: EmailAttachment[];
 };
 
@@ -117,7 +119,7 @@ export async function sendTransactionalEmail(userId: number, kind: string, dedup
     }
     if (!to) throw new Error(`sendTransactionalEmail: account ${userId} has no email address`);
     await sendWithFallback({
-      from: `"ConstructHUB" <${process.env.SMTP_EMAIL || "billing@constructhub.us"}>`,
+      from: email.from || `"ConstructHUB" <${process.env.SMTP_EMAIL || "billing@constructhub.us"}>`,
       to,
       subject: email.subject,
       html: email.html,

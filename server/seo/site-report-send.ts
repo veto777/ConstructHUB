@@ -4,7 +4,10 @@ import { randomUUID } from "node:crypto";
  * (server/seo/jobs.ts runs it). These emails go to addresses the customer
  * typed, so every one carries a link that stops them for that address, an
  * address that used it is never mailed again by that account, and nothing is
- * sent once the account no longer has the SEO tools.
+ * sent once the account no longer has the SEO tools. An address gets a report
+ * only once it has confirmed (server/seo/report-recipients.ts): until then the
+ * send mails it a confirmation instead, and emails leave from the reports
+ * sender, never the billing one.
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { pool } from "../db";
@@ -12,6 +15,7 @@ import { emailLayout, sendTransactionalEmail, APP_BASE_URL } from "../account/em
 import { getEntitlements } from "../entitlements";
 import { seoIncluded } from "./plan";
 import { buildSiteReport, renderReportPdf, reportHighlights, reportIsEmpty, nextSendAt, sendPeriod, type SiteReport } from "./site-report";
+import { ensureRecipients, reportSender } from "./report-recipients";
 
 const secret = () => process.env.SEO_REPORT_SECRET || process.env.SESSION_SECRET || "";
 const norm = (email: string) => email.trim().toLowerCase();
@@ -57,22 +61,34 @@ export function reportEmail(r: SiteReport, opts: { brandName?: string | null; se
  * dedupe window ("send now" passes a fresh one). An empty report (nothing saved
  * for the site yet) is not sent; an address that opted out is skipped.
  */
-export async function sendSiteReport(userId: number, siteId: number, recipients: string[], period: string, opts: { workSince?: Date | null; workUntil?: Date | null; strict?: boolean } = {}): Promise<{ sent: number; skipped: number; failed: number; empty: boolean; optedOut: string[]; uncertain: string[] }> {
+export type SendResult = { sent: number; skipped: number; failed: number; empty: boolean; optedOut: string[]; uncertain: string[];
+  /** Not confirmed yet: skipped, and sent a confirmation email instead where the limits allowed one (confirmationsSent). */
+  pending: string[]; confirmationsSent: string[];
+  /** Over the account's distinct-recipient limit: skipped, nothing sent. */
+  limited: string[] };
+export async function sendSiteReport(userId: number, siteId: number, recipients: string[], period: string, opts: { workSince?: Date | null; workUntil?: Date | null; strict?: boolean } = {}): Promise<SendResult> {
   const report = await buildSiteReport(userId, siteId, opts);
-  if (!report || reportIsEmpty(report)) return { sent: 0, skipped: recipients.length, failed: 0, empty: true, optedOut: [], uncertain: [] };
+  if (!report || reportIsEmpty(report)) return { sent: 0, skipped: recipients.length, failed: 0, empty: true, optedOut: [], uncertain: [], pending: [], confirmationsSent: [], limited: [] };
   const out = new Set(await optedOut(userId));
   const [{ rows: [brand] }, { rows: [me] }] = await Promise.all([
     pool.query("SELECT name, logo FROM sitescan_branding WHERE user_id=$1", [userId]).catch(() => ({ rows: [] as any[] })),
     pool.query("SELECT company_name FROM users WHERE id=$1", [userId]).catch(() => ({ rows: [] as any[] })),
   ]);
+  // Who may get it: the account's own addresses at once; every other address only once it confirmed. An address that
+  // has not (new, or saved before confirmations existed) is mailed the confirmation here instead of the report.
+  const standing = await ensureRecipients(userId, recipients, { brand: brand?.name ?? null });
   const pdf = await renderReportPdf(report, brand ?? null);
   let sent = 0, skipped = 0, failed = 0;
-  const refused: string[] = [], unsure: string[] = [];
+  const refused: string[] = [], unsure: string[] = [], pending: string[] = [], limited: string[] = [];
   for (const raw of recipients) {
     const to = norm(raw);
+    const st = standing.status[to];
+    if (st === "limited") { limited.push(to); skipped++; continue; }
+    if (st === "blocked") { refused.push(to); skipped++; continue; }
+    if (st !== "confirmed") { pending.push(to); skipped++; continue; }
     // Read again just before this recipient (a long pass can outlast an unsubscribe made while it runs).
     if (out.has(to) || (await pool.query("SELECT 1 FROM seo_report_optouts WHERE user_id=$1 AND email=$2", [userId, to])).rows.length) { refused.push(to); skipped++; continue; }
-    const mail = reportEmail(report, { brandName: brand?.name ?? null, senderName: me?.company_name ?? null, unsubscribe: unsubscribeUrl(userId, to) });
+    const mail = { ...reportEmail(report, { brandName: brand?.name ?? null, senderName: me?.company_name ?? null, unsubscribe: unsubscribeUrl(userId, to) }), from: reportSender() };
     // This recipient's delivery for the period: claimed before sending; "sent" only once the email went. Already sent =
     // done; a send under way elsewhere (pending, young) = not done yet, tried again later; a pending one older than half
     // an hour = a send that died, taken over.
@@ -121,7 +137,7 @@ export async function sendSiteReport(userId: number, siteId: number, recipients:
       console.error(`[seo] report for site ${siteId} to ${to.replace(/^(.).*@/, "$1***@")} failed: ${e?.message ?? e}`);
     }
   }
-  return { sent, skipped, failed, empty: false, optedOut: refused, uncertain: unsure };
+  return { sent, skipped, failed, empty: false, optedOut: refused, uncertain: unsure, pending, confirmationsSent: standing.confirmationsSent, limited };
 }
 
 /** How long a due schedule is held while its emails go out; if the process dies, it is due again after this. */
@@ -153,8 +169,8 @@ export async function sendDueReports(): Promise<number> {
       // told twice; a plan that cannot be read stops the send and it is tried again.
       const r = await sendSiteReport(s.user_id, s.site_id, s.recipients, s.work_period, { workSince: new Date(s.work_since), workUntil: new Date(s.work_cutoff), strict: true });
       sent += r.sent;
-      // Every address was dealt with (sent, already sent this period, or opted out): move on. A failure keeps the lease, so it is tried again.
-      // Done — every recipient sent now, already sent for this occurrence, or opted out: the next report's work starts
+      // Done — every recipient sent now, already sent for this occurrence, opted out, or not yet confirmed (it was
+      // mailed the confirmation instead, and gets the NEXT report once it confirms): the next report's work starts
       // at THIS occurrence's end. (An empty report sent nothing: its work is told next time.)
       if (r.failed === 0) await pool.query("UPDATE seo_report_schedules SET next_send_at=$2, last_sent_at=CASE WHEN $3 THEN work_cutoff ELSE last_sent_at END, work_cutoff=NULL, work_since=NULL, work_period=NULL, lease_token=NULL WHERE site_id=$1 AND lease_token=$4", [s.site_id, nextSendAt(s.frequency), !r.empty, token]);
     } catch (e: any) { console.error(`[seo] scheduled report for site ${s.site_id} failed (it will be retried): ${e?.message ?? e}`); }
