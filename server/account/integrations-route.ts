@@ -21,8 +21,8 @@
 import type { Express, NextFunction, Request, Response } from "express";
 import { pool } from "../db";
 import { fromNativeApp } from "../app-shell";
-import { getEntitlements } from "../entitlements";
-import { PLANS, planForModule, type ModuleKey, type PlanModules } from "@shared/plans";
+import { getEntitlements, textingNumbersAllowance } from "../entitlements";
+import { ADDONS, PLANS, UNLIMITED, planForModule, type ModuleKey, type PlanModules } from "@shared/plans";
 
 export type IntegrationStatus = "connected" | "not_connected" | "reconnect";
 export type IntegrationItem = { id: string; service: string; status: IntegrationStatus; detail: string; manageHref: string };
@@ -122,6 +122,24 @@ const gmailAlerts: Builder = async (userId, modules) => {
   return { ...item, status: "connected", detail: `${grants.length === 1 ? `Reading ${grants[0].email}` : `Reading ${n(grants.length, "Gmail account")}: ${listNames(grants.map((g) => g.email))}`}${address ? " · forwarding address set" : ""}.` };
 };
 
+/** Client texting on our carrier: dedicated numbers in use against the plan's included count (textingNumbersIncluded) plus texting_number add-ons. */
+const clientTexting: Builder = async (userId) => {
+  const [row] = await rowsOf<{ n: number }>(
+    `SELECT count(DISTINCT custom_fields->'sms'->>'fromNumber')::int n FROM crm_orgs
+      WHERE owner_user_id=$1 AND custom_fields->'sms'->>'mode'='dedicated' AND custom_fields->'sms'->>'fromNumber' IS NOT NULL`, [userId]);
+  const used = row?.n ?? 0;
+  const ent = await getEntitlements(userId);
+  const allowance = textingNumbersAllowance(ent);
+  const item = { id: "client_texting", service: "Client texting", manageHref: "/crm/settings" };
+  if (allowance === 0) {
+    return { ...item, status: "not_connected", detail: `No number on our carrier yet — add the ${ADDONS.texting_number.name} add-on, or move to the ${PLANS[planForModule("agencyWorkspace")].name} plan, which includes one.` };
+  }
+  if (!used) {
+    return { ...item, status: "not_connected", detail: allowance === UNLIMITED ? "No dedicated number assigned yet." : `${allowance === 1 ? "One number" : `${allowance} numbers`} included with your plan; none assigned yet.` };
+  }
+  return { ...item, status: "connected", detail: allowance === UNLIMITED ? `${n(used, "dedicated number")} on our carrier.` : `${n(used, "dedicated number")} on our carrier · ${allowance} included with your plan.` };
+};
+
 /** Display order. */
 export const INTEGRATION_BUILDERS: readonly Builder[] = [
   googleBusiness,
@@ -131,6 +149,7 @@ export const INTEGRATION_BUILDERS: readonly Builder[] = [
   blotato,
   registrars,
   gmailAlerts,
+  clientTexting,
 ];
 
 export async function integrationItems(userId: number): Promise<IntegrationItem[]> {

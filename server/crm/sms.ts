@@ -38,9 +38,9 @@ import { logActivity } from "./activity";
 import { sendWithFallback } from "../email";
 import { getBaseUrl } from "../auth";
 import { portalBaseUrl } from "../site-context";
-import { getEntitlements, sendLimitReached } from "../entitlements";
+import { getEntitlements, raiseHint, sendLimitReached, textingNumbersAllowance } from "../entitlements";
 import { reserveQuotaFor, refundReservation, monthKey, type LimitReachedBody, type QuotaReservation } from "../growth-quotas";
-import { PLANS, PLAN_KEYS, type PlanKey, type PlanLimits } from "@shared/plans";
+import { PLANS, PLAN_KEYS, UNLIMITED, type PlanKey, type PlanLimits } from "@shared/plans";
 import { logEvent, presentEstimate } from "./entities";
 import { smsSegments } from "./sms-segments";
 import { pushSoon } from "../apns";
@@ -94,7 +94,9 @@ export function smsStatus(orgCustomFields?: unknown) {
 // ── Plan entitlement ────────────────────────────────────────────────────────
 
 /** Texting (client texts, reminders, alert texts) comes with plans that include
- *  team text alerts or client texting (shared/plans.ts): Pro, Growth, Agency. */
+ *  team text alerts or client texting (shared/plans.ts) — every plan on the
+ *  2026-10-09 ladder includes team text alerts, so this resolves to the cheapest
+ *  plan (Solo) unless a future plan sets both to zero/none. */
 export const planIncludesTexting = (l: PlanLimits) => l.teamTextSegments !== 0 || l.clientTexting !== "none";
 const TEXTING_PLANS = PLAN_KEYS.filter((k) => planIncludesTexting(PLANS[k].limits));
 /** The cheapest plan with texting, for the 402 upgrade prompt. */
@@ -801,6 +803,30 @@ export function registerCrmSmsRoutes(app: Express, getDevUser: GetUser): void {
 
     const cf = { ...((ctx.org.customFields as Record<string, any> | null) ?? {}) };
     const prior = orgSmsConfig(cf);
+    // A dedicated number is one of our carrier numbers: how many the account may
+    // hold is the plan's textingNumbersIncluded (0/0/0/1/2) plus texting_number
+    // add-ons (-1 unlimited). Assigning a number that is new to the account at a
+    // full count is a 403; keeping or re-entering an already-assigned number is
+    // always allowed.
+    if (p.mode === "dedicated" && from && from !== prior.fromNumber) {
+      const ownerEnt = await getEntitlements(ctx.org.ownerUserId ?? user.id);
+      const allowance = textingNumbersAllowance(ownerEnt);
+      if (allowance !== UNLIMITED) {
+        const { rows: [used] } = await db.execute(sql`
+          SELECT count(DISTINCT custom_fields->'sms'->>'fromNumber')::int AS n FROM crm_orgs
+           WHERE owner_user_id=${ctx.org.ownerUserId ?? user.id}
+             AND custom_fields->'sms'->>'mode'='dedicated'
+             AND custom_fields->'sms'->>'fromNumber' IS NOT NULL`);
+        const usedN = Number((used as any)?.n ?? 0);
+        if (usedN >= allowance) {
+          const raise = raiseHint(ownerEnt, "textingNumbersIncluded", ["client-texting number"], "texting_number");
+          return sendLimitReached(res, {
+            feature: "textingNumbers", limit: allowance, used: usedN, upgradePlan: raise.upgradePlan, addon: raise.addon,
+            message: `Your ${PLANS[ownerEnt.accessPlan!].name} plan includes ${allowance === 0 ? "no client-texting numbers" : `${allowance} client-texting number${allowance === 1 ? "" : "s"}`} on our carrier, and ${usedN.toLocaleString("en-US")} ${usedN === 1 ? "is" : "are"} in use. ${raise.text}`.trim(),
+          });
+        }
+      }
+    }
     if (p.mode === "platform") {
       delete cf.sms;
     } else {
