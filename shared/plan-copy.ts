@@ -31,7 +31,7 @@ export function priceOrSalesRep(cents: number): string {
   return showsPrice(cents) ? formatUsd(cents) : SALES_REP_LABEL;
 }
 
-/** "Pro", "Pro and Growth", "Pro, Growth and Agency". */
+/** "Pro", "Pro and Agency", "Pro, Agency and Unlimited". */
 export function joinNames(names: readonly string[]): string {
   if (names.length <= 1) return names[0] ?? "";
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
@@ -42,7 +42,7 @@ export function plansWhere(test: (plan: Plan) => boolean): PlanKey[] {
   return PLAN_KEYS.filter((key) => test(PLANS[key]));
 }
 
-/** Plan names, cheapest first, whose plan satisfies `test` ("Pro, Growth and Agency"). */
+/** Plan names, cheapest first, whose plan satisfies `test` ("Pro, Agency and Unlimited"). */
 export function planNamesWhere(test: (plan: Plan) => boolean): string {
   return joinNames(plansWhere(test).map((key) => PLANS[key].name));
 }
@@ -75,7 +75,14 @@ export const AGENCY_ONLY_MODULES: string[] = (Object.keys(MODULE_NAMES) as Modul
   .filter((module) => planForModule(module) === "agency")
   .map((module) => MODULE_NAMES[module]);
 
-/** Graduated Agency location bands: "$15/month each for locations 11–50, …". */
+/**
+ * Graduated Agency location bands (the 2026-09-30 ladder): kept ONLY so the
+ * legacy callers that read old subscriptions keep compiling — server/hub/
+ * presets.ts's agency answer and the band tests. Retired 2026-10-09: the new
+ * price book has no per-location pricing (Unlimited has no location cap), so
+ * no current copy — the pricing page, the knowledge pack, the emails — words
+ * bands any more.
+ */
 export function agencyBandsLine(): string {
   const parts: string[] = [];
   let from = 1;
@@ -88,23 +95,13 @@ export function agencyBandsLine(): string {
   return `${joinNames(parts)}; above ${AGENCY_SELF_SERVE_MAX_LOCATIONS} locations the Agency plan is quoted by a sales rep`;
 }
 
-/** The same bands billed yearly (ANNUAL_MONTHS × the monthly band price): "$150/year each for locations 11–50, …". */
-function agencyBandsAnnualLine(): string {
-  const parts: string[] = [];
-  let from = 1;
-  for (const band of AGENCY_LOCATION_BANDS) {
-    if (band.centsPerLocation > 0) {
-      parts.push(`${formatUsd(band.centsPerLocation * ANNUAL_MONTHS)}/year each for locations ${from}–${band.upTo}`);
-    }
-    from = band.upTo + 1;
-  }
-  return joinNames(parts);
-}
+/** The platform's own add-ons: not the AI Call Assistant's (its own subscription) and not retired lines
+ * (an add-on sold on no plan and not a preview, like the old extra-location one, reads stored subscriptions only). */
+export const PLATFORM_ADDONS: readonly Addon[] = Object.values(ADDONS).filter(
+  (a) => !isCallAssistantAddon(a.key) && (a.availableOn.length > 0 || a.preview === true),
+);
 
-/** The platform's own add-ons: the AI Call Assistant's are the lines of its separate subscription, listed with the service instead. */
-export const PLATFORM_ADDONS: readonly Addon[] = Object.values(ADDONS).filter((a) => !isCallAssistantAddon(a.key));
-
-/** "Extra location — $19/month or $190/year (Starter, Pro and Growth)" — the platform's add-ons. */
+/** "Grid scan pack — $10/month or $100/year (Solo, Team, Pro, Agency, Unlimited)" — the platform's add-ons. */
 export function addonLines(): string[] {
   return PLATFORM_ADDONS.map((addon) => {
     const setup = addon.setupCents ? ` plus a ${formatUsd(addon.setupCents)} one-time setup fee` : "";
@@ -377,7 +374,7 @@ export const CRM_TEXTING_PLANS = joinNames(CRM_PLAN_KEYS.filter((k) => CRM_PLANS
 export const TEXTING_EITHER_LINE = `the ${CRM_TEXTING_PLANS} CRM plans, or the ${TEXTING_PLANS} platform plans`;
 /** "CRM Essentials 500 and CRM Max 1,500" — team text segments a month on the CRM plans that have them. */
 export const CRM_TEXT_SEGMENTS_LINE = joinNames(CRM_PLAN_KEYS.filter((k) => CRM_PLANS[k].limits.teamTextSegments > 0).map((k) => `${CRM_PLANS[k].name} ${CRM_PLANS[k].limits.teamTextSegments.toLocaleString("en-US")}`));
-/** Plans that come with one client-texting number, CRM plans first: "CRM Max and Growth". */
+/** Plans that come with a client-texting number included, CRM plans first: "CRM Max, Agency and Unlimited". */
 export const CLIENT_NUMBER_INCLUDED_PLANS = joinNames([
   ...CRM_PLAN_KEYS.filter((k) => CRM_PLANS[k].limits.clientTexting === "included").map((k) => CRM_PLANS[k].name),
   ...PLAN_KEYS.filter((k) => PLANS[k].limits.clientTexting === "included").map((k) => PLANS[k].name),
@@ -403,13 +400,10 @@ export const crmPlansLine = () => CRM_PLAN_KEYS.map((k) => {
 export function pricingKnowledge(): string {
   const plans = PLAN_KEYS.map((key) => {
     const plan = PLANS[key];
-    const agency = key === "agency"
-      ? ` Locations above ${plan.limits.locations}: ${agencyBandsLine()}. On yearly billing each extra location is ${ANNUAL_MONTHS} times its monthly band price: ${agencyBandsAnnualLine()}.`
-      : "";
-    return `- **${plan.name}** — ${planPriceLine(key)}. ${plan.tagline}${agency}\n  Includes: ${plan.features.join("; ")}.`;
+    return `- **${plan.name}** — ${planPriceLine(key)}. ${plan.tagline}\n  Includes: ${plan.features.join("; ")}.`;
   }).join("\n");
   return `## Plans and pricing (the ConstructHUB price book)
-There is no free plan. A new subscription starts with a ${TRIAL_LABEL}. Plans are billed monthly, or yearly at ${ANNUAL_MONTHS} times the monthly price. The ${PLANS.agency.name} location bands and every add-on are billed the same way: monthly, or yearly at ${ANNUAL_MONTHS} times their monthly price${annualExceptionsLine()}.
+There is no free plan. A new subscription starts with a ${TRIAL_LABEL}. Plans are billed monthly, or yearly at ${ANNUAL_MONTHS} times the monthly price. Every add-on is billed the same way: monthly, or yearly at ${ANNUAL_MONTHS} times its monthly price${annualExceptionsLine()}. Outgrow a plan's locations or seats and you move up a plan — there is no per-location pricing.
 ${plans}
 
 Only the ${PLANS.agency.name} plan includes: ${joinNames(AGENCY_ONLY_MODULES)}.

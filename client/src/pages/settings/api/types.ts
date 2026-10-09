@@ -32,7 +32,7 @@ export type ApiKeyItem = {
 };
 
 export type ApiPlanInfo = {
-  /** false on Starter (0 units): keys can't be created and the API refuses the plan. */
+  /** false when the plan has no API units (0 — Solo and Team today): keys can't be created and the API refuses the plan. */
   apiEnabled: boolean;
   unitsPerMonth: number;
   usedThisMonth: number;

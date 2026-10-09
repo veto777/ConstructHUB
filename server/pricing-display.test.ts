@@ -2,11 +2,14 @@ import { describe, it, expect } from "vitest";
 import fs from "fs";
 import path from "path";
 import {
-  PLANS, PLAN_KEYS, ADDONS, MODULE_NAMES, SALES_THRESHOLD_CENTS, agencyMonthlyCents, showsPrice,
+  PLANS, PLAN_KEYS, ADDONS, SALES_THRESHOLD_CENTS, agencyMonthlyCents, showsPrice,
 } from "../shared/plans";
 import {
+  businessToolsMatrix, businessToolsColumns, crmMatrixRows, crmMatrixColumns, UNLIMITED_CELL,
+} from "../shared/plan-matrix";
+import {
   formatUsd, annualMonthsFree, annualSavingsCents, planPriceCents, addonsForPlan, addonPlanNames,
-  agencyQuote, agencyBandRows, normalizeLocations, comparisonSections, agencyOnlyModuleNames,
+  agencyQuote, agencyBandRows, normalizeLocations,
   describeSubscription, DFY_SERVICES, SALES_ONLY_CART_IDS, isSalesOnlyCartItem, isSalesOnlyService,
 } from "../client/src/lib/pricing-display";
 import { DFY_CATALOG, COURSE_BUNDLE } from "./catalog";
@@ -31,10 +34,11 @@ describe("pricing display: money", () => {
   });
 
   it("add-ons are listed per plan and by plan name", () => {
-    expect(addonsForPlan("starter").map((a) => a.key)).toEqual(["extra_location"]);
-    expect(addonsForPlan("growth").map((a) => a.key)).not.toContain("texting_number");
-    expect(addonsForPlan("agency").map((a) => a.key)).not.toContain("extra_location");
-    expect(addonPlanNames(ADDONS.texting_number)).toBe("Pro, Agency");
+    // The retired extra-location add-on (empty availableOn) is never listed; the Call Assistant's are a separate subscription.
+    expect(addonsForPlan("starter").map((a) => a.key)).toEqual(["protected_site", "texting_number", "competitor_pack", "grid_pack", "seo_basic", "seo_pro"]);
+    expect(addonsForPlan("growth").map((a) => a.key)).toEqual(["extra_seat", "protected_site", "texting_number", "competitor_pack", "grid_pack", "seo_basic", "seo_pro"]);
+    expect(addonsForPlan("agency").map((a) => a.key)).toEqual(["texting_number", "competitor_pack", "grid_pack"]);
+    expect(addonPlanNames(ADDONS.texting_number)).toBe("Solo, Team, Pro, Agency, Unlimited");
   });
 });
 
@@ -77,30 +81,96 @@ describe("pricing display: Agency locations", () => {
   });
 });
 
-describe("pricing display: comparison table", () => {
-  const rows = comparisonSections().flatMap((s) => s.rows);
+describe("pricing display: comparison tables (shared/plan-matrix.ts)", () => {
+  const sections = businessToolsMatrix();
+  const rows = sections.flatMap((s) => s.rows);
   const byKey = Object.fromEntries(rows.map((r) => [r.key, r]));
+  const crmByKey = Object.fromEntries(crmMatrixRows().map((r) => [r.key, r]));
 
   it("has a cell for every plan in every row", () => {
     for (const r of rows) expect(Object.keys(r.cells).sort()).toEqual([...PLAN_KEYS].sort());
+    for (const r of crmMatrixRows()) expect(Object.keys(r.cells).sort()).toEqual(["crm_basic", "crm_essentials", "crm_max"]);
+    // The columns are the price book's display order, Unlimited the hero.
+    expect(businessToolsColumns().map((c) => c.key)).toEqual([...PLAN_KEYS]);
+    expect(businessToolsColumns().find((c) => c.hero)?.key).toBe("agency");
+    expect(crmMatrixColumns().find((c) => c.hero)?.key).toBe("crm_max");
   });
 
-  it("marks the four agency modules as Agency-only", () => {
-    expect(agencyOnlyModuleNames()).toEqual(Object.values(MODULE_NAMES));
-    for (const m of Object.keys(MODULE_NAMES)) {
-      expect(byKey[`module-${m}`].cells).toEqual({ starter: false, pro: false, growth: false, agency: true });
-    }
+  it("is derived from the limits: counts step up the ladder, -1 reads as the unlimited cell", () => {
+    expect(byKey.locations.cells).toEqual({ starter: 1, team: 10, pro: 25, growth: 100, agency: UNLIMITED_CELL });
+    expect(byKey.teamSeats.cells).toEqual({ starter: 1, team: 3, pro: 5, growth: 10, agency: UNLIMITED_CELL });
+    expect(byKey.clientWorkspaces.cells).toEqual({ starter: false, team: false, pro: false, growth: 10, agency: UNLIMITED_CELL });
+    expect(byKey.autoPublish.cells).toEqual({ starter: false, team: false, pro: true, growth: true, agency: true });
+    expect(byKey.gabeQuestions.cells.agency).toBe(UNLIMITED_CELL);
+    expect(byKey.publicApi.cells).toEqual({ starter: false, team: false, pro: 50_000, growth: 250_000, agency: UNLIMITED_CELL });
   });
 
-  it("is generated from limits", () => {
-    expect(byKey.protectedSites.cells).toEqual({ starter: false, pro: "1 website", growth: "3 websites", agency: "10 websites" });
-    // The CRM is a separate product, so it has no row in the platform comparison table.
-    expect(byKey.crmSeats).toBeUndefined();
-    expect(byKey.competitorScans.cells.starter).toBe(false);
-    expect(byKey.grid.cells.agency).toBe("2 per location / mo");
-    expect(byKey.clientTexting.cells).toEqual({
-      starter: false, pro: "Your SignalWire number or the add-on", growth: "1 number included", agency: "Your SignalWire number or the add-on",
+  it("marks coming modules and the not-yet-enforced history row", () => {
+    expect(byKey.permitAlerts.cells).toEqual({ starter: false, team: false, pro: false, growth: { coming: true }, agency: { coming: true } });
+    expect(byKey.csvExport.cells.pro).toEqual({ coming: true });
+    expect(byKey.scheduledReports.cells.growth).toEqual({ coming: true });
+    expect(byKey.history.coming).toBe(true);
+    expect(byKey.history.cells).toEqual({ starter: "90 days", team: "90 days", pro: "12 months", growth: UNLIMITED_CELL, agency: UNLIMITED_CELL });
+  });
+
+  it("words texting, SEO and the Unlimited-only extras from the price book", () => {
+    expect(byKey.clientTextingNumber.cells).toEqual({ starter: "Add-on $29", team: "Add-on $29", pro: "Add-on $29", growth: "1 included", agency: "2 included" });
+    expect(byKey.seoSuite.cells).toEqual({
+      starter: "Add-on from $29", team: "Add-on from $29", pro: "Add-on from $29",
+      growth: "250 keywords + $10 data/mo", agency: "5,000 keywords + $60 data/mo",
     });
+    expect(byKey.whiteLabel.cells).toEqual({ starter: false, team: false, pro: false, growth: false, agency: true });
+    expect(byKey.masterClass.cells.agency).toBe(true);
+    expect(byKey.newProductSeats.cells).toEqual({ starter: false, team: false, pro: false, growth: false, agency: "2 seats (Call Assistant minutes excluded)" });
+    expect(byKey.gbpReinstatement.cells.starter).toBe("$599");
+    expect(byKey.gbpReinstatement.cells.agency).toBe("$299.50 — half price");
+    // Support is inherited down the ladder through each plan's "Everything in …" bullet.
+    expect(byKey.support.cells).toEqual({
+      starter: "Email support", team: "Email support", pro: "Priority email support",
+      growth: "Priority support with a phone callback", agency: "Named support contact, onboarding call, first access to new features",
+    });
+    // Every plan alerts on reviews and drafts replies.
+    expect(Object.values(byKey.reviewAlerts.cells)).toEqual([true, true, true, true, true]);
+  });
+
+  it("labels the rows in the owner's wording (the approved comparison table)", () => {
+    expect(byKey.clientWorkspaces.label).toBe("Client workspaces, roles, bulk actions, email onboarding");
+    expect(byKey.autoPosts.label).toBe("AI posts and photo captions on a schedule");
+    expect(byKey.reviewReminders.label).toBe("Review reminders to customers (text + email)");
+    expect(byKey.permitAlerts.label).toBe("Permit alerts for new filings in a territory");
+    expect(byKey.adsLsaManager.label).toBe("Google Ads and LSA manager, IP exclusions");
+    expect(byKey.cloudflareDomains.label).toBe("Cloudflare, Search Console, Domains, Gmail forwarding");
+    expect(byKey.scheduledReports.label).toBe("Scheduled client email reports");
+    expect(byKey.seoSuite.label).toBe("SEO suite: rank tracker, explorer, keywords, backlinks");
+    expect(byKey.gridWatches.label).toBe("Weekly scheduled grid watches");
+    expect(byKey.masterClass.label).toBe("Master Class course ($2,499)");
+    expect(byKey.gridScans.label).toBe("Grid scans / month");
+    expect(byKey.publicApi.label).toBe("Public API (units / month)");
+    // The grid-scans row counts credits, not scans — the footnote under the table says so.
+    expect(byKey.gridScans.note).toMatch(/metered in credits/);
+  });
+
+  it("derives the CRM rows from CRM_PLANS (a separate product)", () => {
+    expect(crmByKey.seats.cells).toEqual({ crm_basic: 1, crm_essentials: 5, crm_max: 8 });
+    expect(crmByKey.clients.cells.crm_basic).toBe(UNLIMITED_CELL);
+    expect(crmByKey.documents.cells.crm_max).toBe(UNLIMITED_CELL);
+    expect(crmByKey.teamTexts.cells).toEqual({ crm_basic: false, crm_essentials: 500, crm_max: 1500 });
+    expect(crmByKey.jobCosting.cells).toEqual({ crm_basic: false, crm_essentials: true, crm_max: true });
+    expect(crmByKey.jobcam.cells).toEqual({ crm_basic: "Add-on $39", crm_essentials: "Add-on $39", crm_max: true });
+    expect(crmByKey.apiUnits.cells).toEqual({ crm_basic: false, crm_essentials: 10_000, crm_max: 50_000 });
+    expect(crmByKey.trial.cells.crm_basic).toBe("7 days");
+    // The platform matrix has no CRM rows — the CRM is its own product.
+    expect(byKey.seats).toBeUndefined();
+  });
+
+  it("docs/pricing/PLAN-MATRIX.md is generated from the same matrix and current", () => {
+    const doc = read("docs/pricing/PLAN-MATRIX.md");
+    expect(doc).toMatch(/generated from `shared\/plan-matrix\.ts` on \d{4}-\d{2}-\d{2} — do not edit by hand/);
+    for (const key of PLAN_KEYS) expect(doc).toContain(PLANS[key].name);
+    expect(doc).toContain("CRM Basic");
+    expect(doc).toContain("🟣 Unlimited");
+    expect(doc).toContain("🕒 Coming");
+    expect(doc).toContain("There is no per-location pricing and no extra-location add-on");
   });
 });
 

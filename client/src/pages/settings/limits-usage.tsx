@@ -12,7 +12,7 @@ import { ADDONS, ADDON_MAX_QUANTITY, PLANS, CALL_ASSISTANT_FREE_SPAM_CALLS, CALL
 import { CallAssistantTierPicker } from "@/components/call-assistant-tiers";
 import { CALL_ASSISTANT_SEPARATE_LINE, callAssistantOverageLine, callAssistantTierNumbersLine, callAssistantOverageStatusLine } from "@shared/plan-copy";
 import {
-  AGENCY_INCLUDED_LOCATIONS, addonPriceCents, formatUsd, intervalSuffix, type EntitlementsInfo, type UsageMeter,
+  addonPriceCents, formatUsd, intervalSuffix, type EntitlementsInfo, type UsageMeter,
 } from "@/lib/pricing-display";
 import { LoadingCard, formatCount, useOptionalQuery } from "./shared";
 import { useAddonChange, useBillingActions, useCallAssistantChange, useCallAssistantSubscription, useEntitlements, useSubscription } from "./use-billing";
@@ -49,7 +49,7 @@ type LimitRow = {
   hint?: string;
   /** The add-on that raises this limit (shown when the plan can buy it). */
   addon?: AddonKey;
-  /** Extra control instead of an add-on (Agency locations are priced per location). */
+  /** Extra control instead of an add-on (a legacy per-location Agency subscription keeps its location-count change). */
   action?: ReactNode;
 };
 
@@ -158,7 +158,8 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
   // Platform admins (the Alpine account) are all-access: every usage limit is -1, no add-on raises anything.
   const admin = entitlements.isPlatformAdmin === true;
   const unl = admin ? ADMIN_UNLIMITED : FAIR_USE;
-  // Agency's per-location pricing, which an admin's unlimited locations don't follow.
+  // A stored legacy Agency-band subscription still reports the location count it is billed for; a current
+  // plan's limits are flat (Unlimited's locations are simply unlimited), which the rows below show as-is.
   const isAgency = plan === "agency" && !admin;
   const interval: BillingInterval = view.interval ?? "month";
   // Add-ons change a Stripe subscription on a current plan; a legacy plan keeps its old price until it switches in Pricing.
@@ -174,12 +175,11 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
         {
           key: "locations",
           label: "Google Business Profile locations",
-          included: isAgency ? `${formatCount(AGENCY_INCLUDED_LOCATIONS)} included, then per location` : countText(allowances.locations, unl),
+          included: countText(allowances.locations, unl),
           used: entitlements.locations?.used ?? undefined,
-          ceiling: isAgency ? undefined : allowances.locations > 0 ? allowances.locations : undefined,
-          hint: isAgency && view.locations ? `Billed for ${formatCount(view.locations)} locations.` : undefined,
-          addon: isAgency ? undefined : "extra_location",
-          action: isAgency ? (
+          ceiling: allowances.locations > 0 ? allowances.locations : undefined,
+          hint: isAgency && view.locations ? `Billed for ${formatCount(view.locations)} locations (your legacy per-location plan).` : undefined,
+          action: isAgency && view.locations ? (
             <Button size="sm" variant="outline" onClick={() => go("billing")} data-testid="button-limits-locations">Change location count</Button>
           ) : undefined,
         },
@@ -191,7 +191,7 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
           hint: "How often Profile Guard compares your listing with its approved snapshot.",
         },
         meterRow("gridCredits", "Ranking-grid credits", usage.rankings, allowances.gridCredits, {
-          hint: isAgency ? `${formatCount(allowances.gridCreditsPerLocation)} per location each month.` : "One credit per 25 grid points.",
+          hint: "One credit per 25 grid points.",
         }, unl),
         {
           key: "reviewTemplates",
@@ -223,12 +223,11 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
           ceiling: allowances.protectedSites > 0 ? allowances.protectedSites : undefined,
           addon: "protected_site",
         },
-        meterRow("siteScans", "Site Scans", usage.siteScans, allowances.siteScans, {
-          hint: isAgency ? `${formatCount(allowances.siteScansPerLocation)} per location each month.` : undefined,
-        }, unl),
+        meterRow("siteScans", "Site Scans", usage.siteScans, allowances.siteScans, undefined, unl),
         meterRow("competitorScans", "Competitor Intel scans", usage.competitorScans, allowances.competitorScans, { addon: "competitor_pack" }, unl),
-        // ConstructHUB SEO (rank tracker, keyword research, backlinks): included with the Agency plan (shared/plans.ts
-        // SEO_PLAN_LIMITS); an account that had the tools before keeps them (server/entitlements.ts seoGrandfathered).
+        // ConstructHUB SEO (rank tracker, keyword research, backlinks): a taste on Agency, the full suite on Unlimited,
+        // an add-on below that (shared/plans.ts SEO_PLAN_LIMITS, ADDONS.seo_*); an account that had the tools before
+        // keeps them (server/entitlements.ts seoGrandfathered).
         {
           key: "seoKeywords", label: "SEO: tracked keywords",
           included: countText(allowances.seoKeywords, unl),
@@ -429,7 +428,6 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
                 {/* The meters roll over at midnight UTC (billing runs on it); say when that is on the viewer's own clock
                     (audit lane 1 G; owner 2026-10-04: as recommended). */}
                 {resets ? `Monthly counts reset ${resets.toLocaleString(undefined, { month: "long", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" })}.` : ""}
-                {isAgency ? " Agency allowances grow with the locations you're billed for." : ""}
                 {admin
                   ? " This is a platform admin account: every feature and add-on is on, and every plan limit is unlimited, whatever plan it holds. Per-day safety caps still apply (for example 5 Site Scans and 40 Gabe questions a day), and the Call Assistant keeps a ceiling on phone numbers." : ""}
               </p>

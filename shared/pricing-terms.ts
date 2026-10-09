@@ -51,7 +51,7 @@ export type AccountPricingTerms = {
 
 /**
  * The price snapshot a new founding member keeps: taken from the price book
- * now. It covers the PLANS and the Agency location bands only. The AI Call
+ * now. It covers the PLANS only (the 2026-10-09 ladder has no location bands). The AI Call
  * Assistant (shared/plans.ts CALL_ASSISTANT_TIERS) is a separate service on its
  * own subscription and is NOT part of the lock: its prices are not copied
  * here, and foundingPrice() never answers for it.

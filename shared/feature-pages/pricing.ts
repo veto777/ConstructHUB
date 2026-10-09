@@ -208,7 +208,7 @@ export function featurePriceSummary(spec: FeaturePricing): FeaturePriceSummary {
 
 /**
  * One sentence of plan allowances for copy (FAQ answers):
- * "Site Scans a month: Starter 2, Pro 5, Growth 15 and Agency 1 per location".
+ * "Site Scans a month: Solo 2, Team 5, Pro 15, Agency 50 and Unlimited unlimited".
  * Plans without the allowance are left out.
  */
 export function allowanceLine(a: FeatureAllowance): string {

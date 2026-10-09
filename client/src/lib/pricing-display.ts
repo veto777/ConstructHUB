@@ -5,8 +5,8 @@
  * test suite can check it against the price book and the server catalog.
  */
 import {
-  PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, AGENCY_SELF_SERVE_MAX_LOCATIONS,
-  MODULE_NAMES, agencyMonthlyCents, effectivePlanKey, showsPrice, isCallAssistantAddon,
+  PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, AGENCY_SELF_SERVE_MAX_LOCATIONS, LEGACY_AGENCY_BASE_CENTS,
+  agencyMonthlyCents, effectivePlanKey, showsPrice, isCallAssistantAddon,
   type Addon, type AddonKey, type AddonModuleKey, type BillingInterval, type ModuleKey, type Plan, type PlanKey, type PlanLimits,
 } from "@shared/plans";
 
@@ -42,7 +42,7 @@ export function addonPriceCents(addon: Addon, interval: BillingInterval): number
   return interval === "year" ? addon.annualCents : addon.monthlyCents;
 }
 
-/** The plans an add-on can ride on, by name ("Pro, Growth, Agency"). */
+/** The plans an add-on can ride on, by name ("Solo, Team, Pro, Agency, Unlimited"). */
 export function addonPlanNames(addon: Addon): string {
   return PLAN_KEYS.filter((k) => addon.availableOn.includes(k)).map((k) => PLANS[k].name).join(", ");
 }
@@ -59,7 +59,13 @@ export type AgencyQuote =
   | { sales: false; locations: number; monthlyCents: number; annualCents: number; lines: AgencyQuoteLine[] }
   | { sales: true; locations: number };
 
-export const AGENCY_INCLUDED_LOCATIONS = PLANS.agency.limits.locations;
+/**
+ * The locations that sat in the legacy Agency base price (the graduated bands,
+ * retired 2026-10-09). The current Unlimited plan has no location cap at all;
+ * this stays only so the settings surfaces that read a stored per-location
+ * subscription keep working.
+ */
+export const AGENCY_INCLUDED_LOCATIONS = AGENCY_LOCATION_BANDS[0].upTo;
 
 /** Annual is the same multiple of monthly for Agency as its base price (10x). */
 const AGENCY_ANNUAL_MULTIPLE = PLANS.agency.annualCents / PLANS.agency.monthlyCents;
@@ -82,14 +88,15 @@ export function agencyBandRows(): { label: string; centsPerLocation: number | nu
   return rows;
 }
 
-/** The bill for `locations` Agency locations, line by line; above self-serve it is a sales quote. */
+/** The bill for `locations` Agency locations, line by line; above self-serve it is a sales quote.
+ *  LEGACY (2026-09-30 ladder): reads a stored per-location subscription; nothing new is sold this way. */
 export function agencyQuote(locationsInput: number): AgencyQuote {
   const locations = normalizeLocations(locationsInput);
   const monthlyCents = agencyMonthlyCents(locations);
   if (monthlyCents === null) return { sales: true, locations };
   const lines: AgencyQuoteLine[] = [{
     label: `Agency plan (${AGENCY_INCLUDED_LOCATIONS} locations included)`,
-    count: Math.min(locations, AGENCY_INCLUDED_LOCATIONS), centsPerLocation: 0, subtotalCents: PLANS.agency.monthlyCents,
+    count: Math.min(locations, AGENCY_INCLUDED_LOCATIONS), centsPerLocation: 0, subtotalCents: LEGACY_AGENCY_BASE_CENTS,
   }];
   let prev = 0;
   for (const band of AGENCY_LOCATION_BANDS) {
@@ -174,70 +181,10 @@ export function usagePercent(meter: UsageMeter | undefined): number | null {
   return Math.min(100, Math.round((Math.max(0, meter.used) / meter.limit) * 100));
 }
 
-// ── Plan comparison (generated from limits + modules) ───────────────────────
-
-export type CompareCell = boolean | string;
-export type CompareRow = { key: string; label: string; cells: Record<PlanKey, CompareCell> };
-export type CompareSection = { title: string; rows: CompareRow[] };
-
-const n = (v: number) => v.toLocaleString("en-US");
-const perMonth = (v: number) => (v < 0 ? "Unlimited (fair use)" : `${n(v)} / mo`);
-const countOrNone = (v: number, fmt: (v: number) => string): CompareCell => (v === 0 ? false : fmt(v));
-const websites = (v: number) => (v < 0 ? "Unlimited" : `${n(v)} website${v === 1 ? "" : "s"}`);
-
-function row(key: string, label: string, cell: (p: Plan) => CompareCell): CompareRow {
-  const cells = {} as Record<PlanKey, CompareCell>;
-  for (const k of PLAN_KEYS) cells[k] = cell(PLANS[k]);
-  return { key, label, cells };
-}
-
-export function comparisonSections(): CompareSection[] {
-  return [
-    {
-      title: "Google Business Profile",
-      rows: [
-        row("locations", "Google Business Profile locations", (p) =>
-          p.key === "agency" ? `${n(p.limits.locations)} included, then per location` : n(p.limits.locations)),
-        row("guard", "Profile Guard edit checks", (p) => `Every ${p.limits.guardCadenceMinutes} min`),
-        row("autoPublish", "AI review replies publish automatically", (p) => p.limits.autoPublishAiReplies),
-        row("templates", "Review reply templates", (p) => n(p.limits.reviewTemplates)),
-        row("grid", "Ranking-grid credits", (p) =>
-          p.limits.gridCreditsPerLocation > 0 ? `${n(p.limits.gridCreditsPerLocation)} per location / mo` : countOrNone(p.limits.gridCredits, perMonth)),
-      ],
-    },
-    {
-      title: "Websites & ads",
-      rows: [
-        row("protectedSites", "Click Guard + IP Tracker + VPN Shield", (p) => countOrNone(p.limits.protectedSites, websites)),
-        row("siteScans", "Site Scans", (p) =>
-          p.limits.siteScansPerLocation > 0 ? `${n(p.limits.siteScansPerLocation)} per location / mo` : countOrNone(p.limits.siteScans, perMonth)),
-        row("competitorScans", "Competitor Intel scans", (p) => countOrNone(p.limits.competitorScans, perMonth)),
-      ],
-    },
-    {
-      title: "Permits & texting",
-      rows: [
-        row("permitSearches", "Permit searches", (p) => countOrNone(p.limits.permitSearches, perMonth)),
-        row("teamText", "Team text alerts", (p) => countOrNone(p.limits.teamTextSegments, perMonth)),
-        row("clientTexting", "Two-way client texting", (p) =>
-          p.limits.clientTexting === "none" ? false
-            : p.limits.clientTexting === "included" ? "1 number included"
-            : "Your SignalWire number or the add-on"),
-      ],
-    },
-    {
-      title: "Agency tools",
-      rows: (Object.keys(MODULE_NAMES) as ModuleKey[]).map((m) => row(`module-${m}`, MODULE_NAMES[m], (p) => p.modules[m])),
-    },
-  ];
-}
-
-/** Modules that only the Agency plan includes, by name. */
-export function agencyOnlyModuleNames(): string[] {
-  return (Object.keys(MODULE_NAMES) as ModuleKey[])
-    .filter((m) => PLAN_KEYS.every((k) => (k === "agency") === PLANS[k].modules[m]))
-    .map((m) => MODULE_NAMES[m]);
-}
+// ── Plan comparison ─────────────────────────────────────────────────────────
+// The comparison tables live in shared/plan-matrix.ts (derived from the price
+// book, shared with the generated docs/pricing/PLAN-MATRIX.md). This module
+// keeps only the billing/summary helpers above.
 
 // ── The signed-in subscription ──────────────────────────────────────────────
 

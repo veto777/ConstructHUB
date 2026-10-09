@@ -2,19 +2,20 @@ import { describe, expect, it } from "vitest";
 import fs from "fs";
 import path from "path";
 import {
-  PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, SALES_THRESHOLD_CENTS, TRIAL_DAYS,
+  PLANS, PLAN_KEYS, ADDONS, SALES_THRESHOLD_CENTS, TRIAL_DAYS,
 } from "@shared/plans";
 import { CRM_PLANS, CRM_PLAN_KEYS } from "@shared/crm-plans";
 import * as planCopy from "@shared/plan-copy";
 import {
-  pricingKnowledge, formatUsd, priceOrSalesRep, joinNames, agencyBandsLine, addonLines, annualExceptionsLine, PLATFORM_ADDONS,
+  pricingKnowledge, formatUsd, priceOrSalesRep, joinNames, addonLines, annualExceptionsLine, PLATFORM_ADDONS,
   AGENCY_ONLY_MODULES, COMPETITOR_INTEL_PLANS, CRM_SEATS_LINE, CRM_TEXTING_PLANS, CLIENT_NUMBER_INCLUDED_PLANS, SALES_REP_LABEL, STARTING_MONTHLY_CENTS,
-  CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_SPAM, CALL_ASSISTANT_SEPARATE_LINE, CALL_ASSISTANT_FROM_PRICE, callAssistantPricing, callAssistantYearlyNote, callAssistantAboveTopLine,
+  CALL_ASSISTANT_NUMBER_RULES, CALL_ASSISTANT_SPAM, CALL_ASSISTANT_SEPARATE_LINE, CALL_ASSISTANT_FROM_PRICE, TEXTING_PLANS, callAssistantPricing, callAssistantYearlyNote, callAssistantAboveTopLine,
   callAssistantTiers, callAssistantTiersLine, callAssistantTierAdvice, callAssistantSpamAllowanceLine, callAssistantIncludesLine, callAssistantMinuteRule, callAssistantTierNumbersLine, CALL_ASSISTANT_SPAM_BLOCK_TITLE,
   callAssistantOverageLine, callAssistantOverageRule, callAssistantOverageStatusLine, callAssistantTiersShortLine, callAssistantAvailabilityLine, formatCentsShort,
 } from "@shared/plan-copy";
 import { CALL_ASSISTANT_TIERS, CALL_ASSISTANT_FREE_SPAM_CALLS, CALL_ASSISTANT_OVERAGE_RATES, CALL_ASSISTANT_ANNUAL_MONTHS } from "@shared/plans";
 import { SPAM_STRIKES_TO_BLOCK } from "./voice/spam";
+import { COURSE_BUNDLE } from "./catalog";
 import { FORWARDING_ADVICE } from "./voice/numbers";
 import { knowledgeBook, priceBookCents } from "./hub/knowledge";
 import { filterOutput } from "./hub/output-filter";
@@ -62,28 +63,24 @@ describe("plan copy helpers", () => {
 
   it("derives plan facts from the price book", () => {
     expect(STARTING_MONTHLY_CENTS).toBe(PLANS.starter.monthlyCents);
-    expect(AGENCY_ONLY_MODULES).toEqual(["Agency workspace", "Google Ads & LSA manager", "Cloudflare + Search Console", "Domains + Gmail alerts"]);
-    expect(COMPETITOR_INTEL_PLANS).toBe("Pro, Growth and Agency");
+    // Modules whose cheapest plan is the Unlimited key (whiteLabel, masterClass) — the cost-based ladder.
+    expect(AGENCY_ONLY_MODULES).toEqual(["White-label reports", "Master Class"]);
+    expect(COMPETITOR_INTEL_PLANS).toBe("Solo, Team, Pro, Agency and Unlimited");
     expect(CRM_SEATS_LINE).toBe(CRM_PLAN_KEYS.map((k) => `${CRM_PLANS[k].name} ${CRM_PLANS[k].limits.seats}`).join(", ").replace(/, ([^,]*)$/, " and $1"));
-  });
-
-  it("describes every paid Agency location band", () => {
-    const line = agencyBandsLine();
-    for (const band of AGENCY_LOCATION_BANDS.filter((b) => b.centsPerLocation > 0)) {
-      expect(line).toContain(`${formatUsd(band.centsPerLocation)}/month each`);
-      expect(line).toContain(`–${band.upTo}`);
-    }
-    expect(line).toMatch(/above 500 locations .*sales rep/);
   });
 
   it("lists every PLATFORM add-on with its price and plans (the AI Call Assistant's lines are its own subscription's, listed with the service)", () => {
     const lines = addonLines();
     expect(lines).toHaveLength(PLATFORM_ADDONS.length);
-    expect(PLATFORM_ADDONS.length).toBe(Object.keys(ADDONS).length - 5);
+    // 5 Call Assistant lines (4 tiers + the extra number) and the retired extra-location add-on are not platform add-ons.
+    expect(PLATFORM_ADDONS.length).toBe(Object.keys(ADDONS).length - 6);
     for (const addon of PLATFORM_ADDONS) {
       expect(lines.some((l) => l.startsWith(`${addon.name} — ${formatUsd(addon.monthlyCents)}/month`))).toBe(true);
     }
     expect(lines.join(" ")).not.toMatch(/Call Assistant/);
+    // The retired extra-location add-on is never described to customers or the AI.
+    expect(lines.join(" ")).not.toMatch(/Extra location/i);
+    expect(PLATFORM_ADDONS.map((a) => a.key)).not.toContain("extra_location");
     // Every platform add-on is 10 × monthly yearly, so there is no exception to state.
     expect(annualExceptionsLine()).toBe("");
   });
@@ -135,7 +132,7 @@ describe("AI Call Assistant: a separate service (owner, 2026-10-08)", () => {
     for (const gone of ["callAssistantIntroLine", "callAssistantIntroShort", "CALL_ASSISTANT_INTRO", "CALL_ASSISTANT_PLANS"]) expect((planCopy as any)[gone], gone).toBeUndefined();
     for (const t of CALL_ASSISTANT_TIERS) expect(ADDONS[t.addon].introMonthlyCents, t.tier).toBeUndefined();
     for (const line of [callAssistantTiersLine(), callAssistantYearlyNote(), callAssistantTierAdvice(), CALL_ASSISTANT_SEPARATE_LINE, pricingKnowledge()]) {
-      expect(line).not.toMatch(/launch price is|\$99\b|first 3 months|an add-on to the (Pro|Growth|Agency)/i);
+      expect(line).not.toMatch(/launch price is|first 3 months|an add-on to the (Pro|Growth|Agency)/i);
     }
   });
 
@@ -155,7 +152,7 @@ describe("AI Call Assistant: a separate service (owner, 2026-10-08)", () => {
     expect(priceBookCents().has(ADDONS.call_number.annualCents)).toBe(true);
     // The old prices are not: $799, the $99 intro, $1,199 / $1,999 / $3,599 / $6,399 a year, 10¢ and 5¢ a minute.
     // ($149 stays listed by coincidence: CRM Max's yearly price works out to $149 a month.)
-    for (const c of [79_900, 9_900, 119_900, 199_900, 359_900, 639_900, 10, 5]) expect(priceBookCents().has(c), String(c)).toBe(false);
+    for (const c of [79_900, 119_900, 199_900, 359_900, 639_900, 10, 5]) expect(priceBookCents().has(c), String(c)).toBe(false);
     // $249 and $449 stay listed: they are the new 500 and 2,000 minutes tiers.
     expect(priceBookCents().has(24_900) && priceBookCents().has(44_900)).toBe(true);
     // Gabe may name a tier and quote its price, its overage and its yearly price; an old or made-up price is refused.
@@ -264,7 +261,9 @@ describe("AI assistant prompts use the price book", () => {
     }
     expect(knowledge).toContain(`${TRIAL_DAYS}-day trial`);
     expect(knowledge).toContain("There is no free plan");
-    expect(knowledge).toContain(`Only the Agency plan includes: ${joinNames(AGENCY_ONLY_MODULES)}`);
+    // No per-location pricing anywhere in the AI's price book (bands retired 2026-10-09).
+    expect(knowledge).not.toMatch(/per location|location band/i);
+    expect(knowledge).toContain(`Only the ${PLANS.agency.name} plan includes: ${joinNames(AGENCY_ONLY_MODULES)}`);
   });
 
   for (const [name, text] of [
@@ -291,6 +290,8 @@ describe("AI assistant prompts use the price book", () => {
       ...Object.values(ADDONS).map((a) => a.annualCents),
       // The CRM is its own product: its plans' yearly prices are listed prices too.
       ...CRM_PLAN_KEYS.map((k) => CRM_PLANS[k].annualCents),
+      // The Unlimited plan's own feature line states the Master Class's listed price.
+      COURSE_BUNDLE.priceCents,
       SALES_THRESHOLD_CENTS,
     ]);
     const text = HUB_TEXT;
@@ -300,24 +301,26 @@ describe("AI assistant prompts use the price book", () => {
     expect(text).toContain("$599 per project");
   });
 
-  it("ads consultant keeps the Ads & LSA manager on Agency and points to sales", () => {
-    expect(ADS_CONSULTANT_KNOWLEDGE).toContain("The Google Ads & LSA manager is part of the Agency plan only.");
+  it("ads consultant keeps the Ads & LSA manager on the top plan and points to sales", () => {
+    // server/ads-consultant.ts words this with the price book's name for the agency key ("Unlimited").
+    expect(ADS_CONSULTANT_KNOWLEDGE).toContain(`The Google Ads & LSA manager is part of the ${PLANS.agency.name} plan only.`);
     expect(ADS_CONSULTANT_PROMPT).toMatch(/Never invent a product, package, discount or price/);
   });
 });
 
 describe("emails and in-app help", () => {
   it("trial-code invites name the plan whose entitlements the code grants", () => {
-    expect(TRIAL_CODE_PLAN_NAME).toBe("Agency");
+    expect(TRIAL_CODE_PLAN_NAME).toBe(PLANS.agency.name);
   });
 
   it("the SMS info tip names the texting plans from the price book", () => {
     const body = INFO_CONTENT["settings-sms"].body.join(" ");
-    expect(body).toContain("Pro, Growth and Agency");
-    // Texting comes with a CRM plan too (server/crm/sms.ts accepts either), and CRM Max also includes a number.
+    // Every platform plan carries team text alerts; the CRM's Essentials and Max do too.
+    expect(body).toContain(TEXTING_PLANS);
+    expect(TEXTING_PLANS).toBe("Solo, Team, Pro, Agency and Unlimited");
     expect(body).toContain(CRM_TEXTING_PLANS);
     expect(body).toContain(`${CLIENT_NUMBER_INCLUDED_PLANS} each include one number`);
-    expect(CLIENT_NUMBER_INCLUDED_PLANS).toBe("CRM Max and Growth");
+    expect(CLIENT_NUMBER_INCLUDED_PLANS).toBe("CRM Max, Agency and Unlimited");
   });
 });
 
@@ -378,7 +381,7 @@ describe("page copy outside /pricing", () => {
     expect(src).not.toMatch(/CRM is included/i);
     expect(src).toContain("is a separate product with its own subscription plans");
     expect(src).toContain("PLAN_KEYS.map");
-    expect(src).toContain("Object.values(ADDONS)");
+    expect(src).toContain("PLATFORM_ADDONS");
     expect(src).not.toMatch(/Individual Tool Pricing/);
   });
 

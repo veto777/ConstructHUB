@@ -11,7 +11,8 @@ import {
   CRM_PLANS, CRM_PLAN_KEYS, CRM_TRIAL_DAYS, CRM_EXTRA_SEAT_MONTHLY_CENTS, CRM_EXTRA_SEAT_ANNUAL_CENTS, CRM_EXTRA_SEAT_MAX,
   crmPlanPriceCents, type CrmPlanKey,
 } from "@shared/crm-plans";
-import type { BillingInterval } from "@shared/plans";
+import { PLANS, PLAN_KEYS, type BillingInterval } from "@shared/plans";
+import { joinNames } from "@shared/plan-copy";
 import { PurchaseReviewDialog, type PurchaseReview } from "@/components/purchase-review";
 import { inNativeApp } from "@/lib/app-shell";
 
@@ -244,7 +245,7 @@ export function CrmPaywall({ isOwner, orgName }: { isOwner: boolean; orgName?: s
       <h1 className="text-2xl sm:text-3xl font-semibold text-center">Choose a CRM plan to open the CRM</h1>
       <p className="mt-3 text-center text-muted-foreground max-w-2xl mx-auto">
         The ConstructHUB CRM is its own product with its own subscription. A ConstructHUB platform plan
-        (Starter, Pro, Growth, Agency) does not include it, and a CRM plan does not include the platform tools.
+        ({joinNames(PLAN_KEYS.map((k) => PLANS[k].name))}) does not include it, and a CRM plan does not include the platform tools.
       </p>
       {isOwner ? (
         <>

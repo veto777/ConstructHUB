@@ -29,9 +29,9 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { VerificationCancelled } from "@/components/recent-auth";
 import { PurchaseReviewDialog, type PurchaseReview } from "@/components/purchase-review";
-import { ADDONS, CALL_ASSISTANT_TIERS, CALL_ASSISTANT_NAME, ADDON_MAX_QUANTITY, callAssistantTierOf, type AddonKey, type BillingInterval, type CallAssistantTierKey } from "@shared/plans";
+import { ADDONS, PLANS, PLAN_KEYS, CALL_ASSISTANT_TIERS, CALL_ASSISTANT_NAME, ADDON_MAX_QUANTITY, callAssistantTierOf, type AddonKey, type BillingInterval, type CallAssistantTierKey } from "@shared/plans";
 import { CRM_PLANS } from "@shared/crm-plans";
-import { callAssistantPricing, callAssistantTiers, callAssistantYearlyNote, callAssistantAboveTopLine, formatUsd } from "@shared/plan-copy";
+import { callAssistantPricing, callAssistantTiers, callAssistantYearlyNote, callAssistantAboveTopLine, formatUsd, joinNames } from "@shared/plan-copy";
 
 const suffix = (interval: BillingInterval) => (interval === "year" ? "/yr" : "/mo");
 /** The extra number's price per interval, from the price book. */
@@ -193,7 +193,7 @@ export function CallAssistantPlanCards({ interval, signedIn }: { interval: Billi
       "Every voice, the Agent Studio, the Simulator and the call log",
     ],
     notIncluded: [
-      "A ConstructHUB platform plan (Starter, Pro, Growth, Agency) — bought separately, not needed for this",
+      `A ConstructHUB platform plan (${joinNames(PLAN_KEYS.map((k) => PLANS[k].name))}) — bought separately, not needed for this`,
       `The ConstructHUB CRM — a separate product, from ${formatUsd(CRM_PLANS.crm_basic.monthlyCents)}/mo; leads are filed for the CRM, and the Call Assistant's own Calls tab shows every call`,
       "Appointment booking (not available yet) and outbound calls",
     ],
