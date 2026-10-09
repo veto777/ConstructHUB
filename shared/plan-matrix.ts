@@ -134,7 +134,7 @@ export function businessToolsMatrix(): PlanMatrixSection[] {
     { key: "autoPublish", label: "AI review replies publish automatically", cell: (p) => p.limits.autoPublishAiReplies },
     { key: "autoPosts", label: "AI posts and photo captions on a schedule", cell: (p) => moduleCell(p, "autoPosts") },
     { key: "replyTemplates", label: "Review reply templates", cell: (p) => count(p.limits.reviewTemplates) },
-    { key: "reviewReminders", label: "Review reminders to customers (text + email)", cell: (p) => moduleCell(p, "reviewReminders") },
+    { key: "reviewReminders", label: "Review reminders to customers (email; text coming soon)", cell: (p) => moduleCell(p, "reviewReminders") },
     // ── Permits & property ────────────────────────────────────────────────
     { key: "permitSearches", label: "Permit searches / month", cell: (p) => count(p.limits.permitSearches) },
     { key: "permitAlerts", label: "Permit alerts for new filings in a territory", cell: (p) => moduleCell(p, "permitAlerts") },
