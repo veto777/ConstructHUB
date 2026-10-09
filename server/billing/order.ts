@@ -226,7 +226,7 @@ export function parsePlanOrder(
   checkAddonsForPlan(plan, validation);
   // The Agency bands are retired: a NEW Unlimited checkout carries no location count and no band
   // line. Explicitly selecting Unlimited migrates a legacy Agency subscription;
-  // omit plan for interval-only edits that retain its base and bands.
+  // omit plan for location-only or interval-only edits that retain its base and bands.
   const agencyLocations = plan === "agency"
     ? orderAgencyLocations(body?.locations, changePlan ? null : current.agencyLocations ?? null)
     : null;

@@ -164,7 +164,7 @@ describe("add-ons", () => {
     expect(ADDONS.texting_number.grants).toEqual({});
   });
 
-  it("applies only the add-ons the plan sells", () => {
+  it("applies sold add-ons and existing paid legacy locations", () => {
     // Every count add-on sells on Pro: seats, protected sites and scans all move.
     expect(allowancesFor("pro", { protected_site: 2, extra_seat: 1, competitor_pack: 1 })).toMatchObject({ protectedSites: 12, agencySeats: 6, competitorScans: 20 });
     // Extra seat is not sold on Unlimited (its seats are unlimited); Agency ($199) takes two.
@@ -172,8 +172,8 @@ describe("add-ons", () => {
     expect(allowancesFor("growth", { extra_seat: 2 })).toMatchObject({ agencySeats: PLANS.growth.limits.agencySeats + 2 });
     // Starter sells protected sites and competitor packs (1 and 3 included, then the add-on units).
     expect(allowancesFor("starter", { protected_site: 2, competitor_pack: 3 })).toMatchObject({ protectedSites: 3, competitorScans: 31 });
-    // The retired extra-location add-on raises nothing anywhere (stored rows still read, grant nothing).
-    expect(allowancesFor("growth", { extra_location: 2 }).locations).toBe(PLANS.growth.limits.locations);
+    // Retired paid locations still grant capacity; unlimited stays unlimited.
+    expect(allowancesFor("growth", { extra_location: 2 }).locations).toBe(PLANS.growth.limits.locations + 2);
     expect(allowancesFor("agency", { extra_location: 5 }).locations).toBe(-1);
     expect(parseAddons({ extra_seat: 2, protected_site: -1, bogus: 3, competitor_pack: "1.5" })).toEqual({ extra_seat: 2 });
     expect(parseAddons("nonsense")).toEqual({});
@@ -184,6 +184,16 @@ describe("add-ons", () => {
     const ent = await getEntitlements(7);
     expect(ent.allowances).toMatchObject({ competitorScans: 40, agencySeats: 13 });
     expect(ent.limits?.competitorScans).toBe(20);
+  });
+
+  it("lets legacy Starter use its paid second location until the holding is removed", async () => {
+    mocks.row = customer("starter", { addons: { extra_location: 1 } });
+    const ent = await getEntitlements(7);
+    expect(ent.allowances?.locations).toBe(2);
+    expect(fitsLimit(ent.allowances!.locations, 1)).toBe(true);
+    expect(fitsLimit(ent.allowances!.locations, 2)).toBe(false);
+    mocks.row = customer("starter", { addons: {} });
+    expect((await getEntitlements(7)).allowances?.locations).toBe(1);
   });
 });
 

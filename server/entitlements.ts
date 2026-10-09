@@ -266,12 +266,14 @@ export function parseAddons(raw: unknown): Partial<Record<AddonKey, number>> {
   return out;
 }
 
-/** A plan's limits with the add-ons that plan sells applied. */
+/** A plan's limits with purchased add-ons applied, including paid legacy locations. */
 export function allowancesFor(plan: PlanKey, addons: Partial<Record<AddonKey, number>> = {}): PlanLimits {
   const out: PlanLimits = { ...PLANS[plan].limits };
   for (const key of Object.keys(ADDON_GRANTS) as AddonKey[]) {
     const qty = addons[key] ?? 0;
-    if (!qty || !ADDONS[key].availableOn.includes(plan)) continue;
+    // Existing paid locations survive retirement until a plan change removes them.
+    // billing/order.ts still refuses new purchases of the retired add-on.
+    if (!qty || (key !== "extra_location" && !ADDONS[key].availableOn.includes(plan))) continue;
     for (const [limit, per] of Object.entries(ADDON_GRANTS[key]) as [CountLimit, number][]) {
       if (out[limit] !== -1) out[limit] += per * qty;
     }

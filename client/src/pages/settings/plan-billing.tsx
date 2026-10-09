@@ -50,23 +50,25 @@ export function PlanBillingSection(_props: SettingsSectionProps) {
   const addonChange = useAddonChange(addonMutation);
 
   const [locationsInput, setLocationsInput] = useState<string | null>(null);
+  const bandedAgency = view.planKey === "agency" && view.locations !== null;
   const billedLocations = view.locations ?? AGENCY_INCLUDED_LOCATIONS;
-  const wantedLocations = normalizeLocations(locationsInput ?? billedLocations);
+  const wantedLocations = Math.max(AGENCY_INCLUDED_LOCATIONS, normalizeLocations(locationsInput ?? billedLocations));
   const locationsQuote = agencyQuote(wantedLocations);
   // Add-ons and location counts change a Stripe subscription on a current plan;
   // a legacy plan keeps its old price until it switches plans in Pricing.
   const editable = view.changesInPlace && !view.isLegacy;
   const locationsMutation = useMutation({
-    // Without a known interval the server keeps the subscription's own.
+    // Omit plan: explicitly selecting the agency key migrates legacy bands to Unlimited.
+    // A location-only edit keeps the subscription's own base price and interval.
     mutationFn: async (locations: number) =>
-      (await apiRequest("POST", "/api/stripe/change-plan", { plan: "agency", ...(view.interval ? { interval: view.interval } : {}), locations })).json(),
+      (await apiRequest("POST", "/api/stripe/change-plan", { locations })).json(),
     onSuccess: (data: any, locations) => {
       if (data?.url) { window.location.href = data.url; return; }
       setLocationsInput(null);
       refreshBilling();
       toast({ title: "Locations updated", description: `Agency is now billed for ${locations.toLocaleString("en-US")} locations.` });
     },
-    onError: (err, locations) => showError("Couldn't change locations", `${PLANS.agency.name} plan — ${locations.toLocaleString("en-US")} locations`)(err),
+    onError: (err, locations) => showError("Couldn't change locations", `Legacy Agency plan — ${locations.toLocaleString("en-US")} locations`)(err),
   });
 
   const status = subscription?.status || "";
@@ -84,7 +86,7 @@ export function PlanBillingSection(_props: SettingsSectionProps) {
     : `Current period ends ${periodEnd.toLocaleDateString()}`;
   // Legacy subscriptions keep the Stripe price they were sold at until they change plans.
   const priceText = !plan || view.isLegacy || !view.interval ? null
-    : plan.key === "agency"
+    : bandedAgency
       ? (() => {
           if (!view.locations) return null;
           const q = agencyQuote(view.locations);
@@ -113,7 +115,7 @@ export function PlanBillingSection(_props: SettingsSectionProps) {
               ) : plan ? (
                 <>
                   <div className="font-semibold text-primary flex flex-wrap items-center gap-2" data-testid="text-current-plan">
-                    {view.displayName} plan
+                    {bandedAgency ? "Legacy Agency" : view.displayName} plan
                     <Badge variant="outline" className="text-[10px]" data-testid="badge-plan-status">
                       {STATUS_LABELS[status] || status}
                     </Badge>
@@ -209,7 +211,7 @@ export function PlanBillingSection(_props: SettingsSectionProps) {
                 Add-ons and location counts ride on the current plans. Your {view.displayName} price stays as it is; switch to {plan.name} in Pricing to add them.
               </p>
             )}
-            {plan.key === "agency" && editable && (
+            {bandedAgency && editable && (
               <div className="rounded-lg border p-3 space-y-2" data-testid="row-billing-locations">
                 <div className="flex flex-wrap items-end justify-between gap-3">
                   <div className="min-w-0">
@@ -222,7 +224,7 @@ export function PlanBillingSection(_props: SettingsSectionProps) {
                     <Input
                       type="number"
                       inputMode="numeric"
-                      min={1}
+                      min={AGENCY_INCLUDED_LOCATIONS}
                       className="w-24 h-9"
                       aria-label="Billed client locations"
                       value={locationsInput ?? String(billedLocations)}
