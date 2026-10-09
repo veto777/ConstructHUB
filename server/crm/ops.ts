@@ -29,7 +29,7 @@ import {
 import { and, eq, desc, asc, sql, isNull } from "drizzle-orm";
 import { requireOrg, requirePermission, requireOwnerRole, stripMoney, type OrgContext } from "./tenancy";
 import { divisionScopeOf, divisionVisible, divisionMapsForOrg, docDivisionFromMaps } from "./divisions";
-import { emitCrmEvent, webhookUrlIsSafe } from "./integrations";
+import { requireCrmFeature, emitCrmEvent, webhookUrlIsSafe } from "./integrations";
 import { autoSendPaymentReceipt } from "./receipts";
 import { logActivity } from "./activity";
 import { sendWithFallback } from "../email";
@@ -655,6 +655,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
   app.get("/api/crm/projects/:id/costing", async (req: any, res) => {
     const ctx = await ctxFor(req, res);
     if (!ctx) return;
+    if (!await requireCrmFeature(res, ctx.org.ownerUserId, "jobCosting")) return;
     if (!ctx.permissions.seeCosts) return res.status(403).json({ message: "Requires permission: seeCosts" });
     const proj = await ownProject(ctx.org.id, req.params.id);
     if (!proj) return res.status(404).json({ message: "Project not found" });
@@ -723,6 +724,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
   app.put("/api/crm/projects/:id/budget", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "seeCosts");
     if (!ctx) return;
+    if (!await requireCrmFeature(res, ctx.org.ownerUserId, "jobCosting")) return;
     if (!requirePermission(res, ctx, "manageJobs")) return;
     const proj = await ownProject(ctx.org.id, req.params.id);
     if (!proj) return res.status(404).json({ message: "Project not found" });
@@ -784,6 +786,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
   app.post("/api/crm/projects/:id/budget-lines", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "seeCosts");
     if (!ctx) return;
+    if (!await requireCrmFeature(res, ctx.org.ownerUserId, "jobCosting")) return;
     if (!requirePermission(res, ctx, "manageJobs")) return;
     const proj = await ownProject(ctx.org.id, req.params.id);
     if (!proj) return res.status(404).json({ message: "Project not found" });
@@ -800,6 +803,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
   app.patch("/api/crm/budget-lines/:lineId", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "seeCosts");
     if (!ctx) return;
+    if (!await requireCrmFeature(res, ctx.org.ownerUserId, "jobCosting")) return;
     if (!requirePermission(res, ctx, "manageJobs")) return;
     const [line] = await db.select().from(crmBudgetLines)
       .where(and(eq(crmBudgetLines.orgId, ctx.org.id), eq(crmBudgetLines.id, req.params.lineId))).limit(1);
@@ -823,6 +827,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
   app.delete("/api/crm/budget-lines/:lineId", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "seeCosts");
     if (!ctx) return;
+    if (!await requireCrmFeature(res, ctx.org.ownerUserId, "jobCosting")) return;
     if (!requirePermission(res, ctx, "manageJobs")) return;
     const [line] = await db.select().from(crmBudgetLines)
       .where(and(eq(crmBudgetLines.orgId, ctx.org.id), eq(crmBudgetLines.id, req.params.lineId))).limit(1);
@@ -839,6 +844,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
   app.post("/api/crm/projects/:id/commitments", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "seeCosts");
     if (!ctx) return;
+    if (!await requireCrmFeature(res, ctx.org.ownerUserId, "jobCosting")) return;
     const proj = await ownProject(ctx.org.id, req.params.id);
     if (!proj) return res.status(404).json({ message: "Project not found" });
     const parsed = z.object({
@@ -863,6 +869,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
   app.post("/api/crm/projects/:id/costs", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "seeCosts");
     if (!ctx) return;
+    if (!await requireCrmFeature(res, ctx.org.ownerUserId, "jobCosting")) return;
     const proj = await ownProject(ctx.org.id, req.params.id);
     if (!proj) return res.status(404).json({ message: "Project not found" });
     const parsed = z.object({
@@ -892,6 +899,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
   app.get("/api/crm/projects/:id/change-orders", async (req: any, res) => {
     const ctx = await ctxFor(req, res);
     if (!ctx) return;
+    if (!await requireCrmFeature(res, ctx.org.ownerUserId, "jobCosting")) return;
     const proj = await ownProject(ctx.org.id, req.params.id);
     if (!proj) return res.status(404).json({ message: "Project not found" });
     const rows = await db.select().from(crmChangeOrders)
@@ -906,6 +914,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
   app.post("/api/crm/projects/:id/change-orders", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "approveChangeOrders");
     if (!ctx) return;
+    if (!await requireCrmFeature(res, ctx.org.ownerUserId, "jobCosting")) return;
     const proj = await ownProject(ctx.org.id, req.params.id);
     if (!proj) return res.status(404).json({ message: "Project not found" });
     const parsed = z.object({
@@ -937,6 +946,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
   app.post("/api/crm/change-orders/:id/send", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "approveChangeOrders");
     if (!ctx) return;
+    if (!await requireCrmFeature(res, ctx.org.ownerUserId, "jobCosting")) return;
     const [co] = await db.select().from(crmChangeOrders)
       .where(and(eq(crmChangeOrders.orgId, ctx.org.id), eq(crmChangeOrders.id, req.params.id))).limit(1);
     if (!co) return res.status(404).json({ message: "Change order not found" });
@@ -958,6 +968,8 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
       .where(eq(crmChangeOrders.publicToken, String(req.params.token))).limit(1);
     if (!co) return res.status(404).json({ message: "This link is no longer valid." });
     const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, co.orgId)).limit(1);
+    if (!org) return res.status(404).json({ message: "Organization not found" });
+    if (!await requireCrmFeature(res, org.ownerUserId, "jobCosting")) return;
     const [proj] = await db.select().from(crmProjects).where(eq(crmProjects.id, co.projectId)).limit(1);
     if (co.sentAt && !co.firstViewedAt && !co.approvedAt && !co.declinedAt) {
       await db.update(crmChangeOrders).set({ firstViewedAt: new Date() }).where(eq(crmChangeOrders.id, co.id));
@@ -983,6 +995,9 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
     const [co] = await db.select().from(crmChangeOrders)
       .where(eq(crmChangeOrders.publicToken, String(req.params.token))).limit(1);
     if (!co) return res.status(404).json({ message: "This link is no longer valid." });
+    const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, co.orgId)).limit(1);
+    if (!org) return res.status(404).json({ message: "Organization not found" });
+    if (!await requireCrmFeature(res, org.ownerUserId, "jobCosting")) return;
     if (co.approvedAt || co.declinedAt) return res.status(409).json({ message: "Already responded to." });
     const approve = parsed.data.decision === "approve";
     if (approve && !parsed.data.signatureName) return res.status(400).json({ message: "Please type your name to approve." });
@@ -1201,6 +1216,7 @@ export function registerCrmOpsRoutes(app: Express, getDevUser: GetUser): void {
   app.post("/api/crm/api-keys", async (req: any, res) => {
     const ctx = await ctxFor(req, res, "manageIntegrations");
     if (!ctx) return;
+    if (!await requireCrmFeature(res, ctx.org.ownerUserId, "api")) return;
     const name = String(req.body?.name || "").trim() || "API key";
     // Shown exactly once; only the hash is stored.
     const plain = `chk_${randomBytes(24).toString("hex")}`;
