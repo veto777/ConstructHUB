@@ -2,6 +2,40 @@
 
 _Last updated 2026-08-24. Repo: `veto777/ConstructHUB` (private). Local: `/home/veto/ConstructHUB` on the tower._
 
+## 🧱 2026-10-09 — reliability fixes from the SEO review (branch `fix-reliability`, NOT deployed)
+Source: review 4 of 6 (reliability), findings C1/H1-H5/M7/M13. One commit per item; `npm run check` 0.
+- **Request log writes no response bodies** (`server/request-log.ts`, M7/C1). The journal carried every JSON body —
+  CRM customer lists with names, addresses, emails and phones — 21.3 of the unit's 26.6 MB/day, on the disk that
+  filled and crashed production Postgres at 05:40 UTC. A line is now `GET /api/x 200 in 12ms id=<cf-ray|fresh>`;
+  a 5xx adds one scrubbed message (≤ 200 chars, no emails / long numbers). Dev opt-in only: `LOG_RESPONSE_BODIES=1`.
+  **Operator:** also cap the journal — `journalctl --user --vacuum-size=500M` once, and `SystemMaxUse=1G` in
+  `~/.config/systemd/user/journald.conf.d/` (or the system `/etc/systemd/journald.conf`).
+- **Graceful shutdown** (`server/shutdown.ts`, H5). On SIGTERM/SIGINT the app closes the listener, runs its stop
+  hooks (SEO worker timer), drains in-flight requests and tracked paid work (grid scans, rendering checks) for up to
+  `SHUTDOWN_DRAIN_MS` (default 20 000), closes the pool, exits 0; a hard stop at drain + 10 s exits 1; a second
+  signal exits at once. Log lines start `[shutdown]`. What is left to the leases/reconciler is logged as "left behind".
+  **Operator step — the unit** (`~/.config/systemd/user/constructhub.service` on vb11; today `Restart=always`,
+  `RestartSec=5`, `KillMode=control-group`, `TimeoutStopSec=90s`). Recommended, not changed from this branch:
+  ```
+  [Service]
+  KillMode=mixed          # SIGTERM to the Node process only; its children (headless Chromium) get SIGKILL after it exits
+  KillSignal=SIGTERM
+  TimeoutStopSec=35s      # drain 20 s + pool close + margin; must stay ABOVE SHUTDOWN_DRAIN_MS + 10 s
+  Environment=SHUTDOWN_DRAIN_MS=20000
+  ```
+  then `systemctl --user daemon-reload` (takes effect at the next restart). `KillMode=control-group` also works:
+  every process in the cgroup gets SIGTERM at once, so a Chromium child dies with its request instead of after it.
+- **Deploy script** (`script/deploy-vb11.sh`): skips the restart when dist/, assets and dependencies are unchanged on
+  the server (`DEPLOY_FORCE_RESTART=1` to restart anyway); polls the port every second and prints how long it was
+  closed. 49 restarts in 24 h was the problem; a restart that ships nothing is now a no-op.
+- **SEO boot DDL** (`server/seo/schema.ts`, `server/seo/boot.ts`, H1). The ~170 statements run only when the list's
+  hash differs from `seed_state` key `seo-schema` (a normal boot runs zero DDL — look for `[seo] schema up to date`),
+  on one connection with `lock_timeout` 5 s / `statement_timeout` 60 s (`SEO_DDL_LOCK_TIMEOUT_MS`,
+  `SEO_DDL_STATEMENT_TIMEOUT_MS`), indexes built CONCURRENTLY. A failure no longer exits the process: the SEO module
+  is off for that process (`/api/seo` → 503 `seo_unavailable`, no SEO worker, a critical issue on /admin/issues) and
+  the CRM and everything else boot. `FORCE_SEO_SCHEMA=1` runs the list regardless. `scripts/apply-schema-migration.ts`
+  still spreads the list (it does not write the hash; the next boot then runs the idempotent list once and stores it).
+
 ## ☎️ 2026-10-08 (late evening) — the AI Call Assistant is a SEPARATE SERVICE, repriced (branch `billing/call-assistant`, NOT deployed)
 - **Owner decisions:** the Call Assistant is sold on its **own subscription**, like the CRM (`fd964e1`, `069ffdf`): no platform plan
   includes it, and it is bought **with or without a platform plan**. New tiers (keys lite/solo/crew/fleet kept so the voice code paths

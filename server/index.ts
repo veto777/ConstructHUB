@@ -74,6 +74,9 @@ app.use(watchHandledFailures);
 // production (the 2026-10-09 review found customer names and contact details in the journal, 21 MB a day); a 5xx
 // adds one short scrubbed error message. Development may echo bodies with LOG_RESPONSE_BODIES=1.
 import { formatRequestLogLine, requestIdFor, bodyEchoEnabled } from "./request-log";
+// Graceful shutdown (server/shutdown.ts): in-flight requests are counted here and drained on SIGTERM.
+import { installGracefulShutdown, trackRequests } from "./shutdown";
+app.use(trackRequests);
 app.use((req, res, next) => {
   const start = Date.now();
   const requestId = requestIdFor(req.headers);
@@ -171,6 +174,10 @@ process.on("unhandledRejection", (reason) => {
         log(`serving on port ${port}`);
       },
     );
+    // SIGTERM (a deploy's restart): stop accepting, finish in-flight requests and tracked paid work (up to
+    // SHUTDOWN_DRAIN_MS, 20 s), close the pools, exit — instead of dying mid-request.
+    const { pool } = await import("./db");
+    installGracefulShutdown({ server: httpServer, closePools: () => pool.end(), log: (line) => log(line.replace(/^\[shutdown\] /, ""), "shutdown") });
   } catch (err) {
     console.error("Fatal startup error:", err);
     process.exit(1);

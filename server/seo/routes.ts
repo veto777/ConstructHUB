@@ -81,6 +81,7 @@ import { LABS_TASK_USD, LABS_ITEM_USD } from "./pricing";
 import { alertPage, unreadAlerts, undeliveredAlerts, markAlertsRead, ALERT_KINDS } from "./alerts";
 import { seoErrorResponse, publicFailure, publicNote, SEO_VENDOR_NAME, SeoCustomerError } from "./public-errors";
 import { seoLocks, requestQueues } from "./locks";
+import { trackWork } from "../shutdown";
 import { siteCapRefuses } from "./site-cap";
 import { recordUnhandledError } from "../ops/server-errors";
 import { recordFailure } from "../ops/issues";
@@ -693,14 +694,14 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const started = await beginScan(user, site.id, { keyword, size: input.size, spacing: input.spacing });
     if (started.existing) return res.status(200).json({ id: started.id, running: true, reused: true });
     const scanId = started.id;
-    void runGridScan(user, site, pin, { keyword, size: input.size, spacing: input.spacing }, scanId, { label: `Local grid — "${keyword.slice(0, 80)}", ${input.size} × ${input.size} points`, deadline: claimDeadline(begun, GRID_STALE_MINUTES * 60_000) })
+    void trackWork(`local grid scan ${scanId}`, runGridScan(user, site, pin, { keyword, size: input.size, spacing: input.spacing }, scanId, { label: `Local grid — "${keyword.slice(0, 80)}", ${input.size} × ${input.size} points`, deadline: claimDeadline(begun, GRID_STALE_MINUTES * 60_000) })
       .catch(async (e: any) => {
         if (!(e instanceof SeoBudgetError)) { console.warn(`[seo] local grid scan ${scanId} failed: ${e?.message ?? e}`); void recordFailure("job", "SEO local grid scan", e); }
         // The note is the customer's (server/seo/public-errors.ts): never the error's own text. publicFailure looks through
         // fetchGrid's wrapper (`cause`) to the source's error, so a busy source still reads as one.
         const message = e?.notSaved ? "The scan ran but its results could not be saved. You were not charged." : publicFailure(e, "The scan could not be completed. Try again in a few minutes.");
         await failScan(scanId, message).catch(() => {});
-      });
+      }));
     res.status(202).json({ id: scanId, running: true });
   }));
   // Repeat a scan every week or month (run by the scheduler from the month's included data only).
@@ -1446,12 +1447,12 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const started = await beginRender(user, site.id, urls);
     if (started.existing) return res.status(200).json({ id: started.id, running: true, reused: true });
     const runId = started.id;
-    void runRender(user, runId, urls, `Rendering check — ${site.domain}, ${urls.length} page${urls.length === 1 ? "" : "s"}`, site.domain)
+    void trackWork(`rendering check ${runId}`, runRender(user, runId, urls, `Rendering check — ${site.domain}, ${urls.length} page${urls.length === 1 ? "" : "s"}`, site.domain)
       .catch(async (e: any) => {
         if (!(e instanceof SeoBudgetError)) { console.warn(`[seo] rendering check ${runId} failed: ${e?.message ?? e}`); void recordFailure("job", "SEO rendering check", e); }
         const message = e?.notSaved ? "The check ran but its results could not be saved. You were not charged." : publicFailure(e, "The check could not be completed. Try again in a few minutes.");
         await failRender(runId, message).catch(() => {});
-      });
+      }));
     res.status(202).json({ id: runId, running: true });
   }));
   route("get", "/api/seo/sites/:id/render/:runId", async (req, res, user) => {

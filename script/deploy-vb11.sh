@@ -53,20 +53,25 @@ echo "== build =="
 npm run build
 
 echo "== rsync dist/ =="
-"${RSYNC[@]}" dist/ "$HOST:$APP_DIR/dist/"
+# Itemized so the restart below can be skipped when nothing on the server changed (2026-10-09 review H5: 49
+# restarts in 24 h, each closing the port for 7-19 s; many shipped an identical build).
+dist_changes="$("${RSYNC[@]}" -i dist/ "$HOST:$APP_DIR/dist/" | grep -cE '^[<>ch*]' || true)"
 # Old hashed bundles stay publicly fetchable by URL unless removed, and they can
 # carry content later taken out of the client (e.g. paid guide text). Keep only
 # the current build's assets.
-"${RSYNC[@]}" --delete dist/public/assets/ "$HOST:$APP_DIR/dist/public/assets/"
+asset_changes="$("${RSYNC[@]}" -i --delete dist/public/assets/ "$HOST:$APP_DIR/dist/public/assets/" | grep -cE '^[<>ch*]' || true)"
+echo "dist/: $dist_changes file(s) changed, assets: $asset_changes"
 
 echo "== dependency check =="
 # ~/ConstructHUB-demo/node_modules is a symlink to this tree's node_modules,
 # so an npm ci here also changes what the demo service loads on its next restart.
+deps_changed=0
 if "${RSYNC[@]}" --dry-run --out-format='%n' package.json package-lock.json \
     "$HOST:$APP_DIR/" | grep -q .; then
   echo "dependencies changed — syncing manifests and running npm ci on $HOST"
   "${RSYNC[@]}" package.json package-lock.json "$HOST:$APP_DIR/"
   "${SSH[@]}" "cd $APP_DIR && npm ci --omit=dev --no-audit --no-fund"
+  deps_changed=1
 else
   echo "dependencies unchanged — node_modules on $HOST already matches"
 fi
@@ -76,13 +81,23 @@ fi
   || { echo "ABORT: could not install the headless browser playwright-core needs" >&2; exit 1; }
 
 echo "== restart =="
+# Nothing new on the server -> no restart (DEPLOY_FORCE_RESTART=1 restarts anyway). Every restart closes the port
+# for the boot's length, and the app drains in-flight requests first (server/shutdown.ts: up to SHUTDOWN_DRAIN_MS,
+# 20 s; the unit's TimeoutStopSec must stay above that — see HANDOFF.md "Graceful shutdown").
+if [ "$dist_changes" = 0 ] && [ "$asset_changes" = 0 ] && [ "$deps_changed" = 0 ] && [ "${DEPLOY_FORCE_RESTART:-}" != "1" ]; then
+  echo "nothing changed on $HOST — the running process already serves this build; no restart (DEPLOY_FORCE_RESTART=1 to restart anyway)"
+  echo "deploy OK (no-op)"
+  exit 0
+fi
+restart_began=$(date +%s)
 "${SSH[@]}" "systemctl --user restart constructhub.service"
 
 echo "== verify =="
 # A boot that loses a module logs "Failed to initialize CRM module" but keeps
 # serving static pages — catch it here.
 # Boot seeding (13k portals + 8k routes) takes ~1-2 min on vb11 before the port opens; poll instead of a fixed sleep.
-"${SSH[@]}" "for i in \$(seq 1 120); do curl -s -o /dev/null http://127.0.0.1:8110/ && exit 0; sleep 2; done; echo 'DEPLOY BROKEN: :8110 not listening after 240s' >&2; exit 1"
+"${SSH[@]}" "for i in \$(seq 1 240); do curl -s -o /dev/null http://127.0.0.1:8110/ && exit 0; sleep 1; done; echo 'DEPLOY BROKEN: :8110 not listening after 240s' >&2; exit 1"
+echo "port closed for about $(( $(date +%s) - restart_began ))s (drain + stop + boot)"
 "${SSH[@]}" "
   set -e
   systemctl --user is-active constructhub.service
