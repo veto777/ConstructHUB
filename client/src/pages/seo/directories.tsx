@@ -7,8 +7,10 @@
  * Every figure leads somewhere (owner 2026-10-09, links.ts): a directory to its own Site explorer, a count to the
  * links from that directory (picked out on the Backlinks page for a tracked site; the explorer's list says it can't
  * pick them out yet), a site in a column head to its explorer, the counts in the summary line and a kind's heading
- * to this table narrowed (`only`). The competitors compared are the address's `rivals`, so a comparison is a link;
- * arriving by link only looks for a saved copy — nothing is bought until "Check the directories" is pressed.
+ * to this table narrowed (`only`). The competitors compared are the address's `rivals`, so a comparison is a link —
+ * said in its own chip (data-testid="active-filter") with a clear, as `only` is; arriving by link only looks for a
+ * saved copy — nothing is bought until "Check the directories" is pressed. The "as of" date and the price open the
+ * Usage page (that month's lookups; what lookups cost).
  */
 import { useEffect, useMemo, useState } from "react";
 import { useSearch } from "wouter";
@@ -17,7 +19,7 @@ import { Download, Loader2, Play, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { api, Empty, fmtDate, isNotRunYet, money, type SeoStatus } from "./shell";
+import { ActiveFilter, api, Empty, fmtDate, isNotRunYet, money, type SeoStatus } from "./shell";
 import { AddToPlan, type PlanTask } from "./plan-button";
 import { seoLinks, setParams } from "./links";
 import { marketParams } from "./keyword-links";
@@ -56,6 +58,9 @@ export function DirectoriesView({ domain, status, suggestions, planSiteId, marke
   const add = (d: string) => { const c = clean(d); if (looksLikeDomain(c) && c !== domain && !draft.includes(c) && draft.length < MAX_RIVALS) setDraft([...draft, c]); setInput(""); };
   /** The competitors compared as the address word (links.ts `rivals`): the domains, or "none" for this site alone — a comparison with nobody is still a comparison. */
   const rivalsWord = (xs: string[] | null | undefined) => (xs ? xs.join(",") || "none" : undefined);
+  /** What the address's `rivals` named that could not be used: not a domain, this site itself, or a fourth. */
+  const rivalsRaw = params.get("rivals");
+  const leftOut = (rivalsRaw ?? "").split(",").map((x) => x.trim()).filter((x) => x && x.toLowerCase() !== "none" && !arrived.includes(clean(x)));
   /** This view with the competitors compared, and one thing changed. */
   const here = (p: { only?: Only | null; rivals?: string[] | null } = {}) => seoLinks.explorer(domain, "directories", { ...marketParams(market), rivals: rivalsWord(p.rivals === undefined ? applied : p.rivals), only: p.only === undefined ? only ?? undefined : p.only ?? undefined });
   /** The links from one directory to a site: picked out on the Backlinks page for the tracked site; the explorer's list can't yet, and says so. */
@@ -115,10 +120,18 @@ export function DirectoriesView({ domain, status, suggestions, planSiteId, marke
         )}
         {suggestions.filter((s) => s !== domain && !draft.includes(s)).slice(0, 4).map((s) => draft.length < MAX_RIVALS ? <button key={s} type="button" className="g-pill min-h-[44px]" onClick={() => add(s)} title="Add this competitor" data-testid={`button-suggest-rival-${s}`}>+ {s}</button> : null)}
       </div>
+      {/* The comparison the address names (links.ts `rivals`), in words, with a clear that starts over (the narrowing `only` goes with it). */}
+      {rivalsRaw != null && (
+        <ActiveFilter onClear={() => setParams({ rivals: null, only: null })} clearLabel="Start over">
+          {arrived.length ? `Directories of ${domain} compared with ${arrived.join(", ")}` : `Directories of ${domain} on its own — no competitor compared`}
+          {leftOut.length > 0 && ` — left out: ${leftOut.join(", ")} (not a domain, this site itself, or more than ${MAX_RIVALS})`}
+          {dirty && " — the competitors above were changed and are not used until “Use these sites” is pressed"}
+        </ActiveFilter>
+      )}
       {(!applied || dirty) && (
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <Button onClick={use} data-testid="button-directories-prepare">{applied ? "Use these sites" : `Check ${draft.length ? `${1 + draft.length} sites` : "this site"}`}</Button>
-          <span className="g-text-2 text-[13px]">{quote(1 + draft.length) != null ? `Up to ${money(quote(1 + draft.length)!)} of your SEO data for ${draft.length ? `these ${1 + draft.length} sites` : "this site"}; kept for a day and free to reopen.` : status ? "The price couldn't be loaded, so this can't be bought yet — reload the page." : "Getting the price…"}</span>
+          <span className="g-text-2 text-[13px]">{quote(1 + draft.length) != null ? <>Up to <Fig href={seoLinks.usage()} testId="link-directories-price" label={`Up to ${money(quote(1 + draft.length)!)} — what lookups cost and what is left, on the Usage page`}>{money(quote(1 + draft.length)!)}</Fig> of your SEO data for {draft.length ? `these ${1 + draft.length} sites` : "this site"}; kept for a day and free to reopen.</> : status ? "The price couldn't be loaded, so this can't be bought yet — reload the page." : "Getting the price…"}</span>
         </div>
       )}
       {applied && !dirty && saved.isLoading && <p className="g-text-2 flex items-center gap-2 text-[13px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Checking for a saved copy…</p>}
@@ -136,7 +149,7 @@ export function DirectoriesView({ domain, status, suggestions, planSiteId, marke
         <>
           <div className="mb-2 flex flex-wrap items-center gap-2 text-[13px]">
             <span className="g-text-2" data-testid="text-directories-meta">
-              {onIt != null ? <>{domain} is linked from <Fig href={here({ only: "linked" })} testId="link-directories-linked" label={`${onIt} directories that link to ${domain}`}>{onIt}</Fig> of these <Fig href={here({ only: null })} testId="link-directories-all" label={`All ${d.rows.length} directories`}>{d.rows.length}</Fig></> : `${domain}'s own check didn't load`}{d.sites.length > 1 && usKnown ? <> · <Fig href={here({ only: "gaps" })} testId="link-directories-gaps" label={`${gaps.length} directories that link to a competitor and not to you`}>{gaps.length} that link to a competitor and not to you</Fig></> : ""} · as of {fmtDate(d.fetchedAt)} ·{" "}
+              {onIt != null ? <>{domain} is linked from <Fig href={here({ only: "linked" })} testId="link-directories-linked" label={`${onIt} directories that link to ${domain}`}>{onIt}</Fig> of these <Fig href={here({ only: null })} testId="link-directories-all" label={`All ${d.rows.length} directories`}>{d.rows.length}</Fig></> : `${domain}'s own check didn't load`}{d.sites.length > 1 && usKnown ? <> · <Fig href={here({ only: "gaps" })} testId="link-directories-gaps" label={`${gaps.length} directories that link to a competitor and not to you`}>{gaps.length} that link to a competitor and not to you</Fig></> : ""} · <Fig href={seoLinks.usage({ month: d.fetchedAt.slice(0, 7) })} testId="link-directories-as-of" label={`as of ${fmtDate(d.fetchedAt)} — when these directories were checked; that month's lookups on the Usage page`}>as of {fmtDate(d.fetchedAt)}</Fig> ·{" "}
               <button type="button" className={FIG} disabled={run.isPending || !canPay || !status?.configured || !body} onClick={() => body && run.mutate({ body, key: queryKey, again: true })}>{run.isPending ? "Checking…" : `Check again${price != null ? ` — up to ${money(price)}` : ""}`}</button>
             </span>
             <span className="ml-auto flex flex-wrap items-center gap-2">

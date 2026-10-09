@@ -122,13 +122,14 @@ export function useSiteMissing(sites: SeoSite[] | undefined): number | null {
 
 /**
  * What narrowed this view, in the visitor's words, with a way to clear it (data-testid="active-filter"). A page shows
- * one whenever a parameter of the address narrows, opens or highlights something on it.
+ * one whenever a parameter of the address narrows, opens or highlights something on it. The chip and its clear are
+ * both 44 px tall.
  */
 export function ActiveFilter({ children, onClear, clearLabel = "Show everything" }: { children: ReactNode; onClear: () => void; clearLabel?: string }) {
   return (
     <p className="mb-3 flex flex-wrap items-center gap-2 text-[13px]" role="status" data-testid="active-filter">
-      <span className="g-chip min-h-10 !whitespace-normal py-1 [overflow-wrap:anywhere]" style={{ textTransform: "none" }}>{children}</span>
-      <button type="button" className="g-pill g-pill--sm" onClick={onClear} data-testid="button-clear-filter"><X /> {clearLabel}</button>
+      <span className="g-chip min-h-11 !whitespace-normal py-1 [overflow-wrap:anywhere]" style={{ textTransform: "none" }}>{children}</span>
+      <button type="button" className="g-pill g-pill--sm !min-h-11" onClick={onClear} data-testid="button-clear-filter"><X /> {clearLabel}</button>
     </p>
   );
 }
@@ -136,12 +137,12 @@ export function ActiveFilter({ children, onClear, clearLabel = "Show everything"
 /**
  * A strip of tabs (the SEO sections, a page's own lists). Each tab is at least 44 px tall. On a phone the strip scrolls
  * sideways — its scrollbar stays visible and a fade at the right edge says there is more; from 640 px it wraps, so
- * every tab shows.
+ * every tab shows. `data-tab-strip` keeps PHONE_SIZES' rule for a page's own `.g-tabs` (wrap on a phone) off it.
  */
 export function TabStrip({ label, children, className = "" }: { label: string; children: ReactNode; className?: string }) {
   return (
     <div className={`relative mb-4 after:pointer-events-none after:absolute after:inset-y-0 after:right-0 after:w-10 after:bg-gradient-to-l after:from-[color:var(--g-surface,#fff)] after:to-transparent sm:after:hidden ${className}`}>
-      <nav className="g-tabs !mb-0 pr-10 ![scrollbar-width:thin] sm:!flex-wrap sm:!overflow-visible sm:pr-0 [&>a]:flex [&>a]:min-h-11 [&>a]:items-center" aria-label={label}>{children}</nav>
+      <nav className="g-tabs !mb-0 pr-10 ![scrollbar-width:thin] sm:!flex-wrap sm:!overflow-visible sm:pr-0 [&>a]:flex [&>a]:min-h-11 [&>a]:items-center" aria-label={label} data-tab-strip="">{children}</nav>
     </div>
   );
 }
@@ -172,22 +173,55 @@ export function useHash(): string {
   );
 }
 
+/** The SEO sections. Each address comes from links.ts and carries no site: the chosen site is remembered. */
+const ALERTS_HOME = seoLinks.alerts();
 const TABS = [
-  { href: "/seo", label: "Dashboard" },
-  { href: "/seo/explorer", label: "Site explorer" },
-  { href: "/seo/keywords", label: "Keywords explorer" },
-  { href: "/seo/content", label: "Content explorer" },
-  { href: "/seo/rank-tracker", label: "Rank tracker" },
-  { href: "/seo/local-grid", label: "Local grid" },
-  { href: "/seo/plan", label: "Action plan" },
-  { href: "/seo/audit", label: "Site audit" },
-  { href: "/seo/ai", label: "AI visibility" },
-  { href: "/seo/alerts", label: "Alerts" },
-  { href: "/seo/reports", label: "Reports" },
-  { href: "/seo/backlinks", label: "Backlinks" },
-  { href: "/seo/batch", label: "Batch analysis" },
-  { href: "/seo/usage", label: "Usage" },
+  { href: seoLinks.dashboard(), label: "Dashboard" },
+  { href: seoLinks.explorer(""), label: "Site explorer" },
+  { href: seoLinks.keywords(""), label: "Keywords explorer" },
+  { href: seoLinks.content(""), label: "Content explorer" },
+  { href: seoLinks.rankTrackerHome(), label: "Rank tracker" },
+  { href: seoLinks.localGridHome(), label: "Local grid" },
+  { href: seoLinks.planHome(), label: "Action plan" },
+  { href: seoLinks.auditHome(), label: "Site audit" },
+  { href: seoLinks.aiHome(), label: "AI visibility" },
+  { href: ALERTS_HOME, label: "Alerts" },
+  { href: seoLinks.reportsHome(), label: "Reports" },
+  { href: seoLinks.backlinksHome(), label: "Backlinks" },
+  { href: seoLinks.batch(), label: "Batch analysis" },
+  { href: seoLinks.usage(), label: "Usage" },
 ];
+
+/**
+ * Phone sizes for every SEO page, set once on the page frame so no page has to (owner's rule: a 44 px target at 390 px).
+ * Below 640 px: every button is at least 44 × 44, and every pill (a button or a link dressed as one), text box and
+ * select at least 44 px tall; a <details> summary is a 44 px line; a page's own tab strip (a `.g-tabs` that is not a
+ * TabStrip — the keyword views and ideas, opportunities, the Search Console breakdown, the keyword watch, the explorer's
+ * first look) wraps instead of scrolling sideways, every tab 44 px tall, and its scrollbar shows wherever it does
+ * scroll; a checkbox is a 20 px box with a 44 × 44 tap area (in a label, the whole label line is 44 px too) — ticked,
+ * or half-picked with a dash, in the accent with the mark in the page's own colour (white light, near-black dark). On
+ * a desktop buttons keep the 40 px floor and checkboxes their own look. Tailwind reads these classes as written, so
+ * each one is spelled out in full.
+ */
+const PHONE_SIZES = [
+  "[&_button]:min-h-10 max-sm:[&_button]:min-h-11 max-sm:[&_button]:min-w-11",
+  "max-sm:[&_.g-pill]:min-h-11 max-sm:[&_.g-input]:min-h-11 max-sm:[&_select]:min-h-11",
+  "max-sm:[&_summary]:min-h-11 max-sm:[&_summary]:content-center",
+  "[&_.g-tabs:not([data-tab-strip])]:[scrollbar-width:thin] max-sm:[&_.g-tabs:not([data-tab-strip])]:flex-wrap",
+  "[&_.g-tabs:not([data-tab-strip])>a]:flex [&_.g-tabs:not([data-tab-strip])>a]:min-h-11 [&_.g-tabs:not([data-tab-strip])>a]:items-center",
+  "max-sm:[&_label:has(input[type=checkbox])]:min-h-11",
+  "max-sm:[&_input[type=checkbox]]:m-0 max-sm:[&_input[type=checkbox]]:size-11 max-sm:[&_input[type=checkbox]]:shrink-0 max-sm:[&_input[type=checkbox]]:cursor-pointer max-sm:[&_input[type=checkbox]]:appearance-none",
+  "max-sm:[&_input[type=checkbox]]:rounded-[16px] max-sm:[&_input[type=checkbox]]:border-[12px] max-sm:[&_input[type=checkbox]]:border-transparent max-sm:[&_input[type=checkbox]]:bg-clip-padding",
+  "max-sm:[&_input[type=checkbox]]:bg-[color:var(--g-surface)] max-sm:[&_input[type=checkbox]]:[box-shadow:inset_0_0_0_2px_var(--g-text-2)]",
+  "max-sm:[&_input[type=checkbox]:checked]:bg-[color:var(--g-accent)] max-sm:[&_input[type=checkbox]:checked]:[box-shadow:none]",
+  "max-sm:[&_input[type=checkbox]:indeterminate]:bg-[color:var(--g-accent)] max-sm:[&_input[type=checkbox]:indeterminate]:[box-shadow:none]",
+  "max-sm:[&_input[type=checkbox]:checked]:bg-[url(data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2020%2020%22%3E%3Cpath%20d=%22M5%2010.5l3.5%203.5L15%207%22%20fill=%22none%22%20stroke=%22%23fff%22%20stroke-width=%222.5%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22/%3E%3C/svg%3E)]",
+  "max-sm:[&_input[type=checkbox]:indeterminate]:bg-[url(data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2020%2020%22%3E%3Cpath%20d=%22M5%2010h10%22%20fill=%22none%22%20stroke=%22%23fff%22%20stroke-width=%222.5%22%20stroke-linecap=%22round%22/%3E%3C/svg%3E)]",
+  "dark:max-sm:[&_input[type=checkbox]:checked]:bg-[url(data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2020%2020%22%3E%3Cpath%20d=%22M5%2010.5l3.5%203.5L15%207%22%20fill=%22none%22%20stroke=%22%23202124%22%20stroke-width=%222.5%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22/%3E%3C/svg%3E)]",
+  "dark:max-sm:[&_input[type=checkbox]:indeterminate]:bg-[url(data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2020%2020%22%3E%3Cpath%20d=%22M5%2010h10%22%20fill=%22none%22%20stroke=%22%23202124%22%20stroke-width=%222.5%22%20stroke-linecap=%22round%22/%3E%3C/svg%3E)]",
+  "max-sm:[&_input[type=checkbox]]:bg-center max-sm:[&_input[type=checkbox]]:bg-no-repeat",
+  "max-sm:[&_input[type=checkbox]:focus-visible]:[outline-offset:-10px] max-sm:[&_input[type=checkbox]:disabled]:cursor-default max-sm:[&_input[type=checkbox]:disabled]:opacity-50",
+].join(" ");
 
 export function SeoShell({ title, description, actions, children, site, onSite, sites, status, picker = true }: {
   title: string; description: string; actions?: ReactNode; children: ReactNode;
@@ -199,7 +233,7 @@ export function SeoShell({ title, description, actions, children, site, onSite, 
   const gate = planRequiredFrom(status.error) ?? planRequiredFrom(sites.error);
   return (
     <GoogleSurface page accent="brand" testId="seo-surface">
-      <AppPage className="before:hidden [&_button]:min-h-10">
+      <AppPage className={`before:hidden ${PHONE_SIZES}`}>
         <div className="g-header flex flex-wrap items-end justify-between gap-3">
           <div className="min-w-0">
             <h1 className="g-header__title" data-testid="text-page-title">{title}</h1>
@@ -212,7 +246,7 @@ export function SeoShell({ title, description, actions, children, site, onSite, 
         ) : (
           <>
             <TabStrip label="SEO sections">
-              {TABS.map((t) => <Link key={t.href} href={t.href} aria-current={location === t.href ? "page" : undefined}>{t.label}{t.href === "/seo/alerts" && (status.data?.alertsUnread ?? 0) > 0 && <span className="g-chip g-chip--sm ml-1" aria-label={`${status.data!.alertsUnread} unread`}>{status.data!.alertsUnread}</span>}</Link>)}
+              {TABS.map((t) => <Link key={t.href} href={t.href} aria-current={location === t.href ? "page" : undefined}>{t.label}{t.href === ALERTS_HOME && (status.data?.alertsUnread ?? 0) > 0 && <span className="g-chip g-chip--sm ml-1" aria-label={`${status.data!.alertsUnread} unread`}>{status.data!.alertsUnread}</span>}</Link>)}
             </TabStrip>
             {picker && sites.isError && <div className="g-callout mb-4" role="alert" data-testid="seo-sites-error"><h3>Couldn't load your sites</h3><p>{apiErrorMessage(sites.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void sites.refetch()}>Try again</button></div>}
             {picker && !sites.isError && <SitePicker site={site} onSite={onSite} sites={sites} />}

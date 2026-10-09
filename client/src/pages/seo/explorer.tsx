@@ -9,7 +9,7 @@
  * Every figure leads somewhere (owner 2026-10-09, links.ts): a headline figure to its report, a band to the keywords
  * in it, a month on a chart to that month, a row — every cell of it — to its own data. The address carries the view
  * and every filter (?domain, view, band, pos, intent, followed, tld, anchor, path, section, month, move, series,
- * quick, from, to, sort, locationCode + languageCode, …): this page reads them on arrival and whenever they change,
+ * quick, from, to, sort, offset, limit, locationCode + languageCode, …): this page reads them on arrival and whenever they change,
  * and never buys anything to honour them — a saved report opens, otherwise the Analyse button and the report's own
  * "Run report" prompt wait, with the filter already set. Every link is thumb-sized (44 px) and says it is a link
  * without a pointer over it; a chart's clicks have a row of month links beside them for a keyboard or a thumb.
@@ -29,7 +29,7 @@ import { api, canAfford, Empty, fmtDate, fmtNum, priceOf, SeoShell, useSelectedS
 import { compact, DeltaBadge, GradientSpark, monthLabel, PALETTE, TOOLTIP } from "./viz";
 import { BarRows, change, DifficultyBadge, Fig, FIG, Kicker, LinkedDistribution, Metric, MonthLinks, MonthTrend, OpenIcon, PositionBadge, ShareBar, type MonthSeries } from "./viz-explorer";
 import { ReportView, REPORT_NOTE, type TableKey as ReportKey } from "./report-table";
-import { bandOfPosition, FILTER_PARAMS, INTENTS, OVERVIEW_PARAMS, overviewWords, pathOfUrl } from "./explorer-filters";
+import { bandOfPosition, INTENTS, OVERVIEW_PARAMS, overviewWords, pathOfUrl } from "./explorer-filters";
 import { seoLinks, setParam, setParams } from "./links";
 import { marketParams } from "./keyword-links";
 import { GapView } from "./gap";
@@ -74,8 +74,6 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const SURFACE = { borderColor: "var(--g-divider)", background: "var(--g-surface)" } as const;
 /** The largest of a column's numbers, for the share bars beside them. */
 const maxOf = (xs: (number | null | undefined)[]) => Math.max(0, ...xs.map((x) => x ?? 0));
-/** Everything in the address that narrows a report or the overview, plus the view and the country — cleared together when the report changes under them. */
-const NARROWING = Object.fromEntries([...FILTER_PARAMS, ...OVERVIEW_PARAMS, "view", "locationCode", "languageCode", "sort", "rivals", "only"].map((k) => [k, null])) as Record<string, null>;
 /** The overview's own words, cleared together by the chip's Clear. */
 const OVERVIEW_CLEAR = Object.fromEntries(OVERVIEW_PARAMS.map((k) => [k, null])) as Record<string, null>;
 const MONTH = /^\d{4}-\d{2}$/;
@@ -205,12 +203,19 @@ export default function SeoExplorerPage() {
   const quick: TableKey = (TABLES as readonly string[]).includes(params.get("quick") ?? "") ? (params.get("quick") as TableKey) : "keywords";
   const seriesParam = params.get("series");
   const cmpFrom = monthParam("from"), cmpTo = monthParam("to");
-  /** What the address asks of the overview, in words for the chip — including a word that names nothing, said rather than dropped. */
-  const overview = view === "overview" ? overviewWords(Object.fromEntries(OVERVIEW_PARAMS.map((k) => [k, params.get(k) ?? undefined]))) : [];
   const [market, setMarket] = useMarket();
   const mk = { locationCode: market.locationCode, languageCode: market.languageCode };
-  /** Another country is another report: what is on screen is put away first, the view goes back to the overview, and the address names the new country. */
-  const changeMarket = (m: SeoMarket) => { if (marketKey(m) === marketKey(market)) return; setReport(null); setMarket(m); setParams({ ...NARROWING, ...marketParams(m) }, true); };
+  /**
+   * Another country is another report: what is on screen is put away, and the address names the new country as a NEW
+   * history entry, so Back returns to the country before (the entry being left is first made to name its own country —
+   * an address without one means the remembered country, which the pick is about to change). The view and its filters
+   * stay: each still applies to the same report in another country. Only the page of rows starts again (`offset`).
+   */
+  const changeMarket = (m: SeoMarket) => {
+    if (marketKey(m) === marketKey(market)) return;
+    if (!params.get("locationCode")) setParams({ locationCode: market.locationCode, languageCode: market.languageCode }, true);
+    setReport(null); setMarket(m); setParams({ locationCode: m.locationCode, languageCode: m.languageCode, offset: null });
+  };
 
   // A link into this page: ?domain is the site (the saved report opens — nothing is bought), ?locationCode (+ languageCode) the country.
   useEffect(() => {
@@ -313,6 +318,10 @@ export default function SeoExplorerPage() {
     { key: "new", label: "New links that month", color: PALETTE.backlinks, points: monthly(links, (h) => h.newBacklinks), href: (m) => to("newBacklinks", { month: m ?? undefined }), rows: "New links" },
     { key: "lost", label: "Lost links that month", color: PALETTE.backlinks, points: monthly(links, (h) => h.lostBacklinks), href: (m) => to("lostBacklinks", { month: m ?? undefined }), rows: "Lost links" },
   ];
+  /** The chart figures drawn once the report is on screen (each chart needs two months; a figure two months of its own), so the chip never names one that isn't. */
+  const drawn = report ? new Set([...(hist.length > 1 ? performance : []), ...(links.length > 1 ? growth : [])].filter((x) => x.points.length >= 2).map((x) => x.key)) : undefined;
+  /** What the address asks of the overview, in words for the chip — including a word that names nothing, said rather than dropped. */
+  const overview = view === "overview" ? overviewWords(Object.fromEntries(OVERVIEW_PARAMS.map((k) => [k, params.get(k) ?? undefined])), drawn) : [];
   /** The three bands of the position chart, each leading to its keywords. The grey band is everything from position 11 down — the estimate is not capped at 100. */
   const CHART_BANDS = [
     { key: "top3", name: "Positions 1–3", words: "keywords ranking in the top 3", color: PALETTE.top3, opacity: 0.85, href: to("keywords", { band: "top3" }), testId: "link-position-chart-top3" },
@@ -567,7 +576,7 @@ export default function SeoExplorerPage() {
           <p className="g-text-2 mb-2 text-[13px]">A first look at each list. The full reports — every row, with filters, sorting and export — are in the menu on the left.</p>
           {/* The table shown is the address's `quick`, so a first look is a place a link can land on. */}
           <nav className="g-tabs" aria-label="Report tables">
-            {TABLES.map((t) => <Link key={t} href={here({ quick: t })} aria-current={quick === t ? "page" : undefined} className="inline-flex min-h-[44px] items-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--g-blue)]" style={quick === t ? { color: "var(--g-blue)", borderBottomColor: "var(--g-blue)" } : undefined} data-testid={`tab-explorer-${t}`}>{TABLE_LABEL[t]}</Link>)}
+            {TABLES.map((t) => <Link key={t} href={here({ quick: t === "keywords" ? undefined : t })} aria-current={quick === t ? "page" : undefined} className="inline-flex min-h-[44px] items-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--g-blue)]" style={quick === t ? { color: "var(--g-blue)", borderBottomColor: "var(--g-blue)" } : undefined} data-testid={`tab-explorer-${t}`}>{TABLE_LABEL[t]}</Link>)}
           </nav>
           {quick === "keywords" && (report.keywords?.length ? (
             <>
@@ -598,13 +607,15 @@ export default function SeoExplorerPage() {
               <tbody>{report.pages.map((p) => {
                 const path = pathOfUrl(p.url, report.domain);
                 const at = (v: string, q: ExplorerParams = {}) => (path ? to(v, { path, ...q }) : to(v, q));
+                // Whose keywords the figures open: this page's — or, when its address isn't on this site, the whole site's, and the words say so.
+                const whose = path ? "the keywords of this page" : `${report.domain}'s keywords (this page's address isn't on ${report.domain}, so the list can't be narrowed to it)`;
                 return (
                   <tr key={p.url}>
                     <td className="max-w-[420px] truncate">{path ? <Fig href={to("pages", { path })} testId="link-page">{stripUrl(p.url)}</Fig> : <a href={p.url} className={FIG} target="_blank" rel="noreferrer">{stripUrl(p.url)}</a>}<OpenIcon href={p.url} what="the page" /></td>
-                    <td className="num" data-label="Traffic"><ShareBar value={p.traffic} max={maxOf(report.pages!.map((x) => x.traffic))} href={at("keywords")} testId="link-page-traffic" words={`${fmtNum(p.traffic)} visits a month — the keywords of this page`} /></td>
+                    <td className="num" data-label="Traffic"><ShareBar value={p.traffic} max={maxOf(report.pages!.map((x) => x.traffic))} href={at("keywords")} testId="link-page-traffic" words={`${fmtNum(p.traffic)} visits a month — ${whose}`} /></td>
                     <td className="num" data-label="Keywords"><Fig href={at("keywords")} testId="link-page-keywords">{fmtNum(p.keywords)}</Fig></td>
                     <td className="num" data-label="In top 10"><Fig href={at("keywords", { band: "top10" })} testId="link-page-top10">{fmtNum(p.top10)}</Fig></td>
-                    <td className="num" data-label="Traffic value"><Fig href={at("keywords", { sort: "cpc" })} testId="link-page-value" label={`${usd(p.trafficValue)} a month as ads — this page's keywords by ad price`}>{usd(p.trafficValue)}</Fig></td>
+                    <td className="num" data-label="Traffic value"><Fig href={at("keywords", { sort: "cpc" })} testId="link-page-value" label={`${usd(p.trafficValue)} a month as ads — ${whose}, by ad price`}>{usd(p.trafficValue)}</Fig></td>
                   </tr>
                 );
               })}</tbody>

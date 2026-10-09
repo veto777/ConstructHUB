@@ -11,6 +11,11 @@ is shown free.
 Round 2 (Kimi audit `kimi-seo-links-1.md` §2–§7): every secondary figure, cell, date and count of these screens is a
 link; the chips say only what is true; every link is a 44 px target with a cue that needs no hover.
 
+Round 3 (Kimi audit `kimi-seo-links-2.md`): the reports "Keywords checked" bar, the six usage ledger kinds, the batch
+meta line and the compare-list dates link; the reveals ("Show all", "Show more") are addresses, so they are links and the
+back button undoes them; a lone `?prompt=` / `?question=`, a bad `?undelivered=` and a loading `?check=` are said
+honestly; the local grid's key outlines exactly one colour's points.
+
 ## Shared pieces
 
 `shell.tsx`:
@@ -22,9 +27,16 @@ link; the chips say only what is true; every link is a 44 px target with a cue t
 - `useScrollTo` only scrolls. The outline is each page's own: `HIGHLIGHT` (or the same outline classes) is applied by
   reports (`?section=`), plan (`?task=`), alerts (`?alert=`), AI (`?question=` on the tracked row) and the local grid
   (`?cell=` / `?show=` on the points).
-- `TabStrip` — every tab strip of these screens (the SEO nav, the alert kinds, the plan's lists, the mentions tabs):
-  44 px tabs; on a phone the strip scrolls with a visible thin scrollbar and a fade at the right edge; from 640 px it
-  wraps.
+- `TabStrip` — the SEO nav, the alert kinds, the plan's lists and the mentions tabs: 44 px tabs; on a phone the strip
+  scrolls with a visible thin scrollbar and a fade at the right edge; from 640 px it wraps. The site audit's strips
+  wrap on a phone (`TABS` in viz-audit.tsx). The six strips that are a page's own `.g-tabs` (the keyword views and
+  ideas, opportunities, the Search Console breakdown, the keyword watch, the explorer's first look) are sized by the
+  frame (below): 44 px tabs, a visible thin scrollbar, and they wrap on a phone — none scrolls sideways with a hidden
+  scrollbar.
+- `PHONE_SIZES` — on the frame of every SEO page (`AppPage`), so no page has to: below 640 px every button is at
+  least 44 × 44, every pill (a button or a link dressed as one), text box and select at least 44 px tall, every
+  `<details>` summary a 44 px line, and a checkbox a 20 px box with a 44 × 44 tap area (in a label, the whole label
+  line is 44 px). On a desktop buttons keep a 40 px floor. `ActiveFilter`'s chip and its clear are 44 px everywhere.
 - `Tile` takes an optional `href`: the whole tile is the link, its label dotted-underlined.
 
 `viz-more.tsx` — the link classes every link here uses:
@@ -46,7 +58,7 @@ these screens any more (a toggle renders them), so every link is a real anchor a
 | SEO data this month $X left of $Y | `seoLinks.usage()` | — |
 | purchased credit $Z | `seoLinks.usage({ credits: "add" })` — opens the add-credit panel (the flag is consumed, also when the address changes while open) | — |
 | tracked keywords N of M | `seoLinks.dashboard({ sort: "keywords" })` | (the dashboard's chip) |
-| nav tabs | the section roots (they carry no site: the chosen site is remembered) | — |
+| nav tabs | the section roots, each from its builder — `dashboard()`, `explorer("")`, `keywords("")`, `content("")`, `rankTrackerHome()`, `localGridHome()`, `planHome()`, `auditHome()`, `aiHome()`, `alerts()`, `reportsHome()`, `backlinksHome()`, `batch()`, `usage()` (they carry no site: the chosen site is remembered) | — |
 | plan gate "See Agency" | `seoLinks.pricing()` | — |
 
 The three usage-line links are 44 px tall with the dotted underline and the focus ring.
@@ -56,7 +68,7 @@ The three usage-line links are 44 px tall with the dotted underline and the focu
 | Parameter | What it does |
 | --- | --- |
 | `site` | the site reported on |
-| `section` | `rankings` / `fixes` / `work` / `visibility` (By tag) / `grid` — scrolls to and outlines that section. Chip "Jumped to: Rankings" only when the section is in this report; otherwise `"Local grid" is not in this report yet — it appears once that tool has numbers for example.com`, or `No section called "x" in a report (…)`. A site picked drops `?section=` (another report). |
+| `section` | `rankings` / `fixes` / `work` / `visibility` (By tag) / `grid` — scrolls to and outlines that section. Chip "Jumped to: Rankings" only when the section is in this report; otherwise `"Local grid" is not in this report yet — it appears once that tool has numbers for example.com`, or `No section called "x" in a report (…)`. An empty report still says it: `"Rankings" is not in this report — the report has no numbers for example.com yet` (the address is never silently unacknowledged). A site picked drops `?section=` (another report). |
 
 | Figure | Where it goes |
 | --- | --- |
@@ -73,6 +85,8 @@ The three usage-line links are 44 px tall with the dotted underline and the focu
 | Site health / "N errors" / "N warnings" | `audit(site)` / `{ severity }` |
 | Rankings title / device · checked date | `rankTracker(site, { device })` / `{ panel: "history", date, device }` |
 | In the top 3 / top 10 / Average / Map pack / Keywords checked, and their feet ("of N checked", "change on the N in both checks", "N of M tracked not covered") | `rankTracker(site, { band, device })` …; history for the "in both" words; `{ band: "notFound" }` |
+| Keywords checked: the bar's three parts and their legend counts (Top 3 · N, 4–10 · N, Below 10 or not found · N) | `rankTracker(site, { band: "top3", device })` / `{ positions: "4-10", device }` (a slice `band` cannot name) / `{ band: "rest", device }` — the same keywords the tiles above count; 44 px segments and legend links (`link-report-checked-dist-…`) |
+| Download PDF | the report's PDF (a file, `link-report-pdf`) — a 44 px pill |
 | ▲ Moved up / ▼ Moved down headings and rows | `rankTracker(site, { move, device })` / `{ keyword, device }` |
 | All N keywords in the report: heading, keyword · place, Position, Was, Map pack #n / —, Searches / mo | `rankTracker(site, { device })`; `{ keyword, device }`; `{ keyword, panel: "history" }`; `{ keyword, mapPack: true }`; `keywords(kw, { section: "volume" })`. The first 10 rows are on screen and "Show all N" renders the rest — no closed `<details>` (the crawl found the rank-tracker links inside the old one did not navigate). |
 | By tag: tag / Keywords / "N in both" / "N new" / In the top 10 / ±change / Visibility index / ±change | `rankTracker(site, { tag, device })`; `{ tag, panel: "history" }`; `{ tag, move: "new" }`; `{ tag, band: "top10" }`; `{ tag, band: "top10", panel: "history" }`; `{ tag, panel: "history" }` |
@@ -91,7 +105,7 @@ The three usage-line links are 44 px tall with the dotted underline and the focu
 | --- | --- |
 | `scan` | opens one saved scan |
 | `cell` | the point picked (0-based); each dot writes it |
-| `show` | `top3` / `found` / `checked` / `failed` — outlines the points a figure counts (`failed` appended in round 2) |
+| `show` | `top3` / `found` / `checked` / `failed` — outlines the points a figure counts (`failed` appended in round 2); round 3, one per colour of the key: `4-10`, `11-20` (11th or lower, still found), `notFound` (checked, not in the results read) |
 
 Chip: `Scan: "kw" · Oct 3 · point 2 miles north of the business · 7 of 25 outlined: the points where you are in the
 first 3`. With `show=checked` and failed lookups: `22 of 25 outlined: every point that could be checked — the position
@@ -107,9 +121,10 @@ still opening or running). A site picked drops `scan`, `cell`, `show`.
 | Area tile | `{ scan }`; its foot "N points could not be checked" → `{ scan, show: "failed" }`, else "N points checked" → `{ scan, show: "checked" }` |
 | "At N points … recognised by your website or name" | `{ scan, show: "found" }` |
 | Each grid dot | `setParam("cell", i)` |
-| Colour key entries | `{ scan, show }` per colour |
-| Point detail: "You: position n" / businesses in the first three | `{ scan, show, cell }` / `explorer(domain)`, You → `rankTracker(site, { mapPack: true })` |
-| Who shows up: business / domain / In the first 3 / Found / Average position where found | `explorer(domain)`; your row → `rankTracker(site, { mapPack: true })` and `{ scan, show }`. No view holds a rival's points: its figures open its website in Site explorer (the link title says so). |
+| Colour key entries (`link-grid-key-<show>`) | `{ scan, show }` with that colour's own value — 1–3 `top3`, 4–10 `4-10`, 11–20 `11-20`, 20+ not found `notFound`, ? unknown `failed`: the outline is exactly the points painted that colour |
+| Point detail: "You: position n" (`link-grid-cell-band`) / businesses in the first three | `{ scan, show: <that point's colour>, cell }` / `explorer(domain)`, You → `rankTracker(site, { mapPack: true })`; a business with no website says so in visible words |
+| Who shows up: business / domain / In the first 3 / Found / Average position where found | `explorer(domain)`; your row → `rankTracker(site, { mapPack: true })` and `{ scan, show }`. No view holds a rival's points: a rival with a website opens it in Site explorer (the link title says so). A rival with no website in Google's listing has nowhere to open: its name says "(no website in Google's listing)" and, on a phone (where a `title` never shows), each of its figures says "· no website to open" in visible words — plain text, never a guessed link. |
+| Business search results: a listing with no website | its name, then "(no website in Google's listing)" in visible words (no guessed link) |
 | Reviews (who shows up, and the listing-search results' stars) | `seoLinks.googleMaps({ cid, name, address })` — outside the app, the listing on Google Maps, where Google's own stars and reviews live (no view here holds them; the ↗ and the title say so). Rivals carry Google's listing id (`GridRival.cid`) from newer scans; without one it is a Maps search for the name. |
 | "Centred on" listing / its address | `explorer(domain)` / `googleMaps(pin)` |
 | Cost words (about $x of your SEO data, up to $y set aside) | `usage()` |
@@ -135,7 +150,10 @@ like for like against Aug 2026 · AI mentions of x.com (Google AI Overviews) …
 silently dropped: `month="foo" — not a month (YYYY-MM), so not applied` (never "Invalid Date"); `by "bard" — not an
 assistant here (ChatGPT, Google Gemini, Perplexity), so none match` (the list is empty, not everything);
 `named="maybe" — not true or false, so not applied`; `days="x" — not a number of days`; `vs="x" — not a month`.
-The clear control drops every one of these, `prompt` and `question` too ("Show everything" shows everything).
+A question opened by the address alone (`?prompt=` or `?question=` with nothing else) has its chip too — `One question:
+"…"`, `One question, asked again every month: "…"`, `"…" — no saved answers to it for example.com`, or `question #12 —
+not one asked again every month for example.com, so the newest question is shown` — so the clear control is always
+there. The clear control drops every one of these, `prompt` and `question` too ("Show everything" shows everything).
 
 | Figure | Where it goes |
 | --- | --- |
@@ -154,17 +172,21 @@ The clear control drops every one of these, `prompt` and `question` too ("Show e
 | Answers list (`?month` …): date / question / assistant / Named you / Used your website / businesses / "and N more" | `{ month }` / `{ prompt }` / `{ prompt, assistant }` / … / `{ business }` / `{ prompt }`; every cell has its `data-label` |
 | AI mentions: total / as-of date / question / Searches / mo / other sites / Seen / "the N most-searched of M" | `explorer(domain)` / `ai(site, { mentions, platform })` / `keywords(q)` / `keywords(q, { section: "volume" })` / `explorer(domain)` / `keywords(q)` (the source's date has no view) / `explorer(domain)` |
 
-## Alerts (`alerts.tsx`) — honours `site`, `kind`, `now`, `before`, `watch`, `watchAll`
+## Alerts (`alerts.tsx`) — honours `site`, `kind`, `alert`, `undelivered`, `all`, `more`, `now`, `before`, `watch`, `watchAll`
 
 | Parameter | What it narrows |
 | --- | --- |
 | `site` | that site only (the scope picker writes / clears it; the shell's site picker writes it too) |
 | `alert` | one alert's id: scrolled to and outlined when it is among the ones loaded; otherwise the chip says `alert #12 — not among the 50 loaded (it may be older — "Show more" — or of another kind or site)` |
-| `undelivered` | `true`: the alerts whose delivery was given up, of the ones loaded (`not sent — N of the M loaded`); the alert `?alert=` names stays shown |
+| `undelivered` | `true`: the alerts whose delivery was given up, of the ones loaded (`not sent — N of the M loaded`); the alert `?alert=` names stays shown. A value that is neither true nor false → `undelivered="foo" — not true or false, so not applied` |
+| `all` | alert ids, comma-separated: those alerts list every movement (rank alerts, beyond the first 25) or every kept keyword (keyword-watch alerts, beyond the first 20). "Show all N movements" / "Show all N kept with this alert" and "Show the first …" are links that add or remove the alert's id; the others stay as they are |
+| `more` | how many pages of older alerts are listed after the newest page; "Show more (N older)" is a link to one more (44 px), the pages load one after another (a link with `more=3` loads three), the back button lists one fewer. A page that fails is not asked for again by itself: a "Try loading the older alerts again" button. The kind tabs, the scope picker and the chip's clear drop it |
 | `kind` | one kind; the kind tabs are links |
 | `now`, `before`, `watch`, `watchAll` | the keyword watch on the page: the two snapshots compared (ids), its list (`added` / `gone` / `pages`) and every row — its own chip says so (`rank-tracker.md` → Keyword watch) |
 
-Chip: "Rankings fell · example.com only · alert #12" (clear → all alerts: drops `kind`, `site`, `alert`, `undelivered`).
+Chip: "Rankings fell · example.com only · alert #12" (clear → all alerts: drops `kind`, `site`, `alert`, `undelivered`,
+`more`, `all`). The callout over undelivered alerts says how they are marked: "Not sent" — or "Email not sent" when the
+bell entry went out and only the email failed.
 Arriving with `now` + `before` (a plan task's "Open this comparison") scrolls to the keyword watch.
 
 | Alert | Where it goes |
@@ -174,9 +196,9 @@ Arriving with `now` + `before` (a plan task's "Open this comparison") scrolls to
 | links_lost / links_gained | `seoLinks.backlinks(site, { section: "lost" \| "new" })`; each lost site → `{ section: "lost", domain }`, its authority → `explorer(domain)`; the counts now → `explorer(domain, "referringDomains" \| "backlinks")`; the counts then and their date → `backlinks(site)` (the page that keeps the monthly snapshots — the link title says so) |
 | grid_down / grid_up | **per item**: the search → `localGrid(site, { scan: scanId })`, "N of M" → `{ scan, show: "top3" }`, score → `{ scan, show: "checked" }`; "was …", its date and "was score" → `{ scan: wasScanId, show }` (server items now carry `wasScanId`; older alerts → `localGrid(site)`, said in the title). The footer opens the one scan only when the alert holds one item. |
 | mention_new | **per item**: `seoLinks.mentions(site, { check: checkId })` — its date, "N more than this alert keeps" and, with several items, "Open this check on Mentions"; each website → `explorer(domain)`, each page title ↗ the page itself |
-| kw_new / kw_lost figures | position → `explorer(domain, "keywords", { contains })`; volume → `keywords(keyword, { section: "volume" })`; the two snapshot dates and "N more" → the comparison (next row) |
+| kw_new / kw_lost figures | position → `explorer(domain, "keywords", { contains })`; volume → `keywords(keyword, { section: "volume" })`; the two snapshot dates and "N more" → the comparison (next row) when the alert keeps both snapshots' ids (`snapshotId` / `beforeId`). An older alert kept no ids: there is no comparison to open, so its dates and "N more" stay plain words — a link would land on a comparison that does not exist |
 | kw_new / kw_lost | `explorer(domain, "keywords")`; each search → `keywords(keyword)`; "Open this comparison" → `alerts({ site, kind, now, before })` — the keyword watch on the page reads the pair from the address (`?watch=` its list, `?watchAll=` every row; see `rank-tracker.md` → Keyword watch) |
-| page counts | "Showing N of M" → the list itself; "N alerts could not be sent" → `alerts({ site, kind, undelivered: true })` |
+| page counts | "Showing N of M" → N: the list itself, with `undelivered: true` kept when it narrowed the list (`link-alerts-listed`; the sentence then adds "— only the ones not sent, of those loaded"); M: every alert of the kind (`link-alerts-total`); "N alerts could not be sent" → `alerts({ site, kind, undelivered: true })` |
 | Settings → Notifications | `seoLinks.appSettings({ tab: "notifications" })` |
 | a crawl / an AI change | no such alert kinds exist today — nothing to link |
 
@@ -211,7 +233,7 @@ facts when it adds `origin` (the server keeps 12).
 
 | Parameter | What it does |
 | --- | --- |
-| `check` | one watched check (an alert's). Chip: `the check an alert was raised from (#12)` once that check is shown; `check #12 — not available (it may belong to another site), so the newest check is shown` when it is not; `check "abc" — not a check number, so the newest check is shown` |
+| `check` | one watched check (an alert's). The chip says nothing of a check number until the page knows whether it is shown (the answer is in, for that same check); then: `the check an alert was raised from (#12), in the monthly watch below` (the check is the watch panel's; the main table stays the newest ordinary check); `check #12 — not available (it may belong to another site), so the newest check is shown` when it is not; `check "abc" — not a check number, so the newest check is shown` at once |
 | `tab` | `prospects` / `yours` / `unsure` / `linked` / `notMine` / `all`; the tabs are links; another word → `"x" — not a tab here, so Likely you, no link is shown` |
 
 The clear control says where it lands: "Newest check · Likely you, no link".
@@ -222,7 +244,9 @@ The clear control says where it lands: "Newest check · Likely you, no link".
 | row: website / page title ↗ / excerpt / place-match words / Authority / Published / Link to you | `explorer(domain)` / the page / the page / the tab the row is under (`yours` / `unsure` / `notMine`) / `explorer(domain)` / the page (its own date) / `backlinks(site, { domain })` — the links from that website to yours |
 | watch: Next date / first-run date | `alerts({ site, kind: "mention_new" })` (what the watch raises) |
 | watch: the window's dates and its count | `mentions(site, { check: id })` |
-| watch rows: website / page title ↗ | `explorer(domain)` / the page |
+| watch rows: website / page title ↗ / "its website links to you" · "no link found" · "link not known" | `explorer(domain)` / the page / `backlinks(site, { domain })` (as the table's Link to you cell; `link-mentions-watch-link-<domain>`) |
+| the searched name ("using "Alpine Exteriors"", "Following "…"") and a watch row's place words ("names Bellingham", "you confirmed this page") | plain words: the name is the question the check asked, not data with a view of its own (no address narrows by name — the page shows one name at a time), and a watch row's place words describe a page of a watched check that no tab lists; the figures beside them link |
+| "Watch for new mentions every month" | a checkbox whose label is a 44 px target |
 
 ## Usage (`usage.tsx`) — honours `credits`, `month`
 
@@ -239,9 +263,17 @@ intersect → `explorer(target, "contentGap" \| "linkIntersect")`; Batch analysi
 AI visibility → `ai(site, { question: id })` for a monthly question (its label now ends `monthly #id) for domain`),
 else `ai(site, { prompt: first 90 characters })` (the AI page opens the question that begins with them; newer labels
 name the site: `… for domain`); Mentions watch "name" → the site with that business name; Refresh list → `keywords("",
-{ view: "lists" })`; Local grid, older AI and Mentions rows that name no site → the account's only site. A row whose site
-is gone, or cannot be told, stays words with a title saying why — a snapshot or gap of a removed site no longer guesses
-the explorer's live report.
+{ view: "lists" })`; Local grid, older AI and Mentions rows that name no site → the account's only site. Round 3, the six kinds that were
+words: a report table "<name> — <target>" (Organic keywords, Paid keywords, Top pages, Organic competitors, Backlinks,
+New / Lost / Broken backlinks, Referring domains, Anchors, Best pages by links, Referring IPs, Sites with similar links,
+Subdomains, Ads — the server's `REPORT_NAMES`) → `explorer(domain, <its view>)`, and Matching terms / Related terms /
+Questions → `keywords(kw, { table })`; Directories "a, b, c" → `explorer(a, "directories", { rivals: "b,c" })` (alone:
+`rivals: "none"`; a second try names the comparison on newer rows, "(second try for a, b, c)" — an older second try
+names none and stays words); Service-area planner "domain (S × T)" → `servicePlanner(site)` (the site's planner, its
+saved services and towns); Opportunities "domain" → `explorer(domain, "opportunities")`; Bulk keyword analysis →
+`keywords("", { view: "bulk" })` (the label keeps how many keywords, not which). ("Opportities" was the audit's typo, not
+the ledger's.) A row whose site is gone, or cannot be told, stays words with a title saying why — a snapshot or gap of a
+removed site no longer guesses the explorer's live report.
 
 Cost → the page that spent it (else that month); "up to $x set aside — still running" is written out (no longer only a
 `title`); Paid from: included data → `usage({ month })`, purchased credit → `usage({ credits: "add" })`; Credit added →
@@ -250,7 +282,9 @@ Cost → the page that spent it (else that month); "up to $x set aside — still
 ## Batch (`batch.tsx`)
 
 Each website → `explorer(domain)`; each figure → `explorer(domain, "overview" | "referringDomains" | "backlinks" |
-"pages" | "keywords")`. On a phone (the table head hidden) an "Order by" select holds the column sorting. Intro links →
+"pages" | "keywords")`. Meta line: "N sites" → `batch()#table-batch` (the table, scrolled to; `link-batch-count`), "as of
+date" → `usage({ month })` (that month's lookups, where it was charged; `link-batch-as-of`); "United States" is the
+market the numbers are for (a qualifier, plain). On a phone (the table head hidden) an "Order by" select holds the column sorting. Intro links →
 the site's rank tracker competitors panel / `explorer(site, "linkIntersect")` / Site explorer (`explorer("")` without a
 site — no hand-written address).
 
@@ -261,7 +295,8 @@ drops the parameter, empties the box and takes the results off the screen (no na
 keyword → `keywords(kw)`; volume → `keywords(kw, { section: "volume" })`; difficulty → `keywords(kw)`; CPC →
 `keywords(kw, { section: "cpc" })`; intent → `explorer(competitor, "keywords", { intent })`; their position →
 `explorer(competitor, "keywords", { contains: kw })`; "N keywords" / "showing N" → `explorer(ours, "contentGap")`;
-both sites → `explorer(…)`; the competitors panel → `rankTracker(site, { panel: "competitors" })`. Track is 44 px.
+both sites → `explorer(…)`; the competitors panel → `rankTracker(site, { panel: "competitors" })`. Track is 44 px and its
+cell says "Rank tracker" on a phone (card mode); the AI sources table's Plan cell says "Action plan".
 
 ## Appended to links.ts (nothing renamed)
 
@@ -271,6 +306,8 @@ Round 2: `localGrid.show` "failed"; `ai.vs`, `ai.latest`, `ai.days`, `ai.mention
 `alerts.undelivered` (beside the rank tracker's `now` / `before` / `watch` / `watchAll`); `plan.due`, `plan.owner`;
 `searchConsole()` (the rank tracker's, the same line); `appSettings({ tab })`, `siteScan()`, `pricing()`,
 `googleMaps({ cid, name, address })`.
+Round 3: `localGrid.show` "4-10" / "11-20" / "notFound"; `alerts.all`, `alerts.more`; `audit.all`, `audit.more`
+(`site-audit.md`); `servicePlanner(siteId)`.
 
 ## Server fields added for the links
 
@@ -279,6 +316,7 @@ Round 1 — `site-report.ts`: `audit.topIssues[].key`, `work.done[].id`, `work.o
 Round 2 — `site-report.ts`: `alerts[].id`; `grid-monitor.ts`: `GridReportLine.previous.scanId` and the grid alert
 item's `wasScanId`; `grid.ts`: `GridRival.cid`; the AI ledger labels name the site (`… for domain`) and a monthly
 question's id (`monthly #id`) (`routes.ts`, `ai-monthly.ts`).
+Round 3 — `routes.ts`: a Directories second try's ledger label names the whole comparison (`… (second try for a, b, c)`).
 
 Guard: `server/seo/reports-links.test.ts` pins the builders, the address reading, the chips' honest words and every
 figure's link on these screens. It is a source guard (no browser): it does not prove the click-crawl, which is the rig's

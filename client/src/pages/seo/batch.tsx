@@ -5,7 +5,8 @@
  * shown first; reopening the same list within a day is free.
  *
  * Every row opens that website in Site explorer, and every figure in it opens the explorer's report for that figure
- * (links.ts seoLinks.explorer: linking sites, links, pages, keywords).
+ * (links.ts seoLinks.explorer: linking sites, links, pages, keywords). The meta line too: the count of sites opens
+ * the table (#table-batch), the as-of date that month's lookups on Usage (where the analysis was charged).
  */
 import { useMemo, useState } from "react";
 import { Link } from "wouter";
@@ -14,9 +15,9 @@ import { Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { api, Empty, fmtDate, fmtNum, isNotRunYet, money, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { api, Empty, fmtDate, fmtNum, isNotRunYet, money, SeoShell, useHash, useScrollTo, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
 import { seoLinks } from "./links";
-import { FIGURE_LINK, TEXT_LINK } from "./viz-more";
+import { FIGURE_LINK, QUIET_LINK, TEXT_LINK } from "./viz-more";
 
 type Row = { domain: string; authority: number | null; referringDomains: number | null; backlinks: number | null; traffic: number | null; keywords: number | null };
 type Page = { rows: Row[]; missing: string[]; fetchedAt: string };
@@ -60,6 +61,9 @@ export default function SeoBatchPage() {
   const need = holdFor(Math.min(asked.length || draft.length, MAX));
   const canPay = need == null || !status.data?.credits || status.data.credits.availableCents === -1 || status.data.credits.availableCents >= need;
   const page = saved.data?.page ?? null;
+  // "N sites" in the meta line opens the table (#table-batch): brought into view once it is on screen.
+  const hash = useHash();
+  useScrollTo(hash === "table-batch" ? hash : null, !!page);
   const rows = useMemo(() => {
     if (!page) return [];
     const val = (r: Row) => (sort.key === "domain" ? r.domain : (r[sort.key] ?? -1));
@@ -100,7 +104,7 @@ export default function SeoBatchPage() {
         {page && (
           <>
             <div className="mb-2 flex flex-wrap items-center gap-2 text-[13px]">
-              <span className="g-text-2" data-testid="text-batch-meta">{fmtNum(page.rows.length)} site{page.rows.length === 1 ? "" : "s"} · as of {fmtDate(page.fetchedAt)} · United States</span>
+              <span className="g-text-2" data-testid="text-batch-meta"><Link href={`${seoLinks.batch()}#table-batch`} className={QUIET_LINK} title="The websites, in the table below" data-testid="link-batch-count">{fmtNum(page.rows.length)} site{page.rows.length === 1 ? "" : "s"}</Link> · <Link href={seoLinks.usage({ month: page.fetchedAt.slice(0, 7) })} className={QUIET_LINK} title="When this was looked up — that month's lookups on the Usage page" data-testid="link-batch-as-of">as of {fmtDate(page.fetchedAt)}</Link> · United States</span>
               <button type="button" className="g-pill g-pill--sm !min-h-11 ml-auto" onClick={exportCsv} data-testid="button-batch-export"><Download /> Export</button>
             </div>
             {page.missing.length > 0 && <p className="g-text-2 mb-2 text-[13px]" role="status" data-testid="text-batch-missing">Didn't load this time: {page.missing.map((m) => MISSING[m] ?? m).join(", ")}. The other columns are complete. <button type="button" className={TEXT_LINK} disabled={run.isPending || !canPay} onClick={() => run.mutate({ body, key: queryKey, again: true })} data-testid="button-batch-retry">{run.isPending ? "Trying again…" : `Try again${price != null ? ` — about ${money(price)}` : ""}`}</button></p>}
@@ -112,7 +116,7 @@ export default function SeoBatchPage() {
               </select>
             </label>
             <div className="overflow-x-auto">
-              <table className="g-table w-full" data-testid="table-batch">
+              <table id="table-batch" className="g-table w-full scroll-mt-4" data-testid="table-batch">
                 <thead><tr>{th("domain", "Website", false)}{COLS.map((c) => th(c.key, c.label, true, c.title))}</tr></thead>
                 {/* The website opens in Site explorer; each figure opens the explorer's report it was read from. */}
                 <tbody>{rows.map((r) => (

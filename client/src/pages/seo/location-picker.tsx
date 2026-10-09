@@ -36,7 +36,8 @@ export function LocationPicker({ value, onChange, onTyped, error = null, placeho
   if (value) {
     return (
       <span className="g-chip" data-testid="chip-location"><MapPin className="mr-1 inline h-3.5 w-3.5" aria-hidden />{value.label} <span className="g-text-2 text-[12px]">· {value.kind}</span>
-        <button type="button" className="ml-1 align-middle" aria-label={`Remove ${value.label}`} onClick={() => { onChange(null); clear(); }}><X className="h-3 w-3" /></button>
+        {/* A 44 × 44 tap area that does not make the chip taller (the negative margins give the extra height back). */}
+        <button type="button" className="-my-3 -mr-2 ml-0.5 inline-grid min-h-11 min-w-11 place-items-center rounded-full align-middle hover:bg-[var(--g-hover)]" aria-label={`Remove ${value.label}`} onClick={() => { onChange(null); clear(); }} data-testid="button-remove-location"><X className="h-3.5 w-3.5" /></button>
       </span>
     );
   }
@@ -65,7 +66,7 @@ export function LocationPicker({ value, onChange, onTyped, error = null, placeho
           {search.isSuccess && q === text.trim() && items.length === 0 && <li className="g-text-2 px-3 py-2">No place starts with "{q}". Try the city name or a ZIP code.</li>}
           {items.map((p, i) => (
             <li key={p.code} id={`${id}-opt-${p.code}`} role="option" aria-selected={i === active} onMouseEnter={() => setActive(i)} onMouseDown={(e) => { e.preventDefault(); pick(p); }}
-              className="g-text flex cursor-pointer items-baseline gap-2 px-3 py-1.5" style={i === active ? { background: "var(--g-hover)" } : undefined} data-testid={`option-location-${p.code}`}>
+              className="g-text flex cursor-pointer items-baseline gap-2 px-3 py-1.5 max-sm:min-h-11 max-sm:items-center" style={i === active ? { background: "var(--g-hover)" } : undefined} data-testid={`option-location-${p.code}`}>
               {p.label} <span className="g-text-2 ml-auto text-[12px]">{p.kind}</span>
             </li>
           ))}

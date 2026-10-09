@@ -8,7 +8,8 @@
  * list is one lookup (free to reopen for a day). See server/seo/reports.ts.
  *
  * The address is the state (links.ts): `keyword`, `view`, `table`, `locationCode` + `languageCode`, `section`,
- * `month`, `intent`, `list`, `topic` and `show` are read from it, every tab and figure is a link that writes it, and
+ * `month`, `intent`, `list`, `topic`, `show`, `service` and `town` are read from it (the ideas table also reads its
+ * `sort`, `offset` and `limit`), every tab and figure is a link that writes it, and
  * what narrowed the view is shown in a chip (data-testid="active-filter") with a clear control. The ideas tables
  * are `linked`: their filter boxes read the address and write it back. Arriving by link never buys: the saved
  * overview opens, or the Look up button waits.
@@ -24,7 +25,7 @@ import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { api, canAfford, Empty, fmtDate, fmtNum, money, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
 import { ReportView, type TableKey } from "./report-table";
-import { INTENTS } from "./explorer-filters";
+import { INTENTS, pathOfUrl } from "./explorer-filters";
 import { AddToList, BulkKeywords, KeywordLists } from "./keyword-lists";
 import { MarketPicker, useMarket } from "./market";
 import { DEFAULT_MARKET, findMarket, marketKey, SEO_MARKETS, type SeoMarket } from "@shared/seo-markets";
@@ -274,7 +275,7 @@ export default function SeoKeywordsPage() {
                 foot={o.topAvg.referringDomains != null ? <Link href={addr({ section: "serp" })} className={TEXT_LINK} data-testid="link-top-avg">Top pages average {fmtNum(o.topAvg.referringDomains)} referring domains</Link> : "0–100"} />
               <MetricColumn label="Cost per click" value={<Link href={addr({ section: "cpc" })} className={FIG_LINK} title="No view lists the bids — this opens who ranks" data-testid="link-cpc">{o.cpc == null ? "—" : `$${o.cpc.toFixed(2)}`}</Link>}
                 foot={o.bidLow != null && o.bidHigh != null ? <Link href={addr({ section: "cpc" })} className={TEXT_LINK} data-testid="link-cpc-bids">Top-of-page bids ${o.bidLow.toFixed(2)}–${o.bidHigh.toFixed(2)}</Link> : o.competition ? <Link href={addr({ section: "cpc" })} className={TEXT_LINK} data-testid="link-cpc-bids">{cap(o.competition.toLowerCase())} ad competition</Link> : undefined} />
-              <MetricColumn label="Intent" value={o.intent ? <Link href={addr({ section: "ideas", table: "matchingTerms", intent: (INTENTS as readonly string[]).includes(o.intent) ? o.intent : undefined })} className={`${FIG_LINK} text-[20px]`} title="Matching terms, narrowed to this intent" data-testid="link-intent">{cap(o.intent)}</Link> : "—"}
+              <MetricColumn label="Intent" value={o.intent ? <Link href={addr({ section: "ideas", table: "matchingTerms", intent: (INTENTS as readonly string[]).includes(o.intent) ? o.intent : undefined })} className={`${FIG_LINK} text-[20px]`} title={(INTENTS as readonly string[]).includes(o.intent) ? "Matching terms, narrowed to this intent" : "Matching terms — the ideas table has no filter for this intent, so every idea is shown"} data-testid="link-intent">{cap(o.intent)}</Link> : "—"}
                 foot={o.results != null ? <Link href={addr({ section: "results" })} className={TEXT_LINK} data-testid="link-results">{fmtNum(o.results)} results</Link> : undefined} />
               {o.potential !== undefined && <MetricColumn label="Traffic potential" value={o.potential ? <Link href={addr({ section: "ideas", table: "relatedTerms", intent: undefined })} className={FIG_LINK} title="The related terms the #1 page ranks for" data-testid="link-potential">{fmtNum(o.potential.traffic)}</Link> : "—"}
                 foot={o.potential ? <Link href={addr({ section: "ideas", table: "relatedTerms", intent: undefined })} className={TEXT_LINK} data-testid="link-potential-note">{o.potential.keywords === 1 ? `Estimated visits a month the #1 page gets from search in ${market.label} — it ranks for one keyword` : o.potential.keywords == null ? `Estimated visits a month the #1 page gets from search in ${market.label}` : `Estimated visits a month the #1 page gets in ${market.label} from all ${fmtNum(o.potential.keywords)} keywords it ranks for`}</Link> : (o.missing ?? []).includes("potential") ? "Didn't load this time (not charged)" : "Not available for this keyword"} />}
@@ -299,7 +300,8 @@ export default function SeoKeywordsPage() {
             </Card>
             <Card className="scroll-mt-4" id="keyword-features" testId="panel-keyword-features">
               <Heading className="mb-2">On the results page</Heading>
-              {o.features.length ? <div className="flex flex-wrap gap-1.5">{o.features.map((f) => <FeatureTag key={f} feature={f} label={FEATURE[f] ?? cap(f.replace(/_/g, " "))} href={addr({ section: "serp" })} testId={`link-feature-${f}`} />)}</div> : <p className="g-text-2 text-[13px]">Plain results only.</p>}
+              {/* A feature opens this card as its own address (links.ts `section` features): what the saved results page showed. */}
+              {o.features.length ? <div className="flex flex-wrap gap-1.5">{o.features.map((f) => <FeatureTag key={f} feature={f} label={FEATURE[f] ?? cap(f.replace(/_/g, " "))} href={addr({ section: "features" })} testId={`link-feature-${f}`} />)}</div> : <p className="g-text-2 text-[13px]">Plain results only.</p>}
               <p className="g-text-2 mt-3 text-[12px]">{o.features.includes("local_pack") ? "The saved results had a map pack, so a strong Google Business Profile matters as much as the website." : "No map pack in the saved results, so the website is what competes here."}</p>
               {site && isTracked && <p className="g-text-2 mt-2 text-[12px]">Tracked on {site.domain}: <Link href={seoLinks.rankTracker(site.id, { keyword: o.keyword })} className={TEXT_LINK} data-testid="link-features-tracker">the results-page features of each weekly check</Link></p>}
             </Card>
@@ -311,13 +313,13 @@ export default function SeoKeywordsPage() {
               <div className="overflow-x-auto">
               <table className="g-table">
                 <thead><tr><th className="num w-10">#</th><th>Page</th><th className="num">Site authority</th><th></th></tr></thead>
-                <tbody>{o.serp.map((s) => { const shown = s.url.replace(/^https?:\/\/(www\.)?/, ""); const rest = shown.startsWith(s.domain) ? shown.slice(s.domain.length) : ` · ${shown}`; return (
+                <tbody>{o.serp.map((s) => { const shown = s.url.replace(/^https?:\/\/(www\.)?/, ""); const rest = shown.startsWith(s.domain) ? shown.slice(s.domain.length) : ` · ${shown}`; const path = pathOfUrl(s.url, s.domain); return (
                   <tr key={`${s.position}-${s.url}`}>
-                    <td className="num"><Link href={seoLinks.explorer(s.domain, "keywords", { contains: o.keyword, ...(market.locationCode !== DEFAULT_MARKET.locationCode ? { locationCode: market.locationCode } : {}) })} className={FIG_LINK} title={`Its place for this search — ${s.domain}'s organic keywords in Site explorer, narrowed to it (its own lookup: a saved page opens free)`} data-testid={`link-serp-position-${s.position}`}>{s.position}</Link></td>
-                    {/* The address under the title: the site is a link 44 px tall; only the rest of the address is cut short. */}
-                    <td className="min-w-0"><a href={s.url} className={TEXT_LINK} target="_blank" rel="noreferrer">{s.title ?? s.domain}</a><span className="g-text-2 flex max-w-[520px] items-center text-[12px]"><Link href={seoLinks.explorer(s.domain)} className={`${BLOCK_LINK} g-link shrink-0`} title={`${s.domain} in Site explorer`} data-testid={`link-serp-domain-${s.position}`}>{s.domain}</Link><span className="min-w-0 truncate">{rest}</span></span></td>
+                    <td className="num" data-label="Place"><Link href={seoLinks.explorer(s.domain, "keywords", { contains: o.keyword, ...marketParams(market) })} className={FIG_LINK} title={`Its place for this search — ${s.domain}'s organic keywords in Site explorer, narrowed to it (its own lookup: a saved page opens free)`} data-testid={`link-serp-position-${s.position}`}>{s.position}</Link></td>
+                    {/* The address under the title: the site is a link 44 px tall, and so is the rest of the address (that page in Site explorer) — only its words are cut short. */}
+                    <td className="min-w-0" data-label="Page"><a href={s.url} className={TEXT_LINK} target="_blank" rel="noreferrer">{s.title ?? s.domain}</a><span className="g-text-2 flex max-w-[520px] items-center text-[12px]"><Link href={seoLinks.explorer(s.domain)} className={`${BLOCK_LINK} g-link shrink-0`} title={`${s.domain} in Site explorer`} data-testid={`link-serp-domain-${s.position}`}>{s.domain}</Link>{rest && <Link href={path ? seoLinks.explorer(s.domain, "pages", { path, ...marketParams(market) }) : seoLinks.explorer(s.domain, "pages", marketParams(market))} className={`${BLOCK_LINK} g-link min-w-0`} title={path ? `${s.url} — this page in Site explorer's top pages` : `${s.url} — not an address on ${s.domain} as written, so this opens ${s.domain}'s top pages in Site explorer`} data-testid={`link-serp-path-${s.position}`}><span className="min-w-0 truncate">{rest}</span></Link>}</span></td>
                     <td className="num" data-label="Site authority"><Link href={seoLinks.explorer(s.domain, "referringDomains")} className={BLOCK_LINK} title="Link strength of the site, 0–100 — opens its referring domains" data-testid={`link-serp-authority-${s.position}`}><BarFigure value={s.authority} max={100} color={PALETTE.authority} format={String} /></Link></td>
-                    <td className="num"><Link className={TEXT_LINK} href={seoLinks.explorer(s.domain)} data-testid={`link-explore-${s.position}`}>Explore site</Link></td>
+                    <td className="num" data-label="Site"><Link className={TEXT_LINK} href={seoLinks.explorer(s.domain)} data-testid={`link-explore-${s.position}`}>Explore site</Link></td>
                   </tr>
                 ); })}</tbody>
               </table>

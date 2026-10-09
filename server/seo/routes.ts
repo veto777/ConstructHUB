@@ -799,7 +799,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
         if (!again.length) return res.json({ page: now, reused: true });
         if (!isConfigured()) return notReady(res);
         const out = await buyOnce<DirectoriesPage>(user, key, "directories-retry", CACHE_HOURS, directoriesEstimateUsd(again.length),
-          async () => { const o = await fetchDirectories(again); return { ...o, data: mergeDirectories(now, o.data) }; }, true, `Directories — ${again.join(", ")} (second try)`);
+          async () => { const o = await fetchDirectories(again); return { ...o, data: mergeDirectories(now, o.data) }; }, true, `Directories — ${again.join(", ")} (second try for ${sites.join(", ")})`);
         return res.status(201).json({ page: out.data, reused: false, saved: out.saved });
       });
       return;

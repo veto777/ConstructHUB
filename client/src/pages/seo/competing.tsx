@@ -4,13 +4,14 @@
  * It reports what the checks saw and how many checks that rests on; what to make of it is left to a look at the pages.
  * Each keyword opens its row in the table (with its history), each volume the keywords explorer, each page the site
  * explorer's pages view for that address, each date that check in the history panel. The opened row (`competing`)
- * and the further lists (`competingShow`) are in the address.
+ * and the further lists (`competingShow`) are in the address; a `competing` that names none of the rows listed is
+ * said in a chip (data-testid="active-filter") with a clear — never quietly ignored.
  */
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { apiErrorMessage } from "@/lib/queryClient";
-import { fmtDate, fmtNum, type SeoSite } from "./shell";
+import { ActiveFilter, fmtDate, fmtNum, type SeoSite } from "./shell";
 import { AddToPlan, type PlanTask } from "./plan-button";
 import { seoLinks, setParam } from "./links";
 import { hrefWith, pageParts, useRankParams, type RankTo } from "./rank-params";
@@ -44,12 +45,15 @@ export function CompetingPages({ site }: { site: SeoSite }) {
   // The further list named by the address; a row opened by the address in a further list opens that list too.
   const more = p.competingShow ?? (changed.some((i) => i.keywordId === open) ? "changed" : variants.some((i) => i.keywordId === open) ? "variants" : null);
   const to = (x: RankTo = {}) => seoLinks.rankTracker(site.id, x);
+  // A row the address opens that is not listed here (its pages stopped changing, or the keyword was removed): said, with a clear.
+  const missing = open != null && !d.items.some((i) => i.keywordId === open)
+    ? <ActiveFilter onClear={() => setParam("competing", null)} clearLabel="Clear">The keyword the address opens is not among those listed here — Google may no longer be showing different pages for it, or it is no longer tracked — so no row is opened</ActiveFilter> : null;
   // What can be said rests on keywords that ranked in at least two checks; that number is always given.
   const basis = <><Link href={to({ checked: true })} className={LINK} title="The keywords with a saved check" data-testid="link-competing-comparable">{fmtNum(d.comparable)} of your {fmtNum(d.keywords)} checked keyword{d.keywords === 1 ? "" : "s"}</Link> ranked, with the page recorded, in two or more checks in the last <Link href={to({ panel: "history" })} className={LINK} title="The checks of these days, in the history panel" data-testid="link-competing-days">{d.days} days</Link></>;
   if (!d.items.length) return (
-    <p className="g-text-2 mb-5 text-[13px]" data-testid="competing-none">
+    <>{missing}<p className="g-text-2 mb-5 text-[13px]" data-testid="competing-none">
       {d.comparable === 0 ? <>Not enough checks yet to say whether Google switches between your pages: none of your <Link href={to({ checked: true })} className={LINK} title="The keywords with a saved check" data-testid="link-competing-comparable">{fmtNum(d.keywords)} checked keyword{d.keywords === 1 ? "" : "s"}</Link> has ranked in two checks.</> : <>No change of address seen: {basis}, and for each of them the checks recorded the same address every time.</>}
-    </p>
+    </p></>
   );
   // Where a keyword leads: its row in the table, opened on its history, on the device the line was read on; a date, that check in the history panel.
   const scopeOfItem = (i: Item): RankTo => (site.devices === "both" && (i.device === "desktop" || i.device === "mobile") ? { device: i.device } : {});
@@ -114,6 +118,7 @@ export function CompetingPages({ site }: { site: SeoSite }) {
   return (
     <section className="mb-5 scroll-mt-16" data-testid="rank-competing">
       <SectionTitle>The page Google shows for each search</SectionTitle>
+      {missing}
       <p className="g-text-2 mb-2 text-[12px]" data-testid="text-competing-basis">{basis}. One page is recorded per check per device. A keyword opens its row in the table; a page opens in Site explorer; a date opens that check in the history panel.</p>
       {alternating.length > 0 ? (
         <>

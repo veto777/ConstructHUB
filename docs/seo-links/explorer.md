@@ -58,7 +58,7 @@ clicks are a picture: the months under each chart are a row of links, and the le
 | A card's title: Organic positions / Organic keywords by position / Organic keywords by intent; Referring domains / Backlinks by domain ending (`link-panel-*`) | `explorer(d, "keywords")` / `explorer(d, "referringDomains")` — the rows the card counts | — |
 | Intent card's "of the top N keywords" (`link-intents-top`) | `explorer(d, "overview")` with the first look on Organic keywords — the N keywords the intents are counted from | — |
 | Intent rows: the word, the Keywords count (with its bar) and the Traffic | `explorer(d, "keywords", { intent })`; an intent the list has no filter for leads to every keyword and the link's label says so | Commercial keywords |
-| First-look tabs (Organic keywords / Top pages / Organic competitors / Referring domains / Anchors) | `explorer(d, "overview", { quick })` — the table shown is the address's; `keywords` is the default and is not written | First look: Top pages (on the overview's chip) |
+| First-look tabs (Organic keywords / Top pages / Organic competitors / Referring domains / Anchors) | `explorer(d, "overview", { quick })` — the table shown is the address's; `keywords` is the default and is not written (the Organic keywords tab links to the overview with no `quick`) | First look: Top pages (on the overview's chip) |
 | "Showing the **N keywords that bring the most traffic** of **M**" over the keywords first look (`link-keywords-shown`, `link-keywords-total`, then "Every keyword →") | `explorer(d, "keywords")` — the report, most traffic first | — |
 | Quick table: a keyword | `seoLinks.keywords(keyword, marketParams(market))` — the country **and its language** | (keywords explorer) |
 | Quick table: a keyword's Position | `explorer(d, "keywords", bandOfPosition(position))` — `{ band: "top3" }` for 1–3, `{ pos: "4-10" }`, `"11-20"`, `"21-50"`, `"51-100"`, `"101-"` | Keywords in positions 4–10 |
@@ -66,7 +66,7 @@ clicks are a picture: the months under each chart are a row of links, and the le
 | Quick table: a keyword's Traffic | `explorer(d, "keywords", { path })` — the keywords of the page that earns it; with no page, `seoLinks.keywords(keyword, { section: "results" })` | On the page /path |
 | Quick table: a keyword's Intent | `explorer(d, "keywords", { intent })` | Commercial keywords |
 | Quick table: a keyword's page / a top page | `explorer(d, "pages", { path })` — the page itself behind the ↗ icon | On the page /path |
-| Quick table: a page's Traffic (with its bar) / Keywords / In top 10 / Traffic value | `explorer(d, "keywords", { path })` / same / `{ path, band: "top10" }` / `{ path, sort: "cpc" }` (its keywords by ad price) | On the page /path · Keywords in the top 10 |
+| Quick table: a page's Traffic (with its bar) / Keywords / In top 10 / Traffic value | `explorer(d, "keywords", { path })` / same / `{ path, band: "top10" }` / `{ path, sort: "cpc" }` (its keywords by ad price). A page whose address isn't on this site opens the site's whole keyword list, and the Traffic and Traffic value words say so ("… — d's keywords (this page's address isn't on d, so the list can't be narrowed to it)") | On the page /path · Keywords in the top 10 / Ordered by “Highest CPC” |
 | Quick table: a competitor / its Shared keywords (with its bar) / Their keywords / Their traffic / Explore | `explorer(c)` / `explorer(c, "keywords", { why: "shared" })` / `explorer(c, "keywords")` / `explorer(c, "pages")` / `explorer(c)` — every one in the same country | — / Opened from a shared count: the list of what two sites share is in Content gap / Link intersect — this is the whole list |
 | Quick table: a referring domain / its Authority / its Links / its Spam / its Follow / First seen | `explorer(r)` / `explorer(r, "referringDomains")` (the sites linking to it) / the links from it: `seoLinks.backlinks(siteId, { domain: r })` for a tracked site, else `explorer(d, "backlinks", { source: r })` / `explorer(r, "backlinks", { why: "spam" })` / `explorer(d, "referringDomains", { followed })` / `explorer(d, "referringDomains", { sort: "newest" })` | — / — / Opened from r: the links can't be narrowed to one linking site yet — every linking site is shown; the Linking page column names each / Opened from a spam score: no view lists spam scores — these are the site's own links, which the score is judged from / Followed referring domains — … / — |
 | Quick table: an anchor / its Backlinks (with its bar) / its Referring domains / First seen | `explorer(d, "backlinks", { anchor })` / `{ anchor, everyLink: true }` / `{ anchor }` (one per site) / `{ anchor, sort: "newest" }` | Links with the anchor “…” (· Every link, not one per site) |
@@ -105,8 +105,10 @@ site, its id):
 | Sites with similar links: Linking sites in common / Explore | `explorer(r, "referringDomains", { why: "shared" })` / `explorer(r)` | Opened from a shared count … |
 | Subdomain / its Traffic / Keywords / In top 3 / In top 10 / Traffic value | `explorer(sub)` / `explorer(sub, "pages")` / `explorer(sub, "keywords")` / `{ band: "top3" }` / `{ band: "top10" }` / `{ sort: "cpc" }` | — / Keywords in the top 3 / … |
 | Ads: Advertiser / Kind / First shown / Last shown / "See the ad" | Google's own page for the ad (external, as before) — there is no view of ours behind an ad | — |
-| Sort picker | writes `sort` (the default is no word); a date cell lands on `sort=newest` | — |
-| "Show the whole site" (under the scope line and in the empty state) | clears the scope on the page **and** in the address (`path`, `section`) | — |
+| Sort picker | writes `sort` (the default is no word) and goes back to the first page; a date cell lands on `sort=newest` | Ordered by “Newest” (any order but the list's first; with a month, the month's words name it instead) / “x” is not an order this list offers, so it is ordered by “Strongest sites” |
+| "Show the whole site" (under the scope line and in the empty state) | clears the scope on the page **and** in the address (`path`, `section`, and `offset` — the first page) | — |
+| "Rows X–Y of N · **as of <date>**" over the table (`link-report-as-of`) | `seoLinks.usage({ month })` — that month's lookups on the Usage page, as every other "as of" | Usage's own |
+| ← Previous / Next → under the table; the Rows picker (25 / 50 / 100) | write `offset` (`setParam`, one history entry each — Back undoes a page turn) and `limit` (`setParams`, from the first page; 50 is no word). A page not opened yet shows "Rows X–Y haven't been loaded" and waits for **Load these rows** | — |
 
 Directories (`directories.tsx`, Site Explorer → Directories):
 
@@ -117,7 +119,10 @@ Directories (`directories.tsx`, Site Explorer → Directories):
 | A kind's heading (Review sites, …) | `{ only: kind }`; on that kind, "every kind →" clears it | Review sites only · N of M |
 | A count ("3 links" / "linked") and a dash ("no link found") | the links from that directory: `seoLinks.backlinks(siteId, { domain: dir })` for the tracked site, else `explorer(site, "backlinks", { source: dir })` | — / Opened from dir: the links can't be narrowed to one linking site yet — … |
 | "Link to check ›" badge (the badge sits in a thumb-sized link) | `{ only: "gaps" }` | Directories that link to a competitor and not to you |
-| "Check these sites" | writes `rivals` (the competitors, or `none` for this site alone) and clears `only`; the comparison is then a link and the back button undoes it | — |
+| "Check these sites" | writes `rivals` (the competitors, or `none` for this site alone) and clears `only`; the comparison is then a link and the back button undoes it | Directories of d compared with a.com, b.com |
+| The competitors the address compares (`rivals`) | their own chip (`active-filter`, shell.tsx `ActiveFilter`) above the table: what is compared, what of the address was left out (not a domain, the site itself, a fourth) and, while the competitors above are being changed, that they are not used yet; **Start over** clears `rivals` and `only` | Directories of d compared with a.com, b.com / Directories of d on its own — no competitor compared |
+| "as of <date>" in the summary line (`link-directories-as-of`) | `seoLinks.usage({ month })` — that month's lookups | Usage's own |
+| "Up to $X" before the first check (`link-directories-price`) | `seoLinks.usage()` — what lookups cost and what is left | Usage's own |
 
 ## Parameters the explorer honours on arrival
 
@@ -125,7 +130,7 @@ Directories (`directories.tsx`, Site Explorer → Directories):
 | --- | --- |
 | `domain` | The site. The saved report opens (free) or the Analyse button waits; nothing is bought. |
 | `view` | The report opened (a key from the left menu); anything else is the overview. |
-| `locationCode`, `languageCode` | The country (and its language) of the report — the market picker follows them, and writes them when changed (United States / English is written as nothing, the default). "United States (Spanish)" is 2840 + es. |
+| `locationCode`, `languageCode` | The country (and its language) of the report — the market picker follows them, and writes them when changed: in full (the United States too) and as a new history entry, so Back returns to the country before; a link built for the default (United States / English) carries nothing. "United States (Spanish)" is 2840 + es. |
 | `band` | `keywords`: position filter — `top3` 1–3, `top10` 1–10, `top20` 1–20, `top50` 1–50, `top100` 1–100, `rest` 11 and below; `notFound` lists nothing extra and the chip says so. |
 | `pos` | `keywords`: a position range the bands don't say — `"4-10"`, `"11-20"`, `"21-"` (from 21 down). Wins over `band`. |
 | `intent` | `keywords`: informational / navigational / commercial / transactional. |
@@ -140,18 +145,22 @@ Directories (`directories.tsx`, Site Explorer → Directories):
 | `sort` | The report's order — a key the report lists (`newest`, `authority`, `position`, `cpc`, …); anything else is the default. The sort picker writes it. |
 | `month` | Overview: the month marked on the Performance and Backlink growth charts and opened in "Compare two months"; said in the overview's chip. On a report: said in the chip with the list's real order — the lists are not split by month. A value that is not a month (YYYY-MM) is said as such on the overview and ignored on a report. |
 | `from`, `to` | Overview: the two months compared (the pickers write them); said in the chip. |
-| `series` | Overview: the figure shown on the chart — `traffic` / `keywords` / `top10` (Performance), `domains` / `backlinks` / `new` / `lost` (Backlink growth); a key the other chart owns shows that chart's first figure. Said in the chip; a key that names nothing is said too. |
+| `series` | Overview: the figure shown on the chart — `traffic` / `keywords` / `top10` (Performance), `domains` / `backlinks` / `new` / `lost` (Backlink growth); the other chart keeps its own first figure. Said in the chip ("Chart figure: Backlinks") only while its chart is drawn (a chart needs two months of figures); once the report is open, a figure whose chart isn't drawn is said as not shown ("Chart figure Backlinks is not shown: its chart isn't drawn for this site …"), and a key that names nothing is said too. |
 | `quick` | Overview: the first-look table — `keywords` (the default, never written) / `pages` / `competitors` / `referringDomains` / `anchors`. Said in the chip. |
 | `move` | `keywords`: said in the chip — the saved report counts up / down / new / lost but does not list which keywords; every keyword is shown. Cleared when filters are applied on the page. |
 | `source` | Backlink tables: the linking site a count was opened from. The list cannot be narrowed to it yet, so every linking site is shown and the chip says so. |
 | `why` | `spam` / `ip` / `shared`: the figure a link came from when no view holds it; the chip says what the list is instead. Cleared by Clear and by "Apply filters". |
-| `rivals`, `only` | Directories: the competitors compared (comma-separated, or `none` for this site alone) and the table's narrowing (`gaps` / `linked` / `reviews` / `trade` / `maps` / `business` / `social`), said in its chip. |
+| `rivals`, `only` | Directories: the competitors compared (comma-separated, or `none` for this site alone) and the table's narrowing (`gaps` / `linked` / `reviews` / `trade` / `maps` / `business` / `social`) — each said in its own chip with a clear (`rivals`: "Directories of d compared with …", **Start over**; `only`: "Review sites only · N of M", **Clear**). |
+| `offset`, `limit` | A full report's page of rows: `offset` the first row (a whole number of pages in, at most 9,900 — anything else is the first page) and `limit` 25 / 50 / 100 (anything else is 50). Link intersect's pages (50 each) and the Opportunities lists' pages (50 each) read `offset` too. Not a narrowing, so no chip: the "Rows X–Y of N" line says which rows. A page not opened yet waits for its own button. |
 
 On-page changes write the same words back (`setParams`, one history entry per "Apply filters", per picked sort, per
 picked month, per first-look tab, per compared month): a picked position range becomes `band` when a band says it and
 `pos` otherwise; an anchor box becomes `anchor`; a ".com" typed in the referring-domains box becomes `tld`; a scope
 becomes `path` (this page only) or `section`, and "Show the whole site" removes them. **Clear** on a report removes
-every filter word, `month`, `source` and `why`; **Clear** on the overview removes `month`, `from`, `to`, `series` and
-`quick`; **Clear** on Directories removes `only`. The market picker writes the new country (`locationCode` +
-`languageCode`, nothing for the default) and clears the view and every filter; a new domain is a new address and a new
-history entry (another site is another address, and Back returns to the last one).
+every filter word, `month`, `sort`, `offset`, `source` and `why`; **Clear** on the overview removes `month`, `from`, `to`,
+`series` and `quick`; **Clear** on Directories removes `only`, and **Start over** removes `rivals` and `only`. Previous /
+Next write `offset`, the Rows picker `limit`; every filter change goes back to the first page. The market picker writes
+the new country (`locationCode` + `languageCode`, in full) as a new history entry — the entry left is first made to name
+its own country, so Back returns to it — and keeps the view and every filter (each still applies to the same report in
+another country); only `offset` goes. A new domain is a new address and a new history entry (another site is another
+address, and Back returns to the last one).

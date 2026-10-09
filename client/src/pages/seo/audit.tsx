@@ -10,7 +10,9 @@
  * chosen on it are the same thing, and the back button undoes a pick. Each tab owns some of them (OWNED); a link to a
  * tab carries only that tab's, and one that arrives for another tab is said so in the chip, with a link that takes it
  * there. Every figure on the page is a link that lands on its data with the narrowing applied; what narrowed a view
- * is said in its data-testid="active-filter" chip.
+ * is said in its data-testid="active-filter" chip. The reveals are addresses too (`all` — every entry of the open issue,
+ * every row of the links / outgoing tabs; `more` — the rows the pages tab lists), so "Show all" / "Show more" are links
+ * and the back button undoes them; no tab carries them on (a pick or another tab starts from the first rows again).
  */
 import { AddToPlan } from "./plan-button";
 import { Fragment, useEffect, useRef, useState } from "react";
@@ -23,7 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { api, Empty, fmtDate, fmtNum, HIGHLIGHT, SeoShell, useAddress, useHash, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
 import { DeltaBadge } from "./viz";
 import { seoLinks, setParam, setParams } from "./links";
-import { ActiveFilter, AMBER, CHEVRON, COMPACT_TABLE, DETAIL_CELL, FIG, FIG_BIG, HealthRing, HealthTrend, RatingBar, SeverityColumn, StatusBar, SUMMARY, TABS, type AuditParams, type Foreign } from "./viz-audit";
+import { ActiveFilter, AMBER, CHEVRON, COMPACT_TABLE, DETAIL_CELL, FIG, FIG_BIG, HealthRing, HealthTrend, PILL, RatingBar, SeverityColumn, StatusBar, SUMMARY, TABS, type AuditParams, type Foreign } from "./viz-audit";
 import { AuditPages } from "./audit-pages";
 import { RenderCheck } from "./render";
 import { OutgoingLinksView } from "./outgoing-links";
@@ -149,8 +151,9 @@ export default function SeoAuditPage() {
     placeholderData: (prev, pq) => (pq?.queryKey[0] === key ? prev : undefined),
     // While a crawl runs, every 6 seconds; otherwise every 5 minutes, so a crawl finished (or changed) elsewhere shows up.
     refetchInterval: (query) => (query.state.data?.running ? 6000 : 5 * 60_000) });
-  const [showAll, setShowAll] = useState(false);
-  useEffect(() => setShowAll(false), [issueParam]);
+  // The reveals (links.ts audit `all` / `more`): read from the address; a link to anything else drops them.
+  const showAll = ["true", "1"].includes(P.get("all") ?? "");
+  const moreParam = P.get("more"), moreRows = moreParam !== null && /^\d{1,5}$/.test(moreParam) ? Number(moreParam) : null;
   const start = useMutation({
     // The same Google profile as the last crawl, so the same checks run and the comparison is like for like.
     mutationFn: () => api("POST", "/api/sitescan", { url: `https://${site!.domain}`, pageCap: 150, psiPages: 1, ...(q.data?.locationId ? { locationId: q.data.locationId } : {}) }),
@@ -198,7 +201,7 @@ export default function SeoAuditPage() {
   const foreignKeys = (Object.keys(current) as Narrowing[]).filter((k) => current[k] && !OWNED[view].includes(k) && !(view === "rendering" && k === "area" && current[k]!.toLowerCase() === "performance"));
   const foreignTab: View = foreignKeys.some((k) => OWNED.issues.includes(k)) && view !== "issues" ? "issues" : foreignKeys.every((k) => k === "result") ? "rendering" : "pages";
   /** A narrowing in words, whatever tab it belongs to (the chip of another tab, and the chip shown while the crawl loads). */
-  const wordOf = (k: Narrowing, v: string) => k === "severity" ? (isSeverity(v) ? SEVERITY[v].plural : `severity “${v}”`) : k === "area" ? `area ${v}` : k === "issue" ? `issue “${(a?.issues ?? []).find((i) => i.key === v)?.title ?? v}”` : k === "status" ? `answer ${v}` : k === "show" ? `pages pill “${v}”` : k === "result" ? `rendering result “${v}”` : `page ${v}`;
+  const wordOf = (k: Narrowing, v: string) => k === "severity" ? (isSeverity(v) ? SEVERITY[v].plural : `severity “${v}”`) : k === "area" ? `area ${v}` : k === "issue" ? (a ? ((a.issues ?? []).find((i) => i.key === v) ? `issue “${a.issues.find((i) => i.key === v)!.title}”` : "an issue this crawl did not find") : "one issue") : k === "status" ? `answer ${v}` : k === "show" ? `pages pill “${v}”` : k === "result" ? `rendering result “${v}”` : `page ${v}`;
   const foreign: Foreign | undefined = foreignKeys.length ? {
     words: `${foreignKeys.map((k) => wordOf(k, current[k]!)).join(", ")} — narrows the ${TAB_LABEL[foreignTab]} tab, not this one`,
     href: go({ tab: foreignTab === "issues" ? undefined : foreignTab, ...Object.fromEntries(foreignKeys.filter((k) => OWNED[foreignTab].includes(k)).map((k) => [k, current[k]])) }),
@@ -218,7 +221,8 @@ export default function SeoAuditPage() {
   // What narrowed the issues tab, in words.
   const narrowed: string[] = [];
   if (severity !== "all" || areaKey !== "all") narrowed.push(`${severity === "all" ? "Issues" : SEVERITY[severity].plural}${areaKey !== "all" ? ` in ${catName(areaKey)}` : ""}`);
-  if (issueParam) narrowed.push(openIssue ? `${openIssue.title} — its affected pages` : `an issue this crawl did not find (${issueParam})`);
+  // An issue this crawl does not have is never named by its raw key (a key is not words a visitor reads).
+  if (issueParam) narrowed.push(openIssue ? `${openIssue.title} — its affected pages` : "An issue this crawl did not find");
   if (foreign) narrowed.push(foreign.words);
   const issueTitles = Object.fromEntries((a?.issues ?? []).map((i) => [i.key, i.title]));
   /** The crawl shown, by its date, as a link that keeps it in the address (as "Crawled <date>" does). */
@@ -391,11 +395,12 @@ export default function SeoAuditPage() {
                     <details id="audit-page-changes" className="mt-1" open={pagesOpen} onToggle={(e) => setPagesOpen(e.currentTarget.open)} data-testid="audit-page-changes">
                       <summary className={SUMMARY}>Show the pages</summary>
                       <div className="mt-2 grid gap-4 md:grid-cols-2">
-                        {([[`Reached on ${fmtDate(shownDate)}, not before`, cmp.added, cmp.addedPages, true], [`Reached before, not on ${fmtDate(shownDate)}`, cmp.removed, cmp.removedPages, false]] as const).map(([t, list, n, now]) => (
-                          <div key={t}><h3 className="g-text font-medium">{t}</h3>
-                            {list.length === 0 ? <p className="g-text-2">None.</p> : <ul className="space-y-0.5">{list.map((u) => { const p = now ? ownPath(u, site.domain) : null; return <li key={u} className="flex items-center gap-2 truncate">{p ? <Link href={pageHref(p)} className={`g-link ${FIG} truncate`} title="Its row on the pages tab (the newest crawl)" data-testid={`link-page-change-${p}`}>{u}</Link> : <a href={u} className={`g-link ${FIG} truncate`} target="_blank" rel="noreferrer" title="This crawl has no row for it: the page as it is now, in a new tab">{u}</a>}<a href={u} className={`g-link ${FIG} shrink-0`} target="_blank" rel="noreferrer" aria-label={`Open ${u} in a new tab`}>↗</a></li>; })}</ul>}
+                        {/* Each heading's dates are the two crawls: the one shown keeps itself in the address (`at`), the earlier one opens on its own. */}
+                        {([["added", cmp.added, cmp.addedPages, true], ["removed", cmp.removed, cmp.removedPages, false]] as const).map(([t, list, n, now]) => { const thenLink = <Link href={go({ at: cmp.jobId, vs: undefined })} className={FIG} title="Show the crawl compared with, on its own" data-testid={`link-page-changes-then-${t}`}>{cmp.at ? `the crawl of ${fmtDate(cmp.at)}` : "the crawl before"}</Link>; return (
+                          <div key={t}><h3 className="g-text font-medium">{now ? <>Reached on {shownLink(`link-page-changes-now-${t}`)}, not in {thenLink}</> : <>Reached in {thenLink}, not on {shownLink(`link-page-changes-now-${t}`)}</>}</h3>
+                            {list.length === 0 ? <p className="g-text-2">None.</p> : <ul className="space-y-0.5">{list.map((u) => { const p = now ? ownPath(u, site.domain) : null; return <li key={u} className="flex items-center gap-2 truncate">{p ? <Link href={pageHref(p)} className={`g-link ${FIG} truncate`} title="Its row on the pages tab (the newest crawl)" data-testid={`link-page-change-${p}`}>{u}</Link> : <a href={u} className={`g-link ${FIG} truncate`} target="_blank" rel="noreferrer" title="This crawl has no row for it: the page as it is now, in a new tab">{u}</a>}<a href={u} className={`g-link ${FIG} min-w-11 shrink-0 text-center`} target="_blank" rel="noreferrer" aria-label={`Open ${u} in a new tab`}>↗</a></li>; })}</ul>}
                             {n > list.length && <p className="g-text-2 text-[12px]">The first <Link href={`${here({})}#audit-page-changes`} className={`g-text-2 ${FIG}`} title="Listed above" data-testid={`link-page-changes-listed-${now ? "added" : "removed"}`}>{fmtNum(list.length)}</Link> of {now ? <><Link href={go({ tab: "pages" })} className={`g-text-2 ${FIG}`} title="Every crawled page, on the pages tab (which of them are new is kept only for the pages listed)" data-testid="link-page-changes-total">{fmtNum(n)}</Link> — <Link href={go({ tab: "pages" })} className={`g-link ${FIG}`} data-testid="link-page-changes-more">every crawled page is on the pages tab</Link></> : <><Link href={go({ at: cmp.jobId, vs: undefined })} className={`g-text-2 ${FIG}`} title="The crawl compared with; the rest of this list was not kept" data-testid="link-page-changes-total-removed">{fmtNum(n)}</Link>; the rest were not kept</>}.</p>}
-                          </div>))}
+                          </div>); })}
                       </div>
                       <p className="g-text-2 mt-2 text-[12px]">"Not reached" means the crawl did not get to the page — it may still exist (a removed link, a robots rule or the page limit can each stop a crawl short of it).</p>
                     </details>
@@ -411,9 +416,9 @@ export default function SeoAuditPage() {
           {/* These read the newest crawl; keyed by it, so a crawl that finishes while one is open is read again at once. */}
           {view === "pages" && <AuditPages key={d?.latestKey ?? ""} crawlId={d?.latestKey} site={site} issueTitles={issueTitles} issueSeverity={Object.fromEntries(a.issues.map((i) => [i.key, i.severity]))} issueArea={Object.fromEntries(a.issues.map((i) => [i.key, { key: i.category, name: catName(i.category) }]))}
             overview={{ failed: a.statuses.failed, excluded: a.statuses.excluded ?? 0, notCrawled: a.notCrawled, blockedByRobots: a.blockedByRobots, pageCap: a.pageCap }} shownDate={shownDate}
-            narrowing={{ status: statusParam, severity: severity === "all" ? null : severity, issue: issueParam, show: showParam, page: pageParam, area: areaParam }} here={here} issueHref={(k) => go({ issue: k })} foreign={foreign} />}
-          {view === "links" && site && <LinkOpportunitiesView key={d?.latestKey ?? ""} crawlId={d?.latestKey} site={site} pageHref={pageHref} pageParam={pageParam} here={here} go={go} foreign={foreign} />}
-          {view === "outgoing" && site && <OutgoingLinksView key={d?.latestKey ?? ""} crawlId={d?.latestKey} site={site} pageHref={pageHref} pageParam={pageParam} here={here} go={go} foreign={foreign} />}
+            narrowing={{ status: statusParam, severity: severity === "all" ? null : severity, issue: issueParam, show: showParam, page: pageParam, area: areaParam }} here={here} issueHref={(k) => go({ issue: k })} foreign={foreign} more={moreRows} />}
+          {view === "links" && site && <LinkOpportunitiesView key={d?.latestKey ?? ""} crawlId={d?.latestKey} site={site} pageHref={pageHref} pageParam={pageParam} here={here} go={go} foreign={foreign} all={showAll} />}
+          {view === "outgoing" && site && <OutgoingLinksView key={d?.latestKey ?? ""} crawlId={d?.latestKey} site={site} pageHref={pageHref} pageParam={pageParam} here={here} go={go} foreign={foreign} all={showAll} />}
           {view === "rendering" && site && <RenderCheck site={site} pageHref={pageHref} pageParam={pageParam} resultParam={resultParam} here={here} go={go} explain={areaParam?.toLowerCase() === "performance"} foreign={foreign} />}
           {view === "issues" && (<>
           <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -429,7 +434,7 @@ export default function SeoAuditPage() {
             <button type="button" className="g-pill g-pill--sm max-sm:!min-h-11" onClick={exportAll} data-testid="button-audit-export"><Download /> Export</button>
             <Link href={seoLinks.plan(site.id)} className="g-pill g-pill--sm max-sm:!min-h-11" data-testid="link-audit-fixplan">Step-by-step fix plan</Link>
           </div>
-          {narrowed.length > 0 && <ActiveFilter words={narrowed.join(" · ")} clearHref={go({})} extra={foreign ? { href: foreign.href, label: foreign.label, testId: "link-foreign-tab" } : undefined}>{issueParam && !openIssue ? `Nothing is listed under “${issueParam}” in the crawl of ${fmtDate(shownDate)}. It may have been fixed, or found by another crawl.` : null}</ActiveFilter>}
+          {narrowed.length > 0 && <ActiveFilter words={narrowed.join(" · ")} clearHref={go({})} extra={foreign ? { href: foreign.href, label: foreign.label, testId: "link-foreign-tab" } : undefined}>{issueParam && !openIssue ? `Nothing is listed under that issue in the crawl of ${fmtDate(shownDate)}. It may have been fixed, or found by another crawl.` : null}</ActiveFilter>}
           {issues.length === 0 ? (
             <Empty testId="audit-no-issues"><h3>{a.issues.length ? "No issues match these filters" : "No issues found"}</h3><p>{a.issues.length ? "Choose a different severity or area." : "The crawl didn't find anything to fix on the pages it checked."}</p></Empty>
           ) : (
@@ -455,10 +460,10 @@ export default function SeoAuditPage() {
                             {i.why && <p className="g-text text-[13px]"><b className="font-medium">Why it matters:</b> {i.why}</p>}
                             {i.fix && <p className="g-text mt-1 text-[13px]"><b className="font-medium">How to fix:</b> {i.fix}</p>}
                             <ul className="mt-2 space-y-0.5 text-[13px]">
-                              {shown.map((u) => { const p = /^https?:\/\//.test(u) ? ownPath(u, site.domain) : null; return <li key={u} className="flex items-center gap-2 truncate">{p ? <><Link href={pageHref(p)} className={`g-link ${FIG} truncate`} title="Its row on the pages tab (the newest crawl)" data-testid={`link-issue-page-${i.key}`}>{u}</Link><a href={u} className={`g-link ${FIG} shrink-0`} target="_blank" rel="noreferrer" aria-label={`Open ${u} in a new tab`}>↗</a></> : /^https?:\/\//.test(u) ? <a href={u} className={`g-link ${FIG} truncate`} target="_blank" rel="noreferrer">{u}</a> : <span className="g-text truncate">{u}</span>}</li>; })}
+                              {shown.map((u) => { const p = /^https?:\/\//.test(u) ? ownPath(u, site.domain) : null; return <li key={u} className="flex items-center gap-2 truncate">{p ? <><Link href={pageHref(p)} className={`g-link ${FIG} truncate`} title="Its row on the pages tab (the newest crawl)" data-testid={`link-issue-page-${i.key}`}>{u}</Link><a href={u} className={`g-link ${FIG} min-w-11 shrink-0 text-center`} target="_blank" rel="noreferrer" aria-label={`Open ${u} in a new tab`}>↗</a></> : /^https?:\/\//.test(u) ? <a href={u} className={`g-link ${FIG} truncate`} target="_blank" rel="noreferrer">{u}</a> : <span className="g-text truncate">{u}</span>}</li>; })}
                             </ul>
                             <div className="mt-2 flex flex-wrap items-center gap-2">
-                              {!showAll && i.items.length > 25 && <button type="button" className="g-pill g-pill--sm max-sm:!min-h-11" onClick={() => setShowAll(true)}>Show all {fmtNum(i.items.length)}</button>}
+                              {i.items.length > 25 && <Link href={here({ all: showAll ? undefined : true })} className={PILL} aria-expanded={showAll} data-testid={`link-issue-all-${i.key}`}>{showAll ? "Show the first 25" : <>Show all {fmtNum(i.items.length)}</>}</Link>}
                               {i.count > i.items.length && <span className="g-text-2 text-[12px]">Showing the first <Link href={`${here({})}#detail-issue-${i.key}`} className={`g-text-2 ${FIG}`} title="Listed above" data-testid={`link-issue-listed-${i.key}`}>{fmtNum(i.items.length)}</Link> of <Link href={go({ tab: "pages", issue: i.key })} className={`g-text-2 ${FIG}`} title="The crawled pages listed under this issue" data-testid={`link-issue-count-${i.key}`}>{fmtNum(i.count)}</Link>.</span>}
                               <button type="button" className="g-pill g-pill--sm max-sm:!min-h-11" onClick={() => downloadCsv(`${i.key}-${site.domain}.csv`, [["Issue", "Page or entry"], ...i.items.map((u) => [i.title, u])])}><Download /> Export this list</button>
                               {a.latest !== false && <AddToPlan siteId={site.id} testId={`button-plan-${i.key}`} tasks={[{ kind: "audit", title: `Fix: ${i.title}`, target: null, facts: { affected: i.count, severity: i.severity, crawlId: a.jobId, crawlAt: a.scannedAt, ...(i.items.length ? { examples: i.items.slice(0, 3).join(" , ").slice(0, 300) } : {}), ...(i.why ? { finding: i.why.length > 300 ? `${i.why.slice(0, 297)}…` : i.why } : {}) }, source: `audit:${i.key}` }]} />}

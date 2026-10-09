@@ -10,14 +10,17 @@
  * The comparison is the address's `competitors` (links.ts): read on arrival — the saved comparison opens, or the Run
  * button waits, nothing is bought — and written by "Compare", so the count above the table is a link to its own rows
  * and the back button returns to the comparison before; a chip says what the address asked for, with a clear.
+ * Link intersect's pages of sites are the address's `offset` too (links.ts, round 3): Previous / Next are links, so the
+ * back button undoes a page turn; a page not opened yet waits for its Run button. Every link to a keyword report
+ * carries the country with its language (marketParams).
  */
 import { AddToPlan } from "./plan-button";
 import { Link } from "wouter";
-import { seoLinks, setParam } from "./links";
+import { seoLinks, setParams } from "./links";
 import { marketParams } from "./keyword-links";
-import { INTENTS } from "./explorer-filters";
+import { INTENTS, MAX_OFFSET, pageFromAddress } from "./explorer-filters";
 import { BLOCK_LINK, FIG_LINK, TEXT_LINK } from "./viz-keywords";
-import { DEFAULT_MARKET, findMarket } from "@shared/seo-markets";
+import { findMarket } from "@shared/seo-markets";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, Loader2, Plus, X } from "lucide-react";
@@ -70,18 +73,22 @@ export function GapView({ kind, domain, status, suggestions, onExplore, onTrack,
   const qc = useQueryClient();
   const { toast } = useToast();
   // The comparison is the address's `competitors` (links.ts): a link to it and a press of Compare are one thing.
-  const competitorsParam = useAddress().get("competitors");
+  const address = useAddress();
+  const competitorsParam = address.get("competitors");
   const wanted = useMemo(() => competitorsOf(competitorsParam, domain), [competitorsParam, domain]);
   const wantedKey = wanted.list.join(",");
   const [draft, setDraft] = useState<string[]>(wanted.list);
   const [input, setInput] = useState("");
   const [applied, setApplied] = useState<string[]>(wanted.list);
-  const [offset, setOffset] = useState(0);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const limit = 50;
+  // Link intersect's page of sites is the address's (links.ts `offset`, pages of 50): Previous / Next are links.
+  const offset = kind === "links" ? pageFromAddress({ offset: address.get("offset") }, [limit], limit).offset : 0;
   // A different report or site starts as the address says (clean when it names no competitors); so does a link
   // followed, or the back button, while this view is open. Arriving only looks for a saved comparison.
-  useEffect(() => { setDraft(wanted.list); setApplied(wanted.list); setInput(""); setOffset(0); setPicked(new Set()); }, [kind, domain, wantedKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setDraft(wanted.list); setApplied(wanted.list); setInput(""); setPicked(new Set()); }, [kind, domain, wantedKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Another page of sites starts with nothing ticked.
+  useEffect(() => { setPicked(new Set()); }, [offset]);
 
   const loc = market && kind === "content" ? market.locationCode : undefined, lang = market && kind === "content" ? market.languageCode : undefined;
   const body = useMemo(() => ({ kind, domain, competitors: applied, ...(kind === "links" ? { limit, offset } : {}), ...(loc ? { locationCode: loc, languageCode: lang } : {}) }), [kind, domain, applied, offset, loc, lang]);
@@ -117,15 +124,16 @@ export function GapView({ kind, domain, status, suggestions, onExplore, onTrack,
   const page = saved.data?.page ?? null;
   const dirty = draft.join(",") !== applied.join(",");
   /** Compare: the list being edited becomes the comparison, and the address says so (one step for the back button). */
-  const compare = () => { setApplied(draft); setOffset(0); setPicked(new Set()); setParam("competitors", draft.join(",")); };
-  /** This comparison's own address: the rows its count counts. */
-  const comparisonHref = seoLinks.explorer(domain, kind === "content" ? "contentGap" : "linkIntersect", { competitors: applied.join(",") || undefined, ...(kind === "content" && market && market.locationCode !== DEFAULT_MARKET.locationCode ? { locationCode: market.locationCode } : {}) });
+  const compare = () => { setApplied(draft); setPicked(new Set()); setParams({ competitors: draft.join(","), offset: null }); };
+  /** This comparison's own address (its first page), or one page of its sites: the rows its count counts. */
+  const comparisonAt = (at?: number) => seoLinks.explorer(domain, kind === "content" ? "contentGap" : "linkIntersect", { competitors: applied.join(",") || undefined, ...(kind === "content" ? marketParams(market) : {}), offset: at || undefined });
+  const comparisonHref = comparisonAt();
   const toggle = (k: string) => setPicked((s) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n; });
   const what = kind === "content" ? "keywords these competitors rank for on Google that this site doesn't" : "websites that link to every competitor you name but not to this site";
   /** Where a keyword's figures lead: its overview in the comparison's country, or one part of it. */
   const kw = (keyword: string, extra: Parameters<typeof seoLinks.keywords>[1] = {}) => seoLinks.keywords(keyword, { ...marketParams(market), ...extra });
   /** A competitor's own keyword list in Site explorer, narrowed to one search: where its position and its visits come from. */
-  const theirs = (competitor: string, keyword: string) => seoLinks.explorer(competitor, "keywords", { contains: keyword, ...(market && market.locationCode !== DEFAULT_MARKET.locationCode ? { locationCode: market.locationCode } : {}) });
+  const theirs = (competitor: string, keyword: string) => seoLinks.explorer(competitor, "keywords", { contains: keyword, ...marketParams(market) });
   /** The competitor placed best for a keyword: its list is where most of "their traffic" is. */
   const bestOf = (r: ContentRow) => [...r.competitors].filter((c) => c.position != null).sort((a, b) => a.position! - b.position!)[0]?.domain ?? r.competitors[0]?.domain ?? null;
   /** A competitor's referring domains in Site explorer, narrowed to one linking site: the row that counts its links. */
@@ -164,7 +172,7 @@ export function GapView({ kind, domain, status, suggestions, onExplore, onTrack,
       </div>
 
       {(competitorsParam ?? "") !== "" && (
-        <ActiveFilter onClear={() => { setDraft([]); setApplied([]); setParam("competitors", null); }} clearLabel="Start over">
+        <ActiveFilter onClear={() => { setDraft([]); setApplied([]); setParams({ competitors: null, offset: null }); }} clearLabel="Start over">
           {wanted.list.length ? `${kind === "content" ? "Content gap" : "Link intersect"}: ${domain} compared with ${wanted.list.join(", ")}` : "No competitor in the address could be used"}
           {wanted.dropped.length > 0 && ` — left out: ${wanted.dropped.join(", ")} (not a domain, the site itself, or more than ${MAX})`}
         </ActiveFilter>
@@ -206,7 +214,7 @@ export function GapView({ kind, domain, status, suggestions, onExplore, onTrack,
                   {(page.rows as ContentRow[]).map((r) => (
                     <tr key={r.keyword}>
                       <td><input type="checkbox" aria-label={`Select ${r.keyword}`} checked={picked.has(r.keyword)} onChange={() => toggle(r.keyword)} /></td>
-                      <td><Link href={kw(r.keyword)} className={TEXT_LINK} title="This keyword's overview (the saved one, or the Look up button)" data-testid="link-gap-keyword">{r.keyword}</Link>{r.intent && <> <Link href={kw(r.keyword, { section: "ideas", table: "matchingTerms", intent: (INTENTS as readonly string[]).includes(r.intent) ? r.intent : undefined })} className={`${FIG_LINK} g-text-2 text-[12px] capitalize`} title="Keyword ideas with this intent" data-testid="link-gap-intent">· {r.intent}</Link></>}</td>
+                      <td><Link href={kw(r.keyword)} className={TEXT_LINK} title="This keyword's overview (the saved one, or the Look up button)" data-testid="link-gap-keyword">{r.keyword}</Link>{r.intent && <> <Link href={kw(r.keyword, { section: "ideas", table: "matchingTerms", intent: (INTENTS as readonly string[]).includes(r.intent) ? r.intent : undefined })} className={`${FIG_LINK} g-text-2 text-[12px] capitalize`} title={(INTENTS as readonly string[]).includes(r.intent) ? "Keyword ideas with this intent" : "Keyword ideas — the ideas table has no filter for this intent, so every idea is shown"} data-testid="link-gap-intent">· {r.intent}</Link></>}</td>
                       <td className="num" data-label="Volume / mo"><Link href={kw(r.keyword, { section: "volume" })} className={TEXT_LINK} title="This keyword's search volume by month" data-testid="link-gap-volume">{fmtNum(r.volume)}</Link></td>
                       <td className="num" data-label="Difficulty"><Link href={kw(r.keyword, { section: "serp" })} className={TEXT_LINK} title="Who ranks for it" data-testid="link-gap-difficulty">{kd(r.difficulty)}</Link></td>
                       <td className="num" data-label="CPC"><Link href={kw(r.keyword, { section: "cpc" })} className={FIG_LINK} title="This keyword's cost per click and bids (no view lists the bids — it opens who ranks)" data-testid="link-gap-cpc">{r.cpc == null ? "—" : `$${r.cpc.toFixed(2)}`}</Link></td>
@@ -239,8 +247,9 @@ export function GapView({ kind, domain, status, suggestions, onExplore, onTrack,
                 </table>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px]">
-                <button type="button" className="g-pill g-pill--sm !min-h-11" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - limit))} data-testid="button-gap-prev">← Previous</button>
-                <button type="button" className="g-pill g-pill--sm !min-h-11" disabled={page.rows.length < limit || (page.total != null && page.offset + page.rows.length >= page.total) || offset + limit > 9900} onClick={() => setOffset(offset + limit)} data-testid="button-gap-next">Next →</button>
+                {/* The pages are addresses (links.ts `offset`), as Content explorer's are: a link to share, and Back undoes a page turn. */}
+                {offset === 0 ? <span className="g-pill g-pill--sm !min-h-11 opacity-50" aria-disabled data-testid="button-gap-prev">← Previous</span> : <Link href={comparisonAt(Math.max(0, offset - limit))} className={`${BLOCK_LINK} g-pill g-pill--sm`} data-testid="button-gap-prev">← Previous</Link>}
+                {page.rows.length < limit || (page.total != null && page.offset + page.rows.length >= page.total) || offset + limit > MAX_OFFSET ? <span className="g-pill g-pill--sm !min-h-11 opacity-50" aria-disabled data-testid="button-gap-next">Next →</span> : <Link href={comparisonAt(offset + limit)} className={`${BLOCK_LINK} g-pill g-pill--sm`} data-testid="button-gap-next">Next →</Link>}
                 <span className="g-text-2">A page you haven't opened yet costs about {priceCents != null ? <Link href={seoLinks.usage()} className={TEXT_LINK} title="Usage and credit: what lookups cost and what is left this month" data-testid="link-gap-page-price">{money(priceCents)}</Link> : "—"}.</span>
               </div>
             </>

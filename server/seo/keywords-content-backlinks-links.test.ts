@@ -8,6 +8,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "fs";
 import path from "path";
+import { seoLinks } from "../../client/src/pages/seo/links";
 
 const read = (rel: string) => fs.readFileSync(path.resolve(import.meta.dirname, "../../client/src/pages/seo", rel), "utf8");
 /** Comments aside; only code counts. */
@@ -153,8 +154,9 @@ describe("Site explorer: content gap and link intersect", () => {
     expect(gap).toContain("was found — ${c}'s referring domains in Site explorer, narrowed to ${r.domain}, list nothing");
   });
   it("the comparison is the address: read on arrival (nothing bought), written by Compare", () => {
-    expect(gap).toMatch(/useAddress\(\)\.get\("competitors"\)/);
-    expect(gap).toMatch(/setParam\("competitors", draft\.join\(","\)\)/);
+    expect(gap).toMatch(/const address = useAddress\(\);\s*const competitorsParam = address\.get\("competitors"\)/);
+    // Compare writes the comparison from its first page (one history entry).
+    expect(gap).toMatch(/setParams\(\{ competitors: draft\.join\(","\), offset: null \}\)/);
     expect(gap.match(/run\.mutate\(/g) ?? []).toHaveLength(2);
   });
 });
@@ -178,5 +180,75 @@ describe("Site explorer: opportunities", () => {
   });
   it("arriving never buys", () => {
     expect(opps.match(/run\.mutate\(/g) ?? []).toHaveLength(2);
+  });
+});
+
+describe("round 3 (Kimi round 2): the remaining figures, the address, honest words, the phone", () => {
+  const SCREENS = { keywords, planner, gap, opps };
+  it("every link to a keyword report carries the country with its language (marketParams), never locationCode alone", () => {
+    for (const [name, src] of Object.entries(SCREENS)) expect(src, name).not.toMatch(/DEFAULT_MARKET\.locationCode \? \{ locationCode/);
+    expect(keywords).toMatch(/seoLinks\.explorer\(s\.domain, "keywords", \{ contains: o\.keyword, \.\.\.marketParams\(market\) \}\)/);
+    expect(tagOf(planner, "link-cell-position")).toContain(`seoLinks.explorer(d.domain, "keywords", { contains: c.keyword, ...marketParams(market) })`);
+    expect(gap).toMatch(/const theirs = \(competitor: string, keyword: string\) => seoLinks\.explorer\(competitor, "keywords", \{ contains: keyword, \.\.\.marketParams\(market\) \}\)/);
+    expect(opps).toMatch(/const loc = marketParams\(market\);/);
+  });
+  it("keywords: the ranking page's path is a link, the feature tags write section=features, the SERP cells are labelled, an intent's title is honest", () => {
+    expect(keywords).toContain("data-testid={`link-serp-path-${s.position}`}");
+    expect(keywords).toMatch(/seoLinks\.explorer\(s\.domain, "pages", \{ path, \.\.\.marketParams\(market\) \}\)/);
+    expect(keywords).not.toMatch(/<span className="min-w-0 truncate">\{rest\}<\/span><\/span><\/td>/);
+    expect(keywords).toMatch(/<FeatureTag [^>]*href=\{addr\(\{ section: "features" \}\)\}/);
+    for (const label of ["Place", "Page", "Site authority", "Site"]) expect(keywords, label).toContain(`data-label="${label}"`);
+    expect(tagOf(keywords, "link-intent")).toContain("the ideas table has no filter for this intent, so every idea is shown");
+  });
+  it("keyword lists: 'Other keywords' opens its rows, the market words are the picked market's, an intent's title is honest", () => {
+    expect(tagOf(lists, "link-topic-other")).toContain(`href={at("other")}`);
+    expect(lists).not.toContain("intent for each. United States, Google.");
+    expect(lists).toContain('`Volume, difficulty, cost per click and intent for each. ${market?.label ?? "United States"}, Google.`');
+    expect(tagOf(lists, "link-keyword-intent")).toContain("the ideas table has no filter for this intent, so every idea is shown");
+    expect(tagOf(gap, "link-gap-intent")).toContain("the ideas table has no filter for this intent, so every idea is shown");
+  });
+  it("Service × town: '—' is no link, every foot is, the chip is honest when a part didn't load, headings narrow (service / town), a phone gets cards", () => {
+    for (const k of ["gaps", "weak", "strong", "unknown"]) expect(planner, k).toContain(`value={d.summary.${k} == null ? "—" : <Link href={showAt("${k}")}`);
+    for (const k of ["weak", "strong", "unknown"]) expect(tagOf(planner, `link-planner-${k}-foot`)).toContain(`showAt("${k}")`);
+    expect(planner).toContain("your rankings didn't load this time, so no cell can be sorted here");
+    expect(planner).toContain("the search volumes didn't load this time, so no cell can be called a gap");
+    expect(planner).toMatch(/\{show && <ActiveFilter onClear=\{\(\) => setParam\("show", null\)\} clearLabel="Every cell">\{showWords\(show\)\}/);
+    expect(planner).toMatch(/const areaAt = \(p: \{ show\?: Show; service\?: string; town\?: string \}\) => seoLinks\.keywords\("", \{ view: "area", \.\.\.p \}\)/);
+    expect(planner).toContain('address.get("service")');
+    expect(planner).toContain('address.get("town")');
+    expect(planner).toContain('setParam("service", null)');
+    expect(planner).toContain('setParam("town", null)');
+    expect(planner).toContain("data-testid={`link-planner-service-${idOf(s)}`}");
+    expect(planner).toContain("data-testid={`link-planner-town-${idOf(t)}`}");
+    expect(planner).toMatch(/const PHONE = "\(max-width: 639px\)"/);
+    expect(planner).toMatch(/\{!phone \? \(/);
+    expect(planner).toContain('data-testid="planner-cards"');
+    expect(seoLinks.keywords("", { view: "area", service: "roof repair", town: "lynden" })).toBe("/seo/keywords?view=area&service=roof+repair&town=lynden");
+  });
+  it("content: the visits figure's title says when it opens the whole site", () => {
+    expect(content).toContain('opens ${pagePath(r) ? "this page" : `${r.domain}\'s pages (the page\'s address could not be read as one of its pages)`} in Site explorer');
+  });
+  it("gap and opportunities: the page of rows is the address, and Previous / Next are links", () => {
+    expect(gap).toMatch(/const offset = kind === "links" \? pageFromAddress\(\{ offset: address\.get\("offset"\) \}, \[limit\], limit\)\.offset : 0;/);
+    expect(gap).toMatch(/<Link href=\{comparisonAt\(Math\.max\(0, offset - limit\)\)\}[^>]*data-testid="button-gap-prev"/);
+    expect(gap).toMatch(/<Link href=\{comparisonAt\(offset \+ limit\)\}[^>]*data-testid="button-gap-next"/);
+    expect(gap).not.toMatch(/setOffset\(/);
+    expect(opps).toMatch(/const offsetParam = pageFromAddress\(\{ offset: address\.get\("offset"\) \}, \[PER_PAGE\], PER_PAGE\)\.offset;/);
+    expect(opps).toMatch(/<Link href=\{pageAt\(from - PER_PAGE\)\}[^>]*data-testid="button-opp-prev"/);
+    expect(opps).toMatch(/<Link href=\{pageAt\(from \+ PER_PAGE\)\}[^>]*data-testid="button-opp-next"/);
+    expect(tagOf(opps, "link-opp-paging")).toContain("href={pageAt(from)}");
+    expect(opps).not.toMatch(/setPage\(/);
+    expect(seoLinks.explorer("mysite.com", "opportunities", { opp: "within", offset: 50 })).toBe("/seo/explorer?domain=mysite.com&view=opportunities&opp=within&offset=50");
+  });
+  it("opportunities: a tab's label carries the link cue too, not only its count", () => {
+    expect(opps).toMatch(/data-testid=\{`tab-opp-\$\{t\}`\}><span className="underline decoration-dotted decoration-1 underline-offset-4">\{label\}<\/span>/);
+    expect(opps).toMatch(/<Link key=\{t\} href=\{here\(t\)\} className="[^"]*focus-visible:outline[^"]*"/);
+  });
+  it("backlinks: a Domain rank with no site named still links; 'lost' is named only when the list is drawn", () => {
+    const at = backlinks.indexOf('data-label="Domain rank"');
+    const cell = backlinks.slice(at, backlinks.indexOf("</td>", at));
+    expect(cell.match(/data-testid="link-page-authority"/g)).toHaveLength(2);
+    expect(cell).toContain('href={view("referringDomains")}');
+    expect(backlinks).toContain("d.snapshot.changes ? `Lost backlinks since ${fmtDate(d.snapshot.changes.since)}` : \"Lost backlinks: this snapshot keeps no list of them");
   });
 });

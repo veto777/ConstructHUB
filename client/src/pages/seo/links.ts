@@ -72,8 +72,13 @@ export const seoLinks = {
    * one its tiles count); with `opp` pages, `path` opens one page's searches. Appended the same day (gap):
    * `competitors` "a.com,b.com" (up to three) is the Content gap / Link intersect comparison — the saved one opens, or
    * its Run button waits; "Compare" writes it.
+   * Appended 2026-10-09 (round 3, paging): `offset` the first row of the page of rows shown (0, 25, 50 … — a multiple
+   * of the page size; the first page is not written) and `limit` the rows per page of a full report, 25 | 50 | 100 (50,
+   * the default, is not written). A full report's Previous / Next and its Rows picker write them; so do Link
+   * intersect's pages (50 rows each) and the Opportunities lists' pages (50 each). A page not opened yet waits for its
+   * own button — arriving never buys it.
    */
-  explorer: (domain: string, view = "overview", p: { band?: PositionBand; intent?: string; followed?: boolean; tld?: string; anchor?: string; path?: string; month?: string; locationCode?: number; pos?: string; move?: Movement; contains?: string; volumeMin?: number; difficultyMax?: number; everyLink?: boolean; section?: string; languageCode?: string; sort?: string; series?: string; quick?: string; from?: string; to?: string; source?: string; why?: string; rivals?: string; only?: string; opp?: "within" | "falling" | "pages" | "home"; competitors?: string } = {}) =>
+  explorer: (domain: string, view = "overview", p: { band?: PositionBand; intent?: string; followed?: boolean; tld?: string; anchor?: string; path?: string; month?: string; locationCode?: number; pos?: string; move?: Movement; contains?: string; volumeMin?: number; difficultyMax?: number; everyLink?: boolean; section?: string; languageCode?: string; sort?: string; series?: string; quick?: string; from?: string; to?: string; source?: string; why?: string; rivals?: string; only?: string; opp?: "within" | "falling" | "pages" | "home"; competitors?: string; offset?: number; limit?: number } = {}) =>
     `/seo/explorer${qs({ domain, view: view === "overview" ? undefined : view, ...p })}`,
 
   /**
@@ -88,8 +93,11 @@ export const seoLinks = {
    * opens its visit on rendering); `result` narrows the rendering table to one result — differ (more or less) | more |
    * less | same | unknown; `status` also takes excluded | beyond-limit | blocked on the pages tab — the overview's counts of
    * what was found and not read, which have no rows (the chip says so).
+   * Appended (round 3): the reveals are addresses too, so they are links and the back button undoes them — `all` true
+   * lists every entry of the open issue (issues tab) or every row (links | outgoing tabs) instead of the first ones;
+   * `more` the number of rows the pages tab lists (100 at first, "Show more" adds 200).
    */
-  audit: (siteId: number, p: { tab?: "issues" | "pages" | "links" | "outgoing" | "rendering"; severity?: "error" | "warning" | "notice"; area?: string; issue?: string; status?: string; at?: string; vs?: string; show?: string; page?: string; result?: string } = {}) =>
+  audit: (siteId: number, p: { tab?: "issues" | "pages" | "links" | "outgoing" | "rendering"; severity?: "error" | "warning" | "notice"; area?: string; issue?: string; status?: string; at?: string; vs?: string; show?: string; page?: string; result?: string; all?: boolean; more?: number } = {}) =>
     `/seo/audit${qs({ site: siteId, ...p })}`,
 
   /**
@@ -102,8 +110,13 @@ export const seoLinks = {
    * saved list (view lists). Appended later the same day: `topic` groups a list's or an analysis's keywords by topic
    * ("*" every group, a term only that group, "other" the keywords in no group); `show` narrows the Service × town
    * grid to the cells a tile counts — gaps | weak (beyond the first three) | strong (in the first three) | unknown.
+   * Appended 2026-10-09 (round 3): `sort` the ideas table's order, a key that table lists (volume | difficulty | cpc;
+   * its first, Highest volume, is not written) — the Sort picker writes it and the chip names the order; `offset` /
+   * `limit` the ideas table's page of rows, as for a Site explorer report; `service` and `town` narrow the Service ×
+   * town grid to one service's row and one town's column (the words as the grid shows them) — a row or column heading
+   * writes them.
    */
-  keywords: (keyword: string, p: { view?: "one" | "bulk" | "lists" | "area"; table?: string; locationCode?: number; languageCode?: string; section?: "volume" | "serp" | "features" | "ideas" | "cpc" | "results"; month?: string; intent?: string; list?: number; topic?: string; show?: "gaps" | "weak" | "strong" | "unknown" } = {}) =>
+  keywords: (keyword: string, p: { view?: "one" | "bulk" | "lists" | "area"; table?: string; locationCode?: number; languageCode?: string; section?: "volume" | "serp" | "features" | "ideas" | "cpc" | "results"; month?: string; intent?: string; list?: number; topic?: string; show?: "gaps" | "weak" | "strong" | "unknown"; sort?: string; offset?: number; limit?: number; service?: string; town?: string } = {}) =>
     `/seo/keywords${qs({ keyword, ...p })}`,
 
   /**
@@ -124,8 +137,10 @@ export const seoLinks = {
    * Local grid for one site; `scan` opens one scan, `cell` one grid point in it (0-based); `show` outlines the points a
    * figure counts — top3 (in the first 3) | found (in the first N) | checked (every point the position score averages).
    * Appended 2026-10-09: `show` "failed" outlines the points whose lookup failed (the Area tile's "could not be checked").
+   * Appended (round 3): one value per colour of the grid's key — "4-10" (4th to 10th), "11-20" (11th or lower, still
+   * found) and "notFound" (not in the local results the lookup read); "top3" is the first colour's.
    */
-  localGrid: (siteId: number, p: { scan?: number; cell?: number; show?: "top3" | "found" | "checked" | "failed" } = {}) => `/seo/local-grid${qs({ site: siteId, ...p })}`,
+  localGrid: (siteId: number, p: { scan?: number; cell?: number; show?: "top3" | "found" | "checked" | "failed" | "4-10" | "11-20" | "notFound" } = {}) => `/seo/local-grid${qs({ site: siteId, ...p })}`,
 
   /**
    * AI visibility for one site; `month` "YYYY-MM"; `assistant` an assistant name; `question` a tracked question id;
@@ -142,7 +157,7 @@ export const seoLinks = {
   ai: (siteId: number, p: { month?: string; assistant?: string; question?: number; named?: boolean; cited?: boolean; first?: boolean; business?: string; source?: string; prompt?: string; vs?: string; latest?: boolean; days?: number; mentions?: string; platform?: "google" | "chat_gpt" } = {}) => `/seo/ai${qs({ site: siteId, ...p })}`,
 
   /** Alerts; `kind` narrows to one kind, `site` to one site. */
-  alerts: (p: { site?: number; kind?: string; /** The keyword watch on the page: compare snapshot `now` with `before` (ids), `watch` opens its added | gone | pages list, `watchAll` true lists every row of it. */ now?: number; before?: number; watch?: "added" | "gone" | "pages"; watchAll?: boolean; /** Appended (alerts, round 2): `alert` an alert's id scrolls to and outlines it (the chip says when it is not among the alerts loaded); `undelivered` true narrows to the alerts whose delivery was given up. */ alert?: number; undelivered?: boolean } = {}) => `/seo/alerts${qs(p)}`,
+  alerts: (p: { site?: number; kind?: string; /** The keyword watch on the page: compare snapshot `now` with `before` (ids), `watch` opens its added | gone | pages list, `watchAll` true lists every row of it. */ now?: number; before?: number; watch?: "added" | "gone" | "pages"; watchAll?: boolean; /** Appended (alerts, round 2): `alert` an alert's id scrolls to and outlines it (the chip says when it is not among the alerts loaded); `undelivered` true narrows to the alerts whose delivery was given up. */ alert?: number; undelivered?: boolean; /** Appended (round 3): the reveals as addresses — `all` the alerts (ids, comma-separated) whose every movement or kept keyword is listed, not only the first ones; `more` how many pages of older alerts are listed after the newest page ("Show more" adds one). */ all?: string; more?: number } = {}) => `/seo/alerts${qs(p)}`,
 
   /**
    * Action plan for one site; `task` scrolls to one task, `status` open | done | overdue (also todo | doing | dropped |
@@ -185,6 +200,24 @@ export const seoLinks = {
    */
   googleMaps: (p: { cid?: string | null; name: string; address?: string | null }) =>
     p.cid && /^\d{1,25}$/.test(p.cid) ? `https://www.google.com/maps?cid=${p.cid}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([p.name, p.address].filter(Boolean).join(", "))}`,
+
+  /**
+   * Appended (round 3, the shell's nav): the plain address of each section whose builder above needs a site. The nav
+   * tabs carry no site — the page opens on the site remembered in this browser (or the first one), see useSelectedSite.
+   */
+  rankTrackerHome: () => "/seo/rank-tracker",
+  localGridHome: () => "/seo/local-grid",
+  planHome: () => "/seo/plan",
+  auditHome: () => "/seo/audit",
+  aiHome: () => "/seo/ai",
+  reportsHome: () => "/seo/reports",
+  backlinksHome: () => "/seo/backlinks",
+
+  /**
+   * Appended (round 3, usage): Keywords explorer's Service × town planner for one site — the page a "Service-area
+   * planner" lookup was made on (the planner opens that site's saved services and towns; nothing is bought on arrival).
+   */
+  servicePlanner: (siteId: number) => `/seo/keywords${qs({ view: "area", site: siteId })}`,
 } as const;
 
 /** Read one parameter of the current address (the pages honour the names above). */

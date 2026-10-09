@@ -8,7 +8,10 @@
  * Every row leads somewhere (owner 2026-10-09): a keyword to the keywords explorer, a domain to its own Site
  * explorer, a page to the report narrowed to that page, an anchor to the links that use it — the page itself stays
  * behind a separate icon. With `linked`, the filters live in the address (links.ts): they are read on arrival and
- * written on "Apply filters", and what narrows the list is said in the chip (data-testid="active-filter").
+ * written on "Apply filters", and what narrows the list is said in the chip (data-testid="active-filter") — the order
+ * picked (`sort`) too. So does the page of rows (round 3): Previous / Next write `offset` and the Rows picker `limit`,
+ * so a page of a report is a place a link lands on and the back button undoes a page turn; a page not opened yet
+ * waits for its own "Load these rows" button. The "as of" date opens that month's lookups on the Usage page.
  */
 import { useRef, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSearch } from "wouter";
@@ -23,7 +26,7 @@ import { DifficultyBadge, PositionBadge } from "./viz";
 import { Fig, FIG, OpenIcon } from "./viz-explorer";
 import { seoLinks, setParam, setParams } from "./links";
 import { marketParams } from "./keyword-links";
-import { addressFromFilters, bandOfPosition, canonicalScope, filtersFromAddress, filterWords, HAS, pathOfUrl, SCOPED, scopePathOf, SORT_LABELS, sortKeyOf, SORTS_BY_DATE, sortWords, type Filters, type Scope, type TableKey } from "./explorer-filters";
+import { addressFromFilters, bandOfPosition, canonicalScope, DEFAULT_LIMIT, filtersFromAddress, filterWords, HAS, LIMITS, MAX_OFFSET, pageFromAddress, pathOfUrl, SCOPED, scopePathOf, SORT_LABELS, sortKeyOf, SORTS_BY_DATE, sortWords, type Filters, type Scope, type TableKey } from "./explorer-filters";
 
 export { scopePathOf, canonicalScope, type TableKey } from "./explorer-filters";
 type Page = { table: TableKey; target: string; capped?: boolean; rows: any[]; sourceRows?: number; total: number | null; limit: number; offset: number; sort: string; fetchedAt: string };
@@ -240,8 +243,15 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
   const [scopeDraft, setScopeDraft] = useState<{ text: string; exact: boolean }>({ text: arrived.scope?.path ?? "", exact: arrived.scope?.exact ?? false });
   const [scope, setScope] = useState<Scope | null>(arrived.scope);
   const [scopeError, setScopeError] = useState<string | null>(null);
-  const [offset, setOffset] = useState(0);
-  const [limit, setLimit] = useState<25 | 50 | 100>(50);
+  // The page of rows: the address's when the filters live there (links.ts `offset` / `limit`), else this view's own.
+  const [ownOffset, setOwnOffset] = useState(0);
+  const [ownLimit, setOwnLimit] = useState<number>(DEFAULT_LIMIT);
+  const paged = linked ? pageFromAddress(address) : null;
+  const offset = paged ? paged.offset : ownOffset, limit = paged ? paged.limit : ownLimit;
+  /** Another page of rows — in the address (one history entry, so Back undoes it) when the filters live there. */
+  const setOffset = (n: number) => { if (linked) setParam("offset", n > 0 ? n : null); else setOwnOffset(n); };
+  /** Another page size, from the first page (the default size is no word). */
+  const setLimit = (n: number) => { if (linked) setParams({ limit: n === DEFAULT_LIMIT ? null : n, offset: null }); else { setOwnLimit(n); setOwnOffset(0); } };
   const [picked, setPicked] = useState<Set<string>>(new Set());
   /** A tracking request is on its way: the button waits, and the ticks are cleared only when it has succeeded. */
   const [tracking, setTracking] = useState(false);
@@ -252,7 +262,7 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
   // The order: the address's when the filters live there (a date cell links the list newest first), else the default.
   const addressSort = linked ? address.sort ?? null : null;
   useEffect(() => { setSort(sortKeyOf(table, addressSort)); }, [table, target, addressSort]);
-  const chooseSort = (key: string) => { setSort(key); setOffset(0); if (linked) setParam("sort", key === SORT_LABELS[table][0][0] ? null : key); };
+  const chooseSort = (key: string) => { setSort(key); if (linked) setParams({ sort: key === SORT_LABELS[table][0][0] ? null : key, offset: null }); else setOwnOffset(0); };
   useEffect(() => {
     setScopeError(null);
     const next = linked ? arrived : { filters: {} as Filters, scope: null as Scope | null };
@@ -260,7 +270,7 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
     setDraft((d) => (JSON.stringify(d) === JSON.stringify(next.filters) ? d : next.filters));
     setScope((sc) => (JSON.stringify(sc) === JSON.stringify(next.scope) ? sc : next.scope));
     setScopeDraft((sd) => { const want = { text: next.scope?.path ?? "", exact: next.scope?.exact ?? false }; return sd.text === want.text && sd.exact === want.exact ? sd : want; });
-    setOffset(0); setPicked(new Set());
+    setOwnOffset(0); setPicked(new Set());
   }, [table, target, linked, arrivedKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const scoped = !!domain && SCOPED.has(table);
   // Belt and braces with the remount: a sort the report does not have is never sent.
@@ -314,16 +324,16 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
       setScope(nextScope);
     }
     const next = Object.fromEntries(Object.entries(draft).filter(([, v]) => v !== undefined && v !== "" && v !== false)) as Filters;
-    setFilters(next); setOffset(0); setPicked(new Set());
-    // A picked filter is the same thing as a link: it goes in the address (one step for the back button).
-    if (linked) setParams(addressFromFilters(table, next, nextScope));
+    setFilters(next); setPicked(new Set());
+    // A picked filter is the same thing as a link: it goes in the address (one step for the back button), from the first page.
+    if (linked) setParams({ ...addressFromFilters(table, next, nextScope), offset: null }); else setOwnOffset(0);
   };
   /** The scope goes, on the page and — when the filters live there — in the address. */
-  const wholeSite = () => { setScope(null); setScopeDraft({ text: "", exact: false }); setOffset(0); setPicked(new Set()); if (linked) setParams({ path: null, section: null }); };
-  /** Everything that narrows the list goes, on the page and in the address (a month picked on the chart with it). */
+  const wholeSite = () => { setScope(null); setScopeDraft({ text: "", exact: false }); setPicked(new Set()); if (linked) setParams({ path: null, section: null, offset: null }); else setOwnOffset(0); };
+  /** Everything the chip says goes, on the page and in the address (a month picked on the chart and the order picked with it), from the first page. */
   const clearAll = () => {
-    setFilters({}); setDraft({}); setScope(null); setScopeDraft({ text: "", exact: false }); setScopeError(null); setOffset(0); setPicked(new Set());
-    if (linked) setParams({ ...addressFromFilters(table, {}, null), month: null });
+    setFilters({}); setDraft({}); setScope(null); setScopeDraft({ text: "", exact: false }); setScopeError(null); setPicked(new Set());
+    if (linked) { setSort(SORT_LABELS[table][0][0]); setParams({ ...addressFromFilters(table, {}, null), month: null, sort: null, offset: null }); } else setOwnOffset(0);
   };
   /** What narrows the list, in words — the applied filters and scope, and what the address asks for that this list cannot be split by. */
   const words = filterWords(table, filters, scope, address, sortKey);
@@ -382,8 +392,8 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
           </select>
         </label>
         <label className="g-text-2 flex items-center gap-1 text-[12px]">Rows
-          <select className="g-input g-select !w-auto !py-1" value={limit} onChange={(e) => { setLimit(Number(e.target.value) as 25 | 50 | 100); setOffset(0); }} data-testid="report-limit">
-            <option value={25}>25</option><option value={50}>50</option><option value={100}>100</option>
+          <select className="g-input g-select !w-auto !py-1" value={limit} onChange={(e) => setLimit(Number(e.target.value))} data-testid="report-limit">
+            {LIMITS.map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
         </label>
         {(scoped || Object.keys(HAS).some((f) => has(f))) && <button type="submit" className="g-pill min-h-[44px]" data-testid="button-apply-filters">Apply filters</button>}
@@ -430,7 +440,9 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
         <>
           <div className="g-text-2 mb-2 flex flex-wrap items-center justify-between gap-2 text-[13px]">
             <span data-testid="report-meta">
-              {page.rows.length ? `Rows ${fmtNum(from)}–${fmtNum(to)}` : "No rows"}{page.total != null ? ` of ${fmtNum(page.total)}` : ""}{page.capped ? " most recent (Google's library gives no more; the site may have run others)" : ""} · as of {fmtDate(page.fetchedAt)}
+              {page.rows.length ? `Rows ${fmtNum(from)}–${fmtNum(to)}` : "No rows"}{page.total != null ? ` of ${fmtNum(page.total)}` : ""}{page.capped ? " most recent (Google's library gives no more; the site may have run others)" : ""} ·{" "}
+              {/* The date this page of rows was looked up: that month's lookups on the Usage page, as every other "as of" does. */}
+              <Fig href={seoLinks.usage({ month: page.fetchedAt.slice(0, 7) })} testId="link-report-as-of" label={`as of ${fmtDate(page.fetchedAt)} — when this page of rows was looked up; that month's lookups on the Usage page`}>as of {fmtDate(page.fetchedAt)}</Fig>
             </span>
             <span className="flex flex-wrap items-center gap-2">
               {trackable && extraAction && page.rows.some((r) => picked.has(r.keyword)) && extraAction(page.rows.filter((r) => picked.has(r.keyword)), () => setPicked(new Set()))}
@@ -463,7 +475,7 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
           )}
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px]">
             <button type="button" className="g-pill min-h-[44px]" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - limit))} data-testid="button-prev-page">← Previous</button>
-            <button type="button" className="g-pill min-h-[44px]" disabled={(page.sourceRows ?? page.rows.length) < limit || (page.total != null && to >= page.total) || offset + limit > 9900} onClick={() => setOffset(offset + limit)} data-testid="button-next-page">Next →</button>
+            <button type="button" className="g-pill min-h-[44px]" disabled={(page.sourceRows ?? page.rows.length) < limit || (page.total != null && to >= page.total) || offset + limit > MAX_OFFSET} onClick={() => setOffset(offset + limit)} data-testid="button-next-page">Next →</button>
             <span className="g-text-2">{whole ? "Paging through these is free." : `A page you haven't opened yet costs about ${price}.`}</span>
           </div>
         </>

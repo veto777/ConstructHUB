@@ -234,7 +234,7 @@ export default function SeoContentPage() {
                     {m && (
                       <span className="contents" data-testid="content-page-metrics">
                         <Figure label={`Linking site${m.linkingSites === 1 ? "" : "s"}`} value={m.linkingSites} max={most.links} color={PALETTE.domains} title={pagePath(r) ? "The backlinks to this page, one per site, in Site explorer" : `The backlinks to ${r.domain} (the page's address could not be read as one of its pages)`} href={pageView(r, "backlinks")} testId="link-content-links" />
-                        <Figure label="Estimated US search visits / mo" value={m.traffic} max={most.traffic} color={PALETTE.traffic} title="An estimate of visits from Google searches made in the United States, in English — opens this page in Site explorer" href={pageView(r, "pages")} testId="link-content-traffic" />
+                        <Figure label="Estimated US search visits / mo" value={m.traffic} max={most.traffic} color={PALETTE.traffic} title={`An estimate of visits from Google searches made in the United States, in English — opens ${pagePath(r) ? "this page" : `${r.domain}'s pages (the page's address could not be read as one of its pages)`} in Site explorer`} href={pageView(r, "pages")} testId="link-content-traffic" />
                       </span>
                     )}
                   </div>

@@ -56,7 +56,8 @@ It is a source check, not a browser walk: it cannot prove that a figure added la
 | The crawl shown, by its date, wherever a sentence names it (the compare card, the "not the newest" notes) | `{ at: <this crawl> }`; the newest crawl's date → `seoLinks.audit(site, { tab })` | none |
 | Compare card: "The first N of M" under each list | `#audit-page-changes` (the list) / M: `{ tab: "pages" }` for pages reached now, `{ at: <compared crawl> }` for pages no longer reached (the rest of that list was not kept) | none |
 | Compare card counts: "N pages reached … and not in the crawl before" (`link-pages-added`), "N the other way round" (`link-pages-removed`) | the current address + `#audit-page-changes` — the list of those pages opens and scrolls into view | none |
-| Pages reached now, not before (compare card) | `{ tab: "pages", page: <path> }` + ↗ to the live page | "One page opened: <path>" (or "<path> — not in this crawl") |
+| Pages reached now, not before (compare card) | `{ tab: "pages", page: <path> }` + ↗ to the live page (the ↗ is 44 px wide as well as tall) | "One page opened: <path>" (or "<path> — not in this crawl") |
+| Compare card list headings' dates ("Reached on <date>, not in the crawl of <date>" / "Reached in the crawl of <date>, not on <date>") | the crawl shown → `{ at: <this crawl> }` (keeps `vs`; `link-page-changes-now-added` / `-removed`); the crawl compared with → `{ at: <compared crawl> }` on its own (`link-page-changes-then-added` / `-removed`) | none |
 | Tabs: Issues / Pages / Internal links / Outgoing links / Rendering | `seoLinks.audit(site, { tab, at, vs })` | none |
 | Severity tabs inside Issues (`tab-audit-<s>`) | current address with `severity` changed | as the columns |
 | Area select | current address with `area: "<Area name>"` | "Issues in <Area>" |
@@ -64,8 +65,9 @@ It is a source check, not a browser walk: it cannot prove that a figure added la
 | Issue row: Area cell | current address with `area: "<Area name>"` | "Issues in <Area>" |
 | Issue row: Affected count, and "of N" under an open issue's list | `seoLinks.audit(site, { tab: "pages", issue: <key> })` — the crawled pages listed under it | "Pages listed under “<Issue title>”" |
 | Open issue: "Showing the first N" | the current address + `#detail-issue-<key>` (the list) | as the open issue |
+| Open issue: "Show all N" / "Show the first 25" (`link-issue-all-<key>`) | the current address with `all: true` / without it — a link, so the back button folds the list again | as the open issue |
 | Issue row: Change / "New" badge | current address with `issue: <key>, vs: <compared crawl>` | "<Issue title> — its affected pages" |
-| Affected page inside an open issue | `{ tab: "pages", page: <path> }` + ↗ to the live page (an address on another site: ↗ only) | "One page opened: <path>" |
+| Affected page inside an open issue | `{ tab: "pages", page: <path> }` + ↗ to the live page, 44 px wide (an address on another site: ↗ only) | "One page opened: <path>" |
 | Not re-checked this time / Fixed since: an issue | `seoLinks.audit(site, { at: <compared crawl>, issue: <key> })` — the issue as the earlier crawl found it | "<Issue title> — its affected pages" |
 | Export, Export this list | stay buttons (a CSV file) | — |
 | Step-by-step fix plan | `seoLinks.plan(site)` | — |
@@ -82,6 +84,7 @@ It is a source check, not a browser walk: it cannot prove that a figure added la
 | Pages tab row: the page's path | `seoLinks.explorer(domain, "pages", { path })` | (Site explorer's) |
 | Pages tab, open row: "Listed under" issues | `seoLinks.audit(site, { issue: <key>, at, vs })` | "<Issue title> — its affected pages" |
 | Pages tab, open row: "Open the page ↗" / "Its keywords and backlinks in Site explorer" | the live page / `seoLinks.explorer(domain, "pages", { path })` | — |
+| Pages tab: "Show more (N left)" (`button-pages-more`) | the current address with `more: <rows listed + 200>` — a link; the back button lists fewer again (a pick, a pill or the search box starts from the first 100) | the chip already above it |
 
 ## Internal links tab (`tab=links`, link-opportunities.tsx)
 
@@ -100,6 +103,7 @@ It is a source check, not a browser walk: it cannot prove that a figure added la
 | Row: the words, Position, the check it rests on (device, date, place) | `seoLinks.rankTracker(site, { keyword, device })` | (Rank tracker's) |
 | Row: Volume | `seoLinks.keywords(keyword)` | (Keywords explorer's) |
 | "N more were found than are listed" | `seoLinks.rankTracker(site)` — the list stops at the first found; the title says so | (Rank tracker's) |
+| "Show all N" (`button-link-opps-all`) | the current address with `all: true` — every suggestion, not the first 50 | the chip already above it |
 | "N pages are cut where the crawl stops saving a page's text" | `{ tab: "pages" }` — which pages were cut is not recorded; the title says so | none |
 | No keywords yet: "rank tracker" | `seoLinks.rankTracker(site)` (was a hand-written address) | — |
 | Links not measurable: "Rendering" | `{ tab: "rendering" }` | none |
@@ -113,7 +117,7 @@ It is a source check, not a browser walk: it cannot prove that a figure added la
 | "N links", "N other websites" | current address + `#table-outgoing` | none |
 | Heading counts: "Checked links that did not answer normally (N, M broken)" | current address + `#outgoing-broken` | none |
 | "N of these websites' addresses were checked", "N page links were not checked" | current address + `#table-outgoing` (the table's last column says which) | none |
-| Checked address | `seoLinks.explorer(<its website>)`, ↗ the live address | (Site explorer's) |
+| Checked address | `seoLinks.explorer(<its website>)`, ↗ the live address (`link-outgoing-open-<address>`, a 44 × 44 px target) | (Site explorer's) |
 | Its answer in words ("404, gone…", "refused our check…") | the live address ↗ — what the check saw; open it to see what it does now | — |
 | "linked from" pages / "and N more" | `{ tab: "pages", page: <path> }` / `{ tab: "pages" }` (the crawl keeps only the first few) | "One page opened: <path>" / none |
 | Table: Website | `seoLinks.explorer(domain)` | (Site explorer's) |
@@ -123,6 +127,7 @@ It is a source check, not a browser walk: it cannot prove that a figure added la
 | Table: example address | the live address ↗ | — |
 | Table: Checked / broken, "not checked" | current address + `#outgoing-broken` | none |
 | "N more websites than are listed" | `{ tab: "pages" }` — the websites beyond the list are only counted; the title says so | none |
+| "Show all N" (`button-outgoing-all`) | the current address with `all: true` — every website, not the first 50 | the chip already above it |
 | `?page=<path>` arriving | the rows that start on that page are outlined and scrolled to | "Page <path> — its links are outlined", or "— no listed link starts on it" and why (only examples are kept) |
 
 ## Rendering tab (`tab=rendering`, render.tsx)
@@ -137,7 +142,7 @@ It is a source check, not a browser walk: it cannot prove that a figure added la
 | "M pages" | `{ tab: "rendering" }` + `#table-render` | none |
 | "N much the same", "N could not be compared" | `result: "same"` / `result: "unknown"` | "Pages much the same" / "Pages that could not be compared" |
 | Row: the page | `{ tab: "pages", page: <path> }` (no crawl: the live page) | "One page opened: <path>" |
-| Row: chevron, Result, Words (HTML / browser), Own-page links (HTML / browser), Main content painted, Loaded | current address with `page: <path>` — the visit's details open (again to close); every cell carries its label on a phone | "Page <path> — its visits below" |
+| Row: chevron, Result, Words (HTML / browser), Own-page links (HTML / browser), Main content painted, Loaded | current address with `page: <path>` — the visit's details open (again to close); every cell carries its label on a phone, the chevron its word ("Details" / "Hide details") | "Page <path> — its visits below" |
 | Details: Answer, Title / Main heading in the browser visit, Usable after, what the browser visit found | the live page ↗ | — |
 | Details: Where the browser visit ended | that address ↗ | — |
 | Details: Title / Main heading in the HTML, Images | `{ tab: "pages", page: <path> }` (no crawl: the live page) | "One page opened: <path>" |
@@ -153,11 +158,13 @@ It is a source check, not a browser walk: it cannot prove that a figure added la
 | `tab` | `issues` (default) \| `pages` \| `links` \| `outgoing` \| `rendering` |
 | `severity` | issues tab: `error` \| `warning` \| `notice`; pages tab: the pages listed under an issue of that severity |
 | `area` | issues tab: an area by name ("Content") or key ("content"); an area no issue is in still narrows, to nothing, and the chip says which. Rendering tab: `Performance` opens the note on why performance was not measured |
-| `issue` | issues tab: that issue's row opens with its affected pages, scrolled into view (and is always listed, whatever `severity` / `area` say); one this crawl did not find is said so in the chip. Pages tab: the pages listed under it |
+| `issue` | issues tab: that issue's row opens with its affected pages, scrolled into view (and is always listed, whatever `severity` / `area` say); one this crawl did not find is said so in the chip ("An issue this crawl did not find" — "Nothing is listed under that issue in the crawl of <date>"; the raw key is never printed). Pages tab: the pages listed under it |
 | `status` | pages tab: `2xx` \| `3xx` \| `4xx` \| `5xx` \| `unusual` cut as the overview counts them; `unchecked` (never loaded), `excluded` (found, not audited), `beyond-limit` (beyond the crawl's limit) and `blocked` (robots.txt) are the overview's counts — no row exists, the chip says so |
 | `show` | pages tab: one of its pills — `notIndexable` \| `canonical` \| `errors` \| `redirected` \| `orphans` \| `deep` \| `thin` \| `noTitle` \| `noDescription` |
 | `page` | pages tab: that page's row opens (always listed, brought within the rows shown, scrolled into view); not in this crawl → said so. Internal links / Outgoing links: its rows are outlined. Rendering: its visit's details open |
 | `result` | rendering tab: `differ` (more or less) \| `more` \| `less` \| `same` \| `unknown` narrows the table (the page `page` opens stays listed); an unknown value is said so |
+| `all` | `true`: every entry of the open issue (issues tab), every suggestion (internal links), every website (outgoing links) — not only the first ones. A reveal, not a narrowing: no chip; a link to anything else on the page drops it |
+| `more` | pages tab: how many rows are listed (100 at first; "Show more" adds 200); dropped by a pick, a pill or typing in the search box |
 | `at` | the crawl shown (a crawl id; absent = the newest) |
 | `vs` | the crawl compared with (absent = the one just before) |
 | `#audit-fixed`, `#audit-not-rechecked`, `#audit-compare` | scrolled to once the crawl is on screen |

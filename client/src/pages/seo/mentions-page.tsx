@@ -22,12 +22,14 @@ export default function SeoMentionsPage() {
   const checkParam = params.get("check");
   const check = Number(checkParam) || null;
   const tab = params.get("tab");
-  /** What the view made of ?check= once it loaded: that check shown, or not available (the newest shown instead). */
-  const [checkState, setCheckState] = useState<{ chosen: boolean; missing: boolean } | null>(null);
-  // The chip says what is on screen: the check named, or why it is not (not a number, not available — the newest instead).
+  /** What the view made of ?check= once it loaded, and for which check: that check shown, or not available (the newest shown instead). */
+  const [checkState, setCheckState] = useState<{ check: number | null; chosen: boolean; missing: boolean } | null>(null);
+  const known = checkState !== null && checkState.check === check ? checkState : null;
+  // The chip says what is on screen: the check named, or why it is not (not a number, not available — the newest
+  // instead). Nothing is said of a check number until its answer is in: before that it is not known to be shown.
   const checkWords = checkParam === null ? "" : !check ? `check "${checkParam}" — not a check number, so the newest check is shown`
-    : missing ? "" : checkState?.missing ? `check #${check} — not available (it may belong to another site), so the newest check is shown`
-    : checkState?.chosen ? `the check an alert was raised from (#${check})` : `check #${check}`;
+    : missing || !known ? "" : known.missing ? `check #${check} — not available (it may belong to another site), so the newest check is shown`
+    : known.chosen ? `the check an alert was raised from (#${check}), in the monthly watch below` : `check #${check}`;
   const chip = [checkWords, tab ? (TAB_LABEL[tab] ? `${TAB_LABEL[tab]} only` : `"${tab}" — not a tab here, so ${TAB_LABEL.prospects} is shown`) : ""].filter(Boolean).join(" · ");
   // Another site has its own checks and tabs.
   const changeSite = (id: number) => { clearParams(["check", "tab"]); onSite(id); };
@@ -39,7 +41,7 @@ export default function SeoMentionsPage() {
         : !site ? <Empty testId="mentions-page-no-site"><h3>No site yet</h3><p>Add your website on the SEO dashboard first.</p></Empty>
         : <>
             {missing && <p className="mb-3 text-[13px]" role="status" style={{ color: "#b06000" }} data-testid="mentions-page-missing">The site this link is for isn't one of yours (or was removed). Showing {site.domain}.</p>}
-            <MentionsView key={site.id} siteId={site.id} domain={site.domain} status={status.data} checkId={!missing ? check : null} onCheck={setCheckState} />
+            <MentionsView key={site.id} siteId={site.id} domain={site.domain} status={status.data} checkId={!missing ? check : null} onCheck={(s) => setCheckState({ ...s, check })} />
           </>}
     </SeoShell>
   );

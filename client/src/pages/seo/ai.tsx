@@ -254,7 +254,13 @@ export default function SeoAiPage() {
     filter.business ? `naming "${filter.business}"` : "", filter.source ? `drawing on ${filter.source}` : "",
   ].filter(Boolean).join(" · ");
   /** Everything the address narrows or opens on this page, one chip: the answers list, the like-for-like month, the AI-mentions website. */
+  // A question opened by the address alone (no other narrowing) is said too, so its clear control is there: what the
+  // page shows for it — that question, the tracked one by its id, or why the newest is shown instead.
+  const questionWords = filtering || !d ? "" : promptParam !== null
+    ? (shown && openPrompt !== null && same(shown.prompt, openPrompt) ? `One question: "${shown.prompt}"` : `"${openPrompt}" — no saved answers to it for ${site?.domain ?? "this site"}`)
+    : questionParam !== null ? (tracked ? `One question, asked again every month: "${tracked.prompt}"` : `question #${questionParam} — not one asked again every month for ${site?.domain ?? "this site"}, so the newest question is shown`) : "";
   const chips = [
+    questionWords,
     filtering ? `${chip} — ${fmtNum(listed.length)} of ${fmtNum(rows.length)} saved answer${rows.length === 1 ? "" : "s"}` : "",
     vsParam !== null ? (MONTH.test(vsParam) ? `like for like against ${monthName(vsParam)} (in "The picture so far")` : `vs="${vsParam}" — not a month (YYYY-MM), so the default month is compared`) : "",
     mentionsParam !== null ? (mentionsWanted ? `AI mentions of ${mentionsWanted.domain} (${mentionsWanted.platform === "google" ? "Google AI Overviews" : "ChatGPT"}) — the saved result, if there is one, at the bottom` : `mentions="${mentionsParam}" — not a website`) : "",

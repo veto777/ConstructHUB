@@ -9,7 +9,8 @@
  * so), `severity` / `issue` / `area` the pages listed under issues of that severity / that one issue / that area,
  * `page` one page whose row is opened. Every pill, figure and row is a link that writes the address, so a link into
  * this tab and a pick on it are the same thing; the chip (data-testid="active-filter") says what narrowed the list,
- * and says honestly when the page or issue asked for is not in this crawl.
+ * and says honestly when the page or issue asked for is not in this crawl. How many rows are listed is the address too
+ * (`more`, links.ts): "Show more" is a link, and the back button lists fewer again.
  */
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -18,7 +19,7 @@ import { Link } from "wouter";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { Empty, fmtDate, fmtNum, HIGHLIGHT, type SeoSite } from "./shell";
 import { PALETTE, StatTile } from "./viz";
-import { seoLinks } from "./links";
+import { seoLinks, setParam } from "./links";
 import { ActiveFilter, CHEVRON, COMPACT_TABLE, DETAIL_CELL, FIG, FIG_BIG, PILL, type AuditParams, type Foreign } from "./viz-audit";
 
 type Row = { url: string; path: string; status: number; redirected: boolean; indexable: boolean | null; whyNot: string | null; canonicalElsewhere?: boolean; depth: number | null; inlinks: number | null; outlinks: number | null;
@@ -79,7 +80,7 @@ const PILL_ON = { borderColor: "var(--g-blue)", color: "var(--g-blue)" };
 /** The answer class a row's status falls in (the first cut that takes it), for the Status cell's link. */
 const classOf = (r: Row) => STATUS_CUTS.find((c) => c.test(r))?.key;
 
-export function AuditPages({ site, issueTitles, issueSeverity, issueArea, crawlId, overview, shownDate, narrowing, here, issueHref, foreign }: {
+export function AuditPages({ site, issueTitles, issueSeverity, issueArea, crawlId, overview, shownDate, narrowing, here, issueHref, foreign, more }: {
   site: SeoSite; issueTitles: Record<string, string>;
   /** Each issue key's severity and area, so `severity` / `area` can cut the pages listed under such issues. */
   issueSeverity: Record<string, Severity>; issueArea: Record<string, { key: string; name: string }>;
@@ -94,12 +95,13 @@ export function AuditPages({ site, issueTitles, issueSeverity, issueArea, crawlI
   /** An issue opened on the issues tab. */
   issueHref: (key: string) => string;
   foreign?: Foreign;
+  /** The rows listed, from the address (`more`; absent = the first 100). */
+  more?: number | null;
 }) {
   const q = useQuery<Data>({ queryKey: [`/api/seo/sites/${site.id}/audit/pages`, crawlId ?? null], refetchOnMount: "always",
     queryFn: async ({ queryKey, signal }) => { const r = await fetch(queryKey[0] as string, { credentials: "include", signal }); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message ?? "The request failed"); return r.json(); } });
   const [text, setText] = useState("");
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "path", dir: 1 });
-  const [shown, setShown] = useState(100);
   const openRef = useRef<HTMLTableRowElement>(null);
   // The newest crawl could not be read: said (the server never answers with an older crawl instead).
   const unreadable = q.data && typeof q.data === "object" && "unreadable" in (q.data as object) ? (q.data as unknown as { scannedAt: string | null }) : null;
@@ -124,9 +126,9 @@ export function AuditPages({ site, issueTitles, issueSeverity, issueArea, crawlI
     const val = (r: Row) => (sort.key === "path" ? r.path : (r[sort.key] ?? (sort.dir === 1 ? Infinity : -Infinity)));
     return [...picked].sort((a, b) => { const x = val(a), y = val(b); return (x < y ? -1 : x > y ? 1 : a.path.localeCompare(b.path)) * sort.dir; });
   }, [d, active, cut, severity, issue, area, page, text, sort, issueSeverity]); // eslint-disable-line react-hooks/exhaustive-deps
-  // The opened page is brought within the rows shown, then into view.
+  // The rows listed: what the address says (at least the first 100), and always as far as the opened page, which is then brought into view.
   const openAt = page ? rows.findIndex((r) => r.path === page) : -1;
-  useEffect(() => { if (openAt >= shown) setShown(openAt + 1); }, [openAt, shown]);
+  const shown = Math.max(more && more > 100 ? more : 100, openAt + 1);
   useEffect(() => { if (openAt >= 0 && openAt < shown) openRef.current?.scrollIntoView({ block: "nearest" }); }, [openAt, shown, page]);
   const exportCsv = () => {
     const lines = [["URL", "Status", "Blocking signal found", "Which", "Clicks deep", "Links to it", "Links from it", "Words", "Title", "Title length", "Description length", "H1 headings", "Images", "Images without alt text", "Size (KB)", "Issues"],
@@ -142,7 +144,8 @@ export function AuditPages({ site, issueTitles, issueSeverity, issueArea, crawlI
   const words: string[] = [];
   if (narrowing.status) words.push(cut ? cut.words : `an answer class this page doesn't know (${narrowing.status})`);
   if (narrowing.severity) words.push(severity ? `Pages with ${SEVERITY_WORDS[severity]}` : `a severity this page doesn't know (${narrowing.severity})`);
-  if (issue) words.push(issueKnown ? `Pages listed under “${issueTitles[issue]}”` : `an issue this crawl did not find (${issue})`);
+  // An issue this crawl does not have is never named by its raw key.
+  if (issue) words.push(issueKnown ? `Pages listed under “${issueTitles[issue]}”` : "an issue this crawl did not find");
   if (area) words.push(`Pages with issues in ${Object.values(issueArea).find((x) => x.name.toLowerCase() === area.toLowerCase() || x.key.toLowerCase() === area.toLowerCase())?.name ?? area}`);
   if (narrowing.show) words.push(active ? active.label : `a pill this page doesn't have (${narrowing.show})`);
   if (page) words.push(!d ? `Page ${page}` : pageFound ? `One page opened: ${page}` : `${page} — not in this crawl`);
@@ -152,7 +155,7 @@ export function AuditPages({ site, issueTitles, issueSeverity, issueArea, crawlI
   const explain = [
     cut?.count ? cut.explain?.(overview, cut.count(overview)) : null,
     page && d && !pageFound ? `No crawled page has the address ${page} in the crawl of ${fmtDate(d.scannedAt)} (the newest). Its row would be here if a crawl had reached it.` : null,
-    issue && !issueKnown ? `Nothing is listed under “${issue}” in the crawl of ${fmtDate(shownDate)}. It may have been fixed, or found by another crawl.` : null,
+    issue && !issueKnown ? `Nothing is listed under that issue in the crawl of ${fmtDate(shownDate)}. It may have been fixed, or found by another crawl.` : null,
   ].filter(Boolean).join(" ");
   const chip = words.length > 0 && <ActiveFilter words={words.join(" · ")} clearHref={clearHref} extra={foreign ? { href: foreign.href, label: foreign.label, testId: "link-foreign-tab" } : undefined}>{explain || null}</ActiveFilter>;
   if (q.isLoading) return <>{chip}<p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading the crawled pages…</p></>;
@@ -196,7 +199,7 @@ export function AuditPages({ site, issueTitles, issueSeverity, issueArea, crawlI
       {chip}
       {active?.hint && <p className="g-text-2 mb-2 text-[13px]" data-testid="text-pages-hint">{active.hint}</p>}
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <label className="min-w-0 flex-1 sm:max-w-xs"><span className="sr-only">Find a page by address or title</span><input className="g-input w-full !py-1.5" value={text} onChange={(e) => { setText(e.target.value); setShown(100); }} placeholder="Find a page…" data-testid="input-pages-search" /></label>
+        <label className="min-w-0 flex-1 sm:max-w-xs"><span className="sr-only">Find a page by address or title</span><input className="g-input w-full !py-1.5" value={text} onChange={(e) => { setText(e.target.value); if (more) setParam("more", null, true); }} placeholder="Find a page…" data-testid="input-pages-search" /></label>
         <span className="g-text-2 text-[13px]" data-testid="text-pages-count"><Link href={`${here({})}#table-audit-pages`} className={`g-text-2 ${FIG}`} title="The pages listed below" data-testid="link-pages-count">{fmtNum(rows.length)} page{rows.length === 1 ? "" : "s"}</Link></span>
         <button type="button" className="g-pill g-pill--sm ml-auto max-sm:!min-h-11" onClick={exportCsv} disabled={!rows.length} data-testid="button-pages-export"><Download /> Export</button>
       </div>
@@ -236,7 +239,7 @@ export function AuditPages({ site, issueTitles, issueSeverity, issueArea, crawlI
           </table>
         </div>
       )}
-      {rows.length > shown && <button type="button" className="g-pill mt-3 max-sm:!min-h-11" onClick={() => setShown(shown + 200)} data-testid="button-pages-more">Show more ({fmtNum(rows.length - shown)} left)</button>}
+      {rows.length > shown && <Link href={here({ more: shown + 200 })} className="g-pill mt-3 max-sm:!min-h-11" data-testid="button-pages-more">Show more ({fmtNum(rows.length - shown)} left)</Link>}
     </div>
   );
 }

@@ -8,6 +8,8 @@
  * the chip (data-testid="active-filter") says what was picked. Every figure leads to its data: a search to the keywords
  * explorer in the snapshot's market, a position or visit estimate to the site's keywords in Site explorer, a page to its
  * keywords there, a count to the list it counts. Nothing is bought by arriving: the snapshot button is the one buyer.
+ * On a phone the two snapshot pickers are 44 px tall and the tables become labelled cards (google.css, under 640 px)
+ * rather than scrolling sideways.
  */
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -34,6 +36,8 @@ type Snap = { id: number; takenOn: string; keywords: number; total: number | nul
 export type KwPick = { siteId: number; now: number; before: number; /** Opened from an alert (a new number each time): focus moves to the comparison once it has loaded. */ fromAlert?: number };
 type View = { pair: { nowId: number; beforeId: number; chosen: boolean; now: Snap; before: Snap } | null; snapshots: Snap[]; snapshotCount: number; watch: boolean; nextAt: string | null; rows: number; alertsOn: boolean; sameMarket: boolean; nextDayAt?: string; latest: { takenOn: string; keywords: number; total: number | null; whole: boolean | null; locationCode: number; languageCode: string; today: boolean } | null; comparison: Comparison | null };
 const card = { borderColor: "var(--g-divider)", background: "var(--g-surface)" };
+/** The snapshot pickers: the 40 px select of these screens made 44 px tall (a thumb's size), never wider than the screen. */
+const PICK = "g-input g-select !min-h-11 !w-auto min-w-0 max-w-full";
 
 export function KeywordWatch({ site, onTrack, pick, onPick }: {
   site: SeoSite; /** Track a keyword in the rank tracker. */ onTrack?: (keywords: Kw[]) => void;
@@ -167,12 +171,12 @@ export function KeywordWatch({ site, onTrack, pick, onPick }: {
       {d.snapshots.length >= 2 && onPick && nowSnap && beforeSnap && (
         <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px]" data-testid="keyword-watch-pick" aria-busy={q.isFetching}>
           <label className="flex min-w-0 max-w-full items-center gap-1"><span className="g-text-2">Compare</span>
-            <select className="g-select min-w-0 max-w-full" value={nowSnap.id} data-testid="select-kw-now"
+            <select className={PICK} value={nowSnap.id} data-testid="select-kw-now"
               onChange={(e) => { const n = d.snapshots.find((x) => x.id === Number(e.target.value))!; const b = earlier(n).find((x) => x.locationCode === n.locationCode && x.languageCode === n.languageCode) ?? earlier(n)[0]; if (b) choose(n.id, b.id); }}>
               {withPair(d.snapshots.filter((x) => earlier(x).length > 0), nowSnap).map((x) => <option key={x.id} value={x.id}>{snapLabel(x)}</option>)}
             </select></label>
           <label className="flex min-w-0 max-w-full items-center gap-1"><span className="g-text-2">with</span>
-            <select className="g-select min-w-0 max-w-full" value={beforeSnap.id} data-testid="select-kw-before" onChange={(e) => choose(nowSnap.id, Number(e.target.value))}>
+            <select className={PICK} value={beforeSnap.id} data-testid="select-kw-before" onChange={(e) => choose(nowSnap.id, Number(e.target.value))}>
               {withPair(earlier(nowSnap), beforeSnap).map((x) => <option key={x.id} value={x.id}>{snapLabel(x)}{x.locationCode !== nowSnap.locationCode || x.languageCode !== nowSnap.languageCode ? " · other country" : ""}</option>)}
             </select></label>
           {placeholder && <span className="sr-only" role="status">Loading the comparison…</span>}
@@ -202,8 +206,9 @@ export function KeywordWatch({ site, onTrack, pick, onPick }: {
           <nav className="g-tabs" aria-label="What changed">
             {([["added", whole ? `Newly seen (${c.added.length})` : c.basis === "top" ? `Entered the top (${c.added.length})` : `In the newer only (${c.added.length})`], ["gone", whole ? `No longer seen (${c.gone.length})` : c.basis === "top" ? `Left the top (${c.gone.length})` : `In the older only (${c.gone.length})`], ["pages", `By page (${pages.length})`]] as const).map(([k, label]) => <Link key={k} href={tabHref(k)} aria-current={tab === k ? "page" : undefined} className="max-sm:!min-h-11" data-testid={`tab-keyword-watch-${k}`}>{label}</Link>)}
           </nav>
+          {/* Each table scrolls sideways only from 640 px; on a phone its rows are labelled cards (data-label), so nothing does. */}
           {tab === "pages" ? (pages.length === 0 ? <p className="g-text-2 text-[13px]">No pages in these snapshots.</p> : (
-            <div className="overflow-x-auto">
+            <div className="sm:overflow-x-auto">
               <p className="g-text-2 mb-2 text-[12px]">Each page of the site with the keywords the data has it ranking for in each snapshot, and the visits those keywords are estimated to bring. Biggest change in visits first.{c.basis !== "whole" ? ` ${c.basis === "top" ? `Only the ${fmtNum(d.rows)} highest-traffic keywords of each snapshot are counted, so a page's smaller keywords may be missing on either side.` : "Whether either snapshot holds every keyword the data has for the site is not known."}` : ""}</p>
               <table className="g-table w-full" data-testid="table-keyword-watch-pages">
                 <thead><tr><th>Page</th><th className="num">Keywords {fmtDate(c.since)}</th><th className="num">Keywords {fmtDate(c.takenOn)}</th><th className="num" title="Estimated visits a month">Est. visits {fmtDate(c.since)}</th><th className="num" title="Estimated visits a month">Est. visits {fmtDate(c.takenOn)}</th><th>What moved</th><th><span className="sr-only">Action plan</span></th></tr></thead>
@@ -228,7 +233,7 @@ export function KeywordWatch({ site, onTrack, pick, onPick }: {
               {pages.some((p) => p.before.unknown + p.after.unknown > 0) && <p className="g-text-2 mt-1 text-[12px]">* Some of the page's keywords had no visit estimate; the figure adds up the ones that had. "—" = no estimate for any of them.</p>}
             </div>
           )) : list.length === 0 ? <p className="g-text-2 text-[13px]">None.</p> : (
-            <div className="overflow-x-auto">
+            <div className="sm:overflow-x-auto">
               <table className="g-table w-full" data-testid={`table-keyword-watch-${tab}`}>
                 <thead><tr><th>Keyword</th><th className="num">{tab === "added" ? `Position ${fmtDate(c.takenOn)}` : `Position ${fmtDate(c.since)}`}</th><th className="num">Volume / mo</th><th className="num" title="Estimated visits a month from this search">Est. visits</th><th>Page</th>{tab === "added" && onTrack && <th><span className="sr-only">Track</span></th>}</tr></thead>
                 <tbody>

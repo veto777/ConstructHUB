@@ -26,8 +26,8 @@ import { LocationPicker, type Place } from "./location-picker";
 import { CompetitorPanel } from "./rank-competitors";
 import { countryLabel } from "@shared/seo-markets";
 import { unresolvedPlaceMessage } from "@shared/seo-place";
-import { seoLinks } from "./links";
-import { effectiveDevice, keepsRow, narrowingWords, PANEL_TARGET, pageParts, scopeOf, scrollToTestId, showsMapPack, slug, useRankParams, utcDay, withFeature, type RankTo } from "./rank-params";
+import { seoLinks, type Movement } from "./links";
+import { effectiveDevice, hrefWith, keepsRow, moved, narrowingWords, PANEL_TARGET, pageParts, scopeOf, scrollToTestId, showsMapPack, slug, useRankParams, utcDay, withFeature, type RankTo } from "./rank-params";
 import { GradientSpark, MetricColumn, ORANGE, PALETTE } from "./viz";
 import { CARD, LINK, LINK_BLOCK, LinkedDistributionBar, PositionBadge, PositionSpark, SectionTitle, TABLE, TAP } from "./viz-rank";
 
@@ -57,6 +57,13 @@ function gscHint(g: { clicks: number | null; previousClicks: number | null; days
   if (g.incomplete) return `${synced} — ${g.completenessUnknown ? "whether every day was fully read is not known" : "some days are still being read from Google, or a read failed, so the count may be short"}; not compared`;
   return `${synced} — not compared`;
 }
+
+/**
+ * A row's movement since the check before, as the glyph beside its position shows it (shell.tsx `Move`) and as `move`
+ * narrows the table (rank-params.ts `moved`): "new" before "up", "lost" before "down"; nothing without a check before.
+ */
+const moveOf = (p: Position): Movement | null => (p?.previousOn ? (["new", "lost", "up", "down", "unchanged"] as const).find((m) => moved(p, m)) ?? null : null);
+const MOVED: Record<Movement, string> = { up: "moved up", down: "moved down", new: "newly found", lost: "no longer found", unchanged: "at the same position" };
 
 /** A figure as a link in the blue of every link, with the test id the links contract asks for (link-<figure>). */
 function Fig({ href, id, title, children, className = LINK }: { href: string; id: string; title: string; children: ReactNode; className?: string }) {
@@ -194,7 +201,17 @@ export default function SeoOverviewPage() {
           <RankTagsPanel site={site} />
           <CompetingPages site={site} />
           <SerpGroupsPanel site={site} />
-          {o?.searchConsole && <GscBreakdownView site={site} />}
+          {o?.searchConsole ? <GscBreakdownView site={site} /> : (params.gsc || params.gscSort || params.gscAll) && (
+            // The address asks for the Search Console breakdown, but this site has no property connected, so the panel isn't
+            // drawn: the chip still answers it — honestly — with a way to connect and a Clear (round 3, the live crawl).
+            <p className="g-text-2 mb-5 flex flex-wrap items-center gap-2 text-[13px]" data-testid="gsc-not-connected">
+              <span className="g-chip !min-h-8 flex-wrap gap-x-2 text-[13px] font-normal max-sm:!min-h-11" style={{ textTransform: "none" }} role="status" data-testid="active-filter">
+                <span>Search Console breakdown{[params.gsc === "query" ? "by search" : params.gsc === "page" ? "by page" : null, params.gscSort === "gain" ? "biggest gain first" : params.gscSort === "loss" ? "biggest fall first" : params.gscSort === "clicks" ? "most clicks first" : null, params.gscAll ? "every row" : null].filter(Boolean).map((w) => ` · ${w}`).join("")}: {site.domain}'s Search Console property isn't connected, so there is no breakdown to show.</span>
+                <Link href={seoLinks.searchConsole()} className={`${LINK} font-medium`} title="Connect the Search Console property (Settings)" data-testid="link-gsc-connect-chip">Connect it</Link>
+                <Link href={hrefWith({ gsc: null, gscSort: null, gscAll: null })} className={`${LINK} font-medium`} title="Drop the Search Console breakdown from the address" data-testid="link-clear-gsc">Clear</Link>
+              </span>
+            </p>
+          )}
           <CompetitorPanel key={site.id} site={site} />
           <AddKeywords site={site} onAdded={invalidate} />
           {o.rows.some((r) => r.searchVolume == null) && (
@@ -257,7 +274,7 @@ export default function SeoOverviewPage() {
                     <Fragment key={r.id}>
                     <tr data-testid={`row-keyword-${r.id}`} className="scroll-mt-16" style={hit ? { background: "var(--g-accent-soft)" } : undefined} data-highlighted={hit || undefined}>
                       <td><Link href={seoLinks.keywords(r.keyword)} className={LINK} title="Open in the keywords explorer" data-testid={`link-keyword-${r.id}`}>{r.keyword}</Link>{r.location && r.location !== countryLabel(site.locationCode) && <span className="g-text-2 text-[12px]"> · <Link href={to({ ...onDevice, location: r.location })} className={LINK} title={`The keywords checked from ${r.location}`} data-testid={`link-row-location-${r.id}`}>{r.location}</Link></span>}{r.tags.map((t) => <span key={t} className="g-text-2 text-[12px]"> · <Link href={to({ ...onDevice, tag: t })} className={LINK} title={`The keywords tagged “${t}”`} data-testid={`link-row-tag-${r.id}-${slug(t)}`}>{t}</Link></span>)}</td>
-                      {o.devices.map((d) => { const p = r.positions[d]; return <td key={d} className="num" data-label={d === "desktop" ? "Desktop" : "Mobile"}>{p ? <><button type="button" className={`g-link ${TAP}`} aria-expanded={openKw === r.id} onClick={toggle} title="Show this keyword's history" data-testid={d === o.devices[0] ? `button-history-${r.id}` : `button-history-${r.id}-${d}`}><PositionBadge position={p.position} depth={site.serpDepth} /></button> <Move now={p.position} before={p.previous} hadBefore={!!p.previousOn} /></> : <span className="g-text-2">—</span>}</td>; })}
+                      {o.devices.map((d) => { const p = r.positions[d], m = moveOf(p); return <td key={d} className="num" data-label={d === "desktop" ? "Desktop" : "Mobile"}>{p ? <><button type="button" className={`g-link ${TAP}`} aria-expanded={openKw === r.id} onClick={toggle} title="Show this keyword's history" data-testid={d === o.devices[0] ? `button-history-${r.id}` : `button-history-${r.id}-${d}`}><PositionBadge position={p.position} depth={site.serpDepth} /></button> {/* The movement beside it is a link to every keyword that moved the same way on that device. */}{m ? <Fig href={to({ ...(d === device ? onDevice : { device: d }), move: m })} id={d === o.devices[0] ? `move-${r.id}` : `move-${r.id}-${d}`} title={`The keywords ${MOVED[m]} since the check before, on ${d}`}><Move now={p.position} before={p.previous} hadBefore={!!p.previousOn} /></Fig> : <Move now={p.position} before={p.previous} hadBefore={!!p.previousOn} />}</> : <span className="g-text-2">—</span>}</td>; })}
                       <td className="num" data-label="Map pack">{!first ? <span className="g-text-2">—</span> : first.local != null ? <><Fig href={to({ ...onDevice, mapPack: true })} id={`map-${r.id}`} title="The keywords whose results show a map pack, the ones you were found in first">#{first.local}</Fig> <Move now={first.local} before={first.previousLocal ?? null} hadBefore={!!first.previousOn} /></> : (first.pack?.length ?? 0) > 0 ? <Fig href={to({ ...onDevice, mapPack: true })} id={`map-${r.id}`} title={`Not found in the map pack, matched by website or business name. In it: ${first.pack!.map((p) => p.title).join(", ")} · the keywords whose results show a map pack`}>not found in it{first.previousLocal != null && <> <span className="g-move g-move--down" aria-label={`No longer found in the map pack — was ${first.previousLocal} in the last check`}>lost</span></>}</Fig> : <Fig href={to({ ...onDevice, noMap: true })} id={`no-map-${r.id}`} title="No map pack in the saved results for this search · the keywords whose results show no map pack" className={`${LINK} g-text-2`}>no map</Fig>}</td>
                       <td data-label="On the page">{first ? <SerpFeatureChips features={showsMapPack(first) ? [...new Set([...(first.features ?? []), "local_pack"])] : first.features} mapOwned={first.local != null} href={(t) => to({ ...onDevice, feature: t })} /> : <span className="g-text-2">—</span>}</td>
                       <td className="num" data-label="Volume">{r.searchVolume != null ? <Link href={seoLinks.keywords(r.keyword)} className={LINK} title="This keyword in the keywords explorer" data-testid={`link-volume-${r.id}`}>{fmtNum(r.searchVolume)}</Link> : <Link href={to({ ...onDevice, noVolume: true })} className={`${LINK} g-text-2`} title="No volume saved yet — the keywords with no volume, in this table (the button above it looks volumes up)" data-testid={`link-volume-${r.id}`}>—</Link>}</td>
