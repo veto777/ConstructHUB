@@ -42,25 +42,24 @@ class SupportBrain(Brain):
         async with self._lock:
             text = (caller_text or "").strip()
             if silence:
-                self.silences += 1
-                if self.silences >= self.silence_limit:
-                    self.end_requested, self.outcome = True, "hangup"
-                    return Decision(say="I haven't heard anything, so I'll let you go. Goodbye.", action="end_call")
-                return Decision(say="Are you still there?", action="continue")
-            self.silences = 0
-            self._log("caller", text)
-            self.turns += 1
+                # The app decides (a number left part-way is settled there; it says "are you still there" itself).
+                text = ""
+            else:
+                self._log("caller", text)
+                self.turns += 1
             # One attempt: a turn changes the app's state, so it is never re-sent (Kimi round 2 N3).
             try:
-                r = await self.app._c.post("/api/voice-internal/support/turn", json={"callSid": self.call_sid, "from": self.caller, "text": text}, timeout=45.0)
+                r = await self.app._c.post("/api/voice-internal/support/turn", json={"callSid": self.call_sid, "from": self.caller, "text": text, "silence": silence}, timeout=45.0)
                 r.raise_for_status()
                 j = r.json()
-                say, end = str(j.get("say") or FAIL_SAY), bool(j.get("end"))
+                # "" is a real answer: the caller is part-way through a number — keep listening, say nothing.
+                say, end = (str(j["say"]) if isinstance(j.get("say"), str) else FAIL_SAY), bool(j.get("end"))
             except Exception as e:  # noqa: BLE001
                 log.warning("support turn failed: %s", e)
                 say, end = FAIL_SAY, True
-            self._log("assistant", say)
-            self.last_say = say
+            if say:
+                self._log("assistant", say)
+                self.last_say = say
             if end:
                 self.end_requested, self.outcome = True, "info"
             return Decision(say=say, action="end_call" if end else "continue")

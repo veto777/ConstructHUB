@@ -17,7 +17,7 @@ export type Category = "payment" | "login" | "technical" | "data" | "other";
 export type Intake = { category?: Category; title?: string; description?: string; steps?: string; device?: string; blocking?: boolean; /** Collected without the AI (it was down): severity is never "critical". */ fallback?: boolean };
 export type CallState = {
   /** Version for the optimistic write (service.ts). */ v?: number;
-  step: "ask_id" | "choose_channel" | "code_sent" | "intake" | "confirm" | "done";
+  step: "ask_id" | "choose_channel" | "code_sent" | "intake" | "confirm" | "done" | "ivr_id" | "ivr_category" | "ivr_blocking" | "ivr_record";
   idTries: number; codeTries: number; codesSent: number; turns: number;
   userId: number | null; crmOrgId: string | null; ref: string | null; email: string | null; phones: string[];
   channel: Channel | null; codeHash: string | null; codeExpires: number | null; verified: boolean;

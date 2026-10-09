@@ -18,7 +18,7 @@ import { StatusPill, type PillTone } from "@/components/crm-ui";
 import { useDocumentTitle } from "@/components/feature-landing/primitives";
 
 type Row = { id: number; number: string; category: string; severity: string; title: string; status: string; created_at: string; contact_email: string; customer_number: string | null };
-type Full = Row & { description: string; steps: string | null; device: string | null; verified_with: string | null; account_email: string | null; notes: { at: string; by: string; kind: string; text: string }[]; history: { at: string; event: string; by?: string }[] };
+type Full = Row & { recording_sid: string | null; transcript_status: string | null; channel: string; description: string; steps: string | null; device: string | null; verified_with: string | null; account_email: string | null; notes: { at: string; by: string; kind: string; text: string }[]; history: { at: string; event: string; by?: string }[] };
 const STATUSES = ["open", "in_progress", "waiting_customer", "resolved", "closed"] as const;
 const LABEL: Record<string, string> = { open: "Open", in_progress: "In progress", waiting_customer: "Waiting on customer", resolved: "Resolved", closed: "Closed" };
 const TONE: Record<string, PillTone> = { open: "danger", in_progress: "info", waiting_customer: "warning", resolved: "success", closed: "neutral" };
@@ -84,6 +84,7 @@ function TicketDetail({ id }: { id: number }) {
         <dt className="text-muted-foreground">Device</dt><dd>{t.device || "—"}</dd>
       </dl>
       <div><p className="text-xs font-medium uppercase text-muted-foreground">What happened</p><p className="whitespace-pre-wrap text-sm">{t.description}</p></div>
+      {t.recording_sid && <div><p className="text-xs font-medium uppercase text-muted-foreground">Caller's recording (keypad line){t.transcript_status === "pending" || t.transcript_status === "working" ? " · transcribing…" : ""}</p><audio controls preload="none" className="mt-1 w-full" src={`/api/admin/support-tickets/${id}/recording`} data-testid="audio-ticket-recording" /></div>}
       {t.steps && <div><p className="text-xs font-medium uppercase text-muted-foreground">Steps to reproduce</p><p className="whitespace-pre-wrap text-sm">{t.steps}</p></div>}
       <div className="space-y-2">
         <p className="text-xs font-medium uppercase text-muted-foreground">Notes & replies</p>

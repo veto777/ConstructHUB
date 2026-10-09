@@ -16,6 +16,8 @@
 import type { Express } from "express";
 import OpenAI from "openai";
 import { createHash, createHmac, randomInt } from "crypto";
+import fs from "fs";
+import path from "path";
 import { pool } from "../db";
 import { aiModel, aiTimeoutMs } from "../ai-config";
 import { ADMIN_EMAILS } from "../admin";
@@ -27,7 +29,8 @@ import { takeBudget } from "../growth-limits";
 import { requireVoiceInternal, VOICE_INTERNAL_PATH } from "../voice/internal-auth";
 import { normalizeE164 } from "../voice/profile-store";
 import { customerNumberFor } from "./schema";
-import { freshState, turn, LINES, type Account, type CallState, type Channel, type Deps, type Intake, type Reply } from "./line";
+import { freshState, turn, LINES, type Account, type CallState, type Category, type Channel, type Deps, type Intake, type Reply } from "./line";
+import { CLIPS, freshIvrState, ivrTurn, type ClipId, type IvrDeps, type IvrInput, type IvrReply } from "./ivr";
 
 const HOUR = 3_600_000, DAY = 24 * HOUR;
 let warnedPepper = false;
@@ -114,7 +117,11 @@ export async function intakeTurn(history: { role: "caller" | "gabe"; text: strin
 const teamEmails = () => [...new Set([...(process.env.SUPPORT_TEAM_EMAILS || "").split(",").map((s) => s.trim()).filter(Boolean), ...ADMIN_EMAILS])];
 const appUrl = () => (process.env.APP_URL || "https://constructhub.us").replace(/\/$/, "");
 
-export async function openTicket(s: CallState, callerNumber: string, callSid: string | null): Promise<{ number: string } | null> {
+/**
+ * Opens the ticket. `recording` (the keypad line): the description is a voice recording — the ticket opens now with a
+ * placeholder, the transcription sweep fills it in, and only then do the emails go out. undefined = a spoken intake.
+ */
+export async function openTicket(s: CallState, callerNumber: string, callSid: string | null, recording?: { sid: string | null }): Promise<{ number: string } | null> {
   if (!s.verified || s.userId === null) throw new Error("not verified");   // the state machine never gets here unverified
   const i = s.intake, severity = !i.fallback && (i.category === "payment" || i.category === "data") ? "critical" : "high";
   const c = await pool.connect();
@@ -128,21 +135,99 @@ export async function openTicket(s: CallState, callerNumber: string, callSid: st
     if (Number((await c.query(`SELECT count(*) AS n FROM support_tickets WHERE user_id = $1 AND created_at > now() - interval '1 day'`, [s.userId])).rows[0].n) >= 5) { await c.query("ROLLBACK"); return null; }
     id = (await c.query(`SELECT nextval(pg_get_serial_sequence('support_tickets','id')) AS id`)).rows[0].id;
     number = `T-${String(id).padStart(5, "0")}`;
+    const title = recording ? CAT_TITLE[i.category ?? "other"] : (i.title || "Support request").slice(0, 120);
+    const description = recording ? (recording.sid ? "Voice description — transcribing…" : "(The caller didn't leave a description.)") : (i.description || "").slice(0, 4000);
     await c.query(
-      `INSERT INTO support_tickets (id, number, user_id, crm_org_id, verified_with, channel, call_sid, category, severity, title, description, steps, device, contact_email, history)
-       VALUES ($1,$2,$3,$4,$5,'phone',$6,$7,$8,$9,$10,$11,$12,$13, jsonb_build_array(jsonb_build_object('at', now(), 'event', 'opened', 'by', 'gabe')))`,
-      [id, number, s.userId, s.crmOrgId, s.ref, callSid, i.category, severity, (i.title || "Support request").slice(0, 120), (i.description || "").slice(0, 4000), i.steps || null, i.device || null, s.email]);
+      `INSERT INTO support_tickets (id, number, user_id, crm_org_id, verified_with, channel, call_sid, category, severity, title, description, steps, device, contact_email, recording_sid, transcript_status, history)
+       VALUES ($1,$2,$3,$4,$5,$14,$6,$7,$8,$9,$10,$11,$12,$13,$15,$16, jsonb_build_array(jsonb_build_object('at', now(), 'event', 'opened', 'by', 'gabe')))`,
+      [id, number, s.userId, s.crmOrgId, s.ref, callSid, i.category, severity, title, description, recording ? null : i.steps || null, i.device || null, s.email,
+        recording ? "phone_keypad" : "phone", recording?.sid ?? null, recording?.sid ? "pending" : null]);
     if (callSid) await c.query(`UPDATE support_calls SET ticket_id = $1, updated_at = now() WHERE call_sid = $2`, [id, callSid]);
     await c.query("COMMIT");
   } catch (e) { await c.query("ROLLBACK").catch(() => {}); throw e; } finally { c.release(); }
-  const rowsT: [string, string][] = [["Ticket", number], ["Category", i.category || "other"], ["Severity", severity], ["Verified with", s.ref || ""], ["Caller ID", normalizeE164(callerNumber) || "unknown"], ["Account", String(s.userId)]];
-  const team = emailLayout({ title: `${severity === "critical" ? "CRITICAL" : "New"} support ticket ${number}: ${i.title || ""}`, intro: i.description || "", rows: [...rowsT, ["Steps", i.steps || "—"], ["Device", i.device || "—"]], cta: { label: "Open in admin", url: `${appUrl()}/admin/tickets/${id}` } });
-  const cust = emailLayout({ title: `We got your ticket ${number}`, intro: `Thanks for calling ConstructHUB support. Gabe opened ticket ${number}: "${i.title || "your issue"}". Our team will reply to this email address — you can reply to this email to add details.`, rows: [["Ticket", number], ["Issue", i.title || ""]], footer: "You're receiving this because you verified your account on a call with ConstructHUB support." });
-  await Promise.allSettled([
-    sendWithFallback({ to: teamEmails().join(","), subject: `[${number}] ${severity === "critical" ? "CRITICAL — " : ""}${i.title || "Support ticket"}`, html: team.html, text: team.text }),
-    sendWithFallback({ to: s.email!, subject: `Your ConstructHUB support ticket ${number}`, html: cust.html, text: cust.text, replyTo: "support@constructhub.us" }),
-  ]).then((r) => r.forEach((x) => x.status === "rejected" && console.error("[support] ticket email failed:", (x as any).reason?.message)));
+  if (!recording?.sid) await sendTicketEmails(id, callerNumber);   // a recorded description: the sweep sends them once transcribed
   return { number };
+}
+
+const CAT_TITLE: Record<Category, string> = { payment: "Payment or billing problem", login: "Login problem", technical: "Something in the app isn't working", data: "Missing data", other: "Support request" };
+
+/** The team's and the customer's emails for a ticket — once (emails_sent_at), from the stored row. */
+export async function sendTicketEmails(id: number, callerNumber?: string): Promise<void> {
+  const t = (await pool.query(`UPDATE support_tickets SET emails_sent_at = now() WHERE id = $1 AND emails_sent_at IS NULL RETURNING *`, [id])).rows[0];
+  if (!t) return;
+  const caller = callerNumber ?? (await pool.query(`SELECT caller_number FROM support_calls WHERE call_sid = $1`, [t.call_sid])).rows[0]?.caller_number;
+  const rowsT: [string, string][] = [["Ticket", t.number], ["Category", t.category], ["Severity", t.severity], ["Verified with", t.verified_with || ""], ["Caller ID", normalizeE164(caller || "") || "unknown"], ["Account", String(t.user_id)], ["Line", t.channel === "phone_keypad" ? "keypad (overflow)" : "Gabe (spoken)"]];
+  const team = emailLayout({ title: `${t.severity === "critical" ? "CRITICAL" : "New"} support ticket ${t.number}: ${t.title}`, intro: t.description || "", rows: [...rowsT, ["Steps", t.steps || "—"], ["Device", t.device || "—"]], cta: { label: "Open in admin", url: `${appUrl()}/admin/tickets/${t.id}` } });
+  const cust = emailLayout({ title: `We got your ticket ${t.number}`, intro: `Thanks for calling ConstructHUB support. Gabe opened ticket ${t.number}: "${t.title}". Our team will reply to this email address — you can reply to this email to add details.`, rows: [["Ticket", t.number], ["Issue", t.title]], footer: "You're receiving this because you verified your account on a call with ConstructHUB support." });
+  await Promise.allSettled([
+    sendWithFallback({ to: teamEmails().join(","), subject: `[${t.number}] ${t.severity === "critical" ? "CRITICAL — " : ""}${t.title}`, html: team.html, text: team.text }),
+    sendWithFallback({ to: t.contact_email, subject: `Your ConstructHUB support ticket ${t.number}`, html: cust.html, text: cust.text, replyTo: "support@constructhub.us" }),
+  ]).then((r) => r.forEach((x) => x.status === "rejected" && console.error("[support] ticket email failed:", (x as any).reason?.message)));
+}
+
+// ---- After the call: the keypad line's recordings → text (the GPU engine), then the emails ----------------------
+const sw = () => {
+  const space = (process.env.SIGNALWIRE_SPACE_URL || "").replace(/^https?:\/\//, "").replace(/\/$/, ""), proj = process.env.SIGNALWIRE_PROJECT_ID, tok = process.env.SIGNALWIRE_API_TOKEN;
+  return space && proj && tok ? { base: `https://${space}/api/laml/2010-04-01/Accounts/${proj}`, auth: `Basic ${Buffer.from(`${proj}:${tok}`).toString("base64")}` } : null;
+};
+/**
+ * One sweep: claim pending recordings and ask the engine to transcribe them (it fetches the audio from SignalWire
+ * itself). Done → the description and a title from the words, then the emails. The engine down or busy → retried every
+ * sweep; after 15 minutes the ticket goes out anyway with "listen to the recording in admin".
+ */
+export async function transcribeSweep(): Promise<void> {
+  const { rows } = await pool.query(
+    `UPDATE support_tickets SET transcript_status = 'working', updated_at = now() WHERE id IN (
+       SELECT id FROM support_tickets WHERE transcript_status = 'pending' OR (transcript_status = 'working' AND updated_at < now() - interval '3 minutes')
+       ORDER BY id LIMIT 10 FOR UPDATE SKIP LOCKED) RETURNING id, recording_sid, category, created_at`);
+  for (const t of rows) {
+    let text = "";
+    try {
+      const r = await fetch(`${(process.env.VOICE_ENGINE_URL || "").replace(/\/$/, "")}/internal/transcribe`, {
+        method: "POST", headers: { authorization: `Bearer ${process.env.VOICE_INTERNAL_SECRET}`, "content-type": "application/json" },
+        body: JSON.stringify({ recordingSid: t.recording_sid }), signal: AbortSignal.timeout(90_000) });
+      if (r.ok) text = String((await r.json()).text || "").trim();
+      else console.warn("[support] transcribe", t.id, r.status);
+    } catch (e: any) { console.warn("[support] transcribe", t.id, e?.message || e); }
+    if (text) {
+      const words = text.split(/\s+/).slice(0, 10).join(" ");
+      await pool.query(`UPDATE support_tickets SET description = $2, title = $3, transcript_status = 'done', updated_at = now() WHERE id = $1`,
+        [t.id, `${text.slice(0, 4000)}\n\n(Transcribed from the caller's voice recording.)`, `${CAT_TITLE[t.category as Category] ?? "Support request"}: ${words}${text.split(/\s+/).length > 10 ? "…" : ""}`.slice(0, 120)]);
+      await sendTicketEmails(t.id);
+    } else if (Date.now() - new Date(t.created_at).getTime() > 15 * 60_000) {
+      await pool.query(`UPDATE support_tickets SET description = 'Voice description — not transcribed; play the recording in admin.', transcript_status = 'failed', updated_at = now() WHERE id = $1`, [t.id]);
+      await sendTicketEmails(t.id);
+    } else await pool.query(`UPDATE support_tickets SET transcript_status = 'pending' WHERE id = $1 AND transcript_status = 'working'`, [t.id]);
+  }
+}
+
+// ---- The keypad line (ivr.ts) on SignalWire: pre-recorded clips + keypad + one recording ------------------------
+const CLIP_DIRS = (() => { const here = import.meta.dirname || __dirname; return [path.join(here, "data", "support-audio"), path.join(here, "..", "data", "support-audio")]; })();
+const clipFile = (id: string) => { for (const d of CLIP_DIRS) { const f = path.join(d, `${id}.mp3`); if (fs.existsSync(f)) return f; } return null; };
+/** A clip's URL — or, if its audio is missing, the same words in the carrier's standard voice (never silence). */
+const playClip = (id: ClipId) => clipFile(id) ? `<Play>${appUrl()}/api/support/audio/${id}.mp3?v=${createHash("sha1").update(CLIPS[id]).digest("hex").slice(0, 8)}</Play>` : `<Say voice="Polly.Matthew">${xmlEsc(CLIPS[id])}</Say>`;
+export function ivrLaml(r: IvrReply): string {
+  const head = `<?xml version="1.0" encoding="UTF-8"?><Response>`, action = `${appUrl()}/api/support/ivr/turn`;
+  const plays = r.play.map(playClip).join("");
+  if (r.end) return `${head}${plays}<Hangup/></Response>`;
+  if (r.record) return `${head}${plays}<Record action="${action}?rec=1" method="POST" maxLength="120" timeout="6" finishOnKey="#" playBeep="true"/><Redirect method="POST">${action}?rec=1</Redirect></Response>`;
+  return `${head}<Gather input="dtmf" action="${action}" method="POST" timeout="10" finishOnKey="#"${r.listen?.digits ? ` numDigits="${r.listen.digits}"` : ""}>${plays}</Gather><Redirect method="POST">${action}?silence=1</Redirect></Response>`;
+}
+const ivrDeps = (callSid: string): IvrDeps => ({ now: () => Date.now(), findAccount, sendCode, hashCode, openTicket: (st, cn, rec) => openTicket(st, cn, callSid, { sid: rec }) });
+async function runIvr(callSid: string, input: IvrInput): Promise<IvrReply | null> {
+  try {
+    const row = (await pool.query(`SELECT state, caller_number FROM support_calls WHERE call_sid = $1 AND created_at > now() - interval '2 hours'`, [callSid])).rows[0];
+    if (!row) return null;
+    const s: CallState = row.state?.step ? row.state : freshIvrState();
+    const v0 = s.v ?? 0; s.v = v0 + 1;
+    let r: IvrReply;
+    try { r = await ivrTurn(s, input, row.caller_number || "", ivrDeps(callSid)); }
+    catch (e: any) { console.error("[support] ivr turn failed:", e?.message || e); r = { play: ["fail"], end: true }; s.step = "done"; }
+    const w = await pool.query(
+      `UPDATE support_calls SET state = $1, user_id = $2, verified_at = CASE WHEN $3 AND verified_at IS NULL THEN now() ELSE verified_at END, updated_at = now()
+       WHERE call_sid = $4 AND COALESCE((state->>'v')::int, 0) = $5`, [JSON.stringify(s), s.verified ? s.userId : null, s.verified, callSid, v0]);
+    return w.rowCount === 0 ? { play: ["still_there"], listen: {}, end: false } : r;
+  } catch (e: any) { console.error("[support] ivr turn failed:", e?.message || e); return { play: ["fail"], end: true }; }
 }
 
 // ---- Routes -----------------------------------------------------------------------------------------------------
@@ -182,20 +267,6 @@ async function runTurn(callSid: string, text: string, callerFallback: string, si
 
 // ---- The phone line on SignalWire LaML -------------------------------------------------------------------------
 const xmlEsc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-const ttsVoice = () => process.env.SUPPORT_TTS_VOICE || "Polly.Matthew-Neural";
-const HINTS = "customer number, CRM, C R M, code, email, text, yes, no, zero, one, two, three, four, five, six, seven, eight, nine, gmail dot com, payment, login, invoice";
-/** The LaML for a reply: speak it, then listen (keypad or speech); silence comes back as ?silence=1. */
-export function lamlFor(r: Reply, step: CallState["step"] | null): string {
-  const say = r.say ? `<Say voice="${ttsVoice()}">${xmlEsc(r.say)}</Say>` : "";
-  const head = `<?xml version="1.0" encoding="UTF-8"?><Response>`;
-  if (r.end) return `${head}${say}<Hangup/></Response>`;
-  const action = `${appUrl()}/api/support/voice/turn`;
-  // A number is being asked for: allow longer pauses between digit groups (the app also joins pieces itself).
-  const digits = step === "ask_id" || step === "code_sent";
-  const gather = `<Gather input="dtmf speech" action="${action}" method="POST" language="en-US" timeout="8" speechTimeout="${digits ? 2 : "auto"}" finishOnKey="#"${digits ? ` numDigits="${step === "code_sent" ? 6 : 8}"` : ""} hints="${xmlEsc(HINTS)}">${say}</Gather>`;
-  return `${head}${gather}<Redirect method="POST">${action}?silence=1</Redirect></Response>`;
-}
-
 /**
  * Is this a real, live call to the support number? A matching SignalWire signature, or (no signing key configured)
  * the call looked up on SignalWire's API: inbound, to SUPPORT_LINE_NUMBER, still ringing / in progress. Returns the
@@ -217,25 +288,47 @@ async function verifiedInbound(req: any): Promise<{ from: string } | null> {
 }
 
 export function registerSupportRoutes(app: Express, getDevUser: any) {
-  // The support number's voice URL (SignalWire). Public; trusted only after verifiedInbound().
-  app.post("/api/support/voice", async (req, res) => {
+  // The keypad line. Reached when the GPU engine is full (it redirects caller 7+ here) or down (the number's voice
+  // fallback URL). Public; trusted only after verifiedInbound(): a live inbound call to SUPPORT_LINE_NUMBER.
+  const ivrStart = async (req: any, res: any) => {
     res.type("text/xml");
     const v = await verifiedInbound(req);
     if (!v) return res.status(403).send(`<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>`);
-    await loadCall(String(req.body.CallSid), v.from);
-    res.send(lamlFor({ say: LINES.greet, end: false }, "ask_id"));
-  });
-  // Each turn. Trusted by the call's unguessable CallSid having been started by a verified call (support_calls row).
-  app.post("/api/support/voice/turn", async (req, res) => {
+    await pool.query(`INSERT INTO support_calls (call_sid, caller_number, state) VALUES ($1,$2,$3) ON CONFLICT (call_sid) DO UPDATE SET state = EXCLUDED.state, updated_at = now()`,
+      [String(req.body.CallSid), normalizeE164(v.from), JSON.stringify(freshIvrState())]);
+    res.send(ivrLaml({ play: ["greet"], listen: { digits: 8 }, end: false }));
+  };
+  app.post("/api/support/ivr", ivrStart);
+  app.post("/api/support/voice", ivrStart);   // the old direct URL → the keypad line
+  // Each keypad step. Trusted by the call's unguessable CallSid having been started by a verified call.
+  app.post("/api/support/ivr/turn", async (req, res) => {
     res.type("text/xml");
     const sid = String(req.body?.CallSid || "");
-    const digits = typeof req.body?.Digits === "string" ? req.body.Digits.replace(/[^0-9]/g, "") : "";
-    const speech = typeof req.body?.SpeechResult === "string" ? req.body.SpeechResult : "";
-    const silence = req.query.silence === "1" || (!digits && !speech.trim());
-    const r = okSid(sid) ? await runTurn(sid, digits || speech, "", silence) : null;
-    if (!r) return res.send(`<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>`);
-    res.send(lamlFor(r.reply, r.state.step));
+    const input: IvrInput = req.query.rec === "1"
+      ? { recording: req.body?.RecordingSid ? { sid: String(req.body.RecordingSid), seconds: Number(req.body.RecordingDuration) || 0 } : null }
+      : req.query.silence === "1" ? { silence: true } : { digits: String(req.body?.Digits ?? "") };
+    if (input.digits === "") input.silence = true;
+    const r = okSid(sid) ? await runIvr(sid, input) : null;
+    res.send(r ? ivrLaml(r) : `<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>`);
   });
+  app.get("/api/support/audio/:id.mp3", (req, res) => {
+    const id = req.params.id;
+    const f = id in CLIPS ? clipFile(id) : null;
+    if (!f) return res.status(404).end();
+    res.setHeader("Cache-Control", "public, max-age=86400"); res.type("audio/mpeg"); fs.createReadStream(f).pipe(res);
+  });
+  // The caller's recording, for the ticket desk (platform admins only) — streamed from SignalWire, never public.
+  app.get("/api/admin/support-tickets/:id/recording", async (req: any, res) => {
+    if (!(await requirePlatformAdmin(req, res, getDevUser))) return;
+    const t = (await pool.query(`SELECT recording_sid FROM support_tickets WHERE id = $1`, [Number(req.params.id) || 0])).rows[0];
+    const c = sw();
+    if (!t?.recording_sid || !c || !/^[A-Za-z0-9-]{10,64}$/.test(t.recording_sid)) return res.status(404).json({ message: "No recording" });
+    const r = await fetch(`${c.base}/Recordings/${t.recording_sid}.mp3`, { headers: { authorization: c.auth }, signal: AbortSignal.timeout(20_000) }).catch(() => null);
+    if (!r?.ok) return res.status(502).json({ message: "Recording unavailable" });
+    res.setHeader("Cache-Control", "no-store"); res.type("audio/mpeg"); res.send(Buffer.from(await r.arrayBuffer()));
+  });
+  setInterval(() => { transcribeSweep().catch((e) => console.error("[support] transcribe sweep failed:", e?.message || e)); }, 30_000).unref();
+
   app.post(`${VOICE_INTERNAL_PATH}/support/start`, requireVoiceInternal, async (req, res) => {
     const { callSid, from } = req.body || {};
     if (!okSid(callSid)) return res.status(400).json({ code: "bad_request" });
@@ -243,9 +336,9 @@ export function registerSupportRoutes(app: Express, getDevUser: any) {
     res.json({ say: LINES.greet });
   });
   app.post(`${VOICE_INTERNAL_PATH}/support/turn`, requireVoiceInternal, async (req, res) => {
-    const { callSid, from, text } = req.body || {};
+    const { callSid, from, text, silence } = req.body || {};
     if (!okSid(callSid) || typeof text !== "string") return res.status(400).json({ code: "bad_request" });
-    const r = await runTurn(callSid, text, String(from || ""), false);
+    const r = await runTurn(callSid, text, String(from || ""), silence === true);
     if (!r) return res.status(409).json({ code: "not_started" });   // a turn requires start
     res.json(r.reply);
   });

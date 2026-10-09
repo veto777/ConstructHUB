@@ -40,6 +40,11 @@ export async function ensureSupportSchema(): Promise<void> {
       created_at timestamptz NOT NULL DEFAULT now(),
       updated_at timestamptz NOT NULL DEFAULT now()
     );
+    -- Keypad line (ivr.ts): the description is a recording, transcribed after the call; the emails wait for it.
+    ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS recording_sid text;
+    ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS transcript_status text;   -- pending | working | done | failed | NULL (spoken)
+    ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS emails_sent_at timestamptz;
+    CREATE INDEX IF NOT EXISTS support_tickets_transcript_idx ON support_tickets (transcript_status) WHERE transcript_status IN ('pending','working');
     CREATE INDEX IF NOT EXISTS support_tickets_status_idx ON support_tickets (status, created_at DESC);
     CREATE INDEX IF NOT EXISTS support_tickets_user_idx ON support_tickets (user_id, created_at);
     CREATE UNIQUE INDEX IF NOT EXISTS support_tickets_call_uq ON support_tickets (call_sid) WHERE call_sid IS NOT NULL;

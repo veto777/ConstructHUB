@@ -56,7 +56,8 @@ class Settings:
     sw_signing_key: str = _env("SIGNALWIRE_SIGNING_KEY")
     skip_signature: bool = _env("VOICE_SKIP_SIGNATURE") == "1"    # dev only, and only on loopback binds (startup_problems)
     # limits / privacy
-    max_active_calls: int = _int("VOICE_MAX_ACTIVE_CALLS", 6)     # GPU + AI + minutes: concurrent live calls this engine takes
+    max_active_calls: int = _int("VOICE_MAX_ACTIVE_CALLS", 6)
+    support_ivr_url: str = _env("SUPPORT_IVR_URL") or "https://constructhub.us/api/support/ivr"   # support line overflow     # GPU + AI + minutes: concurrent live calls this engine takes
     log_transcripts: bool = _env("VOICE_LOG_TRANSCRIPTS") == "1"   # dev flag: what callers say stays out of the journal by default
     # speech
     whisper_model: str = _env("VOICE_WHISPER_MODEL", "large-v3-turbo")

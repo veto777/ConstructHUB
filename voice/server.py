@@ -64,6 +64,16 @@ GENERIC_UNKNOWN = "I'm sorry, this number isn't set up to take calls right now. 
 GENERIC_DOWN = "I'm sorry, we can't take your call right now. Please try again in a few minutes. Goodbye."
 # "Hello?" / "are you there?" repeated is a caller who can't hear us — always answer it, never treat it as a
 # stale duplicate (Alpine 2026-10-02).
+DIGIT_ASK_RE = re.compile(r"customer number|six.digit|the code|digits", re.I)
+DIGIT_WORDS = {"zero", "oh", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "c", "r", "m", "crm"}
+
+
+def mostly_digits(text: str) -> bool:
+    """A number being read out ("four five", "9 8 7") — never a fragment or a stale repeat to drop."""
+    w = re.sub(r"[.,!?-]", " ", text.lower()).split()
+    return bool(w) and sum(1 for x in w if x.isdigit() or x in DIGIT_WORDS) * 2 >= len(w)
+
+
 HELLO_RE = re.compile(r"^(hello|hi|hey|are you there|can you hear me|anyone there|is anybody there)\b", re.I)
 # A lone "bye" before the caller has said anything else, or in the first seconds of a call, is almost always Whisper
 # mishearing "hi" on 8 kHz audio (Alpine 2026-10-02: "Hi, hi, I need an estimate…" → "Bye." → hung up at 16 s).
@@ -114,7 +124,7 @@ def bearer_ok(req: web.Request) -> bool:
 
 @web.middleware
 async def internal_auth(req: web.Request, handler):
-    if req.path.startswith(("/sim/", "/tts/", "/personas")) and not bearer_ok(req):
+    if req.path.startswith(("/sim/", "/tts/", "/personas", "/internal/")) and not bearer_ok(req):
         raise web.HTTPUnauthorized(text=json.dumps({"code": "unauthorized"}), content_type="application/json")
     return await handler(req)
 
@@ -207,9 +217,6 @@ async def signalwire_voice(req: web.Request) -> web.Response:
             log.warning("rejected unsigned/invalid webhook from %s", req.remote)
             return web.Response(status=403, text="bad signature")
     app: AppClient = req.app[CLIENT]
-    if not (stt and tts):
-        log.error("call %s refused: models not loaded", call_sid)
-        return twiml(f"<Say>{xml_escape(GENERIC_DOWN)}</Say><Hangup/>")
     try:
         profile = await app.profile(to, frm, call_sid)
     except ProfileUnavailable as e:
@@ -222,13 +229,24 @@ async def signalwire_voice(req: web.Request) -> web.Response:
         log.info("blocked spammer %s -> %s (%s)", mask(frm), to, call_sid)
         asyncio.create_task(report_blocked(app, profile, call_sid, frm, to))
         return twiml('<Reject reason="rejected"/>')
-    if len(ACTIVE) >= settings.max_active_calls:
-        log.warning("call %s refused: %d active calls (cap %d)", call_sid, len(ACTIVE), settings.max_active_calls)
-        return twiml(f"<Say>{xml_escape(GENERIC_DOWN)}</Say><Hangup/>")
     now = time.time()
     for k, entry in list(PENDING_PROFILES.items()):
         if now - entry[0] > PENDING_TTL_S:
             PENDING_PROFILES.pop(k, None)
+    # Calls answered but whose audio hasn't connected yet count too (two calls at once must not both get seat 6).
+    connecting = sum(1 for k in PENDING_PROFILES if not any(c.call_sid == k for c in ACTIVE))
+    full = len(ACTIVE) + connecting >= settings.max_active_calls
+    if full or not (stt and tts):
+        if profile.kind == "support" and settings.support_ivr_url:
+            # Owner 2026-10-08: the support line's 7th caller (or every caller while the models are down) goes to
+            # Gabe's keypad line in the app — pre-recorded voice + keypad, no GPU, no cap.
+            log.info("support call %s → keypad line (%d active, %d connecting, cap %d, models %s)", call_sid, len(ACTIVE), connecting, settings.max_active_calls, bool(stt and tts))
+            return twiml(f'<Redirect method="POST">{xml_escape(settings.support_ivr_url)}</Redirect>')
+        if not (stt and tts):
+            log.error("call %s refused: models not loaded", call_sid)
+        else:
+            log.warning("call %s refused: %d active calls (cap %d)", call_sid, len(ACTIVE), settings.max_active_calls)
+        return twiml(f"<Say>{xml_escape(GENERIC_DOWN)}</Say><Hangup/>")
     token = secrets.token_urlsafe(24)
     PENDING_PROFILES[call_sid] = (now, profile, token, frm, to)
     log.info("incoming call %s -> %s (%s) org=%s persona=%s", mask(frm), to, call_sid, profile.org.get("name"), (profile.compiled.get("persona") or {}).get("id"))
@@ -237,6 +255,28 @@ async def signalwire_voice(req: web.Request) -> web.Response:
                  f'<Parameter name="from" value="{xml_escape(frm)}"/><Parameter name="to" value="{xml_escape(to)}"/>'
                  f'<Parameter name="callSid" value="{xml_escape(call_sid)}"/><Parameter name="token" value="{xml_escape(token)}"/>'
                  f'</Stream></Connect><Hangup/>')
+
+
+async def internal_transcribe(req: web.Request) -> web.Response:
+    """App → engine (bearer): transcribe a support keypad-line recording after the call. The engine fetches the audio
+    from our SignalWire project itself (the app sends only the RecordingSid)."""
+    j = await req.json()
+    rid = str(j.get("recordingSid") or "")
+    sp, pj, tk = settings.sw_space_url, settings.sw_project_id, settings.sw_api_token
+    if not (stt and SID_RE.match(rid) and sp and pj and tk):
+        return web.json_response({"code": "unavailable"}, status=503)
+    host = re.sub(r"^https?://", "", sp).strip("/")
+    async with httpx.AsyncClient(timeout=30.0, auth=(pj, tk), follow_redirects=True) as c:
+        r = await c.get(f"https://{host}/api/laml/2010-04-01/Accounts/{pj}/Recordings/{rid}.wav")
+    if r.status_code != 200:
+        return web.json_response({"code": "recording_unavailable", "status": r.status_code}, status=502)
+    import io
+    import soundfile as sf
+    data, sr = sf.read(io.BytesIO(r.content), dtype="float32", always_2d=True)
+    pcm16 = audio.resample(data.mean(axis=1), sr, 16000)
+    text = await asyncio.to_thread(stt.transcribe, pcm16, DEFAULT_VOCAB + " ConstructHUB, CRM, JobCam, invoice, estimate, Google Business Profile, Click Guard.")
+    log.info("transcribed support recording (%.0fs audio, %d chars)", len(pcm16) / 16000, len(text))
+    return web.json_response({"text": text})
 
 
 async def report_blocked(app: AppClient, profile: CallProfile, call_sid: str, frm: str, to: str) -> None:
@@ -456,6 +496,8 @@ class Call:
 
         if p.kind == "support":
             # ConstructHUB's own support line: the app's state machine answers every turn (server/support).
+            # No call-tracking whisper on this number, so Gabe can greet after 1 s (the 3 s default ate early "hello"s).
+            self.greeting_delay = float(timings.get("greetingDelaySeconds", 1.0))
             self.voice = persona_voice(PERSONAS, "gabe", "am_michael")
             self.brain = SupportBrain(self.app, sid, self.frm, voice=self.voice)
         else:
@@ -574,7 +616,7 @@ class Call:
             if self.speaking:
                 self.silence_n += 1
                 self.utter.append(f)
-                if self.silence_n >= settings.speech_end_frames:
+                if self.silence_n >= self.end_frames():
                     self.speaking = False
                     if self.speech_n >= settings.min_speech_frames:
                         if self.turn_task is None or self.turn_task.done():
@@ -583,6 +625,13 @@ class Call:
                             self.pending.append(np.concatenate(self.utter))   # speech during a turn: queued, never dropped
                             log.info("caller spoke during a turn; queued")
                     self.utter = []
+
+    def end_frames(self) -> int:
+        """Silence that ends the caller's turn. On the support line, while Gabe is asking for a number or a code, people
+        pause between digit groups — wait ~1.9 s instead of ~1 s (the app also joins a number said in pieces)."""
+        if isinstance(self.brain, SupportBrain) and DIGIT_ASK_RE.search(self.last_ai_text or ""):
+            return settings.speech_end_frames * 2
+        return settings.speech_end_frames
 
     # ── turns ───────────────────────────────────────────────────────────────────────────────────────
 
@@ -619,7 +668,7 @@ class Call:
             if kept != text:
                 log.info("stripped echo: %r -> %r", said(text), said(kept))
             text = kept
-        if overlapped and len(text.split()) < 3 and norm not in SHORT_OK:
+        if overlapped and len(text.split()) < 3 and norm not in SHORT_OK and not mostly_digits(text):
             log.info("ignored short fragment heard over our own voice: %s", said(text))
             self.brain.note_unanswered(text, "short fragment while the assistant was speaking")
             return None
@@ -634,7 +683,7 @@ class Call:
         # The same words again within a few seconds is the queued copy of what we just answered (Alpine
         # 2026-10-02: "Bellingham." answered twice) — not a new turn. A real repeat later still counts.
         norm = " ".join(re.sub(r"[.,!?]", " ", text.lower()).split())
-        if norm == self.last_caller_norm and time.time() - self.last_caller_at < 8.0 and not HELLO_RE.match(norm):
+        if norm == self.last_caller_norm and time.time() - self.last_caller_at < 8.0 and not HELLO_RE.match(norm) and not mostly_digits(norm):
             log.info("ignored duplicate caller text: %s", said(text))
             self.brain.note_unanswered(text, "repeat of what was just answered")
             return None
@@ -939,7 +988,10 @@ async def persona_sample(req: web.Request) -> web.StreamResponse:
 async def health(req: web.Request) -> web.Response:
     """Public (it is reachable at https://constructhub.us/voice/health): liveness only. The settings summary (hosts,
     model, which secrets are set — never their values) is added for bearer callers (the app, the operator)."""
-    out = {"ok": True, "models": bool(stt and tts), "activeCalls": len(ACTIVE), "simSessions": len(SIM_SESSIONS),
+    # activeCalls includes calls answered in the last 2 minutes whose audio hasn't connected yet: restart-when-idle reads
+    # it, and a restart in that gap dropped the owner's test call (2026-10-08).
+    recent = sum(1 for k, e in PENDING_PROFILES.items() if time.time() - e[0] < PENDING_TTL_S and not any(c.call_sid == k for c in ACTIVE))
+    out = {"ok": True, "models": bool(stt and tts), "activeCalls": len(ACTIVE) + recent, "simSessions": len(SIM_SESSIONS),
            "personasVerified": bool(PERSONAS.get("verified")), "startedAt": STARTED.isoformat(timespec="seconds")}
     if bearer_ok(req):
         out["settings"] = settings.describe()
@@ -1082,6 +1134,7 @@ def make_app(load_models: bool = True, client: AppClient | None = None, provider
     app.add_routes([
         web.post("/signalwire/voice", signalwire_voice),
         web.post("/signalwire/status", signalwire_status),
+        web.post("/internal/transcribe", internal_transcribe),
         web.get("/media", media_ws),
         web.get("/health", health),
         web.get("/samples/{name}", persona_sample),
