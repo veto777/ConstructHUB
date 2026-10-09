@@ -41,7 +41,7 @@ function setup(over: Partial<HubDeps> = {}) {
   const ai = {
     calls: [] as HubRequest[],
     queue: [] as Step[],
-    fallback: { content: "**Pro** adds Click Guard. Pro is $79/month or $790/year. See [Pricing](/pricing).", finishReason: "stop" } as HubCompletion,
+    fallback: { content: "**Pro** adds Click Guard. Pro is $99/month or $990/year. See [Pricing](/pricing).", finishReason: "stop" } as HubCompletion,
     complete(body: HubRequest, signal: AbortSignal): Promise<HubCompletion> {
       ai.calls.push(body);
       const step = ai.queue.shift() ?? ai.fallback;

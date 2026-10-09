@@ -9,9 +9,9 @@
  * output filter AND the required-facts check. Cached answers are filtered
  * again every time they are served.
  */
-import { AGENCY_SELF_SERVE_MAX_LOCATIONS, ANNUAL_MONTHS, PLANS, PLAN_KEYS } from "@shared/plans";
+import { ANNUAL_MONTHS, PLANS, PLAN_KEYS } from "@shared/plans";
 import {
-  planPriceLine, agencyBandsLine, joinNames, planNamesWhere, AGENCY_ONLY_MODULES, CRM_SEATS_LINE,
+  planPriceLine, joinNames, planNamesWhere, AGENCY_ONLY_MODULES, CRM_SEATS_LINE,
   PROTECTED_SITE_PLANS, SALES_HREF, SALES_REP_LABEL, TRIAL_LABEL,
   CALL_ASSISTANT_SEPARATE_LINE, CALL_ASSISTANT_NUMBER_RULES, callAssistantAvailabilityLine, callAssistantIncludesLine, callAssistantPricing,
   callAssistantTierNumbersLine, callAssistantTiersShortLine,
@@ -45,7 +45,9 @@ export function templateAnswer(presetId: PresetId): string {
     case "crm":
       return `The **ConstructHub CRM** is a separate product on its own plans — a platform plan does not include it, and a CRM plan does not include the platform tools. It covers clients, estimates with e-signature, invoices, online payments straight into your own Stripe account, a price book, a pipeline, projects, a schedule, team roles and client messaging. Every client you add gets a private portal to read estimates, sign, pay and message you. Seats per CRM plan: ${CRM_SEATS_LINE}. See [ConstructHub CRM](/crm-app).`;
     case "agency":
-      return `The **Agency** plan is ${planPriceLine("agency")} and includes ${PLANS.agency.limits.locations} client locations.\nAbove that: ${agencyBandsLine()}.\nOnly Agency includes the ${joinNames(AGENCY_ONLY_MODULES)}, plus team roles with ${PLANS.agency.limits.agencySeats} agency seats. See [Pricing](/pricing#agency).`;
+      // The 2026-10-09 ladder: Agency is the growth key ($199, 100 locations, 10 client
+      // workspaces); Unlimited (the agency key) is the no-caps plan above it.
+      return `The **Agency** plan is ${planPriceLine("growth")}: ${PLANS.growth.limits.locations} Google Business Profile locations, ${PLANS.growth.limits.clientWorkspaces} client workspaces and ${PLANS.growth.limits.agencySeats} team seats, with ${PLANS.growth.limits.textingNumbersIncluded} client-texting number included and a taste of the SEO tools.\nThe **Unlimited** plan is ${planPriceLine("agency")}: no caps on locations, seats or client workspaces, ${PLANS.agency.limits.textingNumbersIncluded} client-texting numbers, the full SEO suite, white-label reports and the Master Class.\nOnly Unlimited includes the ${joinNames(AGENCY_ONLY_MODULES)}. See [Pricing](/pricing).`;
     case "done-for-you":
       return `Yes. For contractors who'd rather have the work done for them, there is business formation and contractor license help, a Google Business Profile and contractor website, SEO and ad campaigns, monthly SEO packages, and the Complete Business Build. Every one of these is quoted by a sales rep, so there is no price here. Open [${SALES_REP_LABEL}](${SALES_HREF}), fill in your name, email and what you need, and a rep replies by email.`;
     case "permits":
@@ -108,7 +110,9 @@ export function requiredFactsOk(presetId: PresetId, answer: string): boolean {
     case "done-for-you":
       return answer.includes(SALES_REP_LABEL) && answer.includes(SALES_HREF);
     case "agency":
-      return /\bAgency\b/.test(answer) && new RegExp(`\\b${PLANS.agency.limits.locations}\\b`).test(answer) && new RegExp(`\\b${AGENCY_SELF_SERVE_MAX_LOCATIONS}\\b`).test(answer) && /sales rep/i.test(answer);
+      // The new-ladder facts: the Agency plan's headline numbers and that Unlimited above it exists.
+      return /\bAgency\b/.test(answer) && new RegExp(`\\b${PLANS.growth.limits.locations}\\b`).test(answer)
+        && new RegExp(`\\b${PLANS.growth.limits.clientWorkspaces}\\b`).test(answer) && /\bUnlimited\b/.test(answer);
     case "call-assistant": {
       // Every tier's monthly price and the overage as the pack words them, "separate" (never "an add-on to a plan"),
       // and "coming soon" while the price book says so.

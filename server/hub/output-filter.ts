@@ -715,8 +715,13 @@ function checkContent(linkless: string, opts: FilterOptions, book: KnowledgeBook
   for (const s of planSentences(money)) checkPlanPrices(s);
   for (const s of callAssistantSentences(money)) checkCallAssistantPrices(s);
 
-  // O10 — commercial claims
-  for (const re of COMMERCIAL) if (re.test(linkless)) block("O10");
+  // O10 — commercial claims. "Unlimited" is a sold plan name on the 2026-10-09
+  // ladder (shared/plans.ts), never a claim: mask capitalized name mentions
+  // (bare, or with "the/to/on/with" before it, or "plan/tier" after) so the
+  // sweep never reads the name as an "unlimited" promise. Lowercase "unlimited"
+  // and every other claim stay blocked.
+  const commercialText = linkless.replace(/\b(?:the |to |on |with |from )?Unlimited(?: plan| tier)?\b/g, "Top plan");
+  for (const re of COMMERCIAL) if (re.test(commercialText)) block("O10");
   for (const m of linkless.matchAll(/\bfree (plan|tier|version|forever|month)/gi)) {
     const before = linkless.slice(0, m.index!).split(/\s+/).filter(Boolean).slice(-4).join(" ");
     if (!NEG.test(before) && !/there'?s no$/i.test(before)) block("O10");
