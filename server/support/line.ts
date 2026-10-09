@@ -14,7 +14,7 @@
 export type Channel = "email" | "sms";
 export type Account = { userId: number; crmOrgId: string | null; email: string; phones: string[]; ref: string };
 export type Category = "payment" | "login" | "technical" | "data" | "other";
-export type Intake = { category?: Category; title?: string; description?: string; steps?: string; device?: string; blocking?: boolean };
+export type Intake = { category?: Category; title?: string; description?: string; steps?: string; device?: string; blocking?: boolean; /** Collected without the AI (it was down): severity is never "critical". */ fallback?: boolean };
 export type CallState = {
   step: "ask_id" | "choose_channel" | "code_sent" | "intake" | "confirm" | "done";
   idTries: number; codeTries: number; codesSent: number; turns: number;
@@ -27,12 +27,18 @@ export interface Deps {
   now(): number;
   /** Find by customer number, CRM number or account email. Never throws for "not found" (returns null). */
   findAccount(ref: { kind: "customer" | "crm" | "email"; value: string }): Promise<Account | null>;
-  /** Send a fresh code to the account's own email / first phone on file; false when a budget refuses it. */
-  sendCode(acct: { userId: number; email: string; phones: string[] }, channel: Channel, callerNumber: string): Promise<{ sent: boolean; hash: string | null }>;
+  /**
+   * Send a fresh code to the account's own email / first phone on file — or, with no account, do the SAME budget work
+   * and send nothing (Kimi audit 2026-10-08 #1/#2: hit and miss must not differ in words or timing). `allowed: false`
+   * only when the CALLER's budget is spent (identical for hits and misses); an account-side refusal is `allowed: true,
+   * hash: null` (nothing sent, the same words). Delivery happens in the background.
+   */
+  sendCode(acct: { userId: number; email: string; phones: string[] } | null, ref: string, channel: Channel, callerNumber: string): Promise<{ allowed: boolean; hash: string | null }>;
   hashCode(code: string): string;
   /** The intake conversation: the AI returns what to say next and the fields it has so far. May throw. */
   intakeTurn(history: { role: "caller" | "gabe"; text: string }[]): Promise<{ say: string; intake: Intake; ready: boolean }>;
-  openTicket(s: CallState, callerNumber: string): Promise<{ number: string }>;
+  /** Opens the ticket; null when the account's daily ticket cap is spent (Kimi #6). */
+  openTicket(s: CallState, callerNumber: string): Promise<{ number: string } | null>;
 }
 
 export const LINES = {
@@ -53,6 +59,7 @@ export const LINES = {
   confirmNo: "No problem. Tell me what I should change.",
   opened: (n: string) => `Done. Your ticket number is ${n.split("").join(" ")}. I've emailed you a confirmation, and the team will reply by email. Is there anything else? If not, you can hang up. Goodbye.`,
   aiDown: "Please tell me what's wrong: is it about a payment, logging in, or something in the app not working? And describe what happens.",
+  ticketCap: "You've already opened several tickets today, so I can't open another one on this line. Please email support at constructhub dot us and the team will pick it up. Goodbye.",
   tooLong: "I need to wrap up this call. Please email support at constructhub dot us with anything else. Goodbye.",
 };
 
@@ -89,12 +96,12 @@ export async function turn(s: CallState, callerText: string, callerNumber: strin
   const sendTo = async (ch: Channel): Promise<Reply> => {
     if (s.codesSent >= 2) { s.step = "done"; return { say: LINES.sendRefused, end: true }; }
     s.channel = ch; s.codesSent++;
-    if (s.userId !== null && s.email) {
-      // "Text" with no phone on file falls back to the email on file (the words above cover both).
-      const r = await d.sendCode({ userId: s.userId, email: s.email, phones: s.phones }, ch === "sms" && !s.phones.length ? "email" : ch, callerNumber);
-      if (!r.sent) { s.step = "done"; return { say: LINES.sendRefused, end: true }; }
-      s.codeHash = r.hash; s.codeExpires = d.now() + CODE_TTL;
-    } else { s.codeHash = null; s.codeExpires = d.now() + CODE_TTL; }   // no account: same words, nothing sent
+    // "Text" with no phone on file falls back to the email on file (the words cover both). No account: the same call,
+    // the same budgets, nothing sent.
+    const acct = s.userId !== null && s.email ? { userId: s.userId, email: s.email, phones: s.phones } : null;
+    const r = await d.sendCode(acct, s.ref ?? "", ch === "sms" && !s.phones.length ? "email" : ch, callerNumber);
+    if (!r.allowed) { s.step = "done"; return { say: LINES.sendRefused, end: true }; }
+    s.codeHash = r.hash; s.codeExpires = d.now() + CODE_TTL;
     s.codeTries = 0; s.step = "code_sent";
     return { say: LINES.sentNeutral(ch), end: false };
   };
@@ -128,7 +135,7 @@ export async function turn(s: CallState, callerText: string, callerNumber: strin
         // AI down: collect deterministically — the first answer is the description, keywords pick the category.
         s.intake.description = [s.intake.description, text].filter(Boolean).join(" ").slice(0, 2000);
         s.intake.category = /pay|charge|card|invoice|bill|refund/i.test(s.intake.description) ? "payment" : /log ?in|password|locked|sign in/i.test(s.intake.description) ? "login" : /lost|missing|deleted|gone/i.test(s.intake.description) ? "data" : "technical";
-        s.intake.blocking = true; s.intake.title = s.intake.description.slice(0, 80);
+        s.intake.blocking = true; s.intake.title = s.intake.description.slice(0, 80); s.intake.fallback = true;
         if (s.aiTurns.length < 2) { s.aiTurns.push({ role: "gabe", text: LINES.aiDown }); return { say: LINES.aiDown, end: false }; }
         r = { say: "", intake: s.intake, ready: true };
       }
@@ -141,7 +148,9 @@ export async function turn(s: CallState, callerText: string, callerNumber: strin
     case "confirm": {
       if (saidYes(text) && !saidNo(text)) {
         const t = await d.openTicket(s, callerNumber);
-        s.ticketNumber = t.number; s.step = "done";
+        s.step = "done";
+        if (!t) return { say: LINES.ticketCap, end: true };
+        s.ticketNumber = t.number;
         return { say: LINES.opened(t.number), end: true };
       }
       s.step = "intake"; s.aiTurns.push({ role: "caller", text }, { role: "gabe", text: LINES.confirmNo });
@@ -159,9 +168,10 @@ export function cleanIntake(i: Intake | undefined): Intake {
   if (i?.category && CATS.includes(i.category)) o.category = i.category;
   for (const [k, n] of [["title", 120], ["description", 2000], ["steps", 1000], ["device", 200]] as const) { const v = s((i as any)?.[k], n); if (v) (o as any)[k] = v; }
   if (typeof i?.blocking === "boolean") o.blocking = i.blocking;
+  if (i?.fallback === true) o.fallback = true;
   return o;
 }
 /** What Gabe may say from the AI: short, no emails, no long digit runs, no links but our own. */
 export function scrubSay(t: string): string {
-  return (t || "").replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "").replace(/\d[\d\s-]{5,}\d/g, "").replace(/https?:\/\/\S+/g, "").replace(/\s+/g, " ").trim().slice(0, 400);
+  return (t || "").replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "").replace(/\d[\d\s-]{4,}\d/g, "").replace(/https?:\/\/\S+/g, "").replace(/\s+/g, " ").trim().slice(0, 400);
 }

@@ -8,7 +8,7 @@ function deps(over: Partial<Deps> = {}) {
   const d: Deps = {
     now: () => t,
     findAccount: async (ref) => (ref.kind === "customer" && ref.value === "12345678") || (ref.kind === "email" && ref.value === "owner@example.com") || (ref.kind === "crm" && ref.value === "CRM1234567") ? ACCT : null,
-    sendCode: async (a, ch) => { sent.push({ channel: ch, to: ch === "sms" ? a.phones[0] : a.email }); return { sent: true, hash: "H:424242" }; },
+    sendCode: async (a, _ref, ch) => { if (!a) return { allowed: true, hash: null }; sent.push({ channel: ch, to: ch === "sms" ? a.phones[0] : a.email }); return { allowed: true, hash: "H:424242" }; },
     hashCode: (c) => `H:${c}`,
     intakeTurn: async () => ({ say: "", ready: true, intake: { category: "payment", title: "Charged twice", description: "Card charged twice on Oct 1" } }),
     openTicket: async () => { tickets.push(1); return { number: "T-00001" }; },
@@ -85,7 +85,7 @@ describe("support line — the rules are code", () => {
     expect(r.say).toBe(LINES.sendRefused); expect(r.end).toBe(true);
   });
   it("a refused send (rate limit) ends the call", async () => {
-    const { d } = deps({ sendCode: async () => ({ sent: false, hash: null }) }); const s = freshState();
+    const { d } = deps({ sendCode: async () => ({ allowed: false, hash: null }) }); const s = freshState();
     await turn(s, "1 2 3 4 5 6 7 8", "+1", d);
     const r = await turn(s, "email", "+1", d); expect(r).toEqual({ say: LINES.sendRefused, end: true });
   });
@@ -108,4 +108,27 @@ describe("support line — the rules are code", () => {
     expect((await turn(s, "it happened on october first", "+1", d)).say).toMatch(/Should I open the ticket/);
     await turn(s, "yes", "+1", d); expect(tickets.length).toBe(1);
   });
+});
+
+describe("support line — Kimi audit fixes (2026-10-08)", () => {
+  it("a caller-budget refusal reads the same for a real and a made-up account", async () => {
+    const calls: (number | null)[] = [];
+    const refuse = deps({ sendCode: async (a) => { calls.push(a ? a.userId : null); return { allowed: false, hash: null }; } }).d;
+    const a = freshState(), b = freshState();
+    await turn(a, "1 2 3 4 5 6 7 8", "+1", refuse); const ra = await turn(a, "email", "+1", refuse);
+    await turn(b, "8 7 6 5 4 3 2 1", "+1", refuse); const rb = await turn(b, "email", "+1", refuse);
+    expect(rb).toEqual(ra); expect(calls).toEqual([7, null]);   // the budget is asked on both paths
+  });
+  it("an account-side refusal sends nothing but says the same neutral words", async () => {
+    const { d } = deps({ sendCode: async () => ({ allowed: true, hash: null }) }); const s = freshState();
+    await turn(s, "1 2 3 4 5 6 7 8", "+1", d);
+    expect((await turn(s, "email", "+1", d)).say).toBe(LINES.sentNeutral("email"));
+    expect((await turn(s, "424242", "+1", d)).say).toBe(LINES.badCode);
+  });
+  it("the daily ticket cap ends the call without a ticket", async () => {
+    const { d } = deps({ openTicket: async () => null }); const s = freshState();
+    await turn(s, "1 2 3 4 5 6 7 8", "+1", d); await turn(s, "email", "+1", d); await turn(s, "424242", "+1", d); await turn(s, "charged twice", "+1", d);
+    expect(await turn(s, "yes", "+1", d)).toEqual({ say: LINES.ticketCap, end: true });
+  });
+  it("Gabe never speaks a 6-digit run either", () => { expect(scrubSay("your code is 424242")).not.toMatch(/\d{6}/); });
 });

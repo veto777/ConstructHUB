@@ -12,7 +12,7 @@
  */
 import type { Express } from "express";
 import OpenAI from "openai";
-import { createHmac, randomInt } from "crypto";
+import { createHash, createHmac, randomInt } from "crypto";
 import { pool } from "../db";
 import { aiModel, aiTimeoutMs } from "../ai-config";
 import { ADMIN_EMAILS } from "../admin";
@@ -26,8 +26,13 @@ import { normalizeE164 } from "../voice/profile-store";
 import { customerNumberFor } from "./schema";
 import { freshState, turn, LINES, type Account, type CallState, type Channel, type Deps, type Intake } from "./line";
 
-const HOUR = 3_600_000;
-const pepper = () => process.env.SUPPORT_CODE_PEPPER || process.env.SESSION_SECRET || "dev-only-support-pepper";
+const HOUR = 3_600_000, DAY = 24 * HOUR;
+let warnedPepper = false;
+const pepper = () => {
+  const p = process.env.SUPPORT_CODE_PEPPER || process.env.SESSION_SECRET;
+  if (!p && !warnedPepper) { warnedPepper = true; console.warn("[support] SUPPORT_CODE_PEPPER / SESSION_SECRET unset — using the dev pepper"); }
+  return p || "dev-only-support-pepper";
+};
 export const hashCode = (code: string) => createHmac("sha256", pepper()).update(`support-code:${code}`).digest("hex");
 
 async function phonesFor(userId: number): Promise<string[]> {
@@ -46,24 +51,33 @@ export async function findAccount(ref: { kind: "customer" | "crm" | "email"; val
   return { userId: row.user_id, crmOrgId: row.crm_org_id, email: row.email, phones: await phonesFor(row.user_id), ref: ref.value };
 }
 
-/** A fresh code to the account's own email / phone on file. Budgets: 3 per caller and 3 per account an hour, 300 an hour overall. */
-export async function sendCode(acct: { userId: number; email: string; phones: string[] }, channel: Channel, callerNumber: string): Promise<{ sent: boolean; hash: string | null }> {
+/**
+ * A fresh code to the account's own email / phone on file — or, with no account, the SAME budget work and nothing sent
+ * (Kimi audit 2026-10-08 #1, #2, #4, #5). Budgets: per caller 3/hour; per account (or per unknown identifier) 2/hour and
+ * 6/day; 300/hour overall. Only the caller/overall budgets refuse audibly (identical for hits and misses); an account-side
+ * refusal sends nothing and says the same words. Delivery runs in the background so a hit is not slower than a miss.
+ */
+export async function sendCode(acct: { userId: number; email: string; phones: string[] } | null, ref: string, channel: Channel, callerNumber: string): Promise<{ allowed: boolean; hash: string | null }> {
   const caller = normalizeE164(callerNumber) || "unknown";
-  if (!(await takeBudget(`support:code:caller:${caller}`, 3, 1, HOUR))) return { sent: false, hash: null };
-  if (!(await takeBudget(`support:code:acct:${acct.userId}`, 3, 1, HOUR))) return { sent: false, hash: null };
-  if (!(await takeBudget(`support:code:all`, 300, 1, HOUR))) return { sent: false, hash: null };
+  if (!(await takeBudget(`support:code:caller:${caller}`, 3, 1, HOUR))) return { allowed: false, hash: null };
+  if (!(await takeBudget(`support:code:all`, 300, 1, HOUR))) return { allowed: false, hash: null };
+  const key = acct ? `acct:${acct.userId}` : `miss:${createHash("sha256").update(ref.toLowerCase()).digest("hex").slice(0, 24)}`;
+  const okHour = await takeBudget(`support:code:${key}:h`, 2, 1, HOUR), okDay = await takeBudget(`support:code:${key}:d`, 6, 1, DAY);
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+  if (!acct || !okHour || !okDay) return { allowed: true, hash: null };
   const msg = `Your ConstructHUB support code is ${code}. It expires in 10 minutes. If you didn't just call ConstructHUB support, ignore this message.`;
-  try {
+  const deliver = async () => {
     if (channel === "sms" && acct.phones[0]) {
-      const r = await sendSms(acct.phones[0], msg);
-      if (!r.ok) return { sent: false, hash: null };
+      // "*" = a platform send that still honours STOP opt-outs (incl. the platform-wide row), unmetered.
+      const r = await sendSms(acct.phones[0], msg, undefined, "*");
+      if (!r.ok) console.warn("[support] code text not sent:", r.error);
     } else {
       const { html, text } = emailLayout({ title: "Your support code", intro: `Read this code to Gabe on the phone: ${code}. It expires in 10 minutes.`, footer: "If you didn't just call ConstructHUB support, ignore this email — nobody can use the code without it." });
       await sendWithFallback({ to: acct.email, subject: `ConstructHUB support code: ${code}`, html, text });
     }
-  } catch (e: any) { console.error("[support] code delivery failed:", e?.message || e); return { sent: false, hash: null }; }
-  return { sent: true, hash: hashCode(code) };
+  };
+  void deliver().catch((e: any) => console.error("[support] code delivery failed:", e?.message || e));
+  return { allowed: true, hash: hashCode(code) };
 }
 
 // ---- The intake AI: phrases questions and proposes fields; it never sees the account. -------------------------
@@ -79,8 +93,10 @@ Set ready=true when you have enough detail (usually after 2-4 questions); then "
 
 let client: OpenAI | null = null;
 const ai = () => (client ??= new OpenAI({ baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL, apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || "none", maxRetries: 0, timeout: Math.min(20_000, aiTimeoutMs()) }));
-export async function intakeTurn(history: { role: "caller" | "gabe"; text: string }[]): Promise<{ say: string; intake: Intake; ready: boolean }> {
+export async function intakeTurn(history: { role: "caller" | "gabe"; text: string }[], callerNumber = "unknown"): Promise<{ say: string; intake: Intake; ready: boolean }> {
   if (!process.env.AI_INTEGRATIONS_OPENAI_BASE_URL) throw new Error("no AI configured");
+  // Kimi #7: AI turns are budgeted (per caller 120/day, overall 3000/day); over budget = the deterministic intake.
+  if (!(await takeBudget(`support:ai:caller:${normalizeE164(callerNumber) || "unknown"}`, 120, 1, DAY)) || !(await takeBudget("support:ai:all", 3000, 1, DAY))) throw new Error("AI budget spent");
   const r = await ai().chat.completions.create({
     model: aiModel(), temperature: 0.3, max_tokens: 500,
     messages: [{ role: "system", content: INTAKE_SYSTEM }, ...history.map((h) => ({ role: h.role === "caller" ? "user" as const : "assistant" as const, content: h.role === "caller" ? `Caller said: ${h.text}` : h.text }))],
@@ -95,16 +111,23 @@ export async function intakeTurn(history: { role: "caller" | "gabe"; text: strin
 const teamEmails = () => [...new Set([...(process.env.SUPPORT_TEAM_EMAILS || "").split(",").map((s) => s.trim()).filter(Boolean), ...ADMIN_EMAILS])];
 const appUrl = () => (process.env.APP_URL || "https://constructhub.us").replace(/\/$/, "");
 
-export async function openTicket(s: CallState, callerNumber: string, callSid: string | null): Promise<{ number: string }> {
+export async function openTicket(s: CallState, callerNumber: string, callSid: string | null): Promise<{ number: string } | null> {
   if (!s.verified || s.userId === null) throw new Error("not verified");   // the state machine never gets here unverified
-  const i = s.intake, severity = i.category === "payment" || i.category === "data" ? "critical" : "high";
-  const { rows } = await pool.query(
-    `INSERT INTO support_tickets (user_id, crm_org_id, verified_with, channel, call_sid, category, severity, title, description, steps, device, contact_email, history)
-     VALUES ($1,$2,$3,'phone',$4,$5,$6,$7,$8,$9,$10,$11, jsonb_build_array(jsonb_build_object('at', now(), 'event', 'opened', 'by', 'gabe'))) RETURNING id`,
-    [s.userId, s.crmOrgId, s.ref, callSid, i.category, severity, (i.title || "Support request").slice(0, 120), (i.description || "").slice(0, 4000), i.steps || null, i.device || null, s.email]);
-  const id = rows[0].id as number, number = `T-${String(id).padStart(5, "0")}`;
-  await pool.query(`UPDATE support_tickets SET number = $1 WHERE id = $2`, [number, id]);
-  if (callSid) await pool.query(`UPDATE support_calls SET ticket_id = $1, updated_at = now() WHERE call_sid = $2`, [id, callSid]);
+  if (!(await takeBudget(`support:tickets:user:${s.userId}`, 5, 1, DAY))) return null;   // Kimi #6
+  const i = s.intake, severity = !i.fallback && (i.category === "payment" || i.category === "data") ? "critical" : "high";
+  const c = await pool.connect();
+  let id: number, number: string;
+  try {
+    await c.query("BEGIN");
+    id = (await c.query(`SELECT nextval(pg_get_serial_sequence('support_tickets','id')) AS id`)).rows[0].id;
+    number = `T-${String(id).padStart(5, "0")}`;
+    await c.query(
+      `INSERT INTO support_tickets (id, number, user_id, crm_org_id, verified_with, channel, call_sid, category, severity, title, description, steps, device, contact_email, history)
+       VALUES ($1,$2,$3,$4,$5,'phone',$6,$7,$8,$9,$10,$11,$12,$13, jsonb_build_array(jsonb_build_object('at', now(), 'event', 'opened', 'by', 'gabe')))`,
+      [id, number, s.userId, s.crmOrgId, s.ref, callSid, i.category, severity, (i.title || "Support request").slice(0, 120), (i.description || "").slice(0, 4000), i.steps || null, i.device || null, s.email]);
+    if (callSid) await c.query(`UPDATE support_calls SET ticket_id = $1, updated_at = now() WHERE call_sid = $2`, [id, callSid]);
+    await c.query("COMMIT");
+  } catch (e) { await c.query("ROLLBACK").catch(() => {}); throw e; } finally { c.release(); }
   const rowsT: [string, string][] = [["Ticket", number], ["Category", i.category || "other"], ["Severity", severity], ["Verified with", s.ref || ""], ["Caller ID", normalizeE164(callerNumber) || "unknown"], ["Account", String(s.userId)]];
   const team = emailLayout({ title: `${severity === "critical" ? "CRITICAL" : "New"} support ticket ${number}: ${i.title || ""}`, intro: i.description || "", rows: [...rowsT, ["Steps", i.steps || "—"], ["Device", i.device || "—"]], cta: { label: "Open in admin", url: `${appUrl()}/admin/tickets/${id}` } });
   const cust = emailLayout({ title: `We got your ticket ${number}`, intro: `Thanks for calling ConstructHUB support. Gabe opened ticket ${number}: "${i.title || "your issue"}". Our team will reply to this email address — you can reply to this email to add details.`, rows: [["Ticket", number], ["Issue", i.title || ""]], footer: "You're receiving this because you verified your account on a call with ConstructHUB support." });
@@ -134,12 +157,26 @@ export function registerSupportRoutes(app: Express, getDevUser: any) {
   app.post(`${VOICE_INTERNAL_PATH}/support/turn`, requireVoiceInternal, async (req, res) => {
     const { callSid, from, text } = req.body || {};
     if (!okSid(callSid) || typeof text !== "string") return res.status(400).json({ code: "bad_request" });
-    const s = await loadCall(callSid, String(from || ""));
-    const deps: Deps = { now: () => Date.now(), findAccount, sendCode, hashCode, intakeTurn, openTicket: (st, caller) => openTicket(st, caller, callSid) };
-    let r;
-    try { r = await turn(s, text, String(from || ""), deps); }
-    catch (e: any) { console.error("[support] turn failed:", e?.message || e); r = { say: "Sorry, something went wrong on my end. Please email support at constructhub dot us. Goodbye.", end: true }; s.step = "done"; }
-    await pool.query(`UPDATE support_calls SET state = $1, user_id = $2, verified_at = CASE WHEN $3 AND verified_at IS NULL THEN now() ELSE verified_at END, updated_at = now() WHERE call_sid = $4`, [JSON.stringify(s), s.verified ? s.userId : null, s.verified, callSid]);
+    // Kimi #3: one turn at a time per call — a transaction-scoped advisory lock around load → turn → write.
+    const c = await pool.connect();
+    let r: { say: string; end: boolean };
+    try {
+      await c.query("BEGIN");
+      await c.query(`SELECT pg_advisory_xact_lock(hashtext('support-call:' || $1))`, [callSid]);
+      const row = (await c.query(`SELECT state FROM support_calls WHERE call_sid = $1`, [callSid])).rows[0];
+      if (!row) { await c.query("ROLLBACK"); return res.status(409).json({ code: "not_started" }); }   // turn requires start
+      const s: CallState = row.state?.step ? row.state : freshState();
+      const caller = String(from || "");
+      const deps: Deps = { now: () => Date.now(), findAccount, sendCode, hashCode, intakeTurn: (h) => intakeTurn(h, caller), openTicket: (st, cn) => openTicket(st, cn, callSid) };
+      try { r = await turn(s, text, caller, deps); }
+      catch (e: any) { console.error("[support] turn failed:", e?.message || e); r = { say: "Sorry, something went wrong on my end. Please email support at constructhub dot us. Goodbye.", end: true }; s.step = "done"; }
+      await c.query(`UPDATE support_calls SET state = $1, user_id = $2, verified_at = CASE WHEN $3 AND verified_at IS NULL THEN now() ELSE verified_at END, updated_at = now() WHERE call_sid = $4`, [JSON.stringify(s), s.verified ? s.userId : null, s.verified, callSid]);
+      await c.query("COMMIT");
+    } catch (e: any) {
+      await c.query("ROLLBACK").catch(() => {});
+      console.error("[support] turn transaction failed:", e?.message || e);
+      r = { say: "Sorry, something went wrong on my end. Please email support at constructhub dot us. Goodbye.", end: true };
+    } finally { c.release(); }
     res.json(r);
   });
   app.post(`${VOICE_INTERNAL_PATH}/support/end`, requireVoiceInternal, async (req, res) => {

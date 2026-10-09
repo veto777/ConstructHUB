@@ -50,14 +50,18 @@ class SupportBrain(Brain):
             self.silences = 0
             self._log("caller", text)
             self.turns += 1
-            try:
-                r = await self.app._c.post("/api/voice-internal/support/turn", json={"callSid": self.call_sid, "from": self.caller, "text": text}, timeout=30.0)
-                r.raise_for_status()
-                j = r.json()
-                say, end = str(j.get("say") or FAIL_SAY), bool(j.get("end"))
-            except Exception as e:  # noqa: BLE001
-                log.warning("support turn failed: %s", e)
-                say, end = FAIL_SAY, True
+            say, end = FAIL_SAY, True
+            for attempt in range(2):   # one retry on a transport error (Kimi #8); the app's per-call lock keeps it safe
+                try:
+                    r = await self.app._c.post("/api/voice-internal/support/turn", json={"callSid": self.call_sid, "from": self.caller, "text": text}, timeout=30.0)
+                    if r.status_code >= 500 and attempt == 0:
+                        continue
+                    r.raise_for_status()
+                    j = r.json()
+                    say, end = str(j.get("say") or FAIL_SAY), bool(j.get("end"))
+                    break
+                except Exception as e:  # noqa: BLE001
+                    log.warning("support turn failed (attempt %d): %s", attempt + 1, e)
             self._log("assistant", say)
             self.last_say = say
             if end:

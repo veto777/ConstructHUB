@@ -56,6 +56,13 @@ export async function ensureSupportSchema(): Promise<void> {
     );
   `);
   await backfillNumbers();
+  await purgeOldCalls();
+  setInterval(() => { purgeOldCalls().catch((e) => console.error("[support] purge failed:", e?.message || e)); }, 24 * 3_600_000).unref();
+}
+
+/** Support-call state (it holds the account's email/phones once identified) is kept 30 days (Kimi #8). */
+export async function purgeOldCalls(): Promise<void> {
+  await pool.query(`DELETE FROM support_calls WHERE updated_at < now() - interval '30 days'`);
 }
 
 /** Give every account without a number one (unique; a clash retries). */
@@ -71,10 +78,13 @@ export async function backfillNumbers(): Promise<void> {
   }
 }
 
-/** The account's number, assigned on first need (new signups get theirs on the next boot or here). */
+/** The account's number, assigned on first need — only this account (Kimi #8: no table-wide backfill per request). */
 export async function customerNumberFor(userId: number): Promise<string> {
-  const { rows } = await pool.query(`SELECT customer_number FROM users WHERE id = $1`, [userId]);
-  if (rows[0]?.customer_number) return rows[0].customer_number;
-  await backfillNumbers();
-  return (await pool.query(`SELECT customer_number FROM users WHERE id = $1`, [userId])).rows[0]?.customer_number ?? "";
+  for (let i = 0; i < 8; i++) {
+    const { rows } = await pool.query(`SELECT customer_number FROM users WHERE id = $1`, [userId]);
+    if (rows[0]?.customer_number || !rows[0]) return rows[0]?.customer_number ?? "";
+    try { await pool.query(`UPDATE users SET customer_number = $1 WHERE id = $2 AND customer_number IS NULL`, [newCustomerNumber(), userId]); }
+    catch (e: any) { if (e?.code !== "23505") throw e; }
+  }
+  return "";
 }
