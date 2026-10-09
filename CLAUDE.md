@@ -21,6 +21,12 @@ removed. **Never reintroduce it.**
 - A statewide portal can be verified through its state-agency identity plus a county-specific
   source listing; it need not name each county. See `analysis/AUDIT-a4.md` → Round 2.
 
+## 🔴 OWNER ORDER (2026-10-09) — a usage limit is never a reason to stop
+When a usage/session limit cuts work off, do not stop and report: save the resume plan, schedule the resume for the
+reset time (a cron/wakeup that says "resume <task>"), relaunch cut-off agents in their worktrees, and keep going.
+"If you get cut off keep working after the session is reset… especially when I told you don't stop."
+When Fable reaches its limit, switch the agents to Opus (Agent tool `model: "opus"`) and keep working — never wait for the reset.
+
 ## 🚫 Tower boundary
 Self-contained. Never pull in another tower project's infra, domains, or accounts — see
 `~/HUB/ROUTER.md` for the specifics. Enforced by `.git/hooks/pre-commit` (tower guard).

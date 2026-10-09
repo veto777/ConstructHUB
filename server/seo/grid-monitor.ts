@@ -219,7 +219,8 @@ export async function raiseGridAlert(siteId: number, scanId: number): Promise<"g
     if (c.common < Math.max((now.scan.points ?? []).length, (before.scan?.points ?? []).length) * 0.8) continue; // too little in common: try the one before
     if (!c.kind) return null;
     const title = `${site.domain}: "${now.keyword}" ${c.kind === "grid_down" ? "got worse" : "got better"} across your area — in the first 3 at ${c.now.top3} of ${c.common} points, was ${c.before.top3}`;
-    const items = [{ keyword: now.keyword, size: now.size, spacing: now.spacing, scanId: now.id, top3: c.now.top3, checked: c.common, score: c.now.avgRank, wasTop3: c.before.top3, wasChecked: c.common, wasScore: c.before.avgRank, since: new Date(before.created_at).toISOString() }];
+    // Both scans' ids travel with the alert, so its figures open the scan they were read from.
+    const items = [{ keyword: now.keyword, size: now.size, spacing: now.spacing, scanId: now.id, wasScanId: before.id, top3: c.now.top3, checked: c.common, score: c.now.avgRank, wasTop3: c.before.top3, wasChecked: c.common, wasScore: c.before.avgRank, since: new Date(before.created_at).toISOString() }];
     const id = await saveAlert(site.user_id, siteId, c.kind, `grid:${now.id}`, title, items);
     if (id) await deliverAlert(id);
     return c.kind;
@@ -328,7 +329,8 @@ export async function runDueGridWatches(): Promise<number> {
   return done;
 }
 
-export type GridReportLine = { keyword: string; size: number; spacing: number; at: string; top3: number; checked: number; score: number | null; previous: { top3: number; checked: number; score: number | null; at: string } | null };
+/** `scanId` is the newest scan's id, `previous.scanId` the comparable one's (the local grid opens either with ?scan=). */
+export type GridReportLine = { scanId?: number; keyword: string; size: number; spacing: number; at: string; top3: number; checked: number; score: number | null; previous: { scanId?: number; top3: number; checked: number; score: number | null; at: string } | null };
 /**
  * For the scheduled report: the newest scan of each repeating search with a comparable one before it — only scans of
  * the listing the site is pinned to NOW (after a change of listing, the old one's results are not reported as this
@@ -342,7 +344,7 @@ export async function gridReportLines(userId: number, siteId: number): Promise<G
   const lines: GridReportLine[] = [];
   for (const w of watches) {
     const { rows } = await pool.query(
-      `SELECT x.scan, x.created_at, x.top3, x.checked, x.avg_rank::float8 AS score FROM seo_grid_scans x JOIN seo_sites st ON st.id=x.site_id AND st.grid_pin IS NOT NULL
+      `SELECT x.id, x.scan, x.created_at, x.top3, x.checked, x.avg_rank::float8 AS score FROM seo_grid_scans x JOIN seo_sites st ON st.id=x.site_id AND st.grid_pin IS NOT NULL
         WHERE x.site_id=$1 AND x.user_id=$2 AND x.status='done' AND x.keyword=$3 AND x.size=$4 AND x.spacing=$5 AND ${same}
         ORDER BY x.created_at DESC LIMIT 6`, [siteId, userId, w.keyword, w.size, w.spacing]);
     const newest = rows[0];
@@ -350,9 +352,10 @@ export async function gridReportLines(userId: number, siteId: number): Promise<G
     const at = new Date(newest.created_at).toISOString();
     const usable = rows.slice(1).map((r: any) => ({ r, c: compareScans(newest.scan?.points ?? [], r.scan?.points ?? []) }))
       .find(({ r, c }: any) => c.common >= Math.max((newest.scan?.points ?? []).length, (r.scan?.points ?? []).length) * 0.8);
+    const scanId = typeof newest.id === "number" ? { scanId: newest.id } : {};
     lines.push(usable
-      ? { keyword: w.keyword, size: w.size, spacing: w.spacing, at, top3: usable.c.now.top3, checked: usable.c.common, score: usable.c.now.avgRank, previous: { top3: usable.c.before.top3, checked: usable.c.common, score: usable.c.before.avgRank, at: new Date(usable.r.created_at).toISOString() } }
-      : { keyword: w.keyword, size: w.size, spacing: w.spacing, at, top3: newest.top3, checked: newest.checked, score: newest.score, previous: null });
+      ? { ...scanId, keyword: w.keyword, size: w.size, spacing: w.spacing, at, top3: usable.c.now.top3, checked: usable.c.common, score: usable.c.now.avgRank, previous: { ...(typeof usable.r.id === "number" ? { scanId: usable.r.id } : {}), top3: usable.c.before.top3, checked: usable.c.common, score: usable.c.before.avgRank, at: new Date(usable.r.created_at).toISOString() } }
+      : { ...scanId, keyword: w.keyword, size: w.size, spacing: w.spacing, at, top3: newest.top3, checked: newest.checked, score: newest.score, previous: null });
   }
   return lines;
 }

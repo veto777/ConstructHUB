@@ -2,20 +2,34 @@
  * Keywords explorer -> Service × town: the customer's services against the towns they serve.
  * Every cell is the search "service town": how often it is searched and where the site ranks for
  * it. Gaps and weak spots can be ticked and sent to the action plan, a list or the rank tracker.
- * See server/seo/planner.ts.
+ * Every figure is a link (links.ts): a cell's searches a month to the search's overview in the Keywords explorer, its
+ * position to the site's organic keywords in Site explorer (the keyword database the position comes from) and to the
+ * rank tracker when the site tracks it; the summary tiles narrow the grid to the cells they count (`show` in the
+ * address, shown as a chip with a clear). Selecting a cell is its own control, a checkbox. See server/seo/planner.ts.
  */
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "wouter";
+import { seoLinks, setParam } from "./links";
+import { marketParams, useTrackedKeywords } from "./keyword-links";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, Loader2, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { api, Empty, fmtDate, fmtNum, isNotRunYet, money, type SeoSite, type SeoStatus } from "./shell";
+import { ActiveFilter, api, Empty, fmtDate, fmtNum, isNotRunYet, money, useAddress, type SeoSite, type SeoStatus } from "./shell";
 import { AddToList, type KwRow } from "./keyword-lists";
 import { AddToPlan, type PlanTask } from "./plan-button";
 import { DEFAULT_MARKET, findMarket } from "@shared/seo-markets";
 import { MetricColumn, PALETTE } from "./viz";
-import { BarFigure, Card, MetricRow } from "./viz-keywords";
+import { BarFigure, BLOCK_LINK, Card, FIG_LINK, MetricRow, TEXT_LINK } from "./viz-keywords";
+
+type Show = "gaps" | "weak" | "strong" | "unknown";
+const SHOWS: readonly Show[] = ["gaps", "weak", "strong", "unknown"];
+/** The tiles' words, and the address that narrows the grid to the cells each counts. */
+const SHOW_WORDS: Record<Show, string> = { gaps: "Gaps: searched, and no ranking found for you", weak: "Beyond the first three", strong: "In the first three", unknown: "Nothing known: too few searches to measure, or a part that didn't load" };
+const showAt = (show: Show | undefined) => seoLinks.keywords("", { view: "area", show });
+/** A pill-sized button that is 44 px tall on a phone. */
+const PILL = "g-pill g-pill--sm !min-h-11";
 
 type Cell = { service: string; town: string; keyword: string; volume: number | null; difficulty: number | null; cpc: number | null; position: number | null; url: string | null; home: boolean };
 type Data = { domain: string; locationCode?: number; languageCode?: string; fetchedAt: string; services: string[]; towns: string[]; cells: Cell[]; summary: { cells: number; gaps: number | null; gapVolume: number | null; weak: number | null; strong: number | null; unknown: number | null }; missing: string[] };
@@ -97,6 +111,14 @@ export function ServicePlanner({ site, status, onTrack }: { site: SeoSite | null
   // The most-searched pairing in the table: each cell's bar is its share of it.
   const maxVolume = Math.max(0, ...(d?.cells ?? []).map((c) => c.volume ?? 0));
   const market = site ? findMarket(site.locationCode, site.languageCode) ?? DEFAULT_MARKET : DEFAULT_MARKET;
+  const tracked = useTrackedKeywords(site);
+  // `show` in the address (links.ts): only the cells a tile counts are drawn; the chip says which and clears it.
+  const showParam = useAddress().get("show");
+  const show = SHOWS.find((x) => x === showParam);
+  /** Which tile a cell belongs to — the same sorting the server's summary makes. */
+  const bucket = (c: Cell): Show => c.position !== null ? (c.position <= 3 ? "strong" : "weak") : !rankingsKnown ? "unknown" : (c.volume ?? 0) > 0 ? "gaps" : "unknown";
+  const inShow = (c: Cell) => !show || bucket(c) === show;
+  const shownCount = show ? (d?.cells ?? []).filter(inShow).length : 0;
   const exportCsv = () => d && (() => {
     const rows: (string | number | null)[][] = [["Service", "Town", "Search", "Searches / mo", "Difficulty", "Your position", "Your page"], ...d.cells.map((c) => [c.service, c.town, c.keyword, c.volume, c.difficulty, c.position, c.url])];
     const blob = new Blob([rows.map((l) => l.map(csvCell).join(",")).join("\n")], { type: "text/csv;charset=utf-8" });
@@ -122,7 +144,7 @@ export function ServicePlanner({ site, status, onTrack }: { site: SeoSite | null
           <span className="g-text-2 text-[13px]" data-testid="text-planner-cost">
             {tooMany ? <span style={{ color: "var(--g-red)" }}>Up to {MAX_SERVICES} services, {MAX_TOWNS} towns and {MAX_CELLS} searches in one table — shorten a list.</span>
               : tooLong ? <span style={{ color: "var(--g-red)" }}>"{tooLong}" is too long to look up (up to {MAX_CHARS} characters and {MAX_WORDS} words) — shorten that service or town.</span>
-              : cells && quote.data?.quoteCents != null ? `Up to ${money(quote.data.quoteCents)} of your SEO data for ${site.domain} (you pay for what comes back); reopening the same table within a day is free.` : `Every service is paired with every town for ${site.domain}.`}
+              : cells && quote.data?.quoteCents != null ? <>Up to <Link href={seoLinks.usage()} className={TEXT_LINK} title="Usage and credit: what lookups cost and what is left this month" data-testid="link-planner-price">{money(quote.data.quoteCents)}</Link> of your SEO data for {site.domain} (you pay for what comes back); reopening the same table within a day is free.</> : `Every service is paired with every town for ${site.domain}.`}
           </span>
         </div>
       </form>
@@ -144,21 +166,26 @@ export function ServicePlanner({ site, status, onTrack }: { site: SeoSite | null
       {d && !stale && (
         <>
           <Card className="mb-3">
+            {/* Each tile is a link to the grid narrowed to the cells it counts (links.ts `show`). */}
             <MetricRow cols={4}>
-              <MetricColumn label="Gaps" value={d.summary.gaps == null ? "—" : fmtNum(d.summary.gaps)} foot={d.summary.gaps == null ? (rankingsKnown ? "the search volumes didn't load" : "your rankings didn't load") : `searched ${fmtNum(d.summary.gapVolume)} times a month between them`} testId="tile-planner-gaps" />
-              <MetricColumn label="Beyond the first three" value={d.summary.weak == null ? "—" : fmtNum(d.summary.weak)} foot={d.summary.weak == null ? "your rankings didn't load" : "ranked in the keyword database, with room to move up"} testId="tile-planner-weak" />
-              <MetricColumn label="In the first three" value={d.summary.strong == null ? "—" : fmtNum(d.summary.strong)} foot={d.summary.strong == null ? "your rankings didn't load" : undefined} testId="tile-planner-strong" />
-              <MetricColumn label="Nothing known" value={d.summary.unknown == null ? "—" : fmtNum(d.summary.unknown)} foot={d.summary.unknown == null ? "part of the table didn't load" : "too few searches to measure"} testId="tile-planner-unknown" />
+              <MetricColumn label="Gaps" value={<Link href={showAt("gaps")} className={FIG_LINK} title="Only the gaps in the grid" data-testid="link-planner-gaps">{d.summary.gaps == null ? "—" : fmtNum(d.summary.gaps)}</Link>} foot={d.summary.gaps == null ? (rankingsKnown ? "the search volumes didn't load" : "your rankings didn't load") : <Link href={showAt("gaps")} className={TEXT_LINK} data-testid="link-planner-gaps-volume">searched {fmtNum(d.summary.gapVolume)} times a month between them</Link>} testId="tile-planner-gaps" />
+              <MetricColumn label="Beyond the first three" value={<Link href={showAt("weak")} className={FIG_LINK} title="Only these cells in the grid" data-testid="link-planner-weak">{d.summary.weak == null ? "—" : fmtNum(d.summary.weak)}</Link>} foot={d.summary.weak == null ? "your rankings didn't load" : "ranked in the keyword database, with room to move up"} testId="tile-planner-weak" />
+              <MetricColumn label="In the first three" value={<Link href={showAt("strong")} className={FIG_LINK} title="Only these cells in the grid" data-testid="link-planner-strong">{d.summary.strong == null ? "—" : fmtNum(d.summary.strong)}</Link>} foot={d.summary.strong == null ? "your rankings didn't load" : undefined} testId="tile-planner-strong" />
+              <MetricColumn label="Nothing known" value={<Link href={showAt("unknown")} className={FIG_LINK} title="Only these cells in the grid" data-testid="link-planner-unknown">{d.summary.unknown == null ? "—" : fmtNum(d.summary.unknown)}</Link>} foot={d.summary.unknown == null ? "part of the table didn't load" : "too few searches to measure"} testId="tile-planner-unknown" />
             </MetricRow>
           </Card>
+          {show && <ActiveFilter onClear={() => setParam("show", null)} clearLabel="Every cell">{SHOW_WORDS[show]} — {fmtNum(shownCount)} of {fmtNum(d.cells.length)} cells</ActiveFilter>}
           <p className="g-text-2 mb-2 text-[13px]" data-testid="text-planner-meta">
-            {d.services.length} service{d.services.length === 1 ? "" : "s"} × {d.towns.length} town{d.towns.length === 1 ? "" : "s"} for {d.domain} · {market.label} · as of {fmtDate(d.fetchedAt)} ·{" "}
-            <button type="button" className="g-link" disabled={run.isPending || !canPay || !status?.configured || !body} onClick={() => body && run.mutate({ url: base, body, key: queryKey, again: true })} data-testid="button-planner-refresh">{run.isPending ? "Checking…" : `Check again${price != null ? ` — up to ${money(price)}` : ""}`}</button>
+            {/* The grid's size opens every cell (no tile's narrowing), the site its Site explorer, the date that month's lookups on the Usage page. */}
+            <Link href={showAt(undefined)} className={TEXT_LINK} title="Every cell of the grid" data-testid="link-planner-size">{d.services.length} service{d.services.length === 1 ? "" : "s"} × {d.towns.length} town{d.towns.length === 1 ? "" : "s"}</Link>
+            {" for "}<Link href={seoLinks.explorer(d.domain)} className={TEXT_LINK} title={`${d.domain} in Site explorer`} data-testid="link-planner-domain">{d.domain}</Link> · {market.label} ·{" "}
+            <Link href={seoLinks.usage({ month: d.fetchedAt.slice(0, 7) })} className={TEXT_LINK} title="When this table was checked — that month's lookups on the Usage page" data-testid="link-planner-as-of">as of {fmtDate(d.fetchedAt)}</Link> ·{" "}
+            <button type="button" className="g-link min-h-11" disabled={run.isPending || !canPay || !status?.configured || !body} onClick={() => body && run.mutate({ url: base, body, key: queryKey, again: true })} data-testid="button-planner-refresh">{run.isPending ? "Checking…" : `Check again${price != null ? ` — up to ${money(price)}` : ""}`}</button>
           </p>
           {d.missing.length > 0 && <p className="mb-2 text-[13px]" role="status" style={{ color: "var(--g-red)" }} data-testid="text-planner-missing">{d.missing.includes("rankings") ? "Your rankings" : "The search volumes"} didn't load this time and {d.missing.length === 1 ? "that part was" : "those parts were"} not charged — the cells show what did load. Check again to fill it in.</p>}
           <div className="mb-2 flex flex-wrap items-center gap-2">
-            {rankingsKnown && gaps.length > 0 && <button type="button" className="g-pill g-pill--sm" onClick={() => setPicked(new Set(gaps.map((c) => c.keyword)))} data-testid="button-planner-pick-gaps">Select the {gaps.length} gap{gaps.length === 1 ? "" : "s"}</button>}
-            {picked.size > 0 && <button type="button" className="g-pill g-pill--sm" onClick={() => setPicked(new Set())}>Clear</button>}
+            {rankingsKnown && gaps.length > 0 && <button type="button" className={PILL} onClick={() => setPicked(new Set(gaps.map((c) => c.keyword)))} data-testid="button-planner-pick-gaps">Select the {gaps.length} gap{gaps.length === 1 ? "" : "s"}</button>}
+            {picked.size > 0 && <button type="button" className={PILL} onClick={() => setPicked(new Set())}>Clear</button>}
             <span className="ml-auto flex flex-wrap items-center gap-2">
               {chosen.length > 0 && <AddToPlan siteId={site.id} onDone={() => setPicked(new Set())} tasks={chosen.map((c): PlanTask => c.position === null
                 ? !rankingsKnown ? { kind: "other" as const, title: `Check where we rank for "${c.keyword}"`, target: c.keyword, facts: { volume: c.volume }, source: `check:${c.keyword}` }
@@ -166,7 +193,7 @@ export function ServicePlanner({ site, status, onTrack }: { site: SeoSite | null
                 : { kind: "keyword" as const, title: `Move "${c.keyword}" up from position ${c.position}`, target: c.url ?? c.keyword, facts: { position: c.position, volume: c.volume }, source: `kw:${c.keyword}` })} />}
               {chosen.length > 0 && <AddToList market={market} rows={chosen.map((c) => ({ keyword: c.keyword, volume: c.volume, cpc: c.cpc, difficulty: c.difficulty }))} onDone={() => setPicked(new Set())} />}
               {chosen.length > 0 && onTrack && <Button size="sm" title={`Tracked weekly for ${market.label} as a whole — not searched from each town. To check from a town, add the keyword in the rank tracker with that town as its place.`} onClick={() => onTrack(chosen.map((c) => ({ keyword: c.keyword, volume: c.volume, cpc: c.cpc, difficulty: c.difficulty })))} data-testid="button-planner-track">Track {chosen.length} on {site.domain}</Button>}
-              <button type="button" className="g-pill g-pill--sm" onClick={exportCsv} data-testid="button-planner-export"><Download /> Export</button>
+              <button type="button" className={PILL} onClick={exportCsv} data-testid="button-planner-export"><Download /> Export</button>
             </span>
           </div>
           <div className="overflow-x-auto">
@@ -176,15 +203,17 @@ export function ServicePlanner({ site, status, onTrack }: { site: SeoSite | null
               <tbody>{d.services.map((s) => (
                 <tr key={s}>
                   <th scope="row" className="text-left font-medium capitalize">{s}</th>
-                  {d.towns.map((t) => { const c = at(s, t); if (!c) return <td key={t}>—</td>; const st = state(c, rankingsKnown, volumesKnown); const on = picked.has(c.keyword); return (
+                  {d.towns.map((t) => { const c = at(s, t); if (!c) return <td key={t}>—</td>; if (!inShow(c)) return <td key={t} data-label={t} className="g-text-2 text-center" aria-label={`${c.keyword}: not among the cells shown`}>·</td>; const st = state(c, rankingsKnown, volumesKnown); const on = picked.has(c.keyword); const isTracked = tracked.has(c.keyword.toLowerCase()); const words = `${c.keyword}: ${c.volume != null ? `${fmtNum(c.volume)} searches a month` : volumesKnown ? "too few searches to measure" : "search volume didn't load"}; ${st.words}${c.home ? ", with your home page" : ""}`; return (
                     <td key={t} data-label={t}>
-                      <button type="button" onClick={() => toggle(c.keyword)} aria-pressed={on} data-testid={`cell-${s}-${t}`.replace(/\s+/g, "-")}
-                        aria-label={`${c.keyword}: ${c.volume != null ? `${fmtNum(c.volume)} searches a month` : volumesKnown ? "too few searches to measure" : "search volume didn't load"}; ${st.words}${c.home ? ", with your home page" : ""}`}
-                        title={c.url ? `${c.keyword} → ${c.url.replace(/^https?:\/\/(www\.)?/, "")}` : c.keyword}
-                        className="flex w-full min-w-[104px] items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left text-[13px]" style={{ borderColor: on ? "var(--g-blue, #1a73e8)" : "var(--g-divider)", outline: on ? "2px solid var(--g-blue, #1a73e8)" : undefined }}>
-                        <BarFigure value={c.volume} max={maxVolume} color={PALETTE.keywords} align="start" width={40} />
-                        <span className="rounded px-1.5 py-0.5 text-[12px] font-medium tabular-nums" style={{ background: st.bg, color: st.fg }}>{st.label}{c.home ? " ⌂" : ""}</span>
-                      </button>
+                      <div className="flex w-full min-w-[104px] flex-col gap-1 rounded-md border px-2 py-1.5 text-left text-[13px]" style={{ borderColor: on ? "var(--g-blue, #1a73e8)" : "var(--g-divider)", outline: on ? "2px solid var(--g-blue, #1a73e8)" : undefined }} title={c.url ? `${c.keyword} → ${c.url.replace(/^https?:\/\/(www\.)?/, "")}` : c.keyword}>
+                        <div className="flex items-center justify-between gap-2">
+                          {/* Selecting is its own control; the figures are links to where each lives. */}
+                          <label className="inline-flex min-h-11 items-center gap-1.5"><input type="checkbox" checked={on} onChange={() => toggle(c.keyword)} aria-label={`Select ${words}`} data-testid={`cell-${s}-${t}`.replace(/\s+/g, "-")} /><span className="sr-only">Select</span></label>
+                          <Link href={seoLinks.keywords(c.keyword, { ...marketParams(market), section: "volume" })} className={BLOCK_LINK} title={`"${c.keyword}": searches a month, in the Keywords explorer (nothing is bought)`} data-testid="link-cell-keyword"><BarFigure value={c.volume} max={maxVolume} color={PALETTE.keywords} align="start" width={40} /></Link>
+                          <Link href={seoLinks.explorer(d.domain, "keywords", { contains: c.keyword, ...(market.locationCode !== DEFAULT_MARKET.locationCode ? { locationCode: market.locationCode } : {}) })} className={BLOCK_LINK} title={`${st.words} — the site's organic keywords in Site explorer, narrowed to this search`} data-testid="link-cell-position"><span className="rounded px-1.5 py-0.5 text-[12px] font-medium tabular-nums" style={{ background: st.bg, color: st.fg }}>{st.label}{c.home ? " ⌂" : ""}</span></Link>
+                        </div>
+                        {isTracked && site && <Link href={seoLinks.rankTracker(site.id, { keyword: c.keyword })} className={`${TEXT_LINK} text-[12px]`} title={`"${c.keyword}" is tracked on ${site.domain} — its weekly checks`} data-testid="link-cell-tracker">Rank tracker</Link>}
+                      </div>
                     </td>
                   ); })}
                 </tr>
@@ -193,8 +222,9 @@ export function ServicePlanner({ site, status, onTrack }: { site: SeoSite | null
           </div>
           <ul className="g-text-2 mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[12px]" aria-label="What the cells show">
             <li>Left: searches a month</li><li>Right: your position</li>
-            {[[PALETTE.top3, "1–3"], [PALETTE.top10, "4–10"], [PALETTE.rest, "11–100"], [GAP_RED, "Gap: searched, no ranking found"]].map(([col, l]) => <li key={l} className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded" style={{ background: col }} aria-hidden /> {l}</li>)}
-            <li>⌂ your home page is what ranks</li><li>— too few searches to measure</li>
+            {/* Each colour leads to the grid narrowed to its cells — 4–10 and 11–100 together (the tiles' "beyond the first three"; the grid can't split them), and the title says so. */}
+            {([[PALETTE.top3, "1–3", "strong", "Only the cells in the first three"], [PALETTE.top10, "4–10", "weak", "Only the cells beyond the first three (4–10 and 11–100 together)"], [PALETTE.rest, "11–100", "weak", "Only the cells beyond the first three (4–10 and 11–100 together)"], [GAP_RED, "Gap: searched, no ranking found", "gaps", "Only the gaps"]] as const).map(([col, l, to, title]) => <li key={l}><Link href={showAt(to)} className={`${TEXT_LINK} inline-flex items-center gap-1`} title={title} data-testid={`link-planner-legend-${l === "1–3" ? "top3" : l === "4–10" ? "4-10" : l === "11–100" ? "11-100" : "gap"}`}><span className="inline-block h-3 w-3 rounded" style={{ background: col }} aria-hidden /> {l}</Link></li>)}
+            <li>⌂ your home page is what ranks</li><li><Link href={showAt("unknown")} className={TEXT_LINK} title="Only the cells where nothing is known" data-testid="link-planner-legend-unknown">— too few searches to measure</Link></li>
           </ul>
           <p className="g-text-2 mt-2 text-[12px]">Searches a month are counted across {market.label} for those exact words, not just near you — a town name that another state also has counts both. Positions are estimates from the keyword database, not live checks, and "no ranking found" means the database has none in its first 100 — not proof there is none. "Track" checks a search every week for {market.label} as a whole; to have it checked from a town, add it in the rank tracker with that town as its place.</p>
         </>

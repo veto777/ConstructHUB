@@ -283,8 +283,8 @@ export type AiPromptHistory = {
   runId: string | null;
   /** The newest answer from each assistant asked, with the full reading. */
   latest: (AiAnswer & { at: string; runId: string | null })[];
-  /** Every earlier check, newest first: just whether the business was named and used as a source. */
-  history: { at: string; engine: AiEngine; mentioned: boolean; cited: boolean; listedAt: number | null }[];
+  /** Every earlier check, newest first: whether the business was named and used as a source, who else was named and which websites were drawn on (so the page can list the answers of a month, a business or a source). */
+  history: { at: string; engine: AiEngine; mentioned: boolean; cited: boolean; listedAt: number | null; businesses?: string[]; sources?: string[] }[];
 };
 
 /** A site's saved questions, newest first, grouped by question. Pure over the rows, for tests. */
@@ -296,7 +296,7 @@ export function groupAiChecks(rows: any[], maxPrompts = 15): AiPromptHistory[] {
     if (!p) { if (byPrompt.size >= maxPrompts) continue; p = { prompt: r.prompt, lastAt: new Date(r.created_at).toISOString(), runId: r.run_id ?? null, latest: [], history: [] }; byPrompt.set(key, p); }
     const at = new Date(r.created_at).toISOString();
     if (!p.latest.some((x) => x.engine === r.engine)) p.latest.push({ engine: r.engine, model: r.model ?? "", mentioned: r.mentioned, cited: r.cited, listedAt: r.listed_at, businesses: r.businesses ?? [], sources: r.sources ?? [], searches: r.searches ?? [], answer: r.answer ?? "", at, runId: r.run_id ?? null });
-    else if (p.history.length < 60) p.history.push({ at, engine: r.engine, mentioned: r.mentioned, cited: r.cited, listedAt: r.listed_at });
+    else if (p.history.length < 60) p.history.push({ at, engine: r.engine, mentioned: r.mentioned, cited: r.cited, listedAt: r.listed_at, businesses: Array.isArray(r.businesses) ? r.businesses.filter((b: unknown) => typeof b === "string") : [], sources: Array.isArray(r.sources) ? r.sources.map((s: any) => (typeof s === "string" ? s : s?.domain)).filter((d: unknown): d is string => typeof d === "string") : [] });
   }
   return [...byPrompt.values()];
 }

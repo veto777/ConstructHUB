@@ -8,10 +8,10 @@
  * White-label: nothing here names the data vendor or a price. Platform admins
  * see the "Data source" card on /admin (Platform admin), fed by `status.admin`; the SEO pages themselves are vendor-free.
  */
-import { useEffect, useState, type ReactNode } from "react";
-import { Link, useLocation } from "wouter";
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { Link, useLocation, useSearch } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, X } from "lucide-react";
 import { GoogleSurface } from "@/components/google";
 import { AppPage } from "@/components/app-ui";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { PLANS } from "@shared/plans";
 import { inNativeApp } from "@/lib/app-shell";
+import { seoLinks, setParam } from "./links";
 
 export const api = async (method: string, url: string, body?: unknown) => (await apiRequest(method, url, body)).json();
 
@@ -93,12 +94,82 @@ export const useSeoStatus = () => useQuery<SeoStatus>({ queryKey: ["/api/seo/sta
 export const useSeoSites = () => useQuery<SeoSite[]>({ queryKey: ["/api/seo/sites"] });
 
 const SITE_KEY = "seo:site";
-/** The chosen site: remembered per browser; falls back to the first one. */
+/** The parameters of the current address, read again whenever it changes (a link followed, a filter picked, the back button). */
+export function useAddress(): URLSearchParams {
+  const search = useSearch();
+  return useMemo(() => new URLSearchParams(search), [search]);
+}
+
+/**
+ * The chosen site: `?site=<id>` in the address when it names one of this account's sites (every SEO page honours it,
+ * also when the address changes while the page is open), else the one remembered per browser, else the first one.
+ */
 export function useSelectedSite(sites: SeoSite[] | undefined): [SeoSite | null, (id: number) => void] {
-  const [id, setId] = useState<number | null>(() => { try { return Number(localStorage.getItem(SITE_KEY)) || null; } catch { return null; } });
+  const wanted = Number(useAddress().get("site")) || null;
+  const [id, setId] = useState<number | null>(() => { try { return wanted || Number(localStorage.getItem(SITE_KEY)) || null; } catch { return wanted; } });
+  // A site arrived at by link is the site from then on (the nav tabs carry no site), so it is remembered too.
+  useEffect(() => { if (wanted && sites?.some((s) => s.id === wanted)) { setId(wanted); try { localStorage.setItem(SITE_KEY, String(wanted)); } catch { /* private window */ } } }, [wanted, sites]);
   const site = sites?.find((s) => s.id === id) ?? sites?.[0] ?? null;
   useEffect(() => { if (site && site.id !== id) { setId(site.id); try { localStorage.setItem(SITE_KEY, String(site.id)); } catch { /* private window */ } } }, [site, id]);
   return [site, (next) => { setId(next); try { localStorage.setItem(SITE_KEY, String(next)); } catch { /* private window */ } }];
+}
+
+/** The address names a site that is not one of this account's (or was removed): the page says so and shows its own. */
+export function useSiteMissing(sites: SeoSite[] | undefined): number | null {
+  const wanted = Number(useAddress().get("site")) || null;
+  return wanted && sites && !sites.some((s) => s.id === wanted) ? wanted : null;
+}
+
+/**
+ * What narrowed this view, in the visitor's words, with a way to clear it (data-testid="active-filter"). A page shows
+ * one whenever a parameter of the address narrows, opens or highlights something on it.
+ */
+export function ActiveFilter({ children, onClear, clearLabel = "Show everything" }: { children: ReactNode; onClear: () => void; clearLabel?: string }) {
+  return (
+    <p className="mb-3 flex flex-wrap items-center gap-2 text-[13px]" role="status" data-testid="active-filter">
+      <span className="g-chip min-h-10 !whitespace-normal py-1 [overflow-wrap:anywhere]" style={{ textTransform: "none" }}>{children}</span>
+      <button type="button" className="g-pill g-pill--sm" onClick={onClear} data-testid="button-clear-filter"><X /> {clearLabel}</button>
+    </p>
+  );
+}
+
+/**
+ * A strip of tabs (the SEO sections, a page's own lists). Each tab is at least 44 px tall. On a phone the strip scrolls
+ * sideways — its scrollbar stays visible and a fade at the right edge says there is more; from 640 px it wraps, so
+ * every tab shows.
+ */
+export function TabStrip({ label, children, className = "" }: { label: string; children: ReactNode; className?: string }) {
+  return (
+    <div className={`relative mb-4 after:pointer-events-none after:absolute after:inset-y-0 after:right-0 after:w-10 after:bg-gradient-to-l after:from-[color:var(--g-surface,#fff)] after:to-transparent sm:after:hidden ${className}`}>
+      <nav className="g-tabs !mb-0 pr-10 ![scrollbar-width:thin] sm:!flex-wrap sm:!overflow-visible sm:pr-0 [&>a]:flex [&>a]:min-h-11 [&>a]:items-center" aria-label={label}>{children}</nav>
+    </div>
+  );
+}
+
+/** Scrolls to the element with `id` once `ready` (the data is on the page). The element is outlined by its own page. */
+export function useScrollTo(id: string | null | undefined, ready: boolean) {
+  useEffect(() => {
+    if (!id || !ready) return;
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [id, ready]);
+}
+
+/** The outline on the row, card or point a link landed on. */
+export const HIGHLIGHT = { outline: "2px solid var(--g-blue, #1a73e8)", outlineOffset: 2 } as const;
+
+/**
+ * Drops parameters from the address: replaced in place (a page's own narrowing when its site changes), or as ONE new
+ * history entry when `replace` is false (a chip's clear control), so the back button brings the whole narrowing back.
+ */
+export const clearParams = (names: string[], replace = true) => { names.forEach((n, i) => setParam(n, null, replace || i > 0)); };
+
+/** The #fragment of the current address, read again whenever it changes (a link to a part of the page). */
+export function useHash(): string {
+  return useSyncExternalStore(
+    (onChange) => { const events = ["hashchange", "popstate", "pushState", "replaceState"]; for (const e of events) window.addEventListener(e, onChange); return () => { for (const e of events) window.removeEventListener(e, onChange); }; },
+    () => window.location.hash.slice(1), () => "",
+  );
 }
 
 const TABS = [
@@ -140,9 +211,9 @@ export function SeoShell({ title, description, actions, children, site, onSite, 
           <PlanGate requiredPlan={gate.requiredPlan} message={gate.message} />
         ) : (
           <>
-            <nav className="g-tabs sm:!flex-wrap sm:!overflow-visible" aria-label="SEO sections">
+            <TabStrip label="SEO sections">
               {TABS.map((t) => <Link key={t.href} href={t.href} aria-current={location === t.href ? "page" : undefined}>{t.label}{t.href === "/seo/alerts" && (status.data?.alertsUnread ?? 0) > 0 && <span className="g-chip g-chip--sm ml-1" aria-label={`${status.data!.alertsUnread} unread`}>{status.data!.alertsUnread}</span>}</Link>)}
-            </nav>
+            </TabStrip>
             {picker && sites.isError && <div className="g-callout mb-4" role="alert" data-testid="seo-sites-error"><h3>Couldn't load your sites</h3><p>{apiErrorMessage(sites.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void sites.refetch()}>Try again</button></div>}
             {picker && !sites.isError && <SitePicker site={site} onSite={onSite} sites={sites} />}
             <UsageLine status={status} />
@@ -162,7 +233,7 @@ function PlanGate({ requiredPlan, message }: { requiredPlan: keyof typeof PLANS;
       <h3>ConstructHUB SEO is included with the {PLANS[requiredPlan].name} plan</h3>
       <p>{message}</p>
       <p className="mt-1">Accounts that already have the SEO tools keep them.</p>
-      <div className="mt-3"><Link href="/pricing" className="g-pill g-pill--solid">See {PLANS[requiredPlan].name}</Link></div>
+      <div className="mt-3"><Link href={seoLinks.pricing()} className="g-pill g-pill--solid">See {PLANS[requiredPlan].name}</Link></div>
     </div>
   );
 }
@@ -173,7 +244,9 @@ function UsageLine({ status }: { status: ReturnType<typeof useSeoStatus> }) {
   const qc = useQueryClient();
   const [adding, setAdding] = useState(false);
   const u = status.data?.usage, c = status.data?.credits;
-  // Back from Stripe: say what happened once, then drop the flag.
+  const search = useSearch();
+  // Back from Stripe: say what happened once, then drop the flag. ?credits=add (a link from the usage line or the usage
+  // page) opens the add-credit panel — also when the address changes while the page is open.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const flag = params.get("credits");
@@ -184,7 +257,7 @@ function UsageLine({ status }: { status: ReturnType<typeof useSeoStatus> }) {
     params.delete("credits");
     const qs = params.toString();
     window.history.replaceState({}, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
-  }, [toast, qc]);
+  }, [toast, qc, search]);
   const buy = useMutation({
     mutationFn: (cents: number) => api("POST", "/api/seo/credits/checkout", { cents }),
     onSuccess: (data: { url?: string }) => { if (data?.url) window.location.href = data.url; },
@@ -194,14 +267,18 @@ function UsageLine({ status }: { status: ReturnType<typeof useSeoStatus> }) {
   // The iPhone apps sell nothing (App Store 3.1.3(f)): the balance shows, the way to buy more does not.
   const unlimited = c.includedCents === -1, canBuy = !unlimited && !inNativeApp();
   const left = Math.max(0, c.includedCents - c.includedUsedCents);
+  // Every figure leads to its data: the balance to the usage page, the purchased credit to its add-credit panel, the
+  // tracked keywords to the dashboard ordered by keywords. Figures keep the text colour; the dotted underline says
+  // "link" without a hover, and each link is a 44 px-tall hit area on a phone.
+  const link = "inline-flex min-h-11 items-center gap-1 rounded-sm underline decoration-dotted underline-offset-2 hover:decoration-solid focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--g-blue,#1a73e8)]";
   return (
     <div className="mb-4" data-testid="seo-usage-line">
-      <p className="g-text-2 flex flex-wrap items-center gap-x-1 gap-y-1 text-[13px]">
-        <span data-testid="text-seo-balance">
-          SEO data this month{" "}
-          <b className="g-text font-medium">{unlimited ? "unlimited" : `${money(left)} left of ${money(c.includedCents)} included`}</b>
-          {!unlimited && <> · purchased credit <b className="g-text font-medium">{money(c.walletCents)}</b></>}
-          {" · "}tracked keywords <b className="g-text font-medium">{fmtUnit(u.keywords)}</b>
+      <p className="g-text-2 flex flex-wrap items-center gap-x-1 text-[13px]">
+        <span className="inline-flex flex-wrap items-center gap-x-1" data-testid="text-seo-balance">
+          <Link href={seoLinks.usage()} className={link} data-testid="link-usage-balance">SEO data this month{" "}
+            <b className="g-text font-medium">{unlimited ? "unlimited" : `${money(left)} left of ${money(c.includedCents)} included`}</b></Link>
+          {!unlimited && <> · <Link href={seoLinks.usage({ credits: "add" })} className={link} data-testid="link-usage-credit">purchased credit <b className="g-text font-medium">{money(c.walletCents)}</b></Link></>}
+          {" · "}<Link href={seoLinks.dashboard({ sort: "keywords" })} className={link} data-testid="link-usage-keywords">tracked keywords <b className="g-text font-medium">{fmtUnit(u.keywords)}</b></Link>
         </span>
         {canBuy && !adding && <button type="button" className="g-pill g-pill--sm ml-1" onClick={() => setAdding(true)} data-testid="button-add-credit"><Plus /> Add credit</button>}
       </p>
@@ -264,7 +341,11 @@ function SitePicker({ site, onSite, sites }: { site: SeoSite | null; onSite: (id
       {list.length > 0 && (
         <label className="flex min-w-0 flex-1 items-center gap-2 text-[13px] g-text-2 sm:max-w-md">
           <span className="flex-none">Site</span>
-          <select className="g-input g-select" value={site?.id ?? ""} onChange={(e) => onSite(Number(e.target.value))} data-testid="select-seo-site">
+          {/* A site picked here is written to the address (?site=), so the view is the same as one arrived at by link and
+              the back button returns to the site before. This is the ONE writer of ?site= for a pick: a page's `onSite`
+              only drops its own parameters (clearParams, in place) and remembers the site — it never writes ?site=
+              itself, so one pick is one history entry. */}
+          <select className="g-input g-select" value={site?.id ?? ""} onChange={(e) => { onSite(Number(e.target.value)); setParam("site", Number(e.target.value)); }} data-testid="select-seo-site">
             {list.map((s) => <option key={s.id} value={s.id}>{s.domain} · {s.keywordCount} keyword{s.keywordCount === 1 ? "" : "s"}</option>)}
           </select>
         </label>
@@ -323,14 +404,17 @@ export function Move({ now, before, hadBefore }: { now: number | null; before: n
     : <span className="g-move g-move--down" aria-label={`Down ${-d}`}>▼{-d}</span>;
 }
 
-export function Tile({ label, value, hint, testId }: { label: string; value: ReactNode; hint?: ReactNode; testId?: string }) {
-  return (
-    <div className="g-tile" data-testid={testId}>
-      <div className="g-tile__label">{label}</div>
+/** A summary tile; with `href` the whole tile is a link to the figure's data (links.ts), its label dotted-underlined as the cue. */
+export function Tile({ label, value, hint, testId, href }: { label: string; value: ReactNode; hint?: ReactNode; testId?: string; href?: string }) {
+  const body = (
+    <>
+      <div className={`g-tile__label ${href ? "underline decoration-dotted underline-offset-2" : ""}`}>{label}</div>
       <div className="g-tile__value">{value}</div>
       {hint && <div className="g-tile__hint">{hint}</div>}
-    </div>
+    </>
   );
+  if (href) return <Link href={href} className="g-tile block min-w-0 rounded-sm hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--g-blue,#1a73e8)]" data-testid={testId}>{body}</Link>;
+  return <div className="g-tile" data-testid={testId}>{body}</div>;
 }
 
 export function Empty({ children, testId }: { children: ReactNode; testId?: string }) {

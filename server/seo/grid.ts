@@ -116,7 +116,7 @@ export type GridPointResult = GridCell & {
   /** The first three businesses shown there. */
   top: { name: string; rank: number }[];
 };
-export type GridRival = { name: string; ours: boolean; domain: string | null; rating: number | null; reviews: number | null; /** Points where it is in the first three. */ top3: number; /** Points where it shows at all. */ found: number; /** Average position where it shows. */ avgRank: number };
+export type GridRival = { name: string; ours: boolean; domain: string | null; /** Google's listing id, when the result carried one (the reviews link opens that listing on Google Maps). */ cid?: string | null; rating: number | null; reviews: number | null; /** Points where it is in the first three. */ top3: number; /** Points where it shows at all. */ found: number; /** Average position where it shows. */ avgRank: number };
 export type GridSummary = {
   points: number; checked: number; found: number; top3: number;
   /** A score, not a measured rank: the average over the points checked, counting "not in the first 20" as 21. */
@@ -161,7 +161,7 @@ export function rivalsOf(perPoint: MapListing[][], target: GridTarget, keep = 10
     }
   }
   const rows = [...seen.values()].map(({ l, ours, ranks }): GridRival => ({
-    name: l.name, ours, domain: l.domain, rating: l.rating, reviews: l.reviews, top3: ranks.filter((r) => r <= 3).length, found: ranks.length,
+    name: l.name, ours, domain: l.domain, cid: l.cid, rating: l.rating, reviews: l.reviews, top3: ranks.filter((r) => r <= 3).length, found: ranks.length,
     avgRank: Math.round((ranks.reduce((a, b) => a + b, 0) / ranks.length) * 10) / 10,
   })).sort((a, b) => b.top3 - a.top3 || b.found - a.found || a.avgRank - b.avgRank || a.name.localeCompare(b.name));
   const top = rows.slice(0, keep);

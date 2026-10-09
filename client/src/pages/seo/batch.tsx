@@ -3,6 +3,9 @@
  * authority, linking sites, links, estimated search visits and keywords, to
  * size up a list of competitors or link prospects at a glance. The price is
  * shown first; reopening the same list within a day is free.
+ *
+ * Every row opens that website in Site explorer, and every figure in it opens the explorer's report for that figure
+ * (links.ts seoLinks.explorer: linking sites, links, pages, keywords).
  */
 import { useMemo, useState } from "react";
 import { Link } from "wouter";
@@ -12,14 +15,17 @@ import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { api, Empty, fmtDate, fmtNum, isNotRunYet, money, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { seoLinks } from "./links";
+import { FIGURE_LINK, TEXT_LINK } from "./viz-more";
 
 type Row = { domain: string; authority: number | null; referringDomains: number | null; backlinks: number | null; traffic: number | null; keywords: number | null };
 type Page = { rows: Row[]; missing: string[]; fetchedAt: string };
 type SortKey = keyof Row;
 const MAX = 100;
-const COLS: { key: SortKey; label: string; title?: string }[] = [
-  { key: "authority", label: "Authority", title: "Link strength, 0–100" }, { key: "referringDomains", label: "Linking sites" }, { key: "backlinks", label: "Links" },
-  { key: "traffic", label: "Search visits / mo", title: "Estimated visits from Google each month" }, { key: "keywords", label: "Keywords", title: "Keywords it ranks for on Google" },
+/** Each column and the Site explorer report its figure comes from. */
+const COLS: { key: SortKey; label: string; title?: string; view: string }[] = [
+  { key: "authority", label: "Authority", title: "Link strength, 0–100", view: "overview" }, { key: "referringDomains", label: "Linking sites", view: "referringDomains" }, { key: "backlinks", label: "Links", view: "backlinks" },
+  { key: "traffic", label: "Search visits / mo", title: "Estimated visits from Google each month", view: "pages" }, { key: "keywords", label: "Keywords", title: "Keywords it ranks for on Google", view: "keywords" },
 ];
 const MISSING: Record<string, string> = { authority: "authority", referringDomains: "linking sites", backlinks: "links", traffic: "search visits and keywords" };
 const parse = (text: string) => [...new Set(text.split(/[\s,;]+/).map((s) => s.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/[/?#].*$/, "")).filter((s) => /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(s)))];
@@ -81,7 +87,7 @@ export default function SeoBatchPage() {
         </div>
       </form>
       <div className="mt-4">
-        {asked.length === 0 && <Empty testId="batch-intro"><h3>Compare a whole list at once</h3><p>Paste the competitors from your <Link href="/seo/rank-tracker" className="g-link">rank tracker</Link>, the sites from a <Link href="/seo/explorer" className="g-link">link intersect</Link>, or any list of websites. For the full picture of one site, open it in Site explorer.</p></Empty>}
+        {asked.length === 0 && <Empty testId="batch-intro"><h3>Compare a whole list at once</h3><p>Paste the competitors from your {site ? <Link href={seoLinks.rankTracker(site.id, { panel: "competitors" })} className={TEXT_LINK}>rank tracker</Link> : "rank tracker"}, the sites from a <Link href={site ? seoLinks.explorer(site.domain, "linkIntersect") : seoLinks.explorer("")} className={TEXT_LINK}>link intersect</Link>, or any list of websites. For the full picture of one site, open it in <Link href={site ? seoLinks.explorer(site.domain) : seoLinks.explorer("")} className={TEXT_LINK}>Site explorer</Link>.</p></Empty>}
         {asked.length > 0 && saved.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Checking for a saved analysis…</p>}
         {asked.length > 0 && saved.isError && <div className="g-callout" role="alert"><h3>Couldn't check for a saved analysis</h3><p>{apiErrorMessage(saved.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button></div>}
         {asked.length > 0 && saved.isSuccess && !page && (
@@ -95,16 +101,24 @@ export default function SeoBatchPage() {
           <>
             <div className="mb-2 flex flex-wrap items-center gap-2 text-[13px]">
               <span className="g-text-2" data-testid="text-batch-meta">{fmtNum(page.rows.length)} site{page.rows.length === 1 ? "" : "s"} · as of {fmtDate(page.fetchedAt)} · United States</span>
-              <button type="button" className="g-pill g-pill--sm ml-auto" onClick={exportCsv} data-testid="button-batch-export"><Download /> Export</button>
+              <button type="button" className="g-pill g-pill--sm !min-h-11 ml-auto" onClick={exportCsv} data-testid="button-batch-export"><Download /> Export</button>
             </div>
-            {page.missing.length > 0 && <p className="g-text-2 mb-2 text-[13px]" role="status" data-testid="text-batch-missing">Didn't load this time: {page.missing.map((m) => MISSING[m] ?? m).join(", ")}. The other columns are complete. <button type="button" className="g-link" disabled={run.isPending || !canPay} onClick={() => run.mutate({ body, key: queryKey, again: true })} data-testid="button-batch-retry">{run.isPending ? "Trying again…" : `Try again${price != null ? ` — about ${money(price)}` : ""}`}</button></p>}
+            {page.missing.length > 0 && <p className="g-text-2 mb-2 text-[13px]" role="status" data-testid="text-batch-missing">Didn't load this time: {page.missing.map((m) => MISSING[m] ?? m).join(", ")}. The other columns are complete. <button type="button" className={TEXT_LINK} disabled={run.isPending || !canPay} onClick={() => run.mutate({ body, key: queryKey, again: true })} data-testid="button-batch-retry">{run.isPending ? "Trying again…" : `Try again${price != null ? ` — about ${money(price)}` : ""}`}</button></p>}
+            {/* On a phone the table's head is hidden (rows become cards), so the order is picked here instead. */}
+            <label className="mb-2 flex items-center gap-2 text-[13px] sm:hidden"><span className="g-text-2">Order by</span>
+              <select className="g-input g-select !w-auto min-h-11" value={`${sort.key}:${sort.dir}`} onChange={(e) => { const [key, dir] = e.target.value.split(":"); setSort({ key: key as SortKey, dir: dir === "1" ? 1 : -1 }); }} data-testid="select-batch-sort">
+                <option value="domain:1">Website, A to Z</option>
+                {COLS.map((c) => [<option key={`${c.key}:-1`} value={`${c.key}:-1`}>{c.label}, highest first</option>, <option key={`${c.key}:1`} value={`${c.key}:1`}>{c.label}, lowest first</option>])}
+              </select>
+            </label>
             <div className="overflow-x-auto">
               <table className="g-table w-full" data-testid="table-batch">
                 <thead><tr>{th("domain", "Website", false)}{COLS.map((c) => th(c.key, c.label, true, c.title))}</tr></thead>
+                {/* The website opens in Site explorer; each figure opens the explorer's report it was read from. */}
                 <tbody>{rows.map((r) => (
                   <tr key={r.domain}>
-                    <td><Link href={`/seo/explorer?domain=${encodeURIComponent(r.domain)}`} className="g-link" title={`Open ${r.domain} in Site explorer`}>{r.domain}</Link></td>
-                    {COLS.map((c) => <td key={c.key} className="num" data-label={c.label}>{r[c.key] == null ? <span className="g-text-2">—</span> : fmtNum(r[c.key] as number)}</td>)}
+                    <td><Link href={seoLinks.explorer(r.domain)} className={TEXT_LINK} title={`Open ${r.domain} in Site explorer`} data-testid={`link-batch-${r.domain}`}>{r.domain}</Link></td>
+                    {COLS.map((c) => <td key={c.key} className="num" data-label={c.label}>{r[c.key] == null ? <span className="g-text-2">—</span> : <Link href={seoLinks.explorer(r.domain, c.view)} className={FIGURE_LINK} title={`${c.label} of ${r.domain} in Site explorer`}>{fmtNum(r[c.key] as number)}</Link>}</td>)}
                   </tr>
                 ))}</tbody>
               </table>

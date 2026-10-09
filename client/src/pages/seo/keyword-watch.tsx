@@ -3,15 +3,28 @@
  * site ranking for, compared with the one before — which it newly sees, and which it no longer sees. Off until
  * turned on; the monthly snapshot uses only the month's included data. Today's snapshot can also be taken now, at
  * the price on the button (one a day — asking again the same day shows the one there is).
+ * The pair compared (`now`, `before`), the list shown (`watch` added | gone | pages) and "show all" (`watchAll`) are the
+ * address (links.ts seoLinks.alerts), so an alert's "Open this comparison" is a link and the back button undoes a pick;
+ * the chip (data-testid="active-filter") says what was picked. Every figure leads to its data: a search to the keywords
+ * explorer in the snapshot's market, a position or visit estimate to the site's keywords in Site explorer, a page to its
+ * keywords there, a count to the list it counts. Nothing is bought by arriving: the snapshot button is the one buyer.
  */
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useSearch } from "wouter";
 import { Loader2 } from "lucide-react";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { marketLabel } from "@shared/seo-markets";
 import { api, fmtDate, fmtNum, money, useSeoStatus, type SeoSite } from "./shell";
 import { AddToPlan, type PlanTask } from "./plan-button";
+import { seoLinks } from "./links";
+import { marketParams } from "./keyword-links";
+import { hrefWith } from "./rank-params";
+import { LINK, LINK_BLOCK } from "./viz-rank";
+
+type Tab = "added" | "gone" | "pages";
+const TAB_WORDS: Record<Tab, string> = { added: "the searches newly seen", gone: "the searches no longer seen", pages: "the changes by page" };
 
 type Kw = { keyword: string; position: number | null; volume: number | null; traffic: number | null; path: string | null; was?: number | null };
 type Side = { keywords: number; visits: number; unknown: number };
@@ -43,7 +56,15 @@ export function KeywordWatch({ site, onTrack, pick, onPick }: {
   // choosing a snapshot in a select must leave focus in the select).
   const focusFor = mine?.fromAlert && q.data && !placeholder && q.data.pair?.nowId === mine.now && q.data.pair.beforeId === mine.before ? `${mine.now}-${mine.before}-${mine.fromAlert}` : null;
   useEffect(() => { if (focusFor) document.getElementById("keyword-watch-heading")?.focus({ preventScroll: true }); }, [focusFor]);
-  const [tab, setTab] = useState<"added" | "gone" | "pages">("added");
+  // The list shown and "show all" are the address: a tab is a link, and the back button returns to the list before.
+  const address = new URLSearchParams(useSearch());
+  const watchParam = address.get("watch");
+  const tab: Tab = watchParam === "gone" || watchParam === "pages" ? watchParam : "added";
+  const watchAll = ["1", "true", "yes"].includes(address.get("watchAll") ?? "");
+  const shown = watchAll ? Infinity : 50;
+  const tabHref = (k: Tab) => hrefWith({ watch: k, watchAll: null });
+  /** The newest two snapshots, the first list, the first rows: everything this panel reads from the address, cleared. */
+  const newestHref = hrefWith({ now: null, before: null, watch: null, watchAll: null });
   // The day for snapshots changes at midnight UTC: when it does, what can be taken changes, so the panel asks again then.
   const boundary = q.data?.nextDayAt;
   useEffect(() => {
@@ -54,7 +75,6 @@ export function KeywordWatch({ site, onTrack, pick, onPick }: {
     return () => clearTimeout(t);
   }, [boundary, key]); // eslint-disable-line react-hooks/exhaustive-deps
   const newDay = boundary ? new Date(boundary).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit", timeZoneName: "short" }) : null;
-  const [shown, setShown] = useState(50);
   // Refreshes the site the action was for (the screen may have moved to another site meanwhile).
   const done = (siteId = site.id) => { const k = `/api/seo/sites/${siteId}/keyword-watch`; void qc.invalidateQueries({ predicate: (x) => typeof x.queryKey[0] === "string" && (x.queryKey[0] === k || x.queryKey[0].startsWith(`${k}?`)) }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); void qc.invalidateQueries({ predicate: (x) => typeof x.queryKey[0] === "string" && x.queryKey[0].startsWith("/api/seo/alerts") }); };
   // A change of the watch setting in flight, per site: shown and guarded for its own site only, however many sites
@@ -77,7 +97,7 @@ export function KeywordWatch({ site, onTrack, pick, onPick }: {
   const available = status.data?.credits ? status.data.credits.availableCents : -1;
   const canPay = price != null && (available === -1 || available >= price);
   if (q.isLoading) return <p className="g-text-2 mb-4 text-[13px]" role="status"><Loader2 className="mr-1 inline h-4 w-4 animate-spin" /> Loading the keyword watch…</p>;
-  if (q.isError) return <p className="g-text-2 mb-4 text-[13px]" role="alert" data-testid="keyword-watch-error">Couldn't load the keyword watch: {apiErrorMessage(q.error)} {mine && onPick ? <button type="button" className="g-link" onClick={() => onPick(null)}>Show the newest two snapshots</button> : <button type="button" className="g-link" onClick={() => void q.refetch()}>Try again</button>}</p>;
+  if (q.isError) return <p className="g-text-2 mb-4 text-[13px]" role="alert" data-testid="keyword-watch-error">Couldn't load the keyword watch: {apiErrorMessage(q.error)} {mine && onPick ? <Link href={newestHref} className={LINK} data-testid="link-kw-newest">Show the newest two snapshots</Link> : <button type="button" className="g-link" onClick={() => void q.refetch()}>Try again</button>}</p>;
   const d = q.data;
   if (!d) return null;
   const c = d.comparison, list = c && tab !== "pages" ? (tab === "added" ? c.added : c.gone) : [];
@@ -113,6 +133,13 @@ export function KeywordWatch({ site, onTrack, pick, onPick }: {
   const choose = (now: number, before: number) => onPick?.({ siteId: site.id, now, before });
   // Earlier snapshots that can be compared with the chosen "now" one: the same country and language only.
   const earlier = (n: Snap) => d.snapshots.filter((x) => x.takenOn < n.takenOn);
+  // Where the figures lead. A snapshot is a copy of the data's keyword list for the site on its day; that list as it is
+  // now is Site explorer's keywords view, and one keyword's row in it is the place of its position and visit estimate.
+  const siteKeywords = (x: { locationCode: number }, extra: { contains?: string; path?: string } = {}) => seoLinks.explorer(site.domain, "keywords", { ...(x.locationCode === 2840 ? {} : { locationCode: x.locationCode }), ...extra });
+  const sitePage = (path: string) => seoLinks.explorer(site.domain, "pages", { path });
+  const kwHref = (k: Kw, x: { locationCode: number; languageCode: string }) => seoLinks.keywords(k.keyword, marketParams(x));
+  // The chip: what the address picked here — a pair other than the newest two, a list other than the first, every row.
+  const chip = [d.pair?.chosen && nowSnap && beforeSnap ? `the snapshots of ${fmtDate(nowSnap.takenOn)} and ${fmtDate(beforeSnap.takenOn)}` : "", watchParam && tab !== "added" ? TAB_WORDS[tab] : "", watchParam && !(watchParam === "gone" || watchParam === "pages" || watchParam === "added") ? `“${watchParam}” is not a list here, so the first is shown` : "", watchAll ? "every row" : ""].filter(Boolean).join(" · ");
   return (
     <section className="mb-6 rounded-lg border p-4" style={card} data-testid="keyword-watch">
       <div className="flex flex-wrap items-start gap-3">
@@ -124,11 +151,11 @@ export function KeywordWatch({ site, onTrack, pick, onPick }: {
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-3 text-[13px]">
         <span className="g-text-2" data-testid="text-keyword-watch-state">
-          {d.latest ? `Last snapshot ${fmtDate(d.latest.takenOn)} (${place(d.latest)}): ${fmtNum(d.latest.keywords)} keyword${d.latest.keywords === 1 ? "" : "s"}${d.latest.total != null && d.latest.whole === false ? ` of the ${fmtNum(d.latest.total)} the data has for the site` : ""}.` : "No snapshot yet."}
-          {d.watch && d.nextAt ? ` Next: ${fmtDate(d.nextAt)}.` : ""}
+          {d.latest ? <>Last snapshot <Link href={siteKeywords(d.latest)} className={LINK} title="The data's keyword list for the site as it is now, in Site explorer (a snapshot is a copy of it on its day)" data-testid="link-kw-latest-date">{fmtDate(d.latest.takenOn)}</Link> ({place(d.latest)}): <Link href={siteKeywords(d.latest)} className={LINK} title="The data's keyword list for the site as it is now, in Site explorer (a snapshot is a copy of it on its day)" data-testid="link-kw-latest">{fmtNum(d.latest.keywords)} keyword{d.latest.keywords === 1 ? "" : "s"}</Link>{d.latest.total != null && d.latest.whole === false ? <> of <Link href={siteKeywords(d.latest)} className={LINK} title="Every keyword the data has for the site, in Site explorer" data-testid="link-kw-total">the {fmtNum(d.latest.total)} the data has for the site</Link></> : ""}.</> : "No snapshot yet."}
+          {d.watch && d.nextAt ? <> Next: <Link href={seoLinks.usage()} className={LINK} title="Usage and credit: the included data the monthly snapshot uses" data-testid="link-kw-next">{fmtDate(d.nextAt)}</Link>.</> : ""}
         </span>
         {d.latest?.today ? <span className="g-text-2" data-testid="text-keyword-snapshot-today">The snapshot for today has been taken (one a day; days change at midnight UTC{newDay ? ` — ${newDay} for you` : ""}).</span> : (
-          <button type="button" className="g-pill g-pill--sm" disabled={snap.isPending || placeholder || !status.data?.configured || !canPay} onClick={() => snap.mutate({ siteId: site.id })} data-testid="button-keyword-snapshot">
+          <button type="button" className="g-pill g-pill--sm max-sm:!min-h-11" disabled={snap.isPending || placeholder || !status.data?.configured || !canPay} onClick={() => snap.mutate({ siteId: site.id })} data-testid="button-keyword-snapshot">
             {snap.isPending ? <Loader2 className="animate-spin" /> : null} {snap.isPending ? "Taking it…" : `Take a snapshot now${price != null ? ` — up to ${money(price)}` : ""}`}
           </button>
         )}
@@ -148,26 +175,32 @@ export function KeywordWatch({ site, onTrack, pick, onPick }: {
             <select className="g-select min-w-0 max-w-full" value={beforeSnap.id} data-testid="select-kw-before" onChange={(e) => choose(nowSnap.id, Number(e.target.value))}>
               {withPair(earlier(nowSnap), beforeSnap).map((x) => <option key={x.id} value={x.id}>{snapLabel(x)}{x.locationCode !== nowSnap.locationCode || x.languageCode !== nowSnap.languageCode ? " · other country" : ""}</option>)}
             </select></label>
-          {d.pair?.chosen && <button type="button" className="g-link" onClick={() => onPick(null)} data-testid="button-kw-newest">Back to the newest two</button>}
           {placeholder && <span className="sr-only" role="status">Loading the comparison…</span>}
           {q.isFetching && <span className="g-text-2 text-[12px]" role="status">Loading…</span>}
           <span className="g-text-2 w-full text-[12px]">{fmtNum(d.snapshotCount)} snapshot{d.snapshotCount === 1 ? "" : "s"} on record{d.snapshotCount > d.snapshots.length ? `; the newest ${fmtNum(d.snapshots.length)} can be chosen here` : ""}. Snapshots are never rewritten, so a comparison of two of them always shows the same thing.</span>
         </div>
       )}
-      {d.pair?.chosen && onPick && !(d.snapshots.length >= 2 && nowSnap && beforeSnap) && <button type="button" className="g-link mt-2 text-[13px]" onClick={() => onPick(null)} data-testid="button-kw-newest">Back to the newest two</button>}
+      {chip && (
+        <p className="mt-2 flex flex-wrap items-center gap-2 text-[13px]" role="status" data-testid="active-filter">
+          <span className="g-chip !min-h-8 !whitespace-normal py-1 font-normal [overflow-wrap:anywhere]" style={{ textTransform: "none" }}>Keyword watch: {chip}</span>
+          <Link href={newestHref} className={`${LINK} font-medium`} title="The newest two snapshots, the first list" data-testid="link-kw-newest">Back to the newest two</Link>
+        </p>
+      )}
       {d.latest && !c && <p className="g-text-2 mt-3 text-[13px]" data-testid="keyword-watch-first">One snapshot so far, so there is nothing to compare yet. The next one shows what changed.</p>}
       {c && c.basis === "none" && <p className="g-text-2 mt-3 text-[13px]" role="status">{d.pair?.chosen ? "These two snapshots" : "The last two snapshots"} were taken for different countries or languages, so they are not compared.</p>}
       {c && c.basis !== "none" && (
         <div className="mt-3">
           <p className="g-text mb-2 text-[13px]" data-testid="text-keyword-watch-summary">
-            Between {fmtDate(c.since)} and {fmtDate(c.takenOn)} ({place(c)}): {whole
-              ? <>the data newly sees the site ranking for <b className="font-medium">{fmtNum(c.added.length)}</b> search{c.added.length === 1 ? "" : "es"} and no longer sees it for <b className="font-medium">{fmtNum(c.gone.length)}</b>.</>
+            {/* Each count is a link to the list it counts; a snapshot's date to the data's list for the site as it is now. */}
+            Between <Link href={siteKeywords(c)} className={LINK} title="The data's keyword list for the site as it is now, in Site explorer (the older snapshot is a copy of it on its day)" data-testid="link-kw-since">{fmtDate(c.since)}</Link> and <Link href={siteKeywords(c)} className={LINK} title="The data's keyword list for the site as it is now, in Site explorer (the newer snapshot is a copy of it on its day)" data-testid="link-kw-taken">{fmtDate(c.takenOn)}</Link> ({place(c)}): {whole
+              ? <>the data newly sees the site ranking for <Link href={tabHref("added")} className={`${LINK} font-medium`} title="The searches newly seen, listed" data-testid="link-kw-added">{fmtNum(c.added.length)}</Link> search{c.added.length === 1 ? "" : "es"} and no longer sees it for <Link href={tabHref("gone")} className={`${LINK} font-medium`} title="The searches no longer seen, listed" data-testid="link-kw-gone">{fmtNum(c.gone.length)}</Link>.</>
               : c.basis === "top"
-                ? <><b className="font-medium">{fmtNum(c.added.length)}</b> search{c.added.length === 1 ? "" : "es"} entered the site's {fmtNum(d.rows)} highest-traffic keywords and <b className="font-medium">{fmtNum(c.gone.length)}</b> left them. The data has more keywords for the site than a snapshot holds, so one that left may still be there lower down — no alert is sent on this.</>
-                : <><b className="font-medium">{fmtNum(c.added.length)}</b> search{c.added.length === 1 ? " is" : "es are"} in the newer snapshot only and <b className="font-medium">{fmtNum(c.gone.length)}</b> in the older only. The data did not say how many keywords it has for the site in all, so it is not known whether either snapshot is the whole of it — no alert is sent on this.</>}
+                ? <><Link href={tabHref("added")} className={`${LINK} font-medium`} title="The searches that entered the top, listed" data-testid="link-kw-added">{fmtNum(c.added.length)}</Link> search{c.added.length === 1 ? "" : "es"} entered the site's <Link href={siteKeywords(c)} className={LINK} title="The site's keywords in Site explorer, as the data has them now" data-testid="link-kw-top-rows">{fmtNum(d.rows)} highest-traffic keywords</Link> and <Link href={tabHref("gone")} className={`${LINK} font-medium`} title="The searches that left the top, listed" data-testid="link-kw-gone">{fmtNum(c.gone.length)}</Link> left them. The data has more keywords for the site than a snapshot holds, so one that left may still be there lower down — no alert is sent on this.</>
+                : <><Link href={tabHref("added")} className={`${LINK} font-medium`} title="The searches in the newer snapshot only, listed" data-testid="link-kw-added">{fmtNum(c.added.length)}</Link> search{c.added.length === 1 ? " is" : "es are"} in the newer snapshot only and <Link href={tabHref("gone")} className={`${LINK} font-medium`} title="The searches in the older snapshot only, listed" data-testid="link-kw-gone">{fmtNum(c.gone.length)}</Link> in the older only. The data did not say how many keywords it has for the site in all, so it is not known whether either snapshot is the whole of it — no alert is sent on this.</>}
           </p>
+          {/* The tabs are addresses (?watch=): a tab is a link, so the back button returns to the list before. */}
           <nav className="g-tabs" aria-label="What changed">
-            {([["added", whole ? `Newly seen (${c.added.length})` : c.basis === "top" ? `Entered the top (${c.added.length})` : `In the newer only (${c.added.length})`], ["gone", whole ? `No longer seen (${c.gone.length})` : c.basis === "top" ? `Left the top (${c.gone.length})` : `In the older only (${c.gone.length})`], ["pages", `By page (${pages.length})`]] as const).map(([k, label]) => <a key={k} href={`#${k}`} aria-current={tab === k ? "page" : undefined} onClick={(e) => { e.preventDefault(); setTab(k); setShown(50); }} data-testid={`tab-keyword-watch-${k}`}>{label}</a>)}
+            {([["added", whole ? `Newly seen (${c.added.length})` : c.basis === "top" ? `Entered the top (${c.added.length})` : `In the newer only (${c.added.length})`], ["gone", whole ? `No longer seen (${c.gone.length})` : c.basis === "top" ? `Left the top (${c.gone.length})` : `In the older only (${c.gone.length})`], ["pages", `By page (${pages.length})`]] as const).map(([k, label]) => <Link key={k} href={tabHref(k)} aria-current={tab === k ? "page" : undefined} className="max-sm:!min-h-11" data-testid={`tab-keyword-watch-${k}`}>{label}</Link>)}
           </nav>
           {tab === "pages" ? (pages.length === 0 ? <p className="g-text-2 text-[13px]">No pages in these snapshots.</p> : (
             <div className="overflow-x-auto">
@@ -175,18 +208,23 @@ export function KeywordWatch({ site, onTrack, pick, onPick }: {
               <table className="g-table w-full" data-testid="table-keyword-watch-pages">
                 <thead><tr><th>Page</th><th className="num">Keywords {fmtDate(c.since)}</th><th className="num">Keywords {fmtDate(c.takenOn)}</th><th className="num" title="Estimated visits a month">Est. visits {fmtDate(c.since)}</th><th className="num" title="Estimated visits a month">Est. visits {fmtDate(c.takenOn)}</th><th>What moved</th><th><span className="sr-only">Action plan</span></th></tr></thead>
                 <tbody>
-                  {pages.slice(0, shown).map((p) => (
+                  {pages.slice(0, shown).map((p, n) => {
+                    // A page with a path has a place: its row in Site explorer's pages view, and the site's keywords narrowed to it (where its figures live).
+                    const kwOf = p.path ? siteKeywords(c, { path: p.path }) : null;
+                    const fig = (body: React.ReactNode, id: string, title: string) => (kwOf ? <Link href={kwOf} className={LINK} title={title} data-testid={`link-kwpage-${id}-${n}`}>{body}</Link> : body);
+                    return (
                     <tr key={p.id}>
-                      <td className="max-w-[18rem] !whitespace-normal break-all" data-label="Page">{p.path ?? <span className="g-text-2">page not given</span>}{p.cut && <span className="g-text-2 block text-[11px]">address kept only to 300 characters in an older snapshot</span>}</td>
-                      <td className="num" data-label={`Keywords ${fmtDate(c.since)}`}>{fmtNum(p.before.keywords)}</td><td className="num" data-label={`Keywords ${fmtDate(c.takenOn)}`}>{fmtNum(p.after.keywords)}</td>
-                      <td className="num" data-label={`Est. visits ${fmtDate(c.since)}`}>{visits(p.before)}</td><td className="num" data-label={`Est. visits ${fmtDate(c.takenOn)}`}>{visits(p.after)}</td>
-                      <td className="g-text-2 !whitespace-normal text-[12px]" data-label="What moved">{why(p)}</td>
+                      <td className="max-w-[18rem] !whitespace-normal break-all" data-label="Page">{p.path ? <Link href={sitePage(p.path)} className={LINK_BLOCK} title={`${p.url ?? p.path} — this page in Site explorer`} data-testid={`link-kwpage-${n}`}>{p.path}</Link> : <span className="g-text-2">page not given</span>}{p.cut && <span className="g-text-2 block text-[11px]">address kept only to 300 characters in an older snapshot</span>}</td>
+                      <td className="num" data-label={`Keywords ${fmtDate(c.since)}`}>{fig(fmtNum(p.before.keywords), "before", "The site's keywords for this page in the data now, in Site explorer")}</td><td className="num" data-label={`Keywords ${fmtDate(c.takenOn)}`}>{fig(fmtNum(p.after.keywords), "after", "The site's keywords for this page in the data now, in Site explorer")}</td>
+                      <td className="num" data-label={`Est. visits ${fmtDate(c.since)}`}>{fig(visits(p.before), "visits-before", "The keywords these visits are estimated from, in Site explorer")}</td><td className="num" data-label={`Est. visits ${fmtDate(c.takenOn)}`}>{fig(visits(p.after), "visits-after", "The keywords these visits are estimated from, in Site explorer")}</td>
+                      <td className="g-text-2 !whitespace-normal text-[12px]" data-label="What moved">{fig(why(p), "moved", "The site's keywords for this page in the data now, in Site explorer")}</td>
                       <td className="num">{declined(p) && (plannable(p) ? <AddToPlan siteId={site.id} label="Plan" testId={`button-plan-kwpage-${p.id}`} tasks={[pageTask(p)]} /> : <span className="g-text-2 text-[12px]">{p.cut ? "Address incomplete — not planned" : p.url ? "Address too long to plan" : "Page not known"}</span>)}</td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
-              {pages.length > shown && <button type="button" className="g-link mt-1 text-[13px]" onClick={() => setShown(pages.length)} data-testid="button-keyword-watch-pages-all">Show all {fmtNum(pages.length)}</button>}
+              {pages.length > shown && <Link href={hrefWith({ watchAll: true })} className={`${LINK} mt-1 text-[13px]`} data-testid="button-keyword-watch-pages-all">Show all {fmtNum(pages.length)}</Link>}
               {pages.some((p) => p.before.unknown + p.after.unknown > 0) && <p className="g-text-2 mt-1 text-[12px]">* Some of the page's keywords had no visit estimate; the figure adds up the ones that had. "—" = no estimate for any of them.</p>}
             </div>
           )) : list.length === 0 ? <p className="g-text-2 text-[13px]">None.</p> : (
@@ -194,16 +232,23 @@ export function KeywordWatch({ site, onTrack, pick, onPick }: {
               <table className="g-table w-full" data-testid={`table-keyword-watch-${tab}`}>
                 <thead><tr><th>Keyword</th><th className="num">{tab === "added" ? `Position ${fmtDate(c.takenOn)}` : `Position ${fmtDate(c.since)}`}</th><th className="num">Volume / mo</th><th className="num" title="Estimated visits a month from this search">Est. visits</th><th>Page</th>{tab === "added" && onTrack && <th><span className="sr-only">Track</span></th>}</tr></thead>
                 <tbody>
-                  {list.slice(0, shown).map((k) => (
+                  {list.slice(0, shown).map((k, n) => {
+                    // The search opens in the keywords explorer in the snapshot's market; its position and visit estimate are its row among the site's keywords in Site explorer.
+                    const row = siteKeywords(c, { contains: k.keyword }), pos = (tab === "added" ? k.position : k.was) ?? null;
+                    return (
                     <tr key={k.keyword}>
-                      <td>{k.keyword}</td><td className="num" data-label={tab === "added" ? `Position ${fmtDate(c.takenOn)}` : `Position ${fmtDate(c.since)}`}>{(tab === "added" ? k.position : k.was) ?? "—"}</td><td className="num" data-label="Volume / mo">{fmtNum(k.volume)}</td><td className="num" data-label="Est. visits">{k.traffic == null ? "—" : fmtNum(Math.round(k.traffic))}</td>
-                      <td className="max-w-[16rem] truncate g-text-2" title={k.path ?? undefined} data-label="Page">{k.path ?? "—"}</td>
-                      {tab === "added" && onTrack && <td className="num"><button type="button" className="g-pill g-pill--sm" onClick={() => onTrack([k])} aria-label={`Track ${k.keyword} in the rank tracker`}>Track</button></td>}
+                      <td><Link href={kwHref(k, c)} className={LINK} title="This search in the keywords explorer" data-testid={`link-kw-${tab}-${n}`}>{k.keyword}</Link></td>
+                      <td className="num" data-label={tab === "added" ? `Position ${fmtDate(c.takenOn)}` : `Position ${fmtDate(c.since)}`}>{pos == null ? <span title="No position in that snapshot">—</span> : <Link href={row} className={LINK} title="This search among the site's keywords in Site explorer (the data's position now)" data-testid={`link-kw-${tab}-position-${n}`}>{pos}</Link>}</td>
+                      <td className="num" data-label="Volume / mo"><Link href={kwHref(k, c)} className={LINK} title="This search in the keywords explorer" data-testid={`link-kw-${tab}-volume-${n}`}>{fmtNum(k.volume)}</Link></td>
+                      <td className="num" data-label="Est. visits">{k.traffic == null ? <span title="No visit estimate in that snapshot">—</span> : <Link href={row} className={LINK} title="This search among the site's keywords in Site explorer (the data's estimate now)" data-testid={`link-kw-${tab}-visits-${n}`}>{fmtNum(Math.round(k.traffic))}</Link>}</td>
+                      <td className="max-w-[16rem] truncate g-text-2" title={k.path ?? undefined} data-label="Page">{k.path ? <Link href={sitePage(k.path)} className={LINK_BLOCK} title={`${k.path} — this page in Site explorer`} data-testid={`link-kw-${tab}-page-${n}`}>{k.path}</Link> : "—"}</td>
+                      {tab === "added" && onTrack && <td className="num"><button type="button" className="g-pill g-pill--sm max-sm:!min-h-11" onClick={() => onTrack([k])} aria-label={`Track ${k.keyword} in the rank tracker`}>Track</button></td>}
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
-              {list.length > shown && <button type="button" className="g-link mt-1 text-[13px]" onClick={() => setShown(list.length)} data-testid="button-keyword-watch-all">Show all {fmtNum(list.length)}</button>}
+              {list.length > shown && <Link href={hrefWith({ watchAll: true })} className={`${LINK} mt-1 text-[13px]`} data-testid="button-keyword-watch-all">Show all {fmtNum(list.length)}</Link>}
             </div>
           )}
           <p className="g-text-2 mt-2 text-[12px]">Positions and visits are the data's estimates at each snapshot. To know where the site stands on Google for a search, track it in the rank tracker — that checks Google itself.</p>

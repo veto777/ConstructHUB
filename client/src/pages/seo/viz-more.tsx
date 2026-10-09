@@ -6,6 +6,7 @@
  * written out next to it — and nothing here makes up a value: an absent figure is "—".
  */
 import type { ReactNode } from "react";
+import { Link } from "wouter";
 import { ORANGE } from "./viz";
 
 const num = (n: number) => Math.round(n).toLocaleString("en-US");
@@ -13,6 +14,29 @@ const num = (n: number) => Math.round(n).toLocaleString("en-US");
 export const CARD = { borderColor: "var(--g-divider)", background: "var(--g-surface)" } as const;
 /** Headings, labels and links are blue; the figures themselves stay in the text colour. */
 export const BLUE_WORDS = { color: "var(--g-blue)" } as const;
+/** The keyboard focus ring every link here shows (the surface's own rule covers anchors; this says it on the element too). */
+export const FOCUS_RING = "rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--g-blue,#1a73e8)]";
+/**
+ * A link's hit area on a phone: at least 44 px tall, whatever the text size, the words centred in it (the owner taps
+ * these on a 390 px screen). Parts inside it (a number in bold, an icon) sit 4 px apart, as a space would.
+ */
+export const TAP = "inline-flex min-h-11 items-center gap-x-1";
+/** The cue that does not need a hover: a dotted underline always (solid on hover). */
+export const LINK_CUE = "underline decoration-dotted underline-offset-2 hover:decoration-solid";
+/**
+ * A figure that is a link keeps the text colour and shows a dotted underline at all times — the cue that it leads
+ * somewhere, on a phone as on a desktop — a 44 px hit area and the focus ring.
+ */
+export const FIGURE_LINK = `g-text ${TAP} ${LINK_CUE} ${FOCUS_RING}`;
+/** The same on a link that keeps whatever colour its words have (a date in grey, a green verdict). */
+export const QUIET_LINK = `${TAP} ${LINK_CUE} ${FOCUS_RING}`;
+/** Words that lead somewhere, in the link blue: the same underline, hit area and focus ring. */
+export const TEXT_LINK = `g-link ${TAP} ${LINK_CUE} ${FOCUS_RING}`;
+/**
+ * The same 44 px hit area for a small chip or word that must keep its size (a 24 px chip in a row of them): an
+ * invisible box 10 px above and below it takes the tap. Nothing on the page moves.
+ */
+export const TAP_PAD = "relative before:absolute before:inset-x-0 before:-inset-y-2.5 before:content-['']";
 
 /**
  * Figures side by side, as a site's row on the dashboard (and Ahrefs' project rows): two to a row on a phone, more as
@@ -35,10 +59,30 @@ export function MetricRow({ cols = 4, children, testId, className = "" }: { cols
   );
 }
 
-/** A section card: a blue title, a grey note beside it (a date, a device), and whatever goes inside. */
-export function Section({ title, meta, children, testId, className = "" }: { title: ReactNode; meta?: ReactNode; children: ReactNode; testId?: string; className?: string }) {
+/**
+ * A figure that leads to its data (links.ts): the label and the number are one link, the foot and chart sit under it
+ * (the foot can carry links of its own). Looks like viz.tsx's MetricColumn; the figure keeps the text colour and the
+ * label's dotted underline (always shown, not only on hover) says it is a link; the block is well over 44 px tall and
+ * shows the focus ring. `testId` names the column; the link itself is `link-<testId>`.
+ */
+export function LinkedFigure({ href, label, value, delta, foot, chart, children, testId }: { href: string; label: ReactNode; value: ReactNode; delta?: ReactNode; foot?: ReactNode; chart?: ReactNode; children?: ReactNode; testId?: string }) {
   return (
-    <section className={`min-w-0 rounded-xl border p-3 sm:p-4 ${className}`} style={CARD} data-testid={testId}>
+    <div className="flex min-w-0 flex-col" data-testid={testId}>
+      <Link href={href} className={`block min-w-0 rounded-md ${FOCUS_RING}`} data-testid={testId ? `link-${testId}` : undefined}>
+        <span className="block text-[13px] font-medium underline decoration-dotted underline-offset-2 hover:decoration-solid" style={BLUE_WORDS}>{label}</span>
+        <span className="g-text mt-0.5 block text-[28px] leading-9 tabular-nums">{value}{delta}</span>
+      </Link>
+      {foot && <div className="g-text-2 text-[12px] leading-4">{foot}</div>}
+      {children}
+      {chart && <div className="mt-auto pt-2">{chart}</div>}
+    </div>
+  );
+}
+
+/** A section card: a blue title, a grey note beside it (a date, a device), and whatever goes inside. */
+export function Section({ title, meta, children, testId, className = "", id }: { title: ReactNode; meta?: ReactNode; children: ReactNode; testId?: string; className?: string; /** An id a link can scroll to (?section=). */ id?: string }) {
+  return (
+    <section id={id} className={`min-w-0 rounded-xl border p-3 sm:p-4 ${className}`} style={CARD} data-testid={testId}>
       <Heading meta={meta}>{title}</Heading>
       {children}
     </section>

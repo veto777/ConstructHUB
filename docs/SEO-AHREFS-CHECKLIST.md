@@ -1082,6 +1082,24 @@ wording (labels, headings, links), orange for every chart and bar, green / red o
 - Audits: Codex pricing audit #1 (9 defects) and #2 (9 more) - fixed but two deliberate non-fixes recorded in HANDOFF
   (a close-and-sign-up in the same instant; eligibility read as "started inside an open period, paying when recorded").
 
+## Every figure is a link (2026-10-09, owner: "all data should take you somewhere")
+
+The owner, on his phone: "Make sure every link and container actually takes you somewhere. Press Tracked keywords or
+Referring domains and all that data should pop up as hyperlinks. All data should take you somewhere. Fix this and
+have Kimi audit. Don't stop until it's all done. The entire SEO section."
+- Contract: client/src/pages/seo/links.ts - the one place every address is written (seoLinks.*), readParam/setParam
+  so an on-page filter and a link are the same thing (the back button undoes a pick), and the narrowing is shown in a
+  chip data-testid="active-filter" with a clear control. Link maps per screen: docs/seo-links/*.md.
+- Every figure, label, cell, count, delta, legend entry, chart point and row on every SEO screen links to the view that
+  holds its data with the filter applied; where no view holds it, the closest view, and the chip says so. Arriving by
+  link never buys data, starts a crawl, sends or schedules anything (every paid action stays a labelled button).
+- Phone: every link has a 44 px tall hit area at 390 px, a visible cue that does not depend on hover, focus styles;
+  charts clickable by mouse have a list of the same links underneath.
+- Verification: the rig click-crawl (scripts/crawl-links.tmp.ts on vb11: follows every in-app SEO link by clicking it,
+  checks the landing shows data, the chip, no errors, no sideways scroll) and Kimi's read-only audit
+  (~/codex-audits/kimi_links_run.sh; round 1 report out/kimi-seo-links-1.md: architecture right, money clean,
+  secondary figures / one dead parameter / four write-backs / phone targets fixed in round 2).
+
 ## Verification log
 - 2026-10-08: all 11 domain reports, 3 keyword lists, a filtered keyword report and the keyword overview were run against
   live data for alpineexteriorswa.com / "siding contractor" with zero failures (builder's own check, not an independent audit).

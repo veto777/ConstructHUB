@@ -86,12 +86,13 @@ export type SiteReport = {
   auditUnreadable?: string | null;
   /** Site health could not be looked up just now (not "no crawl"): said; a scheduled send fails and is tried again. */
   auditUnavailable?: boolean;
-  audit: { scannedAt: string | null; health: number | null; healthChange: number | null; crawled: number; errors: number; warnings: number; notices: number; topIssues: { title: string; severity: string; count: number }[] } | null;
+  audit: { scannedAt: string | null; health: number | null; healthChange: number | null; crawled: number; errors: number; warnings: number; notices: number; /** `key` is the issue as Site audit names it (?issue=), so the report page can open it there. */ topIssues: { key?: string; title: string; severity: string; count: number }[] } | null;
   /** Real clicks and impressions from Google Search Console, when the site's property is connected: the last 28 days and the 28 before. */
   /** Google's own counts for the last 28 days. A number is null when nothing was synced for that period; `days` is how many of the 28 are there. */
   searchConsole: { clicks: number | null; impressions: number | null; position: number | null; previousClicks: number | null; previousImpressions: number | null; days?: number; previousDays?: number; /** The newest day synced; the 28 days end here. */ through?: string | null; syncedAt?: string | null;
     /** A read of these days is still running or failed, or whether every read finished could not be established (`completenessUnknown`): the counts may be short, so no change is shown. */ incomplete?: boolean; completenessUnknown?: boolean } | null;
-  alerts: { title: string; kind: string; createdAt: string }[];
+  /** `id` is the alert's id on the Alerts page (?alert=), so the report page can open it there. */
+  alerts: { id?: number; title: string; kind: string; createdAt: string }[];
   /** Repeating local grids: the newest scan of each with the comparable one before it. */
   grids?: GridReportLine[];
   /**
@@ -106,9 +107,10 @@ export type WorkSection = {
   since?: string | null;
   /** The plan could not be read: nothing is said about the work (never "nothing done"). */
   unavailable?: boolean;
-  days: number; done: { title: string; doneAt: string; target: string | null; note: string | null; kind: string; owner?: string | null }[]; doneCount: number; open: number; inProgress: number;
+  /** `id` is the task's id in the plan (?task=), so the report page can open it there. */
+  days: number; done: { id?: number; title: string; doneAt: string; target: string | null; note: string | null; kind: string; owner?: string | null }[]; doneCount: number; open: number; inProgress: number;
   /** Open tasks whose due date is before `today` (UTC, said with the date), the earliest first; and how many fall due in the next 7 days. */
-  today?: string; overdue?: { title: string; dueOn: string; owner: string | null }[]; overdueCount?: number; dueSoon?: number;
+  today?: string; overdue?: { id?: number; title: string; dueOn: string; owner: string | null }[]; overdueCount?: number; dueSoon?: number;
 };
 /** Pure: the work section from the plan's rows (any order). */
 /** A note as the report shows it: on one line, at most 300 characters (whole characters, never half of one), "…" when cut. */
@@ -117,7 +119,7 @@ export const reportNote = (note: string | null | undefined) => {
   const flat = Array.from(String(note).normalize("NFC").replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g, " ").replace(/\s+/g, " ").trim());
   return flat.length ? (flat.length > 300 ? `${flat.slice(0, 299).join("")}…` : flat.join("")) : null;
 };
-export function workSection(rows: { title: string; status: string; done_at: string | Date | null; target: string | null; note: string | null; kind: string; due_on?: string | null; owner?: string | null }[], now = new Date(), opts: { since?: Date | null; hasPlan?: boolean } = {}): WorkSection | null {
+export function workSection(rows: { id?: number; title: string; status: string; done_at: string | Date | null; target: string | null; note: string | null; kind: string; due_on?: string | null; owner?: string | null }[], now = new Date(), opts: { since?: Date | null; hasPlan?: boolean } = {}): WorkSection | null {
   if (!rows.length && !opts.hasPlan) return null;
   const since = opts.since ? opts.since.getTime() : now.getTime() - WORK_DAYS * 864e5, until = now.getTime();
   const today = now.toISOString().slice(0, 10), soon = new Date(now.getTime() + 7 * 864e5).toISOString().slice(0, 10);
@@ -129,8 +131,8 @@ export function workSection(rows: { title: string; status: string; done_at: stri
   return {
     days: WORK_DAYS, doneCount: done.length, open: openRows.length, inProgress: rows.filter((t) => t.status === "doing").length,
     since: opts.since ? opts.since.toISOString() : null,
-    done: done.slice(0, WORK_LIST).map((t) => ({ title: t.title, doneAt: new Date(t.done_at!).toISOString(), target: t.target ?? null, note: reportNote(t.note), kind: t.kind, owner: t.owner ?? null })),
-    today, overdue: overdue.slice(0, 10).map((t) => ({ title: t.title, dueOn: due(t)!, owner: t.owner ?? null })), overdueCount: overdue.length,
+    done: done.slice(0, WORK_LIST).map((t) => ({ ...(typeof t.id === "number" ? { id: t.id } : {}), title: t.title, doneAt: new Date(t.done_at!).toISOString(), target: t.target ?? null, note: reportNote(t.note), kind: t.kind, owner: t.owner ?? null })),
+    today, overdue: overdue.slice(0, 10).map((t) => ({ ...(typeof t.id === "number" ? { id: t.id } : {}), title: t.title, dueOn: due(t)!, owner: t.owner ?? null })), overdueCount: overdue.length,
     dueSoon: openRows.filter((t) => { const d = due(t); return d !== null && d >= today && d <= soon; }).length,
   };
 }
@@ -214,14 +216,14 @@ export async function buildSiteReport(userId: number, siteId: number, opts: { wo
     pool.query(`SELECT report FROM seo_domain_reports WHERE user_id=$1 AND domain=$2 AND location_code=$3 AND language_code=$4 ORDER BY created_at DESC LIMIT 1`, [userId, site.domain, site.location_code, site.language_code]),
     siteAudit(userId, site.domain).catch((e) => { if (opts.strict) throw e; return "unavailable" as const; }),
     reportDeps.searchConsole(userId, site.domain).catch(() => null),
-    pool.query(`SELECT title, kind, created_at AS "createdAt" FROM seo_alerts WHERE site_id=$1 AND user_id=$2 AND created_at > now() - interval '35 days' ORDER BY created_at DESC LIMIT 8`, [site.id, userId]),
+    pool.query(`SELECT id, title, kind, created_at AS "createdAt" FROM seo_alerts WHERE site_id=$1 AND user_id=$2 AND created_at > now() - interval '35 days' ORDER BY created_at DESC LIMIT 8`, [site.id, userId]),
   ]);
   const grids = await gridReportLines(userId, site.id).catch(() => []);
   const workSince = opts.workSince ?? new Date(Date.now() - WORK_DAYS * 864e5);
   let work: WorkSection | null;
   try {
     const [{ rows: tasks }, { rows: [all] }] = await Promise.all([
-      pool.query(`SELECT title, status, done_at, target, note, kind, due_on::text AS due_on, owner FROM seo_tasks WHERE site_id=$1 AND user_id=$2 AND (status IN ('todo','doing') OR (status='done' AND done_at > $3 AND done_at <= $4))`, [site.id, userId, workSince.toISOString(), (opts.workUntil ?? new Date()).toISOString()]),
+      pool.query(`SELECT id, title, status, done_at, target, note, kind, due_on::text AS due_on, owner FROM seo_tasks WHERE site_id=$1 AND user_id=$2 AND (status IN ('todo','doing') OR (status='done' AND done_at > $3 AND done_at <= $4))`, [site.id, userId, workSince.toISOString(), (opts.workUntil ?? new Date()).toISOString()]),
       pool.query("SELECT count(*)::int n FROM seo_tasks WHERE site_id=$1 AND user_id=$2", [site.id, userId]),
     ]);
     // A plan whose tasks were all done earlier still has a section: "nothing marked done in this period".
@@ -252,13 +254,14 @@ export async function buildSiteReport(userId: number, siteId: number, opts: { wo
     audit: a ? {
       scannedAt: a.scannedAt, health: a.health, healthChange: a.healthChange, crawled: a.crawled,
       errors: a.totals.error.affected, warnings: a.totals.warning.affected, notices: a.totals.notice.affected,
-      topIssues: a.issues.slice(0, 6).map((i) => ({ title: i.title, severity: i.severity, count: i.count })),
+      topIssues: a.issues.slice(0, 6).map((i) => ({ key: i.key, title: i.title, severity: i.severity, count: i.count })),
     } : null,
     // Nothing synced for the last 28 days is no section at all, rather than a row of zeros.
     searchConsole: gsc && gsc.clicks !== null ? { clicks: rnd(gsc.clicks), impressions: rnd(gsc.impressions), position: gsc.position, previousClicks: rnd(gsc.previousClicks), previousImpressions: rnd(gsc.previousImpressions), days: gsc.days, previousDays: gsc.previousDays, through: gsc.through ?? null, syncedAt: gsc.syncedAt ? new Date(gsc.syncedAt).toISOString() : null,
       // The summary's own completeness verdict travels with the numbers (the PDF, the email and the report page all say it).
       ...(gsc.incomplete ? { incomplete: true } : {}), ...(gsc.completenessUnknown ? { completenessUnknown: true } : {}) } : null,
-    alerts,
+    // The id is a bigint in Postgres (a string on the wire): a number, as the Alerts page uses it.
+    alerts: alerts.map((a: any) => ({ ...a, id: Number(a.id) })),
     grids,
     work,
   };

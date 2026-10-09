@@ -4,12 +4,20 @@
  * (towns), and the ones that don't name any are set apart as "same name — check it is you".
  */
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Loader2, Play } from "lucide-react";
+import { Download, ExternalLink, Loader2, Play } from "lucide-react";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { api, Empty, fmtDate, fmtNum, isNotRunYet, money, type SeoStatus } from "./shell";
+import { api, Empty, fmtDate, fmtNum, isNotRunYet, money, TabStrip, useAddress, type SeoStatus } from "./shell";
+import { FIGURE_LINK, FOCUS_RING, LINK_CUE, QUIET_LINK, TEXT_LINK } from "./viz-more";
+import { seoLinks } from "./links";
 import { AddToPlan, type PlanTask } from "./plan-button";
+
+type Tab = "prospects" | "yours" | "unsure" | "linked" | "notMine" | "all";
+/** The tabs as ?tab= names them, in the visitor's words (the page's chip uses these too). */
+export const TAB_LABEL: Record<string, string> = { prospects: "Likely you, no link", yours: "Likely you", unsure: "Name only — check it is you", linked: "Website links to you", notMine: "Marked not you", all: "All" };
+const TABS: Tab[] = ["prospects", "yours", "unsure", "linked", "notMine", "all"];
 
 type Row = { url: string; domain: string; title: string; snippet: string | null; published: string | null; authority: number | null; linksToYou: boolean | null; place: string | null; /** The customer's own verdict on this website for this name. */ mark?: "mine" | "not_mine" | null };
 type Page = { marksUnavailable?: boolean; name: string; domain: string; rows: Row[]; total: number | null; linksChecked: boolean; linksCheckedAt?: string | null; linksPartial?: boolean; fetchedAt: string };
@@ -28,7 +36,7 @@ const norm = (n: string) => n.trim().replace(/\s+/g, " ").toLowerCase();
 const fingerprint = (t: string) => { let a = 0x811c9dc5, b = 0x01000193 ^ 0x5bd1e995; for (let i = 0; i < t.length; i++) { const c = t.charCodeAt(i); a = Math.imul(a ^ c, 0x01000193) >>> 0; b = Math.imul(b ^ c, 0x5bd1e995) >>> 0; } return a.toString(36) + b.toString(36); };
 const linkWord = (v: boolean | null) => (v === true ? "Links to you" : v === false ? "No link found" : "Not known");
 
-export function MentionsView({ siteId, domain, status, checkId }: { siteId: number; domain: string; status: SeoStatus | undefined; /** A watched check to show (an alert's), instead of the newest. */ checkId?: number | null }) {
+export function MentionsView({ siteId, domain, status, checkId, onCheck }: { siteId: number; domain: string; status: SeoStatus | undefined; /** A watched check to show (an alert's), instead of the newest. */ checkId?: number | null; /** Told, once loaded, whether that check is the one shown or was not available (the page's chip says which). */ onCheck?: (s: { chosen: boolean; missing: boolean }) => void }) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const key = `/api/seo/sites/${siteId}/mentions`;
@@ -52,7 +60,9 @@ export function MentionsView({ siteId, domain, status, checkId }: { siteId: numb
     const marks = new Map(p.rows.map((r) => [pageKey(r.url), r.mark]));
     return { ...m, [k]: { ...had, rows: had.rows.map((r) => (marks.has(pageKey(r.url)) ? { ...r, mark: marks.get(pageKey(r.url)) } : r)) } };
   });
-  const [filter, setFilter] = useState<"prospects" | "yours" | "unsure" | "linked" | "notMine" | "all">("prospects");
+  // Which mentions are listed is the address (?tab=; links.ts seoLinks.mentions): a tab is a link, the back button undoes it.
+  const tabParam = useAddress().get("tab");
+  const filter: Tab = TABS.includes(tabParam as Tab) ? (tabParam as Tab) : "prospects";
   // Verdicts given on this screen, per name and PAGE: shown at once as pending, one request at a time per page (its
   // buttons wait), confirmed when the server answers, and put back to what they were if it refuses.
   type Verdict = "mine" | "not_mine" | null;
@@ -80,7 +90,7 @@ export function MentionsView({ siteId, domain, status, checkId }: { siteId: numb
   // Fresh server data has every saved verdict: what was shown here for settled ones gives way to it (another tab's
   // change included). Ones still in flight stay until they are answered.
   // Every answer whose verdicts DID load teaches what the server holds (one saying they could not be read teaches nothing).
-  useEffect(() => { if (q.data) { learn(q.data.page, q.data.readAt); learn(q.data.watch?.latest?.page, q.data.readAt); } }, [q.dataUpdatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (q.data) { learn(q.data.page, q.data.readAt); learn(q.data.watch?.latest?.page, q.data.readAt); onCheck?.({ chosen: !!q.data.watch?.chosen, missing: !!q.data.watch?.missing }); } }, [q.dataUpdatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
   const [loadedFor, setLoadedFor] = useState<number | null>(null);
   useEffect(() => {
     if (!q.data) return;
@@ -168,7 +178,12 @@ export function MentionsView({ siteId, domain, status, checkId }: { siteId: numb
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `${domain}-mentions.csv`; a.click(); URL.revokeObjectURL(a.href);
   };
   const nameOk = typedOk;
-  const tabs: [typeof filter, string, number][] = [["prospects", "Likely you, no link", groups.prospects.length], ["yours", "Likely you", groups.yours.length], ["unsure", "Name only — check it is you", groups.unsure.length], ["linked", "Website links to you", groups.linked.length], ["notMine", "Marked not you", groups.notMine.length], ["all", "All", groups.all.length]];
+  const tabs: [Tab, string, number][] = TABS.map((k) => [k, TAB_LABEL[k], groups[k].length]);
+  /** A tab of this view as an address (the check on screen kept). */
+  const tabHref = (k: Tab) => seoLinks.mentions(siteId, { tab: k === "prospects" ? undefined : k, check: checkId ?? undefined });
+  const allHere = tabHref("all");
+  /** The tab a row's verdict puts it under. */
+  const tabOf = (r: Row & { place: string | null }): Tab => (markOf(r) === "not_mine" ? "notMine" : likely(r) ? "yours" : "unsure");
   return (
     <div data-testid="mentions">
       {q.data?.watch && <WatchPanel siteId={siteId} name={q.data.name} watch={q.data.watch} domain={domain} retryPrice={status?.holds?.mentionsRetry ?? null}
@@ -179,7 +194,7 @@ export function MentionsView({ siteId, domain, status, checkId }: { siteId: numb
           <input className="g-input w-72 max-w-full" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} placeholder="e.g. Alpine Exteriors" data-testid="input-mentions-name" /></label>
         <label className="flex min-w-0 flex-col text-[13px]"><span className="g-text-2 mb-1">Your places (towns, county), separated by commas</span>
           <input className="g-input w-80 max-w-full" value={placesText} onChange={(e) => setPlacesText(e.target.value)} placeholder="e.g. Bellingham, Whatcom, Lynden" data-testid="input-mentions-places" /></label>
-        {placesChanged && <button type="button" className="g-pill g-pill--sm" disabled={savePlaces.isPending} onClick={() => savePlaces.mutate({ siteId, places })} data-testid="button-mentions-places">Save places (free)</button>}
+        {placesChanged && <button type="button" className="g-pill g-pill--sm !min-h-11" disabled={savePlaces.isPending} onClick={() => savePlaces.mutate({ siteId, places })} data-testid="button-mentions-places">Save places (free)</button>}
         <button type="button" className="g-pill" disabled={!nameOk || run.isPending || peek.isFetching || peekFailed || !status?.configured || !canPay(price)} onClick={() => run.mutate({ siteId, name: name.trim(), replaces: page?.fetchedAt })} data-testid="button-mentions-run">
           {run.isPending ? <Loader2 className="animate-spin" /> : <Play />} {run.isPending ? "Looking…" : `${page ? "Check again" : "Look for mentions"}${price != null ? ` — up to ${money(price)}` : ""}`}
         </button>
@@ -188,22 +203,22 @@ export function MentionsView({ siteId, domain, status, checkId }: { siteId: numb
       {price == null && status && <p className="g-text-2 mb-2 text-[12px]">The price couldn't be loaded, so nothing can be bought yet — reload the page.</p>}
       {price != null && !canPay(price) && <p className="mb-2 text-[12px]" style={{ color: "var(--g-red)" }}>Not enough SEO data left — add credit on the SEO dashboard.</p>}
       {!page ? (
-        <Empty testId="mentions-none"><h3>{peek.isFetching ? "Looking for a saved check of this name…" : peekFailed ? "Couldn't look for a saved check of this name" : Object.keys(kept).length ? "No check saved for this name" : "Not checked yet"}</h3>{peekFailed && <p role="alert">{apiErrorMessage(peek.error)} <button type="button" className="g-link" onClick={() => void peek.refetch()} data-testid="button-mentions-peek-retry">Look again (free)</button></p>}<p>One check lists up to {fmtNum(q.data?.rows ?? 50)} websites that use the name (one page each, your own site left out) and checks which of them link to you. Saved and free to reopen for a week.</p></Empty>
+        <Empty testId="mentions-none"><h3>{peek.isFetching ? "Looking for a saved check of this name…" : peekFailed ? "Couldn't look for a saved check of this name" : Object.keys(kept).length ? "No check saved for this name" : "Not checked yet"}</h3>{peekFailed && <p role="alert">{apiErrorMessage(peek.error)} <button type="button" className={TEXT_LINK} onClick={() => void peek.refetch()} data-testid="button-mentions-peek-retry">Look again (free)</button></p>}<p>One check lists up to {fmtNum(q.data?.rows ?? 50)} websites that use the name (one page each, your own site left out) and checks which of them link to you. Saved and free to reopen for a week.</p></Empty>
       ) : (
         <>
           <div className="mb-2 flex flex-wrap items-center gap-2 text-[13px]">
-            <span className="g-text-2" data-testid="text-mentions-meta">Searched {fmtDate(page.fetchedAt)}{page.linksCheckedAt && page.linksCheckedAt.slice(0, 10) !== page.fetchedAt.slice(0, 10) ? `, links checked ${fmtDate(page.linksCheckedAt)}` : ""}: {fmtNum(rows.length)} website{rows.length === 1 ? "" : "s"} using "{page.name}"{page.total != null && page.total > rows.length ? ` (the source has ${fmtNum(page.total)} pages with the name; one page per website is listed, the strongest websites first)` : ""}.{places.length === 0 ? " Add your places to set apart pages that are less likely to be about you." : ""}</span>
-            <button type="button" className="g-pill g-pill--sm ml-auto" disabled={!rows.length} onClick={exportCsv} data-testid="button-mentions-export"><Download /> Export</button>
+            <span className="g-text-2" data-testid="text-mentions-meta">Searched <Link href={allHere} className={QUIET_LINK}>{fmtDate(page.fetchedAt)}</Link>{page.linksCheckedAt && page.linksCheckedAt.slice(0, 10) !== page.fetchedAt.slice(0, 10) ? <>, links checked <Link href={allHere} className={QUIET_LINK}>{fmtDate(page.linksCheckedAt)}</Link></> : ""}: <Link href={allHere} className={QUIET_LINK} data-testid="link-mentions-all">{fmtNum(rows.length)} website{rows.length === 1 ? "" : "s"}</Link> using "{page.name}"{page.total != null && page.total > rows.length ? <> (the source has <Link href={allHere} className={QUIET_LINK} title="No view lists every page: one page per website is listed here">{fmtNum(page.total)} pages</Link> with the name; one page per website is listed, the strongest websites first)</> : ""}.{places.length === 0 ? " Add your places to set apart pages that are less likely to be about you." : ""}</span>
+            <button type="button" className="g-pill g-pill--sm !min-h-11 ml-auto" disabled={!rows.length} onClick={exportCsv} data-testid="button-mentions-export"><Download /> Export</button>
           </div>
           {!page.linksChecked && (
             <div className="g-callout mb-2" role="status" data-testid="mentions-links-missing"><p>The check of which websites link to you did not load, so that column is not known (it was not charged).</p>
-              <button type="button" className="g-pill g-pill--sm mt-1" disabled={run.isPending || !canPay(retryPrice)} onClick={() => run.mutate({ siteId, name: page.name, retryMissing: true })} data-testid="button-mentions-retry">Check the links again{retryPrice != null ? ` — up to ${money(retryPrice)}` : ""}</button></div>
+              <button type="button" className="g-pill g-pill--sm !min-h-11 mt-1" disabled={run.isPending || !canPay(retryPrice)} onClick={() => run.mutate({ siteId, name: page.name, retryMissing: true })} data-testid="button-mentions-retry">Check the links again{retryPrice != null ? ` — up to ${money(retryPrice)}` : ""}</button></div>
           )}
           {page.marksUnavailable && <p className="mb-2 text-[12px]" role="status" style={{ color: "#b06000" }}>Your "This is us / Not us" answers couldn't be loaded just now, so they aren't shown — they are still saved. Reload to see them.</p>}
           {page.linksPartial && <p className="g-text-2 mb-2 text-[12px]">More of these websites link to you than one check returns; for the rest it is "not known", never "no link".</p>}
-          <nav className="g-tabs" aria-label="Which mentions">
-            {tabs.map(([k, label, n]) => <a key={k} href={`#${k}`} aria-current={filter === k ? "page" : undefined} onClick={(e) => { e.preventDefault(); setFilter(k); }} data-testid={`tab-mentions-${k}`}>{label} ({fmtNum(n)})</a>)}
-          </nav>
+          <TabStrip label="Which mentions">
+            {tabs.map(([k, label, n]) => <Link key={k} href={tabHref(k)} aria-current={filter === k ? "page" : undefined} data-testid={`tab-mentions-${k}`}>{label} ({fmtNum(n)})</Link>)}
+          </TabStrip>
           {list.length === 0 ? <p className="g-text-2 py-3 text-[13px]">None{filter === "prospects" && places.length === 0 ? " — add your places above to find which mentions are yours" : ""}.</p> : (
             <div className="overflow-x-auto">
               <table className="g-table w-full" data-testid="table-mentions">
@@ -211,15 +226,16 @@ export function MentionsView({ siteId, domain, status, checkId }: { siteId: numb
                 <tbody>
                   {list.map((r) => (
                     <tr key={r.url}>
-                      <td className="max-w-[16rem]" data-label="Website"><a href={r.url} target="_blank" rel="noreferrer" className="g-link block truncate" title={r.url}>{r.domain}</a><span className="g-text-2 block truncate text-[12px]" title={r.title}>{r.title}</span></td>
-                      <td className="max-w-[26rem] !whitespace-normal text-[12px]" data-label="What it says">{r.snippet ?? "—"}<span className="g-text-2 block">{markOf(r) === "mine" ? "You confirmed this page is about you" : markOf(r) === "not_mine" ? "You marked this page as another business" : r.place ? `Names ${r.place} too — check it is about you` : "Names none of your places — check it is you"}{!flatHas(`${r.title} ${r.snippet ?? ""}`, page.name) ? " · the name is elsewhere on the page, not in this excerpt" : ""}</span></td>
-                      <td className="num" data-label="Authority">{r.authority ?? "—"}</td>
-                      <td data-label="Published">{r.published ? fmtDate(r.published) : "—"}</td>
-                      <td data-label="Link to you">{linkWord(r.linksToYou)}</td>
-                      <td className="whitespace-nowrap text-right">
+                      {/* The website opens in Site explorer; the page's title opens the page itself. */}
+                      <td className="max-w-[16rem]" data-label="Website"><Link href={seoLinks.explorer(r.domain)} className={`g-link block truncate leading-[44px] ${LINK_CUE} ${FOCUS_RING}`} title={`Open ${r.domain} in Site explorer`} data-testid={`link-mention-${r.domain}`}>{r.domain}</Link><a href={r.url} target="_blank" rel="noreferrer" className={`g-text-2 block truncate text-[12px] leading-[44px] ${LINK_CUE} ${FOCUS_RING}`} title={r.url}>{r.title} <ExternalLink className="inline h-3 w-3" aria-hidden /></a></td>
+                      <td className="max-w-[26rem] !whitespace-normal text-[12px]" data-label="What it says">{r.snippet ? <a href={r.url} target="_blank" rel="noreferrer" className={`${QUIET_LINK} g-text`} title="The excerpt the source returned; opens the page">{r.snippet}</a> : "—"}<span className="g-text-2 block"><Link href={tabHref(tabOf(r))} className={QUIET_LINK} title={`Every mention listed under "${TAB_LABEL[tabOf(r)]}"`}>{markOf(r) === "mine" ? "You confirmed this page is about you" : markOf(r) === "not_mine" ? "You marked this page as another business" : r.place ? `Names ${r.place} too — check it is about you` : "Names none of your places — check it is you"}</Link>{!flatHas(`${r.title} ${r.snippet ?? ""}`, page.name) ? " · the name is elsewhere on the page, not in this excerpt" : ""}</span></td>
+                      <td className="num" data-label="Authority">{r.authority != null ? <Link href={seoLinks.explorer(r.domain)} className={FIGURE_LINK} title={`${r.domain} in Site explorer`}>{r.authority}</Link> : "—"}</td>
+                      <td data-label="Published">{r.published ? <a href={r.url} target="_blank" rel="noreferrer" className={`${QUIET_LINK} g-text`} title="The page's own date; opens the page">{fmtDate(r.published)}</a> : "—"}</td>
+                      <td data-label="Link to you"><Link href={seoLinks.backlinks(siteId, { domain: r.domain })} className={`${QUIET_LINK} g-text`} title={`The links from ${r.domain} to your site, on Backlinks`}>{linkWord(r.linksToYou)}</Link></td>
+                      <td className="whitespace-nowrap text-right" data-label="Is it you?">
                         <span className="inline-flex flex-wrap justify-end gap-1" role="group" aria-label={`Is this page on ${r.domain} about you?`} aria-busy={markPending(r)}>
-                          <button type="button" className="g-pill g-pill--sm" disabled={markPending(r)} aria-pressed={shownMarkFor(page!.name, r) === "mine"} onClick={() => mark.mutate({ siteId, name: page!.name, url: r.url, verdict: markOf(r) === "mine" ? null : "mine", was: markOf(r) })} data-testid={`button-mention-mine-${r.domain}`}>{shownMarkFor(page!.name, r) === "mine" ? "✓ This is us" : "This is us"}</button>
-                          <button type="button" className="g-pill g-pill--sm" disabled={markPending(r)} aria-pressed={shownMarkFor(page!.name, r) === "not_mine"} onClick={() => mark.mutate({ siteId, name: page!.name, url: r.url, verdict: markOf(r) === "not_mine" ? null : "not_mine", was: markOf(r) })} data-testid={`button-mention-notmine-${r.domain}`}>{shownMarkFor(page!.name, r) === "not_mine" ? "✓ Not us" : "Not us"}</button>
+                          <button type="button" className="g-pill g-pill--sm !min-h-11" disabled={markPending(r)} aria-pressed={shownMarkFor(page!.name, r) === "mine"} onClick={() => mark.mutate({ siteId, name: page!.name, url: r.url, verdict: markOf(r) === "mine" ? null : "mine", was: markOf(r) })} data-testid={`button-mention-mine-${r.domain}`}>{shownMarkFor(page!.name, r) === "mine" ? "✓ This is us" : "This is us"}</button>
+                          <button type="button" className="g-pill g-pill--sm !min-h-11" disabled={markPending(r)} aria-pressed={shownMarkFor(page!.name, r) === "not_mine"} onClick={() => mark.mutate({ siteId, name: page!.name, url: r.url, verdict: markOf(r) === "not_mine" ? null : "not_mine", was: markOf(r) })} data-testid={`button-mention-notmine-${r.domain}`}>{shownMarkFor(page!.name, r) === "not_mine" ? "✓ Not us" : "Not us"}</button>
                           {r.linksToYou !== true && markOf(r) !== "not_mine" && !markPending(r) && <AddToPlan siteId={siteId} label="Plan" testId={`button-plan-mention-${r.domain}`} tasks={[task(r)]} />}
                         </span>
                       </td>
@@ -271,37 +287,37 @@ function WatchPanel({ siteId, name, watch, domain, retryPrice, verdict }: { site
     <div className="mb-4 rounded-lg border p-3" style={{ borderColor: "var(--g-divider)" }} data-testid="mentions-watch">
       <div className="flex flex-wrap items-center gap-3 text-[13px]">
         <label className="flex min-h-9 items-center gap-2"><input type="checkbox" checked={set.isPending && set.variables?.siteId === siteId ? set.variables.watch : watch.watch} disabled={set.isPending || (!name && !watch.watch)} onChange={(e) => set.mutate({ siteId, watch: e.target.checked })} data-testid="checkbox-mentions-watch" /><span className="g-text">Watch for new mentions every month</span></label>
-        <span className="g-text-2">{!name ? "Look for mentions once first, so the watch knows which name to follow." : watch.watch ? `Following "${name}".${watch.nextAt ? ` Next: ${fmtDate(watch.nextAt)}.` : ""}` : "From your included SEO data only; when that has run out it waits, and is never charged to credit you bought."}</span>
+        <span className="g-text-2">{!name ? "Look for mentions once first, so the watch knows which name to follow." : watch.watch ? <>Following "{name}".{watch.nextAt ? <> Next: <Link href={seoLinks.alerts({ site: siteId, kind: "mention_new" })} className={QUIET_LINK} title="The alerts the watch raises when it finds new mentions">{fmtDate(watch.nextAt)}</Link>.</> : ""}</> : "From your included SEO data only; when that has run out it waits, and is never charged to credit you bought."}</span>
       </div>
       {watch.watch && watch.note && <p className="mt-1 text-[13px]" role="status" style={{ color: "#b06000" }} data-testid="mentions-watch-note">{WATCH_NOTE[watch.note] ?? "The watch is waiting and will try again."}</p>}
       {watch.missing && <p className="mt-1 text-[13px]" role="status" style={{ color: "#b06000" }} data-testid="mentions-watch-missing">The check this link is for isn't available (it may belong to another site). {l ? "Showing the newest check instead." : ""}</p>}
-      {watch.watch && !l && !watch.note && !watch.missing && <p className="g-text-2 mt-1 text-[13px]" data-testid="mentions-watch-first">No watched check yet{watch.nextAt ? ` — the first runs on or after ${fmtDate(watch.nextAt)}` : ""}. It looks at pages published in the month before it.</p>}
-      {watch.chosen && <p className="mt-1 text-[13px]" role="status" data-testid="mentions-watch-chosen">Showing the check an alert was raised from{l?.name ? ` (for "${l.name}")` : ""}. <a href={`/seo/mentions?site=${siteId}`} className="g-link">Show the newest</a></p>}
+      {watch.watch && !l && !watch.note && !watch.missing && <p className="g-text-2 mt-1 text-[13px]" data-testid="mentions-watch-first">No watched check yet{watch.nextAt ? <> — the first runs on or after <Link href={seoLinks.alerts({ site: siteId, kind: "mention_new" })} className={QUIET_LINK} title="The alerts the watch raises when it finds new mentions">{fmtDate(watch.nextAt)}</Link></> : ""}. It looks at pages published in the month before it.</p>}
+      {watch.chosen && <p className="mt-1 text-[13px]" role="status" data-testid="mentions-watch-chosen">Showing the check an alert was raised from{l?.name ? ` (for "${l.name}")` : ""}. <Link href={seoLinks.mentions(siteId)} className={TEXT_LINK}>Show the newest</Link></p>}
       {l && (
         <div className="mt-2 text-[13px]" data-testid="mentions-watch-latest">
-          <p className="g-text-2">Pages that use "{l.page.name}", published between {fmtDate(l.since)} and {fmtDate(l.takenAt)}: {fmtNum(rows.length)}{(l.page as Page & { complete?: boolean }).complete === false ? " — more were published in this window than one check reads; the next check reads on through the same window" : ""}. Read by publication date, oldest first: a page the source has no date for is not seen, and pages published at the same moment or added to the window between checks can shift places, so a page can occasionally be missed.
-            {rows.length > 0 && <button type="button" className="g-link ml-2" onClick={exportCsv} data-testid="button-mentions-watch-export">Export</button>}</p>
+          <p className="g-text-2">Pages that use "{l.page.name}", published between <Link href={seoLinks.mentions(siteId, { check: l.id })} className={QUIET_LINK}>{fmtDate(l.since)}</Link> and <Link href={seoLinks.mentions(siteId, { check: l.id })} className={QUIET_LINK}>{fmtDate(l.takenAt)}</Link>: <Link href={seoLinks.mentions(siteId, { check: l.id })} className={QUIET_LINK} data-testid="link-mentions-watch-count">{fmtNum(rows.length)}</Link>{(l.page as Page & { complete?: boolean }).complete === false ? " — more were published in this window than one check reads; the next check reads on through the same window" : ""}. Read by publication date, oldest first: a page the source has no date for is not seen, and pages published at the same moment or added to the window between checks can shift places, so a page can occasionally be missed.
+            {rows.length > 0 && <button type="button" className={`${TEXT_LINK} ml-2`} onClick={exportCsv} data-testid="button-mentions-watch-export">Export</button>}</p>
           {l.page.marksUnavailable && <p className="mt-1 text-[12px]" role="status" style={{ color: "#b06000" }}>Your "This is us / Not us" answers couldn't be loaded just now, so they aren't shown here or in the export — they are still saved.</p>}
 
-          {!l.page.linksChecked && rows.length > 0 && <p className="mt-1 text-[12px]" role="status">Whether these websites link to you did not load (not charged). <button type="button" className="g-pill g-pill--sm" disabled={retry.isPending || retryPrice == null} onClick={() => retry.mutate({ siteId, checkId: l.id })} data-testid="button-mentions-watch-retry">Check the links again{retryPrice != null ? ` — up to ${money(retryPrice)}` : ""}</button></p>}
+          {!l.page.linksChecked && rows.length > 0 && <p className="mt-1 text-[12px]" role="status">Whether these websites link to you did not load (not charged). <button type="button" className="g-pill g-pill--sm !min-h-11" disabled={retry.isPending || retryPrice == null} onClick={() => retry.mutate({ siteId, checkId: l.id })} data-testid="button-mentions-watch-retry">Check the links again{retryPrice != null ? ` — up to ${money(retryPrice)}` : ""}</button></p>}
           {rows.length > 0 && (
             <ul className="mt-1 space-y-1">
               {shown.map((r) => {
                 const v = verdict.of(l.page.name, r), busy = verdict.pending(l.page.name, r);
                 return (
                   <li key={r.url} className="flex flex-wrap items-center gap-x-2">
-                    <a href={r.url} className="g-link" target="_blank" rel="noreferrer">{r.domain}</a>
-                    <span className="g-text-2 min-w-0 flex-1">— {r.title}{v === "mine" ? " · you confirmed this page" : v === "not_mine" ? " · marked another business" : r.place ? ` · names ${r.place}` : " · names none of your places"}{r.linksToYou === true ? " · its website links to you" : r.linksToYou === null ? " · link not known" : " · no link found"}</span>
+                    <Link href={seoLinks.explorer(r.domain)} className={TEXT_LINK} title={`Open ${r.domain} in Site explorer`}>{r.domain}</Link>
+                    <span className="g-text-2 min-w-0 flex-1">— <a href={r.url} className={`${QUIET_LINK} g-text-2`} target="_blank" rel="noreferrer" aria-label={`${r.title} — open the page on ${r.domain}`}>{r.title} <ExternalLink className="inline h-3 w-3" aria-hidden /></a>{v === "mine" ? " · you confirmed this page" : v === "not_mine" ? " · marked another business" : r.place ? ` · names ${r.place}` : " · names none of your places"}{r.linksToYou === true ? " · its website links to you" : r.linksToYou === null ? " · link not known" : " · no link found"}</span>
                     <span className="inline-flex gap-1" role="group" aria-label={`Is this page on ${r.domain} about you?`} aria-busy={busy}>
-                      <button type="button" className="g-pill g-pill--sm" disabled={busy} aria-pressed={v === "mine"} onClick={() => verdict.set(l.page.name, r, v === "mine" ? null : "mine")}>{v === "mine" ? "✓ This is us" : "This is us"}</button>
-                      <button type="button" className="g-pill g-pill--sm" disabled={busy} aria-pressed={v === "not_mine"} onClick={() => verdict.set(l.page.name, r, v === "not_mine" ? null : "not_mine")}>{v === "not_mine" ? "✓ Not us" : "Not us"}</button>
+                      <button type="button" className="g-pill g-pill--sm !min-h-11" disabled={busy} aria-pressed={v === "mine"} onClick={() => verdict.set(l.page.name, r, v === "mine" ? null : "mine")}>{v === "mine" ? "✓ This is us" : "This is us"}</button>
+                      <button type="button" className="g-pill g-pill--sm !min-h-11" disabled={busy} aria-pressed={v === "not_mine"} onClick={() => verdict.set(l.page.name, r, v === "not_mine" ? null : "not_mine")}>{v === "not_mine" ? "✓ Not us" : "Not us"}</button>
                     </span>
                   </li>
                 );
               })}
             </ul>
           )}
-          {rows.length > 10 && <button type="button" className="g-link mt-1 text-[13px]" aria-expanded={all} onClick={() => setAll(!all)} data-testid="button-mentions-watch-all">{all ? "Show the first 10" : `Show all ${fmtNum(rows.length)}`}</button>}
+          {rows.length > 10 && <button type="button" className={`${TEXT_LINK} mt-1 text-[13px]`} aria-expanded={all} onClick={() => setAll(!all)} data-testid="button-mentions-watch-all">{all ? "Show the first 10" : `Show all ${fmtNum(rows.length)}`}</button>}
         </div>
       )}
     </div>

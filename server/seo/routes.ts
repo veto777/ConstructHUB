@@ -1219,7 +1219,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
       // another server process): answered from it, nothing bought. A deliberate re-ask later is a new ask.
       const recent = await recentAiRun(user, site.id, input.prompt, engines, AI_DUPLICATE_SECONDS);
       if (recent) return { data: { answers: recent.answers, failed: [] as AiEngine[] }, costUsd: 0, runId: recent.runId, saved: true, reused: true };
-      const o = await withBudget(user, askEstimateUsd(engines), () => askAi(input.prompt, engines, { domain: site.domain, businessName: site.business_name }), { label: `AI visibility — "${input.prompt.slice(0, 90)}" (${engines.map((e) => AI_ENGINES[e].label).join(", ")})` });
+      const o = await withBudget(user, askEstimateUsd(engines), () => askAi(input.prompt, engines, { domain: site.domain, businessName: site.business_name }), { label: `AI visibility — "${input.prompt.slice(0, 90)}" (${engines.map((e) => AI_ENGINES[e].label).join(", ")}) for ${site.domain}` }); // the site, so the usage page opens the right one
       // Saved as one run. If saving fails the customer still gets the answers, and is told they are not in the history.
       const runId = randomUUID();
       let saved = true;

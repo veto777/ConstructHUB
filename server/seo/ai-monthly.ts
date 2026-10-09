@@ -113,7 +113,7 @@ export async function runDueAiChecks(): Promise<number> {
           }
           if (!parked) throw Object.assign(new Error(`answers could not be put on the waiting list: ${(lastError as any)?.message ?? lastError}`), { costUsd: r.costUsd, costUnknown: r.costUnknown, parked: false });
           return r;
-        }, { allowanceOnly: true, label: `AI visibility — "${String(t.prompt).slice(0, 90)}" (${engines.map((e) => AI_ENGINES[e].label).join(", ")}, monthly)` });
+        }, { allowanceOnly: true, label: `AI visibility — "${String(t.prompt).slice(0, 90)}" (${engines.map((e) => AI_ENGINES[e].label).join(", ")}, monthly #${t.id}) for ${site.domain}` }); // the usage page opens the question by its id and site
       } catch (e) {
         // Only a failure that certainly bought nothing closes the run; anything ambiguous leaves it for the branch above.
         if (!outcomeUnknown(e)) await closeRun(runId).catch(() => {});

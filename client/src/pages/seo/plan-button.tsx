@@ -5,6 +5,7 @@ import { Link } from "wouter";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "./shell";
+import { seoLinks } from "./links";
 
 export type PlanTask = { kind: "keyword" | "page" | "link_reclaim" | "link_prospect" | "audit" | "other"; title: string; target?: string | null; facts?: Record<string, string | number | boolean | null>; source?: string | null };
 
@@ -21,10 +22,14 @@ function fingerprint(text: string): string {
  */
 export function fitTask(t: PlanTask): PlanTask {
   const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
-  const facts = Object.fromEntries(Object.entries(t.facts ?? {}).slice(0, 12).map(([k, v]) => [k, typeof v === "string" ? cut(v, 300) : v]));
+  const source = t.source ? (t.source.length > 200 ? `${t.source.slice(0, 180)}#${fingerprint(t.source)}` : t.source) : null;
+  // A source cut to fit keeps its whole words in the facts (up to 300 characters), so the plan's link back to the
+  // finding opens the real keyword or address, never the cut one. The server keeps 12 facts: one is left for it.
+  const cutSource = !!t.source && source !== t.source;
+  const facts = Object.fromEntries(Object.entries(t.facts ?? {}).slice(0, cutSource ? 11 : 12).map(([k, v]) => [k, typeof v === "string" ? cut(v, 300) : v]));
   let target = t.target ?? null;
   if (target && target.length > 500) { try { target = /^https?:\/\//i.test(target) ? new URL(target).origin : cut(target, 500); } catch { target = null; } }
-  const source = t.source ? (t.source.length > 200 ? `${t.source.slice(0, 180)}#${fingerprint(t.source)}` : t.source) : null;
+  if (cutSource) facts.origin = cut(t.source!, 300);
   return { kind: t.kind, title: cut(t.title.trim(), 200), target, facts, source };
 }
 
@@ -50,7 +55,7 @@ export function AddToPlan({ siteId, tasks, label = "Add to plan", onDone, testId
       void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${v.siteId}/tasks`] }); void qc.invalidateQueries({ queryKey: ["/api/seo/dashboard"] });
       toast({
         title: r.added ? `${r.added} added to the action plan` : "Already in the action plan",
-        description: <>{r.already && r.added ? `${r.already} ${r.already === 1 ? "was" : "were"} already there. ` : ""}<Link href={`/seo/plan?site=${v.siteId}`} className="underline">Open the plan</Link></>,
+        description: <>{r.already && r.added ? `${r.already} ${r.already === 1 ? "was" : "were"} already there. ` : ""}<Link href={seoLinks.plan(v.siteId)} className="inline-flex min-h-11 items-center underline">Open the plan</Link></>,
       });
       onDone?.();
     },
@@ -63,7 +68,7 @@ export function AddToPlan({ siteId, tasks, label = "Add to plan", onDone, testId
     },
   });
   return (
-    <button type="button" className="g-pill g-pill--sm" disabled={!tasks.length || m.isPending} onClick={() => m.mutate({ siteId, tasks })} data-testid={testId}
+    <button type="button" className="g-pill g-pill--sm !min-h-11" disabled={!tasks.length || m.isPending} onClick={() => m.mutate({ siteId, tasks })} data-testid={testId}
       aria-label={tasks.length === 1 ? `Add to the action plan: ${tasks[0].title}` : undefined}>
       {m.isPending ? <Loader2 className="animate-spin" /> : <ClipboardList />} {label}{tasks.length > 1 ? ` (${tasks.length})` : ""}
     </button>

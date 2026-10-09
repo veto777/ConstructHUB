@@ -2,24 +2,34 @@
  * Keywords Explorer, beyond one keyword: analyse many keywords at once, and
  * keep keywords in named lists. A list is free to open and edit; only "Analyse"
  * and "Refresh numbers" buy data, and both show the price first.
+ * Every figure in a table is a link (links.ts): a keyword, its volume, cost per click and intent to its overview in
+ * the list's own country, its difficulty to who ranks for it. The open list is the `list` parameter of the address;
+ * grouping by topic is the `topic` parameter ("*" every group, a term one group, "other" the keywords in no group),
+ * so a topic's header counts lead to the rows they count and the back button returns to the view before.
  */
 import { MarketPicker } from "./market";
 import { DEFAULT_MARKET, findMarket, marketLabel, type SeoMarket } from "@shared/seo-markets";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "wouter";
+import { seoLinks, setParam } from "./links";
+import { marketParams } from "./keyword-links";
+import { INTENTS } from "./explorer-filters";
 import { clusterKeywords, CLUSTER_MAX } from "@shared/seo-clusters";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, ListPlus, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { api, Empty, fmtDate, fmtNum, isNotRunYet, money, type SeoSite, type SeoStatus } from "./shell";
+import { ActiveFilter, api, Empty, fmtDate, fmtNum, isNotRunYet, money, useAddress, type SeoSite, type SeoStatus } from "./shell";
 import { PALETTE } from "./viz";
-import { BarFigure, KdBadge } from "./viz-keywords";
+import { BarFigure, BLOCK_LINK, FIG_LINK, KdBadge, LINK_CUE, TEXT_LINK } from "./viz-keywords";
 
 export type KwRow = { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null; intent?: string | null };
 type List = { id: number; name: string; locationCode?: number; languageCode?: string; createdAt: string; keywords: number; volume: number };
 const sameMarket = (l: { locationCode?: number; languageCode?: string }, m: { locationCode: number; languageCode: string }) => (l.locationCode ?? 2840) === m.locationCode && (l.languageCode ?? "en") === m.languageCode;
 const MAX_BULK = 200;
+/** A pill-sized link or button that is 44 px tall on a phone. */
+const PILL = "g-pill g-pill--sm !min-h-11";
 
 const csvCell = (v: string | number | null | undefined) => { const s = v == null ? "" : String(v); return `"${(typeof v !== "number" && /^[=+\-@\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`; };
 function downloadCsv(name: string, rows: (string | number | null | undefined)[][]) {
@@ -50,7 +60,7 @@ export function AddToList({ rows, onDone, label = "Add to a list", market = DEFA
     },
     onError: (e) => toast({ title: "Couldn't add to the list", description: apiErrorMessage(e), variant: "destructive" }),
   });
-  if (!open) return <button type="button" className="g-pill g-pill--sm" disabled={!rows.length} onClick={() => setOpen(true)} data-testid="button-add-to-list"><ListPlus /> {label}{rows.length ? ` (${rows.length})` : ""}</button>;
+  if (!open) return <button type="button" className={PILL} disabled={!rows.length} onClick={() => setOpen(true)} data-testid="button-add-to-list"><ListPlus /> {label}{rows.length ? ` (${rows.length})` : ""}</button>;
   return (
     <form className="flex flex-wrap items-center gap-2 text-[13px]" onSubmit={(e) => { e.preventDefault(); m.mutate(); }} data-testid="form-add-to-list">
       <label className="flex items-center gap-2"><span className="g-text-2">List</span>
@@ -63,47 +73,68 @@ export function AddToList({ rows, onDone, label = "Add to a list", market = DEFA
       {lists.isError && <span className="g-text-2" role="alert">Couldn't load your lists — you can still make a new one. <button type="button" className="g-link" onClick={() => void lists.refetch()}>Try again</button></span>}
       {listId === "new" && <label><span className="sr-only">Name of the new list</span><input className="g-input !py-1" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} placeholder="e.g. Tampa roofing" autoFocus data-testid="input-list-name" /></label>}
       <Button size="sm" type="submit" disabled={m.isPending || (listId === "new" && !name.trim())} data-testid="button-save-to-list">{m.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : `Add ${rows.length}`}</Button>
-      <button type="button" className="g-pill g-pill--sm" onClick={() => setOpen(false)}>Cancel</button>
+      <button type="button" className={PILL} onClick={() => setOpen(false)}>Cancel</button>
     </form>
   );
 }
 
-function KeywordTable({ rows, picked, toggle, setPicked, onOpen, onRemove, testId }: { rows: KwRow[]; picked: Set<string>; toggle: (k: string) => void; /** Lets a whole group be selected at once. */ setPicked?: (next: Set<string>) => void; onOpen?: (k: string) => void; onRemove?: (k: string) => void; testId: string }) {
-  const [grouped, setGrouped] = useState(false);
+/** The address of this view (bulk or a list) with a different `topic`: what the topic links write. */
+function useTopicAddress(): { topic: string | undefined; at: (topic: string | undefined) => string } {
+  const a = useAddress();
+  const view = a.get("view"), topic = a.get("topic")?.trim() || undefined;
+  const at = (t: string | undefined) => seoLinks.keywords(a.get("keyword") ?? "", { view: view === "bulk" || view === "lists" || view === "area" ? view : undefined, list: Number(a.get("list")) || undefined, locationCode: Number(a.get("locationCode")) || undefined, languageCode: a.get("languageCode") || undefined, topic: t });
+  return { topic, at };
+}
+
+function KeywordTable({ rows, picked, toggle, setPicked, market, onRemove, testId }: { rows: KwRow[]; picked: Set<string>; toggle: (k: string) => void; /** Lets a whole group be selected at once. */ setPicked?: (next: Set<string>) => void; /** The country these numbers are for: a keyword opens in it. */ market?: SeoMarket; onRemove?: (k: string) => void; testId: string }) {
+  // Grouping lives in the address (links.ts `topic`): "*" shows every group, a term one group, "other" the keywords in no group.
+  const { topic, at } = useTopicAddress();
+  const grouped = topic != null;
   // Groups are worked out from the keywords themselves (shared/seo-clusters.ts): free, and only when asked for.
   const groups = useMemo(() => (grouped ? clusterKeywords(rows) : [{ term: null, rows: [...rows], volume: null, measured: 0 }]), [grouped, rows]);
   const topics = groups.filter((g) => g.term !== null).length;
+  const one = grouped && topic !== "*" ? groups.find((g) => (g.term ?? "other") === topic) ?? null : null;
+  const unknownTopic = grouped && topic !== "*" && !one;
+  const shownGroups = one ? [one] : groups;
   const cols = 6 + (onRemove ? 1 : 0);
   // The biggest volume in the table: each row's bar is its share of it.
   const maxVolume = Math.max(0, ...rows.map((r) => r.volume ?? 0));
   const pickGroup = (list: KwRow[], on: boolean) => { if (!setPicked) return; const n = new Set(picked); for (const r of list) on ? n.add(r.keyword) : n.delete(r.keyword); setPicked(n); };
+  const kw = (r: KwRow, extra: Parameters<typeof seoLinks.keywords>[1] = {}) => seoLinks.keywords(r.keyword, { ...marketParams(market), ...extra });
+  const groupWords = (g: (typeof groups)[number]) => `${g.rows.length} keyword${g.rows.length === 1 ? "" : "s"}${g.volume == null ? " · no search volumes yet" : g.measured < g.rows.length ? ` · ${fmtNum(g.volume)} searches a month for the ${g.measured} with a figure` : ` · ${fmtNum(g.volume)} searches a month together`}`;
   return (
     <div className="overflow-x-auto">
-      {rows.length >= 6 && (
+      {(rows.length >= 6 || grouped) && (
         <div className="mb-2 flex flex-wrap items-center gap-2 text-[13px]">
-          <button type="button" className="g-pill g-pill--sm" aria-pressed={grouped} style={grouped ? { background: "var(--g-hover)" } : undefined} onClick={() => setGrouped(!grouped)} data-testid={`${testId}-group`}>Group by topic</button>
+          <Link href={at(grouped ? undefined : "*")} className={`${PILL} ${LINK_CUE}`} aria-current={grouped ? "true" : undefined} style={grouped ? { background: "var(--g-hover)" } : undefined} data-testid={`${testId}-group`}>{grouped ? "Ungroup" : "Group by topic"}</Link>
           {grouped && <span className="g-text-2" data-testid={`${testId}-group-note`}>{topics} topic{topics === 1 ? "" : "s"} from the words these keywords share{topics >= CLUSTER_MAX ? ` (the ${CLUSTER_MAX} largest; the rest are under "Other keywords")` : ""} — a starting point for deciding which keywords might share a page. Google may still treat keywords in one group differently.</span>}
         </div>
       )}
+      {one && <ActiveFilter onClear={() => setParam("topic", "*")} clearLabel="Every topic">Topic: {one.term ?? "Other keywords"} — {groupWords(one)}</ActiveFilter>}
+      {unknownTopic && <ActiveFilter onClear={() => setParam("topic", "*")} clearLabel="Every topic">No topic "{topic}" among these keywords — every group is shown</ActiveFilter>}
       <table className="g-table" data-testid={testId}>
         <thead><tr><th aria-label="Select" /><th>Keyword</th><th className="num">Volume / mo</th><th className="num">Difficulty</th><th className="num">CPC</th><th>Intent</th>{onRemove && <th aria-label="Remove" />}</tr></thead>
-        {groups.map((g, gi) => (
+        {shownGroups.map((g, gi) => (
         <tbody key={grouped ? `g:${g.term ?? ""}:${gi}` : "all"}>
           {grouped && (
             <tr data-testid={`${testId}-topic`}>
               <td>{setPicked && <input type="checkbox" aria-label={`Select all ${g.rows.length} keywords ${g.term ? `about ${g.term}` : "in no group"}`} checked={g.rows.every((r) => picked.has(r.keyword))} ref={(el) => { if (el) el.indeterminate = !g.rows.every((r) => picked.has(r.keyword)) && g.rows.some((r) => picked.has(r.keyword)); }} onChange={(e) => pickGroup(g.rows, e.target.checked)} />}</td>
-              <th scope="rowgroup" colSpan={cols - 1} className="text-left"><span className="g-text font-medium">{g.term ?? "Other keywords"}</span> <span className="g-text-2 font-normal">· {g.rows.length} keyword{g.rows.length === 1 ? "" : "s"}{g.volume == null ? " · no search volumes yet" : g.measured < g.rows.length ? ` · ${fmtNum(g.volume)} searches a month for the ${g.measured} with a figure` : ` · ${fmtNum(g.volume)} searches a month together`}</span></th>
+              {/* The term opens its own overview; the counts open only this group's rows. */}
+              <th scope="rowgroup" colSpan={cols - 1} className="text-left">
+                {g.term ? <Link href={seoLinks.keywords(g.term, marketParams(market))} className={`${FIG_LINK} g-text font-medium`} title={`"${g.term}" in the Keywords explorer (nothing is bought)`} data-testid="link-topic-term">{g.term}</Link> : <span className="g-text font-medium">Other keywords</span>}
+                {" "}<Link href={at(g.term ?? "other")} className={`${TEXT_LINK} font-normal`} title="Only this group's keywords" data-testid="link-topic-rows">· {groupWords(g)}</Link>
+              </th>
             </tr>
           )}
           {g.rows.map((r) => (
             <tr key={r.keyword}>
               <td><input type="checkbox" aria-label={`Select ${r.keyword}`} checked={picked.has(r.keyword)} onChange={() => toggle(r.keyword)} /></td>
-              <td>{onOpen ? <button type="button" className="g-link text-left" onClick={() => onOpen(r.keyword)} title="Open this keyword's overview">{r.keyword}</button> : r.keyword}</td>
-              <td className="num" data-label="Volume / mo"><BarFigure value={r.volume} max={maxVolume} color={PALETTE.keywords} /></td>
-              <td className="num" data-label="Difficulty"><KdBadge value={r.difficulty} /></td>
-              <td className="num" data-label="CPC">{r.cpc == null ? "—" : `$${r.cpc.toFixed(2)}`}</td>
-              <td data-label="Intent" className="g-text-2 capitalize">{r.intent ?? "—"}</td>
-              {onRemove && <td className="num"><button type="button" className="g-pill g-pill--danger !min-h-8 !px-2" onClick={() => onRemove(r.keyword)} aria-label={`Remove ${r.keyword}`}><Trash2 /></button></td>}
+              <td><Link href={kw(r)} className={TEXT_LINK} title="Open this keyword's overview (the saved one, or the Look up button — nothing is bought)" data-testid="link-keyword">{r.keyword}</Link></td>
+              <td className="num" data-label="Volume / mo"><Link href={kw(r, { section: "volume" })} className={BLOCK_LINK} title="This keyword's search volume by month" data-testid="link-keyword-volume"><BarFigure value={r.volume} max={maxVolume} color={PALETTE.keywords} /></Link></td>
+              <td className="num" data-label="Difficulty"><Link href={kw(r, { section: "serp" })} className={BLOCK_LINK} title="Who ranks for it — the pages the difficulty is worked out from" data-testid="link-keyword-difficulty"><KdBadge value={r.difficulty} /></Link></td>
+              <td className="num" data-label="CPC"><Link href={kw(r, { section: "cpc" })} className={FIG_LINK} title="This keyword's cost per click and bids" data-testid="link-keyword-cpc">{r.cpc == null ? "—" : `$${r.cpc.toFixed(2)}`}</Link></td>
+              <td data-label="Intent" className="g-text-2 capitalize">{r.intent ? <Link href={kw(r, { section: "ideas", table: "matchingTerms", intent: (INTENTS as readonly string[]).includes(r.intent) ? r.intent : undefined })} className={FIG_LINK} title="Keyword ideas with this intent" data-testid="link-keyword-intent">{r.intent}</Link> : "—"}</td>
+              {onRemove && <td className="num"><button type="button" className="g-pill g-pill--danger !min-h-11 !px-2" onClick={() => onRemove(r.keyword)} aria-label={`Remove ${r.keyword}`}><Trash2 /></button></td>}
             </tr>
           ))}
         </tbody>
@@ -120,7 +151,7 @@ function usePicked() {
 }
 
 /** Paste up to 200 keywords and get the numbers for all of them in one go. */
-export function BulkKeywords({ status, site, onTrack, onOpen, initial = "", market, onMarket }: { status: SeoStatus | undefined; site: SeoSite | null; onTrack?: (rows: KwRow[]) => void; onOpen?: (keyword: string) => void; initial?: string; market?: SeoMarket; onMarket?: (m: SeoMarket) => void }) {
+export function BulkKeywords({ status, site, onTrack, initial = "", market, onMarket }: { status: SeoStatus | undefined; site: SeoSite | null; onTrack?: (rows: KwRow[]) => void; initial?: string; market?: SeoMarket; /** The country picker's pick; the page writes it to the address as well as the store. */ onMarket?: (m: SeoMarket) => void }) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [text, setText] = useState(initial);
@@ -154,7 +185,7 @@ export function BulkKeywords({ status, site, onTrack, onOpen, initial = "", mark
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {market && onMarket && <MarketPicker value={market} onChange={(m) => { setAsked([]); clear(); onMarket(m); }} />}
           <Button type="submit" disabled={!draft.length} data-testid="button-bulk-prepare">Analyse {draft.length ? `${Math.min(draft.length, MAX_BULK)} keyword${draft.length === 1 ? "" : "s"}` : "keywords"}</Button>
-          <span className="g-text-2 text-[13px]">{draft.length > MAX_BULK ? `Only the first ${MAX_BULK} of ${fmtNum(draft.length)} are analysed at once. ` : ""}{price != null && draft.length ? `About ${money(bulkPrice(status, Math.min(draft.length, MAX_BULK)))} of your SEO data; reopening the same set within a day is free. ${market?.label ?? "United States"}, Google.` : "Volume, difficulty, cost per click and intent for each. United States, Google."}</span>
+          <span className="g-text-2 text-[13px]">{draft.length > MAX_BULK ? `Only the first ${MAX_BULK} of ${fmtNum(draft.length)} are analysed at once. ` : ""}{price != null && draft.length ? <>About <Link href={seoLinks.usage()} className={TEXT_LINK} title="Usage and credit: what lookups cost and what is left this month" data-testid="link-bulk-price">{money(bulkPrice(status, Math.min(draft.length, MAX_BULK)))}</Link> of your SEO data; reopening the same set within a day is free. {market?.label ?? "United States"}, Google.</> : "Volume, difficulty, cost per click and intent for each. United States, Google."}</span>
         </div>
       </form>
       <div className="mt-4">
@@ -170,15 +201,15 @@ export function BulkKeywords({ status, site, onTrack, onOpen, initial = "", mark
         {page && (
           <>
             <div className="mb-2 flex flex-wrap items-center gap-2 text-[13px]">
-              <span className="g-text-2" data-testid="text-bulk-meta">{fmtNum(page.rows.length)} of {fmtNum(asked.length)} keywords have numbers · as of {fmtDate(page.fetchedAt)}</span>
-              <button type="button" className="g-pill g-pill--sm" onClick={() => set(new Set(picked.size === page.rows.length ? [] : page.rows.map((r) => r.keyword)))} disabled={!page.rows.length}>{picked.size === page.rows.length && page.rows.length ? "Select none" : "Select all"}</button>
+              <span className="g-text-2" data-testid="text-bulk-meta">{fmtNum(page.rows.length)} of {fmtNum(asked.length)} keywords have numbers · <Link href={seoLinks.usage({ month: page.fetchedAt.slice(0, 7) })} className={TEXT_LINK} title="When this analysis was bought — that month's lookups on the Usage page" data-testid="link-bulk-as-of">as of {fmtDate(page.fetchedAt)}</Link></span>
+              <button type="button" className={PILL} onClick={() => set(new Set(picked.size === page.rows.length ? [] : page.rows.map((r) => r.keyword)))} disabled={!page.rows.length}>{picked.size === page.rows.length && page.rows.length ? "Select none" : "Select all"}</button>
               <span className="ml-auto flex flex-wrap items-center gap-2">
                 <AddToList market={market} rows={chosen} onDone={clear} />
-                {onTrack && site && <button type="button" className="g-pill g-pill--sm" disabled={!chosen.length} onClick={() => onTrack(chosen)} data-testid="button-bulk-track"><Plus /> Track {chosen.length || ""} on {site.domain}</button>}
-                <button type="button" className="g-pill g-pill--sm" disabled={!page.rows.length} onClick={() => downloadCsv("keywords.csv", [["Keyword", "Volume", "Difficulty", "CPC", "Intent"], ...page.rows.map((r) => [r.keyword, r.volume, r.difficulty, r.cpc, r.intent ?? null])])} data-testid="button-bulk-export"><Download /> Export</button>
+                {onTrack && site && <button type="button" className={PILL} disabled={!chosen.length} onClick={() => onTrack(chosen)} data-testid="button-bulk-track"><Plus /> Track {chosen.length || ""} on {site.domain}</button>}
+                <button type="button" className={PILL} disabled={!page.rows.length} onClick={() => downloadCsv("keywords.csv", [["Keyword", "Volume", "Difficulty", "CPC", "Intent"], ...page.rows.map((r) => [r.keyword, r.volume, r.difficulty, r.cpc, r.intent ?? null])])} data-testid="button-bulk-export"><Download /> Export</button>
               </span>
             </div>
-            {page.rows.length > 0 ? <KeywordTable rows={page.rows} picked={picked} toggle={toggle} setPicked={set} onOpen={onOpen} testId="table-bulk" /> : <Empty><h3>No numbers for these keywords</h3><p>None of them has enough searches in the United States to be measured.</p></Empty>}
+            {page.rows.length > 0 ? <KeywordTable rows={page.rows} picked={picked} toggle={toggle} setPicked={set} market={market} testId="table-bulk" /> : <Empty><h3>No numbers for these keywords</h3><p>None of them has enough searches in the United States to be measured.</p></Empty>}
             {page.notFound.length > 0 && <p className="g-text-2 mt-2 text-[13px]" data-testid="text-bulk-notfound">No numbers for {page.notFound.length} keyword{page.notFound.length === 1 ? "" : "s"} (too few searches to measure): {page.notFound.slice(0, 20).join(", ")}{page.notFound.length > 20 ? "…" : ""}</p>}
           </>
         )}
@@ -188,19 +219,24 @@ export function BulkKeywords({ status, site, onTrack, onOpen, initial = "", mark
 }
 
 /** The account's keyword lists: open one, tidy it, track it, export it, or get fresh numbers for it. */
-export function KeywordLists({ status, site, onTrack, onOpen }: { status: SeoStatus | undefined; site: SeoSite | null; /** `from` is the list's own country: its numbers belong to it. */ onTrack?: (rows: KwRow[], from: SeoMarket) => void; onOpen?: (keyword: string, from: SeoMarket) => void }) {
+export function KeywordLists({ status, site, onTrack }: { status: SeoStatus | undefined; site: SeoSite | null; /** `from` is the list's own country: its numbers belong to it. */ onTrack?: (rows: KwRow[], from: SeoMarket) => void }) {
   const qc = useQueryClient();
   const { toast } = useToast();
-  const [openId, setOpenId] = useState<number | null>(null);
+  // The open list is the `list` parameter of the address (links.ts): a list the account no longer has falls back to the first, and says so.
+  const listParam = Number(useAddress().get("list")) || null;
   const [name, setName] = useState("");
   const { picked, toggle, clear, set } = usePicked();
   const lists = useQuery<{ lists: List[] }>({ queryKey: ["/api/seo/lists"] });
-  const current = openId ?? lists.data?.lists[0]?.id ?? null;
+  const known = lists.data?.lists;
+  const first = known?.[0]?.id ?? null;
+  const listKnown = !!listParam && !!known?.some((l) => l.id === listParam);
+  const current = known ? (listKnown ? listParam : first) : null;
+  useEffect(() => { clear(); }, [current]); // eslint-disable-line react-hooks/exhaustive-deps
   const items = useQuery<{ list: { id: number; name: string; locationCode?: number; languageCode?: string }; items: (KwRow & { addedAt: string })[] }>({ queryKey: [`/api/seo/lists/${current}`], enabled: current !== null });
   const refresh = () => void qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && q.queryKey[0].startsWith("/api/seo/lists") });
   const create = useMutation({
     mutationFn: () => api("POST", "/api/seo/lists/items", { name: name.trim(), items: [] }),
-    onSuccess: (r: { list: { id: number } }) => { setName(""); setOpenId(r.list.id); refresh(); },
+    onSuccess: (r: { list: { id: number } }) => { setName(""); setParam("list", r.list.id); refresh(); },
     onError: (e) => toast({ title: "Couldn't create the list", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const remove = useMutation({
@@ -212,7 +248,7 @@ export function KeywordLists({ status, site, onTrack, onOpen }: { status: SeoSta
   });
   const drop = useMutation({
     mutationFn: (id: number) => api("DELETE", `/api/seo/lists/${id}`),
-    onSuccess: () => { setOpenId(null); clear(); refresh(); toast({ title: "List deleted" }); },
+    onSuccess: () => { setParam("list", null); clear(); refresh(); toast({ title: "List deleted" }); },
     onError: (e) => toast({ title: "Couldn't delete the list", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const all = lists.data?.lists ?? [], rows = items.data?.items ?? [];
@@ -243,9 +279,9 @@ export function KeywordLists({ status, site, onTrack, onOpen }: { status: SeoSta
             {all.length === 0 ? <p className="g-text-2 text-[13px]">No lists yet. Name one above, or tick keywords in any report and choose "Add to a list".</p> : (
               <ul className="space-y-0.5" aria-label="Your keyword lists">
                 {all.map((l) => (
-                  <li key={l.id}><button type="button" onClick={() => { setOpenId(l.id); clear(); }} aria-current={current === l.id ? "true" : undefined} className={`flex w-full items-baseline gap-2 rounded-md px-2 py-1.5 text-left text-[13px] ${current === l.id ? "font-medium" : "g-text"}`} style={current === l.id ? { background: "var(--g-accent-soft)", color: "var(--g-blue)" } : undefined} data-testid={`list-${l.id}`}>
+                  <li key={l.id}><Link href={seoLinks.keywords("", { view: "lists", list: l.id })} aria-current={current === l.id ? "true" : undefined} className={`flex w-full min-h-11 items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] ${LINK_CUE} ${current === l.id ? "font-medium" : "g-text"}`} style={current === l.id ? { background: "var(--g-accent-soft)", color: "var(--g-blue)" } : undefined} data-testid={`list-${l.id}`}>
                     <span className="min-w-0 flex-1 truncate">{l.name}{sameMarket(l, DEFAULT_MARKET) ? "" : <span className="g-text-2 font-normal"> · {marketLabel(l.locationCode ?? 2840, l.languageCode ?? "en")}</span>}</span><span className="tabular-nums">{fmtNum(l.keywords)}</span>
-                  </button></li>
+                  </Link></li>
                 ))}
               </ul>
             )}
@@ -256,19 +292,23 @@ export function KeywordLists({ status, site, onTrack, onOpen }: { status: SeoSta
             {current !== null && items.isError && <div className="g-callout" role="alert"><h3>Couldn't open the list</h3><p>{apiErrorMessage(items.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void items.refetch()}>Try again</button></div>}
             {items.data && (
               <>
+                {/* The chip says what the address opened: a list other than the first (the one shown with no `list`), or a list that no longer exists. */}
+                {listParam != null && !listKnown && <ActiveFilter onClear={() => setParam("list", null)} clearLabel="Back to the first list">List #{listParam} isn't one of your lists (deleted, or another account's) — showing "{items.data.list.name}"</ActiveFilter>}
+                {listKnown && listParam !== first && listParam === items.data.list.id && <ActiveFilter onClear={() => setParam("list", null)} clearLabel="Back to the first list">List: {items.data.list.name} · {listMarket.label}</ActiveFilter>}
                 <div className="mb-2 flex flex-wrap items-center gap-2 text-[13px]">
                   <h3 className="text-[17px] font-medium [overflow-wrap:anywhere]" style={{ color: "var(--g-blue)" }}>{items.data.list.name}</h3>
-                  <span className="g-text-2">{fmtNum(rows.length)} keyword{rows.length === 1 ? "" : "s"} · {(() => { const known = rows.filter((r) => r.volume != null); return known.length === 0 ? "no search volumes yet" : `${fmtNum(known.reduce((a, r) => a + (r.volume ?? 0), 0))} searches a month ${known.length < rows.length ? `for the ${fmtNum(known.length)} with a figure` : "in total"}`; })()}</span>
+                  {/* The list's figures are its own address (the rows below; the link to share it), the total grouped by topic. */}
+                  <span className="g-text-2"><Link href={seoLinks.keywords("", { view: "lists", list: items.data.list.id })} className={TEXT_LINK} title="This list's own address — its keywords, below" data-testid="link-list-count">{fmtNum(rows.length)} keyword{rows.length === 1 ? "" : "s"}</Link> · {(() => { const known = rows.filter((r) => r.volume != null); return known.length === 0 ? "no search volumes yet" : <Link href={seoLinks.keywords("", { view: "lists", list: items.data.list.id, topic: "*" })} className={TEXT_LINK} title="The same keywords grouped by topic, each group with its own total" data-testid="link-list-volume">{fmtNum(known.reduce((a, r) => a + (r.volume ?? 0), 0))} searches a month {known.length < rows.length ? `for the ${fmtNum(known.length)} with a figure` : "in total"}</Link>; })()}</span>
                   <span className="ml-auto flex flex-wrap items-center gap-2">
-                    {onTrack && site && <button type="button" className="g-pill g-pill--sm" disabled={!chosen.length} onClick={() => onTrack(chosen, listMarket)} data-testid="button-list-track"><Plus /> Track {chosen.length || ""} on {site.domain}</button>}
-                    <button type="button" className="g-pill g-pill--sm" disabled={!chosen.length || remove.isPending} onClick={() => remove.mutate(chosen.map((r) => r.keyword))} data-testid="button-list-remove"><Trash2 /> Remove {chosen.length || ""}</button>
-                    <button type="button" className="g-pill g-pill--sm" disabled={!rows.length || renew.isPending || !status?.configured || !affordable(status, price)} onClick={() => renew.mutate()} title={price != null ? `Today's numbers for all ${rows.length} keywords, saved back to this list — about ${money(price)}` : undefined} data-testid="button-list-refresh">{renew.isPending ? <Loader2 className="animate-spin" /> : <RefreshCw />} {renew.isPending ? "Refreshing…" : `Refresh numbers${price != null && rows.length ? ` · about ${money(price)}` : ""}`}</button>
-                    <button type="button" className="g-pill g-pill--sm" disabled={!rows.length} onClick={() => downloadCsv(`${items.data!.list.name.replace(/[^a-z0-9]+/gi, "-")}.csv`, [["Keyword", "Volume", "Difficulty", "CPC", "Intent", "Added"], ...rows.map((r) => [r.keyword, r.volume, r.difficulty, r.cpc, r.intent ?? null, r.addedAt.slice(0, 10)])])} data-testid="button-list-export"><Download /> Export</button>
-                    <button type="button" className="g-pill g-pill--sm g-pill--danger" disabled={drop.isPending} onClick={() => { if (window.confirm(`Delete the list "${items.data!.list.name}" and its ${rows.length} keywords? This can't be undone.`)) drop.mutate(items.data!.list.id); }} data-testid="button-list-delete"><Trash2 /> Delete list</button>
+                    {onTrack && site && <button type="button" className={PILL} disabled={!chosen.length} onClick={() => onTrack(chosen, listMarket)} data-testid="button-list-track"><Plus /> Track {chosen.length || ""} on {site.domain}</button>}
+                    <button type="button" className={PILL} disabled={!chosen.length || remove.isPending} onClick={() => remove.mutate(chosen.map((r) => r.keyword))} data-testid="button-list-remove"><Trash2 /> Remove {chosen.length || ""}</button>
+                    <button type="button" className={PILL} disabled={!rows.length || renew.isPending || !status?.configured || !affordable(status, price)} onClick={() => renew.mutate()} title={price != null ? `Today's numbers for all ${rows.length} keywords, saved back to this list — about ${money(price)}` : undefined} data-testid="button-list-refresh">{renew.isPending ? <Loader2 className="animate-spin" /> : <RefreshCw />} {renew.isPending ? "Refreshing…" : `Refresh numbers${price != null && rows.length ? ` · about ${money(price)}` : ""}`}</button>
+                    <button type="button" className={PILL} disabled={!rows.length} onClick={() => downloadCsv(`${items.data!.list.name.replace(/[^a-z0-9]+/gi, "-")}.csv`, [["Keyword", "Volume", "Difficulty", "CPC", "Intent", "Added"], ...rows.map((r) => [r.keyword, r.volume, r.difficulty, r.cpc, r.intent ?? null, r.addedAt.slice(0, 10)])])} data-testid="button-list-export"><Download /> Export</button>
+                    <button type="button" className={`${PILL} g-pill--danger`} disabled={drop.isPending} onClick={() => { if (window.confirm(`Delete the list "${items.data!.list.name}" and its ${rows.length} keywords? This can't be undone.`)) drop.mutate(items.data!.list.id); }} data-testid="button-list-delete"><Trash2 /> Delete list</button>
                   </span>
                 </div>
                 {rows.length === 0 ? <Empty testId="list-empty"><h3>This list is empty</h3><p>Tick keywords in a keyword report, a bulk analysis or a content gap and choose "Add to a list".</p></Empty>
-                  : <KeywordTable rows={rows} picked={picked} toggle={toggle} setPicked={set} onOpen={onOpen ? (k) => onOpen(k, listMarket) : undefined} onRemove={(k) => remove.mutate([k])} testId="table-list" />}
+                  : <KeywordTable rows={rows} picked={picked} toggle={toggle} setPicked={set} market={listMarket} onRemove={(k) => remove.mutate([k])} testId="table-list" />}
               </>
             )}
           </div>
