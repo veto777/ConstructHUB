@@ -4,6 +4,7 @@
  *   GET  /api/crm/billing/plans         the CRM price book (public)
  *   GET  /api/crm/billing/subscription  this account's CRM subscription
  *   POST /api/crm/billing/checkout      start one (Stripe Checkout, one free trial of CRM_TRIAL_DAYS)
+ *   POST /api/crm/billing/change-preview full recurring order, including retained add-ons
  *   POST /api/crm/billing/change        change plan / interval / extra seats / the JobCam add-on in place
  *
  * One account, one Stripe customer, up to two subscriptions: the platform plan
@@ -22,7 +23,7 @@ import { crmPlanPriceSpec, crmSeatPriceSpec, crmAddonPriceSpec, resolvePriceId, 
 import { appReturnBaseUrl, portalReturnBaseUrl } from "../site-context";
 import {
   CRM_PLANS, CRM_PLAN_KEYS, CRM_TRIAL_DAYS, CRM_EXTRA_SEAT_MONTHLY_CENTS, CRM_EXTRA_SEAT_ANNUAL_CENTS,
-  CRM_EXTRA_SEAT_MAX, CRM_ADDONS, crmAddonAvailableOn, crmPlanHasJobcam, isCrmPlanKey, type CrmPlanKey,
+  CRM_EXTRA_SEAT_MAX, CRM_ADDONS, crmPlanPriceCents, crmAddonPriceCents, crmAddonAvailableOn, crmPlanHasJobcam, isCrmPlanKey, type CrmPlanKey,
 } from "@shared/crm-plans";
 import type { BillingInterval } from "@shared/plans";
 import {
@@ -267,6 +268,22 @@ export async function crmChangeItems(
   return items;
 }
 
+/** Read-only recurring order, using the same fallback rules as an actual change. */
+export function crmChangePreview(sub: Stripe.Subscription, body: unknown) {
+  const current = describeCrmSubscription(sub);
+  const order = parseCrmOrder(body, {
+    plan: current.plan ?? undefined, interval: current.interval ?? undefined,
+    extraSeats: current.extraSeats, jobcam: current.jobcam,
+  });
+  const seatCents = order.interval === "year" ? CRM_EXTRA_SEAT_ANNUAL_CENTS : CRM_EXTRA_SEAT_MONTHLY_CENTS;
+  return {
+    order,
+    recurringCents: crmPlanPriceCents(order.plan, order.interval)
+      + order.extraSeats * seatCents
+      + (order.jobcam ? crmAddonPriceCents("jobcam", order.interval) : 0),
+  };
+}
+
 export function registerCrmBillingRoutes(app: Express, deps: CrmBillingDeps) {
   void crmBillingSchemaReady();
 
@@ -343,6 +360,24 @@ export function registerCrmBillingRoutes(app: Express, deps: CrmBillingDeps) {
     }
   });
 
+  app.post("/api/crm/billing/change-preview", async (req: Request, res: Response) => {
+    try {
+      const user = (req as any).user;
+      if (!user) return res.status(401).json({ message: "Login required" });
+      const row = await crmSubscriptionRow(user.id);
+      if (!row?.stripe_subscription_id || !LIVE_STATUSES.has(row.status)) {
+        throw new BillingRequestError(409, "You don't have a CRM subscription to change.", "no_crm_subscription");
+      }
+      const sub = await stripe.subscriptions.retrieve(row.stripe_subscription_id);
+      if (!LIVE_STATUSES.has(sub.status)) {
+        throw new BillingRequestError(409, "Your CRM subscription has ended.", "no_crm_subscription");
+      }
+      res.json(crmChangePreview(sub, req.body ?? {}));
+    } catch (err: any) {
+      deps.sendStripeError(res, err);
+    }
+  });
+
   app.post("/api/crm/billing/change", async (req: Request, res: Response) => {
     try {
       const user = (req as any).user;
@@ -360,9 +395,7 @@ export function registerCrmBillingRoutes(app: Express, deps: CrmBillingDeps) {
           throw new BillingRequestError(409, "Your CRM subscription has ended. Choose a CRM plan in Pricing to start a new one.", "no_crm_subscription");
         }
         const current = describeCrmSubscription(sub);
-        const order = parseCrmOrder(req.body ?? {}, {
-          plan: current.plan ?? undefined, interval: current.interval ?? undefined, extraSeats: current.extraSeats, jobcam: current.jobcam,
-        });
+        const { order } = crmChangePreview(sub, req.body ?? {});
         if (current.plan === order.plan && current.interval === order.interval && current.extraSeats === order.extraSeats && current.jobcam === order.jobcam) {
           return { changed: false, subscription: summary(row) };
         }

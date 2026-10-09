@@ -44,6 +44,30 @@ const usd = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { minim
 const per = (interval: BillingInterval) => (interval === "year" ? "/yr" : "/mo");
 
 type Order = { plan: CrmPlanKey; interval: BillingInterval; extraSeats: number };
+type ChangePreview = { order: Order & { jobcam: boolean }; recurringCents: number };
+
+export function crmPurchaseReview(order: Order, preview?: ChangePreview): PurchaseReview {
+  const selected = preview?.order ?? order;
+  const plan = CRM_PLANS[selected.plan];
+  const jobcam = preview?.order.jobcam ?? false;
+  const cents = preview?.recurringCents ?? crmPlanPriceCents(selected.plan, selected.interval)
+    + selected.extraSeats * (selected.interval === "year" ? CRM_EXTRA_SEAT_ANNUAL_CENTS : CRM_EXTRA_SEAT_MONTHLY_CENTS);
+  return {
+    name: plan.name,
+    product: "ConstructHUB CRM",
+    price: `${usd(cents)}${per(selected.interval)}`,
+    note: preview
+      ? "Your CRM subscription changes in place. This is the full recurring total; the prorated difference is charged or credited now."
+      : `A first CRM subscription starts with a ${CRM_TRIAL_DAYS}-day trial. It is billed separately from any ConstructHUB platform plan. Cancel any time.`,
+    included: [
+      ...plan.features,
+      ...(selected.extraSeats ? [`${selected.extraSeats} extra seat${selected.extraSeats === 1 ? "" : "s"} (${plan.limits.seats + selected.extraSeats} seats in all)`] : []),
+      ...(jobcam ? ["JobCam add-on retained — included in the total"] : []),
+    ],
+    notIncluded: plan.notIncluded.filter((line) => !(jobcam && line.startsWith("JobCam"))
+      && !(selected.extraSeats > 0 && line.startsWith("Extra seats"))),
+  };
+}
 
 export function CrmPlanCards({ interval, signedIn, returnTo = "pricing" }: {
   interval: BillingInterval;
@@ -103,19 +127,15 @@ export function CrmPlanCards({ interval, signedIn, returnTo = "pricing" }: {
     setReview({ plan, interval, extraSeats });
   };
 
-  const reviewData: PurchaseReview | null = review ? {
-    name: CRM_PLANS[review.plan].name,
-    product: "ConstructHUB CRM",
-    price: `${usd(crmPlanPriceCents(review.plan, review.interval) + review.extraSeats * (review.interval === "year" ? CRM_EXTRA_SEAT_ANNUAL_CENTS : CRM_EXTRA_SEAT_MONTHLY_CENTS))}${per(review.interval)}`,
-    note: live
-      ? "Your CRM subscription changes in place and the difference is charged or credited now."
-      : `A first CRM subscription starts with a ${CRM_TRIAL_DAYS}-day trial. It is billed separately from any ConstructHUB platform plan. Cancel any time.`,
-    included: [
-      ...CRM_PLANS[review.plan].features,
-      ...(review.extraSeats ? [`${review.extraSeats} extra seat${review.extraSeats === 1 ? "" : "s"} (${CRM_PLANS[review.plan].limits.seats + review.extraSeats} seats in all)`] : []),
-    ],
-    notIncluded: CRM_PLANS[review.plan].notIncluded,
-  } : null;
+  const changeQuote = useQuery<ChangePreview>({
+    queryKey: ["/api/crm/billing/change-preview", review],
+    enabled: live && !!review,
+    staleTime: 0,
+    retry: false,
+    queryFn: async () => (await apiRequest("POST", "/api/crm/billing/change-preview", review)).json(),
+  });
+  const quoteReady = !live || (changeQuote.isSuccess && !changeQuote.isFetching);
+  const reviewData = review && quoteReady ? crmPurchaseReview(review, live ? changeQuote.data : undefined) : null;
 
   return (
     <div data-testid="block-crm-plans">
@@ -207,12 +227,18 @@ export function CrmPlanCards({ interval, signedIn, returnTo = "pricing" }: {
         The CRM is its own subscription, billed separately from the ConstructHUB platform plans. A first CRM subscription starts with a {CRM_TRIAL_DAYS}-day trial. Prices in USD.
       </p>
 
+      {live && review && !quoteReady && (
+        <p role="status" className="mt-4 text-center text-sm">
+          {changeQuote.isError ? `Couldn't preview your CRM change: ${apiErrorMessage(changeQuote.error)}` : "Loading your full CRM recurring total…"}
+          {changeQuote.isError && <Button variant="link" onClick={() => void changeQuote.refetch()}>Retry preview</Button>}
+        </p>
+      )}
       <PurchaseReviewDialog
         review={reviewData}
         pending={pending}
         confirmLabel={live ? "Change my CRM plan" : "Continue to payment"}
         onClose={() => setReview(null)}
-        onConfirm={() => { if (review) (live ? change : checkout).mutate(review); }}
+        onConfirm={() => { if (review && quoteReady) (live ? change : checkout).mutate(review); }}
       />
     </div>
   );
