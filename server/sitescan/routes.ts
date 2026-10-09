@@ -113,6 +113,32 @@ export function psiLines(psi: any[]): string[] {
     ].join("\n");
   });
 }
+/** The free public scan's abuse limits: anyone can ask for one, of any public website, without an account. */
+export const FREE_SCAN_LIMITS = { perIpDay: 3, perEmailDay: 2, perSiteDay: 3, perHour: 20, perDay: 100, waiting: 5 } as const;
+const DAY_MS = 86400_000;
+/**
+ * May a free scan be queued? Free scans share the one worker with customers' scans (review S-1), so: only a few may
+ * wait at a time ("busy" — nothing is counted against the visitor), the same website is scanned a few times a day
+ * whoever asks, and there is an hourly limit under the daily one. Keys are hashes, never the raw address or email.
+ */
+export async function freeScanGate(
+  who: { ip: string; email: string; host: string },
+  deps = {
+    take: takeBudget,
+    waiting: async () =>
+      (await pool.query("SELECT count(*)::int AS n FROM sitescan_jobs WHERE user_id IS NULL AND status IN ('queued','running')")).rows[0].n as number,
+  },
+): Promise<"ok" | "busy" | "limit"> {
+  if ((await deps.waiting()) >= FREE_SCAN_LIMITS.waiting) return "busy";
+  const L = FREE_SCAN_LIMITS;
+  return (await deps.take("sitescan:lead-ip:" + who.ip, L.perIpDay, 1, DAY_MS)) &&
+    (await deps.take("sitescan:lead-email:" + who.email, L.perEmailDay, 1, DAY_MS)) &&
+    (await deps.take("sitescan:lead-host:" + who.host, L.perSiteDay, 1, DAY_MS)) &&
+    (await deps.take("sitescan:lead-global-hour", L.perHour, 1, 3600_000)) &&
+    (await deps.take("sitescan:lead-global", L.perDay, 1, DAY_MS))
+    ? "ok"
+    : "limit";
+}
 export function registerSiteScanRoutes(
   app: Express,
   auth: (req: any, res: any) => any,
@@ -769,16 +795,14 @@ export function registerSiteScanRoutes(
           .json({ message: "CAPTCHA unavailable. Please retry." });
       }
     }
-    if (
-      !(await takeBudget("sitescan:lead-ip:" + ipKey(req), 3, 1, 86400_000)) ||
-      !(await takeBudget(
-        "sitescan:lead-email:" + hashToken(body.email),
-        2,
-        1,
-        86400_000,
-      )) ||
-      !(await takeBudget("sitescan:lead-global", 100, 1, 86400_000))
-    )
+    const gate = await freeScanGate({ ip: ipKey(req), email: hashToken(body.email), host: hashToken(new URL(url).hostname.replace(/^www\./, "")) });
+    if (gate === "busy") {
+      res.setHeader("Retry-After", "300");
+      return res
+        .status(429)
+        .json({ message: "Free scans are busy right now. Try again in a few minutes." });
+    }
+    if (gate === "limit")
       return res
         .status(429)
         .json({ message: "Free scan limit reached. Try again tomorrow." });

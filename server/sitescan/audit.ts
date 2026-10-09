@@ -9,7 +9,7 @@ import {
 } from "./guidance";
 export { missingPageScope };
 import { safeFetch, siteUrl, type PageResponse } from "./http";
-import { robotsRules } from "./robots";
+import { robotsRules, ROBOTS_LIMITS } from "./robots";
 export const categories = [
   "technical",
   "performance",
@@ -189,7 +189,7 @@ export const emptyState = (url: string): CrawlState => ({
   linkChecks: [],
 });
 export function parsePage(r: PageResponse): Page {
-  const $ = cheerio.load(r.body),
+  const $ = cheerio.load(r.body.length > MAX_PARSE_CHARS ? r.body.slice(0, MAX_PARSE_CHARS) : r.body),
     schema: any[] = [];
   let invalidSchema = false;
   $('script[type="application/ld+json"]').each((_, el) => {
@@ -277,6 +277,17 @@ export function parsePage(r: PageResponse): Page {
     redirects: r.redirects,
   };
 }
+/**
+ * How the crawl runs a piece of work that reads what the site sent (robots.txt, a sitemap, a page) and cannot be
+ * interrupted once it starts. The worker passes one that records the step before it runs and fails the scan when it
+ * overran its time (worker.ts `cpuStep`), so a file built to be slow to read costs one scan and is never read again.
+ */
+export type CrawlStep = <T>(label: string, work: () => T) => Promise<T>;
+const runStep: CrawlStep = async (_label, work) => work();
+/** Thrown by a step to stop the whole scan (not just the page it was reading): the crawl never swallows it. */
+export class ScanAbort extends Error {}
+/** A crawled body is read up to here (the fetch layer already stops at 2 MB). */
+export const MAX_PARSE_CHARS = 2_000_000;
 export async function crawl(
   url: string,
   cap: number,
@@ -285,6 +296,7 @@ export async function crawl(
   http = safeFetch,
   wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms)),
   maxMs = 20 * 60_000,
+  step: CrawlStep = runStep,
 ) {
   let origin = state.origin || new URL(url).origin;
   const requestedOrigin = new URL(url).origin;
@@ -307,8 +319,9 @@ export async function crawl(
       );
     origin = new URL(r.url).origin;
     state.origin = origin;
-    state.robots = r.status === 200 ? r.body : "";
-    const robots = robotsRules(state.robots);
+    // Only what the parser reads is kept (500 KiB): the saved state never carries a larger file around.
+    state.robots = r.status === 200 ? r.body.slice(0, ROBOTS_LIMITS.bytes) : "";
+    const robots = await step("robots.txt", () => robotsRules(state.robots));
     if (robots.delay > 30)
       throw new Error(
         "Site requests a crawl delay over 30 seconds; manual audit required.",
@@ -336,19 +349,21 @@ export async function crawl(
         (u) => new URL(u).origin === origin && robots.allowed(u),
       ).catch(() => null);
       if (!result || result.status !== 200) continue;
-      const $ = cheerio.load(result.body, { xml: true });
-      $("sitemap loc").each((_, el) => {
-        try {
-          const next = siteUrl($(el).text());
-          if (maps.length < 10) maps.push(next);
-        } catch {}
-      });
-      $("url loc").each((_, el) => {
-        try {
-          const next = siteUrl($(el).text());
-          if (new URL(next).origin === origin && state.sitemap.length < 5000)
-            state.sitemap.push(next);
-        } catch {}
+      await step("sitemap " + map, () => {
+        const $ = cheerio.load(result.body.slice(0, MAX_PARSE_CHARS), { xml: true });
+        $("sitemap loc").each((_, el) => {
+          if (maps.length >= 10) return false;
+          try {
+            maps.push(siteUrl($(el).text()));
+          } catch {}
+        });
+        $("url loc").each((_, el) => {
+          if (state.sitemap.length >= 5000) return false;
+          try {
+            const next = siteUrl($(el).text());
+            if (new URL(next).origin === origin) state.sitemap.push(next);
+          } catch {}
+        });
       });
     }
     if (robots.allowed(origin + "/llms.txt")) {
@@ -398,7 +413,7 @@ export async function crawl(
         return ok;
       }).catch((e) => String(e?.message ?? e));
       if (typeof missing !== "string")
-        state.missingPages.push({ ...classifyMissingPage(missing, probe), asked: true });
+        state.missingPages.push({ ...(await step("page " + probe, () => classifyMissingPage(missing, probe))), asked: true });
       else
         state.missingPages.push(
           notAskedProbe(
@@ -421,7 +436,8 @@ export async function crawl(
     state.initialized = true;
     await checkpoint(state);
   }
-  const robots = robotsRules(state.robots),
+  const robots = await step("robots.txt", () => robotsRules(state.robots)),
+    queued = new Set(state.queue),
     visited = new Set([
       ...state.pages.flatMap((p) => [p.url, ...p.redirects]),
       ...state.errors.map((e) => e.url),
@@ -481,7 +497,7 @@ export async function crawl(
           await checkpoint(state);
           continue;
         }
-        const page = parsePage(r);
+        const page = await step("page " + next, () => parsePage(r));
         // Saved with an explicit "not cut": a crawl that records the cut says so on every page, which is how a page
         // from an older crawl (no such field; its alias list was capped at 20 unmarked) is told apart.
         page.redirectsCut = false;
@@ -493,12 +509,15 @@ export async function crawl(
             if (
               new URL(link).origin === origin &&
               !visited.has(link) &&
-              !state.queue.includes(link) &&
+              !queued.has(link) &&
               state.queue.length < cap * 5
-            )
+            ) {
+              queued.add(link);
               state.queue.push(link);
+            }
       }
-    } catch {
+    } catch (e) {
+      if (e instanceof ScanAbort) throw e;
       state.errors.push({
         url: next,
         message:
@@ -848,16 +867,21 @@ export function findingsFor(state: CrawlState, profile: any = null): Finding[] {
     "ClaudeBot",
     "PerplexityBot",
     "Google-Extended",
-  ])
+  ]) {
+    // Read once per bot (it was once per page), with a small work limit: this runs in one go for every page.
+    const rules = robotsRules(state.robots, agent, { stepsTotal: 5_000_000 });
+    const blockedFor = urls((p) => !rules.allowed(p.url));
     add(
       "bot-" + agent,
       "ai-readiness",
       "info",
       `${agent} blocked by robots`,
-      urls((p) => !robotsRules(state.robots, agent).allowed(p.url)),
+      // The limit ran out (a robots.txt built to be slow to read): nothing is known, so nothing is claimed.
+      rules.exhausted ? [] : blockedFor,
       "Crawler access is a business choice, not a promise of AI visibility.",
       "Review this bot’s robots rules against your content policy.",
     );
+  }
   add(
     "llms",
     "ai-readiness",

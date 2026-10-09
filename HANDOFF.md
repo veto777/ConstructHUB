@@ -261,6 +261,33 @@ _Last updated 2026-08-24. Repo: `veto777/ConstructHUB` (private). Local: `/home/
   `~/ConstructHUB-seo/analysis/video-out/database-directory/walkthrough.mp4`; tooling `scripts/tutorials/*` on branch
   `tutorial-video-1` (not merged yet: player wiring + R2 upload in progress).
 
+## 🛡 2026-10-09 — Site Scan: a hostile robots.txt can no longer stall the site (review S-1, branch `fix-robots-matcher`, NOT deployed)
+
+- **What was wrong:** `server/sitescan/robots.ts` turned each `*` of a robots rule into a backtracking `.*` regular expression and the
+  crawler runs inside the web process. Anyone could point the free public scan (`POST /api/sitescan/public/start`, no account) at a site
+  whose robots.txt froze every request for every customer (reviewer: 4 stars, 200-character path = 21.7 s), and the job was leased again
+  after each restart (up to 5 times).
+- **Now:** rules are matched by a plain two-pointer wildcard walk (no regular expression is built from the file), as Google reads them:
+  longest rule wins, Allow wins a tie, `$` ends, case-sensitive, percent-encoding compared in one spelling. Bounds (`ROBOTS_LIMITS`): the
+  first 500 KiB, 5,000 rules, 2,048-character rules and addresses, 50 sitemaps, and a work limit per answer and per rule set — past a
+  bound the answer is "not allowed". Findings read robots.txt once per bot (it was once per page).
+- **Time limits (`server/sitescan/worker.ts`):** every uninterruptible step on what a site sent (robots.txt, sitemap, page, building the
+  report) is marked in the row (`sitescan_jobs.cpu_step`), timed, and followed by a turn of the event loop. Over its time → the scan is
+  failed (`fail_reason='cpu_stall'`, an ops issue "Site Scan stalled the web process") and never leased again. A scan whose worker went
+  away inside a step is failed the same way at the next tick; one that went away between steps is taken again once (`abandoned`).
+  A failed scan is never retried. Whole-scan wall clock: 30 min signed in, 3 min free. Customers' scans are leased before free ones.
+  New columns are added at boot by `ensureSiteScanSchema` (`cpu_step`, `abandoned`, `fail_reason`) — no manual migration.
+- **Free public scan limits** (`FREE_SCAN_LIMITS`): 3/day per visitor address, 2/day per email, 3/day per website, 20/hour and 100/day
+  overall, and at most 5 free scans waiting at once ("busy, try again in a few minutes").
+- **Optional env (defaults are fine):** `SITESCAN_STEP_BUDGET_MS` (5000), `SITESCAN_REPORT_BUDGET_MS` (20000),
+  `SITESCAN_SCAN_BUDGET_MS` (1800000), `SITESCAN_FREE_SCAN_BUDGET_MS` (180000). `SITESCAN_WORKER_DISABLED=true` still stops the worker.
+- **Recommended next (not done here):** the crawl still shares the web process. Its remaining uninterruptible work (HTML parsing of a
+  page up to 2 MB, the per-page checkpoint that serialises the whole crawl state) is bounded and timed, not removed. Move the worker into
+  its own process (the same `runSiteScanWorker` loop under a second systemd unit with `SITESCAN_WORKER_DISABLED=true` on the web unit) —
+  no new job system is needed, the leases already work across processes.
+- **Tests:** `server/sitescan/robots.test.ts` (reviewer's cases in milliseconds; 50,000 random rules/paths against a reference matcher;
+  ordinary robots files), `scan-guard.test.ts` (no DB), and 6 lease/limit tests in `integration.test.ts` (need the dev database).
+
 ## 🔎 2026-10-07 — SEO: Site Explorer + SEO data credit (4x markup, plan allowance, prepaid packs)
 - **Data source is live:** DataForSEO account `support@constructhub.us` created by the owner 2026-10-07, `DATAFORSEO_LOGIN` /
   `DATAFORSEO_PASSWORD` set on vb11, $51 balance. `/seo` no longer shows "being switched on".

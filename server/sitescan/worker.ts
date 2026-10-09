@@ -10,6 +10,7 @@ import {
   scoresFor,
   scoreExplanation,
   missingPageScope,
+  ScanAbort,
   type CrawlState,
 } from "./audit";
 import { pageSpeed, businessSchema } from "./providers";
@@ -43,16 +44,89 @@ export async function enqueue(
   return id;
 }
 export const workerDependencies = { crawl, pageSpeed, http: safeFetch };
+/**
+ * Time limits (review S-1). The crawl runs inside the web process, so a scan must never be able to hold it:
+ *  - one step that reads what a site sent (robots.txt, a sitemap, a page) may take STEP_BUDGET_MS; building the
+ *    report may take REPORT_BUDGET_MS. A step that overran has already cost that time once — the scan is failed
+ *    (`fail_reason='cpu_stall'`) and is never run again;
+ *  - a whole scan has a wall clock (SCAN_BUDGET_MS): past it, nothing more is fetched and the report is built from
+ *    what was read.
+ * A failed scan is never retried. A scan is only picked up again when the process that had it went away without
+ * finishing (its lease ran out) — at most MAX_ABANDONED times, and never when it went away in the middle of a step.
+ */
+const envMs = (name: string, fallback: number) => {
+  const n = Number(process.env[name]);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+};
+export const scanLimits = {
+  stepMs: () => envMs("SITESCAN_STEP_BUDGET_MS", 5_000),
+  reportMs: () => envMs("SITESCAN_REPORT_BUDGET_MS", 20_000),
+  scanMs: (signedIn: boolean) => signedIn ? envMs("SITESCAN_SCAN_BUDGET_MS", 30 * 60_000) : envMs("SITESCAN_FREE_SCAN_BUDGET_MS", 3 * 60_000),
+};
+export const MAX_ABANDONED = 1;
+export class CpuStallError extends ScanAbort {
+  constructor(public step: string, public ms: number, public budget: number) {
+    super(`Site Scan step "${step}" took ${Math.round(ms)} ms (limit ${budget} ms)`);
+  }
+}
+const STALLED = "This website could not be scanned: reading it took too long. The scan was stopped and will not be retried.";
+const ABANDONED = "The scan was interrupted more than once and was stopped. Start a new scan.";
+/**
+ * Scans whose worker went away and that must not be run again: it went away in the middle of a step (`cpu_step` is
+ * still set — the step never returned, which is what a stalled process looks like), or it has been picked up again
+ * too often already. They are failed here, with the reason, before anything is leased.
+ */
+export async function failPoisonedScans() {
+  const { rows } = await pool.query(
+    `UPDATE sitescan_jobs SET status='failed',lease_until=NULL,
+       fail_reason=CASE WHEN cpu_step IS NOT NULL THEN 'cpu_stall' WHEN abandoned>=$1 THEN 'abandoned' ELSE 'retry_limit' END,
+       error=CASE WHEN cpu_step IS NOT NULL THEN $2 ELSE $3 END
+     WHERE status='running' AND lease_until<now() AND (cpu_step IS NOT NULL OR abandoned>=$1 OR attempts>=5)
+     RETURNING id,url,user_id,cpu_step,fail_reason`,
+    [MAX_ABANDONED, STALLED, ABANDONED],
+  );
+  for (const r of rows)
+    if (r.fail_reason === "cpu_stall")
+      void recordFailure("job", "Site Scan stalled the web process", new Error(`scan ${r.id} of ${r.url} never returned from step "${r.cpu_step}"; failed, not retried`));
+  return rows.length;
+}
 export async function runSiteScanWorker(deps = workerDependencies) {
+  await failPoisonedScans();
   const token = randomUUID();
+  // Customers' scans before free ones. A scan left by a worker that went away is taken again once (`abandoned`).
   const {
     rows: [job],
   } = await pool.query(
-    `UPDATE sitescan_jobs SET status='running',lease_token=$1,lease_until=now()+interval '2 minutes',attempts=attempts+1
-    WHERE id=(SELECT id FROM sitescan_jobs WHERE (status='queued' OR status='running' AND lease_until<now()) AND attempts<5 ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING *`,
-    [token],
+    `UPDATE sitescan_jobs SET status='running',lease_token=$1,lease_until=now()+interval '2 minutes',attempts=attempts+1,
+       abandoned=abandoned+CASE WHEN status='running' THEN 1 ELSE 0 END
+    WHERE id=(SELECT id FROM sitescan_jobs WHERE (status='queued' OR status='running' AND lease_until<now() AND cpu_step IS NULL AND abandoned<$2) AND attempts<5 ORDER BY (user_id IS NULL),created_at FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING *`,
+    [token, MAX_ABANDONED],
   );
   if (!job) return;
+  const deadline = Date.now() + scanLimits.scanMs(!!job.user_id);
+  const timeLeft = () => deadline - Date.now();
+  /** Runs one uninterruptible step: marked in the row while it runs, timed, and the event loop gets a turn after it. */
+  const cpuStep = async <T,>(label: string, work: () => T, budget = scanLimits.stepMs()): Promise<T> => {
+    const mark = await pool.query(
+      "UPDATE sitescan_jobs SET cpu_step=$3 WHERE id=$1 AND lease_token=$2",
+      [job.id, token, label.slice(0, 300)],
+    );
+    if (!mark.rowCount) throw new Error("Lease lost");
+    const started = performance.now();
+    let ms = 0;
+    try {
+      return work();
+    } finally {
+      ms = performance.now() - started;
+      // A step that overran keeps its mark: the row then says which step it was.
+      if (ms <= budget)
+        await pool.query(
+          "UPDATE sitescan_jobs SET cpu_step=NULL WHERE id=$1 AND lease_token=$2",
+          [job.id, token],
+        );
+      else throw new CpuStallError(label, ms, budget);
+    }
+  };
   const heartbeat = setInterval(
     () =>
       void pool
@@ -81,16 +155,27 @@ export async function runSiteScanWorker(deps = workerDependencies) {
       checkpoint,
       deps.http,
       undefined,
-      job.user_id ? 20 * 60_000 : 50_000,
+      Math.min(job.user_id ? 20 * 60_000 : 50_000, Math.max(0, timeLeft())),
+      cpuStep,
     );
     // Link sampling is explicitly bounded; external robots policy is fetched before each host's links.
     const rules = new Map<string, ReturnType<typeof robotsRules>>([
-      [state.origin || new URL(job.url).origin, robotsRules(state.robots)],
+      [state.origin || new URL(job.url).origin, await cpuStep("robots.txt", () => robotsRules(state.robots))],
     ]);
-    const candidates = [...new Set(state.pages.flatMap((p) => p.links))]
-      .filter((u) => !state.pages.some((p) => p.url === u))
-      .slice(0, job.user_id ? 40 : 0);
+    const crawled = new Set(state.pages.map((p) => p.url));
+    const candidates: string[] = [];
+    if (job.user_id) {
+      const seen = new Set<string>();
+      pick: for (const p of state.pages)
+        for (const u of p.links) {
+          if (seen.has(u) || crawled.has(u)) continue;
+          seen.add(u);
+          candidates.push(u);
+          if (candidates.length >= 40) break pick;
+        }
+    }
     for (const url of candidates) {
+      if (timeLeft() <= 0) break;
       if (state.linkChecks.some((c) => c.url === url)) continue;
       try {
         const origin = new URL(url).origin;
@@ -100,7 +185,7 @@ export async function runSiteScanWorker(deps = workerDependencies) {
             (u) => new URL(u).origin === origin,
           );
           if (r.status !== 200 && r.status !== 404) continue;
-          rules.set(origin, robotsRules(r.status === 200 ? r.body : ""));
+          rules.set(origin, await cpuStep("robots.txt " + origin, () => robotsRules(r.status === 200 ? r.body : "")));
         }
         const rule = rules.get(origin)!;
         if (!rule.allowed(url) || rule.delay > 30) continue;
@@ -113,6 +198,7 @@ export async function runSiteScanWorker(deps = workerDependencies) {
         );
         state.linkChecks.push({ url, status: result.status });
       } catch (e: any) {
+        if (e instanceof CpuStallError) throw e;
         // Why there was no status, so a redirect the check would not follow is not reported as a page that did not answer.
         const m = String(e?.message ?? e);
         state.linkChecks.push({ url, status: null, reason: /Redirect excluded/i.test(m) ? "redirect_not_followed" : /timed out|timeout/i.test(m) ? "timeout" : "failed" });
@@ -123,6 +209,7 @@ export async function runSiteScanWorker(deps = workerDependencies) {
     for (const image of [
       ...new Set(state.pages.flatMap((p) => p.images.map((i) => i.url))),
     ].slice(0, job.user_id ? 30 : 0)) {
+      if (timeLeft() <= 0) break;
       if (state.imageChecks.some((i) => i.url === image)) continue;
       const origin = new URL(image).origin,
         rule = rules.get(origin);
@@ -152,6 +239,10 @@ export async function runSiteScanWorker(deps = workerDependencies) {
       .filter((p) => p.status === 200)
       .slice(0, job.psi_pages))
       for (const strategy of ["mobile", "desktop"] as const) {
+        if (timeLeft() <= 0) {
+          psi.push({ url: p.url, strategy, reason: "request_error", unavailable: "PageSpeed was not measured: the scan reached its time limit. Retry later." });
+          continue;
+        }
         if (deps.pageSpeed === pageSpeed && !process.env.PAGESPEED_API_KEY) {
           psi.push(await pageSpeed(p.url, strategy));
           continue;
@@ -201,7 +292,7 @@ export async function runSiteScanWorker(deps = workerDependencies) {
         reason: "no_pages",
         unavailable: "No successful HTML pages were available for PageSpeed.",
       });
-    const findings = findingsFor(state, job.profile);
+    const findings = await cpuStep("report: findings", () => findingsFor(state, job.profile), scanLimits.reportMs());
     for (const p of psi)
       if (typeof p.score === "number" && p.score < 90)
         findings.push({
@@ -213,7 +304,17 @@ export async function runSiteScanWorker(deps = workerDependencies) {
           why: "Measured Lighthouse lab performance is below 90; field data may differ.",
           fix: "Review the attached LCP, CLS, blocking time and transfer size measurements; optimize the largest resources and JavaScript.",
         });
-    const scores = scoresFor(findings, state, psi);
+    const built = await cpuStep(
+      "report: guidance",
+      () => ({
+        scores: scoresFor(findings, state, psi),
+        findings: enrichFindings(findings, state, job.profile),
+        fixes: fixesFor(findings, state, job.profile),
+        scoreExplanation: scoreExplanation(findings, state, psi),
+      }),
+      scanLimits.reportMs(),
+    );
+    const scores = built.scores;
     const report = {
       version: 2,
       url: job.url,
@@ -222,12 +323,12 @@ export async function runSiteScanWorker(deps = workerDependencies) {
       remaining: state.queue.length,
       blocked: state.blocked.length,
       errors: state.errors,
-      findings: enrichFindings(findings, state, job.profile),
-      fixes: fixesFor(findings, state, job.profile),
+      findings: built.findings,
+      fixes: built.fixes,
       platforms: [
         ...new Set(state.pages.map((p) => p.platform || "Custom/unknown")),
       ],
-      scoreExplanation: scoreExplanation(findings, state, psi),
+      scoreExplanation: built.scoreExplanation,
       scores,
       psi,
       profile: job.profile,
@@ -291,15 +392,20 @@ export async function runSiteScanWorker(deps = workerDependencies) {
         job.profile?.id ? String(job.profile.id) : null,
       ],
     );
-    report.fixes = reconcileFixes(
-      report.fixes,
-      (previous?.report?.fixes || []).map((f: any) => ({
-        ...f,
-        done: previous.fix_done?.[f.key] ?? f.done,
-      })),
-      state,
-      job.profile,
-      psi,
+    report.fixes = await cpuStep(
+      "report: fixes",
+      () =>
+        reconcileFixes(
+          report.fixes,
+          (previous?.report?.fixes || []).map((f: any) => ({
+            ...f,
+            done: previous.fix_done?.[f.key] ?? f.done,
+          })),
+          state,
+          job.profile,
+          psi,
+        ),
+      scanLimits.reportMs(),
     );
     const changed = await pool.query(
       "UPDATE sitescan_jobs SET report=$3,state=$4,status='completed',completed_at=now(),lease_until=NULL WHERE id=$1 AND lease_token=$2",
@@ -334,11 +440,22 @@ export async function runSiteScanWorker(deps = workerDependencies) {
         },
       );
     }
-  } catch {
+  } catch (e) {
+    // A failed scan is final: nothing leases a 'failed' row again, whatever the reason.
+    const stalled = e instanceof CpuStallError;
     await pool.query(
-      "UPDATE sitescan_jobs SET status='failed',error='Scan could not complete. Check website availability, robots policy and scan limits; lower the page cap and retry.',lease_until=NULL WHERE id=$1 AND lease_token=$2 AND status='running'",
-      [job.id, token],
+      "UPDATE sitescan_jobs SET status='failed',error=$3,fail_reason=$4,lease_until=NULL WHERE id=$1 AND lease_token=$2 AND status='running'",
+      [
+        job.id,
+        token,
+        stalled
+          ? STALLED
+          : "Scan could not complete. Check website availability, robots policy and scan limits; lower the page cap and retry.",
+        stalled ? "cpu_stall" : "error",
+      ],
     );
+    if (stalled)
+      void recordFailure("job", "Site Scan stalled the web process", new Error(`scan ${job.id} of ${job.url}: ${(e as Error).message}; failed, not retried`));
   } finally {
     clearInterval(heartbeat);
   }
@@ -404,7 +521,7 @@ export async function runSchedules() {
       }
     }
     await c.query(
-      "UPDATE sitescan_jobs SET status='failed',error='Worker retry limit reached' WHERE status='running' AND lease_until<now() AND attempts>=5",
+      "UPDATE sitescan_jobs SET status='failed',error='Worker retry limit reached',fail_reason='retry_limit' WHERE status='running' AND lease_until<now() AND attempts>=5",
     );
     await c.query("COMMIT");
   } catch (e) {
