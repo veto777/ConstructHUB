@@ -29,6 +29,9 @@ beforeAll(async()=>{
   await ensureGrowthSchema();await ensureGbpSchema();await ensureSocialSchema();await ensureSocialSchema();await ensureAccountEventsSchema();
   const users=await pool.query("INSERT INTO users(email) SELECT 'agency-fixture-'||gen_random_uuid()||'@example.invalid' FROM generate_series(1,2) RETURNING id");
   [owner,other]=users.rows.map(r=>r.id);
+  // The Social Media tool is a Pro-and-up module (shared/plans.ts socialPublishing): the worker
+  // skips owners without it, so the fixtures hold a Pro plan.
+  await pool.query("INSERT INTO subscriptions(user_id,plan,status) VALUES($1,'pro','active'),($2,'pro','active')",[owner,other]);
   const locations=await pool.query("INSERT INTO business_locations(user_id,business_name,city,phone) SELECT $1,'Agency fixture '||lpad(n::text,4,'0'),'Fixture city '||n,'fixture-phone-'||n FROM generate_series(1,1000) n RETURNING id",[owner]);
   [a,b]=locations.rows.map(r=>r.id);
   foreign=(await pool.query("INSERT INTO business_locations(user_id,business_name) VALUES($1,'Foreign fixture') RETURNING id",[other])).rows[0].id;
@@ -37,6 +40,7 @@ beforeAll(async()=>{
 });
 afterAll(async()=>{
   await pool.query('DELETE FROM business_locations WHERE user_id=ANY($1)',[[owner,other]]);
+  await pool.query('DELETE FROM subscriptions WHERE user_id=ANY($1)',[[owner,other]]);
   await pool.query('DELETE FROM users WHERE id=ANY($1)',[[owner,other]]);
   await pool.query("DELETE FROM growth_budgets WHERE key LIKE $1 OR key=$2",[`social-ai-business:${owner}:%`,`social-ai:${owner}`]);
   await pool.end();

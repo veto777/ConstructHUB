@@ -1,7 +1,8 @@
 /**
- * The four Agency-only modules answer 402 plan_required (server/entitlements.ts) unless the plan includes
- * them; platform admins keep access; a non-Agency owner's everyday pages keep working through the agency
- * middleware; and the modules' background workers skip owners whose plan no longer includes them.
+ * The plan-gated modules answer 402 plan_required (server/entitlements.ts) one plan below the
+ * plan that includes them — Solo < Team < Pro < Agency; platform admins keep access; a non-Agency
+ * owner's everyday pages keep working through the agency middleware; and the modules' background
+ * workers skip owners whose plan no longer includes them.
  */
 import { beforeAll, afterAll, describe, it, expect, vi } from 'vitest';
 import express from 'express';
@@ -32,12 +33,14 @@ import { registerGmailOAuth, runMailWorker } from './mail-alerts/gmail';
 import { registerInboundMail } from './mail-alerts/inbound';
 import { ingest, hash as mailHash, HELD_ALERT_NOTE } from './mail-alerts/service';
 import { encryptToken } from './gbp/token-crypto';
+import { ensureSocialSchema } from './social/schema';
+import { registerSocialRoutes } from './social/routes';
 import { MODULE_NAMES, PLANS, planForModule, type ModuleKey } from '@shared/plans';
 // Fixture platform admins are recognised by email prefix, so no real admin address is written to the DB.
 vi.mock('./admin', async (original) => ({ ...(await original<typeof import('./admin')>()), isPlatformAdminEmail: (email?: string | null) => !!email && email.startsWith('p3-admin-') }));
 vi.mock('./email', () => ({ sendWithFallback: vi.fn(async () => ({ accepted: ['fixture@example.invalid'] })) }));
 
-const users: Record<'pro' | 'agency' | 'admin' | 'legacy' | 'canceled' | 'member' | 'lapsed' | 'lapsedMember', number> = {} as any;
+const users: Record<'starter' | 'team' | 'pro' | 'agency' | 'admin' | 'legacy' | 'canceled' | 'member' | 'lapsed' | 'lapsedMember', number> = {} as any;
 let base = '', server: ReturnType<express.Express['listen']>, agencyLoc: number, proLocs: number[] = [];
 const sessions = new Map<number, any>();
 // A private address per run keeps the per-IP request budgets of these routes away from other suites.
@@ -53,13 +56,15 @@ beforeAll(async () => {
   const target = new URL(process.env.DATABASE_URL!);
   if (!/^\/constructhub_dev(?:_[a-z0-9]+)?$/.test(target.pathname) || !['localhost', '127.0.0.1'].includes(target.hostname)) throw Error('Local development DB required');
   await ensureGrowthSchema(); await ensureAccountEventsSchema(); await ensureAgencySchema(); await ensureAdsSchema();
-  await ensureCloudflareSearchSchema(); await ensureDomainsSchema(); await ensureMailAlertsSchema();
-  for (const key of Object.keys({ pro: 0, agency: 0, admin: 0, legacy: 0, canceled: 0, member: 0, lapsed: 0, lapsedMember: 0 }) as (keyof typeof users)[])
+  await ensureCloudflareSearchSchema(); await ensureDomainsSchema(); await ensureMailAlertsSchema(); await ensureSocialSchema();
+  for (const key of Object.keys({ starter: 0, team: 0, pro: 0, agency: 0, admin: 0, legacy: 0, canceled: 0, member: 0, lapsed: 0, lapsedMember: 0 }) as (keyof typeof users)[])
     users[key] = (await pool.query('INSERT INTO users(email) VALUES($1) RETURNING id', [`${key === 'admin' ? 'p3-admin' : `p3-gate-${key}`}-${randomUUID()}@example.invalid`])).rows[0].id;
   const agencyPlan = planForModule('agencyWorkspace');
-  for (const [user, plan, status] of [[users.pro, PLANS.pro.key, 'active'], [users.agency, agencyPlan, 'active'], [users.legacy, 'platinum', 'active'], [users.canceled, agencyPlan, 'canceled'], [users.lapsed, PLANS.pro.key, 'active']] as const)
+  // Team and Solo sit below the Pro modules; the lapsed owner drops to Team so the Pro-and-up
+  // modules (ads, cloudflare/search console, domains/mail) stop running for them too.
+  for (const [user, plan, status] of [[users.starter, PLANS.starter.key, 'active'], [users.team, PLANS.team.key, 'active'], [users.pro, PLANS.pro.key, 'active'], [users.agency, agencyPlan, 'active'], [users.legacy, 'platinum', 'active'], [users.canceled, agencyPlan, 'canceled'], [users.lapsed, PLANS.team.key, 'active']] as const)
     await pool.query('INSERT INTO subscriptions(user_id,plan,status) VALUES($1,$2,$3)', [user, plan, status]);
-  // An Agency workspace with a member (no plan of their own), and a workspace whose owner dropped to Pro.
+  // An Agency workspace with a member (no plan of their own), and a workspace whose owner dropped to Team.
   await pool.query("INSERT INTO agency_workspaces(user_id,name) VALUES($1,'P- gate agency'),($2,'P- lapsed agency')", [users.agency, users.lapsed]);
   await pool.query("INSERT INTO agency_members(user_id,member_id,role,all_clients) VALUES($1,$2,'manager',true),($3,$4,'manager',true)", [users.agency, users.member, users.lapsed, users.lapsedMember]);
   agencyLoc = (await pool.query("INSERT INTO business_locations(user_id,business_name) VALUES($1,'P- agency client location') RETURNING id", [users.agency])).rows[0].id;
@@ -88,6 +93,9 @@ beforeAll(async () => {
   registerDomainRoutes(app, auth);
   registerMailAlertRoutes(app, auth);
   registerGmailOAuth(app, auth);
+  // The Social Media tool mounts in-process too (reviewReminders/propertyRecords/gridWatches
+  // live in the monolithic route tables and are covered against the real server in plan-gates.test.ts).
+  registerSocialRoutes(app, auth);
   await new Promise<void>(resolve => { server = app.listen(0, '127.0.0.1', () => resolve()); });
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
@@ -101,31 +109,49 @@ afterAll(async () => {
   await pool.end();
 });
 
-const MODULE_ROUTES: Record<ModuleKey, string[]> = {
+// Modules whose routes mount in-process above. reviewReminders (/api/review-reminder-settings),
+// propertyRecords (/api/property-*) and gridWatches (/api/seo/*) live in the monolithic route
+// tables and are covered against the real server in plan-gates.test.ts ("the Team/Pro/Agency
+// module ladder"); socialPublishing mounts here via registerSocialRoutes.
+const MODULE_ROUTES: Partial<Record<ModuleKey, string[]>> = {
   agencyWorkspace: ['/api/agency/locations', '/api/agency/clients', '/api/agency/dashboard', '/api/agency/jobs'],
   adsManager: ['/api/ads/status', '/api/ads/accounts'],
   cloudflareSearchConsole: ['/api/cloudflare/connections?limit=1', '/api/cloudflare/assets', '/api/gsc/connections?limit=1', '/api/gsc/assets'],
   domainsMailAlerts: ['/api/domains/guides', '/api/domains', '/api/mail-alerts/settings', '/api/mail-alerts'],
+  socialPublishing: ['/api/social/businesses'],
+};
+// The fixture user one plan below the module's (the one refused): Solo < Team < Pro < Agency.
+const DENIED_USER: Partial<Record<ModuleKey, keyof typeof users>> = {
+  reviewReminders: 'starter',
+  adsManager: 'team', cloudflareSearchConsole: 'team', domainsMailAlerts: 'team', propertyRecords: 'team', socialPublishing: 'team',
+  agencyWorkspace: 'pro', gridWatches: 'pro',
 };
 
-describe('Agency-only module routes', () => {
+describe('Module routes answer 402 below the plan that includes them', () => {
   for (const [module, paths] of Object.entries(MODULE_ROUTES) as [ModuleKey, string[]][]) {
-    it(`${MODULE_NAMES[module]}: 402 plan_required for Pro, 200 for Agency, a legacy Platinum row and a platform admin`, async () => {
+    it(`${MODULE_NAMES[module]}: 402 plan_required for ${DENIED_USER[module]}, 200 for ${PLANS[planForModule(module)].name} and up, a legacy Platinum row and a platform admin`, async () => {
       for (const path of paths) {
-        const pro = await call(users.pro, path);
-        expect(pro.status, path).toBe(402);
-        expect(pro.data, path).toEqual({ code: 'plan_required', requiredPlan: planForModule(module), message: expect.stringContaining(MODULE_NAMES[module]) });
+        const refused = await call(users[DENIED_USER[module]!], path);
+        expect(refused.status, path).toBe(402);
+        expect(refused.data, path).toEqual({ code: 'plan_required', requiredPlan: planForModule(module), message: expect.stringContaining(MODULE_NAMES[module]) });
         for (const user of [users.canceled]) expect((await call(user, path)).status, `${path} canceled`).toBe(402);
         for (const user of [users.agency, users.legacy, users.admin]) expect((await call(user, path)).status, `${path} as ${user}`).toBe(200);
         expect((await call(null, path)).status, `${path} signed out`).toBe(401);
       }
     });
   }
+  // The social write routes are gated on socialPublishing just like the read; bulk kind
+  // settings|generate runs the autoPosts check on top (same Pro start, so one gate shows here).
+  it('socialPublishing: the bulk write route is gated too', async () => {
+    const refused = await call(users.team, '/api/social/bulk', 'POST', { kind: 'settings', businessIds: [agencyLoc], cadences: [] });
+    expect(refused.status).toBe(402);
+    expect(refused.data).toMatchObject({ code: 'plan_required', requiredPlan: planForModule('socialPublishing') });
+  });
   it('also gates writes and the Gmail OAuth routes, but never the secret-authenticated inbound mail webhook', async () => {
     expect((await call(users.pro, '/api/agency/clients', 'POST', { name: 'P- blocked client' })).status).toBe(402);
-    expect((await call(users.pro, '/api/domains/connections', 'POST', {})).status).toBe(402);
-    expect((await call(users.pro, '/api/ads/sync', 'POST', {})).status).toBe(402);
-    expect((await call(users.pro, '/api/mail-alerts/oauth/connect')).status).toBe(402);
+    expect((await call(users.team, '/api/domains/connections', 'POST', {})).status).toBe(402);
+    expect((await call(users.team, '/api/ads/sync', 'POST', {})).status).toBe(402);
+    expect((await call(users.team, '/api/mail-alerts/oauth/connect')).status).toBe(402);
     // Entitled: the route itself answers (Gmail OAuth is not configured in tests).
     expect((await call(users.agency, '/api/mail-alerts/oauth/connect')).status).toBe(404);
     const previous = process.env.INBOUND_MAIL_SECRET;
@@ -140,7 +166,7 @@ describe('Agency-only module routes', () => {
 
 describe('Saved credentials stay removable without the plan', () => {
   it('lets an account without the module list and disconnect what it connected earlier, behind re-auth, and nothing more', async () => {
-    const user = users.pro;
+    const user = users.team; // below Pro: the modules themselves stay closed
     await pool.query("INSERT INTO ads_grants(user_id,manager_id,refresh_token,verified) VALUES($1,'1112223334',$2,true)", [user, encryptToken('fixture-refresh')]);
     // A pasted Cloudflare token (not one ConstructHUB created), so disconnecting makes no provider call.
     const [cf, gsc] = (await pool.query("INSERT INTO edge_connections(user_id,provider,subject,email,token,method) VALUES($1,'cloudflare','p3-saved-cf','cf@example.invalid',$2,'paste'),($1,'gsc','p3-saved-gsc','gsc@example.invalid',$2,'oauth') RETURNING id", [user, encryptToken('fixture-token')])).rows.map(r => r.id);
@@ -308,7 +334,7 @@ describe('Background workers skip owners whose plan no longer includes the modul
         expect(shown.status).toBe(200);
         expect(shown.data.items.map((m: any) => m.subject)).toEqual(['Gmail Forwarding Confirmation']);
       } finally {
-        await pool.query("UPDATE subscriptions SET plan=$2 WHERE user_id=$1", [users.lapsed, PLANS.pro.key]);
+        await pool.query("UPDATE subscriptions SET plan=$2 WHERE user_id=$1", [users.lapsed, PLANS.team.key]);
       }
       await pool.query("INSERT INTO mail_alert_grants(user_id,google_subject,email,access_token,refresh_token,expires_at,next_sync) VALUES($1,'p3-sub','p3@example.invalid',$2,$3,now()+interval '1 hour',now()-interval '1 minute')", [users.lapsed, encryptToken('fixture-access'), encryptToken('fixture-refresh')]);
       const http = vi.fn(async () => { throw Error('No Gmail calls expected for this owner'); });

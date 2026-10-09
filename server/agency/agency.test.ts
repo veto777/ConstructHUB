@@ -183,16 +183,19 @@ describe('Google invitations and email onboarding with mocked external boundarie
     const make=()=>new GoogleClient(async()=>'fixture',http as any,new Limiter(Date.now,async()=>{}),async()=>{});
     await pollInvitations(owner,'agency',make);
     expect(calls.filter(c=>c.startsWith('POST'))).toEqual(['POST /v1/accounts/agency/invitations/match:accept']);
-    // The fixture owner holds 5,000 locations, above Agency's self-serve cap: the accepted listing is not added,
-    // and the request says why in the words of the location limit (then a sales quote).
+    // The fixture owner holds 5,001 locations, above the Agency plan's 100-location allowance:
+    // the accepted listing is not added, and the request says why in the words of the location
+    // limit (the next plan up is Unlimited).
     const held=(await pool.query('SELECT status,error FROM agency_onboarding WHERE id=$1',[created.id])).rows[0];
     expect(held.status).toBe('accepted');
-    expect(held.error).toMatch(/^Your Agency plan covers 500 Google Business Profile locations and [\d,]+ are in use\. Above 500 locations, talk to a sales rep for a quote\.$/);
+    expect(held.error).toMatch(/^Your Agency plan covers 100 Google Business Profile locations and [\d,]+ are in use\. To raise it, move to Unlimited\.$/);
     expect((await pool.query("SELECT count(*)::int n FROM business_locations WHERE user_id=$1 AND gbp_location_name='locations/fixture'",[owner])).rows[0].n).toBe(0);
     await pollInvitations(owner,'agency',make); // still full: retried, and the owner is told only once
     expect((await pool.query("SELECT count(*)::int n FROM user_notifications WHERE user_id=$1 AND title='Client Google profile not linked'",[owner])).rows[0].n).toBe(1);
-    // With room under the cap, the next poll links it (fixture rows only; the rest of this file is done with them).
-    await pool.query("DELETE FROM business_locations WHERE user_id=$1 AND business_name LIKE 'Agency fixture %' AND id NOT IN (SELECT id FROM business_locations WHERE user_id=$1 ORDER BY id LIMIT 100)",[owner]);
+    // With room under the Agency plan's 100-location allowance, the next poll links it: keep 98
+    // fixture rows (the one unlinked 'Action fixture' row stays too, so 99 are in use) and the
+    // accepted listing becomes the 100th (fixture rows only; the rest of this file is done with them).
+    await pool.query("DELETE FROM business_locations WHERE user_id=$1 AND business_name LIKE 'Agency fixture %' AND id NOT IN (SELECT id FROM business_locations WHERE user_id=$1 ORDER BY id LIMIT 98)",[owner]);
     await pollInvitations(owner,'agency',make);
     expect(calls.filter(c=>c.startsWith('POST'))).toHaveLength(1);
     const linked=(await pool.query('SELECT * FROM agency_onboarding WHERE id=$1',[created.id])).rows[0];expect(linked.status).toBe('linked');expect(linked.error).toBeNull();

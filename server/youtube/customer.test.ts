@@ -67,6 +67,9 @@ beforeAll(async () => {
     const email = `yt-cust-${name}-${randomUUID()}@example.invalid`;
     USERS[name] = { id: (await pool.query("INSERT INTO users(email) VALUES($1) RETURNING id", [email])).rows[0].id, email };
   }
+  // Customer YouTube routes are part of the Social Media tool (shared/plans.ts
+  // socialPublishing, Pro and up): every route but the OAuth callback is gated on it.
+  await pool.query("INSERT INTO subscriptions(user_id,plan,status) SELECT id,'pro','active' FROM users WHERE id = ANY($1::int[])", [ids()]);
   // The project-wide tally is one shared row per day: remember it and put it back.
   day = (await pool.query("SELECT (now() AT TIME ZONE 'America/Los_Angeles')::date::text AS d")).rows[0].d;
   projectUsedBefore = (await pool.query("SELECT used FROM youtube_upload_daily WHERE day = $1::date AND user_id = 0", [day])).rows[0]?.used ?? null;
@@ -94,6 +97,7 @@ afterAll(async () => {
   await pool.query("DELETE FROM youtube_customer_videos WHERE user_id = ANY($1::int[])", [ids()]);
   await pool.query("DELETE FROM youtube_customer_connections WHERE user_id = ANY($1::int[])", [ids()]);
   await pool.query("DELETE FROM youtube_upload_daily WHERE user_id = ANY($1::int[])", [ids()]);
+  await pool.query("DELETE FROM subscriptions WHERE user_id = ANY($1::int[])", [ids()]);
   if (projectUsedBefore === null) await pool.query("DELETE FROM youtube_upload_daily WHERE day = $1::date AND user_id = 0", [day]);
   else await pool.query("UPDATE youtube_upload_daily SET used = $2 WHERE day = $1::date AND user_id = 0", [day, projectUsedBefore]);
   await pool.query("DELETE FROM account_activity WHERE user_id = ANY($1::int[])", [ids()]).catch(() => undefined);

@@ -58,9 +58,10 @@ beforeAll(async () => {
     ],
   );
   [user, other] = rows.map((r) => r.id);
-  // Site Scans come from the plan's monthly allowance: Agency includes one per location.
+  // Site Scans come from the plan's monthly allowance: Unlimited (`user`) is uncapped, so it
+  // queues the whole 1,000-location agency; `other` is on Agency (50/month) for the limit checks.
   await pool.query(
-    "INSERT INTO subscriptions(user_id,plan,status) VALUES($1,'agency','active'),($2,'agency','active')",
+    "INSERT INTO subscriptions(user_id,plan,status) VALUES($1,'agency','active'),($2,'growth','active')",
     [user, other],
   );
   ids = (
@@ -166,30 +167,63 @@ it("paginates/searches 1,000 owned locations and queues the whole agency in one 
     { locationId: ids[0] },
   );
   expect(scoped.body.total).toBe(1);
-  // 1,000 locations = 1,000 Site Scans a month on Agency, all used by the bulk run above.
-  const monthly = await call("post", "/api/sitescan/bulk", {
+  // Unlimited includes unlimited Site Scans a month, so for `user` the daily agency queue
+  // budget (1,000 sites/day) — already spent by the bulk above — is what refuses a second run.
+  const again = await call("post", "/api/sitescan/bulk", {
     locationIds: [ids[0]],
   });
-  expect(monthly.status).toBe(403);
-  expect(monthly.body).toMatchObject({
-    code: "limit_reached",
-    feature: "siteScans",
-    limit: 1000,
-  });
-  expect(monthly.body.message).toContain("1,000 Site Scans");
-  // The daily agency queue budget still applies, and a refused bulk gives its monthly scans back.
-  const [own] = (
+  expect(again.status).toBe(429);
+  // A plan with a monthly Site Scan allowance is refused with 403 once it is spent: Agency
+  // includes 50/month, so scanning 50 owned locations spends it and the next request names
+  // the limit.
+  const otherIds = (
     await pool.query(
-      "INSERT INTO business_locations(user_id,business_name,website,gbp_location_name) VALUES($1,'Agency fixture other','https://agency-fixture.test/other','locations/agency-fixture-other') RETURNING id",
+      `INSERT INTO business_locations(user_id,business_name,website,gbp_location_name)
+       SELECT $1,'Agency fixture other '||lpad(i::text,4,'0'),'https://agency-fixture.test/other-'||i,'locations/agency-fixture-other-'||i FROM generate_series(1,51) i RETURNING id`,
       [other],
     )
   ).rows.map((r) => r.id);
   await pool.query(
-    "INSERT INTO gbp_sync_status(location_id,kind,last_success,profile_snapshot) VALUES($1,'profile',now(),jsonb_build_object('business_name','Agency fixture other','website','https://agency-fixture.test/other'))",
-    [own],
+    `INSERT INTO gbp_sync_status(location_id,kind,last_success,profile_snapshot)
+     SELECT id,'profile',now(),jsonb_build_object('business_name',business_name,'website',website) FROM business_locations WHERE user_id=$1`,
+    [other],
   );
+  expect(
+    (
+      await call(
+        "post",
+        "/api/sitescan/bulk",
+        { locationIds: otherIds.slice(0, 50) },
+        {},
+        {},
+        other,
+      )
+    ).status,
+  ).toBe(202);
+  const monthly = await call(
+    "post",
+    "/api/sitescan/bulk",
+    { locationIds: [otherIds[50]] },
+    {},
+    {},
+    other,
+  );
+  expect(monthly.status).toBe(403);
+  expect(monthly.body).toMatchObject({
+    code: "limit_reached",
+    feature: "siteScans",
+    limit: 50,
+  });
+  expect(monthly.body.message).toContain("50 Site Scans");
+  // The daily agency queue budget still applies on top of the monthly allowance, and a bulk
+  // it refuses gives its monthly scans back (clear the spent monthly count so the reservation
+  // succeeds and the daily budget is the refusal).
+  await pool.query("DELETE FROM growth_budgets WHERE key LIKE $1", [
+    `quota:user:${other}:siteScans:%`,
+  ]);
   await pool.query(
-    "INSERT INTO growth_budgets(key,period,used) VALUES($1,$2,1000)",
+    `INSERT INTO growth_budgets(key,period,used) VALUES($1,$2,1000)
+     ON CONFLICT(key,period) DO UPDATE SET used=1000`,
     [`sitescan:bulk:${other}`, String(Math.floor(Date.now() / 86400000))],
   );
   expect(
@@ -197,7 +231,7 @@ it("paginates/searches 1,000 owned locations and queues the whole agency in one 
       await call(
         "post",
         "/api/sitescan/bulk",
-        { locationIds: [own] },
+        { locationIds: [otherIds[0]] },
         {},
         {},
         other,

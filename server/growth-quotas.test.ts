@@ -29,27 +29,29 @@ describe("monthly allowances come from shared/plans.ts", () => {
     expect([3, 5, 7, 9, 11, 13, 15].map(gridCreditCost)).toEqual([1, 1, 2, 4, 5, 7, 9]);
   });
 
-  it("reads each plan's limits, per-location Agency allowances and competitor packs", async () => {
+  it("reads each plan's flat allowances and competitor packs", async () => {
     mocks.row = plan("starter");
     const starter = await getEntitlements(1);
-    expect(monthlyLimit(starter, "searches")).toBe(100);
-    expect(monthlyLimit(starter, "rankings")).toBe(5);
+    expect(monthlyLimit(starter, "searches")).toBe(10);
+    expect(monthlyLimit(starter, "rankings")).toBe(3);
     expect(monthlyLimit(starter, "siteScans")).toBe(2);
-    expect(monthlyLimit(starter, "competitorScans")).toBe(0);
+    expect(monthlyLimit(starter, "competitorScans")).toBe(1);
+    expect(monthlyLimit(starter, "gabeQuestions")).toBe(100);
     expect(monthlyLimit(starter, "photos")).toBe(-1);
 
     mocks.row = plan("gold", { addons: { competitor_pack: 2 } });
     const growth = await getEntitlements(1);
-    expect(monthlyLimit(growth, "searches")).toBe(5000);
-    expect(monthlyLimit(growth, "competitorScans")).toBe(28);
+    expect(monthlyLimit(growth, "searches")).toBe(200);
+    expect(monthlyLimit(growth, "competitorScans")).toBe(40);
 
     mocks.row = plan("agency");
     const agency = await getEntitlements(1);
-    // Agency is billed for at least its 10 included locations.
-    expect(monthlyLimit(agency, "rankings", 3)).toBe(20);
-    expect(monthlyLimit(agency, "siteScans", 3)).toBe(10);
-    expect(monthlyLimit(agency, "rankings", 25)).toBe(50);
-    expect(monthlyLimit(agency, "siteScans", 25)).toBe(25);
+    // Unlimited: flat allowances, independent of the location count.
+    expect(monthlyLimit(agency, "rankings", 3)).toBe(150);
+    expect(monthlyLimit(agency, "siteScans", 3)).toBe(-1);
+    expect(monthlyLimit(agency, "rankings", 25)).toBe(150);
+    expect(monthlyLimit(agency, "siteScans", 25)).toBe(-1);
+    expect(monthlyLimit(agency, "gabeQuestions")).toBe(-1);
 
     mocks.row = undefined;
     expect(monthlyLimit(await getEntitlements(1), "searches")).toBe(0);
@@ -63,21 +65,21 @@ describe("monthly allowances come from shared/plans.ts", () => {
     mocks.row = plan("premium"); // legacy -> Pro
     expect(monthlyLimit(await getEntitlements(1), "texts")).toBe(PLANS.pro.limits.teamTextSegments);
 
-    mocks.row = plan("starter");
+    mocks.row = plan(null); // no plan at all: texts are included with every paid plan
     const none = await reserveQuotaFor(42, "texts", 1);
     expect(none.ok).toBe(false);
-    expect(!none.ok && none.body).toMatchObject({ code: "plan_required", requiredPlan: "pro" });
+    expect(!none.ok && none.body).toMatchObject({ code: "plan_required", requiredPlan: "starter" });
     expect(mocks.take).not.toHaveBeenCalled();
 
     mocks.row = plan("pro");
     mocks.take.mockResolvedValue(false);
-    mocks.used = 500;
+    mocks.used = 1000;
     const spent = await reserveQuotaFor(42, "texts", 2);
-    expect(mocks.take.mock.calls[0].slice(0, 3)).toEqual([`quota:user:42:texts:${monthKey()}`, 500, 2]);
+    expect(mocks.take.mock.calls[0].slice(0, 3)).toEqual([`quota:user:42:texts:${monthKey()}`, 1000, 2]);
     expect(!spent.ok && spent.status).toBe(403);
     expect(!spent.ok && spent.body).toMatchObject({
-      code: "limit_reached", feature: "texts", limit: 500, used: 500, upgradePlan: "growth", addon: null,
-      message: "You've used all 500 text segments your Pro plan includes this month. The count resets on the 1st (UTC). To raise it, move to Growth (1,500 text segments).",
+      code: "limit_reached", feature: "texts", limit: 1000, used: 1000, upgradePlan: "growth", addon: null,
+      message: "You've used all 1,000 text segments your Pro plan includes this month. The count resets on the 1st (UTC). To raise it, move to Agency (2,000 text segments).",
     });
   });
 });
@@ -94,10 +96,11 @@ describe("reserving quota", () => {
     expect(none.json.mock.calls[0][0]).toMatchObject({ code: "plan_required", requiredPlan: "starter" });
     expect(mocks.take).not.toHaveBeenCalled();
 
-    mocks.row = plan("standard");
-    const starter = res();
-    expect(await reserveMonthlyQuota(req(42), starter, "competitorScans")).toBe(false);
-    expect(starter.json.mock.calls[0][0]).toMatchObject({ code: "plan_required", requiredPlan: "pro", message: "Competitor Intel is included with the Pro plan. Upgrade in Pricing to use it." });
+    mocks.row = plan("standard"); // legacy key -> Solo, which now includes Competitor Intel (1/month)
+    mocks.take.mockResolvedValue(true);
+    const legacy = res();
+    expect(await reserveMonthlyQuota(req(42), legacy, "competitorScans")).toBe(true);
+    expect(mocks.take.mock.calls[0].slice(0, 3)).toEqual([`quota:user:42:competitorScans:${monthKey()}`, 1, 1]);
   });
 
   it("reserves the full amount atomically and explains an exhausted quota", async () => {
@@ -105,33 +108,33 @@ describe("reserving quota", () => {
     mocks.take.mockResolvedValue(false);
     const r = res();
     expect(await reserveMonthlyQuota(req(42), r, "rankings", gridCreditCost(15))).toBe(false);
-    expect(mocks.take.mock.calls[0].slice(0, 3)).toEqual([`quota:user:42:rankings:${monthKey()}`, 5, 9]);
+    expect(mocks.take.mock.calls[0].slice(0, 3)).toEqual([`quota:user:42:rankings:${monthKey()}`, 3, 9]);
     expect(r.status).toHaveBeenCalledWith(403);
     // Nothing used yet, but a 15x15 grid needs more credits than the plan has.
     expect(r.json.mock.calls[0][0]).toMatchObject({
-      code: "limit_reached", feature: "rankings", limit: 5, used: 0, upgradePlan: "pro",
-      message: "This needs 9 ranking-grid credits, and 5 of the 5 ranking-grid credits your Starter plan includes this month are left. The count resets on the 1st (UTC). To raise it, move to Pro (15 ranking-grid credits).",
+      code: "limit_reached", feature: "rankings", limit: 3, used: 0, upgradePlan: "team",
+      message: "This needs 9 ranking-grid credits, and 3 of the 3 ranking-grid credits your Solo plan includes this month are left. The count resets on the 1st (UTC). To raise it, move to Team (10 ranking-grid credits).",
     });
-    mocks.used = 5;
+    mocks.used = 3;
     const spent = res();
     expect(await reserveMonthlyQuota(req(42), spent, "rankings", 1)).toBe(false);
-    expect(spent.json.mock.calls[0][0].message).toBe("You've used all 5 ranking-grid credits your Starter plan includes this month. The count resets on the 1st (UTC). To raise it, move to Pro (15 ranking-grid credits).");
+    expect(spent.json.mock.calls[0][0].message).toBe("You've used all 3 ranking-grid credits your Solo plan includes this month. The count resets on the 1st (UTC). To raise it, move to Team (10 ranking-grid credits).");
     mocks.used = undefined;
 
     mocks.row = plan("growth");
     const pack = await reserveQuotaFor(42, "competitorScans");
     expect(pack.ok).toBe(false);
-    expect(!pack.ok && pack.body.message).toContain("add the Competitor scan pack add-on or move to Agency (20 Competitor Intel scans)");
+    expect(!pack.ok && pack.body.message).toContain("add the Competitor scan pack add-on or move to Unlimited (50 Competitor Intel scans)");
   });
 
   it("charges the agency owner's allowance for a member acting in the workspace, and refunds unused work", async () => {
-    mocks.row = plan("agency");
+    mocks.row = plan("growth"); // Agency: a flat 50 Site Scans a month (no per-location billing)
     mocks.locations = 30;
     mocks.take.mockResolvedValue(true);
     const r = res();
     r.locals.agencyOwner = 900;
     expect(await reserveMonthlyQuota(req(42), r, "siteScans", 4)).toBe(true);
-    expect(mocks.take.mock.calls[0].slice(0, 3)).toEqual([quotaKey(900, "siteScans"), 30, 4]);
+    expect(mocks.take.mock.calls[0].slice(0, 3)).toEqual([quotaKey(900, "siteScans"), 50, 4]);
     await refundQuota(r, 3);
     await refundQuota(r, 3);
     expect(mocks.refunds).toEqual([[quotaKey(900, "siteScans"), 3], [quotaKey(900, "siteScans"), 1]]);
@@ -155,7 +158,7 @@ describe("reserving quota", () => {
     for (const row of [{ email: "alpinesidingcompany@gmail.com", plan: null }, plan("platinum", { email: "alpinesidingcompany@gmail.com", stripe_subscription_id: null }), plan("starter", { email: "support@constructhub.us" })]) {
       mocks.row = row;
       const ent = await getEntitlements(1);
-      for (const feature of ["searches", "rankings", "siteScans", "competitorScans", "photos", "texts"] as const) {
+      for (const feature of ["searches", "rankings", "siteScans", "competitorScans", "photos", "texts", "gabeQuestions"] as const) {
         expect(monthlyLimit(ent, feature, 50), feature).toBe(-1);
         const r = await reserveQuotaFor(1, feature, 9_999);
         expect(r.ok, feature).toBe(true);
@@ -206,6 +209,6 @@ describe("reserving quota", () => {
     mocks.used = 20;
     const r = await reserveQuotaFor(7, "competitorScans");
     expect(r).toMatchObject({ ok: false, status: 403 });
-    expect(mocks.take.mock.calls[0][1]).toBe(20);
+    expect(mocks.take.mock.calls[0][1]).toBe(50);
   });
 });
