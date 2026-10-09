@@ -1,13 +1,17 @@
 /**
  * The support line's real dependencies (line.ts `Deps`), its routes, and the admin ticket desk.
  *
- *  The phone line (SignalWire LaML, 2026-10-08): the number's voice URL is POST /api/support/voice. SignalWire does the
- *  listening and the speaking (Gather speech + keypad, Say) and posts each turn to /api/support/voice/turn — no GPU in
- *  the path, so the line takes as many simultaneous calls as SignalWire carries; each turn is one short request here.
- *  Engine → app (bearer VOICE_INTERNAL_SECRET, the older GPU-engine path, kept for fallback):
+ *  The phone line, as the code stands (2026-10-09): the support number's voice URL is the GPU engine
+ *  (voice/server.py), which asks the app for the number's profile, gets `kind: "support"` and runs Gabe with speech —
+ *  on at most VOICE_SUPPORT_MAX_CALLS (default 2) of the engine's seats, for at most 8 minutes a call, within
+ *  calls-per-hour limits per caller and overall (review S-2: the support line can never take the seats customers'
+ *  Call Assistant calls need). Engine → app (bearer VOICE_INTERNAL_SECRET):
  *    POST /api/voice-internal/support/start  { callSid, from }          → { say }
  *    POST /api/voice-internal/support/turn   { callSid, from, text }    → { say, end }
  *    POST /api/voice-internal/support/end    { callSid }                → { ok }
+ *  Over any of those limits, or with the engine down (the number's fallback URL), the caller gets the keypad line
+ *  here: POST /api/support/ivr (also the old /api/support/voice) and /api/support/ivr/turn — pre-recorded clips +
+ *  keypad on SignalWire LaML, no GPU, no seat. (The spoken LaML Gather line of 2026-10-08 no longer exists.)
  *  Admin (platform admins only, the admin passphrase too):
  *    GET   /api/admin/support-tickets?status=   list      GET /api/admin/support-tickets/:id   one
  *    PATCH /api/admin/support-tickets/:id { status }      POST /api/admin/support-tickets/:id/note { text, email }

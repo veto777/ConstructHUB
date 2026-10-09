@@ -232,6 +232,9 @@ operator from the app's values), `VOICE_ANTHROPIC_API_KEY`, `VOICE_ANTHROPIC_MOD
 PROJECT_ID/API_TOKEN/SIGNING_KEY` (verification only), `VOICE_WHISPER_MODEL`, `VOICE_TTS_DEVICE`,
 `VOICE_STT_DEVICE`, `VOICE_MODELS_DIR`, `VOICE_RECORDINGS_DIR`, `VOICE_GREETING_DELAY_S`, `VOICE_SKIP_SIGNATURE` (the
 engine refuses to start with it on a non-loopback `VOICE_BIND`), `VOICE_MAX_ACTIVE_CALLS` (default 6),
+`VOICE_SUPPORT_MAX_CALLS` (2: the seats the public support line may hold — never all; the rest are customers'),
+`VOICE_SUPPORT_MAX_CALL_SECONDS` (480), `VOICE_SUPPORT_IDLE_SECONDS` (60), `VOICE_SUPPORT_CALLS_PER_CALLER_HOUR` (4),
+`VOICE_SUPPORT_CALLS_PER_HOUR` (40), `VOICE_ZOMBIE_SECONDS` (45), `VOICE_STREAM_START_SECONDS` (10),
 `VOICE_LOG_TRANSCRIPTS` (dev only; default off: the journal gets lengths, not words, and masked caller numbers).
 
 ## 10. Lead delivery into the CRM (calls+crm lane, `server/voice/leads.ts`)
@@ -400,7 +403,9 @@ voice route answers 402. Numbers/Studio edits need `manageSettings` (the panels 
 - Media stream: `/media` is public, so the verified webhook mints a one-use token per CallSid and puts it in the
   `<Stream>` as `<Parameter name="token">`; `start` must carry it (constant-time compare) or the CallSid must be
   live in our SignalWire project for that `to`. `from`/`to` come from the webhook, never the client. Concurrent
-  calls are capped (`VOICE_MAX_ACTIVE_CALLS`).
+  calls are capped (`VOICE_MAX_ACTIVE_CALLS`); a socket holds no seat until its `start` is accepted, the support
+  line has its own seat budget inside the cap (`VOICE_SUPPORT_MAX_CALLS`), and a reaper frees any seat whose call is
+  dead, over its time, or stuck (`voice/server.py` `seats()` / `reap()`).
 - Engine profile: `GET /profile` answers 423 `paused` — reason `addon_inactive` when the org owner's subscription
   no longer carries the Call Assistant add-on, `payment_needed` when it does but is not active/trialing,
   `number_releasing` for a number being released. `say` is the "taking a short break" line only for

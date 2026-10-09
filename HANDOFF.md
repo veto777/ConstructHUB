@@ -2,6 +2,32 @@
 
 _Last updated 2026-08-24. Repo: `veto777/ConstructHUB` (private). Local: `/home/veto/ConstructHUB` on the tower._
 
+## 🪑 2026-10-09 — the support line can no longer take customers' Call Assistant seats (review S-2, branch `fix-review-high`, NOT deployed)
+
+- **What was wrong:** support calls and customers' Call Assistant calls shared the engine's 6 seats (`VOICE_MAX_ACTIVE_CALLS`). Six
+  calls to the public support number filled them; a customer's call was then answered "we can't take your call right now" and hung up.
+  Worse, the public `/media` socket took a seat the moment it connected — before proving it was a call — so six idle sockets did the
+  same with no phone at all. A dead stream (no audio from the carrier) kept its seat until the 15-minute cap.
+- **Which path is live (from the code, not from prod env):** the support number's voice URL is the GPU engine (`voice/server.py`,
+  profile `kind: "support"`); the keypad line in the app (`/api/support/ivr`, also the old `/api/support/voice`) is the overflow and the
+  number's fallback. The spoken LaML Gather line of 10-08 no longer exists in the code — there is nothing else to fix.
+- **Now (`voice/server.py` `seats()` / `seat_free()` / `reap()`):**
+  - One pool of seats, two budgets. The support line may hold at most `VOICE_SUPPORT_MAX_CALLS` (default **2**, never all of them);
+    every other seat can only go to a customer's call. **This changes the owner's 10-08 rule "the 7th caller goes to the keypad line":
+    it is now the 3rd support caller** (set `VOICE_SUPPORT_MAX_CALLS` higher to give support more, at customers' expense).
+  - Support calls per hour: 4 per caller number, 40 overall (`VOICE_SUPPORT_CALLS_PER_CALLER_HOUR`, `VOICE_SUPPORT_CALLS_PER_HOUR`;
+    in the engine's memory — a restart forgets them, the seat cap still holds). Over any limit → the keypad line, no seat.
+  - A support call ends at 8 minutes (`VOICE_SUPPORT_MAX_CALL_SECONDS=480`) with a spoken wrap-up, and after 60 s without a word
+    from the caller (`VOICE_SUPPORT_IDLE_SECONDS`). The hang-up never waits on the goodbye being spoken.
+  - A `/media` socket holds no seat until its `start` is accepted, must start within 10 s, and waiting sockets are bounded.
+  - A reaper (every 5 s) frees every stuck seat: no audio for 45 s (`VOICE_ZOMBIE_SECONDS`), past the time cap, a wrap-up or the
+    after-call paperwork that never finishes, a set-up that never greeted. The carrier's status callback (completed / failed /
+    no-answer…) frees the seat at once. After-call paperwork now survives the connection being dropped.
+- **Operator:** nothing is required — the defaults apply on the next engine deploy (`voice/deploy/restart-when-idle.sh`). The engine's
+  `/health` (with the bearer) shows the support settings. Engine tests: `cd voice && .venv/bin/python -m pytest selftest -q` (101).
+- **Left as found (separate review items):** the keypad line itself has no cap on calls at once or per caller (S-11), and the
+  per-account code budgets can be used up by a stranger (S-10).
+
 ## ☎️ 2026-10-08 (late evening) — the AI Call Assistant is a SEPARATE SERVICE, repriced (branch `billing/call-assistant`, NOT deployed)
 - **Owner decisions:** the Call Assistant is sold on its **own subscription**, like the CRM (`fd964e1`, `069ffdf`): no platform plan
   includes it, and it is bought **with or without a platform plan**. New tiers (keys lite/solo/crew/fleet kept so the voice code paths
