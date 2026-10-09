@@ -8,7 +8,8 @@ import { randomUUID } from "node:crypto";
 import { pool } from "./db";
 import { getEntitlements, redeemTrialCode, endRevokedTrial, TRIAL_CODE_PLAN } from "./entitlements";
 import { monthlyUsage } from "./growth-quotas";
-import { getSeatUsage } from "./crm/tenancy";
+import { getSeatUsage, getOwnerSeatUsage } from "./crm/tenancy";
+import { PLANS } from "@shared/plans";
 
 const users: number[] = [], codes: number[] = [], orgs: string[] = [];
 async function account(plan?: string, extra: { status?: string; stripe?: string | null; end?: Date | null; customer?: string } = {}) {
@@ -195,25 +196,30 @@ describe("CRM seats follow the owner's CRM plan", () => {
     expect((await getSeatUsage(await org(legacy))).limit).toBe(0);
   });
 
-  it("adds the platform plan's agencySeats to the pool while the Agency workspace module is on, and -1 is unlimited", async () => {
-    // Agency ($199): CRM Basic's 1 seat + the platform plan's 10 agencySeats.
+  it("keeps the CRM seat pool separate from the platform team seats", async () => {
+    // Pools are separate by design (owner, 2026-10-07): the CRM pool is the CRM plan's seats
+    // ONLY — a platform plan's agencySeats never enter it, not even on Agency or Unlimited.
     const growth = await account("growth");
     await crmSub(growth, "crm_basic");
-    expect(await getSeatUsage(await org(growth))).toMatchObject({ plan: "crm_basic", planName: "CRM Basic", limit: 11 });
-    // Unlimited's agencySeats are -1: the pool has no ceiling.
+    expect(await getSeatUsage(await org(growth))).toMatchObject({ plan: "crm_basic", planName: "CRM Basic", limit: 1 });
+    // Unlimited's platform agencySeats are -1; the CRM pool still has just the CRM plan's seat.
     const unlimited = await account("agency");
     await crmSub(unlimited, "crm_basic");
-    expect((await getSeatUsage(await org(unlimited))).limit).toBe(-1);
+    expect((await getSeatUsage(await org(unlimited))).limit).toBe(1);
+    // The platform pool answers separately: the owner's platform team seats, never CRM seats.
+    expect((await getOwnerSeatUsage(growth, { product: "platform" })).limit).toBe(PLANS.growth.limits.agencySeats);
+    expect((await getOwnerSeatUsage(unlimited, { product: "platform" })).limit).toBe(-1);
   });
 
   it("one seat message without any plan, and an expired CRM grant drops its seats", async () => {
     const none = await getSeatUsage(await org(await account()));
     expect(none).toMatchObject({ plan: "none", limit: 0 });
     expect(none.message).toContain("The ConstructHUB CRM is a separate subscription");
-    // A canceled CRM plan drops its seats; the platform plan's agencySeats remain in the pool.
+    // A canceled CRM plan drops its seats; the platform plan's agencySeats stay in the platform pool.
     const lapsed = await account("growth");
     await crmSub(lapsed, "crm_essentials", { status: "canceled" });
-    expect((await getSeatUsage(await org(lapsed))).limit).toBe(10);
+    expect((await getSeatUsage(await org(lapsed))).limit).toBe(0);
+    expect((await getOwnerSeatUsage(lapsed, { product: "platform" })).limit).toBe(PLANS.growth.limits.agencySeats);
   });
 
   it("keeps beta owners unlimited", async () => {

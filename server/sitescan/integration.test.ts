@@ -531,15 +531,23 @@ it("deleting a running scan stops the worker without resurrecting the row or not
   expect((notifyUser as any).mock.calls.length).toBe(before);
 });
 it("owners can remove their PDF branding and it never touches another owner's", async () => {
+  // White-label branding is Unlimited-only (shared/plans.ts): saving needs the Unlimited plan.
   const users: number[] = [];
-  for (const n of [1, 2])
+  for (const n of [1, 2, 3])
     users.push(
       (await pool.query("INSERT INTO users(email) VALUES($1) RETURNING id", [
         `sitescan-brand-${n}-${randomUUID()}@example.invalid`,
       ])).rows[0].id,
     );
+  await pool.query(
+    "INSERT INTO subscriptions(user_id,plan,status) VALUES($1,'agency','active'),($2,'agency','active'),($3,'pro','active')",
+    users,
+  );
   try {
-    for (const user of users)
+    expect(
+      (await call("post", "/api/sitescan/branding", { body: { name: "Fixture denied" }, user: users[2] })).status,
+    ).toBe(402);
+    for (const user of users.slice(0, 2))
       expect(
         (await call("post", "/api/sitescan/branding", { body: { name: `Fixture ${user}` }, user })).status,
       ).toBe(200);
@@ -553,6 +561,7 @@ it("owners can remove their PDF branding and it never touches another owner's", 
       `Fixture ${users[1]}`,
     );
   } finally {
+    await pool.query("DELETE FROM subscriptions WHERE user_id=ANY($1::int[])", [users]);
     await pool.query("DELETE FROM users WHERE id=ANY($1::int[])", [users]);
   }
 });
@@ -562,6 +571,8 @@ it("renaming PDF branding without a logo field keeps the saved logo; null remove
   } = await pool.query("INSERT INTO users(email) VALUES($1) RETURNING id", [
     `sitescan-brand-keep-${randomUUID()}@example.invalid`,
   ]);
+  // White-label branding is Unlimited-only.
+  await pool.query("INSERT INTO subscriptions(user_id,plan,status) VALUES($1,'agency','active')", [user]);
   const png =
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jA1kAAAAASUVORK5CYII=";
   const read = async () => (await call("get", "/api/sitescan/branding", { user })).body;
@@ -577,6 +588,7 @@ it("renaming PDF branding without a logo field keeps the saved logo; null remove
     expect((await call("post", "/api/sitescan/branding", { body: { name: "No logo", logo: null }, user })).status).toBe(200);
     expect(await read()).toEqual({ name: "No logo", logo: null });
   } finally {
+    await pool.query("DELETE FROM subscriptions WHERE user_id=$1", [user]);
     await pool.query("DELETE FROM users WHERE id=$1", [user]);
   }
 });

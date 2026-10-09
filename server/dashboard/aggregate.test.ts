@@ -9,6 +9,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
 import { PLANS, UNLIMITED } from "@shared/plans";
+import { CRM_PLANS } from "@shared/crm-plans";
 import { DASHBOARD_TILE_KEYS, type DashboardPayload, type DashboardTile, type DashboardTileKey } from "@shared/dashboard";
 import { buildDashboard, withTimeout, DashboardTimeout } from "./aggregate";
 import { createDashboardCache } from "./cache";
@@ -213,7 +214,8 @@ describe("buildDashboard (development database)", () => {
 
     expect(p.account).toMatchObject({ plan: "agency", planName: "Unlimited", status: "active", firstName: "Dana", displayName: "Dana Agency", unreadNotifications: 1 });
     expect(p.account.usage.find((u) => u.key === "searches")).toMatchObject({ used: 7, limit: PLANS.agency.limits.permitSearches });
-    expect(p.account.usage.find((u) => u.key === "crmSeats")).toMatchObject({ surface: "portal" });
+    // CRM seats are the CRM plan's pool (separate product): Essentials' 5 seats, one holder (the owner).
+    expect(p.account.usage.find((u) => u.key === "crmSeats")).toMatchObject({ used: 1, limit: CRM_PLANS.crm_essentials.limits.seats, surface: "portal" });
 
     expect(value(p, "gbp", "locations")).toBe(2);
     expect(tile(p, "gbp").metrics.find((m) => m.key === "locations")?.limit).toBe(UNLIMITED);
@@ -292,6 +294,9 @@ describe("buildDashboard (development database)", () => {
     expect(value(theirs, "reviews", "unanswered")).toBe(2);
     expect(value(theirs, "clickGuard", "suspicious30d")).toBe(5);
     expect(value(theirs, "crm", "clients")).toBe(4);
+    // No CRM plan on this account (platform Agency plan only): the CRM-seats meter stays off —
+    // the CRM is a separate product and its seats never come from the platform plan.
+    expect(theirs.account.usage.find((u) => u.key === "crmSeats")).toBeUndefined();
     expect(value(mine, "gbp", "locations")).toBe(2);
     expect(value(mine, "reviews", "unanswered")).toBe(1);
     expect(value(mine, "clickGuard", "suspicious30d")).toBe(2);
