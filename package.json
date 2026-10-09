@@ -14,7 +14,8 @@
     "test:e2e:parallel": "playwright test --grep-invert @serial",
     "test:e2e:serial": "E2E_WORKERS=1 playwright test --grep @serial",
     "e2e:lane": "tsx script/e2e-lane.ts",
-    "e2e:worktree": "bash script/e2e-worktree.sh"
+    "e2e:worktree": "bash script/e2e-worktree.sh",
+    "pricing:matrix": "tsx script/pricing-matrix-md.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.999.0",

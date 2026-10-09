@@ -38,6 +38,9 @@ Self-contained. Never pull in another tower project's infra, domains, or account
 - `server/hub/` — Hub, the corner assistant (TruthCoder). Its guardrails are deterministic code there, not the
   prompt; its knowledge pack is `server/data/hub-knowledge.md` (prices are tokens filled from `shared/plans.ts`).
 - Auth: session (connect-pg-simple) + Google OAuth. Payments: Stripe. Storage: Cloudflare R2. AI: OpenAI.
+- Price book: `shared/plans.ts` (platform) + `shared/crm-plans.ts` (CRM, a separate product) — prices/limits are changed
+  ONLY there; plan keys never change (`starter`=Solo … `agency`=Unlimited). The pricing page and `docs/pricing/PLAN-MATRIX.md`
+  both derive from `shared/plan-matrix.ts`. How to change a price, add a row, mark Coming, test and ship: `docs/pricing/README.md`.
 
 ## Data pipelines (`scripts/`, re-runnable)
 - `scrape-netronline.ts` — real assessor/appraiser offices from NETR Online → `server/data/appraisers.json`.
