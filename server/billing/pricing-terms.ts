@@ -44,7 +44,7 @@
  */
 import { pool } from "../db";
 import { ACCESS_STATUSES, LEGACY_PLAN_MAP, PLAN_KEYS } from "@shared/plans";
-import { priceSnapshot, parseFoundingPrices, type AccountPricingTerms } from "@shared/pricing-terms";
+import { FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT, priceSnapshot, parseFoundingPrices, type AccountPricingTerms } from "@shared/pricing-terms";
 import { STRIPE_ENDED_STATUSES, SUBSCRIPTION_ORDER } from "../entitlements";
 
 type Queryable = { query: (text: string, values?: unknown[]) => Promise<{ rows: any[]; rowCount?: number | null }> };
@@ -245,15 +245,20 @@ export async function accountPricingTerms(userId: number, q: Queryable = pool): 
 
 // ── Marks on a Stripe subscription write ────────────────────────────────────
 
-/**
- * The price snapshot a founding member keeps is the price book at marking
- * time. That equals the prices in force at the sign-up date because the price
- * book has not changed since the offer began — server/billing/founding-
- * baseline.test.ts pins today's prices and fails the moment one moves, at
- * which point the snapshot must become the prices of the sign-up date and
- * checkout must read foundingPrice() (shared/pricing-terms.ts).
- */
-const snapshotJson = (now: Date) => JSON.stringify(priceSnapshot(now));
+/** Select the immutable book by subscription start, even on a delayed write. */
+const snapshotJson = (startedAt: Date) => JSON.stringify(priceSnapshot(startedAt));
+
+// Bulk writes select independently for each subscription, in the same atomic
+// statement as eligibility and conflict handling. Keep the books in the shared
+// helper; SQL only selects one and stamps the subscription's UTC start time.
+const snapshotBooksJson = JSON.stringify({
+  legacy: priceSnapshot(new Date(Date.parse(FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT) - 1)),
+  current: priceSnapshot(new Date(FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT)),
+});
+const SNAPSHOT_AT_SQL = (at: string) => `(
+  (CASE WHEN ${at} < '${FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT}'::timestamptz
+    THEN $1::jsonb->'legacy' ELSE $1::jsonb->'current' END)
+  || jsonb_build_object('capturedAt', to_char(${at} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))) `;
 
 /**
  * Mark an account as a founding member when its Stripe subscription STARTED
@@ -283,10 +288,10 @@ export async function noteFoundingMember(userId: number, status: string | null |
     `INSERT INTO account_pricing_terms (user_id, founding_member_at, founding_prices)
      SELECT $1, now(), $2::jsonb
       WHERE ${IN_OFFER_PERIOD_SQL("$3::timestamptz")}
-     ON CONFLICT (user_id) DO UPDATE SET founding_member_at = now(), founding_prices = EXCLUDED.founding_prices, updated_at = now()
+     ON CONFLICT (user_id) DO UPDATE SET founding_member_at = now(), founding_prices = COALESCE(account_pricing_terms.founding_prices, EXCLUDED.founding_prices), updated_at = now()
       WHERE account_pricing_terms.founding_member_at IS NULL
      RETURNING user_id`,
-    [userId, snapshotJson(now), startedAt ?? now]);
+    [userId, snapshotJson(startedAt ?? now), startedAt ?? now]);
   return rows.length > 0;
 }
 
@@ -347,7 +352,7 @@ export const FOUNDING_CUTOVER_STATUSES: readonly string[] = [...ACCESS_STATUSES,
  *     one still ahead (server/entitlements.ts grantExpired).
  * Every kept row is grandfathered; only Stripe rows in FOUNDING_CUTOVER_STATUSES
  * become founding members — a trial code, an admin grant or a subscription that
- * never paid keeps SEO and nothing more. $1 the price snapshot (jsonb), $2
+ * never paid keeps SEO and nothing more. $1 the dated price books (jsonb), $2
  * ACCESS_STATUSES, $3 KNOWN_PLAN_KEYS, $4 STRIPE_ENDED_STATUSES, $5
  * FOUNDING_CUTOVER_STATUSES, $6 the boundary (ranAt: the transaction's clock
  * read under the lock, to the millisecond the marker stores — the selection,
@@ -359,7 +364,7 @@ export const SEO_CUTOVER_SQL = `
   INSERT INTO account_pricing_terms (user_id, seo_grandfathered_at, seo_grandfathered_plan, founding_member_at, founding_prices)
   SELECT u.id, $6::timestamptz, s.plan,
          CASE WHEN s.stripe_subscription_id IS NOT NULL AND s.status = ANY($5::text[]) THEN $6::timestamptz END,
-         CASE WHEN s.stripe_subscription_id IS NOT NULL AND s.status = ANY($5::text[]) THEN $1::jsonb END
+         CASE WHEN s.stripe_subscription_id IS NOT NULL AND s.status = ANY($5::text[]) THEN ${SNAPSHOT_AT_SQL("COALESCE(s.start_date::timestamptz, $6::timestamptz)")} END
     FROM users u
     JOIN LATERAL (SELECT * FROM subscriptions x WHERE x.user_id = u.id ${SUBSCRIPTION_ORDER}) s ON true
    WHERE s.plan = ANY($3::text[])
@@ -401,7 +406,7 @@ export async function runSeoAgencyOnlyCutover(db: Connectable = pool): Promise<C
     // the INSERT selects and stamps with that same value.
     const { rows: [clock] } = await c.query("SELECT now() AS ran_at");
     const ranAt = new Date(clock.ran_at);
-    const { rowCount } = await c.query(SEO_CUTOVER_SQL, [snapshotJson(ranAt), ACCESS_STATUSES, KNOWN_PLAN_KEYS, STRIPE_ENDED_STATUSES, FOUNDING_CUTOVER_STATUSES, ranAt]);
+    const { rowCount } = await c.query(SEO_CUTOVER_SQL, [snapshotBooksJson, ACCESS_STATUSES, KNOWN_PLAN_KEYS, STRIPE_ENDED_STATUSES, FOUNDING_CUTOVER_STATUSES, ranAt]);
     const grandfathered = Number(rowCount ?? 0);
     await c.query(
       "INSERT INTO pricing_settings (key, value) VALUES ($1, $2::jsonb)",
@@ -443,7 +448,7 @@ export const RECONCILE_SEO_SQL = `
 
 export const RECONCILE_FOUNDING_SQL = `
   INSERT INTO account_pricing_terms (user_id, founding_member_at, founding_prices)
-  SELECT u.id, now(), $1::jsonb
+  SELECT u.id, now(), ${SNAPSHOT_AT_SQL("s.start_date::timestamptz")}
     FROM users u
     JOIN LATERAL (SELECT * FROM subscriptions x WHERE x.user_id = u.id ${SUBSCRIPTION_ORDER}) s ON true
    WHERE s.stripe_subscription_id IS NOT NULL AND s.status = ANY($2::text[])
@@ -453,13 +458,14 @@ export const RECONCILE_FOUNDING_SQL = `
   ON CONFLICT (user_id) DO UPDATE SET
     founding_member_at = COALESCE(account_pricing_terms.founding_member_at, EXCLUDED.founding_member_at),
     founding_prices = COALESCE(account_pricing_terms.founding_prices, EXCLUDED.founding_prices),
-    updated_at = now()`;
+    updated_at = now()
+    WHERE account_pricing_terms.founding_member_at IS NULL`;
 
 export type ReconcileResult = { grandfathered: number; founding: number };
 
-export async function reconcilePricingTerms(q: Queryable = pool, now = new Date()): Promise<ReconcileResult> {
+export async function reconcilePricingTerms(q: Queryable = pool, _now = new Date()): Promise<ReconcileResult> {
   const seo = await q.query(RECONCILE_SEO_SQL, [KNOWN_PLAN_KEYS, ACCESS_STATUSES, STRIPE_ENDED_STATUSES, SEO_CUTOVER_KEY]);
-  const founding = await q.query(RECONCILE_FOUNDING_SQL, [snapshotJson(now), ACCESS_STATUSES]);
+  const founding = await q.query(RECONCILE_FOUNDING_SQL, [snapshotBooksJson, ACCESS_STATUSES]);
   const out = { grandfathered: Number(seo.rowCount ?? 0), founding: Number(founding.rowCount ?? 0) };
   if (out.grandfathered || out.founding) console.log(`[billing] pricing terms reconciled: ${out.grandfathered} grandfathered, ${out.founding} founding member(s) marked from stored subscriptions.`);
   return out;

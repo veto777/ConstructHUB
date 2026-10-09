@@ -17,7 +17,7 @@
  * here (and nothing that reads it) states a customer count or a limit.
  */
 import {
-  AGENCY_LOCATION_BANDS, ANNUAL_MONTHS, PLANS, PLAN_KEYS, planPriceCents, isPlanKey,
+  PLAN_KEYS, planPriceCents, isPlanKey,
   type BillingInterval, type PlanKey,
 } from "./plans";
 
@@ -37,7 +37,7 @@ export type FoundingPrices = {
   agencyIncludedLocations: number;
   /** ANNUAL_MONTHS: yearly = this many months of the monthly price, plans and bands alike. */
   annualMonths: number;
-  /** ISO time the snapshot was taken. */
+  /** ISO subscription start time whose price book was captured. */
   capturedAt: string;
 };
 
@@ -50,21 +50,67 @@ export type AccountPricingTerms = {
 };
 
 /**
- * The price snapshot a new founding member keeps: taken from the price book
- * now. It covers the PLANS only (the 2026-10-09 ladder has no location bands). The AI Call
- * Assistant (shared/plans.ts CALL_ASSISTANT_TIERS) is a separate service on its
- * own subscription and is NOT part of the lock: its prices are not copied
- * here, and foundingPrice() never answers for it.
+ * Inclusive UTC boundary of the owner-approved five-plan book.
+ * DEPLOY STEP: set this to the moment the five-plan ladder goes live in
+ * production (the release deploy time), in the deploy commit. Subscriptions
+ * started before it were sold on the four-plan book and lock those prices.
+ * See docs/pricing/README.md "Deploying a new price book".
  */
-export function priceSnapshot(now = new Date()): FoundingPrices {
-  const plans = {} as Record<PlanKey, FoundingPlanPrice>;
-  for (const key of PLAN_KEYS) plans[key] = { monthlyCents: PLANS[key].monthlyCents, annualCents: PLANS[key].annualCents };
+export const FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT = "2026-10-09T00:00:00.000Z";
+
+/**
+ * Frozen four-plan book deployed 2026-09-30 (HANDOFF.md, that date's entry).
+ * Applies to starts before the five-plan boundary, including older subscribers.
+ * Keys retain their billing identity even when display names change.
+ */
+export const LEGACY_FOUNDING_PRICE_BOOK = Object.freeze({
+  effectiveUntil: FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT,
+  plans: Object.freeze({
+    starter: Object.freeze({ monthlyCents: 2900, annualCents: 29000 }),
+    pro: Object.freeze({ monthlyCents: 7900, annualCents: 79000 }),
+    growth: Object.freeze({ monthlyCents: 19900, annualCents: 199000 }),
+    agency: Object.freeze({ monthlyCents: 34900, annualCents: 349000 }),
+  }),
+  agencyBands: Object.freeze([
+    Object.freeze({ upTo: 10, centsPerLocation: 0 }),
+    Object.freeze({ upTo: 50, centsPerLocation: 1500 }),
+    Object.freeze({ upTo: 250, centsPerLocation: 1000 }),
+    Object.freeze({ upTo: 500, centsPerLocation: 700 }),
+  ]),
+  agencyIncludedLocations: 10,
+  annualMonths: 10,
+});
+
+/** Keep dated books immutable: future repricing must add a version. */
+export const FIVE_PLAN_FOUNDING_PRICE_BOOK = Object.freeze({
+  effectiveFrom: FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT,
+  plans: Object.freeze({
+    starter: Object.freeze({ monthlyCents: 2900, annualCents: 29000 }),
+    team: Object.freeze({ monthlyCents: 4900, annualCents: 49000 }),
+    pro: Object.freeze({ monthlyCents: 9900, annualCents: 99000 }),
+    growth: Object.freeze({ monthlyCents: 19900, annualCents: 199000 }),
+    agency: Object.freeze({ monthlyCents: 44900, annualCents: 449000 }),
+  }),
+  // Retain the serialized shape; new Unlimited subscriptions have no bands.
+  agencyBands: LEGACY_FOUNDING_PRICE_BOOK.agencyBands,
+  agencyIncludedLocations: -1,
+  annualMonths: 10,
+});
+
+/**
+ * Copy the book in force at subscription start, never at delayed processing.
+ * Add-ons and the separate AI Call Assistant subscription are outside the lock.
+ */
+export function priceSnapshot(startedAt = new Date()): FoundingPrices {
+  const book = startedAt.getTime() < Date.parse(FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT)
+    ? LEGACY_FOUNDING_PRICE_BOOK : FIVE_PLAN_FOUNDING_PRICE_BOOK;
+  const plans = Object.fromEntries(Object.entries(book.plans).map(([key, price]) => [key, { ...price }])) as FoundingPrices["plans"];
   return {
     plans,
-    agencyBands: AGENCY_LOCATION_BANDS.map((b) => ({ upTo: b.upTo, centsPerLocation: b.centsPerLocation })),
-    agencyIncludedLocations: PLANS.agency.limits.locations,
-    annualMonths: ANNUAL_MONTHS,
-    capturedAt: now.toISOString(),
+    agencyBands: book.agencyBands.map((b) => ({ ...b })),
+    agencyIncludedLocations: book.agencyIncludedLocations,
+    annualMonths: book.annualMonths,
+    capturedAt: startedAt.toISOString(),
   };
 }
 

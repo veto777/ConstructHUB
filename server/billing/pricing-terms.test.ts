@@ -9,6 +9,7 @@ vi.mock("../db", () => ({ pool: { query: vi.fn(async () => ({ rows: [] })), conn
 
 import { ACCESS_STATUSES, AGENCY_LOCATION_BANDS, ANNUAL_MONTHS, LEGACY_PLAN_MAP, PLANS, PLAN_KEYS } from "@shared/plans";
 import {
+  FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT, LEGACY_FOUNDING_PRICE_BOOK,
   FOUNDING_MEMBER_LINE, FOUNDING_OFFER_LINE, foundingPrice, isFoundingMember, parseFoundingPrices, priceSnapshot,
   type AccountPricingTerms, type FoundingPrices,
 } from "@shared/pricing-terms";
@@ -27,16 +28,50 @@ const T = (iso: string) => new Date(iso);
 
 describe("the price snapshot a founding member keeps", () => {
   it("copies every plan's two prices and the Agency bands from the price book, with the time it was taken", () => {
-    const snap = snapshotAt("2026-10-08T12:00:00Z");
+    const snap = snapshotAt("2026-10-09T12:00:00Z");
     for (const key of PLAN_KEYS) expect(snap.plans[key]).toEqual({ monthlyCents: PLANS[key].monthlyCents, annualCents: PLANS[key].annualCents });
     expect(snap.agencyBands).toEqual(AGENCY_LOCATION_BANDS.map((b) => ({ upTo: b.upTo, centsPerLocation: b.centsPerLocation })));
     // Everything an Agency location charge is computed from (server/billing/prices.ts agencyLocationTiers).
     expect(snap.agencyIncludedLocations).toBe(PLANS.agency.limits.locations);
     expect(snap.annualMonths).toBe(ANNUAL_MONTHS);
-    expect(snap.capturedAt).toBe("2026-10-08T12:00:00.000Z");
+    expect(snap.capturedAt).toBe("2026-10-09T12:00:00.000Z");
     // A copy, not a reference: the stored row cannot follow a later edit of PLANS.
     expect(snap.plans.starter).not.toBe(PLANS.starter);
     expect(parseFoundingPrices(JSON.parse(JSON.stringify(snap)))).toEqual(snap);
+  });
+
+  it("locks the complete four-plan book immediately before the UTC boundary, including legacy bands", () => {
+    const snap = snapshotAt("2026-10-08T23:59:59.999Z");
+    expect(snap.plans).toEqual({
+      starter: { monthlyCents: 2900, annualCents: 29000 },
+      pro: { monthlyCents: 7900, annualCents: 79000 },
+      growth: { monthlyCents: 19900, annualCents: 199000 },
+      agency: { monthlyCents: 34900, annualCents: 349000 },
+    });
+    expect(snap.agencyIncludedLocations).toBe(10);
+    expect(snap.annualMonths).toBe(10);
+    expect(snap.agencyBands).toEqual([
+      { upTo: 10, centsPerLocation: 0 }, { upTo: 50, centsPerLocation: 1500 },
+      { upTo: 250, centsPerLocation: 1000 }, { upTo: 500, centsPerLocation: 700 },
+    ]);
+    expect(parseFoundingPrices(JSON.parse(JSON.stringify(snap)))).toEqual(snap);
+    expect(foundingPrice(member(snap), "pro", "month")).toBe(7900);
+    expect(foundingPrice(member(snap), "pro", "year")).toBe(79000);
+    // Team did not exist in this book; it falls back to the current price.
+    expect(foundingPrice(member(snap), "team", "month")).toBe(4900);
+    expect(Object.isFrozen(LEGACY_FOUNDING_PRICE_BOOK.plans.pro)).toBe(true);
+    snap.plans.pro.monthlyCents = 1;
+    snap.agencyBands[1].centsPerLocation = 1;
+    expect(snapshotAt("2026-10-08T23:59:59.999Z").plans.pro.monthlyCents).toBe(7900);
+    expect(snapshotAt("2026-10-08T23:59:59.999Z").agencyBands[1].centsPerLocation).toBe(1500);
+  });
+
+  it("uses the five-plan book at the inclusive cutover boundary", () => {
+    const snap = snapshotAt(FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT);
+    expect(snap.plans.pro).toEqual({ monthlyCents: 9900, annualCents: 99000 });
+    expect(snap.plans.team).toEqual({ monthlyCents: 4900, annualCents: 49000 });
+    expect(snap.plans.agency).toEqual({ monthlyCents: 44900, annualCents: 449000 });
+    expect(snap.agencyIncludedLocations).toBe(-1);
   });
 
   it("reads only a well-formed stored value", () => {
@@ -169,9 +204,35 @@ describe("the founding member mark (noteFoundingMember)", () => {
       expect(text).toMatch(/ON CONFLICT \(user_id\) DO UPDATE/);
       expect(text).toMatch(/WHERE account_pricing_terms\.founding_member_at IS NULL/);
       expect(values[0]).toBe(7);
-      expect(JSON.parse(values[1] as string)).toEqual(snapshotAt("2026-10-08T12:00:00Z"));
+      expect(JSON.parse(values[1] as string)).toEqual(snapshotAt("2026-10-08T10:00:00Z"));
       expect(values[2]).toEqual(T("2026-10-08T10:00:00Z"));
     }
+  });
+
+  it.each([
+    ["2026-10-08T23:59:59.000Z", 7900],
+    [FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT, 9900],
+    ["2026-10-10T00:00:00.000Z", 9900],
+  ])("locks the checkout/start book for %s when the first successful write happens later", async (start, cents) => {
+    const q = fakeQ(() => ({ rows: [{ user_id: 7 }] }));
+    await noteFoundingMember(7, "active", "sub_1", T(start), q, T("2026-10-15T00:00:00Z"));
+    const snapshot = JSON.parse(q.calls[0].values[1] as string);
+    expect(snapshot.capturedAt).toBe(start);
+    expect(foundingPrice(member(snapshot), "pro", "month")).toBe(cents);
+    expect(foundingPrice(member(snapshot), "pro", "year")).toBe(cents * 10);
+  });
+
+  it("preserves an existing snapshot on conflicts, including one stored before the membership mark", async () => {
+    const q = fakeQ();
+    await noteFoundingMember(7, "active", "sub_retry", T("2026-10-10T00:00:00Z"), q);
+    expect(q.calls[0].text).toContain("founding_prices = COALESCE(account_pricing_terms.founding_prices, EXCLUDED.founding_prices)");
+    expect(q.calls[0].text).toContain("WHERE account_pricing_terms.founding_member_at IS NULL");
+    // Reading an existing row never re-snapshots it, even after changing away and back.
+    const stored = member(snapshotAt("2026-10-08T12:00:00Z"));
+    const before = JSON.stringify(stored);
+    expect(foundingPrice(stored, "agency", "month")).toBe(34900);
+    expect(foundingPrice(stored, "pro", "month")).toBe(7900);
+    expect(JSON.stringify(stored)).toBe(before);
   });
 
   it("without a start date the processing time stands in", async () => {
@@ -267,7 +328,7 @@ describe("the one-time SEO cutover", () => {
     expect(SEO_CUTOVER_SQL).toMatch(/s\.stripe_subscription_id IS NULL AND s\.status = ANY\(\$2::text\[\]\) AND \(s\.current_period_end IS NULL OR s\.current_period_end > \$6::timestamptz\)/);
     // Every kept row is grandfathered; the founding mark and its snapshot only for a paying Stripe subscription.
     expect(FOUNDING_CUTOVER_STATUSES).toEqual(["active", "trialing", "past_due"]);
-    expect(SEO_CUTOVER_SQL).toMatch(/SELECT u\.id, \$6::timestamptz, s\.plan,\s*CASE WHEN s\.stripe_subscription_id IS NOT NULL AND s\.status = ANY\(\$5::text\[\]\) THEN \$6::timestamptz END,\s*CASE WHEN s\.stripe_subscription_id IS NOT NULL AND s\.status = ANY\(\$5::text\[\]\) THEN \$1::jsonb END/);
+    expect(SEO_CUTOVER_SQL).toMatch(/SELECT u\.id, \$6::timestamptz, s\.plan,\s*CASE WHEN s\.stripe_subscription_id IS NOT NULL AND s\.status = ANY\(\$5::text\[\]\) THEN \$6::timestamptz END,\s*CASE WHEN s\.stripe_subscription_id IS NOT NULL AND s\.status = ANY\(\$5::text\[\]\) THEN/);
     expect(SEO_CUTOVER_SQL).toMatch(/seo_grandfathered_at = COALESCE\(account_pricing_terms\.seo_grandfathered_at, EXCLUDED\.seo_grandfathered_at\)/);
     expect(SEO_CUTOVER_SQL).toMatch(/founding_member_at = COALESCE\(account_pricing_terms\.founding_member_at, EXCLUDED\.founding_member_at\)/);
   });
@@ -287,7 +348,7 @@ describe("the one-time SEO cutover", () => {
     // The boundary is the transaction's own clock, read after the lock — the snapshot and the marker carry it.
     expect(texts[at + 1]).toBe("SELECT now() AS ran_at");
     expect(texts[at + 2]).toBe(SEO_CUTOVER_SQL.trim());
-    expect(q.calls[at + 2].values).toEqual([JSON.stringify(snapshotAt("2026-10-08T12:00:00Z")), ACCESS_STATUSES, KNOWN_PLAN_KEYS, STRIPE_ENDED_STATUSES, FOUNDING_CUTOVER_STATUSES, T("2026-10-08T12:00:00Z")]);
+    expect(q.calls[at + 2].values).toEqual([expect.any(String), ACCESS_STATUSES, KNOWN_PLAN_KEYS, STRIPE_ENDED_STATUSES, FOUNDING_CUTOVER_STATUSES, T("2026-10-08T12:00:00Z")]);
     expect(texts[at + 3]).toMatch(/INSERT INTO pricing_settings \(key, value\)/);
     expect(q.calls[at + 3].values).toEqual([SEO_CUTOVER_KEY, JSON.stringify({ ranAt: "2026-10-08T12:00:00.000Z", grandfathered: 3 })]);
     expect(texts[at + 4]).toBe("COMMIT");
@@ -313,6 +374,38 @@ describe("the one-time SEO cutover", () => {
 });
 
 describe("boot reconciliation", () => {
+  it("selects the old or new book per stored start date, independent of the reconciliation clock", async () => {
+    const early = fakeQ();
+    const late = fakeQ();
+    await reconcilePricingTerms(early, T("2026-10-08T12:00:00Z"));
+    await reconcilePricingTerms(late, T("2026-11-01T12:00:00Z"));
+    expect(late.calls[1]).toEqual(early.calls[1]);
+    const { text, values } = late.calls[1];
+    expect(text).toContain(`CASE WHEN s.start_date::timestamptz < '${FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT}'::timestamptz`);
+    expect(text).toContain("THEN $1::jsonb->'legacy' ELSE $1::jsonb->'current' END");
+    expect(text).toContain(`jsonb_build_object('capturedAt', to_char(s.start_date::timestamptz AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))`);
+    const books = JSON.parse(values[0] as string);
+    expect(books.legacy).toEqual(snapshotAt("2026-10-08T23:59:59.999Z"));
+    expect(books.current).toEqual(snapshotAt(FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT));
+    expect(foundingPrice(member(books.legacy), "pro", "month")).toBe(7900);
+    expect(foundingPrice(member(books.current), "pro", "month")).toBe(9900);
+    // Also guard a concurrent webhook winning after the SELECT's NOT EXISTS.
+    expect(text).toContain("WHERE account_pricing_terms.founding_member_at IS NULL");
+    expect(text).toContain("founding_prices = COALESCE(account_pricing_terms.founding_prices, EXCLUDED.founding_prices)");
+  });
+
+  it("uses the same dated books when the one-time SEO cutover first runs after repricing", async () => {
+    const q = fakeQ((text) => ({ rows: text === "SELECT now() AS ran_at" ? [{ ran_at: T("2026-10-15T12:00:00Z") }] : [] }));
+    await runSeoAgencyOnlyCutover(connectable(q));
+    const cutover = q.calls.find((call) => call.text === SEO_CUTOVER_SQL)!;
+    const reconciliation = fakeQ();
+    await reconcilePricingTerms(reconciliation);
+    expect(cutover.values[0]).toEqual(reconciliation.calls[1].values[0]);
+    expect(cutover.text).toContain(`CASE WHEN COALESCE(s.start_date::timestamptz, $6::timestamptz) < '${FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT}'::timestamptz`);
+    expect(cutover.text).toContain("THEN $1::jsonb->'legacy' ELSE $1::jsonb->'current' END");
+    expect(cutover.text).toContain("founding_prices = COALESCE(account_pricing_terms.founding_prices, EXCLUDED.founding_prices)");
+  });
+
   it("applies the two start-date rules from the stored subscriptions, leaving existing marks alone", async () => {
     expect(RECONCILE_SEO_SQL).toMatch(/s\.stripe_subscription_id IS NOT NULL AND NOT \(s\.status = ANY\(\$3::text\[\]\)\) AND s\.plan = ANY\(\$1::text\[\]\)/);
     expect(RECONCILE_SEO_SQL).toMatch(/s\.start_date IS NOT NULL/);
@@ -324,7 +417,7 @@ describe("boot reconciliation", () => {
     const q = fakeQ((text) => ({ rows: [], rowCount: /seo_grandfathered_plan\)/.test(text) ? 2 : 1 }));
     expect(await reconcilePricingTerms(q, T("2026-10-08T12:00:00Z"))).toEqual({ grandfathered: 2, founding: 1 });
     expect(q.calls[0].values).toEqual([KNOWN_PLAN_KEYS, ACCESS_STATUSES, STRIPE_ENDED_STATUSES, SEO_CUTOVER_KEY]);
-    expect(q.calls[1].values).toEqual([JSON.stringify(snapshotAt("2026-10-08T12:00:00Z")), ACCESS_STATUSES]);
+    expect(q.calls[1].values).toEqual([expect.any(String), ACCESS_STATUSES]);
   });
 });
 
