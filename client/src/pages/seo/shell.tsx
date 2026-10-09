@@ -9,11 +9,13 @@
  * see the "Data source" card on /admin (Platform admin), fed by `status.admin`; the SEO pages themselves are vendor-free.
  */
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
-import { Link, useLocation, useSearch } from "wouter";
+import { createPortal } from "react-dom";
+import { Link, useSearch } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Plus, X } from "lucide-react";
 import { GoogleSurface } from "@/components/google";
 import { AppPage } from "@/components/app-ui";
+import { SegmentedTabs, useToolSlot } from "@/components/tool";
 import { Button } from "@/components/ui/button";
 import { planRequiredFrom } from "@/components/plan-required";
 import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
@@ -134,15 +136,13 @@ export function ActiveFilter({ children, onClear, clearLabel = "Show everything"
 }
 
 /**
- * A strip of tabs (the SEO sections, a page's own lists). Each tab is at least 44 px tall. On a phone the strip scrolls
- * sideways — its scrollbar stays visible and a fade at the right edge says there is more; from 640 px it wraps, so
- * every tab shows.
+ * A page's own tabs (which alerts, which tasks…): the shared segmented tabs (components/tool/tabs.tsx). They never
+ * wrap — the row scrolls sideways with an edge fade. The SEO sections themselves are the tool shell's navigation
+ * (components/seo-tool/nav.ts): the top bar, the icon rail and the sub-navigation.
  */
 export function TabStrip({ label, children, className = "" }: { label: string; children: ReactNode; className?: string }) {
   return (
-    <div className={`relative mb-4 after:pointer-events-none after:absolute after:inset-y-0 after:right-0 after:w-10 after:bg-gradient-to-l after:from-[color:var(--g-surface,#fff)] after:to-transparent sm:after:hidden ${className}`}>
-      <nav className="g-tabs !mb-0 pr-10 ![scrollbar-width:thin] sm:!flex-wrap sm:!overflow-visible sm:pr-0 [&>a]:flex [&>a]:min-h-11 [&>a]:items-center" aria-label={label}>{children}</nav>
-    </div>
+    <SegmentedTabs label={label} className={`mb-4 ${className}`}>{children}</SegmentedTabs>
   );
 }
 
@@ -172,38 +172,25 @@ export function useHash(): string {
   );
 }
 
-const TABS = [
-  { href: "/seo", label: "Dashboard" },
-  { href: "/seo/explorer", label: "Site explorer" },
-  { href: "/seo/keywords", label: "Keywords explorer" },
-  { href: "/seo/content", label: "Content explorer" },
-  { href: "/seo/rank-tracker", label: "Rank tracker" },
-  { href: "/seo/local-grid", label: "Local grid" },
-  { href: "/seo/plan", label: "Action plan" },
-  { href: "/seo/audit", label: "Site audit" },
-  { href: "/seo/ai", label: "AI visibility" },
-  { href: "/seo/alerts", label: "Alerts" },
-  { href: "/seo/reports", label: "Reports" },
-  { href: "/seo/backlinks", label: "Backlinks" },
-  { href: "/seo/batch", label: "Batch analysis" },
-  { href: "/seo/usage", label: "Usage" },
-];
-
 export function SeoShell({ title, description, actions, children, site, onSite, sites, status, picker = true }: {
   title: string; description: string; actions?: ReactNode; children: ReactNode;
   /** false on pages that are not about one tracked site (Site explorer takes any domain). */
   picker?: boolean;
   site: SeoSite | null; onSite: (id: number) => void; sites: ReturnType<typeof useSeoSites>; status: ReturnType<typeof useSeoStatus>;
 }) {
-  const [location] = useLocation();
   const gate = planRequiredFrom(status.error) ?? planRequiredFrom(sites.error);
+  const slot = useToolSlot();
+  const bar = <>{picker && !sites.isError && <SitePicker site={site} onSite={onSite} sites={sites} />}<UsageLine status={status} /></>;
   return (
-    <GoogleSurface page accent="brand" testId="seo-surface">
-      <AppPage className="before:hidden [&_button]:min-h-10">
-        <div className="g-header flex flex-wrap items-end justify-between gap-3">
+    <GoogleSurface page accent="brand" className="tool-page" testId="seo-surface">
+      <AppPage className="before:hidden [&_button]:min-h-10 !space-y-3 !pt-2 sm:!pt-3">
+        {/* The section's global input — the site switcher, "Add a site", the balance — lives in the tool bar's second
+            row (components/tool/shell.tsx); outside a tool shell it renders here. */}
+        {!gate && (slot ? createPortal(bar, slot) : <div className="mb-3 flex flex-wrap items-center gap-2">{bar}</div>)}
+        <div className="tool-head">
           <div className="min-w-0">
-            <h1 className="g-header__title" data-testid="text-page-title">{title}</h1>
-            <p className="g-header__sub">{description}</p>
+            <h1 className="tool-head__title" data-testid="text-page-title">{title}</h1>
+            <p className="tool-head__sub">{description}</p>
           </div>
           {actions && <div className="flex w-full flex-wrap gap-2 sm:w-auto">{actions}</div>}
         </div>
@@ -211,15 +198,10 @@ export function SeoShell({ title, description, actions, children, site, onSite, 
           <PlanGate requiredPlan={gate.requiredPlan} message={gate.message} />
         ) : (
           <>
-            <TabStrip label="SEO sections">
-              {TABS.map((t) => <Link key={t.href} href={t.href} aria-current={location === t.href ? "page" : undefined}>{t.label}{t.href === "/seo/alerts" && (status.data?.alertsUnread ?? 0) > 0 && <span className="g-chip g-chip--sm ml-1" aria-label={`${status.data!.alertsUnread} unread`}>{status.data!.alertsUnread}</span>}</Link>)}
-            </TabStrip>
             {picker && sites.isError && <div className="g-callout mb-4" role="alert" data-testid="seo-sites-error"><h3>Couldn't load your sites</h3><p>{apiErrorMessage(sites.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void sites.refetch()}>Try again</button></div>}
-            {picker && !sites.isError && <SitePicker site={site} onSite={onSite} sites={sites} />}
-            <UsageLine status={status} />
-            <p className="g-text-2 mb-4 text-[12px]" data-testid="seo-dates-note">Dates of checks, crawls and reports are UTC days — the day each is filed under; in the US evening that is already the next day.</p>
             {status.data && !status.data.configured && <NotReadyNotice />}
             {children}
+            <details className="tool-about"><summary>How dates are counted</summary><p data-testid="seo-dates-note">Dates of checks, crawls and reports are UTC days — the day each is filed under; in the US evening that is already the next day.</p></details>
           </>
         )}
       </AppPage>
@@ -268,19 +250,19 @@ function UsageLine({ status }: { status: ReturnType<typeof useSeoStatus> }) {
   const unlimited = c.includedCents === -1, canBuy = !unlimited && !inNativeApp();
   const left = Math.max(0, c.includedCents - c.includedUsedCents);
   // Every figure leads to its data: the balance to the usage page, the purchased credit to its add-credit panel, the
-  // tracked keywords to the dashboard ordered by keywords. Figures keep the text colour; the dotted underline says
-  // "link" without a hover, and each link is a 44 px-tall hit area on a phone.
-  const link = "inline-flex min-h-11 items-center gap-1 rounded-sm underline decoration-dotted underline-offset-2 hover:decoration-solid focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--g-blue,#1a73e8)]";
+  // tracked keywords to the dashboard ordered by keywords. Each is a small stat chip (styles/tabs.css): the pill shape
+  // says "link" without a hover, and each chip is a 44 px-tall hit area on a phone.
+  const link = "stat-chip";
   return (
-    <div className="mb-4" data-testid="seo-usage-line">
-      <p className="g-text-2 flex flex-wrap items-center gap-x-1 text-[13px]">
-        <span className="inline-flex flex-wrap items-center gap-x-1" data-testid="text-seo-balance">
+    <div className="tool-slot__end" data-testid="seo-usage-line">
+      <p className="stat-chips">
+        <span className="stat-chips" data-testid="text-seo-balance">
           <Link href={seoLinks.usage()} className={link} data-testid="link-usage-balance">SEO data this month{" "}
             <b className="g-text font-medium">{unlimited ? "unlimited" : `${money(left)} left of ${money(c.includedCents)} included`}</b></Link>
-          {!unlimited && <> · <Link href={seoLinks.usage({ credits: "add" })} className={link} data-testid="link-usage-credit">purchased credit <b className="g-text font-medium">{money(c.walletCents)}</b></Link></>}
-          {" · "}<Link href={seoLinks.dashboard({ sort: "keywords" })} className={link} data-testid="link-usage-keywords">tracked keywords <b className="g-text font-medium">{fmtUnit(u.keywords)}</b></Link>
+          {!unlimited && <><span className="sr-only"> · </span><Link href={seoLinks.usage({ credits: "add" })} className={link} data-testid="link-usage-credit">purchased credit <b className="g-text font-medium">{money(c.walletCents)}</b></Link></>}
+          <span className="sr-only"> · </span><Link href={seoLinks.dashboard({ sort: "keywords" })} className={link} data-testid="link-usage-keywords">tracked keywords <b className="g-text font-medium">{fmtUnit(u.keywords)}</b></Link>
         </span>
-        {canBuy && !adding && <button type="button" className="g-pill g-pill--sm ml-1" onClick={() => setAdding(true)} data-testid="button-add-credit"><Plus /> Add credit</button>}
+        {canBuy && !adding && <button type="button" className="g-pill g-pill--sm" onClick={() => setAdding(true)} data-testid="button-add-credit"><Plus /> Add credit</button>}
       </p>
       {!unlimited && c.availableCents === 0 && !adding && (
         <p className="mt-1 text-[13px]" style={{ color: "var(--g-red)" }} role="status" data-testid="text-seo-out-of-credit">
@@ -337,10 +319,11 @@ function SitePicker({ site, onSite, sites }: { site: SeoSite | null; onSite: (id
   const [adding, setAdding] = useState(false);
   const list = sites.data ?? [];
   return (
-    <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+    <div className="flex min-w-0 flex-wrap items-center gap-2">
+      <span className="tool-slot__crumb"><Link href={seoLinks.dashboard()} data-testid="link-all-sites">All sites</Link><span aria-hidden>/</span></span>
       {list.length > 0 && (
-        <label className="flex min-w-0 flex-1 items-center gap-2 text-[13px] g-text-2 sm:max-w-md">
-          <span className="flex-none">Site</span>
+        <label className="flex min-w-0 items-center gap-2 text-[13px] sm:max-w-sm">
+          <span className="sr-only">Site</span>
           {/* A site picked here is written to the address (?site=), so the view is the same as one arrived at by link and
               the back button returns to the site before. This is the ONE writer of ?site= for a pick: a page's `onSite`
               only drops its own parameters (clearParams, in place) and remembers the site — it never writes ?site=

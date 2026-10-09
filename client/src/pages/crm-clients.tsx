@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { EMAIL_RE, customerErrorMessage, duplicateMatches, type DuplicateMatch } from "@/lib/crm-customer-errors";
 import { Users, Plus, Search, Loader2, Mail, Phone, MapPin, ChevronRight, Download, Upload } from "lucide-react";
+import { SegmentedTabs, TabCount } from "@/components/tool";
 import { CrmPage, CrmPageHeader, EmptyState, ErrorCard, InitialAvatar, crmTable, crmTableCards } from "@/components/crm-ui";
 
 interface Client {
@@ -311,22 +312,19 @@ export default function CrmClientsPage() {
             value={q} onChange={(e) => setQ(e.target.value)} data-testid="input-search-clients" />
         </div>
         {/* Bid outcome tabs — where does every client stand on their bid? */}
-        <div className="inline-flex rounded-lg border bg-card p-0.5" data-testid="tabs-bid-status">
+        <SegmentedTabs as="group" label="Bid status" testId="tabs-bid-status">
           {BID_TABS.map((t) => {
             // Whole-book counts from the server, not just the loaded rows.
             const n = tabTotal(t.key);
             return (
-              <button key={t.key}
-                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                  tab === t.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-                }`}
+              <button key={t.key} type="button" aria-pressed={tab === t.key}
                 onClick={() => setTab(t.key)}
                 data-testid={`tab-bid-${t.key}`}>
-                {t.label} <span className="opacity-70 tabular-nums">{n}</span>
+                {t.label} <TabCount>{n}</TabCount>
               </button>
             );
           })}
-        </div>
+        </SegmentedTabs>
       </div>
 
       {isLoading || isPlaceholderData ? (

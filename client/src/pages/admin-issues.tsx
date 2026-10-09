@@ -1,4 +1,5 @@
 import { AppPage, Toolbar } from "@/components/app-ui";
+import { SegmentedTabs, TabCount } from "@/components/tool";
 import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
 /**
  * /admin/issues — the issue desk (docs/ops/ISSUE-DESK.md): every failure the
@@ -320,16 +321,15 @@ export default function AdminIssuesPage() {
       <GoogleSectionHeader as="h1" title="Issues" count={total > 0 ? total : null} description="Review failures, inspect reports, and track fixes." flush />
 
       <div className="min-w-0 space-y-3">
-        <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1" role="tablist" aria-label="Filter by status">
+        <SegmentedTabs as="tablist" label="Filter by status">
           {chips.map((c) => (
             <button key={c.key} type="button" role="tab" aria-selected={status === c.key} onClick={() => setStatusFilter(c.key)}
-              className={cn("g-pill g-pill--sm shrink-0", status === c.key && "g-pill--on")}
               data-testid={`filter-status-${c.key}`}>
               {c.label}
-              <span className={cn("tabular-nums text-xs", status === c.key ? "opacity-80" : "text-muted-foreground")}>{c.n}</span>
+              <TabCount>{c.n}</TabCount>
             </button>
           ))}
-        </div>
+        </SegmentedTabs>
         <Toolbar filters={<Select value={source} onValueChange={setSource}>
           <SelectTrigger className="w-full md:w-48" aria-label="Filter by source" data-testid="select-issue-source"><SelectValue /></SelectTrigger>
           <SelectContent>

@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsTrigger } from "@/components/ui/tabs";
+import { ToolTabsList as TabsList } from "@/components/tool";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -456,7 +457,7 @@ export default function CrmPriceBookPage() {
       />
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="bg-muted/60 p-1 flex-wrap h-auto max-w-full justify-start sm:h-10 sm:flex-nowrap">
+        <TabsList>
           <TabsTrigger value="items"><Package className="h-4 w-4 mr-1" /> Price Chart</TabsTrigger>
           <TabsTrigger value="materials"><Wrench className="h-4 w-4 mr-1" /> Materials</TabsTrigger>
           <TabsTrigger value="labor"><Percent className="h-4 w-4 mr-1" /> Labor</TabsTrigger>

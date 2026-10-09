@@ -48,13 +48,12 @@ export function BillingPanel({ tab, onTabChange, subscriptions, subscriptionsExt
     if (tab === undefined) setParam(next === "subscriptions" ? null : next);
   };
   return (
-    <Tabs value={active} onValueChange={change} className="space-y-4 min-w-0 [&>div:first-child]:mx-0 [&>div:first-child]:px-0" data-testid="tabs-billing">
-      <AppTabsList>
+    <Tabs value={active} onValueChange={change} className="space-y-4 min-w-0" data-testid="tabs-billing">
+      <AppTabsList bleed={false}>
         {BILLING_TABS.map((t) => (
           <TabsTrigger
             key={t.id}
             value={t.id}
-            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-3 py-2"
             data-testid={`tab-billing-${t.id}`}
           >
             {t.label}

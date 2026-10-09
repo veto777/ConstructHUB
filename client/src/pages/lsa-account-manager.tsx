@@ -1,6 +1,7 @@
 import { Tabs } from "@/components/ui/tabs";
 import { AppPage, Section, AppTabsList, Toolbar, Notice, appTable, appTableCards } from "@/components/app-ui";
 import { GoogleSectionHeader, GooglePill } from "@/components/google";
+import { ToolTabs } from "@/components/tool";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
@@ -184,8 +185,7 @@ export default function LsaAccountManagerPage() {
         description={<>Manage client accounts through your Google Ads manager connection. <span className="g-chip g-chip--sm ml-1 align-middle" data-testid="badge-admin-only">Admin only</span></>}
         flush
         actions={activeTab === "audit" ? <GooglePill icon={RefreshCw} variant="solid" label="Refresh audit" onClick={() => queryClient.invalidateQueries({queryKey:["/api/admin/lsa/audit-log"]})} /> : undefined} />
-        <div className="-mx-4 overflow-x-auto px-4 scrollbar-none sm:mx-0 sm:px-0" role="tablist" aria-label="LSA account manager sections">
-          <div className="flex w-max gap-2">
+        <ToolTabs as="tablist" label="LSA account manager sections">
           {tabs.map(tab => (
             <GooglePill
               key={tab.id}
@@ -198,8 +198,7 @@ export default function LsaAccountManagerPage() {
               testId={`tab-${tab.id}`}
             />
           ))}
-          </div>
-        </div>
+        </ToolTabs>
 
         {activeTab === "manager" && <ManagerConnectionTab />}
         {activeTab === "accounts" && <AccountsTab onSelectAccount={setSelectedAccountId} />}

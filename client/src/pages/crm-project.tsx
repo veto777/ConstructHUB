@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsTrigger } from "@/components/ui/tabs";
+import { ToolTabsList as TabsList } from "@/components/tool";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -290,7 +291,7 @@ export default function CrmProjectPage() {
       )}
 
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="flex-wrap h-auto bg-muted/60 p-1">
+        <TabsList>
           {seeCosts && <TabsTrigger value="costing"><DollarSign className="h-4 w-4 mr-1" /> Costing</TabsTrigger>}
           <TabsTrigger value="change-orders"><FileDiff className="h-4 w-4 mr-1" /> Change orders</TabsTrigger>
           <TabsTrigger value="punch"><ClipboardCheck className="h-4 w-4 mr-1" /> Punch list</TabsTrigger>

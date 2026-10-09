@@ -1,0 +1,489 @@
+/*
+ * The "tool" layer — the dense, professional-tool look that sits beside the Google-format kit (google.css).
+ * Owner, 2026-10-09: "super clean, super fast and not so simple and ai looking like ours"; "everything is clickable
+ * and separately". Components: client/src/components/tool/* (tabs, stats, shell).
+ *
+ *   Tokens            --tool-* below (light + dark). The navy is the app sidebar's own colour (`--sidebar`), the
+ *                     accent is the page accent (`--g-accent` / `--primary`), the indicator is the brand orange.
+ *   .tool-tabs        data-variant="bar"        a section's tabs: a bar with an orange indicator under the active
+ *                                               tab (data-tone="dark" = the navy tool bar). Sticky. Never wraps.
+ *                     data-variant="segmented"  a view switch inside a page: joined, bordered rectangles; the active
+ *                                               one is filled with a pale orange tint. `.g-tabs` is an alias.
+ *   .tool-panel       a white panel with a hairline border on the light-grey page (.tool-page)
+ *   .tool-strip       metric columns divided by 1px rules (never separate floating cards)
+ *   .tool-stat*       one metric: small muted label, big tabular number, coloured delta, sub-rows, sparkline
+ *   .tool-link        a figure that is its own click target: own hover, own focus ring, 40px tall on touch
+ *   .tool-badge       small solid status chip      .tool-table  compact rows      .tool-skel  skeleton block
+ *   .tool-shell*      the tool shell: navy two-row top bar, icon rail, sub-navigation, content
+ */
+
+:root {
+  --tool-navy: hsl(var(--sidebar));
+  --tool-navy-2: hsl(var(--sidebar-accent));
+  --tool-navy-line: color-mix(in srgb, #fff 16%, hsl(var(--sidebar)));
+  --tool-on-navy: hsl(var(--sidebar-foreground));
+  --tool-orange: hsl(25 95% 53%);
+  --tool-bg: #f6f7f9;
+  --tool-side: #eef0f3;
+  --tool-panel: #ffffff;
+  --tool-line: #dde0e4;
+  --tool-line-strong: #c4c8cf;
+  --tool-text: #1f2328;
+  --tool-text-2: #5f6368;
+  --tool-hover: rgb(15 23 42 / .06);
+  --tool-active: rgb(15 23 42 / .09);
+  --tool-accent: var(--g-accent, hsl(var(--primary)));
+  --tool-accent-ink: var(--g-accent-ink, hsl(var(--primary)));
+  --tool-up: #188038;
+  --tool-down: #d93025;
+  --tool-warn: #b06000;
+  --tool-good-bg: #1e8e3e;
+  --tool-warn-bg: #e37400;
+  --tool-bad-bg: #d93025;
+  --tool-seg-on: color-mix(in srgb, var(--tool-orange) 15%, #fff);
+  --tool-seg-on-line: color-mix(in srgb, var(--tool-orange) 60%, #fff);
+  --tool-blue: #1a73e8;
+}
+.dark {
+  --tool-bg: #18191b;
+  --tool-side: #1d1e21;
+  --tool-panel: #202124;
+  --tool-line: #3c4043;
+  --tool-line-strong: #5f6368;
+  --tool-text: #e8eaed;
+  --tool-text-2: #9aa0a6;
+  --tool-hover: rgb(255 255 255 / .07);
+  --tool-active: rgb(255 255 255 / .11);
+  --tool-up: #81c995;
+  --tool-down: #f28b82;
+  --tool-warn: #fdd663;
+  --tool-good-bg: #1e8e3e;
+  --tool-warn-bg: #b06000;
+  --tool-bad-bg: #c5221f;
+  --tool-seg-on: color-mix(in srgb, var(--tool-orange) 22%, #202124);
+  --tool-seg-on-line: color-mix(in srgb, var(--tool-orange) 60%, #202124);
+  --tool-blue: #8ab4f8;
+}
+
+/* ── Page + panels ───────────────────────────────────────────────────────────────────────────────────────────── */
+.tool-page { background: var(--tool-bg); }
+.tool-panel { border: 1px solid var(--tool-line); border-radius: 6px; background: var(--tool-panel); color: var(--tool-text); }
+.tool-panel__head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 16px; border-bottom: 1px solid var(--tool-line); }
+.tool-panel .tool-panel__title { margin: 0; font-size: 15px; line-height: 20px; font-weight: 600; color: var(--tool-text); overflow-wrap: anywhere; }
+.tool-panel__body { padding: 12px 16px; }
+.tool-muted { color: var(--tool-text-2); }
+
+/* ── A figure that is its own click target ───────────────────────────────────────────────────────────────────── */
+.tool-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 4px;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  text-underline-offset: 3px;
+}
+.tool-link:hover { text-decoration: underline; background: color-mix(in srgb, var(--tool-accent) 9%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--tool-accent) 9%, transparent); }
+.tool-link:focus-visible { outline: 2px solid var(--tool-accent); outline-offset: 2px; }
+.tool-link--blue { color: var(--tool-accent-ink); }
+@media (hover: none), (pointer: coarse) {
+  /* Touch has no hover: the cue is always there, and every target is at least 44px tall (the owner reads these on a phone). */
+  .tool-link { min-height: 44px; text-decoration: underline; text-decoration-style: dotted; text-decoration-color: color-mix(in srgb, currentColor 50%, transparent); }
+}
+
+/* ── Metric strip + stat cell ────────────────────────────────────────────────────────────────────────────────── */
+/* Columns divided by 1px rules: the grid's 1px gap shows the line colour behind the cells. */
+.tool-strip { display: grid; grid-template-columns: repeat(var(--tool-strip-cols, 2), minmax(0, 1fr)); gap: 1px; background: var(--tool-line); border-top: 1px solid var(--tool-line); overflow: hidden; }
+.tool-strip--boxed { border: 1px solid var(--tool-line); border-radius: 6px; }
+.tool-strip > * { min-width: 0; background: var(--tool-panel); }
+@media (min-width: 768px) { .tool-strip { grid-template-columns: repeat(var(--tool-strip-cols-md, 3), minmax(0, 1fr)); } }
+@media (min-width: 1280px) { .tool-strip { grid-template-columns: repeat(var(--tool-strip-cols-xl, 6), minmax(0, 1fr)); } }
+.tool-stat { display: flex; min-width: 0; flex-direction: column; gap: 4px; padding: 12px 14px; }
+.tool-stat__label { display: flex; align-items: center; gap: 4px; min-height: 18px; font-size: 12px; line-height: 16px; color: var(--tool-text-2); }
+.tool-stat__figure { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-height: 34px; }
+.tool-stat__value { font-size: 26px; line-height: 32px; font-weight: 500; letter-spacing: -.01em; font-variant-numeric: tabular-nums; color: var(--tool-text); }
+a.tool-stat__value, .tool-stat__value a { color: var(--tool-accent-ink); }
+.tool-stat__value--none { color: var(--tool-text-2); }
+.tool-delta { font-size: 12px; line-height: 16px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tool-delta[data-dir="up"] { color: var(--tool-up); }
+.tool-delta[data-dir="down"] { color: var(--tool-down); }
+.tool-delta[data-dir="flat"] { color: var(--tool-text-2); }
+.tool-stat__subs { display: grid; gap: 0; margin: 2px 0 0; padding: 0; list-style: none; font-size: 13px; line-height: 18px; }
+.tool-stat__sub { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-height: 24px; color: var(--tool-text-2); }
+.tool-stat__sub > :last-child { font-variant-numeric: tabular-nums; color: var(--tool-text); text-align: right; }
+.tool-stat__sub a.tool-link { color: var(--tool-accent-ink); }
+.tool-stat__note { font-size: 12px; line-height: 16px; color: var(--tool-text-2); }
+.tool-stat__spark { display: flex; align-items: stretch; gap: 6px; margin-top: auto; padding-top: 6px; border-radius: 4px; }
+.tool-stat__spark svg { display: block; flex: 1 1 auto; min-width: 0; width: 100%; height: 40px; overflow: visible; }
+.tool-stat__range { display: flex; flex: none; flex-direction: column; justify-content: space-between; font-size: 10px; line-height: 12px; color: var(--tool-text-2); font-variant-numeric: tabular-nums; text-align: right; }
+a.tool-stat__spark:hover { background: var(--tool-hover); text-decoration: none; }
+a.tool-stat__spark:focus-visible { outline: 2px solid var(--tool-accent); outline-offset: 2px; }
+.tool-stat__spark--none { height: 46px; }
+
+/* ── Status badge (health score etc.): a small solid rounded chip ────────────────────────────────────────────── */
+.tool-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; height: 26px; padding: 0 9px; border-radius: 9999px; font-size: 14px; line-height: 1; font-weight: 600; font-variant-numeric: tabular-nums; color: #fff; background: var(--tool-text-2); }
+.tool-badge[data-tone="good"] { background: var(--tool-good-bg); }
+.tool-badge[data-tone="warn"] { background: var(--tool-warn-bg); }
+.tool-badge[data-tone="bad"] { background: var(--tool-bad-bg); }
+.tool-badge[data-tone="none"] { background: transparent; color: var(--tool-text-2); box-shadow: inset 0 0 0 1px var(--tool-line-strong); }
+.tool-badge--lg { min-width: 40px; height: 32px; font-size: 18px; padding: 0 11px; }
+/* A small outlined chip: plan, group, "New". */
+.tool-chip { display: inline-flex; align-items: center; gap: 4px; min-height: 22px; padding: 0 8px; border: 1px solid var(--tool-line-strong); border-radius: 9999px; background: transparent; font-size: 12px; line-height: 16px; font-weight: 500; color: var(--tool-text-2); white-space: nowrap; }
+button.tool-chip { cursor: pointer; }
+button.tool-chip:hover, a.tool-chip:hover { border-color: var(--tool-accent); color: var(--tool-text); background: var(--tool-hover); }
+button.tool-chip:focus-visible, a.tool-chip:focus-visible { outline: 2px solid var(--tool-accent); outline-offset: 2px; }
+.tool-chip--new { border-color: transparent; background: var(--tool-orange); color: #fff; font-size: 10px; min-height: 16px; padding: 0 5px; text-transform: uppercase; letter-spacing: .03em; }
+/* A small bordered button (the reference's "Start monitoring" / "Add"). */
+.tool-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 30px; padding: 0 10px; border: 1px solid var(--tool-line-strong); border-radius: 5px; background: var(--tool-panel); font-size: 13px; line-height: 18px; font-weight: 500; color: var(--tool-text); text-decoration: none; white-space: nowrap; cursor: pointer; }
+.tool-btn:hover { border-color: var(--tool-accent); background: color-mix(in srgb, var(--tool-accent) 8%, var(--tool-panel)); }
+.tool-btn:focus-visible { outline: 2px solid var(--tool-accent); outline-offset: 2px; }
+.tool-btn:disabled { opacity: .5; cursor: default; }
+.tool-btn > svg { width: 14px; height: 14px; flex: none; }
+.tool-btn--icon { width: 30px; padding: 0; }
+.tool-btn--quiet { border-color: transparent; background: transparent; color: var(--tool-text-2); }
+@media (pointer: coarse) { .tool-btn { min-height: 44px; } .tool-btn--icon { width: 44px; } .tool-chip:is(a, button) { min-height: 44px; } }
+
+/* ── Dense tables ────────────────────────────────────────────────────────────────────────────────────────────── */
+.tool-table { width: 100%; border-collapse: collapse; font-size: 13px; line-height: 18px; }
+.tool-table th { position: sticky; top: 0; z-index: 1; height: 34px; padding: 0 10px; border-bottom: 1px solid var(--tool-line); background: var(--tool-panel); font-size: 12px; font-weight: 500; color: var(--tool-text-2); text-align: left; white-space: nowrap; }
+.tool-table td { height: 38px; padding: 0 10px; border-bottom: 1px solid var(--tool-line); }
+.tool-table tr:last-child td { border-bottom: 0; }
+.tool-table tbody tr:hover td { background: var(--tool-hover); }
+.tool-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+/* A row label with a soft tinted bar behind it (its share of the total). */
+.tool-bar-cell { position: relative; }
+.tool-bar-cell::before { content: ""; position: absolute; inset: 5px auto 5px 4px; width: calc(var(--share, 0) * (100% - 8px)); border-radius: 3px; background: color-mix(in srgb, var(--tool-blue) 14%, transparent); pointer-events: none; }
+.tool-bar-cell > * { position: relative; }
+
+/* ── Skeletons (reserve the height the data will take: no layout shift) ──────────────────────────────────────── */
+.tool-skel { display: block; border-radius: 4px; background: linear-gradient(90deg, var(--tool-hover) 25%, var(--tool-active) 37%, var(--tool-hover) 63%); background-size: 400% 100%; animation: tool-skel 1.4s ease infinite; }
+@keyframes tool-skel { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+@media (prefers-reduced-motion: reduce) { .tool-skel { animation: none; } }
+
+/* ── Tabs: the scrolling row shared by both variants ─────────────────────────────────────────────────────────── */
+.tool-tabs {
+  --tr-accent: var(--tool-accent);
+  --tr-surface: var(--tool-panel);
+  --tr-text: var(--tool-text);
+  --tr-ink: var(--tool-text-2);
+  --tr-fade: var(--tool-panel);
+  position: relative;
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+}
+.tool-tabs .tool-tabs__scroll { flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+.tool-tabs .tool-tabs__scroll::-webkit-scrollbar { display: none; }
+.tool-tabs .tool-tabs__list { display: flex; flex-wrap: nowrap; align-items: stretch; justify-content: flex-start; width: max-content; min-width: 100%; height: auto; margin: 0; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; color: inherit; }
+.tool-tabs .tool-tabs__list > :is(a, button),
+.g-tabs > :is(a, button) {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13.5px;
+  line-height: 18px;
+  font-weight: 500;
+  letter-spacing: 0;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: none;
+  transition: background-color .1s ease, color .1s ease, border-color .1s ease;
+}
+.tool-tabs .tool-tabs__list > :is(a, button):focus-visible,
+.g-tabs > :is(a, button):focus-visible { outline: 2px solid var(--tool-accent); outline-offset: -2px; box-shadow: none; }
+.tool-tabs .tool-tabs__list > :is(a, button)[disabled] { opacity: .5; cursor: default; }
+.tool-tabs .tool-tabs__list > :is(a, button) > svg { width: 15px; height: 15px; margin: 0; flex: none; color: currentColor; }
+/* A small control that belongs to the tab before it (its "i" help button): sits in the row, is not a tab. */
+.tool-tabs .tool-tabs__list > .tool-tabs__aside { display: inline-flex; flex: none; align-self: center; margin: 0 6px 0 -8px; }
+
+/* ── Tabs, variant "bar": a section's tabs ───────────────────────────────────────────────────────────────────── */
+.tool-tabs[data-variant="bar"] { padding: 0 6px; border: 1px solid var(--tool-line); border-radius: 6px; background: var(--tool-panel); transition: box-shadow .15s ease; }
+.tool-tabs[data-variant="bar"][data-sticky="true"] { position: sticky; top: 0; z-index: 20; }
+.tool-tabs[data-variant="bar"][data-stuck="true"] { border-radius: 0 0 6px 6px; box-shadow: 0 8px 14px -10px rgb(0 0 0 / .35); }
+.tool-tabs[data-variant="bar"] .tool-tabs__list { gap: 2px; }
+.tool-tabs[data-variant="bar"] .tool-tabs__list > :is(a, button) { min-height: 42px; height: auto; padding: 0 12px; color: var(--tr-ink); }
+.tool-tabs[data-variant="bar"] .tool-tabs__list > :is(a, button):hover { color: var(--tr-text); background: var(--tool-hover); }
+.tool-tabs[data-variant="bar"] .tool-tabs__list > :is(a, button):is([aria-current="page"], [aria-selected="true"], [data-state="active"], [aria-pressed="true"]) { color: var(--tr-text); font-weight: 600; background: transparent; }
+.tool-tabs[data-variant="bar"] .tool-tabs__list > :is(a, button):is([aria-current="page"], [aria-selected="true"], [data-state="active"], [aria-pressed="true"])::after { content: ""; position: absolute; inset: auto 8px 0 8px; height: 3px; border-radius: 3px 3px 0 0; background: var(--tool-orange); }
+/* The navy tool bar. */
+.tool-tabs[data-variant="bar"][data-tone="dark"] { --tr-text: #fff; --tr-ink: color-mix(in srgb, #fff 78%, var(--tool-navy)); --tr-fade: var(--tool-navy); --tr-surface: var(--tool-navy-2); padding: 0; border: 0; border-radius: 0; background: var(--tool-navy); }
+.tool-tabs[data-variant="bar"][data-tone="dark"] .tool-tabs__list > :is(a, button):hover { background: color-mix(in srgb, #fff 9%, transparent); }
+.tool-tabs[data-variant="bar"][data-tone="dark"] .tool-tabs__list > :is(a, button):focus-visible { outline-color: #fff; }
+@media (max-width: 639px) {
+  /* Phones: 44px tabs, full-bleed to the screen edges where the page has the usual 16px gutter. */
+  .tool-tabs[data-variant="bar"] .tool-tabs__list > :is(a, button) { min-height: 44px; }
+  .tool-tabs[data-variant="bar"][data-bleed="true"]:not([data-tone="dark"]) { margin-left: -16px; margin-right: -16px; max-width: none; border-left: 0; border-right: 0; border-radius: 0; }
+}
+
+/* ── Tabs, variant "segmented": a view switch inside a page (`.g-tabs` is the older markup, same look) ───────── */
+.g-tabs { display: flex; flex-wrap: nowrap; margin-bottom: 16px; padding: 1px; overflow-x: auto; scrollbar-width: none; }
+.g-tabs::-webkit-scrollbar { display: none; }
+.tool-tabs[data-variant="segmented"] .tool-tabs__scroll { padding: 1px; }
+.tool-tabs[data-variant="segmented"] .tool-tabs__list { min-width: 0; }
+.tool-tabs[data-variant="segmented"] .tool-tabs__list > :is(a, button),
+.g-tabs > :is(a, button) {
+  min-height: 32px;
+  height: auto;
+  padding: 0 12px;
+  border: 1px solid var(--tool-line-strong);
+  background: var(--tool-panel);
+  color: var(--tool-text);
+  font-size: 13px;
+  font-weight: 400;
+}
+.tool-tabs[data-variant="segmented"] .tool-tabs__list > :is(a, button):not(:first-child),
+.g-tabs > :is(a, button):not(:first-child) { margin-left: -1px; }
+.tool-tabs[data-variant="segmented"] .tool-tabs__list > :is(a, button):first-child,
+.g-tabs > :is(a, button):first-child { border-radius: 5px 0 0 5px; }
+.tool-tabs[data-variant="segmented"] .tool-tabs__list > :is(a, button):last-child,
+.g-tabs > :is(a, button):last-child { border-radius: 0 5px 5px 0; }
+.tool-tabs[data-variant="segmented"] .tool-tabs__list > :is(a, button):only-child,
+.g-tabs > :is(a, button):only-child { border-radius: 5px; }
+.tool-tabs[data-variant="segmented"] .tool-tabs__list > :is(a, button):hover,
+.g-tabs > :is(a, button):hover { z-index: 1; border-color: var(--tool-accent); background: color-mix(in srgb, var(--tool-accent) 7%, var(--tool-panel)); }
+.tool-tabs[data-variant="segmented"] .tool-tabs__list > :is(a, button):is([aria-current="page"], [aria-selected="true"], [data-state="active"], [aria-pressed="true"]),
+.g-tabs > :is(a, button):is([aria-current="page"], [aria-selected="true"], [aria-pressed="true"]) {
+  z-index: 2;
+  border-color: var(--tool-seg-on-line);
+  background: var(--tool-seg-on);
+  color: var(--tool-text);
+  font-weight: 500;
+}
+.tool-tabs[data-variant="segmented"] .tool-tabs__list > :is(a, button):focus-visible,
+.g-tabs > :is(a, button):focus-visible { z-index: 3; }
+@media (pointer: coarse) {
+  .tool-tabs[data-variant="segmented"] .tool-tabs__list > :is(a, button), .g-tabs > :is(a, button) { min-height: 44px; }
+}
+
+/* Counts and badges inside a tab. */
+.tool-tabs .tool-tabs__list > :is(a, button) :is(.tool-tabs__count, .g-chip) {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 18px; min-height: 18px; margin-left: 0; padding: 0 5px;
+  border-radius: 9999px; background: var(--tool-active); color: inherit; font-size: 11px; line-height: 14px; font-weight: 600; font-variant-numeric: tabular-nums; text-transform: none;
+}
+.tool-tabs[data-tone="dark"] .tool-tabs__list > :is(a, button) :is(.tool-tabs__count, .g-chip) { background: var(--tool-orange); color: #fff; }
+
+/* Edge fades + chevrons, shown only on the side that has more. */
+.tool-tabs .tool-tabs__nudge { position: absolute; top: 0; bottom: 0; z-index: 4; display: none; align-items: center; width: 44px; padding: 0; border: 0; color: var(--tr-text); cursor: pointer; }
+.tool-tabs .tool-tabs__nudge[data-show="true"] { display: flex; }
+.tool-tabs .tool-tabs__nudge--left { left: 0; justify-content: flex-start; padding-left: 4px; background: linear-gradient(to right, var(--tr-fade) 55%, transparent); border-radius: inherit; }
+.tool-tabs .tool-tabs__nudge--right { right: 0; justify-content: flex-end; padding-right: 4px; background: linear-gradient(to left, var(--tr-fade) 55%, transparent); border-radius: inherit; }
+.tool-tabs .tool-tabs__nudge > svg { width: 22px; height: 22px; padding: 3px; border-radius: 9999px; background: var(--tr-surface); box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 22%, transparent); }
+.tool-tabs .tool-tabs__nudge:hover > svg { box-shadow: 0 0 0 1px currentColor; }
+@media (hover: none), (pointer: coarse) {
+  /* Touch: swipe. Keep the fade as the "there is more" cue, drop the button. */
+  .tool-tabs .tool-tabs__nudge { width: 28px; pointer-events: none; }
+  .tool-tabs .tool-tabs__nudge > svg { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .tool-tabs, .tool-tabs * { transition: none !important; scroll-behavior: auto !important; } }
+
+/* ── Small stat chips (the "meta" line: a label and its figure, each a link to its data) ─────────────────────── */
+.stat-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.stat-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 10px; border: 1px solid var(--tool-line-strong); border-radius: 5px; background: var(--tool-panel); color: var(--tool-text-2); font-size: 12px; line-height: 16px; text-decoration: none; white-space: nowrap; }
+.stat-chip b { color: var(--tool-text); font-weight: 600; font-variant-numeric: tabular-nums; }
+a.stat-chip:hover { border-color: var(--tool-accent); background: color-mix(in srgb, var(--tool-accent) 8%, var(--tool-panel)); }
+a.stat-chip:focus-visible { outline: 2px solid var(--tool-accent); outline-offset: 2px; }
+@media (pointer: coarse) { .stat-chip { min-height: 44px; } }
+
+/* ── The tool shell ──────────────────────────────────────────────────────────────────────────────────────────── */
+.tool-shell { display: flex; flex-direction: column; width: 100%; min-width: 0; height: 100vh; height: 100dvh; background: var(--tool-bg); color: var(--tool-text); }
+.tool-top { position: relative; z-index: 30; flex: none; padding-top: env(safe-area-inset-top); background: var(--tool-navy); color: var(--tool-on-navy); }
+.tool-top__row { display: flex; align-items: center; gap: 4px 10px; min-height: 48px; padding: 0 12px; }
+.tool-top__brand { display: inline-flex; flex: none; align-items: center; border-radius: 6px; }
+.tool-top__brand:focus-visible, .tool-top__all:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.tool-top__all { display: inline-flex; flex: none; align-items: center; gap: 6px; min-height: 32px; padding: 0 10px; border: 1px solid color-mix(in srgb, #fff 34%, transparent); border-radius: 6px; background: transparent; color: #fff; font-size: 13px; font-weight: 500; white-space: nowrap; cursor: pointer; }
+.tool-top__all:hover { background: color-mix(in srgb, #fff 12%, transparent); border-color: #fff; }
+.tool-top__all > svg { width: 15px; height: 15px; }
+.tool-top__tabs { flex: 1 1 auto; min-width: 0; align-self: stretch; display: flex; }
+.tool-top__tabs > .tool-tabs { flex: 1 1 auto; align-self: stretch; }
+.tool-top__tabs .tool-tabs__scroll, .tool-top__tabs .tool-tabs__list { height: 100%; }
+.tool-top__tabs .tool-tabs[data-variant="bar"] .tool-tabs__list > :is(a, button) { min-height: 48px; padding: 0 10px; }
+/* The app's own controls (bell, settings, cart, theme) on navy: the same buttons, light on dark. */
+.tool-top__actions { display: flex; flex: none; align-items: center; gap: 2px; margin-left: auto; --muted-foreground: 210 20% 82%; --foreground: 0 0% 100%; --accent: 215 40% 24%; --accent-foreground: 0 0% 100%; color: hsl(210 20% 82%); }
+.tool-top__row2 { display: flex; align-items: center; min-height: 46px; padding: 6px 12px; border-top: 1px solid var(--tool-navy-line); }
+.tool-top__row2:has(> .tool-slot:empty) { display: none; }
+/* The section's global input (site switcher, add a site, balance): provided by the page, lives in the bar. */
+.tool-slot { display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; color: var(--tool-on-navy); font-size: 13px; color-scheme: dark; }
+.tool-slot--page { padding: 8px 12px; background: var(--tool-navy); }
+.tool-slot--page:empty { display: none; }
+.tool-slot > * { margin: 0 !important; }
+.tool-slot label, .tool-slot .g-text-2 { color: var(--tool-on-navy); }
+.tool-slot :is(.g-input, input, select) { min-height: 34px; height: 34px; padding-top: 0; padding-bottom: 0; border: 1px solid var(--tool-navy-line); border-radius: 5px; background-color: var(--tool-navy-2); color: #fff; font-size: 13px; }
+.tool-slot :is(.g-input, input)::placeholder { color: color-mix(in srgb, #fff 55%, transparent); }
+.tool-slot :is(.g-input, input, select):focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+.tool-slot :is(.g-pill, button[type="submit"]) { min-height: 34px; height: 34px; padding: 0 12px; border: 1px solid color-mix(in srgb, #fff 34%, transparent); border-radius: 5px; background: transparent; color: #fff; font-size: 13px; }
+.tool-slot .g-pill > svg { width: 15px; height: 15px; color: currentColor; }
+.tool-slot :is(.g-pill, button[type="submit"]):hover { background: color-mix(in srgb, #fff 12%, transparent); border-color: #fff; filter: none; }
+.tool-slot .stat-chips { gap: 6px; }
+.tool-slot .stat-chip { border-color: color-mix(in srgb, #fff 22%, transparent); background: transparent; color: var(--tool-on-navy); }
+.tool-slot .stat-chip b { color: #fff; }
+.tool-slot a.stat-chip:hover { border-color: #fff; background: color-mix(in srgb, #fff 12%, transparent); }
+.tool-slot a.stat-chip:focus-visible { outline-color: #fff; }
+.tool-slot .g-callout { width: 100%; color: var(--tool-text); color-scheme: normal; }
+.tool-slot__crumb { display: inline-flex; align-items: center; gap: 6px; color: color-mix(in srgb, #fff 78%, var(--tool-navy)); white-space: nowrap; }
+.tool-slot__crumb a { color: inherit; text-decoration: none; border-radius: 4px; }
+.tool-slot__crumb a:hover { color: #fff; text-decoration: underline; }
+.tool-slot__crumb a:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.tool-slot__end { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-left: auto !important; }
+/* A page's own input (a domain box) comes first in the row, whatever order the pages mounted in. */
+.tool-slot > form { order: -1; display: flex; flex: 1 1 320px; flex-flow: row wrap; align-items: center; gap: 6px; max-width: 760px; }
+.tool-slot > form > label { flex: 1 1 200px; max-width: none; }
+.tool-slot > form svg { color: color-mix(in srgb, #fff 60%, transparent); }
+@media (pointer: coarse) { .tool-slot :is(.g-input, input, select), .tool-slot :is(.g-pill, button[type="submit"]) { min-height: 44px; height: 44px; } }
+
+.tool-body { position: relative; display: flex; flex: 1 1 auto; min-height: 0; }
+.tool-rail { display: none; flex: none; flex-direction: column; gap: 2px; width: 76px; padding: 8px 6px; overflow-y: auto; scrollbar-width: none; border-right: 1px solid var(--tool-line); background: var(--tool-side); }
+.tool-rail::-webkit-scrollbar { display: none; }
+@media (min-width: 768px) { .tool-rail { display: flex; } }
+.tool-rail__item { position: relative; display: flex; flex: none; flex-direction: column; align-items: center; gap: 3px; padding: 7px 2px 6px; border-radius: 8px; color: var(--tool-text-2); font-size: 11px; line-height: 13px; font-weight: 500; text-align: center; text-decoration: none; overflow-wrap: anywhere; }
+.tool-rail__item > svg { width: 20px; height: 20px; flex: none; stroke-width: 1.7; }
+.tool-rail__item:hover { background: var(--tool-hover); color: var(--tool-text); }
+.tool-rail__item:focus-visible { outline: 2px solid var(--tool-accent); outline-offset: -2px; }
+.tool-rail__item[aria-current="page"] { background: var(--tool-active); color: var(--tool-text); font-weight: 600; }
+.tool-rail__item[aria-current="page"] > svg { color: var(--tool-orange); }
+.tool-rail__item[aria-current="page"]::before { content: ""; position: absolute; inset: 8px auto 8px -6px; width: 3px; border-radius: 0 3px 3px 0; background: var(--tool-orange); }
+.tool-rail__badge { position: absolute; top: 3px; right: 12px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 9999px; background: var(--tool-orange); color: #fff; font-size: 10px; line-height: 16px; font-weight: 700; }
+.tool-rail__sep { flex: 1 1 8px; min-height: 8px; margin: 4px 8px 0; border-bottom: 1px solid var(--tool-line); }
+
+.tool-subnav { display: none; flex: none; flex-direction: column; width: 216px; padding: 10px 8px 16px; overflow-y: auto; border-right: 1px solid var(--tool-line); background: var(--tool-side); font-size: 13px; line-height: 18px; }
+.tool-subnav[data-open="true"] { display: flex; }
+.tool-subnav__title { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 0 0 6px; padding: 2px 10px; font-size: 12px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; color: var(--tool-text-2); }
+.tool-subnav__item { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 30px; padding: 3px 10px; border-radius: 6px; color: var(--tool-text); text-decoration: none; overflow-wrap: anywhere; }
+.tool-subnav__item:hover { background: var(--tool-hover); }
+.tool-subnav__item:focus-visible, .tool-subnav__group:focus-visible { outline: 2px solid var(--tool-accent); outline-offset: -2px; }
+.tool-subnav__item[aria-current="page"] { background: var(--tool-active); font-weight: 600; }
+.tool-subnav__group { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; min-height: 30px; margin-top: 8px; padding: 3px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--tool-text); font: inherit; font-weight: 700; text-align: left; cursor: pointer; }
+.tool-subnav__group:hover { background: var(--tool-hover); }
+.tool-subnav__group > svg { width: 14px; height: 14px; flex: none; color: var(--tool-text-2); transition: transform .12s ease; }
+.tool-subnav__group[aria-expanded="false"] > svg { transform: rotate(-90deg); }
+.tool-subnav__items { display: grid; gap: 1px; margin: 0; padding: 0; list-style: none; }
+.tool-subnav__backdrop { display: none; }
+@media (pointer: coarse) { .tool-subnav__item, .tool-subnav__group { min-height: 44px; } }
+@media (max-width: 1023px) {
+  /* Tablets and phones: the sub-navigation is a drawer over the page. */
+  .tool-subnav { position: absolute; top: 0; bottom: 0; left: 76px; z-index: 26; width: min(280px, 86vw); box-shadow: 8px 0 24px -12px rgb(0 0 0 / .45); }
+  .tool-subnav__backdrop[data-open="true"] { display: block; position: absolute; inset: 0; z-index: 25; border: 0; background: rgb(0 0 0 / .35); }
+}
+@media (max-width: 767px) { .tool-subnav { left: 0; } }
+
+.tool-main { display: flex; flex: 1 1 auto; flex-direction: column; min-width: 0; overflow: auto; }
+@media (max-width: 767px) { .tool-main { padding-bottom: calc(60px + env(safe-area-inset-bottom)); } }
+.tool-crumb { display: flex; flex: none; align-items: center; gap: 8px; min-height: 40px; padding: 4px 12px 0; color: var(--tool-text-2); font-size: 13px; }
+.tool-crumb__sep { color: var(--tool-line-strong); }
+.tool-crumb b { color: var(--tool-text); font-weight: 600; }
+.tool-crumb a { color: inherit; text-decoration: none; border-radius: 4px; }
+.tool-crumb a:hover { color: var(--tool-text); text-decoration: underline; }
+.tool-crumb a:focus-visible { outline: 2px solid var(--tool-accent); outline-offset: 2px; }
+.tool-main__content { flex: 1 1 auto; min-width: 0; }
+
+/* The "All tools" list (the way back to the rest of the product). */
+.tool-all { display: grid; gap: 14px; }
+.tool-all__group { display: grid; gap: 2px; }
+.tool-all__title { padding: 0 8px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--tool-text-2); }
+.tool-all__item { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 4px 8px; border-radius: 6px; color: var(--tool-text); font-size: 14px; text-decoration: none; }
+.tool-all__item:hover { background: var(--tool-hover); }
+.tool-all__item:focus-visible { outline: 2px solid var(--tool-accent); outline-offset: -2px; }
+.tool-all__item[aria-current="page"] { background: var(--tool-active); font-weight: 600; }
+.tool-all__item > svg, .tool-all__item > img { width: 18px; height: 18px; flex: none; }
+.tool-all__sub { padding-left: 36px; min-height: 32px; font-size: 13px; color: var(--tool-text-2); }
+@media (pointer: coarse) { .tool-all__item { min-height: 44px; } }
+
+/* ── A tool page's own header: one line of title, one muted line under it, actions at the right ──────────────── */
+.tool-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 12px; margin: 0; }
+.tool-head .tool-head__title { margin: 0; font-size: 20px; line-height: 26px; font-weight: 600; letter-spacing: -.01em; color: var(--tool-text); }
+.tool-head__sub { margin: 2px 0 0; max-width: 72ch; font-size: 13px; line-height: 18px; color: var(--tool-text-2); }
+/* A long explanation, folded away ("About this page"). */
+.tool-about { font-size: 12px; line-height: 18px; color: var(--tool-text-2); }
+:is(.tool-about, .tool-row-more) > summary:not(.list-none):not([hidden]) { padding: 0 2px; font-size: 12px; font-weight: 400; color: var(--tool-text-2); }
+.tool-about > summary { display: inline-flex; align-items: center; min-height: 28px; cursor: pointer; border-radius: 4px; }
+.tool-about > summary:hover { color: var(--tool-text); text-decoration: underline; }
+.tool-about > summary:focus-visible { outline: 2px solid var(--tool-accent); outline-offset: 2px; }
+.tool-about > :not(summary) { margin: 4px 0 0; max-width: 80ch; }
+@media (pointer: coarse) { .tool-about > summary { min-height: 44px; } }
+.tool-slot [data-testid="text-seo-out-of-credit"] { color: #ffb4ab !important; }
+
+/* Tab rows that only repeat the sub-navigation: hidden while it is open beside the page (components/seo-tool/nav.ts). */
+.tool-shell[data-subnav-inline="true"] :is([data-testid="explorer-menu"], nav[aria-label="Keywords explorer views"], nav[aria-label="Audit views"]) { display: none; }
+.tool-shell[data-subnav-inline="true"] .tool-tabs:has(> .tool-tabs__scroll > nav[aria-label="Which alerts"]) { display: none; }
+/* Phones: the page's slot scrolls with the page — the site switcher on one line, the balance chips as one sideways row. */
+.tool-slot--page { flex-direction: column; align-items: stretch; gap: 8px; }
+.tool-slot--page .tool-slot__crumb { display: none; }
+.tool-slot--page > div:first-child { flex-wrap: wrap; }
+.tool-slot--page > div:first-child > label { flex: 1 1 160px; max-width: none; }
+.tool-slot--page > div:first-child > label > select { width: 100%; }
+.tool-slot--page .tool-slot__end { margin-left: 0 !important; }
+.tool-slot--page .stat-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.tool-slot--page .stat-chips::-webkit-scrollbar { display: none; }
+.tool-slot--page .stat-chips > * { flex: none; }
+
+/* A row's extra, folded away (the big trend chart under a site's metrics). */
+.tool-row-more { border-top: 1px solid var(--tool-line); font-size: 12px; color: var(--tool-text-2); }
+.tool-row-more > summary:not(.list-none):not([hidden]) { display: flex; align-items: center; min-height: 32px; padding: 0 14px; border-radius: 0; cursor: pointer; }
+.tool-row-more > summary:hover { color: var(--tool-text); background: var(--tool-hover); }
+.tool-row-more > summary:focus-visible { outline: 2px solid var(--tool-accent); outline-offset: -2px; }
+.tool-row-more[open] > summary { border-bottom: 1px solid var(--tool-line); }
+.tool-row-more > :not(summary) { margin: 12px 14px; }
+@media (pointer: coarse) { .tool-row-more > summary { min-height: 44px; } }
+
+/*
+ * ── The older kit parts on a tool page take the tool look (no page file changes) ───────────────────────────────
+ * Pills become small bordered buttons, cards become hairline panels, tables get dense, a metric's label goes small
+ * and grey and its number blue. On a mouse a link's underline shows on hover and targets are compact; on touch the
+ * underline cue and the 44px targets stay exactly as the pages wrote them.
+ */
+.tool-shell .tool-page .g-pill { gap: 6px; min-height: 30px; padding: 0 10px; border-color: var(--tool-line-strong); border-radius: 5px; background: var(--tool-panel); color: var(--tool-text); font-size: 13px; line-height: 18px; }
+.tool-shell .tool-page .g-pill > svg { width: 14px; height: 14px; color: var(--tool-text-2); }
+.tool-shell .tool-page .g-pill:hover { border-color: var(--tool-accent); background: color-mix(in srgb, var(--tool-accent) 8%, var(--tool-panel)); filter: none; }
+.tool-shell .tool-page .g-pill--solid { border-color: var(--tool-accent); background: var(--tool-accent); color: #fff; }
+.dark .tool-shell .tool-page .g-pill--solid { color: #202124; }
+.tool-shell .tool-page .g-pill--solid > svg { color: currentColor; }
+.tool-shell .tool-page .g-pill--solid:hover { background: var(--tool-accent); filter: brightness(1.08); }
+.tool-shell .tool-page .g-pill--on { border-color: var(--tool-seg-on-line); background: var(--tool-seg-on); color: var(--tool-text); }
+.tool-shell .tool-page :is(.g-input, .g-select) { min-height: 32px; border-color: var(--tool-line-strong); border-radius: 5px; font-size: 13px; }
+.tool-shell .tool-page :is(.rounded-xl, .rounded-2xl, .rounded-lg, .g-callout, .g-tile) { border-radius: 6px; }
+.tool-shell .tool-page .shadow-sm { box-shadow: none; }
+.tool-shell .tool-page .g-callout { background: var(--tool-panel); padding: 12px 16px; }
+.tool-shell .tool-page .g-callout h3 { font-size: 15px; line-height: 20px; font-weight: 600; }
+.tool-shell .tool-page .g-callout :is(p, li) { font-size: 13px; line-height: 18px; }
+.tool-shell .tool-page .g-table { font-size: 13px; line-height: 18px; }
+.tool-shell .tool-page .g-table th { padding: 6px 10px; }
+.tool-shell .tool-page .g-table td { padding: 7px 10px; vertical-align: middle; }
+.tool-shell .tool-page .g-table tbody tr:hover td { background: var(--tool-hover); }
+.tool-shell .tool-page .g-tile__value, .tool-shell .tool-page .g-tile__label { font-variant-numeric: tabular-nums; }
+/* A metric written with the older pieces (label over number as one link): label small and grey, number blue. */
+.tool-shell .tool-page a[data-testid$="-label"] { color: var(--tool-text-2) !important; font-size: 12px; line-height: 16px; font-weight: 400; }
+.tool-shell .tool-page :is(h2, h3)[style*="--g-blue"] { color: var(--tool-text) !important; font-weight: 600; }
+.tool-shell .tool-page h3.uppercase.tracking-wide { font-size: 13px; line-height: 18px; letter-spacing: 0; text-transform: none; }
+.tool-shell .tool-page a.group > [data-testid$="-label"] { color: var(--tool-text-2) !important; font-size: 12px; line-height: 16px; font-weight: 400; text-decoration-line: none; }
+.tool-shell .tool-page a.group > .g-text.tabular-nums { color: var(--tool-accent-ink); font-weight: 500; letter-spacing: -.01em; }
+.tool-shell .tool-page a.group:hover > .g-text.tabular-nums { text-decoration: underline; text-underline-offset: 3px; }
+@media (hover: hover) and (pointer: fine) {
+  .tool-shell .tool-page :is(.min-h-\[44px\], .min-h-11, .min-h-10, .\!min-h-\[44px\], .\!min-h-11) { min-height: 26px !important; }
+  .tool-shell .tool-page :is(.h-11.w-11, .\!h-11) { width: 30px; height: 30px !important; }
+  .tool-shell .tool-page button { min-height: 0; }
+  .tool-shell .tool-page :is(a, summary, button).underline:not(:hover):not(:focus-visible) { text-decoration-line: none; }
+  .tool-shell .tool-page :is(a, summary, button).underline:hover { background: color-mix(in srgb, var(--tool-accent) 9%, transparent); }
+  .tool-shell .tool-page .tool-btn { min-height: 30px; }
+}
+.tool-slot--page > form { flex: 0 0 auto; width: 100%; max-width: 100%; }
+.tool-slot--page > form > * { min-width: 0; }
+.tool-slot--page > form > label { flex: 1 1 100%; }
+.tool-slot--page > form > :is(select, button, div) { flex: 1 1 0; }
+.tool-slot--page, .tool-slot--page > * { min-width: 0; max-width: 100%; }
+.tool-slot--page .tool-slot__end { display: block; }
+.tool-slot--page .stat-chips { max-width: 100%; }
+/* A page wrapper that says overflow-y:auto but never scrolls (it grows with its content) would trap a sticky tab bar
+   inside it; the real scroll area is the layout's <main>. */
+.h-full.overflow-y-auto:has(.tool-tabs[data-sticky="true"]) { overflow: visible; }
+/* A bare select (no .g-input) took the browser's white box in dark mode. */
+.tool-shell .tool-page select.g-select { background-color: var(--tool-panel); color: var(--tool-text); border: 1px solid var(--tool-line-strong); border-radius: 5px; padding: 0 6px; }
+.tool-delta__period { margin-left: 4px; font-size: 11px; line-height: 16px; font-weight: 400; color: var(--tool-text-2); white-space: nowrap; }

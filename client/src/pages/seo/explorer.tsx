@@ -30,6 +30,7 @@ import { compact, DeltaBadge, GradientSpark, monthLabel, PALETTE, TOOLTIP } from
 import { BarRows, change, DifficultyBadge, Fig, FIG, Kicker, LinkedDistribution, Metric, MonthLinks, MonthTrend, OpenIcon, PositionBadge, ShareBar, type MonthSeries } from "./viz-explorer";
 import { ReportView, REPORT_NOTE, type TableKey as ReportKey } from "./report-table";
 import { bandOfPosition, FILTER_PARAMS, INTENTS, OVERVIEW_PARAMS, overviewWords, pathOfUrl } from "./explorer-filters";
+import { ToolBarSlot } from "@/components/tool";
 import { seoLinks, setParam, setParams } from "./links";
 import { marketParams } from "./keyword-links";
 import { GapView } from "./gap";
@@ -325,6 +326,8 @@ export default function SeoExplorerPage() {
 
   return (
     <SeoShell title="Site explorer" description="Any website's estimated search traffic, keywords, backlinks and competitors — yours or a competitor's." site={site} onSite={onSite} sites={sites} status={status} picker={false}>
+      {/* The domain box is this tool's global input: it lives in the tool bar's second row (components/tool/shell.tsx). */}
+      <ToolBarSlot>
       <form className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center" onSubmit={(e) => { e.preventDefault(); submit(false); }} data-testid="form-explorer">
         <label className="relative min-w-0 flex-1 sm:max-w-xl">
           <span className="sr-only">Domain</span>
@@ -337,6 +340,7 @@ export default function SeoExplorerPage() {
         </Button>
         {site && site.domain !== input.trim() && <button type="button" className="g-pill min-h-[44px]" onClick={() => { setInput(site.domain); open(site.domain); }} data-testid="button-explorer-my-site">My site: {site.domain}</button>}
       </form>
+      </ToolBarSlot>
       <p className="g-text-2 mb-4 text-[13px]" data-testid="text-explorer-cost">
         A new report costs {priceOf(status.data, "explorerReport")} of your SEO data. Reopening a saved one is free for {recent.data?.freeForDays ?? 7} days.{holdNote(status.data, "explorerReport")}{!affordable && " You don't have enough SEO data left for a new report — add credit above."}
       </p>

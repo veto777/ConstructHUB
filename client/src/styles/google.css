@@ -563,10 +563,7 @@ a.g-stat:hover { background: var(--g-surface-2); }
 .g-tile__value { margin-top: 4px; font-size: 24px; line-height: 32px; font-weight: 400; color: var(--g-text); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .g-tile__hint { margin-top: 2px; font-size: 12px; line-height: 16px; color: var(--g-text-2); }
 /* Tab strip under the header (Google's underline tabs). */
-.g-tabs { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid var(--g-divider); margin-bottom: 16px; scrollbar-width: none; }
-.g-tabs a { flex: none; padding: 10px 12px; color: var(--g-text-2); font-size: 14px; font-weight: 500; text-decoration: none; border-bottom: 3px solid transparent; margin-bottom: -1px; white-space: nowrap; }
-.g-tabs a:hover { color: var(--g-text); background: var(--g-hover); border-radius: 8px 8px 0 0; }
-.g-tabs a[aria-current="page"] { color: var(--g-accent-ink); border-bottom-color: var(--g-accent); }
+/* .g-tabs (the tab rows) now lives in ./tool.css with the shared tool tabs and segmented tabs. */
 /* Notice / empty card. */
 .g-callout { border: 1px solid var(--g-divider); border-radius: 8px; padding: 16px; background: var(--g-surface-2); }
 .g-callout h3 { margin: 0 0 4px; font-size: 16px; line-height: 24px; font-weight: 500; color: var(--g-text); }
