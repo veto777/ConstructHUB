@@ -7,12 +7,15 @@ import { reconcileStripeEvent } from "./payment-ledger";
  *   2. Outbound webhook dispatch — HMAC-signed, with retry/backoff.
  *   3. API-key authentication for the public read API.
  */
-import type { Express, RequestHandler } from "express";
+import type { Express, RequestHandler, Response } from "express";
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import { isIP } from "net";
 import { lookup } from "dns/promises";
 import Stripe from "stripe";
-import { db } from "../db";
+import { db, pool } from "../db";
+import { getCrmEntitlements } from "./entitlements";
+import { inferRows, unitsFor } from "../public-api/quota";
+import { apiMonthStart, apiMonthResetsAt } from "../account/api-keys";
 import {
   crmPayments, crmInvoices, crmEstimates, crmProjects, crmCustomers, crmOrgs,
   crmApiKeys, crmWebhooks, crmMembers, crmEstimateEvents, crmPaymentAccounts,
@@ -166,6 +169,77 @@ export async function emitCrmEvent(orgId: string, event: string, payload: any): 
 
 export type ApiCtx = { orgId: string; keyId: string; scopes: string[] };
 
+/** Resolve the billing owner's CRM subscription, never the acting seat's platform plan. */
+export async function requireCrmFeature(res: Response, ownerUserId: number, feature: "jobCosting" | "api") {
+  const ent = await getCrmEntitlements(ownerUserId, { fresh: true });
+  if (ent.active && (feature === "jobCosting" ? ent.limits?.jobCosting : (ent.limits?.apiUnitsPerMonth ?? 0) > 0)) return ent;
+  res.status(402).json({
+    code: "crm_plan_required", feature, requiredPlan: "crm_essentials",
+    message: `${feature === "jobCosting" ? "Job costing and change orders require" : "CRM API access requires"} CRM Essentials or Max.`,
+    href: "/pricing#crm",
+  });
+  return null;
+}
+
+// Separate from account_api_usage: the CRM and platform sell separate allowances.
+// Owned here like the CRM subscription's additive runtime DDL. Fail closed and
+// retry initialization after an outage. No existing billing rows are changed.
+let apiUsageReady: Promise<unknown> | undefined;
+function ensureApiUsage() {
+  return apiUsageReady ??= pool.query(`CREATE TABLE IF NOT EXISTS crm_api_monthly_usage (
+    owner_user_id integer NOT NULL, month date NOT NULL,
+    units integer NOT NULL DEFAULT 0, requests integer NOT NULL DEFAULT 0,
+    PRIMARY KEY (owner_user_id, month)
+  )`).catch((error) => { apiUsageReady = undefined; throw error; });
+}
+
+/** Read API: meter successful JSON before sending, using the platform's unit formula. */
+async function installCrmApiMeter(req: any, res: Response, ownerUserId: number, limit: number) {
+  await ensureApiUsage();
+  const month = apiMonthStart();
+  const { rows: [usage] } = await pool.query(
+    "SELECT units FROM crm_api_monthly_usage WHERE owner_user_id=$1 AND month=$2::date", [ownerUserId, month]);
+  const refuse = () => {
+    const resetsAt = apiMonthResetsAt(new Date(month));
+    res.setHeader("X-Units-Remaining", "0");
+    res.setHeader("Retry-After", String(Math.max(1, Math.ceil((Date.parse(resetsAt) - Date.now()) / 1000))));
+    return res.status(429).json({ error: { code: "quota_exceeded", message: "Monthly CRM API allowance exceeded.", limit, resetsAt } });
+  };
+  if ((usage?.units ?? 0) + unitsFor(req.method) > limit) { refuse(); return false; }
+  const json = res.json.bind(res);
+  let sending = false;
+  res.json = ((body: unknown) => {
+    if (sending) return res;
+    sending = true;
+    void (async () => {
+      try {
+        if (res.statusCode < 400) {
+          const units = unitsFor(req.method, inferRows(body));
+          // Atomic admission across ALL keys/orgs owned by the subscriber, even
+          // across processes. A revoked/replaced key cannot reset their usage.
+          const { rows: [charged] } = await pool.query(`
+            INSERT INTO crm_api_monthly_usage (owner_user_id, month, units, requests)
+            SELECT $1, $2::date, $3::integer, 1 WHERE $3::integer <= $4::integer
+            ON CONFLICT (owner_user_id, month) DO UPDATE
+              SET units = crm_api_monthly_usage.units + EXCLUDED.units,
+                  requests = crm_api_monthly_usage.requests + 1
+              WHERE crm_api_monthly_usage.units + EXCLUDED.units <= $4::integer
+            RETURNING units`, [ownerUserId, month, units, limit]);
+          res.json = json;
+          if (!charged) { if (!res.destroyed) refuse(); return; }
+          res.setHeader("X-Units-Remaining", String(limit - charged.units));
+        }
+        if (!res.destroyed) json(body);
+      } catch {
+        res.json = json;
+        if (!res.headersSent && !res.destroyed) res.status(503).json({ error: { code: "internal_error", message: "CRM API usage could not be recorded." } });
+      }
+    })();
+    return res;
+  }) as Response["json"];
+  return true;
+}
+
 /** `Authorization: Bearer chk_…` → org context, or 401. */
 export const requireApiKey: RequestHandler = async (req: any, res, next) => {
   const hdr = String(req.headers.authorization || "");
@@ -179,6 +253,12 @@ export const requireApiKey: RequestHandler = async (req: any, res, next) => {
   const [key] = await db.select().from(crmApiKeys)
     .where(and(eq(crmApiKeys.keyHash, hash), isNull(crmApiKeys.revokedAt))).limit(1);
   if (!key) return res.status(401).json({ error: { message: "Invalid or revoked API key." } });
+
+  const [org] = await db.select().from(crmOrgs).where(eq(crmOrgs.id, key.orgId)).limit(1);
+  if (!org) return res.status(401).json({ error: { message: "API key organization no longer exists." } });
+  const ent = await requireCrmFeature(res, org.ownerUserId, "api");
+  if (!ent) return;
+  if (!await installCrmApiMeter(req, res, org.ownerUserId, ent.limits!.apiUnitsPerMonth)) return;
 
   // Best-effort usage stamp.
   db.update(crmApiKeys).set({ lastUsedAt: new Date() }).where(eq(crmApiKeys.id, key.id)).catch(() => {});
