@@ -59,8 +59,13 @@ _Last updated 2026-08-24. Repo: `veto777/ConstructHUB` (private). Local: `/home/
     no-answer…) frees the seat at once. After-call paperwork now survives the connection being dropped.
 - **Operator:** nothing is required — the defaults apply on the next engine deploy (`voice/deploy/restart-when-idle.sh`). The engine's
   `/health` (with the bearer) shows the support settings. Engine tests: `cd voice && .venv/bin/python -m pytest selftest -q` (101).
-- **Left as found (separate review items):** the keypad line itself has no cap on calls at once or per caller (S-11), and the
-  per-account code budgets can be used up by a stranger (S-10).
+- **Fixed 2026-10-09 (branch `fix-keypad-line`, review S-10/S-11 — `server/support/limits.ts`):** code budgets are per (caller, account),
+  so a stranger spends their own allowance (2/h, 6/day per pair; 3/h per caller; `SUPPORT_CODES_PER_HOUR`=300 line-wide, audible + ops issue;
+  `SUPPORT_CODE_CALLERS_PER_ACCOUNT_DAY`=4 distinct numbers per account, the next is refused silently — the phone on file never is). The
+  keypad line: `SUPPORT_IVR_MAX_CALLS`=10 at once, `SUPPORT_IVR_MAX_CALLS_PER_CALLER`=2, `SUPPORT_IVR_CALLS_PER_CALLER_DAY`=10 → "busy, try
+  later"; `SUPPORT_IVR_MAX_CALL_SECONDS`=360; `SUPPORT_LINE_DAILY_MINUTES`=600 for the whole line (keypad + spoken; metered per turn into
+  `growth_budgets`, settled by the carrier's status callback) → "call back tomorrow". Every trip is an ops issue (`support-line|…`). The two
+  new clips (`busy`, `minutes_out`) are read by the carrier's voice until `scripts/support/clips.py` is run on the GPU box (`AWAITING_AUDIO`).
 
 ## ☎️ 2026-10-08 (late evening) — the AI Call Assistant is a SEPARATE SERVICE, repriced (branch `billing/call-assistant`, NOT deployed)
 - **Owner decisions:** the Call Assistant is sold on its **own subscription**, like the CRM (`fd964e1`, `069ffdf`): no platform plan

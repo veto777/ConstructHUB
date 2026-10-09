@@ -35,9 +35,9 @@ import { normalizeE164 } from "../voice/profile-store";
 import { customerNumberFor } from "./schema";
 import { freshState, turn, LINES, type Account, type CallState, type Category, type Channel, type Deps, type Intake, type Reply } from "./line";
 import { CLIPS, freshIvrState, ivrTurn, type ClipId, type IvrDeps, type IvrInput, type IvrReply } from "./ivr";
-import { codeSendGate } from "./limits";
+import { admitIvrCall, codeSendGate, LIMITS, meterCall, minutesExhausted, realStore } from "./limits";
 
-const HOUR = 3_600_000, DAY = 24 * HOUR;
+const DAY = 24 * 3_600_000;
 let warnedPepper = false;
 const pepper = () => {
   const p = process.env.SUPPORT_CODE_PEPPER || process.env.SESSION_SECRET;
@@ -225,12 +225,20 @@ async function runIvr(callSid: string, input: IvrInput): Promise<IvrReply | null
     if (!row) return null;
     const s: CallState = row.state?.step ? row.state : freshIvrState();
     const v0 = s.v ?? 0; s.v = v0 + 1;
+    // Review S-11: the seconds since the last turn go into the day's minutes; the call ends at its own cap.
+    const m = await meterCall(callSid, Date.now());
+    const cap = LIMITS.ivrMaxCallSeconds();
     let r: IvrReply;
-    try { r = await ivrTurn(s, input, row.caller_number || "", ivrDeps(callSid)); }
-    catch (e: any) { console.error("[support] ivr turn failed:", e?.message || e); r = { play: ["fail"], end: true }; s.step = "done"; }
+    if (!m.ok) { r = { play: ["minutes_out"], end: true }; s.step = "done"; }
+    else if (cap >= 0 && m.total >= cap && s.step !== "done") { r = { play: ["too_long"], end: true }; s.step = "done"; }
+    else {
+      try { r = await ivrTurn(s, input, row.caller_number || "", ivrDeps(callSid)); }
+      catch (e: any) { console.error("[support] ivr turn failed:", e?.message || e); r = { play: ["fail"], end: true }; s.step = "done"; }
+    }
     const w = await pool.query(
-      `UPDATE support_calls SET state = $1, user_id = $2, verified_at = CASE WHEN $3 AND verified_at IS NULL THEN now() ELSE verified_at END, updated_at = now()
-       WHERE call_sid = $4 AND COALESCE((state->>'v')::int, 0) = $5`, [JSON.stringify(s), s.verified ? s.userId : null, s.verified, callSid, v0]);
+      `UPDATE support_calls SET state = $1, user_id = $2, verified_at = CASE WHEN $3 AND verified_at IS NULL THEN now() ELSE verified_at END, updated_at = now(),
+         ended_at = CASE WHEN $6 THEN COALESCE(ended_at, now()) ELSE ended_at END
+       WHERE call_sid = $4 AND COALESCE((state->>'v')::int, 0) = $5`, [JSON.stringify(s), s.verified ? s.userId : null, s.verified, callSid, v0, r.end]);
     return w.rowCount === 0 ? { play: ["still_there"], listen: {}, end: false } : r;
   } catch (e: any) { console.error("[support] ivr turn failed:", e?.message || e); return { play: ["fail"], end: true }; }
 }
@@ -243,6 +251,10 @@ async function loadCall(callSid: string, from: string): Promise<CallState> {
   return st && st.step ? st : freshState();
 }
 const okSid = (v: unknown): v is string => typeof v === "string" && /^[A-Za-z0-9_-]{8,80}$/.test(v);
+/** The line refused or wrapped up the call: its state is over (a later turn hears "wrap up") and it holds no seat. */
+async function endCall(callSid: string): Promise<void> {
+  await pool.query(`UPDATE support_calls SET state = jsonb_set(state, '{step}', '"done"'), ended_at = COALESCE(ended_at, now()), updated_at = now() WHERE call_sid = $1`, [callSid]);
+}
 const FAIL: Reply = { say: "Sorry, something went wrong on my end. Please email support at constructhub dot us. Goodbye.", end: true };
 
 /**
@@ -299,8 +311,14 @@ export function registerSupportRoutes(app: Express, getDevUser: any) {
     res.type("text/xml");
     const v = await verifiedInbound(req);
     if (!v) return res.status(403).send(`<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>`);
-    await pool.query(`INSERT INTO support_calls (call_sid, caller_number, state) VALUES ($1,$2,$3) ON CONFLICT (call_sid) DO UPDATE SET state = EXCLUDED.state, updated_at = now()`,
-      [String(req.body.CallSid), normalizeE164(v.from), JSON.stringify(freshIvrState())]);
+    const sid = String(req.body.CallSid), from = normalizeE164(v.from);
+    // Review S-11: seats at once (line-wide and per caller), calls a day per caller, and the line's daily minutes.
+    // A refused call gets no row: a short message and the hang-up, nothing to come back to.
+    const fresh = (await pool.query(`SELECT 1 FROM support_calls WHERE call_sid = $1`, [sid])).rowCount === 0;
+    const a = await admitIvrCall(sid, from, fresh);
+    if (!a.ok) return res.send(ivrLaml({ play: [a.why === "minutes" ? "minutes_out" : "busy"], end: true }));
+    await pool.query(`INSERT INTO support_calls (call_sid, caller_number, state, line) VALUES ($1,$2,$3,'ivr') ON CONFLICT (call_sid) DO UPDATE SET state = EXCLUDED.state, line = 'ivr', updated_at = now()`,
+      [sid, from, JSON.stringify(freshIvrState())]);
     res.send(ivrLaml({ play: ["greet"], listen: { digits: 8 }, end: false }));
   };
   app.post("/api/support/ivr", ivrStart);
@@ -338,18 +356,22 @@ export function registerSupportRoutes(app: Express, getDevUser: any) {
     const { callSid, from } = req.body || {};
     if (!okSid(callSid)) return res.status(400).json({ code: "bad_request" });
     await loadCall(callSid, String(from || ""));
+    // Review S-11: the spoken line shares the day's carrier minutes with the keypad line; spent → say so and hang up.
+    if (await minutesExhausted()) { await endCall(callSid); return res.json({ say: LINES.minutesOut, end: true }); }
     res.json({ say: LINES.greet });
   });
   app.post(`${VOICE_INTERNAL_PATH}/support/turn`, requireVoiceInternal, async (req, res) => {
     const { callSid, from, text, silence } = req.body || {};
     if (!okSid(callSid) || typeof text !== "string") return res.status(400).json({ code: "bad_request" });
+    if (!(await meterCall(callSid, Date.now())).ok) { await endCall(callSid); return res.json({ say: LINES.minutesOut, end: true }); }
     const r = await runTurn(callSid, text, String(from || ""), silence === true);
     if (!r) return res.status(409).json({ code: "not_started" });   // a turn requires start
+    if (r.reply.end) await realStore.end(callSid);
     res.json(r.reply);
   });
   app.post(`${VOICE_INTERNAL_PATH}/support/end`, requireVoiceInternal, async (req, res) => {
     const { callSid } = req.body || {};
-    if (okSid(callSid)) await pool.query(`UPDATE support_calls SET updated_at = now() WHERE call_sid = $1`, [callSid]);
+    if (okSid(callSid)) { await meterCall(callSid, Date.now()); await realStore.end(callSid); }
     res.json({ ok: true });
   });
 

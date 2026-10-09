@@ -34,10 +34,17 @@ export const CLIPS = {
   silent_bye: "I haven't heard anything, so I'll let you go. Please call back, or email support at constructhub dot us. Goodbye.",
   too_long: "I need to wrap up this call. Please email support at constructhub dot us with anything else. Goodbye.",
   fail: "Sorry, something went wrong on my end. Please email support at constructhub dot us. Goodbye.",
+  busy: "All of our support lines are busy right now. Please try again in a few minutes, or email support at constructhub dot us. Goodbye.",
+  minutes_out: "Our phone support has reached its limit for today. Please email support at constructhub dot us, or call back tomorrow. Goodbye.",
   t: "T.",
   d0: "zero.", d1: "one.", d2: "two.", d3: "three.", d4: "four.", d5: "five.", d6: "six.", d7: "seven.", d8: "eight.", d9: "nine.",
 } as const;
 export type ClipId = keyof typeof CLIPS;
+/**
+ * Clips added on 2026-10-09 (review S-11) that have not been recorded in Gabe's voice yet — the carrier's standard
+ * voice reads their text until scripts/support/clips.py is run on the GPU box (then empty this list).
+ */
+export const AWAITING_AUDIO: ClipId[] = ["busy", "minutes_out"];
 
 /** What to do next: play these clips, then listen on the keypad (`digits` = how many to wait for), record, or hang up. */
 export type IvrReply = { play: ClipId[]; listen?: { digits?: number }; record?: boolean; end: boolean };
