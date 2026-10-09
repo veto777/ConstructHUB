@@ -12,6 +12,35 @@ Source: owner decisions 2026-10-09 (the cost-based rebuild, docs/pricing/README.
 - **Tests**: run with Node 20 (`export PATH=$HOME/.nvm/versions/node/v20.19.6/bin:$PATH`), lane env (`set -a; . /home/veto/ConstructHUB-a5/.env; set +a`). The dev-server suites need a dev server on CRM_TEST_BASE_URL (:8169 — `npm run dev` with that env). Run server/plan-gates.test.ts and server/growth-isolation.test.ts one at a time (they spawn child servers; blank DATAFORSEO_* for them is already in the suites). State at the end of Lane A: 4,516 tests passing in the a5-env full run; the only reds are the other lane's three pricing suites (11), one hub prompt test on lane B's plan-copy paragraphs, five app suites hard-pinned to the a6 lane DB (green on a6), ops/app-review-watch (a6-pinned; green with the sweep-plat env), voice/fresh-schema (needs CREATEDB on the cluster role), and two pre-existing non-ladder failures (help-registry's /listing-editor row, crm/admin's LSA-gate premise — both predate the rebuild).
 - **Coming next (not this lane)**: csvExport, permitAlerts, historyDays are on the books (modules/limits exist) but no feature/export exists yet to enforce — COMING_MODULES in shared/plans.ts; scheduledReports is live and gated to Agency and above. Limits & usage UI row for Gabe questions. Anything in the Lane B file list above.
 
+## 📨 2026-10-09 — SEO report emails: recipients must CONFIRM first (review S-3, branch `fix-report-relay`, NOT deployed)
+
+**Problem:** "Send now" and scheduled SEO reports mailed any address the customer typed, with the customer's brand
+name and PDF, from the billing sender — an open relay under our name. **Fix** (`server/seo/report-recipients.ts`):
+- A new address first gets ONE short confirmation email (no PDF; only a 60-char, escaped brand name) with a signed,
+  single-use link that lasts 7 days (`/api/seo/report-confirm`, `/api/seo/report-refuse`). Until confirmed it is
+  "pending" and both Send now and the schedule skip it. The account owner's address and active team members
+  (accepted CRM invitations) are confirmed on sight.
+- "This wasn't me" blocks the address for that account AND in `seo_report_blocks` (every account). TODO: merge with
+  the platform-wide suppression table from branch `privacy-code` once it is on main (one write + one read).
+- Limits: 5 confirmation emails/day and 20 distinct typed recipients per account (Agency / platform admin: 25 and
+  100); one confirmation per recipient per 7 days across all accounts; at most 3 confirmation emails ever per
+  (account, address). A tripped limit is a warning on the issue desk (`seo-report-confirm-limit:*`).
+- **Legacy recipients already in production schedules** have no row in `seo_report_recipients`: the NEXT send mails
+  them the confirmation instead of the report (owner/team addresses excepted), and the Reports page says so.
+  Nothing is lost — they get the following report once they confirm.
+- Tables are created at boot (`seo_report_recipients`, `seo_report_blocks`, SEO_SCHEMA_DDL). No manual migration.
+
+**Operator steps (sender identity):** reports and confirmations now set `From: "ConstructHUB Reports"
+<SEO_REPORT_FROM>` (default `reports@constructhub.us`), not billing@. The Gmail transport (`server/email.ts trySend`)
+rewrites the From ADDRESS to `SMTP_EMAIL` — the display name survives — so for the address to really change:
+1. Create `reports@constructhub.us` (Google Workspace alias or mailbox) and add it as a verified **"Send mail as"**
+   address on the `SMTP_EMAIL` account, or give it its own SMTP credentials.
+2. DNS: make sure SPF (`include:_spf.google.com`), DKIM (Workspace selector) and DMARC are published for
+   `constructhub.us`; if a sub-domain is preferred (`reports.constructhub.us`), add its own SPF/DKIM/DMARC.
+3. Set `SEO_REPORT_FROM` in prod `.env`; `SEO_REPORT_SECRET` optional (falls back to `SESSION_SECRET`; with neither,
+   no confirmation is sent and the issue desk says so).
+4. Mailer side (branch `privacy-code`): have `swapFromEmail` honor the From address when it is a verified alias.
+
 ## 🧱 2026-10-09 — reliability fixes from the SEO review (branch `fix-reliability`, NOT deployed)
 Source: review 4 of 6 (reliability), findings C1/H1-H5/M7/M13. One commit per item; `npm run check` 0.
 - **Request log writes no response bodies** (`server/request-log.ts`, M7/C1). The journal carried every JSON body —

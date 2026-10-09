@@ -38,7 +38,8 @@ type Report = {
   work?: { unavailable?: boolean; since?: string | null; days: number; done: { id?: number; title: string; doneAt: string; target: string | null; note: string | null; kind: string }[]; doneCount: number; open: number; inProgress: number; today?: string; overdue?: { id?: number; title: string; dueOn: string; owner: string | null }[]; overdueCount?: number; dueSoon?: number } | null;
 };
 type Schedule = { frequency: "off" | "weekly" | "monthly"; recipients: string[]; nextSendAt: string | null; lastSentAt: string | null; uncertain?: { recipient: string; period: string; at: string }[] | null; uncertainMore?: number; uncertainDays?: number };
-type Data = { report: Report; highlights: [string, string][]; empty: boolean; schedule: Schedule; brandName: string | null; accountEmail: string | null; optedOut?: string[] };
+type RecipientStanding = { email: string; status: "confirmed" | "pending" | "unconfirmed" | "blocked" | "limited" };
+type Data = { report: Report; highlights: [string, string][]; empty: boolean; schedule: Schedule; brandName: string | null; accountEmail: string | null; optedOut?: string[]; recipients?: RecipientStanding[]; confirmDays?: number };
 
 const card = CARD;
 // A missing position is "not found": the site was not within the result pages the check read, which is not proof it ranks nowhere.
@@ -145,15 +146,15 @@ export default function SeoReportsPage() {
   const list = parseEmails(emails), tooMany = list.length > 5, bad = list.filter((e) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e));
   const save = useMutation({
     mutationFn: () => api("POST", `${key}/schedule`, { frequency, recipients: list }),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: [key] }); toast({ title: frequency === "off" ? "Scheduled reports turned off" : `Report scheduled ${frequency}` }); },
+    onSuccess: (x: { confirmationsSent?: string[] }) => { void qc.invalidateQueries({ queryKey: [key] }); toast({ title: frequency === "off" ? "Scheduled reports turned off" : `Report scheduled ${frequency}`, description: x?.confirmationsSent?.length ? `A confirmation email went to ${x.confirmationsSent.join(", ")}; they get reports once they confirm.` : undefined }); },
     onError: (e) => toast({ title: "Couldn't save the schedule", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const send = useMutation({
     mutationFn: () => api("POST", `${key}/send`, { recipients: list }),
     // Whatever happened, the schedule's note about deliveries in doubt is read again.
     onSettled: () => void qc.invalidateQueries({ queryKey: [key] }),
-    onSuccess: (x: { sent: number; failed?: number; empty: boolean; optedOut?: string[]; uncertain?: string[] }) => toast(x.empty ? { title: "Nothing to send yet", description: "The report has no numbers for this site.", variant: "destructive" }
-      : { title: `Report sent to ${x.sent} address${x.sent === 1 ? "" : "es"}`, description: [x.optedOut?.length ? `${x.optedOut.join(", ")} asked not to get these reports and was skipped.` : "", x.failed ? `${x.failed} could not be sent — try again.` : "", x.uncertain?.length ? `A send to ${x.uncertain.join(", ")} broke off and may have arrived, so it was not sent again automatically.` : ""].filter(Boolean).join(" ") || undefined, variant: x.failed ? "destructive" : undefined }),
+    onSuccess: (x: { sent: number; failed?: number; empty: boolean; optedOut?: string[]; uncertain?: string[]; pending?: string[]; confirmationsSent?: string[]; limited?: string[] }) => toast(x.empty ? { title: "Nothing to send yet", description: "The report has no numbers for this site.", variant: "destructive" }
+      : { title: `Report sent to ${x.sent} address${x.sent === 1 ? "" : "es"}`, description: [x.pending?.length ? `${x.pending.join(", ")} has not confirmed yet${x.confirmationsSent?.length ? ` — a confirmation email went to ${x.confirmationsSent.join(", ")}` : ""}; the report goes out once they confirm.` : "", x.limited?.length ? `${x.limited.join(", ")} is over your limit of different addresses and was not added.` : "", x.optedOut?.length ? `${x.optedOut.join(", ")} asked not to get these reports and was skipped.` : "", x.failed ? `${x.failed} could not be sent — try again.` : "", x.uncertain?.length ? `A send to ${x.uncertain.join(", ")} broke off and may have arrived, so it was not sent again automatically.` : ""].filter(Boolean).join(" ") || undefined, variant: x.failed ? "destructive" : undefined }),
     onError: (e) => toast({ title: "Couldn't send the report", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const invalid = !list.length || tooMany || bad.length > 0;
@@ -326,7 +327,10 @@ export default function SeoReportsPage() {
               <textarea className="g-input mt-1 min-h-[96px] py-2" value={emails} onChange={(e) => setEmails(e.target.value)} placeholder={"you@yourcompany.com\nclient@theirs.com"} aria-invalid={bad.length > 0 || tooMany} data-testid="textarea-report-recipients" />
             </label>
             {(bad.length > 0 || tooMany) && <p className="mt-1 text-[12px]" style={{ color: "var(--g-red)" }} role="alert">{tooMany ? "Up to 5 addresses." : `Not an email address: ${bad.slice(0, 2).join(", ")}`}</p>}
-            <p className="g-text-2 mt-2 text-[12px]">Every email says you asked for it and has a link the recipient can use to stop them.</p>
+            <p className="g-text-2 mt-2 text-[12px]">A new address first gets one short confirmation email from ConstructHUB (no report attached) and receives reports only after confirming — your own address and your team's are confirmed automatically. Every report says you asked for it and has a link the recipient can use to stop them.</p>
+            {(d.recipients?.some((r) => r.status === "pending") ?? false) && <p className="g-text-2 mt-1 text-[12px]" data-testid="text-report-pending">Waiting to confirm (skipped until they do): {d.recipients!.filter((r) => r.status === "pending").map((r) => r.email).join(", ")}. The confirmation link lasts {d.confirmDays ?? 7} days.</p>}
+            {(d.recipients?.some((r) => r.status === "unconfirmed") ?? false) && <p className="g-text-2 mt-1 text-[12px]" data-testid="text-report-unconfirmed">Saved before confirmations existed: {d.recipients!.filter((r) => r.status === "unconfirmed").map((r) => r.email).join(", ")}. The next send mails them the confirmation instead of the report; reports follow once they confirm.</p>}
+            {(d.recipients?.some((r) => r.status === "blocked") ?? false) && <p className="g-text-2 mt-1 text-[12px]" data-testid="text-report-blocked">Declined these reports (skipped): {d.recipients!.filter((r) => r.status === "blocked").map((r) => r.email).join(", ")}</p>}
             {(d.optedOut?.length ?? 0) > 0 && <p className="g-text-2 mt-1 text-[12px]" data-testid="text-report-optouts">Asked not to get your reports (they are skipped): {d.optedOut!.join(", ")}</p>}
             {d.schedule.uncertain === null && <p className="g-text-2 mt-2 text-[12px]" role="note" data-testid="text-report-uncertain-unread">Couldn't check just now whether any report email is in doubt.</p>}
             {(d.schedule.uncertain?.length ?? 0) > 0 && <p className="mt-2 text-[12px]" role="note" data-testid="text-report-uncertain">Not known whether these arrived — the send broke off and may have gone through, so it was not sent again automatically (the last {d.schedule.uncertainDays ?? 60} days): {d.schedule.uncertain!.map((u) => `${u.period} to ${u.recipient} (${fmtDate(u.at)})`).join("; ")}{d.schedule.uncertainMore ? `; and ${d.schedule.uncertainMore} more` : ""}.</p>}

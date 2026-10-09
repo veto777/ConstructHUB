@@ -109,6 +109,10 @@ vi.mock("../ops/server-errors", () => ({ recordUnhandledError: (_req: any, _res:
 vi.mock("../ops/issues", () => ({ recordFailure: async () => {}, recordIssue: async () => {} }));
 vi.mock("./credits", async (actual) => ({ ...(await actual<typeof import("./credits")>()), creditStatus: async () => ({ includedCents: 2000, includedUsedCents: 100, walletCents: 0, availableCents: 1900 }) }));
 vi.mock("./site-report-send", async (actual) => ({ ...(await actual<typeof import("./site-report-send")>()), sendSiteReport: async () => ({ sent: 1, failed: 0, skipped: 0 }), validUnsubscribe: () => true, optOut: async () => {}, optedOut: async () => [] }));
+vi.mock("./report-recipients", async (actual) => ({ ...(await actual<typeof import("./report-recipients")>()),
+  ensureRecipients: async (_u: number, emails: string[]) => ({ status: Object.fromEntries(emails.map((e) => [e, "confirmed"])), confirmed: emails, pending: [], blocked: [], limited: [], confirmationsSent: [] }),
+  recipientStatuses: async (_u: number, emails: string[]) => emails.map((email) => ({ email, status: "confirmed" })),
+  confirmRecipient: async () => "invalid", refuseRecipient: async () => "invalid" }));
 
 /** The ledger, without a database: a lookup runs, and a refusal is the real error with its real (internal) detail. */
 const ledger = vi.hoisted(() => ({ refuse: null as null | "cap" | "credits" }));
@@ -268,6 +272,10 @@ const SPECS: Record<string, { url: string; body?: unknown }[]> = {
   "GET /api/seo/sites/:id/voice": [{ url: "/api/seo/sites/1/voice" }],
   "POST /api/seo/sites/:id/tracked-competitors": [{ url: "/api/seo/sites/1/tracked-competitors", body: { domain: "rival.com" } }],
   "DELETE /api/seo/sites/:id/tracked-competitors/:domain": [{ url: "/api/seo/sites/1/tracked-competitors/rival.com" }],
+  "GET /api/seo/report-confirm": [{ url: "/api/seo/report-confirm?t=x" }],
+  "POST /api/seo/report-confirm": [{ url: "/api/seo/report-confirm?t=x", body: {} }],
+  "GET /api/seo/report-refuse": [{ url: "/api/seo/report-refuse?t=x" }],
+  "POST /api/seo/report-refuse": [{ url: "/api/seo/report-refuse?t=x", body: {} }],
   "GET /api/seo/report-unsubscribe": [{ url: "/api/seo/report-unsubscribe?u=1&e=a%40b.co&t=x" }],
   "POST /api/seo/report-unsubscribe": [{ url: "/api/seo/report-unsubscribe?u=1&e=a%40b.co&t=x", body: {} }],
   "GET /api/seo/sites/:id/report": [{ url: "/api/seo/sites/1/report" }],
@@ -332,7 +340,7 @@ describe("every SEO route, as a customer", () => {
     const routes = [...new Set(registered())];
     expect(routes.filter((r) => !SPECS[r]), `${HOW} These routes have no request in SPECS (white-label.test.ts), so nothing checks what they return`).toEqual([]);
     expect(Object.keys(SPECS).filter((r) => !routes.includes(r)), "SPECS lists routes that are no longer registered — remove them").toEqual([]);
-    expect(routes.length, "the number of /api/seo routes changed: add the new ones to SPECS, then update this count").toBe(90);
+    expect(routes.length, "the number of /api/seo routes changed: add the new ones to SPECS, then update this count").toBe(94);
   });
 
   for (const mode of Object.keys(PROVIDER)) {

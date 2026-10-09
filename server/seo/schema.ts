@@ -1,6 +1,7 @@
 import { LOCATION_SCHEMA_DDL } from "./locations";
 import { LIST_SCHEMA_DDL } from "./lists";
 import { REPORT_SCHEDULE_DDL } from "./site-report";
+import { REPORT_RECIPIENT_DDL } from "./report-recipients";
 import { VOICE_SCHEMA_DDL } from "./voice";
 import { AI_SCHEMA_DDL } from "./ai-visibility";
 import { GRID_SCHEMA_DDL } from "./grid";
@@ -132,6 +133,8 @@ export const SEO_SCHEMA_DDL = [
   ...VOICE_SCHEMA_DDL,
   // Scheduled SEO reports (server/seo/site-report.ts).
   ...REPORT_SCHEDULE_DDL,
+  // Who may get them: confirmed recipients and the addresses that refused (server/seo/report-recipients.ts).
+  ...REPORT_RECIPIENT_DDL,
   // Keyword lists (server/seo/lists.ts).
   ...LIST_SCHEMA_DDL,
   // What each lookup was, for the customer's usage history (server/seo/usage.ts).
