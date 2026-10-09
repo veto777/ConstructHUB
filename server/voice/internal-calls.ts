@@ -33,6 +33,7 @@ import { putRecording, recordingsConfigured } from "./recordings";
 import { recordActivity } from "../crm/activity";
 import { recordFailure } from "../ops/issues";
 import { recordCallReportIssues } from "../ops/call-assistant";
+import { settleSupportCall } from "../support/limits";
 
 /** A 15-minute 8 kHz mono WAV is ~14 MB; cap recordings well under the app's 50 MB JSON limit. */
 export const RECORDING_MAX_BYTES = 40 * 1024 * 1024;
@@ -463,7 +464,8 @@ export function registerVoiceInternalCallRoutes(app: Express): void {
     const { callSid, callStatus, duration } = parsed.data;
     try {
       const call = await loadCall(callSid);
-      if (!call) return res.json({ ok: true, known: false });
+      // Not a Call Assistant call: a support-line call (spoken or keypad) settles its carrier minutes here (review S-11).
+      if (!call) return res.json({ ok: true, known: await settleSupportCall(callSid, duration) });
       const status = callStatus.toLowerCase();
       // A call that never opened a stream gets its outcome from the carrier; a reported call keeps the engine's.
       const outcomeFor: Record<string, CallOutcome> = { failed: "error", busy: "hangup", "no-answer": "hangup", canceled: "hangup" };

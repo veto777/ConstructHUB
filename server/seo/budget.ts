@@ -79,7 +79,8 @@ export class SeoBudgetError extends Error {
 
 export type BudgetReservation = { /** seo_reservations row: what makes the settlement survive a crash. */ id?: string; userId: number; month: string; estimateUsd: number; credit: CreditReservation | null; /** Set by settleBudget: a reservation settles once. */ settled?: boolean };
 /** `allowanceOnly`: spend the month's included SEO data only, never credit the customer bought (automatic jobs). */
-export type BudgetOptions = { allowanceOnly?: boolean; /** What this lookup is, in the customer's words — shown in their usage history. */ label?: string };
+export type BudgetOptions = { allowanceOnly?: boolean; /** What this lookup is, in the customer's words — shown in their usage history. */ label?: string;
+  /** Count the cost against the platform's monthly cap and ledger only — never the customer's SEO allowance or purchased credit. For data the customer has already paid for another way (the plan's ranking-grid credits). */ platformOnly?: boolean };
 
 /** Reserve `estimateUsd` for this account, or throw SeoBudgetError. */
 export async function reserveBudget(userId: number, estimateUsd: number, opts: BudgetOptions = {}): Promise<BudgetReservation> {
@@ -114,6 +115,7 @@ export async function reserveBudget(userId: number, estimateUsd: number, opts: B
   // The customer's side of the same call: the estimate at the customer's price,
   // from this month's allowance and then purchased credit (server/seo/credits.ts).
   const reservation: BudgetReservation = { id, userId, month, estimateUsd, credit: null };
+  if (opts.platformOnly) return reservation;
   try {
     reservation.credit = await budgetDeps.reserveCredits(userId, await budgetDeps.allowanceCents(userId), retailCents(estimateUsd), { allowanceOnly: opts.allowanceOnly, reservationId: id, month });
   } catch (e) {
