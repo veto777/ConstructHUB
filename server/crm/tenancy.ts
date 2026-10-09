@@ -18,7 +18,7 @@ import type { CrmPermission } from "@shared/schema";
 import { and, asc, eq } from "drizzle-orm";
 import { authorizeObjectRequest } from "./object-access";
 import { PLANS, type AddonKey, type PlanKey } from "@shared/plans";
-import { getEntitlements, raiseHint, plural, inUse, type Entitlements } from "../entitlements";
+import { getEntitlements, raiseHint, plural, inUse, textingNumbersAllowance, type Entitlements } from "../entitlements";
 import { getCrmEntitlements, crmPlanRequiredBody } from "./entitlements";
 import { CRM_PLANS, cheapestCrmPlanWhere, CRM_EXTRA_SEAT_MONTHLY_CENTS, type CrmPlanKey } from "@shared/crm-plans";
 
@@ -113,6 +113,16 @@ export async function requireOrg(req: any, res: any, userId: number): Promise<Or
   if (!ctx || !await authorizeObjectRequest(req, res, ctx)) return null;
   if (!await crmPlanOk(req, res, ctx)) return null;
   return ctx;
+}
+
+/** SMS setup is also sold by the platform; this grants no CRM feature access. */
+export async function requireSmsOrg(req: any, res: any, userId: number): Promise<OrgContext | null> {
+  const ctx = await resolveOrg(req, res, userId);
+  if (!ctx || !await authorizeObjectRequest(req, res, ctx)) return null;
+  const ent = await getEntitlements(ctx.org.ownerUserId);
+  if (ent.isPlatformAdmin || textingNumbersAllowance(ent) !== 0
+      || (ent.allowances && (ent.allowances.teamTextSegments !== 0 || ent.allowances.clientTexting !== "none"))) return ctx;
+  return await crmPlanOk(req, res, ctx) ? ctx : null;
 }
 
 /**
