@@ -1189,7 +1189,7 @@ date + 60 days. Evidence for all of the above: Gmail screenshots in `attached_as
       expired estimates not counted in client bid tabs, org-wide stats vs divisions,
       adopt `eslint-plugin-react-hooks` (the pipeline blank-screen class).
 - [x] **GBP API access — APPROVED 2026-09-23** (application #3, case `1-4033000042334`; timeline above).
-- [ ] **Enable the Business Profile APIs** in project `construction-hub-489119` (owner console click,
+- [x] **Enable the Business Profile APIs** — DONE (verified live 2026-10-09: 2 grants with all 4 scopes, Profile Guard and reviews run through the API) in project `construction-hub-489119` (owner console click,
       links in the timeline section) — then build the GBP integration (OAuth scope `business.manage`,
       account/location listing, info edits, review display + owner replies, performance metrics).
 - [x] Deploy — **DONE 2026-07-10** (live at constructhub.us, see "Live deployment").
