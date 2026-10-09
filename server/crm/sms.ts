@@ -329,22 +329,12 @@ async function dedicatedNumbers(q: Pick<typeof db, "execute">, ownerId: number):
   return rows.map(r => String(r.number));
 }
 
-/** Keep saved settings/data, but stop using carrier numbers no longer paid for. */
-export async function reconcileTextingNumbers(ownerId: number): Promise<void> {
-  const [ent, crm] = await Promise.all([getEntitlements(ownerId), getCrmEntitlements(ownerId)]);
-  const allowance = textingNumbersAllowance(ent, crm);
+/** Billing changes invalidate plan checks, never the configured sender. A pause,
+ * cancellation, downgrade or removed add-on can later be reversed. Preserve the
+ * number and its stable allocation order so access returns without reconfiguration;
+ * dedicatedSmsAllowed enforces the current allowance before every carrier send. */
+export async function reconcileTextingNumbers(_ownerId: number): Promise<void> {
   clearSmsEntitlementCache();
-  if (allowance === UNLIMITED) return;
-  await db.transaction(async tx => {
-    await lockTextingOwner(tx, ownerId);
-    const excess = (await dedicatedNumbers(tx, ownerId)).slice(allowance);
-    for (const number of excess) {
-      await tx.execute(sql`UPDATE crm_orgs
-        SET custom_fields=jsonb_set(custom_fields, '{sms,mode}', '"platform"'::jsonb), updated_at=now()
-        WHERE owner_user_id=${ownerId} AND custom_fields->'sms'->>'mode'='dedicated'
-          AND custom_fields->'sms'->>'fromNumber'=${number}`);
-    }
-  });
 }
 
 /** Uncached: stale caller settings cannot authorize a removed number. */

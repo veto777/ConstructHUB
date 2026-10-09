@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PLANS, UNLIMITED, type PlanKey } from "@shared/plans";
 import { CRM_PLANS, type CrmPlanKey } from "@shared/crm-plans";
+import { crmSmsOptouts } from "@shared/schema";
 import { PgDialect } from "drizzle-orm/pg-core";
 
 const state = vi.hoisted(() => ({
@@ -8,12 +9,12 @@ const state = vi.hoisted(() => ({
   org: { id: "org", ownerUserId: 7, customFields: {} as any },
   used: 0, assigned: false,
   numbers: [] as string[], transaction: vi.fn(),
-  execute: vi.fn(), update: vi.fn(), query: vi.fn(),
+  reserve: vi.fn(), execute: vi.fn(), update: vi.fn(), query: vi.fn(),
 }));
 vi.mock("../db", () => ({
   pool: { query: state.query },
   db: {
-    select: () => ({ from: () => ({ where: () => ({ limit: async () => [state.org] }) }) }),
+    select: () => ({ from: (table: unknown) => ({ where: () => ({ limit: async () => table === crmSmsOptouts ? [] : [state.org] }) }) }),
     transaction: state.transaction,
     execute: state.execute,
     update: () => ({ set: state.update }),
@@ -24,6 +25,9 @@ vi.mock("../entitlements", async (original) => ({
   getEntitlements: vi.fn(async () => state.platform),
 }));
 vi.mock("./entitlements", () => ({ getCrmEntitlements: vi.fn(async () => state.crm) }));
+vi.mock("../growth-quotas", () => ({
+  reserveQuotaFor: state.reserve, refundReservation: vi.fn(), monthKey: () => "2026-10",
+}));
 vi.mock("./tenancy", () => ({ requireOrg: async () => ({ org: state.org }), requireSmsOrg: async () => ({ org: state.org }), requirePermission: () => true }));
 vi.mock("./activity", () => ({ logActivity: vi.fn() }));
 vi.mock("../email", () => ({ sendWithFallback: vi.fn() }));
@@ -47,6 +51,7 @@ let sender: (req: any, res: any) => Promise<unknown>;
 beforeEach(() => {
   vi.clearAllMocks();
   clearSmsEntitlementCache();
+  state.reserve.mockResolvedValue({ ok: true, reservation: null });
   plans("starter", "crm_max");
   state.org.customFields = {};
   state.used = 0;
@@ -205,16 +210,63 @@ describe("dedicated number removal and concurrency", () => {
     expect(await dedicatedSmsAllowed(undefined, number)).toBe(false);
     expect(await dedicatedSmsAllowed("*", number)).toBe(false);
   });
-  it("keeps only the allowed distinct numbers after a downgrade and preserves saved data", async () => {
-    plans("growth", null);
+  it("preserves assignments after a downgrade and only authorizes the first number", async () => {
+    plans("agency", null);
     state.numbers = [number, "+15553334444"];
     state.org.customFields = { sms: { mode: "dedicated", fromNumber: "+15553334444" } };
-    expect(await dedicatedSmsAllowed("org", "+15553334444")).toBe(false);
+    expect(await dedicatedSmsAllowed("org", "+15553334444")).toBe(true);
+    plans("growth", null);
     await reconcileTextingNumbers(7);
-    const update = state.execute.mock.calls.map(([q]) => new PgDialect().sqlToQuery(q)).find(q => q.sql.includes("UPDATE crm_orgs"))!;
-    expect(update.params).toEqual([7, "+15553334444"]);
-    expect(update.sql).toContain("jsonb_set(custom_fields, '{sms,mode}'");
-    expect(update.sql).toContain("'\"platform\"'::jsonb");
+    expect(await dedicatedSmsAllowed("org", "+15553334444")).toBe(false);
+    expect(state.transaction).not.toHaveBeenCalled();
+    expect(state.org.customFields.sms).toEqual({ mode: "dedicated", fromNumber: "+15553334444" });
+    state.org.customFields.sms.fromNumber = number;
+    expect(await dedicatedSmsAllowed("org", number)).toBe(true);
+    state.org.customFields.sms.fromNumber = "+15553334444";
+    plans("agency", null);
+    await reconcileTextingNumbers(7);
+    expect(await dedicatedSmsAllowed("org", "+15553334444")).toBe(true);
+  });
+  describe.each(["purchased", "Agency", "CRM Max"])("%s number recovery", source => {
+    it.each(["past_due", "unpaid", "incomplete", "canceled", "ended", "allowance removed"])(
+      "blocks sends during %s and resumes with the saved number", async status => {
+        vi.stubEnv("SIGNALWIRE_SPACE_URL", "example.signalwire.com");
+        vi.stubEnv("SIGNALWIRE_PROJECT_ID", "project");
+        vi.stubEnv("SIGNALWIRE_API_TOKEN", "token");
+        vi.stubEnv("SIGNALWIRE_FROM_NUMBER", "+15550000000");
+        const fetch = vi.fn(async (_url: string, _request: RequestInit) => ({ ok: true, json: async () => ({ sid: "sent" }) }));
+        vi.stubGlobal("fetch", fetch);
+        const activate = () => plans(source === "Agency" ? "growth" : "starter",
+          source === "CRM Max" ? "crm_max" : null, source === "purchased" ? 1 : 0);
+        const saved = { sms: { mode: "dedicated", fromNumber: number }, smsAlerts: true };
+        state.org.customFields = structuredClone(saved);
+        state.numbers = [number];
+        const send = () => sendSms("+15553334444", "test", state.org.customFields, "org");
+        try {
+          activate();
+          await reconcileTextingNumbers(7);
+          expect(await send()).toMatchObject({ ok: true, provider: "signalwire" });
+          // Effective entitlements returned while billing denies number access.
+          plans(status === "allowance removed" ? "starter" : null, null);
+          state.platform.status = status;
+          state.crm.status = status;
+          await reconcileTextingNumbers(7);
+          expect(await send()).toMatchObject({ ok: false, error: expect.stringContaining("outside your current allowance") });
+          expect(fetch).toHaveBeenCalledTimes(1);
+          expect(state.reserve).toHaveBeenCalledTimes(1);
+          expect(state.org.customFields).toEqual(saved);
+          expect(state.transaction).not.toHaveBeenCalled();
+          activate();
+          await reconcileTextingNumbers(7);
+          expect(await send()).toMatchObject({ ok: true, provider: "signalwire" });
+          expect(fetch).toHaveBeenCalledTimes(2);
+          expect(state.reserve).toHaveBeenCalledTimes(2);
+          for (const [, request] of fetch.mock.calls) {
+            expect(new URLSearchParams(String(request.body)).get("From")).toBe(number);
+          }
+        } finally { vi.unstubAllEnvs(); vi.unstubAllGlobals(); }
+      },
+    );
   });
   it("blocks the carrier send before metering after an add-on is removed", async () => {
     vi.stubEnv("SIGNALWIRE_SPACE_URL", "example.signalwire.com");
