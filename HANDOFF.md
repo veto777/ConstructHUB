@@ -2,6 +2,24 @@
 
 _Last updated 2026-08-24. Repo: `veto777/ConstructHUB` (private). Local: `/home/veto/ConstructHUB` on the tower._
 
+## 🗺️ 2026-10-09 — the plan's Ranking Grid runs on DataForSEO, not Google Places (branch `grid/dataforseo`, deployed same day)
+- **Owner decision 2026-10-09 ("We will use DataForSEO instead for both"):** the ranking grid behind the plans' grid credits
+  (`/api/ranking-grid/scans`, server/routes.ts `runRankingGridScan`) now makes one DataForSEO local-finder search per point
+  (`lookupPoint` in server/seo/grid.ts — the same source and request as the SEO section's Local grid), instead of a Google
+  Places Text Search per point. Why: Places was free only inside Google's 5,000 free calls a month (about 100 7×7 grids
+  across ALL customers), then $32 per 1,000 = $1.57 per 49-point grid; DataForSEO is $0.002 a point = $0.10 per grid at any
+  volume, and a local-finder search from the searcher's coordinates is the accurate one (a Places text search is a map view).
+- **Money:** the customer still pays with grid credits (unchanged); the data cost goes to the platform's monthly SEO data
+  cap/ledger only — new `BudgetOptions.platformOnly` (server/seo/budget.ts) skips the customer's SEO allowance/credit. So
+  the $100/month default cap (`SEO_MONTHLY_BUDGET_USD`) now also covers ranking grids; when it is hit the scan fails and
+  the credits are refunded (logged `[ranking-grid] … refused by the SEO data cap`). `GOOGLE_PLACES_API_KEY` is no longer
+  read by the grid (Competitor Intel and location lookup still use it).
+- **Matching:** results carry Google's `cid`, not a `place_id`, so the business is recognised by exact normalised name
+  within a mile of the pin until a point shows it, then by `cid` for the rest of the scan. Up to 6 points in parallel.
+- **Tests:** server/plan-gates.test.ts and growth-isolation.test.ts now blank `DATAFORSEO_LOGIN/PASSWORD` for the spawned
+  server (a scan must fail and refund there, never spend). Run with Node 20 (`~/.nvm/versions/node/v20.19.6/bin`) and the
+  a5 lane env; run the two server-spawning suites one at a time (together they collide on the port).
+
 ## 💳 2026-10-09 — refunds and disputes on SEO credit packs now reach the wallet (review M-3, branch `fix-review-high`, NOT deployed)
 
 > **OWNER/OPERATOR ACTION: enable these event types on the live webhook endpoint** (Stripe Dashboard → Developers →

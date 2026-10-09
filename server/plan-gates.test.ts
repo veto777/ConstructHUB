@@ -46,7 +46,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("plan gates (auxili
   beforeAll(async () => {
     if (!/^\/constructhub_dev(?:_a\d+)?$/.test(new URL(process.env.DATABASE_URL!).pathname)) throw new Error("Requires a ConstructHUB development lane DB");
     child = spawn(process.execPath, ["--import", "tsx", "server/index.ts"], {
-      env: { ...process.env, PORT: String(port), NODE_ENV: "development", DEV_AUTH_BYPASS_USER1: "false", CRM_DEMO_AUTOLOGIN: "false", SESSION_SECRET: secret, EMAIL_FORCE_SINK: "1", STRIPE_SECRET_KEY: "", GOOGLE_PLACES_API_KEY: "", SCRAPE_SCHEDULER_DISABLED: "true", GBP_SYNC_DISABLED: "true" },
+      env: { ...process.env, PORT: String(port), NODE_ENV: "development", DEV_AUTH_BYPASS_USER1: "false", CRM_DEMO_AUTOLOGIN: "false", SESSION_SECRET: secret, EMAIL_FORCE_SINK: "1", STRIPE_SECRET_KEY: "", GOOGLE_PLACES_API_KEY: "", DATAFORSEO_LOGIN: "", DATAFORSEO_PASSWORD: "", SCRAPE_SCHEDULER_DISABLED: "true", GBP_SYNC_DISABLED: "true" },
       stdio: ["ignore", "pipe", "pipe"], detached: true,
     });
     mkdirSync("tmp", { recursive: true });
