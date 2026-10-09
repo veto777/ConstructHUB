@@ -56,7 +56,7 @@ export type AccountPricingTerms = {
  * started before it were sold on the four-plan book and lock those prices.
  * See docs/pricing/README.md "Deploying a new price book".
  */
-export const FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT = "2026-10-09T00:00:00.000Z";
+export const FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT = "2026-10-09T20:30:00.000Z";
 
 /**
  * Frozen four-plan book deployed 2026-09-30 (HANDOFF.md, that date's entry).
