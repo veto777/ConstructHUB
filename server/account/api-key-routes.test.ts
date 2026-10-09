@@ -110,11 +110,11 @@ afterAll(async () => {
 
 describe("plan allowance", () => {
   it("follows the contract table until shared/plans.ts publishes apiUnitsPerMonth", () => {
-    expect([apiUnitsForPlan("starter"), apiUnitsForPlan("pro"), apiUnitsForPlan("growth"), apiUnitsForPlan("agency")]).toEqual([0, 10_000, 50_000, 250_000]);
+    expect([apiUnitsForPlan("starter"), apiUnitsForPlan("team"), apiUnitsForPlan("pro"), apiUnitsForPlan("growth"), apiUnitsForPlan("agency")]).toEqual([0, 0, 50_000, 250_000, -1]);
     expect(apiUnitsForPlan("starter", { ...PLANS.starter.limits, apiUnitsPerMonth: 500 } as any)).toBe(500);
     expect(cheapestApiPlan()).toBe("pro");
     expect(apiAllowance({ accessPlan: null, allowances: null })).toEqual({ apiEnabled: false, unitsPerMonth: 0, ratePerMinute: 0 });
-    expect(apiAllowance({ accessPlan: "pro", allowances: PLANS.pro.limits })).toEqual({ apiEnabled: true, unitsPerMonth: 10_000, ratePerMinute: 60 });
+    expect(apiAllowance({ accessPlan: "pro", allowances: PLANS.pro.limits })).toEqual({ apiEnabled: true, unitsPerMonth: 50_000, ratePerMinute: 60 });
     expect(apiAllowance({ accessPlan: "agency", allowances: { ...PLANS.agency.limits, apiUnitsPerMonth: -1, apiRatePerMinute: 120 } as any })).toEqual({ apiEnabled: true, unitsPerMonth: -1, ratePerMinute: 120 });
   });
   it("parses names, scopes, limits and windows strictly", () => {
@@ -134,7 +134,7 @@ describe("GET /api/account/api-keys", () => {
     expect((await call(null, "/api/account/api-keys")).status).toBe(401);
     const pro = await call(users.pro, "/api/account/api-keys");
     expect(pro.status).toBe(200);
-    expect(pro.data).toEqual({ keys: [], plan: { apiEnabled: true, unitsPerMonth: 10_000, usedThisMonth: 0, ratePerMinute: 60 } });
+    expect(pro.data).toEqual({ keys: [], plan: { apiEnabled: true, unitsPerMonth: 50_000, usedThisMonth: 0, ratePerMinute: 60 } });
     expect(pro.headers.get("cache-control")).toBe("no-store");
     expect((await call(users.starter, "/api/account/api-keys")).data.plan).toEqual({ apiEnabled: false, unitsPerMonth: 0, usedThisMonth: 0, ratePerMinute: 60 });
     expect((await call(users.none, "/api/account/api-keys")).data.plan).toEqual({ apiEnabled: false, unitsPerMonth: 0, usedThisMonth: 0, ratePerMinute: 0 });

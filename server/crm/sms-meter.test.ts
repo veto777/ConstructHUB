@@ -8,7 +8,11 @@
  * imported AFTER the env shims, like sms-compliance.test.ts). Part 2 boots a
  * child server from THIS checkout on its own port (plan-gates.test.ts
  * pattern) for the HTTP answers: 403 limit_reached on a manual send, 402
- * plan_required on Starter, and `usage.texts` on /api/entitlements.
+ * plan_required for an owner with no texting plan, and `usage.texts` on
+ * /api/entitlements. Every fixture owner holds a CRM plan — the CRM is a
+ * separate product and its staff routes refuse 402 crm_plan_required
+ * without one (server/crm/tenancy.ts). CRM Basic adds no texts, so the Pro
+ * fixture's cap stays the platform plan's teamTextSegments.
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -67,7 +71,7 @@ const fill = (owner: number, used: number) =>
 const usedOf = async (owner: number) =>
   Number((await pool.query("select used from growth_budgets where key=$1 and period='0'", [keyOf(owner)])).rows[0]?.used ?? 0);
 const spentMessage = (plan: "pro") =>
-  `You've used all ${PLANS[plan].limits.teamTextSegments} text segments your ${PLANS[plan].name} plan includes this month. The count resets on the 1st (UTC). ` +
+  `You've used all ${PLANS[plan].limits.teamTextSegments.toLocaleString("en-US")} text segments your ${PLANS[plan].name} plan includes this month. The count resets on the 1st (UTC). ` +
   `To raise it, move to ${PLANS.growth.name} (${PLANS.growth.limits.teamTextSegments.toLocaleString("en-US")} text segments).`;
 
 afterEach(() => vi.unstubAllGlobals());
@@ -78,8 +82,8 @@ afterAll(() => pool.end());
 
 describe("monthly text allowance seam (real test DB)", () => {
   const owners: number[] = [];
-  let proOwner = 0, starterOwner = 0;
-  let proOrg: any, starterOrgId = "";
+  let proOwner = 0, noPlanOwner = 0;
+  let proOrg: any, noPlanOrgId = "";
   const phone = "+15550199777", optedOut = "+15550199778";
 
   beforeAll(async () => {
@@ -99,19 +103,21 @@ describe("monthly text allowance seam (real test DB)", () => {
       return u.id as number;
     };
     proOwner = await mk("pro");
-    starterOwner = await mk("starter");
+    // Every platform plan includes texting on the 2026-10-09 ladder, so the
+    // "no texting plan" case is an owner with no plan at all.
+    noPlanOwner = await mk(null);
     // An owner member with a mobile and the legacy smsAlerts toggle on: what textOrgOwners texts.
     const { rows: [org] } = await pool.query(
       "insert into crm_orgs(name, owner_user_id, custom_fields) values ('vitest-sms-meter-pro', $1, $2) returning *",
       [proOwner, JSON.stringify({ smsAlerts: true })]);
     proOrg = { ...org, customFields: org.custom_fields };
     await pool.query("insert into crm_members(org_id, user_id, email, role, status, phone) values ($1, $2, 'sms-meter-owner@example.invalid', 'owner', 'active', $3)", [org.id, proOwner, phone]);
-    starterOrgId = (await pool.query("insert into crm_orgs(name, owner_user_id) values ('vitest-sms-meter-starter', $1) returning id", [starterOwner])).rows[0].id;
+    noPlanOrgId = (await pool.query("insert into crm_orgs(name, owner_user_id) values ('vitest-sms-meter-noplan', $1) returning id", [noPlanOwner])).rows[0].id;
   });
 
   afterAll(async () => {
-    await pool.query("delete from crm_sms_optouts where org_id = any($1)", [[proOrg?.id, starterOrgId].filter(Boolean)]);
-    await pool.query("delete from crm_members where org_id = any($1)", [[proOrg?.id, starterOrgId].filter(Boolean)]);
+    await pool.query("delete from crm_sms_optouts where org_id = any($1)", [[proOrg?.id, noPlanOrgId].filter(Boolean)]);
+    await pool.query("delete from crm_members where org_id = any($1)", [[proOrg?.id, noPlanOrgId].filter(Boolean)]);
     await pool.query("delete from crm_orgs where owner_user_id = any($1)", [owners]);
     await pool.query("delete from growth_budgets where key like any($1)", [owners.map((u) => `quota:user:${u}:%`)]);
     await pool.query("delete from subscriptions where user_id = any($1)", [owners]);
@@ -183,17 +189,17 @@ describe("monthly text allowance seam (real test DB)", () => {
     expect(await usedOf(proOwner)).toBe(PRO_LIMIT);
   });
 
-  it("an opted-out number costs nothing, and a plan without texting is still refused 402-style", async () => {
+  it("an opted-out number costs nothing, and an owner with no plan is still refused 402-style", async () => {
     await recordSmsOptout(proOrg.id, optedOut, "STOP");
     const stop = await withSwEnv({}, () => sendSms(optedOut, "hi", undefined, proOrg.id));
     expect(stop.ok).toBe(false);
     expect(stop.error).toContain("STOP");
     expect(await usedOf(proOwner)).toBe(0);
 
-    const starter = await withSwEnv({}, () => sendSms(phone, "hi", undefined, starterOrgId));
-    expect(starter).toMatchObject({ ok: false, error: SMS_NEEDS_PLAN });
-    expect(starter.limit).toBeUndefined();
-    expect(await usedOf(starterOwner)).toBe(0);
+    const refused = await withSwEnv({}, () => sendSms(phone, "hi", undefined, noPlanOrgId));
+    expect(refused).toMatchObject({ ok: false, error: SMS_NEEDS_PLAN });
+    expect(refused.limit).toBeUndefined();
+    expect(await usedOf(noPlanOwner)).toBe(0);
   });
 });
 
@@ -217,12 +223,17 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("monthly text allow
   const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
   const users: number[] = [], sids: string[] = [], orgs: string[] = [];
   let child: ChildProcess;
-  let starter: Account, pro: Account;
+  let noTextPlan: Account, pro: Account;
 
-  async function account(plan: string): Promise<Account> {
+  // Every fixture owner holds a CRM plan: CRM staff routes refuse 402
+  // crm_plan_required without one (server/crm/tenancy.ts). CRM Basic adds no
+  // text allowance, so the Pro owner's monthly cap stays the platform plan's
+  // teamTextSegments. `plan` null = no platform plan (no texting entitlement).
+  async function account(plan: string | null, crmPlan = "crm_basic"): Promise<Account> {
     const { rows: [user] } = await db.query("insert into users(email,display_name,email_verified) values($1,'P-Text meter',true) returning id", [`p-sms-meter-${randomUUID()}@example.invalid`]);
     users.push(user.id);
-    await db.query("insert into subscriptions(user_id,plan,status,stripe_subscription_id) values($1,$2,'active',$3)", [user.id, plan, `sub_p_${randomUUID()}`]);
+    if (plan) await db.query("insert into subscriptions(user_id,plan,status,stripe_subscription_id) values($1,$2,'active',$3)", [user.id, plan, `sub_p_${randomUUID()}`]);
+    await db.query("insert into crm_subscriptions(user_id,plan,status) values($1,$2,'active')", [user.id, crmPlan]);
     const sid = randomUUID(); sids.push(sid);
     await db.query("insert into session(sid,sess,expire) values($1,$2,now()+interval '1 hour')", [sid, JSON.stringify({ cookie: { maxAge: 3600000 }, passport: { user: user.id } })]);
     const sig = createHmac("sha256", secret).update(sid).digest("base64").replace(/=+$/, "");
@@ -258,7 +269,8 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("monthly text allow
       await new Promise((r) => setTimeout(r, 500));
     }
     if (!ready) throw new Error("Text meter test server did not start");
-    starter = await account("starter");
+    // CRM Basic only (no platform plan): the owner has no texting plan.
+    noTextPlan = await account(null);
     pro = await account("pro");
     // The Pro org texts clients from its own (unreachable) SignalWire account.
     const sender = await api("/api/crm/sms/sender", pro, "PUT", { mode: "byo", fromNumber: "+15550106666", spaceUrl: "127.0.0.1:9", projectId: "p-meter-byo", apiToken: "tok-p-meter" });
@@ -274,6 +286,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("monthly text allow
     await db.query("delete from crm_orgs where id=any($1::text[])", [orgs]);
     await db.query("delete from growth_budgets where key like any($1)", [users.map((u) => `quota:user:${u}:%`)]);
     await db.query("delete from subscriptions where user_id=any($1::int[])", [users]);
+    await db.query("delete from crm_subscriptions where user_id=any($1::int[])", [users]);
     await db.query("delete from users where id=any($1::int[])", [users]);
     await db.query("delete from session where sid=any($1::text[])", [sids]);
     await db.end();
@@ -309,13 +322,14 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("monthly text allow
     expect(r.status).toBe(200);
     expect(r.body.allowances.teamTextSegments).toBe(PRO_LIMIT);
     expect(r.body.usage.texts).toEqual({ used: PRO_LIMIT, limit: PRO_LIMIT });
-    expect((await api("/api/entitlements", starter)).body.usage.texts).toEqual({ used: 0, limit: 0 });
+    // No platform plan: no platform text allowance either.
+    expect((await api("/api/entitlements", noTextPlan)).body.usage.texts).toEqual({ used: 0, limit: 0 });
   });
 
-  it("a Starter org still gets 402 plan_required", async () => {
-    const r = await api("/api/crm/messages", starter, "POST", { customerId: starter.customer, channel: "text", body: "On my way" });
+  it("an org whose owner has no texting plan still gets 402 plan_required", async () => {
+    const r = await api("/api/crm/messages", noTextPlan, "POST", { customerId: noTextPlan.customer, channel: "text", body: "On my way" });
     expect(r.status).toBe(402);
     expect(r.body).toMatchObject({ code: "plan_required", requiredPlan: TEXTING_PLAN, planAllowsSms: false });
-    expect(await usedOf(starter.id)).toBe(0);
+    expect(await usedOf(noTextPlan.id)).toBe(0);
   });
 });

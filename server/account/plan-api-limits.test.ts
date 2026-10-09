@@ -4,9 +4,9 @@ import { ADDONS, PLANS, PLAN_KEYS, type AddonKey } from "@shared/plans";
 import { allowancesFor, cheapestPlanWhere } from "../entitlements";
 
 describe("public API plan limits", () => {
-  it("Starter has no API; Pro 10k, Growth 50k, Agency 250k units a month; 60 requests a minute everywhere", () => {
-    expect(PLAN_KEYS.map((k) => [k, PLANS[k].limits.apiUnitsPerMonth])).toEqual([["starter", 0], ["pro", 10_000], ["growth", 50_000], ["agency", 250_000]]);
-    for (const k of PLAN_KEYS) expect(PLANS[k].limits.apiRatePerMinute).toBe(60);
+  it("Starter and Team have no API; Pro 50k, Agency 250k, Unlimited uncapped; 60 requests a minute (120 on Unlimited)", () => {
+    expect(PLAN_KEYS.map((k) => [k, PLANS[k].limits.apiUnitsPerMonth])).toEqual([["starter", 0], ["team", 0], ["pro", 50_000], ["growth", 250_000], ["agency", -1]]);
+    for (const k of PLAN_KEYS) expect(PLANS[k].limits.apiRatePerMinute).toBe(k === "agency" ? 120 : 60);
   });
 
   it("entitlement allowances carry them and no add-on raises them", () => {
@@ -14,7 +14,7 @@ describe("public API plan limits", () => {
     for (const k of PLAN_KEYS) {
       const a = allowancesFor(k, everyAddon);
       expect(a.apiUnitsPerMonth).toBe(PLANS[k].limits.apiUnitsPerMonth);
-      expect(a.apiRatePerMinute).toBe(60);
+      expect(a.apiRatePerMinute).toBe(PLANS[k].limits.apiRatePerMinute);
     }
     for (const addon of Object.values(ADDONS)) {
       expect(addon.grants).not.toHaveProperty("apiUnitsPerMonth");

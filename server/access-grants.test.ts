@@ -81,7 +81,7 @@ describe("rules", () => {
       expect(grantInputError({ ...ok, days }), String(days)).toBe("Days must be a whole number from 1 to 1000.");
     }
     for (const plan of ["platinum", "free", "", "PRO", undefined, 3]) {
-      expect(grantInputError({ ...ok, plan }), String(plan)).toBe("Choose a plan: Starter, Pro, Growth, Agency.");
+      expect(grantInputError({ ...ok, plan }), String(plan)).toBe("Choose a plan: Solo, Team, Pro, Agency, Unlimited.");
     }
     for (const userId of [undefined, 0, -1, "5", 1.5, 2 ** 31]) {
       expect(grantInputError({ ...ok, userId }), String(userId)).toBe("Pick an account to give access to.");
@@ -230,7 +230,7 @@ describe("routes (in-process, lane DB)", () => {
     for (const plan of ["platinum", "free", "enterprise", undefined]) {
       const r = await grant({ userId: target.id, plan, days: 30 });
       expect(r.status, String(plan)).toBe(400);
-      expect(r.body.message).toBe("Choose a plan: Starter, Pro, Growth, Agency.");
+      expect(r.body.message).toBe("Choose a plan: Solo, Team, Pro, Agency, Unlimited.");
     }
     expect((await grant({ userId: 2147483000, plan: "pro", days: 30 })).status).toBe(404);
     expect((await q("select 1 from admin_audit_log where action = 'access_grant' and parameters->>'userId' = '2147483000'")).rows).toEqual([]);
@@ -301,7 +301,7 @@ describe("routes (in-process, lane DB)", () => {
       const [before] = await subOf(payer.id);
       const r = await grant({ userId: payer.id, plan: "agency", days: 365 });
       expect(r.status, status).toBe(409);
-      expect(r.body.message).toContain("pays for Growth through Stripe");
+      expect(r.body.message).toContain("pays for Agency through Stripe");
       expect(await subOf(payer.id)).toEqual([before]);
       expect(await grantsOf(payer.id)).toEqual([]);
       const { rows: audit } = await q("select result, error_message from admin_audit_log where target_account_name = $1", [payer.email]);

@@ -18,7 +18,7 @@ vi.mock("../email", () => ({ sendWithFallback: vi.fn(async () => ({ accepted: []
 const users = {} as Record<"agency" | "pro" | "none", number>;
 let base = "", server: ReturnType<express.Express["listen"]>;
 const tag = randomUUID().slice(0, 8);
-const IDS = ["google_business", "google_ads", "cloudflare", "search_console", "blotato", "registrars", "gmail_alerts"];
+const IDS = ["google_business", "google_ads", "cloudflare", "search_console", "blotato", "registrars", "gmail_alerts", "client_texting"];
 
 async function get(user: number | null) {
   const r = await fetch(`${base}/api/account/integrations`, { headers: user ? { "x-fixture-user": String(user) } : {} });
@@ -101,14 +101,22 @@ describe("GET /api/account/integrations", () => {
     expect(items.gmail_alerts).toMatchObject({ status: "reconnect", detail: "alerts@example.invalid needs to be reconnected." });
     expect(items.cloudflare.detail).toBe("1 connection (cf@example.invalid) · 2 zones (1 access removed).");
   });
-  it("shows another account nothing of the first, and names the plan that includes an Agency-only service", async () => {
+  it("shows another account nothing of the first, and names the plan that includes a service their plan lacks", async () => {
     const pro = byId((await get(users.pro)).data.items);
     for (const id of IDS) expect(pro[id].status, id).toBe("not_connected");
     expect(pro.google_business.detail).toBe("No Google account connected.");
     expect(pro.blotato.detail).toBe("No Blotato API key connected.");
-    for (const id of ["google_ads", "cloudflare", "search_console", "registrars", "gmail_alerts"]) expect(pro[id].detail, id).toBe("Included with the Agency plan.");
+    // Pro includes these modules, so the row says what a Pro account would do next.
+    expect(pro.google_ads.detail).toBe("No Google Ads manager account connected.");
+    expect(pro.cloudflare.detail).toBe("No Cloudflare connection.");
+    expect(pro.search_console.detail).toBe("No Google Search Console connection.");
+    expect(pro.registrars.detail).toBe("No registrar API key connected.");
+    expect(pro.gmail_alerts.detail).toBe("No Gmail account connected and no forwarding address yet.");
+    // Client texting needs the add-on on Pro — the row names the Agency plan, which includes a number.
+    expect(pro.client_texting.detail).toBe("No number on our carrier yet — add the Client texting number add-on, or move to the Agency plan, which includes one.");
     const none = byId((await get(users.none)).data.items);
-    expect(none.cloudflare.detail).toBe("Included with the Agency plan.");
+    expect(none.cloudflare.detail).toBe("Included with the Pro plan.");
+    expect(none.client_texting.detail).toBe("No number on our carrier yet — add the Client texting number add-on, or move to the Agency plan, which includes one.");
     await pool.query("INSERT INTO mail_alert_addresses(user_id,token_hash,token_cipher) VALUES($1,$2,'enc')", [users.pro, `acct-l5-${tag}-pro`]);
     expect(byId(await integrationItems(users.pro)).gmail_alerts).toMatchObject({ status: "connected", detail: "Forwarding address set; no Gmail account connected." });
   });

@@ -125,9 +125,10 @@ describe("orgCanTextClients (pure)", () => {
 });
 
 describe("opt-out suppression seam (real test DB)", () => {
-  // Texting comes with Pro, Growth and Agency (legacy Premium / Gold / Platinum map
-  // onto them): orgs A and B belong to a legacy Premium owner, orgFree to an owner
-  // with no plan, and the rest cover the new plans and the legacy map.
+  // Every 2026-10-09 platform plan includes team text alerts (legacy Standard /
+  // Premium / Gold / Platinum map onto Starter / Pro / Growth / Agency): orgs A
+  // and B belong to a legacy Premium owner, orgFree to an owner with no plan at
+  // all, and the rest cover the new plans and the legacy map.
   let orgA = "", orgB = "", orgFree = "";
   const byPlan: Record<string, string> = {};
   const owners: number[] = [];
@@ -146,7 +147,7 @@ describe("opt-out suppression seam (real test DB)", () => {
     orgA = await org(premium, "vitest-sms-seam-a");
     orgB = await org(premium, "vitest-sms-seam-b");
     orgFree = await org(await mk(null), "vitest-sms-seam-free");
-    for (const plan of ["starter", "pro", "growth", "agency", "standard", "gold", "platinum"]) {
+    for (const plan of ["starter", "team", "pro", "growth", "agency", "standard", "gold", "platinum"]) {
       byPlan[plan] = await org(await mk(plan), `vitest-sms-plan-${plan}`);
     }
   });
@@ -158,12 +159,12 @@ describe("opt-out suppression seam (real test DB)", () => {
     await pool.query(`delete from users where id = any($1)`, [owners]);
   });
 
-  it("texting follows the plan: Pro, Growth and Agency, legacy plans through the map", async () => {
+  it("texting follows the plan: every platform plan includes it, legacy plans through the map, and the refusal names the CRM plans", async () => {
     clearSmsEntitlementCache();
     const entitled = Object.fromEntries(await Promise.all(Object.entries(byPlan).map(async ([plan, id]) => [plan, await orgSmsEntitled(id)])));
-    expect(entitled).toEqual({ starter: false, pro: true, growth: true, agency: true, standard: false, gold: true, platinum: true });
-    expect(SMS_NEEDS_PLAN).toBe("Text messaging is included with the Pro, Growth and Agency plans. Upgrade in Pricing to turn it on.");
-    expect(smsPlanRequired()).toEqual({ code: "plan_required", requiredPlan: "pro", message: SMS_NEEDS_PLAN, planAllowsSms: false });
+    expect(entitled).toEqual({ starter: true, team: true, pro: true, growth: true, agency: true, standard: true, gold: true, platinum: true });
+    expect(SMS_NEEDS_PLAN).toBe("Text messaging is included with the CRM Essentials and CRM Max plans. Change your CRM plan in Pricing to turn it on.");
+    expect(smsPlanRequired()).toEqual({ code: "plan_required", requiredPlan: "starter", message: SMS_NEEDS_PLAN, planAllowsSms: false });
   });
 
   it("orgs without a texting plan cannot text; a lapsed plan stops texting", async () => {
