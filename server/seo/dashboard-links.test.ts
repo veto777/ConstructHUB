@@ -14,7 +14,7 @@ const read = (rel: string) => fs.readFileSync(path.resolve(import.meta.dirname, 
 /** Comments aside; only code counts. */
 const code = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 /** A link whose data-testid (or a component's testId / linkTestId) starts with `t`. */
-const pinned = (t: string) => new RegExp(`(testId|data-testid)=\\{\`${t}`);
+const pinned = (t: string) => new RegExp(`(testId|data-testid)(=\\{|: )\`${t}`);
 
 describe("the dashboard address (links.ts)", () => {
   it("is one builder; the list's anchor is #sites; an absent narrowing writes nothing", () => {
@@ -36,7 +36,10 @@ describe("the dashboard address (links.ts)", () => {
 });
 
 describe("the dashboard honours the address and links every figure", () => {
-  const dash = code(read("dashboard.tsx")), viz = code(read("viz.tsx"));
+  // The row's layout moved to components/seo-tool/project-row.tsx (the tool look, 2026-10-09): the page keeps the data,
+  // the order and the mutations; the pins below read both, as one dashboard.
+  const page = code(read("dashboard.tsx")), row = code(read("../../components/seo-tool/project-row.tsx"));
+  const dash = `${page}\n${row}`, viz = code(read("viz.tsx"));
 
   it("reads sort, group and filter from the address, re-read on every change, and lands on #sites", () => {
     expect(dash).toContain("const address = useAddress()");
@@ -52,7 +55,11 @@ describe("the dashboard honours the address and links every figure", () => {
   });
 
   it("never buys data on arrival: the only purchase is the Analyse / Refresh button", () => {
-    expect(dash.match(/analyse\.mutate\(/g)).toHaveLength(2);
+    // One purchase in the page, handed to the row, which calls it from its two buttons (Refresh / Analyse, and the empty row's Analyse).
+    expect(page.match(/analyse\.mutate\(/g)).toHaveLength(1);
+    expect(page).toContain("onAnalyse={() => analyse.mutate(s.domain)}");
+    expect(row.match(/onClick=\{onAnalyse\}/g)).toHaveLength(2);
+    expect(row).not.toMatch(/useEffect/);
     expect(dash).not.toMatch(/useEffect\([^;]*analyse\.mutate/);
   });
 
@@ -91,8 +98,9 @@ describe("the dashboard honours the address and links every figure", () => {
   it("every figure of a card is a link: numbers, changes, dates, crawl rows, legend entries, start-step counts", () => {
     for (const t of ["link-domain-", "link-analysed-", "link-health-", "link-health-move-", "link-health-pages-", "link-health-crawled-", "link-health-before-", "link-health-audit-", "link-crawl-", "link-authority-", "link-authority-change-", "link-authority-foot-", "link-domains-", "link-domains-change-", "link-backlinks-", "link-traffic-", "link-traffic-change-", "link-traffic-value-", "link-keywords-", "link-keywords-change-", "link-tracked-", "link-tracked-checked-", "link-tracked-due-", "link-add-keywords-", "link-start-tracked-", "link-start-rank-", "link-start-audit-", "link-explore-", "link-rank-", "link-audit-", "link-plan-"]) expect(dash, t).toMatch(pinned(t));
     expect(dash).toContain('href={seoLinks.audit(siteId, { tab: "issues" })}');
-    expect(dash).toContain('href={seoLinks.audit(siteId, { tab: "pages" })}');
-    expect(dash).toContain("href={seoLinks.audit(siteId, { at: audit.jobId, vs: prev.jobId })}");
+    expect(dash).toContain('href: seoLinks.audit(siteId, { tab: "pages" })');
+    expect(dash).toContain('href: seoLinks.audit(siteId, { tab: "pages", show: "errors" })');
+    expect(dash).toContain("href: seoLinks.audit(siteId, { at: audit.jobId, vs: prev.jobId })");
     // "Last N crawls": the whole row (date and health figure) opens that crawl.
     expect(dash).toContain("<FigureLink href={crawl(t.jobId)} onClick={onPick} testId={`link-crawl-${siteId}-${i}`}>{fmtDate(t.at)}: {healthWords(t)}</FigureLink>");
     expect(dash).toContain("<FigureLink href={crawl(prev!.jobId)} onClick={onPick} testId={`link-health-before-${siteId}`}>the crawl before scored");
@@ -101,9 +109,10 @@ describe("the dashboard honours the address and links every figure", () => {
     expect(dash).toContain("testId={`link-start-tracked-${s.id}`}>{fmtNum(s.keywordCount)} tracked</FigureLink>");
     expect(dash).toContain('segmentHref={(k) => ex("keywords", { band: k as PositionBand })}');
     expect(dash).toContain("segmentHref={(k) => seoLinks.rankTracker(s.id, { band: k as PositionBand })}");
-    expect(dash).toContain("href={seoLinks.rankTracker(s.id, { device: rank.device ?? undefined })}");
+    expect(dash).toContain("href: seoLinks.rankTracker(s.id, { device: rank.device ?? undefined })");
     expect(dash).toContain('pointHref={(_k, p) => ex("overview", { month: p.key })}');
-    for (const v of ["authority", "domains", "traffic", "keywords"]) expect(dash, v).toContain(`testId={\`spark-${v}-\${s.id}\`}`);
+    // Each sparkline is one link of its own (components/tool/stats.tsx StatCell `spark.href`); the months stay links in the row's trend panel.
+    for (const v of ["authority", "domains", "traffic", "keywords"]) expect(dash, v).toContain(`testId: \`spark-${v}-\${s.id}\``);
   });
 
   it("every link is a thumb's size with a cue that needs no hover (viz.tsx)", () => {
@@ -113,7 +122,11 @@ describe("the dashboard honours the address and links every figure", () => {
     expect(viz).toMatch(/function FigureLink\([\s\S]*?className=\{`\$\{TAP\} \$\{LINK_CUE\} rounded-sm \$\{className\}`\}/);
     // A figure's label and number are one block link (54px tall); the change beside it is its own 44px link.
     expect(viz).toMatch(/function FigureBlock\([\s\S]*?<Link href=\{href\} onClick=\{onClick\} className=\{`group block min-w-0 rounded-sm \$\{FOCUS\}`\} data-testid=\{testId\}>/);
-    expect(dash).toContain("const CHANGE_LINK = `flex min-h-[44px] items-end self-stretch rounded-sm ${LINK_CUE}`");
+    // The row's own targets are the tool layer's (styles/tool.css): a change, a sub-count, a sparkline and a number are
+    // each a link that is 44px tall with an underline cue on touch, and shows its underline on hover with a mouse.
+    const css = fs.readFileSync(path.resolve(import.meta.dirname, "../../client/src/styles/tool.css"), "utf8");
+    expect(css).toContain(".tool-link { min-height: 44px; text-decoration: underline; text-decoration-style: dotted;");
+    expect(css).toMatch(/@media \(pointer: coarse\) \{ \.tool-btn \{ min-height: 44px; \} \.tool-btn--icon \{ width: 44px; \} \.tool-chip:is\(a, button\) \{ min-height: 44px; \} \}/);
     // Bar segments: real, focusable links, 44px tall, with the 10px bar drawn through the middle; the legend the same height.
     expect(viz).toContain('<div className="relative flex min-h-[44px] items-center">');
     expect(viz).toContain("className={`relative flex min-h-[44px] items-center rounded-sm hover:opacity-80 ${FOCUS}`} style={style} aria-label={words}");
@@ -128,8 +141,8 @@ describe("the dashboard honours the address and links every figure", () => {
     // The dashboard's own tappables: the chip's clear, the star, the group button, the pills.
     expect(dash).toContain('className={`grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-[color:var(--g-chip)] ${FOCUS}`} aria-label="Clear — all sites, as added"');
     expect(dash).toContain("className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${FOCUS}`} aria-pressed");
-    expect(dash).toContain("g-chip g-chip--sm !min-h-[44px]");
-    expect(dash).toContain("const PILL = `g-pill g-pill--sm !min-h-[44px] ${FOCUS}`");
+    expect(dash).toContain('className="tool-chip max-w-full');
+    expect(row).toContain('className="tool-btn"');
     expect(dash).not.toMatch(/className="g-pill g-pill--sm"/);
   });
 });

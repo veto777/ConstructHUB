@@ -29,7 +29,10 @@ class SupportBrain(Brain):
         try:
             r = await self.app._c.post("/api/voice-internal/support/start", json={"callSid": self.call_sid, "from": self.caller})
             r.raise_for_status()
-            g = r.json().get("say") or FAIL_SAY
+            j = r.json()
+            g = j.get("say") or FAIL_SAY
+            if j.get("end"):   # the app refused the call (the line's daily minute budget is spent): say it, then hang up
+                self.end_requested = True
         except Exception as e:  # noqa: BLE001
             log.warning("support start failed: %s", e)
             g = FAIL_SAY
@@ -71,7 +74,7 @@ class SupportBrain(Brain):
         try:
             await self.app._c.post("/api/voice-internal/support/end", json={"callSid": self.call_sid})
         except Exception as e:  # noqa: BLE001
-            log.warning("support end failed: %s", e)
+            log.warning("support end failed: %r", e)
 
     async def report(self, ended_at: datetime | None = None, duration_seconds: int | None = None) -> dict[str, Any]:
         return {"outcome": self.outcome or "info", "support": True}

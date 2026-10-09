@@ -67,6 +67,7 @@ export const LINES = {
   silentBye: "I haven't heard anything, so I'll let you go. Please call back or email support at constructhub dot us. Goodbye.",
   ticketCap: "You've already opened several tickets today, so I can't open another one on this line. Please email support at constructhub dot us and the team will pick it up. Goodbye.",
   tooLong: "I need to wrap up this call. Please email support at constructhub dot us with anything else. Goodbye.",
+  minutesOut: "Our phone support has reached its limit for today. Please email support at constructhub dot us, or call back tomorrow. Goodbye.",
 };
 
 export const freshState = (): CallState => ({ step: "ask_id", idTries: 0, codeTries: 0, codesSent: 0, turns: 0, userId: null, crmOrgId: null, ref: null, email: null, phones: [], channel: null, codeHash: null, codeExpires: null, verified: false, intake: {}, aiTurns: [], ticketNumber: null });

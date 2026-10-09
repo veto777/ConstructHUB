@@ -1,5 +1,6 @@
 import { AppPage, Section, Notice, appTable, appTableCards } from "@/components/app-ui";
 import { GoogleSectionHeader, GooglePill } from "@/components/google";
+import { ToolTabs } from "@/components/tool";
 import { Search } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -72,7 +73,7 @@ export default function AdsManagerPage() {
         {status.data?.connected&&<><Button variant="outline" disabled={action.isPending||!enabled} onClick={()=>run('/sync',{kind:'poll'})}>Poll invitations</Button><Button variant="outline" disabled={action.isPending} onClick={()=>{if(window.confirm('Remove local MCC credentials and cancel queued work? Revoke Google access separately in your Google Account.'))run('/disconnect',{confirm:true});}}>Disconnect MCC</Button></>}
       </div>
     </CardContent></Section>
-    <div className="-mx-4 overflow-x-auto px-4 scrollbar-none sm:mx-0 sm:px-0" role="tablist" aria-label="Ads manager sections"><div className="flex w-max gap-2">{(Object.keys(labels) as Tab[]).map(t=><GooglePill key={t} label={labels[t]} selected={tab===t} ariaPressed={tab===t} onClick={()=>switchTab(t)} />)}</div></div>
+    <ToolTabs as="group" label="Ads manager sections">{(Object.keys(labels) as Tab[]).map(t=><GooglePill key={t} label={labels[t]} selected={tab===t} ariaPressed={tab===t} onClick={()=>switchTab(t)} />)}</ToolTabs>
     <div className="flex flex-wrap gap-3"><div className="g-search w-full sm:max-w-sm" role="search"><Search aria-hidden="true" /><input type="search" aria-label="Search accounts or records" placeholder={tab==='findings'?'Search audit findings':'Search name or customer ID'} value={q} onChange={e=>{setQ(e.target.value);setPage(1);setAll(false);setSelected([]);}}/></div><details className="w-full sm:w-auto"><summary className="g-pill cursor-pointer list-none [&::-webkit-details-marker]:hidden">Filters</summary><div className="flex flex-col sm:flex-row gap-3 py-3">
       <label>Filter <select className="border rounded p-2 bg-background" aria-label="Status filter" value={filter} onChange={e=>{setFilter(e.target.value);setPage(1);setSelected([]);setAll(false);}}><option value="">All</option>{(tab==='accounts'?['ENABLED','SUSPENDED','CANCELED','UNLINKED']:tab==='findings'?['warning','unknown','info']:tab==='invitations'?['queued','pending','accepted','rejected','cancelled','unknown','failed']:tab==='plans'?['preview','queued','applying','applied','reversed','failed','unknown','expired','no_change']:['queued','running','done','failed','unknown','cancelled']).map(s=><option key={s}>{s}</option>)}</select></label>
       {tab==='accounts'&&<label>LSA <select className="border rounded p-2 bg-background" aria-label="LSA filter" value={lsa} onChange={e=>{setLsa(e.target.value);setPage(1);setAll(false);setSelected([]);}}><option value="">All accounts</option><option value="true">LSA identified</option><option value="false">No LSA campaigns found</option><option value="unknown">Not checked</option></select></label>}

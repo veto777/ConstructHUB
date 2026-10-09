@@ -56,8 +56,20 @@ class Settings:
     sw_signing_key: str = _env("SIGNALWIRE_SIGNING_KEY")
     skip_signature: bool = _env("VOICE_SKIP_SIGNATURE") == "1"    # dev only, and only on loopback binds (startup_problems)
     # limits / privacy
-    max_active_calls: int = _int("VOICE_MAX_ACTIVE_CALLS", 6)
-    support_ivr_url: str = _env("SUPPORT_IVR_URL") or "https://constructhub.us/api/support/ivr"   # support line overflow     # GPU + AI + minutes: concurrent live calls this engine takes
+    max_active_calls: int = _int("VOICE_MAX_ACTIVE_CALLS", 6)     # GPU + AI + minutes: concurrent live calls this engine takes
+    support_ivr_url: str = _env("SUPPORT_IVR_URL") or "https://constructhub.us/api/support/ivr"   # support line overflow (keypad line)
+    # The support line's own budget (review S-2): the public support number may hold at most this many of the seats
+    # above — never the rest, which stay for customers' Call Assistant calls. Over any of these the caller gets the
+    # keypad line instead of a seat. 0 = every support call goes to the keypad line.
+    support_max_calls: int = _int("VOICE_SUPPORT_MAX_CALLS", 2)
+    support_max_call_s: int = _int("VOICE_SUPPORT_MAX_CALL_SECONDS", 480)            # spoken wrap-up, then hang up
+    support_idle_s: int = _int("VOICE_SUPPORT_IDLE_SECONDS", 60)                     # no words heard from the caller for this long
+    support_calls_per_caller_hour: int = _int("VOICE_SUPPORT_CALLS_PER_CALLER_HOUR", 4)
+    support_calls_per_hour: int = _int("VOICE_SUPPORT_CALLS_PER_HOUR", 40)
+    # Seat hygiene, every call type: a stream with no audio from the carrier for this long is dead and gives its seat
+    # back; a socket on the public /media route must present a valid "start" within the deadline.
+    zombie_s: float = _float("VOICE_ZOMBIE_SECONDS", 45.0)
+    stream_start_s: float = _float("VOICE_STREAM_START_SECONDS", 10.0)
     log_transcripts: bool = _env("VOICE_LOG_TRANSCRIPTS") == "1"   # dev flag: what callers say stays out of the journal by default
     # speech
     whisper_model: str = _env("VOICE_WHISPER_MODEL", "large-v3-turbo")
@@ -86,6 +98,11 @@ class Settings:
         base = self.public_base
         return ("wss://" + base[len("https://"):] if base.startswith("https://") else "ws://" + base[len("http://"):]) + "/media"
 
+    @property
+    def support_seats(self) -> int:
+        """Seats the support line may hold: never all of them, whatever the env says (one always stays a customer's)."""
+        return max(0, min(self.support_max_calls, self.max_active_calls - 1))
+
     def startup_problems(self) -> list[str]:
         """Reasons to refuse to start. Signature checks off on a non-loopback interface (the tailnet address the app
         proxies to) would let any peer forge SignalWire webhooks into the app."""
@@ -105,6 +122,9 @@ class Settings:
             "anthropic_api_key": bool(self.anthropic_api_key), "signalwire": bool(self.sw_project_id and self.sw_api_token),
             "signing_key": bool(self.sw_signing_key), "whisper_model": self.whisper_model, "tts_device": self.tts_device,
             "skip_signature": self.skip_signature, "max_active_calls": self.max_active_calls, "log_transcripts": self.log_transcripts,
+            "support_max_calls": self.support_seats, "support_max_call_s": self.support_max_call_s, "support_idle_s": self.support_idle_s,
+            "support_calls_per_caller_hour": self.support_calls_per_caller_hour, "support_calls_per_hour": self.support_calls_per_hour,
+            "zombie_s": self.zombie_s,
         }
 
 

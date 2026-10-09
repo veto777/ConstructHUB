@@ -14,6 +14,7 @@ import {
   StatusPill,
 } from "@/components/app-ui";
 import { GoogleSectionHeader, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
+import { ToolTabs } from "@/components/tool";
 import {
   AlertTriangle,
   ChevronRight, Copy, Monitor, Smartphone, Tablet,
@@ -633,24 +634,20 @@ export default function VpnShieldPage() {
         }
       />
 
-      {/* Scrolls sideways on phones instead of wrapping. */}
-      <div className="-mx-4 overflow-x-auto px-4 scrollbar-none sm:mx-0 sm:px-0">
-        <div className="inline-flex h-10 w-max min-w-full gap-1 rounded-xl bg-muted p-1 sm:min-w-0" role="tablist">
-          {tabs.map(tab => (
-            <Button
-              key={tab.id}
-              variant="ghost"
-              className={`h-8 shrink-0 rounded-lg px-3.5 font-medium ${activeTab === tab.id ? "bg-background text-primary font-semibold shadow-sm hover:bg-background" : "text-muted-foreground hover:bg-background/60 hover:text-foreground"}`}
-              onClick={() => setActiveTab(tab.id)}
-              role="tab"
-              aria-selected={activeTab === tab.id}
-              data-testid={`tab-vpn-${tab.id}`}
-            >
-              {tab.label}
-            </Button>
-          ))}
-        </div>
-      </div>
+      <ToolTabs as="tablist" label="VPN Shield sections">
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            data-testid={`tab-vpn-${tab.id}`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </ToolTabs>
 
       {domainsLoading ? (
         <div className="flex items-center justify-center py-20">

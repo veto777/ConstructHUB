@@ -5,6 +5,7 @@ server/voice/internal-auth.ts (503 when unset, 401 when wrong).
 Numbers it knows (E.164):
   +13605550100  live    → the sample compiled profile (voice/tests/profiles/sample.json)
   +13605550142  paused  → 423 {code:"paused", say}
+  +13605550177  the support line → {kind:"support"} + /support/start|turn|end
   anything else         → 404 {code:"unknown_number"}
 Caller +13605550666 is on the block list (caller.blocked = true).
 
@@ -25,6 +26,7 @@ LOG = web.AppKey("log", list)
 COMPILED = web.AppKey("compiled", dict)
 RECORDINGS = web.AppKey("recordings", dict)
 LIVE, PAUSED, BLOCKED_CALLER = "+13605550100", "+13605550142", "+13605550666"
+SUPPORT = "+13605550177"   # ConstructHUB's own support line: {kind: "support"} (server/voice/internal-profile.ts)
 
 
 def make_mock_app(secret: str, compiled: dict[str, Any] | None = None) -> web.Application:
@@ -56,6 +58,10 @@ def make_mock_app(secret: str, compiled: dict[str, Any] | None = None) -> web.Ap
         to, frm = req.query.get("to", ""), req.query.get("from", "")
         if to == PAUSED:
             return web.json_response({"code": "paused", "say": "Thanks for calling. We're closed right now, please call back later. Goodbye."}, status=423)
+        if to == SUPPORT:
+            return web.json_response({"kind": "support", "status": "live", "org": {"id": "constructhub-support", "name": "ConstructHUB Support", "timezone": "America/New_York"},
+                                      "number": {"id": "support", "label": "Support line", "phoneNumber": to, "isTest": False},
+                                      "caller": {"number": frm, "blocked": False, "strikes": 0, "customer": None}})
         if to != LIVE:
             return web.json_response({"code": "unknown_number"}, status=404)
         return web.json_response({
@@ -92,6 +98,19 @@ def make_mock_app(secret: str, compiled: dict[str, Any] | None = None) -> web.Ap
         log(req, body)
         return web.json_response({"ok": True})
 
+    async def support_start(req):
+        log(req, await req.json())
+        return web.json_response({"say": "Hi, this is Gabe with ConstructHUB support."})
+
+    async def support_turn(req):
+        body = await req.json()
+        log(req, body)
+        return web.json_response({"say": "" if body.get("silence") else "Okay.", "end": False})
+
+    async def support_end(req):
+        log(req, await req.json())
+        return web.json_response({"ok": True})
+
     async def dump_log(req):
         return web.json_response(req.app[LOG])
 
@@ -104,6 +123,9 @@ def make_mock_app(secret: str, compiled: dict[str, Any] | None = None) -> web.Ap
         web.put("/api/voice-internal/calls/{sid}", call_put),
         web.post("/api/voice-internal/recordings/{sid}", recording),
         web.post("/api/voice-internal/status", status),
+        web.post("/api/voice-internal/support/start", support_start),
+        web.post("/api/voice-internal/support/turn", support_turn),
+        web.post("/api/voice-internal/support/end", support_end),
     ])
     return app
 

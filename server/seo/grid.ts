@@ -192,6 +192,11 @@ async function mapLookup(path: string, body: Record<string, unknown>, opts: { de
 /** The local search made from one point: the searcher's own coordinates, no map view. */
 export const pointRequest = (keyword: string, cell: { lat: number; lng: number }) => ({ keyword, location_coordinate: `${cell.lat},${cell.lng}`, language_code: "en", depth: GRID_DEPTH });
 
+/** One local-finder search from one point, for a caller that keeps its own results (the plan's ranking grid). Costs one lookup (GRID_POINT_USD). */
+export async function lookupPoint(keyword: string, cell: { lat: number; lng: number }, opts: { deadline?: Deadline } = {}): Promise<{ listings: MapListing[]; costUsd: number }> {
+  return mapLookup("/serp/google/local_finder/live/advanced", pointRequest(keyword, cell), opts);
+}
+
 /** Find the business on Google Maps by name (and town), to choose the pin the grid is centred on. */
 export async function locateBusiness(query: string): Promise<{ data: MapListing[]; costUsd: number }> {
   const { listings, costUsd } = await mapLookup("/serp/google/maps/live/advanced", { keyword: query, location_code: 2840, language_code: "en", depth: 10 });

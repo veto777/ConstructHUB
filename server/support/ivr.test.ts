@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "fs";
 import path from "path";
-import { CLIPS, freshIvrState, ivrTurn, ticketClips, type IvrDeps } from "./ivr";
+import { AWAITING_AUDIO, CLIPS, freshIvrState, ivrTurn, ticketClips, type IvrDeps } from "./ivr";
 import type { Account } from "./line";
 
 const ACCT: Account = { userId: 7, crmOrgId: null, email: "owner@example.com", phones: ["+15555550123"], ref: "12345678" };
@@ -69,9 +69,9 @@ describe("keypad line (overflow)", () => {
     expect(await ivrTurn(s, { silence: true }, "+1", d)).toEqual({ play: ["silent_bye"], end: true });
   });
   it("ticket numbers become digit clips", () => { expect(ticketClips("T-00305")).toEqual(["t", "d0", "d0", "d3", "d0", "d5"]); });
-  it("every clip has its recorded audio, and the clip text names the real support address", () => {
+  it("every clip has its recorded audio (bar the ones still awaiting Gabe's voice), and the clip text names the real support address", () => {
     const dir = path.join(import.meta.dirname, "..", "data", "support-audio");
-    for (const id of Object.keys(CLIPS)) expect(fs.existsSync(path.join(dir, `${id}.mp3`)), id).toBe(true);
+    for (const id of Object.keys(CLIPS)) expect(fs.existsSync(path.join(dir, `${id}.mp3`)), id).toBe(!AWAITING_AUDIO.includes(id as any));
     for (const t of Object.values(CLIPS)) expect(t).not.toMatch(/dot com/);
   });
 });

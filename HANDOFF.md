@@ -68,6 +68,89 @@ Source: review 4 of 6 (reliability), findings C1/H1-H5/M7/M13. One commit per it
   (CRM Basic $39 + seats, or a platform plan), one notice per trial, nothing for a non-trialing redelivery. Platform
   trials get the same email (there was none before either).
 
+## 🗺️ 2026-10-09 — the plan's Ranking Grid runs on DataForSEO, not Google Places (branch `grid/dataforseo`, deployed same day)
+- **Owner decision 2026-10-09 ("We will use DataForSEO instead for both"):** the ranking grid behind the plans' grid credits
+  (`/api/ranking-grid/scans`, server/routes.ts `runRankingGridScan`) now makes one DataForSEO local-finder search per point
+  (`lookupPoint` in server/seo/grid.ts — the same source and request as the SEO section's Local grid), instead of a Google
+  Places Text Search per point. Why: Places was free only inside Google's 5,000 free calls a month (about 100 7×7 grids
+  across ALL customers), then $32 per 1,000 = $1.57 per 49-point grid; DataForSEO is $0.002 a point = $0.10 per grid at any
+  volume, and a local-finder search from the searcher's coordinates is the accurate one (a Places text search is a map view).
+- **Money:** the customer still pays with grid credits (unchanged); the data cost goes to the platform's monthly SEO data
+  cap/ledger only — new `BudgetOptions.platformOnly` (server/seo/budget.ts) skips the customer's SEO allowance/credit. So
+  the $100/month default cap (`SEO_MONTHLY_BUDGET_USD`) now also covers ranking grids; when it is hit the scan fails and
+  the credits are refunded (logged `[ranking-grid] … refused by the SEO data cap`). `GOOGLE_PLACES_API_KEY` is no longer
+  read by the grid (Competitor Intel and location lookup still use it).
+- **Matching:** results carry Google's `cid`, not a `place_id`, so the business is recognised by exact normalised name
+  within a mile of the pin until a point shows it, then by `cid` for the rest of the scan. Up to 6 points in parallel.
+- **Tests:** server/plan-gates.test.ts and growth-isolation.test.ts now blank `DATAFORSEO_LOGIN/PASSWORD` for the spawned
+  server (a scan must fail and refund there, never spend). Run with Node 20 (`~/.nvm/versions/node/v20.19.6/bin`) and the
+  a5 lane env; run the two server-spawning suites one at a time (together they collide on the port).
+
+## 💳 2026-10-09 — refunds and disputes on SEO credit packs now reach the wallet (review M-3, branch `fix-review-high`, NOT deployed)
+
+> **OWNER/OPERATOR ACTION: enable these event types on the live webhook endpoint** (Stripe Dashboard → Developers →
+> Webhooks → the constructhub.us endpoint → "Select events"). Until they are enabled nothing below runs and the credit
+> behaves exactly as before (no error, no change) — but a refund or chargeback then still leaves the credit in place.
+> - `charge.refunded`
+> - `charge.refund.updated`
+> - `charge.dispute.created`
+> - `charge.dispute.updated`
+> - `charge.dispute.closed`
+> - `charge.dispute.funds_withdrawn`
+> - `charge.dispute.funds_reinstated`
+> - `checkout.session.async_payment_failed`
+> - `checkout.session.async_payment_succeeded` (bank debits are credited on this one — check it is on too)
+> No new secret or env var: the same endpoint and signing secret (the webhook still verifies the raw body and fails closed).
+
+- **What was wrong:** the webhook credited a pack once paid and never looked again. A refund or a chargeback left the credit
+  in the wallet to keep or spend; Stripe took the money (and a dispute fee) back.
+- **Now (`server/seo/credit-reversals.ts`, called from the webhook switch in `server/stripe.ts`):** every pack is found by its
+  PaymentIntent (stored at purchase from now on; older packs are found through their checkout session and backfilled).
+  Refund, full or partial → the same share of the credit is taken back; a refund that later fails gives it back. Dispute opened →
+  the disputed credit is put **on hold** (cannot be spent); won → released; lost → removed. A failed bank debit was never credited
+  (credit is granted only once Stripe says paid); one that somehow was is taken back. Each is read from Stripe as it is now, so
+  duplicate and out-of-order events move nothing twice. A refund for a pack not credited yet is retried (400), never skipped.
+- **Credit already spent:** the rest is recorded as **owed** (`seo_credit_wallets.owed_cents`). While anything is owed, lookups that
+  cost credit are refused — the month's allowance included — and the SEO pages and Settings → Limits & usage say why in plain
+  words; the next pack bought settles it first. Every movement is a row in `seo_credit_ledger` with the Stripe event, object and
+  PaymentIntent ids. A dispute raises an ops issue (critical when it opens). Prices and packs are unchanged; the credit checkout
+  now also tags its PaymentIntent with the pack's metadata.
+- **Schema:** added at boot by the SEO schema (`CREDIT_SCHEMA_DDL`): wallet `frozen_cents` / `owed_cents`, purchase
+  `stripe_payment_intent` / `refunded_cents` / `disputed_lost_cents` / `reversed_at`, tables `seo_credit_disputes`, `seo_credit_ledger`.
+- **Not done:** packs refunded or disputed BEFORE this ships are not looked at again (no backfill job); check the Stripe
+  dashboard's refunds/disputes for `ConstructHUB SEO data credit` payments since 2026-10-07 and adjust by hand if any exist.
+
+## 🪑 2026-10-09 — the support line can no longer take customers' Call Assistant seats (review S-2, branch `fix-review-high`, NOT deployed)
+
+- **What was wrong:** support calls and customers' Call Assistant calls shared the engine's 6 seats (`VOICE_MAX_ACTIVE_CALLS`). Six
+  calls to the public support number filled them; a customer's call was then answered "we can't take your call right now" and hung up.
+  Worse, the public `/media` socket took a seat the moment it connected — before proving it was a call — so six idle sockets did the
+  same with no phone at all. A dead stream (no audio from the carrier) kept its seat until the 15-minute cap.
+- **Which path is live (from the code, not from prod env):** the support number's voice URL is the GPU engine (`voice/server.py`,
+  profile `kind: "support"`); the keypad line in the app (`/api/support/ivr`, also the old `/api/support/voice`) is the overflow and the
+  number's fallback. The spoken LaML Gather line of 10-08 no longer exists in the code — there is nothing else to fix.
+- **Now (`voice/server.py` `seats()` / `seat_free()` / `reap()`):**
+  - One pool of seats, two budgets. The support line may hold at most `VOICE_SUPPORT_MAX_CALLS` (default **2**, never all of them);
+    every other seat can only go to a customer's call. **This changes the owner's 10-08 rule "the 7th caller goes to the keypad line":
+    it is now the 3rd support caller** (set `VOICE_SUPPORT_MAX_CALLS` higher to give support more, at customers' expense).
+  - Support calls per hour: 4 per caller number, 40 overall (`VOICE_SUPPORT_CALLS_PER_CALLER_HOUR`, `VOICE_SUPPORT_CALLS_PER_HOUR`;
+    in the engine's memory — a restart forgets them, the seat cap still holds). Over any limit → the keypad line, no seat.
+  - A support call ends at 8 minutes (`VOICE_SUPPORT_MAX_CALL_SECONDS=480`) with a spoken wrap-up, and after 60 s without a word
+    from the caller (`VOICE_SUPPORT_IDLE_SECONDS`). The hang-up never waits on the goodbye being spoken.
+  - A `/media` socket holds no seat until its `start` is accepted, must start within 10 s, and waiting sockets are bounded.
+  - A reaper (every 5 s) frees every stuck seat: no audio for 45 s (`VOICE_ZOMBIE_SECONDS`), past the time cap, a wrap-up or the
+    after-call paperwork that never finishes, a set-up that never greeted. The carrier's status callback (completed / failed /
+    no-answer…) frees the seat at once. After-call paperwork now survives the connection being dropped.
+- **Operator:** nothing is required — the defaults apply on the next engine deploy (`voice/deploy/restart-when-idle.sh`). The engine's
+  `/health` (with the bearer) shows the support settings. Engine tests: `cd voice && .venv/bin/python -m pytest selftest -q` (101).
+- **Fixed 2026-10-09 (branch `fix-keypad-line`, review S-10/S-11 — `server/support/limits.ts`):** code budgets are per (caller, account),
+  so a stranger spends their own allowance (2/h, 6/day per pair; 3/h per caller; `SUPPORT_CODES_PER_HOUR`=300 line-wide, audible + ops issue;
+  `SUPPORT_CODE_CALLERS_PER_ACCOUNT_DAY`=4 distinct numbers per account, the next is refused silently — the phone on file never is). The
+  keypad line: `SUPPORT_IVR_MAX_CALLS`=10 at once, `SUPPORT_IVR_MAX_CALLS_PER_CALLER`=2, `SUPPORT_IVR_CALLS_PER_CALLER_DAY`=10 → "busy, try
+  later"; `SUPPORT_IVR_MAX_CALL_SECONDS`=360; `SUPPORT_LINE_DAILY_MINUTES`=600 for the whole line (keypad + spoken; metered per turn into
+  `growth_budgets`, settled by the carrier's status callback) → "call back tomorrow". Every trip is an ops issue (`support-line|…`). The two
+  new clips (`busy`, `minutes_out`) are read by the carrier's voice until `scripts/support/clips.py` is run on the GPU box (`AWAITING_AUDIO`).
+
 ## ☎️ 2026-10-08 (late evening) — the AI Call Assistant is a SEPARATE SERVICE, repriced (branch `billing/call-assistant`, NOT deployed)
 - **Owner decisions:** the Call Assistant is sold on its **own subscription**, like the CRM (`fd964e1`, `069ffdf`): no platform plan
   includes it, and it is bought **with or without a platform plan**. New tiers (keys lite/solo/crew/fleet kept so the voice code paths
@@ -1195,7 +1278,7 @@ date + 60 days. Evidence for all of the above: Gmail screenshots in `attached_as
       expired estimates not counted in client bid tabs, org-wide stats vs divisions,
       adopt `eslint-plugin-react-hooks` (the pipeline blank-screen class).
 - [x] **GBP API access — APPROVED 2026-09-23** (application #3, case `1-4033000042334`; timeline above).
-- [ ] **Enable the Business Profile APIs** in project `construction-hub-489119` (owner console click,
+- [x] **Enable the Business Profile APIs** — DONE (verified live 2026-10-09: 2 grants with all 4 scopes, Profile Guard and reviews run through the API) in project `construction-hub-489119` (owner console click,
       links in the timeline section) — then build the GBP integration (OAuth scope `business.manage`,
       account/location listing, info edits, review display + owner replies, performance metrics).
 - [x] Deploy — **DONE 2026-07-10** (live at constructhub.us, see "Live deployment").

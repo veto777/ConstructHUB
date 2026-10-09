@@ -5,6 +5,7 @@ import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { AppPage, Notice, Toolbar } from "@/components/app-ui";
+import { ToolTabs } from "@/components/tool";
 import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
 import { ExternalLink, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -337,7 +338,7 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
       {!all && businessId && <MappingEditor businessId={businessId} defaults={data?.defaults || []} />}
 
       {!all && (
-        <nav className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap" aria-label="Social Media views">
+        <ToolTabs label="Social Media views">
           {[
             ["compose", "Compose"],
             ["queue", "Calendar & queue"],
@@ -352,7 +353,7 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
               label={label}
             />
           ))}
-        </nav>
+        </ToolTabs>
       )}
 
       {tab === "compose" && (

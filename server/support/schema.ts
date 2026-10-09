@@ -60,6 +60,11 @@ export async function ensureSupportSchema(): Promise<void> {
       created_at timestamptz NOT NULL DEFAULT now(),
       updated_at timestamptz NOT NULL DEFAULT now()
     );
+    -- Review S-11 (limits.ts): which line took the call, the seconds already in the day's minutes budget, and when it ended.
+    ALTER TABLE support_calls ADD COLUMN IF NOT EXISTS line text NOT NULL DEFAULT 'engine';   -- engine (spoken) | ivr (keypad)
+    ALTER TABLE support_calls ADD COLUMN IF NOT EXISTS metered_seconds integer NOT NULL DEFAULT 0;
+    ALTER TABLE support_calls ADD COLUMN IF NOT EXISTS ended_at timestamptz;
+    CREATE INDEX IF NOT EXISTS support_calls_open_ivr_idx ON support_calls (line, updated_at) WHERE ended_at IS NULL;
   `);
   await backfillNumbers();
   await purgeOldCalls();

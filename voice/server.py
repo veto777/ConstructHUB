@@ -97,6 +97,19 @@ SIM_SESSIONS: dict[str, dict[str, Any]] = {}
 # filed leads and burned minutes); one use, then it is gone.
 PENDING_PROFILES: dict[str, tuple[float, CallProfile, str, str, str]] = {}
 GREET_CACHE: dict[str, bytes] = {}
+# Support-line calls given a seat in the last hour: (time, caller number). In memory: an engine restart forgets it,
+# and the seat cap below still holds.
+SUPPORT_RECENT: list[tuple[float, str]] = []
+MIN_CAP_S = 30                                 # no call is capped shorter than this, whatever a profile says
+CAP_GRACE_S = 45.0                             # past its cap by this much and still open → the reaper closes it
+WRAP_TTL_S = 40.0                              # a goodbye that never finishes does not keep the line open
+CLOSE_TTL_S = 180.0                            # bookkeeping after hang-up may hold the seat this long, no longer
+STARTING_TTL_S = 60.0                          # authenticated but never greeted (a hung set-up) → closed
+REAP_EVERY_S = 5.0
+SUPPORT_WRAP = "I need to wrap up this call now. Please email support at constructhub dot us with anything else, or call back. Goodbye."
+SUPPORT_IDLE_BYE = "I haven't heard anything for a while, so I'll let you go. Please call back, or email support at constructhub dot us. Goodbye."
+CALL_WRAP = "I'm sorry, I have to let you go now. Thank you for calling, goodbye."
+REAPER = web.AppKey("reaper", asyncio.Task)
 STARTED = datetime.now(timezone.utc)
 
 
@@ -202,6 +215,48 @@ def e164(n: str) -> str:
     return n
 
 
+# ── seats (review S-2) ──────────────────────────────────────────────────────────────────────────────────
+# One pool of settings.max_active_calls seats (what the GPU carries), two budgets: the public support line may hold at
+# most settings.support_seats of them; every other seat can only ever go to a customer's Call Assistant call. A seat
+# is held by a call we answered whose audio has not connected yet (PENDING_PROFILES) or by an authenticated stream
+# (ACTIVE with a profile). A socket on the public /media route that has not proved it is a call holds none.
+
+def is_support(profile: Any) -> bool:
+    return getattr(profile, "kind", "") == "support"
+
+
+def seats() -> dict[str, int]:
+    live = [c for c in ACTIVE if c.profile is not None]
+    sids = {c.call_sid for c in live}
+    kinds = [is_support(c.profile) for c in live] + [is_support(e[1]) for k, e in PENDING_PROFILES.items() if k not in sids]
+    support = sum(1 for k in kinds if k)
+    return {"support": support, "assistant": len(kinds) - support, "total": len(kinds)}
+
+
+def seat_free(profile: Any, held: dict[str, int] | None = None) -> bool:
+    held = held or seats()
+    if held["total"] >= settings.max_active_calls:
+        return False
+    return not is_support(profile) or held["support"] < settings.support_seats
+
+
+def support_rate_ok(frm: str, now: float | None = None) -> bool:
+    """Calls per hour the support line gives a seat to: per caller number and overall. True records the call."""
+    now = time.time() if now is None else now
+    SUPPORT_RECENT[:] = [x for x in SUPPORT_RECENT if now - x[0] < 3600]
+    who = frm or "unknown"   # withheld caller id: every such caller shares one allowance
+    if len(SUPPORT_RECENT) >= settings.support_calls_per_hour or sum(1 for x in SUPPORT_RECENT if x[1] == who) >= settings.support_calls_per_caller_hour:
+        return False
+    SUPPORT_RECENT.append((now, who))
+    return True
+
+
+def prune_pending(now: float) -> None:
+    for k, entry in list(PENDING_PROFILES.items()):
+        if now - entry[0] > PENDING_TTL_S:
+            PENDING_PROFILES.pop(k, None)
+
+
 # ── public (SignalWire) ─────────────────────────────────────────────────────────────────────────────────
 
 async def signalwire_voice(req: web.Request) -> web.Response:
@@ -230,22 +285,30 @@ async def signalwire_voice(req: web.Request) -> web.Response:
         asyncio.create_task(report_blocked(app, profile, call_sid, frm, to))
         return twiml('<Reject reason="rejected"/>')
     now = time.time()
-    for k, entry in list(PENDING_PROFILES.items()):
-        if now - entry[0] > PENDING_TTL_S:
-            PENDING_PROFILES.pop(k, None)
-    # Calls answered but whose audio hasn't connected yet count too (two calls at once must not both get seat 6).
-    connecting = sum(1 for k in PENDING_PROFILES if not any(c.call_sid == k for c in ACTIVE))
-    full = len(ACTIVE) + connecting >= settings.max_active_calls
-    if full or not (stt and tts):
-        if profile.kind == "support" and settings.support_ivr_url:
-            # Owner 2026-10-08: the support line's 7th caller (or every caller while the models are down) goes to
-            # Gabe's keypad line in the app — pre-recorded voice + keypad, no GPU, no cap.
-            log.info("support call %s → keypad line (%d active, %d connecting, cap %d, models %s)", call_sid, len(ACTIVE), connecting, settings.max_active_calls, bool(stt and tts))
-            return twiml(f'<Redirect method="POST">{xml_escape(settings.support_ivr_url)}</Redirect>')
-        if not (stt and tts):
+    prune_pending(now)
+    # Calls answered but whose audio hasn't connected yet hold a seat too (two calls at once must not both get the last one).
+    held = seats()
+    again = call_sid in PENDING_PROFILES   # the carrier re-sent the webhook: same call, same seat
+    models = bool(stt and tts)
+    if is_support(profile):
+        # The support number is public and unverified at this point, so it has its own small budget (review S-2):
+        # over the support seats, over the calls-per-hour limits, or with the models down, the caller gets Gabe's
+        # keypad line in the app (pre-recorded voice + keypad, no GPU) — never one of the customers' seats.
+        why = None if models else "models down"
+        if not why and not again and not seat_free(profile, held):
+            why = "support seats in use"
+        if not why and not again and not support_rate_ok(frm, now):
+            why = "calls-per-hour limit"
+        if why:
+            log.info("support call %s → keypad line: %s (%d of %d support seats, %d of %d seats in all)", call_sid, why, held["support"], settings.support_seats, held["total"], settings.max_active_calls)
+            if settings.support_ivr_url:
+                return twiml(f'<Redirect method="POST">{xml_escape(settings.support_ivr_url)}</Redirect>')
+            return twiml(f"<Say>{xml_escape(GENERIC_DOWN)}</Say><Hangup/>")
+    elif not models or not (again or seat_free(profile, held)):
+        if not models:
             log.error("call %s refused: models not loaded", call_sid)
         else:
-            log.warning("call %s refused: %d active calls (cap %d)", call_sid, len(ACTIVE), settings.max_active_calls)
+            log.warning("call %s refused: %d of %d seats in use (%d support)", call_sid, held["total"], settings.max_active_calls, held["support"])
         return twiml(f"<Say>{xml_escape(GENERIC_DOWN)}</Say><Hangup/>")
     token = secrets.token_urlsafe(24)
     PENDING_PROFILES[call_sid] = (now, profile, token, frm, to)
@@ -296,6 +359,13 @@ async def signalwire_status(req: web.Request) -> web.Response:
     if not valid_signature(req, form) and not await call_lookup(call_sid):
         log.warning("rejected unsigned/unknown status callback from %s", req.remote)
         return web.Response(status=403, text="bad signature")
+    if form.get("CallStatus") in ("completed", "busy", "failed", "no-answer", "canceled"):
+        # The carrier says the call is over: its seat is free now, whatever the media socket is (not) doing.
+        PENDING_PROFILES.pop(call_sid, None)
+        for c in list(ACTIVE):
+            if c.call_sid == call_sid and c.brain and not c.closing:
+                log.info("call %s is %s at the carrier; closing its stream", call_sid, form.get("CallStatus"))
+                asyncio.create_task(c.close())
     await req.app[CLIENT].status_callback({"callSid": call_sid, "callStatus": form.get("CallStatus"), "duration": form.get("CallDuration")})
     return web.Response(text="ok")
 
@@ -318,6 +388,10 @@ class Call:
         self.greeting_delay = settings.greeting_delay_s
         self.silence_prompt_s = 12.0
         self.max_call_s = 900
+        self.idle_s = 0.0                      # support line: hang up after this long with no words from the caller
+        self.last_heard = time.time()
+        self.closing_at = 0.0
+        self.wrapping_at = 0.0                 # a wrap-up line is being said before the hang-up (once per call)
         # audio state
         self.pcm16 = np.zeros(0, np.float32)
         self.utter: list[np.ndarray] = []
@@ -471,15 +545,22 @@ class Call:
                 await self.ws.close()
                 return False
             try:
-                self.profile = await self.app.profile(self.to, self.frm, self.call_sid)
+                found = await self.app.profile(self.to, self.frm, self.call_sid)
             except Exception as e:  # noqa: BLE001
                 log.error("stream %s without a profile (%s); hanging up", self.call_sid, e)
                 await self.ws.close()
                 return False
-            if (self.profile.caller or {}).get("blocked"):
+            if (found.caller or {}).get("blocked"):
                 log.info("blocked caller on a stream with no webhook profile (%s); hanging up", self.call_sid)
                 await self.ws.close()
                 return False
+            # No seat was reserved for this stream at a webhook, so it is admitted here, under the same budgets.
+            if any(c.call_sid == self.call_sid and c.profile is not None for c in ACTIVE) or not seat_free(found) \
+                    or (is_support(found) and not support_rate_ok(self.frm)):
+                log.warning("media stream refused: no seat for %s", self.call_sid)
+                await self.ws.close()
+                return False
+            self.profile = found
         p = self.profile
         c = p.compiled
         timings = c.get("timings") or {}
@@ -499,6 +580,8 @@ class Call:
             # No call-tracking whisper on this number, so Gabe can greet after 1 s (the 3 s default ate early "hello"s).
             self.greeting_delay = float(timings.get("greetingDelaySeconds", 1.0))
             self.voice = persona_voice(PERSONAS, "gabe", "am_michael")
+            # The engine's own limits for this line, not the profile's: 8 minutes, and 60 s without a word.
+            self.max_call_s, self.idle_s = settings.support_max_call_s, float(settings.support_idle_s)
             self.brain = SupportBrain(self.app, sid, self.frm, voice=self.voice)
         else:
             self.brain = Brain(c, self.frm, on_event=on_event, caller_info=p.caller, timezone=(p.org or {}).get("timezone"), provider=self.provider)
@@ -547,18 +630,32 @@ class Call:
                 log.warning("inbound audio stalled: no media from the carrier for %.0fs (call %s)", gap, self.call_sid)
 
     async def cap_watch(self) -> None:
-        """Hard cap on one call (profile.timings.maxCallSeconds): say goodbye and hang up."""
-        await asyncio.sleep(max(30, self.max_call_s))
-        if self.closing or not self.brain:
+        """Hard cap on one call (profile.timings.maxCallSeconds; the support line: VOICE_SUPPORT_MAX_CALL_SECONDS):
+        say goodbye and hang up."""
+        await asyncio.sleep(max(MIN_CAP_S, self.max_call_s))
+        await self.wrap_up(f"reached the {self.max_call_s}s cap", SUPPORT_WRAP if is_support(self.profile) else CALL_WRAP)
+
+    async def wrap_up(self, why: str, text: str) -> None:
+        """Say a last line and hang up. The hang-up never depends on the line getting said (a failed or stuck
+        text-to-speech must not keep the seat)."""
+        if self.closing or self.wrapping_at or not self.brain:
             return
-        log.info("call %s reached the %ds cap", self.call_sid, self.max_call_s)
-        if self.turn_task and not self.turn_task.done():
-            self.turn_task.cancel()
-        self.brain.end_requested = True
-        self.brain.outcome = self.brain.outcome or "info"
-        await self.say("I'm sorry, I have to let you go now. Thank you for calling, goodbye.")
-        await self.wait_played()
-        await self.close()
+        self.wrapping_at = time.time()
+        log.info("call %s %s; wrapping up", self.call_sid, why)
+        try:
+            if self.turn_task and not self.turn_task.done() and self.turn_task is not asyncio.current_task():
+                self.turn_task.cancel()
+            self.brain.end_requested = True
+            self.brain.outcome = self.brain.outcome or "info"
+
+            async def last_words() -> None:
+                await self.say(text)
+                await self.wait_played()
+            await asyncio.wait_for(last_words(), 25)
+        except Exception as ex:  # noqa: BLE001 — includes the timeout
+            log.warning("wrap-up line not played (%s): %r", self.call_sid, ex)
+        finally:
+            await self.close()
 
     # ── inbound ────────────────────────────────────────────────────────────────────────────────────
 
@@ -697,6 +794,7 @@ class Call:
         await self.wait_played()   # still finishing a sentence? answer after it, not over it
         if self.watch_task:
             self.watch_task.cancel()
+        self.last_heard = time.time()
         if settings.log_transcripts:
             log.info("caller %s: %s", self.call_sid, text)
         else:
@@ -828,7 +926,7 @@ class Call:
         never sit on a silent line while we file paperwork, and a failure in it can never keep the line open."""
         if self.closing:
             return
-        self.closing = True
+        self.closing, self.closing_at = True, time.time()
         self._stop_tasks()
         try:
             await asyncio.wait_for(self.ws.close(), 5)
@@ -913,6 +1011,15 @@ class Call:
                 log.warning("recording kept at %s (upload failed: %s)", wav_path, up.get("error"))
 
 
+FINISHING: set[asyncio.Task] = set()
+
+
+def _finished(task: asyncio.Task) -> None:
+    FINISHING.discard(task)
+    if not task.cancelled() and task.exception():
+        log.error("finish failed: %r", task.exception(), exc_info=task.exception())
+
+
 async def media_ws(req: web.Request) -> web.WebSocketResponse:
     ws = web.WebSocketResponse(heartbeat=20)
     await ws.prepare(req)
@@ -920,12 +1027,21 @@ async def media_ws(req: web.Request) -> web.WebSocketResponse:
         log.error("media stream refused: models not loaded")
         await ws.close()
         return ws
-    if len(ACTIVE) >= settings.max_active_calls:
-        log.warning("media stream refused: %d active calls (cap %d)", len(ACTIVE), settings.max_active_calls)
+    # /media is public: a socket holds no seat until its "start" proves it is a call we answered (seats()), so
+    # strangers' sockets cannot fill the engine. They are bounded on their own and must start within the deadline.
+    waiting = sum(1 for c in ACTIVE if c.profile is None)
+    if waiting >= max(4, 2 * settings.max_active_calls):
+        log.warning("media stream refused: %d sockets waiting to start", waiting)
         await ws.close()
         return ws
     call = Call(ws, req.app[CLIENT], req.app.get(PROVIDER))
     ACTIVE.add(call)
+
+    def start_deadline() -> None:
+        if call.profile is None and not ws.closed:
+            log.warning("media stream closed: no valid start within %.0fs", settings.stream_start_s)
+            asyncio.create_task(ws.close())
+    deadline = asyncio.get_running_loop().call_later(settings.stream_start_s, start_deadline)
     try:
         async for msg in ws:
             if msg.type != web.WSMsgType.TEXT:
@@ -957,13 +1073,16 @@ async def media_ws(req: web.Request) -> web.WebSocketResponse:
             elif e not in ("connected", "dtmf"):
                 log.info("carrier event: %s", json.dumps(ev)[:300])
     finally:
+        deadline.cancel()
         log.info("websocket closed: code=%s in_frames=%d (%s)", ws.close_code, call.frames_in, call.call_sid)
         if call.brain and not call.closing:   # the caller (or the carrier) hung up first
-            call.closing = True
-            try:
-                await call.finish()
-            except Exception as ex:  # noqa: BLE001
-                log.exception("finish failed: %s", ex)
+            call.closing, call.closing_at = True, time.time()
+            # The bookkeeping (and the seat's release at the end of it) runs as its own task: if this handler is
+            # cancelled — the connection dropped, the server is stopping — the call is still filed and its seat freed.
+            task = asyncio.create_task(call.finish())
+            FINISHING.add(task)
+            task.add_done_callback(_finished)
+            await asyncio.shield(task)
         elif not call.brain:
             ACTIVE.discard(call)
         # else: close() is running the bookkeeping and removes the call from ACTIVE when it is done
@@ -1090,6 +1209,54 @@ async def tts_preview(req: web.Request) -> web.Response:
     return web.Response(body=buf.getvalue(), content_type="audio/wav", headers={"Cache-Control": "no-store"})
 
 
+# ── seat reaper (review S-2) ────────────────────────────────────────────────────────────────────────────
+
+def reap(now: float | None = None) -> list[tuple[str, str]]:
+    """One pass over the open streams: every way a call can sit on a seat without being a live conversation gets it
+    closed here, so a seat is always given back. Returns what it did, [(callSid, why)]."""
+    now = time.time() if now is None else now
+    prune_pending(now)
+    done: list[tuple[str, str]] = []
+    for c in list(ACTIVE):
+        sid, age, why = c.call_sid or "?", now - c.started, ""
+        if c.closing:
+            if c.closing_at and now - c.closing_at > CLOSE_TTL_S:
+                ACTIVE.discard(c)   # hung up long ago; the bookkeeping is stuck — the seat is not
+                why = "bookkeeping stuck after hang-up"
+        elif c.brain is None:
+            limit = STARTING_TTL_S if c.profile is not None else settings.stream_start_s + 5
+            if age > limit:
+                ACTIVE.discard(c)
+                asyncio.create_task(c.ws.close())
+                why = "never started"
+        elif c.wrapping_at:
+            if now - c.wrapping_at > WRAP_TTL_S:
+                asyncio.create_task(c.close())
+                why = "wrap-up never finished"
+        elif now - c.last_in > settings.zombie_s:
+            asyncio.create_task(c.close())
+            why = f"no audio from the carrier for {now - c.last_in:.0f}s"
+        elif age > max(MIN_CAP_S, c.max_call_s) + CAP_GRACE_S:
+            asyncio.create_task(c.close())
+            why = "past its time cap"
+        elif c.idle_s and now - c.last_heard > c.idle_s and now - c.started > c.idle_s:
+            asyncio.create_task(c.wrap_up(f"heard nothing for {c.idle_s:.0f}s", SUPPORT_IDLE_BYE))
+            why = "idle"
+        if why:
+            log.warning("reaper: call %s — %s", sid, why)
+            done.append((sid, why))
+    return done
+
+
+async def reaper() -> None:
+    while True:
+        await asyncio.sleep(REAP_EVERY_S)
+        try:
+            reap()
+        except Exception as ex:  # noqa: BLE001 — the reaper itself must never die
+            log.exception("reaper pass failed: %s", ex)
+
+
 # ── app ─────────────────────────────────────────────────────────────────────────────────────────────────
 
 def _log_task_crash(loop: asyncio.AbstractEventLoop, context: dict) -> None:
@@ -1109,6 +1276,7 @@ async def on_startup(app: web.Application) -> None:
     except Exception as e:  # noqa: BLE001
         log.warning("app health check failed (%s) — calls cannot be served until it passes", e)
     PERSONAS = load_personas()
+    app[REAPER] = asyncio.create_task(reaper())
     if app.get(LOAD_MODELS, True):
         try:
             log.info("loading models on %s…", settings.tts_device)
@@ -1122,6 +1290,8 @@ async def on_startup(app: web.Application) -> None:
 
 
 async def on_cleanup(app: web.Application) -> None:
+    if app.get(REAPER):
+        app[REAPER].cancel()
     await app[CLIENT].aclose()
 
 

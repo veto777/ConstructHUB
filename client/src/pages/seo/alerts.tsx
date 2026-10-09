@@ -217,7 +217,7 @@ export default function SeoAlertsPage() {
         )}
         <button type="button" className="g-pill g-pill--sm !min-h-11 ml-auto" disabled={!unread || read.isPending} onClick={() => read.mutate(null)} data-testid="button-alerts-read-all"><Check /> Mark all read{unread ? ` (${fmtNum(unread)})` : ""}</button>
       </div>
-      <p className="g-text-2 mb-4 text-[13px]">Alerts also reach the bell at the top of the page, and your inbox for falls and lost links. Choose what is emailed under <Link href={seoLinks.appSettings({ tab: "notifications" })} className={TEXT_LINK} data-testid="link-alerts-settings">Settings → Notifications</Link>; set how big a move counts under {site ? <Link href={seoLinks.rankTracker(site.id)} className={TEXT_LINK}>Rank tracker → Tracking settings</Link> : "Rank tracker → Tracking settings"}.</p>
+      <p className="g-text-2 text-[12px]">Alerts also go to the bell and your inbox (falls and lost links). Emails: <Link href={seoLinks.appSettings({ tab: "notifications" })} className={TEXT_LINK} data-testid="link-alerts-settings">Settings → Notifications</Link> · what counts as a move: {site ? <Link href={seoLinks.rankTracker(site.id)} className={TEXT_LINK}>Rank tracker → Tracking settings</Link> : "Rank tracker → Tracking settings"}.</p>
 
       {site && <div id="keyword-watch" className="scroll-mt-4"><KeywordWatch site={site} pick={kwPick} onPick={pickKw} /></div>}
       {page.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading alerts…</p>}

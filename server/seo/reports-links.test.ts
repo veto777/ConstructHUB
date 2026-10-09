@@ -131,12 +131,17 @@ describe("the screens: every figure a link, honest chips, 44 px targets", () => 
   it("shell: one writer of ?site=, tab strips that show there is more, Tile with an href", () => {
     expect(shell).toContain('onChange={(e) => { onSite(Number(e.target.value)); setParam("site", Number(e.target.value)); }}');
     expect(shell).toMatch(/export function TabStrip\(/);
-    expect(shell).toContain("![scrollbar-width:thin]");
-    expect(shell).toContain("[&>a]:min-h-11");
-    expect(shell).toContain('<TabStrip label="SEO sections">');
+    // A page's own tab strip is the shared segmented tabs: it never wraps and shows there is more (an edge fade and,
+    // on a mouse, chevrons — components/tool/tabs.tsx). The SEO sections are the tool shell's navigation
+    // (components/seo-tool/nav.ts; server/seo/tool-nav.test.ts).
+    expect(shell).toContain("<SegmentedTabs label={label} className={`mb-4 ${className}`}>{children}</SegmentedTabs>");
+    expect(fs.readFileSync(path.resolve(import.meta.dirname, "../../client/src/components/tool/tabs.tsx"), "utf8")).toContain('className="tool-tabs__nudge tool-tabs__nudge--right" data-show={more.right || undefined}');
+    expect(shell).not.toContain('label="SEO sections"');
     expect(shell).toMatch(/export function Tile\(\{ label, value, hint, testId, href \}/);
     for (const t of ["link-usage-balance", "link-usage-credit", "link-usage-keywords"]) expect(shell).toContain(`data-testid="${t}"`);
-    expect(shell).toContain("inline-flex min-h-11 items-center gap-1 rounded-sm underline decoration-dotted");
+    // The balance figures are small stat chips (styles/tool.css): a bordered chip is the cue, 44 px tall on touch.
+    expect(shell).toContain('const link = "stat-chip";');
+    expect(fs.readFileSync(path.resolve(import.meta.dirname, "../../client/src/styles/tool.css"), "utf8")).toContain("@media (pointer: coarse) { .stat-chip { min-height: 44px; } }");
     // Each page's own site change only drops its parameters in place; the picker writes ?site=.
     for (const s of [grid, ai, plan, reports]) expect(s).toMatch(/const changeSite = \(id: number\) => \{ clearParams\(\[?[^)]*\]?\); onSite\(id\); \};/);
   });

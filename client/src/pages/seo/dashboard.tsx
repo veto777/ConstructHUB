@@ -14,17 +14,18 @@
  * whether that came by address or was remembered from a visit before. Every
  * link is at least 44px tall and underlined without hover (the owner's phone).
  */
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { BarChart3, CheckCircle2, Circle, Loader2, RefreshCw, ScanSearch, Star, Target, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Loader2, X } from "lucide-react";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { holdNote } from "./shell";
 import { api, canAfford, Empty, fmtDate, fmtNum, money, SeoShell, useAddress, useHash, useSelectedSite, useSeoSites, useSeoStatus, type SeoSite } from "./shell";
-import { seoLinks, setParam, type PositionBand } from "./links";
-import { compact, DeltaBadge, DistributionBar, FigureLink, FOCUS, GradientSpark, LINK_CUE, MetricColumn, monthLabel, PALETTE, ScoreBadge, StatTile, TAP, TrendPanel, type TrendPoint } from "./viz";
+import { seoLinks, setParam } from "./links";
+import { compact, FigureLink, FOCUS, LINK_CUE, PALETTE, TAP } from "./viz";
+import { MetricStrip, StatusBadge, scoreTone } from "@/components/tool";
+import { PortfolioCell, ProjectRow, type SiteCard } from "@/components/seo-tool/project-row";
 
 type SortKey = "added" | "name" | "traffic" | "authority" | "keywords" | "top10" | "tasks" | "health";
 const SORTS: [SortKey, string][] = [["added", "As added"], ["name", "Name"], ["traffic", "Most search traffic"], ["authority", "Highest authority"], ["keywords", "Most tracked keywords"], ["top10", "Most keywords in the top 10"], ["tasks", "Most open tasks"], ["health", "Lowest site health first"]];
@@ -35,93 +36,8 @@ const FILTER_WORDS: Record<Filter, string> = { analysed: "Analysed sites", crawl
 const isFilter = (v: unknown): v is Filter => v === "analysed" || v === "crawled";
 /** The group filter's key: "all", "none" (sites in no group) or "g:" + the group's name in lower case — a group's own name can never be mistaken for a choice, and "Roofing" and "roofing" are one group. */
 const groupKey = (g: string) => `g:${g.toLowerCase()}`;
-/** A pill that is a link, tall enough for a thumb. */
-const PILL = `g-pill g-pill--sm !min-h-[44px] ${FOCUS}`;
-type Card = {
-  site: SeoSite;
-  /** From the site's own crawls (Site audit): the newest finished crawl, and the newest few oldest first (gaps included). */
-  audit: (HealthPoint & { trend: HealthPoint[] }) | null;
-  /** null = the count could not be read just now. */
-  openTasks?: number | null;
-  /** Each keyword's newest check on ONE device (`device`), between `firstOn` and `checkedOn`. */
-  rank: { top3: number; top10: number; ranked: number; checked: number; checkedOn: string | null; firstOn?: string | null; device?: "desktop" | "mobile" | null };
-  report: {
-    fetchedAt: string; authority: number | null; backlinks: number | null; referringDomains: number | null;
-    organicKeywords: number | null; organicTraffic: number | null; trafficValue: number | null; top3: number | null; top10: number | null;
-    history: { month: string; traffic: number; keywords: number }[] | null;
-    linkHistory: { month: string; referringDomains: number; authority: number | null }[] | null;
-  } | null;
-};
-
-/** A series' change from its first to its last point (null when there is no series to speak of). */
-const change = (xs: (number | null | undefined)[] | undefined) => { const v = (xs ?? []).filter((x): x is number => typeof x === "number"); return v.length > 1 ? v[v.length - 1] - v[0] : null; };
-/** One crawl's health; readable false = the crawl could not be read (score not known). pages = what the score is out of. */
-type HealthPoint = { jobId: string; at: string | null; readable: boolean; health: number | null; pages: number | null; errorPages: number | null; pageCap: number | null };
-const healthWords = (p: HealthPoint) => (!p.readable ? "could not be read" : p.health === null ? "no page scored" : `health ${p.health}, ${fmtNum(p.errorPages ?? 0)} of ${fmtNum(p.pages ?? 0)} pages with errors`);
-/** A change badge as a link: beside the number, 44px tall, underlined like every link. */
-const CHANGE_LINK = `flex min-h-[44px] items-end self-stretch rounded-sm ${LINK_CUE}`;
-
-/** A figure's change over the months shown, as a link to the explorer from the first of those months (nothing when there is no change). */
-function Change({ value, href, testId }: { value: number | null; href: string; testId: string }) {
-  if (value == null || !Number.isFinite(value) || Math.round(value) === 0) return null;
-  return <Link href={href} className={CHANGE_LINK} data-testid={testId}><DeltaBadge value={value} label="Change over the months shown" /></Link>;
-}
-
-/**
- * Site health from the site's own crawls: the newest crawl's score, its move since the crawl just before it (only when
- * both have a score), and the last few crawls. Health is a share of the pages crawled, so a move can come from crawling
- * different pages — the sizes are said whenever they differ. The score opens the audit's issues, the pages with errors
- * its pages, a crawl (its date, its row in the list, the crawl before) that crawl, and the move the audit comparing the
- * two crawls.
- */
-function HealthTile({ audit, siteId, onPick }: { audit: Card["audit"]; siteId: number; /** The audit page keeps a chosen site: told which before a link is followed. */ onPick?: () => void }) {
-  const trend = audit?.trend ?? [];
-  const prev = trend.length > 1 ? trend[trend.length - 2] : null;
-  const move = audit?.health != null && prev?.health != null ? audit.health - prev.health : null;
-  // Different page limits, or more than a tenth more or fewer pages scored (every crawl's size is in the list below).
-  const sizesDiffer = !!audit && !!prev && prev.readable && audit.readable && (prev.pageCap !== audit.pageCap || Math.abs((prev.pages ?? 0) - (audit.pages ?? 0)) > 0.1 * Math.max(prev.pages ?? 0, audit.pages ?? 0));
-  const crawl = (jobId: string) => seoLinks.audit(siteId, { at: jobId });
-  const hint: ReactNode = !audit ? <>No crawl yet — run one in <FigureLink href={seoLinks.audit(siteId)} onClick={onPick} testId={`link-health-audit-${siteId}`}>Site audit</FigureLink></>
-    : !audit.readable ? <>The newest crawl (<FigureLink href={crawl(audit.jobId)} onClick={onPick} testId={`link-health-crawled-${siteId}`}>{fmtDate(audit.at)}</FigureLink>) could not be read, so its score is not known</>
-    : audit.health === null ? <>Crawled <FigureLink href={crawl(audit.jobId)} onClick={onPick} testId={`link-health-crawled-${siteId}`}>{fmtDate(audit.at)}</FigureLink> — no page could be scored</>
-    : <>
-      <FigureLink href={seoLinks.audit(siteId, { tab: "pages" })} onClick={onPick} testId={`link-health-pages-${siteId}`}>{fmtNum(audit.errorPages ?? 0)} of {fmtNum(audit.pages ?? 0)} pages with errors</FigureLink>
-      {" · "}<FigureLink href={crawl(audit.jobId)} onClick={onPick} testId={`link-health-crawled-${siteId}`}>crawled {fmtDate(audit.at)}</FigureLink>
-      {prev && move === null ? <> · <FigureLink href={crawl(prev.jobId)} onClick={onPick} testId={`link-health-before-${siteId}`}>the crawl before has no score</FigureLink></> : null}
-      {sizesDiffer ? <> · <FigureLink href={crawl(prev!.jobId)} onClick={onPick} testId={`link-health-before-${siteId}`}>the crawl before scored {fmtNum(prev!.pages ?? 0)} pages{prev!.pageCap !== audit.pageCap ? ` (limit ${fmtNum(prev!.pageCap ?? 0)}, now ${fmtNum(audit.pageCap ?? 0)})` : ""}</FigureLink> — a move can come from crawling different pages, not only from fixes</> : null}
-    </>;
-  return (
-    <MetricColumn label="Health score" testId={`metric-health-${siteId}`} href={seoLinks.audit(siteId, { tab: "issues" })} onClick={onPick} linkTestId={`link-health-${siteId}`}
-      value={<ScoreBadge value={audit?.health ?? null} label={audit?.health == null ? "No health score" : `Site health ${audit.health} out of 100`} />}
-      delta={move && audit && prev ? <Link href={seoLinks.audit(siteId, { at: audit.jobId, vs: prev.jobId })} onClick={onPick} className={CHANGE_LINK} data-testid={`link-health-move-${siteId}`}><DeltaBadge value={move} label={`${move > 0 ? "Up" : "Down"} ${Math.abs(move)} since the crawl before`} /></Link> : null}
-      foot={hint}>
-      {trend.length > 1 && (
-        <details className="mt-1 text-[12px]" data-testid={`health-history-${siteId}`}>
-          <summary className={`${TAP} ${LINK_CUE} cursor-pointer rounded-sm`} style={{ color: "var(--g-accent-ink)" }}>Last {trend.length} crawls</summary>
-          <ul className="g-text-2 mt-1">{trend.slice().reverse().map((t, i) => <li key={t.jobId}><FigureLink href={crawl(t.jobId)} onClick={onPick} testId={`link-crawl-${siteId}-${i}`}>{fmtDate(t.at)}: {healthWords(t)}</FigureLink></li>)}</ul>
-        </details>
-      )}
-    </MetricColumn>
-  );
-}
-
-/** One step of filling a site's card: numbered, with its icon, what it gives, and whether it is done. */
-function StartStep({ n, done, icon, color, title, text, children }: { n: number; done: boolean; icon: ReactNode; color: string; title: string; text: ReactNode; children: ReactNode }) {
-  return (
-    <div className="relative flex min-w-0 flex-col gap-2 overflow-hidden rounded-xl border p-4" style={{ borderColor: "var(--g-divider)", background: "var(--g-surface)" }}>
-      <div className="flex items-center gap-2">
-        <span className="grid h-9 w-9 place-items-center rounded-lg" style={{ color, background: `color-mix(in srgb, ${color} 14%, transparent)` }} aria-hidden>{icon}</span>
-        <span className="g-text-2 text-[11px] font-medium uppercase tracking-wide">Step {n}</span>
-        <span className="ml-auto inline-flex items-center gap-1 text-[12px] font-medium" style={{ color: done ? "var(--g-green)" : "var(--g-text-2)" }}>
-          {done ? <CheckCircle2 className="h-4 w-4" aria-hidden /> : <Circle className="h-4 w-4" aria-hidden />}{done ? "Done" : "Not yet"}
-        </span>
-      </div>
-      <h3 className="text-[15px] font-semibold" style={{ color: "var(--g-blue)" }}>{title}</h3>
-      <p className="g-text-2 text-[13px] leading-5">{text}</p>
-      <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">{children}</div>
-    </div>
-  );
-}
+/** A site's figures as the dashboard request returns them (the row's layout: components/seo-tool/project-row.tsx). */
+type Card = SiteCard;
 
 /** Scrolls to the site list (the portfolio strip's links end in #sites; a pushState never scrolls by itself). */
 const scrollToSites = () => requestAnimationFrame(() => document.getElementById("sites")?.scrollIntoView({ behavior: "smooth", block: "start" }));
@@ -267,120 +183,29 @@ export default function SeoDashboardPage() {
         const analysed = shownCards.filter((c) => !!c.report), withTraffic = shownCards.filter((c) => c.report?.organicTraffic != null);
         const avgHealth = scored.length ? Math.round(scored.reduce((n, c) => n + (c.audit!.health as number), 0) / scored.length) : null;
         return (
-          <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="seo-portfolio">
-            <StatTile label="Sites" color={PALETTE.domains} value={fmtNum(shownCards.length)} testId="tile-sites" href={listAt({})} onClick={scrollToSites} linkTestId="link-sites"
+          <MetricStrip cols={[2, 4, 4]} boxed className="mb-4" testId="seo-portfolio">
+            <PortfolioCell label="Sites" color={PALETTE.domains} value={fmtNum(shownCards.length)} testId="tile-sites" href={listAt({})} onClick={scrollToSites} linkTestId="link-sites"
               foot={<><FigureLink href={listAt({ filter: "analysed" })} onClick={scrollToSites} testId="link-sites-analysed">{fmtNum(analysed.length)} analysed</FigureLink> · <FigureLink href={listAt({ filter: "crawled" })} onClick={scrollToSites} testId="link-sites-crawled">{fmtNum(crawled.length)} crawled</FigureLink></>} />
-            <StatTile label="Average site health" color={PALETTE.health} value={<ScoreBadge value={avgHealth} />} testId="tile-health" href={listAt({ sort: "health" })} onClick={scrollToSites} linkTestId="link-health-average"
+            <PortfolioCell label="Average site health" color={PALETTE.health} value={avgHealth == null ? null : <StatusBadge tone={scoreTone(avgHealth)} size="lg">{avgHealth}</StatusBadge>} testId="tile-health" href={listAt({ sort: "health" })} onClick={scrollToSites} linkTestId="link-health-average"
               foot={scored.length ? <FigureLink href={listAt({ filter: "crawled", sort: "health" })} onClick={scrollToSites} testId="link-health-scored">Of the {fmtNum(scored.length)} crawled site{scored.length === 1 ? "" : "s"}{scored.length < crawled.length ? " with a score" : ""}</FigureLink>
                 : crawled.length ? <FigureLink href={listAt({ filter: "crawled" })} onClick={scrollToSites} testId="link-health-scored">{fmtNum(crawled.length)} crawled, no score yet</FigureLink> : "No site crawled yet"} />
-            <StatTile label="Tracked keywords" color={PALETTE.tracked} value={fmtNum(totals.keywords)} testId="tile-tracked" href={listAt({ sort: "keywords" })} onClick={scrollToSites} linkTestId="link-tracked-total"
+            <PortfolioCell label="Tracked keywords" color={PALETTE.tracked} value={fmtNum(totals.keywords)} testId="tile-tracked" href={listAt({ sort: "keywords" })} onClick={scrollToSites} linkTestId="link-tracked-total"
               foot={totals.checked ? <FigureLink href={listAt({ sort: "top10" })} onClick={scrollToSites} testId="link-top10-total">{fmtNum(totals.top10)} in the top 10 in the newest checks</FigureLink> : totals.keywords ? "No check saved yet" : "No keyword tracked yet"} />
-            <StatTile label="Organic traffic (estimate)" color={PALETTE.traffic} value={withTraffic.length ? compact(withTraffic.reduce((n, c) => n + (c.report!.organicTraffic as number), 0)) : "—"} testId="tile-traffic" href={listAt({ sort: "traffic" })} onClick={scrollToSites} linkTestId="link-traffic-total"
+            <PortfolioCell label="Organic traffic (estimate)" color={PALETTE.traffic} value={withTraffic.length ? compact(withTraffic.reduce((n, c) => n + (c.report!.organicTraffic as number), 0)) : "—"} testId="tile-traffic" href={listAt({ sort: "traffic" })} onClick={scrollToSites} linkTestId="link-traffic-total"
               foot={withTraffic.length ? <FigureLink href={listAt({ filter: "analysed", sort: "traffic" })} onClick={scrollToSites} testId="link-traffic-analysed">Visits a month, {fmtNum(withTraffic.length)} analysed site{withTraffic.length === 1 ? "" : "s"} added up</FigureLink>
                 : analysed.length ? <FigureLink href={listAt({ filter: "analysed" })} onClick={scrollToSites} testId="link-traffic-analysed">{fmtNum(analysed.length)} analysed, no traffic figure yet</FigureLink> : "No site analysed yet"} />
-          </div>
+          </MetricStrip>
         );
       })()}
       <div id="sites" className="scroll-mt-4 space-y-4" data-testid="seo-dashboard">
         {cards.length > 0 && shownCards.length === 0 && (filter || activeGroup !== "all") && <Empty testId="seo-dashboard-group-empty"><h3>No sites here</h3><p>{filter ? <>No {FILTER_WORDS[filter].toLowerCase()}{activeGroup !== "all" ? ` in ${groupLabel}` : ""} yet — </> : "Choose another group above, or "}<button type="button" className={`${TAP} ${LINK_CUE} rounded-sm`} style={{ color: "var(--g-accent-ink)" }} onClick={clearNarrowing}>show all sites</button>.</p></Empty>}
-        {shownCards.map(({ site: s, rank, report: r, audit, openTasks }) => {
-          const busy = analyse.isPending && analyse.variables === s.domain;
-          // Where this site's figures lead. Arriving by any of these never buys data: the explorer shows the saved
-          // report (or an Analyse button), the audit and the rank tracker what is stored.
-          const ex = (view?: string, p?: { band?: PositionBand; month?: string }) => seoLinks.explorer(s.domain, view, p);
-          const pick = () => onSite(s.id); // the audit, rank tracker and plan keep a chosen site: a link to one site's page also makes it the chosen site
-          const pts = (xs: { month: string; value: number | null }[]): TrendPoint[] => xs.filter((h) => h.value != null).map((h) => ({ label: monthLabel(h.month), value: h.value as number, key: h.month }));
-          const trafficPts = pts((r?.history ?? []).map((h) => ({ month: h.month, value: h.traffic })));
-          const keywordPts = pts((r?.history ?? []).map((h) => ({ month: h.month, value: h.keywords })));
-          const domainPts = pts((r?.linkHistory ?? []).map((h) => ({ month: h.month, value: h.referringDomains })));
-          const authorityPts = pts((r?.linkHistory ?? []).map((h) => ({ month: h.month, value: h.authority })));
-          const atMonth = (view: string) => (p: TrendPoint) => ex(view, { month: p.key });
-          const since = (view: string, xs: TrendPoint[]) => ex(view, { month: xs[0]?.key });
+        {shownCards.map((card) => {
+          const s = card.site;
           return (
-            <section key={s.id} className="rounded-xl border p-3 shadow-sm sm:p-5" style={{ borderColor: "var(--g-divider)", background: "var(--g-surface)" }} data-testid={`card-site-${s.id}`}>
-              <div className="mb-4 flex flex-wrap items-center gap-2">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[16px] font-semibold uppercase" style={{ color: "var(--g-blue)", background: "var(--g-accent-soft)" }} aria-hidden>{s.domain.replace(/^www\./, "")[0]}</span>
-                <button type="button" className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${FOCUS}`} aria-pressed={!!s.starred} aria-label={s.starred ? `Remove the star from ${s.domain}` : `Star ${s.domain} to keep it on top`} title={s.starred ? "Starred — stays on top" : "Star to keep on top"} disabled={star.isPending} onClick={() => star.mutate({ id: s.id, starred: !s.starred })} data-testid={`button-star-${s.id}`}>
-                  <Star className="h-4 w-4" style={s.starred ? { fill: "#f9ab00", color: "#f9ab00" } : { color: "var(--g-text-2)" }} aria-hidden />
-                </button>
-                <div className="min-w-0">
-                  <h2 className="g-text text-[18px] font-semibold leading-6 [overflow-wrap:anywhere]"><FigureLink href={ex()} testId={`link-domain-${s.id}`}>{s.domain}</FigureLink></h2>
-                  <span className="g-text-2 text-[12px]">{r ? <FigureLink href={ex()} testId={`link-analysed-${s.id}`}>analysed {fmtDate(r.fetchedAt)}</FigureLink> : "not analysed yet"}</span>
-                </div>
-                {editing === s.id ? (
-                  <form className="flex w-full min-w-0 flex-wrap items-center gap-1 sm:w-auto" onSubmit={(e) => { e.preventDefault(); setSiteGroup.mutate({ id: s.id, group: groupDraft.trim() || null }); }} data-testid={`form-group-${s.id}`}>
-                    <label className="sr-only" htmlFor={`group-${s.id}`}>Group for {s.domain}</label>
-                    <input id={`group-${s.id}`} className="g-input !h-11 w-40 min-w-0 max-w-full flex-1 !py-1 text-[13px] sm:flex-none" list="seo-groups" maxLength={40} value={groupDraft} onChange={(e) => setGroupDraft(e.target.value)} placeholder="e.g. Smith Roofing" autoFocus data-testid={`input-group-${s.id}`} />
-                    <button type="submit" className={PILL} disabled={setSiteGroup.isPending}>Save</button>
-                    <button type="button" className={PILL} onClick={() => setEditing(null)}>Cancel</button>
-                  </form>
-                ) : (
-                  <button type="button" className={`g-chip g-chip--sm !min-h-[44px] max-w-full !whitespace-normal text-left !normal-case [overflow-wrap:anywhere] ${FOCUS}`} onClick={() => { setEditing(s.id); setGroupDraft(s.group ?? ""); }} aria-label={s.group ? `Group: ${s.group} — change` : `Put ${s.domain} in a group`} data-testid={`button-group-${s.id}`}>{s.group ? s.group : "+ Group"}</button>
-                )}
-                <div className="ml-auto flex flex-wrap gap-2">
-                  <Link href={ex()} className={PILL} data-testid={`link-explore-${s.id}`}>Site explorer</Link>
-                  <Link href={seoLinks.rankTracker(s.id)} className={PILL} onClick={pick} data-testid={`link-rank-${s.id}`}>Rank tracker</Link>
-                  <Link href={seoLinks.audit(s.id)} className={PILL} onClick={pick} data-testid={`link-audit-${s.id}`}>Site audit{audit?.health != null ? ` · health ${audit.health}` : ""}</Link>
-                  <Link href={seoLinks.plan(s.id)} className={PILL} onClick={pick} data-testid={`link-plan-${s.id}`}>Action plan{openTasks == null ? " · count unavailable" : openTasks ? ` · ${openTasks} open` : ""}</Link>
-                  <button type="button" className={PILL} disabled={busy || !configured || !affordable} onClick={() => analyse.mutate(s.domain)} data-testid={`button-analyse-${s.id}`} title={`A new report costs about ${price} of your SEO data.${holdNote(status.data, "explorerReport")}`}>
-                    {busy ? <Loader2 className="animate-spin" /> : <RefreshCw />} {r ? "Refresh" : "Analyse"} · {price}
-                  </button>
-                </div>
-              </div>
-              {r ? (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-6 border-t pt-4 md:grid-cols-3 xl:grid-cols-6" style={{ borderColor: "var(--g-divider)" }}>
-                    <div className="min-w-0 border-[color:var(--g-divider)] px-1 sm:px-3 xl:[&:not(:first-child)]:border-l"><HealthTile audit={audit} siteId={s.id} onPick={pick} /></div>
-                    <div className="min-w-0 border-[color:var(--g-divider)] px-1 sm:px-3 xl:[&:not(:first-child)]:border-l"><MetricColumn label="Authority" testId={`metric-authority-${s.id}`} href={ex()} linkTestId={`link-authority-${s.id}`} value={r.authority == null ? "—" : String(r.authority)}
-                      delta={<Change value={change(authorityPts.map((p) => p.value))} href={since("overview", authorityPts)} testId={`link-authority-change-${s.id}`} />}
-                      foot={<FigureLink href={ex("referringDomains")} testId={`link-authority-foot-${s.id}`}>0–100, from the sites linking to it</FigureLink>}
-                      chart={<GradientSpark range height={48} points={authorityPts} color={PALETTE.authority} pointHref={atMonth("overview")} testId={`spark-authority-${s.id}`} />} /></div>
-                    <div className="min-w-0 border-[color:var(--g-divider)] px-1 sm:px-3 xl:[&:not(:first-child)]:border-l"><MetricColumn label="Referring domains" testId={`metric-domains-${s.id}`} href={ex("referringDomains")} linkTestId={`link-domains-${s.id}`} value={compact(r.referringDomains)}
-                      delta={<Change value={change(domainPts.map((p) => p.value))} href={since("referringDomains", domainPts)} testId={`link-domains-change-${s.id}`} />}
-                      foot={<FigureLink href={ex("backlinks")} testId={`link-backlinks-${s.id}`}>{compact(r.backlinks)} backlinks</FigureLink>}
-                      chart={<GradientSpark range height={48} points={domainPts} color={PALETTE.domains} pointHref={atMonth("referringDomains")} testId={`spark-domains-${s.id}`} />} /></div>
-                    <div className="min-w-0 border-[color:var(--g-divider)] px-1 sm:px-3 xl:[&:not(:first-child)]:border-l"><MetricColumn label="Organic traffic (est.)" testId={`metric-traffic-${s.id}`} href={ex()} linkTestId={`link-traffic-${s.id}`} value={compact(r.organicTraffic)}
-                      delta={<Change value={change(trafficPts.map((p) => p.value))} href={since("overview", trafficPts)} testId={`link-traffic-change-${s.id}`} />}
-                      foot={<FigureLink href={ex("keywords")} testId={`link-traffic-value-${s.id}`}>Visits a month, estimated from rankings{r.trafficValue != null ? ` · value $${Math.round(r.trafficValue).toLocaleString("en-US")} / mo` : ""}</FigureLink>}
-                      chart={<GradientSpark range height={48} points={trafficPts} color={PALETTE.traffic} pointHref={atMonth("overview")} testId={`spark-traffic-${s.id}`} />} /></div>
-                    <div className="min-w-0 border-[color:var(--g-divider)] px-1 sm:px-3 xl:[&:not(:first-child)]:border-l"><MetricColumn label="Organic keywords" testId={`metric-keywords-${s.id}`} href={ex("keywords")} linkTestId={`link-keywords-${s.id}`} value={compact(r.organicKeywords)}
-                      delta={<Change value={change(keywordPts.map((p) => p.value))} href={since("keywords", keywordPts)} testId={`link-keywords-change-${s.id}`} />}
-                      chart={<GradientSpark range height={48} points={keywordPts} color={PALETTE.keywords} pointHref={atMonth("keywords")} testId={`spark-keywords-${s.id}`} />}>
-                      {r.top10 != null && r.top3 != null && r.organicKeywords != null && <div className="mt-1.5"><DistributionBar testId={`dist-keywords-${s.id}`} parts={[{ key: "top3", label: "Top 3", value: r.top3, color: PALETTE.top3 }, { key: "top10", label: "4–10", value: Math.max(0, r.top10 - r.top3), color: PALETTE.top10 }, { key: "rest", label: "11+", value: Math.max(0, r.organicKeywords - r.top10), color: PALETTE.rest }]} segmentHref={(k) => ex("keywords", { band: k as PositionBand })} /></div>}
-                    </MetricColumn></div>
-                    <div className="min-w-0 border-[color:var(--g-divider)] px-1 sm:px-3 xl:[&:not(:first-child)]:border-l"><MetricColumn label="Tracked keywords" testId={`metric-tracked-${s.id}`} href={seoLinks.rankTracker(s.id)} onClick={pick} linkTestId={`link-tracked-${s.id}`} value={fmtNum(s.keywordCount)}
-                      foot={rank.checked ? <FigureLink href={seoLinks.rankTracker(s.id, { device: rank.device ?? undefined })} onClick={pick} testId={`link-tracked-checked-${s.id}`}>{rank.device ? `On ${rank.device}` : "Newest checks"} · {rank.firstOn && rank.firstOn !== rank.checkedOn ? `checked ${fmtDate(rank.firstOn)} to ${fmtDate(rank.checkedOn)}` : `checked ${fmtDate(rank.checkedOn)}`}</FigureLink>
-                        : s.keywordCount ? <FigureLink href={seoLinks.rankTracker(s.id)} onClick={pick} testId={`link-tracked-due-${s.id}`}>No check saved yet{s.nextRankCheckAt ? ` — the first automatic check is due ${fmtDate(s.nextRankCheckAt)}` : ""}; it is skipped while this month's included data is used up</FigureLink> : "None yet"}>
-                      {rank.checked > 0 ? <div className="mt-1.5"><DistributionBar testId={`dist-tracked-${s.id}`} parts={[{ key: "top3", label: "Top 3", value: rank.top3, color: PALETTE.top3 }, { key: "top10", label: "4–10", value: Math.max(0, rank.top10 - rank.top3), color: PALETTE.top10 }, { key: "rest", label: "Below 10 or not found", value: Math.max(0, rank.checked - rank.top10), color: PALETTE.rest }]} segmentHref={(k) => seoLinks.rankTracker(s.id, { band: k as PositionBand })} onSegment={pick} /></div>
-                        : !s.keywordCount && <Link href={seoLinks.rankTracker(s.id)} className={`${PILL} mt-2 self-start`} onClick={pick} data-testid={`link-add-keywords-${s.id}`}>Add keywords</Link>}
-                    </MetricColumn></div>
-                  </div>
-                  <TrendPanel title="Over time" testId={`trend-${s.id}`} note="Monthly. Traffic and keywords are estimates from the keyword database; referring domains and authority come from the backlink index. A point, or a month in the list, opens that month in Site explorer."
-                    series={[
-                      { key: "traffic", label: "Organic traffic (estimate)", color: PALETTE.traffic, points: trafficPts },
-                      { key: "keywords", label: "Organic keywords", color: PALETTE.keywords, points: keywordPts },
-                      { key: "domains", label: "Referring domains", color: PALETTE.domains, points: domainPts },
-                      { key: "authority", label: "Authority", color: PALETTE.authority, points: authorityPts },
-                    ]} pointHref={(_k, p) => ex("overview", { month: p.key })} />
-                </div>
-              ) : (
-                <div className="grid gap-3 md:grid-cols-3" data-testid={`start-${s.id}`}>
-                  {/* Three steps to fill this card; each says whether it is done. Nothing here is a figure until a step has run. */}
-                  <StartStep n={1} done={false} icon={<BarChart3 className="h-5 w-5" />} color={PALETTE.traffic} title="Analyse the site"
-                    text="Authority, backlinks, estimated search traffic, keywords and competitors — with two years of monthly history.">
-                    <Button size="sm" className="min-h-[44px]" disabled={busy || !configured || !affordable} onClick={() => analyse.mutate(s.domain)} data-testid={`button-analyse-empty-${s.id}`}>{busy ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}Analyse — about {price}</Button>
-                  </StartStep>
-                  <StartStep n={2} done={(s.keywordCount ?? 0) > 0} icon={<Target className="h-5 w-5" />} color={PALETTE.traffic} title="Track your keywords"
-                    text={(s.keywordCount ?? 0) > 0 ? <><FigureLink href={seoLinks.rankTracker(s.id)} onClick={pick} testId={`link-start-tracked-${s.id}`}>{fmtNum(s.keywordCount)} tracked</FigureLink> — checked every week by default.</> : "Your services and towns: where the site is found in Google and the map pack, every week."}>
-                    <Link href={seoLinks.rankTracker(s.id)} className={PILL} onClick={pick} data-testid={`link-start-rank-${s.id}`}>Open Rank tracker</Link>
-                  </StartStep>
-                  <StartStep n={3} done={!!audit} icon={<ScanSearch className="h-5 w-5" />} color={PALETTE.traffic} title="Crawl the site"
-                    text={audit ? <>Crawled — the health score and its issues are in <FigureLink href={seoLinks.audit(s.id)} onClick={pick} testId={`link-start-audit-${s.id}`}>Site audit</FigureLink>.</> : "Broken pages, redirects, titles, speed and what a crawler can read."}>
-                    {audit ? <div className="w-full border-t pt-2" style={{ borderColor: "var(--g-divider)" }}><HealthTile audit={audit} siteId={s.id} onPick={pick} /></div> : <Link href={seoLinks.audit(s.id)} className={PILL} onClick={pick} data-testid={`link-start-audit-${s.id}`}>Open Site audit</Link>}
-                  </StartStep>
-                </div>
-              )}
-            </section>
+            <ProjectRow key={s.id} card={card} busy={analyse.isPending && analyse.variables === s.domain} canAnalyse={configured && affordable} price={price} priceNote={holdNote(status.data, "explorerReport")}
+              onAnalyse={() => analyse.mutate(s.domain)} onPick={() => onSite(s.id)}
+              star={{ pending: star.isPending, onToggle: () => star.mutate({ id: s.id, starred: !s.starred }) }}
+              group={{ editing: editing === s.id, draft: groupDraft, pending: setSiteGroup.isPending, onDraft: setGroupDraft, onEdit: () => { setEditing(s.id); setGroupDraft(s.group ?? ""); }, onSave: () => setSiteGroup.mutate({ id: s.id, group: groupDraft.trim() || null }), onCancel: () => setEditing(null) }} />
           );
         })}
       </div>
