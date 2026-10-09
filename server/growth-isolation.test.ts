@@ -29,7 +29,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("growth isolation (
 beforeAll(async () => {
   if (!/^\/constructhub_dev(?:_a\d+)?$/.test(new URL(process.env.DATABASE_URL!).pathname)) throw new Error("Requires a ConstructHUB development lane DB");
   child = spawn(process.execPath, ["--import", "tsx", "server/index.ts"], {
-    env: { ...process.env, PORT: String(port), NODE_ENV: "development", DEV_AUTH_BYPASS_USER1: "false", CRM_DEMO_AUTOLOGIN: "false", SESSION_SECRET: secret, EMAIL_FORCE_SINK: "true", STRIPE_SECRET_KEY: "", GOOGLE_PLACES_API_KEY: "", },
+    env: { ...process.env, PORT: String(port), NODE_ENV: "development", DEV_AUTH_BYPASS_USER1: "false", CRM_DEMO_AUTOLOGIN: "false", SESSION_SECRET: secret, EMAIL_FORCE_SINK: "true", STRIPE_SECRET_KEY: "", GOOGLE_PLACES_API_KEY: "", DATAFORSEO_LOGIN: "", DATAFORSEO_PASSWORD: "", },
     stdio: ["ignore", "pipe", "pipe"], detached: true,
   });
   const log = createWriteStream(`tmp/growth-test-${port}.log`);
