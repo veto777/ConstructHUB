@@ -299,6 +299,36 @@ export default function PricingPage() {
   // Add-ons ride on a Stripe subscription to one of the current plans (a legacy plan switches first).
   const addonsEditable = view.changesInPlace && !view.isLegacy;
   const monthsFree = annualMonthsFree();
+  // Monthly / Annual switch. Shown in the hero and again above the plan cards; both drive the same
+  // interval, so the Business Tools and CRM tabs always price the same period.
+  const billingToggle = (suffix: string, className: string) => (
+    <div
+      role="radiogroup"
+      aria-label="Billing period"
+      className={`${className} inline-flex items-center rounded-full border border-mkt-rule bg-mkt-card p-1`}
+      data-testid={`toggle-interval${suffix}`}
+    >
+      {(["month", "year"] as const).map((i) => (
+        <button
+          key={i}
+          type="button"
+          role="radio"
+          aria-checked={interval === i}
+          onClick={() => setBillingInterval(i)}
+          className={`rounded-full px-4 sm:px-5 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mkt-orange ${interval === i ? "bg-mkt-panel text-mkt-panel-ink" : "text-mkt-ink-soft hover:text-mkt-ink"}`}
+          data-testid={`button-interval${suffix}-${i}`}
+        >
+          {i === "month" ? "Monthly" : "Annual"}
+          {i === "year" && (
+            <span className={`ml-2 rounded-full border border-current px-1.5 py-0.5 text-[11px] font-semibold ${interval === i ? "text-mkt-orange dark:text-[#AE4A04]" : "text-mkt-orange-ink"}`}>
+              {monthsFree} months free
+            </span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+
   const confirmFrom = view.displayName ? `Your ${view.displayName} subscription${view.interval ? ` (billed ${intervalWord(view.interval)})` : ""}` : "Your subscription";
   // Retired add-ons (empty availableOn, not a preview — e.g. the old extra-location line) are not sold: they read
   // stored subscriptions on the server, they are never listed here.
@@ -323,31 +353,7 @@ export default function PricingPage() {
               A new account starts any plan with a {TRIAL_DAYS}-day free trial. Cancel before it ends and you pay nothing.
               The CRM is a separate product with its own plans, from {CRM_FROM_PRICE}, and the {CALL_ASSISTANT_NAME} is a separate service, from {CALL_ASSISTANT_FROM_PRICE}.
             </p>
-            <div
-              role="radiogroup"
-              aria-label="Billing period"
-              className="mt-7 inline-flex items-center rounded-full border border-mkt-rule bg-mkt-card p-1"
-              data-testid="toggle-interval"
-            >
-              {(["month", "year"] as const).map((i) => (
-                <button
-                  key={i}
-                  type="button"
-                  role="radio"
-                  aria-checked={interval === i}
-                  onClick={() => setBillingInterval(i)}
-                  className={`rounded-full px-4 sm:px-5 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mkt-orange ${interval === i ? "bg-mkt-panel text-mkt-panel-ink" : "text-mkt-ink-soft hover:text-mkt-ink"}`}
-                  data-testid={`button-interval-${i}`}
-                >
-                  {i === "month" ? "Monthly" : "Annual"}
-                  {i === "year" && (
-                    <span className={`ml-2 rounded-full border border-current px-1.5 py-0.5 text-[11px] font-semibold ${interval === i ? "text-mkt-orange dark:text-[#AE4A04]" : "text-mkt-orange-ink"}`}>
-                      {monthsFree} months free
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
+            {billingToggle("", "mt-7")}
           </div>
 
           {/* The mascot and his line on the navy grid panel (decorative). */}
@@ -416,6 +422,7 @@ export default function PricingPage() {
               </button>
             ))}
           </div>
+          <div className="flex justify-center">{billingToggle("-plans", "mt-4")}</div>
 
           {tab === "business" ? (
             <div role="tabpanel" className="mt-8">
@@ -434,22 +441,22 @@ export default function PricingPage() {
                           {PLAN_RIBBON[key]}
                         </div>
                       )}
-                      <div className="p-6 lg:p-7 pb-0 lg:pb-0">
+                      <div className="p-6 lg:p-7 xl:p-5 2xl:p-7 pb-0 lg:pb-0 xl:pb-0 2xl:pb-0">
                         <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="h-10 w-10 rounded-lg border border-mkt-rule bg-mkt-paper flex items-center justify-center text-mkt-ink shrink-0">
+                          <div className="flex items-center gap-3 xl:gap-2 2xl:gap-3 min-w-0">
+                            <div className="h-10 w-10 xl:h-8 xl:w-8 2xl:h-10 2xl:w-10 rounded-lg border border-mkt-rule bg-mkt-paper flex items-center justify-center text-mkt-ink shrink-0">
                               <Icon className="w-[18px] h-[18px]" strokeWidth={1.75} />
                             </div>
-                            <h3 className="font-display font-semibold text-[1.45rem] leading-tight text-mkt-ink">{plan.name}</h3>
+                            <h3 className="font-display font-semibold text-[1.45rem] xl:text-[1.25rem] 2xl:text-[1.45rem] leading-tight whitespace-nowrap text-mkt-ink">{plan.name}</h3>
                           </div>
-                          <span className="font-display italic text-mkt-muted text-lg leading-none pt-1" aria-hidden>{String(index + 1).padStart(2, "0")}</span>
+                          <span className="font-display italic text-mkt-muted text-lg leading-none pt-1 shrink-0 xl:hidden 2xl:inline" aria-hidden>{String(index + 1).padStart(2, "0")}</span>
                         </div>
                         {view.live && view.planKey === key && view.isLegacy && (
                           <p className="mt-2 text-[12px] text-mkt-muted" data-testid={`text-legacy-${key}`}>Your {view.displayName} features match this plan</p>
                         )}
                         <p className="text-[14.5px] text-mkt-ink-soft pt-3 leading-relaxed">{plan.tagline}</p>
                         <div className="pt-5 font-display font-semibold text-mkt-ink leading-none" data-testid={`text-price-${key}`}>
-                          <span className="text-[2.9rem] tracking-[-0.02em]">{formatUsd(planPriceCents(plan, interval))}</span>
+                          <span className="text-[2.9rem] xl:text-[2.3rem] 2xl:text-[2.9rem] whitespace-nowrap tracking-[-0.02em]">{formatUsd(planPriceCents(plan, interval))}</span>
                           <span className="font-sans text-[15px] font-medium text-mkt-muted ml-1">{intervalSuffix(interval)}</span>
                         </div>
                         <p className="mt-3 text-[12.5px] leading-relaxed text-mkt-muted min-h-[2.5rem]" data-testid={`text-price-note-${key}`}>
