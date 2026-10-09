@@ -1,4 +1,4 @@
-/** /seo/rank-tracker — rank tracker: tiles, the positions table with movement, Search Console if connected, recent checks. */
+/** /seo/rank-tracker — rank tracker: the figures in one row with their trends, the positions table with movement, Search Console if connected, recent checks. */
 import { GscBreakdownView } from "./gsc-breakdown";
 import { SerpFeatureChips, hasFeature, ownsFeature } from "./serp-features";
 import { Fragment, useEffect, useRef, useState } from "react";
@@ -8,8 +8,8 @@ import { Loader2, Play, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { api, Empty, fmtDate, fmtNum, fmtUnit, money, Move, SeoShell, Tile, useSelectedSite, useSeoSites, useSeoStatus, type SeoSite } from "./shell";
-import { KeywordHistory, RankHistoryPanel } from "./rank-history";
+import { api, Empty, fmtDate, fmtNum, fmtUnit, money, Move, SeoShell, useSelectedSite, useSeoSites, useSeoStatus, type SeoSite } from "./shell";
+import { KeywordHistory, RankHistoryPanel, useRankHistory, type HistoryDay } from "./rank-history";
 import { RankTagsPanel } from "./rank-tags";
 import { CompetingPages } from "./competing";
 import { SerpGroupsPanel } from "./serp-groups";
@@ -17,6 +17,8 @@ import { LocationPicker, type Place } from "./location-picker";
 import { CompetitorPanel } from "./rank-competitors";
 import { countryLabel } from "@shared/seo-markets";
 import { unresolvedPlaceMessage } from "@shared/seo-place";
+import { DistributionBar, GradientSpark, MetricColumn, ORANGE, PALETTE } from "./viz";
+import { CARD, PositionBadge, PositionSpark, SectionTitle, TABLE } from "./viz-rank";
 
 type Position = { position: number | null; url: string | null; checkedOn: string; previous: number | null; previousOn: string | null; features: string[]; local?: number | null; previousLocal?: number | null; pack?: { position: number; title: string; domain: string | null }[]; top?: { position: number; domain: string; url?: string | null; title?: string | null }[] } | null;
 type Overview = {
@@ -74,6 +76,8 @@ export default function SeoOverviewPage() {
     onSuccess: invalidate,
     onError: (e) => toast({ title: "Couldn't remove the keyword", description: apiErrorMessage(e), variant: "destructive" }),
   });
+  // The trend under each figure: the saved history the History panel reads too (one request, shared) — first device, all keywords.
+  const history = useRankHistory(site?.id ?? null, "", "");
   const o = overview.data;
   const configured = !!status.data?.configured;
   const running = o?.runs.some((r) => r.status === "queued" || r.status === "running");
@@ -95,23 +99,45 @@ export default function SeoOverviewPage() {
       {site && overview.isError && <div className="g-callout" role="alert" data-testid="rank-overview-error"><h3>Couldn't load your rankings</h3><p>{apiErrorMessage(overview.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void overview.refetch()}>Try again</button></div>}
       {site && o && (
         <>
-          <div className="g-tiles mb-5">
-            <Tile label="Tracked keywords" value={fmtNum(o.summary.tracked)} hint={o.summary.lastCheckedOn ? `Last checked ${fmtDate(o.summary.lastCheckedOn)}` : "Not checked yet"} testId="tile-tracked" />
-            <Tile label="In the top 10" value={fmtNum(o.summary.top10)} hint={`${fmtNum(o.summary.top3)} in the top 3`} testId="tile-top10" />
-            <Tile label="Average position" value={o.summary.averagePosition ?? "—"} hint={`${o.devices[0]}, ranked keywords only`} testId="tile-average" />
-            {(o.summary.withMapPack ?? 0) > 0 && <Tile label="In the Google map pack" value={fmtNum(o.summary.inMapPack ?? 0)} hint={`of ${fmtNum(o.summary.withMapPack)} searches that show a map`} testId="tile-map-pack" />}
-            <Tile label="Since last check" value={<><span className="g-move g-move--up text-[20px]">▲{o.summary.improved}</span> <span className="g-move g-move--down text-[20px]">▼{o.summary.declined}</span></>} hint="Keywords up / down" testId="tile-movement" />
-            {o.searchConsole ? (
-              <>
-                <Tile label={o.searchConsole.through ? `Search Console clicks (28 days to ${fmtDate(o.searchConsole.through)})` : "Search Console clicks (28 days)"} value={fmtNum(o.searchConsole.clicks)} hint={gscHint(o.searchConsole)} testId="tile-gsc-clicks" />
-                <Tile label="Impressions (28 days)" value={fmtNum(o.searchConsole.impressions)} hint={o.searchConsole.position != null ? `Average position ${o.searchConsole.position}` : o.searchConsole.property} testId="tile-gsc-impressions" />
-              </>
-            ) : (
-              <Tile label="Search Console" value="—" hint={<Link href="/search-console" className="g-link">Connect the property for clicks and impressions</Link>} testId="tile-gsc-missing" />
-            )}
-            <Tile label="Next automatic check" value={configured ? fmtDate(o.nextCheck.nextAt) : "—"} hint={configured ? `${fmtNum(o.nextCheck.serps)} result page${o.nextCheck.serps === 1 ? "" : "s"} per check` : "Being switched on"} testId="tile-next-check" />
-            {status.data && <Tile label="Keywords in your plan" value={fmtUnit(status.data.usage.keywords)} hint="Across all your sites" testId="tile-plan-keywords" />}
-          </div>
+          {(() => {
+            // The figures as one row of columns with thin dividers (as Ahrefs lays its rank tracker out), each with its
+            // trend in orange: one point per saved check day on the first device. A day without a figure is left out.
+            const days = history.data?.days ?? [], hLast = days.length ? days[days.length - 1] : null;
+            const trend = (pick: (d: HistoryDay) => number | null | undefined) => days.flatMap((d) => { const v = pick(d); return v == null ? [] : [{ label: fmtDate(d.date), value: v }]; });
+            const col = "min-w-0 border-[color:var(--g-divider)] px-1 sm:px-3 xl:[&:not(:first-child)]:border-l";
+            const col2 = "min-w-0 border-[color:var(--g-divider)] px-1 sm:px-3 md:[&:not(:first-child)]:border-l";
+            return (
+              <section className="mb-5 rounded-xl border p-3 sm:p-5" style={CARD} data-testid="rank-overview">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-6 md:grid-cols-3 xl:grid-cols-6">
+                  <div className={col}><MetricColumn label="Visibility" testId="tile-visibility" value={hLast ? `${hLast.visibility}%` : "—"}
+                    foot={hLast ? `Estimated share of clicks from positions, not real clicks · ${history.data?.device ?? o.devices[0]}, ${fmtDate(hLast.date)}` : history.isLoading ? "Loading…" : "No saved check to measure"}
+                    chart={<GradientSpark range height={48} points={trend((d) => d.visibility)} color={ORANGE} format={(v) => `${v}%`} />} /></div>
+                  <div className={col}><MetricColumn label="Average position" testId="tile-average" value={o.summary.averagePosition ?? "—"} foot={`${o.devices[0]}, ranked keywords only`}
+                    chart={<PositionSpark range height={48} points={trend((d) => d.averagePosition)} />} /></div>
+                  <div className={col}><MetricColumn label="In the top 10" testId="tile-top10" value={fmtNum(o.summary.top10)} foot={`${fmtNum(o.summary.top3)} in the top 3`}
+                    chart={<GradientSpark range height={48} points={trend((d) => d.top10)} color={ORANGE} />} /></div>
+                  <div className={col}><MetricColumn label="Since last check" testId="tile-movement" value={<><span className="g-move g-move--up text-[22px]">▲{o.summary.improved}</span> <span className="g-move g-move--down text-[22px]">▼{o.summary.declined}</span></>} foot="Keywords up / down" /></div>
+                  {(o.summary.withMapPack ?? 0) > 0 && <div className={col}><MetricColumn label="In the Google map pack" testId="tile-map-pack" value={fmtNum(o.summary.inMapPack ?? 0)} foot={`of ${fmtNum(o.summary.withMapPack)} searches that show a map`}
+                    chart={<GradientSpark range height={48} points={trend((d) => d.mapPack)} color={ORANGE} />} /></div>}
+                  <div className={col}><MetricColumn label="Tracked keywords" testId="tile-tracked" value={fmtNum(o.summary.tracked)} foot={o.summary.lastCheckedOn ? `Last checked ${fmtDate(o.summary.lastCheckedOn)}` : "Not checked yet"}>
+                    {o.summary.checked > 0 && <div className="mt-1.5"><DistributionBar parts={[{ label: "Top 3", value: o.summary.top3, color: PALETTE.top3 }, { label: "4–10", value: Math.max(0, o.summary.top10 - o.summary.top3), color: PALETTE.top10 }, { label: "Below 10 or not found", value: Math.max(0, o.summary.checked - o.summary.top10), color: PALETTE.rest }]} /></div>}
+                  </MetricColumn></div>
+                </div>
+                <div className="mt-5 grid grid-cols-2 gap-x-3 gap-y-6 border-t pt-4 md:grid-cols-4" style={{ borderColor: "var(--g-divider)" }}>
+                  {o.searchConsole ? (
+                    <>
+                      <div className={col2}><MetricColumn label={o.searchConsole.through ? `Search Console clicks (28 days to ${fmtDate(o.searchConsole.through)})` : "Search Console clicks (28 days)"} testId="tile-gsc-clicks" value={fmtNum(o.searchConsole.clicks)} foot={gscHint(o.searchConsole)} /></div>
+                      <div className={col2}><MetricColumn label="Impressions (28 days)" testId="tile-gsc-impressions" value={fmtNum(o.searchConsole.impressions)} foot={o.searchConsole.position != null ? `Average position ${o.searchConsole.position}` : o.searchConsole.property} /></div>
+                    </>
+                  ) : (
+                    <div className={col2}><MetricColumn label="Search Console" testId="tile-gsc-missing" value="—" foot={<Link href="/search-console" className="g-link">Connect the property for clicks and impressions</Link>} /></div>
+                  )}
+                  <div className={col2}><MetricColumn label="Next automatic check" testId="tile-next-check" value={configured ? fmtDate(o.nextCheck.nextAt) : "—"} foot={configured ? `${fmtNum(o.nextCheck.serps)} result page${o.nextCheck.serps === 1 ? "" : "s"} per check` : "Being switched on"} /></div>
+                  {status.data && <div className={col2}><MetricColumn label="Keywords in your plan" testId="tile-plan-keywords" value={fmtUnit(status.data.usage.keywords)} foot="Across all your sites" /></div>}
+                </div>
+              </section>
+            );
+          })()}
           <RankHistoryPanel site={site} />
           <RankTagsPanel site={site} />
           <CompetingPages site={site} />
@@ -151,7 +177,8 @@ export default function SeoOverviewPage() {
               ].filter(Boolean);
               return parts.length ? <p className="g-text-2 mb-2 text-[13px]" data-testid="text-serp-features">In the newest saved check of each of your {firsts.length} keyword{firsts.length === 1 ? "" : "s"} on {o.devices[0]}, the results showed {parts.join(", ")}.</p> : null;
             })()}
-            <table className="g-table" data-testid="table-positions">
+            <div className="overflow-x-auto">
+            <table className={TABLE} data-testid="table-positions">
               <thead><tr><th>Keyword</th>{o.devices.map((d) => <th key={d} className="num">{d === "desktop" ? "Desktop" : "Mobile"}</th>)}<th className="num" title="Your place among the businesses in the map pack of the saved check, matched by your website or business name">Map pack</th><th title="What else the saved results showed for this search; a green chip means you were found in it">On the page</th><th className="num">Volume</th><th>Ranking page</th><th className="num">Checked</th><th aria-label="Remove" /></tr></thead>
               <tbody>
                 {o.rows.map((r) => {
@@ -160,7 +187,7 @@ export default function SeoOverviewPage() {
                     <Fragment key={r.id}>
                     <tr data-testid={`row-keyword-${r.id}`}>
                       <td><button type="button" className="g-link text-left" aria-expanded={openKw === r.id} onClick={() => setOpenKw(openKw === r.id ? null : r.id)} title="Show this keyword's history" data-testid={`button-history-${r.id}`}>{r.keyword}</button>{r.location && r.location !== countryLabel(site.locationCode) && <span className="g-text-2 text-[12px]"> · {r.location}</span>}{r.tags.length > 0 && <span className="g-text-2 text-[12px]"> · {r.tags.join(", ")}</span>}</td>
-                      {o.devices.map((d) => { const p = r.positions[d]; return <td key={d} className="num" data-label={d === "desktop" ? "Desktop" : "Mobile"}>{p ? <>{p.position ?? `>${site.serpDepth}`} <Move now={p.position} before={p.previous} hadBefore={!!p.previousOn} /></> : <span className="g-text-2">—</span>}</td>; })}
+                      {o.devices.map((d) => { const p = r.positions[d]; return <td key={d} className="num" data-label={d === "desktop" ? "Desktop" : "Mobile"}>{p ? <><PositionBadge position={p.position} depth={site.serpDepth} /> <Move now={p.position} before={p.previous} hadBefore={!!p.previousOn} /></> : <span className="g-text-2">—</span>}</td>; })}
                       <td className="num" data-label="Map pack">{!first ? <span className="g-text-2">—</span> : first.local != null ? <>#{first.local} <Move now={first.local} before={first.previousLocal ?? null} hadBefore={!!first.previousOn} /></> : (first.pack?.length ?? 0) > 0 ? <span className="g-text-2" title={`Not found in the map pack, matched by website or business name. In it: ${first.pack!.map((p) => p.title).join(", ")}`}>not found in it{first.previousLocal != null && <> <span className="g-move g-move--down" aria-label={`No longer found in the map pack — was ${first.previousLocal} in the last check`}>lost</span></>}</span> : <span className="g-text-2" title="No map pack in the saved results for this search">no map</span>}</td>
                       <td data-label="On the page">{first ? <SerpFeatureChips features={(first.pack?.length ?? 0) > 0 || first.local != null ? [...new Set([...(first.features ?? []), "local_pack"])] : first.features} mapOwned={first.local != null} /> : <span className="g-text-2">—</span>}</td>
                       <td className="num" data-label="Volume">{fmtNum(r.searchVolume)}</td>
@@ -170,7 +197,7 @@ export default function SeoOverviewPage() {
                     </tr>
                     {openKw === r.id && <tr data-testid={`row-history-${r.id}`}><td colSpan={o.devices.length + 6}>{(first?.pack?.length ?? 0) > 0 && <p className="g-text-2 mb-2 text-[13px]" data-testid={`pack-${r.id}`}>The map pack in the saved results for this search ({fmtDate(first!.checkedOn)}): {first!.pack!.map((p) => `${p.position}. ${p.title}`).join(" · ")}</p>}<KeywordHistory id={r.id} devices={o.devices} />{(first?.top?.length ?? 0) > 0 && (
                       <div className="mt-3" data-testid={`serp-${r.id}`}>
-                        <h4 className="g-text mb-1 text-[13px] font-medium">Google's first page for this search, as saved <span className="g-text-2 font-normal">· {fmtDate(first!.checkedOn)}</span></h4>
+                        <h4 className="mb-1 text-[13px] font-medium" style={{ color: "var(--g-blue)" }}>Google's first page for this search, as saved <span className="g-text-2 font-normal">· {fmtDate(first!.checkedOn)}</span></h4>
                         <ol className="space-y-0.5 text-[13px]">{first!.top!.map((t) => { const mine = t.domain === site.domain || t.domain.endsWith(`.${site.domain}`); return <li key={`${t.position}-${t.domain}`} className={mine ? "g-text font-medium" : "g-text-2"}><span className="inline-block w-6 tabular-nums">{t.position}.</span> {t.url ? <a href={t.url} target="_blank" rel="noreferrer" className="g-link">{t.domain}</a> : t.domain}{mine ? " · you" : ""}{t.title ? <span className="g-text-2 font-normal"> — {t.title}</span> : null}</li>; })}</ol>
                       </div>
                     )}</td></tr>}
@@ -179,11 +206,12 @@ export default function SeoOverviewPage() {
                 })}
               </tbody>
             </table>
+            </div>
             </>
           )}
           {o.runs.length > 0 && (
             <section className="mt-6">
-              <h2 className="g-text mb-2 text-[16px] font-medium">Recent checks</h2>
+              <SectionTitle className="mb-2">Recent checks</SectionTitle>
               <ul className="g-text-2 space-y-1 text-[13px]" data-testid="list-runs">
                 {o.runs.map((r) => <li key={r.id}>{fmtDate(r.created_at)} · {RUN_TRIGGER[r.trigger] ?? r.trigger} · {r.status === "done" && r.partial ? "done, but not every check came back" : RUN_STATUS[r.status] ?? r.status}{r.total ? ` · ${r.checked}/${r.total} checks` : ""}{r.error ? <span className="g-closed"> · {r.error}</span> : null}</li>)}
               </ul>

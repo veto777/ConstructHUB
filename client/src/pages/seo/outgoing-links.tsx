@@ -8,6 +8,7 @@ import { Download, Loader2 } from "lucide-react";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { Empty, fmtDate, fmtNum, isNotRunYet, type SeoSite } from "./shell";
 import { AddToPlan, type PlanTask } from "./plan-button";
+import { COMPACT_TABLE } from "./viz-audit";
 
 type Domain = { domain: string; pages: number; links: number; examples: { from: string; to: string; anchor: string | null }[]; checked: number; broken: number };
 type Answer = "gone" | "error" | "refused" | "inconclusive" | "no_content" | "redirect_unfollowed" | "no_answer" | "no_status" | "unusual";
@@ -58,14 +59,15 @@ export function OutgoingLinksView({ site, crawlId }: { site: SeoSite; /** The ne
   return (
     <div data-testid="outgoing-links">
       <p className="g-text-2 mb-3 max-w-3xl text-[13px]">The other websites your pages link to. Links to suppliers, associations and directories are normal; a link to a page that no longer answers is worth fixing, and a website you did not expect here is worth a look.</p>
-      {d.linksMeasured === null && <p className="mb-3 text-[13px]" role="status" style={{ color: "#b06000" }} data-testid="outgoing-no-pages">No page of this crawl loaded, so there are no links to read. Run a new crawl in Site audit.</p>}
-      {d.linksMeasured === false && <p className="mb-3 text-[13px]" role="status" style={{ color: "#b06000" }} data-testid="outgoing-unmeasured">Most pages that loaded have no web (http/https) links saved from their HTML — one possible reason is links added by JavaScript, which the crawl does not run. (Phone and email links are not counted.) What is listed is only what the HTML had.</p>}
+      {/* Said in a plain callout rather than a colour of its own: the page's words carry the caution. */}
+      {d.linksMeasured === null && <p className="g-callout g-text mb-3 text-[13px]" role="status" data-testid="outgoing-no-pages">No page of this crawl loaded, so there are no links to read. Run a new crawl in Site audit.</p>}
+      {d.linksMeasured === false && <p className="g-callout g-text mb-3 text-[13px]" role="status" data-testid="outgoing-unmeasured">Most pages that loaded have no web (http/https) links saved from their HTML — one possible reason is links added by JavaScript, which the crawl does not run. (Phone and email links are not counted.) What is listed is only what the HTML had.</p>}
       <div className="mb-2 flex flex-wrap items-center gap-2 text-[13px]">
         <span className="g-text-2" data-testid="text-outgoing-meta">From the crawl of {d.scannedAt ? fmtDate(d.scannedAt) : "an unknown date"}: {fmtNum(d.links)} link{d.links === 1 ? "" : "s"} to {fmtNum(d.domains)} other website{d.domains === 1 ? "" : "s"}, from {fmtNum(d.pagesRead)} page{d.pagesRead === 1 ? "" : "s"} that loaded.</span>
         <button type="button" className="g-pill g-pill--sm ml-auto" disabled={!d.linkedDomains.length} onClick={exportCsv} data-testid="button-outgoing-export"><Download /> Export</button>
       </div>
       <section className="mb-4" data-testid="outgoing-broken">
-        <h3 className="g-text mb-1 text-[14px] font-medium">Checked links that did not answer normally ({fmtNum(d.broken.length)}{d.broken.some((b) => broken(b.answer)) ? `, ${fmtNum(d.broken.filter((b) => broken(b.answer)).length)} broken` : ""})</h3>
+        <h3 className="mb-1 text-[14px] font-medium" style={{ color: "var(--g-blue)" }}>Checked links that did not answer normally ({fmtNum(d.broken.length)}{d.broken.some((b) => broken(b.answer)) ? `, ${fmtNum(d.broken.filter((b) => broken(b.answer)).length)} broken` : ""})</h3>
         <p className="g-text-2 mb-2 text-[12px]">The crawl checks a sample of the addresses it did not crawl itself: {fmtNum(d.checkedAddresses)} of these websites' addresses were checked; links to the others ({fmtNum(d.uncheckedLinks)} page link{d.uncheckedLinks === 1 ? "" : "s"}) were not checked, so nothing is said about them.</p>
         {d.checkedAddresses === 0 ? <p className="g-text-2 text-[13px]" data-testid="outgoing-none-checked">No outgoing addresses were checked in this crawl, so nothing is said about whether they work.</p> : d.broken.length === 0 ? <p className="g-text-2 text-[13px]">Every checked address gave an ordinary answer (the check looks at the answer, not at what the page says).</p> : (
           <ul className="space-y-1 text-[13px]">
@@ -81,7 +83,7 @@ export function OutgoingLinksView({ site, crawlId }: { site: SeoSite; /** The ne
       </section>
       {d.linkedDomains.length === 0 ? <Empty testId="outgoing-none"><h3>No links to other websites</h3><p>{d.linksMeasured === null ? "No page loaded." : d.linksMeasured ? "The HTML of the pages read has no web links to other websites." : "No web links were saved from the HTML (one possible reason: links added by JavaScript)."}</p></Empty> : (
         <div className="overflow-x-auto">
-          <table className="g-table w-full" data-testid="table-outgoing">
+          <table className={COMPACT_TABLE} data-testid="table-outgoing">
             <thead><tr><th>Website</th><th className="num">Pages linking</th><th className="num">Links</th><th>For example</th><th className="num" title="Of its addresses the crawl checked: how many, and how many were gone or a server error">Checked / broken</th></tr></thead>
             <tbody>
               {d.linkedDomains.slice(0, shown).map((x) => (

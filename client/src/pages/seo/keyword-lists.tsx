@@ -12,7 +12,9 @@ import { Download, ListPlus, Loader2, Plus, RefreshCw, Trash2 } from "lucide-rea
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { api, Empty, fmtDate, fmtNum, isNotRunYet, kd, money, type SeoSite, type SeoStatus } from "./shell";
+import { api, Empty, fmtDate, fmtNum, isNotRunYet, money, type SeoSite, type SeoStatus } from "./shell";
+import { PALETTE } from "./viz";
+import { BarFigure, KdBadge } from "./viz-keywords";
 
 export type KwRow = { keyword: string; volume: number | null; cpc: number | null; difficulty: number | null; intent?: string | null };
 type List = { id: number; name: string; locationCode?: number; languageCode?: string; createdAt: string; keywords: number; volume: number };
@@ -72,6 +74,8 @@ function KeywordTable({ rows, picked, toggle, setPicked, onOpen, onRemove, testI
   const groups = useMemo(() => (grouped ? clusterKeywords(rows) : [{ term: null, rows: [...rows], volume: null, measured: 0 }]), [grouped, rows]);
   const topics = groups.filter((g) => g.term !== null).length;
   const cols = 6 + (onRemove ? 1 : 0);
+  // The biggest volume in the table: each row's bar is its share of it.
+  const maxVolume = Math.max(0, ...rows.map((r) => r.volume ?? 0));
   const pickGroup = (list: KwRow[], on: boolean) => { if (!setPicked) return; const n = new Set(picked); for (const r of list) on ? n.add(r.keyword) : n.delete(r.keyword); setPicked(n); };
   return (
     <div className="overflow-x-auto">
@@ -95,8 +99,8 @@ function KeywordTable({ rows, picked, toggle, setPicked, onOpen, onRemove, testI
             <tr key={r.keyword}>
               <td><input type="checkbox" aria-label={`Select ${r.keyword}`} checked={picked.has(r.keyword)} onChange={() => toggle(r.keyword)} /></td>
               <td>{onOpen ? <button type="button" className="g-link text-left" onClick={() => onOpen(r.keyword)} title="Open this keyword's overview">{r.keyword}</button> : r.keyword}</td>
-              <td className="num" data-label="Volume / mo">{fmtNum(r.volume)}</td>
-              <td className="num" data-label="Difficulty">{kd(r.difficulty)}</td>
+              <td className="num" data-label="Volume / mo"><BarFigure value={r.volume} max={maxVolume} color={PALETTE.keywords} /></td>
+              <td className="num" data-label="Difficulty"><KdBadge value={r.difficulty} /></td>
               <td className="num" data-label="CPC">{r.cpc == null ? "—" : `$${r.cpc.toFixed(2)}`}</td>
               <td data-label="Intent" className="g-text-2 capitalize">{r.intent ?? "—"}</td>
               {onRemove && <td className="num"><button type="button" className="g-pill g-pill--danger !min-h-8 !px-2" onClick={() => onRemove(r.keyword)} aria-label={`Remove ${r.keyword}`}><Trash2 /></button></td>}
@@ -239,7 +243,7 @@ export function KeywordLists({ status, site, onTrack, onOpen }: { status: SeoSta
             {all.length === 0 ? <p className="g-text-2 text-[13px]">No lists yet. Name one above, or tick keywords in any report and choose "Add to a list".</p> : (
               <ul className="space-y-0.5" aria-label="Your keyword lists">
                 {all.map((l) => (
-                  <li key={l.id}><button type="button" onClick={() => { setOpenId(l.id); clear(); }} aria-current={current === l.id ? "true" : undefined} className={`flex w-full items-baseline gap-2 rounded px-2 py-1.5 text-left text-[13px] ${current === l.id ? "g-text font-medium" : "g-text-2"}`} style={current === l.id ? { background: "var(--g-hover)" } : undefined} data-testid={`list-${l.id}`}>
+                  <li key={l.id}><button type="button" onClick={() => { setOpenId(l.id); clear(); }} aria-current={current === l.id ? "true" : undefined} className={`flex w-full items-baseline gap-2 rounded-md px-2 py-1.5 text-left text-[13px] ${current === l.id ? "font-medium" : "g-text"}`} style={current === l.id ? { background: "var(--g-accent-soft)", color: "var(--g-blue)" } : undefined} data-testid={`list-${l.id}`}>
                     <span className="min-w-0 flex-1 truncate">{l.name}{sameMarket(l, DEFAULT_MARKET) ? "" : <span className="g-text-2 font-normal"> · {marketLabel(l.locationCode ?? 2840, l.languageCode ?? "en")}</span>}</span><span className="tabular-nums">{fmtNum(l.keywords)}</span>
                   </button></li>
                 ))}
@@ -253,7 +257,7 @@ export function KeywordLists({ status, site, onTrack, onOpen }: { status: SeoSta
             {items.data && (
               <>
                 <div className="mb-2 flex flex-wrap items-center gap-2 text-[13px]">
-                  <h3 className="g-text text-[17px] font-medium">{items.data.list.name}</h3>
+                  <h3 className="text-[17px] font-medium [overflow-wrap:anywhere]" style={{ color: "var(--g-blue)" }}>{items.data.list.name}</h3>
                   <span className="g-text-2">{fmtNum(rows.length)} keyword{rows.length === 1 ? "" : "s"} · {(() => { const known = rows.filter((r) => r.volume != null); return known.length === 0 ? "no search volumes yet" : `${fmtNum(known.reduce((a, r) => a + (r.volume ?? 0), 0))} searches a month ${known.length < rows.length ? `for the ${fmtNum(known.length)} with a figure` : "in total"}`; })()}</span>
                   <span className="ml-auto flex flex-wrap items-center gap-2">
                     {onTrack && site && <button type="button" className="g-pill g-pill--sm" disabled={!chosen.length} onClick={() => onTrack(chosen, listMarket)} data-testid="button-list-track"><Plus /> Track {chosen.length || ""} on {site.domain}</button>}

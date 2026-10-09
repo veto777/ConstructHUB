@@ -10,10 +10,12 @@ import { Download, Loader2, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { api, Empty, fmtDate, fmtNum, isNotRunYet, money, Tile, type SeoSite, type SeoStatus } from "./shell";
+import { api, Empty, fmtDate, fmtNum, isNotRunYet, money, type SeoSite, type SeoStatus } from "./shell";
 import { AddToList, type KwRow } from "./keyword-lists";
 import { AddToPlan, type PlanTask } from "./plan-button";
 import { DEFAULT_MARKET, findMarket } from "@shared/seo-markets";
+import { MetricColumn, PALETTE } from "./viz";
+import { BarFigure, Card, MetricRow } from "./viz-keywords";
 
 type Cell = { service: string; town: string; keyword: string; volume: number | null; difficulty: number | null; cpc: number | null; position: number | null; url: string | null; home: boolean };
 type Data = { domain: string; locationCode?: number; languageCode?: string; fetchedAt: string; services: string[]; towns: string[]; cells: Cell[]; summary: { cells: number; gaps: number | null; gapVolume: number | null; weak: number | null; strong: number | null; unknown: number | null }; missing: string[] };
@@ -24,15 +26,20 @@ const parse = (text: string) => [...new Set(text.split(/\n/).map((s) => s.toLowe
 const MAX_CHARS = 80, MAX_WORDS = 10;
 const csvCell = (v: string | number | null) => { const s = v == null ? "" : String(v); return `"${(typeof v !== "number" && /^[=+\-@\t\r]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`; };
 
-/** What a cell says, in colour and in words (colour is never the only signal). */
+/** A gap — searched, and no ranking found — is the one thing here shown in red: it is what needs doing. */
+const GAP_RED = "#c5221f";
+/**
+ * What a cell says, in colour and in words (colour is never the only signal). Positions wear the dashboard's orange
+ * shades — deep for the first three, light for the rest of page one, grey beyond — so the only red is a gap.
+ */
 function state(c: Cell, rankingsKnown: boolean, volumesKnown: boolean): { bg: string; fg: string; label: string; words: string } {
   if (c.position !== null) {
-    if (c.position <= 3) return { bg: "#188038", fg: "#fff", label: `#${c.position}`, words: `the keyword database has you at ${c.position}` };
-    if (c.position <= 10) return { bg: "#f9ab00", fg: "#202124", label: `#${c.position}`, words: `the keyword database has you at ${c.position}, on page one` };
-    return { bg: "#e8710a", fg: "#202124", label: `#${c.position}`, words: `the keyword database has you at ${c.position}, beyond page one` };
+    if (c.position <= 3) return { bg: PALETTE.top3, fg: "#fff", label: `#${c.position}`, words: `the keyword database has you at ${c.position}` };
+    if (c.position <= 10) return { bg: PALETTE.top10, fg: "#202124", label: `#${c.position}`, words: `the keyword database has you at ${c.position}, on page one` };
+    return { bg: PALETTE.rest, fg: "#202124", label: `#${c.position}`, words: `the keyword database has you at ${c.position}, beyond page one` };
   }
   if (!rankingsKnown) return { bg: "var(--g-divider)", fg: "var(--g-text)", label: "?", words: "your ranking didn't load" };
-  if ((c.volume ?? 0) > 0) return { bg: "#c5221f", fg: "#fff", label: "Gap", words: "the keyword database has no ranking for you in its first 100" };
+  if ((c.volume ?? 0) > 0) return { bg: GAP_RED, fg: "#fff", label: "Gap", words: "the keyword database has no ranking for you in its first 100" };
   if (!volumesKnown) return { bg: "var(--g-divider)", fg: "var(--g-text)", label: "?", words: "the search volume didn't load, and no ranking was found for you" };
   return { bg: "transparent", fg: "var(--g-text-2)", label: "—", words: "too few searches to measure, and no ranking was found for you" };
 }
@@ -87,6 +94,8 @@ export function ServicePlanner({ site, status, onTrack }: { site: SeoSite | null
   const chosen = (d?.cells ?? []).filter((c) => picked.has(c.keyword));
   const toggle = (k: string) => setPicked((s) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n; });
   const gaps = rankingsKnown ? (d?.cells ?? []).filter((c) => c.position === null && (c.volume ?? 0) > 0) : [];
+  // The most-searched pairing in the table: each cell's bar is its share of it.
+  const maxVolume = Math.max(0, ...(d?.cells ?? []).map((c) => c.volume ?? 0));
   const market = site ? findMarket(site.locationCode, site.languageCode) ?? DEFAULT_MARKET : DEFAULT_MARKET;
   const exportCsv = () => d && (() => {
     const rows: (string | number | null)[][] = [["Service", "Town", "Search", "Searches / mo", "Difficulty", "Your position", "Your page"], ...d.cells.map((c) => [c.service, c.town, c.keyword, c.volume, c.difficulty, c.position, c.url])];
@@ -134,12 +143,14 @@ export function ServicePlanner({ site, status, onTrack }: { site: SeoSite | null
       {d && stale && <Empty testId="planner-stale"><h3>This table was made for another country</h3><p>{site.domain} is now set to {market.label}; the saved table is not shown as its numbers.</p><Button className="mt-2" disabled={run.isPending || !status?.configured || !canPay || !body} onClick={() => body && run.mutate({ url: base, body, key: queryKey, again: true })} data-testid="button-planner-rebuild">{run.isPending ? "Checking…" : `Build it for ${market.label}${price != null ? ` — up to ${money(price)}` : ""}`}</Button></Empty>}
       {d && !stale && (
         <>
-          <div className="g-tiles mb-3">
-            <Tile label="Gaps" value={d.summary.gaps == null ? "—" : fmtNum(d.summary.gaps)} hint={d.summary.gaps == null ? (rankingsKnown ? "the search volumes didn't load" : "your rankings didn't load") : `searched ${fmtNum(d.summary.gapVolume)} times a month between them`} testId="tile-planner-gaps" />
-            <Tile label="Beyond the first three" value={d.summary.weak == null ? "—" : fmtNum(d.summary.weak)} hint={d.summary.weak == null ? "your rankings didn't load" : "ranked in the keyword database, with room to move up"} testId="tile-planner-weak" />
-            <Tile label="In the first three" value={d.summary.strong == null ? "—" : fmtNum(d.summary.strong)} hint={d.summary.strong == null ? "your rankings didn't load" : undefined} testId="tile-planner-strong" />
-            <Tile label="Nothing known" value={d.summary.unknown == null ? "—" : fmtNum(d.summary.unknown)} hint={d.summary.unknown == null ? "part of the table didn't load" : "too few searches to measure"} testId="tile-planner-unknown" />
-          </div>
+          <Card className="mb-3">
+            <MetricRow cols={4}>
+              <MetricColumn label="Gaps" value={d.summary.gaps == null ? "—" : fmtNum(d.summary.gaps)} foot={d.summary.gaps == null ? (rankingsKnown ? "the search volumes didn't load" : "your rankings didn't load") : `searched ${fmtNum(d.summary.gapVolume)} times a month between them`} testId="tile-planner-gaps" />
+              <MetricColumn label="Beyond the first three" value={d.summary.weak == null ? "—" : fmtNum(d.summary.weak)} foot={d.summary.weak == null ? "your rankings didn't load" : "ranked in the keyword database, with room to move up"} testId="tile-planner-weak" />
+              <MetricColumn label="In the first three" value={d.summary.strong == null ? "—" : fmtNum(d.summary.strong)} foot={d.summary.strong == null ? "your rankings didn't load" : undefined} testId="tile-planner-strong" />
+              <MetricColumn label="Nothing known" value={d.summary.unknown == null ? "—" : fmtNum(d.summary.unknown)} foot={d.summary.unknown == null ? "part of the table didn't load" : "too few searches to measure"} testId="tile-planner-unknown" />
+            </MetricRow>
+          </Card>
           <p className="g-text-2 mb-2 text-[13px]" data-testid="text-planner-meta">
             {d.services.length} service{d.services.length === 1 ? "" : "s"} × {d.towns.length} town{d.towns.length === 1 ? "" : "s"} for {d.domain} · {market.label} · as of {fmtDate(d.fetchedAt)} ·{" "}
             <button type="button" className="g-link" disabled={run.isPending || !canPay || !status?.configured || !body} onClick={() => body && run.mutate({ url: base, body, key: queryKey, again: true })} data-testid="button-planner-refresh">{run.isPending ? "Checking…" : `Check again${price != null ? ` — up to ${money(price)}` : ""}`}</button>
@@ -170,8 +181,8 @@ export function ServicePlanner({ site, status, onTrack }: { site: SeoSite | null
                       <button type="button" onClick={() => toggle(c.keyword)} aria-pressed={on} data-testid={`cell-${s}-${t}`.replace(/\s+/g, "-")}
                         aria-label={`${c.keyword}: ${c.volume != null ? `${fmtNum(c.volume)} searches a month` : volumesKnown ? "too few searches to measure" : "search volume didn't load"}; ${st.words}${c.home ? ", with your home page" : ""}`}
                         title={c.url ? `${c.keyword} → ${c.url.replace(/^https?:\/\/(www\.)?/, "")}` : c.keyword}
-                        className="flex w-full min-w-[96px] items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left text-[13px]" style={{ borderColor: on ? "var(--g-blue, #1a73e8)" : "var(--g-divider)", outline: on ? "2px solid var(--g-blue, #1a73e8)" : undefined }}>
-                        <span className="tabular-nums">{c.volume != null ? fmtNum(c.volume) : <span className="g-text-2">—</span>}</span>
+                        className="flex w-full min-w-[104px] items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left text-[13px]" style={{ borderColor: on ? "var(--g-blue, #1a73e8)" : "var(--g-divider)", outline: on ? "2px solid var(--g-blue, #1a73e8)" : undefined }}>
+                        <BarFigure value={c.volume} max={maxVolume} color={PALETTE.keywords} align="start" width={40} />
                         <span className="rounded px-1.5 py-0.5 text-[12px] font-medium tabular-nums" style={{ background: st.bg, color: st.fg }}>{st.label}{c.home ? " ⌂" : ""}</span>
                       </button>
                     </td>
@@ -182,7 +193,7 @@ export function ServicePlanner({ site, status, onTrack }: { site: SeoSite | null
           </div>
           <ul className="g-text-2 mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[12px]" aria-label="What the cells show">
             <li>Left: searches a month</li><li>Right: your position</li>
-            {[["#188038", "1–3"], ["#f9ab00", "4–10"], ["#e8710a", "11–100"], ["#c5221f", "Gap: searched, no ranking found"]].map(([col, l]) => <li key={l} className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded" style={{ background: col }} aria-hidden /> {l}</li>)}
+            {[[PALETTE.top3, "1–3"], [PALETTE.top10, "4–10"], [PALETTE.rest, "11–100"], [GAP_RED, "Gap: searched, no ranking found"]].map(([col, l]) => <li key={l} className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded" style={{ background: col }} aria-hidden /> {l}</li>)}
             <li>⌂ your home page is what ranks</li><li>— too few searches to measure</li>
           </ul>
           <p className="g-text-2 mt-2 text-[12px]">Searches a month are counted across {market.label} for those exact words, not just near you — a town name that another state also has counts both. Positions are estimates from the keyword database, not live checks, and "no ranking found" means the database has none in its first 100 — not proof there is none. "Track" checks a search every week for {market.label} as a whole; to have it checked from a town, add it in the rank tracker with that town as its place.</p>

@@ -9,6 +9,7 @@ import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { fmtDate, fmtNum, type SeoSite } from "./shell";
 import { AddToPlan, type PlanTask } from "./plan-button";
+import { SectionTitle, TABLE } from "./viz-rank";
 
 type Member = { keywordId: number; keyword: string; volume: number | null; position: number | null; page: string | null; shared: number; of: number; checkedOn?: string | null };
 type Group = { location: string | null; locationCode: number | null; members: Member[]; volume: number | null; measured: number; ownPages: string[]; ownDistinct?: number; unranked: number; rankedNoPage?: number; from?: string | null; to?: string | null };
@@ -30,7 +31,7 @@ export function SerpGroupsPanel({ site }: { site: SeoSite }) {
   const shownDevice = d?.device ?? (device || (site.devices === "mobile" ? "mobile" : "desktop"));
   const head = (
     <div className="mb-1 flex flex-wrap items-baseline gap-2">
-      <h2 className="g-text text-[16px] font-medium">Searches with largely the same results</h2>
+      <SectionTitle>Searches with largely the same results</SectionTitle>
       {site.devices === "both" && <span className="flex gap-1" role="group" aria-label="Device">{["desktop", "mobile"].map((v) => <button key={v} type="button" className="g-pill g-pill--sm" aria-pressed={shownDevice === v} style={shownDevice === v ? { borderColor: "var(--g-blue)", color: "var(--g-blue)" } : undefined} onClick={() => { setDevice(v); setOpen(null); }} data-testid={`button-serp-device-${v}`}>{v === "desktop" ? "Desktop" : "Mobile"}</button>)}</span>}
     </div>
   );
@@ -70,7 +71,7 @@ export function SerpGroupsPanel({ site }: { site: SeoSite }) {
         <>
           {split.length > 0 && <p className="g-text mb-2 text-[13px]" data-testid="text-serp-groups-split">In {fmtNum(split.length)} group{split.length === 1 ? "" : "s"}, more than one address of yours ranks for searches with overlapping results — worth opening them to see whether they are different pages, and what each is for.</p>}
           <div className="overflow-x-auto">
-            <table className="g-table w-full" data-testid="table-serp-groups">
+            <table className={TABLE} data-testid="table-serp-groups">
               <thead><tr><th aria-label="Show the keywords" className="w-12" /><th>Group (its first keyword)</th><th className="num">Keywords</th><th className="num">Volume / mo</th><th>Your addresses that rank</th><th><span className="sr-only">Action plan</span></th></tr></thead>
               {shown.map((g, gi) => {
                 const isOpen = open === gi, first = g.members[0], noPage = g.rankedNoPage ?? 0, ranked = g.members.length - g.unranked;
@@ -84,7 +85,7 @@ export function SerpGroupsPanel({ site }: { site: SeoSite }) {
                       <td className="max-w-[20rem]">
                         {ranked === 0 ? <span className="g-text-2">Your site was not found for any of them</span>
                           : g.ownPages.length === 0 ? <span className="g-text-2">Ranks for {ranked}, page not recorded</span>
-                          : distinct(g) > 1 ? <span><span style={{ color: "#b06000" }}>{distinct(g)} addresses</span><span className="g-text-2 block text-[12px]">{g.ownPages.length > distinct(g) ? `${g.ownPages.length} as recorded; ` : ""}whether they are different pages is not checked (one may redirect to another)</span></span>
+                          : distinct(g) > 1 ? <span><span className="g-text font-medium">{distinct(g)} addresses</span><span className="g-text-2 block text-[12px]">{g.ownPages.length > distinct(g) ? `${g.ownPages.length} as recorded; ` : ""}whether they are different pages is not checked (one may redirect to another)</span></span>
                           : g.ownPages.length > 1 ? <span>{g.ownPages.length} addresses that may be one page<span className="g-text-2 block text-[12px]">they differ only by http/https, "www" or a last slash — not checked</span></span>
                           : <span className="block truncate" title={g.ownPages[0]}>{nameOf(g.ownPages[0], site.domain)}</span>}
                         {ranked > 0 && (g.unranked > 0 || (noPage > 0 && g.ownPages.length > 0)) && <span className="g-text-2 block text-[12px]">{[g.unranked > 0 ? `not found for ${g.unranked}` : "", noPage > 0 && g.ownPages.length > 0 ? `page not recorded for ${noPage}` : ""].filter(Boolean).join(" · ")}</span>}

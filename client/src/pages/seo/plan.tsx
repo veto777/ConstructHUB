@@ -10,7 +10,9 @@ import { Check, ExternalLink, Loader2, Play, Plus, RotateCcw, Trash2, X } from "
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { api, Empty, fmtDate, fmtNum, SeoShell, Tile, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { api, Empty, fmtDate, fmtNum, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { MetricColumn } from "./viz";
+import { CARD, MetricRow } from "./viz-more";
 
 type Kind = "keyword" | "page" | "link_reclaim" | "link_prospect" | "audit" | "other";
 type Status = "todo" | "doing" | "done" | "dropped";
@@ -116,12 +118,15 @@ export default function SeoPlanPage() {
       {site && q.isError && <div className="g-callout" role="alert"><h3>Couldn't load the plan</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>}
       {site && q.data && (
         <>
-          <div className="g-tiles mb-4">
-            <Tile label="To do" value={fmtNum(counts?.todo ?? 0)} testId="tile-plan-todo" />
-            <Tile label="In progress" value={fmtNum(counts?.doing ?? 0)} testId="tile-plan-doing" />
-            <Tile label="Done in the last 30 days" value={fmtNum(counts?.doneRecently ?? 0)} testId="tile-plan-done" />
-            <Tile label="Done in all" value={fmtNum(counts?.done ?? 0)} testId="tile-plan-total" />
-            {overdue > 0 && <Tile label="Past their due date" value={fmtNum(overdue)} testId="tile-plan-overdue" />}
+          {/* The plan's counts in one row (as the dashboard lays a site's figures out). */}
+          <div className="mb-4 rounded-xl border p-3 sm:p-4" style={CARD}>
+            <MetricRow cols={overdue > 0 ? 5 : 4} testId="plan-summary">
+              <MetricColumn label="To do" value={fmtNum(counts?.todo ?? 0)} testId="tile-plan-todo" />
+              <MetricColumn label="In progress" value={fmtNum(counts?.doing ?? 0)} testId="tile-plan-doing" />
+              <MetricColumn label="Done in the last 30 days" value={fmtNum(counts?.doneRecently ?? 0)} testId="tile-plan-done" />
+              <MetricColumn label="Done in all" value={fmtNum(counts?.done ?? 0)} testId="tile-plan-total" />
+              {overdue > 0 && <MetricColumn label="Past their due date" value={fmtNum(overdue)} testId="tile-plan-overdue" />}
+            </MetricRow>
           </div>
           <form className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center" onSubmit={(e) => { e.preventDefault(); if (title.trim()) add.mutate({ siteId: site.id, title: title.trim() }); }} data-testid="form-plan-add">
             <label className="min-w-0 flex-1 sm:max-w-xl"><span className="sr-only">A task of your own</span>

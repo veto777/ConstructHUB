@@ -1,16 +1,25 @@
-/** /seo/backlinks — the monthly backlink snapshot (summary tiles + top backlinks), "Refresh now". */
+/**
+ * /seo/backlinks — the monthly backlink snapshot: a row of figures (each against the snapshot before, when there is
+ * one), the links found gone since the last snapshot, the strongest linking pages, and "Refresh now".
+ */
 import { AddToPlan } from "./plan-button";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { api, money, canAfford, Empty, fmtDate, fmtNum, Move, priceOf, SeoShell, Tile, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { api, money, Empty, fmtDate, fmtNum, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { DeltaBadge, DistributionBar, MetricColumn, PALETTE } from "./viz";
+import { CARD, Heading, MetricRow, PairBars } from "./viz-more";
 
 type Summary = { rank: number | null; backlinks: number | null; referringDomains: number | null; referringPages: number | null; brokenBacklinks: number | null; newBacklinks: number | null; lostBacklinks: number | null; newReferringDomains: number | null; lostReferringDomains: number | null; spamScore: number | null; totalCount?: number | null };
 type Backlink = { domainFrom: string | null; urlFrom: string | null; urlTo: string | null; anchor: string | null; dofollow: boolean; rank: number | null; domainRank: number | null; spamScore: number | null; firstSeen: string | null; isNew: boolean; isLost: boolean };
 type Lost = { domain: string; authority: number | null; spam?: number | null; from: string | null; to: string | null; anchor: string | null; lastSeen: string | null; follow: boolean };
 type Data = { configured: boolean; snapshot: { takenOn: string; summary: Summary; backlinks: Backlink[]; changes?: { since: string; lost: Lost[]; lostTotal: number | null; failed?: boolean } | null } | null; refreshCents?: number; previous: { takenOn: string; summary: Summary } | null; nextSnapshotAt: string | null };
+
+/** "+12 new · −3 lost", or a plain "not available" when the snapshot carries neither count (never "+— new"). */
+const flow = (added: number | null | undefined, lost: number | null | undefined, tail = "") =>
+  added == null && lost == null ? "New and lost: not available" : `+${fmtNum(added)} new · −${fmtNum(lost)} lost${tail}`;
 
 export default function SeoBacklinksPage() {
   const status = useSeoStatus();
@@ -33,7 +42,11 @@ export default function SeoBacklinksPage() {
   const credits = status.data?.credits;
   const canRefresh = refreshCents == null || !credits || credits.availableCents === -1 || credits.availableCents >= refreshCents;
   const d = data.data, s = d?.snapshot?.summary, p = d?.previous?.summary;
-  const diff = (a: number | null | undefined, b: number | null | undefined) => a != null && b != null && a !== b ? <Move now={-a} before={-b} /> : null;
+  // The move since the snapshot before: more is better, except for spam (`upIsBad`).
+  const diff = (a: number | null | undefined, b: number | null | undefined, upIsBad = false) => a != null && b != null ? <DeltaBadge value={a - b} label={`Change since the snapshot of ${fmtDate(d?.previous?.takenOn)}`} upIsBad={upIsBad} /> : null;
+  // Two snapshots side by side: the earlier one paler. Nothing is drawn without an earlier snapshot.
+  const pair = (now: number | null | undefined, before: number | null | undefined) => d?.previous && now != null && before != null ? <PairBars before={before} now={now} beforeLabel={fmtDate(d.previous.takenOn)} nowLabel={fmtDate(d.snapshot?.takenOn)} /> : undefined;
+  const listed = d?.snapshot?.backlinks ?? [], dofollow = listed.filter((b) => b.dofollow).length;
   return (
     <SeoShell title="Backlinks" description="Who links to your site: a fresh snapshot every month, refreshable any time." site={site} onSite={onSite} sites={sites} status={status}
       actions={site && d && <Button className="w-full sm:w-auto" disabled={!configured || refresh.isPending || !canRefresh} onClick={() => refresh.mutate()} data-testid="button-refresh-backlinks" title={!configured ? "Rank tracking is being switched on for your account" : !canRefresh ? "Not enough SEO data left — add credit above" : undefined}>{refresh.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}Refresh now{refreshCents != null ? ` — up to ${money(refreshCents)}` : ""}</Button>}>
@@ -44,15 +57,19 @@ export default function SeoBacklinksPage() {
       {site && d?.snapshot && s && (
         <>
           <p className="g-text-2 mb-3 text-[13px]" data-testid="text-snapshot-meta">Snapshot from {fmtDate(d.snapshot.takenOn)}{p && d.previous ? ` · compared with ${fmtDate(d.previous.takenOn)}` : ""} · next automatic snapshot {fmtDate(d.nextSnapshotAt)}</p>
-          <div className="g-tiles mb-5">
-            <Tile label="Domain rank" value={s.rank ?? "—"} hint="Link authority, 0–1000" testId="tile-rank" />
-            <Tile label="Backlinks" value={<>{fmtNum(s.backlinks)} {diff(s.backlinks, p?.backlinks)}</>} hint={`+${fmtNum(s.newBacklinks)} new · −${fmtNum(s.lostBacklinks)} lost (30 days)`} testId="tile-backlinks" />
-            <Tile label="Referring domains" value={<>{fmtNum(s.referringDomains)} {diff(s.referringDomains, p?.referringDomains)}</>} hint={`+${fmtNum(s.newReferringDomains)} new · −${fmtNum(s.lostReferringDomains)} lost`} testId="tile-domains" />
-            <Tile label="Spam score" value={s.spamScore ?? "—"} hint={`${fmtNum(s.brokenBacklinks)} broken backlinks`} testId="tile-spam" />
+          {/* The snapshot's figures in one row, each with its move since the snapshot before (and both snapshots as bars). */}
+          <div className="mb-5 rounded-xl border p-3 sm:p-4" style={CARD}>
+            <MetricRow cols={5} testId="backlinks-summary">
+              <MetricColumn label="Domain rank" testId="tile-rank" value={s.rank ?? "—"} delta={diff(s.rank, p?.rank)} foot="Link authority, 0–1000" chart={pair(s.rank, p?.rank)} />
+              <MetricColumn label="Backlinks" testId="tile-backlinks" value={fmtNum(s.backlinks)} delta={diff(s.backlinks, p?.backlinks)} foot={flow(s.newBacklinks, s.lostBacklinks, " (30 days)")} chart={pair(s.backlinks, p?.backlinks)} />
+              <MetricColumn label="Referring domains" testId="tile-domains" value={fmtNum(s.referringDomains)} delta={diff(s.referringDomains, p?.referringDomains)} foot={flow(s.newReferringDomains, s.lostReferringDomains)} chart={pair(s.referringDomains, p?.referringDomains)} />
+              <MetricColumn label="Referring pages" testId="tile-pages" value={fmtNum(s.referringPages)} delta={diff(s.referringPages, p?.referringPages)} foot="Pages with at least one link to the site" chart={pair(s.referringPages, p?.referringPages)} />
+              <MetricColumn label="Spam score" testId="tile-spam" value={s.spamScore ?? "—"} delta={diff(s.spamScore, p?.spamScore, true)} foot={`${fmtNum(s.brokenBacklinks)} broken backlinks`} chart={pair(s.spamScore, p?.spamScore)} />
+            </MetricRow>
           </div>
           {d.snapshot.changes && (
             <section className="mb-5" data-testid="section-lost-links">
-              <h2 className="g-text mb-1 text-[15px] font-medium">Lost backlinks seen since {fmtDate(d.snapshot.changes.since)}</h2>
+              <Heading className="!mb-1">Lost backlinks seen since {fmtDate(d.snapshot.changes.since)}</Heading>
               {d.snapshot.changes.failed ? <p className="text-[13px]" role="status" style={{ color: "var(--g-red)" }} data-testid="text-lost-links-failed">This part didn't load with this snapshot and was not charged. Refresh to try again.</p>
               : d.snapshot.changes.lost.length === 0 ? <p className="g-text-2 text-[13px]" data-testid="text-no-lost-links">None found — no backlink that was still being seen after {fmtDate(d.snapshot.changes.since)} is now marked lost.</p> : (
                 <>
@@ -75,9 +92,18 @@ export default function SeoBacklinksPage() {
               )}
             </section>
           )}
-          {d.snapshot.backlinks.length > 0 && <h2 className="g-text mb-2 text-[15px] font-medium">Strongest linking pages</h2>}
+          {listed.length > 0 && (
+            <div className="mb-3 flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+              <Heading className="!mb-0">Strongest linking pages</Heading>
+              {/* Of the pages listed here only — not of every backlink the site has. */}
+              <div className="w-full max-w-xs" title={`Of the ${fmtNum(listed.length)} linking pages listed below`}>
+                <DistributionBar testId="backlinks-follow" parts={[{ label: "dofollow", value: dofollow, color: PALETTE.backlinks }, { label: "nofollow", value: listed.length - dofollow, color: PALETTE.rest }]} />
+                <p className="g-text-2 mt-0.5 text-[11px]">Of the {fmtNum(listed.length)} pages listed</p>
+              </div>
+            </div>
+          )}
           {d.snapshot.backlinks.length === 0 ? <Empty>{(s as { listFailed?: boolean }).listFailed ? <>The list of linking pages didn't load for this snapshot — the totals above are still right. Refresh to try again.</> : <>No live backlinks were found for {site.domain}.</>}</Empty> : (
-            <table className="g-table" data-testid="table-backlinks">
+            <div className="overflow-x-auto"><table className="g-table" data-testid="table-backlinks">
               <thead><tr><th>Linking page</th><th>Anchor</th><th>Links to</th><th className="num">Domain rank</th><th className="num">Spam</th><th>Follow</th><th className="num">First seen</th></tr></thead>
               <tbody>
                 {d.snapshot.backlinks.map((b, i) => (
@@ -92,7 +118,7 @@ export default function SeoBacklinksPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           )}
         </>
       )}

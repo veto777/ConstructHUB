@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { fmtDate, fmtNum, type SeoSite } from "./shell";
+import { SectionTitle, TABLE } from "./viz-rank";
 
 type Row = { tag: string | null; keywords: number; checked: number; ranked: number; top3: number; top10: number; averagePosition: number | null; visibility: number | null; compared: number; weighted: boolean; changeWeighted: boolean | null; visibilityChange: number | null; top10Change: number | null; positionNow: number | null; positionBefore: number | null; rankedBoth: number; newSince: number };
 type Span = { from: string; to: string; keywords: number };
@@ -41,7 +42,7 @@ export function RankTagsPanel({ site }: { site: SeoSite }) {
   return (
     <section className="mb-5" data-testid="rank-tags" aria-busy={q.isFetching}>
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <h2 className="g-text text-[16px] font-medium">By tag</h2>
+        <SectionTitle>By tag</SectionTitle>
         {shell.devices.length > 1 && (
           <div className="flex gap-1" role="group" aria-label="Device">
             {shell.devices.map((x) => <button key={x} type="button" className="g-pill g-pill--sm" aria-pressed={(device ?? shell.device) === x} style={(device ?? shell.device) === x ? { borderColor: "var(--g-blue)", color: "var(--g-blue)" } : undefined} onClick={() => setDevice(x)} data-testid={`button-tags-${x}`}>{x === "desktop" ? "Desktop" : "Mobile"}</button>)}
@@ -57,7 +58,7 @@ export function RankTagsPanel({ site }: { site: SeoSite }) {
       {d.rows.length === 0 && <p className="g-text-2 mb-2 text-[13px]" data-testid="text-tags-none">None of these keywords has a tag yet. Give keywords a tag (a service, a town) when you add them, and each tag gets its own row here.</p>}
       {d.now && (
         <div className="overflow-x-auto">
-          <table className="g-table w-full" data-testid="table-rank-tags">
+          <table className={TABLE} data-testid="table-rank-tags">
             <thead><tr><th>Tag</th><th className="num">Keywords</th><th className="num">Visibility index</th><th className="num">In the top 10</th><th className="num">Avg. position</th><th className="num">New since</th></tr></thead>
             <tbody>
               {list.map((r) => (

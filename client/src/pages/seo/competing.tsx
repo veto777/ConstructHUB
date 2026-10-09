@@ -9,6 +9,7 @@ import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { fmtDate, fmtNum, type SeoSite } from "./shell";
 import { AddToPlan, type PlanTask } from "./plan-button";
+import { SectionTitle, TABLE } from "./viz-rank";
 
 type Page = { url: string; times: number; best: number; lastSeen: string; lastPosition: number };
 type Item = { keywordId: number; keyword: string; volume: number | null; location: string | null; device: string; kind: "alternating" | "changed" | "variants"; checks: number; firstRanked: string; lastRanked: string; lastRankedAny?: string; lastCheck: string; switches: number; pages: Page[]; variants?: string[][] };
@@ -57,7 +58,7 @@ export function CompetingPages({ site }: { site: SeoSite }) {
   };
   const table = (items: Item[], testId: string) => (
     <div className="overflow-x-auto">
-      <table className="g-table w-full" data-testid={testId}>
+      <table className={TABLE} data-testid={testId}>
         <thead><tr><th aria-label="Show the pages" className="w-12" /><th>Keyword</th><th className="num">Volume / mo</th><th className="num" title="Checks in which your site ranked, and when">Ranked checks</th><th className="num" title="Times the page shown was not the one from the ranked check before">Page changes</th><th>Last shown</th><th><span className="sr-only">Action plan</span></th></tr></thead>
         <tbody>
           {items.map((i) => {
@@ -93,7 +94,7 @@ export function CompetingPages({ site }: { site: SeoSite }) {
   );
   return (
     <section className="mb-5" data-testid="rank-competing">
-      <h2 className="g-text text-[16px] font-medium">The page Google shows for each search</h2>
+      <SectionTitle>The page Google shows for each search</SectionTitle>
       <p className="g-text-2 mb-2 text-[12px]" data-testid="text-competing-basis">{basis}. One page is recorded per check per device.</p>
       {alternating.length > 0 ? (
         <>

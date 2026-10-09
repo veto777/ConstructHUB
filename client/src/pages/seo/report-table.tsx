@@ -12,7 +12,8 @@ import { Download, Loader2, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { api, canAfford, Empty, fmtDate, fmtNum, kd, money, type SeoStatus } from "./shell";
+import { api, canAfford, Empty, fmtDate, fmtNum, money, type SeoStatus } from "./shell";
+import { DifficultyBadge, PositionBadge } from "./viz";
 
 export type TableKey =
   | "keywords" | "paidKeywords" | "pages" | "competitors" | "backlinks" | "newBacklinks" | "lostBacklinks" | "brokenBacklinks"
@@ -32,10 +33,10 @@ const Ext = ({ href, children }: { href: string; children: ReactNode }) => <a hr
 type Col = { key: string; label: string; num?: boolean; cell: (r: any, ctx: { target: string; onExplore?: (d: string) => void }) => ReactNode; csv: (r: any) => string | number | null };
 const kwCols: Col[] = [
   { key: "keyword", label: "Keyword", cell: (r) => r.keyword, csv: (r) => r.keyword },
-  { key: "position", label: "Position", num: true, cell: (r) => r.position ?? "—", csv: (r) => r.position },
+  { key: "position", label: "Position", num: true, cell: (r) => <PositionBadge value={r.position} />, csv: (r) => r.position },
   { key: "volume", label: "Volume", num: true, cell: (r) => fmtNum(r.volume), csv: (r) => r.volume },
   { key: "traffic", label: "Traffic", num: true, cell: (r) => fmtNum(r.traffic), csv: (r) => r.traffic },
-  { key: "difficulty", label: "Difficulty", num: true, cell: (r) => kd(r.difficulty), csv: (r) => r.difficulty },
+  { key: "difficulty", label: "Difficulty", num: true, cell: (r) => <DifficultyBadge value={r.difficulty} />, csv: (r) => r.difficulty },
   { key: "cpc", label: "CPC", num: true, cell: (r) => usd2(r.cpc), csv: (r) => r.cpc },
   { key: "intent", label: "Intent", cell: (r) => (r.intent ? cap(r.intent) : "—"), csv: (r) => r.intent },
   { key: "url", label: "Page", cell: (r, c) => (r.url ? <Ext href={r.url}>{strip(r.url).replace(c.target, "") || "/"}</Ext> : "—"), csv: (r) => r.url },
@@ -43,7 +44,7 @@ const kwCols: Col[] = [
 const ideaCols: Col[] = [
   { key: "keyword", label: "Keyword", cell: (r) => r.keyword, csv: (r) => r.keyword },
   { key: "volume", label: "Volume", num: true, cell: (r) => fmtNum(r.volume), csv: (r) => r.volume },
-  { key: "difficulty", label: "Difficulty", num: true, cell: (r) => kd(r.difficulty), csv: (r) => r.difficulty },
+  { key: "difficulty", label: "Difficulty", num: true, cell: (r) => <DifficultyBadge value={r.difficulty} />, csv: (r) => r.difficulty },
   { key: "cpc", label: "CPC", num: true, cell: (r) => usd2(r.cpc), csv: (r) => r.cpc },
   { key: "intent", label: "Intent", cell: (r) => (r.intent ? cap(r.intent) : "—"), csv: (r) => r.intent },
   { key: "competition", label: "Ad competition", cell: (r) => (r.competition ? cap(String(r.competition).toLowerCase()) : "—"), csv: (r) => r.competition },

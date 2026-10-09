@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { api, Empty, fmtDate, fmtNum, isNotRunYet, money, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { PALETTE } from "./viz";
+import { Figure } from "./viz-keywords";
 
 type Row = { url: string; domain: string; title: string; snippet: string | null; authority: number | null; published: string | null; quality: number | null; author: string | null };
 type Page = { query: string; rows: Row[]; total: number | null; sourceRows: number; limit: number; offset: number; fetchedAt: string };
@@ -97,6 +99,8 @@ export default function SeoContentPage() {
     const val = (u: string) => { const m = metricOf(u); return m ? (by === "links" ? m.linkingSites : m.traffic) : null; };
     return rows.map((r, i) => ({ r, i, v: val(r.url) })).sort((a, b) => (a.v == null ? 1 : 0) - (b.v == null ? 1 : 0) || (b.v ?? 0) - (a.v ?? 0) || a.i - b.i).map((x) => x.r);
   }, [saved.data, metrics.data, by]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The biggest linking-site count and visit figure on this page of results: each row's bar is its share of them.
+  const most = useMemo(() => { const ms = metrics.data?.page?.rows ?? []; return { links: Math.max(0, ...ms.map((m) => m.linkingSites ?? 0)), traffic: Math.max(0, ...ms.map((m) => m.traffic ?? 0)) }; }, [metrics.data]);
 
   return (
     <SeoShell title="Content explorer" description="Search the web for pages about a topic — who is writing about what you sell, how strong their site is, and when." site={site} onSite={onSite} sites={sites} status={status} picker={false}>
@@ -166,19 +170,29 @@ export default function SeoContentPage() {
           )}
           {page.rows.length === 0 ? <Empty testId="content-empty"><h3>No pages found</h3><p>Try fewer words, or loosen the filters.</p></Empty> : (
             <ul className="space-y-2" data-testid="list-content">
-              {ordered.map((r) => (
-                <li key={r.url} className="rounded-lg border p-3" style={{ borderColor: "var(--g-divider)", background: "var(--g-surface)" }}>
-                  <a href={r.url} target="_blank" rel="noreferrer nofollow" className="g-link text-[15px] font-medium">{r.title}</a>
-                  <div className="g-text-2 mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12px]">
-                    <Link href={`/seo/explorer?domain=${encodeURIComponent(r.domain)}`} className="g-link" title={`Open ${r.domain} in Site explorer`}>{r.domain}</Link>
-                    <span title="Link strength of the site, 0–100">authority {r.authority ?? "—"}</span>
-                    {r.published && <span>published {new Date(`${r.published}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>}
-                    {r.author && <span>by {r.author}</span>}
-                    {metricOf(r.url) && <span className="g-text" data-testid="content-page-metrics"><b className="font-medium tabular-nums">{metricOf(r.url)!.linkingSites == null ? "—" : fmtNum(metricOf(r.url)!.linkingSites)}</b> linking site{metricOf(r.url)!.linkingSites === 1 ? "" : "s"} · <b className="font-medium tabular-nums">{metricOf(r.url)!.traffic == null ? "—" : fmtNum(metricOf(r.url)!.traffic)}</b> <span title="An estimate of visits from Google searches made in the United States, in English">estimated US search visits / mo</span></span>}
+              {/* One card per page: the page and who wrote it on the left; its figures, each with an orange bar, on the right (underneath on a phone). */}
+              {ordered.map((r) => { const m = metricOf(r.url); return (
+                <li key={r.url} className="flex min-w-0 flex-col gap-3 rounded-xl border p-3 sm:flex-row sm:items-start sm:p-4" style={{ borderColor: "var(--g-divider)", background: "var(--g-surface)" }}>
+                  <div className="min-w-0 flex-1">
+                    <a href={r.url} target="_blank" rel="noreferrer nofollow" className="g-link text-[15px] font-medium [overflow-wrap:anywhere]">{r.title}</a>
+                    <div className="g-text-2 mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12px]">
+                      <Link href={`/seo/explorer?domain=${encodeURIComponent(r.domain)}`} className="g-link [overflow-wrap:anywhere]" title={`Open ${r.domain} in Site explorer`}>{r.domain}</Link>
+                      {r.published && <span>published {new Date(`${r.published}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>}
+                      {r.author && <span>by {r.author}</span>}
+                    </div>
+                    {r.snippet && <p className="g-text mt-1 text-[13px]">{r.snippet}</p>}
                   </div>
-                  {r.snippet && <p className="g-text mt-1 text-[13px]">{r.snippet}</p>}
+                  <div className="flex flex-wrap gap-x-5 gap-y-2 border-t pt-3 text-[14px] sm:w-[14rem] sm:shrink-0 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0 lg:w-auto lg:max-w-[26rem]" style={{ borderColor: "var(--g-divider)" }}>
+                    <Figure label="Authority" value={r.authority} max={100} color={PALETTE.authority} format={String} title="Link strength of the site, 0–100" />
+                    {m && (
+                      <span className="contents" data-testid="content-page-metrics">
+                        <Figure label={`Linking site${m.linkingSites === 1 ? "" : "s"}`} value={m.linkingSites} max={most.links} color={PALETTE.domains} />
+                        <Figure label="Estimated US search visits / mo" value={m.traffic} max={most.traffic} color={PALETTE.traffic} title="An estimate of visits from Google searches made in the United States, in English" />
+                      </span>
+                    )}
+                  </div>
                 </li>
-              ))}
+              ); })}
             </ul>
           )}
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px]">

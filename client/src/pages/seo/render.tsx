@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { api, Empty, fmtDate, fmtNum, money, useSeoStatus, type SeoSite } from "./shell";
+import { AMBER, COMPACT_TABLE } from "./viz-audit";
 
 type Side = { status: number | null; finalUrl?: string | null; measured?: boolean; words: number | null; internalLinks: number | null; externalLinks: number | null; images: number | null; title: string | null; h1: string | null };
 type Verdict = "same" | "more" | "less" | "unknown";
@@ -18,10 +19,11 @@ type Row = { url: string; plain: Side | null; rendered: Side | null; timing: { l
 type Run = { id: number; status: "running" | "done" | "failed"; urls: string[]; result: { rows: Row[]; summary: { pages: number; more: number; less: number; same: number; unknown: number }; fetchedAt: string } | null; error: string | null; at: string };
 type Data = { latest: Run | null; suggestions: string[]; max: number };
 
+/** Amber for a page that differs once JavaScript runs (a warning), green for one that does not, grey when unknown. */
 const VERDICT: Record<string, { label: string; color: string }> = {
-  needs_js: { label: "More once JavaScript runs", color: "#e8710a" },
-  more: { label: "More once JavaScript runs", color: "#e8710a" },
-  less: { label: "Less once JavaScript runs", color: "#e8710a" },
+  needs_js: { label: "More once JavaScript runs", color: AMBER },
+  more: { label: "More once JavaScript runs", color: AMBER },
+  less: { label: "Less once JavaScript runs", color: AMBER },
   same: { label: "Much the same", color: "var(--g-green)" },
   unknown: { label: "Could not be compared", color: "var(--g-text-2)" },
 };
@@ -91,8 +93,8 @@ export function RenderCheck({ site }: { site: SeoSite }) {
 
   return (
     <div data-testid="render-check">
-      <section className="mb-4 rounded-lg border p-4" style={{ borderColor: "var(--g-divider)" }}>
-        <h2 className="g-text text-[16px] font-medium">Your pages with and without JavaScript</h2>
+      <section className="mb-4 rounded-xl border p-3 sm:p-4" style={{ borderColor: "var(--g-divider)", background: "var(--g-surface)" }}>
+        <h2 className="text-[14px] font-medium" style={{ color: "var(--g-blue)" }}>Your pages with and without JavaScript</h2>
         <p className="g-text-2 mt-1 max-w-3xl text-[13px]">Each page is fetched twice: once as plain HTML, which is all a simple crawler and many AI assistants read, and once in a browser with JavaScript run. If words or links only show up in the second visit, anything that reads the HTML alone misses them. This compares two visits made for you just now — it does not measure what Google itself renders or indexes.</p>
         <fieldset className="mt-3" disabled={running}>
           <legend className="g-text text-[13px] font-medium">Pages to check <span className="g-text-2 font-normal">(up to {max})</span></legend>
@@ -128,7 +130,7 @@ export function RenderCheck({ site }: { site: SeoSite }) {
             Checked {fmtDate(run.result.fetchedAt)}: <strong>{differ}</strong> of {s.pages} page{s.pages === 1 ? "" : "s"} {differ === 1 ? "was" : "were"} clearly different once JavaScript had run, {s.same} much the same{s.unknown ? `, ${s.unknown} could not be compared` : ""}.
           </p>
           <div className="overflow-x-auto">
-            <table className="g-table w-full" data-testid="table-render">
+            <table className={COMPACT_TABLE} data-testid="table-render">
               <thead>
                 <tr><th rowSpan={2}>Page</th><th rowSpan={2}>Result</th><th colSpan={2} className="num">Words</th><th colSpan={2} className="num">Links to your own pages</th><th rowSpan={2} className="num" title="When the biggest thing on screen was painted, in the browser visit">Main content painted</th><th rowSpan={2} className="num" title="When the page finished loading, in the browser visit">Loaded</th></tr>
                 <tr><th className="num">HTML</th><th className="num">Browser</th><th className="num">HTML</th><th className="num">Browser</th></tr>
@@ -139,7 +141,7 @@ export function RenderCheck({ site }: { site: SeoSite }) {
                   return [
                     <tr key={r.url} data-testid={`row-render-${name}`}>
                       <td className="max-w-[18rem]"><button type="button" className="g-link truncate text-left" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : r.url)} title={r.url}>{name}</button></td>
-                      <td><span className="mr-2 inline-block h-2.5 w-2.5 rounded-full align-middle" style={{ background: VERDICT[r.verdict]?.color }} aria-hidden />{VERDICT[r.verdict]?.label ?? "Could not be compared"}</td>
+                      <td><span className="mr-2 inline-block h-2 w-2 rounded-full align-middle" style={{ background: VERDICT[r.verdict]?.color }} aria-hidden />{VERDICT[r.verdict]?.label ?? "Could not be compared"}</td>
                       <td className="num">{n(r.plain?.words)}</td><td className="num">{n(r.rendered?.words)}</td>
                       <td className="num">{n(r.plain?.internalLinks)}</td><td className="num">{n(r.rendered?.internalLinks)}</td>
                       <td className="num">{secs(r.timing?.lcp)}</td><td className="num">{secs(r.timing?.loaded)}</td>

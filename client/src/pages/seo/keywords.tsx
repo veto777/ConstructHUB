@@ -8,19 +8,20 @@
  * list is one lookup (free to reopen for a day). See server/seo/reports.ts.
  */
 import { ServicePlanner } from "./planner";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { holdNote, isNotRunYet, refreshSeoData } from "./shell";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Loader2, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { api, canAfford, Empty, fmtDate, fmtNum, kd, money, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { api, canAfford, Empty, fmtDate, fmtNum, money, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
 import { ReportView, type TableKey } from "./report-table";
 import { AddToList, BulkKeywords, KeywordLists } from "./keyword-lists";
 import { MarketPicker, useMarket } from "./market";
 import { findMarket, marketKey, type SeoMarket } from "@shared/seo-markets";
+import { GradientSpark, MetricColumn, monthLabel, PALETTE } from "./viz";
+import { BarFigure, Card, FeatureTag, Heading, KdBadge, MetricRow, MonthlyBars } from "./viz-keywords";
 
 type Overview = {
   missing?: string[];
@@ -36,15 +37,10 @@ type Overview = {
 
 const IDEAS: [TableKey, string][] = [["matchingTerms", "Matching terms"], ["relatedTerms", "Related terms"], ["questions", "Questions"]];
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-const monthLabel = (m: string) => new Date(`${m}-15T12:00:00`).toLocaleDateString("en-US", { month: "short", year: "numeric" });
 const FEATURE: Record<string, string> = {
   local_pack: "Map pack", people_also_ask: "People also ask", featured_snippet: "Featured snippet", images: "Images", video: "Videos", paid: "Ads",
   related_searches: "Related searches", people_also_search: "People also search", knowledge_graph: "Knowledge panel", shopping: "Shopping", top_stories: "Top stories", ai_overview: "AI overview",
 };
-
-function Stat({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
-  return <div className="g-tile"><div className="g-tile__label">{label}</div><div className="g-tile__value">{value}</div>{hint && <div className="g-tile__hint">{hint}</div>}</div>;
-}
 
 export default function SeoKeywordsPage() {
   const status = useSeoStatus();
@@ -133,6 +129,8 @@ export default function SeoKeywordsPage() {
   const busy = lookup.isPending || (saved.isLoading && !!keyword && !overview);
   const o = overview;
   const peak = o && o.trend.length ? o.trend.reduce((a, b) => (b.volume > a.volume ? b : a)) : null;
+  /** The months as chart points, oldest first (the source gives them that way). */
+  const trend = (o?.trend ?? []).map((t) => ({ label: monthLabel(t.month), value: t.volume }));
 
   return (
     <SeoShell title="Keywords explorer" description="How often people search for something, how hard it is to rank for, who ranked for it when it was last looked up, and the keywords around it." site={site} onSite={onSite} sites={sites} status={status}>
@@ -165,65 +163,57 @@ export default function SeoKeywordsPage() {
       {o && (
         <div data-testid="keyword-overview">
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <h2 className="g-text text-[20px] font-medium">"{o.keyword}"</h2>
+            <h2 className="text-[20px] font-medium [overflow-wrap:anywhere]" style={{ color: "var(--g-blue)" }}>"{o.keyword}"</h2>
             <span className="g-text-2 text-[12px]">as of {fmtDate(o.fetchedAt)}</span>
             <button type="button" className="g-pill g-pill--sm" disabled={refresh.isPending || !configured || !affordable} onClick={() => refresh.mutate({ keyword: o.keyword, market: marketKey(market), body: mk })} title={`Looks it up again — about ${price}`} data-testid="button-keyword-refresh">{refresh.isPending ? <Loader2 className="animate-spin" /> : null} Refresh · {price}</button>
             <span className="ml-auto"><AddToList market={market} rows={[{ keyword: o.keyword, volume: o.volume, cpc: o.cpc, difficulty: o.difficulty, intent: o.intent }]} label="Save to a list" /></span>
             {site && <button type="button" className="g-pill g-pill--sm" disabled={track.isPending} onClick={() => track.mutate({ rows: [{ keyword: o.keyword, volume: o.volume, cpc: o.cpc, difficulty: o.difficulty }], from: market })} data-testid="button-track-keyword"><Plus /> Track on {site.domain}</button>}
           </div>
-          <div className="g-tiles mb-4">
-            <Stat label="Search volume" value={fmtNum(o.volume)} hint={peak ? `Peak ${fmtNum(peak.volume)} in ${monthLabel(peak.month)}` : "per month"} />
-            <Stat label="Difficulty" value={kd(o.difficulty)} hint={o.topAvg.referringDomains != null ? `Top pages average ${fmtNum(o.topAvg.referringDomains)} referring domains` : "0–100"} />
-            <Stat label="Cost per click" value={o.cpc == null ? "—" : `$${o.cpc.toFixed(2)}`} hint={o.bidLow != null && o.bidHigh != null ? `Top-of-page bids $${o.bidLow.toFixed(2)}–$${o.bidHigh.toFixed(2)}` : o.competition ? `${cap(o.competition.toLowerCase())} ad competition` : undefined} />
-            <Stat label="Intent" value={o.intent ? cap(o.intent) : "—"} hint={o.results != null ? `${fmtNum(o.results)} results` : undefined} />
-            {o.potential !== undefined && <>
-              <Stat label="Traffic potential" value={o.potential ? fmtNum(o.potential.traffic) : "—"} hint={o.potential ? (o.potential.keywords === 1 ? `Estimated visits a month the #1 page gets from search in ${market.label} — it ranks for one keyword` : o.potential.keywords == null ? `Estimated visits a month the #1 page gets from search in ${market.label}` : `Estimated visits a month the #1 page gets in ${market.label} from all ${fmtNum(o.potential.keywords)} keywords it ranks for`) : (o.missing ?? []).includes("potential") ? "Didn't load this time (not charged)" : "Not available for this keyword"} />
-              <Stat label="Parent topic" value={o.potential?.parentTopic ? (o.potential.parentTopic === o.keyword ? <span data-testid="text-parent-topic">This keyword</span> : <button type="button" className="g-link block text-left text-[17px] leading-snug" onClick={() => { const k = o.potential!.parentTopic!; setInput(k); setOverview(null); setKeyword(k); }} data-testid="button-parent-topic">{o.potential.parentTopic}</button>) : "—"} hint={o.potential?.parentTopic ? `The search that sends the #1 page the most visits${o.potential.parentVolume != null ? ` — ${fmtNum(o.potential.parentVolume)} searches a month` : ""}` : undefined} />
-            </>}
-          </div>
+          {/* The figures in one row, as Ahrefs lays a keyword out: volume with its trend, the difficulty badge, cost, intent, and what the #1 page gets. */}
+          <Card className="mb-4" testId="keyword-metrics">
+            <MetricRow cols={o.potential !== undefined ? 6 : 4}>
+              <MetricColumn label="Search volume" value={fmtNum(o.volume)} foot={peak ? `Peak ${fmtNum(peak.volume)} in ${monthLabel(peak.month)}` : "per month"}
+                chart={<GradientSpark range height={44} points={trend} color={PALETTE.keywords} format={fmtNum} />} />
+              <MetricColumn label="Difficulty" value={<KdBadge value={o.difficulty} size="lg" />} foot={o.topAvg.referringDomains != null ? `Top pages average ${fmtNum(o.topAvg.referringDomains)} referring domains` : "0–100"} />
+              <MetricColumn label="Cost per click" value={o.cpc == null ? "—" : `$${o.cpc.toFixed(2)}`} foot={o.bidLow != null && o.bidHigh != null ? `Top-of-page bids $${o.bidLow.toFixed(2)}–$${o.bidHigh.toFixed(2)}` : o.competition ? `${cap(o.competition.toLowerCase())} ad competition` : undefined} />
+              <MetricColumn label="Intent" value={o.intent ? <span className="text-[20px]">{cap(o.intent)}</span> : "—"} foot={o.results != null ? `${fmtNum(o.results)} results` : undefined} />
+              {o.potential !== undefined && <MetricColumn label="Traffic potential" value={o.potential ? fmtNum(o.potential.traffic) : "—"} foot={o.potential ? (o.potential.keywords === 1 ? `Estimated visits a month the #1 page gets from search in ${market.label} — it ranks for one keyword` : o.potential.keywords == null ? `Estimated visits a month the #1 page gets from search in ${market.label}` : `Estimated visits a month the #1 page gets in ${market.label} from all ${fmtNum(o.potential.keywords)} keywords it ranks for`) : (o.missing ?? []).includes("potential") ? "Didn't load this time (not charged)" : "Not available for this keyword"} />}
+              {o.potential !== undefined && <MetricColumn label="Parent topic" value={o.potential?.parentTopic ? (o.potential.parentTopic === o.keyword ? <span className="text-[17px] leading-snug" data-testid="text-parent-topic">This keyword</span> : <button type="button" className="g-link block text-left text-[17px] leading-snug [overflow-wrap:anywhere]" onClick={() => { const k = o.potential!.parentTopic!; setInput(k); setOverview(null); setKeyword(k); }} data-testid="button-parent-topic">{o.potential.parentTopic}</button>) : "—"} foot={o.potential?.parentTopic ? `The search that sends the #1 page the most visits${o.potential.parentVolume != null ? ` — ${fmtNum(o.potential.parentVolume)} searches a month` : ""}` : undefined} />}
+            </MetricRow>
+          </Card>
           {o.potential === undefined && <p className="g-text-2 -mt-2 mb-4 text-[13px]" data-testid="text-potential-older">Traffic potential and parent topic were added after this overview was saved — Refresh to see them.</p>}
           <div className="mb-4 grid gap-4 lg:grid-cols-3">
-            <section className="rounded-lg border p-4 lg:col-span-2" style={{ borderColor: "var(--g-divider)" }} data-testid="panel-keyword-trend">
-              <h3 className="g-text mb-2 text-[15px] font-medium">Search volume by month</h3>
-              {o.trend.length > 1 ? (
-                <div style={{ width: "100%", height: 220 }}>
-                  <ResponsiveContainer>
-                    <AreaChart data={o.trend} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-                      <CartesianGrid stroke="var(--g-divider)" vertical={false} />
-                      <XAxis dataKey="month" tickFormatter={monthLabel} tick={{ fontSize: 12, fill: "var(--g-text-2)" }} axisLine={false} tickLine={false} minTickGap={40} />
-                      <YAxis tick={{ fontSize: 12, fill: "var(--g-text-2)" }} axisLine={false} tickLine={false} width={48} tickFormatter={(v) => (v >= 1000 ? `${Math.round(v / 1000)}K` : String(v))} />
-                      <Tooltip labelFormatter={(m) => monthLabel(String(m))} formatter={(v: number) => [fmtNum(v), "Searches"]} contentStyle={{ fontSize: 12, background: "var(--g-surface)", border: "1px solid var(--g-divider)", color: "var(--g-text)" }} />
-                      <Area type="monotone" dataKey="volume" stroke="#1a73e8" fill="#1a73e8" fillOpacity={0.15} strokeWidth={2} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : <p className="g-text-2 text-[13px]">No monthly history for this keyword.</p>}
-            </section>
-            <section className="rounded-lg border p-4" style={{ borderColor: "var(--g-divider)" }} data-testid="panel-keyword-features">
-              <h3 className="g-text mb-2 text-[15px] font-medium">On the results page</h3>
-              {o.features.length ? <div className="flex flex-wrap gap-1.5">{o.features.map((f) => <span key={f} className="g-chip g-chip--sm">{FEATURE[f] ?? cap(f.replace(/_/g, " "))}</span>)}</div> : <p className="g-text-2 text-[13px]">Plain results only.</p>}
+            <Card className="lg:col-span-2" testId="panel-keyword-trend">
+              <Heading className="mb-2">Search volume by month</Heading>
+              {o.trend.length > 1 ? <MonthlyBars points={trend} color={PALETTE.keywords} height={220} /> : <p className="g-text-2 text-[13px]">No monthly history for this keyword.</p>}
+            </Card>
+            <Card testId="panel-keyword-features">
+              <Heading className="mb-2">On the results page</Heading>
+              {o.features.length ? <div className="flex flex-wrap gap-1.5">{o.features.map((f) => <FeatureTag key={f} feature={f} label={FEATURE[f] ?? cap(f.replace(/_/g, " "))} />)}</div> : <p className="g-text-2 text-[13px]">Plain results only.</p>}
               <p className="g-text-2 mt-3 text-[12px]">{o.features.includes("local_pack") ? "The saved results had a map pack, so a strong Google Business Profile matters as much as the website." : "No map pack in the saved results, so the website is what competes here."}</p>
-            </section>
+            </Card>
           </div>
           <section className="mb-5" data-testid="panel-keyword-serp">
-            <h3 className="g-text mb-2 text-[15px] font-medium">Who ranks <span className="g-text-2 text-[12px] font-normal">· Google's top results as saved on {fmtDate(o.fetchedAt)} (desktop)</span></h3>
+            <Heading className="mb-2" note={`Google's top results as saved on ${fmtDate(o.fetchedAt)} (desktop)`}>Who ranks</Heading>
             {(o.missing?.length ?? 0) > 0 && <p className="g-text-2 mb-2 text-[13px]" role="status" data-testid="text-keyword-missing">{[o.missing!.includes("results") ? "The top results" : null, o.missing!.includes("authority") ? "Site authority" : null, o.missing!.includes("potential") ? "Traffic potential and parent topic" : null].filter(Boolean).join(", ").replace(/, ([^,]*)$/, " and $1") || "Part of this overview"} didn't load this time; you were not charged for that part. Refresh looks the whole keyword up again.</p>}
             {o.serp.length ? (
+              <div className="overflow-x-auto">
               <table className="g-table">
                 <thead><tr><th className="num w-10">#</th><th>Page</th><th className="num">Site authority</th><th></th></tr></thead>
                 <tbody>{o.serp.map((s) => (
                   <tr key={`${s.position}-${s.url}`}>
                     <td className="num">{s.position}</td>
-                    <td><a href={s.url} className="g-link" target="_blank" rel="noreferrer">{s.title ?? s.domain}</a><span className="g-text-2 block max-w-[520px] truncate text-[12px]">{s.url.replace(/^https?:\/\/(www\.)?/, "")}</span></td>
-                    <td className="num" data-label="Site authority">{s.authority ?? "—"}</td>
+                    <td className="min-w-0"><a href={s.url} className="g-link" target="_blank" rel="noreferrer">{s.title ?? s.domain}</a><span className="g-text-2 block max-w-[520px] truncate text-[12px]">{s.url.replace(/^https?:\/\/(www\.)?/, "")}</span></td>
+                    <td className="num" data-label="Site authority"><BarFigure value={s.authority} max={100} color={PALETTE.authority} format={String} title="Link strength of the site, 0–100" /></td>
                     <td className="num"><a className="g-link" href={`/seo/explorer?domain=${encodeURIComponent(s.domain)}`} data-testid={`link-explore-${s.position}`}>Explore site</a></td>
                   </tr>
                 ))}</tbody>
               </table>
+              </div>
             ) : <p className="g-text-2 text-[13px]">The top results weren't available for this keyword.</p>}
           </section>
 
-          <h3 className="g-text mb-2 text-[15px] font-medium">Keyword ideas</h3>
+          <Heading className="mb-2">Keyword ideas</Heading>
           <nav className="g-tabs" aria-label="Keyword ideas">
             {IDEAS.map(([k, label]) => <a key={k} href={`#${k}`} aria-current={ideas === k ? "page" : undefined} onClick={(e) => { e.preventDefault(); setIdeas(k); }} data-testid={`tab-ideas-${k}`}>{label}</a>)}
           </nav>

@@ -9,12 +9,13 @@ import { AddToPlan } from "./plan-button";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ChevronDown, ChevronRight, Download, Loader2, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { api, Empty, fmtDate, fmtNum, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { DeltaBadge, DistributionBar, MetricColumn } from "./viz";
+import { AMBER, COMPACT_TABLE, HealthRing, HealthTrend, RatingBar, SeverityColumn } from "./viz-audit";
 import { AuditPages } from "./audit-pages";
 import { RenderCheck } from "./render";
 import { OutgoingLinksView } from "./outgoing-links";
@@ -34,9 +35,10 @@ type Audit = {
 type Compared = { jobId: string; at: string | null; chosen: boolean; addedPages: number; removedPages: number; added: string[]; removed: string[]; capsDiffer: boolean };
 type AuditData = { locationId: number | null; audit: (Audit & { latest?: boolean; completedAt?: string | null; comparedWith?: Compared | null }) | null; latestId?: string | null; latestKey?: string | null; crawls?: { jobId: string; at: string | null; pageCap: number | null; readable?: boolean }[]; newestUnreadable?: { jobId: string; at: string | null }; previousUnreadable?: { jobId: string; at: string | null }; atMissing?: boolean; vsMissing?: boolean; history: { jobId: string; at: string; health: number | null; errors: number; warnings: number; notices: number; crawled: number; unreadable?: boolean }[]; running: Run | null; lastFailed: Run | null };
 
+/** Red, amber, blue — what errors, warnings and notices mean (as in Ahrefs); the only coloured dots on the page. */
 const SEVERITY: Record<Severity, { label: string; plural: string; color: string }> = {
   error: { label: "Error", plural: "Errors", color: "var(--g-red)" },
-  warning: { label: "Warning", plural: "Warnings", color: "#e8710a" },
+  warning: { label: "Warning", plural: "Warnings", color: AMBER },
   notice: { label: "Notice", plural: "Notices", color: "var(--g-blue)" },
 };
 const CATEGORY: Record<string, string> = { technical: "Technical", performance: "Performance", local: "Local", content: "Content", "ai-readiness": "AI readiness" };
@@ -44,28 +46,19 @@ const CATEGORY: Record<string, string> = { technical: "Technical", performance: 
 const catName = (k: unknown) => (typeof k === "string" ? (Object.prototype.hasOwnProperty.call(CATEGORY, k) ? CATEGORY[k] : k) : "Other");
 /** A stored crawl error as a customer sentence: one plain line, at most 200 characters, else the general wording. */
 const crawlError = (e: string | null) => e || "The crawl stopped before it completed.";
+/**
+ * The status bar's shades, the same in light and dark mode: green for pages that work, amber and red for the ones that
+ * don't, blue (muted) for redirects, and the two greys for answers nothing can be said about. The legend writes every
+ * number beside its swatch, so the colour is never the only way to tell them apart.
+ */
 const STATUS = [
-  { key: "ok", label: "Working (2xx)", color: "var(--g-green)" },
+  { key: "ok", label: "Working (2xx)", color: "#1e8e3e" },
   { key: "redirected", label: "Redirected (3xx)", color: "var(--g-blue)" },
-  { key: "clientError", label: "Not found / blocked (4xx)", color: "#e8710a" },
-  { key: "serverError", label: "Server error (5xx)", color: "var(--g-red)" },
+  { key: "clientError", label: "Not found / blocked (4xx)", color: AMBER },
+  { key: "serverError", label: "Server error (5xx)", color: "#d93025" },
   { key: "failed", label: "Couldn't be checked", color: "var(--g-text-2)" },
-  { key: "unusual", label: "Unusual answer (1xx, or above 599)", color: "#9334e6" },
+  { key: "unusual", label: "Unusual answer (1xx, or above 599)", color: "var(--g-text)" },
 ] as const;
-const healthColor = (h: number) => (h >= 90 ? "var(--g-green)" : h >= 70 ? "#e8710a" : "var(--g-red)");
-const healthWord = (h: number) => (h >= 90 ? "Good" : h >= 70 ? "Needs work" : "Poor");
-
-function HealthRing({ value }: { value: number | null }) {
-  const r = 52, c = 2 * Math.PI * r, v = value ?? 0;
-  return (
-    <svg viewBox="0 0 128 128" className="h-32 w-32 shrink-0" role="img" aria-label={value == null ? "No health score yet" : `Health score ${value} out of 100`}>
-      <circle cx="64" cy="64" r={r} fill="none" stroke="var(--g-divider)" strokeWidth="10" />
-      {value != null && <circle cx="64" cy="64" r={r} fill="none" stroke={healthColor(v)} strokeWidth="10" strokeLinecap="round" strokeDasharray={`${(v / 100) * c} ${c}`} transform="rotate(-90 64 64)" />}
-      <text x="64" y="62" textAnchor="middle" dominantBaseline="middle" fontSize="30" fill="var(--g-text)">{value ?? "—"}</text>
-      <text x="64" y="86" textAnchor="middle" fontSize="11" fill="var(--g-text-2)">{value == null ? "no data" : healthWord(v)}</text>
-    </svg>
-  );
-}
 
 /** Change in affected pages: fewer is better, so a drop is green. */
 function Change({ issue, before }: { issue: Issue; /** The crawl compared with, in words ("the crawl before", "the crawl of Sep 3"). */ before: string }) {
@@ -90,7 +83,10 @@ function downloadCsv(name: string, rows: string[][]) {
 }
 
 const card = { borderColor: "var(--g-divider)", background: "var(--g-surface)" };
-const tooltipStyle = { fontSize: 12, background: "var(--g-surface)", border: "1px solid var(--g-divider)", color: "var(--g-text)" };
+/** A small blue heading, the same as the dashboard's labels. */
+const heading = { color: "var(--g-blue)" };
+/** The thin divider between the columns of the overview row. */
+const divider = { borderColor: "var(--g-divider)" };
 
 export default function SeoAuditPage() {
   const status = useSeoStatus();
@@ -200,70 +196,60 @@ export default function SeoAuditPage() {
       )}
       {site && a && (
         <>
-          <div className="mb-4 grid gap-4 lg:grid-cols-3" data-testid="audit-overview">
-            <section className="flex items-center gap-4 rounded-lg border p-4" style={card} data-testid="audit-health">
-              <HealthRing value={a.health} />
-              <div className="min-w-0">
-                <h2 className="g-text text-[16px] font-medium">Health score</h2>
-                <p className="g-text-2 text-[13px]">The share of crawled pages with no errors.</p>
-                {a.healthChange !== null && a.healthChange !== 0 && <p className="mt-1 text-[13px]"><span className={`g-move ${a.healthChange > 0 ? "g-move--up" : "g-move--down"}`}>{a.healthChange > 0 ? "▲" : "▼"}{Math.abs(a.healthChange)}</span> <span className="g-text-2">since {before}</span></p>}
-                <p className="g-text-2 mt-1 text-[12px]">Crawled {fmtDate(shownDate)}</p>
+          {/* One row, as Ahrefs lays a site audit out: the health ring, the pages crawled with their status bar, then errors,
+              warnings and notices as columns with thin dividers. On a phone the ring and the crawl count take a full line
+              each and the three severities share one. */}
+          <section className="mb-4 rounded-xl border p-3 shadow-sm sm:p-5" style={card} data-testid="audit-overview">
+            <div className="grid grid-cols-6 gap-x-3 gap-y-5 lg:grid-cols-7 lg:gap-y-0">
+              <div className="col-span-6 flex min-w-0 items-center gap-3 lg:col-span-2" data-testid="audit-health">
+                <HealthRing value={a.health} />
+                <div className="min-w-0">
+                  <h2 className="text-[13px] font-medium" style={heading}>Health score</h2>
+                  <p className="g-text-2 text-[12px] leading-4">The share of crawled pages with no errors.</p>
+                  {a.healthChange !== null && a.healthChange !== 0 && <p className="g-text-2 mt-1 text-[12px] leading-4 [&>span]:!ml-0"><DeltaBadge value={a.healthChange} label={`${a.healthChange > 0 ? "Up" : "Down"} ${Math.abs(a.healthChange)} since ${before}`} /> since {before}</p>}
+                  <p className="g-text-2 mt-1 text-[12px] leading-4">Crawled {fmtDate(shownDate)}</p>
+                </div>
               </div>
-            </section>
-            <section className="rounded-lg border p-4" style={card} data-testid="audit-crawled">
-              <h2 className="g-text text-[16px] font-medium">Pages crawled <span className="tabular-nums">{fmtNum(total)}</span></h2>
-              <div className="my-3 flex h-3 overflow-hidden rounded-full" style={{ background: "var(--g-divider)" }} aria-hidden>
-                {total > 0 && STATUS.map((s) => (a.statuses[s.key] ?? 0) > 0 && <div key={s.key} style={{ width: `${((a.statuses[s.key] ?? 0) / total) * 100}%`, background: s.color }} />)}
+              <div className="col-span-6 min-w-0 lg:col-span-2 lg:border-l lg:pl-3" style={divider} data-testid="audit-crawled">
+                <MetricColumn label="Pages crawled" value={fmtNum(total)}>
+                  <div className="mt-1.5"><DistributionBar parts={STATUS.filter((s) => s.key !== "unusual" || (a.statuses.unusual ?? 0) > 0).map((s) => ({ label: s.label, value: a.statuses[s.key] ?? 0, color: s.color }))} /></div>
+                </MetricColumn>
               </div>
-              <ul className="space-y-1 text-[13px]">
-                {STATUS.filter((s) => s.key !== "unusual" || (a.statuses.unusual ?? 0) > 0).map((s) => <li key={s.key} className="flex items-center gap-2"><span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: s.color }} aria-hidden /><span className="g-text-2">{s.label}</span><span className="g-text ml-auto tabular-nums">{fmtNum((a.statuses[s.key] ?? 0))}</span></li>)}
-              </ul>
-              {(a.statuses.excluded ?? 0) > 0 && <p className="g-text-2 mt-2 text-[12px]">{fmtNum(a.statuses.excluded)} more address{a.statuses.excluded === 1 ? " was" : "es were"} found but not audited (files such as PDFs, or links that leave the site). They don't affect the health score.</p>}
-              {(a.notCrawled > 0 || a.blockedByRobots > 0) && <p className="g-text-2 mt-2 text-[12px]">{a.notCrawled > 0 ? `${fmtNum(a.notCrawled)} more pages were found but not crawled (the crawl stops at ${fmtNum(a.pageCap)}). ` : ""}{a.blockedByRobots > 0 ? `${fmtNum(a.blockedByRobots)} blocked by robots.txt.` : ""}</p>}
-            </section>
-            <section className="rounded-lg border p-4" style={card} data-testid="audit-totals">
-              <h2 className="g-text mb-2 text-[16px] font-medium">Issues found</h2>
-              <ul className="space-y-2">
-                {(Object.keys(SEVERITY) as Severity[]).map((s) => (
-                  <li key={s}>
-                    <button type="button" className="flex w-full items-baseline gap-2 text-left" onClick={() => setSeverity(severity === s ? "all" : s)} aria-pressed={severity === s} data-testid={`button-severity-${s}`}>
-                      <span className="text-[24px] leading-7 tabular-nums" style={{ color: SEVERITY[s].color }}>{fmtNum(a.totals[s].issues)}</span>
-                      <span className="g-text text-[14px]">{SEVERITY[s].plural}</span>
-                      <span className="g-text-2 ml-auto text-[12px] tabular-nums">{fmtNum(a.totals[s].affected)} affected</span>
-                    </button>
-                  </li>
+              {/* The three severities are grid cells of the row above (display: contents), kept together for the tests. */}
+              <div className="contents" data-testid="audit-totals">
+                {(Object.keys(SEVERITY) as Severity[]).map((s, i) => (
+                  <div key={s} className={`col-span-2 min-w-0 lg:col-span-1 lg:border-l lg:pl-3${i > 0 ? " border-l pl-3" : ""}`} style={divider}>
+                    <SeverityColumn label={SEVERITY[s].plural} color={SEVERITY[s].color} value={fmtNum(a.totals[s].issues)} foot={`${fmtNum(a.totals[s].affected)} affected`}
+                      pressed={severity === s} onClick={() => setSeverity(severity === s ? "all" : s)} testId={`button-severity-${s}`} />
+                  </div>
                 ))}
-              </ul>
-              <p className="g-text-2 mt-2 text-[12px]">Errors lower the health score. Warnings and notices are improvements.</p>
-            </section>
-          </div>
+              </div>
+            </div>
+            <div className="g-text-2 mt-3 space-y-0.5 text-[12px] leading-4">
+              <p>Errors lower the health score. Warnings and notices are improvements.</p>
+              {(a.statuses.excluded ?? 0) > 0 && <p>{fmtNum(a.statuses.excluded)} more address{a.statuses.excluded === 1 ? " was" : "es were"} found but not audited (files such as PDFs, or links that leave the site). They don't affect the health score.</p>}
+              {(a.notCrawled > 0 || a.blockedByRobots > 0) && <p>{a.notCrawled > 0 ? `${fmtNum(a.notCrawled)} more pages were found but not crawled (the crawl stops at ${fmtNum(a.pageCap)}). ` : ""}{a.blockedByRobots > 0 ? `${fmtNum(a.blockedByRobots)} blocked by robots.txt.` : ""}</p>}
+            </div>
+          </section>
 
           {(scored.length > 1 || a.scores) && (
             <div className="mb-4 grid gap-4 lg:grid-cols-3">
               {scored.length > 1 && (
-                <section className="rounded-lg border p-4 lg:col-span-2" style={card} data-testid="audit-trend">
-                  <h2 className="g-text mb-2 text-[16px] font-medium">Health score over time</h2>
-                  <div className="h-44">
-                    <ResponsiveContainer>
-                      <LineChart data={trend} margin={{ top: 6, right: 8, bottom: 0, left: 0 }}>
-                        <CartesianGrid stroke="var(--g-divider)" vertical={false} />
-                        <XAxis dataKey="at" tickFormatter={(v) => fmtDate(String(v))} tick={{ fontSize: 12, fill: "var(--g-text-2)" }} axisLine={false} tickLine={false} />
-                        <YAxis domain={[0, 100]} tick={{ fontSize: 12, fill: "var(--g-text-2)" }} axisLine={false} tickLine={false} width={32} />
-                        <Tooltip labelFormatter={(v) => fmtDate(String(v))} formatter={(v: number) => [v, "Health score"]} contentStyle={tooltipStyle} />
-                        <Line type="monotone" dataKey="health" stroke="var(--g-green)" strokeWidth={2} dot={{ r: 3 }} connectNulls={false} isAnimationActive={false} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
+                <section className="rounded-xl border p-3 sm:p-4 lg:col-span-2" style={card} data-testid="audit-trend">
+                  <h2 className="mb-1 text-[14px] font-medium" style={heading}>Health score over time</h2>
+                  <p className="g-text-2 mb-1 text-[12px]">Health score: {scored[0].health} on {fmtDate(scored[0].at)} → <b className="g-text font-medium">{scored[scored.length - 1].health}</b> on {fmtDate(scored[scored.length - 1].at)}</p>
+                  <HealthTrend points={trend.map((h) => ({ key: h.jobId, label: fmtDate(h.at), value: h.health }))} />
+                  <p className="g-text-2 mt-1 text-[11px]">Every finished crawl, oldest first. A crawl with no score, or that could not be read, is a gap in the line.</p>
                 </section>
               )}
               {a.scores && (
-                <section className={`rounded-lg border p-4 ${scored.length > 1 ? "" : "lg:col-span-3"}`} style={card} data-testid="audit-scores">
-                  <h2 className="g-text mb-2 text-[16px] font-medium">By area</h2>
+                <section className={`rounded-xl border p-3 sm:p-4 ${scored.length > 1 ? "" : "lg:col-span-3"}`} style={card} data-testid="audit-scores">
+                  <h2 className="mb-2 text-[14px] font-medium" style={heading}>By area</h2>
                   <ul className="space-y-2 text-[13px]">
                     {Object.entries(a.scores.categories).map(([k, v]) => (
                       <li key={k}>
                         <div className="flex"><span className="g-text">{catName(k)}</span><span className="g-text ml-auto tabular-nums">{v == null ? "not measured" : v}</span></div>
-                        <div className="mt-1 h-1.5 overflow-hidden rounded-full" style={{ background: "var(--g-divider)" }} aria-hidden>{v != null && <div className="h-full" style={{ width: `${v}%`, background: healthColor(v) }} />}</div>
+                        <RatingBar value={v} />
                       </li>
                     ))}
                   </ul>
@@ -274,9 +260,9 @@ export default function SeoAuditPage() {
           )}
 
           {(crawls.length > 1 || !!d?.newestUnreadable) && (
-            <section className="mb-4 rounded-lg border p-4" style={card} data-testid="audit-compare">
+            <section className="mb-4 rounded-xl border p-3 sm:p-4" style={card} data-testid="audit-compare">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                <label className="flex min-w-0 max-w-full flex-wrap items-center gap-2"><span className="g-text text-[16px] font-medium">Showing</span>
+                <label className="flex min-w-0 max-w-full flex-wrap items-center gap-2"><span className="text-[14px] font-medium" style={heading}>Showing</span>
                   <select className="g-select min-w-0 max-w-full" value={a.latest === false ? a.jobId : ""} data-testid="select-audit-at"
                     onChange={(e) => choose({ at: e.target.value || null, vs: null })}>
                     {d?.newestUnreadable ? <><option value="">The newest crawl ({fmtDate(d.newestUnreadable.at)}, could not be read)</option>
@@ -285,7 +271,7 @@ export default function SeoAuditPage() {
                       {crawls.slice(1).map((c, i) => <option key={c.jobId} value={c.jobId} disabled={c.readable === false}>Crawl of {crawlWord(c, i + 1)}{c.readable === false ? " (could not be read)" : ""}</option>)}</>}
                   </select></label>
                 {earlier.length > 0 && (
-                  <label className="flex min-w-0 max-w-full flex-wrap items-center gap-2"><span className="g-text text-[16px] font-medium">compared with</span>
+                  <label className="flex min-w-0 max-w-full flex-wrap items-center gap-2"><span className="text-[14px] font-medium" style={heading}>compared with</span>
                     <select className="g-select min-w-0 max-w-full" value={cmp?.chosen ? cmp.jobId : ""} data-testid="select-audit-vs"
                       onChange={(e) => choose({ at, vs: e.target.value || null })}>
                       <option value="">The crawl before it ({fmtDate(earlier[0].at)}{earlier[0].readable === false ? ", could not be read" : ""})</option>
@@ -346,7 +332,7 @@ export default function SeoAuditPage() {
             <Empty testId="audit-no-issues"><h3>{a.issues.length ? "No issues match these filters" : "No issues found"}</h3><p>{a.issues.length ? "Choose a different severity or area." : "The crawl didn't find anything to fix on the pages it checked."}</p></Empty>
           ) : (
             <div className="overflow-x-auto">
-            <table className="g-table w-full" data-testid="table-audit-issues">
+            <table className={COMPACT_TABLE} data-testid="table-audit-issues">
               <thead><tr><th aria-label="Show details" className="w-12" /><th>Issue</th><th>Area</th><th className="num">Affected</th><th className="num whitespace-nowrap pr-2" title={`Change in affected pages since ${before}`}>Change</th></tr></thead>
               <tbody>
                 {issues.map((i) => {
@@ -355,7 +341,7 @@ export default function SeoAuditPage() {
                     <Fragment key={i.key}>
                       <tr data-testid={`row-issue-${i.key}`}>
                         <td><button type="button" className="g-pill !min-h-8 !px-2" aria-expanded={isOpen} aria-label={`${isOpen ? "Hide" : "Show"} details for ${i.title}`} onClick={() => { setOpen(isOpen ? null : i.key); setShowAll(false); }} data-testid={`button-issue-${i.key}`}>{isOpen ? <ChevronDown /> : <ChevronRight />}</button></td>
-                        <td><span className="mr-2 inline-block h-2.5 w-2.5 rounded-full align-middle" style={{ background: SEVERITY[i.severity].color }} aria-hidden /><span className="sr-only">{SEVERITY[i.severity].label}: </span>{i.title}</td>
+                        <td><span className="mr-2 inline-block h-2 w-2 rounded-full align-middle" style={{ background: SEVERITY[i.severity].color }} aria-hidden /><span className="sr-only">{SEVERITY[i.severity].label}: </span>{i.title}</td>
                         <td data-label="Area" className="g-text-2">{catName(i.category)}</td>
                         <td className="num" data-label="Affected">{fmtNum(i.count)}</td>
                         <td className="num pr-2" data-label={`Change since ${before}`}><Change issue={i} before={before} /></td>
@@ -387,7 +373,7 @@ export default function SeoAuditPage() {
           )}
           {(a.notRechecked?.length ?? 0) > 0 && (
             <section className="mt-6" data-testid="audit-not-rechecked">
-              <h2 className="g-text mb-2 text-[16px] font-medium">Not re-checked this time</h2>
+              <h2 className="mb-2 text-[14px] font-medium" style={heading}>Not re-checked this time</h2>
               <p className="g-text-2 mb-2 text-[13px]">{before.charAt(0).toUpperCase() + before.slice(1)} found these, and this crawl could not check them the same way — it didn't look at the same pages (or read no pages at all), a page didn't answer normally this time (an error or a redirect), didn't measure speed on them again, only sampled the pages for that check, or had no Google profile to compare with. So they are not counted as fixed.</p>
               <ul className="g-text-2 space-y-1 text-[13px]">
                 {a.notRechecked!.map((f) => <li key={f.key}>{f.title} <span className="tabular-nums">({fmtNum(f.previous)} before)</span></li>)}
@@ -396,7 +382,7 @@ export default function SeoAuditPage() {
           )}
           {a.fixed.length > 0 && (
             <section className="mt-6" data-testid="audit-fixed">
-              <h2 className="g-text mb-2 text-[16px] font-medium">Fixed since {before}</h2>
+              <h2 className="mb-2 text-[14px] font-medium" style={heading}>Fixed since {before}</h2>
               <ul className="g-text-2 space-y-1 text-[13px]">
                 {a.fixed.map((f) => <li key={f.key}><span className="g-move g-move--up">✓</span> {f.title} <span className="tabular-nums">({fmtNum(f.previous)} before)</span></li>)}
               </ul>

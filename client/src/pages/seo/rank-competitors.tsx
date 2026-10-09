@@ -10,12 +10,12 @@ import { Loader2, Plus, X } from "lucide-react";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { api, fmtDate, fmtNum, type SeoSite } from "./shell";
+import { ORANGE, PALETTE } from "./viz";
+import { CARD, PanelTitle, SectionTitle } from "./viz-rank";
 
 type Row = { domain: string; isSite: boolean; visibility: number; top3: number; top10: number; ranked: number; averagePosition: number | null; observed?: number };
 type Voice = { device: string; devices?: string[]; tracked?: number; checkedOn: string | null; hasPages: boolean; max: number; keywords: number; competitors: string[]; domains: Row[];
   seenMost: { domain: string; keywords: number; bestPosition: number }[]; mapLeaders: { title: string; domain: string | null; keywords: number; isSite: boolean }[] };
-
-const card = { borderColor: "var(--g-divider)", background: "var(--g-surface)" };
 
 export function CompetitorPanel({ site, onExplore }: { site: SeoSite; onExplore?: (domain: string) => void }) {
   const qc = useQueryClient();
@@ -69,7 +69,7 @@ export function CompetitorPanel({ site, onExplore }: { site: SeoSite; onExplore?
   return (
     <section className="mb-5" data-testid="rank-competitors">
       <div className="mb-2 flex flex-wrap items-baseline gap-2">
-        <h2 className="g-text text-[16px] font-medium">Competitors</h2>
+        <SectionTitle>Competitors</SectionTitle>
         {(v.tags?.length ?? 0) > 0 && (
           <label className="flex items-center gap-1 text-[12px]"><span className="g-text-2">Keywords</span>
             <select className="g-select min-w-0 max-w-[12rem]" value={tag} onChange={(e) => setTag(e.target.value)} aria-describedby={q.isPlaceholderData ? `voice-loading-${site.id}` : undefined} data-testid="select-voice-tag">
@@ -83,8 +83,8 @@ export function CompetitorPanel({ site, onExplore }: { site: SeoSite; onExplore?
         {(v.devices?.length ?? 0) > 1 && <span className="flex gap-1" role="group" aria-label="Device">{v.devices!.map((d) => <button key={d} type="button" className="g-pill g-pill--sm" aria-pressed={v.device === d} style={v.device === d ? { borderColor: "var(--g-blue)", color: "var(--g-blue)" } : undefined} onClick={() => setDevice(d)}>{d === "desktop" ? "Desktop" : "Mobile"}</button>)}</span>}
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-lg border p-4" style={card} data-testid="voice-share">
-          <h3 className="g-text text-[14px] font-medium">Share of voice</h3>
+        <div className="rounded-xl border p-3 sm:p-4" style={CARD} data-testid="voice-share">
+          <PanelTitle>Share of voice</PanelTitle>
           <p className="g-text-2 mb-3 text-[12px]">A visibility index from where each site ranks on these keywords — not a count of real clicks: 100% would mean first place for all of them.{v.keywords === 0 ? (tag ? ` None of the keywords tagged "${tag}" was in the newest check yet; the figures appear after the next check.` : " Follow your competitors now; the figures appear after the next check.") : ""}</p>
           <ul className="space-y-2">
             {v.domains.map((d) => (
@@ -97,7 +97,8 @@ export function CompetitorPanel({ site, onExplore }: { site: SeoSite; onExplore?
                   <span className="g-text w-12 text-right tabular-nums">{d.visibility}%</span></>}
                   {!d.isSite && <button type="button" className="g-text-2" aria-label={`Stop following ${d.domain}`} disabled={remove.isPending} onClick={() => remove.mutate(d.domain)}><X className="h-3.5 w-3.5" /></button>}
                 </div>
-                {!unmeasured && (d.isSite || d.observed !== 0) && <div className="mt-1 h-2 overflow-hidden rounded-full" style={{ background: "var(--g-divider)" }} aria-hidden><div className="h-full" style={{ width: `${(d.visibility / top) * 100}%`, background: d.isSite ? "var(--g-blue)" : "#9aa0a6" }} /></div>}
+                {/* Bars in orange like every chart: your site in the full shade, the sites you follow in the lighter one. */}
+                {!unmeasured && (d.isSite || d.observed !== 0) && <div className="mt-1 h-2 overflow-hidden rounded-full" style={{ background: "var(--g-divider)" }} aria-hidden><div className="h-full rounded-full" style={{ width: `${(d.visibility / top) * 100}%`, background: d.isSite ? ORANGE : PALETTE.top10 }} /></div>}
               </li>
             ))}
           </ul>
@@ -109,8 +110,8 @@ export function CompetitorPanel({ site, onExplore }: { site: SeoSite; onExplore?
           {v.hasPages && v.competitors.length > 0 && <p className="g-text-2 mt-2 text-[12px]">A competitor you just followed is measured in the top ten right away, and further down from the next check. A check reads Google's results only as far as the page your own site is on, so a competitor ranking below you may show as not found.</p>}
         </div>
         <div className="space-y-4">
-          <div className="rounded-lg border p-4" style={card} data-testid="voice-seen-most">
-            <h3 className="g-text text-[14px] font-medium">Seen most on your keywords</h3>
+          <div className="rounded-xl border p-3 sm:p-4" style={CARD} data-testid="voice-seen-most">
+            <PanelTitle>Seen most on your keywords</PanelTitle>
             <p className="g-text-2 mb-2 text-[12px]">Other sites in Google's top ten for the most of your keywords — your real competition for these searches.</p>
             {v.seenMost.length === 0 ? <p className="g-text-2 text-[13px]">{v.hasPages ? "No other site is in the top ten for these keywords." : "This fills in at the next check."}</p> : (
               <ul className="space-y-1 text-[13px]">
@@ -125,8 +126,8 @@ export function CompetitorPanel({ site, onExplore }: { site: SeoSite; onExplore?
             )}
           </div>
           {v.mapLeaders.length > 0 && (
-            <div className="rounded-lg border p-4" style={card} data-testid="voice-map-leaders">
-              <h3 className="g-text text-[14px] font-medium">Who is in the Google map pack</h3>
+            <div className="rounded-xl border p-3 sm:p-4" style={CARD} data-testid="voice-map-leaders">
+              <PanelTitle>Who is in the Google map pack</PanelTitle>
               <p className="g-text-2 mb-2 text-[12px]">Businesses Google shows on the map for your keywords, by how many keywords they appear on.</p>
               <ul className="space-y-1 text-[13px]">
                 {v.mapLeaders.slice(0, 8).map((l) => <li key={`${l.title}|${l.domain}`} className="flex items-baseline gap-2"><span className={`min-w-0 flex-1 truncate ${l.isSite ? "g-text font-medium" : "g-text"}`}>{l.title}{l.isSite && <span className="g-text-2 font-normal"> · you</span>}</span><span className="g-text-2 text-[12px] tabular-nums">{l.keywords} keyword{l.keywords === 1 ? "" : "s"}</span></li>)}

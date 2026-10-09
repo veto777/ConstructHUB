@@ -10,7 +10,9 @@ import { Loader2, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { api, Empty, fmtDate, fmtNum, money, SeoShell, Tile, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { api, Empty, fmtDate, fmtNum, money, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { DeltaBadge, MetricColumn } from "./viz";
+import { CARD, Heading, MetricRow, MiniBar, RatioBar } from "./viz-more";
 
 type Pin = { name: string; address: string | null; lat: number; lng: number; cid: string | null; domain?: string | null };
 type Listing = { name: string; rank: number; cid: string | null; domain: string | null; address: string | null; lat: number | null; lng: number | null; rating: number | null; reviews: number | null };
@@ -156,8 +158,8 @@ export default function SeoLocalGridPage() {
       {site && q.data && (
         <>
           {(!pin || changing) ? (
-            <section className="mb-5 rounded-lg border p-4" style={{ borderColor: "var(--g-divider)" }} data-testid="grid-locate">
-              <h2 className="g-text mb-1 text-[16px] font-medium">{pin ? "Choose a different listing" : "First, find your business on Google Maps"}</h2>
+            <section className="mb-5 rounded-xl border p-3 sm:p-4" style={CARD} data-testid="grid-locate">
+              <Heading className="!mb-1">{pin ? "Choose a different listing" : "First, find your business on Google Maps"}</Heading>
               <p className="g-text-2 mb-3 text-[13px]">The grid is centred on your Google Business listing, and that listing is what we look for at every point. Search by name and town.{pin ? " Scans made with the listing you have now stay in the history, but are not compared with scans of a different one." : ""}</p>
               <form className="flex flex-col gap-2 sm:flex-row sm:items-center" onSubmit={(e) => { e.preventDefault(); if (query.trim().length >= 2) locate.mutate({ siteId: site.id, text: query.trim() }); }}>
                 <label className="min-w-0 flex-1 sm:max-w-xl"><span className="sr-only">Business name and town</span>
@@ -224,12 +226,21 @@ export default function SeoLocalGridPage() {
           {openId != null && view.data?.status === "failed" && <div className="g-callout mb-4" role="alert" data-testid="grid-failed"><h3>The scan didn't finish</h3><p>{view.data.error}</p></div>}
           {shown && (
             <section className="mb-6" data-testid="grid-result">
-              <h2 className="g-text mb-3 text-[18px] font-medium">"{shown.keyword}" <span className="g-text-2 text-[12px] font-normal">· {shown.size} × {shown.size}, {miles(shown.spacing)} apart · {fmtDate(shown.fetchedAt)} · {shown.center.name}</span></h2>
-              <div className="g-tiles mb-4">
-                <Tile label="Position score" value={shown.summary.avgRank ?? "—"} hint={`Average over the ${shown.summary.checked} points checked; "not in the first ${depth}" counts as ${depth + 1}${previous?.avgRank != null && shown.summary.avgRank != null ? `. Was ${previous.avgRank} over ${previous.checked} points on ${fmtDate(previous.at)}` : ""}`} testId="tile-grid-avg" />
-                <Tile label="In the first 3" value={`${shown.summary.top3} of ${shown.summary.checked}`} hint={previous ? `${previous.top3} of ${previous.checked} on ${fmtDate(previous.at)}` : "points where you are one of the first three local results"} testId="tile-grid-top3" />
-                <Tile label="Found" value={`${shown.summary.found} of ${shown.summary.checked}`} hint={`points where you are in the first ${depth} local results`} testId="tile-grid-found" />
-                <Tile label="Area" value={span ? `${span} × ${span} mi` : "1 point"} hint={shown.summary.checked < shown.summary.points ? `${shown.summary.points - shown.summary.checked} point${shown.summary.points - shown.summary.checked === 1 ? "" : "s"} could not be checked` : `${shown.summary.points} points checked`} testId="tile-grid-area" />
+              <Heading className="!mb-3 !text-[18px]" meta={<>{shown.size} × {shown.size}, {miles(shown.spacing)} apart · {fmtDate(shown.fetchedAt)} · {shown.center.name}</>}>"{shown.keyword}"</Heading>
+              {/* The scan's figures in one row; the move is against the comparable scan before it (lower position score is better). */}
+              <div className="mb-4 rounded-xl border p-3 sm:p-4" style={CARD}>
+                <MetricRow cols={4} testId="grid-summary">
+                  <MetricColumn label="Position score" testId="tile-grid-avg" value={shown.summary.avgRank ?? "—"}
+                    delta={previous?.avgRank != null && shown.summary.avgRank != null ? <DeltaBadge value={shown.summary.avgRank - previous.avgRank} upIsBad label={`Change since the scan of ${fmtDate(previous.at)}`} /> : null}
+                    foot={`Average over the ${shown.summary.checked} points checked; "not in the first ${depth}" counts as ${depth + 1}${previous?.avgRank != null && shown.summary.avgRank != null ? `. Was ${previous.avgRank} over ${previous.checked} points on ${fmtDate(previous.at)}` : ""}`} />
+                  <MetricColumn label="In the first 3" testId="tile-grid-top3" value={`${shown.summary.top3} of ${shown.summary.checked}`}
+                    delta={previous && previous.checked === shown.summary.checked ? <DeltaBadge value={shown.summary.top3 - previous.top3} label={`Change since the scan of ${fmtDate(previous.at)}, over the same ${previous.checked} points`} /> : null}
+                    foot={previous ? `${previous.top3} of ${previous.checked} on ${fmtDate(previous.at)}` : "points where you are one of the first three local results"}
+                    chart={<RatioBar value={shown.summary.top3} total={shown.summary.checked} label="Points in the first 3" />} />
+                  <MetricColumn label="Found" testId="tile-grid-found" value={`${shown.summary.found} of ${shown.summary.checked}`} foot={`points where you are in the first ${depth} local results`}
+                    chart={<RatioBar value={shown.summary.found} total={shown.summary.checked} label="Points where you are found" />} />
+                  <MetricColumn label="Area" testId="tile-grid-area" value={span ? `${span} × ${span} mi` : "1 point"} foot={shown.summary.checked < shown.summary.points ? `${shown.summary.points - shown.summary.checked} point${shown.summary.points - shown.summary.checked === 1 ? "" : "s"} could not be checked` : `${shown.summary.points} points checked`} />
+                </MetricRow>
               </div>
               {(() => {
                 const mine = watches.find((w) => w.keyword === shown.keyword && w.size === shown.size && w.spacing === shown.spacing);
@@ -262,21 +273,21 @@ export default function SeoLocalGridPage() {
                 </div>
                 <div className="min-w-0">
                   {selected ? (
-                    <div className="mb-4 rounded-lg border p-3" style={{ borderColor: "var(--g-divider)" }} data-testid="grid-cell-detail" role="status">
-                      <h3 className="g-text text-[14px] font-medium">{whereIs(selected, shown.size, shown.spacing).replace(/^./, (c) => c.toUpperCase())}</h3>
+                    <div className="mb-4 rounded-xl border p-3" style={CARD} data-testid="grid-cell-detail" role="status">
+                      <Heading level={3} className="!mb-0 !text-[14px]">{whereIs(selected, shown.size, shown.spacing).replace(/^./, (c) => c.toUpperCase())}</Heading>
                       <p className="g-text-2 text-[13px]">You: {tone(selected).words}{selected.by && selected.by !== "id" ? ` (recognised by your ${selected.by})` : ""}.</p>
                       {selected.top.length > 0 && <ol className="g-text mt-2 list-decimal pl-5 text-[13px]">{selected.top.map((t) => <li key={t.rank}>{t.name}</li>)}</ol>}
                     </div>
                   ) : <p className="g-text-2 mb-4 text-[13px]">Select a point to see who is in the first three there.</p>}
-                  <h3 className="g-text mb-2 text-[15px] font-medium">Who shows up across the area</h3>
+                  <Heading level={3}>Who shows up across the area</Heading>
                   {shown.rivals.length ? (
                     <div className="overflow-x-auto"><table className="g-table" data-testid="table-grid-rivals">
                       <thead><tr><th>Business</th><th className="num">In the first 3</th><th className="num">Found</th><th className="num">Average position where found</th><th className="num">Reviews</th></tr></thead>
                       <tbody>{shown.rivals.map((r, i) => (
                         <tr key={`${r.name}-${i}`} style={r.ours ? { background: "var(--g-hover, rgba(26,115,232,.06))" } : undefined}>
                           <td>{r.name}{r.ours && <span className="g-chip g-chip--sm ml-2">You</span>}{r.domain && <span className="g-text-2 block text-[12px]">{r.domain}</span>}</td>
-                          <td className="num" data-label="In the first 3">{r.top3} of {shown.summary.checked}</td>
-                          <td className="num" data-label="Found">{r.found} of {shown.summary.checked}</td>
+                          <td className="num" data-label="In the first 3"><MiniBar value={r.top3} total={shown.summary.checked} className="mr-2" />{r.top3} of {shown.summary.checked}</td>
+                          <td className="num" data-label="Found"><MiniBar value={r.found} total={shown.summary.checked} className="mr-2" />{r.found} of {shown.summary.checked}</td>
                           <td className="num" data-label="Average position where found">{r.avgRank}</td>
                           <td className="num" data-label="Reviews">{r.rating != null ? `${r.rating} (${fmtNum(r.reviews)})` : "—"}</td>
                         </tr>
@@ -291,7 +302,7 @@ export default function SeoLocalGridPage() {
 
           {pin && !changing && watches.length > 0 && (
             <section className="mb-5" data-testid="grid-watches">
-              <h2 className="g-text mb-2 text-[15px] font-medium">Repeating scans</h2>
+              <Heading>Repeating scans</Heading>
               <ul className="space-y-1 text-[13px]">
                 {watches.map((w) => <li key={w.id} className="flex flex-wrap items-center gap-2"><span className="g-text">"{w.keyword}"</span><span className="g-text-2">{w.size} × {w.size}, {miles(w.spacing)} apart · every {w.every === "weekly" ? "week" : "month"} · next {fmtDate(w.nextAt)}</span><button type="button" className="g-link" disabled={unwatch.isPending} onClick={() => unwatch.mutate({ siteId: site.id, id: w.id })} aria-label={`Stop repeating the scan for ${w.keyword}`}>Stop</button></li>)}
               </ul>
@@ -300,7 +311,7 @@ export default function SeoLocalGridPage() {
           )}
           {pin && !changing && (
             <section data-testid="grid-history">
-              <h2 className="g-text mb-2 text-[15px] font-medium">Scans so far</h2>
+              <Heading>Scans so far</Heading>
               {q.data.scans.length === 0 ? <Empty testId="grid-no-scans"><h3>No scans yet</h3><p>Enter a search your customers make — "siding contractor", "roof repair near me" — and scan the area. Green points are where you are one of the first three local businesses Google lists.</p></Empty> : (
                 <div className="overflow-x-auto"><table className="g-table" data-testid="table-grid-scans">
                   <thead><tr><th>Search</th><th>Grid</th><th className="num">Position score</th><th className="num">In the first 3</th><th className="num">Found</th><th className="num">When</th></tr></thead>

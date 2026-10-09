@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Download, Loader2 } from "lucide-react";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { fmtDate, fmtNum, type SeoSite } from "./shell";
+import { CARD, SectionTitle, TABLE } from "./viz-rank";
 
 type Row = { key: string; clicks: number | null; impressions: number | null; position: number | null; prevClicks: number | null; prevImpressions: number | null; prevPosition: number | null; tracked?: boolean };
 type Data = { dimension: "page" | "query"; property: string; coverage: "domain" | "prefix"; others: string[]; through: string | null; days: number; previousDays: number; comparable: boolean; incomplete?: boolean; completenessUnknown?: boolean; rows: Row[]; more: number; total: number };
@@ -48,9 +49,9 @@ export function GscBreakdownView({ site }: { site: SeoSite }) {
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `${site.domain}-search-console-${dimension === "page" ? "pages" : "searches"}.csv`; a.click(); URL.revokeObjectURL(a.href);
   };
   return (
-    <section className="mb-6 rounded-lg border p-4" style={{ borderColor: "var(--g-divider)", background: "var(--g-surface)" }} data-testid="gsc-breakdown" aria-busy={q.isFetching}>
+    <section className="mb-6 rounded-xl border p-3 sm:p-4" style={CARD} data-testid="gsc-breakdown" aria-busy={q.isFetching}>
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <h2 className="g-text text-[16px] font-medium">Google's own clicks, by {dimension === "page" ? "page" : "search"}</h2>
+        <SectionTitle>Google's own clicks, by {dimension === "page" ? "page" : "search"}</SectionTitle>
         <nav className="g-tabs !mb-0" aria-label="By page or search">
           {(["page", "query"] as const).map((x) => <a key={x} href={`#${x}`} aria-current={dimension === x ? "page" : undefined} onClick={(e) => { e.preventDefault(); setDimension(x); setShown(25); }} data-testid={`tab-gsc-${x}`}>{x === "page" ? "Pages" : "Searches"}</a>)}
         </nav>
@@ -71,7 +72,7 @@ export function GscBreakdownView({ site }: { site: SeoSite }) {
           </p>
           {rows.length === 0 ? <p className="g-text-2 text-[13px]">No {dimension === "page" ? "pages" : "searches"} returned for these 56 days.</p> : (
             <div className="overflow-x-auto">
-              <table className="g-table w-full" data-testid="table-gsc">
+              <table className={TABLE} data-testid="table-gsc">
                 <thead><tr><th>{word}</th><th className="num">Clicks</th><th className="num">Change</th><th className="num">Impressions</th><th className="num">Avg. position</th></tr></thead>
                 <tbody>
                   {rows.slice(0, shown).map((r) => {

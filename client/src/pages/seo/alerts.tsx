@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { api, Empty, fmtDate, fmtNum, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
 import { KeywordWatch, type KwPick } from "./keyword-watch";
 import { marketLabel } from "@shared/seo-markets";
+import { BLUE_WORDS } from "./viz-more";
 
 type Kind = "rank_drop" | "rank_gain" | "links_lost" | "links_gained" | "grid_down" | "grid_up" | "kw_new" | "kw_lost" | "mention_new";
 type MentionItem = { checkId: number; name: string; since: string; takenOn: string; linksChecked?: boolean; pages: { domain: string; url: string; title: string; place: string | null; confirmed: boolean; linksToYou: boolean | null }[]; more?: number };
@@ -150,10 +151,11 @@ export default function SeoAlertsPage() {
       {q.isSuccess && alerts.length > 0 && <p className="g-text-2 mb-2 text-[13px]" data-testid="alerts-count">Showing {fmtNum(alerts.length)} of {fmtNum(total)} alert{total === 1 ? "" : "s"}{kind !== "all" ? ` of this kind` : ""}{scope === "site" && site ? ` for ${site.domain}` : ""}, newest first.</p>}
       <ul className="space-y-3" data-testid="list-alerts">
         {alerts.map((a) => (
-          <li key={a.id} className="rounded-lg border p-4" style={{ borderColor: "var(--g-divider)", background: "var(--g-surface)" }} data-testid={`alert-${a.id}`}>
+          <li key={a.id} className="min-w-0 rounded-xl border p-3 sm:p-4" style={{ borderColor: "var(--g-divider)", background: "var(--g-surface)" }} data-testid={`alert-${a.id}`}>
             <div className="mb-1 flex flex-wrap items-center gap-2">
+              {/* The kind keeps its green / red: better or worse is exactly what it says. The title is blue like every heading. */}
               <span className={`g-move ${KIND[a.kind].good ? "g-move--up" : "g-move--down"} text-[13px]`}>{KIND[a.kind].good ? "▲" : "▼"} {KIND[a.kind].label}</span>
-              <h2 className="g-text text-[15px] font-medium">{a.title}</h2>
+              <h2 className="min-w-0 text-[15px] font-medium [overflow-wrap:anywhere]" style={BLUE_WORDS}>{a.title}</h2>
               {!a.readAt && <span className="g-chip g-chip--sm">New</span>}
               {a.notSent && <span className="g-chip g-chip--sm" title="Sending it to the bell or by email failed again and again, so it was given up. It is kept here.">Not sent</span>}
               {!a.notSent && a.emailFailed && <span className="g-chip g-chip--sm" title="The bell entry went out; the email failed every time it was tried.">Email not sent</span>}

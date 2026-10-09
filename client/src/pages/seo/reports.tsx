@@ -12,11 +12,15 @@ import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { api, Empty, fmtDate, fmtNum, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { DeltaBadge, DistributionBar, MetricColumn, PALETTE } from "./viz";
+import { BarList, BLUE_WORDS, CARD, Heading, leadFigure, MetricRow, MiniBar, Section } from "./viz-more";
 
 type Mover = { keyword: string; location: string | null; device: string; from: number | null; to: number | null };
 type Report = {
   domain: string; generatedAt: string; comparedWith: string | null;
   rankings: { byTag?: { tag: string; keywords: number; top3: number; top10: number; top10Change: number | null; visibility: number | null; visibilityChange: number | null; compared: number; newSince: number; weighted?: boolean; changeWeighted?: boolean | null }[]; moreTags?: number; tracked: number; checked?: number; device?: string; improvedCount?: number; declinedCount?: number; checkedOn: string | null; top3: number; top10: number; averagePosition: number | null; inMapPack: number; withMapPack: number; improved: Mover[]; declined: Mover[];
+    /** Changes measured only on the keywords in BOTH checks (how many those are), and the average of those ranked both times. */
+    compared?: number | null; top10Change?: number | null; top3Change?: number | null; averageNow?: number | null; averageBefore?: number | null; rankedBoth?: number;
     keywords: { keyword: string; location: string | null; position: number | null; previous: number | null; local: number | null; volume: number | null }[] } | null;
   search: { fetchedAt: string } | null;
   searchConsole?: { clicks: number; /** The server's verdict on the reads of these days: unfinished / failed, or not checkable (`completenessUnknown`) — the counts may be short and are not compared. */ incomplete?: boolean; completenessUnknown?: boolean } | null;
@@ -28,7 +32,7 @@ type Report = {
 type Schedule = { frequency: "off" | "weekly" | "monthly"; recipients: string[]; nextSendAt: string | null; lastSentAt: string | null; uncertain?: { recipient: string; period: string; at: string }[] | null; uncertainMore?: number; uncertainDays?: number };
 type Data = { report: Report; highlights: [string, string][]; empty: boolean; schedule: Schedule; brandName: string | null; accountEmail: string | null; optedOut?: string[] };
 
-const card = { borderColor: "var(--g-divider)", background: "var(--g-surface)" };
+const card = CARD;
 // A missing position is "not found": the site was not within the result pages the check read, which is not proof it ranks nowhere.
 const moverText = (m: Mover) => `${m.keyword}${m.location ? ` · ${m.location}` : ""}: ${m.from === null ? `now ${m.to}` : m.to === null ? `was ${m.from}, now not found` : `${m.from} → ${m.to}`}`;
 const parseEmails = (text: string) => [...new Set(text.split(/[\s,;]+/).map((s) => s.trim().toLowerCase()).filter(Boolean))];
@@ -86,17 +90,35 @@ export default function SeoReportsPage() {
       {site && d && r && !d.empty && (
         <div className="grid gap-4 lg:grid-cols-3">
           <div className="space-y-4 lg:col-span-2" data-testid="report-preview">
-            <section className="rounded-lg border p-4" style={card}>
-              <h2 className="g-text text-[16px] font-medium">At a glance <span className="g-text-2 text-[12px] font-normal">· {fmtDate(r.generatedAt)}{r.comparedWith ? ` · rankings compared with ${fmtDate(r.comparedWith)}` : ""}</span></h2>
-              <table className="g-table mt-2" data-testid="table-report-highlights"><tbody>
-                {d.highlights.map(([label, value]) => <tr key={label}><td className="g-text-2">{label}</td><td className="num g-text font-medium">{value}</td></tr>)}
-              </tbody></table>
-            </section>
-            {r.rankings && (
-              <section className="rounded-lg border p-4" style={card} data-testid="report-rankings">
-                <h2 className="g-text mb-2 text-[16px] font-medium">Rankings <span className="g-text-2 text-[12px] font-normal">· {r.rankings.device ?? "desktop"} · checked {fmtDate(r.rankings.checkedOn)}</span></h2>
+            <Section title="At a glance" meta={<>{fmtDate(r.generatedAt)}{r.comparedWith ? ` · rankings compared with ${fmtDate(r.comparedWith)}` : ""}</>}>
+              {/* Each highlight as the report words it: its leading number big, the rest of the line under it. A line with no leading number is shown in words. */}
+              <div className="grid grid-cols-2 gap-x-3 gap-y-4 md:grid-cols-3 xl:grid-cols-4" data-testid="table-report-highlights">
+                {d.highlights.map(([label, value]) => { const f = leadFigure(value); return (
+                  <div key={label} className="min-w-0 border-[color:var(--g-divider)] px-1 sm:px-3 xl:[&:not(:nth-child(4n+1))]:border-l">
+                    <div className="text-[13px] font-medium [overflow-wrap:anywhere]" style={BLUE_WORDS}>{label}</div>
+                    {f.big ? <div className="g-text mt-0.5 text-[26px] leading-9 tabular-nums">{f.big}</div> : null}
+                    {f.rest && <div className={f.big ? "g-text-2 text-[12px] leading-4 [overflow-wrap:anywhere]" : "g-text mt-1 text-[13px] leading-5 [overflow-wrap:anywhere]"}>{f.rest}</div>}
+                  </div>
+                ); })}
+              </div>
+            </Section>
+            {r.rankings && (() => {
+              const k = r.rankings, checked = k.checked ?? k.tracked, compared = k.compared ?? 0;
+              const avgMove = k.averageNow != null && k.averageBefore != null && k.rankedBoth ? k.averageNow - k.averageBefore : null;
+              return (
+              <Section title="Rankings" meta={<>{k.device ?? "desktop"} · checked {fmtDate(k.checkedOn)}</>} testId="report-rankings">
+                {/* The figures of the latest check; a change is measured only on the keywords in both checks, and says on how many. */}
+                <MetricRow cols={k.withMapPack > 0 ? 5 : 4} className="mb-4" testId="report-rankings-figures">
+                  <MetricColumn label="In the top 3" value={fmtNum(k.top3)} delta={compared ? <DeltaBadge value={k.top3Change} label={`Change on the ${compared} keywords in both checks`} /> : null} foot={compared ? `of ${fmtNum(checked)} checked · change on the ${fmtNum(compared)} in both checks` : `of ${fmtNum(checked)} checked`} />
+                  <MetricColumn label="In the top 10" value={fmtNum(k.top10)} delta={compared ? <DeltaBadge value={k.top10Change} label={`Change on the ${compared} keywords in both checks`} /> : null} foot={`of ${fmtNum(checked)} checked${k.tracked > checked ? ` · ${fmtNum(k.tracked - checked)} of ${fmtNum(k.tracked)} tracked not covered` : ""}`} />
+                  <MetricColumn label="Average position" value={k.averagePosition ?? "—"} delta={avgMove != null ? <DeltaBadge value={avgMove} upIsBad label="Change in the average of the keywords ranked both times" /> : null} foot={avgMove != null ? `the ${fmtNum(k.rankedBoth)} ranked both times: ${k.averageBefore} then, ${k.averageNow} now` : "Of the keywords found; lower is better"} />
+                  {k.withMapPack > 0 && <MetricColumn label="In the Google map pack" value={`${fmtNum(k.inMapPack)} of ${fmtNum(k.withMapPack)}`} foot="searches that show a map" />}
+                  <MetricColumn label="Keywords checked" value={fmtNum(checked)} foot="and where they rank">
+                    <div className="mt-1.5"><DistributionBar parts={[{ label: "Top 3", value: k.top3, color: PALETTE.top3 }, { label: "4–10", value: Math.max(0, k.top10 - k.top3), color: PALETTE.top10 }, { label: "Below 10 or not found", value: Math.max(0, checked - k.top10), color: PALETTE.rest }]} /></div>
+                  </MetricColumn>
+                </MetricRow>
                 {!r.comparedWith && <p className="g-text-2 text-[13px]">This is the first check, so there is nothing to compare with yet. The next report shows what moved.</p>}
-                {r.comparedWith && r.rankings.improved.length === 0 && r.rankings.declined.length === 0 && <p className="g-text-2 text-[13px]">{(r.rankings as { compared?: number | null }).compared === 0 ? `No keyword was in both this check and the one of ${fmtDate(r.comparedWith)}, so nothing is compared.` : `No keyword changed position since ${fmtDate(r.comparedWith)}.`}</p>}
+                {r.comparedWith && k.improved.length === 0 && k.declined.length === 0 && <p className="g-text-2 text-[13px]">{k.compared === 0 ? `No keyword was in both this check and the one of ${fmtDate(r.comparedWith)}, so nothing is compared.` : `No keyword changed position since ${fmtDate(r.comparedWith)}.`}</p>}
                 <div className="grid gap-4 sm:grid-cols-2">
                   {r.rankings.improved.length > 0 && <div><h3 className="g-move g-move--up mb-1 text-[13px]">▲ Moved up{(r.rankings.improvedCount ?? 0) > r.rankings.improved.length ? ` — the ${r.rankings.improved.length} biggest of ${r.rankings.improvedCount}` : ""}</h3><ul className="g-text space-y-0.5 text-[13px]">{r.rankings.improved.map((m, i) => <li key={i}>{moverText(m)}</li>)}</ul></div>}
                   {r.rankings.declined.length > 0 && <div><h3 className="g-move g-move--down mb-1 text-[13px]">▼ Moved down{(r.rankings.declinedCount ?? 0) > r.rankings.declined.length ? ` — the ${r.rankings.declined.length} biggest of ${r.rankings.declinedCount}` : ""}</h3><ul className="g-text space-y-0.5 text-[13px]">{r.rankings.declined.map((m, i) => <li key={i}>{moverText(m)}</li>)}</ul></div>}
@@ -108,33 +130,40 @@ export default function SeoReportsPage() {
                 </details>
                 {(r.rankings.byTag?.length ?? 0) > 0 && (
                   <div className="mt-3 overflow-x-auto" data-testid="report-by-tag">
-                    <h3 className="g-text mb-1 text-[14px] font-medium">By tag</h3>
+                    <Heading level={3} className="!mb-1 !text-[14px]">By tag</Heading>
                     <table className="g-table w-full text-[13px]"><thead><tr><th>Tag</th><th className="num">Keywords</th><th className="num">In the top 10</th><th className="num">Visibility index</th></tr></thead>
                       <tbody>{r.rankings.byTag!.map((t) => (
                         <tr key={t.tag}>
                           <td className="!whitespace-normal [overflow-wrap:anywhere]" data-label="Tag"><span className="sr-only">Tag: </span>{t.tag}</td>
                           <td className="num" data-label="Keywords"><span className="sr-only">Keywords: </span>{fmtNum(t.keywords)}{r.comparedWith && <span className="g-text-2 block text-[11px]">{fmtNum(t.compared)} in both · {fmtNum(t.newSince)} new</span>}</td>
                           <td className="num" data-label="In the top 10"><span className="sr-only">In the top 10: </span>{fmtNum(t.top10)}{r.comparedWith && <TagChange v={t.top10Change} />}</td>
-                          <td className="num" data-label="Visibility index"><span className="sr-only">Visibility index: </span>{t.visibility === null ? "—" : t.visibility}{r.comparedWith && <TagChange v={t.visibilityChange} />}{t.visibility !== null && t.weighted !== undefined && <span className="g-text-2 block text-[11px]">{t.weighted ? "by search volume" : "each keyword once"}{t.changeWeighted != null && t.changeWeighted !== t.weighted ? `; change ${t.changeWeighted ? "by volume" : "each once"}` : ""}</span>}</td>
+                          <td className="num" data-label="Visibility index"><span className="sr-only">Visibility index: </span>{t.visibility !== null && <MiniBar value={t.visibility} total={100} className="mr-2" />}{t.visibility === null ? "—" : t.visibility}{r.comparedWith && <TagChange v={t.visibilityChange} />}{t.visibility !== null && t.weighted !== undefined && <span className="g-text-2 block text-[11px]">{t.weighted ? "by search volume" : "each keyword once"}{t.changeWeighted != null && t.changeWeighted !== t.weighted ? `; change ${t.changeWeighted ? "by volume" : "each once"}` : ""}</span>}</td>
                         </tr>))}</tbody></table>
                     {(r.rankings.moreTags ?? 0) > 0 && <p className="g-text-2 mt-1 text-[12px]">…and {r.rankings.moreTags} more tags.</p>}
                     <p className="g-text-2 mt-1 text-[12px]">{r.comparedWith ? `Changes count only the keywords in both checks (${fmtDate(r.rankings.checkedOn)} and ${fmtDate(r.comparedWith)}); ` : ""}a keyword can carry several tags. The visibility index is not a share of real clicks: 100 would mean every keyword first (weighted by search volume where every keyword has one).</p>
                   </div>
                 )}
-              </section>
-            )}
+              </Section>
+            ); })()}
             {r.auditUnavailable && <p className="g-text-2 text-[13px]" role="note" data-testid="report-audit-unavailable">Site health could not be looked up just now, so it is left out of this report.</p>}
             {r.auditUnreadable !== undefined && !r.audit && <p className="g-text-2 text-[13px]" role="note" data-testid="report-audit-unreadable">Site health: the newest crawl{r.auditUnreadable ? ` (${fmtDate(r.auditUnreadable)})` : ""} could not be read, so no health score is reported.</p>}
             {r.audit && r.audit.topIssues.length > 0 && (
-              <section className="rounded-lg border p-4" style={card} data-testid="report-audit">
-                <h2 className="g-text mb-2 text-[16px] font-medium">What to fix first <span className="g-text-2 text-[12px] font-normal">· crawled {fmtDate(r.audit.scannedAt)}</span></h2>
-                <ul className="g-text space-y-0.5 text-[13px]">{r.audit.topIssues.map((i) => <li key={i.title}>{i.title} <span className="g-text-2">— {fmtNum(i.count)} affected ({i.severity})</span></li>)}</ul>
-              </section>
+              <Section title="What to fix first" meta={<>crawled {fmtDate(r.audit.scannedAt)}</>} testId="report-audit">
+                {/* The longest bar is the issue found on the most pages; the words say the count and how serious it is. */}
+                <BarList rows={r.audit.topIssues.map((i) => ({ key: i.title, label: i.title, title: i.title, value: i.count, words: `${fmtNum(i.count)} affected (${i.severity})` }))} />
+              </Section>
             )}
             {r.work && (
-              <section className="rounded-lg border p-4" style={card} data-testid="report-work">
-                <h2 className="g-text mb-2 text-[16px] font-medium">Work done <span className="g-text-2 text-[12px] font-normal">· {r.work.since ? `since ${fmtDate(r.work.since)}` : `the last ${r.work.days} days`}, from the <Link href="/seo/plan" className="g-link">action plan</Link></span></h2>
+              <Section title="Work done" meta={<>{r.work.since ? `since ${fmtDate(r.work.since)}` : `the last ${r.work.days} days`}, from the <Link href="/seo/plan" className="g-link">action plan</Link></>} testId="report-work">
                 {r.work.unavailable && <p className="text-[13px]" role="status" style={{ color: "#b06000" }}>The action plan couldn't be read just now, so nothing is said about the work done. Reload to try again.</p>}
+                {!r.work.unavailable && (
+                  <MetricRow cols={4} className="mb-3" testId="report-work-figures">
+                    <MetricColumn label="Marked done" value={fmtNum(r.work.doneCount)} foot={r.work.since ? `since ${fmtDate(r.work.since)}` : `in the last ${r.work.days} days`} />
+                    <MetricColumn label="Still open" value={fmtNum(r.work.open)} foot={r.work.dueSoon ? `${fmtNum(r.work.dueSoon)} due today or in the next 7 days` : undefined} />
+                    <MetricColumn label="In progress" value={fmtNum(r.work.inProgress)} />
+                    <MetricColumn label="Past their due date" value={fmtNum(r.work.overdueCount ?? 0)} foot={r.work.overdueCount ? "listed below" : undefined} />
+                  </MetricRow>
+                )}
                 {r.work.unavailable ? null : r.work.done.length === 0 ? <p className="g-text-2 text-[13px]">No task was marked done in this period.</p> : (
                   <ul className="g-text space-y-0.5 text-[13px]">{r.work.done.map((t, i) => <li key={i}><span className="g-text-2">{fmtDate(t.doneAt)}</span> — {t.title}{t.note && <span className="g-text-2"> ({t.note})</span>}</li>)}</ul>
                 )}
@@ -146,20 +175,19 @@ export default function SeoReportsPage() {
                   </div>
                 )}
                 {!r.work.unavailable && <p className="g-text-2 mt-1 text-[12px]">{fmtNum(r.work.open)} still open{r.work.inProgress ? `, ${fmtNum(r.work.inProgress)} in progress` : ""}{r.work.dueSoon ? `, ${fmtNum(r.work.dueSoon)} due today or in the next 7 days` : ""}. "Done" is what was marked in the plan; whether a site issue is gone shows in the next crawl.</p>}
-              </section>
+              </Section>
             )}
             {r.alerts.length > 0 && (
-              <section className="rounded-lg border p-4" style={card} data-testid="report-alerts">
-                <h2 className="g-text mb-2 text-[16px] font-medium">Alerts in the last month</h2>
+              <Section title="Alerts in the last month" testId="report-alerts">
                 <ul className="g-text space-y-0.5 text-[13px]">{r.alerts.map((a, i) => <li key={i}><span className="g-text-2">{fmtDate(a.createdAt)}</span> — {a.title}</li>)}</ul>
-              </section>
+              </Section>
             )}
             {r.searchConsole?.incomplete && <p className="g-text-2 text-[13px]" role="note" data-testid="report-gsc-incomplete">Search Console: {r.searchConsole.completenessUnknown ? "whether every one of these days was fully read from Google could not be checked" : "some of these days are still being read from Google, or a read of them failed"}, so the clicks and impressions above may be short and are not compared with the 28 days before.</p>}
             {!r.searchConsole && <p className="g-text-2 text-[13px]" data-testid="report-gsc-missing">Want real clicks in this report, not just estimates? <Link href="/search-console" className="g-link">Connect Google Search Console</Link> for {site.domain} and the report adds Google's own count of clicks and impressions.</p>}
             <p className="g-text-2 text-[12px]">The PDF has the same content{d.brandName ? `, under the name "${d.brandName}"` : ""}. Set your own name and logo for reports under <Link href="/site-scan" className="g-link">Site Scan → Branding</Link>. Missing a section? It appears once that tool has numbers for this site.</p>
           </div>
-          <form className="h-fit rounded-lg border p-4" style={card} onSubmit={(e) => { e.preventDefault(); save.mutate(); }} data-testid="form-report-schedule">
-            <h2 className="g-text text-[16px] font-medium">Email this report</h2>
+          <form className="h-fit min-w-0 rounded-xl border p-3 sm:p-4" style={card} onSubmit={(e) => { e.preventDefault(); save.mutate(); }} data-testid="form-report-schedule">
+            <Heading className="!mb-0">Email this report</Heading>
             <p className="g-text-2 mt-1 text-[13px]">Sent as an email with the PDF attached. Free — it uses the numbers you already have.</p>
             <label className="mt-3 block text-[13px]"><span className="g-text-2">How often</span>
               <select className="g-input g-select mt-1" value={frequency} onChange={(e) => setFrequency(e.target.value as Schedule["frequency"])} data-testid="select-report-frequency">

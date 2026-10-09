@@ -1,7 +1,7 @@
 /**
  * What else Google shows on the results page for a tracked keyword (from the check already paid for), as small
  * chips: the map pack, an AI overview, a featured snippet, "people also ask", videos, images, ads… A chip is
- * filled when the site itself is in that feature.
+ * green when the site itself is in that feature (green only ever means "good" here), plain otherwise.
  */
 export const SERP_FEATURES: Record<string, { short: string; long: string }> = {
   local_pack: { short: "Map", long: "Google shows a map with local businesses" },
@@ -29,8 +29,8 @@ export function SerpFeatureChips({ features, mapOwned }: { features: readonly st
       {shown.map((t) => {
         const own = t === "local_pack" ? !!mapOwned : ownsFeature(features, t);
         return (
-          <span key={t} className="rounded px-1.5 py-0.5 text-[11px] font-medium" title={`${SERP_FEATURES[t].long}${own ? " — and you are in it" : ""}`}
-            style={own ? { background: "#188038", color: "#fff" } : { background: "var(--g-hover, rgba(0,0,0,.06))", color: "var(--g-text-2)" }}>
+          <span key={t} className="rounded border px-1.5 text-[11px] font-medium leading-4" title={`${SERP_FEATURES[t].long}${own ? " — and you are in it" : ""}`}
+            style={own ? { borderColor: "var(--g-green)", color: "var(--g-green)" } : { borderColor: "var(--g-divider)", color: "var(--g-text-2)" }}>
             {SERP_FEATURES[t].short}{own && <span className="sr-only"> (you are in it)</span>}
           </span>
         );

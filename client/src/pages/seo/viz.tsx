@@ -27,7 +27,7 @@ export function DeltaBadge({ value, label, upIsBad = false, suffix = "" }: { val
   if (value == null || !Number.isFinite(value) || Math.round(value) === 0) return null;
   const good = upIsBad ? value < 0 : value > 0;
   return (
-    <span className="ml-1.5 align-baseline text-[14px] font-medium tabular-nums" style={{ color: good ? "var(--g-green)" : "var(--g-red)" }} aria-label={label}>
+    <span className="ml-1.5 inline-block whitespace-nowrap align-baseline text-[14px] font-medium tabular-nums" style={{ color: good ? "var(--g-green)" : "var(--g-red)" }} aria-label={label}>
       {value > 0 ? "+" : "−"}{compact(Math.abs(value))}{suffix}
     </span>
   );
@@ -189,3 +189,26 @@ export function TrendPanel({ series, title, note, testId }: { series: { key: str
 
 /** "2026-03" → "Mar 2026"; anything else as it is. */
 export const monthLabel = (m: string) => (/^\d{4}-\d{2}$/.test(m) ? new Date(`${m}-15T12:00:00Z`).toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" }) : m);
+
+/**
+ * Where a keyword ranks, as a compact badge — the same on every SEO screen: dark orange in the top 3, light orange to
+ * 10, plain below that. An absent position is "—".
+ */
+export function PositionBadge({ value }: { value: number | null | undefined }) {
+  if (value == null) return <span className="g-text-2">—</span>;
+  const style = value <= 3 ? { background: PALETTE.top3, color: "#fff" } : value <= 10 ? { background: PALETTE.top10, color: "#202124" } : { background: "var(--g-chip)", color: "var(--g-text)" };
+  return <span className="inline-grid h-6 min-w-[2rem] place-items-center rounded-md px-1.5 text-[12px] font-medium tabular-nums" style={style}>{value}</span>;
+}
+
+/** Keyword difficulty 0–100 in words (the bands shell.tsx `kd()` uses): under 30 easy, under 60 medium, else hard. */
+export const kdWord = (n: number) => (n < 30 ? "easy" : n < 60 ? "medium" : "hard");
+
+/**
+ * Keyword difficulty as a tinted badge — the same on every SEO screen: green when easy, amber when medium, red when
+ * hard, with the number and the word, so the colour is never the only signal.
+ */
+export function DifficultyBadge({ value }: { value: number | null | undefined }) {
+  if (value == null) return <span className="g-text-2">—</span>;
+  const color = value < 30 ? "var(--g-green)" : value < 60 ? "#f29900" : "var(--g-red)";
+  return <span className="inline-flex h-6 items-center whitespace-nowrap rounded-md px-1.5 text-[12px] font-medium tabular-nums" style={{ color, background: `color-mix(in srgb, ${color} 14%, transparent)` }}>{value} {kdWord(value)}</span>;
+}

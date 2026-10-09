@@ -8,7 +8,9 @@ import { Fragment, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight, Download, Loader2 } from "lucide-react";
 import { apiErrorMessage } from "@/lib/queryClient";
-import { Empty, fmtDate, fmtNum, Tile, type SeoSite } from "./shell";
+import { Empty, fmtDate, fmtNum, type SeoSite } from "./shell";
+import { PALETTE, StatTile } from "./viz";
+import { COMPACT_TABLE } from "./viz-audit";
 
 type Row = { url: string; path: string; status: number; redirected: boolean; indexable: boolean | null; whyNot: string | null; canonicalElsewhere?: boolean; depth: number | null; inlinks: number | null; outlinks: number | null;
   title: string | null; titleLength: number; descriptionLength: number; h1: number; words: number; images: number; imagesNoAlt: number; kb: number | null; issues: string[] };
@@ -72,13 +74,14 @@ export function AuditPages({ site, issueTitles, crawlId }: { site: SeoSite; issu
   const s = d.summary, measured = s.linksMeasured !== false;
   return (
     <div data-testid="audit-pages">
-      <div className="g-tiles mb-4">
-        <Tile label="Nothing blocking Google" value={`${fmtNum(s.indexable)} of ${fmtNum(s.pages)}`} hint={s.notIndexable ? `${fmtNum(s.notIndexable)} carry a signal that keeps Google out — check they are meant to` : "No page tells Google to stay away. Google still decides what it lists."} testId="tile-pages-indexable" />
+      {/* The same tiles as the dashboard's: a blue label, the figure, and what it rests on underneath. */}
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatTile label="Nothing blocking Google" color={PALETTE.health} value={`${fmtNum(s.indexable)} of ${fmtNum(s.pages)}`} foot={s.notIndexable ? `${fmtNum(s.notIndexable)} carry a signal that keeps Google out — check they are meant to` : "No page tells Google to stay away. Google still decides what it lists."} testId="tile-pages-indexable" />
         {measured ? <>
-          <Tile label="Average clicks from home" value={s.averageDepth ?? "—"} hint={s.deep ? `${fmtNum(s.deep)} page${s.deep === 1 ? " is" : "s are"} 4 or more clicks deep` : "No page is more than 3 clicks deep"} testId="tile-pages-depth" />
-          <Tile label="Pages nothing links to" value={fmtNum(s.orphans)} hint="Among the pages crawled" testId="tile-pages-orphans" />
-        </> : <Tile label="Links between pages" value="Not measurable" hint="Too few links in the page source" testId="tile-pages-links-unmeasured" />}
-        <Tile label="Pages with little text" value={fmtNum(s.thin)} hint="Under 200 words" testId="tile-pages-thin" />
+          <StatTile label="Average clicks from home" color={PALETTE.health} value={s.averageDepth ?? "—"} foot={s.deep ? `${fmtNum(s.deep)} page${s.deep === 1 ? " is" : "s are"} 4 or more clicks deep` : "No page is more than 3 clicks deep"} testId="tile-pages-depth" />
+          <StatTile label="Pages nothing links to" color={PALETTE.health} value={fmtNum(s.orphans)} foot="Among the pages crawled" testId="tile-pages-orphans" />
+        </> : <StatTile label="Links between pages" color={PALETTE.health} value={<span className="text-[20px] sm:text-[22px]">Not measurable</span>} foot="Too few links in the page source" testId="tile-pages-links-unmeasured" />}
+        <StatTile label="Pages with little text" color={PALETTE.health} value={fmtNum(s.thin)} foot="Under 200 words" testId="tile-pages-thin" />
       </div>
       {!measured && (
         <div className="g-callout mb-3" role="status" data-testid="pages-links-unmeasured">
@@ -100,7 +103,7 @@ export function AuditPages({ site, issueTitles, crawlId }: { site: SeoSite; issu
       </div>
       {rows.length === 0 ? <Empty testId="audit-pages-none"><h3>No page matches</h3><p>Clear the search box or choose another filter.</p></Empty> : (
         <div className="overflow-x-auto">
-          <table className="g-table w-full" data-testid="table-audit-pages">
+          <table className={COMPACT_TABLE} data-testid="table-audit-pages">
             <thead><tr><th aria-label="Show details" className="w-12" />{COLS.map((c) => (
               <th key={c.key} className={c.num ? "num" : undefined} aria-sort={sort.key === c.key ? (sort.dir === 1 ? "ascending" : "descending") : undefined} title={c.title}>
                 <button type="button" className="g-text-2 whitespace-nowrap" onClick={() => setSort((x) => ({ key: c.key, dir: x.key === c.key ? (x.dir === 1 ? -1 : 1) : 1 }))}>{c.label}{sort.key === c.key ? (sort.dir === 1 ? " ▲" : " ▼") : ""}</button>

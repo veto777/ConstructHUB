@@ -4,18 +4,21 @@
  * top keywords and pages, organic competitors, referring domains and anchors.
  * One report is charged to the account's SEO data credit; a saved report is free to
  * reopen for a week (server/seo/explorer.ts). White-label: no vendor, no price.
+ * Looks like the dashboard (owner, 10/8): blue wording, orange graphs; green and red only mean better or worse.
  */
 import { DirectoriesView } from "./directories";
 import { MentionsView } from "./mentions";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { holdNote, isNotRunYet, refreshSeoData } from "./shell";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Area, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, CartesianGrid, ComposedChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ExternalLink, Loader2, Plus, RefreshCw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { api, canAfford, Empty, fmtDate, fmtNum, kd, priceOf, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { api, canAfford, Empty, fmtDate, fmtNum, priceOf, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { compact, DeltaBadge, DistributionBar, GradientSpark, MetricColumn, monthLabel, PALETTE, TOOLTIP, TrendPanel } from "./viz";
+import { BarRows, change, DifficultyBadge, Kicker, PositionBadge, ShareBar } from "./viz-explorer";
 import { ReportView, REPORT_NOTE, type TableKey as ReportKey } from "./report-table";
 import { GapView } from "./gap";
 import { OpportunitiesView } from "./opportunities";
@@ -52,20 +55,19 @@ type Report = {
 };
 type Recent = { items: { domain: string; locationCode?: number; languageCode?: string; fetchedAt: string; authority: number | null; referringDomains: number | null; keywords: number | null; traffic: number | null }[]; freeForDays: number };
 
-const BLUE = "#1a73e8", ORANGE = "#e8710a", GREEN = "#188038", GREY = "#9aa0a6";
 const usd = (n: number | null | undefined) => n == null ? "—" : `$${Math.round(n).toLocaleString("en-US")}`;
-/** 12,345 → 12.3K, as the tiles read at a glance; exact numbers stay in the tables. */
-const compact = (n: number | null | undefined) =>
-  n == null ? "—" : Math.abs(n) >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : Math.abs(n) >= 10_000 ? `${(n / 1000).toFixed(1)}K` : Math.round(n).toLocaleString("en-US");
-const monthLabel = (m: string) => new Date(`${m}-15T12:00:00`).toLocaleDateString("en-US", { month: "short", year: "numeric" });
 const stripUrl = (u: string) => u.replace(/^https?:\/\/(www\.)?/, "");
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const SURFACE = { borderColor: "var(--g-divider)", background: "var(--g-surface)" } as const;
+/** The largest of a column's numbers, for the share bars beside them. */
+const maxOf = (xs: (number | null | undefined)[]) => Math.max(0, ...xs.map((x) => x ?? 0));
 
+/** A card with a blue title and an optional note on the right. */
 function Panel({ title, hint, children, testId, className = "" }: { title: string; hint?: ReactNode; children: ReactNode; testId?: string; className?: string }) {
   return (
-    <section className={`rounded-lg border p-4 ${className}`} style={{ borderColor: "var(--g-divider)", background: "var(--g-surface)" }} data-testid={testId}>
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="g-text text-[15px] font-medium">{title}</h2>
+    <section className={`min-w-0 rounded-xl border p-3 sm:p-4 ${className}`} style={SURFACE} data-testid={testId}>
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-[14px] font-medium" style={{ color: "var(--g-blue)" }}>{title}</h2>
         {hint && <span className="g-text-2 text-[12px]">{hint}</span>}
       </div>
       {children}
@@ -73,32 +75,9 @@ function Panel({ title, hint, children, testId, className = "" }: { title: strin
   );
 }
 
-function Stat({ label, value, hint, testId }: { label: string; value: ReactNode; hint?: ReactNode; testId?: string }) {
-  return (
-    <div className="min-w-0" data-testid={testId}>
-      <div className="g-text-2 text-[12px]">{label}</div>
-      <div className="g-text text-[26px] leading-8 tabular-nums" style={{ color: "var(--g-blue)" }}>{value}</div>
-      {hint && <div className="g-text-2 text-[12px]">{hint}</div>}
-    </div>
-  );
-}
-
-/** Authority as a ring, 0–100: the number and the ring say the same thing. */
-function AuthorityRing({ value }: { value: number | null }) {
-  const r = 26, c = 2 * Math.PI * r, v = Math.max(0, Math.min(100, value ?? 0));
-  return (
-    <div className="flex items-center gap-3" data-testid="stat-authority">
-      <svg width="64" height="64" viewBox="0 0 64 64" role="img" aria-label={`Authority ${value ?? "unknown"} out of 100`}>
-        <circle cx="32" cy="32" r={r} fill="none" stroke="var(--g-divider)" strokeWidth="7" />
-        <circle cx="32" cy="32" r={r} fill="none" stroke="#673ab7" strokeWidth="7" strokeDasharray={`${(v / 100) * c} ${c}`} strokeLinecap="round" transform="rotate(-90 32 32)" />
-      </svg>
-      <div>
-        <div className="g-text-2 text-[12px]">Authority</div>
-        <div className="g-text text-[26px] leading-8 tabular-nums">{value ?? "—"}</div>
-        <div className="g-text-2 text-[12px]">link strength, 0–100</div>
-      </div>
-    </div>
-  );
+/** One figure's column in the headline row: a thin divider on its left from the second column on (not on a phone). */
+function Col({ children, first = false }: { children: ReactNode; first?: boolean }) {
+  return <div className={`min-w-0 px-1 sm:px-3 ${first ? "" : "sm:border-l"}`} style={{ borderColor: "var(--g-divider)" }}>{children}</div>;
 }
 
 /** The left menu, grouped the way Site Explorer groups its reports. */
@@ -141,7 +120,7 @@ function CompareMonths({ report }: { report: Report }) {
     <section className="mb-4" data-testid="panel-compare">
       <button type="button" className="g-pill g-pill--sm" aria-expanded={open} onClick={() => setOpen(!open)} data-testid="button-compare">{open ? "Hide the comparison" : "Compare two months"}</button>
       {open && (
-        <div className="mt-3 rounded-lg border p-4" style={{ borderColor: "var(--g-divider)" }}>
+        <div className="mt-3 rounded-xl border p-3 sm:p-4" style={SURFACE}>
           <div className="mb-3 flex flex-wrap items-center gap-3 text-[13px]">
             <label className="g-text-2 flex items-center gap-2">From <select className="g-input g-select !w-auto !py-1" value={a ?? ""} onChange={(e) => setA(e.target.value)} data-testid="select-compare-from">{months.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}</select></label>
             <label className="g-text-2 flex items-center gap-2">to <select className="g-input g-select !w-auto !py-1" value={b ?? ""} onChange={(e) => setB(e.target.value)} data-testid="select-compare-to">{months.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}</select></label>
@@ -177,7 +156,6 @@ export default function SeoExplorerPage() {
   const [table, setTable] = useState<TableKey>("keywords");
   // ?view=<report> opens that report (an alert links straight to Mentions); anything else is the overview.
   const [view, setView] = useState<ViewKey>(() => { const v = new URLSearchParams(window.location.search).get("view"); return v && Object.prototype.hasOwnProperty.call(MENU_LABEL, v) ? (v as ViewKey) : "overview"; });
-  const [series, setSeries] = useState({ traffic: true, keywords: true, top10: false });
   const [market, setMarket] = useMarket();
   const mk = { locationCode: market.locationCode, languageCode: market.languageCode };
   /** Another country is another report: what is on screen is put away first. */
@@ -226,16 +204,16 @@ export default function SeoExplorerPage() {
   const notFoundYet = !!domain && !report && savedMissing && !analyse.isPending;
   const savedFailed = !!domain && !report && saved.isError && !savedMissing && !analyse.isPending;
 
+  // Keywords by where they rank: each band on its own, from the cumulative counts the report keeps.
   const positions = useMemo(() => {
     if (!report) return [];
     const p = report.organic.positions;
-    return [
-      { range: "1–3", keywords: p.top3, color: GREEN }, { range: "4–10", keywords: p.top10 - p.top3, color: BLUE },
-      { range: "11–20", keywords: p.top20 - p.top10, color: ORANGE }, { range: "21–50", keywords: p.top50 - p.top20, color: "#f9ab00" },
-      { range: "51–100", keywords: p.top100 - p.top50, color: GREY },
-    ];
+    return [{ label: "1–3", value: p.top3 }, { label: "4–10", value: p.top10 - p.top3 }, { label: "11–20", value: p.top20 - p.top10 }, { label: "21–50", value: p.top50 - p.top20 }, { label: "51–100", value: p.top100 - p.top50 }];
   }, [report]);
   const followedPct = report?.links.referringDomains ? Math.round(((report.links.followedDomains ?? 0) / report.links.referringDomains) * 1000) / 10 : null;
+  // The monthly series behind the headline figures (oldest first), for the small trend charts and their changes.
+  const hist = report?.history ?? [], links = report?.linkHistory ?? [];
+  const spark = (points: { label: string; value: number }[] | undefined, color: string) => <GradientSpark range height={48} points={points} color={color} />;
 
   return (
     <SeoShell title="Site explorer" description="Any website's estimated search traffic, keywords, backlinks and competitors — yours or a competitor's." site={site} onSite={onSite} sites={sites} status={status} picker={false}>
@@ -291,11 +269,14 @@ export default function SeoExplorerPage() {
       {report && (
         <div data-testid="explorer-report">
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <h2 className="g-text text-[20px] font-medium">Overview: <a href={`https://${report.domain}`} target="_blank" rel="noreferrer" className="g-link">{report.domain} <ExternalLink className="inline h-3.5 w-3.5" aria-hidden /></a></h2>
-            <span className="g-text-2 text-[12px]" data-testid="text-explorer-fetched">{marketLabel(report.locationCode ?? 2840, report.languageCode ?? "en")} · as of {fmtDate(report.fetchedAt)}</span>
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[16px] font-semibold uppercase" style={{ color: "var(--g-blue)", background: "var(--g-accent-soft)" }} aria-hidden>{report.domain.replace(/^www\./, "")[0]}</span>
+            <div className="min-w-0">
+              <h2 className="g-text text-[18px] font-semibold leading-6 [overflow-wrap:anywhere]">Overview: <a href={`https://${report.domain}`} target="_blank" rel="noreferrer" className="g-link">{report.domain} <ExternalLink className="inline h-3.5 w-3.5" aria-hidden /></a></h2>
+              <span className="g-text-2 text-[12px]" data-testid="text-explorer-fetched">{marketLabel(report.locationCode ?? 2840, report.languageCode ?? "en")} · as of {fmtDate(report.fetchedAt)}</span>
+            </div>
             <div className="ml-auto flex flex-wrap gap-2">
-              {!tracked && <button type="button" className="g-pill" disabled={track.isPending} onClick={() => track.mutate(report.domain)} data-testid="button-explorer-track"><Plus /> Track rankings</button>}
-              <button type="button" className="g-pill" disabled={analyse.isPending || !configured} onClick={() => { setInput(report.domain); analyse.mutate({ domain: report.domain, refresh: true }); }} data-testid="button-explorer-refresh"><RefreshCw className={analyse.isPending ? "animate-spin" : ""} /> Refresh</button>
+              {!tracked && <button type="button" className="g-pill g-pill--sm" disabled={track.isPending} onClick={() => track.mutate(report.domain)} data-testid="button-explorer-track"><Plus /> Track rankings</button>}
+              <button type="button" className="g-pill g-pill--sm" disabled={analyse.isPending || !configured} onClick={() => { setInput(report.domain); analyse.mutate({ domain: report.domain, refresh: true }); }} data-testid="button-explorer-refresh"><RefreshCw className={analyse.isPending ? "animate-spin" : ""} /> Refresh</button>
             </div>
           </div>
           {report.missing.length > 0 && <p className="g-text-2 mb-3 text-[13px]" role="status" data-testid="text-explorer-missing">Some sections didn't load this time ({report.missing.map((m) => TABLE_LABEL[m as TableKey] ?? cap(m)).join(", ")}). Refresh to try again.</p>}
@@ -304,11 +285,11 @@ export default function SeoExplorerPage() {
             <nav className="flex-none lg:w-48" aria-label="Site explorer reports" data-testid="explorer-menu">
               {MENU.map((g) => (
                 <div key={g.group || "top"} className="mb-3">
-                  {g.group && <div className="g-text mb-1 text-[13px] font-medium">{g.group}</div>}
+                  {g.group && <div className="mb-1 text-[11px] font-medium uppercase tracking-wide" style={{ color: "var(--g-blue)" }}>{g.group}</div>}
                   <div className="flex flex-wrap gap-1 lg:flex-col lg:gap-0">
                     {g.items.map(([key, label]) => (
                       <button key={key} type="button" onClick={() => setView(key)} aria-current={view === key ? "page" : undefined} data-testid={`menu-${key}`}
-                        className={`rounded px-2 py-1 text-left text-[13px] ${view === key ? "g-text font-medium" : "g-text-2"}`} style={view === key ? { background: "var(--g-hover)" } : undefined}>{label}</button>
+                        className={`rounded-md px-2 py-1 text-left text-[13px] ${view === key ? "font-medium" : "g-text-2"}`} style={view === key ? { color: "var(--g-blue)", background: "var(--g-accent-soft)" } : undefined}>{label}</button>
                     ))}
                   </div>
                 </div>
@@ -337,132 +318,116 @@ export default function SeoExplorerPage() {
             </>
           ) : (
           <>
-          <div className="mb-4 grid gap-4 lg:grid-cols-3">
-            <Panel title="Backlink profile" testId="panel-backlinks">
-              <AuthorityRing value={report.links.authority} />
-              <div className="mt-4 grid grid-cols-2 gap-4">
-                <Stat label="Backlinks" value={compact(report.links.backlinks)} hint={report.links.brokenBacklinks != null ? `${compact(report.links.brokenBacklinks)} broken` : undefined} testId="stat-backlinks" />
-                <Stat label="Referring domains" value={compact(report.links.referringDomains)} hint={report.links.referringIps != null ? `${compact(report.links.referringIps)} IPs` : undefined} testId="stat-ref-domains" />
-              </div>
-            </Panel>
-            <Panel title="Organic search" testId="panel-organic">
-              <div className="grid grid-cols-2 gap-4">
-                <Stat label="Organic keywords" value={compact(report.organic.keywords)} hint={`Top 3: ${fmtNum(report.organic.positions.top3)} · top 10: ${fmtNum(report.organic.positions.top10)}`} testId="stat-organic-keywords" />
-                <Stat label="Organic traffic (estimate)" value={compact(report.organic.traffic)} hint={`Visits a month, estimated from rankings · worth ${usd(report.organic.trafficValue)} / mo as ads`} testId="stat-organic-traffic" />
-              </div>
-              <p className="g-text-2 mt-4 text-[12px]" data-testid="text-organic-movement">
-                Since last month: <span style={{ color: "var(--g-green)" }}>▲ {fmtNum(report.organic.isUp)} up</span> · <span style={{ color: "var(--g-red)" }}>▼ {fmtNum(report.organic.isDown)} down</span> · {fmtNum(report.organic.isNew)} new · {fmtNum(report.organic.isLost)} lost
-              </p>
-            </Panel>
-            <Panel title="Paid search" testId="panel-paid">
-              <div className="grid grid-cols-2 gap-4">
-                <Stat label="Paid keywords" value={compact(report.paid.keywords)} testId="stat-paid-keywords" />
-                <Stat label="Paid traffic" value={compact(report.paid.traffic)} hint={`Est. cost ${usd(report.paid.trafficValue)} / mo`} testId="stat-paid-traffic" />
-              </div>
-              {report.paid.keywords === 0 && <p className="g-text-2 mt-4 text-[12px]">No Google Ads seen for this domain.</p>}
-            </Panel>
+          {/* The headline figures as one card: backlinks and organic search side by side on a wide screen, paid search on a
+              row of its own under them (beside the report menu, seven columns in one row would be too narrow to read). */}
+          <div className="mb-4 rounded-xl border p-3 sm:p-4" style={SURFACE} data-testid="explorer-figures">
+            <div className="grid gap-y-5 xl:grid-cols-[3fr_2fr] xl:gap-x-5">
+              <section className="min-w-0" data-testid="panel-backlinks">
+                <Kicker>Backlink profile</Kicker>
+                <div className="grid grid-cols-2 gap-x-2 gap-y-5 sm:grid-cols-3">
+                  <Col first><MetricColumn label="Authority" testId="stat-authority" value={report.links.authority ?? "—"} delta={<DeltaBadge value={change(links.map((h) => h.authority))} label="Change over the months shown" />} foot="link strength, 0–100"
+                    chart={spark(links.filter((h) => h.authority != null).map((h) => ({ label: monthLabel(h.month), value: h.authority as number })), PALETTE.authority)} /></Col>
+                  <Col><MetricColumn label="Backlinks" testId="stat-backlinks" value={compact(report.links.backlinks)} delta={<DeltaBadge value={change(links.map((h) => h.backlinks))} label="Change over the months shown" />} foot={report.links.brokenBacklinks != null ? `${compact(report.links.brokenBacklinks)} broken` : undefined}
+                    chart={spark(links.map((h) => ({ label: monthLabel(h.month), value: h.backlinks })), PALETTE.backlinks)} /></Col>
+                  <Col><MetricColumn label="Referring domains" testId="stat-ref-domains" value={compact(report.links.referringDomains)} delta={<DeltaBadge value={change(links.map((h) => h.referringDomains))} label="Change over the months shown" />} foot={report.links.referringIps != null ? `${compact(report.links.referringIps)} IPs` : undefined}
+                    chart={spark(links.map((h) => ({ label: monthLabel(h.month), value: h.referringDomains })), PALETTE.domains)} /></Col>
+                </div>
+              </section>
+              <section className="min-w-0 border-t pt-5 xl:border-l xl:border-t-0 xl:pl-5 xl:pt-0" style={{ borderColor: "var(--g-divider)" }} data-testid="panel-organic">
+                <Kicker>Organic search</Kicker>
+                <div className="grid grid-cols-2 gap-x-2 gap-y-5">
+                  <Col first><MetricColumn label="Organic keywords" testId="stat-organic-keywords" value={compact(report.organic.keywords)} delta={<DeltaBadge value={change(hist.map((h) => h.keywords))} label="Change over the months shown" />}
+                    chart={spark(hist.map((h) => ({ label: monthLabel(h.month), value: h.keywords })), PALETTE.keywords)}>
+                    <div className="mt-1.5"><DistributionBar parts={[{ label: "Top 3", value: report.organic.positions.top3, color: PALETTE.top3 }, { label: "4–10", value: Math.max(0, report.organic.positions.top10 - report.organic.positions.top3), color: PALETTE.top10 }, { label: "11+", value: Math.max(0, report.organic.keywords - report.organic.positions.top10), color: PALETTE.rest }]} /></div>
+                  </MetricColumn></Col>
+                  <Col><MetricColumn label="Organic traffic (estimate)" testId="stat-organic-traffic" value={compact(report.organic.traffic)} delta={<DeltaBadge value={change(hist.map((h) => h.traffic))} label="Change over the months shown" />} foot={`Visits a month, estimated from rankings · worth ${usd(report.organic.trafficValue)} / mo as ads`}
+                    chart={spark(hist.map((h) => ({ label: monthLabel(h.month), value: h.traffic })), PALETTE.traffic)} /></Col>
+                </div>
+                <p className="g-text-2 mt-3 text-[12px]" data-testid="text-organic-movement">
+                  Since last month: <span style={{ color: "var(--g-green)" }}>▲ {fmtNum(report.organic.isUp)} up</span> · <span style={{ color: "var(--g-red)" }}>▼ {fmtNum(report.organic.isDown)} down</span> · {fmtNum(report.organic.isNew)} new · {fmtNum(report.organic.isLost)} lost
+                </p>
+              </section>
+              <section className="min-w-0 border-t pt-5 xl:col-span-2" style={{ borderColor: "var(--g-divider)" }} data-testid="panel-paid">
+                <Kicker>Paid search</Kicker>
+                <div className="grid grid-cols-2 gap-x-2 gap-y-5 sm:grid-cols-3 xl:grid-cols-5">
+                  <Col first><MetricColumn label="Paid keywords" testId="stat-paid-keywords" value={compact(report.paid.keywords)} /></Col>
+                  <Col><MetricColumn label="Paid traffic" testId="stat-paid-traffic" value={compact(report.paid.traffic)} foot={`Est. cost ${usd(report.paid.trafficValue)} / mo`} /></Col>
+                </div>
+                {report.paid.keywords === 0 && <p className="g-text-2 mt-3 text-[12px]">No Google Ads seen for this domain.</p>}
+              </section>
+            </div>
           </div>
 
           <CompareMonths report={report} />
           <div className="mb-4 grid gap-4 lg:grid-cols-3">
-            <Panel title="Performance" hint="estimated, by month" testId="panel-performance" className="lg:col-span-2">
-              {report.history && report.history.length > 1 ? (
-                <>
-                  <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
-                    {([["traffic", "Organic traffic", ORANGE], ["keywords", "Organic keywords", BLUE], ["top10", "Keywords in top 10", GREEN]] as const).map(([key, label, color]) => (
-                      <label key={key} className="g-text flex items-center gap-1.5">
-                        <input type="checkbox" checked={series[key]} onChange={(e) => setSeries((s) => ({ ...s, [key]: e.target.checked }))} style={{ accentColor: color }} data-testid={`check-series-${key}`} /> {label}
-                      </label>
-                    ))}
-                  </div>
-                  <div style={{ width: "100%", height: 260 }} data-testid="chart-performance">
-                    <ResponsiveContainer>
-                      <ComposedChart data={report.history} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-                        <CartesianGrid stroke="var(--g-divider)" vertical={false} />
-                        <XAxis dataKey="month" tickFormatter={monthLabel} tick={{ fontSize: 12, fill: "var(--g-text-2)" }} axisLine={false} tickLine={false} />
-                        <YAxis yAxisId="traffic" tick={{ fontSize: 12, fill: "var(--g-text-2)" }} axisLine={false} tickLine={false} width={44} tickFormatter={(v) => compact(v)} />
-                        <YAxis yAxisId="keywords" orientation="right" tick={{ fontSize: 12, fill: "var(--g-text-2)" }} axisLine={false} tickLine={false} width={40} tickFormatter={(v) => compact(v)} />
-                        <Tooltip labelFormatter={(m) => monthLabel(String(m))} formatter={(v: number, name: string) => [fmtNum(v), name]} contentStyle={{ fontSize: 12, background: "var(--g-surface)", border: "1px solid var(--g-divider)", color: "var(--g-text)" }} />
-                        {series.traffic && <Area yAxisId="traffic" type="monotone" dataKey="traffic" name="Organic traffic" stroke={ORANGE} fill={ORANGE} fillOpacity={0.15} strokeWidth={2} />}
-                        {series.keywords && <Line yAxisId="keywords" type="monotone" dataKey="keywords" name="Organic keywords" stroke={BLUE} strokeWidth={2} dot={false} />}
-                        {series.top10 && <Line yAxisId="keywords" type="monotone" dataKey="top10" name="Keywords in top 10" stroke={GREEN} strokeWidth={2} dot={false} />}
-                      </ComposedChart>
-                    </ResponsiveContainer>
-                  </div>
-                </>
-              ) : <p className="g-text-2 text-[13px]">No history for this domain yet.</p>}
-            </Panel>
-            <div className="flex flex-col gap-4">
-              <Panel title="Organic positions" hint="keywords by rank" testId="panel-positions">
-                <div style={{ width: "100%", height: 150 }}>
-                  <ResponsiveContainer>
-                    <BarChart data={positions} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
-                      <XAxis dataKey="range" tick={{ fontSize: 12, fill: "var(--g-text-2)" }} axisLine={false} tickLine={false} />
-                      <YAxis hide />
-                      <Tooltip formatter={(v: number) => [fmtNum(v), "Keywords"]} contentStyle={{ fontSize: 12, background: "var(--g-surface)", border: "1px solid var(--g-divider)", color: "var(--g-text)" }} cursor={{ fill: "var(--g-hover)" }} />
-                      <Bar dataKey="keywords" radius={[3, 3, 0, 0]}>{positions.map((p) => <Cell key={p.range} fill={p.color} />)}</Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
+            <section className="min-w-0 lg:col-span-2" data-testid="panel-performance">
+              {hist.length > 1 ? (
+                <div data-testid="chart-performance">
+                  <TrendPanel key={report.domain} title="Performance" testId="check-series" note="Monthly estimates from the keyword database."
+                    series={[
+                      { key: "traffic", label: "Organic traffic (estimate)", color: PALETTE.traffic, points: hist.map((h) => ({ label: monthLabel(h.month), value: h.traffic })) },
+                      { key: "keywords", label: "Organic keywords", color: PALETTE.keywords, points: hist.map((h) => ({ label: monthLabel(h.month), value: h.keywords })) },
+                      { key: "top10", label: "Keywords in top 10", color: PALETTE.keywords, points: hist.map((h) => ({ label: monthLabel(h.month), value: h.top10 })) },
+                    ]} />
                 </div>
+              ) : <Panel title="Performance" hint="estimated, by month"><p className="g-text-2 text-[13px]">No history for this domain yet.</p></Panel>}
+            </section>
+            <div className="flex min-w-0 flex-col gap-4">
+              <Panel title="Organic positions" hint="keywords by rank" testId="panel-positions">
+                <BarRows rows={positions} />
               </Panel>
               <Panel title="Referring domains" testId="panel-followed">
                 {report.links.referringDomains ? (
-                  <div className="space-y-2 text-[13px]">
-                    {([["Followed", report.links.followedDomains, followedPct], ["Not followed", report.links.nofollowDomains, followedPct == null ? null : Math.round((100 - followedPct) * 10) / 10]] as const).map(([label, count, pct]) => (
-                      <div key={label}>
-                        <div className="g-text flex justify-between"><span>{label}</span><span className="tabular-nums">{fmtNum(count)} <span className="g-text-2">{pct == null ? "" : `${pct}%`}</span></span></div>
-                        <div className="h-1.5 rounded" style={{ background: "var(--g-divider)" }}><div className="h-1.5 rounded" style={{ width: `${pct ?? 0}%`, background: BLUE }} /></div>
-                      </div>
-                    ))}
-                  </div>
+                  <BarRows of={report.links.referringDomains} rows={[
+                    { label: "Followed", value: report.links.followedDomains, hint: followedPct == null ? undefined : `${followedPct}%` },
+                    { label: "Not followed", value: report.links.nofollowDomains, hint: followedPct == null ? undefined : `${Math.round((100 - followedPct) * 10) / 10}%` },
+                  ]} />
                 ) : <p className="g-text-2 text-[13px]">No referring domains found.</p>}
               </Panel>
+              {(report.links.tlds ?? []).length > 0 && (
+                <Panel title="Backlinks by domain ending" hint="the top 6" testId="panel-tlds">
+                  <BarRows rows={report.links.tlds.map((t) => ({ label: `.${t.tld}`, value: t.links }))} />
+                </Panel>
+              )}
             </div>
           </div>
 
-          {report.linkHistory && report.linkHistory.length > 1 && (
-            <Panel title="Backlink growth" hint="last 12 months" testId="panel-link-history" className="mb-4">
-              <div style={{ width: "100%", height: 220 }} data-testid="chart-link-history">
-                <ResponsiveContainer>
-                  <ComposedChart data={report.linkHistory} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-                    <CartesianGrid stroke="var(--g-divider)" vertical={false} />
-                    <XAxis dataKey="month" tickFormatter={monthLabel} tick={{ fontSize: 12, fill: "var(--g-text-2)" }} axisLine={false} tickLine={false} />
-                    <YAxis yAxisId="domains" tick={{ fontSize: 12, fill: "var(--g-text-2)" }} axisLine={false} tickLine={false} width={44} tickFormatter={(v) => compact(v)} />
-                    <YAxis yAxisId="links" orientation="right" tick={{ fontSize: 12, fill: "var(--g-text-2)" }} axisLine={false} tickLine={false} width={44} tickFormatter={(v) => compact(v)} />
-                    <Tooltip labelFormatter={(m) => monthLabel(String(m))} formatter={(v: number, name: string) => [fmtNum(v), name]} contentStyle={{ fontSize: 12, background: "var(--g-surface)", border: "1px solid var(--g-divider)", color: "var(--g-text)" }} />
-                    <Area yAxisId="domains" type="monotone" dataKey="referringDomains" name="Referring domains" stroke={BLUE} fill={BLUE} fillOpacity={0.15} strokeWidth={2} />
-                    <Line yAxisId="links" type="monotone" dataKey="backlinks" name="Backlinks" stroke="#673ab7" strokeWidth={2} dot={false} />
-                    <Line yAxisId="domains" type="monotone" dataKey="newBacklinks" name="New links that month" stroke={GREEN} strokeWidth={1.5} dot={false} />
-                    <Line yAxisId="domains" type="monotone" dataKey="lostBacklinks" name="Lost links that month" stroke="#d93025" strokeWidth={1.5} dot={false} />
-                  </ComposedChart>
-                </ResponsiveContainer>
+          {links.length > 1 && (
+            <section className="mb-4" data-testid="panel-link-history">
+              <div data-testid="chart-link-history">
+                <TrendPanel key={report.domain} title="Backlink growth" testId="link-history" note="Monthly, from the backlink index — the last 12 months. New and lost are the links gained and lost in that month."
+                  series={[
+                    { key: "domains", label: "Referring domains", color: PALETTE.domains, points: links.map((h) => ({ label: monthLabel(h.month), value: h.referringDomains })) },
+                    { key: "backlinks", label: "Backlinks", color: PALETTE.backlinks, points: links.map((h) => ({ label: monthLabel(h.month), value: h.backlinks })) },
+                    { key: "new", label: "New links that month", color: PALETTE.backlinks, points: links.map((h) => ({ label: monthLabel(h.month), value: h.newBacklinks })) },
+                    { key: "lost", label: "Lost links that month", color: PALETTE.backlinks, points: links.map((h) => ({ label: monthLabel(h.month), value: h.lostBacklinks })) },
+                  ]} />
               </div>
-              <p className="g-text-2 mt-2 text-[12px]">Blue area: referring domains. Purple: total backlinks (right scale). Green and red: links gained and lost each month.</p>
-            </Panel>
+            </section>
           )}
-          {(report.history?.length ?? 0) > 1 && (
+          {hist.length > 1 && (
             <Panel title="Organic keywords by position" hint="by month" testId="panel-position-history" className="mb-4">
-              <div className="h-56">
+              <div className="h-44 sm:h-56" aria-hidden>
                 <ResponsiveContainer>
-                  <ComposedChart data={report.history!.map((h) => ({ month: h.month, top3: h.top3, top10: Math.max(0, h.top10 - h.top3), rest: Math.max(0, h.keywords - h.top10) }))} margin={{ top: 6, right: 8, bottom: 0, left: 0 }}>
-                    <CartesianGrid stroke="var(--g-divider)" vertical={false} />
-                    <XAxis dataKey="month" tickFormatter={(m) => monthLabel(String(m))} tick={{ fontSize: 12, fill: "var(--g-text-2)" }} axisLine={false} tickLine={false} minTickGap={24} />
-                    <YAxis tick={{ fontSize: 12, fill: "var(--g-text-2)" }} axisLine={false} tickLine={false} width={44} tickFormatter={(v) => compact(v)} allowDecimals={false} />
-                    <Tooltip labelFormatter={(m) => monthLabel(String(m))} formatter={(v: number, name: string) => [fmtNum(v), name]} contentStyle={{ fontSize: 12, background: "var(--g-surface)", border: "1px solid var(--g-divider)", color: "var(--g-text)" }} />
-                    <Area type="monotone" dataKey="top3" name="Positions 1–3" stackId="p" stroke="#188038" fill="#188038" fillOpacity={0.7} isAnimationActive={false} />
-                    <Area type="monotone" dataKey="top10" name="Positions 4–10" stackId="p" stroke="#1a73e8" fill="#1a73e8" fillOpacity={0.6} isAnimationActive={false} />
-                    <Area type="monotone" dataKey="rest" name="Positions 11–100" stackId="p" stroke="#9aa0a6" fill="#9aa0a6" fillOpacity={0.4} isAnimationActive={false} />
+                  <ComposedChart data={hist.map((h) => ({ month: h.month, top3: h.top3, top10: Math.max(0, h.top10 - h.top3), rest: Math.max(0, h.keywords - h.top10) }))} margin={{ top: 6, right: 6, bottom: 0, left: 0 }}>
+                    <CartesianGrid stroke="var(--g-divider)" strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="month" tickFormatter={(m) => monthLabel(String(m))} tick={{ fontSize: 11, fill: "var(--g-text-2)" }} axisLine={false} tickLine={false} minTickGap={24} />
+                    <YAxis tick={{ fontSize: 11, fill: "var(--g-text-2)" }} axisLine={false} tickLine={false} width={44} tickFormatter={(v) => compact(v)} allowDecimals={false} />
+                    <Tooltip labelFormatter={(m) => monthLabel(String(m))} formatter={(v: number, name: string) => [fmtNum(v), name]} contentStyle={TOOLTIP} labelStyle={{ color: "var(--g-text-2)" }} />
+                    <Area type="monotone" dataKey="top3" name="Positions 1–3" stackId="p" stroke={PALETTE.top3} fill={PALETTE.top3} fillOpacity={0.85} isAnimationActive={false} />
+                    <Area type="monotone" dataKey="top10" name="Positions 4–10" stackId="p" stroke={PALETTE.top10} fill={PALETTE.top10} fillOpacity={0.7} isAnimationActive={false} />
+                    <Area type="monotone" dataKey="rest" name="Positions 11–100" stackId="p" stroke={PALETTE.rest} fill={PALETTE.rest} fillOpacity={0.6} isAnimationActive={false} />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
-              <p className="g-text-2 mt-2 text-[12px]">Green: keywords ranking in the top 3. Blue: positions 4–10. Grey: the rest of the first hundred.</p>
+              <p className="g-text-2 mt-2 text-[12px]">Dark orange: keywords ranking in the top 3. Light orange: positions 4–10. Grey: the rest of the first hundred. Monthly estimates.</p>
             </Panel>
           )}
           {report.intents && (
             <Panel title="Organic keywords by intent" hint={`of the top ${report.keywords?.length ?? 0} keywords`} testId="panel-intents" className="mb-4">
               <table className="g-table">
                 <thead><tr><th>Intent</th><th className="num">Keywords</th><th className="num">Traffic</th></tr></thead>
-                <tbody>{report.intents.map((i) => <tr key={i.intent}><td>{cap(i.intent)}</td><td className="num" data-label="Keywords">{fmtNum(i.keywords)}</td><td className="num" data-label="Traffic">{fmtNum(i.traffic)}</td></tr>)}</tbody>
+                <tbody>{report.intents.map((i) => <tr key={i.intent}><td>{cap(i.intent)}</td><td className="num" data-label="Keywords"><ShareBar value={i.keywords} max={maxOf(report.intents!.map((x) => x.keywords))} /></td><td className="num" data-label="Traffic">{fmtNum(i.traffic)}</td></tr>)}</tbody>
               </table>
             </Panel>
           )}
@@ -479,10 +444,10 @@ export default function SeoExplorerPage() {
                 <tbody>{report.keywords.map((k) => (
                   <tr key={`${k.keyword}-${k.url}`}>
                     <td>{k.keyword}</td>
-                    <td className="num" data-label="Position">{k.position ?? "—"}</td>
+                    <td className="num" data-label="Position"><PositionBadge value={k.position} /></td>
                     <td className="num" data-label="Volume">{fmtNum(k.volume)}</td>
                     <td className="num" data-label="Traffic">{fmtNum(k.traffic)}</td>
-                    <td className="num" data-label="Difficulty">{kd(k.difficulty)}</td>
+                    <td className="num" data-label="Difficulty"><DifficultyBadge value={k.difficulty} /></td>
                     <td className="num" data-label="CPC">{k.cpc == null ? "—" : `$${k.cpc.toFixed(2)}`}</td>
                     <td data-label="Intent" className="whitespace-nowrap">{k.intent ? cap(k.intent) : "—"}</td>
                     <td data-label="Page" className="max-w-[240px] truncate">{k.url ? <a href={k.url} className="g-link" target="_blank" rel="noreferrer">{stripUrl(k.url).replace(report.domain, "") || "/"}</a> : "—"}</td>
@@ -497,7 +462,7 @@ export default function SeoExplorerPage() {
               <tbody>{report.pages.map((p) => (
                 <tr key={p.url}>
                   <td className="max-w-[420px] truncate"><a href={p.url} className="g-link" target="_blank" rel="noreferrer">{stripUrl(p.url)}</a></td>
-                  <td className="num" data-label="Traffic">{fmtNum(p.traffic)}</td><td className="num" data-label="Keywords">{fmtNum(p.keywords)}</td>
+                  <td className="num" data-label="Traffic"><ShareBar value={p.traffic} max={maxOf(report.pages!.map((x) => x.traffic))} /></td><td className="num" data-label="Keywords">{fmtNum(p.keywords)}</td>
                   <td className="num" data-label="In top 10">{fmtNum(p.top10)}</td><td className="num" data-label="Traffic value">{usd(p.trafficValue)}</td>
                 </tr>
               ))}</tbody>
@@ -509,7 +474,7 @@ export default function SeoExplorerPage() {
               <tbody>{report.competitors.map((c) => (
                 <tr key={c.domain}>
                   <td>{c.domain}</td>
-                  <td className="num" data-label="Shared keywords">{fmtNum(c.commonKeywords)}</td><td className="num" data-label="Their keywords">{fmtNum(c.keywords)}</td>
+                  <td className="num" data-label="Shared keywords"><ShareBar value={c.commonKeywords} max={maxOf(report.competitors!.map((x) => x.commonKeywords))} /></td><td className="num" data-label="Their keywords">{fmtNum(c.keywords)}</td>
                   <td className="num" data-label="Their traffic">{fmtNum(c.traffic)}</td>
                   <td className="num"><button type="button" className="g-link" onClick={() => { setInput(c.domain); open(c.domain); }} data-testid={`button-explore-${c.domain}`}>Explore</button></td>
                 </tr>
@@ -535,7 +500,7 @@ export default function SeoExplorerPage() {
               <tbody>{report.anchors.map((a, i) => (
                 <tr key={`${a.anchor}-${i}`}>
                   <td className="max-w-[420px] truncate">{a.anchor || <span className="g-text-2">(no text — image or empty link)</span>}</td>
-                  <td className="num" data-label="Backlinks">{fmtNum(a.backlinks)}</td><td className="num" data-label="Referring domains">{fmtNum(a.referringDomains)}</td>
+                  <td className="num" data-label="Backlinks"><ShareBar value={a.backlinks} max={maxOf(report.anchors!.map((x) => x.backlinks))} /></td><td className="num" data-label="Referring domains">{fmtNum(a.referringDomains)}</td>
                   <td className="num g-text-2" data-label="First seen">{fmtDate(a.firstSeen)}</td>
                 </tr>
               ))}</tbody>

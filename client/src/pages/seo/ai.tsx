@@ -14,6 +14,8 @@ import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { AiSummaryPanel } from "./ai-summary";
 import { api, Empty, fmtDate, fmtNum, isNotRunYet, money, SeoShell, useSelectedSite, useSeoSites, useSeoStatus, type SeoStatus } from "./shell";
+import { MetricColumn } from "./viz";
+import { CARD, Heading, MetricRow, RatioBar } from "./viz-more";
 
 type Engine = "chatgpt" | "gemini" | "perplexity";
 type Source = { domain: string; title: string | null; url: string | null; ours: boolean };
@@ -27,7 +29,7 @@ const ENGINES: { key: Engine; label: string; price: "aiChatgpt" | "aiGemini" | "
   { key: "chatgpt", label: "ChatGPT", price: "aiChatgpt" }, { key: "gemini", label: "Google Gemini", price: "aiGemini" }, { key: "perplexity", label: "Perplexity", price: "aiPerplexity" },
 ];
 const LABEL = Object.fromEntries(ENGINES.map((e) => [e.key, e.label])) as Record<Engine, string>;
-const card = { borderColor: "var(--g-divider)", background: "var(--g-surface)" };
+const card = CARD;
 const can = (status: SeoStatus | undefined, cents: number | null) => cents == null || !status?.credits || status.credits.availableCents === -1 || status.credits.availableCents >= cents;
 
 function Verdict({ ok, yes, no }: { ok: boolean; yes: string; no: string }) {
@@ -37,11 +39,8 @@ function Verdict({ ok, yes, no }: { ok: boolean; yes: string; no: string }) {
 function AnswerCard({ a, name, stale }: { a: Answer; name: string | null; /** From an earlier ask than the others shown. */ stale?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
-    <section className="rounded-lg border p-4" style={card} data-testid={`ai-answer-${a.engine}`}>
-      <div className="mb-2 flex flex-wrap items-baseline gap-2">
-        <h3 className="g-text text-[15px] font-medium">{LABEL[a.engine]}</h3>
-        {a.at && <span className="g-text-2 text-[12px]">asked {fmtDate(a.at)}</span>}
-      </div>
+    <section className="min-w-0 rounded-xl border p-3 sm:p-4" style={card} data-testid={`ai-answer-${a.engine}`}>
+      <Heading level={3} meta={a.at ? `asked ${fmtDate(a.at)}` : undefined}>{LABEL[a.engine]}</Heading>
       {stale && <p className="g-text-2 mb-2 text-[12px]" data-testid={`ai-stale-${a.engine}`}>Not asked the last time — this is its answer from {fmtDate(a.at)}.</p>}
       <div className="flex flex-col gap-1">
         <Verdict ok={a.mentioned} yes={a.listedAt ? `Named you — ${a.listedAt === 1 ? "first" : `#${a.listedAt}`} of ${a.businesses.length} businesses` : "Named you"} no={name ? `Did not name ${name}` : "Did not name you"} />
@@ -87,7 +86,7 @@ function Mentions({ status, domain: initial }: { status: SeoStatus | undefined; 
   const price = status?.prices?.aiMentions ?? null, page = saved.data?.page ?? null;
   return (
     <section className="mt-8" data-testid="ai-mentions">
-      <h2 className="g-text text-[18px] font-medium">Where AI answers already use a website</h2>
+      <Heading className="!mb-0 !text-[18px]">Where AI answers already use a website</Heading>
       <p className="g-text-2 mb-3 text-[13px]">The questions for which Google's AI Overviews (or ChatGPT) quote a site as a source — yours, or a competitor's to see what earns them the mention. A local business often has none yet; a big brand has thousands.</p>
       <form className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center" onSubmit={(e) => { e.preventDefault(); const d = input.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/[/?#].*$/, ""); if (d) setAsked({ domain: d, platform }); }} data-testid="form-ai-mentions">
         <label className="min-w-0 flex-1 sm:max-w-sm"><span className="sr-only">Website</span><input className="g-input w-full" value={input} onChange={(e) => setInput(e.target.value)} placeholder="example.com" autoComplete="off" data-testid="input-ai-mentions-domain" /></label>
@@ -105,7 +104,7 @@ function Mentions({ status, domain: initial }: { status: SeoStatus | undefined; 
       )}
       {page && (
         <div data-testid="ai-mentions-result">
-          <p className="g-text mb-2 text-[14px]"><b className="font-medium tabular-nums">{fmtNum(page.total ?? page.rows.length)}</b> {page.platform === "google" ? "Google AI Overview" : "ChatGPT"} answer{(page.total ?? page.rows.length) === 1 ? "" : "s"} use {page.domain} as a source <span className="g-text-2 text-[12px]">· as of {fmtDate(page.fetchedAt)} · United States</span></p>
+          <div className="mb-3"><MetricColumn label={`${page.platform === "google" ? "Google AI Overview" : "ChatGPT"} answer${(page.total ?? page.rows.length) === 1 ? "" : "s"} that use ${page.domain} as a source`} value={fmtNum(page.total ?? page.rows.length)} foot={`as of ${fmtDate(page.fetchedAt)} · United States`} /></div>
           {page.rows.length === 0 ? <Empty><h3>No AI answers use this site yet</h3><p>That is normal for a local business. AI answers lean on pages that explain a topic clearly and are quoted by other sites — guides, comparisons, cost pages — and on review and directory sites. The "Ask the assistants" check above shows who they named, when last asked, for your service and city.</p></Empty> : (
             <div className="overflow-x-auto"><table className="g-table w-full" data-testid="table-ai-mentions">
               <thead><tr><th>Question people ask</th><th className="num">Searches / mo</th><th>Other sites used in the same answer</th><th className="num">Seen</th></tr></thead>
@@ -192,8 +191,8 @@ export default function SeoAiPage() {
                 <Button type="submit" disabled={!name.trim() || saveName.isPending}>{saveName.isPending ? "Saving…" : "Save name"}</Button></div>
             </form>
           )}
-          <form className="rounded-lg border p-4" style={card} onSubmit={(e) => { e.preventDefault(); if (ready) ask.mutate(prompt.trim()); }} data-testid="form-ai-ask">
-            <h2 className="g-text text-[16px] font-medium">Ask the assistants</h2>
+          <form className="min-w-0 rounded-xl border p-3 sm:p-4" style={card} onSubmit={(e) => { e.preventDefault(); if (ready) ask.mutate(prompt.trim()); }} data-testid="form-ai-ask">
+            <Heading className="!mb-0">Ask the assistants</Heading>
             <label className="mt-2 block text-[13px]"><span className="g-text-2">The question a customer would ask</span>
               <textarea className="g-input mt-1 min-h-[72px] w-full py-2" value={prompt} maxLength={300} onChange={(e) => setPrompt(e.target.value)} placeholder="Who are the best siding contractors in Bellingham, WA? Name specific companies." data-testid="textarea-ai-prompt" />
             </label>
@@ -212,7 +211,7 @@ export default function SeoAiPage() {
           {d.prompts.length === 0 && !shown && !ask.isPending && <Empty testId="ai-empty"><h3>Nothing asked yet</h3><p>Ask the question your customers ask — "best roofing contractor in my city" — and see which businesses each assistant names, and which websites it relied on.</p></Empty>}
           {shown && (
             <section className="mt-5" data-testid="ai-result">
-              <h2 className="g-text mb-1 text-[16px] font-medium">"{shown.prompt}"</h2>
+              <Heading className="!mb-1">"{shown.prompt}"</Heading>
               {unsaved && !ask.isPending && <p className="mb-2 text-[13px]" style={{ color: "var(--g-red)" }} role="alert" data-testid="ai-unsaved">These answers are shown but could not be added to your history. Copy anything you want to keep.</p>}
               {namesIt && <p className="g-text-2 mb-2 text-[13px]" data-testid="ai-names-it">Your question names your business, so being named back proves little. Ask it the way a stranger would — the service and the city, no names.</p>}
               <p className="g-text-2 mb-3 text-[13px]">Named by {freshAnswers.filter((a) => a.mentioned).length} of the {freshAnswers.length} assistant{freshAnswers.length === 1 ? "" : "s"} asked on {fmtDate(shown.lastAt)} <button type="button" className="g-link ml-2" disabled={ask.isPending} onClick={() => ask.mutate(shown.prompt)} data-testid="button-ai-again">Ask again{price != null ? ` — about ${money(price)}` : ""}</button></p>
@@ -223,18 +222,28 @@ export default function SeoAiPage() {
                   <span className="g-text-2 text-[12px]">{t ? `next on ${fmtDate(t.nextAt)} · ` : ""}{monthly != null ? `about ${money(monthly)} a month, taken from your included SEO data only — it is skipped when that has run out` : ""}</span>
                 </label>
               ); })()}
+              {/* This ask's answers added up: named, used as a source, named first — each out of the assistants asked this time. */}
+              {freshAnswers.length > 0 && (
+                <div className="mb-4 rounded-xl border p-3 sm:p-4" style={card}>
+                  <MetricRow cols={3} testId="ai-result-figures">
+                    <MetricColumn label="Named you" value={`${freshAnswers.filter((a) => a.mentioned).length} of ${freshAnswers.length}`} foot={`assistant${freshAnswers.length === 1 ? "" : "s"} asked on ${fmtDate(shown.lastAt)}`} chart={<RatioBar value={freshAnswers.filter((a) => a.mentioned).length} total={freshAnswers.length} label="Named you" />} />
+                    <MetricColumn label="Used your website as a source" value={`${freshAnswers.filter((a) => a.cited).length} of ${freshAnswers.length}`} chart={<RatioBar value={freshAnswers.filter((a) => a.cited).length} total={freshAnswers.length} label="Used your website" />} />
+                    <MetricColumn label="Named you first" value={`${freshAnswers.filter((a) => a.listedAt === 1).length} of ${freshAnswers.length}`} foot="first of the businesses it listed" chart={<RatioBar value={freshAnswers.filter((a) => a.listedAt === 1).length} total={freshAnswers.length} label="Named you first" />} />
+                  </MetricRow>
+                </div>
+              )}
               <div className="grid gap-4 lg:grid-cols-3">{ENGINES.map((e) => shown.latest.find((a) => a.engine === e.key)).filter((a): a is Answer & { at: string } => !!a).map((a) => <AnswerCard key={a.engine} a={a} name={d.businessName} stale={!isFresh(a)} />)}</div>
               {shown.history.length > 0 && (
                 <details className="mt-3 text-[13px]" data-testid="ai-history"><summary className="g-link cursor-pointer">Earlier answers to this question ({shown.history.length})</summary>
-                  <table className="g-table mt-2"><thead><tr><th>Asked</th><th>Assistant</th><th>Named you</th><th>Used your website</th></tr></thead>
-                    <tbody>{shown.history.map((h, i) => <tr key={i}><td>{fmtDate(h.at)}</td><td>{LABEL[h.engine]}</td><td>{h.mentioned ? `Yes${h.listedAt ? ` (#${h.listedAt})` : ""}` : "No"}</td><td>{h.cited ? "Yes" : "No"}</td></tr>)}</tbody></table>
+                  <div className="overflow-x-auto"><table className="g-table mt-2"><thead><tr><th>Asked</th><th>Assistant</th><th>Named you</th><th>Used your website</th></tr></thead>
+                    <tbody>{shown.history.map((h, i) => <tr key={i}><td>{fmtDate(h.at)}</td><td>{LABEL[h.engine]}</td><td>{h.mentioned ? `Yes${h.listedAt ? ` (#${h.listedAt})` : ""}` : "No"}</td><td>{h.cited ? "Yes" : "No"}</td></tr>)}</tbody></table></div>
                 </details>
               )}
             </section>
           )}
           {d.prompts.length > 1 && (
             <section className="mt-6" data-testid="ai-prompts">
-              <h2 className="g-text mb-2 text-[16px] font-medium">Questions you have asked</h2>
+              <Heading>Questions you have asked</Heading>
               <div className="overflow-x-auto"><table className="g-table w-full">
                 <thead><tr><th>Question</th>{ENGINES.map((e) => <th key={e.key}>{e.label}</th>)}<th className="num">Last asked</th></tr></thead>
                 <tbody>{d.prompts.map((p) => (
@@ -249,7 +258,7 @@ export default function SeoAiPage() {
           )}
           {(d.tracked?.length ?? 0) > 0 && (
             <section className="mt-6" data-testid="ai-tracked">
-              <h2 className="g-text mb-1 text-[16px] font-medium">Asked again every month</h2>
+              <Heading className="!mb-1">Asked again every month</Heading>
               <p className="g-text-2 mb-2 text-[13px]">{d.tracked!.length} of {d.maxTracked ?? 5} questions. Each uses your included SEO data only, and is skipped in a month when that has run out.</p>
               <ul className="space-y-1 text-[13px]">
                 {d.tracked!.map((t) => (

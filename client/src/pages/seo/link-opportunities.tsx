@@ -9,6 +9,7 @@ import { Link } from "wouter";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { Empty, fmtDate, fmtNum, isNotRunYet, type SeoSite } from "./shell";
 import { AddToPlan, type PlanTask } from "./plan-button";
+import { COMPACT_TABLE } from "./viz-audit";
 
 type Item = { keywordId: number; keyword: string; volume: number | null; position: number | null; checkedOn: string | null; device: string | null; place: string | null; to: string; from: string; fromTitle: string | null; context: string; pair: string };
 type Data = { jobId: string; scannedAt: string | null; checkedOn: string | null; linksMeasured: boolean; targets: number; boilerplate: number; notRanking: number; notCrawled: number; notUsable: number; tooShort: number; aliasesCut?: number; cutPages: number; items: Item[]; more: number };
@@ -79,7 +80,7 @@ export function LinkOpportunitiesView({ site, crawlId }: { site: SeoSite; /** Th
           )}
           {d.items.length === 0 ? <Empty testId="link-opps-none"><h3>No suggestions from these checks</h3><p>{d.targets === 0 ? "No keyword could be looked for (see above)." : "Where the pages read use the words of the keywords looked for, they already link to the page that ranks — as far as the crawl's HTML shows."}</p></Empty> : (
             <div className="overflow-x-auto">
-              <table className="g-table w-full" data-testid="table-link-opps">
+              <table className={COMPACT_TABLE} data-testid="table-link-opps">
                 <thead><tr><th>On this page…</th><th>…these words</th><th>…could link to</th><th className="num" title="Where the page being linked to ranks for these words">Position</th><th className="num">Volume / mo</th><th><span className="sr-only">Action plan</span></th></tr></thead>
                 <tbody>
                   {d.items.slice(0, shown).map((i) => (
