@@ -1,0 +1,21 @@
+import { chromium } from "playwright";
+const PATHS = ["/seo/explorer?domain=jameshardie.com&month=2025-10", "/seo/rank-tracker?site=3&mapPack=true", "/seo/rank-tracker?site=3&gsc=query",
+  "/seo/rank-tracker?site=3&panel=history&series=visibility&date=2026-10-08", "/seo/alerts?watch=1", "/seo/ai?site=1&month=2026-09&business=Side-Pro%20Inc."];
+(async () => { const b = await chromium.launch({ headless: true, args: ["--disable-dev-shm-usage"] });
+  const ctx = await b.newContext({ viewport: { width: 1280, height: 1600 } }); await ctx.addInitScript("localStorage.setItem('hub.welcomeSeen','1')");
+  for (const path of PATHS) {
+    const p = await ctx.newPage(); await p.goto("http://127.0.0.1:8189" + path, { waitUntil: "domcontentloaded" });
+    let chip = 0; for (let i = 0; i < 12 && !chip; i++) { await p.waitForTimeout(1000); chip = await p.locator("[data-testid=active-filter]").count(); }
+    const words = chip ? (await p.locator("[data-testid=active-filter]").first().innerText()).replace(/\s+/g, " ").slice(0, 110) : "";
+    console.log(`${chip ? "CHIP" : "NONE"} ${path}  ${words}`); await p.close();
+  }
+  // a real click on a dashboard month link
+  const p = await ctx.newPage(); await p.goto("http://127.0.0.1:8189/seo", { waitUntil: "domcontentloaded" }); await p.waitForTimeout(5000);
+  const a = p.locator('main a[href*="/seo/audit?site=1&at="]').first(); const n = await a.count(); const href = n ? await a.getAttribute("href") : null;
+  if (n) { await a.scrollIntoViewIfNeeded(); await a.click(); await p.waitForTimeout(3000); }
+  console.log(`dashboard audit-at link: found=${n} href=${href} -> landed ${p.url().replace("http://127.0.0.1:8189", "")}`);
+  const m = p.locator('main a[href*="/seo/explorer?domain="][href*="month="]').first();
+  await p.goto("http://127.0.0.1:8189/seo", { waitUntil: "domcontentloaded" }); await p.waitForTimeout(5000);
+  const mn = await m.count(); const mh = mn ? await m.getAttribute("href") : null; if (mn) { await m.scrollIntoViewIfNeeded(); await m.click(); await p.waitForTimeout(3000); }
+  console.log(`dashboard month link: found=${mn} href=${mh} -> landed ${p.url().replace("http://127.0.0.1:8189", "")}`);
+  await b.close(); })();

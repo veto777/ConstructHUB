@@ -1,0 +1,18 @@
+import { chromium } from "playwright";
+const PAGES = ["/seo", "/seo/rank-tracker?site=3", "/seo/rank-tracker?site=1", "/seo/explorer?domain=jameshardie.com", "/seo/audit?site=1",
+  "/seo/keywords?keyword=hardie%20plank%20siding", "/seo/content?q=fiber%20cement%20siding%20cost", "/seo/backlinks?site=1", "/seo/reports?site=1",
+  "/seo/local-grid?site=1", "/seo/ai?site=1", "/seo/alerts", "/seo/plan?site=1", "/seo/mentions?site=1", "/seo/usage", "/seo/batch", "/seo/competitors?site=1"];
+(async () => { const b = await chromium.launch({ headless: true, args: ["--disable-dev-shm-usage"] });
+  for (const w of [1280, 390]) {
+    const ctx = await b.newContext({ viewport: { width: w, height: 1600 } }); await ctx.addInitScript("localStorage.setItem('hub.welcomeSeen','1')");
+    for (const path of PAGES) {
+      const p = await ctx.newPage(); const errs: string[] = []; p.on("pageerror", (e) => errs.push(e.message.slice(0, 90)));
+      await p.goto("http://127.0.0.1:8189" + path, { waitUntil: "domcontentloaded", timeout: 30000 }).catch((e) => errs.push("goto " + String(e).slice(0, 60)));
+      await p.waitForTimeout(4500);
+      const r = await p.evaluate(`(() => { const as = [...document.querySelectorAll('main a[href^="/seo"]')]; const small = as.filter(a => { const b = a.getBoundingClientRect(); return b.width > 0 && b.height > 0 && b.height < 40; }).length; return { links: as.length, small, overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth }; })()`).catch(() => ({ links: -1, small: -1, overflow: -1 }));
+      console.log(`${w} ${path.padEnd(52)} links=${r.links} under40px=${r.small} overflow=${r.overflow} errors=${errs.length} ${errs[0] ?? ""}`);
+      await p.close();
+    }
+    await ctx.close();
+  }
+  await b.close(); })();
