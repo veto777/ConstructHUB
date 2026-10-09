@@ -108,7 +108,8 @@ describe("pricing display: comparison tables (shared/plan-matrix.ts)", () => {
   it("marks coming modules and the not-yet-enforced history row", () => {
     expect(byKey.permitAlerts.cells).toEqual({ starter: false, team: false, pro: false, growth: { coming: true }, agency: { coming: true } });
     expect(byKey.csvExport.cells.pro).toEqual({ coming: true });
-    expect(byKey.scheduledReports.cells.growth).toEqual({ coming: true });
+    // Scheduled client email reports are LIVE (server/seo/site-report-send.ts, sent by server/seo/jobs.ts) — a plain ✅, never Coming.
+    expect(byKey.scheduledReports.cells).toEqual({ starter: false, team: false, pro: false, growth: true, agency: true });
     expect(byKey.history.coming).toBe(true);
     expect(byKey.history.cells).toEqual({ starter: "90 days", team: "90 days", pro: "12 months", growth: UNLIMITED_CELL, agency: UNLIMITED_CELL });
   });
@@ -121,7 +122,15 @@ describe("pricing display: comparison tables (shared/plan-matrix.ts)", () => {
     });
     expect(byKey.whiteLabel.cells).toEqual({ starter: false, team: false, pro: false, growth: false, agency: true });
     expect(byKey.masterClass.cells.agency).toBe(true);
-    expect(byKey.newProductSeats.cells).toEqual({ starter: false, team: false, pro: false, growth: false, agency: "2 seats (Call Assistant minutes excluded)" });
+    // These two cells are derived from the Unlimited card's own bullets (plan-matrix.ts), so the
+    // expectation derives from PLANS too: the 2026-10-09 rebuild dropped the bullets' "($2,499)" and
+    // "(Call Assistant minutes excluded)" notes, and a hard-coded expectation would freeze stale copy.
+    const newProductBullet = PLANS.agency.features.find((f) => /new product/i.test(f)) ?? "";
+    const newProductNote = newProductBullet.match(/\(([^)]*)\)/)?.[1] ?? "";
+    expect(byKey.newProductSeats.cells).toEqual({
+      starter: false, team: false, pro: false, growth: false,
+      agency: newProductNote ? `2 seats (${newProductNote})` : "2 seats",
+    });
     expect(byKey.gbpReinstatement.cells.starter).toBe("$599");
     expect(byKey.gbpReinstatement.cells.agency).toBe("$299.50 — half price");
     // Support is inherited down the ladder through each plan's "Everything in …" bullet.
@@ -143,7 +152,9 @@ describe("pricing display: comparison tables (shared/plan-matrix.ts)", () => {
     expect(byKey.scheduledReports.label).toBe("Scheduled client email reports");
     expect(byKey.seoSuite.label).toBe("SEO suite: rank tracker, explorer, keywords, backlinks");
     expect(byKey.gridWatches.label).toBe("Weekly scheduled grid watches");
-    expect(byKey.masterClass.label).toBe("Master Class course ($2,499)");
+    // The label carries the Unlimited bullet's price note only when the bullet states one (plan-matrix.ts derives it).
+    const masterClassBullet = PLANS.agency.features.find((f) => /master class/i.test(f)) ?? "";
+    expect(byKey.masterClass.label).toBe(`Master Class course${masterClassBullet.match(/\(\$[\d,]+\)/)?.[0] ?? ""}`);
     expect(byKey.gridScans.label).toBe("Grid scans / month");
     expect(byKey.publicApi.label).toBe("Public API (units / month)");
     // The grid-scans row counts credits, not scans — the footnote under the table says so.
@@ -269,5 +280,18 @@ describe("pricing UI source", () => {
     const app = read("client/src/App.tsx");
     expect(app).toMatch(/setLocation\("\/pricing#add-ons", \{ replace: true \}\)/);
     expect(read("client/src/components/app-sidebar.tsx")).not.toMatch(/Individual Tools/);
+  });
+
+  it("plan cards and the purchase review badge coming-soon bullets from COMING_MODULES (one mechanism)", () => {
+    // The card badge and the review flag both derive from shared/plans.ts isComingFeature /
+    // FEATURE_BULLET_MODULE — never a hard-coded "(coming soon)" line — so a module shipping
+    // (leaving COMING_MODULES) drops every badge at once.
+    const pricing = read("client/src/pages/pricing.tsx");
+    expect(pricing).toContain("isComingFeature(feature)");
+    expect(pricing).toContain("badge-coming-");
+    expect(pricing).toContain("comingSoon: isComingFeature(text)");
+    const review = read("client/src/components/purchase-review.tsx");
+    expect(review).toContain("comingSoon");
+    expect(review).toContain("Coming soon");
   });
 });

@@ -68,7 +68,13 @@ table.
 - **Mark a row Coming:** set `coming: true` on the row (renders a Coming
   badge; used today for scan & ranking history, whose retention is not
   enforced yet). A module in `COMING_MODULES` renders as Coming on the plans
-  that promise it (CSV export, scheduled reports, permit alerts).
+  that promise it (today: CSV export and permit alerts) — on the comparison
+  table, the plan cards and the checkout purchase review alike. The cards and
+  the review badge a plan bullet through `FEATURE_BULLET_MODULE` /
+  `isComingFeature` (shared/plans.ts), one map derived from `COMING_MODULES`:
+  when a module ships and leaves `COMING_MODULES`, its badge disappears from
+  every surface at once. (Scheduled client email reports shipped 2026-10-09 —
+  server/seo/site-report-send.ts — so it is a plain ✅, not Coming.)
 - Cell values: `true` / `false` / a number / `"unlimited"` (use the `count()`
   helper for any `-1` limit) / a short string / `{ coming: true }`.
 
