@@ -34,7 +34,7 @@ export function AppTabBar() {
   return (
     <nav data-testid="app-tabbar" aria-label="Main"
       className="fixed inset-x-0 bottom-0 z-40 flex border-t border-border/60 bg-background/90 backdrop-blur-xl md:hidden"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+      style={{ paddingBottom: "max(6px, calc(env(safe-area-inset-bottom) - 16px))" }}>
       {tabs.map((t) => (
         <Link key={t.key} href={t.href} data-testid={`tabbar-${t.key}`} className={tabClass(active === t.key)} aria-current={active === t.key ? "page" : undefined}>
           <TabFace icon={PLATFORM_TAB_ICONS[t.key] ?? Menu} label={t.label} active={active === t.key} />

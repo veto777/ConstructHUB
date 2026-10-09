@@ -146,7 +146,7 @@ export function CrmRibbon() {
       <nav
         data-testid="crm-ribbon"
         className="fixed inset-x-0 bottom-0 z-50 flex border-t border-border/60 bg-background/85 backdrop-blur-xl md:hidden"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        style={{ paddingBottom: "max(6px, calc(env(safe-area-inset-bottom) - 16px))" }}
       >
         {/* The person's four tabs (Settings → Phone tab bar, or More → Customize the bar); More always stays last. */}
         {tabs.map((t) => (
