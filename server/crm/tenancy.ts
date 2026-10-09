@@ -17,8 +17,8 @@ import { crmOrgs, crmMembers, users, crmEffectivePermissions } from "@shared/sch
 import type { CrmPermission } from "@shared/schema";
 import { and, asc, eq } from "drizzle-orm";
 import { authorizeObjectRequest } from "./object-access";
-import { PLANS, ADDONS, type AddonKey, type PlanKey } from "@shared/plans";
-import { getEntitlements, raiseHint, cheapestPlanWhere, plural, inUse, type Entitlements } from "../entitlements";
+import { PLANS, type AddonKey, type PlanKey } from "@shared/plans";
+import { getEntitlements, raiseHint, plural, inUse, type Entitlements } from "../entitlements";
 import { getCrmEntitlements, crmPlanRequiredBody } from "./entitlements";
 import { CRM_PLANS, cheapestCrmPlanWhere, CRM_EXTRA_SEAT_MONTHLY_CENTS, type CrmPlanKey } from "@shared/crm-plans";
 
@@ -247,29 +247,18 @@ export async function getSeatUsage(org: typeof crmOrgs.$inferSelect, adding?: { 
 /** Runs SQL: the pool, or the connection holding the seat lock (withSeatLock). */
 type Sql = { query: (text: string, values?: unknown[]) => Promise<{ rows: any[] }> };
 
-/**
- * The people holding seats on an owner's plan, one entry per person: members
- * (active or invited) of every CRM org the owner owns, plus — while the plan
- * includes the Agency workspace — the owner and their agency team. Seats are
- * one pool: the plan's crmSeats plus Extra seat add-ons ("One more CRM or
- * agency team seat"), so someone on both teams holds one seat. An invitation
- * not yet accepted counts by the account its email belongs to, else the email.
- */
-async function seatHolders(q: Sql, ownerUserId: number, withAgencyTeam: boolean): Promise<Set<string>> {
-  const { rows: crm } = await q.query(
+/** Count each person once within the selected product, including pending CRM invitations. */
+async function seatHolders(q: Sql, ownerUserId: number, platform: boolean): Promise<Set<string>> {
+  if (platform) {
+    const { rows } = await q.query("SELECT member_id FROM agency_members WHERE user_id=$1", [ownerUserId]);
+    return new Set([`u:${ownerUserId}`, ...rows.map(r => `u:${r.member_id}`)]);
+  }
+  const { rows } = await q.query(
     `SELECT COALESCE('u:' || COALESCE(m.user_id, (SELECT u.id FROM users u WHERE lower(u.email)=lower(m.email) ORDER BY u.id LIMIT 1)),
                      'e:' || lower(m.email)) AS who
        FROM crm_members m JOIN crm_orgs o ON o.id=m.org_id
-      WHERE o.owner_user_id=$1 AND m.status IN ('active','invited')`,
-    [ownerUserId],
-  );
-  const holders = new Set<string>(crm.map((r: { who: string }) => r.who));
-  if (withAgencyTeam) {
-    holders.add(`u:${ownerUserId}`);
-    const { rows: team } = await q.query("SELECT member_id FROM agency_members WHERE user_id=$1", [ownerUserId]);
-    for (const r of team) holders.add(`u:${r.member_id}`);
-  }
-  return holders;
+      WHERE o.owner_user_id=$1 AND m.status IN ('active','invited')`, [ownerUserId]);
+  return new Set<string>(rows.map(r => r.who));
 }
 
 /** A person's seat identity: their account when one exists, else the invited email. */
@@ -281,91 +270,55 @@ async function seatIdentity(q: Sql, person: { userId?: number | null; email?: st
   return u ? `u:${u.id}` : `e:${email}`;
 }
 
-/**
- * Seat usage on an owner's plan; the CRM team and the Agency team share it.
- * `adding` asks about one more person (by account id or email): `canAdd` says
- * whether they can join, which is always true for someone who already holds a
- * seat on the other team. Under the seat lock, pass its `client` and `ent`
- * so every query runs on the connection holding the lock.
- */
+/** CRM callers default to their own pool; platform callers select their product explicitly. */
 export async function getOwnerSeatUsage(
   ownerUserId: number,
-  opts: { adding?: { userId?: number | null; email?: string | null }; client?: Sql; ent?: Entitlements } = {},
+  opts: { adding?: { userId?: number | null; email?: string | null }; client?: Sql; ent?: Entitlements; product?: "platform" | "crm" } = {},
 ) {
   const q: Sql = opts.client ?? pool;
-  const ent = opts.ent ?? await getEntitlements(ownerUserId);
-  const withAgencyTeam = ent.modules.agencyWorkspace;
-  const holders = await seatHolders(q, ownerUserId, withAgencyTeam);
+  const platform = opts.product === "platform";
+  const holders = await seatHolders(q, ownerUserId, platform);
   const used = holders.size;
   const adding = opts.adding ? await seatIdentity(q, opts.adding) : null;
   const alreadySeated = !!adding && holders.has(adding);
-
-  // Beta accounts (owner signed up through a platform beta invite) get
-  // unlimited seats for the duration of the beta — every gate below, and both
-  // 402 sites in routes.ts, key off this result, so they never paywall one.
-  const { rows: [owner] } = await q.query("SELECT beta_at FROM users WHERE id=$1", [ownerUserId]);
-  if (owner?.beta_at) {
-    return {
-      plan: "beta",
-      planName: "Beta",
-      limit: -1,                               // -1 means unlimited
-      used,
-      remaining: -1,
-      canAddSeat: true,
-      canAdd: true,
-      message: "Beta accounts have unlimited CRM seats.",
-      upgradePlan: null as PlanKey | null,
-      upgradeCrmPlan: null as CrmPlanKey | null,
-      addon: null as AddonKey | null,
-    };
-  }
-
-  // The CRM is a SEPARATE PRODUCT (shared/crm-plans.ts): its seats come from
-  // the account's own CRM subscription, never from a ConstructHUB platform
-  // plan. On Agency the agency team draws from the platform plan's agencySeats,
-  // and both pools are counted together because seatHolders() returns the two
-  // teams as one set.
-  const crm = await getCrmEntitlements(ownerUserId);
-  const agencySeats = withAgencyTeam ? (ent.allowances?.agencySeats ?? 0) : 0;
-  // -1 (Unlimited's agencySeats, or an unlimited CRM plan) means no ceiling in
-  // either pool: an unlimited plus a finite count is still unlimited.
-  const limit = crm.seats < 0 || agencySeats < 0 ? -1 : crm.seats + agencySeats;
-  const planName = crm.plan ? CRM_PLANS[crm.plan].name : withAgencyTeam && ent.accessPlan ? PLANS[ent.accessPlan].name : "none";
-  const canAddSeat = limit < 0 || used < limit;
-  const [one, many] = withAgencyTeam ? ["seat", "seats"] : ["CRM seat", "CRM seats"];
-  let message = `Your ${planName} plan includes ${limit < 0 ? `unlimited ${many}` : plural(limit, one, many)} and ${inUse(used)}.`;
+  let limit: number, plan: string, planName: string;
   let upgradePlan: PlanKey | null = null;
   let upgradeCrmPlan: CrmPlanKey | null = null;
   let addon: AddonKey | null = null;
-  if (!crm.plan) {
-    upgradeCrmPlan = cheapestCrmPlanWhere(() => true);
-    const cheapest = upgradeCrmPlan ? CRM_PLANS[upgradeCrmPlan] : null;
-    message = `The ConstructHUB CRM is a separate subscription from your platform plan${cheapest ? `, from $${(cheapest.monthlyCents / 100).toFixed(0)}/mo` : ""}. Choose a CRM plan to open the CRM and add your team.`;
-  } else if (!canAddSeat) {
-    upgradeCrmPlan = cheapestCrmPlanWhere((l) => l.seats > limit);
-    const next = upgradeCrmPlan ? CRM_PLANS[upgradeCrmPlan] : null;
-    message += next
-      ? ` ${next.name} includes ${plural(next.limits.seats, "seat")}, or add an extra seat for $${(CRM_EXTRA_SEAT_MONTHLY_CENTS / 100).toFixed(0)}/mo.`
-      : ` Add an extra seat for $${(CRM_EXTRA_SEAT_MONTHLY_CENTS / 100).toFixed(0)}/mo.`;
-    // The Agency team is in the pool and the platform plan sells the Extra seat
-    // add-on: buying one raises agencySeats, so name it for the client's
-    // limit_reached handler (plan-errors.ts). Without the module the add-on
-    // buys nothing, and on Unlimited the pool never fills.
-    if (withAgencyTeam && ent.accessPlan && ADDONS.extra_seat.availableOn.includes(ent.accessPlan)) addon = "extra_seat";
+  let hint = "";
+  if (platform) {
+    const ent = opts.ent ?? await getEntitlements(ownerUserId);
+    // Effective allowances include purchased extra_seat quantities and legacy key mapping.
+    limit = ent.allowances?.agencySeats ?? 0;
+    plan = ent.accessPlan ?? "none";
+    planName = ent.accessPlan ? PLANS[ent.accessPlan].name : "none";
+    if (limit >= 0 && used >= limit) {
+      const raise = raiseHint(ent, "agencySeats", ["team seat"], "extra_seat");
+      upgradePlan = raise.upgradePlan;
+      addon = raise.addon;
+      hint = raise.text;
+    }
+  } else {
+    const crm = await getCrmEntitlements(ownerUserId);
+    limit = crm.seats;
+    plan = crm.via === "beta" ? "beta" : crm.plan ?? "none";
+    planName = crm.via === "beta" ? "Beta" : crm.plan ? CRM_PLANS[crm.plan].name : "none";
+    if (!crm.active) {
+      upgradeCrmPlan = cheapestCrmPlanWhere(() => true);
+      hint = "The ConstructHUB CRM is a separate subscription. Choose a CRM plan to open the CRM and add your team.";
+    } else if (limit >= 0 && used >= limit) {
+      upgradeCrmPlan = cheapestCrmPlanWhere(l => l.seats > limit);
+      const next = upgradeCrmPlan ? CRM_PLANS[upgradeCrmPlan] : null;
+      hint = `${next ? `${next.name} includes ${plural(next.limits.seats, "seat")}, or add` : "Add"} an extra seat for $${(CRM_EXTRA_SEAT_MONTHLY_CENTS / 100).toFixed(0)}/mo.`;
+    }
   }
-
+  const canAddSeat = limit < 0 || used < limit;
+  const unit = platform ? "team seat" : "CRM seat";
+  const message = `Your ${planName} plan includes ${limit < 0 ? `unlimited ${unit}s` : plural(limit, unit)} and ${inUse(used)}.${hint ? ` ${hint}` : ""}`;
   return {
-    plan: crm.plan ?? ent.accessPlan ?? "none",
-    planName,
-    limit,
-    used,
-    remaining: limit < 0 ? -1 : Math.max(0, limit - used),
-    canAddSeat,
-    canAdd: alreadySeated || canAddSeat,
-    message,
-    upgradePlan,
-    upgradeCrmPlan,
-    addon,
+    product: platform ? "platform" as const : "crm" as const,
+    plan, planName, limit, used, remaining: limit < 0 ? -1 : Math.max(0, limit - used),
+    canAddSeat, canAdd: alreadySeated || canAddSeat, message, upgradePlan, upgradeCrmPlan, addon,
   };
 }
 
@@ -377,7 +330,7 @@ export const SEAT_LOCK = 7164;
 export type SeatLock = { client: PoolClient; db: NodePgDatabase<typeof schema>; ent: Entitlements };
 /**
  * Run a seat check and the addition it allows one at a time per owner, so the
- * CRM team and the Agency team can't race past the shared pool together. It is
+ * additions cannot race past either product's seat limit. It is
  * one transaction holding pg_advisory_xact_lock, and `fn` must do all of its
  * SQL through the SeatLock it is given: a request waiting for the lock holds a
  * pool connection, so work under the lock that needed a second connection from
@@ -407,7 +360,7 @@ export async function withSeatLock<T>(ownerUserId: number, fn: (lock: SeatLock) 
 export function seatLimitBody(seats: SeatUsage) {
   return {
     code: "limit_reached",
-    feature: "crmSeats",
+    feature: seats.product === "platform" ? "agencySeats" : "crmSeats",
     limit: seats.limit,
     used: seats.used,
     upgradePlan: seats.upgradePlan,
