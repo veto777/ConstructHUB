@@ -3,8 +3,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -13,18 +11,18 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { VerificationCancelled } from "@/components/recent-auth";
 import {
-  Check, Zap, Star, TrendingUp, Building2, Loader2, ExternalLink, X, ArrowDown,
+  Check, Zap, Star, Building2, Loader2, ExternalLink, X,
   Wrench, Globe, Megaphone, Briefcase, Search, MessageSquare, Settings2,
 } from "lucide-react";
 import {
-  PLANS, PLAN_KEYS, ADDONS, TRIAL_DAYS, AGENCY_LOCATION_BANDS, AGENCY_SELF_SERVE_MAX_LOCATIONS, CALL_ASSISTANT_NAME, isCallAssistantAddon,
+  PLANS, PLAN_KEYS, ADDONS, TRIAL_DAYS, CALL_ASSISTANT_NAME, isCallAssistantAddon,
   type AddonKey, type BillingInterval, type PlanKey,
 } from "@shared/plans";
 import {
   formatUsd, intervalSuffix, intervalWord, planPriceCents, annualSavingsCents, annualMonthsFree,
-  addonPriceCents, addonPlanNames, agencyQuote, agencyBandRows, comparisonSections, describeSubscription,
-  normalizeLocations, isSalesOnlyService, DFY_SERVICES, AGENCY_INCLUDED_LOCATIONS, PAYMENT_PROBLEM_STATUSES,
-  type CompareCell, type SubscriptionInfo,
+  addonPriceCents, addonPlanNames, describeSubscription,
+  isSalesOnlyService, DFY_SERVICES, PAYMENT_PROBLEM_STATUSES,
+  type SubscriptionInfo,
 } from "@/lib/pricing-display";
 import { TalkToSalesButton, TalkToSalesDialog } from "@/components/talk-to-sales";
 import { ToastAction } from "@/components/ui/toast";
@@ -37,13 +35,14 @@ import { CallAssistantPlanCards } from "@/components/call-assistant-tiers";
 import { StandingGator } from "@/components/mascot";
 import { H2, Kicker, LEAD, TEXT_LINK } from "@/components/feature-landing/primitives";
 import { CrmPlanCards } from "@/components/crm-plans";
+import { BusinessToolsComparison, CrmComparison } from "@/components/plan-comparison-table";
+import { CRM_ADDONS, CRM_EXTRA_SEAT_MONTHLY_CENTS } from "@shared/crm-plans";
 import { PurchaseReviewDialog } from "@/components/purchase-review";
 import { trackConversion, trackEvent } from "@/lib/gtag";
 
 // Design B (the marketing site's editorial look): hairline cards on cream, ONE
-// orange for the recommended plan, the navy panel colour for Agency (it turns
-// cream in dark mode, as the hero panels do, so the accent still reads).
-const ORANGE_BUTTON = "border-0 bg-mkt-orange hover:bg-mkt-orange-hover text-white font-semibold rounded-lg";
+// navy panel colour for the Unlimited hero card (it turns cream in dark mode,
+// as the hero panels do, so the accent still reads).
 const NAVY_BUTTON = "h-11 rounded-lg border-0 bg-mkt-panel text-mkt-panel-ink hover:opacity-90 font-semibold text-[15px]";
 const OUTLINE_BUTTON = "h-11 rounded-lg border-2 border-mkt-ink [border-color:var(--mkt-ink)] bg-transparent text-mkt-ink hover:bg-mkt-ink hover:text-mkt-paper font-semibold text-[15px]";
 const SECTION_X = "px-4 sm:px-6 lg:px-8";
@@ -51,24 +50,20 @@ const SECTION_X = "px-4 sm:px-6 lg:px-8";
 const PLAN_STYLE: Record<PlanKey, { icon: any; card: string; ribbon: string; button: string }> = {
   starter: { icon: Zap, card: "border border-mkt-rule hover:border-mkt-ink", ribbon: "", button: OUTLINE_BUTTON },
   team: { icon: Zap, card: "border border-mkt-rule hover:border-mkt-ink", ribbon: "", button: OUTLINE_BUTTON },
-  pro: {
-    icon: Star, card: "border-2 border-mkt-orange", ribbon: "bg-mkt-orange text-white",
-    button: ORANGE_BUTTON,
-  },
-  growth: { icon: TrendingUp, card: "border border-mkt-rule hover:border-mkt-ink", ribbon: "", button: OUTLINE_BUTTON },
+  pro: { icon: Star, card: "border border-mkt-rule hover:border-mkt-ink", ribbon: "", button: OUTLINE_BUTTON },
+  growth: { icon: Star, card: "border border-mkt-rule hover:border-mkt-ink", ribbon: "", button: OUTLINE_BUTTON },
   agency: {
     icon: Building2, card: "border-2 border-mkt-panel", ribbon: "bg-mkt-panel text-mkt-panel-ink",
     button: NAVY_BUTTON,
   },
 };
 
-const PLAN_RIBBON: Partial<Record<PlanKey, string>> = { pro: "Recommended", agency: "For agencies" };
+/** Unlimited is the hero of the ladder: the one plan with no caps. */
+const PLAN_RIBBON: Partial<Record<PlanKey, string>> = { agency: "No caps" };
 
 const SERVICE_ICONS: Record<string, any> = {
   formation: Wrench, website: Globe, "seo-ads": Megaphone, "seo-packages": Search, "business-build": Briefcase, custom: MessageSquare,
 };
-
-const AGENCY_PRESETS = [10, 25, 50, 100, 250, 500];
 
 /** Bring a section to the top of whatever scrolls it: the app's own pane when
  *  signed in (scrollIntoView would also scroll the window and push the top bar
@@ -87,7 +82,7 @@ function scrollToSection(el: HTMLElement) {
 
 const LOCATION_EVENTS = ["pushState", "replaceState", "popstate", "hashchange"] as const;
 
-type PlanRequest = { plan: PlanKey; interval: BillingInterval; locations?: number };
+type PlanRequest = { plan: PlanKey; interval: BillingInterval };
 
 /** GET /api/pricing/founding-offer → { open }; null when the server does not answer it (the prerender shell, an outage). */
 async function fetchFoundingOffer(): Promise<{ open: boolean } | null> {
@@ -95,29 +90,25 @@ async function fetchFoundingOffer(): Promise<{ open: boolean } | null> {
   return r.ok ? ((await r.json()) as { open: boolean }) : null;
 }
 
-const planBody = (r: PlanRequest) => ({ plan: r.plan, interval: r.interval, ...(r.plan === "agency" ? { locations: r.locations ?? AGENCY_INCLUDED_LOCATIONS } : {}) });
+const planBody = (r: PlanRequest) => ({ plan: r.plan, interval: r.interval });
 
 function planRequestPrice(r: PlanRequest): string {
-  if (r.plan === "agency") {
-    const q = agencyQuote(r.locations ?? AGENCY_INCLUDED_LOCATIONS);
-    if (!q.sales) return `${formatUsd(r.interval === "year" ? q.annualCents : q.monthlyCents)}${intervalSuffix(r.interval)}`;
-  }
   return `${formatUsd(planPriceCents(PLANS[r.plan], r.interval))}${intervalSuffix(r.interval)}`;
 }
 
-function CompareValue({ value }: { value: CompareCell }) {
-  if (value === true) return <Check className="w-5 h-5 text-mkt-orange-ink mx-auto" strokeWidth={2.25} aria-label="Included" />;
-  if (value === false) return <X className="w-4 h-4 text-mkt-muted opacity-60 mx-auto" aria-label="Not included" />;
-  return <span className="text-[14px] font-semibold text-mkt-ink">{value}</span>;
-}
+type PricingTab = "business" | "crm";
+
+const TABS: { key: PricingTab; label: string; testId: string }[] = [
+  { key: "business", label: "Business Tools", testId: "tab-business" },
+  { key: "crm", label: "CRM (Customer Relations Management)", testId: "tab-crm" },
+];
 
 export default function PricingPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [interval, setBillingInterval] = useState<BillingInterval>(() =>
     new URLSearchParams(window.location.search).get("interval") === "year" ? "year" : "month");
-  const [agencyInput, setAgencyInput] = useState(String(AGENCY_INCLUDED_LOCATIONS));
-  const agencyLocations = normalizeLocations(agencyInput);
+  const [tab, setTab] = useState<PricingTab>("business");
   const [confirm, setConfirm] = useState<PlanRequest | null>(null);
   /** A first purchase is reviewed before Stripe: what the plan includes, and what it does NOT (owner, 2026-10-07). */
   const [review, setReview] = useState<PlanRequest | null>(null);
@@ -194,8 +185,7 @@ export default function PricingPage() {
 
   /** A request the server says only a sales rep can sell (409 talk_to_sales) opens the inquiry form. */
   const [salesTopic, setSalesTopic] = useState<string | null>(null);
-  const requestTopic = (r: PlanRequest) =>
-    r.plan === "agency" ? `${PLANS.agency.name} plan — ${(r.locations ?? AGENCY_INCLUDED_LOCATIONS).toLocaleString("en-US")} locations` : `${PLANS[r.plan].name} plan`;
+  const requestTopic = (r: PlanRequest) => `${PLANS[r.plan].name} plan`;
 
   const showError = (title: string, opts: { portal?: boolean } = {}) => (err: unknown) => {
     if (err instanceof VerificationCancelled) return;
@@ -262,8 +252,6 @@ export default function PricingPage() {
   // The server decides trial eligibility (one per customer), so the button never promises it;
   // the line under the plans explains the trial for new accounts.
   const startLabel = (plan: PlanKey) => `Choose ${PLANS[plan].name}`;
-  /** An Agency subscriber keeps the location count they are billed for unless they pick another. */
-  const currentAgencyLocations = view.planKey === "agency" && !view.isLegacy && view.locations ? view.locations : AGENCY_INCLUDED_LOCATIONS;
 
   const isCurrent = (plan: PlanKey) =>
     view.live && !view.isLegacy && view.planKey === plan && (view.interval === null || view.interval === interval);
@@ -296,26 +284,24 @@ export default function PricingPage() {
     let id = "";
     try { id = decodeURIComponent(window.location.hash.slice(1)); } catch { return; }
     if (!id) return;
+    hashHandledFor.current = navCount;
+    // #crm is a tab: open it first, then scroll once the panel has rendered.
+    if (id === "crm") setTab("crm");
     const frame = requestAnimationFrame(() => {
-      hashHandledFor.current = navCount;
       const el = document.getElementById(id);
       if (el) scrollToSection(el);
+      if (id === "crm") window.setTimeout(() => { const late = document.getElementById("crm"); if (late) scrollToSection(late); }, 80);
     });
     return () => cancelAnimationFrame(frame);
   }, [pageSettled, navCount]);
 
-  const jumpTo = (id: string) => {
-    const el = document.getElementById(id);
-    if (el) scrollToSection(el);
-  };
-
   // Add-ons ride on a Stripe subscription to one of the current plans (a legacy plan switches first).
   const addonsEditable = view.changesInPlace && !view.isLegacy;
   const monthsFree = annualMonthsFree();
-  const quote = agencyQuote(agencyLocations);
-  const bandPrices = AGENCY_LOCATION_BANDS.map((b) => b.centsPerLocation).filter((c) => c > 0);
-  const sections = comparisonSections();
   const confirmFrom = view.displayName ? `Your ${view.displayName} subscription${view.interval ? ` (billed ${intervalWord(view.interval)})` : ""}` : "Your subscription";
+  // Retired add-ons (empty availableOn, not a preview — e.g. the old extra-location line) are not sold: they read
+  // stored subscriptions on the server, they are never listed here.
+  const listedAddons = (Object.keys(ADDONS) as AddonKey[]).filter((k) => !isCallAssistantAddon(k) && (ADDONS[k].availableOn.length > 0 || ADDONS[k].preview));
 
   return (
     <>
@@ -412,103 +398,132 @@ export default function PricingPage() {
               {FOUNDING_OFFER_LINE}
             </p>
           )}
-          <div id="plans" className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 pt-3 scroll-mt-16">
-            {PLAN_KEYS.map((key, index) => {
-              const plan = PLANS[key];
-              const style = PLAN_STYLE[key];
-              const Icon = style.icon;
-              const current = isCurrent(key);
-              const request: PlanRequest = { plan: key, interval, ...(key === "agency" ? { locations: currentAgencyLocations } : {}) };
-              const pending = busy && pendingPlan?.plan === key && pendingPlan.locations === request.locations;
-              return (
-                <div key={key} className={`relative flex flex-col rounded-2xl bg-mkt-card transition-colors ${style.card}`} data-testid={`card-plan-${key}`}>
-                  {PLAN_RIBBON[key] && (
-                    <div className={`absolute -top-3 left-6 z-10 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] ${style.ribbon}`}>
-                      {PLAN_RIBBON[key]}
-                    </div>
-                  )}
-                  <div className="p-6 lg:p-7 pb-0 lg:pb-0">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="h-10 w-10 rounded-lg border border-mkt-rule bg-mkt-paper flex items-center justify-center text-mkt-ink shrink-0">
-                          <Icon className="w-[18px] h-[18px]" strokeWidth={1.75} />
-                        </div>
-                        <h3 className="font-display font-semibold text-[1.45rem] leading-tight text-mkt-ink">{plan.name}</h3>
-                      </div>
-                      <span className="font-display italic text-mkt-muted text-lg leading-none pt-1" aria-hidden>{String(index + 1).padStart(2, "0")}</span>
-                    </div>
-                    {view.live && view.planKey === key && view.isLegacy && (
-                      <p className="mt-2 text-[12px] text-mkt-muted" data-testid={`text-legacy-${key}`}>Your {view.displayName} features match this plan</p>
-                    )}
-                    <p className="text-[14.5px] text-mkt-ink-soft pt-3 leading-relaxed">{plan.tagline}</p>
-                    <div className="pt-5 font-display font-semibold text-mkt-ink leading-none" data-testid={`text-price-${key}`}>
-                      <span className="text-[2.9rem] tracking-[-0.02em]">{formatUsd(planPriceCents(plan, interval))}</span>
-                      <span className="font-sans text-[15px] font-medium text-mkt-muted ml-1">{intervalSuffix(interval)}</span>
-                    </div>
-                    <p className="mt-3 text-[12.5px] leading-relaxed text-mkt-muted min-h-[2.5rem]" data-testid={`text-price-note-${key}`}>
-                      {interval === "year"
-                        ? `${formatUsd(Math.round(plan.annualCents / 12))}/mo billed yearly · save ${formatUsd(annualSavingsCents(plan))}`
-                        : `or ${formatUsd(plan.annualCents)}/yr (${monthsFree} months free)`}
-                      {key === "agency" && (
-                        <span className="block">
-                          {AGENCY_INCLUDED_LOCATIONS} locations included, then {formatUsd(Math.max(...bandPrices))} down to {formatUsd(Math.min(...bandPrices))} per location
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                  <div className="flex flex-col flex-1 p-6 lg:p-7 pt-5 lg:pt-5">
-                    <ul className="space-y-2.5 flex-1 border-t border-mkt-rule pt-5">
-                      {plan.features.map((feature) => (
-                        <li key={feature} className="flex items-start gap-2.5 text-[14px] leading-snug text-mkt-ink">
-                          <Check className="w-4 h-4 shrink-0 mt-0.5 text-mkt-orange-ink" />
-                          <span>{feature}</span>
-                        </li>
-                      ))}
-                      <li className="pt-3 text-[11.5px] font-bold uppercase tracking-[0.12em] text-mkt-muted">Not included</li>
-                      {plan.notIncluded.map((line) => (
-                        <li key={line} className="flex items-start gap-2.5 text-[13px] leading-snug text-mkt-muted" data-testid={`text-not-included-${key}`}>
-                          <X className="w-4 h-4 shrink-0 mt-0.5 text-red-600" />
-                          <span>{line}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="space-y-2 pt-6">
-                      <Button
-                        className={`w-full h-11 rounded-lg text-[15px] font-semibold ${current ? "border-2 border-mkt-rule bg-transparent text-mkt-ink-soft" : style.button}`}
-                        variant={current ? "outline" : "default"}
-                        disabled={current || busy}
-                        onClick={() => choosePlan(request)}
-                        data-testid={`button-subscribe-${key}`}
-                      >
-                        {pending && <Loader2 className="w-4 h-4 animate-spin mr-1" />}
-                        {ctaLabel(key)}
-                      </Button>
-                      {key === "agency" && (
-                        <button type="button" onClick={() => jumpTo("agency")} className="w-full text-[13px] font-semibold text-mkt-ink-soft hover:text-mkt-ink underline decoration-mkt-orange-soft decoration-2 underline-offset-4 inline-flex items-center justify-center gap-1" data-testid="link-agency-calculator">
-                          Price more than {AGENCY_INCLUDED_LOCATIONS} locations <ArrowDown className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <p className="text-center text-[13px] text-mkt-muted mt-6">
-            No free plan. A new account's first plan starts with the {TRIAL_DAYS}-day trial. Prices in USD.
-          </p>
-        </div>
 
-        <section id="crm" className="scroll-mt-16" aria-labelledby="crm-heading" data-testid="section-crm-plans">
-          <div className="text-center max-w-3xl mx-auto">
-            <h2 id="crm-heading" className={H2} data-testid="text-crm-heading">ConstructHUB CRM: <em className="text-mkt-orange-ink">a separate product</em></h2>
-            <p className={`${LEAD} mt-4`}>
-              Estimates, invoices, payments, scheduling and a client portal. The CRM has its own plans and its own subscription:
-              the ConstructHUB plans above do not include it, and a CRM plan does not include the tools above. Buy either one, or both.
-            </p>
+          {/* The two products: the platform's Business Tools, and the CRM (a separate product). */}
+          <div role="tablist" aria-label="Choose a product" className="flex flex-wrap justify-center gap-2 pt-3">
+            {TABS.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                role="tab"
+                aria-selected={tab === t.key}
+                onClick={() => setTab(t.key)}
+                className={`rounded-full border px-4 sm:px-5 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mkt-orange ${tab === t.key ? "border-mkt-panel bg-mkt-panel text-mkt-panel-ink" : "border-mkt-rule text-mkt-ink-soft hover:border-mkt-ink hover:text-mkt-ink"}`}
+                data-testid={t.testId}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
-          <div className="mt-10"><CrmPlanCards interval={interval} signedIn={!!user} /></div>
-        </section>
+
+          {tab === "business" ? (
+            <div role="tabpanel" className="mt-8">
+              <div id="plans" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5 scroll-mt-16">
+                {PLAN_KEYS.map((key, index) => {
+                  const plan = PLANS[key];
+                  const style = PLAN_STYLE[key];
+                  const Icon = style.icon;
+                  const current = isCurrent(key);
+                  const request: PlanRequest = { plan: key, interval };
+                  const pending = busy && pendingPlan?.plan === key;
+                  return (
+                    <div key={key} className={`relative flex flex-col rounded-2xl bg-mkt-card transition-colors ${style.card}`} data-testid={`card-plan-${key}`}>
+                      {PLAN_RIBBON[key] && (
+                        <div className={`absolute -top-3 left-6 z-10 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] ${style.ribbon}`}>
+                          {PLAN_RIBBON[key]}
+                        </div>
+                      )}
+                      <div className="p-6 lg:p-7 pb-0 lg:pb-0">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="h-10 w-10 rounded-lg border border-mkt-rule bg-mkt-paper flex items-center justify-center text-mkt-ink shrink-0">
+                              <Icon className="w-[18px] h-[18px]" strokeWidth={1.75} />
+                            </div>
+                            <h3 className="font-display font-semibold text-[1.45rem] leading-tight text-mkt-ink">{plan.name}</h3>
+                          </div>
+                          <span className="font-display italic text-mkt-muted text-lg leading-none pt-1" aria-hidden>{String(index + 1).padStart(2, "0")}</span>
+                        </div>
+                        {view.live && view.planKey === key && view.isLegacy && (
+                          <p className="mt-2 text-[12px] text-mkt-muted" data-testid={`text-legacy-${key}`}>Your {view.displayName} features match this plan</p>
+                        )}
+                        <p className="text-[14.5px] text-mkt-ink-soft pt-3 leading-relaxed">{plan.tagline}</p>
+                        <div className="pt-5 font-display font-semibold text-mkt-ink leading-none" data-testid={`text-price-${key}`}>
+                          <span className="text-[2.9rem] tracking-[-0.02em]">{formatUsd(planPriceCents(plan, interval))}</span>
+                          <span className="font-sans text-[15px] font-medium text-mkt-muted ml-1">{intervalSuffix(interval)}</span>
+                        </div>
+                        <p className="mt-3 text-[12.5px] leading-relaxed text-mkt-muted min-h-[2.5rem]" data-testid={`text-price-note-${key}`}>
+                          {interval === "year"
+                            ? `${formatUsd(Math.round(plan.annualCents / 12))}/mo billed yearly · save ${formatUsd(annualSavingsCents(plan))}`
+                            : `or ${formatUsd(plan.annualCents)}/yr (${monthsFree} months free)`}
+                        </p>
+                      </div>
+                      <div className="flex flex-col flex-1 p-6 lg:p-7 pt-5 lg:pt-5">
+                        <ul className="space-y-2.5 flex-1 border-t border-mkt-rule pt-5">
+                          {plan.features.map((feature) => (
+                            <li key={feature} className="flex items-start gap-2.5 text-[14px] leading-snug text-mkt-ink">
+                              <Check className="w-4 h-4 shrink-0 mt-0.5 text-mkt-orange-ink" />
+                              <span>{feature}</span>
+                            </li>
+                          ))}
+                          <li className="pt-3 text-[11.5px] font-bold uppercase tracking-[0.12em] text-mkt-muted">Not included</li>
+                          {plan.notIncluded.map((line) => (
+                            <li key={line} className="flex items-start gap-2.5 text-[13px] leading-snug text-mkt-muted" data-testid={`text-not-included-${key}`}>
+                              <X className="w-4 h-4 shrink-0 mt-0.5 text-red-600" />
+                              <span>{line}</span>
+                            </li>
+                          ))}
+                        </ul>
+                        <div className="space-y-2 pt-6">
+                          <Button
+                            className={`w-full h-11 rounded-lg text-[15px] font-semibold ${current ? "border-2 border-mkt-rule bg-transparent text-mkt-ink-soft" : style.button}`}
+                            variant={current ? "outline" : "default"}
+                            disabled={current || busy}
+                            onClick={() => choosePlan(request)}
+                            data-testid={`button-subscribe-${key}`}
+                          >
+                            {pending && <Loader2 className="w-4 h-4 animate-spin mr-1" />}
+                            {ctaLabel(key)}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-center text-[13px] text-mkt-muted mt-6">
+                No free plan. A new account's first plan starts with the {TRIAL_DAYS}-day trial. Prices in USD.
+                Outgrow a plan's locations or seats? Move up — there is no per-location pricing.
+              </p>
+
+              <section id="comparison" className="mt-16 scroll-mt-16" aria-labelledby="comparison-heading">
+                <SectionHead n="01" kicker="Compare" lede="What each Business Tools plan includes, side by side.">
+                  <h2 id="comparison-heading" className={H2} data-testid="text-comparison-heading">Compare <em className="text-mkt-orange-ink">plans</em></h2>
+                </SectionHead>
+                <div className="mt-10">
+                  <BusinessToolsComparison interval={interval} />
+                </div>
+              </section>
+            </div>
+          ) : (
+            <div role="tabpanel" id="crm" className="mt-8 scroll-mt-16" data-testid="section-crm-plans" aria-labelledby="crm-heading">
+              <div className="text-center max-w-3xl mx-auto">
+                <h2 id="crm-heading" className={H2} data-testid="text-crm-heading">ConstructHUB CRM: <em className="text-mkt-orange-ink">a separate product</em></h2>
+                <p className={`${LEAD} mt-4`}>
+                  Estimates, invoices, payments, scheduling and a client portal. The CRM has its own plans and its own subscription:
+                  the Business Tools plans do not include it, and a CRM plan does not include the tools above. Buy either one, or both.
+                </p>
+              </div>
+              <div className="mt-10"><CrmPlanCards interval={interval} signedIn={!!user} /></div>
+              <div className="mt-12">
+                <CrmComparison interval={interval} />
+                <p className="mt-4 text-center text-[13px] text-mkt-muted">
+                  CRM add-ons: JobCam — job photos &amp; video at {formatUsd(CRM_ADDONS.jobcam.monthlyCents)}/mo on the plans that do not include it,
+                  and an extra seat at {formatUsd(CRM_EXTRA_SEAT_MONTHLY_CENTS)}/mo. A first CRM subscription starts with a free trial.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* The AI Call Assistant: a separate service on its own subscription (shared/plans.ts CALL_ASSISTANT_TIERS, server/voice/subscription.ts). */}
         <section id="call-assistant" className="scroll-mt-16" aria-labelledby="call-assistant-heading" data-testid="section-call-assistant-plans">
@@ -523,164 +538,9 @@ export default function PricingPage() {
           <div className="mt-10"><CallAssistantPlanCards interval={interval} signedIn={!!user} /></div>
         </section>
 
-        <section id="comparison" className="scroll-mt-16" aria-labelledby="comparison-heading">
-          <SectionHead n="01" kicker="Compare" lede="What each plan includes, side by side.">
-            <h2 id="comparison-heading" className={H2} data-testid="text-comparison-heading">Compare <em className="text-mkt-orange-ink">plans</em></h2>
-          </SectionHead>
-          <div className="mt-10 overflow-x-auto rounded-2xl border border-mkt-rule bg-mkt-card" data-testid="table-plan-comparison">
-            <table className="w-full min-w-[640px] text-[14px]">
-              <thead>
-                <tr className="border-b border-mkt-rule">
-                  <th scope="col" className="sticky left-0 z-10 bg-mkt-card text-left p-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-mkt-muted min-w-[140px] sm:min-w-[200px]">Feature</th>
-                  {PLAN_KEYS.map((key) => (
-                    <th key={key} scope="col" className={`p-4 text-center min-w-[110px] ${key === "pro" ? "bg-[color:var(--mkt-orange-soft)]" : ""}`}>
-                      <span className="block font-display font-semibold text-[1.15rem] text-mkt-ink">{PLANS[key].name}</span>
-                      <span className="block text-[12px] font-medium text-mkt-muted">
-                        {formatUsd(planPriceCents(PLANS[key], interval))}{intervalSuffix(interval)}
-                      </span>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sections.flatMap((section) => [
-                  <tr key={`s-${section.title}`} className="bg-mkt-paper-2 border-b border-mkt-rule">
-                    <th scope="colgroup" colSpan={PLAN_KEYS.length + 1} className="sticky left-0 text-left px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-mkt-orange-ink">{section.title}</th>
-                  </tr>,
-                  ...section.rows.map((r) => (
-                    <tr key={r.key} className="border-b border-dotted border-mkt-rule last:border-b-0" data-testid={`row-compare-${r.key}`}>
-                      <th scope="row" className="sticky left-0 z-10 bg-mkt-card px-4 py-3 text-left font-medium text-mkt-ink">{r.label}</th>
-                      {PLAN_KEYS.map((key) => (
-                        <td key={key} className="px-4 py-3 text-center text-mkt-ink" data-testid={`cell-compare-${r.key}-${key}`}>
-                          <CompareValue value={r.cells[key]} />
-                        </td>
-                      ))}
-                    </tr>
-                  )),
-                ])}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <section id="agency" className="scroll-mt-16" aria-labelledby="agency-heading">
-          <SectionHead
-            n="02"
-            kicker="Agency"
-            lede={<>
-              {formatUsd(PLANS.agency.monthlyCents)}/mo includes {AGENCY_INCLUDED_LOCATIONS} client locations. Each location above that is
-              priced by the band it falls in, like tax brackets, so adding a location never lowers the bill.
-            </>}
-          >
-            <h2 id="agency-heading" className={H2}>Agency pricing <em className="text-mkt-orange-ink">by location</em></h2>
-          </SectionHead>
-          <div className="mt-10 grid grid-cols-1 lg:grid-cols-2 gap-5 max-w-5xl mx-auto">
-            <div className="rounded-2xl border border-mkt-rule bg-mkt-card overflow-hidden">
-              <table className="w-full text-[14px]" data-testid="table-agency-bands">
-                <thead>
-                  <tr className="border-b border-mkt-rule">
-                    <th scope="col" className="text-left p-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-mkt-muted">Locations</th>
-                    <th scope="col" className="text-right p-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-mkt-muted">Per location / month</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {agencyBandRows().map((b) => (
-                    <tr key={b.label} className="border-b border-dotted border-mkt-rule last:border-0">
-                      <td className="px-4 py-3 font-display font-semibold text-[1.05rem] text-mkt-ink">{b.label}</td>
-                      <td className="px-4 py-3 text-right text-mkt-ink">
-                        {b.centsPerLocation === null ? "Talk to a sales rep" : b.centsPerLocation === 0 ? `Included in ${formatUsd(PLANS.agency.monthlyCents)}` : formatUsd(b.centsPerLocation)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div className="rounded-2xl border border-mkt-rule bg-mkt-card overflow-hidden flex flex-col" data-testid="card-agency-calculator">
-              <div className="relative bg-mkt-panel text-mkt-panel-ink px-5 py-3.5 flex items-center gap-2.5">
-                <div className="absolute inset-0 mkt-grid-paper-panel opacity-60" aria-hidden />
-                <Building2 className="relative w-4 h-4 text-mkt-orange" aria-hidden />
-                <span className="relative text-[11px] font-semibold uppercase tracking-[0.16em]">{PLANS.agency.name} calculator</span>
-              </div>
-              <div className="p-5 lg:p-6 space-y-5 flex-1">
-                <div className="space-y-2">
-                  <Label htmlFor="agency-locations" className="text-[13px] font-semibold text-mkt-ink">How many client locations?</Label>
-                  <Input
-                    id="agency-locations"
-                    type="number"
-                    inputMode="numeric"
-                    min={1}
-                    step={1}
-                    value={agencyInput}
-                    onChange={(e) => setAgencyInput(e.target.value)}
-                    onBlur={() => setAgencyInput(String(agencyLocations))}
-                    className="h-11 rounded-lg text-[15px] md:text-[15px]"
-                    data-testid="input-agency-locations"
-                  />
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {AGENCY_PRESETS.map((n) => (
-                      <button
-                        key={n}
-                        type="button"
-                        onClick={() => setAgencyInput(String(n))}
-                        className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition-colors ${agencyLocations === n ? "border-mkt-panel bg-mkt-panel text-mkt-panel-ink" : "border-mkt-rule text-mkt-ink-soft hover:border-mkt-ink hover:text-mkt-ink"}`}
-                        data-testid={`button-agency-preset-${n}`}
-                      >
-                        {n}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {quote.sales ? (
-                  <div className="space-y-3 border-t border-mkt-rule pt-5" data-testid="text-agency-sales">
-                    <p className="font-display font-semibold text-[1.4rem] leading-tight text-mkt-ink" data-testid="text-agency-total">
-                      {quote.locations.toLocaleString("en-US")} locations = Talk to a sales rep
-                    </p>
-                    <p className="text-[14px] text-mkt-ink-soft">Above {AGENCY_SELF_SERVE_MAX_LOCATIONS.toLocaleString("en-US")} locations we price the workspace with you.</p>
-                    <TalkToSalesButton topic={`Agency plan — ${quote.locations.toLocaleString("en-US")} locations`} className={`w-full ${NAVY_BUTTON}`} data-testid="button-agency-sales" />
-                  </div>
-                ) : (
-                  <div className="space-y-3 border-t border-mkt-rule pt-5">
-                    <p className="font-display font-semibold text-[1.75rem] leading-tight text-mkt-ink" data-testid="text-agency-total">
-                      {quote.locations.toLocaleString("en-US")} location{quote.locations === 1 ? "" : "s"} = {formatUsd(interval === "year" ? quote.annualCents : quote.monthlyCents)}{intervalSuffix(interval)}
-                    </p>
-                    <ul className="space-y-1.5 text-[14px]" data-testid="list-agency-breakdown">
-                      {quote.lines.map((l) => (
-                        <li key={l.label} className="flex justify-between gap-3 border-b border-dotted border-mkt-rule pb-1.5 last:border-0">
-                          <span className="text-mkt-ink-soft">
-                            {l.label}{l.centsPerLocation > 0 ? ` · ${l.count.toLocaleString("en-US")} × ${formatUsd(l.centsPerLocation)}` : ""}
-                          </span>
-                          <span className="font-semibold text-mkt-ink">{formatUsd(l.subtotalCents)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    <p className="text-[12.5px] text-mkt-muted leading-relaxed">
-                      {interval === "year"
-                        ? `Billed yearly: ${monthsFree} months free versus ${formatUsd(quote.monthlyCents)}/mo.`
-                        : `Or ${formatUsd(quote.annualCents)}/yr billed yearly (${monthsFree} months free).`}
-                      {quote.locations > AGENCY_INCLUDED_LOCATIONS && ` About ${formatUsd(Math.round(quote.monthlyCents / quote.locations))} per location per month.`}
-                    </p>
-                    <Button
-                      className={`w-full ${NAVY_BUTTON}`}
-                      disabled={busy || (isCurrent("agency") && view.locations === quote.locations)}
-                      onClick={() => choosePlan({ plan: "agency", interval, locations: quote.locations })}
-                      data-testid="button-agency-start"
-                    >
-                      {busy && pendingPlan?.plan === "agency" && pendingPlan.locations === quote.locations && <Loader2 className="w-4 h-4 animate-spin mr-1" />}
-                      {isCurrent("agency")
-                        ? (view.locations === quote.locations ? "Your current location count" : `Change to ${quote.locations.toLocaleString("en-US")} locations`)
-                        : view.live ? `Switch to ${PLANS.agency.name} with ${quote.locations.toLocaleString("en-US")} locations`
-                        : startLabel("agency")}
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </section>
-
         <section id="add-ons" className="scroll-mt-16" aria-labelledby="addons-heading">
           <SectionHead
-            n="03"
+            n="02"
             kicker="Add-ons"
             lede={<>
               Need one more of something? Add it to your plan instead of moving up a plan.
@@ -700,7 +560,7 @@ export default function PricingPage() {
               </thead>
               <tbody>
                 {/* The AI Call Assistant's lines (its tiers, the extra number) are its own subscription's, listed in its section above. */}
-                {(Object.keys(ADDONS) as AddonKey[]).filter((k) => !isCallAssistantAddon(k)).map((k) => {
+                {listedAddons.map((k) => {
                   const addon = ADDONS[k];
                   return (
                     <tr key={k} className="border-b border-dotted border-mkt-rule last:border-0" data-testid={`row-addon-${k}`}>
@@ -738,7 +598,7 @@ export default function PricingPage() {
         <section id="services" className="scroll-mt-16" aria-labelledby="dfy-heading">
           <div id="done-for-you" className="scroll-mt-16">
             <SectionHead
-              n="04"
+              n="03"
               kicker="Done for you"
               lede={<>
                 We quote these for your business. Tell a sales rep what you need and we'll scope it with you —
@@ -749,7 +609,7 @@ export default function PricingPage() {
             </SectionHead>
             {/* The inquiry form for anyone sent here by a "Talk to a sales rep" link elsewhere on the site. */}
             <div className="mt-7 flex justify-center">
-              <TalkToSalesButton topic="Done-for-you services" className={`${ORANGE_BUTTON} h-12 px-6 text-base`} data-testid="button-services-sales" />
+              <TalkToSalesButton topic="Done-for-you services" className={`${OUTLINE_BUTTON} h-12 px-6`} variant="outline" data-testid="button-services-sales" />
             </div>
           </div>
           <div className="mt-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -793,15 +653,14 @@ export default function PricingPage() {
       <AlertDialogContent data-testid="dialog-change-plan">
         <AlertDialogHeader>
           <AlertDialogTitle>
-            {confirm && (view.planKey === confirm.plan && !view.isLegacy && confirm.plan !== "agency"
+            {confirm && (view.planKey === confirm.plan && !view.isLegacy
               ? `Switch to ${intervalWord(confirm.interval)} billing?`
               : `Switch to ${PLANS[confirm.plan].name}?`)}
           </AlertDialogTitle>
           <AlertDialogDescription>
             {confirm && (
               <>
-                {confirmFrom} changes to {PLANS[confirm.plan].name}
-                {confirm.plan === "agency" ? ` with ${(confirm.locations ?? AGENCY_INCLUDED_LOCATIONS).toLocaleString("en-US")} locations` : ""} at{" "}
+                {confirmFrom} changes to {PLANS[confirm.plan].name} at{" "}
                 {planRequestPrice(confirm)}, billed {intervalWord(confirm.interval)}. No second subscription is created; you can review charges in Manage billing.
               </>
             )}
@@ -863,8 +722,8 @@ function ServiceCard({ service, index }: { service: (typeof DFY_SERVICES)[number
           <>
             <p className="font-display font-semibold text-[2rem] leading-none text-mkt-ink" data-testid={`text-service-price-${service.id}`}>{formatUsd(service.priceCents!)}</p>
             <Button
-              className={`w-full ${isInCart(cartId) ? ORANGE_BUTTON : OUTLINE_BUTTON}`}
-              variant={isInCart(cartId) ? "default" : "outline"}
+              className={`w-full ${OUTLINE_BUTTON}`}
+              variant="outline"
               disabled={isInCart(cartId)}
               onClick={() => {
                 if (addItem({ id: cartId, type: "dfy_service", name: service.title, price: service.priceCents!, description: service.blurb })) {
