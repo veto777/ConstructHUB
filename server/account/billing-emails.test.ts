@@ -547,6 +547,7 @@ describe("onStripeBillingEvent (the webhook's one call)", () => {
     const sub = subscription([item("si_plan", PRO_M)]);
     const all: BillingEmailEvent[] = [
       { type: "billing.subscription_started", userId: USER, subscription: sub },
+      { type: "billing.trial_ending", userId: USER, subscription: { ...sub, status: "trialing", trial_end: PERIOD_END } },
       { type: "billing.subscription_changed", userId: USER, subscription: sub, previousItems: [item("si_plan", GROWTH_M)] },
       { type: "billing.cancellation_scheduled", userId: USER, subscription: { ...sub, cancel_at_period_end: true } },
       { type: "billing.cancellation_reverted", userId: USER, subscription: sub },
@@ -596,5 +597,46 @@ describe("no secrets, always a text part, escaped layout", () => {
     expect(text).toContain("PDF: https://pay.stripe.com/x.pdf");
     expect(text).not.toContain("Nope:");
     expect(text.trim().endsWith("f")).toBe(true);
+  });
+});
+
+describe("trial ending (customer.subscription.trial_will_end)", () => {
+  const CRM_BASIC_M = price("price_crm_basic_m", { kind: "crm_plan", key: "crm_basic" } as any, "month", 3900);
+  const CRM_SEAT_M = price("price_crm_seat_m", { kind: "crm_seat" } as any, "month", 1700);
+
+  it("maps the Stripe event to billing.trial_ending and tells a platform customer the date and the first charge, once", async () => {
+    const sub = subscription([item("si_plan", PRO_M)], { status: "trialing", trial_end: PERIOD_END });
+    const events = await billingEmailEventsFromStripe(stripeEvent("customer.subscription.trial_will_end", sub), { userId: USER });
+    expect(events.map((e) => e.type)).toEqual(["billing.trial_ending"]);
+    const result = await handleBillingEmailEvent(events[0], { baseUrl: BASE });
+    expect(result).toMatchObject({ kind: EMAIL_KINDS.trialEnding, dedupeKey: `trial_ending:sub_1:${PERIOD_END}`, sent: true });
+    const mail = last();
+    expect(mail.subject).toBe("Your ConstructHUB Pro trial ends January 1, 2030");
+    expect(mail.text).toContain("Trial ends: January 1, 2030");
+    expect(mail.text).toContain(`First charge: $${(PLANS.pro.monthlyCents / 100).toFixed(2)} on January 1, 2030`);
+    expect(mail.html).toContain("cancel before the trial ends and you pay nothing");
+    expect((await handleBillingEmailEvent(events[0], { baseUrl: BASE })).sent).toBe(false); // redelivery
+    expect(sent()).toHaveLength(1);
+  });
+
+  it("names the CRM product and its own price for a CRM subscription (the event used to be dropped for the CRM)", async () => {
+    const sub = subscription([item("si_crm", CRM_BASIC_M), item("si_seat", CRM_SEAT_M, 2)], { id: "sub_crm", status: "trialing", trial_end: PERIOD_END, metadata: { userId: String(USER), product: "crm" } });
+    const facts = subscriptionFacts(sub);
+    expect(facts.planName).toBe("CRM Basic");
+    expect(facts.recurringCents).toBe(3900 + 2 * 1700);
+    expect(facts.extras).toEqual(["Extra seat × 2"]);
+    const [event] = await billingEmailEventsFromStripe(stripeEvent("customer.subscription.trial_will_end", sub), { userId: USER });
+    await handleBillingEmailEvent(event, { baseUrl: BASE });
+    expect(last().subject).toBe("Your ConstructHUB CRM Basic trial ends January 1, 2030");
+    expect(last().text).toContain("First charge: $73.00 on January 1, 2030");
+    expect(last().text).not.toMatch(/\bPro\b/);
+  });
+
+  it("a redelivery after the trial converted or the subscription ended sends nothing", async () => {
+    const sub = subscription([item("si_plan", PRO_M)], { status: "active", trial_end: PERIOD_END });
+    const result = await handleBillingEmailEvent({ type: "billing.trial_ending", userId: USER, subscription: sub }, { baseUrl: BASE });
+    expect(result.sent).toBe(false);
+    expect(result.skipped).toContain("not trialing");
+    expect(sent()).toHaveLength(0);
   });
 });

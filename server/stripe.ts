@@ -1,6 +1,6 @@
 import type Stripe from "stripe";
 import type { Express, Request, Response } from "express";
-import { db } from "./db";
+import { db, pool } from "./db";
 import { subscriptions, masterClassModules } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { getBaseUrl } from "./auth";
@@ -32,7 +32,7 @@ import {
 } from "./billing/webhook-events";
 import { fulfilOneTimePurchase } from "./billing/fulfilment";
 import { stripeConfigured } from "./billing/client";
-import { onStripeBillingEvent } from "./account/billing-emails";
+import { onStripeBillingEvent, userIdForStripeObject } from "./account/billing-emails";
 import { forgetDashboard } from "./dashboard/cache";
 import { introsForOrder, attachIntrosToItems, recordIntro, markIntrosUsedByHeldAddons, type StripeForIntro } from "./billing/intro";
 import { noteSubscriptionTerms } from "./billing/pricing-terms";
@@ -869,7 +869,16 @@ export function registerStripeRoutes(app: Express) {
         }
         case "customer.subscription.trial_will_end": {
           const sub = event.data.object as Stripe.Subscription;
-          if (isCrmSubscription(sub) || isCallAssistantSubscription(sub)) { sendBillingEmail = false; break; }
+          if (isCallAssistantSubscription(sub)) { sendBillingEmail = false; break; }
+          if (isCrmSubscription(sub)) {
+            // The CRM is a separate product with its own trial (CRM_TRIAL_DAYS): the platform bus event is not
+            // emitted for it, but the customer still gets the trial-ending notice below (billing-emails.ts names
+            // the product from the price), so the first charge never comes unannounced. Before 2026-10-09 this
+            // event was dropped for CRM subscriptions.
+            eventUserId = (await userIdForStripeObject(sub))
+              ?? (await pool.query("SELECT user_id FROM crm_subscriptions WHERE stripe_subscription_id = $1 LIMIT 1", [sub.id])).rows[0]?.user_id ?? null;
+            break;
+          }
           const [tracked] = await db.select().from(subscriptions).where(eq(subscriptions.stripeCustomerId, sub.customer as string)).limit(1);
           eventUserId = await onTrialWillEnd(event, tracked?.plan ?? null);
           break;

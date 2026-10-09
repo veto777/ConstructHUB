@@ -44,9 +44,9 @@ import { describeSubscription, roleOfPrice, agencyLocationTiers, tieredAmountCen
 import { subscriptionPeriodEnd, cancellationOf } from "../billing/sync";
 import { COURSE_BUNDLE } from "../catalog";
 import { recordFailure, recordIssue } from "../ops/issues";
-import { CRM_PLANS, CRM_ADDONS } from "@shared/crm-plans";
+import { CRM_PLANS, CRM_ADDONS, crmPlanPriceCents, CRM_EXTRA_SEAT_MONTHLY_CENTS, CRM_EXTRA_SEAT_ANNUAL_CENTS } from "@shared/crm-plans";
 import {
-  welcomeEmail, subscriptionStartedEmail, receiptEmail, paymentFailedEmail, planChangedEmail,
+  welcomeEmail, subscriptionStartedEmail, trialEndingEmail, receiptEmail, paymentFailedEmail, planChangedEmail,
   cancellationScheduledEmail, cancellationRevertedEmail, subscriptionEndedEmail, purchaseReceiptEmail,
   dateWords, intervalWord, money, safeUrl,
   type EmailMessage, type SubscriptionFacts, type InvoiceFacts, type ReceiptLine, type PurchaseFacts, type PurchaseKind, type PlanChangeFacts,
@@ -58,6 +58,7 @@ export type { EmailMessage, SubscriptionFacts, InvoiceFacts, PurchaseFacts, Purc
 
 export const BILLING_EMAIL_EVENTS = [
   "billing.subscription_started",
+  "billing.trial_ending",
   "billing.subscription_changed",
   "billing.cancellation_scheduled",
   "billing.cancellation_reverted",
@@ -78,6 +79,7 @@ type Base = {
 };
 export type BillingEmailEvent =
   | (Base & { type: "billing.subscription_started"; subscription: Stripe.Subscription })
+  | (Base & { type: "billing.trial_ending"; subscription: Stripe.Subscription })
   | (Base & {
       type: "billing.subscription_changed";
       subscription: Stripe.Subscription;
@@ -106,6 +108,7 @@ export type BillingEmailEvent =
 export const EMAIL_KINDS = {
   welcome: "welcome",
   subscriptionStarted: "billing.subscription_started",
+  trialEnding: "billing.trial_ending",
   subscriptionChanged: "billing.subscription_changed",
   cancellationScheduled: "billing.cancellation_scheduled",
   cancellationReverted: "billing.cancellation_reverted",
@@ -383,6 +386,12 @@ function labelForRole(price: Stripe.Price | null, fallback: string | null): stri
 }
 
 /** Plan name, price per interval, extras, trial and next-charge dates for a subscription. */
+/** The CRM plan item's role, when the subscription is the CRM product. */
+function crmRole(items: Stripe.SubscriptionItem[]): { kind: "crm_plan"; key: keyof typeof CRM_PLANS; interval: BillingInterval } | null {
+  for (const item of items) { const r = roleOfPrice(item.price); if (r?.kind === "crm_plan") return r as any; }
+  return null;
+}
+
 export function subscriptionFacts(sub: Stripe.Subscription): SubscriptionFacts {
   const items = sub.items?.data ?? [];
   const shape = describeSubscription(items);
@@ -406,6 +415,17 @@ export function subscriptionFacts(sub: Stripe.Subscription): SubscriptionFacts {
       const included = PLANS.agency.limits.locations;
       recurringCents += tieredAmountCents(agencyLocationTiers(interval), shape.agencyExtraLocations);
       extras.push(`${included + shape.agencyExtraLocations} locations (${included} included${shape.agencyExtraLocations ? ` + ${shape.agencyExtraLocations} extra` : ""})`);
+    }
+  } else if (crmRole(items) && interval) {
+    // The CRM product: its plan, extra seats and add-ons by our own prices (the platform's shape knows none of them).
+    const role = crmRole(items)!;
+    planName = CRM_PLANS[role.key].name;
+    recurringCents = crmPlanPriceCents(role.key, interval);
+    for (const item of items) {
+      const r = roleOfPrice(item.price);
+      const qty = item.quantity ?? 1;
+      if (r?.kind === "crm_seat" && qty > 0) { recurringCents += (interval === "year" ? CRM_EXTRA_SEAT_ANNUAL_CENTS : CRM_EXTRA_SEAT_MONTHLY_CENTS) * qty; extras.push(`Extra seat × ${qty}`); }
+      else if (r?.kind === "crm_addon") { const a = CRM_ADDONS[r.key]; recurringCents += (interval === "year" ? a.annualCents : a.monthlyCents) * qty; extras.push(`${a.name} add-on`); }
     }
   } else {
     // A legacy or sales-made subscription: name it from the price, total the unit amounts when Stripe gives them.
@@ -551,6 +571,13 @@ export function billingEmailFor(event: BillingEmailEvent, baseUrl = accountBaseU
     case "billing.subscription_started": {
       const sub = event.subscription;
       return { kind: EMAIL_KINDS.subscriptionStarted, dedupeKey: `subscription_started:${sub.id}`, message: subscriptionStartedEmail(subscriptionFacts(sub), baseUrl) };
+    }
+    case "billing.trial_ending": {
+      const sub = event.subscription;
+      const kind = EMAIL_KINDS.trialEnding, dedupeKey = `trial_ending:${sub.id}:${sub.trial_end ?? "none"}`;
+      // Stripe sends this only for trialing subscriptions; a stale redelivery after conversion or cancellation says nothing.
+      if (sub.status !== "trialing" || !sub.trial_end) return { kind, dedupeKey, message: null, skipped: `subscription ${sub.id} is ${sub.status}, not trialing` };
+      return { kind, dedupeKey, message: trialEndingEmail(subscriptionFacts(sub), baseUrl) };
     }
     case "billing.subscription_changed": {
       const sub = event.subscription;
@@ -772,6 +799,9 @@ export async function billingEmailEventsFromStripe(event: Stripe.Event, ctx: { u
       }
       break;
     }
+    case "customer.subscription.trial_will_end":
+      out.push({ type: "billing.trial_ending", userId, eventId, subscription: object });
+      break;
     case "customer.subscription.deleted":
       out.push({ type: "billing.subscription_ended", userId, eventId, subscription: object });
       break;

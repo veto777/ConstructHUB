@@ -82,6 +82,7 @@ import { LABS_TASK_USD, LABS_ITEM_USD } from "./pricing";
 import { alertPage, unreadAlerts, undeliveredAlerts, markAlertsRead, ALERT_KINDS } from "./alerts";
 import { seoErrorResponse, publicFailure, publicNote, SEO_VENDOR_NAME, SeoCustomerError } from "./public-errors";
 import { seoLocks, requestQueues } from "./locks";
+import { trackWork } from "../shutdown";
 import { siteCapRefuses } from "./site-cap";
 import { recordUnhandledError } from "../ops/server-errors";
 import { recordFailure } from "../ops/issues";
@@ -393,10 +394,24 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const site = await ownedSite(user, req.params.id);
     const [{ rows: keywords }, { rows: checks }, { rows: runs }, gsc] = await Promise.all([
       pool.query("SELECT id, keyword, tags, search_volume, cpc::float8 AS cpc, difficulty, location_name FROM seo_keywords WHERE site_id=$1 ORDER BY keyword, location_name NULLS FIRST", [site.id]),
+      // The newest two checks per keyword and device, each pair read through seo_rank_checks_kw_device_on — not a
+      // window sort over the site's whole history with its SERP JSON (review H3). Only the previous check's position
+      // and date are used, so the heavy columns are read for the newest row alone.
       pool.query(
-        `SELECT keyword_id, device, position, url, checked_on::text AS checked_on, serp_features, local_position, local_pack, serp_top FROM (
-           SELECT c.*, row_number() OVER (PARTITION BY keyword_id, device ORDER BY checked_on DESC) rn
-           FROM seo_rank_checks c WHERE c.site_id=$1) x WHERE rn<=2 ORDER BY keyword_id, device, checked_on DESC`, [site.id]),
+        `SELECT k.id AS keyword_id, d.device, c.position, c.url, c.checked_on::text AS checked_on, c.serp_features, c.local_position, c.local_pack, c.serp_top
+           FROM seo_keywords k
+           CROSS JOIN (VALUES ('desktop'), ('mobile')) AS d(device)
+           CROSS JOIN LATERAL (SELECT position, url, checked_on, serp_features, local_position, local_pack, serp_top, 1 AS rn
+                                 FROM seo_rank_checks WHERE keyword_id=k.id AND device=d.device ORDER BY checked_on DESC, id DESC LIMIT 1) c
+          WHERE k.site_id=$1
+         UNION ALL
+         SELECT k.id, d.device, p.position, p.url, p.checked_on::text, '[]'::jsonb, p.local_position, NULL::jsonb, NULL::jsonb
+           FROM seo_keywords k
+           CROSS JOIN (VALUES ('desktop'), ('mobile')) AS d(device)
+           CROSS JOIN LATERAL (SELECT position, url, checked_on, local_position
+                                 FROM seo_rank_checks WHERE keyword_id=k.id AND device=d.device ORDER BY checked_on DESC, id DESC OFFSET 1 LIMIT 1) p
+          WHERE k.site_id=$1
+         ORDER BY keyword_id, device, checked_on DESC`, [site.id]),
       pool.query("SELECT id, trigger, status, total, checked, error, partial, created_at, started_at, finished_at FROM seo_rank_runs WHERE site_id=$1 ORDER BY created_at DESC LIMIT 5", [site.id]),
       searchConsoleSummary(user, site.domain),
     ]);
@@ -694,14 +709,14 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const started = await beginScan(user, site.id, { keyword, size: input.size, spacing: input.spacing });
     if (started.existing) return res.status(200).json({ id: started.id, running: true, reused: true });
     const scanId = started.id;
-    void runGridScan(user, site, pin, { keyword, size: input.size, spacing: input.spacing }, scanId, { label: `Local grid — "${keyword.slice(0, 80)}", ${input.size} × ${input.size} points`, deadline: claimDeadline(begun, GRID_STALE_MINUTES * 60_000) })
+    void trackWork(`local grid scan ${scanId}`, runGridScan(user, site, pin, { keyword, size: input.size, spacing: input.spacing }, scanId, { label: `Local grid — "${keyword.slice(0, 80)}", ${input.size} × ${input.size} points`, deadline: claimDeadline(begun, GRID_STALE_MINUTES * 60_000) })
       .catch(async (e: any) => {
         if (!(e instanceof SeoBudgetError)) { console.warn(`[seo] local grid scan ${scanId} failed: ${e?.message ?? e}`); void recordFailure("job", "SEO local grid scan", e); }
         // The note is the customer's (server/seo/public-errors.ts): never the error's own text. publicFailure looks through
         // fetchGrid's wrapper (`cause`) to the source's error, so a busy source still reads as one.
         const message = e?.notSaved ? "The scan ran but its results could not be saved. You were not charged." : publicFailure(e, "The scan could not be completed. Try again in a few minutes.");
         await failScan(scanId, message).catch(() => {});
-      });
+      }));
     res.status(202).json({ id: scanId, running: true });
   }));
   // Repeat a scan every week or month (run by the scheduler from the month's included data only).
@@ -1481,12 +1496,12 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const started = await beginRender(user, site.id, urls);
     if (started.existing) return res.status(200).json({ id: started.id, running: true, reused: true });
     const runId = started.id;
-    void runRender(user, runId, urls, `Rendering check — ${site.domain}, ${urls.length} page${urls.length === 1 ? "" : "s"}`, site.domain)
+    void trackWork(`rendering check ${runId}`, runRender(user, runId, urls, `Rendering check — ${site.domain}, ${urls.length} page${urls.length === 1 ? "" : "s"}`, site.domain)
       .catch(async (e: any) => {
         if (!(e instanceof SeoBudgetError)) { console.warn(`[seo] rendering check ${runId} failed: ${e?.message ?? e}`); void recordFailure("job", "SEO rendering check", e); }
         const message = e?.notSaved ? "The check ran but its results could not be saved. You were not charged." : publicFailure(e, "The check could not be completed. Try again in a few minutes.");
         await failRender(runId, message).catch(() => {});
-      });
+      }));
     res.status(202).json({ id: runId, running: true });
   }));
   route("get", "/api/seo/sites/:id/render/:runId", async (req, res, user) => {

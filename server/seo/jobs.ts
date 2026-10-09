@@ -29,10 +29,12 @@ import { runDueMentionChecks } from "./mention-watch";
 import { isConfigured, serpTaskPost, serpTaskGet, backlinksSummary, backlinksList, MAX_TASKS_PER_POST, claimDeadline, type Deadline, type PostedRankTask, type Device, lostLinks, type LostLink } from "./dataforseo";
 import { estimateRankCheckUsd, estimateBacklinkSnapshotUsd, devicesOf, serpUsd, type DeviceSet, estimateLostLinksUsd, LOST_LINK_ROWS } from "./pricing";
 import { seoIncluded, SEO_NOT_READY_MESSAGE, SEO_PLAN_SKIPPED_MESSAGE } from "./plan";
-import { seoLocks } from "./locks";
+import { seoLocks, seoLockPool } from "./locks";
+import { pruneSeoHistory } from "./retention";
 import { raiseLinkAlerts, rankAlertPlan, saveRankAlerts, deliverAlert, type RunCoverage } from "./alerts";
 
 import { publicFailure } from "./public-errors";
+import { backlogWarning, closeDecision } from "./collect-plan";
 
 /** Runs `fn` in one transaction on its own connection. */
 async function withTransaction<T>(fn: (db: { query: typeof pool.query }) => Promise<T>): Promise<T> {
@@ -43,9 +45,13 @@ async function withTransaction<T>(fn: (db: { query: typeof pool.query }) => Prom
 }
 const TICK_MS = 60_000;
 const LOCK_KEY = 7192;
-/** Standard-queue tasks finish in ~5 minutes on average; after this a run closes with what it has. */
-const RUN_WINDOW_MS = 90 * 60_000;
-const TASK_GETS_PER_TICK = 300;
+/**
+ * How long one pass of the collector may spend asking for results (SEO_COLLECT_BUDGET_MS, default 40 s of the 60 s
+ * tick). The pass is sized to the backlog, not to a fixed count: it leases runs oldest first and goes on until every
+ * pending result was asked for or the time is up — so paid results are never left to expire unread while the
+ * process is healthy (server/seo/collect-plan.ts; review H2). The run window itself is RUN_WINDOW_MS there.
+ */
+const COLLECT_BUDGET_MS = (() => { const n = Number(process.env.SEO_COLLECT_BUDGET_MS); return Number.isFinite(n) && n >= 1_000 ? Math.floor(n) : 40_000; })();
 const TASK_GET_CONCURRENCY = 10;
 /** How long the poster holds a run between chunks; a run whose lease lapsed is taken over by the collector. */
 const POST_LEASE_MINUTES = 5;
@@ -218,12 +224,30 @@ export async function collectRunningRuns(): Promise<void> {
       void recordFailure("job", "SEO stuck rank run close", e, { runId: s.id });
     }
   }
-  const { rows: runs } = await pool.query(
-    `UPDATE seo_rank_runs SET lease_until=now()+interval '5 minutes'
-     WHERE id IN (SELECT id FROM seo_rank_runs WHERE status='running' AND (lease_until IS NULL OR lease_until<now()) ORDER BY started_at FOR UPDATE SKIP LOCKED LIMIT 20)
-     RETURNING *`);
-  let budget = TASK_GETS_PER_TICK;
+  // Oldest runs first, 20 at a lease, lease again while time remains: the pass drains the backlog instead of
+  // asking for a fixed 300 results. A run already handled this pass is not handled again (its lease was given back).
+  const passDeadline = Date.now() + COLLECT_BUDGET_MS;
+  const LEASE_BATCH = 20;
+  const handled = new Set<string>();
+  let unasked = 0;
+  let oldestUnasked: string | null = null;
+  for (;;) {
+    const { rows: leased } = await pool.query(
+      `UPDATE seo_rank_runs SET lease_until=now()+interval '5 minutes'
+       WHERE id IN (SELECT id FROM seo_rank_runs WHERE status='running' AND (lease_until IS NULL OR lease_until<now()) ORDER BY started_at FOR UPDATE SKIP LOCKED LIMIT ${LEASE_BATCH})
+       RETURNING *`);
+    const runs = leased.filter((r: any) => !handled.has(r.id));
+    if (!runs.length) break;
   for (const run of runs) {
+    handled.add(run.id);
+    // Out of time before this run's turn: every one of its results stays unasked (the lease goes back, next tick).
+    if (Date.now() >= passDeadline) {
+      const waiting = Array.isArray(run.tasks) ? run.tasks.length : 0;
+      unasked += waiting;
+      if (waiting && run.started_at && (!oldestUnasked || new Date(run.started_at) < new Date(oldestUnasked))) oldestUnasked = run.started_at;
+      await pool.query("UPDATE seo_rank_runs SET lease_until=NULL WHERE id=$1", [run.id]).catch(() => {});
+      continue;
+    }
     try {
       const { rows: [site] } = await pool.query("SELECT domain, business_name FROM seo_sites WHERE id=$1", [run.site_id]);
       const competitors = await trackedCompetitors(run.site_id).catch(() => [] as string[]);
@@ -233,11 +257,11 @@ export async function collectRunningRuns(): Promise<void> {
       let written = 0;
       // Results for keywords removed while their check was in the queue: nothing to save, and no longer asked for.
       let discarded = 0;
-      const batch = tasks.slice(0, budget);
-      const rest = tasks.slice(budget);
-      budget -= batch.length;
-      for (let i = 0; i < batch.length; i += TASK_GET_CONCURRENCY) {
-        const chunk = batch.slice(i, i + TASK_GET_CONCURRENCY);
+      // Every task is asked for, in order, while the pass has time; the ones not reached are `rest` (unasked).
+      let rest: PostedRankTask[] = [];
+      for (let i = 0; i < tasks.length; i += TASK_GET_CONCURRENCY) {
+        if (Date.now() >= passDeadline) { rest = tasks.slice(i); break; }
+        const chunk = tasks.slice(i, i + TASK_GET_CONCURRENCY);
         const settled = await Promise.allSettled(chunk.map((t) => seoJobDeps.serpTaskGet({ taskId: t.taskId, keywordId: t.keywordId, keyword: t.keyword, targetDomain: site?.domain ?? "", businessName: site?.business_name ?? null, competitors })));
         for (let j = 0; j < chunk.length; j++) {
           const t = chunk[j], r = settled[j];
@@ -261,10 +285,18 @@ export async function collectRunningRuns(): Promise<void> {
         }
       }
       const remaining = [...pending, ...rest];
-      const expired = run.started_at && Date.now() - new Date(run.started_at).getTime() > RUN_WINDOW_MS;
+      // Past the window the run is closed only when every remaining result was asked for this pass: a paid result
+      // that is merely unread (the pass ran out of time) is never thrown away (collect-plan.ts).
+      const decision = closeDecision({ remaining: remaining.length, unasked: rest.length, startedAt: run.started_at, now: Date.now() });
+      if (rest.length) {
+        unasked += rest.length;
+        if (run.started_at && (!oldestUnasked || new Date(run.started_at) < new Date(oldestUnasked))) oldestUnasked = run.started_at;
+        if (decision.heldOpen) console.warn(`[seo] run ${run.id} is past its window with ${rest.length} result(s) not yet asked for — kept open, not closed unread`);
+      }
+      const expired = decision.close && decision.expired;
       const errorNote = [run.error, failures.length ? `${failures.length} check(s) failed: ${failures[0]}` : null,
         expired && remaining.length ? `${remaining.length} check(s) never came back from the queue` : null].filter(Boolean).join(" · ") || null;
-      if (!remaining.length || expired) {
+      if (decision.close) {
         // Paid checks that never came back are refunded (once per run).
         // ...and so are checks the source said it could not do.
         const undelivered = (expired ? remaining.length : 0) + Number(run.failed ?? 0) + failures.length;
@@ -294,6 +326,11 @@ export async function collectRunningRuns(): Promise<void> {
       void recordFailure("job", "SEO rank run collect", e);
     }
   }
+    if (Date.now() >= passDeadline || leased.length < LEASE_BATCH) break;
+  }
+  // Unread results near their window: the issue desk hears about it before anything could be lost.
+  const warning = backlogWarning({ unasked, oldestStartedAt: oldestUnasked, now: Date.now(), budgetMs: COLLECT_BUDGET_MS });
+  if (warning) { console.warn(`[seo] ${warning}`); void recordFailure("job", "SEO rank collector backlog", new Error(warning), { unasked, oldestStartedAt: oldestUnasked }, "warning"); }
 }
 
 /**
@@ -554,7 +591,8 @@ async function settleLinkAlerts(siteId: number): Promise<void> {
 
 /** One scheduler pass; only one instance at a time across processes. */
 export async function seoTick(): Promise<void> {
-  const client = await pool.connect();
+  // The tick's lock is held for the whole pass (minutes): on the locks' own pool, so it never pins an app connection.
+  const client = await seoLockPool.connect();
   try {
     const { rows: [{ locked }] } = await client.query("SELECT pg_try_advisory_lock($1) AS locked", [LOCK_KEY]);
     if (!locked) return;
@@ -571,6 +609,8 @@ export async function seoTick(): Promise<void> {
       await runDueBacklinkSnapshots();
       await runDueKeywordSnapshots().catch((e) => console.error("[seo] keyword snapshots failed", e?.message ?? e));
       await runDueMentionChecks().catch((e) => console.error("[seo] mentions watch failed", e?.message ?? e));
+      // Nightly, in the quiet hour, capped per table (server/seo/retention.ts): summaries forever, raw detail for a bounded time.
+      await pruneSeoHistory().catch((e) => { console.error("[seo] retention failed", e?.message ?? e); void recordFailure("job", "SEO history retention", e); });
       // A scan takes a minute or two, so it is started here and left to finish on its own (it leases its watch, the
       // database allows one running scan per site, and it never runs two passes at once).
       void runDueGridWatches().catch((e) => console.error("[seo] repeating grids failed", e?.message ?? e));

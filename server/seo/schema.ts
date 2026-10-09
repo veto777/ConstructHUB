@@ -133,6 +133,7 @@ export const SEO_SCHEMA_DDL = [
   ...VOICE_SCHEMA_DDL,
   // Scheduled SEO reports (server/seo/site-report.ts).
   ...REPORT_SCHEDULE_DDL,
+  // Who may get them: confirmed recipients and the addresses that refused (server/seo/report-recipients.ts).
   ...REPORT_RECIPIENT_DDL,
   // Keyword lists (server/seo/lists.ts).
   ...LIST_SCHEMA_DDL,
@@ -288,8 +289,104 @@ export const SEO_SCHEMA_DDL = [
    )`,
   // Last of all: the mentions watch's alert kind (the full list again, so it holds whatever ran before it).
   ...MENTION_WATCH_ALERT_DDL,
+  // The newest N checks per keyword and device (overview, dashboard, tags) walk this instead of sorting a site's
+  // whole history (review H3). Built CONCURRENTLY at boot like every index here.
+  `CREATE INDEX IF NOT EXISTS seo_rank_checks_kw_device_on ON seo_rank_checks(keyword_id, device, checked_on DESC, id DESC)`,
 ];
 
-export async function ensureSeoSchema() {
-  for (const sql of SEO_SCHEMA_DDL) await pool.query(sql);
+/**
+ * Boot-time schema step (reliability review H1, 2026-10-09).
+ *
+ * Before: every boot ran all ~170 statements above through the pool, un-caught, with no lock_timeout — one failure
+ * (a statement that fails on existing rows, a full disk, a dropped connection) exited the process into systemd's
+ * restart loop and took the CRM down with it, and one long reader on a seo_* table hung the boot on an ACCESS
+ * EXCLUSIVE lock with the port closed.
+ *
+ * Now:
+ *   - The list's hash is remembered in `seed_state` (key SEO_SCHEMA_KEY, the pattern of seed-permit-portals.ts).
+ *     A boot whose code carries the same list runs ZERO DDL — one SELECT. Any change to the list runs it all again
+ *     (every statement is idempotent) and stores the new hash only after the last statement succeeded.
+ *   - The statements run on one connection with `lock_timeout` (SEO_DDL_LOCK_TIMEOUT_MS, 5 s) and `statement_timeout`
+ *     (SEO_DDL_STATEMENT_TIMEOUT_MS, 60 s): a held table lock makes this step fail fast instead of hanging the boot.
+ *   - `CREATE [UNIQUE] INDEX IF NOT EXISTS` is run CONCURRENTLY: on a table that has grown, a plain build blocks
+ *     writers for its duration. An index left INVALID by an interrupted concurrent build is dropped and rebuilt.
+ *   - It throws instead of exiting; server/seo/boot.ts catches, records an ops issue and boots WITHOUT the SEO
+ *     module (503 on /api/seo, no worker) rather than taking the process down.
+ */
+import { createHash } from "node:crypto";
+
+export const SEO_SCHEMA_KEY = "seo-schema";
+/** One hash for the whole list: any edit to any statement changes it. */
+export function seoSchemaHash(ddl: readonly string[] = SEO_SCHEMA_DDL): string {
+  const h = createHash("sha256");
+  for (const s of ddl) h.update(s).update("\n;\n");
+  return h.digest("hex");
+}
+
+export type DdlClient = { query: (sql: string, params?: unknown[]) => Promise<{ rows: any[] }> };
+export type SeoSchemaOutcome = { skipped: boolean; ran: number; ms: number; hash: string };
+
+const INDEX_RE = /^\s*CREATE\s+(UNIQUE\s+)?INDEX\s+IF\s+NOT\s+EXISTS\s+("?[A-Za-z_][A-Za-z0-9_]*"?)\s+ON\s+/i;
+/** `CREATE [UNIQUE] INDEX IF NOT EXISTS name ON …` as a concurrent build, with the index's name; null for any other statement. */
+export function concurrentIndexStatement(sql: string): { sql: string; name: string } | null {
+  const m = INDEX_RE.exec(sql);
+  if (!m) return null;
+  return { name: m[2].replace(/"/g, ""), sql: sql.replace(/^(\s*CREATE\s+(?:UNIQUE\s+)?INDEX)\s+IF\s+NOT\s+EXISTS/i, "$1 CONCURRENTLY IF NOT EXISTS") };
+}
+
+/** Run one statement of the list on `client`: indexes concurrently (dropping an invalid leftover first), the rest as written. */
+export async function runSeoDdlStatement(client: DdlClient, sql: string): Promise<void> {
+  const idx = concurrentIndexStatement(sql);
+  if (!idx) { await client.query(sql); return; }
+  // An INVALID index of this name (an interrupted concurrent build) would make IF NOT EXISTS skip the rebuild.
+  const { rows } = await client.query("SELECT 1 FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid WHERE c.relname=$1 AND NOT i.indisvalid", [idx.name]);
+  if (rows.length) await client.query(`DROP INDEX CONCURRENTLY IF EXISTS ${idx.name}`);
+  try { await client.query(idx.sql); }
+  catch (e) {
+    // A failed concurrent build leaves an invalid index behind; remove it so the next boot can try again.
+    await client.query(`DROP INDEX CONCURRENTLY IF EXISTS ${idx.name}`).catch(() => {});
+    throw e;
+  }
+}
+
+const envMs = (name: string, fallback: number) => { const n = Number(process.env[name]); return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback; };
+
+/** Has this exact list been applied already (seed_state row)? False when the table is missing (a fresh database). */
+async function seoSchemaApplied(hash: string, q: DdlClient = pool): Promise<boolean> {
+  const { rows: [t] } = await q.query("SELECT to_regclass('public.seed_state') AS t");
+  if (!t?.t) return false;
+  const { rows: [row] } = await q.query("SELECT hash FROM seed_state WHERE key=$1", [SEO_SCHEMA_KEY]);
+  return row?.hash === hash;
+}
+
+/**
+ * Bring the SEO tables up to the list above. Skips everything when the stored hash matches (`force` runs it anyway,
+ * e.g. FORCE_SEO_SCHEMA=1). Throws on failure — nothing is remembered then, so the next boot tries again.
+ */
+export async function ensureSeoSchema(opts: { force?: boolean; connect?: () => Promise<DdlClient & { release: (err?: Error) => void }> } = {}): Promise<SeoSchemaOutcome> {
+  const started = Date.now();
+  const hash = seoSchemaHash();
+  const force = opts.force ?? process.env.FORCE_SEO_SCHEMA === "1";
+  if (!force && await seoSchemaApplied(hash)) return { skipped: true, ran: 0, ms: Date.now() - started, hash };
+  const client = await (opts.connect ?? (() => pool.connect()))();
+  let ran = 0;
+  try {
+    await client.query(`SET lock_timeout = ${envMs("SEO_DDL_LOCK_TIMEOUT_MS", 5_000)}`);
+    await client.query(`SET statement_timeout = ${envMs("SEO_DDL_STATEMENT_TIMEOUT_MS", 60_000)}`);
+    for (const sql of SEO_SCHEMA_DDL) {
+      try { await runSeoDdlStatement(client, sql); ran++; }
+      catch (e: any) {
+        throw Object.assign(new Error(`SEO schema statement ${ran + 1}/${SEO_SCHEMA_DDL.length} failed: ${e?.message ?? e} — ${sql.replace(/\s+/g, " ").slice(0, 160)}`), { cause: e, statement: ran + 1 });
+      }
+    }
+    await client.query(`CREATE TABLE IF NOT EXISTS seed_state (
+      key text PRIMARY KEY, hash text NOT NULL, row_count integer NOT NULL, applied_at timestamptz NOT NULL DEFAULT now())`);
+    await client.query(`INSERT INTO seed_state(key, hash, row_count) VALUES($1, $2, $3)
+      ON CONFLICT (key) DO UPDATE SET hash=EXCLUDED.hash, row_count=EXCLUDED.row_count, applied_at=now()`, [SEO_SCHEMA_KEY, hash, SEO_SCHEMA_DDL.length]);
+  } finally {
+    // Session settings go back to the pool's defaults; a connection that cannot even do that is handed back as broken.
+    try { await client.query("RESET lock_timeout"); await client.query("RESET statement_timeout"); client.release(); }
+    catch (e) { client.release(e instanceof Error ? e : new Error(String(e))); }
+  }
+  return { skipped: false, ran, ms: Date.now() - started, hash };
 }

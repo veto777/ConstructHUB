@@ -31,7 +31,8 @@ import { useDocumentTitle } from "@/components/feature-landing/primitives";
 import { VerificationCancelled } from "@/components/recent-auth";
 import { cn } from "@/lib/utils";
 
-type ListPayload = { issues: OpsIssueRow[]; total: number; counts: Record<string, number> };
+type DiskReading = { ok: true; path: string; freeGb: number; totalGb: number; warn: boolean; critical: boolean; thresholdGb: number; checkedAt: string } | { ok: false; path: string; error: string; warn: false; critical: false };
+type ListPayload = { issues: OpsIssueRow[]; total: number; counts: Record<string, number>; host?: { disk: DiskReading | null } };
 
 const STATUS_TONE: Record<IssueStatus, PillTone> = {
   triage: "warning", new: "danger", inspecting: "info", inspected: "neutral", fix_ready: "success", fixed: "teal", ignored: "neutral",
@@ -321,6 +322,14 @@ export default function AdminIssuesPage() {
       <GoogleSectionHeader as="h1" title="Issues" count={total > 0 ? total : null} description="Review failures, inspect reports, and track fixes." flush />
 
       <div className="min-w-0 space-y-3">
+        {data.host?.disk?.ok && data.host.disk.warn && (
+          // Free disk under the warning line (server/ops/disk.ts): the volume that filled and crashed Postgres on 2026-10-09.
+          <div role="alert" data-testid="banner-disk-low"
+            className={cn("rounded-lg border px-3 py-2 text-sm", data.host.disk.critical ? "border-red-300 bg-red-50 text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-100" : "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100")}>
+            <span className="font-medium">Disk space low:</span> {data.host.disk.freeGb} GB free of {data.host.disk.totalGb} GB on the server volume
+            (warning line {data.host.disk.thresholdGb} GB). Prune pre-deploy dumps, uploads in tmp/ and the journal before the database runs out of room.
+          </div>
+        )}
         <SegmentedTabs as="tablist" label="Filter by status">
           {chips.map((c) => (
             <button key={c.key} type="button" role="tab" aria-selected={status === c.key} onClick={() => setStatusFilter(c.key)}

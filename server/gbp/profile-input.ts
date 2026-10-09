@@ -4,7 +4,7 @@ const date=z.object({year:z.number().int().min(1).max(9999),month:z.number().int
 const time=z.object({hours:z.number().int().min(0).max(24).optional(),minutes:z.number().int().min(0).max(59).optional(),seconds:z.number().int().min(0).max(59).optional(),nanos:z.literal(0).optional()}).strict();
 const day=z.enum(['MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY','SUNDAY']);
 const category=z.object({name:z.string().regex(/^categories\/[\w:.-]+$/)}).strict();
-export const ownerProfileInput=z.object({fields:z.object({
+export const profileFields=z.object({
   title:text.min(1).optional(),
   phoneNumbers:z.object({primaryPhone:text.optional(),additionalPhones:z.array(text).max(2).optional()}).strict().nullable().optional(),
   websiteUri:z.string().url().max(2048).refine(s=>/^https?:\/\//.test(s)).nullable().optional(),
@@ -16,4 +16,5 @@ export const ownerProfileInput=z.object({fields:z.object({
   serviceArea:z.object({businessType:z.enum(['CUSTOMER_LOCATION_ONLY','CUSTOMER_AND_BUSINESS_LOCATION']),places:z.object({placeInfos:z.array(z.object({placeName:text,placeId:text}).strict()).max(20)}).strict().optional()}).strict().nullable().optional(),
   'openInfo.openingDate':date.nullable().optional(),
   'openInfo.status':z.enum(['OPEN','CLOSED_TEMPORARILY','CLOSED_PERMANENTLY']).optional(),
-}).strict().refine(f=>Object.keys(f).length>0)}).strict();
+}).strict();
+export const ownerProfileInput=z.object({fields:profileFields.refine(f=>Object.keys(f).length>0)}).strict();

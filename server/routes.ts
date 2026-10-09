@@ -402,6 +402,9 @@ export async function registerRoutes(
   await ensureProfileGuardSchema();
   const { registerProfileGuardRoutes } = await import("./gbp/guard-routes");
   registerProfileGuardRoutes(app, getDevUser);
+  // Listing editor (/listing-editor): same auth and ownership rules as the profile PATCH above.
+  const { registerListingEditorRoutes } = await import("./gbp/listing-editor");
+  registerListingEditorRoutes(app, getDevUser);
   const { startGuardWorker } = await import("./gbp/guard");
   const { startReplyWorker } = await import("./gbp/review-automation");
   startGuardWorker();
@@ -414,11 +417,10 @@ export async function registerRoutes(
   startSiteScanWorker();
   // SEO toolset (server/seo): rank tracker, keyword research, backlinks,
   // competitor gap on DataForSEO pay-as-you-go, capped by SEO_MONTHLY_BUDGET_USD.
-  const { ensureSeoSchema } = await import("./seo/schema");
-  await ensureSeoSchema();
-  const { registerSeoRoutes } = await import("./seo/routes");
-  registerSeoRoutes(app, getDevUser);
-  (await import("./seo/jobs")).startSeoWorker();
+  // Guarded (server/seo/boot.ts): the schema step runs zero DDL when its stored hash matches, with lock and
+  // statement timeouts when it does not; a failure disables the SEO module for this process instead of the boot.
+  const { bootSeoModule } = await import("./seo/boot");
+  await bootSeoModule(app, getDevUser);
   const { registerGbpRoutes } = await import("./gbp/routes");
   registerGbpRoutes(app, getDevUser);
   const { startAgencyWorker } = await import("./agency/jobs");

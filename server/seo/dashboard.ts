@@ -14,7 +14,8 @@ export const groupNameSql = (set: string, name: string) =>
 export type DashboardRank = { top3: number; top10: number; ranked: number; checked: number; checkedOn: string | null; firstOn: string | null; device: "desktop" | "mobile" | null };
 
 /**
- * Every site's newest positions in one query, on ONE device per site — desktop when the site tracks it, else mobile —
+ * Every site's newest positions in one query (each keyword's newest check read through seo_rank_checks_kw_device_on,
+ * not DISTINCT ON over the account's whole history — review H3), on ONE device per site — desktop when the site tracks it, else mobile —
  * never the better of two devices. Each keyword's newest check of that device; the dates they span are returned, so
  * the card can say what its numbers rest on.
  */
@@ -22,9 +23,11 @@ export async function dashboardRanks(siteIds: number[]): Promise<Map<number, Das
   const { rows } = await pool.query(
     `SELECT site_id, device, count(*) FILTER (WHERE position<=3)::int AS top3, count(*) FILTER (WHERE position<=10)::int AS top10,
             count(*) FILTER (WHERE position IS NOT NULL)::int AS ranked, count(*)::int AS checked, max(checked_on)::text AS checked_on, min(checked_on)::text AS first_on
-       FROM (SELECT DISTINCT ON (c.keyword_id) c.site_id, c.device, c.position, c.checked_on FROM seo_rank_checks c JOIN seo_sites s ON s.id=c.site_id
-              WHERE c.site_id = ANY($1::int[]) AND c.device = CASE WHEN s.devices='mobile' THEN 'mobile' ELSE 'desktop' END
-              ORDER BY c.keyword_id, c.checked_on DESC, c.id DESC) x
+       FROM (SELECT k.site_id, d.device, c.position, c.checked_on
+               FROM seo_keywords k JOIN seo_sites s ON s.id=k.site_id
+               CROSS JOIN LATERAL (SELECT CASE WHEN s.devices='mobile' THEN 'mobile' ELSE 'desktop' END AS device) d
+               CROSS JOIN LATERAL (SELECT position, checked_on FROM seo_rank_checks WHERE keyword_id=k.id AND device=d.device ORDER BY checked_on DESC, id DESC LIMIT 1) c
+              WHERE k.site_id = ANY($1::int[])) x
       GROUP BY site_id, device`, [siteIds]);
   return new Map(rows.map((r: any) => [r.site_id, { top3: r.top3, top10: r.top10, ranked: r.ranked, checked: r.checked, checkedOn: r.checked_on, firstOn: r.first_on, device: r.device }]));
 }
