@@ -624,14 +624,19 @@ export async function hasModule(userId: number, module: AnyModuleKey): Promise<b
 /**
  * Client-texting numbers on our carrier the account may hold: the plan's
  * textingNumbersIncluded (the source, shared/plans.ts) plus one per
- * texting_number add-on unit; -1 when either side is unlimited. Admins run
+ * texting_number add-on unit, plus the active CRM plan's included number;
+ * -1 when either platform component is unlimited. Admins run
  * with textingNumbersIncluded -1.
  */
-export function textingNumbersAllowance(ent: Pick<Entitlements, "allowances" | "addons">): number {
+export function textingNumbersAllowance(
+  ent: Pick<Entitlements, "allowances" | "addons">,
+  crm?: Pick<import("./crm/entitlements").CrmEntitlements, "active" | "limits">,
+): number {
   const included = ent.allowances?.textingNumbersIncluded ?? 0;
   const bought = ent.addons.texting_number ?? 0;
   if (included === UNLIMITED || bought === UNLIMITED) return UNLIMITED;
-  return included + bought;
+  const crmIncluded = crm?.active && crm.limits?.clientTexting === "included" ? 1 : 0;
+  return included + crmIncluded + bought;
 }
 
 /**
