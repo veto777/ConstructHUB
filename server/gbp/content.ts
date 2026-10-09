@@ -11,6 +11,14 @@ import { notifyUser, logActivity } from '../account-events';
 import { aiModel, aiVisionModel, aiTimeoutMs } from '../ai-config';
 import { aiAnswer, aiErrorTag, fitChars, NO_TOOLS_RULE, withRetryNote } from '../ai-output';
 import { recordFailure } from '../ops/issues';
+import { hasModule, usersWithModule, sendModuleRequired } from '../entitlements';
+
+class AutoPostsRequired extends GoogleError {
+    constructor() { super('invalid', 'AI posts on a schedule requires Pro or above', 402); }
+}
+async function requireAutoPosts(user: number) {
+    if (!await hasModule(user, 'autoPosts')) throw new AutoPostsRequired();
+}
 export async function ensureGbpContentSchema() {
     await pool.query(`CREATE TABLE IF NOT EXISTS gbp_content_jobs (
     id bigserial PRIMARY KEY, user_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -139,6 +147,7 @@ export async function payloadFor(user: number, raw: unknown) {
 function sortJson(value: any): any { return Array.isArray(value) ? value.map(sortJson) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(k => [k, sortJson(value[k])])) : value; }
 export async function enqueue(user: number, location: number, raw: unknown) {
     const loc = await ownedLocation(user, location);
+    await requireAutoPosts(user);
     const target = { account: loc.gbp_account_name, location: loc.gbp_location_name, subject: loc.gbp_google_subject };
     const b = z.object({ requestKey: z.string().uuid(), items: z.array(itemInput).min(1).max(100), schedule: scheduleInput }).parse(raw);
     const times = scheduleTimes(b.schedule, b.items.length);
@@ -180,8 +189,15 @@ export async function runContentWorker(make: typeof clientFor = clientFor) {
             return;
         const recovered=await c.query(`UPDATE gbp_content_jobs SET status='uncertain',error='Interrupted publish. Check Google before retrying.' WHERE status='publishing' RETURNING id,user_id`);
         for(const job of recovered.rows)await notifyUser(job.user_id,'gbp.post_failed',{title:'Google publish interrupted',body:'Check Google before retrying to avoid duplicates.',link:'/gbp-content',severity:'warning'}).catch(()=>{});
-        const { rows } = await c.query("SELECT * FROM gbp_content_jobs WHERE status='queued' AND due_at<=now() ORDER BY due_at LIMIT 20");
+        // Paused owners keep their jobs and cannot occupy the oldest batch slots.
+        // Shared entitlement rules resolve legacy keys, grants and subscription status.
+        const { rows: owners } = await c.query("SELECT DISTINCT user_id FROM gbp_content_jobs WHERE status='queued' AND due_at<=now()");
+        const entitled = await usersWithModule(owners.map(o => o.user_id), 'autoPosts');
+        if (!entitled.size) return;
+        const { rows } = await c.query("SELECT * FROM gbp_content_jobs WHERE status='queued' AND due_at<=now() AND user_id=ANY($1::int[]) ORDER BY due_at LIMIT 20", [[...entitled]]);
         for (const j of rows) {
+            // Access may have changed since selection. Leave the job untouched so it resumes.
+            if (!await hasModule(j.user_id, 'autoPosts')) continue;
             if (j.schedule?.businessHours) {
                 const [next] = scheduleTimes({ ...j.schedule, custom: undefined, start: new Date().toISOString() }, 1);
                 if (next.getTime() > Date.now() + 1000) {
@@ -316,6 +332,7 @@ export function registerContentRoutes(app: Express, auth: (req: any, res: any) =
             res.json(await fn(req, u.id, location));
         }
         catch (e) {
+            if (e instanceof AutoPostsRequired) return void sendModuleRequired(res, 'autoPosts');
             res.status(e instanceof z.ZodError ? 400 : e instanceof GoogleError ? e.status : 500).json({ message: e instanceof z.ZodError ? e.issues.map(i => i.message).join('; ') : e instanceof GoogleError ? e.message : 'Content operation failed' });
         }
     });
@@ -360,6 +377,7 @@ export function registerContentRoutes(app: Express, auth: (req: any, res: any) =
     // (uncertain publishes only after the owner confirmed they checked Google first).
     route('patch', '/jobs/:job', async (r, u, l) => {
         const job = z.coerce.number().int().positive().parse(r.params.job), b = z.object({ action: z.enum(['cancel', 'retry']), checkedGoogle: z.boolean().optional() }).parse(r.body);
+        if (b.action === 'retry') await requireAutoPosts(u);
         const result = await pool.query(`UPDATE gbp_content_jobs SET status=$4,error=NULL,due_at=CASE WHEN $4='queued' THEN now() ELSE due_at END
       WHERE id=$1 AND user_id=$2 AND location_id=$3 AND (status IN ('queued','failed') OR (status='uncertain' AND $5)) RETURNING *`, [job, u, l, b.action === 'cancel' ? 'cancelled' : 'queued', b.action === 'cancel' || b.checkedGoogle === true]);
         if (!result.rowCount)
@@ -368,6 +386,7 @@ export function registerContentRoutes(app: Express, auth: (req: any, res: any) =
     });
     route('patch', '/style', async (r, u, l) => { const { summary } = z.object({ summary: z.string().max(6000) }).parse(r.body); await pool.query(`INSERT INTO gbp_content_style(user_id,location_id,summary) VALUES($1,$2,$3) ON CONFLICT(user_id,location_id) DO UPDATE SET summary=$3,updated_at=now()`, [u, l, summary]); return { summary }; });
     route('post', '/learn', async (_r, u, l) => {
+        await requireAutoPosts(u);
         if (!await takeBudget(`gbp-content-ai:${u}`, 100, 1, 86400000))
             throw new GoogleError('quota', 'Daily AI budget reached', 429);
         const loc = await ownedLocation(u, l), posts = await make(u, loc.gbp_google_subject).pages('reviews', `/v4/${loc.gbp_account_name}/${loc.gbp_location_name}/localPosts`, 'localPosts');
@@ -393,6 +412,7 @@ export function registerContentRoutes(app: Express, auth: (req: any, res: any) =
         return { summary, postCount: posts.length, draft: true };
     });
     route('post', '/draft', async (r, u, l) => {
+        await requireAutoPosts(u);
         const b = z.object({ kind: z.enum(['photo', 'post']), photoIds: z.array(id).max(100).default([]), instructions: z.string().max(4000).default(''), examples: z.string().max(6000).default('') }).parse(r.body);
         if (b.kind === 'photo' && !b.photoIds.length)
             throw new GoogleError('invalid', 'Select photos', 400);

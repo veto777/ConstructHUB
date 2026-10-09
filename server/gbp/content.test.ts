@@ -45,6 +45,8 @@ beforeAll(async () => {
     await ensureGbpContentSchema();
     const users = (await pool.query("INSERT INTO users(email) VALUES('content-'||gen_random_uuid()||'@example.invalid'),('content-'||gen_random_uuid()||'@example.invalid') RETURNING id")).rows;
     [user, other] = users.map(u => u.id);
+    // Scheduling and AI content require an active Pro subscription.
+    await pool.query("INSERT INTO subscriptions(user_id,plan,status) VALUES($1,'pro','active')", [user]);
     location = (await pool.query("INSERT INTO business_locations(user_id,business_name,gbp_account_name,gbp_location_name,gbp_google_subject) VALUES($1,'Content fixture','accounts/content','locations/content','subject') RETURNING id", [user])).rows[0].id;
     const folder = (await pool.query("INSERT INTO media_folders(user_id,name) VALUES($1,'Content fixture') RETURNING id", [user])).rows[0].id;
     photo = (await pool.query("INSERT INTO media_photos(user_id,folder_id,name,url,r2_key) VALUES($1,$2,'Fixture.jpg','/fixture.jpg','media/fixture.jpg') RETURNING id", [user, folder])).rows[0].id;
