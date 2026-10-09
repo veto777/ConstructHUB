@@ -137,33 +137,6 @@ async function seedTree(t: Tree, label: string, assignee: string) {
     [t.share, org, t.project, randomUUID().replace(/-/g, ""), `${tag} ${label} share`]);
 }
 
-beforeAll(async () => {
-  await pool.query("insert into crm_orgs(id,name,owner_user_id) values ($1,$2,1)", [org, `${tag} role gates`]);
-  await pool.query("insert into crm_members(id,org_id,user_id,email,role,status,display_name) values ($1,$2,1,$3,'owner','active','Seat Under Test')", [me, org, `${tag}-me@example.invalid`]);
-  await pool.query("insert into crm_members(id,org_id,email,role,status,display_name,hourly_cost_cents) values ($1,$2,$3,'pm','active','Colleague',$4)", [other, org, `${tag}-other@example.invalid`, cost()]);
-  await pool.query("insert into crm_cost_codes(id,org_id,code,name) values ($1,$2,'07-300','Roofing')", [pb.costCode, org]);
-  await pool.query("insert into crm_pb_categories(id,org_id,name) values ($1,$2,'Roofing')", [pb.category, org]);
-  await pool.query(`insert into crm_pb_items(id,org_id,name,pricing_mode,flat_price_cents,flat_cost_cents,rate_cents_per_sqft,markup_bps,min_charge_cents) values ($1,$2,$3,'flat',$4,$5,$6,$7,$8)`,
-    [pb.item, org, `${tag} SKU`, price(), cost(), price(), cost(), price()]);
-  await pool.query("insert into crm_pb_materials(id,org_id,name,price_cents,cost_cents) values ($1,$2,$3,$4,$5)", [pb.material, org, `${tag} shingle`, price(), cost()]);
-  await pool.query("insert into crm_pb_labor_rates(id,org_id,name,hourly_price_cents,hourly_cost_cents) values ($1,$2,$3,$4,$5)", [pb.labor, org, `${tag} crew`, price(), cost()]);
-  await pool.query("insert into crm_pb_packages(id,org_id,name) values ($1,$2,$3)", [pb.pkg, org, `${tag} package`]);
-  await seedTree(mine, "mine", me);
-  await seedTree(theirs, "theirs", other);
-  await call("GET", "/api/crm/me");
-  expect((await call("POST", "/api/crm/org/switch", { orgId: org })).status).toBe(200);
-  const who = await call("GET", "/api/crm/me");
-  expect(who.json?.org?.id).toBe(org);
-}, 60_000);
-
-afterAll(async () => {
-  const { rows } = await pool.query(
-    "select table_name from information_schema.columns where column_name='org_id' and table_schema=current_schema() and table_name <> 'crm_orgs'");
-  for (const { table_name } of rows) await pool.query(`delete from "${table_name}" where org_id = $1`, [org]).catch(() => {});
-  await pool.query("delete from crm_orgs where id=$1", [org]);
-  await pool.end();
-}, 60_000);
-
 // ── The route table ─────────────────────────────────────────────────────────
 
 type Need =
@@ -200,6 +173,8 @@ const none = randomUUID();
 const jobcamManage = { any: ["manageJobs", "manageCustomers"] } as const;
 
 const ROUTES: RouteRow[] = [
+  // Authenticated caller previews their own subscription; no org-role permission.
+  R("POST", "/api/crm/billing/change-preview", null),
   // identity, org, team
   R("GET", "/api/crm/me", null),
   R("PATCH", "/api/crm/profile", null, { body: { phone: 12 } }),
@@ -523,6 +498,35 @@ describe("route inventory", () => {
   });
 });
 
+// Keep database/server fixtures out of the standalone inventory checks.
+describe("live CRM role gates", () => {
+beforeAll(async () => {
+  await pool.query("insert into crm_orgs(id,name,owner_user_id) values ($1,$2,1)", [org, `${tag} role gates`]);
+  await pool.query("insert into crm_members(id,org_id,user_id,email,role,status,display_name) values ($1,$2,1,$3,'owner','active','Seat Under Test')", [me, org, `${tag}-me@example.invalid`]);
+  await pool.query("insert into crm_members(id,org_id,email,role,status,display_name,hourly_cost_cents) values ($1,$2,$3,'pm','active','Colleague',$4)", [other, org, `${tag}-other@example.invalid`, cost()]);
+  await pool.query("insert into crm_cost_codes(id,org_id,code,name) values ($1,$2,'07-300','Roofing')", [pb.costCode, org]);
+  await pool.query("insert into crm_pb_categories(id,org_id,name) values ($1,$2,'Roofing')", [pb.category, org]);
+  await pool.query(`insert into crm_pb_items(id,org_id,name,pricing_mode,flat_price_cents,flat_cost_cents,rate_cents_per_sqft,markup_bps,min_charge_cents) values ($1,$2,$3,'flat',$4,$5,$6,$7,$8)`,
+    [pb.item, org, `${tag} SKU`, price(), cost(), price(), cost(), price()]);
+  await pool.query("insert into crm_pb_materials(id,org_id,name,price_cents,cost_cents) values ($1,$2,$3,$4,$5)", [pb.material, org, `${tag} shingle`, price(), cost()]);
+  await pool.query("insert into crm_pb_labor_rates(id,org_id,name,hourly_price_cents,hourly_cost_cents) values ($1,$2,$3,$4,$5)", [pb.labor, org, `${tag} crew`, price(), cost()]);
+  await pool.query("insert into crm_pb_packages(id,org_id,name) values ($1,$2,$3)", [pb.pkg, org, `${tag} package`]);
+  await seedTree(mine, "mine", me);
+  await seedTree(theirs, "theirs", other);
+  await call("GET", "/api/crm/me");
+  expect((await call("POST", "/api/crm/org/switch", { orgId: org })).status).toBe(200);
+  const who = await call("GET", "/api/crm/me");
+  expect(who.json?.org?.id).toBe(org);
+}, 60_000);
+
+afterAll(async () => {
+  const { rows } = await pool.query(
+    "select table_name from information_schema.columns where column_name='org_id' and table_schema=current_schema() and table_name <> 'crm_orgs'");
+  for (const { table_name } of rows) await pool.query(`delete from "${table_name}" where org_id = $1`, [org]).catch(() => {});
+  await pool.query("delete from crm_orgs where id=$1", [org]);
+  await pool.end();
+}, 60_000);
+
 // ── 2. The permission matrix ────────────────────────────────────────────────
 
 describe.each(SEATS)("permission matrix — $name", ({ role, overrides }) => {
@@ -796,4 +800,6 @@ describe("member activity log", () => {
     expect(text).not.toMatch(/hourlyCostCents|permissions\b(?!”)|4200|42\.00/);
     await pool.query("update crm_members set permissions=null, hourly_cost_cents=$2 where id=$1", [other, 9111100 + 1]);
   }, 30_000);
+});
+
 });

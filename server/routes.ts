@@ -6100,15 +6100,12 @@ function main() {
     try {
       const pending = await storage.getPendingReminders();
       // Review reminders are a Team-and-up feature (shared/plans.ts reviewReminders): one batch
-      // query, and owners whose plan no longer includes the module get their reminders cancelled
-      // (same handling as an explicit "off") instead of piling up unsent.
+      // query. Missing access can be temporary (past_due or a billing lapse), so leave
+      // pending reminders intact for the next run after entitlement is restored.
       const allowed = await usersWithModule(pending.map((r) => r.userId), "reviewReminders");
       for (const request of pending) {
         try {
-          if (!allowed.has(request.userId)) {
-            await storage.updateReviewRequest(request.id, { nextReminderAt: null });
-            continue;
-          }
+          if (!allowed.has(request.userId)) continue;
           const settings = await storage.getReminderSettings(request.userId);
           const maxReminders = settings?.maxReminders ?? 3;
           const enabled = settings?.enabled !== false;
