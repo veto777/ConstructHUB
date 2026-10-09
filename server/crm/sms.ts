@@ -318,10 +318,11 @@ async function lockTextingOwner(tx: Parameters<Parameters<typeof db.transaction>
 }
 
 /** Stable number order keeps the same assignments when an allowance shrinks. */
-async function dedicatedNumbers(q: Pick<typeof db, "execute">, ownerId: number): Promise<string[]> {
+async function dedicatedNumbers(q: Pick<typeof db, "execute">, ownerId: number, replacingOrgId?: string): Promise<string[]> {
   const { rows } = await q.execute(sql`
     SELECT custom_fields->'sms'->>'fromNumber' AS number
       FROM crm_orgs WHERE owner_user_id=${ownerId}
+       ${replacingOrgId === undefined ? sql`` : sql`AND id <> ${replacingOrgId}`}
        AND custom_fields->'sms'->>'mode'='dedicated'
        AND custom_fields->'sms'->>'fromNumber' IS NOT NULL
      GROUP BY custom_fields->'sms'->>'fromNumber'
@@ -858,7 +859,11 @@ export function registerCrmSmsRoutes(app: Express, getDevUser: GetUser): void {
       const cf = { ...((fresh.customFields as Record<string, any> | null) ?? {}) };
       const prior = orgSmsConfig(cf);
       if (p.mode === "dedicated" && from) {
-        const numbers = await dedicatedNumbers(tx, ownerId);
+        // A replacement releases this org's old assignment, but a number
+        // shared by another org must still count. Keep the stable allocation
+        // order for unchanged senders (including accounts over allowance).
+        const numbers = await dedicatedNumbers(tx, ownerId,
+          prior.mode === "dedicated" && prior.fromNumber !== from ? fresh.id : undefined);
         const allowed = allowance === UNLIMITED || numbers.slice(0, allowance).includes(from)
           || (!numbers.includes(from) && numbers.length < allowance);
         if (!allowed) {
