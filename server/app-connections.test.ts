@@ -58,6 +58,9 @@ beforeAll(async () => {
   for(let i=0;i<2;i++) {
     const {rows:[u]}=await pool.query("INSERT INTO users(email,email_verified) VALUES($1,true) RETURNING id",[`${randomUUID()}@example.invalid`]);ids.push(u.id);
     await pool.query("INSERT INTO subscriptions(user_id,plan,status) VALUES($1,'agency','active')",[u.id]);
+    // The calendar connection is a CRM route: the org owner needs the CRM's own
+    // subscription (a separate product since fd964e1d), not a platform plan.
+    await pool.query("INSERT INTO crm_subscriptions(user_id,plan,status) VALUES($1,'crm_max','active')",[u.id]);
   }
   [owner,other]=ids; cookie=await session(owner);otherCookie=await session(other);
 },40000);
@@ -66,7 +69,7 @@ afterAll(async()=>{
   await pool.query("DELETE FROM session WHERE sid=ANY($1::text[])",[[...sids]]);
   await pool.query("DELETE FROM crm_members WHERE user_id=ANY($1::int[])",[ids]);
   await pool.query("DELETE FROM crm_orgs WHERE owner_user_id=ANY($1::int[])",[ids]);
-  for(const table of ["subscriptions","account_activity","ads_jobs","ads_grants","lsa_connections"]) await pool.query(`DELETE FROM ${table} WHERE user_id=ANY($1::int[])`,[ids]);
+  for(const table of ["subscriptions","crm_subscriptions","account_activity","ads_jobs","ads_grants","lsa_connections"]) await pool.query(`DELETE FROM ${table} WHERE user_id=ANY($1::int[])`,[ids]);
   const hash=createHash('sha256').update(ip).digest('hex');
   await pool.query("DELETE FROM growth_budgets WHERE key LIKE $1 OR key LIKE ANY($2::text[])",[`%:ip:${hash}`,ids.flatMap(id=>[`%:user:${id}`,`edge:%:${id}`])]);
   await pool.query("DELETE FROM users WHERE id=ANY($1::int[])",[ids]);

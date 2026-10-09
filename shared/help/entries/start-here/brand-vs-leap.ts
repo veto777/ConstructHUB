@@ -5,7 +5,7 @@ import { CRM_TRIAL_DAYS } from "../../../crm-plans";
 const entry: HelpDraft = {
   key: "brand-vs-leap", group: "Start here", route: "/pricing", title: "Leap vs ConstructHUB CRM",
   whatItIs: "A side-by-side look at the published list prices of ConstructHUB CRM and Leap, for the same number of people, as each company’s pricing page showed them on 8 October 2026.",
-  whatItDoes: "Leap CRM Essential is for a single user and lists at about twice ConstructHUB CRM Basic, which has one seat. Leap’s Team plan is priced for its first user plus a monthly price for each additional user; ConstructHUB CRM Essentials has five seats at one price. The two products do not have the same features: Leap has an in-home sales app, SalesPro, and supplier integrations that ConstructHUB does not have. ConstructHUB’s permit office directory, in Business tools, is free to browse.",
+  whatItDoes: "Leap CRM Essential is for a single user and lists at about twice ConstructHUB CRM Basic, which has one seat. Leap’s “Team” plan is priced for its first user plus a monthly price for each additional user; ConstructHUB CRM Essentials has five seats at one price. The two products do not have the same features: Leap has an in-home sales app, SalesPro, and supplier integrations that ConstructHUB does not have. ConstructHUB’s permit office directory, in Business tools, is free to browse.",
   howToUse: [
     "Open constructhub.us/pricing and read each CRM plan’s price, its seats and its Not included list.",
     "Open Leap’s pricing page and compare the same number of people, on the same billing period.",
