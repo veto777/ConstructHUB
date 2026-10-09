@@ -60,6 +60,7 @@ afterAll(async () => {
   await pool.query("delete from review_reminder_settings where user_id=any($1::int[])", [users]);
   await pool.query("delete from review_referral_settings where user_id=any($1::int[])", [users]);
   await pool.query("delete from review_recipient_preferences where user_id=any($1::int[])", [users]);
+  await pool.query("delete from subscriptions where user_id=any($1::int[])", [users]);
   await pool.query("delete from users where id=any($1::int[])", [users]);
   await pool.query("delete from session where sid=any($1::text[])", [sids]);
   await pool.end();
@@ -197,9 +198,12 @@ describe("contractor referral settings", () => {
 
 describe("settings validation and photo plan caps", () => {
   it("validates reminder settings while preserving an explicit zero limit", async () => {
-    expect((await api("/api/review-reminder-settings", a, "PUT", { timeWindows: [], timezone: "invalid" })).status).toBe(400);
-    expect((await api("/api/review-reminder-settings", a, "PUT", { maxReminders: 0, timezone: "Asia/Tokyo" })).status).toBe(200);
-    const settings = await (await api("/api/review-reminder-settings", a)).json();
+    // Review reminders are a Team-and-up module (shared/plans.ts reviewReminders): a dedicated Team account.
+    const teamCookie = await account();
+    await pool.query("insert into subscriptions(user_id,plan,status) values($1,'team','active')", [users[users.length - 1]]);
+    expect((await api("/api/review-reminder-settings", teamCookie, "PUT", { timeWindows: [], timezone: "invalid" })).status).toBe(400);
+    expect((await api("/api/review-reminder-settings", teamCookie, "PUT", { maxReminders: 0, timezone: "Asia/Tokyo" })).status).toBe(200);
+    const settings = await (await api("/api/review-reminder-settings", teamCookie)).json();
     expect(settings.maxReminders).toBe(0); expect(settings.timezone).toBe("Asia/Tokyo");
   });
   it("refuses photo processing without a plan before starting work (no silent fallback plan)", async () => {

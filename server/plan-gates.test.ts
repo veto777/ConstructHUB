@@ -182,7 +182,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("plan gates (auxili
     const auto = await api("/api/gbp/locations/2147483647/ai-replies", starter, "PUT", { mode: "auto" });
     expect(auto.status).toBe(402);
     expect(auto.body).toMatchObject({ code: "plan_required", requiredPlan: "pro" });
-    expect(auto.body.message).toContain("Your Starter plan drafts AI replies for you to approve.");
+    expect(auto.body.message).toContain("Your Solo plan drafts AI replies for you to approve.");
     // Drafts pass the plan gate (the route itself then finds no such location).
     expect((await api("/api/gbp/locations/2147483647/ai-replies", starter, "PUT", { mode: "draft" })).status).not.toBe(402);
     expect((await api("/api/gbp/locations/2147483647/ai-replies", none, "PUT", { mode: "draft" })).status).toBe(402);
