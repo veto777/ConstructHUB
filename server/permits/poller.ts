@@ -153,13 +153,13 @@ export async function matchAndNotify(watches: PermitWatch[], permitIds: number[]
 async function setState(databaseId: number, patch: { nextPollAt: Date; lastPolledAt?: Date; lastSuccessAt?: Date; lastError: string | null; failing: boolean; lastCount?: number }, now: Date) {
   await pool.query(
     `INSERT INTO permit_poll_state(database_id, next_poll_at, last_polled_at, last_success_at, last_error, failing_since, last_count)
-     VALUES($1,$2,$3,$4,$5,CASE WHEN $6 THEN $3 END,COALESCE($7,0))
+     VALUES($1::int,$2::timestamptz,$3::timestamptz,$4::timestamptz,$5::text,CASE WHEN $6::boolean THEN $3::timestamptz END,COALESCE($7::int,0))
      ON CONFLICT (database_id) DO UPDATE SET
        next_poll_at=EXCLUDED.next_poll_at, last_polled_at=EXCLUDED.last_polled_at,
        last_success_at=COALESCE(EXCLUDED.last_success_at, permit_poll_state.last_success_at),
        last_error=EXCLUDED.last_error,
-       failing_since=CASE WHEN $6 THEN COALESCE(permit_poll_state.failing_since, $3) ELSE NULL END,
-       last_count=COALESCE($7, permit_poll_state.last_count)`,
+       failing_since=CASE WHEN $6::boolean THEN COALESCE(permit_poll_state.failing_since, $3::timestamptz) ELSE NULL END,
+       last_count=COALESCE($7::int, permit_poll_state.last_count)`,
     [databaseId, patch.nextPollAt, patch.lastPolledAt ?? now, patch.lastSuccessAt ?? null, patch.lastError, patch.failing, patch.lastCount ?? null]);
 }
 
