@@ -159,3 +159,6 @@ import citizenserveAdapter from "./citizenserve";
 registerAdapter(citizenserveAdapter);
 import civicgovAdapter from "./civicgov";
 registerAdapter(civicgovAdapter);
+
+import iworqAdapter from "./iworq";
+registerAdapter(iworqAdapter);

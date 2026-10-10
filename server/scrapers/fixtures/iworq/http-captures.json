@@ -1,0 +1,121 @@
+[
+  {
+    "file": "douglas-home.html",
+    "url": "https://douglascounty.portal.iworq.net/portalhome/douglascounty",
+    "finalUrl": "https://douglascounty.portal.iworq.net/portalhome/douglascounty",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:45:56.022Z"
+  },
+  {
+    "file": "graham-home.html",
+    "url": "https://grahamcounty.portal.iworq.net/portalhome/grahamcounty",
+    "finalUrl": "https://grahamcounty.portal.iworq.net/portalhome/grahamcounty",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:45:56.379Z"
+  },
+  {
+    "file": "kennesaw-home.html",
+    "url": "https://kennesaw.portal.iworq.net/portalhome/kennesaw",
+    "finalUrl": "https://kennesaw.portal.iworq.net/portalhome/kennesaw",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:45:56.827Z"
+  },
+  {
+    "file": "cottonwood-application.html",
+    "url": "https://cottonwoodheights.portal.iworq.net/COTTONWOODHEIGHTS/new-permit/600/1032",
+    "finalUrl": "https://cottonwoodheights.portal.iworq.net/COTTONWOODHEIGHTS/new-permit/600/1032",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:45:57.232Z"
+  },
+  {
+    "file": "chamblee-home.html",
+    "url": "https://chamblee.portal.iworq.net/portalhome/chamblee",
+    "finalUrl": "https://chamblee.portal.iworq.net/portalhome/chamblee",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:45:57.582Z"
+  },
+  {
+    "file": "clay-request.html",
+    "url": "https://portal.iworq.net/CLAYCOUNTY/new-request/700/3481",
+    "finalUrl": "https://portal.iworq.net/CLAYCOUNTY/new-request/700/3481",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:45:58.015Z"
+  },
+  {
+    "file": "douglas-search.html",
+    "url": "https://douglascounty.portal.iworq.net/DOUGLASCOUNTY/permits/600",
+    "finalUrl": "https://douglascounty.portal.iworq.net/DOUGLASCOUNTY/permits/600",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:43:48.212Z"
+  },
+  {
+    "file": "graham-search.html",
+    "url": "https://grahamcounty.portal.iworq.net/grahamcounty/permits/600",
+    "finalUrl": "https://grahamcounty.portal.iworq.net/grahamcounty/permits/600",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:44:12.845Z"
+  },
+  {
+    "file": "northliberty-search.html",
+    "url": "https://portal.iworq.net/NORTHLIBERTY/permits/600",
+    "finalUrl": "https://portal.iworq.net/NORTHLIBERTY/permits/600",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:44:13.415Z"
+  },
+  {
+    "file": "kennesaw-search.html",
+    "url": "https://kennesaw.portal.iworq.net/KENNESAW/permits/600",
+    "finalUrl": "https://kennesaw.portal.iworq.net/KENNESAW/permits/600",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:44:46.663Z"
+  },
+  {
+    "file": "chamblee-search.html",
+    "url": "https://chamblee.portal.iworq.net/CHAMBLEE/permits/601",
+    "finalUrl": "https://chamblee.portal.iworq.net/CHAMBLEE/permits/601",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:44:47.158Z"
+  },
+  {
+    "file": "cottonwood-home.html",
+    "url": "https://cottonwoodheights.portal.iworq.net/portalhome/cottonwoodheights",
+    "finalUrl": "https://cottonwoodheights.portal.iworq.net/portalhome/cottonwoodheights",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:44:47.562Z"
+  },
+  {
+    "file": "cottonwood-search.html",
+    "url": "https://cottonwoodheights.portal.iworq.net/COTTONWOODHEIGHTS/permits/600",
+    "finalUrl": "https://cottonwoodheights.portal.iworq.net/COTTONWOODHEIGHTS/permits/600",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:45:24.942Z"
+  },
+  {
+    "file": "douglas-history.html",
+    "url": "https://douglascounty.portal.iworq.net/douglascounty/permits/602",
+    "finalUrl": "https://douglascounty.portal.iworq.net/douglascounty/permits/602",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:44:47.981Z"
+  },
+  {
+    "file": "dearborn-home.html",
+    "url": "https://dearbornpermit.portal.iworq.net/portalhome/dearbornpermit",
+    "finalUrl": "https://dearbornpermit.portal.iworq.net/portalhome/dearbornpermit",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:45:24.086Z"
+  },
+  {
+    "file": "hastings-home.html",
+    "url": "https://cityofhastings.portal.iworq.net/portalhome/cityofhastings",
+    "finalUrl": "https://cityofhastings.portal.iworq.net/portalhome/cityofhastings",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:45:24.498Z"
+  },
+  {
+    "file": "clay-home.html",
+    "url": "https://portal.iworq.net/portalhome/CLAYCOUNTY",
+    "finalUrl": "https://portal.iworq.net/portalhome/CLAYCOUNTY",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:45:25.399Z"
+  }
+]
