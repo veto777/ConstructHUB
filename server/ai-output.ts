@@ -21,6 +21,7 @@
  * Paths that call the HTTP API directly use aiAnswer(body, opts) on the parsed JSON.
  */
 import OpenAI from "openai";
+import { withOpenAiFallback } from "./ai-fallback";
 import { aiTimeoutMs } from "./ai-config";
 
 /** Add to every system prompt: the model has no tools and must answer, not think aloud. */
@@ -321,14 +322,18 @@ export class AiAnswerError extends Error {
   }
 }
 
-/** Every AI client: AI_TIMEOUT_MS per call and at most one SDK retry. */
-export function aiClient(opts: { timeoutFallbackMs?: number; maxRetries?: 0 | 1 } = {}): OpenAI {
-  return new OpenAI({
+/**
+ * Every AI client: AI_TIMEOUT_MS per call and at most one SDK retry. TruthCoder answers first;
+ * when it fails or is too slow the request goes to OpenAI's cheapest model (./ai-fallback.ts).
+ * `fallbackAfterMs` shortens how long TruthCoder gets (a live call cannot wait 30 s).
+ */
+export function aiClient(opts: { timeoutFallbackMs?: number; maxRetries?: 0 | 1; fallbackAfterMs?: number } = {}): OpenAI {
+  return withOpenAiFallback(new OpenAI({
     apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
     baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
     timeout: aiTimeoutMs(opts.timeoutFallbackMs ?? 60_000),
     maxRetries: Math.min(opts.maxRetries ?? 0, 1),
-  });
+  }), { waitMs: opts.fallbackAfterMs });
 }
 
 /** What the retry adds to the first system message after a rejected answer. */

@@ -1,4 +1,5 @@
 /** GBP content queue. External boundaries are injectable; no credentials are stored here. */
+import { OPENAI_FALLBACK_BASE_URL, openAiFallbackBody, runWithFallback } from '../ai-fallback';
 import { createHash, createHmac, timingSafeEqual } from 'crypto';
 import { pipeline } from 'node:stream/promises';
 import type { Express } from 'express';
@@ -259,7 +260,18 @@ export const createDraftGenerator = (http: typeof fetch = fetch): DraftAI => asy
     for (let attempt = 0; attempt < 2; attempt++) {
         let body: any;
         try {
-            const r = await http(`${process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || 'https://api.openai.com/v1'}/chat/completions`, { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(aiTimeoutMs(60000)), body: JSON.stringify({ model, max_tokens: 2000, messages: attempt ? withRetryNote(messages, reason) : messages }) });
+            // TruthCoder first; OpenAI's cheapest model when it fails or is slow (../ai-fallback.ts).
+            const params = { model, max_tokens: 2000, messages: attempt ? withRetryNote(messages, reason) : messages };
+            const post = (url: string, bearer: string, payload: unknown, signal: AbortSignal) => http(`${url}/chat/completions`, { method: 'POST', headers: { Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json' }, signal, body: JSON.stringify(payload) });
+            const r = await runWithFallback(async (signal) => {
+                const res = await post(process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || 'https://api.openai.com/v1', key, params, AbortSignal.any([signal, AbortSignal.timeout(aiTimeoutMs(60000))]));
+                if (!res.ok && (res.status === 408 || res.status === 429 || res.status >= 500)) throw Object.assign(new Error('AI HTTP ' + res.status), { status: res.status, response: res });
+                return res;
+            }, async (signal, f) => {
+                const res = await post(OPENAI_FALLBACK_BASE_URL, f.key, openAiFallbackBody(params, f.model), signal);
+                if (!res.ok) throw Object.assign(new Error('fallback AI HTTP ' + res.status), { status: res.status });
+                return res;
+            }, { vision: images.length > 0, label: 'gbp-content' }).catch((e: any) => { if (e?.response) return e.response as Response; throw e; });
             if (!r.ok) {
                 // Status only: the body can echo the request (and its key).
                 console.error('GBP content AI HTTP', r.status);

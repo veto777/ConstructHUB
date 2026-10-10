@@ -19,6 +19,7 @@
  */
 import type { Express } from "express";
 import OpenAI from "openai";
+import { withOpenAiFallback } from "../ai-fallback";
 import { createHash, createHmac, randomInt } from "crypto";
 import fs from "fs";
 import path from "path";
@@ -103,7 +104,9 @@ Reply with ONLY this JSON: {"say":"...","ready":false,"intake":{"category":"paym
 Set ready=true when you have enough detail (usually after 2-4 questions); then "say" can be empty.`;
 
 let client: OpenAI | null = null;
-const ai = () => (client ??= new OpenAI({ baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL, apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || "none", maxRetries: 0, timeout: Math.min(7_000, aiTimeoutMs()) }));   // a phone turn can't wait longer
+// A phone turn can't wait longer than ~7 s: TruthCoder gets 3.5 s, then OpenAI's cheapest model gets 4 s (../ai-fallback.ts).
+const ai = () => (client ??= withOpenAiFallback(new OpenAI({ baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL, apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || "none", maxRetries: 0, timeout: Math.min(7_000, aiTimeoutMs()) }),
+  { waitMs: Number(process.env.AI_FALLBACK_PHONE_AFTER_MS) || 3_500, fallbackTimeoutMs: 4_000, label: "support-line" }));
 export async function intakeTurn(history: { role: "caller" | "gabe"; text: string }[], callerNumber = "unknown"): Promise<{ say: string; intake: Intake; ready: boolean }> {
   if (!process.env.AI_INTEGRATIONS_OPENAI_BASE_URL) throw new Error("no AI configured");
   // Kimi #7: AI turns are budgeted (per caller 120/day, overall 3000/day); over budget = the deterministic intake.
