@@ -6,6 +6,7 @@
  * `capabilities.listRecent = false`; platform-specific adapter files under
  * server/scrapers/ replace these wrappers by calling `registerAdapter`.
  */
+import accela from "./accela";
 import { scrapeByPlatform, type ScrapeResult } from "../scraper";
 import type { AdapterCtx, PermitRecord, PermitSearchType, PortalAdapter } from "./types";
 
@@ -84,6 +85,8 @@ registerAdapter(legacy("SmartGov", [], ["address", "permit"]));
 registerAdapter(legacy("Skagit County", ["Custom / GovPlatform"], ["address", "permit", "name"]));
 registerAdapter(legacy("Tyler EnerGov", ["Tyler Technologies", "Tyler EnerGov Self Service"], ["address", "permit", "name"]));
 registerAdapter(legacy("eTRAKiT", [], ["permit", "name", "company"]));
-registerAdapter(legacy("Accela", ["Accela Citizen Access"], ["address", "permit", "name"]));
+
 registerAdapter(legacy("Click2Gov", [], ["address", "permit", "name"]));
 registerAdapter(legacy("FTG Portal", [], ["name", "company"]));
+
+registerAdapter(accela);
