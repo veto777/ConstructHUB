@@ -21,6 +21,9 @@
  * (server/seo/reports.test.ts). Request shapes follow OpenSEO's
  * src/server/lib/dataforseo (MIT — notice in server/seo/dataforseo.ts).
  */
+import type { SeoPlace } from "./place";
+import type { PlannerMetrics } from "./google-planner";
+import { withGoogleNumbers } from "./free-keywords";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { pool } from "../db";
@@ -79,6 +82,8 @@ export const reportInput = z.object({
   filters: reportFilters.default({}),
   locationCode: z.number().int().positive().default(2840),
   languageCode: z.string().regex(/^[a-z]{2}$/).default("en"),
+  /** A US state, county, city, ZIP code or metro area (GET /api/seo/locations): the keyword ideas tables use it. */
+  placeCode: z.number().int().positive().nullable().optional(),
   /** Return the saved page only; never call the source, never spend. */
   peek: z.boolean().default(false),
 }).strict();
@@ -415,8 +420,12 @@ export type KeywordOverview = {
   serp: SerpRow[];
   /** What the page ranking first earns from search in all (absent on overviews saved before 2026-10-08; null when it did not load or there is no first page). */
   potential?: KeywordPotential | null;
-  /** Sections that did not load this time: "results" (the top ten), "authority" and/or "potential". */
+  /** Sections that did not load this time: "results" (the top ten), "authority" and/or "potential" — and on the free view, "difficulty" too (./free-keywords.ts). */
   missing?: string[];
+  /** Google's free numbers only (volume, cost per click, bids, months); the rest is bought with the full lookup. */
+  free?: boolean;
+  /** The US state, county, city, ZIP code or metro area the numbers and results are for (null = the whole country). */
+  place?: SeoPlace | null;
 };
 
 export type KeywordPotential = {
@@ -472,8 +481,12 @@ export function parseKeywordOverview(item: any, serpItems: any[], ranks: any[], 
   };
 }
 
-/** Overview + today's top results, then their authority and what the first page earns: four calls. */
-export async function fetchKeywordOverview(input: { keyword: string; locationCode: number; languageCode: string }): Promise<{ data: KeywordOverview; costUsd: number; /** The parts that arrived: what the customer pays for. A part that failed is ours to carry. */ customerUsd: number; costUnknown?: boolean }> {
+/**
+ * Overview + today's top results, then their authority and what the first page earns: four calls. With a place, the
+ * results are Google's as searched from there; with Google's free numbers (`google`), volume, cost per click, bids and
+ * months are Google's own for the country or place (difficulty, intent and traffic potential are country-wide).
+ */
+export async function fetchKeywordOverview(input: { keyword: string; locationCode: number; languageCode: string; place?: SeoPlace | null; google?: PlannerMetrics }): Promise<{ data: KeywordOverview; costUsd: number; /** The parts that arrived: what the customer pays for. A part that failed is ours to carry. */ customerUsd: number; costUnknown?: boolean }> {
   let costUsd = 0, customerUsd = 0;
   const call = async (path: string, body: Record<string, unknown>) => {
     try {
@@ -494,7 +507,7 @@ export async function fetchKeywordOverview(input: { keyword: string; locationCod
   let failure: unknown = null;
   const [overview, serp] = await Promise.all([
     call("/dataforseo_labs/google/keyword_overview/live", { ...loc, keywords: [input.keyword], include_serp_info: true }).catch((e) => { failure = e; return null; }),
-    call("/serp/google/organic/live/advanced", { ...loc, keyword: input.keyword, depth: 10, device: "desktop" }).catch((e: any) => { console.warn(`[seo] keyword ${input.keyword}: results unavailable — ${e?.message ?? e}`); return null; }),
+    call("/serp/google/organic/live/advanced", { ...loc, ...(input.place ? { location_code: input.place.code } : {}), keyword: input.keyword, depth: 10, device: "desktop" }).catch((e: any) => { console.warn(`[seo] keyword ${input.keyword}: results unavailable — ${e?.message ?? e}`); return null; }),
   ]);
   if (failure || !overview) throw Object.assign(failure instanceof Error ? failure : new Error(String(failure ?? "overview unavailable")), { costUsd, costUnknown });
   if (!serp) missing.push("results");
@@ -510,7 +523,14 @@ export async function fetchKeywordOverview(input: { keyword: string; locationCod
       ? call("/dataforseo_labs/google/ranked_keywords/live", potentialBody).then((t) => parsePotential(t.result?.[0], String(first.url))).catch(() => { missing.push("potential"); return null; })
       : null,
   ]);
-  return { data: { ...parseKeywordOverview(taskItems(overview)[0] ?? {}, serpItems, ranks, input), potential, missing }, costUsd, customerUsd, costUnknown };
+  let data: KeywordOverview = { ...parseKeywordOverview(taskItems(overview)[0] ?? {}, serpItems, ranks, input), potential, missing, place: input.place ?? null };
+  if (input.place && serp) {
+    // The results page as searched from the place: its own count and features, not the country's.
+    const r0 = serp.result?.[0];
+    data = { ...data, results: num(r0?.se_results_count) ?? data.results,
+      features: Array.isArray(r0?.item_types) ? r0.item_types.filter((t: unknown) => typeof t === "string" && t !== "organic") : data.features };
+  }
+  return { data: withGoogleNumbers(data, input.google), costUsd, customerUsd, costUnknown };
 }
 
 // ── Saved pages ────────────────────────────────────────────────────────────

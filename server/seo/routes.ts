@@ -65,6 +65,10 @@ import { dashboardRanks, groupNameSql } from "./dashboard";
 import { aiSummary } from "./ai-summary";
 import { watchSetting, setKeywordWatch, takeKeywordSnapshot, keywordWatchView, comparePick, KW_SNAPSHOT_ESTIMATE_USD } from "./keyword-watch";
 import { searchLocations, locationByCode } from "./locations";
+import { resolvePlace, placeCodeInput } from "./place";
+import { plannerConfigured, plannerIdeas, type PlannerMetrics } from "./google-planner";
+import { freeIdeaPage, freeFilterRefusal, freeOverview, googleNumbers, keywordVolumes, FREE_IDEAS_MAX } from "./free-keywords";
+import type { KeywordTable } from "./reports";
 import { BULK_MAX } from "./lists";
 import { bulkInput, bulkEstimateUsd, cleanKeywords, fetchBulkKeywords, listsOf, listItems, addToList, removeFromList, deleteList, refreshListMetrics, listItemsInput, ListError, type BulkPage } from "./lists";
 import { usageHistory } from "./usage";
@@ -208,7 +212,10 @@ const researchInput = z.object({
   seed: z.string().trim().min(1).max(200),
   locationCode: z.number().int().positive().default(2840),
   languageCode: z.string().regex(/^[a-z]{2}$/).default("en"),
+  placeCode: placeCodeInput,
 }).strict();
+/** Google's free keyword ideas are kept a week per account, seed and place (they are monthly figures). */
+const FREE_IDEAS_HOURS = 7 * 24;
 const competitorInput = z.object({ competitor: z.string().min(3).max(253) }).strict();
 const explorerInput = z.object({
   domain: z.string().min(3).max(253),
@@ -224,7 +231,11 @@ const keywordOverviewInput = z.object({
   keyword: z.string().trim().min(1).max(200),
   locationCode: z.number().int().positive().default(2840),
   languageCode: z.string().regex(/^[a-z]{2}$/).default("en"),
+  /** A US state, county, city, ZIP code or metro area: Google's numbers and results for there. */
+  placeCode: placeCodeInput,
   peek: z.boolean().default(false),
+  /** Buy the full overview (difficulty, who ranks, traffic potential) when there is no saved one; without it, Google's free numbers answer. */
+  full: z.boolean().default(false),
   refresh: z.boolean().default(false),
 }).strict();
 const historyInput = z.object({ device: z.enum(["desktop", "mobile"]).optional(), tag: z.string().trim().min(1).max(40).optional() }).strict();
@@ -512,16 +523,22 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     // The keywords still without a volume are read INSIDE the locked section: a request that waited for another (in
     // this process or another one) finds what that one already filled in, and buys only what is still missing.
     const result = await once(`volumes:${user}:${site.id}`, async () => {
-      const { rows } = await pool.query("SELECT id, keyword FROM seo_keywords WHERE site_id=$1 AND (volume_checked_at IS NULL OR volume_checked_at<now()-interval '30 days') ORDER BY id LIMIT 1000", [site.id]);
+      // Each keyword's volume is for the place it is checked from (a city keyword gets the city's searches), from
+      // Google's own numbers first (free); the paid source only answers when Google cannot.
+      const { rows } = await pool.query("SELECT id, keyword, coalesce(location_code, $2) AS geo FROM seo_keywords WHERE site_id=$1 AND (volume_checked_at IS NULL OR volume_checked_at<now()-interval '30 days') ORDER BY id LIMIT 1000", [site.id, site.location_code]);
       if (!rows.length) return { updated: 0 };
-      const out = await withBudget(user, estimateAdsVolumeUsd(rows.length), () => adsSearchVolume({ keywords: rows.map((r: any) => r.keyword), locationCode: site.location_code, languageCode: site.language_code }), { label: `Search volumes — ${rows.length} keyword${rows.length === 1 ? "" : "s"} for ${site.domain}` });
-      const byKeyword = new Map(out.data.map((v) => [v.keyword.toLowerCase(), v]));
+      const byPlace = new Map<number, any[]>();
+      for (const r of rows) { const g = Number(r.geo); byPlace.set(g, [...(byPlace.get(g) ?? []), r]); }
       let updated = 0;
-      for (const r of rows) {
-        const v = byKeyword.get(r.keyword.toLowerCase());
-        if (!v) continue;
-        await pool.query("UPDATE seo_keywords SET search_volume=$2, cpc=$3, volume_checked_at=now() WHERE id=$1", [r.id, v.searchVolume, v.cpc]);
-        updated++;
+      for (const [geo, group] of byPlace) {
+        const out = await withBudget(user, estimateAdsVolumeUsd(group.length), () => keywordVolumes(group.map((r: any) => r.keyword), geo, site.language_code), { label: `Search volumes — ${group.length} keyword${group.length === 1 ? "" : "s"} for ${site.domain}` });
+        const byKeyword = new Map(out.data.map((v) => [v.keyword.toLowerCase(), v]));
+        for (const r of group) {
+          const v = byKeyword.get(r.keyword.toLowerCase());
+          if (!v) continue;
+          await pool.query("UPDATE seo_keywords SET search_volume=$2, cpc=$3, volume_checked_at=now() WHERE id=$1", [r.id, v.searchVolume, v.cpc]);
+          updated++;
+        }
       }
       return { updated };
     });
@@ -561,6 +578,15 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   route("post", "/api/seo/keywords/research", async (req, res, user, ent) => {
     const input = researchInput.parse(req.body);
     if (!marketOk(input)) return res.status(400).json({ message: "That country isn't available." });
+    const researchPlace = await resolvePlace(input.placeCode, input);
+    if (plannerConfigured()) {
+      // Google's own keyword ideas: free (owner, 2026-10-10). Difficulty and intent are not Google's to give.
+      try {
+        const ideas = await plannerIdeas(input.seed, researchPlace?.code ?? input.locationCode, input.languageCode, SUGGESTION_LIMIT);
+        return res.json({ seed: input.seed, items: ideas.map((m) => ({ keyword: m.keyword, searchVolume: m.volume, cpc: m.cpc, difficulty: null, competition: m.competitionIndex == null ? null : m.competitionIndex / 100, intent: null })), reused: false, free: true, place: researchPlace, usage: await planUsage(user, ent) });
+      } catch (e: any) { console.warn(`[seo] google keyword ideas unavailable, using the paid source: ${e?.message ?? e}`); }
+    }
+    if (researchPlace) return res.status(503).json({ message: "Keyword ideas for a city, county or state aren't available right now. Try again in a few minutes, or search the whole country." });
     if (!isConfigured()) return notReady(res);
     // A duplicate made within five minutes (a double click, or a request waiting in another server process) is answered
     // from the saved copy and bought once (DUPLICATE_WINDOW_HOURS).
@@ -651,6 +677,27 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const full = effectiveReport({ ...input, target });
     // More conditions than the source takes: refused before anything is looked up, never dropped silently.
     try { reportRequest(full); } catch (e) { if (e instanceof TooManyFilters) return res.status(400).json({ message: e.message }); throw e; }
+    if (forKeyword && plannerConfigured()) {
+      // Matching terms / Related terms / Questions from Google's own keyword ideas: free, for the country or a place
+      // (owner, 2026-10-10). Opening a table is enough — there is nothing to buy, so `peek` answers too.
+      const refusal = freeFilterRefusal(full.filters);
+      if (refusal) return res.status(400).json({ message: refusal });
+      const place = await resolvePlace(input.placeCode, input);
+      const geo = place?.code ?? input.locationCode;
+      const ideasKey = cacheKey("google-ideas", [target, geo, input.languageCode]);
+      let got = await cached<{ fetchedAt: string; ideas: PlannerMetrics[] }>(user, ideasKey, FREE_IDEAS_HOURS);
+      if (!got) {
+        try {
+          got = { fetchedAt: new Date().toISOString(), ideas: await plannerIdeas(target, geo, input.languageCode, FREE_IDEAS_MAX) };
+          const toSave = got;
+          await keep(`google ideas ${target}`, () => saveCached(user, ideasKey, "google-ideas", toSave, 0));
+        } catch (e: any) { console.warn(`[seo] google keyword ideas unavailable for "${target}", using the paid tables: ${e?.message ?? e}`); got = null; }
+      }
+      if (got) {
+        const page = freeIdeaPage({ table: input.table as KeywordTable, seed: target, languageCode: input.languageCode, filters: full.filters, sort: input.sort, limit: input.limit, offset: input.offset, fetchedAt: got.fetchedAt }, got.ideas);
+        return res.json({ page, reused: true, free: true, place });
+      }
+    }
     if (input.table === "ads") {
       // One lookup brings every ad the library will give; each page is cut from that saved copy.
       if (input.offset >= ADS_MAX) return res.status(400).json({ message: `Google's ad library gives the ${ADS_MAX} most recent ads.` });
@@ -749,15 +796,31 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const keyword = cleanKeyword(input.keyword);
     if (!keyword) return res.status(400).json({ message: "Enter a keyword." });
     if (hasOperator(keyword)) return res.status(400).json({ message: NO_OPERATORS });
-    const key = cacheKey("keyword-overview", [keyword, input.locationCode, input.languageCode]);
+    const place = await resolvePlace(input.placeCode, input);
+    const geo = place?.code ?? input.locationCode;
+    // The country's key is the one saved overviews already have; a place adds its code.
+    const key = cacheKey("keyword-overview", place ? [keyword, input.locationCode, input.languageCode, place.code] : [keyword, input.locationCode, input.languageCode]);
     if (!input.refresh) {
       const saved = await cached<KeywordOverview>(user, key, KEYWORD_OVERVIEW_TTL_DAYS * 24);
       if (saved) return res.json({ overview: saved, reused: true });
     }
+    if (!input.full && !input.refresh && plannerConfigured()) {
+      // Google's own numbers first, free (owner, 2026-10-10): volume, cost per click, bids, four years of months.
+      // Difficulty, who ranks and traffic potential come with the full lookup (`full`).
+      const freeKey = cacheKey("keyword-free", [keyword, geo, input.languageCode]);
+      const kept = await cached<KeywordOverview>(user, freeKey, KEYWORD_OVERVIEW_TTL_DAYS * 24);
+      if (kept) return res.json({ overview: kept, reused: true, free: true });
+      const m = await googleNumbers(keyword, geo, input.languageCode);
+      if (m) {
+        const overview = freeOverview({ keyword, locationCode: input.locationCode, languageCode: input.languageCode, place }, m);
+        await keep(`free overview ${keyword}`, () => saveCached(user, freeKey, "keyword-free", overview, 0));
+        return res.json({ overview, reused: false, free: true });
+      }
+    }
     if (input.peek) return res.status(404).json({ code: "no_report", message: "Not looked up yet." });
     if (!isConfigured()) return notReady(res);
     const out = await buyOnce<KeywordOverview>(user, key, "keyword-overview", KEYWORD_OVERVIEW_TTL_DAYS * 24, KEYWORD_OVERVIEW_ESTIMATE_USD,
-      () => fetchKeywordOverview({ keyword, locationCode: input.locationCode, languageCode: input.languageCode }), input.refresh, `Keyword overview — ${keyword}`);
+      async () => fetchKeywordOverview({ keyword, locationCode: input.locationCode, languageCode: input.languageCode, place, google: await googleNumbers(keyword, geo, input.languageCode) }), input.refresh, `Keyword overview — ${keyword}${place ? ` (${place.label})` : ""}`);
     res.status(out.reused ? 200 : 201).json({ overview: out.data, reused: out.reused, saved: out.saved });
   });
 
@@ -1137,13 +1200,21 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (!marketOk(input)) return res.status(400).json({ message: "That country isn't available." });
     const keywords = cleanKeywords(input.keywords);
     if (!keywords.length) return res.status(400).json({ message: "Enter at least one keyword." });
-    const key = cacheKey("keywords-bulk", [[...keywords].sort(), input.locationCode, input.languageCode]);
+    const bulkPlace = await resolvePlace(input.placeCode, input);
+    const key = cacheKey("keywords-bulk", bulkPlace ? [[...keywords].sort(), input.locationCode, input.languageCode, bulkPlace.code] : [[...keywords].sort(), input.locationCode, input.languageCode]);
     const saved = await cached<BulkPage>(user, key, CACHE_HOURS);
     if (saved) return res.json({ page: saved, reused: true });
     if (input.peek) return res.status(404).json({ code: "no_report", message: "Not run yet." });
     if (!isConfigured()) return notReady(res);
     const out = await buyOnce<BulkPage>(user, key, "keywords-bulk", CACHE_HOURS, bulkEstimateUsd(keywords.length),
-      () => fetchBulkKeywords({ keywords, locationCode: input.locationCode, languageCode: input.languageCode }), false, `Bulk keyword analysis — ${keywords.length} keyword${keywords.length === 1 ? "" : "s"}`);
+      async () => {
+        const o = await fetchBulkKeywords({ keywords, locationCode: input.locationCode, languageCode: input.languageCode });
+        if (!bulkPlace) return o;
+        // The place's own volume and cost per click (Google, free); difficulty and intent stay the country's.
+        const v = await keywordVolumes(keywords, bulkPlace.code, input.languageCode);
+        const by = new Map(v.data.map((x) => [x.keyword.toLowerCase(), x]));
+        return { data: { ...o.data, place: bulkPlace, rows: o.data.rows.map((r) => { const x = by.get(r.keyword.toLowerCase()); return { ...r, volume: x?.searchVolume ?? null, cpc: x?.cpc ?? null }; }) }, costUsd: o.costUsd + v.costUsd };
+      }, false, `Bulk keyword analysis — ${keywords.length} keyword${keywords.length === 1 ? "" : "s"}${bulkPlace ? ` (${bulkPlace.label})` : ""}`);
     res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, saved: out.saved });
   });
 

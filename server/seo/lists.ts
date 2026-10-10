@@ -36,6 +36,8 @@ export const bulkInput = z.object({
   keywords: z.array(z.string().max(400)).min(1).max(1000),
   locationCode: z.number().int().positive().default(2840),
   languageCode: z.string().regex(/^[a-z]{2}$/).default("en"),
+  /** A US state, county, city, ZIP code or metro area: its own volumes and cost per click (difficulty stays the country's). */
+  placeCode: z.number().int().positive().nullable().optional(),
   /** Return the saved copy or 404 — never buy. */
   peek: z.boolean().default(false),
 }).strict();
@@ -43,7 +45,7 @@ export const bulkInput = z.object({
 /** The most a bulk analysis of `count` keywords can cost us. */
 export const bulkEstimateUsd = (count: number) => estimateLabsUsd(count);
 
-export type BulkPage = { rows: KeywordIdeaRow[]; /** Asked for, but the source has no numbers for them. */ notFound: string[]; fetchedAt: string };
+export type BulkPage = { rows: KeywordIdeaRow[]; /** Asked for, but the source has no numbers for them. */ notFound: string[]; fetchedAt: string; /** The place the volumes are for (absent = the country). */ place?: { code: number; label: string; kind: string } | null };
 export const listDeps = { request };
 
 export async function fetchBulkKeywords(input: { keywords: string[]; locationCode: number; languageCode: string }): Promise<{ data: BulkPage; costUsd: number }> {
