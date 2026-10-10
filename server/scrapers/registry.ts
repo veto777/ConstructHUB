@@ -191,3 +191,8 @@ registerAdapter(govbuilt);
 
 import citysquared from "./citysquared";
 registerAdapter(citysquared);
+
+import govwell from './govwell';
+registerAdapter(govwell);
+import permitlink from './permitlink';
+registerAdapter(permitlink);
