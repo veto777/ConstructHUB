@@ -11,10 +11,10 @@
  */
 import { describe, expect, it } from "vitest";
 import { AGENCY_LOCATION_BANDS, ANNUAL_MONTHS, PLANS, PLAN_KEYS, agencyPriceCents } from "@shared/plans";
-import { FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT, priceSnapshot } from "@shared/pricing-terms";
+import { ANNUAL_11X_PRICE_BOOK_EFFECTIVE_AT, priceSnapshot } from "@shared/pricing-terms";
 
-// A start on the five-plan book (the live one): the boundary is the deploy time, which may be in the future when this runs.
-const ON_LIVE_BOOK = new Date(Date.parse(FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT) + 3_600_000);
+// A start on the live book (annual 11x): the boundary is the deploy time, which may be in the future when this runs.
+const ON_LIVE_BOOK = new Date(Date.parse(ANNUAL_11X_PRICE_BOOK_EFFECTIVE_AT) + 3_600_000);
 
 /**
  * The price book as it is from the 2026-10-09 five-plan ladder. Do not "fix"

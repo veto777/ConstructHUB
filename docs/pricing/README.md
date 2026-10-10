@@ -149,3 +149,14 @@ When a new ladder goes live:
 2. Keep the previous book frozen as a dated constant; never edit it.
 3. Existing snapshots are never rewritten.
 
+Dated books (`shared/pricing-terms.ts priceBookAt`): four-plan
+(`LEGACY_FOUNDING_PRICE_BOOK`, until 2026-10-09T20:34:00Z) → five-plan, annual
+10x (`FIVE_PLAN_FOUNDING_PRICE_BOOK`, from 20:34:00Z) → five-plan, annual 11x
+(`ANNUAL_11X_FOUNDING_PRICE_BOOK`, from 2026-10-09T20:51:41Z, when commit
+5061ece9 went live). Add the next book after the last one and add its key to
+`snapshotBooksJson` / `SNAPSHOT_AT_SQL` in `server/billing/pricing-terms.ts`.
+
+The CRM (`shared/crm-plans.ts`) has no founding lock and no dated book: a CRM
+subscriber keeps the Stripe Price their plan line was sold at
+(`server/crm/billing.ts keepsCrmPlanPrice`) until they change plan or interval.
+

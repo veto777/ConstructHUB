@@ -9,7 +9,8 @@ vi.mock("../db", () => ({ pool: { query: vi.fn(async () => ({ rows: [] })), conn
 
 import { ACCESS_STATUSES, AGENCY_LOCATION_BANDS, ANNUAL_MONTHS, LEGACY_PLAN_MAP, PLANS, PLAN_KEYS } from "@shared/plans";
 import {
-  FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT, LEGACY_FOUNDING_PRICE_BOOK,
+  ANNUAL_11X_FOUNDING_PRICE_BOOK, ANNUAL_11X_PRICE_BOOK_EFFECTIVE_AT, FIVE_PLAN_FOUNDING_PRICE_BOOK, FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT,
+  LEGACY_FOUNDING_PRICE_BOOK, priceBookAt,
   FOUNDING_MEMBER_LINE, FOUNDING_OFFER_LINE, foundingPrice, isFoundingMember, parseFoundingPrices, priceSnapshot,
   type AccountPricingTerms, type FoundingPrices,
 } from "@shared/pricing-terms";
@@ -26,8 +27,8 @@ const member = (prices: unknown, at: Date | string | null = "2026-10-08T12:00:00
   ({ seoGrandfatheredAt: null, seoGrandfatheredPlan: null, foundingMemberAt: at, foundingPrices: prices as FoundingPrices | null });
 const T = (iso: string) => new Date(iso);
 
-// A start on the five-plan book: the boundary is the deploy time, so derive it rather than assume a date.
-const AFTER_BOUNDARY = new Date(Date.parse(FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT) + 12 * 3_600_000).toISOString();
+// A start on the live (newest) book: the boundary is the deploy time, so derive it rather than assume a date.
+const AFTER_BOUNDARY = new Date(Date.parse(ANNUAL_11X_PRICE_BOOK_EFFECTIVE_AT) + 12 * 3_600_000).toISOString();
 describe("the price snapshot a founding member keeps", () => {
   it("copies every plan's two prices and the Agency bands from the price book, with the time it was taken", () => {
     const snap = snapshotAt(AFTER_BOUNDARY);
@@ -68,12 +69,30 @@ describe("the price snapshot a founding member keeps", () => {
     expect(snapshotAt("2026-10-08T23:59:59.999Z").agencyBands[1].centsPerLocation).toBe(1500);
   });
 
-  it("uses the five-plan book at the inclusive cutover boundary", () => {
+  it("uses the five-plan book (annual 10x, as deployed 2026-10-09T20:34Z) at its inclusive boundary", () => {
     const snap = snapshotAt(FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT);
-    expect(snap.plans.pro).toEqual({ monthlyCents: 9900, annualCents: PLANS.pro.annualCents });
-    expect(snap.plans.team).toEqual({ monthlyCents: 4900, annualCents: PLANS.team.annualCents });
-    expect(snap.plans.agency).toEqual({ monthlyCents: 44900, annualCents: PLANS.agency.annualCents });
+    expect(snap.plans).toEqual({
+      starter: { monthlyCents: 2900, annualCents: 29000 },
+      team: { monthlyCents: 4900, annualCents: 49000 },
+      pro: { monthlyCents: 9900, annualCents: 99000 },
+      growth: { monthlyCents: 19900, annualCents: 199000 },
+      agency: { monthlyCents: 44900, annualCents: 449000 },
+    });
+    expect(snap.annualMonths).toBe(10);
     expect(snap.agencyIncludedLocations).toBe(-1);
+    // Still the 10x book one millisecond before the 11x boundary.
+    const last = snapshotAt(new Date(Date.parse(ANNUAL_11X_PRICE_BOOK_EFFECTIVE_AT) - 1).toISOString());
+    expect(last.plans).toEqual(snap.plans);
+    expect(Object.isFrozen(FIVE_PLAN_FOUNDING_PRICE_BOOK.plans.pro)).toBe(true);
+  });
+
+  it("uses the annual-11x book from its inclusive boundary on, and it is the live price book", () => {
+    expect(Date.parse(ANNUAL_11X_PRICE_BOOK_EFFECTIVE_AT)).toBeGreaterThan(Date.parse(FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT));
+    const snap = snapshotAt(ANNUAL_11X_PRICE_BOOK_EFFECTIVE_AT);
+    for (const key of PLAN_KEYS) expect(snap.plans[key]).toEqual({ monthlyCents: PLANS[key].monthlyCents, annualCents: PLANS[key].annualCents });
+    expect(snap.plans.pro).toEqual({ monthlyCents: 9900, annualCents: 108900 });
+    expect(snap.annualMonths).toBe(11);
+    expect(priceBookAt(T(ANNUAL_11X_PRICE_BOOK_EFFECTIVE_AT))).toBe(ANNUAL_11X_FOUNDING_PRICE_BOOK);
   });
 
   it("reads only a well-formed stored value", () => {
@@ -214,6 +233,7 @@ describe("the founding member mark (noteFoundingMember)", () => {
   it.each([
     ["2026-10-08T23:59:59.000Z", 7900],
     [FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT, 9900],
+    [ANNUAL_11X_PRICE_BOOK_EFFECTIVE_AT, 9900],
     ["2026-10-10T00:00:00.000Z", 9900],
   ])("locks the checkout/start book for %s when the first successful write happens later", async (start, cents) => {
     const q = fakeQ(() => ({ rows: [{ user_id: 7 }] }));
@@ -221,7 +241,7 @@ describe("the founding member mark (noteFoundingMember)", () => {
     const snapshot = JSON.parse(q.calls[0].values[1] as string);
     expect(snapshot.capturedAt).toBe(start);
     expect(foundingPrice(member(snapshot), "pro", "month")).toBe(cents);
-    expect(foundingPrice(member(snapshot), "pro", "year")).toBe(cents * (T(start) < T(FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT) ? LEGACY_FOUNDING_PRICE_BOOK.annualMonths : ANNUAL_MONTHS));
+    expect(foundingPrice(member(snapshot), "pro", "year")).toBe(cents * priceBookAt(T(start)).annualMonths);
   });
 
   it("preserves an existing snapshot on conflicts, including one stored before the membership mark", async () => {
@@ -383,14 +403,19 @@ describe("boot reconciliation", () => {
     await reconcilePricingTerms(late, T("2026-11-01T12:00:00Z"));
     expect(late.calls[1]).toEqual(early.calls[1]);
     const { text, values } = late.calls[1];
-    expect(text).toContain(`CASE WHEN s.start_date::timestamptz < '${FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT}'::timestamptz`);
-    expect(text).toContain("THEN $1::jsonb->'legacy' ELSE $1::jsonb->'current' END");
+    expect(text).toContain(`CASE WHEN s.start_date::timestamptz < '${FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT}'::timestamptz THEN $1::jsonb->'legacy'`);
+    expect(text).toContain(`WHEN s.start_date::timestamptz < '${ANNUAL_11X_PRICE_BOOK_EFFECTIVE_AT}'::timestamptz THEN $1::jsonb->'fivePlan'`);
+    expect(text).toContain("ELSE $1::jsonb->'current' END");
     expect(text).toContain(`jsonb_build_object('capturedAt', to_char(s.start_date::timestamptz AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))`);
     const books = JSON.parse(values[0] as string);
     expect(books.legacy).toEqual(snapshotAt(new Date(Date.parse(FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT) - 1).toISOString()));
-    expect(books.current).toEqual(snapshotAt(FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT));
+    expect(books.fivePlan).toEqual(snapshotAt(FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT));
+    expect(books.current).toEqual(snapshotAt(ANNUAL_11X_PRICE_BOOK_EFFECTIVE_AT));
     expect(foundingPrice(member(books.legacy), "pro", "month")).toBe(7900);
+    expect(foundingPrice(member(books.fivePlan), "pro", "month")).toBe(9900);
+    expect(foundingPrice(member(books.fivePlan), "pro", "year")).toBe(99000);
     expect(foundingPrice(member(books.current), "pro", "month")).toBe(9900);
+    expect(foundingPrice(member(books.current), "pro", "year")).toBe(108900);
     // Also guard a concurrent webhook winning after the SELECT's NOT EXISTS.
     expect(text).toContain("WHERE account_pricing_terms.founding_member_at IS NULL");
     expect(text).toContain("founding_prices = COALESCE(account_pricing_terms.founding_prices, EXCLUDED.founding_prices)");
@@ -406,7 +431,9 @@ describe("boot reconciliation", () => {
     expect(cutover.text).toContain(`CASE WHEN COALESCE(s.start_date::timestamptz, '${FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT}'::timestamptz - interval '1 millisecond') < '${FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT}'::timestamptz`);
     // An existing subscriber with no stored start date is dated before the boundary: the four-plan book.
     expect(cutover.text).not.toContain("COALESCE(s.start_date::timestamptz, $6::timestamptz)");
-    expect(cutover.text).toContain("THEN $1::jsonb->'legacy' ELSE $1::jsonb->'current' END");
+    expect(cutover.text).toContain("THEN $1::jsonb->'legacy'");
+    expect(cutover.text).toContain("THEN $1::jsonb->'fivePlan'");
+    expect(cutover.text).toContain("ELSE $1::jsonb->'current' END");
     expect(cutover.text).toContain("founding_prices = COALESCE(account_pricing_terms.founding_prices, EXCLUDED.founding_prices)");
   });
 

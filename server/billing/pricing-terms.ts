@@ -44,7 +44,7 @@
  */
 import { pool } from "../db";
 import { ACCESS_STATUSES, LEGACY_PLAN_MAP, PLAN_KEYS } from "@shared/plans";
-import { FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT, priceSnapshot, parseFoundingPrices, type AccountPricingTerms } from "@shared/pricing-terms";
+import { ANNUAL_11X_PRICE_BOOK_EFFECTIVE_AT, FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT, priceSnapshot, parseFoundingPrices, type AccountPricingTerms } from "@shared/pricing-terms";
 import { STRIPE_ENDED_STATUSES, SUBSCRIPTION_ORDER } from "../entitlements";
 
 type Queryable = { query: (text: string, values?: unknown[]) => Promise<{ rows: any[]; rowCount?: number | null }> };
@@ -251,13 +251,16 @@ const snapshotJson = (startedAt: Date) => JSON.stringify(priceSnapshot(startedAt
 // Bulk writes select independently for each subscription, in the same atomic
 // statement as eligibility and conflict handling. Keep the books in the shared
 // helper; SQL only selects one and stamps the subscription's UTC start time.
+// 'current' is always the newest book; the older ones keep their own keys.
 const snapshotBooksJson = JSON.stringify({
   legacy: priceSnapshot(new Date(Date.parse(FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT) - 1)),
-  current: priceSnapshot(new Date(FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT)),
+  fivePlan: priceSnapshot(new Date(FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT)),
+  current: priceSnapshot(new Date(ANNUAL_11X_PRICE_BOOK_EFFECTIVE_AT)),
 });
 const SNAPSHOT_AT_SQL = (at: string) => `(
-  (CASE WHEN ${at} < '${FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT}'::timestamptz
-    THEN $1::jsonb->'legacy' ELSE $1::jsonb->'current' END)
+  (CASE WHEN ${at} < '${FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT}'::timestamptz THEN $1::jsonb->'legacy'
+    WHEN ${at} < '${ANNUAL_11X_PRICE_BOOK_EFFECTIVE_AT}'::timestamptz THEN $1::jsonb->'fivePlan'
+    ELSE $1::jsonb->'current' END)
   || jsonb_build_object('capturedAt', to_char(${at} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))) `;
 
 /**

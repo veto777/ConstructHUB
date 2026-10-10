@@ -246,16 +246,20 @@ type CrmCurrent = ReturnType<typeof describeCrmSubscription>;
  * through `priceId`, so billing-jobcam.test.ts drives it with a double.
  */
 export async function crmChangeItems(
-  current: Pick<CrmCurrent, "planItem" | "seatItem" | "jobcamItem" | "extraSeats">,
+  current: Pick<CrmCurrent, "plan" | "interval" | "planItem" | "seatItem" | "jobcamItem" | "extraSeats">,
   order: CrmOrder,
   priceId: (spec: ReturnType<typeof crmPlanPriceSpec>) => Promise<string>,
 ): Promise<Stripe.SubscriptionUpdateParams.Item[]> {
   const items: Stripe.SubscriptionUpdateParams.Item[] = [];
-  const planPrice = await priceId(crmPlanPriceSpec(order.plan, order.interval));
   if (current.planItem) {
-    if (current.planItem.price.id !== planPrice) items.push({ id: current.planItem.id, price: planPrice, quantity: 1 });
+    // Same plan, same interval (a seat or add-on edit): the plan line keeps the price it was sold at,
+    // so a CRM repricing never moves an existing subscriber who did not ask for a new plan.
+    if (!keepsCrmPlanPrice(current, order)) {
+      const planPrice = await priceId(crmPlanPriceSpec(order.plan, order.interval));
+      if (current.planItem.price.id !== planPrice) items.push({ id: current.planItem.id, price: planPrice, quantity: 1 });
+    }
   } else {
-    items.push({ price: planPrice, quantity: 1 });
+    items.push({ price: await priceId(crmPlanPriceSpec(order.plan, order.interval)), quantity: 1 });
   }
   if (current.seatItem) {
     if (order.extraSeats === 0) items.push({ id: current.seatItem.id, deleted: true });
@@ -280,6 +284,11 @@ export async function crmChangeItems(
   return items;
 }
 
+/** The order leaves the plan and interval as they are: the existing plan line (and its price) stays. */
+export function keepsCrmPlanPrice(current: Pick<CrmCurrent, "plan" | "interval" | "planItem">, order: CrmOrder): boolean {
+  return !!current.planItem && current.plan === order.plan && current.interval === order.interval;
+}
+
 /** Read-only recurring order, using the same fallback rules as an actual change. */
 export function crmChangePreview(sub: Stripe.Subscription, body: unknown) {
   const current = describeCrmSubscription(sub);
@@ -290,7 +299,8 @@ export function crmChangePreview(sub: Stripe.Subscription, body: unknown) {
   const seatCents = order.interval === "year" ? CRM_EXTRA_SEAT_ANNUAL_CENTS : CRM_EXTRA_SEAT_MONTHLY_CENTS;
   return {
     order,
-    recurringCents: crmPlanPriceCents(order.plan, order.interval)
+    recurringCents: (keepsCrmPlanPrice(current, order) && typeof current.planItem?.price.unit_amount === "number"
+      ? current.planItem.price.unit_amount : crmPlanPriceCents(order.plan, order.interval))
       + order.extraSeats * seatCents
       + (order.jobcam ? crmAddonPriceCents("jobcam", order.interval) : 0),
   };

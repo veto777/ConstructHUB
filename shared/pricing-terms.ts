@@ -81,9 +81,38 @@ export const LEGACY_FOUNDING_PRICE_BOOK = Object.freeze({
   annualMonths: 10,
 });
 
-/** Keep dated books immutable: future repricing must add a version. */
+/**
+ * Frozen five-plan book as deployed at FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT
+ * (commit 99b43ae9): annual = 10x monthly. Live until the 11x book below.
+ * Keep dated books immutable: future repricing must add a version.
+ */
 export const FIVE_PLAN_FOUNDING_PRICE_BOOK = Object.freeze({
   effectiveFrom: FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT,
+  plans: Object.freeze({
+    starter: Object.freeze({ monthlyCents: 2900, annualCents: 29000 }),
+    team: Object.freeze({ monthlyCents: 4900, annualCents: 49000 }),
+    pro: Object.freeze({ monthlyCents: 9900, annualCents: 99000 }),
+    growth: Object.freeze({ monthlyCents: 19900, annualCents: 199000 }),
+    agency: Object.freeze({ monthlyCents: 44900, annualCents: 449000 }),
+  }),
+  // Retain the serialized shape; new Unlimited subscriptions have no bands.
+  agencyBands: LEGACY_FOUNDING_PRICE_BOOK.agencyBands,
+  agencyIncludedLocations: -1,
+  annualMonths: 10,
+});
+
+/**
+ * Inclusive UTC boundary of the annual-is-11x book (owner, 2026-10-09: "1 month
+ * free not 2"). Commit 5061ece9 went live in production at this moment (vb11
+ * journal: "serving on port 8110" after the 20:51:34Z restart); it had edited
+ * the five-plan book in place, which is restored above.
+ * See docs/pricing/README.md "Deploying a new price book".
+ */
+export const ANNUAL_11X_PRICE_BOOK_EFFECTIVE_AT = "2026-10-09T20:51:41.000Z";
+
+/** Frozen five-plan book with annual = 11x monthly (one month free). */
+export const ANNUAL_11X_FOUNDING_PRICE_BOOK = Object.freeze({
+  effectiveFrom: ANNUAL_11X_PRICE_BOOK_EFFECTIVE_AT,
   plans: Object.freeze({
     starter: Object.freeze({ monthlyCents: 2900, annualCents: 31900 }),
     team: Object.freeze({ monthlyCents: 4900, annualCents: 53900 }),
@@ -91,19 +120,27 @@ export const FIVE_PLAN_FOUNDING_PRICE_BOOK = Object.freeze({
     growth: Object.freeze({ monthlyCents: 19900, annualCents: 218900 }),
     agency: Object.freeze({ monthlyCents: 44900, annualCents: 493900 }),
   }),
-  // Retain the serialized shape; new Unlimited subscriptions have no bands.
   agencyBands: LEGACY_FOUNDING_PRICE_BOOK.agencyBands,
   agencyIncludedLocations: -1,
   annualMonths: 11,
 });
 
+/** The dated books, oldest first: each applies from its boundary until the next one's. */
+export function priceBookAt(startedAt: Date) {
+  const t = startedAt.getTime();
+  if (t < Date.parse(FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT)) return LEGACY_FOUNDING_PRICE_BOOK;
+  if (t < Date.parse(ANNUAL_11X_PRICE_BOOK_EFFECTIVE_AT)) return FIVE_PLAN_FOUNDING_PRICE_BOOK;
+  return ANNUAL_11X_FOUNDING_PRICE_BOOK;
+}
+
 /**
  * Copy the book in force at subscription start, never at delayed processing.
- * Add-ons and the separate AI Call Assistant subscription are outside the lock.
+ * Add-ons, the CRM (its own subscription; shared/crm-plans.ts) and the separate
+ * AI Call Assistant subscription are outside the lock: those keep the Stripe
+ * Price they were sold at until the customer changes them.
  */
 export function priceSnapshot(startedAt = new Date()): FoundingPrices {
-  const book = startedAt.getTime() < Date.parse(FIVE_PLAN_PRICE_BOOK_EFFECTIVE_AT)
-    ? LEGACY_FOUNDING_PRICE_BOOK : FIVE_PLAN_FOUNDING_PRICE_BOOK;
+  const book = priceBookAt(startedAt);
   const plans = Object.fromEntries(Object.entries(book.plans).map(([key, price]) => [key, { ...price }])) as FoundingPrices["plans"];
   return {
     plans,

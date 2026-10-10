@@ -90,6 +90,36 @@ describe("CRM recurring change preview and purchase confirmation", () => {
   });
 });
 
+describe("an existing CRM subscriber on an older price (repricing 2026-10-10: Basic $39 -> $49)", () => {
+  // Sold at $39/mo before the repricing: the Stripe line still carries that price.
+  function soldAt39(): Stripe.Subscription {
+    return {
+      id: "sub_old", status: "active", items: { data: [{
+        id: "plan", quantity: 1,
+        price: { id: "price_crm_basic_month_3900", unit_amount: 3900, metadata: { chub_kind: "crm_plan", chub_key: "crm_basic" }, recurring: { interval: "month" } },
+      }] },
+    } as unknown as Stripe.Subscription;
+  }
+
+  it("keeps the plan line and its price when only seats change", async () => {
+    const sub = soldAt39();
+    const preview = crmChangePreview(sub, { extraSeats: 2 });
+    expect(preview.recurringCents).toBe(3900 + 2 * 1700);
+    const items = await crmChangeItems(describeCrmSubscription(sub), preview.order, async (spec) => spec.lookupKey);
+    expect(items).toEqual([{ price: "chub_v1_crmseat_month_1700", quantity: 2 }]);
+  });
+
+  it("moves to the current book only when the customer changes plan or interval", async () => {
+    const sub = soldAt39();
+    const yearly = crmChangePreview(sub, { interval: "year" });
+    expect(yearly.recurringCents).toBe(53900);
+    expect(await crmChangeItems(describeCrmSubscription(sub), yearly.order, async (spec) => spec.lookupKey))
+      .toEqual([{ id: "plan", price: "chub_v1_crmplan_crm_basic_year_53900", quantity: 1 }]);
+    const up = crmChangePreview(sub, { plan: "crm_essentials" });
+    expect(up.recurringCents).toBe(9900);
+  });
+});
+
 describe("CRM change-preview route", () => {
   function route() {
     const routes = new Map<string, Function>();
