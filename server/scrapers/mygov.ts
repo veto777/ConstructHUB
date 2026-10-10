@@ -19,13 +19,13 @@ function str(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null;
 }
 export function parseMyGovLocations(value: unknown): { address: string; location_id: number }[] {
-  if (!Array.isArray(value) || value.some(r => !object(r) || typeof r.address !== "string" || !Number.isSafeInteger(r.location_id) || r.location_id <= 0)) {
+  if (!Array.isArray(value) || value.some(r => !object(r) || typeof r.address !== "string" || typeof r.location_id !== "number" || !Number.isSafeInteger(r.location_id) || r.location_id <= 0)) {
     throw new Error("MyGov lookup response is not a location array");
   }
   return value;
 }
 export function parseMyGovModules(value: unknown): Row[] {
-  if (!Array.isArray(value) || value.some(r => !object(r) || typeof r.module !== "string" || !Number.isSafeInteger(r.total_projects) || r.total_projects < 0)) {
+  if (!Array.isArray(value) || value.some(r => !object(r) || typeof r.module !== "string" || typeof r.total_projects !== "number" || !Number.isSafeInteger(r.total_projects) || r.total_projects < 0)) {
     throw new Error("MyGov response is not a public module list");
   }
   return value;
