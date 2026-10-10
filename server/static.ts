@@ -13,6 +13,7 @@ import { isKnownPath, marketingRouteForCase } from "@shared/app-routes";
 import { withRouteMeta, withSeoHead } from "./seo-html";
 import { withGoogleTag } from "./google-tag";
 import { registerAdsLanding, ADS_LANDING_PATHS } from "./ads-landing";
+import { registerAdsLandingRecording } from "./ads-landing-recording";
 
 export { withRouteMeta, withSeoHead };
 
@@ -173,6 +174,7 @@ export function serveStatic(app: Express, distPath = path.resolve(__dirname, "pu
   // a click-id + campaign-key check, bots blocked and fed to Click Guard.
   registerAdsLanding(app, (publicPath) =>
     prerendered.get(publicPath) ?? withSeoHead(marketingHtml, publicPath, { origin: BASE }));
+  registerAdsLandingRecording(app);
 
   for (const [from, to] of Object.entries(RETIRED_ROUTES)) {
     app.get(from, (_req, res) => res.redirect(301, to));

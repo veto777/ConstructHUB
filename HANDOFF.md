@@ -1,3 +1,33 @@
+## 2026-10-10 — Alpine door intelligence and replay (ads/door-hardening; not deployed)
+
+Ported X4BNet datacenter/VPN IPv4+IPv6 feeds (startup / 12-hour refresh, keep the last good lists on failure),
+native CIDR matching, ipinfo privacy/ASN lookup and optional `IPQS_API_KEY`, a 30-day `ip_intel_cache`, and
+a 1.5-second response budget with `uncertain` hits enriched afterwards. Bot/proxy hits maintain a 60-day
+landing ban refreshed every 10 minutes. Owner and DNS-verified Google exceptions precede exclusions.
+Added rrweb recording on all three doors, immediate normal-fetch full snapshots, ordered/idempotent
+5-second batches, lifecycle flushing, masked inputs, 10 MB / 30-minute caps, and `ads_lp_rr` storage.
+Replay/hit-list endpoints require `requirePlatformAdmin`; the Ads manager's Landing door tab shows the
+last 200 hits. Recording retention runs every 24 hours under the existing Ads worker advisory lock.
+
+**Behavior choice requiring review:** Alpine's supplied 2026-10-09 implementation serves the public page
+in place for every verdict to support “every visit” recording. This port follows that behavior: block /
+redirect verdicts still log, ban and exclude IPs, but no longer produce HTTP 403 / 302 responses on normal
+door requests. The user was asked about the conflict with preserving ConstructHUB's enforcement and
+had not replied when this entry was written. Verified Google alone receives a recorder-off marker.
+Ordinary allowed US visitors remain unexcluded by default, as requested for the nationwide campaign.
+Alpine-only Turnstile/probe/conversion machinery, site-wide bans, range escalation and automatic
+exclusion of every served visitor were not ported. This lane does not change edge configuration.
+
+Validation: Node 20.19.6, `npx tsc --noEmit -p .` clean; the requested three-file Vitest command passes
+56 tests (verdicts, IPv4/IPv6, cache/failure/budget behavior, HTTP endpoint contracts with mocked storage,
+browser recording transport and cache headers). No live-database or deployed-edge test was run.
+`rrweb` and `rrweb-player` were installed only in this worktree's ignored `.cache/door-deps`; local
+`node_modules` now links shared packages individually plus these private packages, without modifying
+the shared dependency directory. `package-lock.json` is untouched per lane scope; the integrating lane
+must reconcile it with the two new dependencies. Commit is blocked: `.git` points to the absent
+`/home/veto/ConstructHUB/.git/worktrees/ConstructHUB-door2`. No Git metadata was fabricated, and
+`.alpine-ref` was not staged. No merge or deployment.
+
 ## 2026-10-10 — /googleads-pricing door; constructhub.us in Click Guard (ads/pricing-door)
 
 The 2026-10-09 Performance Max campaign (681-225-6576, under MCC 831-008-9188) now lands on the door
