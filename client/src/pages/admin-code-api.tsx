@@ -10,7 +10,8 @@ import { GoogleSectionHeader } from "@/components/google";
  *
  * Every token writes only to its own branch (devapi/…) on GitHub; nothing
  * runs or deploys until the owner merges and deploys it. Issuing needs a
- * Google re-verification from the last 15 minutes (server/dev-api/routes.ts).
+ * Google re-verification from the last 15 minutes AND the admin's
+ * authenticator code (server/dev-api/routes.ts).
  */
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -41,7 +42,7 @@ type TokenItem = {
 };
 type Payload = {
   configured: boolean; apiUrl: string; baseBranch: string | null; hours: { min: number; max: number }; maxLive: number;
-  verification: { googleLinked: boolean; googleVerifiedUntil: string | null }; tokens: TokenItem[];
+  verification: { googleLinked: boolean; totpEnabled: boolean; googleVerifiedUntil: string | null }; tokens: TokenItem[];
 };
 type Issued = { token: string; apiUrl: string; item: TokenItem };
 type Activity = {
@@ -164,14 +165,15 @@ export default function AdminCodeApiPage() {
   const [hours, setHours] = useState(24);
   const [access, setAccess] = useState<"read" | "write">("write");
   const [issued, setIssued] = useState<Issued | null>(null);
+  const [totpCode, setTotpCode] = useState("");
   const [revoking, setRevoking] = useState<TokenItem | null>(null);
 
   const issue = useMutation({
     mutationFn: async () => (await apiRequest("POST", KEY, {
-      name: name.trim(), holderType: holder, hours, scopes: access === "write" ? ["read", "write"] : ["read"],
+      name: name.trim(), holderType: holder, hours, scopes: access === "write" ? ["read", "write"] : ["read"], totpCode,
     })).json() as Promise<Issued>,
-    onSuccess: (out) => { setIssued(out); setName(""); void queryClient.invalidateQueries({ queryKey: [KEY] }); },
-    onError: (e) => { toast({ title: "Token not issued", description: apiErrorMessage(e), variant: "destructive" }); void queryClient.invalidateQueries({ queryKey: [KEY] }); },
+    onSuccess: (out) => { setIssued(out); setName(""); setTotpCode(""); void queryClient.invalidateQueries({ queryKey: [KEY] }); },
+    onError: (e) => { setTotpCode(""); toast({ title: "Token not issued", description: apiErrorMessage(e), variant: "destructive" }); void queryClient.invalidateQueries({ queryKey: [KEY] }); },
   });
   const revoke = useMutation({
     mutationFn: async (t: TokenItem) => (await apiRequest("DELETE", `${KEY}/${t.id}`)).json(),
@@ -181,7 +183,8 @@ export default function AdminCodeApiPage() {
 
   const verifiedUntil = data?.verification.googleVerifiedUntil ? new Date(data.verification.googleVerifiedUntil).getTime() : 0;
   const verified = verifiedUntil > now;
-  const canIssue = !!data?.configured && !!data.verification.googleLinked && verified && !!name.trim() && !issue.isPending;
+  const canIssue = !!data?.configured && !!data.verification.googleLinked && !!data.verification.totpEnabled && verified
+    && !!name.trim() && /^\d{6}$/.test(totpCode) && !issue.isPending;
   const live = data?.tokens.filter((t) => t.status === "live") ?? [];
   const past = data?.tokens.filter((t) => t.status !== "live") ?? [];
 
@@ -263,9 +266,28 @@ export default function AdminCodeApiPage() {
                 </div>
               </div>
             </div>
-            <Button disabled={!canIssue} onClick={() => issue.mutate()} data-testid="button-issue">
-              {issue.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Issue token
-            </Button>
+            {data.verification.totpEnabled ? (
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="totp-code">Authenticator code</Label>
+                  <Input id="totp-code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="123456" className="w-32 font-mono tracking-widest"
+                    value={totpCode} onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    onKeyDown={(e) => { if (e.key === "Enter" && canIssue) issue.mutate(); }} data-testid="input-totp-code" />
+                </div>
+                <Button disabled={!canIssue} onClick={() => issue.mutate()} data-testid="button-issue">
+                  {issue.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Issue token
+                </Button>
+              </div>
+            ) : (
+              <Alert data-testid="alert-totp-setup">
+                <ShieldCheck className="h-4 w-4" />
+                <AlertTitle>Turn on two-step sign-in first</AlertTitle>
+                <AlertDescription>
+                  Issuing a token needs Google <strong>and</strong> the 6-digit code from an authenticator app (Google Authenticator, Authy).{" "}
+                  <a href="/settings?tab=security" className="font-medium underline">Set it up in Settings → Security</a>, then come back.
+                </AlertDescription>
+              </Alert>
+            )}
           </CardContent>
         </Card>
 

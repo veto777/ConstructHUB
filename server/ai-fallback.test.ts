@@ -41,12 +41,18 @@ describe("runWithFallback", () => {
     expect(await runWithFallback((s) => sleep(5, s), fb, { env: ENV })).toBe("truthcode");
     expect(fb).not.toHaveBeenCalled();
   });
-  it("a slow TruthCoder is cancelled at the wait and OpenAI answers", async () => {
+  it("a slow TruthCoder keeps running when OpenAI fails, and its late answer is used", async () => {
+    const out = await runWithFallback((s) => sleep(150, s), () => Promise.reject(Object.assign(new Error("insufficient_quota"), { status: 429 })), { env: ENV });
+    expect(out).toBe("truthcode");
+    expect(primarySkipped()).toBe(false);
+  });
+  it("a slow TruthCoder that OpenAI beats is cancelled, without a cooldown", async () => {
     let aborted = false;
     const out = await runWithFallback((s) => { s.addEventListener("abort", () => { aborted = true; }); return sleep(5_000, s); },
       async (_s, cfg) => `openai:${cfg.model}`, { env: ENV });
     expect(out).toBe("openai:gpt-5.4-nano");
     expect(aborted).toBe(true);
+    expect(primarySkipped()).toBe(false); // slow is not down: TruthCoder is tried first next time
   });
   it("a TruthCoder error goes to OpenAI at once, then TruthCoder is skipped during the cooldown", async () => {
     const primary = vi.fn(() => Promise.reject(Object.assign(new Error("502"), { status: 502 })));

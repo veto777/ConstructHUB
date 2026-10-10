@@ -4,15 +4,17 @@
  * respond in a reasonable time frame then we use the cheapest model openai has to offer").
  *
  * Every AI request still goes to the app's provider first (AI_INTEGRATIONS_OPENAI_BASE_URL,
- * TruthCoder). When it fails, or has not answered within the wait below, the SAME request goes
- * to OpenAI's API on gpt-5.4-nano. Nothing changes until an OpenAI key is set.
+ * TruthCoder). When it fails, or has not answered within the wait below, the SAME request also
+ * goes to OpenAI's API on gpt-5.4-nano; the first answer wins (a slow TruthCoder keeps running,
+ * so a failing OpenAI never costs an answer TruthCoder would have given). Nothing changes until
+ * an OpenAI key is set.
  *
  *   AI_FALLBACK_OPENAI_API_KEY   the OpenAI key (falls back to HUB_OPENAI_API_KEY, Gabe's key)
  *   AI_FALLBACK=off              turn the fallback off
  *   AI_FALLBACK_MODEL            gpt-5.4-nano (default) or gpt-5.4-mini; anything else → nano
  *   AI_FALLBACK_AFTER_MS         how long TruthCoder gets on text (default 30000)
  *   AI_FALLBACK_VISION_AFTER_MS  …on requests with photos (default 90000; its vision model is slow)
- *   AI_FALLBACK_COOLDOWN_MS      after TruthCoder failed AND OpenAI answered, go straight to
+ *   AI_FALLBACK_COOLDOWN_MS      after TruthCoder errored AND OpenAI answered, go straight to
  *                                OpenAI for this long (default 60000), so nobody waits on a dead
  *                                server request after request
  *
@@ -74,16 +76,15 @@ export const primarySkipped = (now = Date.now()) => now < primaryDownUntil;
 /** A provider error as a short tag (never the body, which may echo the key). */
 const tag = (e: any) => [e?.constructor?.name || e?.name || "Error", e?.status ?? ""].filter(Boolean).join(" ");
 
-class PrimaryTooSlow extends Error {
-  constructor(ms: number) { super(`TruthCoder gave no answer within ${ms} ms`); this.name = "PrimaryTooSlow"; }
-}
 
 /**
- * Run `primary`; on its failure or after `waitMs`, run `fallback` (when the fallback is on).
- * Each gets an AbortSignal: the primary's fires at the deadline, both fire when `signal` does.
- * The caller's own cancel (`signal`) is never treated as a TruthCoder failure.
+ * Run `primary`; when it fails, or has not answered within `waitMs`, also run `fallback`.
+ * A slow TruthCoder is NOT cancelled at the deadline: both run, the first answer wins and the
+ * other is cancelled. So when OpenAI fails (no credit, outage), TruthCoder still has its full
+ * time, exactly as before the fallback existed. Each side gets its own AbortSignal; both fire
+ * when the caller's `signal` does, and the caller's own cancel is never a TruthCoder failure.
  */
-export async function runWithFallback<T>(
+export function runWithFallback<T>(
   primary: (signal: AbortSignal) => Promise<T>,
   fallback: (signal: AbortSignal, cfg: FallbackSettings) => Promise<T>,
   opts: { waitMs?: number; vision?: boolean; signal?: AbortSignal; fallbackTimeoutMs?: number; label?: string; env?: NodeJS.ProcessEnv } = {},
@@ -92,44 +93,57 @@ export async function runWithFallback<T>(
   const outer = opts.signal;
   if (!cfg) return primary(outer ?? new AbortController().signal);
   const label = opts.label || "ai";
-  const fallbackSignal = () => {
-    const t = AbortSignal.timeout(opts.fallbackTimeoutMs ?? 60_000);
-    return outer ? AbortSignal.any([outer, t]) : t;
-  };
+  const primaryCtl = new AbortController(), fallbackCtl = new AbortController();
+  const primarySignal = outer ? AbortSignal.any([outer, primaryCtl.signal]) : primaryCtl.signal;
+  const fallbackSignal = () => AbortSignal.any([fallbackCtl.signal, AbortSignal.timeout(opts.fallbackTimeoutMs ?? 60_000), ...(outer ? [outer] : [])]);
 
   if (primarySkipped()) {
     // TruthCoder failed moments ago and OpenAI answered: OpenAI first, TruthCoder if OpenAI fails.
-    try { return await fallback(fallbackSignal(), cfg); } catch (e) {
+    return fallback(fallbackSignal(), cfg).catch((e) => {
       if (outer?.aborted) throw e;
       console.warn(`[ai-fallback] ${label}: openai ${cfg.model} failed during the cooldown (${tag(e)}); trying truthcode`);
       primaryDownUntil = 0;
-      return primary(outer ?? new AbortController().signal);
-    }
+      return primary(primarySignal);
+    });
   }
 
   const waitMs = opts.waitMs ?? (opts.vision ? cfg.visionAfterMs : cfg.afterMs);
-  const deadline = new AbortController();
-  const timer = setTimeout(() => deadline.abort(new PrimaryTooSlow(waitMs)), waitMs);
   const started = Date.now();
-  let primaryError: unknown;
-  try {
-    return await primary(outer ? AbortSignal.any([outer, deadline.signal]) : deadline.signal);
-  } catch (e) {
-    if (outer?.aborted) throw e;
-    primaryError = deadline.signal.aborted ? deadline.signal.reason : e;
-  } finally {
-    clearTimeout(timer);
-  }
-  const why = primaryError instanceof PrimaryTooSlow ? `no answer in ${waitMs} ms` : tag(primaryError);
-  try {
-    const out = await fallback(fallbackSignal(), cfg);
-    primaryDownUntil = Date.now() + cfg.cooldownMs;
-    console.warn(`[ai-fallback] ${label}: truthcode ${why} after ${Date.now() - started} ms → openai ${cfg.model} answered`);
-    return out;
-  } catch (e) {
-    console.warn(`[ai-fallback] ${label}: truthcode ${why}; openai ${cfg.model} failed too (${tag(e)})`);
-    throw primaryError;
-  }
+  return new Promise<T>((resolve, reject) => {
+    let done = false, fallbackStarted = false, fallbackFailed = false, primaryFailed = false;
+    let primaryError: unknown;
+    const settle = (fn: () => void) => { if (done) return; done = true; clearTimeout(timer); fn(); };
+    const failBoth = () => settle(() => reject(primaryError));
+    const startFallback = (why: string) => {
+      if (fallbackStarted || done) return;
+      fallbackStarted = true;
+      fallback(fallbackSignal(), cfg).then((out) => {
+        if (done) return;
+        primaryCtl.abort();
+        primaryDownUntil = primaryFailed ? Date.now() + cfg.cooldownMs : 0;
+        console.warn(`[ai-fallback] ${label}: truthcode ${why}; openai ${cfg.model} answered after ${Date.now() - started} ms`);
+        settle(() => resolve(out));
+      }, (e) => {
+        fallbackFailed = true;
+        if (done) return;
+        console.warn(`[ai-fallback] ${label}: truthcode ${why}; openai ${cfg.model} failed (${tag(e)})${primaryFailed ? "" : ", still waiting for truthcode"}`);
+        if (primaryFailed) failBoth();
+      });
+    };
+    const timer = setTimeout(() => startFallback(`gave no answer in ${waitMs} ms`), waitMs);
+    primary(primarySignal).then((out) => {
+      if (done) return;
+      fallbackCtl.abort();
+      settle(() => resolve(out));
+    }, (e) => {
+      if (done) return;
+      if (outer?.aborted) { fallbackCtl.abort(); return settle(() => reject(e)); }
+      primaryFailed = true;
+      primaryError = e;
+      if (fallbackFailed) return failBoth();
+      startFallback(`failed (${tag(e)})`);
+    });
+  });
 }
 
 export interface FallbackChatClient {

@@ -7,8 +7,10 @@
  *     (pushed), and cannot write CI config or outside its scope
  *   - submit, revoke (401 afterwards), expiry, and the audit trail
  *
+ *   - and the authenticator code: two-step must be on, the code must be right, a code works once
+ *
  * Run with DATABASE_URL on a constructhub_dev* lane, DEV_AUTH_BYPASS_USER1=true and NODE_ENV=development.
- * Skipped otherwise. User 1's google_id is set for the run and restored after.
+ * Skipped otherwise. User 1's google_id and two-step settings are set for the run and restored after.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import express from "express";
@@ -18,13 +20,25 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Secret, TOTP } from "otpauth";
 
 const DB = process.env.DATABASE_URL ?? "";
 const enabled = /constructhub_dev/.test(DB) && process.env.DEV_AUTH_BYPASS_USER1 === "true" && process.env.NODE_ENV !== "production";
 
 describe.skipIf(!enabled)("Code API routes", () => {
   let server: Server, base = "", root = "", origin = "";
-  let pool: any, oldGoogleId: string | null = null;
+  let pool: any, oldGoogleId: string | null = null, oldTotp: { totp_enabled: boolean; totp_secret: string | null } | null = null;
+  const secret = new Secret({ size: 20 });
+  const totp = new TOTP({ issuer: "ConstructHUB", algorithm: "SHA1", digits: 6, period: 30, secret });
+  // A valid code not used yet, made when it is needed (the check accepts one step either side).
+  const usedCodes = new Set<string>();
+  const freshCode = () => {
+    for (const d of [0, -30_000, 30_000]) {
+      const c = totp.generate({ timestamp: Date.now() + d });
+      if (!usedCodes.has(c)) { usedCodes.add(c); return c; }
+    }
+    throw new Error("no unused code in the current window");
+  };
   const session: any = {};
   const issued: string[] = [];
   const g = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
@@ -50,6 +64,8 @@ describe.skipIf(!enabled)("Code API routes", () => {
     const { rows: [u] } = await pool.query("SELECT google_id FROM users WHERE id=1");
     oldGoogleId = u?.google_id ?? null;
     if (!oldGoogleId) await pool.query("UPDATE users SET google_id=$1 WHERE id=1", [`devapi-test-${Date.now()}`]);
+    ({ rows: [oldTotp] } = await pool.query("SELECT totp_enabled, totp_secret FROM users WHERE id=1"));
+    await pool.query("UPDATE users SET totp_enabled=false WHERE id=1"); // first: two-step off
 
     const { registerDevApi } = await import("./routes");
     const app = express();
@@ -73,6 +89,7 @@ describe.skipIf(!enabled)("Code API routes", () => {
         await pool.query("DELETE FROM dev_api_tokens WHERE id = ANY($1)", [issued]);
       }
       if (!oldGoogleId) await pool.query("UPDATE users SET google_id=NULL WHERE id=1 AND google_id LIKE 'devapi-test-%'");
+      if (oldTotp) await pool.query("UPDATE users SET totp_enabled=$1, totp_secret=$2 WHERE id=1", [oldTotp.totp_enabled, oldTotp.totp_secret]);
     }
     rmSync(root, { recursive: true, force: true });
   });
@@ -97,10 +114,26 @@ describe.skipIf(!enabled)("Code API routes", () => {
     expect((await admin("POST", "/api/admin/dev-tokens", issue)).status).toBe(403);
   });
 
-  it("issues a 24–48 hour token after Google, shown once, on its own pushed branch", async () => {
+  it("after Google, still needs two-step on and the right authenticator code, once", async () => {
     session.googleVerified = { userId: 1, at: Date.now() };
-    expect((await admin("POST", "/api/admin/dev-tokens", { ...issue, hours: 72 })).status).toBe(400);
-    const res = await admin("POST", "/api/admin/dev-tokens", issue);
+    const off = await admin("POST", "/api/admin/dev-tokens", { ...issue, totpCode: "123456" });
+    expect(off.status).toBe(403);
+    expect((await off.json()).totp).toBe("setup");
+    expect((await (await admin("GET", "/api/admin/dev-tokens")).json()).verification.totpEnabled).toBe(false);
+    const { encryptToken } = await import("../gbp/token-crypto");
+    await pool.query("UPDATE users SET totp_enabled=true, totp_secret=$1 WHERE id=1", [encryptToken(secret.base32)]);
+    for (const totpCode of [undefined, "12345", "000000"]) {
+      const res = await admin("POST", "/api/admin/dev-tokens", { ...issue, totpCode });
+      expect(res.status, String(totpCode)).toBe(403);
+      expect((await res.json()).totp).toBe("invalid");
+    }
+  });
+
+  it("issues a 24–48 hour token after Google + code, shown once, on its own pushed branch", async () => {
+    session.googleVerified = { userId: 1, at: Date.now() };
+    const code = freshCode();
+    expect((await admin("POST", "/api/admin/dev-tokens", { ...issue, hours: 72, totpCode: code })).status).toBe(400);
+    const res = await admin("POST", "/api/admin/dev-tokens", { ...issue, totpCode: code });
     expect(res.status).toBe(201);
     const body = await res.json();
     token = body.token; tokenId = body.item.id; branch = body.item.branch; issued.push(tokenId);
@@ -114,6 +147,9 @@ describe.skipIf(!enabled)("Code API routes", () => {
     expect(item.status).toBe("live");
     expect(JSON.stringify(list)).not.toContain(token.slice(15));
     expect(list.verification.googleLinked).toBe(true);
+    expect(list.verification.totpEnabled).toBe(true);
+    // The same code cannot issue a second token (a 4th strike; the right code cleared the earlier 3).
+    expect((await admin("POST", "/api/admin/dev-tokens", { ...issue, totpCode: code })).status).toBe(403);
   });
 
   it("reads the code, never secrets", async () => {
@@ -150,20 +186,30 @@ describe.skipIf(!enabled)("Code API routes", () => {
 
   it("a read-only token cannot write", async () => {
     session.googleVerified = { userId: 1, at: Date.now() };
-    const body = await (await admin("POST", "/api/admin/dev-tokens", { ...issue, name: "Reader", scopes: ["read"], hours: 48 })).json();
+    const body = await (await admin("POST", "/api/admin/dev-tokens", { ...issue, name: "Reader", scopes: ["read"], hours: 48, totpCode: freshCode() })).json();
     issued.push(body.item.id);
     expect((await api(body.token, "GET", "/me")).status).toBe(200);
     expect((await api(body.token, "POST", "/commits", { message: "x", changes: [{ path: "a.ts", content: "x" }] })).status).toBe(403);
   });
 
+  it("five wrong codes lock issuing for 15 minutes", async () => {
+    session.googleVerified = { userId: 1, at: Date.now() };
+    for (let i = 0; i < 5; i++) expect((await admin("POST", "/api/admin/dev-tokens", { ...issue, totpCode: "000000" })).status).toBe(403);
+    const locked = await admin("POST", "/api/admin/dev-tokens", { ...issue, totpCode: freshCode() });
+    expect(locked.status).toBe(429);
+    expect((await locked.json()).totp).toBe("locked");
+  });
+
   it("revoked and expired tokens stop at once", async () => {
     expect((await admin("DELETE", `/api/admin/dev-tokens/${tokenId}`)).status).toBe(200);
     expect((await api(token, "GET", "/me")).status).toBe(401);
-    session.googleVerified = { userId: 1, at: Date.now() };
-    const body = await (await admin("POST", "/api/admin/dev-tokens", { ...issue, name: "Expiring" })).json();
-    issued.push(body.item.id);
-    await pool.query("UPDATE dev_api_tokens SET expires_at = now() - interval '1 second' WHERE id=$1", [body.item.id]);
-    expect((await api(body.token, "GET", "/me")).status).toBe(401);
+    const { newTokenIdentity, insertToken } = await import("./tokens");
+    const id = newTokenIdentity();
+    const row = await insertToken(id, { name: "Expiring", holderType: "agent", hours: 24, scopes: ["read"] }, "0".repeat(40), { id: 1, email: "dev@constructhub.local" });
+    issued.push(row.id);
+    expect((await api(id.token, "GET", "/me")).status).not.toBe(401);
+    await pool.query("UPDATE dev_api_tokens SET expires_at = now() - interval '1 second' WHERE id=$1", [row.id]);
+    expect((await api(id.token, "GET", "/me")).status).toBe(401);
     // The branches stay on GitHub for review.
     expect(g(origin, "rev-parse", branch)).toMatch(/^[0-9a-f]{40}$/);
   });
