@@ -33,7 +33,7 @@ beforeAll(async () => {
     users[key] = (await pool.query("INSERT INTO users(email) VALUES($1) RETURNING id", [`${key === "admin" ? "pa-admin" : `pa-routes-${key}`}-${randomUUID()}@example.invalid`])).rows[0].id;
   await pool.query("INSERT INTO subscriptions(user_id,plan,status) VALUES($1,$2,'active'),($3,$4,'active')", [users.agency, planForModule("permitAlerts"), users.pro, PLANS.pro.key]);
   dbId = (await pool.query("INSERT INTO permit_databases(name, jurisdiction, jurisdiction_type, county_id, platform, search_url) VALUES ('PA routes Faketown', 'Faketown, OR', 'city', 1, 'FakeRoutesPortal', 'https://permits.faketown.invalid/') RETURNING id")).rows[0].id;
-  otherDbId = (await pool.query("INSERT INTO permit_databases(name, jurisdiction, jurisdiction_type, county_id, platform, search_url) VALUES ('PA routes Legacytown', 'Legacytown, OR', 'city', 1, 'SmartGov', 'https://permits.legacy.invalid/') RETURNING id")).rows[0].id;
+  otherDbId = (await pool.query("INSERT INTO permit_databases(name, jurisdiction, jurisdiction_type, county_id, platform, search_url) VALUES ('PA routes Legacytown', 'Legacytown, OR', 'city', 1, 'Skagit County', 'https://permits.legacy.invalid/') RETURNING id")).rows[0].id;
   registerAdapter({ platform: "FakeRoutesPortal", capabilities: { search: ["address"], listRecent: true, detail: false }, async search() { return []; }, async listRecent() { return []; } });
 
   const app = express();
@@ -63,7 +63,7 @@ describe("permit alert routes", () => {
     const r = await call(null, "/api/permits/alert-platforms");
     expect(r.status).toBe(200);
     expect(r.data.platforms).toContain("FakeRoutesPortal");
-    expect(r.data.platforms).not.toContain("SmartGov");
+    expect(r.data.platforms).not.toContain("Skagit County");
     const t = await call(null, "/api/permits/trades");
     expect(t.data.trades.map((x: any) => x.key)).toContain("roofing");
   });

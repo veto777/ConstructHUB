@@ -58,6 +58,7 @@ export const TOOL_RULES: Record<string, Rule> = {
   "/schedules": { landing: "/features/permits", has: (e) => count(e, "permitSearches") },
   "/history": { landing: "/features/permits", has: (e) => count(e, "permitSearches") },
   "/property": { landing: "/features/property", has: (e) => module(e, "propertyRecords") },
+  "/permit-alerts": { landing: "/features/permits", has: (e) => module(e, "permitAlerts") },
   // Google Business
   "/google-profile": { landing: "/features/gbp", has: (e) => count(e, "locations") },
   "/locations": { landing: "/features/gbp", has: (e) => count(e, "locations") },

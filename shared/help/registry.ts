@@ -329,6 +329,18 @@ const entries: Draft[] = [
     howItWorks: "A schedule can only be made for a portal that has a verified link and supports live search. Other accounts see a message that administrator access is required.",
     needs: ["Administrator access."],
   },
+  {
+    key: "permit-alerts", group: "Permits & Databases", route: "/permit-alerts", title: "Permit Alerts",
+    whatItIs: "Watches that tell you when a new permit you care about is filed.",
+    whatItDoes: "Watch an address, a parcel, a contractor, or the trades you work in across the jurisdictions you pick. Watched portals are checked every hour and you get one digest per watch by email, text or Telegram.",
+    howToUse: [
+      "Sidebar → Permits & Databases → Permit Alerts.",
+      "Choose what to watch — an address, a parcel, a contractor, or the trades in an area — and pick the jurisdictions.",
+      "Pick how to hear about hits (email, text or Telegram) and save the watch.",
+    ],
+    howItWorks: "Alerts work on the portals that can list permits by date; the directory marks those Alerts supported. Each watched jurisdiction is polled hourly through the adapter registry, and only jurisdictions with an active watch are polled.",
+    needs: [moduleNeed("permitAlerts")],
+  },
 
   /* ══ Google Business ══════════════════════════════════════════════════════════════════════════ */
   {
