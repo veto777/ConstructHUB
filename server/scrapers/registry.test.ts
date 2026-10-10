@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 vi.mock("../storage", () => ({ storage: {} }));
 import { readFileSync } from "fs";
-import { getAdapter, getAdapterFor, isLegacyAdapter, listPlatformLabels, registerJurisdictionAdapter, renderScrapablePlatformsModule, supportsAlerts } from "./registry";
+import { getAdapter, getAdapterFor, isLegacyAdapter, listScrapableLabels, registerJurisdictionAdapter, renderScrapablePlatformsModule, supportsAlerts } from "./registry";
 import { SCRAPABLE_PLATFORM_LABELS, ADAPTER_JURISDICTIONS, isScrapablePlatform } from "../../shared/scrapable-platforms";
 import type { PortalAdapter } from "./types";
 
@@ -31,7 +31,7 @@ describe("adapter registry", () => {
     const onDisk = readFileSync(new URL("../../shared/scrapable-platforms.ts", import.meta.url), "utf8");
     // The test above registered a fake jurisdiction; compare the platform labels only, and the committed
     // jurisdiction list against the registry minus that fake.
-    const labels = listPlatformLabels();
+    const labels = listScrapableLabels();
     expect([...SCRAPABLE_PLATFORM_LABELS]).toEqual(labels);
     for (const l of labels) expect(isScrapablePlatform(l.toUpperCase())).toBe(true);
     const rendered = renderScrapablePlatformsModule({ excludeJurisdictions: ["testville, zz"] });

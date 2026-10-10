@@ -43,6 +43,12 @@ export function listPlatformLabels(): string[] {
   return Array.from(adapters.keys()).sort();
 }
 
+/** Labels whose adapter can actually run at least one search type (an adapter that only detects a
+ * login wall or CAPTCHA registers its labels for honest reporting but is not "searchable"). */
+export function listScrapableLabels(): string[] {
+  return listPlatformLabels().filter((l) => (adapters.get(l)?.capabilities.search.length ?? 0) > 0);
+}
+
 // Jurisdiction-specific adapters (official open-data feeds keyed by the catalog's
 // "City, ST" / "X County, ST" string). They beat the platform adapter: the bulk feed
 // is cheaper and lists by date, which the alerts poller needs.
@@ -82,7 +88,7 @@ export function renderScrapablePlatformsModule(opts: { excludeJurisdictions?: st
     "// Lower-cased permit_databases.platform labels (and aliases) that have a live-search adapter, plus the",
     "// jurisdictions served by a jurisdiction-specific adapter (official open-data feeds). Shared with the client so the",
     "// Search/Directory pages can tell \"searchable here\" from \"link only\" without a server round trip.",
-    `export const SCRAPABLE_PLATFORM_LABELS: readonly string[] = [\n${list(listPlatformLabels())}];`,
+    `export const SCRAPABLE_PLATFORM_LABELS: readonly string[] = [\n${list(listScrapableLabels())}];`,
     `export const ADAPTER_JURISDICTIONS: readonly string[] = [\n${list(listAdapterJurisdictions().filter((j) => !skip.has(j)))}];`,
     "",
     "const labels = new Set(SCRAPABLE_PLATFORM_LABELS);",
