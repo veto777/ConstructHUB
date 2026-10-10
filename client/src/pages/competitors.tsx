@@ -905,7 +905,7 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retry
                 </div>
                 <div className="p-3 rounded-lg border border-border text-center">
                   <p className="text-2xl font-bold text-muted-foreground">{moderate}</p>
-                  <p className="text-xs text-muted-foreground">Some signals Risk</p>
+                  <p className="text-xs text-muted-foreground">Some signals</p>
                 </div>
                 <div className="p-3 rounded-lg border border-red-500/20 text-center">
                   <p className="text-2xl font-bold text-red-500">{highRisk}</p>

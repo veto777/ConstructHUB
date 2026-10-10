@@ -806,7 +806,7 @@ export default function SiteScanPage() {
       {error && <Notice tone="danger">{error}</Notice>}
       {notice && <Notice>{notice}</Notice>}
       <section data-testid="section-scan-history">
-        <GoogleSectionHeader title="History & score trend" count={data?.total || 0} />
+        <GoogleSectionHeader title="History & score trend" />
         <div className="space-y-3">
           {listError && (
             <Notice tone="danger">

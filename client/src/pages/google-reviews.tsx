@@ -1829,11 +1829,21 @@ function GoogleProfileReviewsTab() {
   const totalReviews = reviewData?.total??0;
   const unanswered = reviewData?.unanswered??0;
   const avgRating = reviewData?.average??0;
-  const ratingDistribution = [5, 4, 3, 2, 1].map(star => ({
-    star,
-    count: reviewData?.distribution?.[5-star]??0,
-    pct: totalReviews > 0 ? Math.round((reviewData?.distribution?.[5-star]??0) / totalReviews * 100) : 0,
-  }));
+  const ratingDistribution = (() => {
+    const counts = [5, 4, 3, 2, 1].map(star => ({ star, count: reviewData?.distribution?.[5-star]??0 }));
+    const exact = counts.map(c => totalReviews > 0 ? (c.count / totalReviews) * 100 : 0);
+    const pcts = exact.map(e => Math.round(e));
+    // largest-remainder adjustment so the bars always sum to exactly 100%
+    const drift = 100 - pcts.reduce((a, b) => a + b, 0);
+    if (drift !== 0 && totalReviews > 0) {
+      const step = drift > 0 ? 1 : -1;
+      [...counts.keys()]
+        .sort((a, b) => (exact[b] - Math.floor(exact[b])) - (exact[a] - Math.floor(exact[a])))
+        .slice(0, Math.abs(drift))
+        .forEach(i => { pcts[i] += step; });
+    }
+    return counts.map((c, i) => ({ ...c, pct: pcts[i] }));
+  })();
 
   const clearFilters = () => {
     setSearchQuery("");

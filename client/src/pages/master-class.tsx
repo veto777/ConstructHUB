@@ -130,11 +130,11 @@ function AgencyTile({ icon: Icon, iconClass, name, caption, agency, url, status,
 }) {
   const usable = url && status !== "dead" ? url : null;
   const className = "flex items-center gap-2 p-3 rounded-lg border bg-muted/30";
-  const body = (sub: string, trailing: React.ReactNode) => (
+  const body = (sub: React.ReactNode, trailing: React.ReactNode) => (
     <>
       <Icon className={`h-4 w-4 ${iconClass} shrink-0`} />
       <div className="min-w-0">
-        <p className="text-xs font-medium truncate">{name}</p>
+        <p className="text-xs font-medium break-words" title={name}>{name}</p>
         <p className="text-[10px] text-muted-foreground">{sub}</p>
       </div>
       {trailing}
@@ -145,7 +145,7 @@ function AgencyTile({ icon: Icon, iconClass, name, caption, agency, url, status,
   }
   const checked = checkedAt ? ` Link checked ${new Date(`${checkedAt}T00:00`).toLocaleDateString()}.` : "";
   const href = usable ?? `https://www.google.com/search?q=${encodeURIComponent(`${agency} ${stateName}`)}`;
-  const sub = !usable ? "Search the web" : status === "unconfirmed" ? `${caption} · link unconfirmed` : caption;
+  const sub: React.ReactNode = !usable ? "Search the web" : status === "unconfirmed" ? <>{caption} · <span className="text-amber-600 dark:text-amber-400">link unconfirmed</span></> : caption;
   const title = usable
     ? `${agency} — opens the agency's site.${status === "unconfirmed" ? " Our automated check couldn't confirm this page." : ""}${checked}`
     : `We don't have a checked link for ${agency} — searches the web instead.`;

@@ -1429,7 +1429,7 @@ export default function CrmSettingsPage() {
                   {smsStatus.canTextClients === false && (
                     <div className="text-xs text-amber-600 dark:text-amber-400 mt-1" data-testid="text-sms-client-note">
                       The shared number texts YOUR team only (bids signed, money landed, client re-opens).
-                      Texting CLIENTS needs your own number — pick "My own number" below. That number needs
+                      Texting CLIENTS needs a dedicated number — pick "A number we set up for you" below. That number needs
                       its carrier registration (10DLC); carriers no longer allow a shared number to text
                       on behalf of many businesses.
                     </div>
@@ -1474,7 +1474,7 @@ export default function CrmSettingsPage() {
                   {/* Buying a ConstructHUB-billed number is a sale — not offered in the iPhone apps
                       (App Store 3.1.3(f)). An account that already has one keeps it, labelled neutrally. */}
                   {!inNativeApp() ? (
-                    <SelectItem value="dedicated">My own number, billed through ConstructHUB</SelectItem>
+                    <SelectItem value="dedicated">A number we set up for you, billed through ConstructHUB</SelectItem>
                   ) : senderForm.mode === "dedicated" ? (
                     <SelectItem value="dedicated">My own number (set up on the website)</SelectItem>
                   ) : null}

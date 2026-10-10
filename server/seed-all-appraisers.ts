@@ -81,7 +81,7 @@ export async function syncAppraiserRecords(records: AppraiserRecord[]) {
       isActive: !!r.portalUrl && ["live", "verified", "unconfirmed"].includes(r.linkStatus || ""),
       linkStatus: r.portalUrl ? (r.linkStatus || "unchecked") : (r.linkStatus === "dead" ? "dead" : "none"),
       lastVerifiedAt: r.lastVerifiedAt ? new Date(r.lastVerifiedAt) : null,
-      notes: `Sourced from NETR Online. Contact for property records in ${r.county} County.`,
+      notes: `Sourced from NETR Online — contact them for property records in ${r.county} County.`,
     };
     const matches = existing.filter(e => e.countyId === countyId && e.notes?.startsWith(REAL_DATA_MARKER));
     if (matches.length) {

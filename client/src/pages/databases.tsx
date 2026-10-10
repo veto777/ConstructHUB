@@ -610,7 +610,7 @@ function ScrapeDialog({
 
   const getPlaceholder = () => {
     switch (searchType) {
-      case "address": return "e.g., 3520 malland";
+      case "address": return "e.g., 3520 Blake St, Denver";
       case "name": return "e.g., Smith, John";
       case "company_name": return "e.g., CM Heating LLC";
       case "permit_number": return "e.g., BLD-2025-0791";

@@ -517,7 +517,7 @@ function InsightsTab({ location }: { location: BusinessLocation }) {
           <table className="w-full text-sm" data-testid="table-performance">
             <thead className={appTableCards.thead}><tr>
               <th className="p-2 text-left">{group === "day" ? "Date" : group === "week" ? "Week" : "Month"}</th>
-              {data.metrics.map((m) => <th className="p-2" key={m}>{PERF_LABELS[m] || m}</th>)}
+              {data.metrics.map((m) => <th className="p-2 whitespace-nowrap" key={m}>{PERF_LABELS[m] || m}</th>)}
             </tr></thead>
             <tbody>
               <tr className={`${appTableCards.tr} border-b font-semibold bg-muted/40`} data-testid="row-performance-total">

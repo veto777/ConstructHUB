@@ -563,7 +563,7 @@ export default function SearchPage() {
           <input
             type="search"
             placeholder={
-              searchType === "address" ? "911, 3520 malland, etc." :
+              searchType === "address" ? "e.g. 3520 Blake St, Denver" :
               searchType === "keyword" ? "siding, roofing, electrical, plumbing..." :
               "Enter search value..."
             }

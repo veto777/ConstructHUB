@@ -25,14 +25,14 @@ export async function auditAccount(api:AdsApi,cid:string,state:State) {
   if(budgets) {
     const measured=budgets.filter(r=>r.metrics?.searchBudgetLostImpressionShare!==undefined && Number.isFinite(Number(r.metrics.searchBudgetLostImpressionShare)));
     const limited=measured.filter(r=>Number(r.metrics.searchBudgetLostImpressionShare)>0.1);
-    findings.push({kind:'budget',severity:limited.length?'warning':measured.length?'info':'unknown',title:measured.length?`${limited.length} campaigns lost >10% search impression share to budget`:'Budget limitation metrics unavailable',detail:`Last 30 days; ${measured.length} campaigns with available metrics. Missing metrics are not zero. Review lead quality before increasing spend.`,fix:google});
+    findings.push({kind:'budget',severity:limited.length?'warning':measured.length?'info':'unknown',title:measured.length?`${limited.length} campaign${limited.length===1?'':'s'} lost >10% search impression share to budget`:'Budget limitation metrics unavailable',detail:`Last 30 days; ${measured.length} campaign${measured.length===1?'':'s'} with available metrics. Missing metrics are not zero. Review lead quality before increasing spend.`,fix:google});
   }
   const terms=await read('terms');
   if(terms) findings.push({kind:'waste',severity:terms.length?'warning':'info',title:`${terms.length} search terms with spend and no reported conversions`,detail:'Top 100 terms in the last 30 days; conversion lag and Google privacy thresholds apply. Review relevance before excluding. '+terms.slice(0,10).map(r=>r.searchTermView?.searchTerm).filter(Boolean).join('; '),fix:{label:'Edit negative keyword preview',action:{kind:'negative'}}});
   const ads=await read('disapproved');
   if(ads) findings.push({kind:'disapproved',severity:ads.length?'warning':'info',title:`${ads.length} disapproved ads`,detail:'Review the policy issue in Google Ads; appeals require account-specific evidence.',fix:google});
   const presence=state.campaign.filter(c=>['SEARCH','DISPLAY','PERFORMANCE_MAX'].includes(c.advertisingChannelType) && c.geoTargetTypeSetting.positiveGeoTargetType!=='PRESENCE');
-  if(presence.length) findings.push({kind:'presence',severity:'warning',title:`${presence.length} campaigns are not presence-only`,detail:'Interest targeting may reach people outside your service area.',fix:{label:'Preview presence-only',action:{kind:'presence'}}});
+  if(presence.length) findings.push({kind:'presence',severity:'warning',title:`${presence.length} campaign${presence.length===1?'':'s'} ${presence.length===1?'is':'are'} not presence-only`,detail:'Interest targeting may reach people outside your service area.',fix:{label:'Preview presence-only',action:{kind:'presence'}}});
   const unscheduled=state.campaign.filter(c=>['SEARCH','DISPLAY','PERFORMANCE_MAX'].includes(c.advertisingChannelType)&&!state.campaignCriterion.some(r=>r.campaign===c.resourceName&&r.adSchedule));
   if(unscheduled.length) findings.push({kind:'schedule',severity:'warning',title:`${unscheduled.length} campaigns have no ad schedule`,detail:'Check whether someone can answer calls during all advertised hours.',fix:{label:'Edit schedule preview',action:{kind:'schedule'}}});
   const lsa=state.campaign.filter(c=>c.advertisingChannelType==='LOCAL_SERVICES');

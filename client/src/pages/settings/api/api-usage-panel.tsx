@@ -99,8 +99,8 @@ export function ApiUsagePanel({ days = 30 }: ApiUsagePanelProps = {}) {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Day</TableHead>
-                          <TableHead className="text-right">Requests</TableHead>
-                          <TableHead className="text-right">Units</TableHead>
+                          <TableHead className="text-right whitespace-nowrap">Requests</TableHead>
+                          <TableHead className="text-right whitespace-nowrap">Units</TableHead>
                           <TableHead>By key</TableHead>
                         </TableRow>
                       </TableHeader>
