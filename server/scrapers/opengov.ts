@@ -60,12 +60,26 @@ export function parseJson(body: string, url: string): unknown {
   return json;
 }
 
-async function get(ctx: AdapterCtx, url: string, json = true): Promise<unknown> {
-  // Reject redirects instead of following a login or a different service.
+async function get(ctx: AdapterCtx, url: string, json = true, redirects = 0): Promise<unknown> {
+  // JSON never follows redirects. HTML permits only same-tenant portal migrations.
   const res = await politeFetch(url, { redirect: "manual", headers: { accept: json ? "application/json" : "text/html", sourceApp: "storefront" } }, { minDelayMs: Math.max(1000, ctx.politeness.minDelayMs), retries: 1 });
   if ([401, 403, 429, 503].includes(res.status)) throw new PortalBlockedError(url, res.status);
+  if (!json && [301, 302, 307, 308].includes(res.status)) {
+    const location = res.headers.get("location");
+    if (!location || redirects >= 3) throw new Error("OpenGov portal redirect did not resolve");
+    const target = new URL(location, url);
+    const original = portalIdentity(url);
+    const redirected = portalIdentity(target.href);
+    if (target.protocol !== "https:" || redirected.tenant !== original.tenant || target.pathname !== "/" || target.search || target.hash) {
+      throw new Error("OpenGov redirected outside the tenant portal");
+    }
+    return get(ctx, target.href, false, redirects + 1);
+  }
   if (!res.ok) throw new Error(`OpenGov HTTP ${res.status}: ${url}`);
   const body = await res.text();
+  if (!json && /<title[^>]*>\s*(?:just a moment|attention required)|cf-chl-|id=["']challenge-form|verify you are human/i.test(body)) {
+    throw new PortalBlockedError(url, 403, "OpenGov returned an anti-bot challenge");
+  }
   return json ? parseJson(body, url) : body;
 }
 
@@ -116,7 +130,7 @@ async function recordPages(ctx: AdapterCtx, first: string, origin: string): Prom
     else {
       const href = typeof link === "string" ? link : object(link) && typeof link.href === "string" ? link.href : null;
       if (!href) throw new Error("Invalid OpenGov pagination link");
-      const candidate = new URL(href, next);
+      const candidate: URL = new URL(href, next);
       const initial = new URL(first);
       if (candidate.origin !== initial.origin || candidate.pathname !== initial.pathname || candidate.username || candidate.password || candidate.hash) throw new Error("Unsafe OpenGov pagination link");
       next = candidate.href;
@@ -209,7 +223,7 @@ const adapter: PortalAdapter = {
     "OpenGov Permits & Licensing",
     "OpenGov (Building permits)",
     "ViewPoint Cloud"
-],
+  ],
   capabilities: { search: ["address", "permit"], listRecent: false, detail: false },
   search,
   async listRecent(ctx) {
