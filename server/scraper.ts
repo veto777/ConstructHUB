@@ -2470,13 +2470,16 @@ export async function scrapePermitDetail(
   rawData: Record<string, any> | null,
   jurisdiction?: string | null
 ): Promise<PermitDetail | null> {
+  // The legacy detail scrapers below own the three platforms they handle (Accela, Tyler EnerGov, Click2Gov):
+  // their deadline/cleanup behavior is covered by permit-details.test.ts and the replacement adapters are not a
+  // drop-in for it. A jurisdiction-specific adapter (e.g. open data) still wins even on those platforms. For every
+  // other platform, a registry adapter that implements detail provides it.
+  const LEGACY_DETAIL = new Set(["Accela", "Tyler EnerGov", "Click2Gov"]);
   const registry = await import("./scrapers/registry");
-  const adapter = registry.getAdapterFor({ platform, jurisdiction: jurisdiction ?? null });
-  if (adapter && !registry.isLegacyAdapter(adapter)) {
-    if (!adapter.detail || !adapter.capabilities.detail) {
-      log(`${adapter.platform} adapter has no detail lookup`, "adapter");
-      return null;
-    }
+  const jurisdictionAdapter = registry.getJurisdictionAdapter(jurisdiction ?? null);
+  const adapter = jurisdictionAdapter
+    ?? (LEGACY_DETAIL.has(platform) ? null : registry.getAdapter(platform));
+  if (adapter && !registry.isLegacyAdapter(adapter) && adapter.detail && adapter.capabilities.detail) {
     const ctx = buildAdapterCtx({ databaseId: 0, databaseName: jurisdiction ?? platform, jurisdiction: jurisdiction ?? "", searchUrl, portalUrl: searchUrl });
     try {
       const record = await adapter.detail(ctx, permitNumber);
@@ -2491,6 +2494,10 @@ export async function scrapePermitDetail(
     } finally {
       await ctx.closeAll();
     }
+  }
+  if (adapter && !registry.isLegacyAdapter(adapter) && !LEGACY_DETAIL.has(platform)) {
+    log(`${adapter.platform} adapter has no detail lookup`, "adapter");
+    return null;
   }
   switch (platform) {
     case "Accela":
