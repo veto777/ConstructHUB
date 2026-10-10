@@ -4,7 +4,7 @@
  * call here is a no-op. A conversion fires once per browser session per kind,
  * so a refresh of /pricing?success=true cannot count twice.
  */
-type ConversionKind = "signup" | "purchase" | "crm_purchase" | "call_assistant_purchase";
+type ConversionKind = "signup" | "purchase" | "crm_purchase" | "call_assistant_purchase" | "alacarte_purchase";
 type GtagConfig = { ids: string[]; conversions: Partial<Record<ConversionKind, string | null>> };
 
 const gtag = (...args: unknown[]) => {

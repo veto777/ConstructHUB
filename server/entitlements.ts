@@ -33,6 +33,14 @@
  * why, so the app can say "update your payment method" instead of "buy it".
  * The platform plan plays no part: a stale Call Assistant key on the platform
  * row's add-ons is ignored (withoutCallAssistantAddons).
+ *
+ * À LA CARTE items (shared/alacarte.ts, owner 2026-10-10: every tool as its
+ * own subscription) are read from alacarte_subscriptions (server/billing/
+ * alacarte-store.ts) in the same query and laid over the plan's allowances and
+ * modules — or over STANDALONE_BASE_LIMITS when the account has no plan at
+ * all — by applyAlacarteGrants, so every gate (requirePlan, requireModule, the
+ * quotas) works the same with or without a plan. `plan` and `accessPlan` stay
+ * null without one; `allowances` and `modules` carry what was bought.
  */
 import type { Request, Response, NextFunction } from "express";
 import { pool } from "./db";
@@ -47,6 +55,8 @@ import {
   type AddonModuleKey, type AnyModuleKey,
 } from "@shared/plans";
 import { parseFoundingPrices, type FoundingPrices } from "@shared/pricing-terms";
+import { ALACARTE, ALACARTE_PRICING_HREF, STANDALONE_BASE_LIMITS, applyAlacarteGrants, alacarteItemForModule } from "@shared/alacarte";
+import { ALACARTE_JOIN_COLUMN, alacarteSchemaReady, alacarteStateOf, type AlacarteJoinedColumns, type AlacarteState } from "./billing/alacarte-store";
 import {
   CALL_ASSISTANT_JOIN_COLUMNS, callAssistantSchemaReady, callAssistantSubscriptionOf,
   type CallAssistantJoinedColumns, type CallAssistantSubscriptionState,
@@ -96,6 +106,12 @@ export type Entitlements = {
   subscriptionStatus: string | null;
   /** The account's Call Assistant subscription (server/voice/subscription-store.ts): status, tier, extra numbers. */
   callAssistant: CallAssistantSubscriptionState;
+  /**
+   * The account's à la carte items (server/billing/alacarte-store.ts): the ones
+   * in force are already laid over `allowances` and `modules`; `paused` ones
+   * are bought but waiting on a payment (shown, never granted).
+   */
+  alacarte: AlacarteState;
   isPlatformAdmin: boolean;
   /** End of a Stripe-less grant (trial code); null for Stripe-managed or open-ended rows. */
   grantEndsAt: Date | null;
@@ -298,10 +314,10 @@ type PricingTermsColumns = {
  * an unknown user. A user without a subscription row comes back with the
  * subscription columns null.
  */
-export async function accountSubscriptionRow(userId: number): Promise<(SubscriptionRow & PricingTermsColumns & CallAssistantJoinedColumns & { email?: string | null; addons?: unknown; id?: number | null }) | undefined> {
-  await callAssistantSchemaReady();
+export async function accountSubscriptionRow(userId: number): Promise<(SubscriptionRow & PricingTermsColumns & CallAssistantJoinedColumns & AlacarteJoinedColumns & { email?: string | null; addons?: unknown; id?: number | null }) | undefined> {
+  await Promise.all([callAssistantSchemaReady(), alacarteSchemaReady()]);
   const { rows: [row] } = await pool.query(
-    `SELECT u.email, s.*, t.seo_grandfathered_at, t.seo_grandfathered_plan, t.founding_member_at, t.founding_prices, ${CALL_ASSISTANT_JOIN_COLUMNS} FROM users u
+    `SELECT u.email, s.*, t.seo_grandfathered_at, t.seo_grandfathered_plan, t.founding_member_at, t.founding_prices, ${CALL_ASSISTANT_JOIN_COLUMNS}, ${ALACARTE_JOIN_COLUMN} FROM users u
        LEFT JOIN LATERAL (
          SELECT * FROM subscriptions x WHERE x.user_id = u.id ${SUBSCRIPTION_ORDER}
        ) s ON true
@@ -349,7 +365,13 @@ export async function getEntitlements(userId: number, now = new Date()): Promise
   const grantEnd = row && !row.stripe_subscription_id && row.current_period_end ? new Date(row.current_period_end) : null;
   // Grandfathering follows the plan the account is on now, while it has one. Admins are unlimited regardless.
   const seoGrandfathered = !!row?.seo_grandfathered_at && !!plan;
-  const base = admin ? platformAdminAllowances() : accessPlan ? allowancesFor(accessPlan, addons) : null;
+  // À la carte items in force are laid over the plan's allowances and modules — or over the stand-alone base
+  // (nothing) when the account has no plan — so a gate reads one shape whatever was bought.
+  const alacarte = alacarteStateOf(row?.alacarte_items);
+  const planModules = admin ? ALL_MODULES : plan ? PLANS[plan].modules : NO_MODULES;
+  const planBase = admin ? platformAdminAllowances() : accessPlan ? allowancesFor(accessPlan, addons) : alacarte.active.length ? STANDALONE_BASE_LIMITS : null;
+  const overlaid = !admin && planBase && alacarte.active.length ? applyAlacarteGrants(planBase, planModules, alacarte.active) : null;
+  const base = overlaid?.limits ?? planBase;
   const allowances = base && !admin && seoGrandfathered && accessPlan ? withSeoGrandfathering(base, accessPlan) : base;
   const foundingMember = row?.founding_member_at
     ? { since: new Date(row.founding_member_at), prices: parseFoundingPrices(row.founding_prices) }
@@ -360,19 +382,26 @@ export async function getEntitlements(userId: number, now = new Date()): Promise
     accessPlan,
     limits: accessPlan ? PLANS[accessPlan].limits : null,
     allowances,
-    modules: admin ? ALL_MODULES : plan ? PLANS[plan].modules : NO_MODULES,
+    modules: overlaid?.modules ?? planModules,
     addonModules,
     addonModulesPaused: addonModulesPausedFor(callAssistant, admin),
     addons,
     storedAddons,
     subscriptionStatus: status,
     callAssistant,
+    alacarte,
     isPlatformAdmin: admin,
     grantEndsAt: plan && grantEnd ? grantEnd : null,
     seoGrandfathered,
     foundingMember,
   };
 }
+
+/** The plan name a limit message names: the access plan's, or "à la carte" for an account on items alone. */
+export const accessPlanName = (ent: Pick<Entitlements, "accessPlan">): string => (ent.accessPlan ? PLANS[ent.accessPlan].name : "à la carte");
+
+/** Does the account hold allowances of its own (a plan, or à la carte items), as opposed to none at all? */
+export const ownsAllowances = (ent: Pick<Entitlements, "accessPlan" | "alacarte">): boolean => !!ent.accessPlan || ent.alacarte.active.length > 0;
 
 /** The cheapest plan whose limits pass `test` (for upgrade prompts). */
 export function cheapestPlanWhere(test: (limits: PlanLimits) => boolean): PlanKey | null {
@@ -651,15 +680,18 @@ export async function usersWithModule(userIds: readonly number[], module: Module
   const ids = [...new Set(userIds.filter((id) => Number.isSafeInteger(id)))];
   const out = new Set<number>();
   if (!ids.length) return out;
+  await alacarteSchemaReady();
   const { rows } = await pool.query(
-    `SELECT u.id AS account_id, u.email, s.plan, s.status, s.stripe_subscription_id, s.current_period_end FROM users u
+    `SELECT u.id AS account_id, u.email, s.plan, s.status, s.stripe_subscription_id, s.current_period_end, ${ALACARTE_JOIN_COLUMN} FROM users u
        LEFT JOIN LATERAL (
          SELECT * FROM subscriptions x WHERE x.user_id = u.id ${SUBSCRIPTION_ORDER}
        ) s ON true
       WHERE u.id = ANY($1::int[])`, [ids, ACCESS_STATUSES]);
   for (const row of rows) {
     const plan = activePlanKey(row, now);
-    if (isPlatformAdminEmail(row.email) || (plan && PLANS[plan].modules[module])) out.add(Number(row.account_id));
+    // An à la carte item in force switches its modules on with or without a plan (shared/alacarte.ts).
+    const viaItem = alacarteStateOf(row.alacarte_items).active.some((h) => ALACARTE[h.key].grants.modules?.includes(module));
+    if (isPlatformAdminEmail(row.email) || (plan && PLANS[plan].modules[module]) || viaItem) out.add(Number(row.account_id));
   }
   return out;
 }
@@ -676,7 +708,12 @@ export const planPausedMessage = (module: ModuleKey) =>
  * section; no plan is "required".
  */
 export function sendModuleRequired(res: Response, module: AnyModuleKey) {
-  if (!isAddonModule(module)) return sendPlanRequired(res, planForModule(module), MODULE_NAMES[module]);
+  if (!isAddonModule(module)) {
+    // The item that sells the module on its own (shared/alacarte.ts), so the client can offer it beside the plan.
+    const item = alacarteItemForModule(module);
+    return sendPlanRequired(res, planForModule(module), MODULE_NAMES[module],
+      item ? { alacarte: { key: item, name: ALACARTE[item].name, href: ALACARTE_PRICING_HREF } } : {});
+  }
   return res.status(402).json({
     code: CALL_ASSISTANT_REQUIRED_CODE,
     addon: ADDON_MODULES[module],

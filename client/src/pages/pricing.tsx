@@ -40,6 +40,8 @@ import { BusinessToolsComparison, CrmComparison } from "@/components/plan-compar
 import { GRID_CREDITS_NOTE } from "@shared/plan-matrix";
 import { CRM_ADDONS, CRM_EXTRA_SEAT_MONTHLY_CENTS } from "@shared/crm-plans";
 import { PurchaseReviewDialog } from "@/components/purchase-review";
+import { AlacarteCards } from "@/components/alacarte-cards";
+import { ALACARTE, type AlacarteKey, isAlacarteKey } from "@shared/alacarte";
 import { trackConversion, trackEvent } from "@/lib/gtag";
 
 // Design B (the marketing site's editorial look): hairline cards on cream, ONE
@@ -98,12 +100,16 @@ function planRequestPrice(r: PlanRequest): string {
   return `${formatUsd(planPriceCents(PLANS[r.plan], r.interval))}${intervalSuffix(r.interval)}`;
 }
 
-type PricingTab = "business" | "crm";
+type PricingTab = "business" | "crm" | "alacarte";
 
 const TABS: { key: PricingTab; label: string; testId: string }[] = [
   { key: "business", label: "Business Tools", testId: "tab-business" },
   { key: "crm", label: "CRM (Customer Relations Management)", testId: "tab-crm" },
+  // Every tool on its own subscription (shared/alacarte.ts, owner 2026-10-10).
+  { key: "alacarte", label: "À la carte", testId: "tab-alacarte" },
 ];
+/** The tabs a #fragment opens: /pricing#crm, /pricing#alacarte. */
+const TAB_BY_HASH: Partial<Record<string, PricingTab>> = { crm: "crm", alacarte: "alacarte" };
 
 export default function PricingPage() {
   const { toast } = useToast();
@@ -173,11 +179,21 @@ export default function PricingPage() {
       void queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       trackConversion("call_assistant_purchase");
       toast({ title: `Your ${CALL_ASSISTANT_NAME} is active`, description: "Set it up under Call Assistant in the sidebar. It is billed on its own subscription, separately from any ConstructHUB plan." });
-    } else if (params.get("canceled") || params.get("crm_canceled") || params.get("call_assistant_canceled")) {
+    } else if (params.get("alacarte_success")) {
+      // One tool bought on its own: its allowances and modules are live, and the sidebar unlocks it.
+      const key = params.get("alacarte_success");
+      void queryClient.invalidateQueries({ queryKey: ["/api/alacarte/me"] });
+      void queryClient.invalidateQueries({ queryKey: ["/api/entitlements"] });
+      void queryClient.invalidateQueries({ queryKey: ["/api/crm/billing/subscription"] });
+      void queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      trackConversion("alacarte_purchase");
+      const name = isAlacarteKey(key) ? ALACARTE[key as AlacarteKey].name : "Your tool";
+      toast({ title: `${name} is active`, description: "It is billed on its own subscription. Find it in the sidebar; manage it in Settings → Billing." });
+    } else if (params.get("canceled") || params.get("crm_canceled") || params.get("call_assistant_canceled") || params.get("alacarte_canceled")) {
       toast({ title: "Checkout canceled", description: "No charges were made." });
     } else return;
     params.delete("success"); params.delete("canceled"); params.delete("crm_success"); params.delete("crm_canceled");
-    params.delete("call_assistant_success"); params.delete("call_assistant_canceled");
+    params.delete("call_assistant_success"); params.delete("call_assistant_canceled"); params.delete("alacarte_success"); params.delete("alacarte_canceled");
     const qs = params.toString();
     window.history.replaceState({}, "", `/pricing${qs ? `?${qs}` : ""}${window.location.hash}`);
   }, [toast]);
@@ -298,12 +314,13 @@ export default function PricingPage() {
     try { id = decodeURIComponent(window.location.hash.slice(1)); } catch { return; }
     if (!id) return;
     hashHandledFor.current = navCount;
-    // #crm is a tab: open it first, then scroll once the panel has rendered.
-    if (id === "crm") setTab("crm");
+    // #crm and #alacarte are tabs: open the tab first, then scroll once the panel has rendered.
+    const tabFor = TAB_BY_HASH[id];
+    if (tabFor) setTab(tabFor);
     const frame = requestAnimationFrame(() => {
       const el = document.getElementById(id);
       if (el) scrollToSection(el);
-      if (id === "crm") window.setTimeout(() => { const late = document.getElementById("crm"); if (late) scrollToSection(late); }, 80);
+      if (tabFor) window.setTimeout(() => { const late = document.getElementById(id); if (late) scrollToSection(late); }, 80);
     });
     return () => cancelAnimationFrame(frame);
   }, [pageSettled, navCount]);
@@ -364,6 +381,7 @@ export default function PricingPage() {
             <p className="mt-5 text-base sm:text-lg text-mkt-ink-soft max-w-[36rem] mx-auto lg:mx-0 leading-relaxed" data-testid="text-trial">
               A new account starts any plan with a {TRIAL_DAYS}-day free trial. Cancel before it ends and you pay nothing.
               The CRM is a separate product with its own plans, from {CRM_FROM_PRICE}, and the {CALL_ASSISTANT_NAME} is a separate service, from {CALL_ASSISTANT_FROM_PRICE}.
+              Or buy any single tool on its own, à la carte.
             </p>
             {billingToggle("", "mt-7")}
           </div>
@@ -418,7 +436,7 @@ export default function PricingPage() {
             </p>
           )}
 
-          {/* The two products: the platform's Business Tools, and the CRM (a separate product). */}
+          {/* The products: the platform's Business Tools, the CRM (a separate product), and every tool à la carte. */}
           <div role="tablist" aria-label="Choose a product" className="flex flex-wrap justify-center gap-2 pt-3">
             {TABS.map((t) => (
               <button
@@ -534,6 +552,17 @@ export default function PricingPage() {
                   </p>
                 </div>
               </section>
+            </div>
+          ) : tab === "alacarte" ? (
+            <div role="tabpanel" id="alacarte" className="mt-8 scroll-mt-16" data-testid="section-alacarte-plans" aria-labelledby="alacarte-heading">
+              <div className="text-center max-w-3xl mx-auto">
+                <h2 id="alacarte-heading" className={H2} data-testid="text-alacarte-heading">Every tool, <em className="text-mkt-orange-ink">on its own</em></h2>
+                <p className={`${LEAD} mt-4`}>
+                  Pick one tool and pay for that alone, monthly or yearly, with no plan at all. Already on a Business Tools or CRM plan?
+                  Every tool is a smaller add-on price on top of it. Each one has a Compare page that sets it beside the other products out there.
+                </p>
+              </div>
+              <div className="mt-10"><AlacarteCards interval={interval} signedIn={!!user} /></div>
             </div>
           ) : (
             <div role="tabpanel" id="crm" className="mt-8 scroll-mt-16" data-testid="section-crm-plans" aria-labelledby="crm-heading">

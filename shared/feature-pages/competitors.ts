@@ -178,6 +178,26 @@ const page: FeaturePage = {
         "monthly allowance.",
     ],
   },
+  // Prices read on 2026-10-10 from: app.gmbeverywhere.com (pricing), brightlocal.com/pricing/, get.nicejob.com/pricing,
+  // localo.com/pricing (~/codex-audits/a-la-carte-competitors.md → competitor_intel).
+  compare: {
+    alacarte: ["competitor_intel"],
+    checkedOn: "2026-10-10",
+    competitors: [
+      { name: "GMB Everywhere", plan: "Power User", price: { kind: "monthly", cents: 3000 }, note: "less on an annual plan", source: "https://app.gmbeverywhere.com/pricing" },
+      { name: "BrightLocal", plan: "Track", price: { kind: "monthly", cents: 4100 }, source: "https://www.brightlocal.com/pricing/" },
+      { name: "NiceJob", plan: "Pro", price: { kind: "monthly", cents: 12500 }, note: "competitive intel is on the Pro plan", source: "https://get.nicejob.com/pricing" },
+      { name: "Localo", plan: "Single Business", price: { kind: "monthly", cents: 3900, billed: "annually" }, source: "https://localo.com/pricing" },
+    ],
+    onlyUs: [
+      "Scan an area by trade, 10 to 100 miles out, without naming a single competitor first.",
+      "A BS Meter from 0 to 100 on every listing, with the reasons behind the score.",
+      "A review-sample breakdown for every listing in the scan.",
+      "A failed scan doesn't count against your month.",
+    ],
+    theyNotUs: "Tracking the same competitors over time — ours is a scan you keep, organised by trade.",
+    noContractorAlternative: true,
+  },
   related: ["rankingGrid", "reviews", "gbp"],
   app: { href: "/competitors", surface: "app" },
   headings: {

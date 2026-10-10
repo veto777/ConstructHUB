@@ -46,6 +46,10 @@ import {
   registerCallAssistantBillingRoutes, isCallAssistantSubscription, isCallAssistantCheckoutSession,
   syncCallAssistantSubscription,
 } from "./voice/subscription";
+import {
+  registerAlacarteBillingRoutes, isAlacarteSubscription, isAlacarteCheckoutSession, applyAlacarteSubscription, endAlacarteSubscription,
+  reconcileAlacartePricing,
+} from "./billing/alacarte";
 
 export { PaymentsNotConfiguredError };
 
@@ -271,6 +275,11 @@ export function registerStripeRoutes(app: Express) {
     sendStripeError,
     recentAuthOk,
   });
+  // And every tool à la carte (owner, 2026-10-10): one subscription per item, with or without a plan (server/billing/alacarte.ts).
+  registerAlacarteBillingRoutes(app, {
+    getOrCreateCustomer: (userId, email) => getOrCreateCustomer(userId, email),
+    sendStripeError,
+  });
 
   app.get("/api/stripe/plans", (_req: Request, res: Response) => {
     res.json(priceBook());
@@ -327,7 +336,7 @@ export function registerStripeRoutes(app: Express) {
           // (server/crm/billing.ts, server/voice/subscription.ts): neither is "the plan" nor a
           // reason to withhold the platform trial.
           const all = await stripe.subscriptions.list({ customer: customerId, status: "all", limit: 20 });
-          const history = { data: all.data.filter((s) => !isCrmSubscription(s) && !isCallAssistantSubscription(s)) };
+          const history = { data: all.data.filter((s) => !isCrmSubscription(s) && !isCallAssistantSubscription(s) && !isAlacarteSubscription(s)) };
           const live = history.data.find((s) => LIVE_STATUSES.has(s.status));
           if (live) {
             // Record it (as the webhook will), so the account gets what it pays
@@ -343,7 +352,7 @@ export function registerStripeRoutes(app: Express) {
         // tab is expired first, so finishing both can't start two subscriptions.
         const open = await stripe.checkout.sessions.list({ customer: customerId, status: "open", limit: 10 });
         for (const stale of open.data) {
-          if (stale.mode === "subscription" && !isCrmCheckoutSession(stale) && !isCallAssistantCheckoutSession(stale)) await stripe.checkout.sessions.expire(stale.id);
+          if (stale.mode === "subscription" && !isCrmCheckoutSession(stale) && !isCallAssistantCheckoutSession(stale) && !isAlacarteCheckoutSession(stale)) await stripe.checkout.sessions.expire(stale.id);
         }
         const metadata = orderMetadata(user.id, order);
         // Intro price for an add-on bought with the plan (Checkout takes one session-level coupon; it
@@ -815,6 +824,10 @@ export function registerStripeRoutes(app: Express) {
             await syncCallAssistantSubscription({ id: session.subscription as string }, userId);
             await afterSubscriptionChange(userId);
             sendBillingEmail = false;
+          } else if (userId && session.subscription && isAlacarteCheckoutSession(session)) {
+            // An à la carte item is its own subscription, recorded in alacarte_subscriptions, never on the platform row.
+            await applyAlacarteSubscription(await stripe.subscriptions.retrieve(session.subscription as string), userId);
+            sendBillingEmail = false;
           } else if (userId && session.subscription) {
             // Plan, interval, add-ons and Agency locations are read from the
             // subscription's items (prices we created), not from metadata.
@@ -831,6 +844,8 @@ export function registerStripeRoutes(app: Express) {
             emitSubscriptionStarted(userId, stripeSubscription, set.plan ?? tracked?.plan ?? null);
             // A returning customer's scheduled number release is cancelled when the add-on is back.
             await afterSubscriptionChange(userId);
+            // A plan now: every à la carte item moves to the add-on price at its next renewal.
+            await reconcileAlacartePricing(userId);
           }
           break;
         }
@@ -888,6 +903,7 @@ export function registerStripeRoutes(app: Express) {
         case "customer.subscription.trial_will_end": {
           const sub = event.data.object as Stripe.Subscription;
           if (isCallAssistantSubscription(sub)) { sendBillingEmail = false; break; }
+          if (isAlacarteSubscription(sub)) { sendBillingEmail = false; break; }
           if (isCrmSubscription(sub)) {
             // The CRM is a separate product with its own trial (CRM_TRIAL_DAYS): the platform bus event is not
             // emitted for it, but the customer still gets the trial-ending notice below (billing-emails.ts names
@@ -908,6 +924,14 @@ export function registerStripeRoutes(app: Express) {
           if (isCrmSubscription(payload)) {
             // As below, the row takes the subscription as Stripe has it NOW.
             eventUserId = await applyCrmSubscription(await stripe.subscriptions.retrieve(payload.id));
+            sendBillingEmail = false;
+            // A CRM plan starting or ending changes the à la carte tier (at the next renewal).
+            await reconcileAlacartePricing(eventUserId);
+            break;
+          }
+          if (isAlacarteSubscription(payload)) {
+            // An à la carte item's own subscription, as Stripe has it NOW.
+            eventUserId = await applyAlacarteSubscription(await stripe.subscriptions.retrieve(payload.id));
             sendBillingEmail = false;
             break;
           }
@@ -953,6 +977,8 @@ export function registerStripeRoutes(app: Express) {
             // subscription (canceled / unpaid / incomplete_expired) or a removed add-on releases
             // the org's numbers; past_due only pauses the assistant (entitlements) and keeps them.
             await afterSubscriptionChange(existingSub.userId);
+            // The plan's status decides the à la carte tier: standalone <-> add-on at the next renewal.
+            await reconcileAlacartePricing(existingSub.userId);
           } else if (existingSub) {
             sendBillingEmail = false;
             console.warn(`[billing] ${event.type} for ${payload.id} (${(sub ?? payload).status}) ignored: user ${existingSub.userId} is on ${existingSub.stripeSubscriptionId ?? "a live trial-code grant"}.`);
@@ -964,6 +990,12 @@ export function registerStripeRoutes(app: Express) {
           const customerId = sub.customer as string;
           if (isCrmSubscription(sub)) {
             eventUserId = await endCrmSubscription(sub);
+            sendBillingEmail = false;
+            await reconcileAlacartePricing(eventUserId);
+            break;
+          }
+          if (isAlacarteSubscription(sub)) {
+            eventUserId = await endAlacarteSubscription(sub);
             sendBillingEmail = false;
             break;
           }
@@ -994,6 +1026,8 @@ export function registerStripeRoutes(app: Express) {
             emitSubscriptionCanceled(existingSub.userId, sub, existingSub.plan);
             // Cancelled: the Call Assistant numbers are released (now, or once SignalWire's minimum days pass).
             await afterSubscriptionChange(existingSub.userId);
+            // No plan any more: every à la carte item moves to the standalone price at its next renewal.
+            await reconcileAlacartePricing(existingSub.userId);
           } else if (existingSub) {
             sendBillingEmail = false;
             console.warn(`[billing] deletion of ${sub.id} ignored: user ${existingSub.userId} is on ${existingSub.stripeSubscriptionId ?? "no subscription"}.`);

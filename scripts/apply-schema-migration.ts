@@ -19,6 +19,7 @@ import { PRICING_TERMS_DDL } from "../server/billing/pricing-terms-schema";
 import { ACCOUNT_SCHEMA_DDL } from "../server/account/schema";
 import { VOICE_SCHEMA_BACKFILL, VOICE_SCHEMA_DDL } from "../server/voice/schema";
 import { CALL_ASSISTANT_SUBSCRIPTION_DDL } from "../server/voice/subscription-store";
+import { ALACARTE_SUBSCRIPTION_DDL } from "../server/billing/alacarte-store";
 import { DASHBOARD_PREFS_DDL } from "../server/dashboard/prefs";
 import { ACCESS_GRANTS_DDL } from "../server/access-grants-schema";
 import { OPS_ISSUES_DDL } from "../server/ops/schema";
@@ -66,6 +67,8 @@ const STATEMENTS = [
   ...VOICE_SCHEMA_DDL,
   // The AI Call Assistant's own subscription (a separate service, server/voice/subscription-store.ts).
   ...CALL_ASSISTANT_SUBSCRIPTION_DDL,
+  // Every tool à la carte: one subscription per item (server/billing/alacarte-store.ts).
+  ...ALACARTE_SUBSCRIPTION_DDL,
   // …and its idempotent backfill (per-tier overage buckets for rows metered at the old single 10¢ rate).
   ...VOICE_SCHEMA_BACKFILL,
   // Dashboard (server/dashboard/tiles/protect.ts): Click Guard, IP Tracker and

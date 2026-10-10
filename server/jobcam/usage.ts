@@ -1,3 +1,4 @@
+import { JOBCAM_INCLUDED_GB } from "@shared/jobcam-storage";
 /**
  * Per-org JobCam storage meter (jobcam_org_usage): bytes of originals +
  * renditions and media counts. The processor adds on ready, the delete routes
@@ -76,7 +77,8 @@ async function planJobcamStorageGb(orgId: string, exec: Exec): Promise<number> {
   const { rows: [o] } = await exec.execute(sql`SELECT owner_user_id FROM crm_orgs WHERE id = ${orgId}`);
   if (!o?.owner_user_id) return 0;
   const crm = await getCrmEntitlements(Number(o.owner_user_id));
-  return crm.active ? crm.limits?.jobcamStorageGb ?? 0 : 0;
+  // The JobCam-only shell (à la carte, no CRM plan) carries the included size, as the JobCam add-on does.
+  return crm.active ? crm.limits?.jobcamStorageGb ?? (crm.jobcamOnly ? JOBCAM_INCLUDED_GB : 0) : 0;
 }
 
 /** The row every read assumes: an org that has never uploaded still has a size (the included one). */

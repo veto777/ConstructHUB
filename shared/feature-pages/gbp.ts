@@ -1,4 +1,4 @@
-import type { FeatureAllowance, FeaturePage } from "./types";
+import type { FeatureAllowance, FeatureCompare, FeaturePage } from "./types";
 import { allowanceLine } from "./pricing";
 import { ADDONS, PLANS } from "../plans";
 import { joinNames } from "../plan-copy";
@@ -23,6 +23,27 @@ import { joinNames } from "../plan-copy";
 
 const LOCATIONS: FeatureAllowance = { limit: "locations", unit: "Google Business Profile locations", period: "count" };
 const EXTRA_LOCATION_PLANS = joinNames(ADDONS.extra_location.availableOn.map((k) => PLANS[k].name));
+
+export const GBP_COMPARE: FeatureCompare = {
+  // Prices read on 2026-10-10 from: localo.com/pricing, brightlocal.com/pricing/, synup.com/pricing,
+  // localfalcon.com/report-types/falcon-guard (~/codex-audits/a-la-carte-competitors.md → gbp).
+  alacarte: ["gbp"],
+  checkedOn: "2026-10-10",
+  competitors: [
+    { name: "Localo", plan: "Single Business", price: { kind: "monthly", cents: 3900, billed: "annually" }, per: "1 business", source: "https://localo.com/pricing" },
+    { name: "BrightLocal", plan: "Manage", price: { kind: "monthly", cents: 5400 }, per: "1 location", note: "less on an annual plan", source: "https://www.brightlocal.com/pricing/" },
+    { name: "Synup", plan: "Solo", price: { kind: "monthly", cents: 4900 }, per: "1 location", source: "https://www.synup.com/pricing" },
+    { name: "Local Falcon", plan: "Falcon Guard", price: { kind: "per_unit", cents: 10, unit: "location" }, note: "checks twice a day", source: "https://www.localfalcon.com/report-types/falcon-guard" },
+  ],
+  onlyUs: [
+    "Profile Guard checks on a schedule you set — hourly on this item, faster on the bigger plans — and Lockdown writes your approved value back and confirms Google accepted it.",
+    "Every change keeps the old and new value, when it was found and what Google reported, with a ready report for Google's official form.",
+    "Changing Guard settings asks for your password, authenticator or an emailed code, so a signed-in session can't quietly switch it off.",
+    "Your Google performance history keeps growing past Google's own window, synced every six hours.",
+  ],
+  theyNotUs: "Bulk listing distribution to other directories (Synup, and BrightLocal's listing tools) — here you keep a citation checklist you mark yourself.",
+  noContractorAlternative: true,
+};
 
 const page: FeaturePage = {
   key: "gbp",
@@ -189,6 +210,7 @@ const page: FeaturePage = {
         "listing exactly as it is.",
     ],
   },
+  compare: GBP_COMPARE,
   related: ["profileGuard", "reviews", "gbpContent"],
   app: { href: "/locations", surface: "app", label: "Open Locations" },
   headings: {

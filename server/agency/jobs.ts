@@ -132,7 +132,7 @@ export async function runAgencyJobs(perform=performJob,limit=10,onlyUser?:number
       if(j.action!=='sync'&&!await workspaceEntitled(j.user_id,j.actor_id)) {
         await c.query("UPDATE agency_jobs SET status='failed',error=$2,finished_at=now() WHERE id=$1",[j.id,agencyPlanPaused]);continue;
       }
-      if(j.action==='sync'&&(await getEntitlements(j.user_id)).accessPlan===null) {
+      if(j.action==='sync'&&(await getEntitlements(j.user_id)).allowances===null) {
         await c.query("UPDATE agency_jobs SET status='failed',error=$2,finished_at=now() WHERE id=$1",[j.id,gbpSyncPaused]);continue;
       }
       try {

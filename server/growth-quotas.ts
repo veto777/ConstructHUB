@@ -12,7 +12,7 @@ import { pool } from "./db";
 import { takeBudget } from "./growth-limits";
 import {
   getEntitlements, cheapestPlanWhere, raiseHint, plural, billedLocationCount, TOP_PLAN,
-  type Entitlements, type CountLimit,
+  type Entitlements, type CountLimit, accessPlanName, ownsAllowances,
 } from "./entitlements";
 import { PLANS, gridCreditCost, type PlanKey, type PlanLimits, type AddonKey } from "@shared/plans";
 
@@ -107,7 +107,7 @@ function planRequiredBody(feature: MeteredFeature) {
 
 function limitBody(ent: Entitlements, feature: MeteredFeature, limit: number, used: number, amount: number) {
   const meter = METERS[feature];
-  const plan = PLANS[ent.accessPlan!].name;
+  const plan = accessPlanName(ent);
   const units = (n: number) => plural(n, meter.unit[0], meter.unit[1]);
   let raise = meter.limit ? raiseHint(ent, meter.limit, meter.unit, meter.addon) : { text: "", upgradePlan: null, addon: null };
   if (!raise.text && meter.perLocation && ent.allowances?.[meter.perLocation]) {
@@ -152,7 +152,8 @@ export async function reserveQuotaFor(
   const { ent, limit: base } = await allowanceFor(userId, feature);
   const extraLimit = extra?.limit ?? 0;
   const limit = base === -1 || extraLimit === -1 ? -1 : base + extraLimit;
-  if (limit === 0 || (!ent.accessPlan && !extraLimit)) return { ok: false, status: 402, body: planRequiredBody(feature) };
+  // An account on à la carte items alone owns its allowances like a plan does (shared/alacarte.ts).
+  if (limit === 0 || (!ownsAllowances(ent) && !extraLimit)) return { ok: false, status: 402, body: planRequiredBody(feature) };
   const key = quotaKey(userId, feature);
   if (limit === -1) {
     // Unlimited (platform admins): never refused. A counted meter still records
@@ -166,8 +167,8 @@ export async function reserveQuotaFor(
   if (!allowed) {
     const { rows: [row] } = await pool.query("SELECT used FROM growth_budgets WHERE key=$1 AND period='0'", [key]);
     const used = Number(row?.used ?? 0);
-    if (!ent.accessPlan) {
-      // No platform plan: the whole allowance is the other product's.
+    if (!ownsAllowances(ent)) {
+      // No platform plan and no à la carte item: the whole allowance is the other product's.
       const unit = METERS[feature].unit[0];
       return { ok: false, status: 403, body: {
         code: "limit_reached", feature, limit, used, upgradePlan: null, addon: null, resetsAt: resetsAt(),

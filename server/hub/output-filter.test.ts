@@ -3,6 +3,8 @@
  * redteam-cases.json is blocked with its O-code; acceptable answers are
  * delivered (with the permitted strip / rewrite / truncate repairs only).
  */
+import { alacartePriceCents } from "@shared/alacarte";
+import { alacarteLines } from "./knowledge";
 import { describe, expect, it } from "vitest";
 import { PLANS, PLAN_KEYS, ADDONS, ANNUAL_MONTHS } from "@shared/plans";
 import { formatUsd, planPriceLine } from "@shared/plan-copy";
@@ -215,7 +217,7 @@ describe("F2: a wrong price bound to a plan (O9)", () => {
     "Plans run from $29/month (Solo) to $449/month (Unlimited).",
     "Upgrading from Solo to Pro takes you from $29/month to $99/month.",
     "$29/month for Solo, $99/month for Pro.",
-    "On Pro, each extra protected website is $15/month.",
+    `On Pro, each extra protected website is ${formatUsd(ADDONS.protected_site.monthlyCents)}/month.`,
     "The Client texting number add-on is $29/month plus a $29 one-time setup fee, available on Pro and Agency.",
     `Agency is $199/month or ${formatUsd(PLANS.growth.annualCents)}/year, with 100 Google Business Profile locations included.`,
     "Anything priced at $1,000 or more, like Agency above 500 locations, is quoted by a sales rep.",
@@ -488,6 +490,30 @@ describe("formatting can't hide what a visitor reads (checks run on the delivere
   });
 });
 
+describe("à la carte (owner, 2026-10-10): every tool on its own, at the price book's prices", () => {
+  it("delivers a sentence that names a real item with its price-book price, standalone or add-on", () => {
+    for (const text of [
+      `GridRank is ${formatUsd(alacartePriceCents("gridrank", "standalone", "month"))}/month à la carte, or ${formatUsd(alacartePriceCents("gridrank", "addon", "month"))}/month as an add-on to any plan.`,
+      `You can buy Site Scan à la carte for ${formatUsd(alacartePriceCents("site_scan", "standalone", "month"))}/month with no plan at all.`,
+      "Every tool is sold à la carte on Pricing, on its own subscription.",
+      `The Google Ads & LSA manager a la carte is ${formatUsd(alacartePriceCents("ads_manager", "standalone", "year"))}/year on yearly billing.`,
+      `JobCam on its own is ${formatUsd(alacartePriceCents("jobcam", "standalone", "month"))}/month.`,
+    ]) expect(delivered(text), text).toBe(text);
+    for (const line of alacarteLines()) expect(delivered(line), line).toBe(line);
+  });
+  it("still blocks à la carte for things that are not items, and an à la carte price outside the price book", () => {
+    blocked("You can buy backlinks à la carte.", "O10");
+    // The Master Class modules and bundle stay sales-only (O11); the Master Class à la carte is a listed price.
+    expect(delivered(`The Master Class on its own is ${formatUsd(alacartePriceCents("master_class", "standalone", "month"))}/month.`)).toContain("Master Class");
+    // The bundle's amount is not a listed price (O8 fires first); the name next to a listed amount is O11.
+    expect(["O8", "O11"]).toContain(isBlocked("The Master Class bundle is $2,499."));
+    blocked("The Master Class costs $99.", "O11");
+    blocked("Gabe is sold à la carte.", "O10");
+    blocked("GridRank à la carte is $23/month.", "O8");
+    expect(delivered("Keyword research is not sold à la carte; the SEO suite is.")).toContain("SEO suite");
+  });
+});
+
 describe("SEO suites and individual-feature claims; founding offer has no count or deadline", () => {
   it("allows the sold SEO suite add-on prices", () => {
     for (const amount of ["$29/month", "$79/month", `${formatUsd(ADDONS.seo_basic.annualCents)}/year`, `${formatUsd(ADDONS.seo_pro.annualCents)}/year`]) {
@@ -498,6 +524,7 @@ describe("SEO suites and individual-feature claims; founding offer has no count 
   it("an SEO price outside the price book and à la carte: blocked (O10)", () => {
     blocked("The SEO add-on costs $19/month.", "O10");
     blocked("You can add the rank tracking add-on to Starter.", "O10");
+    // "à la carte" is real since 2026-10-10, but only for real items (shared/alacarte.ts): rank tracking is not one.
     blocked("You can buy rank tracking à la carte.", "O10");
     blocked("Rank tracking a la carte is coming.", "O10");
     blocked("An SEO plan is $19/month.", "O10");

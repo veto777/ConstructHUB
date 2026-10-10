@@ -1,5 +1,6 @@
 import type { FeatureAllowance, FeaturePage } from "./types";
 import { allowanceLine } from "./pricing";
+import { CLICK_GUARD_COMPARE } from "./clickGuard";
 import { ADDONS, PLANS } from "../plans";
 import { plansWhere } from "../plan-copy";
 
@@ -155,6 +156,8 @@ const page: FeaturePage = {
         "show how much of your traffic it actually touches before you decide to block.",
     ],
   },
+  // Sold with Click Guard as one item (shared/alacarte.ts click_guard): the same comparison.
+  compare: CLICK_GUARD_COMPARE,
   related: ["clickGuard", "ipTracker", "cloudflare"],
   app: { href: "/vpn-shield", surface: "app" },
   headings: {

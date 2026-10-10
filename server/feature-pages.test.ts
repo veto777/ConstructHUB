@@ -30,6 +30,8 @@ const kebab = (key: string) => key.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowe
 /** The keys the template branch was asked to register (the dashboard's tiles + the platform pages). */
 const EXPECTED_KEYS = [
   "gbp", "reviews", "profileGuard", "rankingGrid", "gbpContent", "social", "siteScan", "media",
+  // The SEO suite (a stub: the à la carte SEO items' Compare page, shared/alacarte.ts).
+  "seo",
   "clickGuard", "ipTracker", "vpnShield", "cloudflare", "searchConsole", "domains", "mailAlerts",
   "permits", "property", "competitors", "adsManager", "lsaLeads",
   "crm", "crmSchedule", "crmLeads", "texting", "jobcam", "agency",
@@ -67,7 +69,7 @@ describe("feature page registry", () => {
   });
 
   it("gives every feature its own content file, and every content file is registered", () => {
-    const files = fs.readdirSync(dir).filter((f) => f.endsWith(".ts") && !["index.ts", "types.ts", "pricing.ts"].includes(f));
+    const files = fs.readdirSync(dir).filter((f) => f.endsWith(".ts") && !["index.ts", "types.ts", "pricing.ts", "compare.ts"].includes(f));
     expect(files.map((f) => f.replace(/\.ts$/, "")).sort()).toEqual(FEATURE_PAGES.map((p) => p.key).sort());
     const index = read("shared/feature-pages/index.ts");
     for (const page of FEATURE_PAGES) expect(index).toContain(`import ${page.key} from "./${page.key}";`);

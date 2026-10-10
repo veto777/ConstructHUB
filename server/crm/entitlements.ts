@@ -12,6 +12,13 @@
  * account's Stripe customer; a CRM Stripe subscription carries
  * metadata.product = "crm" and CRM prices (server/billing/prices.ts), which is
  * how the webhook tells the two apart (server/crm/billing.ts).
+ *
+ * JobCam bought à la carte with NO CRM plan (shared/alacarte.ts, owner
+ * 2026-10-10: "all features should have a standalone access") opens a
+ * JobCam-only shell: `active` with `via: "jobcam"` and `jobcamOnly: true`, no
+ * plan and no limits. requireOrg creates the owner's org as for any CRM user,
+ * JobCam works with the included storage, and every other CRM route answers
+ * 402 crm_plan_required (server/crm/tenancy.ts JOBCAM_SHELL_PATHS).
  */
 import { pool } from "../db";
 import { ACCESS_STATUSES } from "../../shared/plans";
@@ -20,6 +27,7 @@ import {
   type CrmPlanKey, type CrmPlanLimits,
 } from "../../shared/crm-plans";
 import { isPlatformAdminEmail } from "../admin";
+import { alacarteSchemaReady } from "../billing/alacarte-store";
 
 /** Idempotent, additive. Run once per process before anything reads the table. */
 export const CRM_SUBSCRIPTION_DDL: readonly string[] = [
@@ -85,14 +93,16 @@ export type CrmEntitlements = {
   status: string | null;
   /** True when the CRM is usable right now. */
   active: boolean;
-  /** Why it is usable: a paid/trialing CRM plan, a beta account, or ConstructHUB staff. */
-  via: "plan" | "beta" | "admin" | null;
+  /** Why it is usable: a paid/trialing CRM plan, a beta account, ConstructHUB staff, or JobCam bought à la carte with no CRM plan. */
+  via: "plan" | "beta" | "admin" | "jobcam" | null;
+  /** JobCam à la carte with no CRM plan: only JobCam (and the clients/projects shots are filed to) is open. */
+  jobcamOnly: boolean;
   trialEndsAt: Date | null;
   currentPeriodEnd: Date | null;
 };
 
 export const NO_CRM: CrmEntitlements = {
-  plan: null, limits: null, seats: 0, extraSeats: 0, jobcamAddon: false, jobcam: false, status: null, active: false, via: null,
+  plan: null, limits: null, seats: 0, extraSeats: 0, jobcamAddon: false, jobcam: false, jobcamOnly: false, status: null, active: false, via: null,
   trialEndsAt: null, currentPeriodEnd: null,
 };
 
@@ -121,18 +131,20 @@ export async function getCrmEntitlements(userId: number | null | undefined, opts
 }
 
 async function loadCrmEntitlements(userId: number): Promise<CrmEntitlements> {
-  await crmBillingSchemaReady();
+  await Promise.all([crmBillingSchemaReady(), alacarteSchemaReady()]);
+  // JobCam bought à la carte (shared/alacarte.ts, its own subscription) counts like the JobCam add-on on this CRM plan.
   const { rows: [row] } = await pool.query(
-    `SELECT u.email, u.beta_at, s.plan, s.status, s.extra_seats, s.jobcam_addon, s.trial_end, s.current_period_end
+    `SELECT u.email, u.beta_at, s.plan, s.status, s.extra_seats, s.jobcam_addon, s.trial_end, s.current_period_end,
+            EXISTS (SELECT 1 FROM alacarte_subscriptions a WHERE a.user_id = u.id AND a.item_key = 'jobcam' AND a.status = ANY($2::text[])) AS jobcam_alacarte
        FROM users u LEFT JOIN crm_subscriptions s ON s.user_id = u.id
-      WHERE u.id = $1`, [userId]);
+      WHERE u.id = $1`, [userId, ACCESS_STATUSES]);
   if (!row) return NO_CRM;
   return crmEntitlementsFromRow(row, isPlatformAdminEmail(row.email));
 }
 
 /** The entitlements one users ⟕ crm_subscriptions row gives. Pure — crm-plans.test.ts checks it. */
 export function crmEntitlementsFromRow(
-  row: { beta_at?: Date | string | null; plan?: unknown; status?: string | null; extra_seats?: number | null; jobcam_addon?: boolean | null; trial_end?: Date | string | null; current_period_end?: Date | string | null },
+  row: { beta_at?: Date | string | null; plan?: unknown; status?: string | null; extra_seats?: number | null; jobcam_addon?: boolean | null; jobcam_alacarte?: boolean | null; trial_end?: Date | string | null; current_period_end?: Date | string | null },
   isAdmin: boolean,
 ): CrmEntitlements {
   // ConstructHUB staff and beta accounts use the CRM without a subscription.
@@ -147,13 +159,15 @@ export function crmEntitlementsFromRow(
   const live = !!status && (ACCESS_STATUSES as readonly string[]).includes(status);
   const storedPlan: unknown = row.plan;
   const plan: CrmPlanKey | null = live && isCrmPlanKey(storedPlan) ? storedPlan : null;
-  if (!plan) return { ...NO_CRM, status };
+  // No CRM plan, but JobCam bought à la carte (an active alacarte_subscriptions row): the JobCam-only shell.
+  if (!plan) return row.jobcam_alacarte === true ? { ...NO_CRM, status, active: true, via: "jobcam", jobcam: true, jobcamOnly: true, seats: 1 } : { ...NO_CRM, status };
   const limits = CRM_PLANS[plan].limits;
   const extraSeats = Math.max(0, Number(row.extra_seats) || 0);
-  // The add-on only counts on a plan that sells it; a plan that includes JobCam needs none.
-  const jobcamAddon = row.jobcam_addon === true && crmAddonAvailableOn("jobcam", plan);
+  // The add-on only counts on a plan that sells it; a plan that includes JobCam needs none. Bought on the CRM
+  // subscription or à la carte (jobcam_alacarte), it is the same add-on to the gate.
+  const jobcamAddon = (row.jobcam_addon === true || row.jobcam_alacarte === true) && crmAddonAvailableOn("jobcam", plan);
   return {
-    plan, limits, extraSeats, jobcamAddon, jobcam: crmPlanHasJobcam(plan, jobcamAddon), status, active: true, via: "plan",
+    plan, limits, extraSeats, jobcamAddon, jobcam: crmPlanHasJobcam(plan, jobcamAddon), status, active: true, via: "plan", jobcamOnly: false,
     seats: limits.seats < 0 ? limits.seats : limits.seats + extraSeats,
     trialEndsAt: status === "trialing" && row.trial_end ? new Date(row.trial_end) : null,
     currentPeriodEnd: row.current_period_end ? new Date(row.current_period_end) : null,

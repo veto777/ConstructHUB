@@ -280,3 +280,22 @@ describe("who has JobCam (crmEntitlementsFromRow → jobcamAccessFrom)", () => {
     for (const p of ["crm_basic", "crm_essentials", null] as const) expect(jobcamPlanRequiredBody(p).message).not.toMatch(/\$|\d+\/mo/);
   });
 });
+
+describe("JobCam à la carte with no CRM plan (owner, 2026-10-10): the JobCam-only shell", () => {
+  const access = (r: any, admin = false) => jobcamAccessFrom(crmEntitlementsFromRow(r, admin));
+  it("an active à la carte JobCam row opens JobCam only; with a plan that sells the add-on it is that add-on", () => {
+    const only = crmEntitlementsFromRow({ plan: null, status: null, jobcam_alacarte: true }, false);
+    expect(only).toMatchObject({ active: true, via: "jobcam", jobcamOnly: true, jobcam: true, jobcamAddon: false, plan: null, limits: null, seats: 1 });
+    expect(access({ plan: null, status: null, jobcam_alacarte: true })).toEqual({ entitled: true, via: "alacarte", plan: null });
+    // No row, or a lapsed CRM plan with no à la carte JobCam: nothing.
+    expect(crmEntitlementsFromRow({ plan: null, status: null }, false).active).toBe(false);
+    expect(crmEntitlementsFromRow({ plan: "crm_basic", status: "canceled", jobcam_alacarte: false }, false).active).toBe(false);
+    expect(access({ plan: null, status: null, jobcam_alacarte: false })).toMatchObject({ entitled: false, via: null });
+    // On CRM Basic the same purchase is the JobCam add-on; on Max it is already included.
+    expect(access({ plan: "crm_basic", status: "active", jobcam_alacarte: true })).toEqual({ entitled: true, via: "addon", plan: "crm_basic" });
+    expect(crmEntitlementsFromRow({ plan: "crm_basic", status: "active", jobcam_alacarte: true }, false).jobcamOnly).toBe(false);
+    expect(access({ plan: "crm_max", status: "active", jobcam_alacarte: true })).toEqual({ entitled: true, via: "plan", plan: "crm_max" });
+    // Staff and beta read as before.
+    expect(access({ plan: null, status: null, jobcam_alacarte: true }, true).via).toBe("admin");
+  });
+});

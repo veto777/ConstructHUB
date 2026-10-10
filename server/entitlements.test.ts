@@ -15,8 +15,9 @@ import {
   sendLocationLimit, raiseHint, cheapestPlanWhere, TOP_PLAN, hasModule, usersWithModule, planPausedMessage,
   platformAdminAllowances, ADMIN_NON_CAP_LIMITS, ADMIN_CALL_ASSISTANT_NUMBERS, callAssistantAllowance,
 } from "./entitlements";
-import { ADDONS, PLANS, LEGACY_PLAN_MAP, fitsLimit, SEO_GRANDFATHERED_LIMITS, SEO_PLAN_LIMITS } from "@shared/plans";
-import { withSeoGrandfathering } from "./entitlements";
+import { ADDONS, PLANS, LEGACY_PLAN_MAP, fitsLimit, SEO_GRANDFATHERED_LIMITS, SEO_PLAN_LIMITS, UNLIMITED } from "@shared/plans";
+import { STANDALONE_BASE_LIMITS } from "@shared/alacarte";
+import { withSeoGrandfathering, sendModuleRequired, accessPlanName, ownsAllowances } from "./entitlements";
 import { seoIncluded, seoAllowanceTest } from "./seo/plan";
 
 const res = () => { const r: any = { status: vi.fn(() => r), json: vi.fn(() => r) }; return r; };
@@ -378,5 +379,95 @@ describe("SEO grandfathering and founding members (account_pricing_terms, owner 
     expect(ent.plan).toBeNull();
     expect(ent.foundingMember).not.toBeNull();
     expect(ent.seoGrandfathered).toBe(false);
+  });
+});
+
+describe("à la carte items (shared/alacarte.ts, owner 2026-10-10): every tool as its own subscription", () => {
+  const items = (...list: { key: string; tier?: string; quantity?: number; status?: string }[]) =>
+    list.map((i) => ({ key: i.key, tier: i.tier ?? "standalone", quantity: i.quantity ?? 1, status: i.status ?? "active" }));
+
+  it("with no plan at all, active items are the account's whole allowance and modules; plan stays null", async () => {
+    mocks.row = { email: "solo@example.invalid", plan: null, status: null, alacarte_items: items({ key: "gbp", quantity: 2 }, { key: "reviews" }, { key: "permits" }, { key: "seo_basic" }) };
+    const ent = await getEntitlements(7);
+    expect(ent.plan).toBeNull();
+    expect(ent.accessPlan).toBeNull();
+    expect(ent.limits).toBeNull();
+    expect(ent.alacarte.active).toEqual([{ key: "gbp", quantity: 2 }, { key: "reviews", quantity: 1 }, { key: "permits", quantity: 1 }, { key: "seo_basic", quantity: 1 }]);
+    expect(ent.alacarte.paused).toEqual([]);
+    expect(ent.allowances).toMatchObject({ locations: 2, reviewTemplates: 30, permitSearches: UNLIMITED, seoKeywords: 1000, seoCreditCents: 2000, autoPublishAiReplies: true, siteScans: 0, gridCredits: 0 });
+    expect(ent.modules).toMatchObject({ reviewReminders: true, permitAlerts: true, adsManager: false, autoPosts: false });
+    expect(seoIncluded(ent)).toBe(true);
+    expect(ownsAllowances(ent)).toBe(true);
+    expect(accessPlanName(ent)).toBe("à la carte");
+    // The gates read the same shape: a location fits, Competitor Intel does not.
+    expect(fitsLimit(ent.allowances!.locations, 1)).toBe(true);
+    expect(fitsLimit(ent.allowances!.locations, 2)).toBe(false);
+    const r = res();
+    expect(await requirePlan(r, 7, "Competitor Intel", (a) => a.competitorScans !== 0)).toBeNull();
+    expect(r.status).toHaveBeenCalledWith(402);
+    expect(await requirePlan(res(), 7, "Permit search", (a) => a.permitSearches !== 0)).not.toBeNull();
+    expect(await hasModule(7, "permitAlerts")).toBe(true);
+    expect(await hasModule(7, "adsManager")).toBe(false);
+  });
+
+  it("on a plan, items add to the plan's allowances and switch modules on; unlimited stays unlimited", async () => {
+    mocks.row = customer("starter", { addons: { competitor_pack: 1 }, alacarte_items: items({ key: "gridrank" }, { key: "ads_manager" }, { key: "site_scan", quantity: 2 }) });
+    const ent = await getEntitlements(7);
+    expect(ent.plan).toBe("starter");
+    expect(ent.limits).toEqual(PLANS.starter.limits);
+    expect(ent.allowances).toMatchObject({
+      gridCredits: PLANS.starter.limits.gridCredits + 10, siteScans: PLANS.starter.limits.siteScans + 10,
+      competitorScans: PLANS.starter.limits.competitorScans + 10, locations: 1,
+    });
+    expect(ent.modules).toMatchObject({ gridWatches: true, adsManager: true, cloudflareSearchConsole: false });
+    expect(accessPlanName(ent)).toBe("Solo");
+    mocks.row = customer("agency", { alacarte_items: items({ key: "site_scan" }) });
+    expect((await getEntitlements(7)).allowances?.siteScans).toBe(UNLIMITED);
+  });
+
+  it("a paused item (payment needed) is shown, never granted; an ended one is nothing; a platform admin is unlimited anyway", async () => {
+    mocks.row = { email: "solo@example.invalid", plan: null, status: null, alacarte_items: items({ key: "gbp", status: "past_due" }, { key: "reviews", status: "canceled" }) };
+    let ent = await getEntitlements(7);
+    expect(ent.alacarte.paused).toEqual(["gbp"]);
+    expect(ent.alacarte.active).toEqual([]);
+    expect(ent.allowances).toBeNull();
+    expect(ent.modules.reviewReminders).toBe(false);
+    expect(ownsAllowances(ent)).toBe(false);
+    mocks.row = { email: "support@constructhub.us", plan: null, status: null, alacarte_items: items({ key: "gbp" }) };
+    ent = await getEntitlements(1);
+    expect(ent.isPlatformAdmin).toBe(true);
+    expect(ent.allowances).toEqual(platformAdminAllowances());
+    expect(ent.alacarte.active).toEqual([{ key: "gbp", quantity: 1 }]);
+    // Nothing at all: the base is not even the stand-alone zeros — allowances stay null, as before.
+    mocks.row = customer(null);
+    ent = await getEntitlements(7);
+    expect(ent.allowances).toBeNull();
+    expect(ent.alacarte.active).toEqual([]);
+    expect(STANDALONE_BASE_LIMITS.locations).toBe(0);
+  });
+
+  it("the account query joins the items in; the batch module query counts an item's module", async () => {
+    const { pool } = await import("./db");
+    const query = pool.query as any;
+    mocks.row = customer("starter");
+    await getEntitlements(7);
+    const accountSql = query.mock.calls.map((c: any[]) => c[0]).find((sql: string) => /FROM users u/.test(sql) && /LEFT JOIN LATERAL/.test(sql));
+    expect(accountSql).toMatch(/FROM alacarte_subscriptions a WHERE a\.user_id = u\.id\) AS alacarte_items/);
+    query.mockImplementationOnce(async () => ({ rows: [
+      { account_id: 1, email: "a@example.invalid", plan: null, status: null, alacarte_items: items({ key: "website_tools" }) },
+      { account_id: 2, email: "b@example.invalid", plan: null, status: null, alacarte_items: items({ key: "website_tools", status: "past_due" }) },
+      { account_id: 3, email: "c@example.invalid", plan: "starter", status: "active", stripe_subscription_id: "sub_3", alacarte_items: [] },
+    ] }));
+    expect([...await usersWithModule([1, 2, 3], "domainsMailAlerts")]).toEqual([1]);
+  });
+
+  it("the 402 for a plan module names the à la carte item that sells it on its own", () => {
+    const r = res();
+    sendModuleRequired(r, "adsManager");
+    expect(r.status).toHaveBeenCalledWith(402);
+    expect(r.json.mock.calls[0][0]).toMatchObject({ code: "plan_required", requiredPlan: "pro", alacarte: { key: "ads_manager", name: "Google Ads & LSA manager", href: "/pricing#alacarte" } });
+    const none = res();
+    sendModuleRequired(none, "whiteLabel");
+    expect(none.json.mock.calls[0][0].alacarte).toBeUndefined();
   });
 });

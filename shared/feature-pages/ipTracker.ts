@@ -1,5 +1,6 @@
 import type { FeatureAllowance, FeaturePage } from "./types";
 import { allowanceLine } from "./pricing";
+import { CLICK_GUARD_COMPARE } from "./clickGuard";
 import { ADDONS, PLANS } from "../plans";
 import { plansWhere } from "../plan-copy";
 
@@ -178,6 +179,8 @@ const page: FeaturePage = {
         "Removing a site stops tracking it and deletes its recorded visits and blocked IPs.",
     ],
   },
+  // Sold with Click Guard as one item (shared/alacarte.ts click_guard): the same comparison.
+  compare: CLICK_GUARD_COMPARE,
   related: ["clickGuard", "vpnShield", "siteScan"],
   app: { href: "/ip-tracker", surface: "app" },
   headings: {

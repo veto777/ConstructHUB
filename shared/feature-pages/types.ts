@@ -11,6 +11,7 @@
  */
 import type { AddonKey, CountLimitKey, ModuleKey } from "../plans";
 import type { CrmAddonKey } from "../crm-plans";
+import type { AlacarteKey } from "../alacarte";
 import type { DashboardGroupKey, DashboardSurface } from "../dashboard";
 
 /** The dashboard's five groups, plus the platform pieces that have no tile (Gabe, the API). */
@@ -163,9 +164,67 @@ export type LandingContent = {
   sources: string[];
 };
 
+/**
+ * A competitor's published price, in cents — formatted by ./compare.ts
+ * competitorPriceLabel, never typed as a "$" figure (the test forbids one).
+ */
+export type CompetitorPrice =
+  | { kind: "monthly"; cents: number; billed?: "annually" }
+  | { kind: "monthly_from"; cents: number }
+  | { kind: "monthly_range"; fromCents: number; toCents: number }
+  | { kind: "annual"; cents: number }
+  | { kind: "one_time"; cents: number }
+  | { kind: "per_unit"; cents: number; unit: string }
+  /** Not public: the vendor quotes it. */
+  | { kind: "quote" };
+
+export type FeatureCompetitor = {
+  name: string;
+  /** The plan the price is for ("Single Business", "Starter"). */
+  plan?: string;
+  price: CompetitorPrice;
+  /** "per user", "1 location", "per channel" — what the price covers. */
+  per?: string;
+  /** One honest qualifier: "credits; a 7×7 grid is 49 credits". */
+  note?: string;
+  /** The vendor's own pricing page the price was read from (absent only for a quote-only vendor). */
+  source?: string;
+  /** The price came from a third-party listing (Capterra …), not the vendor's page: labelled "reported". */
+  reported?: true;
+};
+
+/**
+ * The "Compare" section (owner, 2026-10-10: "compare to other products if
+ * they exist and what we offer what they dont, if there are no other
+ * products, mention that we are one of a kind"). Competitors and their prices
+ * come ONLY from ~/codex-audits/a-la-carte-competitors.md (vendor pricing
+ * pages, read on `checkedOn`); `onlyUs` repeats claims this page already
+ * makes; `theyNotUs` is honest about the gap. Rendered by
+ * client/src/components/feature-landing/sections.tsx CompareSection, with the
+ * à la carte Buy buttons for `alacarte` (shared/alacarte.ts).
+ */
+export type FeatureCompare = {
+  /** The à la carte items this page sells (empty: the page only compares). */
+  alacarte: AlacarteKey[];
+  /** When the vendor pages were read (ISO date). */
+  checkedOn: string;
+  /** 2–4 named competitors. */
+  competitors: FeatureCompetitor[];
+  /** What we do that they don't — only from this page's own claims. */
+  onlyUs: string[];
+  /** What they do that we don't — one honest line. */
+  theyNotUs: string;
+  /** Where nothing comparable exists: the "one of a kind" line, worded as the research allows. */
+  oneOfAKind?: string;
+  /** No contractor-specific alternative was found (the competitors are general tools). */
+  noContractorAlternative?: boolean;
+};
+
 export type FeaturePage = LandingContent & {
   group: FeatureGroupKey;
   pricing: FeaturePricing;
+  /** Named competitors, their prices, and the à la carte offer (see FeatureCompare). */
+  compare?: FeatureCompare;
   /** Registry keys of related features (shown as cards). */
   related: string[];
   /** The feature in the app: the "Open <feature>" button for signed-in visitors. */

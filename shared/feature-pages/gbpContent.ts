@@ -166,6 +166,25 @@ const page: FeaturePage = {
         "publishing to a different listing.",
     ],
   },
+  // Prices read on 2026-10-10 from: oneupapp.io/price, localo.com/pricing, merchynt.com/pricing, gmbbriefcase.com/pricing
+  // (~/codex-audits/a-la-carte-competitors.md → ai_posts).
+  compare: {
+    alacarte: ["ai_posts"],
+    checkedOn: "2026-10-10",
+    competitors: [
+      { name: "OneUp", plan: "Basic", price: { kind: "monthly", cents: 1500 }, note: "Intermediate is more", source: "https://www.oneupapp.io/price" },
+      { name: "Localo", plan: "Single Business", price: { kind: "monthly", cents: 3900, billed: "annually" }, source: "https://localo.com/pricing" },
+      { name: "Merchynt", plan: "Paige", price: { kind: "monthly", cents: 9900 }, per: "per business", source: "https://www.merchynt.com/pricing" },
+      { name: "GMB Briefcase", plan: "Business", price: { kind: "monthly", cents: 9900 }, source: "https://gmbbriefcase.com/pricing" },
+    ],
+    onlyUs: [
+      "Drafts use only your listing's own facts — never an invented price or date — and wait for your approval unless you say otherwise.",
+      "Publishes only inside your business hours, on the weekdays and times you choose.",
+      "Photos filed by Google's categories, with filenames and details that help Google read them.",
+    ],
+    theyNotUs: "Merchynt's Paige posts fully on its own, and OneUp posts to other social networks too (ours stays on Google — see Social Media).",
+    noContractorAlternative: true,
+  },
   related: ["gbp", "media", "social"],
   app: { href: "/gbp-content", surface: "app" },
   headings: {

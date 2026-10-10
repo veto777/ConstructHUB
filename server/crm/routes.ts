@@ -454,6 +454,8 @@ export function registerCrmRoutes(app: Express, getDevUser: GetUser): void {
         status: crmEnt.status,
         trialEndsAt: crmEnt.trialEndsAt,
         isOwner: ctx.org.ownerUserId === user.id,
+        // JobCam bought à la carte with no CRM plan: only JobCam (and clients/projects) is open; the app gates the rest.
+        jobcamOnly: crmEnt.jobcamOnly,
         // JobCam: CRM Max includes it; Basic / Essentials with the add-on; staff and beta always (jobcam/plan.ts).
         jobcam: jobcam.entitled,
         jobcamVia: jobcam.via,

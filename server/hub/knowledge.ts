@@ -27,6 +27,7 @@ import { VOICE_PERSONA_LIST } from "@shared/voice-personas";
 import { HUB_PAGES, type PageKey } from "@shared/hub-links";
 import { CRM_ADDONS, CRM_PLANS, CRM_PLAN_KEYS, CRM_EXTRA_SEAT_MONTHLY_CENTS, CRM_EXTRA_SEAT_ANNUAL_CENTS } from "@shared/crm-plans";
 import { SEO_CREDIT_PACKS } from "@shared/seo-credits";
+import { ALACARTE, ALACARTE_KEYS, ALACARTE_PRICING_HREF, ALACARTE_ANNUAL_MONTHS, alacartePriceCents } from "@shared/alacarte";
 import { SEO_PLAN_LIMITS } from "@shared/plans";
 
 export const KNOWLEDGE_FILE = "hub-knowledge.md";
@@ -92,9 +93,26 @@ export function knowledgeTokens(): Record<string, string> {
     CALL_ASSISTANT_SPAM_FREE: callAssistantSpamAllowanceLine().replace(/^./, (c) => c.toUpperCase()),
     CALL_ASSISTANT_AVAILABILITY: callAssistantAvailabilityLine(),
     CALL_ASSISTANT_STATUS: callAssistantPricing().comingSoon ? "coming soon, not for sale yet" : `a separate service with its own subscription, from ${CALL_ASSISTANT_FROM_PRICE}`,
+    // Every tool à la carte (shared/alacarte.ts, owner 2026-10-10): one line per item, both tiers, derived — never typed.
+    ALACARTE_LINES: alacarteLines().map((l) => `- ${l}`).join("\n"),
+    ALACARTE_HREF: ALACARTE_PRICING_HREF,
+    ALACARTE_ANNUAL_MONTHS: String(ALACARTE_ANNUAL_MONTHS),
     // "Janice, Sofia and Maya (women's voices) and Gabe, Marcus and Ethan (men's voices)".
     CALL_ASSISTANT_PERSONAS: `${joinNames(VOICE_PERSONA_LIST.filter((p) => p.gender === "female").map((p) => p.name))} (women's voices) and ${joinNames(VOICE_PERSONA_LIST.filter((p) => p.gender === "male").map((p) => p.name))} (men's voices)`,
   };
+}
+
+/**
+ * The à la carte price book as Gabe may state it: "GridRank — $49/month or $539/year on its own; $29/month or
+ * $319/year as an add-on to any Business Tools or CRM plan". Every figure from shared/alacarte.ts.
+ */
+export function alacarteLines(): string[] {
+  return ALACARTE_KEYS.map((k) => {
+    const it = ALACARTE[k];
+    const per = it.unit ? ` per ${it.unit}` : "";
+    return `${it.name} — ${formatUsd(alacartePriceCents(k, "standalone", "month"))}/month or ${formatUsd(alacartePriceCents(k, "standalone", "year"))}/year on its own${per}; `
+      + `${formatUsd(alacartePriceCents(k, "addon", "month"))}/month or ${formatUsd(alacartePriceCents(k, "addon", "year"))}/year as an add-on to any Business Tools or CRM plan${per}`;
+  });
 }
 
 /** Strip builder comments and fill every {{TOKEN}}; an unknown token is a boot error, never a blank. */
@@ -247,6 +265,8 @@ export function priceBookCents(): Set<number> {
   cents.add(CRM_EXTRA_SEAT_MONTHLY_CENTS); cents.add(CRM_EXTRA_SEAT_ANNUAL_CENTS);
   // The CRM's own add-ons (JobCam), monthly and yearly.
   for (const addon of Object.values(CRM_ADDONS)) { cents.add(addon.monthlyCents); cents.add(addon.annualCents); }
+  // Every tool à la carte (shared/alacarte.ts): both tiers, monthly and yearly.
+  for (const k of ALACARTE_KEYS) for (const tier of ["standalone", "addon"] as const) for (const i of ["month", "year"] as const) cents.add(alacartePriceCents(k, tier, i));
   // SEO data: the monthly allowance of each plan that has the tools (0 on the others) and the prepaid credit packs (shared/seo-credits.ts).
   for (const key of PLAN_KEYS) if (SEO_PLAN_LIMITS[key].seoCreditCents > 0) cents.add(SEO_PLAN_LIMITS[key].seoCreditCents);
   for (const pack of SEO_CREDIT_PACKS) cents.add(pack);
