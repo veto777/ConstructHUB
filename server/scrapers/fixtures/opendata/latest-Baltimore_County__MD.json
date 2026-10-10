@@ -1,0 +1,21 @@
+{
+  "displayFieldName": "",
+  "fieldAliases": {
+    "LATEST_DATE": "LATEST_DATE"
+  },
+  "fields": [
+    {
+      "name": "LATEST_DATE",
+      "type": "esriFieldTypeDate",
+      "alias": "LATEST_DATE",
+      "length": 8
+    }
+  ],
+  "features": [
+    {
+      "attributes": {
+        "LATEST_DATE": 1635292800000
+      }
+    }
+  ]
+}

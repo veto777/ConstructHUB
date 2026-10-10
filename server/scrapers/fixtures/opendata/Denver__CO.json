@@ -1,0 +1,360 @@
+{
+  "objectIdFieldName": "OBJECTID",
+  "uniqueIdField": {
+    "name": "OBJECTID",
+    "isSystemMaintained": true
+  },
+  "globalIdFieldName": "GLOBALID",
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": {
+    "wkid": 4326,
+    "latestWkid": 4326
+  },
+  "fields": [
+    {
+      "name": "OBJECTID",
+      "type": "esriFieldTypeOID",
+      "alias": "OBJECTID",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "DATE_ISSUED",
+      "type": "esriFieldTypeDate",
+      "alias": "date_issued",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "PERMIT_NUM",
+      "type": "esriFieldTypeString",
+      "alias": "permit_num",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ADDRESS",
+      "type": "esriFieldTypeString",
+      "alias": "address",
+      "sqlType": "sqlTypeOther",
+      "length": 100,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "LOCATION",
+      "type": "esriFieldTypeString",
+      "alias": "location",
+      "sqlType": "sqlTypeOther",
+      "length": 255,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "CLASS",
+      "type": "esriFieldTypeString",
+      "alias": "class",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "UNITS",
+      "type": "esriFieldTypeString",
+      "alias": "units",
+      "sqlType": "sqlTypeOther",
+      "length": 15,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "VALUATION",
+      "type": "esriFieldTypeDouble",
+      "alias": "valuation",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "PERMIT_FEE",
+      "type": "esriFieldTypeDouble",
+      "alias": "permit_fee",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "CONTRACTOR_NAME",
+      "type": "esriFieldTypeString",
+      "alias": "contractor_name",
+      "sqlType": "sqlTypeOther",
+      "length": 255,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "FINAL_DATE",
+      "type": "esriFieldTypeDate",
+      "alias": "final_date",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "CANCEL",
+      "type": "esriFieldTypeDate",
+      "alias": "cancel",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "DATE_RECEIVED",
+      "type": "esriFieldTypeDate",
+      "alias": "date_received",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "BID_AUTHNAME",
+      "type": "esriFieldTypeString",
+      "alias": "bid_authname",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "LOG_NUM",
+      "type": "esriFieldTypeString",
+      "alias": "log_num",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "EXEMPT",
+      "type": "esriFieldTypeString",
+      "alias": "exempt",
+      "sqlType": "sqlTypeOther",
+      "length": 10,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "CO_REQUIRED",
+      "type": "esriFieldTypeString",
+      "alias": "co_required",
+      "sqlType": "sqlTypeOther",
+      "length": 10,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "DATE_CO_ISSUED",
+      "type": "esriFieldTypeString",
+      "alias": "date_co_issued",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ADDRESS_NUMBER",
+      "type": "esriFieldTypeSmallInteger",
+      "alias": "ADDRESS_NUMBER",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ADDRESS_STREETDIR",
+      "type": "esriFieldTypeString",
+      "alias": "ADDRESS_STREETDIR",
+      "sqlType": "sqlTypeOther",
+      "length": 10,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ADDRESS_STREETNAME",
+      "type": "esriFieldTypeString",
+      "alias": "ADDRESS_STREETNAME",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ADDRESS_STREETTYPE",
+      "type": "esriFieldTypeString",
+      "alias": "ADDRESS_STREETTYPE",
+      "sqlType": "sqlTypeOther",
+      "length": 10,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ADDRESS_UNITTYPE",
+      "type": "esriFieldTypeString",
+      "alias": "ADDRESS_UNITTYPE",
+      "sqlType": "sqlTypeOther",
+      "length": 20,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ADDRESS_UNIT",
+      "type": "esriFieldTypeString",
+      "alias": "ADDRESS_UNIT",
+      "sqlType": "sqlTypeOther",
+      "length": 20,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "GLOBALID",
+      "type": "esriFieldTypeGlobalID",
+      "alias": "GLOBALID",
+      "sqlType": "sqlTypeOther",
+      "length": 38,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SCHEDNUM",
+      "type": "esriFieldTypeString",
+      "alias": "SCHEDNUM",
+      "sqlType": "sqlTypeOther",
+      "length": 13,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "STAT_CODE_3",
+      "type": "esriFieldTypeString",
+      "alias": "STAT_CODE_3",
+      "sqlType": "sqlTypeOther",
+      "length": 15,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "STAT_CODE_2",
+      "type": "esriFieldTypeString",
+      "alias": "STAT_CODE_2",
+      "sqlType": "sqlTypeOther",
+      "length": 15,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "STAT_CODE_1",
+      "type": "esriFieldTypeString",
+      "alias": "STAT_CODE_1",
+      "sqlType": "sqlTypeOther",
+      "length": 15,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "NEIGHBORHOOD",
+      "type": "esriFieldTypeString",
+      "alias": "NEIGHBORHOOD",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    }
+  ],
+  "exceededTransferLimit": true,
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 289755,
+        "DATE_ISSUED": 1352950135000,
+        "PERMIT_NUM": "2012-RESCON-0000004625",
+        "ADDRESS": "3729 N LIPAN ST",
+        "LOCATION": null,
+        "CLASS": "NEW BUILDING",
+        "UNITS": null,
+        "VALUATION": 14285,
+        "PERMIT_FEE": 139,
+        "CONTRACTOR_NAME": "BUDGET GARAGES & CONSTRUCTION CO INC",
+        "FINAL_DATE": 1357257600000,
+        "CANCEL": null,
+        "DATE_RECEIVED": 1352937600000,
+        "BID_AUTHNAME": null,
+        "LOG_NUM": "2012-LOG-J003379",
+        "EXEMPT": "",
+        "CO_REQUIRED": "YES",
+        "DATE_CO_ISSUED": null,
+        "ADDRESS_NUMBER": 3729,
+        "ADDRESS_STREETDIR": "N",
+        "ADDRESS_STREETNAME": "LIPAN",
+        "ADDRESS_STREETTYPE": "ST",
+        "ADDRESS_UNITTYPE": "",
+        "ADDRESS_UNIT": "",
+        "GLOBALID": "919448d9-7522-4178-a067-ff6278e77e1a",
+        "SCHEDNUM": "0228105015000",
+        "STAT_CODE_3": null,
+        "STAT_CODE_2": null,
+        "STAT_CODE_1": "012",
+        "NEIGHBORHOOD": "Highland"
+      },
+      "geometry": {
+        "x": -105.00210614608574,
+        "y": 39.7685877799321
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 289768,
+        "DATE_ISSUED": 1353032416000,
+        "PERMIT_NUM": "2012-RESCON-0000004884",
+        "ADDRESS": "395 S GAYLORD ST BASEMENT",
+        "LOCATION": null,
+        "CLASS": "ALTERATION/TENANT FINISH",
+        "UNITS": null,
+        "VALUATION": 3600,
+        "PERMIT_FEE": 51,
+        "CONTRACTOR_NAME": "GEELS CONSTRUCTION INC",
+        "FINAL_DATE": 1372377600000,
+        "CANCEL": null,
+        "DATE_RECEIVED": 1353024000000,
+        "BID_AUTHNAME": null,
+        "LOG_NUM": null,
+        "EXEMPT": "",
+        "CO_REQUIRED": "YES",
+        "DATE_CO_ISSUED": null,
+        "ADDRESS_NUMBER": 395,
+        "ADDRESS_STREETDIR": "S",
+        "ADDRESS_STREETNAME": "GAYLORD",
+        "ADDRESS_STREETTYPE": "ST",
+        "ADDRESS_UNITTYPE": "",
+        "ADDRESS_UNIT": "BASEMENT",
+        "GLOBALID": "d3798302-d2fd-4908-a735-af9b7300c926",
+        "SCHEDNUM": "0514103009000",
+        "STAT_CODE_3": null,
+        "STAT_CODE_2": null,
+        "STAT_CODE_1": "021",
+        "NEIGHBORHOOD": "Washington Park"
+      },
+      "geometry": {
+        "x": -104.96201261864753,
+        "y": 39.70944017357244
+      }
+    }
+  ]
+}

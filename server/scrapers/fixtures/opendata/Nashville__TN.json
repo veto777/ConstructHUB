@@ -1,0 +1,424 @@
+{
+  "objectIdFieldName": "ObjectId",
+  "uniqueIdField": {
+    "name": "ObjectId",
+    "isSystemMaintained": true
+  },
+  "globalIdFieldName": "",
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": {
+    "wkid": 4326,
+    "latestWkid": 4326
+  },
+  "fields": [
+    {
+      "name": "Permit__",
+      "type": "esriFieldTypeString",
+      "alias": "Permit #",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"Permit number assigned to the building permit record.\",\"fieldValueType\":\"uniqueIdentifier\"}"
+    },
+    {
+      "name": "Permit_Type_Description",
+      "type": "esriFieldTypeString",
+      "alias": "Permit Type Description",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": {
+        "type": "codedValue",
+        "name": "BuildingPermitsIssued_Permit_Type_Description_666451b4-14fc-494e-8df0-987ecc18472a",
+        "codedValues": [
+          {
+            "name": "Building Residential - New",
+            "code": "Building Residential - New"
+          },
+          {
+            "name": "Building Residential - Addition",
+            "code": "Building Residential - Addition"
+          },
+          {
+            "name": "Building Commercial - Rehab",
+            "code": "Building Commercial - Rehab"
+          },
+          {
+            "name": "Building Demolition Permit",
+            "code": "Building Demolition Permit"
+          },
+          {
+            "name": "Building Residential - Rehab",
+            "code": "Building Residential - Rehab"
+          },
+          {
+            "name": "Building Sign Permit",
+            "code": "Building Sign Permit"
+          },
+          {
+            "name": "Building Commercial - Tenant Finish Out",
+            "code": "Building Commercial - Tenant Finish Out"
+          },
+          {
+            "name": "Building Use & Occupancy",
+            "code": "Building Use & Occupancy"
+          },
+          {
+            "name": "Building Commercial - New",
+            "code": "Building Commercial - New"
+          },
+          {
+            "name": "Building Tree Removal Permit",
+            "code": "Building Tree Removal Permit"
+          },
+          {
+            "name": "Building Commercial - Foundation",
+            "code": "Building Commercial - Foundation"
+          },
+          {
+            "name": "Building Commercial - Shell",
+            "code": "Building Commercial - Shell"
+          },
+          {
+            "name": "Building Commercial - Addition",
+            "code": "Building Commercial - Addition"
+          },
+          {
+            "name": "Building Residential Rehab Storm Damage",
+            "code": "Building Residential Rehab Storm Damage"
+          },
+          {
+            "name": "Building Residential - Tenant Finish Out",
+            "code": "Building Residential - Tenant Finish Out"
+          },
+          {
+            "name": "Building Commercial - Roofing / Siding",
+            "code": "Building Commercial - Roofing / Siding"
+          },
+          {
+            "name": "Building Residential - Change Contractor",
+            "code": "Building Residential - Change Contractor"
+          },
+          {
+            "name": "Building Residential - Roofing / Siding",
+            "code": "Building Residential - Roofing / Siding"
+          },
+          {
+            "name": "Building Commercial Rehab Storm Damage",
+            "code": "Building Commercial Rehab Storm Damage"
+          },
+          {
+            "name": "Building Residential New Storm Damage",
+            "code": "Building Residential New Storm Damage"
+          },
+          {
+            "name": "Building Demolition Storm Damage",
+            "code": "Building Demolition Storm Damage"
+          },
+          {
+            "name": "Building Commercial - Change Contractor",
+            "code": "Building Commercial - Change Contractor"
+          },
+          {
+            "name": "Building Commercial - Structural Frame",
+            "code": "Building Commercial - Structural Frame"
+          },
+          {
+            "name": "Building Commercial New Storm Damage",
+            "code": "Building Commercial New Storm Damage"
+          },
+          {
+            "name": "Building Commercial - Fire Damage",
+            "code": "Building Commercial - Fire Damage"
+          },
+          {
+            "name": "Building Residential - Foundation",
+            "code": "Building Residential - Foundation"
+          },
+          {
+            "name": "Building Residential - Amend Permit",
+            "code": "Building Residential - Amend Permit"
+          },
+          {
+            "name": "Building Residential - Fire Damage",
+            "code": "Building Residential - Fire Damage"
+          },
+          {
+            "name": "Building Moving Permit",
+            "code": "Building Moving Permit"
+          },
+          {
+            "name": "Building Commercial - Amend Permit",
+            "code": "Building Commercial - Amend Permit"
+          },
+          {
+            "name": "Building Residential - Shell",
+            "code": "Building Residential - Shell"
+          },
+          {
+            "name": "Temporary Building Use & Occupancy",
+            "code": "Temporary Building Use & Occupancy"
+          }
+        ]
+      },
+      "defaultValue": null,
+      "description": "{\"value\":\"Text description of the permit type, such as residential new, commercial rehab, or demolition.\",\"fieldValueType\":\"typeOrCategory\"}"
+    },
+    {
+      "name": "Permit_Subtype_Description",
+      "type": "esriFieldTypeString",
+      "alias": "Permit Subtype Description",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"Text description of the more specific permit subtype or use category.\",\"fieldValueType\":\"typeOrCategory\"}"
+    },
+    {
+      "name": "Parcel",
+      "type": "esriFieldTypeString",
+      "alias": "Parcel",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"Parcel identification number associated with the permit location.\",\"fieldValueType\":\"uniqueIdentifier\"}"
+    },
+    {
+      "name": "Date_Entered",
+      "type": "esriFieldTypeDate",
+      "alias": "Date Entered",
+      "sqlType": "sqlTypeTimestamp2",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"Date the permit record was entered into the system.\",\"fieldValueType\":\"dateAndTime\"}"
+    },
+    {
+      "name": "Date_Issued",
+      "type": "esriFieldTypeDate",
+      "alias": "Date Issued",
+      "sqlType": "sqlTypeTimestamp2",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"Date the permit was issued.\",\"fieldValueType\":\"dateAndTime\"}"
+    },
+    {
+      "name": "Const_Cost",
+      "type": "esriFieldTypeDouble",
+      "alias": "Construction Cost",
+      "sqlType": "sqlTypeFloat",
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"Estimated construction cost associated with the permit, in dollars.\",\"fieldValueType\":\"currency\"}"
+    },
+    {
+      "name": "Address",
+      "type": "esriFieldTypeString",
+      "alias": "Address",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"Street address where the permitted work is located.\",\"fieldValueType\":\"locationOrPlaceName\"}"
+    },
+    {
+      "name": "City",
+      "type": "esriFieldTypeString",
+      "alias": "City",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"City where the permitted work is located.\",\"fieldValueType\":\"locationOrPlaceName\"}"
+    },
+    {
+      "name": "State",
+      "type": "esriFieldTypeString",
+      "alias": "State",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"State where the permitted work is located.\",\"fieldValueType\":\"locationOrPlaceName\"}"
+    },
+    {
+      "name": "Subdivision_Lot",
+      "type": "esriFieldTypeString",
+      "alias": "Subdivision Lot",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"Subdivision and lot description for the permit location.\",\"fieldValueType\":\"locationOrPlaceName\"}"
+    },
+    {
+      "name": "Contact",
+      "type": "esriFieldTypeString",
+      "alias": "Contact",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"Primary contact or applicant name associated with the permit.\",\"fieldValueType\":\"nameOrTitle\"}"
+    },
+    {
+      "name": "Per_Ty",
+      "type": "esriFieldTypeString",
+      "alias": "Permit Type",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"Abbreviated code for the permit type.\",\"fieldValueType\":\"typeOrCategory\"}"
+    },
+    {
+      "name": "Per_SubTy",
+      "type": "esriFieldTypeString",
+      "alias": "Permit Subtype",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"Abbreviated code for the permit subtype.\",\"fieldValueType\":\"typeOrCategory\"}"
+    },
+    {
+      "name": "IVR_Trk_",
+      "type": "esriFieldTypeInteger",
+      "alias": "IVR Tracking",
+      "sqlType": "sqlTypeInteger",
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"IVR tracking number used to reference the permit in the permitting system.\",\"fieldValueType\":\"uniqueIdentifier\"}"
+    },
+    {
+      "name": "Purpose",
+      "type": "esriFieldTypeString",
+      "alias": "Purpose",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"Narrative description of the work proposed or authorized by the permit.\",\"fieldValueType\":\"description\"}"
+    },
+    {
+      "name": "Council_Dist",
+      "type": "esriFieldTypeDouble",
+      "alias": "Council District",
+      "sqlType": "sqlTypeFloat",
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"Metropolitan Council district number for the permit location.\",\"fieldValueType\":\"countOrAmount\"}"
+    },
+    {
+      "name": "Census_Tract",
+      "type": "esriFieldTypeDouble",
+      "alias": "Census Tract",
+      "sqlType": "sqlTypeFloat",
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"Census tract number for the permit location.\",\"fieldValueType\":\"uniqueIdentifier\"}"
+    },
+    {
+      "name": "Lon",
+      "type": "esriFieldTypeDouble",
+      "alias": "Longitude",
+      "sqlType": "sqlTypeFloat",
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"Longitude coordinate of the permit location.\",\"fieldValueType\":\"coordinate\"}"
+    },
+    {
+      "name": "Lat",
+      "type": "esriFieldTypeDouble",
+      "alias": "Latitude",
+      "sqlType": "sqlTypeFloat",
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"Latitude coordinate of the permit location.\",\"fieldValueType\":\"coordinate\"}"
+    },
+    {
+      "name": "ObjectId",
+      "type": "esriFieldTypeOID",
+      "alias": "Object ID",
+      "sqlType": "sqlTypeInteger",
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"System-generated unique object identifier for each record.\",\"fieldValueType\":\"uniqueIdentifier\"}"
+    },
+    {
+      "name": "ZIP",
+      "type": "esriFieldTypeString",
+      "alias": "ZIP Code",
+      "sqlType": "sqlTypeFloat",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"ZIP code for the permit location.\",\"fieldValueType\":\"locationOrPlaceName\"}"
+    }
+  ],
+  "exceededTransferLimit": true,
+  "features": [
+    {
+      "attributes": {
+        "Permit__": "2023007679",
+        "Permit_Type_Description": "Building Sign Permit",
+        "Permit_Subtype_Description": "Sign - Ground /  Wall Signs",
+        "Parcel": "13500030500",
+        "Date_Entered": 1675663200000,
+        "Date_Issued": 1699250400000,
+        "Const_Cost": 36809,
+        "Address": "730 NASHBORO BLVD",
+        "City": "NASHVILLE",
+        "State": "TN",
+        "Subdivision_Lot": "N/S NASHBORO BLVD. E. OF MURFREESBORO PK.",
+        "Contact": "rahgie Holloway",
+        "Per_Ty": "CASN",
+        "Per_SubTy": "CAZ02A001",
+        "IVR_Trk_": 4260453,
+        "Purpose": "to erect 79.37Sf non illuminated wall sign and 22Sf non illuminated wall sign for Arc recreation center.",
+        "Council_Dist": 29,
+        "Census_Tract": 37015612,
+        "Lon": -86.64519735999998,
+        "Lat": 36.09114931,
+        "ObjectId": 1,
+        "ZIP": "37217"
+      },
+      "geometry": {
+        "x": -86.64519736001895,
+        "y": 36.09114931001651
+      }
+    },
+    {
+      "attributes": {
+        "Permit__": "2023052161",
+        "Permit_Type_Description": "Building Commercial - New",
+        "Permit_Subtype_Description": "Restaurant (Take Out)",
+        "Parcel": "10513012800",
+        "Date_Entered": 1690952400000,
+        "Date_Issued": 1699941600000,
+        "Const_Cost": 44000,
+        "Address": "2405 C 12TH AVE S",
+        "City": "NASHVILLE",
+        "State": "TN",
+        "Subdivision_Lot": "PT LOT 13 BELMONT LAND CO",
+        "Contact": "beatrice pieri",
+        "Per_Ty": "CACN",
+        "Per_SubTy": "CAF31A203",
+        "IVR_Trk_": 4358096,
+        "Purpose": "to construct permanent food trailer on site for 2405 12 south. not to be over any easements.  bb poc andrew pieri",
+        "Council_Dist": 18,
+        "Census_Tract": 37016900,
+        "Lon": -86.78942141,
+        "Lat": 36.1259458,
+        "ObjectId": 2,
+        "ZIP": "37204"
+      },
+      "geometry": {
+        "x": -86.78942140996375,
+        "y": 36.12594579969176
+      }
+    }
+  ]
+}

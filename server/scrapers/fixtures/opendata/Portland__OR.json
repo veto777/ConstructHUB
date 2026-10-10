@@ -1,0 +1,266 @@
+{
+  "displayFieldName": "REV",
+  "fieldAliases": {
+    "OBJECTID": "OBJECTID",
+    "INDATE": "INDATE",
+    "ISSUEDATE": "ISSUEDATE",
+    "STATUS": "STATUS",
+    "YEAR_": "YEAR_",
+    "NEWCLASS": "NEWCLASS",
+    "NEWTYPE": "NEWTYPE",
+    "NBRHOOD": "NBRHOOD",
+    "PDXBND": "PDXBND",
+    "IS_ADU": "IS_ADU",
+    "REV": "REV",
+    "FOLDERNUMB": "FOLDERNUMB",
+    "PROP_ADDRE": "PROP_ADDRE",
+    "WORKDESC": "WORKDESC",
+    "SUB": "SUB",
+    "OCC": "OCC",
+    "NEW_UNITS": "NEW_UNITS",
+    "FOLDER_DES": "FOLDER_DES",
+    "VALUATION": "VALUATION",
+    "CONST": "CONST",
+    "PROPLOT": "PROPLOT",
+    "PROPGISID1": "PROPGISID1",
+    "PROPERTYRO": "PROPERTYRO",
+    "FOLDERRSN": "FOLDERRSN",
+    "X_COORD": "X_COORD",
+    "Y_COORD": "Y_COORD",
+    "SQFT": "SQFT"
+  },
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": {
+    "wkid": 4326,
+    "latestWkid": 4326
+  },
+  "fields": [
+    {
+      "name": "OBJECTID",
+      "type": "esriFieldTypeOID",
+      "alias": "OBJECTID"
+    },
+    {
+      "name": "INDATE",
+      "type": "esriFieldTypeDate",
+      "alias": "INDATE",
+      "length": 8
+    },
+    {
+      "name": "ISSUEDATE",
+      "type": "esriFieldTypeDate",
+      "alias": "ISSUEDATE",
+      "length": 8
+    },
+    {
+      "name": "STATUS",
+      "type": "esriFieldTypeString",
+      "alias": "STATUS",
+      "length": 50
+    },
+    {
+      "name": "YEAR_",
+      "type": "esriFieldTypeSmallInteger",
+      "alias": "YEAR_"
+    },
+    {
+      "name": "NEWCLASS",
+      "type": "esriFieldTypeString",
+      "alias": "NEWCLASS",
+      "length": 50
+    },
+    {
+      "name": "NEWTYPE",
+      "type": "esriFieldTypeString",
+      "alias": "NEWTYPE",
+      "length": 50
+    },
+    {
+      "name": "NBRHOOD",
+      "type": "esriFieldTypeString",
+      "alias": "NBRHOOD",
+      "length": 100
+    },
+    {
+      "name": "PDXBND",
+      "type": "esriFieldTypeString",
+      "alias": "PDXBND",
+      "length": 20
+    },
+    {
+      "name": "IS_ADU",
+      "type": "esriFieldTypeString",
+      "alias": "IS_ADU",
+      "length": 20
+    },
+    {
+      "name": "REV",
+      "type": "esriFieldTypeString",
+      "alias": "REV",
+      "length": 12
+    },
+    {
+      "name": "FOLDERNUMB",
+      "type": "esriFieldTypeString",
+      "alias": "FOLDERNUMB",
+      "length": 50
+    },
+    {
+      "name": "PROP_ADDRE",
+      "type": "esriFieldTypeString",
+      "alias": "PROP_ADDRE",
+      "length": 140
+    },
+    {
+      "name": "WORKDESC",
+      "type": "esriFieldTypeString",
+      "alias": "WORKDESC",
+      "length": 36
+    },
+    {
+      "name": "SUB",
+      "type": "esriFieldTypeString",
+      "alias": "SUB",
+      "length": 50
+    },
+    {
+      "name": "OCC",
+      "type": "esriFieldTypeString",
+      "alias": "OCC",
+      "length": 36
+    },
+    {
+      "name": "NEW_UNITS",
+      "type": "esriFieldTypeDouble",
+      "alias": "NEW_UNITS"
+    },
+    {
+      "name": "FOLDER_DES",
+      "type": "esriFieldTypeString",
+      "alias": "FOLDER_DES",
+      "length": 200
+    },
+    {
+      "name": "VALUATION",
+      "type": "esriFieldTypeDouble",
+      "alias": "VALUATION"
+    },
+    {
+      "name": "CONST",
+      "type": "esriFieldTypeString",
+      "alias": "CONST",
+      "length": 36
+    },
+    {
+      "name": "PROPLOT",
+      "type": "esriFieldTypeString",
+      "alias": "PROPLOT",
+      "length": 50
+    },
+    {
+      "name": "PROPGISID1",
+      "type": "esriFieldTypeString",
+      "alias": "PROPGISID1",
+      "length": 50
+    },
+    {
+      "name": "PROPERTYRO",
+      "type": "esriFieldTypeString",
+      "alias": "PROPERTYRO",
+      "length": 50
+    },
+    {
+      "name": "FOLDERRSN",
+      "type": "esriFieldTypeDouble",
+      "alias": "FOLDERRSN"
+    },
+    {
+      "name": "X_COORD",
+      "type": "esriFieldTypeDouble",
+      "alias": "X_COORD"
+    },
+    {
+      "name": "Y_COORD",
+      "type": "esriFieldTypeDouble",
+      "alias": "Y_COORD"
+    },
+    {
+      "name": "SQFT",
+      "type": "esriFieldTypeInteger",
+      "alias": "SQFT"
+    }
+  ],
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 1,
+        "INDATE": 796521600000,
+        "ISSUEDATE": 822960000000,
+        "STATUS": "Final",
+        "YEAR_": 1996,
+        "NEWCLASS": "Alteration",
+        "NEWTYPE": "Single Family Dwelling",
+        "NBRHOOD": "EAST COLUMBIA",
+        "PDXBND": "YES",
+        "IS_ADU": "False",
+        "REV": null,
+        "FOLDERNUMB": "95-051241-000-00-RS",
+        "PROP_ADDRE": "9000 NE M L KING BLVD - Unit 223",
+        "WORKDESC": "Alteration",
+        "SUB": "Other",
+        "OCC": "R3",
+        "NEW_UNITS": 1,
+        "FOLDER_DES": "set up mh in space 9",
+        "VALUATION": 0,
+        "CONST": "VN",
+        "PROPLOT": "M355359",
+        "PROPGISID1": "1N1E10AA  3400",
+        "PROPERTYRO": "1N1E10AA  03400",
+        "FOLDERRSN": 302175,
+        "X_COORD": 7648165.40737876,
+        "Y_COORD": 708289.16675216,
+        "SQFT": null
+      },
+      "geometry": {
+        "x": -122.66402549269557,
+        "y": 45.58910029809973
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 2,
+        "INDATE": 775699200000,
+        "ISSUEDATE": 790300800000,
+        "STATUS": "Final",
+        "YEAR_": 1995,
+        "NEWCLASS": "New Construction",
+        "NEWTYPE": "Single Family Dwelling",
+        "NBRHOOD": "SOUTH BURLINGAME",
+        "PDXBND": "YES",
+        "IS_ADU": "False",
+        "REV": null,
+        "FOLDERNUMB": "94-000664-000-00-RS",
+        "PROP_ADDRE": "7632 SW RUBY TER",
+        "WORKDESC": "New Construction",
+        "SUB": "Single Family Dwelling",
+        "OCC": "R3",
+        "NEW_UNITS": 1,
+        "FOLDER_DES": "NSFR GAR, CARSON HTS LOT 6 BLK 37, MAP #3829-zoned R5/R5s",
+        "VALUATION": 85978,
+        "CONST": "VN",
+        "PROPLOT": "R128118",
+        "PROPGISID1": "1S1E22CC  901",
+        "PROPERTYRO": "1S1E22CC  00901",
+        "FOLDERRSN": 267974,
+        "X_COORD": 7642905.42839742,
+        "Y_COORD": 663059.34776316,
+        "SQFT": null
+      },
+      "geometry": {
+        "x": -122.67979854274716,
+        "y": 45.46470657996102
+      }
+    }
+  ],
+  "exceededTransferLimit": true
+}

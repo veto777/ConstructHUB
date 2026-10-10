@@ -1,0 +1,231 @@
+{
+  "objectIdFieldName": "OBJECTID",
+  "uniqueIdField": {
+    "name": "OBJECTID",
+    "isSystemMaintained": true
+  },
+  "globalIdFieldName": "",
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": {
+    "wkid": 4326,
+    "latestWkid": 4326
+  },
+  "fields": [
+    {
+      "name": "OBJECTID",
+      "type": "esriFieldTypeOID",
+      "alias": "OBJECTID",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "PermitCenterID",
+      "type": "esriFieldTypeGUID",
+      "alias": "PermitCenterID",
+      "sqlType": "sqlTypeOther",
+      "length": 38,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "PermitType",
+      "type": "esriFieldTypeString",
+      "alias": "PermitType",
+      "sqlType": "sqlTypeOther",
+      "length": 30,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "WorkClass",
+      "type": "esriFieldTypeString",
+      "alias": "WorkClass",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "PermitStatus",
+      "type": "esriFieldTypeString",
+      "alias": "PermitStatus",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "WorkflowStep",
+      "type": "esriFieldTypeString",
+      "alias": "WorkflowStep",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "WorkflowStepStatus",
+      "type": "esriFieldTypeString",
+      "alias": "WorkflowStepStatus",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "WorkflowStepDate",
+      "type": "esriFieldTypeDate",
+      "alias": "WorkflowStepDate",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "WorkflowAction",
+      "type": "esriFieldTypeString",
+      "alias": "WorkflowAction",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "WorkflowActionDate",
+      "type": "esriFieldTypeDate",
+      "alias": "WorkflowActionDate",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "PermitDescription",
+      "type": "esriFieldTypeString",
+      "alias": "PermitDescription",
+      "sqlType": "sqlTypeOther",
+      "length": 255,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "APNDash",
+      "type": "esriFieldTypeString",
+      "alias": "APNDash",
+      "sqlType": "sqlTypeOther",
+      "length": 12,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "FullStreetAddress",
+      "type": "esriFieldTypeString",
+      "alias": "FullStreetAddress",
+      "sqlType": "sqlTypeOther",
+      "length": 150,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ZipCode",
+      "type": "esriFieldTypeInteger",
+      "alias": "ZipCode",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ApplicationDate",
+      "type": "esriFieldTypeDate",
+      "alias": "ApplicationDate",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "IssuedDate",
+      "type": "esriFieldTypeDate",
+      "alias": "IssuedDate",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ExpirationDate",
+      "type": "esriFieldTypeDate",
+      "alias": "CreateDate",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "PermitNumber",
+      "type": "esriFieldTypeString",
+      "alias": "Permit Number",
+      "sqlType": "sqlTypeOther",
+      "length": 20,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\":\"Field used by ITC to store current and old (Accella) permit ids. \",\"fieldValueType\":\"\"}"
+    }
+  ],
+  "exceededTransferLimit": true,
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 111765,
+        "PermitCenterID": "00099c1d-2e26-4d47-b1e9-90611c16cc84",
+        "PermitType": "Building (Commercial)",
+        "WorkClass": "Accessory",
+        "PermitStatus": "Complete",
+        "WorkflowStep": "Issue Permit",
+        "WorkflowStepStatus": "Started",
+        "WorkflowStepDate": null,
+        "WorkflowAction": null,
+        "WorkflowActionDate": null,
+        "PermitDescription": "ELECTRICAL ENCLOSURE // GOTO B202303207",
+        "APNDash": "232-08-682A",
+        "FullStreetAddress": "12302 W Bell RD",
+        "ZipCode": 85375,
+        "ApplicationDate": 1687824000000,
+        "IssuedDate": 1696204800000,
+        "ExpirationDate": 1771286400000,
+        "PermitNumber": "B202306811"
+      },
+      "geometry": {
+        "x": -112.32511649997117,
+        "y": 33.63942599964814
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 111766,
+        "PermitCenterID": "0024bbbe-9a89-4b9c-9ffe-0a699a571dda",
+        "PermitType": "Building (Commercial)",
+        "WorkClass": "Signs",
+        "PermitStatus": "Complete",
+        "WorkflowStep": "Final Inspections",
+        "WorkflowStepStatus": "Passed",
+        "WorkflowStepDate": 1729123200000,
+        "WorkflowAction": "Final Building",
+        "WorkflowActionDate": 1740441600000,
+        "PermitDescription": "REBUILD BILLBOARD STRUCTURE TO 90' IN HEIGHT AND DUAL DIGITAL FACES // REFER TO PLANNING CASE Z2022105",
+        "APNDash": "301-85-065B",
+        "FullStreetAddress": "16804 S 54th ST",
+        "ZipCode": 85226,
+        "ApplicationDate": 1690416000000,
+        "IssuedDate": 1692144000000,
+        "ExpirationDate": 1756166400000,
+        "PermitNumber": "B202307928"
+      },
+      "geometry": {
+        "x": -111.96813599994286,
+        "y": 33.29369099992904
+      }
+    }
+  ]
+}

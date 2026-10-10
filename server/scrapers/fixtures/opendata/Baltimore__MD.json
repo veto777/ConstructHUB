@@ -1,0 +1,170 @@
+{
+  "objectIdFieldName": "OBJECTID",
+  "globalIdFieldName": "",
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": {
+    "wkid": 4326,
+    "latestWkid": 4326
+  },
+  "fields": [
+    {
+      "name": "CaseNumber",
+      "alias": "CaseNumber",
+      "type": "esriFieldTypeString",
+      "length": 250
+    },
+    {
+      "name": "Description",
+      "alias": "Description",
+      "type": "esriFieldTypeString",
+      "length": 1073741822
+    },
+    {
+      "name": "ExpirationDate",
+      "alias": "ExpirationDate",
+      "type": "esriFieldTypeDate",
+      "length": 8
+    },
+    {
+      "name": "IssuedDate",
+      "alias": "IssuedDate",
+      "type": "esriFieldTypeDate",
+      "length": 8
+    },
+    {
+      "name": "Address",
+      "alias": "Address",
+      "type": "esriFieldTypeString",
+      "length": 250
+    },
+    {
+      "name": "BLOCKLOT",
+      "alias": "BLOCKLOT",
+      "type": "esriFieldTypeString",
+      "length": 30
+    },
+    {
+      "name": "ExistingUse",
+      "alias": "ExistingUse",
+      "type": "esriFieldTypeString",
+      "length": 100
+    },
+    {
+      "name": "ProposedUse",
+      "alias": "ProposedUse",
+      "type": "esriFieldTypeString",
+      "length": 100
+    },
+    {
+      "name": "csm_projname",
+      "alias": "csm_projname",
+      "type": "esriFieldTypeString",
+      "length": 30
+    },
+    {
+      "name": "prc_block_no",
+      "alias": "prc_block_no",
+      "type": "esriFieldTypeString",
+      "length": 5
+    },
+    {
+      "name": "prc_lot",
+      "alias": "prc_lot",
+      "type": "esriFieldTypeString",
+      "length": 4
+    },
+    {
+      "name": "Neighborhood",
+      "alias": "Neighborhood",
+      "type": "esriFieldTypeString",
+      "length": 1073741822
+    },
+    {
+      "name": "Cost",
+      "alias": "Cost",
+      "type": "esriFieldTypeDouble"
+    },
+    {
+      "name": "Council_District",
+      "alias": "Council_District",
+      "type": "esriFieldTypeInteger"
+    },
+    {
+      "name": "OBJECTID",
+      "alias": "OBJECTID",
+      "type": "esriFieldTypeOID"
+    },
+    {
+      "name": "HousingMarketTypology2017",
+      "alias": "HousingMarketTypology2017",
+      "type": "esriFieldTypeString",
+      "length": 1073741822
+    },
+    {
+      "name": "IsPermitModification",
+      "alias": "IsPermitModification",
+      "type": "esriFieldTypeInteger"
+    },
+    {
+      "name": "PermitName",
+      "alias": "PermitName",
+      "type": "esriFieldTypeString",
+      "length": 255
+    }
+  ],
+  "features": [
+    {
+      "attributes": {
+        "CaseNumber": "BCCM-25-000001",
+        "Description": "SCOPE OF WORK: ------- EXTERIOR ALTERATIONS ------ Repair one damaged rafter. AS PER CODE.\r\n\r\nApproved For Work Only. Subject to the permitted uses and regulations under the provisions of the Zoning Ordinance.",
+        "ExpirationDate": 1758686400000,
+        "IssuedDate": 1740027600000,
+        "Address": "401 W REDWOOD ST",
+        "BLOCKLOT": "0654 009",
+        "ExistingUse": "Commercial",
+        "ProposedUse": "Commercial",
+        "csm_projname": null,
+        "prc_block_no": "0654",
+        "prc_lot": "009",
+        "Neighborhood": "Downtown",
+        "Cost": 61555.58,
+        "Council_District": 11,
+        "OBJECTID": 1,
+        "HousingMarketTypology2017": "B",
+        "IsPermitModification": 0,
+        "PermitName": "Redwood Southern Mangement"
+      },
+      "geometry": {
+        "x": -76.62119885351034,
+        "y": 39.28845691637462
+      }
+    },
+    {
+      "attributes": {
+        "CaseNumber": "BCCM-25-000002",
+        "Description": "We will install 68' of 6' tall black vinyl coated chain link fencing in the rear, and 58' of 6' tall  black ornamental steel picket fencing in the front, including a 20' wide slide gate.  \r\nApproved For Work only. Subject to the permitted uses and regulations under the provisions of the Zoning Ordinance.\r\nAs per plans as per code.  Please add your licensed professional before work can begin for this scope of work for this commercial property.",
+        "ExpirationDate": 1775275200000,
+        "IssuedDate": 1752465600000,
+        "Address": "309 N HOWARD ST",
+        "BLOCKLOT": "0578 012",
+        "ExistingUse": "Commercial",
+        "ProposedUse": "Commercial",
+        "csm_projname": null,
+        "prc_block_no": "0578",
+        "prc_lot": "012",
+        "Neighborhood": "Downtown",
+        "Cost": 34000,
+        "Council_District": 11,
+        "OBJECTID": 2,
+        "HousingMarketTypology2017": "Rental Market 1",
+        "IsPermitModification": 0,
+        "PermitName": "Bell Urban"
+      },
+      "geometry": {
+        "x": -76.61924325064177,
+        "y": 39.29327384580748
+      }
+    }
+  ],
+  "exceededTransferLimit": true
+}
