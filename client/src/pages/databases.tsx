@@ -392,7 +392,15 @@ function PaginationControls({
 
 type IssuedByPortal = { jurisdiction: string; portalUrl: string | null; searchUrl: string | null; linkStatus: string | null };
 
+/** Portal platforms whose adapter can list permits by date — the ones permit alerts can poll (server/permits/routes.ts). */
+function useAlertPlatforms(): Set<string> {
+  const { data } = useQuery<{ platforms: string[] }>({ queryKey: ["/api/permits/alert-platforms"], staleTime: 5 * 60_000 });
+  return useMemo(() => new Set((data?.platforms ?? []).map((p) => p.toLowerCase())), [data]);
+}
+
 function DatabaseCard({ database, countyName }: { database: PermitDatabase; countyName?: string }) {
+  const alertPlatforms = useAlertPlatforms();
+  const alertsSupported = !!database.platform && alertPlatforms.has(database.platform.toLowerCase());
   // "Acadia Parish", "Kusilvak Census Area", "City of Alexandria" — not every county-equivalent is a "County".
   const stateCode = /, ([A-Z]{2})$/.exec(database.jurisdiction)?.[1] ?? "";
   const [scrapeOpen, setScrapeOpen] = useState(false);
@@ -443,7 +451,10 @@ function DatabaseCard({ database, countyName }: { database: PermitDatabase; coun
       <GoogleListRow
         testId={`card-database-${database.id}`}
         title={title}
-        badges={<span className="g-chip g-chip--sm">{database.jurisdictionType}</span>}
+        badges={<>
+          <span className="g-chip g-chip--sm">{database.jurisdictionType}</span>
+          {alertsSupported && <span className="g-chip g-chip--sm" data-testid={`badge-alerts-${database.id}`}>Alerts supported</span>}
+        </>}
         meta={[
           title !== database.jurisdiction ? database.jurisdiction : null,
           database.jurisdictionType === "city" && countyName ? countyLabel(countyName, stateCode) : null,

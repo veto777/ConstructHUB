@@ -231,6 +231,7 @@ const permitsGroup: NavGroup = {
     { title: "Property Records", url: "/property", icon: Building },
     { title: "Scrape Schedules", url: "/schedules", icon: Clock },
     { title: "Search History", url: "/history", icon: FileText },
+    { title: "Permit Alerts", url: "/permit-alerts", icon: Bell, badge: "new" as BadgeType },
   ],
 };
 
