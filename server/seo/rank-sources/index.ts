@@ -1,6 +1,7 @@
 /** The rank sources and one run of the comparison over a site's tracked keywords (script/seo-rank-compare.ts). */
 import { pool } from "../../db";
 import { normalizeDomain } from "../dataforseo";
+import { ensureLocations } from "../locations";
 import { markdownReport, scoreSource, type Pair, type SourceScore } from "./compare";
 import { cseSource } from "./google-cse";
 import { dataforseoSource } from "./dataforseo";
@@ -16,6 +17,7 @@ export const SOURCES: Record<SourceName, RankSource> = { dataforseo: dataforseoS
 
 /** A place from the rank tracker's list, with Google's canonical name (null = not on the list). */
 export async function placeByCode(code: number): Promise<RankPlace | null> {
+  await ensureLocations(); // the list loads itself the first time (free)
   const { rows: [r] } = await pool.query("SELECT code, name FROM seo_locations WHERE code=$1", [code]);
   if (!r) return null;
   const parts = String(r.name).split(",").map((p: string) => p.trim());
