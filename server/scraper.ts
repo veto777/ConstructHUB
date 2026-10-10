@@ -77,6 +77,12 @@ async function createIsolatedPage(): Promise<{ page: Page; context: BrowserConte
   return { page, context };
 }
 
+/** A fresh isolated browser context on the shared browser (permit alert adapters, server/scrapers/*). Caller closes it. */
+export async function newBrowserContext(): Promise<BrowserContext> {
+  const { context } = await createIsolatedPage();
+  return context;
+}
+
 async function closeIsolatedPage(page: Page, context: BrowserContext) {
   try { await page.close(); } catch {}
   try { await context.close(); } catch {}

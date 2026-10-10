@@ -3329,3 +3329,79 @@ export const youtubeUploadDaily = pgTable("youtube_upload_daily", {
   userId: integer("user_id").notNull(),
   used: integer("used").notNull().default(0),
 }, (t) => [primaryKey({ columns: [t.day, t.userId] })]);
+
+// ── Permit alerts (server/permits/*) ─────────────────────────────────────────
+// Tables are created by server/permits/schema.ts ensurePermitAlertsSchema (idempotent DDL, the
+// schema-ensure pattern); these definitions give the server typed reads/writes.
+
+/** One thing a customer wants to hear about (shared/permit-alerts.ts WatchKind). */
+export const permitWatches = pgTable("permit_watches", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  userId: integer("user_id").notNull(),
+  kind: text("kind").notNull(),
+  name: text("name").notNull(),
+  params: jsonb("params").notNull().$type<Record<string, unknown>>(),
+  channels: jsonb("channels").notNull().$type<Record<string, unknown>>(),
+  databaseIds: integer("database_ids").array().notNull(),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
+  lastMatchedAt: timestamp("last_matched_at", { withTimezone: true }),
+});
+export type PermitWatch = typeof permitWatches.$inferSelect;
+
+/** Normalized permit records seen by the alerts poller (server/scrapers/types.ts PermitRecord). */
+export const permits = pgTable("permits", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  databaseId: integer("database_id").notNull(),
+  permitNumber: text("permit_number").notNull(),
+  jurisdiction: text("jurisdiction").notNull(),
+  address: text("address"),
+  addressNorm: text("address_norm"),
+  parcel: text("parcel"),
+  lat: doublePrecision("lat"),
+  lng: doublePrecision("lng"),
+  permitType: text("permit_type"),
+  workClass: text("work_class"),
+  description: text("description"),
+  status: text("status"),
+  issuedAt: text("issued_at"),
+  appliedAt: text("applied_at"),
+  expiresAt: text("expires_at"),
+  valuation: doublePrecision("valuation"),
+  contractorName: text("contractor_name"),
+  contractorLicense: text("contractor_license"),
+  applicantName: text("applicant_name"),
+  ownerName: text("owner_name"),
+  sourceUrl: text("source_url"),
+  raw: jsonb("raw"),
+  contentHash: text("content_hash").notNull(),
+  firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex("permits_database_number").on(t.databaseId, t.permitNumber)]);
+export type Permit = typeof permits.$inferSelect;
+
+/** A permit that matched a watch, and how the digest went out. */
+export const permitWatchHits = pgTable("permit_watch_hits", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  watchId: bigint("watch_id", { mode: "number" }).notNull(),
+  permitId: bigint("permit_id", { mode: "number" }).notNull(),
+  reason: text("reason"),
+  matchedAt: timestamp("matched_at", { withTimezone: true }).notNull().defaultNow(),
+  notifiedAt: timestamp("notified_at", { withTimezone: true }),
+  channelResults: jsonb("channel_results"),
+}, (t) => [uniqueIndex("permit_watch_hits_once").on(t.watchId, t.permitId)]);
+export type PermitWatchHit = typeof permitWatchHits.$inferSelect;
+
+/** Per-jurisdiction poll bookkeeping: when it ran, when it last worked, what went wrong. */
+export const permitPollState = pgTable("permit_poll_state", {
+  databaseId: integer("database_id").primaryKey(),
+  nextPollAt: timestamp("next_poll_at", { withTimezone: true }).notNull().defaultNow(),
+  lastPolledAt: timestamp("last_polled_at", { withTimezone: true }),
+  lastSuccessAt: timestamp("last_success_at", { withTimezone: true }),
+  lastError: text("last_error"),
+  failingSince: timestamp("failing_since", { withTimezone: true }),
+  lastCount: integer("last_count").notNull().default(0),
+});
+export type PermitPollState = typeof permitPollState.$inferSelect;

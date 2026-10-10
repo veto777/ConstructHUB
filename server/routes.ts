@@ -365,6 +365,13 @@ export async function registerRoutes(
   const { startDomainWorker } = await import("./domains/service");
   startDomainWorker();
   startMailWorker();
+  // Permit alerts (server/permits): watches on jurisdictions, polled hourly through the adapter registry.
+  const { ensurePermitAlertsSchema } = await import("./permits/schema");
+  await ensurePermitAlertsSchema();
+  const { registerPermitAlertRoutes } = await import("./permits/routes");
+  registerPermitAlertRoutes(app, getDevUser);
+  const { startPermitAlertsWorker } = await import("./permits/poller");
+  startPermitAlertsWorker();
   const { ensureGbpTokenEncryption } = await import("./gbp/token-crypto");
   await ensureGbpTokenEncryption();
   const { ensureAccountSecuritySchema, registerAccountSecurityRoutes } = await import("./account-security");
