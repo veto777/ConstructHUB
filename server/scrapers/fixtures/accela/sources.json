@@ -1,0 +1,448 @@
+[
+  {
+    "file": "tampa-landing.html.gz",
+    "url": "https://aca-prod.accela.com/TAMPA/Default.aspx",
+    "method": "GET",
+    "status": 200,
+    "time": "2026-10-10T17:54:26.511Z",
+    "jurisdiction": "Tampa, FL",
+    "query": {
+      "mode": "search",
+      "type": "address",
+      "value": "2917 W Main St"
+    },
+    "sha256": "a9cdc3821c462d7c115210975929747c1b3c988fad267e7e43d6bb894bca5161"
+  },
+  {
+    "file": "tampa-form.html.gz",
+    "url": "https://aca-prod.accela.com/TAMPA/Cap/CapHome.aspx?module=Building&TabName=Home",
+    "method": "GET",
+    "status": 200,
+    "time": "2026-10-10T17:54:27.429Z",
+    "jurisdiction": "Tampa, FL",
+    "query": {
+      "mode": "search",
+      "type": "address",
+      "value": "2917 W Main St"
+    },
+    "sha256": "2ff20c8c4d66dec19cc9a635b6b4ede72dcd44718374ebf9f4bed5c0ce642937"
+  },
+  {
+    "file": "tampa-address.html.gz",
+    "url": "https://aca-prod.accela.com/TAMPA/Cap/CapHome.aspx?module=Building&TabName=Home",
+    "method": "POST",
+    "status": 200,
+    "time": "2026-10-10T17:54:28.938Z",
+    "jurisdiction": "Tampa, FL",
+    "query": {
+      "mode": "search",
+      "type": "address",
+      "value": "2917 W Main St"
+    },
+    "sha256": "bb65064c5127f2e9a91a201b344702a45bfdf6c55d12e4597307540ac24a38b9"
+  },
+  {
+    "file": "tampa-license-form.html.gz",
+    "url": "https://aca-prod.accela.com/TAMPA/Cap/CapHome.aspx?module=Building&TabName=Home",
+    "method": "POST",
+    "status": 200,
+    "time": "2026-10-10T17:50:24.854Z",
+    "jurisdiction": "Tampa, FL",
+    "query": {
+      "mode": "search",
+      "type": "company",
+      "value": "ACTION AIRCONDITIONING INC"
+    },
+    "sha256": "60fde97f4ad4a411af377c4e6e2ca1e07de947027c1c91edf208c28b364b57b2"
+  },
+  {
+    "file": "tampa-license-results.html.gz",
+    "url": "https://aca-prod.accela.com/TAMPA/Cap/CapHome.aspx?module=Building&TabName=Home",
+    "method": "POST",
+    "status": 200,
+    "time": "2026-10-10T17:50:25.874Z",
+    "jurisdiction": "Tampa, FL",
+    "query": {
+      "mode": "search",
+      "type": "company",
+      "value": "ACTION AIRCONDITIONING INC"
+    },
+    "sha256": "7beb7f7c2ba5c1f0063d850c9ce3d3c2ed5fc7081ca09b51f2eff77abf6a83d5"
+  },
+  {
+    "file": "lane-landing.html.gz",
+    "url": "https://aca-oregon.accela.com/LANE_CO/Default.aspx",
+    "method": "GET",
+    "status": 200,
+    "time": "2026-10-10T17:52:19.188Z",
+    "jurisdiction": "Lane County, OR",
+    "query": {
+      "mode": "search",
+      "type": "address",
+      "value": "89817 Territorial"
+    },
+    "sha256": "66427993fc59bc1f6a0c6841aac1a3f22373ac2e6a436cb0af0d1aa7c13af774"
+  },
+  {
+    "file": "lane-form.html.gz",
+    "url": "https://aca-oregon.accela.com/LANE_CO/Cap/CapHome.aspx?module=Building&TabName=Home",
+    "method": "GET",
+    "status": 200,
+    "time": "2026-10-10T17:52:20.233Z",
+    "jurisdiction": "Lane County, OR",
+    "query": {
+      "mode": "search",
+      "type": "address",
+      "value": "89817 Territorial"
+    },
+    "sha256": "c65b413fcd55a720d201c8931735ef77ec3d05cb4deff9f6e9cfa75626696c72"
+  },
+  {
+    "file": "lane-address-page1.html.gz",
+    "url": "https://aca-oregon.accela.com/LANE_CO/Cap/CapHome.aspx?module=Building&TabName=Home",
+    "method": "POST",
+    "status": 200,
+    "time": "2026-10-10T17:52:21.863Z",
+    "jurisdiction": "Lane County, OR",
+    "query": {
+      "mode": "search",
+      "type": "address",
+      "value": "89817 Territorial"
+    },
+    "sha256": "27aaca4184ee76163c2497fb4bb3d55e0820ae942dcfb7e5326747af76a2168a"
+  },
+  {
+    "file": "lane-address-page2.html.gz",
+    "url": "https://aca-oregon.accela.com/LANE_CO/Cap/CapHome.aspx?module=Building&TabName=Home",
+    "method": "POST",
+    "status": 200,
+    "time": "2026-10-10T17:52:22.502Z",
+    "jurisdiction": "Lane County, OR",
+    "query": {
+      "mode": "search",
+      "type": "address",
+      "value": "89817 Territorial"
+    },
+    "sha256": "7876c98207bde3320a2d089e6571052a6f228be43b3a8da9381308a870ef94b5"
+  },
+  {
+    "file": "lane-address-page3.html.gz",
+    "url": "https://aca-oregon.accela.com/LANE_CO/Cap/CapHome.aspx?module=Building&TabName=Home",
+    "method": "POST",
+    "status": 200,
+    "time": "2026-10-10T17:52:23.410Z",
+    "jurisdiction": "Lane County, OR",
+    "query": {
+      "mode": "search",
+      "type": "address",
+      "value": "89817 Territorial"
+    },
+    "sha256": "79c7afd669526e00d8601dd0fda512d0baf6ead7f87d8d1b0e99f683eac605be"
+  },
+  {
+    "file": "lane-no-records.html.gz",
+    "url": "https://aca-oregon.accela.com/LANE_CO/Cap/CapHome.aspx?module=Building&TabName=Home",
+    "method": "POST",
+    "status": 200,
+    "time": "2026-10-10T17:54:29.948Z",
+    "jurisdiction": "Lane County, OR",
+    "query": {
+      "mode": "search",
+      "type": "address",
+      "value": "100 Main"
+    },
+    "sha256": "527b1bed7be61a883a43d3ed42c8dbb34075d1f12c9f00850132c89e75904ec2"
+  },
+  {
+    "file": "lane-license-form.html.gz",
+    "url": "https://aca-oregon.accela.com/LANE_CO/Cap/CapHome.aspx?module=Building&TabName=Home",
+    "method": "POST",
+    "status": 200,
+    "time": "2026-10-10T17:53:47.314Z",
+    "jurisdiction": "Lane County, OR",
+    "query": {
+      "mode": "search",
+      "type": "license",
+      "value": "C1229"
+    },
+    "sha256": "ac6ed305833912d792e681b5301160ea4376194e4021bac9b6889c4e244bfff5"
+  },
+  {
+    "file": "lane-license-results.html.gz",
+    "url": "https://aca-oregon.accela.com/LANE_CO/Cap/CapHome.aspx?module=Building&TabName=Home",
+    "method": "POST",
+    "status": 200,
+    "time": "2026-10-10T17:53:48.408Z",
+    "jurisdiction": "Lane County, OR",
+    "query": {
+      "mode": "search",
+      "type": "license",
+      "value": "C1229"
+    },
+    "sha256": "f592f78811865712c402a0862f8544c0abcea43deeb27ef9c11a036eebfc235c"
+  },
+  {
+    "file": "lane-detail.html.gz",
+    "url": "https://aca-oregon.accela.com/LANE_CO/Cap/CapDetail.aspx?Module=Building&TabName=Building&capID1=26CAP&capID2=00000&capID3=004A1&agencyCode=LANE_CO&IsToShowInspection=",
+    "method": "GET",
+    "status": 200,
+    "time": "2026-10-10T17:53:51.042Z",
+    "jurisdiction": "Lane County, OR",
+    "query": {
+      "mode": "search",
+      "type": "license",
+      "value": "C1229"
+    },
+    "sha256": "d1a5e778dec4c7cb8eb19a94be2d24981ec88a4b693b0e9688cd5e1067faaba9"
+  },
+  {
+    "file": "sacramento-form.html.gz",
+    "url": "https://aca-prod.accela.com/SACRAMENTO/Cap/CapHome.aspx?module=Building&TabName=Home",
+    "method": "GET",
+    "status": 200,
+    "time": "2026-10-10T17:52:18.780Z",
+    "jurisdiction": "Sacramento, CA",
+    "query": {
+      "mode": "recent",
+      "type": null,
+      "value": "2026-10-10"
+    },
+    "sha256": "463881a797b806fe9284463115c66e1583f6cc4e2b2f4f8b622955cb12ae60f3"
+  },
+  {
+    "file": "sacramento-recent.html.gz",
+    "url": "https://aca-prod.accela.com/SACRAMENTO/Cap/CapHome.aspx?module=Building&TabName=Home",
+    "method": "POST",
+    "status": 200,
+    "time": "2026-10-10T17:52:20.182Z",
+    "jurisdiction": "Sacramento, CA",
+    "query": {
+      "mode": "recent",
+      "type": null,
+      "value": "2026-10-10"
+    },
+    "sha256": "44a8584fed95374da69b38f4aee6aeae8eb7727a39836920dc5e8279ceeca727"
+  },
+  {
+    "file": "sacramento-detail.html.gz",
+    "url": "https://aca-prod.accela.com/SACRAMENTO/Cap/CapDetail.aspx?Module=Building&TabName=Building&capID1=26PUB&capID2=00000&capID3=17348&agencyCode=SACRAMENTO&IsToShowInspection=",
+    "method": "GET",
+    "status": 200,
+    "time": "2026-10-10T17:53:19.114Z",
+    "jurisdiction": "Sacramento, CA",
+    "query": {
+      "mode": "detail",
+      "type": null,
+      "value": "RES-2622712"
+    },
+    "sha256": "df79b4c7e0bbd08f4892394ea7209db57e801e65b52cf70584620d60c706c03c"
+  },
+  {
+    "file": "oregon-shared-results.html.gz",
+    "url": "https://aca-oregon.accela.com/oregon/Cap/CapHome.aspx?module=Building&TabName=Home",
+    "method": "POST",
+    "status": 200,
+    "time": "2026-10-10T17:50:15.238Z",
+    "jurisdiction": "Linn County, OR",
+    "query": {
+      "mode": "search",
+      "type": "address",
+      "value": "100 Main"
+    },
+    "sha256": "c57599c8f37e466a9d9a0f530e17092a078d7b737c6ce79c98a038d0d673245c"
+  },
+  {
+    "file": "cobb-landing.html.gz",
+    "url": "https://cobbca.cobbcounty.gov/CitizenAccess/Default.aspx",
+    "method": "GET",
+    "status": 200,
+    "time": "2026-10-10T17:53:16.112Z",
+    "jurisdiction": "Cobb County, GA",
+    "query": {
+      "mode": "search",
+      "type": "address",
+      "value": "100 Main"
+    },
+    "sha256": "3a4bce5ab35ac44552f5910ee59044cb5eedc7cb1dc099a8eaa218eb461b7289"
+  },
+  {
+    "file": "cobb-login.html.gz",
+    "url": "https://cobbca.cobbcounty.gov/CitizenAccess/Login.aspx?ReturnUrl=%2fCitizenAccess%2fCap%2fCapHome.aspx%3fmodule%3dBuilding%26TabName%3dHome",
+    "method": "GET",
+    "status": 200,
+    "time": "2026-10-10T17:53:17.966Z",
+    "jurisdiction": "Cobb County, GA",
+    "query": {
+      "mode": "search",
+      "type": "address",
+      "value": "100 Main"
+    },
+    "sha256": "4b0e83b012e2cc1cff61e77672479bf9b4cd57c4e714aaf31909a09265e3a085"
+  },
+  {
+    "file": "sacramento-week-page1.html.gz",
+    "url": "https://aca-prod.accela.com/SACRAMENTO/Cap/CapHome.aspx?module=Building&TabName=Home",
+    "method": "POST",
+    "status": 200,
+    "time": "2026-10-10T17:51:55.649Z",
+    "jurisdiction": "Sacramento, CA",
+    "query": {
+      "mode": "recent",
+      "type": null,
+      "value": "2026-10-03"
+    },
+    "sha256": "fe0139d66d1d12ff40acdbf4a4f4d1f453fc0e7078555b48dbacc9fb89eaaaac"
+  },
+  {
+    "file": "sacramento-week-page2.html.gz",
+    "url": "https://aca-prod.accela.com/SACRAMENTO/Cap/CapHome.aspx?module=Building&TabName=Home",
+    "method": "POST",
+    "status": 200,
+    "time": "2026-10-10T17:51:56.203Z",
+    "jurisdiction": "Sacramento, CA",
+    "query": {
+      "mode": "recent",
+      "type": null,
+      "value": "2026-10-03"
+    },
+    "sha256": "83a680845532a7d27eb1ecd872cd86619d447d0234fe043ff027169908076b46"
+  },
+  {
+    "file": "sacramento-week-page3.html.gz",
+    "url": "https://aca-prod.accela.com/SACRAMENTO/Cap/CapHome.aspx?module=Building&TabName=Home",
+    "method": "POST",
+    "status": 200,
+    "time": "2026-10-10T17:51:57.163Z",
+    "jurisdiction": "Sacramento, CA",
+    "query": {
+      "mode": "recent",
+      "type": null,
+      "value": "2026-10-03"
+    },
+    "sha256": "b342be4090cf7bf8dd9ed68666ab71b53c70d8402dd73979fecccae0293c5fcc"
+  },
+  {
+    "file": "sacramento-week-page4.html.gz",
+    "url": "https://aca-prod.accela.com/SACRAMENTO/Cap/CapHome.aspx?module=Building&TabName=Home",
+    "method": "POST",
+    "status": 200,
+    "time": "2026-10-10T17:51:58.243Z",
+    "jurisdiction": "Sacramento, CA",
+    "query": {
+      "mode": "recent",
+      "type": null,
+      "value": "2026-10-03"
+    },
+    "sha256": "5974528576bbc629720baea3b58a15e24c1ca89db9e1d9eb3e3e08b54eb53ad7"
+  },
+  {
+    "file": "sacramento-week-page5.html.gz",
+    "url": "https://aca-prod.accela.com/SACRAMENTO/Cap/CapHome.aspx?module=Building&TabName=Home",
+    "method": "POST",
+    "status": 200,
+    "time": "2026-10-10T17:51:59.386Z",
+    "jurisdiction": "Sacramento, CA",
+    "query": {
+      "mode": "recent",
+      "type": null,
+      "value": "2026-10-03"
+    },
+    "sha256": "a3831f65ba61714b5b38048be253536ae6bb07ca5340f2710983ae07a37295ec"
+  },
+  {
+    "file": "sacramento-week-page6.html.gz",
+    "url": "https://aca-prod.accela.com/SACRAMENTO/Cap/CapHome.aspx?module=Building&TabName=Home",
+    "method": "POST",
+    "status": 200,
+    "time": "2026-10-10T17:52:00.176Z",
+    "jurisdiction": "Sacramento, CA",
+    "query": {
+      "mode": "recent",
+      "type": null,
+      "value": "2026-10-03"
+    },
+    "sha256": "e627860a2bf4ef3a8a1dbf4a7c146e263a2169156e0a8ed5c5fdd200ed7184e0"
+  },
+  {
+    "file": "sacramento-week-page7.html.gz",
+    "url": "https://aca-prod.accela.com/SACRAMENTO/Cap/CapHome.aspx?module=Building&TabName=Home",
+    "method": "POST",
+    "status": 200,
+    "time": "2026-10-10T17:52:01.432Z",
+    "jurisdiction": "Sacramento, CA",
+    "query": {
+      "mode": "recent",
+      "type": null,
+      "value": "2026-10-03"
+    },
+    "sha256": "ea28bee5b7c1d59fe09f862ccc1914f5c7b6d8044d7569a310f43141e3714511"
+  },
+  {
+    "file": "sacramento-week-page8.html.gz",
+    "url": "https://aca-prod.accela.com/SACRAMENTO/Cap/CapHome.aspx?module=Building&TabName=Home",
+    "method": "POST",
+    "status": 200,
+    "time": "2026-10-10T17:52:02.166Z",
+    "jurisdiction": "Sacramento, CA",
+    "query": {
+      "mode": "recent",
+      "type": null,
+      "value": "2026-10-03"
+    },
+    "sha256": "03323e8f823ea32910bcff0352d7e9d008c978dbddfbd408c13e5ec8b1c5070a"
+  },
+  {
+    "file": "sacramento-week-page9.html.gz",
+    "url": "https://aca-prod.accela.com/SACRAMENTO/Cap/CapHome.aspx?module=Building&TabName=Home",
+    "method": "POST",
+    "status": 200,
+    "time": "2026-10-10T17:52:03.184Z",
+    "jurisdiction": "Sacramento, CA",
+    "query": {
+      "mode": "recent",
+      "type": null,
+      "value": "2026-10-03"
+    },
+    "sha256": "933773b5a6be03d6bd4ef6bab780640be8308e5e286c97c783282e19dfdb3cf3"
+  },
+  {
+    "file": "sacramento-week-page10.html.gz",
+    "url": "https://aca-prod.accela.com/SACRAMENTO/Cap/CapHome.aspx?module=Building&TabName=Home",
+    "method": "POST",
+    "status": 200,
+    "time": "2026-10-10T17:52:04.211Z",
+    "jurisdiction": "Sacramento, CA",
+    "query": {
+      "mode": "recent",
+      "type": null,
+      "value": "2026-10-03"
+    },
+    "sha256": "28dbd64ad2057694b672c1d4831ac27b243339f1f4db2022c0aee0e02debbdf2"
+  },
+  {
+    "file": "tampa-detail.html.gz",
+    "url": "https://aca-prod.accela.com/TAMPA/Cap/CapDetail.aspx?Module=Building&TabName=Building&capID1=26CAP&capID2=00000&capID3=02OJ7&agencyCode=TAMPA&IsToShowInspection=",
+    "method": "GET",
+    "status": 200,
+    "time": "2026-10-10T17:54:51.808Z",
+    "jurisdiction": "Tampa, FL",
+    "query": {
+      "mode": "detail",
+      "value": "BTR-27-0633104"
+    },
+    "sha256": "f061cc70f5cd420724345035b494662dda6bfcb09dcd11546ff29702d1642b8b"
+  },
+  {
+    "file": "boulder-form.html.gz",
+    "url": "https://aca-prod.accela.com/BOCO/Cap/CapHome.aspx?module=Building&TabName=Home",
+    "method": "GET",
+    "status": 200,
+    "time": "2026-10-10T17:56:52.329Z",
+    "jurisdiction": "Boulder County, CO",
+    "query": {
+      "mode": "recent",
+      "value": "2026-10-03"
+    },
+    "sha256": "857ab85c4b9afcb326c653aff792dc9cae5c55dff7342cc962d52929c7d15446"
+  }
+]
