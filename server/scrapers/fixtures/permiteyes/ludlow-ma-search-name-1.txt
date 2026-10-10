@@ -1,0 +1,2739 @@
+
+
+
+
+<html lang="en">
+<head>
+ <meta charset="utf-8" />
+        <title>Permiteyes</title>
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta content="width=device-width, initial-scale=1" name="viewport" />
+        <meta content="" name="description" />
+        <meta content="" name="author" />
+
+
+<!--Plugins-->
+<link href="css/fontawesome.css" rel="stylesheet" type="text/css" />
+
+<link href="/assets/global/plugins/font-awesome/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+<link href="/assets/global/plugins/simple-line-icons/simple-line-icons.min.css" rel="stylesheet" type="text/css" />
+<link href="/assets/global/plugins/bootstrap/css/bootstrap.css" rel="stylesheet" type="text/css" />
+
+<link href="/assets/global/plugins/fullcalendar/fullcalendar.min.css" rel="stylesheet" type="text/css" />
+<link href="/assets/global/plugins/fullcalendar/scheduler.min.css" rel="stylesheet" type="text/css" />
+<link href="/assets/global/plugins/jquery-qtip-custom/jquery.qtip.min.css" rel="stylesheet" type="text/css" />
+<!--<link href="/assets/global/plugins/uniform/css/uniform.default.css" rel="stylesheet" type="text/css" />-->
+
+<!--css-->
+
+<link href="/assets/global/css/components-md.css" rel="stylesheet" id="style_components" type="text/css" />
+<link href="/assets/global/css/plugins-md.css" rel="stylesheet" type="text/css" />
+<link href="/assets/layouts/layout2/css/layout.css" rel="stylesheet" type="text/css" />
+<link href="/assets/layouts/layout2/css/themes/blue.css" rel="stylesheet" type="text/css" id="style_color" />
+<link href="/assets/layouts/layout2/css/custom.css" rel="stylesheet" type="text/css" />
+
+
+<style>
+@media print {
+  html, body {
+    display: none;  /* hide whole page */
+  }
+}
+</style>
+
+<link href="/assets/global/plugins/datatables/datatables.css" rel="stylesheet" type="text/css" />
+<link href="/assets/global/plugins/datatables/plugins/bootstrap/datatables.bootstrap.css" rel="stylesheet" type="text/css" />
+ <!-- START DATE PICKER-->
+<link href="/assets/global/plugins/bootstrap-datepicker/css/bootstrap-datepicker3.min.css" rel="stylesheet" type="text/css" />
+
+<!-- END DATE PICKER-->
+<style type="text/css">
+.portlet.viewlight {padding: 12px 10px 15px 10px;background-color: #fff;}
+.viewreadonly{background: none !important;cursor:default !important;border-bottom: 1px solid #c2cad8 !important;font-style: italic;font-weight: 600;}
+.transactionsfont{font-size: 12px;}
+.showpartialcontent{white-space: nowrap;width: 30ch;overflow: hidden;text-overflow: ellipsis;}
+.sectionmargin{margin-bottom: 20px;}
+/*All Permit form css*/
+.form-horizontal .form-group.form-md-line-input {padding-top: 6px !important; margin-bottom: 0px !important; margin: 0 0px 0px 0px !important; }
+.form-group.form-md-line-input {margin: 0 0 0px 0 !important; padding-top: 0px !important; }
+.form-control {height: 30px !important;font-size: 12px !important;}
+textarea.form-control {height: auto !important;}
+label {font-size: 12px !important;}
+.control-label{text-align: left !important;}
+/*Tent Form css*/
+.checkbox_radio_readonly {cursor: default !important;}
+/*Residential Form css*/
+.horizontal-line{width:100%;color:#337ab7;background-color:rgba(51, 122, 183,0.7);height:1px}
+.red-font{color:red}
+.section-heading{font-weight:bold;color:#337ab7}
+.md-checkbox label, .md-radio label, .row label, label, .font-label{color:#1b1a1a}
+.textarea-bg{background-color:rgba(232, 234, 237,0.7) !important}
+.inline-text-box{border: 0;border-bottom: 1px solid #c2cad8;background: none;outline: none !important;box-shadow: none !important;}
+textarea{resize:none}
+.section-border{border:1px solid #888888;padding:10px}
+.title-bg{background:#555;color:#fff !important;padding:2.5px;}
+.title-bg label {color:#fff !important; margin-bottom: 1px !important;}
+.title-text{font-size:14px;margin-top:40px}
+.form-group.form-md-line-input .form-control{background-color:#f3f3f4 !important}
+.form-body{ padding:0 !important;}
+.SameAsWidth {width: 6.33333% !important;color:white !important;padding-right: 0 !important;}
+@media screen and (max-width: 480px) {.SameAsWidth {width: 20.33333% !important;color:white !important;}}
+.pr-0 {padding-right: 0 ;}
+.pl-0 {padding-left: 0 ;}
+.pb-0 {padding-bottom: 0 ;}
+.pt-0 {padding-top: 0;}
+.p-0 {padding-right: 0 ;padding-left: 0 ;padding-bottom: 0 ;padding-top: 0;}
+.display-none {display: none;}
+.display-inline {display: inline;}
+.mr-0 {margin-right: 0;}
+.mt-0 {margin-top: 0;}
+.mb-0 {margin-bottom: 0;}
+.ml-0 {margin-left: 0;}
+/*Plumbing Form CSS*/
+.letter{max-width:25px;text-align:center}
+/*All Form CSS*/
+#lbl_AppSameAsOwner, #lbl_AgntSameAsApp, .title-bg .fa {color: #ffffff;}
+#span_AppSameAsOwner, #span_AgntSameAsApp{border-color: #ffffff;}
+/* Worker's CSS*/
+#portlet_show_workers, #portlet_show_affidavit{ /*background-color:#f4f5f7;*/padding-bottom: 10px;padding-top:20px;}
+#WCNoEmployee, #WCAppName, #OwnerAgent, #OwnerNameDeclare, #AppNameDeclare{ max-width:250px;}
+#WCAppName{ width:40%; min-width:300px;}
+#OwnerAgent{max-width:400px;}
+#EstimatedCost{ width:100%;}
+.word-wrap{ word-wrap:break-word;}
+/*Residential Form CSS*/
+#div_BuildingSetbacks1, #div_BuildingSetbacks2, #div_BuildingSetbacks3{border:1px dotted #333;padding-left:25px;padding-right:25px;}
+#div_BuildingSetbacks3{padding-bottom: 25px;}
+/*Sign Permit Form CSS*/
+.font-weight-600{font-weight: 600;}
+.date-picker {border-bottom: 1px solid #c2cad8 !important; cursor: auto !important;}
+/*For All Building View Form CSS*/
+/*.md-radio-inline, .md-radio, .check, .box, .md-radiobtn, .md-radio label, .date-picker, .md-checkbox, .md-checkbox label {cursor:default !important;}*/
+.error
+{
+  color:red;
+  font-size: 12px;
+  font-weight: bold;
+
+}
+#btnNoStr {
+	line-height: 0.20 !important;
+}
+.txtInlineBgColor{  padding:5px; background-color: #f3f3f4 !important; }
+input[type=number]::-webkit-inner-spin-button, 
+    input[type=number]::-webkit-outer-spin-button { 
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    margin: 0; 
+    }
+    input[type=number] {
+    -moz-appearance:textfield;
+}
+.cursor-pointer{
+  cursor: pointer;
+}
+
+.TextRemain{
+        color: red;
+    }
+
+
+</style>
+
+<style>
+@media (min-width: 992px)
+{
+.page-content-wrapper .page-content {
+    margin-left: 0px !important;
+    margin-top: 0;
+    min-height: 600px;
+    padding: 25px 20px 10px;
+}
+.page-sidebar-closed .page-content-wrapper .page-content
+    {
+        margin-left:0px !important;
+    }   
+}
+.page-content-wrapper .page-content {
+
+    padding: 10px 15px 10px;
+}
+
+.table td span, .table th {
+    font-size: 12px !important;
+    font-weight:normal !important;
+    line-height:13px !important;
+}
+.table th{font-weight:bold !important}
+table.dataTable tbody th, table.dataTable tbody td
+{
+    padding:2px 2px !important;
+    white-space: nowrap !important;
+}
+.btn-sm(.md-skip){padding :0px !important}
+.btn-sm {padding: 1px 5px 1px 5px !important}
+.app_view{
+  padding: 1px 5px 1px 5px !important;
+  height: 15px;
+  font-size: 10px;
+      line-height: 1;
+  }
+
+  .input-sm
+{
+  height: 25px !important;
+  font-size: 10px;
+  padding: 2px;
+}
+.table-toolbar {
+     margin-bottom: 0px !important;
+}
+
+.portlet.light .portlet-body {
+     padding-top: 0px !important;
+}
+
+.padding10portlet{
+  padding: 0px 0px 0px 0px !important;
+
+}
+
+.portlet.light>.portlet-title>.caption.caption-md>.caption-subject {
+    font-size: 14px;
+}
+
+.portlet {
+     margin-bottom: 10px !important;
+}
+
+.portlet.light>.portlet-title>.caption {
+    padding: 3px 0;
+}
+
+.profile-usermenu ul li a:hover {
+    color: #576A7F;
+    cursor:default;
+    background:none;
+}
+.profile-usermenu ul li a i {
+    color: #576A7F;
+    cursor:default;
+    background:none;
+}
+
+.tabbable-line .caption{cursor:default;}
+.userHome{background:#3598dc !important;color:#fff !important}
+
+.active-row {
+    background: #AAC1DF !important
+}
+
+.nav-tabs {
+    border-bottom: 3px solid #17C4BB;
+}
+.nav-tabs > li.active > a, .nav-tabs > li.active > a:hover, .nav-tabs > li.active > a:focus {
+    color: #fff;
+    background-color: #17C4BB;
+    border: 1px solid #17C4BB;
+    border-bottom-color: #17C4BB;
+    cursor: default;
+}
+.paddingleftright5{
+    padding-left:5px !important;
+    padding-right:5px !important;
+
+}
+#transportlet > .panel {
+    margin-bottom: 10px;
+}
+
+.paginate_button{
+  padding:0em 0em !important;
+  border-radius:0px !important;         
+}
+.nav-tabs li:nth-child(1) {
+    /*width: 75px;*/
+}
+
+.nav-tabs li a {
+    padding: 5px;
+}
+.nav-tabs li:nth-child(1) > a {
+    /*padding: 9px;*/
+    /*line-height: 16px !important;*/
+}
+/* FOR DATE */
+.fa-2 {font-size: 2em;}
+
+</style>
+
+<link href="/assets/global/plugins/bootstrap-daterangepicker/daterangepicker.min.css" rel="stylesheet" type="text/css" />
+ </head>
+
+
+    <body class="page-header-fixed page-sidebar-closed-hide-logo page-container-bg-solid page-sidebar-closed" > <!-- oncontextmenu="return false" -->
+        <!-- BEGIN HEADER -->
+           <!-- BEGIN HEADER -->
+<!-- Code edited by Krutika on 12/03/2020 -->
+	<style>
+	.page-header.navbar .page-actions {
+				margin: 17px 0 15px 15px;
+				padding: 0;
+				width: 1000px;
+				float: left;
+		}
+
+.heading{
+				position: relative;
+				display: inline-block;
+				vertical-align: middle;
+				width: 675px;
+				color: #578ebe;
+}
+.heading-text{
+		font-size:30px !important;
+		font-weight: bold;
+}
+.page-actions {
+
+	padding-left: 25% !important;
+}
+
+
+	</style>
+
+			<div class="page-header navbar navbar-fixed-top">
+					<div class="page-header-inner ">
+							<div class="page-top">
+							<div class="top-menu">
+
+							</div>
+
+			                 <div class="col-md-12" >
+
+	                 	 <div class="col-md-offset-2 col-md-8 text-center">
+                          <label class="heading-text display-none" id="page-header2">Ludlow Fire- Burn Permits</label>
+                          <label class="heading-text" id="page-header">Welcome To Ludlow Online Permitting</label>
+                    	</div>
+
+                    <div class="col-md-2  text-center  display-none publichomeuser" style="margin-top: 10;">
+	    				<button type="button" class="btn btn-success new_appl1" id="btn_new_appl1" name="new_appl1">Apply For New Permit</button>
+                    </div>
+
+                    <div class="col-md-2  text-center  display-none publichomeuser1" style="margin-top: 10;">
+	    				<button type="button" class="btn btn-success new_appl1" id="btn_new_appl2" name="new_appl2">Public Home</button>
+                    </div>
+
+
+                </div>
+			</div>
+	</div>
+</div>
+
+		
+		
+
+         <!-- END HEADER -->
+        <!-- BEGIN HEADER & CONTENT DIVIDER -->
+        <div class="clearfix"> </div>
+        <!-- END HEADER & CONTENT DIVIDER -->
+        <!-- BEGIN CONTAINER -->
+        <div class="page-container">
+                        <!-- BEGIN CONTENT -->
+            <div class="page-content-wrapper" style="margin-left:0px !important">
+                <!-- BEGIN CONTENT BODY -->
+                <div class="page-content" style="margin-left:0px !important">
+                    <!-- BEGIN PAGE HEADER-->
+                    <!-- END PAGE HEADER-->
+                            <!-- END PAGE HEADER-->
+                <div class="row">
+                    <div class="col-md-12">
+                    <!-- BEGIN TICKET LIST CONTENT -->
+
+                     <div class="app-ticket app-ticket-list permit-list col-md-12 paddingleftright5" >
+                        <div class="row">
+                            <div class="col-md-12 padding10portlet">
+                                <div class="portlet light " style="min-height:200px !important;overflow: auto;">
+                                    <div class="portlet-body">
+                                     <!-- START -->
+
+                                         <p style="float: right;" id="demo"></p>
+                                         <ul class="nav nav-tabs" id="tab-header-group">
+                                                              <li><a class="tab-header" href="#buildingpublichometab"data-toggle="tab" data-url='ajax/getbuildingpublichome.php'><img src="images/departments/BLDG_sm.gif" valign="bottom" alt="" />&nbsp;BLDG</a></li>
+                              
+                            </ul>
+
+                                             <div class="col-md-12">
+                                                <label class="text-left col-md-12" name="ValMessage"><b id="ValMessage"></b> </label>
+                                              </div>
+
+                                               <div class="tab-content">
+                                                  <!-- Start Building Public Home -->
+                               <div class="tab-pane fade" id="buildingpublichometab">
+                                <table class="table table-striped table-bordered table-hover" data-table-id="BuildingPublicHome" id="BuildingPublicHome" width="100%">
+                                  <thead>
+                                  <tr>
+                                      <th>Application</th>
+                                      <th>Permit</th>
+                                      <th>COC</th>
+                                      <th>Inspection</th>
+                                      <th>Fee</th>
+                                      <th>Sign Off</th>
+                                      <th>Appl. Date</th>
+                                      <th>Issue Date</th>
+                                      <th>Applicant Name</th>
+                                      <th>Site Address</th>
+                                      <th>Appl. Type</th>
+                                      <th>Appl. Status</th>
+                                      <th>Permit Number</th>
+                                      <th></th>
+
+                                  </tr>
+                                                        
+                                  <tr id="searchBuildingPublicHome">
+                                      <td></td>
+                                      <td></td>
+                                      <td></td>
+                                      <td></td>
+                                      <td></td>
+                                      <td></td>
+                                      <td>
+                                          <center><i name="icon-daterange1" class="form-filter fa fa-calendar fa-2" aria-hidden="true"></i></center>
+                                          <input type="hidden" name="daterange1" class="form-control form-filter input-sm" value="" />
+                                          <label id="DisplaySelectedApplDate" style="padding-top: 10px !important;padding-right: 0px !important;padding-left: 0px !important;"></label>
+                                      </td>
+                                      <td>
+                                           <center><i name="icon-daterange2" class="form-filter fa fa-calendar fa-2" aria-hidden="true"></i></center>
+                                          <input type="hidden" name="daterange2" class="form-control form-filter input-sm" value="" />
+                                          <label id="DisplaySelectedIssueDate" style="padding-top: 10px !important;padding-right: 0px !important;padding-left: 0px !important;"></label>
+                                      </td>
+                                      <td>
+                                          <input type="text" class="form-control form-filter input-sm" name="applicant_name">
+                                      </td>
+                                      <td>
+                                          <input type="text" class="form-control form-filter input-sm" name="site_add">
+                                      </td>
+                                      <td>
+                                          <select class="form-control form-filter input-sm selectfont" name="application_type" id="application_type" style="width: 75px;">
+                                              <option value="">Select</option>
+                                          </select>
+                                      </td>
+                                      <td>
+                                          <select class="form-control form-filter input-sm selectfont" name="application_status" id="application_status" style="width: 75px;">
+                                              <option value="">Select</option>
+                                          </select> 
+                                      </td>
+                                      
+                                      <td>
+                                          <input type="text" class="form-control form-filter input-sm" name="permit_num">
+                                      </td>
+                                      <td></td>
+                                   
+                                  </tr>
+                                  </thead>
+                                  <tbody> </tbody>
+                                  </table>
+                                </div>
+                              <!-- End Building Public Home -->
+
+                                               <!-- Start BOH Public Home -->
+                               <div class="tab-pane fade" id="bohpublichometab">
+                                <table class="table table-striped table-bordered table-hover" id="BOHPublicHome" width="100%">
+                                  <thead>
+                                  <tr>
+                                      <!-- <th>Application</th> -->
+                                      <th>Permit</th>
+                                      <th>Inspection</th>
+                                      <th>Ap. No.</th>
+                                      <th>Appl. Date</th>
+                                      <th>Issue Date</th>
+                                      <th>Expiry Date</th>
+                                      <th>Estab. Name</th>
+                                      <th>Estab. Address</th>
+                                      <th>MapBlockLot</th>
+                                      <!-- <th>Applicant</th> -->
+                                      <!-- <th>Owner</th> -->
+                                      <th>Appl. Type</th>
+                                      <th>Permit Number</th>
+                                      <th>Appl. Status</th>
+                                      <th></th>
+
+                                  </tr>
+                                                        
+                                  <tr id="searchBOHPublicHome">
+                                     <!--  <td>
+                                      </td> -->
+                                      <td>
+                                      </td>
+                                      <td>
+                                        
+                                      </td>
+                                      <td>
+                                          <input type="text" class="form-control form-filter input-sm" size="1" name="app_id" id="app_id">
+                                      </td>
+                                      <td>
+                                          <center><i name="icon-daterange3" class="form-filter fa fa-calendar fa-2" aria-hidden="true"></i></center>
+                                          <input type="hidden" name="daterange3" class="form-control form-filter input-sm" value="" />
+                                          <label id="BOHDisplaySelectedApplDate" style="padding-top: 10px !important;padding-right: 0px !important;padding-left: 0px !important;"></label>
+                                      </td>
+                                      <td>
+                                           <center><i name="icon-daterange4" class="form-filter fa fa-calendar fa-2" aria-hidden="true"></i></center>
+                                          <input type="hidden" name="daterange4" class="form-control form-filter input-sm" value="" />
+                                          <label id="BOHDisplaySelectedIssueDate" style="padding-top: 10px !important;padding-right: 0px !important;padding-left: 0px !important;"></label>
+                                      </td>
+                                      <td>
+                                           <center><i name="icon-daterange5" class="form-filter fa fa-calendar fa-2" aria-hidden="true"></i></center>
+                                          <input type="hidden" name="daterange5" class="form-control form-filter input-sm" value="" />
+                                          <label id="BOHDisplaySelectedExpiryDate" style="padding-top: 10px !important;padding-right: 0px !important;padding-left: 0px !important;"></label>
+                                      </td>
+                                      <td>
+                                          <input type="text" class="form-control form-filter input-sm" name="estab_name">
+                                      </td>
+                                      <td>
+                                          <input type="text" class="form-control form-filter input-sm" name="estab_address">
+                                      </td>
+                                      <td>
+                                          <input type="text" class="form-control form-filter input-sm" name="mapblocklot">
+                                      </td>
+                                     
+                                      <td>
+                                        <input type="text" class="form-control form-filter input-sm" name="BOHName">
+                                      </td>
+                                      <td>
+                                          <input type="text" class="form-control form-filter input-sm" name="permit_num">
+                                      </td>
+
+                                       <td>
+                                          <input type="text" class="form-control form-filter input-sm" name="BOHApplicationStatus">
+                                      </td>
+
+                                       <td>
+                                      </td>
+
+                                      
+                                      
+                                   
+                                  </tr>
+                                  </thead>
+                                  <tbody> </tbody>
+                                  </table>
+                                </div>
+                              <!-- End BOH Public Home -->
+
+
+                               <!-- Start Planning Public Home -->
+                               <div class="tab-pane fade" id="planningpublichometab">
+                                <table class="table table-striped table-bordered table-hover" id="PlanningPublicHome" width="100%">
+                                  <thead>
+                                  <tr>
+                                     
+                                      <th>Application</th>
+                                      <th>Inspection</th>
+                                      <th>Decision Result</th>
+                                      <th>Ap. No.</th>
+                                      <th>Appl. Date</th>
+                                      <th>Site Address</th>
+                                      <th>Applicant</th>
+                                      <th>Appl. Type</th>
+                                      <th>Appl. Status</th>
+                                      <th></th>
+
+                                  </tr>
+                                                        
+                                  <tr id="searchPlanningPublicHome">
+                                      
+
+                                      <td>
+                                      </td>
+                                      <td>
+                                        
+                                      </td>
+                                     <td>
+                                          <input type="text" class="form-control form-filter input-sm"  name="decision1" id="decision1">
+                                      </td>
+                                      <td>
+                                          <input type="text" class="form-control form-filter input-sm" size="1" name="app_id" id="app_id">
+                                      </td>
+                                      <td>
+                                          <center><i name="icon-daterange6" class="form-filter fa fa-calendar fa-2" aria-hidden="true"></i></center>
+                                          <input type="hidden" name="daterange6" class="form-control form-filter input-sm" value="" />
+                                          <label id="DisplaySelectedApplDate" style="padding-top: 10px !important;padding-right: 0px !important;padding-left: 0px !important;"></label>
+                                      </td>
+                                    
+                                      <td>
+                                          <input type="text" class="form-control form-filter input-sm" name="site_address">
+                                      </td>
+                                      <td>
+                                          <input type="text" class="form-control form-filter input-sm" name="applicant_name">
+                                      </td>
+                                     
+                                      <td>
+                                        <input type="text" class="form-control form-filter input-sm" name="PlanningName">
+                                          
+                                      </td>
+                                       <td>
+                                          <input type="text" class="form-control form-filter input-sm" name="BOHApplicationStatus">
+                                         
+                                      </td>
+
+                                      <td>
+                                      </td>
+                                      
+                                   
+                                  </tr>
+                                  </thead>
+                                  <tbody> </tbody>
+                                  </table>
+                                </div>
+                              <!-- End Planning Public Home -->
+
+                              <!-- Start Concom Public Home -->
+                               <div class="tab-pane fade" id="concompublichometab">
+                                <table class="table table-striped table-bordered table-hover" id="ConcomPublicHome" width="100%">
+                                  <thead>
+                                  <tr>
+                                     
+                                      <th>Application</th>
+                                      <th>Ap. No.</th>
+                                      <th>Appl. Date</th>
+                                      <th>Site Address</th>
+                                      <th>Applicant</th>
+                                      <th>Appl. Type</th>
+                                      <th>Appl. Status</th>
+                                      <th></th>
+
+                                  </tr>
+                                                        
+                                  <tr id="searchConcomPublicHome">
+                                      <td></td>
+                                      <td>
+                                          <input type="text" class="form-control form-filter input-sm" size="1" name="app_id" id="app_id">
+                                      </td>
+                                      <td>
+                                          <center><i name="icon-daterange9" class="form-filter fa fa-calendar fa-2" aria-hidden="true"></i></center>
+                                          <input type="hidden" name="daterange9" class="form-control form-filter input-sm" value="" />
+                                          <label id="DisplaySelectedApplDate" style="padding-top: 10px !important;padding-right: 0px !important;padding-left: 0px !important;"></label>
+                                      </td>
+                                    
+                                      <td>
+                                          <input type="text" class="form-control form-filter input-sm" name="site_address">
+                                      </td>
+                                      <td>
+                                          <input type="text" class="form-control form-filter input-sm" name="applicant_name">
+                                      </td>
+                                     
+                                      <td>
+                                        <input type="text" class="form-control form-filter input-sm" name="ConcomName">
+                                          
+                                      </td>
+                                       <td>
+                                          <input type="text" class="form-control form-filter input-sm" name="ConcomApplicationStatus">
+                                         
+                                      </td>
+                                      <td></td>
+                                      
+                                   
+                                  </tr>
+                                  </thead>
+                                  <tbody> </tbody>
+                                  </table>
+                                </div>
+                              <!-- End Concom Public Home -->
+
+                              <!-- Start Fire Public Home -->
+                               <div class="tab-pane fade" id="firepublichometab">
+                                <table class="table table-striped table-bordered table-hover" id="FirePublicHome" width="100%">
+                                  <thead>
+                                  <tr>
+                                      <th>Application</th>
+                                      <th>Permit</th>
+                                      <th>Inspection</th>
+                                      <th>Ap. No.</th>
+                                      <th>Appl. Date</th>
+                                      <th>Issue Date</th>
+                                      <th>Site Address</th>
+                                      <th>Applicant</th>
+                                      <th>Appl. Type</th>
+                                      <th>Permit Number</th>
+                                      <th>Appl. Status</th>
+                                      <th></th>
+
+                                  </tr>
+                                                        
+                                  <tr id="searchFirePublicHome">
+                                      <td>
+                                      </td>
+                                      <td>
+                                      </td>
+                                      <td>
+                                        
+                                      </td>
+                                      <td>
+                                          <input type="text" class="form-control form-filter input-sm" size="1" name="app_id" id="app_id">
+                                      </td>
+                                      <td>
+                                          <center><i name="icon-daterange7" class="form-filter fa fa-calendar fa-2" aria-hidden="true"></i></center>
+                                          <input type="hidden" name="daterange7" class="form-control form-filter input-sm" value="" />
+                                          <label id="DisplaySelectedApplDate" style="padding-top: 10px !important;padding-right: 0px !important;padding-left: 0px !important;"></label>
+                                      </td>
+                                      <td>
+                                           <center><i name="icon-daterange8" class="form-filter fa fa-calendar fa-2" aria-hidden="true"></i></center>
+                                          <input type="hidden" name="daterange8" class="form-control form-filter input-sm" value="" />
+                                          <label id="DisplaySelectedIssueDate" style="padding-top: 10px !important;padding-right: 0px !important;padding-left: 0px !important;"></label>
+                                      </td>
+                                      <td>
+                                          <input type="text" class="form-control form-filter input-sm" name="site_address">
+                                      </td>
+                                      <td>
+                                          <input type="text" class="form-control form-filter input-sm" name="applicant_name">
+                                      </td>
+                                      
+                                      <td>
+                                        <input type="text" class="form-control form-filter input-sm" name="FireName">
+                                          
+                                      </td>
+
+
+                                      <td>
+                                          <input type="text" class="form-control form-filter input-sm" name="permit_num">
+                                      </td>
+
+                                       <td>
+                                          <input type="text" class="form-control form-filter input-sm" name="FireApplicationStatus">
+
+                                      </td>
+                                      <td>
+                                      </td>
+                                   
+                                  </tr>
+                                  </thead>
+                                  <tbody> </tbody>
+                                  </table>
+                                </div>
+                              <!-- End Fire Public Home -->
+
+                              <!-- Start ZBA Public Home -->
+                               <div class="tab-pane fade" id="zbapublichometab">
+                                <table class="table table-striped table-bordered table-hover" id="ZBAPublicHome" width="100%">
+                                  <thead>
+                                  <tr>
+                                     
+                                      <th>Application</th>
+                                      <th>Decision Result</th>
+                                      <th>Ap. No.</th>
+                                      <th>Appl. Date</th>
+                                      <th>Site Address</th>
+                                      <th>Applicant</th>
+                                      <th>Appl. Type</th>
+                                      <th>Appl. Status</th>
+                                      <th></th>
+
+                                  </tr>
+                                                        
+                                  <tr id="searchZBAPublicHome">
+                                      <td></td>
+                                      <td>
+                                          <input type="text" class="form-control form-filter input-sm"  name="decision1" id="decision1">
+                                      </td>
+                                      <td>
+                                          <input type="text" class="form-control form-filter input-sm" size="1" name="app_id" id="app_id">
+                                      </td>
+                                      <td>
+                                          <center><i name="icon-daterange9" class="form-filter fa fa-calendar fa-2" aria-hidden="true"></i></center>
+                                          <input type="hidden" name="daterange9" class="form-control form-filter input-sm" value="" />
+                                          <label id="DisplaySelectedApplDate" style="padding-top: 10px !important;padding-right: 0px !important;padding-left: 0px !important;"></label>
+                                      </td>
+                                    
+                                      <td>
+                                          <input type="text" class="form-control form-filter input-sm" name="site_address">
+                                      </td>
+                                      <td>
+                                          <input type="text" class="form-control form-filter input-sm" name="applicant_name">
+                                      </td>
+                                     
+                                      <td>
+                                        <input type="text" class="form-control form-filter input-sm" name="ZBAName">
+                                          
+                                      </td>
+                                       <td>
+                                          <input type="text" class="form-control form-filter input-sm" name="ZBAApplicationStatus">
+                                         
+                                      </td>
+                                      <td></td>
+                                      
+                                   
+                                  </tr>
+                                  </thead>
+                                  <tbody> </tbody>
+                                  </table>
+                                </div>
+                              <!-- End ZBA Public Home -->
+
+                             <!-- Start DPW Public Home -->
+                               <div class="tab-pane fade" id="dpwpublichometab">
+                                <table class="table table-striped table-bordered table-hover" id="DPWPublicHome" width="100%">
+                                  <thead>
+                                  <tr>
+                                      <th>Application</th>
+                                      <th>Permit</th>
+                                      <th>Inspection</th>
+                                      <th>Ap. No.</th>
+                                      <th>Appl. Date</th>
+                                      <th>Issue Date</th>
+                                      <th>Site Address</th>
+                                      <th>Applicant</th>
+                                      <th>Appl. Type</th>
+                                      <th>Permit Number</th>
+                                      <th>Appl. Status</th>
+                                      <th></th>
+
+                                  </tr>
+                                                        
+                                  <tr id="searchDPWPublicHome">
+                                      <td>
+                                      </td>
+                                      <td>
+                                      </td>
+                                      <td>
+                                        
+                                      </td>
+                                      <td>
+                                          <input type="text" class="form-control form-filter input-sm" size="1" name="app_id" id="app_id">
+                                      </td>
+                                      <td>
+                                          <center><i name="icon-daterange10" class="form-filter fa fa-calendar fa-2" aria-hidden="true"></i></center>
+                                          <input type="hidden" name="daterange10" class="form-control form-filter input-sm" value="" />
+                                          <label id="DisplaySelectedApplDate" style="padding-top: 10px !important;padding-right: 0px !important;padding-left: 0px !important;"></label>
+                                      </td>
+                                      <td>
+                                           <center><i name="icon-daterange11" class="form-filter fa fa-calendar fa-2" aria-hidden="true"></i></center>
+                                          <input type="hidden" name="daterange11" class="form-control form-filter input-sm" value="" />
+                                          <label id="DisplaySelectedIssueDate" style="padding-top: 10px !important;padding-right: 0px !important;padding-left: 0px !important;"></label>
+                                      </td>
+                                      <td>
+                                          <input type="text" class="form-control form-filter input-sm" name="site_address">
+                                      </td>
+                                      <td>
+                                          <input type="text" class="form-control form-filter input-sm" name="applicant_name">
+                                      </td>
+                                      
+                                      <td>
+                                        <input type="text" class="form-control form-filter input-sm" name="DPWName">
+                                          
+                                      </td>
+
+
+                                      <td>
+                                          <input type="text" class="form-control form-filter input-sm" name="permit_num">
+                                      </td>
+
+                                       <td>
+                                          <input type="text" class="form-control form-filter input-sm" name="DPWApplicationStatus">
+
+                                      </td>
+                                      <td></td>
+                                      
+                                   
+                                  </tr>
+                                  </thead>
+                                  <tbody> </tbody>
+                                  </table>
+                                </div>
+                              <!-- End Fire Public Home -->
+
+                                               </div>
+                                   </div>
+                                 </div>
+                               </div>
+                             </div>
+                           </div>
+                  </div>
+                </div>
+
+                <!-- Details Portlet Starts Here-->
+            <div class="row">
+              <div class="col-md-12 ">
+                <div class="col-md-12" id="details_section" style="display:none;background:#fff">
+                  <div class="portlet">
+                      <div class="portlet-title">
+                          <div class="caption font-dark">
+                              <i class="fa  fa-globe font-dark"></i>
+                              <span class="caption-subject bold uppercase">Details</span>
+                          </div>
+                      </div>
+                      <div class="portlet-body">
+                          <div class="panel-group accordion" id="accordion1">
+                              <ul class="nav nav-tabs" id="transtabs">
+                                  <li  class="active">
+                                      <!-- <a href="#view_application" data-toggle="tab">Application Form</a> -->
+                                  </li>
+                              </ul>
+                              <div class="tab-content" id="tabcontents">
+                                  <div class="tab-pane"  id="view_application">
+                                       <div class="panel-group accordion">
+                                      </div>
+                                  </div>
+                              </div>
+                           </div>
+                      </div>
+                  </div>
+              </div>
+            </div>
+          </div>
+          <!-- Details Portlet Ends  Here-->
+              </div>
+            </div>
+          </div>
+          
+        <div id="AttachmentModal" class="modal fade AttachmentModal" role="dialog" data-backdrop="static" data-keyboard="false"></div>
+        
+
+ <!-- BEGIN FOOTER -->
+        <style>
+.scroll-to-top label {
+    display: inline-block;
+    color: teal;
+    font-size: 15px !important;
+    opacity: 0.7;
+    font-weight: 600;
+    border: 2px solid teal;
+    padding: 3px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+</style>
+<div class="page-footer">
+    <div class="page-footer-inner"> 2019 &copy; All rights reserved.
+        <a href="//fullcircletech.com/" title="" target="_blank">Full Circle Technologies, Inc.</a>
+    </div>
+    <div class="scroll-to-top">
+        <button class="btn btn-success">Scroll to Top</button>
+        <!-- <label>Scroll to Top</label> -->
+        <!-- <i class="icon-arrow-up"></i> -->
+    </div>
+</div>      <!-- END FOOTER -->
+
+        <!-- BEGIN CORE PLUGINS -->
+         <script src="/assets/global/plugins/jquery.min.js" type="text/javascript"></script>
+
+<script src="/assets/global/plugins/bootstrap/js/bootstrap.min.js" type="text/javascript"></script>
+<script src="/assets/global/plugins/jquery-slimscroll/jquery.slimscroll.min.js" type="text/javascript"></script>
+
+<script>
+function convertdate(date)
+    {
+
+      var convdate='';
+      if(date!="" && date!="0000-00-00" && date!=null)
+      {
+             convdate = moment(date).format("MM/DD/YY");
+      }else{
+             convdate="";
+        }
+
+      return convdate;
+    }
+</script>        <!-- END CORE PLUGINS -->
+
+        <!-- BEGIN THEME GLOBAL SCRIPTS -->
+          <script src="/assets/global/scripts/app.min.js" type="text/javascript"></script>
+<script src="/assets/layouts/layout2/scripts/layout.min.js" type="text/javascript"></script>
+<script src="/assets/layouts/layout2/scripts/demo.min.js" type="text/javascript"></script>
+
+<script src="/assets/global/plugins/jquery-validation/js/jquery.validate.min.js" type="text/javascript"></script>
+<script src="/assets/global/plugins/jquery-validation/js/additional-methods.min.js" type="text/javascript"></script>
+
+  <!-- START DATE PICKER-->
+<script src="/assets/global/plugins/moment.min.js" type="text/javascript"></script>
+<script src="/assets/global/plugins/bootstrap-daterangepicker/daterangepicker.min.js" type="text/javascript"></script>
+<script src="/assets/global/plugins/bootstrap-datepicker/js/bootstrap-datepicker.min.js" type="text/javascript"></script>
+<script src="/assets/pages/scripts/components-date-time-pickers.js" type="text/javascript"></script>
+<script src="js/masked.js" type="text/javascript"></script>
+ <!-- END DATE PICKER-->        <!-- END THEME GLOBAL SCRIPTS -->
+
+        <!-- BEGIN PAGE LEVEL PLUGINS -->
+          
+<script src="/assets/global/scripts/datatable.js" type="text/javascript"></script>
+<script src="/assets/global/plugins/datatables/datatables.min.js" type="text/javascript"></script>
+<script src="/assets/global/plugins/datatables/plugins/bootstrap/datatables.bootstrap.min.js" type="text/javascript"></script>        <!-- END PAGE LEVEL PLUGINS -->
+
+        <!-- BEGIN PAGE LEVEL SCRIPTS -->
+
+        <!-- END PAGE LEVEL SCRIPTS -->
+        <!-- BEGIN THEME LAYOUT SCRIPTS -->
+
+        <!-- END THEME LAYOUT SCRIPTS -->
+    </body>
+
+<script type="text/javascript">
+  $(function() {
+    var start = moment();
+    var end = moment().add(29, 'days');
+
+    $('i[name="icon-daterange1"], i[name="icon-daterange2"], i[name="icon-daterange3"], i[name="icon-daterange4"], i[name="icon-daterange5"], i[name="icon-daterange6"], i[name="icon-daterange7"], i[name="icon-daterange8"], i[name="icon-daterange9"], i[name="icon-daterange10"], i[name="icon-daterange11"]').daterangepicker({
+        startDate: start,
+        endDate: end,
+        ranges: {
+           'Today': [moment(), moment()],
+           'Yesterday': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
+           'Last 7 Days': [moment().subtract(6, 'days'), moment()],
+           'Last 30 Days': [moment().subtract(29, 'days'), moment()],
+           'This Month': [moment().startOf('month'), moment().endOf('month')],
+           'Last Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month')]
+        }
+    });
+
+});
+</script>  
+<script type="text/javascript">
+   var pageURL = $(location).attr("href"); //ControllerURL = "controller";
+var CurrDeptName='';
+// if (pageURL.indexOf("applications.php") > 0 || pageURL.indexOf("buildinghome.php") > 0 ||  pageURL.indexOf("deletedapplications.php") > 0 ||  pageURL.indexOf("printapplication.php") > 0 || pageURL.indexOf("renewalhome.php") > 0 ) {
+//   Dept="";
+
+//     JsURL= "js";
+//     ControllerURL = "controller";
+// } else if (pageURL.indexOf("userapplication.php") > 0 || pageURL.indexOf("userindex.php") > 0 || pageURL.indexOf("buildingpublichome.php") > 0) {
+//   // alert(1);
+// Dept="boh/";
+// JsURL= Dept+"js";
+// ControllerURL = "boh/controller";
+
+// }
+
+
+
+
+if (pageURL.indexOf("applications.php") > 0 || pageURL.indexOf("buildinghome.php") > 0 ||  pageURL.indexOf("deletedapplications.php") > 0 ||  pageURL.indexOf("printapplication.php") > 0 || pageURL.indexOf("renewalhome.php") > 0 ) {
+    Dept="";
+    JsURL= "js";
+    ControllerURL = "controller";
+}
+else if (pageURL.indexOf("userapplication.php") > 0 || pageURL.indexOf("userindex.php") > 0 || pageURL.indexOf("publicview.php") > 0) {
+     Dept="building/";
+     JsURL= "building/js";
+     ControllerURL = "building/controller";
+}
+
+
+$(document).ready(function() {
+var selectedRow;
+var tableHome;
+var SelectedTownId;
+// HIDE AND SHOW DATE RANGE PICKER 'APPLY' AND 'CANCEL' BUTTONS.
+$("div.ranges ul").on('click', 'li', function(){
+    if($(this).is(":last-child")){  $(".applyBtn, .cancelBtn").show();
+    } else { $(".applyBtn, .cancelBtn").hide();}
+});
+
+
+
+$('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
+  // alert("123");
+      var target = $(e.target).attr("href"); // activated tab
+      var url = $(e.target).data('url');
+
+      var SelectedTownId = $(e.target).data('town-id');
+      // alert(SelectedTownId);
+      target = target + ' table';
+            var tableId = $(target).data('table-id');
+      tableId = '#'+tableId;
+      // alert(tableId);
+      if ( $.fn.DataTable.isDataTable(tableId) ) {
+          $(tableId).DataTable().destroy();
+        }
+      //Start-Datatable JS
+      switch (tableId){
+
+        case '#BuildingPublicHome' :
+         var tableHome = $(tableId).DataTable({
+              'dom':'<<"pull-left"><"pull-right"f>>rt<"bottom"ip><"clear">',
+                "pagingType":"simple_numbers",
+                "language": {
+                    "paginate": {
+                      "previous": "<",
+                      "next": ">",
+                    },
+                    "zeroRecords": "No applications fit these qualifications"
+                  },
+                "columnDefs": [
+
+                   {'targets': 0, "width": "5px !important", "orderable": false},
+                   {'targets': 1, "width": "5px !important", "orderable": false},
+                   {'targets': 2, "width": "15px !important", "orderable": false, "visible":false},
+                   {'targets': 3, "width": "15px !important", "orderable": false},
+                   {'targets': 4, "width": "15px !important", "orderable": false},
+                   {'targets': 5, "width": "10px !important", "orderable": false},
+                   {'targets': 6, "width": "50px !important"},
+                   {'targets': 7, "width": "50px !important"},
+                   {'targets': 8, "width": "40px !important"},
+                   {'targets': 9, "width": "20px !important"},
+                   {'targets': 10, "width": "30px !important" },
+                   {'targets': 11, "width": "30px !important" },
+                    {'targets': 13,"width": "20px !important", "orderable": false},
+                             ],
+                
+                "autoWidth": false,
+                "orderCellsTop":true,
+                "processing":true,
+                "serverSide":true,
+                "deferRender":true,
+                "ordering": true,
+                "order": [
+                  [0, 'DESC']
+                 ],
+                 "orderClasses": false,
+                "info":true,
+                "paging":true,
+                "pageLength": 15,
+                "scrollX": true,
+                   "scrollY":false,
+                "ajax": {
+                   "url": url,
+                   "type":'post',
+                   "data": {
+                        "town_id": SelectedTownId
+                    }
+                },
+                         "rowCallback": function( row, data, index ) {
+                      
+                     }
+         });
+
+          //DATE RANGE APPL DATE
+            $('i[name="icon-daterange1"]').on('apply.daterangepicker', function(ev, picker) {
+                $('input[name="daterange1"]').val(picker.startDate.format('YYYY-MM-DD') + '|' + picker.endDate.format('YYYY-MM-DD'));
+                $('#DisplaySelectedApplDate').html(picker.startDate.format('DD-MM-YY') + ' To <br>' + picker.endDate.format('DD-MM-YY'));
+                var dateindex = $('input[name="daterange1"]').parent().index();   //alert(dateindex);
+                var date = $('input[name="daterange1"]').val(); //alert(date);
+
+                tableHome
+                .column((dateindex )+ ':visible')
+                .search( date )
+                .draw();
+            });
+
+            //DATE RANGE ISSUE DATE
+            $('i[name="icon-daterange2"]').on('apply.daterangepicker', function(ev, picker) {
+                $('input[name="daterange2"]').val(picker.startDate.format('YYYY-MM-DD') + ' | ' + picker.endDate.format('YYYY-MM-DD'));
+                $('#DisplaySelectedIssueDate').html(picker.startDate.format('DD-MM-YY') + ' To <br>' + picker.endDate.format('DD-MM-YY'));
+                var dateindex = $('input[name="daterange2"]').parent().index();   //alert(dateindex);
+                var date = $('input[name="daterange2"]').val(); //alert(date);
+
+                tableHome
+                .column((dateindex )+ ':visible')
+                .search( date )
+                .draw();
+            });
+
+            $('#searchBuildingPublicHome input, select').on('keyup change', function(){
+                 tableHome
+                .column( ($(this).parent().index())+':visible' )
+                .search( this.value )
+                .draw();
+                     
+            });
+
+
+
+
+
+      //Start-Issue Permit View
+      $("#BuildingPublicHome tbody").on('click','.view_CIpermit',function()
+      {
+
+         $('#liIssuePermit').remove();
+         $('#lidivIssuePermit').remove();;
+         $('#liInspection').remove();
+         $('#lidivInspection').remove();
+         $('#liSignOff').remove();
+         $('#lidivSignOff').remove();
+         // $('#liIssueCertificate').remove();
+         // $('#lidivIssueCertificate').remove();
+         $('#liCertificateOfOccupancy').remove();
+         $('#lidivCertificateOfOccupancy').remove();
+
+        // $("#transtabs li").removeClass('active');
+        // $("#tabcontents div").removeClass('active');
+
+          ApplicationId = $(this).data("application-id");
+          PermitId = $(this).data("permit-id");
+          Permitfile = $(this).data("permit-file");
+          PermiteditfileId = $(this).data("permit-editfile");
+          var DeptName = $(this).data("folderpath");
+          var DataId = $(this).data("data-id");
+          var TransactionId=$(this).data("transaction-id");
+          var TransName=$(this).data("transaction-name");
+          var TransFile=$(this).data("transaction-file");
+          var TownId = $(this).data("town-id");
+          var CertType = $(this).data("certtype-id");
+          var TransactionAutoIncreId = $(this).data("transactionAutoIncre-id");
+          // alert(CertType);
+          transnameid0=TransName.replace(/ /g, "");
+          transnameid=transnameid0.replace(/\./g, "");
+          accordiondivid=transnameid+'accordion';
+
+          // $("#PublicHomePointer").css("display", "inline");
+          $(".table tbody tr").removeClass("active-row");
+          selectedRow=$(this).parent().find(".view_CIpermit").data("id");
+          tableHome.draw(false);
+          tableHome.on( 'draw', function () {
+            $('.app_data[data-id="' + selectedRow + '" ]').parent().parent().parent().addClass("active-row");
+          });
+          $(this).parent().parent().addClass("active-row");
+          accordionid=transnameid+'accordion';
+          frmname='frm'+transnameid;
+          $.ajax
+           ({
+            url:DeptName+"/"+Permitfile+"?application_id="+ApplicationId+"&permit_file="+$(this).parent().find(".view_app").data("permit-file"),
+            success:function(msg)
+             {
+              $("#view_application").html(msg);
+             }
+          });
+          $('#details_section').show();
+          if($("#li" + transnameid).length == 0){
+            // alert(1);
+              $("#transtabs li").removeClass('active'); $('#li'+transnameid+'').addClass('active');
+              $("#tabcontents div").removeClass('active');
+              $('#transtabs').append('<li class="active activetranstabs" id="li'+transnameid+'"><a href="#lidiv'+transnameid+'" data-toggle="tab">'+TransName+'</a></li>');
+              $('#tabcontents').append('<div id="lidiv'+transnameid+'" class="tab-pane active activetranstabcontents" ><div class="panel-group accordion transaccordions" id="'+accordionid+'"></div></div>');
+          }
+          var loadUrl = DeptName+"/"+TransFile+"?application_id="+ApplicationId+"&permit_id="+PermitId+"&data_id="+DataId+"&transname="+transnameid+"&permit_file="+Permitfile+"&permit_editfile="+PermiteditfileId+"&TransactionId="+TransactionId+"&TownId="+TownId+"&TransactionAutoIncreId="+TransactionAutoIncreId+"&CertType="+CertType;
+          $("#"+accordionid).html('<div class="panel-body accordion-body"></div>');
+          $('#' + accordionid + ' .accordion-body').load(loadUrl);
+
+          var scrollHeight = $("#lidiv" + transnameid).offset().top;
+                        $('body,html').animate({
+                          scrollTop: scrollHeight
+                        });
+
+
+      });
+
+
+
+
+
+
+      //Start-Issue Permit View
+     /* $("#BuildingPublicHome tbody").on('click','.view_CIpermit',function()
+      {
+
+         $('#liIssuePermit').remove();
+         $('#lidivIssuePermit').remove();;
+         $('#liInspection').remove();
+         $('#lidivInspection').remove();
+         $('#liSignOff').remove();
+         $('#lidivSignOff').remove();
+         // $('#liIssueCertificate').remove();
+         // $('#lidivIssueCertificate').remove();
+         $('#liCertificateOfOccupancy').remove();
+         $('#lidivCertificateOfOccupancy').remove();
+         $('#liPayFee').remove();
+         $('#lidivPayFee').remove();
+         $('#lidivIssueCertificate').remove();
+
+        // $("#transtabs li").removeClass('active');
+        // $("#tabcontents div").removeClass('active');
+
+          ApplicationId = $(this).data("application-id");
+          PermitId = $(this).data("permit-id");
+          Permitfile = $(this).data("permit-file");
+          PermiteditfileId = $(this).data("permit-editfile");
+          var DeptName = $(this).data("folderpath");
+          var DataId = $(this).data("data-id");
+          var TransactionId=$(this).data("transaction-id");
+          var TransName=$(this).data("transaction-name");
+          var TransFile=$(this).data("transaction-file");
+          var TownId = $(this).data("town-id");
+          var CertType = $(this).data("certtype-id");
+          var TransactionAutoIncreId = $(this).data("transactionAutoIncre-id");
+          // alert(CertType);
+          transnameid0=TransName.replace(/ /g, "");
+          transnameid=transnameid0.replace(/\./g, "");
+          accordiondivid=transnameid+'accordion';
+
+          // $("#PublicHomePointer").css("display", "inline");
+          $(".table tbody tr").removeClass("active-row");
+          selectedRow=$(this).parent().find(".view_CIpermit").data("id");
+          tableHome.draw(false);
+          tableHome.on( 'draw', function () {
+            $('.app_data[data-id="' + selectedRow + '" ]').parent().parent().parent().addClass("active-row");
+          });
+          $(this).parent().parent().addClass("active-row");
+          accordionid=transnameid+'accordion';
+          frmname='frm'+transnameid;
+          $.ajax
+           ({
+            url:DeptName+"/"+Permitfile+"?application_id="+ApplicationId+"&permit_file="+$(this).parent().find(".view_app").data("permit-file"),
+            success:function(msg)
+             {
+              $("#view_application").html(msg);
+             }
+          });
+          $('#details_section').show();
+          if($("#li" + transnameid).length == 0){
+            // alert(1);
+              $("#transtabs li").removeClass('active'); $('#li'+transnameid+'').addClass('active');
+              $("#tabcontents div").removeClass('active');
+              $('#transtabs').append('<li class="active activetranstabs" id="li'+transnameid+'"><a href="#lidiv'+transnameid+'" data-toggle="tab">'+TransName+'</a></li>');
+              $('#tabcontents').append('<div id="lidiv'+transnameid+'" class="tab-pane active activetranstabcontents" ><div class="panel-group accordion transaccordions" id="'+accordionid+'"></div></div>');
+          }
+          var loadUrl = DeptName+"/"+TransFile+"?application_id="+ApplicationId+"&permit_id="+PermitId+"&data_id="+DataId+"&transname="+transnameid+"&permit_file="+Permitfile+"&permit_editfile="+PermiteditfileId+"&TransactionId="+TransactionId+"&TownId="+TownId+"&TransactionAutoIncreId="+TransactionAutoIncreId+"&CertType="+CertType;
+          $("#"+accordionid).html('<div class="panel-body accordion-body"></div>');
+          $('#' + accordionid + ' .accordion-body').load(loadUrl);
+
+          var scrollHeight = $("#lidiv" + transnameid).offset().top;
+                        $('body,html').animate({
+                          scrollTop: scrollHeight
+                        });
+
+
+      });
+*/
+
+
+
+
+      //Start-Issue Permit View
+      $("#BuildingPublicHome tbody").on('click','.view_permit',function()
+      {
+
+            $('#liInspection').remove();
+            $('#lidivInspection').remove();
+            $('#liCertificateOfCompletion').remove();
+            $('#lidivCertificateOfCompletion').remove();
+         //    $('#liIssuePermit').remove();
+         // $('#lidivIssuePermit').remove();
+            $('#liSignOff').remove();
+            $('#lidivSignOff').remove();
+            $('#liIssueCertificate').remove();
+            $('#lidivIssueCertificate').remove();
+            $('#liCertificateOfOccupancy').remove();
+            $('#lidivCertificateOfOccupancy').remove();
+            $('#liCertificateOfOccupancyC').remove();
+            $('#lidivCertificateOfOccupancyC').remove();
+            $('#liPayFee').remove();
+            $('#lidivIssueCertificate').remove();
+    
+        // $("#transtabs li").removeClass('active');
+        // $("#tabcontents div").removeClass('active');
+
+
+          ApplicationId = $(this).data("application-id");
+          PermitId = $(this).data("permit-id");
+          Permitfile = $(this).data("permit-file");
+          PermiteditfileId = $(this).data("permit-editfile");
+          var DeptName = $(this).data("folderpath");
+          var DataId = $(this).data("data-id");
+          var TransactionId=$(this).data("transaction-id");
+          var TransName=$(this).data("transaction-name");
+          var TransFile=$(this).data("transaction-file");
+          var TownId = $(this).data("town-id");
+          var TransactionAutoIncreId = $(this).data("transactionAutoIncre-id");
+          // var CertType = $(this).data("certtype-id");
+         //  alert(ApplicationId);
+          transnameid0=TransName.replace(/ /g, "");
+          transnameid=transnameid0.replace(/\./g, "");
+          accordiondivid=transnameid+'accordion';
+
+          // $("#PublicHomePointer").css("display", "inline");
+          $(".table tbody tr").removeClass("active-row");
+          selectedRow=$(this).parent().find(".view_permit").data("id");
+          tableHome.draw(false);
+          tableHome.on( 'draw', function () {
+            $('.app_data[data-id="' + selectedRow + '" ]').parent().parent().parent().addClass("active-row");
+          });
+          $(this).parent().parent().addClass("active-row");
+          accordionid=transnameid+'accordion';
+          frmname='frm'+transnameid;
+          $.ajax
+           ({
+            url:DeptName+"/"+Permitfile+"?application_id="+ApplicationId+"&permit_file="+$(this).parent().find(".view_app").data("permit-file"),
+            success:function(msg)
+             {
+              $("#view_application").html(msg);
+             }
+          });
+          $('#details_section').show();
+          if($("#li" + transnameid).length == 0){
+            // alert(1);
+              $("#transtabs li").removeClass('active'); $('#li'+transnameid+'').addClass('active');
+              $("#tabcontents div").removeClass('active');
+              $('#transtabs').append('<li class="active activetranstabs" id="li'+transnameid+'"><a href="#lidiv'+transnameid+'" data-toggle="tab">'+TransName+'</a></li>');
+              $('#tabcontents').append('<div id="lidiv'+transnameid+'" class="tab-pane active activetranstabcontents" ><div class="panel-group accordion transaccordions" id="'+accordionid+'"></div></div>');
+          }
+          var loadUrl = DeptName+"/"+TransFile+"?application_id="+ApplicationId+"&permit_id="+PermitId+"&data_id="+DataId+"&transname="+transnameid+"&permit_file="+Permitfile+"&permit_editfile="+PermiteditfileId+"&TransactionId="+TransactionId+"&TownId="+TownId+"&TransactionAutoIncreId="+TransactionAutoIncreId;
+          $("#"+accordionid).html('<div class="panel-body accordion-body"></div>');
+          $('#' + accordionid + ' .accordion-body').load(loadUrl);
+
+          var scrollHeight = $("#lidiv" + transnameid).offset().top;
+                        $('body,html').animate({
+                          scrollTop: scrollHeight
+                        });
+
+
+      });
+
+
+       //Start-Issue Permit View
+      $("#BuildingPublicHome tbody").on('click','.view_coc',function()
+      {
+
+            $('#liIssuePermit').remove();
+            $('#lidivIssuePermit').remove();
+            $('#liInspection').remove();
+            $('#lidivInspection').remove();
+            $('#liSignOff').remove();
+            $('#lidivSignOff').remove();
+            $('#liIssueCertificate').remove();
+            $('#lidivIssueCertificate').remove();
+            $('#liCertificateOfOccupancy').remove();
+            $('#lidivCertificateOfOccupancy').remove();
+            $('#liCertificateOfCompletion').remove();
+            $('#lidivCertificateOfCompletion').remove();
+            $('#liCertificateOfOccupancyC').remove();
+            $('#lidivCertificateOfOccupancyC').remove();
+            $('#liPayFee').remove();
+            $('#lidivPayFee').remove();
+            $('#lidivIssueCertificate').remove();
+
+        // $("#transtabs li").removeClass('active');
+        // $("#tabcontents div").removeClass('active');
+
+        ApplicationId = $(this).data("application-id");
+        PermitId = $(this).data("permit-id");
+        Permitfile = $(this).data("permit-file");
+        PermiteditfileId = $(this).data("permit-editfile");
+        var DeptName = $(this).data("folderpath");
+        var DataId = $(this).data("data-id");
+        var COCtype = $(this).data("coc-type");
+        // alert(COCtype);
+        var TransactionId=$(this).data("transaction-id");
+        var TransName=$(this).data("transaction-name");
+        var TransFile=$(this).data("transaction-file");
+        transnameid0=TransName.replace(/ /g, "");
+        transnameid=transnameid0.replace(/\./g, "");
+        accordiondivid=transnameid+'accordion';
+
+        $("#BuildingPublicHome tbody tr").removeClass("active-row");
+          selectedRow=$(this).parent().find(".view_coc").data("id");
+          tableHome.draw(false);
+          tableHome.on( 'draw', function () {
+            $('.app_data[data-id="' + selectedRow + '" ]').parent().parent().parent().addClass("active-row");
+          });
+          $(this).parent().parent().addClass("active-row");
+
+        accordionid=transnameid+'accordion';
+        frmname='frm'+transnameid;
+
+        if($("#li" + transnameid).length == 0)
+          {
+            $('#transtabs').append('<li class="active activetranstabs" id="li'+transnameid+'"><a href="#lidiv'+transnameid+'" data-toggle="tab">'+TransName+'</a></li>');
+            $('#tabcontents').append('<div id="lidiv'+transnameid+'" class="tab-pane active activetranstabcontents" ><div class="panel-group accordion transaccordions" id="'+accordionid+'"></div></div>');
+          }
+
+           var loadUrl = DeptName+"/"+TransFile+"?application_id="+ApplicationId+"&ApplicationId="+ApplicationId+"&permit_id="+PermitId+"&data_id="+DataId+"&transname="+transnameid+"&permit_file="+Permitfile+"&permit_editfile="+PermiteditfileId+"&TransactionId="+TransactionId+"&CertType="+COCtype;
+       // alert(loadUrl);
+             $("#"+accordionid).html('<div class="panel-body accordion-body"></div>');
+             if(!$("#details_section").is(":visible")){$("#details_section").show();}
+             $('#' + accordionid + ' .accordion-body').load(loadUrl);
+
+             $("#li" + transnameid).addClass('active');
+             $("#lidiv" + transnameid).addClass('active');
+
+             var scrollHeight = $("#lidiv" + transnameid).offset().top-150;
+                        $('body,html').animate({
+                          scrollTop: scrollHeight
+                        });
+
+        });
+      //End-Issue Permit View
+
+
+
+
+            //Start- Fee/Sign Off History
+      $("#BuildingPublicHome tbody").on('click','.view_FeeSignOff',function()
+      {
+
+            $('#liIssuePermit').remove();
+            $('#lidivIssuePermit').remove();
+            $('#liInspection').remove();
+            $('#lidivInspection').remove();
+            $('#liIssueCertificate').remove();
+            $('#lidivIssueCertificate').remove();
+            $('#liCertificateOfOccupancy').remove();
+            $('#lidivCertificateOfOccupancy').remove();
+            $('#liCertificateOfCompletion').remove();
+            $('#lidivCertificateOfCompletion').remove();
+            $('#liCertificateOfOccupancyC').remove();
+            $('#lidivCertificateOfOccupancyC').remove();
+            $('#liPayFee').remove();
+            $('#lidivPayFee').remove();
+            $('#lidivIssueCertificate').remove();
+
+        $("#transtabs li").removeClass('active');
+        $("#tabcontents div").removeClass('active');
+
+          ApplicationId = $(this).data("application-id");
+          PermitId = $(this).data("permit-id");
+          Permitfile = $(this).data("permit-file");
+          PermiteditfileId = $(this).data("permit-editfile");
+          var DeptName = $(this).data("folderpath");
+          var DataId = $(this).data("data-id");
+          var TransactionId=$(this).data("transaction-id");
+          var TransName=$(this).data("transaction-name");
+          var TransFile=$(this).data("transaction-file");
+          transnameid0=TransName.replace(/ /g, "");
+          transnameid=transnameid0.replace(/\./g, "");
+          accordiondivid=transnameid+'accordion';
+
+
+          $("#BuildingPublicHome tbody tr").removeClass("active-row");
+          selectedRow=$(this).parent().parent().parent().find(".view_permit").data("id");
+
+          tableHome.draw(false);
+          tableHome.on( 'draw', function () {
+            $('.app_data[data-id="' + selectedRow + '" ]').parent().parent().parent().addClass("active-row");
+          });
+          $(this).parent().parent().addClass("active-row");
+          accordionid=transnameid+'accordion';
+          frmname='frm'+transnameid;
+
+
+           if($("#li" + transnameid).length == 0)
+          {
+            $('#transtabs').append('<li class="active activetranstabs" id="li'+transnameid+'"><a href="#lidiv'+transnameid+'" data-toggle="tab">'+TransName+'</a></li>');
+            $('#tabcontents').append('<div id="lidiv'+transnameid+'" class="tab-pane active activetranstabcontents" ><div class="panel-group accordion transaccordions" id="'+accordionid+'"></div></div>');
+          }
+          // alert(CurrDeptName);
+           var loadUrl =TransFile+"?application_id="+ApplicationId+"&permit_id="+PermitId+"&data_id="+DataId+"&transname="+transnameid+"&permit_file="+Permitfile+"&permit_editfile="+PermiteditfileId+"&TransactionId="+TransactionId+'&CurrDeptName='+CurrDeptName;
+           // alert(CurrDeptName);
+             $("#"+accordionid).html('<div class="panel-body accordion-body"></div>');
+             if(!$("#details_section").is(":visible")){$("#details_section").show();}
+             $('#' + accordionid + ' .accordion-body').load(loadUrl);
+
+             $("#li" + transnameid).addClass('active');
+             $("#lidiv" + transnameid).addClass('active');
+
+             var scrollHeight = $("#lidiv" + transnameid).offset().top;
+                        $('body,html').animate({
+                          scrollTop: scrollHeight
+                        });
+
+
+
+      });
+
+      $("#BuildingPublicHome tbody").on('click','.view_Fee',function()
+      {//alert("fee");
+
+            $('#liIssuePermit').remove();
+            $('#lidivIssuePermit').remove();
+            $('#liInspection').remove();
+            $('#lidivInspection').remove();
+            $('#liIssueCertificate').remove();
+            $('#lidivIssueCertificate').remove();
+            $('#liCertificateOfOccupancy').remove();
+            $('#lidivCertificateOfOccupancy').remove();
+            $('#liCertificateOfCompletion').remove();
+            $('#lidivCertificateOfCompletion').remove();
+            $('#liCertificateOfOccupancyC').remove();
+            $('#lidivCertificateOfOccupancyC').remove();
+            $('#lidivSignOff').remove();
+            $('#liSignOff').remove();
+            $('#lidivIssueCertificate').remove();
+
+        $("#transtabs li").removeClass('active');
+        $("#tabcontents div").removeClass('active');
+
+          ApplicationId = $(this).data("application-id");
+          PermitId = $(this).data("permit-id");
+          Permitfile = $(this).data("permit-file");
+          PermiteditfileId = $(this).data("permit-editfile");
+          var DeptName = $(this).data("folderpath");
+          var DataId = $(this).data("data-id");
+          var TransactionId=$(this).data("transaction-id");
+          var TransName=$(this).data("transaction-name");
+          var TransFile=$(this).data("transaction-file");
+          transnameid0=TransName.replace(/ /g, "");
+          transnameid=transnameid0.replace(/\./g, "");
+          accordiondivid=transnameid+'accordion';
+
+
+          $("#BuildingPublicHome tbody tr").removeClass("active-row");
+          selectedRow=$(this).parent().parent().parent().find(".view_permit").data("id");
+
+          tableHome.draw(false);
+          tableHome.on( 'draw', function () {
+            $('.app_data[data-id="' + selectedRow + '" ]').parent().parent().parent().addClass("active-row");
+          });
+          $(this).parent().parent().addClass("active-row");
+          accordionid=transnameid+'accordion';
+          frmname='frm'+transnameid;
+
+
+           if($("#li" + transnameid).length == 0)
+          {
+            $('#transtabs').append('<li class="active activetranstabs" id="li'+transnameid+'"><a href="#lidiv'+transnameid+'" data-toggle="tab">'+TransName+'</a></li>');
+            $('#tabcontents').append('<div id="lidiv'+transnameid+'" class="tab-pane active activetranstabcontents" ><div class="panel-group accordion transaccordions" id="'+accordionid+'"></div></div>');
+          }
+          // alert(CurrDeptName);
+           var loadUrl =TransFile+"?application_id="+ApplicationId+"&permit_id="+PermitId+"&data_id="+DataId+"&transname="+transnameid+"&permit_file="+Permitfile+"&permit_editfile="+PermiteditfileId+"&TransactionId="+TransactionId+'&CurrDeptName='+CurrDeptName;
+           // alert(CurrDeptName);
+             $("#"+accordionid).html('<div class="panel-body accordion-body"></div>');
+             if(!$("#details_section").is(":visible")){$("#details_section").show();}
+             $('#' + accordionid + ' .accordion-body').load(loadUrl);
+
+             $("#li" + transnameid).addClass('active');
+             $("#lidiv" + transnameid).addClass('active');
+
+             var scrollHeight = $("#lidiv" + transnameid).offset().top;
+                        $('body,html').animate({
+                          scrollTop: scrollHeight
+                        });
+
+
+
+      });
+
+
+
+      // //End-Issue Permit View
+
+            // Building End
+break;
+            // BOH Tab Start
+            case '#BOHPublicHome' : 
+         var tableHome = $(tableId).DataTable({
+              'dom':'<<"pull-left"><"pull-right"f>>rt<"bottom"ip><"clear">',
+                "pagingType":"simple_numbers",
+                "language": {
+                    "paginate": {
+                      "previous": "<",
+                      "next": ">",
+                    },
+                    "zeroRecords": "No applications fit these qualifications"
+                  },
+                "columnDefs": [
+
+                   {'targets': 0, "width": "5px !important"},
+                   {'targets': 1, "width": "5px !important"},
+                   {'targets': 2, "width": "15px !important"},
+                   {'targets': 3, "width": "15px !important"},
+                   {'targets': 4, "width": "10px !important"},
+                   {'targets': 5, "width": "50px !important"},
+                   {'targets': 6, "width": "50px !important"},
+                   {'targets': 7, "width": "40px !important"},
+                   {'targets': 8, "width": "20px !important"},
+                   {'targets': 9, "width": "30px !important" },
+                   // {'targets': 10,"width": "20px !important" },
+                             ],
+                
+                "autoWidth": false,
+                "orderCellsTop":true,
+                "processing":true,
+                "serverSide":true,
+                "deferRender":true,
+                "ordering": true,
+                "order": [
+                  [0, 'DESC']
+                 ],
+                 "orderClasses": false,
+                "info":true,
+                "paging":true,
+                "pageLength": 15,
+                "scrollX": true,
+                   "scrollY":false,
+                "ajax": {
+                   "url": url,
+                   "type":'post'
+                },
+                         "rowCallback": function( row, data, index ) {
+                      
+                     }
+         });
+
+          //DATE RANGE APPL DATE
+            $('i[name="icon-daterange3"]').on('apply.daterangepicker', function(ev, picker) { 
+                $('input[name="daterange3"]').val(picker.startDate.format('YYYY-MM-DD') + '|' + picker.endDate.format('YYYY-MM-DD')); 
+                $('#BOHDisplaySelectedApplDate').html(picker.startDate.format('DD-MM-YY') + ' To <br>' + picker.endDate.format('DD-MM-YY'));
+                var dateindex = $('input[name="daterange3"]').parent().index();   //alert(dateindex);
+                var date = $('input[name="daterange3"]').val(); //alert(date);
+
+                tableHome
+                .column((dateindex )+ ':visible')
+                .search( date )
+                .draw();
+            });
+
+            //DATE RANGE ISSUE DATE
+            $('i[name="icon-daterange4"]').on('apply.daterangepicker', function(ev, picker) { 
+                $('input[name="daterange4"]').val(picker.startDate.format('YYYY-MM-DD') + ' | ' + picker.endDate.format('YYYY-MM-DD'));
+                $('#BOHDisplaySelectedIssueDate').html(picker.startDate.format('DD-MM-YY') + ' To <br>' + picker.endDate.format('DD-MM-YY'));
+                var dateindex = $('input[name="daterange4"]').parent().index();   //alert(dateindex);
+                var date = $('input[name="daterange4"]').val(); //alert(date);
+
+                tableHome
+                .column((dateindex )+ ':visible')
+                .search( date )
+                .draw();
+            });
+
+
+            //DATE RANGE EXPIRY DATE
+            $('i[name="icon-daterange5"]').on('apply.daterangepicker', function(ev, picker) { 
+                $('input[name="daterange5"]').val(picker.startDate.format('YYYY-MM-DD') + ' | ' + picker.endDate.format('YYYY-MM-DD'));
+                $('#BOHDisplaySelectedExpiryDate').html(picker.startDate.format('DD-MM-YY') + ' To <br>' + picker.endDate.format('DD-MM-YY'));
+                var dateindex = $('input[name="daterange5"]').parent().index();   //alert(dateindex);
+                var date = $('input[name="daterange5"]').val(); //alert(date);
+
+                tableHome
+                .column((dateindex )+ ':visible')
+                .search( date )
+                .draw();
+            });
+
+           
+
+            $('#searchBOHPublicHome input, select').on('keyup change', function(){
+                 tableHome
+                .column( ($(this).parent().index())+':visible' )
+                .search( this.value )
+                .draw();
+                     
+            });
+
+        
+
+      //Start-Issue Permit View
+      $("#BOHPublicHome tbody").on('click','.view_permit',function()
+      {  
+
+          // var details_Subsection = $("#transtabs").children();
+          // console.log(details_Subsection);
+            $('#liInspection').remove(); 
+            $('#lidivInspection').remove(); 
+       
+          ApplicationId = $(this).data("application-id");
+          PermitId = $(this).data("permit-id");
+          Permitfile = $(this).data("permit-file");
+          PermiteditfileId = $(this).data("permit-editfile");
+          var DeptName = $(this).data("folderpath");
+          var DataId = $(this).data("data-id");
+          var TransactionId=$(this).data("transaction-id");
+          var TransName=$(this).data("transaction-name");
+          var TransFile=$(this).data("transaction-file");
+          transnameid0=TransName.replace(/ /g, "");
+          transnameid=transnameid0.replace(/\./g, "");
+          accordiondivid=transnameid+'accordion';
+
+          // $("#PublicHomePointer").css("display", "inline");
+          $(".table tbody tr").removeClass("active-row");
+          selectedRow=$(this).parent().find(".view_permit").data("id");
+          tableHome.draw(false);                               
+          tableHome.on( 'draw', function () {  
+            $('.app_data[data-id="' + selectedRow + '" ]').parent().parent().parent().addClass("active-row");
+          });
+          $(this).parent().parent().addClass("active-row");
+          accordionid=transnameid+'accordion';
+          frmname='frm'+transnameid;
+          $.ajax
+           ({
+            url:DeptName+"/"+Permitfile+"?application_id="+ApplicationId+"&permit_file="+$(this).parent().find(".view_app").data("permit-file"),
+            success:function(msg)
+             {
+              $("#view_application").html(msg);
+             }
+          });
+          $('#details_section').show();
+          if($("#li" + transnameid).length == 0){ 
+              $("#transtabs li").removeClass('active'); $('#li'+transnameid+'').addClass('active');
+              $("#tabcontents div").removeClass('active');
+              $('#transtabs').append('<li class="active activetranstabs" id="li'+transnameid+'"><a href="#lidiv'+transnameid+'" data-toggle="tab">'+TransName+'</a></li>');
+              $('#tabcontents').append('<div id="lidiv'+transnameid+'" class="tab-pane active activetranstabcontents" ><div class="panel-group accordion transaccordions" id="'+accordionid+'"></div></div>');
+          }
+          var loadUrl = DeptName+"/"+TransFile+"?application_id="+ApplicationId+"&permit_id="+PermitId+"&data_id="+DataId+"&transname="+transnameid+"&permit_file="+Permitfile+"&permit_editfile="+PermiteditfileId+"&TransactionId="+TransactionId;  
+          $("#"+accordionid).html('<div class="panel-body accordion-body"></div>');
+          $('#' + accordionid + ' .accordion-body').load(loadUrl);
+
+          var scrollHeight = $("#lidiv" + transnameid).offset().top;
+                        $('body,html').animate({
+                          scrollTop: scrollHeight
+                        });
+          
+       
+      });
+      // //End-Issue Permit View
+
+
+break;
+            // BOH Tab End
+
+// Planning Tab Start
+             case '#PlanningPublicHome' : 
+         var tableHome = $(tableId).DataTable({
+              'dom':'<<"pull-left"><"pull-right"f>>rt<"bottom"ip><"clear">',
+                "pagingType":"simple_numbers",
+                "language": {
+                    "paginate": {
+                      "previous": "<",
+                      "next": ">",
+                    },
+                    "zeroRecords": "No applications fit these qualifications"
+                  },
+                "columnDefs": [
+
+                   {'targets': 0, "width": "5px !important", "orderable": false},
+                   {'targets': 1, "width": "5px !important"},
+                   {'targets': 2, "width": "15px !important"},
+                   {'targets': 3, "width": "15px !important"},
+                   {'targets': 4, "width": "10px !important"},
+                   {'targets': 5, "width": "50px !important"},
+                   {'targets': 6, "width": "50px !important"},
+                   // {'targets': 7, "width": "40px !important"},
+                   // {'targets': 8, "width": "20px !important"},
+                   // {'targets': 9, "width": "30px !important" },
+                   // {'targets': 10,"width": "20px !important" },
+                             ],
+                
+                "autoWidth": false,
+                "orderCellsTop":true,
+                "processing":true,
+                "serverSide":true,
+                "deferRender":true,
+                "ordering": true,
+                "order": [
+                  [0, 'DESC']
+                 ],
+                 "orderClasses": false,
+                "info":true,
+                "paging":true,
+                "pageLength": 15,
+                "scrollX": true,
+                   "scrollY":false,
+                "ajax": {
+                   "url": url,
+                   "type":'post'
+                },
+                         "rowCallback": function( row, data, index ) {
+                      
+                     }
+         });
+
+          //DATE RANGE APPL DATE
+            $('i[name="icon-daterange6"]').on('apply.daterangepicker', function(ev, picker) { 
+                $('input[name="daterange6"]').val(picker.startDate.format('YYYY-MM-DD') + '|' + picker.endDate.format('YYYY-MM-DD')); 
+                $('#DisplaySelectedApplDate').html(picker.startDate.format('DD-MM-YY') + ' To <br>' + picker.endDate.format('DD-MM-YY'));
+                var dateindex = $('input[name="daterange6"]').parent().index();   //alert(dateindex);
+                var date = $('input[name="daterange6"]').val(); //alert(date);
+
+                tableHome
+                .column((dateindex )+ ':visible')
+                .search( date )
+                .draw();
+            });
+
+            // //DATE RANGE ISSUE DATE
+            // $('i[name="icon-daterange7"]').on('apply.daterangepicker', function(ev, picker) { 
+            //     $('input[name="daterange7"]').val(picker.startDate.format('YYYY-MM-DD') + ' | ' + picker.endDate.format('YYYY-MM-DD'));
+            //     $('#DisplaySelectedIssueDate').html(picker.startDate.format('DD-MM-YY') + ' To <br>' + picker.endDate.format('DD-MM-YY'));
+            //     var dateindex = $('input[name="daterange7"]').parent().index();   //alert(dateindex);
+            //     var date = $('input[name="daterange7"]').val(); //alert(date);
+
+            //     tableHome
+            //     .column((dateindex )+ ':visible')
+            //     .search( date )
+            //     .draw();
+            // });
+
+            $('#searchPlanningPublicHome input, select').on('keyup change', function(){
+                 tableHome
+                .column( ($(this).parent().index())+':visible' )
+                .search( this.value )
+                .draw();
+                     
+            });
+
+
+        
+
+      //Start-Issue Permit View
+      // $("#PlanningPublicHome tbody").on('click','.view_permit',function()
+      // {  
+       
+      //     // $('#liInspection').remove(); 
+      //     // $('#lidivInspection').remove(); 
+
+
+      //     ApplicationId = $(this).data("application-id");
+      //     PermitId = $(this).data("permit-id");
+      //     Permitfile = $(this).data("permit-file");
+      //     PermiteditfileId = $(this).data("permit-editfile");
+      //     var DeptName = $(this).data("folderpath");
+      //     var DataId = $(this).data("data-id");
+      //     var TransactionId=$(this).data("transaction-id");
+      //     var TransName=$(this).data("transaction-name");
+      //     var TransFile=$(this).data("transaction-file");
+      //     transnameid0=TransName.replace(/ /g, "");
+      //     transnameid=transnameid0.replace(/\./g, "");
+      //     accordiondivid=transnameid+'accordion';
+
+      //     // $("#PublicHomePointer").css("display", "inline");
+      //     $(".table tbody tr").removeClass("active-row");
+      //     selectedRow=$(this).parent().find(".view_permit").data("id"); 
+      //     tableHome.draw(false);                               
+      //     tableHome.on( 'draw', function () {  
+      //       $('.app_data[data-id="' + selectedRow + '" ]').parent().parent().parent().addClass("active-row");
+      //     });
+      //     $(this).parent().parent().addClass("active-row");
+      //     accordionid=transnameid+'accordion';
+      //     frmname='frm'+transnameid;
+      //     $.ajax
+      //      ({
+      //       url:DeptName+"/"+Permitfile+"?application_id="+ApplicationId+"&permit_file="+$(this).parent().find(".view_app").data("permit-file"),
+      //       success:function(msg)
+      //        {
+      //         $("#view_application").html(msg);
+      //        }
+      //     });
+      //     $('#details_section').show();
+      //     if($("#li" + transnameid).length == 0){ 
+      //         $("#transtabs li").removeClass('active'); $('#li'+transnameid+'').addClass('active');
+      //         $("#tabcontents div").removeClass('active');
+      //         $('#transtabs').append('<li class="active activetranstabs" id="li'+transnameid+'"><a href="#lidiv'+transnameid+'" data-toggle="tab">'+TransName+'</a></li>');
+      //         $('#tabcontents').append('<div id="lidiv'+transnameid+'" class="tab-pane active activetranstabcontents" ><div class="panel-group accordion transaccordions" id="'+accordionid+'"></div></div>');
+      //     }
+      //     var loadUrl = DeptName+"/"+TransFile+"?application_id="+ApplicationId+"&permit_id="+PermitId+"&data_id="+DataId+"&transname="+transnameid+"&permit_file="+Permitfile+"&permit_editfile="+PermiteditfileId+"&TransactionId="+TransactionId;  
+      //     $("#"+accordionid).html('<div class="panel-body accordion-body"></div>');
+      //     $('#' + accordionid + ' .accordion-body').load(loadUrl);
+
+      //     var scrollHeight = $("#lidiv" + transnameid).offset().top;
+      //                   $('body,html').animate({
+      //                     scrollTop: scrollHeight
+      //                   });
+          
+       
+      // });
+      // // //End-Issue Permit View
+
+            // Planning End
+break;
+
+// concom Tab Start
+             case '#ConcomPublicHome' : 
+         var tableHome = $(tableId).DataTable({
+              'dom':'<<"pull-left"><"pull-right"f>>rt<"bottom"ip><"clear">',
+                "pagingType":"simple_numbers",
+                "language": {
+                    "paginate": {
+                      "previous": "<",
+                      "next": ">",
+                    },
+                    "zeroRecords": "No applications fit these qualifications"
+                  },
+                "columnDefs": [
+
+                   {'targets': 0, "width": "5px !important", "orderable": false},
+                   {'targets': 1, "width": "5px !important"},
+                   {'targets': 2, "width": "15px !important"},
+                   {'targets': 3, "width": "15px !important"},
+                   {'targets': 4, "width": "10px !important"},
+                   {'targets': 5, "width": "50px !important"},
+                   // {'targets': 6, "width": "50px !important"},
+                   // {'targets': 7, "width": "40px !important"},
+                   // {'targets': 8, "width": "20px !important"},
+                   // {'targets': 9, "width": "30px !important" },
+                   // {'targets': 10,"width": "20px !important" },
+                             ],
+                
+                "autoWidth": false,
+                "orderCellsTop":true,
+                "processing":true,
+                "serverSide":true,
+                "deferRender":true,
+                "ordering": true,
+                "order": [
+                  [0, 'DESC']
+                 ],
+                 "orderClasses": false,
+                "info":true,
+                "paging":true,
+                "pageLength": 15,
+                "scrollX": true,
+                   "scrollY":false,
+                "ajax": {
+                   "url": url,
+                   "type":'post'
+                },
+                         "rowCallback": function( row, data, index ) {
+                      
+                     }
+         });
+
+          //DATE RANGE APPL DATE
+            $('i[name="icon-daterange9"]').on('apply.daterangepicker', function(ev, picker) { 
+                $('input[name="daterange9"]').val(picker.startDate.format('YYYY-MM-DD') + '|' + picker.endDate.format('YYYY-MM-DD')); 
+                $('#DisplaySelectedApplDate').html(picker.startDate.format('DD-MM-YY') + ' To <br>' + picker.endDate.format('DD-MM-YY'));
+                var dateindex = $('input[name="daterange9"]').parent().index();   //alert(dateindex);
+                var date = $('input[name="daterange9"]').val(); //alert(date);
+
+                tableHome
+                .column((dateindex )+ ':visible')
+                .search( date )
+                .draw();
+            });
+
+            // //DATE RANGE ISSUE DATE
+            // $('i[name="icon-daterange7"]').on('apply.daterangepicker', function(ev, picker) { 
+            //     $('input[name="daterange7"]').val(picker.startDate.format('YYYY-MM-DD') + ' | ' + picker.endDate.format('YYYY-MM-DD'));
+            //     $('#DisplaySelectedIssueDate').html(picker.startDate.format('DD-MM-YY') + ' To <br>' + picker.endDate.format('DD-MM-YY'));
+            //     var dateindex = $('input[name="daterange7"]').parent().index();   //alert(dateindex);
+            //     var date = $('input[name="daterange7"]').val(); //alert(date);
+
+            //     tableHome
+            //     .column((dateindex )+ ':visible')
+            //     .search( date )
+            //     .draw();
+            // });
+
+            $('#searchConcomPublicHome input, select').on('keyup change', function(){
+                 tableHome
+                .column( ($(this).parent().index())+':visible' )
+                .search( this.value )
+                .draw();
+                     
+            });
+
+
+        
+
+      //Start-Issue Permit View
+      // $("#ZBAPublicHome tbody").on('click','.view_permit',function()
+      // {  
+       
+
+      //   $('#liInspection').remove(); 
+      //       $('#lidivInspection').remove(); 
+
+      //     ApplicationId = $(this).data("application-id");
+      //     PermitId = $(this).data("permit-id");
+      //     Permitfile = $(this).data("permit-file");
+      //     PermiteditfileId = $(this).data("permit-editfile");
+      //     var DeptName = $(this).data("folderpath");
+      //     var DataId = $(this).data("data-id");
+      //     var TransactionId=$(this).data("transaction-id");
+      //     var TransName=$(this).data("transaction-name");
+      //     var TransFile=$(this).data("transaction-file");
+      //     transnameid0=TransName.replace(/ /g, "");
+      //     transnameid=transnameid0.replace(/\./g, "");
+      //     accordiondivid=transnameid+'accordion';
+
+      //     // $("#PublicHomePointer").css("display", "inline");
+      //     $(".table tbody tr").removeClass("active-row");
+      //     selectedRow=$(this).parent().find(".view_permit").data("id"); 
+      //     tableHome.draw(false);                               
+      //     tableHome.on( 'draw', function () {  
+      //       $('.app_data[data-id="' + selectedRow + '" ]').parent().parent().parent().addClass("active-row");
+      //     });
+      //     $(this).parent().parent().addClass("active-row");
+      //     accordionid=transnameid+'accordion';
+      //     frmname='frm'+transnameid;
+      //     $.ajax
+      //      ({
+      //       url:DeptName+"/"+Permitfile+"?application_id="+ApplicationId+"&permit_file="+$(this).parent().find(".view_app").data("permit-file"),
+      //       success:function(msg)
+      //        {
+      //         $("#view_application").html(msg);
+      //        }
+      //     });
+      //     $('#details_section').show();
+      //     if($("#li" + transnameid).length == 0){ 
+      //         $("#transtabs li").removeClass('active'); $('#li'+transnameid+'').addClass('active');
+      //         $("#tabcontents div").removeClass('active');
+      //         $('#transtabs').append('<li class="active activetranstabs" id="li'+transnameid+'"><a href="#lidiv'+transnameid+'" data-toggle="tab">'+TransName+'</a></li>');
+      //         $('#tabcontents').append('<div id="lidiv'+transnameid+'" class="tab-pane active activetranstabcontents" ><div class="panel-group accordion transaccordions" id="'+accordionid+'"></div></div>');
+      //     }
+      //     var loadUrl = DeptName+"/"+TransFile+"?application_id="+ApplicationId+"&permit_id="+PermitId+"&data_id="+DataId+"&transname="+transnameid+"&permit_file="+Permitfile+"&permit_editfile="+PermiteditfileId+"&TransactionId="+TransactionId;  
+      //     $("#"+accordionid).html('<div class="panel-body accordion-body"></div>');
+      //     $('#' + accordionid + ' .accordion-body').load(loadUrl);
+
+      //     var scrollHeight = $("#lidiv" + transnameid).offset().top;
+      //                   $('body,html').animate({
+      //                     scrollTop: scrollHeight
+      //                   });
+          
+       
+      // });
+      // // //End-Issue Permit View
+
+            
+break;
+// concom End
+
+// Fire Tab Start
+ case '#FirePublicHome' : 
+         var tableHome = $(tableId).DataTable({
+              'dom':'<<"pull-left"><"pull-right"f>>rt<"bottom"ip><"clear">',
+                "pagingType":"simple_numbers",
+                "language": {
+                    "paginate": {
+                      "previous": "<",
+                      "next": ">",
+                    },
+                    "zeroRecords": "No applications fit these qualifications"
+                  },
+                "columnDefs": [
+
+                   {'targets': 0, "width": "5px !important", "orderable": false},
+                   {'targets': 1, "width": "5px !important"},
+                   {'targets': 2, "width": "15px !important"},
+                   {'targets': 3, "width": "15px !important"},
+                   {'targets': 4, "width": "10px !important"},
+                   {'targets': 5, "width": "50px !important"},
+                   {'targets': 6, "width": "50px !important"},
+                   {'targets': 7, "width": "40px !important"},
+                   {'targets': 8, "width": "20px !important"},
+                   {'targets': 9, "width": "30px !important" },
+                   // {'targets': 10,"width": "20px !important" },
+                             ],
+                
+                "autoWidth": false,
+                "orderCellsTop":true,
+                "processing":true,
+                "serverSide":true,
+                "deferRender":true,
+                "ordering": true,
+                "order": [
+                  [0, 'DESC']
+                 ],
+                 "orderClasses": false,
+                "info":true,
+                "paging":true,
+                "pageLength": 15,
+                "scrollX": true,
+                   "scrollY":false,
+                "ajax": {
+                   "url": url,
+                   "type":'post'
+                },
+                         "rowCallback": function( row, data, index ) {
+                      
+                     }
+         });
+
+          //DATE RANGE APPL DATE
+            $('i[name="icon-daterange7"]').on('apply.daterangepicker', function(ev, picker) { 
+                $('input[name="daterange7"]').val(picker.startDate.format('YYYY-MM-DD') + '|' + picker.endDate.format('YYYY-MM-DD')); 
+                $('#DisplaySelectedApplDate').html(picker.startDate.format('DD-MM-YY') + ' To <br>' + picker.endDate.format('DD-MM-YY'));
+                var dateindex = $('input[name="daterange7"]').parent().index();   //alert(dateindex);
+                var date = $('input[name="daterange7"]').val(); //alert(date);
+
+                tableHome
+                .column((dateindex )+ ':visible')
+                .search( date )
+                .draw();
+            });
+
+            //DATE RANGE ISSUE DATE
+            $('i[name="icon-daterange8"]').on('apply.daterangepicker', function(ev, picker) { 
+                $('input[name="daterange8"]').val(picker.startDate.format('YYYY-MM-DD') + ' | ' + picker.endDate.format('YYYY-MM-DD'));
+                $('#DisplaySelectedIssueDate').html(picker.startDate.format('DD-MM-YY') + ' To <br>' + picker.endDate.format('DD-MM-YY'));
+                var dateindex = $('input[name="daterange8"]').parent().index();   //alert(dateindex);
+                var date = $('input[name="daterange8"]').val(); //alert(date);
+
+                tableHome
+                .column((dateindex )+ ':visible')
+                .search( date )
+                .draw();
+            });
+
+            $('#searchFirePublicHome input, select').on('keyup change', function(){
+                 tableHome
+                .column( ($(this).parent().index())+':visible' )
+                .search( this.value )
+                .draw();
+                     
+            });
+
+
+       
+
+      //Start-Issue Permit View
+      $("#FirePublicHome tbody").on('click','.view_permit',function()
+      {  
+          
+
+            $('#liInspection').remove(); 
+            $('#lidivInspection').remove(); 
+
+
+          ApplicationId = $(this).data("application-id");
+          PermitId = $(this).data("permit-id");
+          Permitfile = $(this).data("permit-file");
+          PermiteditfileId = $(this).data("permit-editfile");
+          var DeptName = $(this).data("folderpath");
+          var DataId = $(this).data("data-id");
+          var TransactionId=$(this).data("transaction-id");
+          var TransName=$(this).data("transaction-name");
+          var TransFile=$(this).data("transaction-file");
+          transnameid0=TransName.replace(/ /g, "");
+          transnameid=transnameid0.replace(/\./g, "");
+          accordiondivid=transnameid+'accordion';
+
+          // $("#PublicHomePointer").css("display", "inline");
+          $(".table tbody tr").removeClass("active-row");
+          selectedRow=$(this).parent().find(".view_permit").data("id"); 
+          tableHome.draw(false);                               
+          tableHome.on( 'draw', function () {  
+            $('.app_data[data-id="' + selectedRow + '" ]').parent().parent().parent().addClass("active-row");
+          });
+          $(this).parent().parent().addClass("active-row");
+          accordionid=transnameid+'accordion';
+          frmname='frm'+transnameid;
+          $.ajax
+           ({
+            url:DeptName+"/"+Permitfile+"?application_id="+ApplicationId+"&permit_file="+$(this).parent().find(".view_app").data("permit-file"),
+            success:function(msg)
+             {
+              $("#view_application").html(msg);
+             }
+          });
+          $('#details_section').show();
+          if($("#li" + transnameid).length == 0){ 
+              $("#transtabs li").removeClass('active'); $('#li'+transnameid+'').addClass('active');
+              $("#tabcontents div").removeClass('active');
+              $('#transtabs').append('<li class="active activetranstabs" id="li'+transnameid+'"><a href="#lidiv'+transnameid+'" data-toggle="tab">'+TransName+'</a></li>');
+              $('#tabcontents').append('<div id="lidiv'+transnameid+'" class="tab-pane active activetranstabcontents" ><div class="panel-group accordion transaccordions" id="'+accordionid+'"></div></div>');
+          }
+          var loadUrl = DeptName+"/"+TransFile+"?application_id="+ApplicationId+"&permit_id="+PermitId+"&data_id="+DataId+"&transname="+transnameid+"&permit_file="+Permitfile+"&permit_editfile="+PermiteditfileId+"&TransactionId="+TransactionId;  
+          $("#"+accordionid).html('<div class="panel-body accordion-body"></div>');
+          $('#' + accordionid + ' .accordion-body').load(loadUrl);
+
+          var scrollHeight = $("#lidiv" + transnameid).offset().top;
+                        $('body,html').animate({
+                          scrollTop: scrollHeight
+                        });
+          
+       
+      });
+      // //End-Issue Permit View
+
+break;
+            // Fire End
+
+// zba Tab Start
+             case '#ZBAPublicHome' : 
+         var tableHome = $(tableId).DataTable({
+              'dom':'<<"pull-left"><"pull-right"f>>rt<"bottom"ip><"clear">',
+                "pagingType":"simple_numbers",
+                "language": {
+                    "paginate": {
+                      "previous": "<",
+                      "next": ">",
+                    },
+                    "zeroRecords": "No applications fit these qualifications"
+                  },
+                "columnDefs": [
+
+                   {'targets': 0, "width": "5px !important", "orderable": false},
+                   {'targets': 1, "width": "5px !important"},
+                   {'targets': 2, "width": "15px !important"},
+                   {'targets': 3, "width": "15px !important"},
+                   {'targets': 4, "width": "10px !important"},
+                   {'targets': 5, "width": "50px !important"},
+                   // {'targets': 6, "width": "50px !important"},
+                   // {'targets': 7, "width": "40px !important"},
+                   // {'targets': 8, "width": "20px !important"},
+                   // {'targets': 9, "width": "30px !important" },
+                   // {'targets': 10,"width": "20px !important" },
+                             ],
+                
+                "autoWidth": false,
+                "orderCellsTop":true,
+                "processing":true,
+                "serverSide":true,
+                "deferRender":true,
+                "ordering": true,
+                "order": [
+                  [0, 'DESC']
+                 ],
+                 "orderClasses": false,
+                "info":true,
+                "paging":true,
+                "pageLength": 15,
+                "scrollX": true,
+                   "scrollY":false,
+                "ajax": {
+                   "url": url,
+                   "type":'post'
+                },
+                         "rowCallback": function( row, data, index ) {
+                      
+                     }
+         });
+
+          //DATE RANGE APPL DATE
+            $('i[name="icon-daterange9"]').on('apply.daterangepicker', function(ev, picker) { 
+                $('input[name="daterange9"]').val(picker.startDate.format('YYYY-MM-DD') + '|' + picker.endDate.format('YYYY-MM-DD')); 
+                $('#DisplaySelectedApplDate').html(picker.startDate.format('DD-MM-YY') + ' To <br>' + picker.endDate.format('DD-MM-YY'));
+                var dateindex = $('input[name="daterange9"]').parent().index();   //alert(dateindex);
+                var date = $('input[name="daterange9"]').val(); //alert(date);
+
+                tableHome
+                .column((dateindex )+ ':visible')
+                .search( date )
+                .draw();
+            });
+
+            // //DATE RANGE ISSUE DATE
+            // $('i[name="icon-daterange7"]').on('apply.daterangepicker', function(ev, picker) { 
+            //     $('input[name="daterange7"]').val(picker.startDate.format('YYYY-MM-DD') + ' | ' + picker.endDate.format('YYYY-MM-DD'));
+            //     $('#DisplaySelectedIssueDate').html(picker.startDate.format('DD-MM-YY') + ' To <br>' + picker.endDate.format('DD-MM-YY'));
+            //     var dateindex = $('input[name="daterange7"]').parent().index();   //alert(dateindex);
+            //     var date = $('input[name="daterange7"]').val(); //alert(date);
+
+            //     tableHome
+            //     .column((dateindex )+ ':visible')
+            //     .search( date )
+            //     .draw();
+            // });
+
+            $('#searchZBAPublicHome input, select').on('keyup change', function(){
+                 tableHome
+                .column( ($(this).parent().index())+':visible' )
+                .search( this.value )
+                .draw();
+                     
+            });
+
+
+        
+
+      //Start-Issue Permit View
+      // $("#ZBAPublicHome tbody").on('click','.view_permit',function()
+      // {  
+       
+
+      //   $('#liInspection').remove(); 
+      //       $('#lidivInspection').remove(); 
+
+      //     ApplicationId = $(this).data("application-id");
+      //     PermitId = $(this).data("permit-id");
+      //     Permitfile = $(this).data("permit-file");
+      //     PermiteditfileId = $(this).data("permit-editfile");
+      //     var DeptName = $(this).data("folderpath");
+      //     var DataId = $(this).data("data-id");
+      //     var TransactionId=$(this).data("transaction-id");
+      //     var TransName=$(this).data("transaction-name");
+      //     var TransFile=$(this).data("transaction-file");
+      //     transnameid0=TransName.replace(/ /g, "");
+      //     transnameid=transnameid0.replace(/\./g, "");
+      //     accordiondivid=transnameid+'accordion';
+
+      //     // $("#PublicHomePointer").css("display", "inline");
+      //     $(".table tbody tr").removeClass("active-row");
+      //     selectedRow=$(this).parent().find(".view_permit").data("id"); 
+      //     tableHome.draw(false);                               
+      //     tableHome.on( 'draw', function () {  
+      //       $('.app_data[data-id="' + selectedRow + '" ]').parent().parent().parent().addClass("active-row");
+      //     });
+      //     $(this).parent().parent().addClass("active-row");
+      //     accordionid=transnameid+'accordion';
+      //     frmname='frm'+transnameid;
+      //     $.ajax
+      //      ({
+      //       url:DeptName+"/"+Permitfile+"?application_id="+ApplicationId+"&permit_file="+$(this).parent().find(".view_app").data("permit-file"),
+      //       success:function(msg)
+      //        {
+      //         $("#view_application").html(msg);
+      //        }
+      //     });
+      //     $('#details_section').show();
+      //     if($("#li" + transnameid).length == 0){ 
+      //         $("#transtabs li").removeClass('active'); $('#li'+transnameid+'').addClass('active');
+      //         $("#tabcontents div").removeClass('active');
+      //         $('#transtabs').append('<li class="active activetranstabs" id="li'+transnameid+'"><a href="#lidiv'+transnameid+'" data-toggle="tab">'+TransName+'</a></li>');
+      //         $('#tabcontents').append('<div id="lidiv'+transnameid+'" class="tab-pane active activetranstabcontents" ><div class="panel-group accordion transaccordions" id="'+accordionid+'"></div></div>');
+      //     }
+      //     var loadUrl = DeptName+"/"+TransFile+"?application_id="+ApplicationId+"&permit_id="+PermitId+"&data_id="+DataId+"&transname="+transnameid+"&permit_file="+Permitfile+"&permit_editfile="+PermiteditfileId+"&TransactionId="+TransactionId;  
+      //     $("#"+accordionid).html('<div class="panel-body accordion-body"></div>');
+      //     $('#' + accordionid + ' .accordion-body').load(loadUrl);
+
+      //     var scrollHeight = $("#lidiv" + transnameid).offset().top;
+      //                   $('body,html').animate({
+      //                     scrollTop: scrollHeight
+      //                   });
+          
+       
+      // });
+      // // //End-Issue Permit View
+
+            // zba End
+break;
+
+// DPW Tab Start
+ case '#DPWPublicHome' : 
+         var tableHome = $(tableId).DataTable({
+              'dom':'<<"pull-left"><"pull-right"f>>rt<"bottom"ip><"clear">',
+                "pagingType":"simple_numbers",
+                "language": {
+                    "paginate": {
+                      "previous": "<",
+                      "next": ">",
+                    },
+                    "zeroRecords": "No applications fit these qualifications"
+                  },
+                "columnDefs": [
+
+                   {'targets': 0, "width": "5px !important", "orderable": false},
+                   {'targets': 1, "width": "5px !important"},
+                   {'targets': 2, "width": "15px !important"},
+                   {'targets': 3, "width": "15px !important"},
+                   {'targets': 4, "width": "10px !important"},
+                   {'targets': 5, "width": "50px !important"},
+                   {'targets': 6, "width": "50px !important"},
+                   {'targets': 7, "width": "40px !important"},
+                   {'targets': 8, "width": "20px !important"},
+                   {'targets': 9, "width": "30px !important" },
+                   // {'targets': 10,"width": "20px !important" },
+                             ],
+                
+                "autoWidth": false,
+                "orderCellsTop":true,
+                "processing":true,
+                "serverSide":true,
+                "deferRender":true,
+                "ordering": true,
+                "order": [
+                  [0, 'DESC']
+                 ],
+                 "orderClasses": false,
+                "info":true,
+                "paging":true,
+                "pageLength": 15,
+                "scrollX": true,
+                   "scrollY":false,
+                "ajax": {
+                   "url": url,
+                   "type":'post'
+                },
+                         "rowCallback": function( row, data, index ) {
+                      
+                     }
+         });
+
+          //DATE RANGE APPL DATE
+            $('i[name="icon-daterange10"]').on('apply.daterangepicker', function(ev, picker) { 
+                $('input[name="daterange10"]').val(picker.startDate.format('YYYY-MM-DD') + '|' + picker.endDate.format('YYYY-MM-DD')); 
+                $('#DisplaySelectedApplDate').html(picker.startDate.format('DD-MM-YY') + ' To <br>' + picker.endDate.format('DD-MM-YY'));
+                var dateindex = $('input[name="daterange10"]').parent().index();   //alert(dateindex);
+                var date = $('input[name="daterange10"]').val(); //alert(date);
+
+                tableHome
+                .column((dateindex )+ ':visible')
+                .search( date )
+                .draw();
+            });
+
+            //DATE RANGE ISSUE DATE
+            $('i[name="icon-daterange11"]').on('apply.daterangepicker', function(ev, picker) { 
+                $('input[name="daterange11"]').val(picker.startDate.format('YYYY-MM-DD') + ' | ' + picker.endDate.format('YYYY-MM-DD'));
+                $('#DisplaySelectedIssueDate').html(picker.startDate.format('DD-MM-YY') + ' To <br>' + picker.endDate.format('DD-MM-YY'));
+                var dateindex = $('input[name="daterange11"]').parent().index();   //alert(dateindex);
+                var date = $('input[name="daterange11"]').val(); //alert(date);
+
+                tableHome
+                .column((dateindex )+ ':visible')
+                .search( date )
+                .draw();
+            });
+
+            $('#searchDPWPublicHome input, select').on('keyup change', function(){
+                 tableHome
+                .column( ($(this).parent().index())+':visible' )
+                .search( this.value )
+                .draw();
+                     
+            });
+
+
+       
+
+      //Start-Issue Permit View
+      $("#DPWPublicHome tbody").on('click','.view_permit',function()
+      {  
+       
+
+            $('#liInspection').remove(); 
+            $('#lidivInspection').remove(); 
+
+
+          ApplicationId = $(this).data("application-id");
+          PermitId = $(this).data("permit-id");
+          Permitfile = $(this).data("permit-file");
+          PermiteditfileId = $(this).data("permit-editfile");
+          var DeptName = $(this).data("folderpath");
+          var DataId = $(this).data("data-id");
+          var TransactionId=$(this).data("transaction-id");
+          var TransName=$(this).data("transaction-name");
+          var TransFile=$(this).data("transaction-file");
+          transnameid0=TransName.replace(/ /g, "");
+          transnameid=transnameid0.replace(/\./g, "");
+          accordiondivid=transnameid+'accordion';
+
+          // $("#PublicHomePointer").css("display", "inline");
+          $(".table tbody tr").removeClass("active-row");
+          selectedRow=$(this).parent().find(".view_permit").data("id"); 
+          tableHome.draw(false);                               
+          tableHome.on( 'draw', function () {  
+            $('.app_data[data-id="' + selectedRow + '" ]').parent().parent().parent().addClass("active-row");
+          });
+          $(this).parent().parent().addClass("active-row");
+          accordionid=transnameid+'accordion';
+          frmname='frm'+transnameid;
+          $.ajax
+           ({
+            url:DeptName+"/"+Permitfile+"?application_id="+ApplicationId+"&permit_file="+$(this).parent().find(".view_app").data("permit-file"),
+            success:function(msg)
+             {
+              $("#view_application").html(msg);
+             }
+          });
+          $('#details_section').show();
+          if($("#li" + transnameid).length == 0){ 
+              $("#transtabs li").removeClass('active'); $('#li'+transnameid+'').addClass('active');
+              $("#tabcontents div").removeClass('active');
+              $('#transtabs').append('<li class="active activetranstabs" id="li'+transnameid+'"><a href="#lidiv'+transnameid+'" data-toggle="tab">'+TransName+'</a></li>');
+              $('#tabcontents').append('<div id="lidiv'+transnameid+'" class="tab-pane active activetranstabcontents" ><div class="panel-group accordion transaccordions" id="'+accordionid+'"></div></div>');
+          }
+          var loadUrl = DeptName+"/"+TransFile+"?application_id="+ApplicationId+"&permit_id="+PermitId+"&data_id="+DataId+"&transname="+transnameid+"&permit_file="+Permitfile+"&permit_editfile="+PermiteditfileId+"&TransactionId="+TransactionId;  
+          $("#"+accordionid).html('<div class="panel-body accordion-body"></div>');
+          $('#' + accordionid + ' .accordion-body').load(loadUrl);
+
+          var scrollHeight = $("#lidiv" + transnameid).offset().top;
+                        $('body,html').animate({
+                          scrollTop: scrollHeight
+                        });
+          
+       
+      });
+      // //End-Issue Permit View
+
+break;
+            // DPW End
+
+      }
+      //End-Datatable JS
+
+ 
+   
+     
+
+      // //Start-Inspection History
+      $(".table tbody").on('click','.view_Insp',function()
+      {
+
+
+         $('#liIssuePermit').remove();
+         $('#lidivIssuePermit').remove();
+         $('#liSignOff').remove();
+         $('#lidivSignOff').remove();
+         $('#liIssueCertificate').remove();
+         $('#lidivIssueCertificate').remove();
+         $('#liCertificateOfOccupancy').remove();
+         $('#lidivCertificateOfOccupancy').remove();
+         $('#liCertificateOfCompletion').remove();
+         $('#lidivCertificateOfCompletion').remove();
+         $('#liCertificateOfOccupancyC').remove();
+         $('#lidivCertificateOfOccupancyC').remove();
+            $('#liPayFee').remove();
+            $('#lidivPayFee').remove();
+         $('#lidivIssueCertificate').remove();
+
+          ApplicationId = $(this).data("application-id");
+          PermitId = $(this).data("permit-id");
+          Permitfile = $(this).data("permit-file");
+          PermiteditfileId = $(this).data("permit-editfile");
+          var DeptName = $(this).data("folderpath");
+          var DataId = $(this).data("data-id");
+          var TransactionId=$(this).data("transaction-id");
+          var PermitName=$(this).data("permit-name");
+          var TransName=$(this).data("transaction-name");
+          var TransFile="publicinspection.php";
+          transnameid0=TransName.replace(/ /g, "");
+          transnameid=transnameid0.replace(/\./g, "");
+          accordiondivid=transnameid+'accordion';
+
+          $("#PublicHomePointer").css("display", "inline");
+          $(".table tbody tr").removeClass("active-row");
+          selectedRow=$(this).parent().parent().parent().find(".view_permit").data("id"); 
+
+          tableHome.draw(false);                               
+          tableHome.on( 'draw', function () {  
+            $('.app_data[data-id="' + selectedRow + '" ]').parent().parent().parent().addClass("active-row");
+          });
+          $(this).parent().parent().addClass("active-row");
+          accordionid=transnameid+'accordion';
+          frmname='frm'+transnameid;
+          $.ajax
+           ({
+            url:DeptName+"/"+Permitfile+"?application_id="+ApplicationId+"&permit_file="+$(this).parent().find(".view_app").data("permit-file"),
+            success:function(msg)
+             {
+              $("#view_application").html(msg);
+             }
+          });
+          $('#details_section').show();
+          // alert(transnameid);
+          if($("#li" + transnameid).length == 0){ 
+              $("#transtabs li").removeClass('active'); $('#li'+transnameid+'').addClass('active');
+              $("#tabcontents div").removeClass('active');
+              $('#transtabs').append('<li class="active activetranstabs" id="li'+transnameid+'"><a href="#lidiv'+transnameid+'" data-toggle="tab">'+TransName+'</a></li>');
+              $('#tabcontents').append('<div id="lidiv'+transnameid+'" class="tab-pane active activetranstabcontents" ><div class="panel-group accordion transaccordions" id="'+accordionid+'"></div></div>');
+              
+          }
+          var loadUrl = TransFile+"?application_id="+ApplicationId+"&permit_id="+PermitId+"&data_id="+DataId+"&transname="+transnameid+"&permit_file="+Permitfile+"&permit_editfile="+PermiteditfileId+"&TransactionId="+TransactionId;  
+          $("#"+accordionid).html('<div class="panel-body accordion-body"></div>');
+          $('#' + accordionid + ' .accordion-body').load(loadUrl);
+
+          var scrollHeight = $("#lidiv" + transnameid).offset().top;
+          $('body,html').animate({
+            scrollTop: scrollHeight
+          });
+          
+       
+      });
+      // //End-Inspection History
+
+      //Start-View Application
+    $(".table tbody").on('click', '.view_app', function()
+    {
+        var permit_file = $(this).data("permit-file");
+        var permit_editfile = $(this).data("permit-editfile");
+        var $siblings = $(this).parent().siblings();
+        var DeptName = $(this).data("folderpath");
+        // alert(DeptName);
+        var selectedzba=($($siblings[6]).text());
+        var selected=($($siblings[8]).text());
+        var selectedboh=($($siblings[9]).text());
+        var selectedconcom=($($siblings[6]).text());
+
+        // if(selected=="Partially Submitted" || selectedboh=="Partially Submitted"  || selectedzba=="Partially Submitted" || selectedconcom=="Partially Submitted"  )
+        // {
+        //    $(".permit-list").addClass("col-md-12");
+        //    // $(".permit-list").removeClass("col-md-6half");
+        //    // $(".transaction").hide();
+        //    var scrollHeight = ($("#details_section").offset().top)-80;
+        //     $('body,html').animate({
+        //         scrollTop: scrollHeight
+        //     });
+        // }
+        // else
+        // {
+            $(".permit-list").removeClass("col-md-12");
+        // }
+
+        // SHOWING PERMIT VIEW FILES.
+        $.ajax({
+            url:   DeptName+'/'+ $(this).data("permit-file") + "?application_id=" + $(this).data("application-id") + "&permit_file=" + $(this).parent().find(".app_data").data("permit-file") + "&permit_editfile=" + permit_editfile+ "&PermitId=" + $(this).data("permit-id") ,
+            success: function(msg) {
+                $(".activetranstabs").remove();
+                $(".activetranstabcontents").remove();
+                $("#view_application").addClass('active');
+                $("#details_section").show();
+                $("#view_application").html(msg);
+                // $(".print_app").addClass("display-none");
+
+                var scrollHeight = ($("#details_section").offset().top)-80;
+            $('body,html').animate({
+                scrollTop: scrollHeight
+            });
+            }
+        })
+        
+
+        selectedRow=$(this).data("id"); 
+        tableHome.draw(false);
+        tableHome.on( 'draw', function () {
+            $('.app_data[data-id="' + selectedRow + '" ]').parent().parent().addClass("active-row");
+        }); 
+
+    });
+    //End-View Application
+
+    //Start-Attachment
+    $(".table tbody").on('click','.Attachmentclass',function(){
+
+        $(".table tbody tr").removeClass("active-row");
+        $(this).parent().parent().parent().addClass("active-row");
+        var ApplicationId=$(this).data("application-id");
+        selectedRow = $(this).data("id");
+        var FolderPath=$(this).data("folderpath");
+        $('#AttachmentModal').load(FolderPath+'/attachments.php?application_id='+ApplicationId+'&CurrDeptName='+CurrDeptName+'&source=history');
+    });
+    $('#AttachmentModal').on('hidden.bs.modal', function(e) {  
+        tableHome.draw(false);
+        tableHome.on('draw', function() {
+            $('.Attachmentclass[data-id="' + selectedRow + '" ]').parent().parent().parent().addClass("active-row");
+        });
+    });
+    //End-Attachment
+   
+
+    
+    
+
+    // //Start- GET APPLICATION TYPE,STATUS
+    $.ajax({
+
+       url:"controller/getvalues_controller.php",
+       data : {
+          action : "GetApplTypeStatus",
+          town_id : SelectedTownId
+
+       },
+       type: "POST",
+        success: function(response)
+         {                                  
+                var arr = $.parseJSON(response);  
+                $("#application_type").html("<option value='' >Select</option>");
+                
+                 for(var i=0;i<arr.ApplicationType.length;i++){
+                     var obj = arr.ApplicationType[i];
+                     var app_name = obj['AbbrName'];
+                     var app_id = obj['AutoId'];
+                    $("#application_type").append("<option value='"+app_id+"'' >"+app_name+"</option>");
+                 }
+                $("#application_status").html("<option value='' >Select</option>");
+                for(var i=0;i<arr.ApplicationStatus.length;i++){
+                    var obj = arr.ApplicationStatus[i];
+                    var app_status = obj['Status'];
+
+                    $("#application_status").append("<option value='"+app_status+"'' >"+app_status+"</option>");
+                }
+
+          }
+    });
+    // //Start- GET APPLICATION TYPE,STATUS
+
+
+        
+});
+
+
+    $('#tab-header-group a:first').tab('show')
+           
+   
+    $('#tab-header-group .tab-header').click(function(){
+      $("#details_section").hide();
+    });
+
+
+        
+});
+</script>
+</html>

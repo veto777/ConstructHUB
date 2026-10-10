@@ -1,0 +1,171 @@
+{
+  "help": "https://data.boston.gov/api/3/action/help_show?name=datastore_search_sql",
+  "success": true,
+  "result": {
+    "sql": "SELECT * FROM \"6ddcd912-32a0-43df-9908-63574f8c7e77\" WHERE permitnumber IS NOT NULL ORDER BY \"_id\" LIMIT 2 OFFSET 0",
+    "records": [
+      {
+        "_id": 1,
+        "_full_text": "'-04':45 '-10':39,40,46 '-2':52 '-71.06125000072386':67 '0':54 '00':48,49 '000.00':36 '02129':60 '04':47 '07':42 '1':51 '111431':62 '14':41 '2':61 '20':55 '200139000':63 '2019':38 '2020':44 '2963544.171922311':64 '2nd':17 '42.3792800000703':66 '5':35 '59':43 '73.00':37 '774712.5125123858':65 'a':5 'a1004007':1 'alt889295':15 'amend':14 'amendment':3 'and':22 'application':10 'charlestown':58 'closed':50 'code':32 'existing':16 'fam':53 'filed':12 'floor':18,29 'form':7 'frame':28 'framed':24 'framing':19 'intend':26 'is':11 'long':6 'ma':59 'micheal':33 'other':2,8 'polk':56 'rotten':21 'st':57 'this':9 'to':4,13,27,31 'tobin':34 'under':23 'up':30 'was':20 'we':25",
+        "permitnumber": "A1004007",
+        "worktype": "OTHER",
+        "permittypedescr": "Amendment to a Long Form",
+        "description": "Other",
+        "comments": "this application is filed to amend ALT889295 existing 2nd floor framing was rotten and under framed we intend to frame floor up to code\n\n;",
+        "applicant": "MICHEAL TOBIN",
+        "declared_valuation": "$5,000.00",
+        "total_fees": "$73.00",
+        "issued_date": "2019-10-10T14:07:59",
+        "expiration_date": "2020-04-10T04:00:00",
+        "status": "Closed",
+        "occupancytype": "1-2FAM",
+        "sq_feet": "0",
+        "address": "20 Polk ST",
+        "city": "Charlestown",
+        "state": "MA",
+        "zip": "02129",
+        "ward": "2",
+        "property_id": "111431",
+        "parcel_id": "200139000",
+        "gpsy": "2963544.171922311",
+        "gpsx": "774712.5125123858",
+        "y_latitude": "42.3792800000703",
+        "x_longitude": "-71.06125000072386"
+      },
+      {
+        "_id": 2,
+        "_full_text": "'-01':40,45,46 '-07':39 '-28':56 '-3':52 '-71.09889000065596':69 '0':54 '00':48,49 '02130':62 '05':47 '1':51 '1.00':36 '10':24 '11':63 '1101453000':65 '13':41 '2020':38 '2021':44 '26':55 '2939380.481732726':66 '32078':64 '42.313110000280076':68 '46':42 '56':43 '57.00':37 '764656.0375466347':67 'a':5 'a1007876':1 'alt915302':14,33 'amendment':3,10 'and':20 'as':25 'by':15,23 'carthy':35 'chilcott':57 'cost':28 'damien':34 'dormer':22 'enlarge':21 'fam':53 'form':7 'interior/exterior':8 'intext':2 'issued':12,31 'jamaica':59 'long':6 'ls':16 'ma':61 'of':18 'on':30 'open':50 'per':26 'permit':13,32 'pl':58 'plain':60 'plans':27 'reflected':29 'relocation':17 'to':4,11 'windows':19 'work':9",
+        "permitnumber": "A1007876",
+        "worktype": "INTEXT",
+        "permittypedescr": "Amendment to a Long Form",
+        "description": "Interior/Exterior Work",
+        "comments": "Amendment to issued permit ALT915302 by LS. Relocation of windows and enlarge dormer by 10\" as per plans. Cost reflected on issued permit ALT915302",
+        "applicant": "Damien Carthy",
+        "declared_valuation": "$1.00",
+        "total_fees": "$57.00",
+        "issued_date": "2020-07-01T13:46:56",
+        "expiration_date": "2021-01-01T05:00:00",
+        "status": "Open",
+        "occupancytype": "1-3FAM",
+        "sq_feet": "0",
+        "address": "26-28 Chilcott PL",
+        "city": "Jamaica Plain",
+        "state": "MA",
+        "zip": "02130",
+        "ward": "11",
+        "property_id": "32078",
+        "parcel_id": "1101453000",
+        "gpsy": "2939380.481732726",
+        "gpsx": "764656.0375466347",
+        "y_latitude": "42.313110000280076",
+        "x_longitude": "-71.09889000065596"
+      }
+    ],
+    "fields": [
+      {
+        "id": "_id",
+        "type": "int4"
+      },
+      {
+        "id": "_full_text",
+        "type": "tsvector"
+      },
+      {
+        "id": "permitnumber",
+        "type": "text"
+      },
+      {
+        "id": "worktype",
+        "type": "text"
+      },
+      {
+        "id": "permittypedescr",
+        "type": "text"
+      },
+      {
+        "id": "description",
+        "type": "text"
+      },
+      {
+        "id": "comments",
+        "type": "text"
+      },
+      {
+        "id": "applicant",
+        "type": "text"
+      },
+      {
+        "id": "declared_valuation",
+        "type": "text"
+      },
+      {
+        "id": "total_fees",
+        "type": "text"
+      },
+      {
+        "id": "issued_date",
+        "type": "timestamp"
+      },
+      {
+        "id": "expiration_date",
+        "type": "timestamp"
+      },
+      {
+        "id": "status",
+        "type": "text"
+      },
+      {
+        "id": "occupancytype",
+        "type": "text"
+      },
+      {
+        "id": "sq_feet",
+        "type": "numeric"
+      },
+      {
+        "id": "address",
+        "type": "text"
+      },
+      {
+        "id": "city",
+        "type": "text"
+      },
+      {
+        "id": "state",
+        "type": "text"
+      },
+      {
+        "id": "zip",
+        "type": "text"
+      },
+      {
+        "id": "ward",
+        "type": "numeric"
+      },
+      {
+        "id": "property_id",
+        "type": "numeric"
+      },
+      {
+        "id": "parcel_id",
+        "type": "numeric"
+      },
+      {
+        "id": "gpsy",
+        "type": "numeric"
+      },
+      {
+        "id": "gpsx",
+        "type": "numeric"
+      },
+      {
+        "id": "y_latitude",
+        "type": "numeric"
+      },
+      {
+        "id": "x_longitude",
+        "type": "numeric"
+      }
+    ]
+  }
+}

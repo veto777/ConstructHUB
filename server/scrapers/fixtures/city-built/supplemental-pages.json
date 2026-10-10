@@ -1,0 +1,65 @@
+[
+  {
+    "targetIndex": 209,
+    "url": "http://apps.alamance-nc.com/Inspections/Public/PermitSearch.aspx",
+    "httpStatus": 200,
+    "fixture": "alamance-search.html"
+  },
+  {
+    "targetIndex": 250,
+    "url": "https://app.lincoln.ne.gov/aspx/city/buildperm/default.aspx",
+    "httpStatus": 403,
+    "fixture": null,
+    "error": "/home/veto/ConstructHUB-codex-14/server/scrapers/polite-fetch.ts:69\n    if (attempt >= retries || res.status === 401) throw new PortalBlockedError(url, res.status);\n                                                        ^\n\n\nPortalBlockedError: Portal returned HTTP 403 for https://app.lincoln.ne.gov/aspx/city/buildperm/default.aspx\n    at politeFetch (/home/veto/ConstructHUB-codex-14/server/scrapers/polite-fetch.ts:69:57)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async <anonymous> (/home/veto/ConstructHUB-codex-14/server/scrapers/fixtures/city-built/probe.ts:18:17) {\n  url: 'https://app.lincoln.ne.gov/aspx/city/buildperm/default.aspx',\n  status: 403\n}\n\nNode.js v20.19.6\n"
+  },
+  {
+    "targetIndex": 254,
+    "url": "https://comdev.lyon-county.org/CitizenPortal/PermitUI/PermitSearch.aspx",
+    "httpStatus": 200,
+    "fixture": "lyon-search.html"
+  },
+  {
+    "targetIndex": 269,
+    "url": "https://cms.revize.com/revize/apps/polkcounty/searchbuildingpermit.php",
+    "httpStatus": 403,
+    "fixture": null,
+    "error": "/home/veto/ConstructHUB-codex-14/server/scrapers/polite-fetch.ts:69\n    if (attempt >= retries || res.status === 401) throw new PortalBlockedError(url, res.status);\n                                                        ^\n\n\nPortalBlockedError: Portal returned HTTP 403 for https://cms.revize.com/revize/apps/polkcounty/searchbuildingpermit.php\n    at politeFetch (/home/veto/ConstructHUB-codex-14/server/scrapers/polite-fetch.ts:69:57)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async <anonymous> (/home/veto/ConstructHUB-codex-14/server/scrapers/fixtures/city-built/probe.ts:18:17) {\n  url: 'https://cms.revize.com/revize/apps/polkcounty/searchbuildingpermit.php',\n  status: 403\n}\n\nNode.js v20.19.6\n"
+  },
+  {
+    "targetIndex": 262,
+    "url": "https://permittingservices.montgomerycountymd.gov/DPS/online/eSearch.aspx",
+    "httpStatus": 500,
+    "fixture": null,
+    "error": "/home/veto/ConstructHUB-codex-14/server/scrapers/city-built/http.ts:28\n            throw new Error(`Portal HTTP ${res.status}: ${url}`);\n                  ^\n\n\nError: Portal HTTP 500: https://permittingservices.montgomerycountymd.gov/DPS/online/eSearch.aspx\n    at PublicSession.request (/home/veto/ConstructHUB-codex-14/server/scrapers/city-built/http.ts:28:19)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async <anonymous> (/home/veto/ConstructHUB-codex-14/server/scrapers/fixtures/city-built/post.ts:2:294)\n\nNode.js v20.19.6\n"
+  },
+  {
+    "targetIndex": 512,
+    "url": "https://permits.losgatosca.gov/Building/Search-Records",
+    "httpStatus": 200,
+    "fixture": "losgatos-records.html"
+  },
+  {
+    "targetIndex": 555,
+    "url": "https://www.newmarketnh.gov/228/Online-Permitting",
+    "httpStatus": 200,
+    "fixture": "newmarket-search.html"
+  },
+  {
+    "targetIndex": 607,
+    "url": "https://discovery.cor.gov/public/permits/permitInquiry.nsf/index.html",
+    "httpStatus": 200,
+    "fixture": "richardson-inquiry.html"
+  },
+  {
+    "targetIndex": 399,
+    "url": "https://denisontx.gov/732/Search-Permits",
+    "httpStatus": 200,
+    "fixture": "denison-search.html"
+  },
+  {
+    "targetIndex": 268,
+    "url": "https://fasttrack.ocfl.net/OnlineServices/PermitsAllTypes.aspx",
+    "httpStatus": 200,
+    "fixture": "orange-search.html"
+  }
+]

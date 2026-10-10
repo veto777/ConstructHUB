@@ -1,0 +1,481 @@
+
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<meta name="viewport" content="initial-scale=1.0, width=device-width, minimum-scale=1.0, maximum-scale=1.0, user-scalable=0" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
+<title>Research Permits - City of Turlock (Building in Turlock\Building & Safety)</title>
+
+<link rel='stylesheet' href='/_css/robotofonts.css' type='text/css'>
+<link rel="stylesheet" href="/_css/flaticon.css" type="text/css">
+<link rel="stylesheet" href="/_css/magnific-popup.css">
+<link rel="stylesheet" href="/_css/formcontrols2.css">
+<link rel="stylesheet" href="/_css/styleturlock.css">
+<link rel="stylesheet" href="/_css/jquery.auto-complete.css">
+<script src="/_scripts/jquery.min.js"></script>
+<script src="/_scripts/jquery.auto-complete.min.js"></script>
+<style>
+.topHeader{
+    min-height: 290px;
+    background: linear-gradient( rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.85) ), url('/_images/buildinginturlock0.jpg');
+    background-repeat: no-repeat;
+    background-position: center center;
+    background-size: cover;
+    display: table-cell;
+    vertical-align: bottom;
+}
+</style>
+
+</head>
+
+<body>
+
+<header>
+<div id="pcm" style="display:none;">
+ <div class="container1130" style="position:relative;">
+  <div id="linksforresidents" class="pcmbutton">Links for Residents</div>
+<div id="PeopleMenu" style="position:absolute;top:112px;left:30px;width:calc(100% - 120px);border:8px solid white;border-radius:5px;display:none;padding:20px;">
+ <div id="menu1" style="max-width:30%;display:inline-block;vertical-align:top;padding-right:50px;">
+ </div>
+ <div id="menu2" style="max-width:60%;display:inline-block;vertical-align:top;padding-right:40px;">
+ </div>
+ <div id="menu3" style="max-width:60%;display:inline-block;vertical-align:top;">
+ </div>
+</div>
+  <div id="linksforbusinessesprofessionals" class="pcmbutton">Links for Businesses & Professionals</div>
+  <div id="pcmitems">
+  <div style="display:inline-block;width:7%;vertical-align:top;"></div>
+   <div style="display:inline-block;width:30%;vertical-align:top;">
+    <a href="/doingbusinesswithus/index.asp" class="rbt flaticon-men16">&nbsp; Doing Business with Us</a><br/>
+    <a href="/doingbusinessinturlock/index.asp" class="rbt flaticon-businessman88">&nbsp; Doing Business in Turlock</a><br/>
+    <a href="/capitalprojects/index.asp" class="rbt flaticon-worker5">&nbsp; Capital Projects</a><br/>
+    <a href="/cityfinancesbudget/index.asp" class="rbt flaticon-budget">&nbsp; City Finances & Budget</a><br/>
+    <a href="/workingforus/index.asp" class="rbt flaticon-business53">&nbsp; Working for Us</a><br/>
+    <a href="/specialevents/index.asp" class="rbt flaticon-calendar146">&nbsp; Special Events</a><br/>
+    <a href="/animalservices/index.asp" class="rbt flaticon-dog50">&nbsp; Animal Services</a><br/>
+   </div>
+   <div style="display:inline-block;width:30%;vertical-align:top;">
+    <a href="/buildinginturlock/index.asp" class="rbt flaticon-worker5">&nbsp; Building in Turlock</a><br/>
+    <a href="/watersewergarbageservice/index.asp" class="rbt flaticon-shower5">&nbsp; Water Sewer & Garbage</a><br/>
+    <a href="/neighborhoodissues/index.asp" class="rbt flaticon-home21">&nbsp; Neighborhood Issues</a><br/>
+    <a href="/parksfieldsbuildings/index.asp" class="rbt flaticon-park15">&nbsp; Parks, Fields & Buildings</a><br/>
+    <a href="/housingprograms/index.asp" class="rbt flaticon-real11">&nbsp; Housing Programs</a><br/>
+    <a href="/streetstraffic/index.asp" class="rbt flaticon-road22">&nbsp; Streets & Traffic</a><br/>
+    <a href="/transitservices/index.asp" class="rbt flaticon-transport19">&nbsp; Transit Services</a><br/>
+   </div>
+   <div style="display:inline-block;width:30%;white-space:nowrap;vertical-align:top;">
+    <a href="/policedepartment/index.asp" class="rbt flaticon-security51">&nbsp; Police Department</a><br/>
+    <a href="/firedepartment/index.asp" class="rbt flaticon-transport604">&nbsp; Fire Department</a><br/>
+    <a href="/recreation/index.asp" class="rbt flaticon-soccer19">&nbsp; Recreation</a><br/>
+    <a href="/education/index.asp" class="rbt flaticon-teacher4">&nbsp; Education</a><br/>
+    <a href="/government/index.asp" class="rbt flaticon-public6">&nbsp; Government</a><br/>
+    <a href="/aboutturlock/index.asp" class="rbt flaticon-map30">&nbsp; About Turlock</a><br/>
+	<a href="/government/elections/measureatransactionsandusetax.asp" class="rbt flaticon-budget">&nbsp; Measure A</a><br/>
+   </div>
+  </div>
+ </div>
+</div>
+
+<div id="searcharea" style="display:none;">
+ <div class="container1130">
+  <div style="padding-top:150px;text-align:center;">
+   <form action="/search/go.asp" method=post>
+    <input id=searchb type=text name=k style="width:70%;border:0px;border-bottom:3px solid #fff;background-color:#000;font:24px Roboto;color:white;">
+    <br/><br/>
+<script>
+$('#searchb').autoComplete({
+    minChars: 2,
+    source: function(term, response){
+        $.getJSON('/keywords.asp', { q: term }, function(data){ response(data); });
+    }
+});
+</script>
+    <div style="font:16px Roboto;">
+     <input name="searchplace" value="entiresite" type="radio" checked id="entiresite"><label for="entiresite"> Entire Site</label> &nbsp;&nbsp;&nbsp; 
+     <input name="searchplace" value="thissection" type="radio" id="thissection"><label for="thissection"> Building in Turlock Only</label><input type=hidden name="thissection" value="buildinginturlock"><input type=hidden name="thissection1" value="Building in Turlock"> &nbsp;&nbsp;&nbsp; 
+     <span id="othercategories" style="background:#333;cursor:pointer;padding:2px 8px 2px 8px;">Other Categories</span>
+    </div>
+    <div id="othercategoryitems" style="display:none;font:16px Roboto;padding:10px 0px 0px 0px;">
+     <input name="searchplace" type="radio" value="jobdescriptions" id="jobdescriptions"><label for="jobdescriptions"> Job Descriptions</label> &nbsp;&nbsp;&nbsp; 
+     <input name="searchplace" type="radio" value="councilmeetingdocs" id="councilmeetingdocs"><label for="councilmeetingdocs"> Council Meeting Docs</label> &nbsp;&nbsp;&nbsp; 
+     <input name="searchplace" type="radio" value="businesslicenses" id="businesslicenses"><label for="businesslicenses"> Business Licenses</label> &nbsp;&nbsp;&nbsp; 
+     <input name="searchplace" type="radio" value="municipalcode" id="municipalcode"><label for="municipalcode"> Municipal Code</label> &nbsp;&nbsp;&nbsp; 
+    </div>
+    <br/><br/>
+    <button type="submit">Search</button>
+   </form>
+   <div style="padding-top:50px;font:16px Roboto;line-height:22px;"><div style="font:20px Roboto;padding-bottom:30px;">Common searches</div>
+    <div class="searchitems">
+     <a href="/watersewergarbageservice/billspayments//">pay utility bill</a><br/>
+     <a href="/animalservices/shelteranimals/">adoptable animals</a><br/>
+     <a href="/watersewergarbageservice/waterconservation/landscapewateringdays.asp">landscape watering days</a><br/>
+     <a href="/streetstraffic/leafpickupprogram">leaf pickup days</a><br/>
+    </div>
+    <div class="searchitems">
+     <a href="/aboutturlock/phonenumbers">call the city</a><br/>
+     <a href="/watersewergarbageservice/waterconservation/landscapewateringdays.asp">landscape watering days</a><br/>
+    </div>
+   </div>
+  </div>
+ </div>
+</div>
+
+<iframe id="loginarea" style="display:none;padding:0px;overflow-y:scroll;"></iframe>
+
+
+
+<div id="top-pc" class="topHeader">
+ <div id="bmenubar" style=""></div>
+ <div class="container1130">
+  <div style="position:relative;">
+   <div id="section1">Building in Turlock</div>
+   
+   <div id="breadcrumbnew"><a href="/">Home</a> &nbsp;>&nbsp; <a href="/buildinginturlock">Building in Turlock</a> &nbsp;>&nbsp; <a href="/buildinginturlock/buildingsafety">Building & Safety</a> &nbsp;>&nbsp; <a href="/buildinginturlock/buildingsafety/buildingpermits">Building Permits</a> &nbsp;>&nbsp; Research Permits
+   </div>
+   
+   <div style="position:absolute;right: 365px;top:18px;" id="loginicontainer"><div id="loginicon" style="z-index:99;"></div></div>
+   <div style="position:absolute;right: 275px;" id="searchicontainer"><div id="searchicon" style="z-index:99;"></div></div>
+   <div style="position:absolute;right:130px;"><div id="pcmenubutton" style="z-index:100;text-shadow: 2px 2px rgba(0,0,0,0.3);"><div id="menuicon" style="margin-top:2px;"><span></span><span></span><span></span><span></span></div> MENU</div></div>
+   <div id="pcsb1" style="position:absolute;right:350px;"><div id="pcloginbutton" style="z-index:100;text-shadow: 2px 2px rgba(0,0,0,0.3);margin-left:-50px;padding-left:50px;">LOGIN</div></div>
+   <div id="pcsb" style="position:absolute;right:230px;"><div id="pcsearchbutton" style="z-index:100;text-shadow: 2px 2px rgba(0,0,0,0.3);margin-left:-50px;padding-left:50px;">SEARCH</div></div>
+   <div style="position:absolute;left:80px;"><div id="pccitylogo"><a href="/index.asp"><img alt="City of Turlock" src="/_images/whitelogo.svg" class="shadow" width=85></a></div></div>
+<style>
+.shadow {
+    /* Use -webkit- only if supporting: Chrome < 54, iOS < 9.3, Android < 4.4.4 */
+    -webkit-filter: drop-shadow( 0px 1px 1px #000 ); 
+            filter: drop-shadow( 0px 1px 1px #000 );
+}
+</style>
+   
+  </div>
+ </div>
+</div>
+
+
+<div id="mobilespacer"></div>
+<div id="top-mobile" style="position:fixed;top:0;left:0;width:100%;height:60px;z-index:99;">
+ <div style="position:fixed;top:16px;left:18px;"><img alt="Menu Button" src="/_images/mobile_menu.png" onclick="showglyph()"><div style="position:fixed;top:39px;left:22px;font:8px Roboto;color:white;text-shadow:2px 2px rgba(0,0,0,0.3);" onclick="showglyph()">MENU</div></div>
+ <div style="position:fixed;top:8px;left:calc(50% - 30px);"><img alt="City Logo" src="/_images/whitelogo.svg" width=60 class="shadow"></div>
+ <div style="position:fixed;top:15px;left:calc(100% - 42px);"><img alt="Search Button" src="/_images/mobile_search.png" onclick="showsearch()"><div style="position:fixed;top:39px;left:calc(100% - 42px);font:8px Roboto;color:white;text-shadow:2px 2px rgba(0,0,0,0.3);" onclick="showsearch()">SEARCH</div></div>
+ 
+ <div style="position:fixed;top:15px;left:calc(100% - 90px);"><a href="/_webaccounts/login.asp?showlogin=1" class="login"><img alt="Login Button" src="/_images/mobile_user.png"><div style="position:fixed;top:39px;left:calc(100% - 83px);font:8px Roboto;color:white;text-shadow:2px 2px rgba(0,0,0,0.3);">LOGIN</div></a></div>
+ 
+ <div style="position:fixed;top:60px;width:100%;height:3px;display:inline-block;opacity:0.4"></div>
+ <div id="searchbar" style="position:fixed;top:60px;height:40px;width:100%;background-color:#333333;display:none;z-index:99;"><form action="/search/go.asp" id="search_form" method="post" style="margin:0"><input autocomplete="off" type="text" id="searchbm" name="k" style="font:16px Roboto;padding:4px;margin-top:5px;margin-left:18px;width:calc(100% - 102px);-webkit-appearance:none; border-radius: 0;"><input type="submit" name="commit" value="SEARCH" style="background-color:black;color:white;font:12px Roboto;border:1px solid black;padding:5px;height:32px;-webkit-appearance:none; border-radius: 0;"></form></div>
+ <script>
+  function showglyph() {
+   $("#glyphs").fadeToggle(200);
+   $("#searchbar").hide();
+  }
+  function showsearch() {
+   $("#glyphs").hide();
+   $("#searchbar").slideToggle(200);
+   $("#searchtext").focus();
+  }
+$('#searchbm').autoComplete({
+    minChars: 2,
+    source: function(term, response){
+        $.getJSON('/keywords.asp', { q: term }, function(data){ response(data); });
+    }
+});
+
+ </script>
+ <section id="glyphs" style="display:none;z-index:99;">
+  <div class="glyph"><a href="/doingbusinesswithus"><div class="glyph-icon flaticon-men16"></div>Doing Business with Us</a></div>
+  <div class="glyph"><a href="/doingbusinessinturlock"><div class="glyph-icon flaticon-businessman88"></div>Doing Business in Turlock</a></div>
+  <div class="glyph"><a href="/capitalprojects"><div class="glyph-icon flaticon-worker5"></div>Capital Projects</a></div>
+  <div class="glyph"><a href="/cityfinancesbudget"><div class="glyph-icon flaticon-budget"></div>City Finances & Budget</a></div>
+  <div class="glyph"><a href="/workingforus"><div class="glyph-icon flaticon-business53"></div>Working for Us</a></div>
+  <div class="glyph"><a href="/specialevents"><div class="glyph-icon flaticon-calendar146"></div>Special Events</a></div>
+  <div class="glyph"><a href="/animalservices"><div class="glyph-icon flaticon-dog50"></div>Animal Services</a></div>
+  <div class="glyph"><a href="/buildinginturlock"><div class="glyph-icon flaticon-worker5"></div>Building in Turlock</a></div>
+  <div class="glyph"><a href="/watersewergarbageservice"><div class="glyph-icon flaticon-shower5"></div>Water Sewer & Garbage</a></div>
+  <div class="glyph"><a href="/neighborhoodissues"><div class="glyph-icon flaticon-home21"></div>Neighborhood Issues</a></div>
+  <div class="glyph"><a href="/parksfieldsbuildings"><div class="glyph-icon flaticon-park15"></div>Parks, Fields & Buildings</a></div>
+  <div class="glyph"><a href="/housingprograms"><div class="glyph-icon flaticon-real11"></div>Housing Programs</a></div>
+  <div class="glyph"><a href="/streetstraffic"><div class="glyph-icon flaticon-road22"></div>Streets & Traffic</a></div>
+  <div class="glyph"><a href="/policedepartment"><div class="glyph-icon flaticon-security51"></div>Police Department</a></div>
+  <div class="glyph"><a href="/firedepartment"><div class="glyph-icon flaticon-transport604"></div>Fire Department</a></div>
+  <div class="glyph"><a href="/recreation"><div class="glyph-icon flaticon-soccer19"></div>Recreation</a></div>
+  <div class="glyph"><a href="/education"><div class="glyph-icon flaticon-teacher4"></div>Education</a></div>
+  <div class="glyph"><a href="/transitservices"><div class="glyph-icon flaticon-transport19"></div>Transit Services</a></div>
+  <div class="glyph"><a href="/government"><div class="glyph-icon flaticon-public6"></div>Government</a></div>
+  <div class="glyph"><a href="/aboutturlock"><div class="glyph-icon flaticon-map30"></div>About Turlock</a></div>
+  <div class="glyph"><a href="/government/elections/measureatransactionsandusetax.asp"><div class="glyph-icon flaticon-budget"></div>Measure A</a></div>
+ </section>
+</div>
+
+</header>
+
+<div class="container1130">
+
+
+
+
+
+<div style="background-color:#ffffff;padding:10px;">
+<div class="click-nav noindex" id="clicknav">
+ <ul class="no-js">
+  <li><a class="clicker">Building in Turlock Menu</a>
+    <ul>
+  <li class=""><a href="/buildinginturlock/onlinepayments">Online Payments</a></li>
+  <li class=""><a href="/buildinginturlock/buildingsafety">Building & Safety</a></li>
+  <li class=" clicknavsel lsub"><a href="/buildinginturlock/buildingsafety/buildingpermits">Building Permits</a></li>
+  <li class="lsub2"><a href="/buildinginturlock/buildingsafety/buildingpermits/onlinepermits.asp">Online Permits</a></li>
+  <li class=" clicknavsel lsub2"><a href="/buildinginturlock/buildingsafety/buildingpermits/researchpermits.asp">Research Permits</a></li>
+  <li class="lsub2"><a href="/buildinginturlock/buildingsafety/buildingpermits/unpermittedconstruction.asp">Unpermitted Construction</a></li>
+  <li class="lsub2"><a href="/buildinginturlock/buildingsafety/buildingpermits/residentialsolar.asp">Residential Solar</a></li>
+  <li class="lsub"><a href="/buildinginturlock/buildingsafety/planreview.asp">Plan Review</a></li>
+  <li class="lsub"><a href="/buildinginturlock/buildingsafety/inspections">Inspections</a></li>
+  <li class="lsub"><a href="/buildinginturlock/buildingsafety/currentcodedesigncriteria.asp">Current Code & Design Criteria</a></li>
+  <li class="lsub"><a href="/buildinginturlock/buildingsafety/ADU.asp">ADU Pre-Drawn Plans</a></li>
+  <li class="lsub"><a href="/buildinginturlock/buildingsafety/postentitlementpermits">Post Entitlement Permits</a></li>
+  <li class=""><a href="/buildinginturlock/planninglandusepermitting">Planning & Land Use Permitting</a></li>
+  <li class=""><a href="/buildinginturlock/landdevelopment">Land Development</a></li>
+  <li class=""><a href="/buildinginturlock/predevelopmentmeetings">Predevelopment Meetings</a></li>
+  <li class=""><a href="/buildinginturlock/developmentimpactfees">Development Impact Fees</a></li>
+  <li class=""><a href="/buildinginturlock/developmentfeeestimate">Development Fee Estimate</a></li>
+  <li class=""><a href="/buildinginturlock/landscaping">Landscaping</a></li>
+
+    </ul>
+  </li>
+ </ul>
+</div>
+</div>
+	
+<!-- jQuery -->
+<script>
+$(function() {
+	// Clickable Dropdown
+	$('.click-nav > ul').toggleClass('no-js js');
+	$('.click-nav .js ul').hide();
+	$('.click-nav .js').click(function(e) {
+		$('.click-nav .js ul').slideToggle(200);
+		$('.clicker').toggleClass('active');
+		e.stopPropagation();
+	});
+	$(document).click(function() {
+		if ($('.click-nav .js ul').is(':visible')) {
+			$('.click-nav .js ul', this).slideUp();
+			$('.clicker').removeClass('active');
+		}
+	});
+
+
+});
+</script>
+	
+
+<div class="main noindex">
+<div id="sbar">
+ <ul>
+  <li class="nav-item-heading"><a href="/buildinginturlock/onlinepayments">Online Payments</a></li>
+  <li class="nav-item-heading"><a href="/buildinginturlock/buildingsafety">Building & Safety</a></li>
+  <li class=" sbarsel"><a href="/buildinginturlock/buildingsafety/buildingpermits">Building Permits</a></li>
+  <li class="nav-item-sub"><a href="/buildinginturlock/buildingsafety/buildingpermits/onlinepermits.asp">Online Permits</a></li>
+  <li class="nav-item-sub sbarsel"><a href="/buildinginturlock/buildingsafety/buildingpermits/researchpermits.asp">Research Permits</a></li>
+  <li class="nav-item-sub"><a href="/buildinginturlock/buildingsafety/buildingpermits/unpermittedconstruction.asp">Unpermitted Construction</a></li>
+  <li class="nav-item-sub"><a href="/buildinginturlock/buildingsafety/buildingpermits/residentialsolar.asp">Residential Solar</a></li>
+  <li class=""><a href="/buildinginturlock/buildingsafety/planreview.asp">Plan Review</a></li>
+  <li class=""><a href="/buildinginturlock/buildingsafety/inspections">Inspections</a></li>
+  <li class=""><a href="/buildinginturlock/buildingsafety/currentcodedesigncriteria.asp">Current Code & Design Criteria</a></li>
+  <li class=""><a href="/buildinginturlock/buildingsafety/ADU.asp">ADU Pre-Drawn Plans</a></li>
+  <li class=""><a href="/buildinginturlock/buildingsafety/postentitlementpermits">Post Entitlement Permits</a></li>
+  <li class="nav-item-heading"><a href="/buildinginturlock/planninglandusepermitting">Planning & Land Use Permitting</a></li>
+  <li class="nav-item-heading"><a href="/buildinginturlock/landdevelopment">Land Development</a></li>
+  <li class="nav-item-heading"><a href="/buildinginturlock/predevelopmentmeetings">Predevelopment Meetings</a></li>
+  <li class="nav-item-heading"><a href="/buildinginturlock/developmentimpactfees">Development Impact Fees</a></li>
+  <li class="nav-item-heading"><a href="/buildinginturlock/developmentfeeestimate">Development Fee Estimate</a></li>
+  <li class="nav-item-heading"><a href="/buildinginturlock/landscaping">Landscaping</a></li>
+
+ </ul>
+</div>
+
+
+
+
+
+
+
+
+
+
+<article>
+
+
+
+<div id="mcont">
+<h1>Research Permits</h1>
+
+
+
+
+
+
+<style>
+.tabon {background-color:#555555;color:#EEEEEE; padding:10px 35px 10px 35px; margin-bottom:10px;}
+.taboff {background-color:#EEEEEE;color:#999999; padding:10px 35px 10px 35px; margin-bottom:10px;}
+</style>
+
+<h3>Building Permit Archive / Research</h3>
+
+This system allows you to view the details of building permits issued within the City of Turlock.  Should you require additional information or have any questions, please contact the Building & Safety Division (209) 668-5560.
+<br/><br/>
+<b>NOTE:</b> The City of Turlock assumes no liability for any errors, omissions, or inaccuracies in the information provided regardless of how caused, or any decision made or action taken or not taken by the user in reliance upon any information or data furnished hereunder. By using this tool, the user accepts and agrees to the conditions of use listed above.
+<br/><br/>
+
+<br/>
+
+<a href="researchpermits.asp" style="text-decoration:none;"><span class="tabon">Search by Address</span></a><a href="researchpermits_apn.asp" style="text-decoration:none;"><span class="taboff">Search by APN</span></a>
+<br/>
+<div style="border:1px solid #555555; padding:15px;">
+
+
+
+
+
+ To search for building permits for a particular address, please complete following fields.
+<br/><br/>
+
+ <form action="researchpermits.asp" method=post name=searchform>
+ <div class="controls">
+  <input id="streetnumber" type="text" name="streetnumber" class="floatLabel" maxlength=6>
+  <label for="streetnumber">Street Number</label>
+  <input id="streetname" type="text" name="streetname" class="floatLabel" style="text-transform: uppercase;">
+  <label for="streetname">Street Name</label>
+<button type="submit">Search building permits</button>
+ </div>
+ </form>
+
+<script>
+$('#streetname').autoComplete({
+                minChars: 1,
+                source: function(term, suggest){
+                    term = term.toLowerCase();
+                    var choices = ["A ST","ABBEY CT","ABIGAIL LN","ACME CT","ADAMS ST","ADDISON DR","ADRIAN ST","AHERN CT","AHLEM WAY","AKRON DR","ALASKA ST","ALBA CT","ALBOROUGH CT","ALDERSGATE CT","ALEX CIR","ALEX WAY","ALEXANDER CT","ALFREDA ST","ALLEN WAY","ALMOND AVE","ALPHA RD","ALTA VISTA ST","AMBERWOOD LN","AMETHYST WAY","ANDINO CT","ANDLEMAN CT","ANDRE LN","ANDREWS CT","ANGELUS CT","ANGELUS ST","ANNHURST AVE","ANNING DR","ANTHOLOGY ST","APPLE BLOSSOM LN","APPLE LN","APTOS DR","ARABIAN WAY","ARAKELIAN WAY","ARBOR WAY","ARCADIAN DR","ARLINDA CT","ARLINGTON CT","ARTHUR MACE DR","ARTISAN WAY","ASBURY CT","ASH RD","ASHBROOK LN","ASHFORD DR","ASHLAND AVE","ASHLAND CT","ASHLEY CT","ASHTON CT","ASPENWOOD DR","ASTI CT","ATHERSTONE RD","ATLANTA CT","AUGSBURG CT","AUGUSTA PLACE","AUSTIN DAVID WAY","AUTO MALL DR","AUTUMN MOON WAY","AVATAR CT","AVERY CT","AZUSA CT","B ST","BACKUS LN","BALL CT","BARBARA WAY","BARDINI WAY","BARNUM CT","BARON CT","BATES CT","BATES WAY","BAXTER RD","BAYLOR AVE","BAYWOOD LN","BEL AIR CT","BELHAVEN PL","BELL ST","BELLEVUE CT","BENJAMIN WAY","BENNINGTON AVE","BENTLEY DR","BEREA CT","BEREA DR","BERNELL AVE","BERRY DR","BESSEMER ST","BETHANY AVE","BETHPAGE ST","BILTMORE DR","BIRCHWOOD WAY","BIRD ROCK PL","BITTERN WAY","BLACK OAK ST","BLACKBURN CT","BLEVINS CT","BLEVINS WAY","BLOSSOM DR","BLUE OAK CT","BLUEFIELD AVE","BLUETHROAT DR","BLUSH CT","BONITA AVE","BOSTON CT","BOTHUN RD","BOURANG WAY","BOXWOOD WAY","BRADLEY AVE","BRANDING IRON DR","BREDENBERG LN","BRENDA WAY","BRENT CT","BREVARD LN","BRIAN LN","BRIDGEPORT CT","BRIER RD","BRISA LN","BRISTOL PARK CIR","BRONCO CT","BROOKS CT","BROOKSTONE DR","BRUCE LN","BRYCE AVE","BUCKNELL ST","BUCKSKIN WAY","BUNGALOW LN","BURGENLAND AVE","BURMAN DR","BUTTE WAY","BUTTON CT","C ST","CAHILL AVE","CAJUN CT","CALI LIN CT","CALIDA WAY","CALIFORNIA AVE","CALLISTO LN","CAMBRIDGE CT","CAMELLIA ST","CAMPBELL WAY","CANDLESTICK CT","CAPRICE DR","CAPURSO DR","CARLEEN CT","CARLETON DR","CARMICHAEL WAY","CARNEGIE ST","CARNIVAL DR","CAROLYN DR","CARRIAGE CT","CARRIGAN ST","CARROUSEL CT","CASE WAY","CASEY RAY CT","CASTILE CT","CASTILE LN","CASTLEVIEW DR","CASTOR ST","CASUAL LN","CEDAR RIDGE DR","CELEBRATION LN","CHAKKAR ESTATES DR","CHANDLER DR","CHARLES PL","CHATSWORTH CT","CHELSEA PL","CHERISH CT","CHEROKEE CT","CHERRY BLOSSOM LN","CHESTNUT ST","CHRIS LN","CHRISTINE WAY","CIRCUS CT","CLARA DR","CLARK ST","CLAYTON RD","CLEAR WATER COVE","CLEMSON CT","CLIFFORD AVE","CLOTILDE CT","CLOVER DR","COCOA ST","CODY CT","COLBY AVE","COLE AVE","COLLEGEVIEW DR","COLORADO AVE","COLORADO AVE","COLUMBIA ST","COMMERCE WAY","CONTI CT","COOPER AVE","CORELLO ST","CORI CT","CORNELL DR","CORTA VISTA","COTTONWOOD ST","COUNTRY LN","COUNTRY WALK LN","COUNTRYSIDE DR","COUNTRYSIDE DR","CRAFTSMAN ST","CRAIG CT","CRANE AVE","CREDENCE CT","CRIMSON WAY","CROSSBILL WAY","CROWELL RD","CROWLEY DR","CRUSHER AVE","CRYSTAL CT","CUMBERLAND DR","CURT CT","CURTION AVE","CYPRESS POINT DR","D ST","DAFFODIL LN","DALARNA CT","DALARNA WAY","DANCER WAY","DANNY AVE","DAUBENBERGER RD","DAVIS ST","DAWN WAY","DE PAUW DR","DEANNA CT","DEDICATION DR","DEEP SEA LN","DELAWARE CT","DELBON AVE","DELIA CT","DELS LN","DELTA CT","DEMIE CT","DESTINY DR","DEWAR LN","DIANNE DR","DIFANI PL","DIVANIAN DR","DOMINGO CT","DONNELLY PARK DR","DONOVAN WAY","DOO CT","DORAL WAY","DOW ST","DRAFT CT","DREW AVE","DREXEL AVE","DUKE CT","DUQUESNE WAY","E AVE MP2","E CANAL DR","E CHAMBERLAIN DR","E CHRISTOFFERSEN PKWY","E F ST","E GLENWOOD AVE","E GREENWAY AVE","E HAWKEYE AVE","E HAWKEYE AVE","E LINWOOD AVE","E MAIN ST","E MARSHALL ST","E MINNESOTA AVE","E MONTE VISTA AVE","E MONTE VISTA AVE","E MONTE VISTA AVE","E OLIVE AVE","E SPRINGER DR","E SYRACUSE AVE","E TAYLOR RD","E TUOLUMNE RD","E ZEERING RD","EAGLEGLEN AVE","EARLHAM DR","EAST AVE","EBE'S CT","EDDO WAY","EDGEWATER DR","EDGEWOOD DR","EDWARD DR","EIGHTH ST","EL CAMINO DR","EL CAPITAN DR","EL DORADO WAY","EL JACINTO CT","EL PASEO","ELDERWOOD AVE","ELENA CT","ELIZABETH WAY","ELLERD DR","ELLESMERE CT","ELMCREST CT","ELMWOOD CT","ELON CT","EMERALD WAY","EMILY ST","EMPRESS LN","ENCHANTMENT LN","ENCLAVE DR","ENGLISH AVE","ENTERTAINMENT WAY","ERICK WAY","ERIN WAY","ESCENA CT","ESCONDIDO","ESPERANZA CT","ESTATES DR","ESTRELLA WAY","ETHAN ALLEN CT","ETHAN ALLEN LN","EUREKA DR","EVELLE LN","EVERGREEN LN","EXETER LN","EXPEDITION ST","EXPLORER WAY","FAIRBANKS RANCH RD","FAIRVALE CT","FALCON CREST WAY","FALCONGLEN CT","FALL CREEK CT","FALLBROOK LN","FANTASY CT","FARR ST","FEARLENE AVE","FEATHERMINT LN","FEDERATION CT","FENN CT","FERNWOOD DR","FERREIRA RANCH DR","FESTIVAL LN","FIELD DR","FIFTH ST","FILMORE WAY","FIRESIDE DR","FISK CT","FLORENCE ST","FLOWER ST","FLOWERGLEN AVE","FOREST DR","FOSBERG RD","FOUR SEASONS DR","FOURTH ST","FOXTAIL CT","FRAGO CT","FRANCIS SCOTT WAY","FRANK'S CT","FRANSIL LN","FREEDOM CT","FREEWAY/REST STOP","FREITAS CT","FREITAS PARK","FRENCH CT","FULKERTH RD","FULLERTON DR","G ST","GABRIEL ST","GAIL AVE","GALA CT","GALLERY CT","GARDEN CT","GARDEN GATE WAY","GARDEN LN","GARFIELD LN","GARY ST","GARZELLIS WAY","GEER RD","GEER RD","GEMSTONE WAY","GEORGETOWN AVE","GEORGIA WAY","GERALD CT","GETTYSBURG ST","GIKAS LN","GLASGOW ST","GLEN HAVEN CT","GLENVILLE CT","GLIMMER LN","GLORY ST","GOLD DR","GOLDEN OAK CT","GOLF RD","GOMES LN","GRAND OAK CT","GRANDVIEW CIR","GRANT AVE","GRAYWOLF CIR","GREELEY CT","GREENBORO ST","GREENFIELD DR","GREENHILLS DR","GREENHOUSE WAY","GREENWAY AVE","GREENWOOD LN","GRIFFIN RD","GRILLOS DR","GUATAVITA DR","H ST","HACIENDA DR","HAMILTON ST","HAMMOND DR","HAMPTON WAY","HANOVER AVE","HARDING RD","HARTLEY LN","HARTVICKSON DR","HARTWICK AVE","HARVEST DR","HARVEST PARK DR","HAVERFORD DR","HAYES DR","HAYFIELD CT","HEARTLAND WAY","HEATHERNOEL WAY","HEDSTROM RD","HEDSTROM RD","HEIRLOOM CT","HELEN DR","HENRY WAY","HEPPNER WAY","HERITAGE WAY","HIDDEN SPRINGS CT","HIGH ST","HILDA CT","HILLSDALE DR","HIRAM CT","HOBBY CT","HOGAN DR","HOLLAND DR","HOMER WAY","HOMESTEAD WAY","HONEYCREEPER DR","HOOD CT","HOPE CT","HORIZON CT","HOTEL DR","HUGHES CT","HUMBOLT CT","HUMPHREY CT","HYSELL CT","I ST","IMAGES CT","IMPRESSION ST","IMPULSE LN","INDEPENDENCE DR","INDUSTRIAL ROWE","INSPIRATION WAY","IRONWOOD DR","ISAAC WAY","IVANHOE LN","IVORY LN","JACKSON CT","JACQUELINELEE DR","JAMES LN","JANELLE LN","JANIE CT","JASMINE CT","JASON DR","JEANNIE CT","JEFFERSON ST","JENSEN PL","JESSICA ST","JOETT DR","JORDAN AVE","JORGE CT","JOYNICHOLE DR","JUBILEE DR","JUDD LN","JULEP WAY","JULIAN ST","JULIE AVE","JUSTICE CT","JUSTIN DR","KALLAND CT","KAREN WAY","KATELYN ST","KATHERINE CT","KATIE WAY","KAY CIR","KEENE CT","KELLOGG AVE","KENDRA CT","KENNETH DR","KENSINGTON CT","KENWOOD AVE","KERLEY LN","KEVIN WAY","KIMBERLY SHEA DR","KINGS CT","KINSHIP DR","KIRKES DR","KIRKLAND CT","KIRKSEY DR","LA JUNTA CT","LA LINDA CT","LA MANCHA PL","LA PALOMA ST","LA ROSA CT","LA SALLE DR","LA SIESTA CT","LA SOMBRA CT","LACY WAY","LAMAR CT","LAMBERT WAY","LANDER AVE","LANE ST","LANTANA WAY","LAPWING WAY","LARCHWOOD CT","LARKSPUR PL","LAS DALIAS CT","LASITER LN","LATOUR CT","LAUREL WALK","LAUREN CIR","LAVON NEW LN","LAZARINE CT","LEDWITH CT","LEE AVE","LEERAE CT","LEFFLER PL","LEGACY LN","LEMONGRASS ST","LEPIN LN","LEW LN","LEWIS ST","LEXINGTON AVE","LIAL CT","LIBERTY CT","LIBERTY SQUARE PKWY","LILY LN","LIMESTONE RD","LINCOLN AVE","LINDA VISTA","LINDEN LN","LINFIELD CT","LINN CT","LIRIO DR","LITTLE ST","LOCH LOMOND CT","LOCUST ST","LOGAN LN","LORI CT","LOYOLA WAY","LUKAS ST","LUMINA LN","LYNBOROUGH CT","LYONS AVE","MACIE WAY","MADELYNNE CT","MADISON LN","MAE ST","MAGNOLIA DR","MAJESTIC CT","MALLARD CT","MANZANITA WAY","MAPLE ST","MARGOT LN","MARIE DR","MARK CT","MARKET ST","MARLEE DR","MARSHAL","MARSHALL ST","MARSTON CT","MARTINEZ ST","MARYANN DR","MAYFAIRE DR","MC CORMICK ST","MC KENNA DR","MC KINLEY PL","MC NEFF DR","MEADOW LARK DR","MEADOWBROOK LN","MEADOWMONT LN","MEANDERING LN","MEDEIROS RD","MELLO CT","MEMORY LN","MENLO DR","MERCHANT LN","MERION DR","MERRIMENT CT","MERRITT ST","MESSENGER CT","MICHAEL WAY","MICHELLE LYNN CT","MIDSUMMER LN","MILANO CT","MILANO WAY","MILES CT","MILESTONE WAY","MILHOUS ST","MILL ST","MILLERTON WAY","MILLSTREAM LN","MINARET AVE","MINERVA ST","MIRA FLORES DR","MIRAGE DR","MISSION ST","MITCHELL AVE","MONARCH CT","MONOGRAM CT","MONROE AVE","MONTANA AVE","MONTARA DR","MONTREUX WAY","MOON ROSE CT","MOONBEAM WAY","MOONEYHAM CT","MORNING DEW CT","MORNING STAR CT","MOTIF CT","MOUNTAIN SPRINGS DR","MOUNTAIN VIEW RD","MOUNTAIN VIEW RD","MULBERRY DR","MUMMS WAY","MURPHY DR","MURRAY ST","MUSTANG CT","MYERS WAY","MYRTLE ST","N BEECH ST","N BERKELEY AVE","N BERKELEY AVE","N BROADWAY","N CENTER ST","N CLINTON RD","N DAUBENBERGER RD","N DAUBENBERGER RD","N DENAIR AVE","N DENAIR AVE","N FIRST ST","N FRONT ST","N GOLDEN STATE BLVD","N GOLDEN STATE BLVD","N JOHNSON RD","N JOHNSON RD","N KILROY RD","N KILROY RD","N LAUREL ST","N OLIVE AVE","N OLIVE AVE","N ORANGE ST","N PALM ST","N QUINCY RD","N QUINCY RD","N SODERQUIST RD","N TEGNER RD","N TEGNER RD","N THOR ST","N TULLY RD","N WALNUT RD","N WALNUT RD","N WARING RD","N WASHINGTON RD","NADIA CT","NATE PLACE","NATHAN CT","NAVY LN","NEWCOMB AVE","NEWTON CT","NIAGRA ST","NICKLAUS DR","NICOLE CT","NICOLE CT","NIEL AVE","NIKKI ANN WAY","NINTH ST","NOBLE LN","NODA AVE","NORDIC WAY","NORTH AVE","NORTH HIGHLANDS AVE","NORTH PARK CT","NORTHSIDE CT","NORTHWESTERN CT","NOTTINGHAM PL","OAK CREST DR","OAK ST","OAK VIEW CT","OAKFIELD DR","OGDEN WAY","OLD ROSE LN","OLD VINEYARD RD","OLEANDER LN","OLYMPIC DR","OPPELT WAY","ORCHARD ST","ORCHID LN","ORO VISTA","OXFORD AVE","OXFORD CT","PACER WAY","PACIFIC GROVE CT","PADDOCK LN","PAISLEY LN","PALACE CT","PALACIA CT","PALMER DR","PANORAMA AVE","PARK ST","PARKSIDE CT","PARNELL AVE","PARQUET WAY","PASADERA WAY","PASEO BELLEZA","PASEO DE LEON","PASEO DEL SOL","PASEO ENTRADA","PASTORAL AVE","PATCHWORK CT","PATHWAY LN","PAULA CT","PAULSON RD","PAVILLION WAY","PAYNE WAY","PEACE WAY","PEACOCK DR","PECAN WAY","PEDRAS RD","PENN AVE","PEONY LN","PEPPERCORN DR","PEPPERRIDGE DR","PERNET CT","PERSIAN LN","PERSIMMON RD","PICARD CT","PICARD LN","PICCADILLY LN","PIEDMONT AVE","PIN OAK CT","PINE VALLEY CT","PINEHURST DR","PINEWOOD ST","PINTO WAY","PIONEER AVE","PIRO CT","PLUMWOOD CT","POLK AVE","POLO CT","POLOUS DR","POLYVIEW DR","POMONA CT","PORSCHE STRASSE","PORTER WAY","PORTO FINO ST","POST OAK DR","POTOMAC AVE","POWERS CT","PRAIRIE FALCON WAY","PRIMROSE LN","PRINCETON CT","PROVIDENCE LN","PROVO ST","PURPLE SAGE LN","PUTNAM CT","QUAIL CT","QUARTO DR","QUEENSLAND AVE","RACE ST","RADCLIFFE WAY","RADFORD WAY","RADIO ST","RAINER WAY","RALEIGH CT","RAMIN DR","RAMSON DR","RAY CT","RED OAK CT","REDBUD LN","REDHAWK CIR","REDHILL WAY","REDPOLL CT","REEF POINT DR","REFLECTION AVE","REGAL CT","REGIS ST","REINHOLZ AVE","RETREAT DR","REXHAM CT","RICE AVE","RICHARD ST","RIVIERA WAY","ROANOKE CT","ROBBIN WAY","ROBERTS RD","ROCHELLE AVE","ROCHESTER CT","ROCKFORD WAY","ROCKHURST LN","ROCKWOOD AVE","ROHRER DR","ROMEO LN","RONDEE LN","ROSE GARDEN WAY","ROSE ST","ROSEBOROUGH CT","ROSENTHAL DR","ROSEWOOD DR","ROTH CT","ROTH WAY","ROTHBURY CT","ROYAL WOOD LN","RUBLE RD","RUNYAN DR","RUTGERS AVE","RYKER CT","S BEECH ST","S BERKELEY AVE","S BROADWAY","S CENTER ST","S COMMONS RD","S DAUBENBERGER RD","S DENAIR AVE","S FIRST ST","S GOLDEN STATE BLVD","S JOHNSON RD","S KILROY RD","S LAUREL ST","S MINARET AVE","S ORANGE ST","S PALM ST","S PAULSON RD","S QUINCY RD","S ROSE ST","S SODERQUIST RD","S TEGNER RD","S THOR ST","S TULLY RD","S WALNUT AVE","S WALNUT RD","S WASHINGTON RD","SAGE WAY","SAI LN","SALEM WAY","SALLY PL","SAN JOAQUIN ST","SANDPIPER CIR","SANDSTONE ST","SANDY WAY","SANTA CRUZ CT","SANTA MARIA PL","SANTA YNEZ AVE","SANTOS CT","SANTOS ST","SARGON PLACE","SAROLOU DR","SCONYERS CT","SCOTTLEE DR","SEA LION WAY","SEABORG ST","SEASIDE WAY","SEASONS PARK DR","SEATTLE CT","SEBASTIAN DR","SERANADE DR","SERR DR","SEVENTH ST","SHADOW PARK DR","SHADOWVIEW CT","SHADY LN","SHADY OAK CT","SHASTA ST","SHAWNAN DR","SHERRI WAY","SHERWOOD DR","SHETLAND WAY","SHIRE WAY","SIERRA ST","SIERRA VISTA DR","SIERRAGLEN AVE","SILVER CREEK CT","SILVER LEAF LN","SILVER LUPINE DR","SILVER OAK CT","SILVERGLEN AVE","SILVERTON AVE","SIMMONS RD","SIMON DR","SIXTH ST","SKYWAY CT","SMITH DR","SNOWBIRD DR","SNOWMASS LN","SODERSTROM LN","SOLEIL AVE","SOLITUDE LN","SORENSON WAY","SORREL DR","SOUTH AVE","SOUZA ST","SPARKLE CT","SPENGLER WAY","SPIRIT CT","SPOONBILL WAY","SPRING BLOSSOM LN","SPRING CREST DR","SPRING GARDEN DR","SPRING VALLEY DR","SPRINGFORD CT","SPRINGVILLE WAY","SPRUCE ST","SPYGLASS LN","ST GEORGE PL","ST JOSEPH PL","ST LOUIS CT","ST MARY'S CT","ST PATRICK PL","STALLION CT","STALLION WAY","STANISLAUS ST","STANLEY AVE","STARR AVE","STATE ST","STEPHEN PL","STERLING OAK DR","STERLING RIDGE DR","STERN WAY","STEVENOT CT","STONE CT","STONE MEADOW RD","STONRIDGE DR","STRATHAVEN CT","STROLLING LN","STUART PL","SUE DR","SUGAR OAK DR","SUMMER CREEK DR","SUMMER CREST DR","SUMMER GARDEN LN","SUMMERDALE AVE","SUMMERFIELD DR","SUMMERSONG CT","SUMMERTON LN","SUN GARDEN CT","SUN VALLEY CT","SUNBIRD DR","SUNDAY DR","SUNNY LN","SUNNY OAK DR","SUNNYBROOK CIR","SUNNYHILL DR","SUNNYSIDE DR","SUNNYVIEW T","SUNNYWAY DR","SUNSET DR","SUNSHINE CT","SUNSHINE WAY","SUPREME CT","SWAN PARK DR","SYCAMORE ST","SYLVA ST","SYLVIA CT","TAFT CT","TAHAMA LN","TAHOE DR","TAMMI WAY","TAMPA ST","TANBARK LN","TANDOORI WAY","TAPESTRY WAY","TARTAN RD","TASSIE CT","TATE ST","TAWNY LN","TAYLOR CT","TAYLOR RD","TEA ROSE ST","TEAKWOOD ST","TELLURIDE LN","TEMPLE AVE","TERESA CT","TERRALINDA DR","THE BURL","THIRD ST","TIFFANY CT","TIFFANY WAY","TIGERS DR","TIVERTON WAY","TOKAY AVE","TORNELL AVE","TORRE CT","TRADE WAY","TRADITIONS WAY","TRAIL WAY","TRAMWAY PL","TRAPPER JOHN LN","TRAVIS CT","TREASURE CT","TRELLIS LN","TRINITY CT","TRINITY WAY","TRIUMPH CT","TROTTER WAY","TROY CT","TULANE WAY","TURNSTONE DR","TUSCANY PL","TWENTIETH CENTURY BLVD","TYPHOON CT","TYPHOON DR","TYROLIA CT","UNISON WAY","VAIL CT","VALDOSTA DR","VALENTINE CT","VALLEY VIEW DR","VALPARAISO DR","VAN BUREN CIR","VANDERBILT AVE","VASCHE AVE","VASCONCELLOS WAY","VASSAR AVE","VEECK DR","VENTURE LN","VERMONT AVE","VERONA AVE","VICTORIA CT","VICTORY LN","VIEIRA WAY","VIENTO RD","VILLA ST","VILLA WOODS DR","VILLAGE PARK CT","VINTAGE DR","VIOLET WAY","VISCOUNT CT","VISIONS DR","VITRINA CT","VOLK AVE","VOUMARD RANCH DR","W CANAL DR","W CHAMBERLAIN DR","W CHRISTOFFERSEN PKWY","W F ST","W GLENWOOD AVE","W GREENWAY AVE","W HARDING RD","W HAWKEYE AVE","W LINWOOD AVE","W MAIN ST","W MINNESOTA AVE","W MONTE VISTA AVE","W MONTE VISTA AVE","W OLIVE AVE","W SIMMONS RD","W SPRINGER DR","W SPRINGER DR","W SYRACUSE AVE","W TAYLOR RD","W TUOLUMNE RD","W TUOLUMNE RD","W WARNER RD","W ZEERING RD","WABASH DR","WAGNER DR","WAGTAIL WAY","WAKEFIELD RD","WALDORF DR","WARING RD","WARP DR","WATERTHRUSH WAY","WAVES END WAY","WAYSIDE DR","WEDGEWOOD CT","WELLERMAN WAY","WELLINGTON LN","WENDY WAY","WEST AVE NORTH","WEST AVE SOUTH","WESTBURY LN","WESTMINSTER LN","WHISPER PL","WHISPERING PINES DR","WHISTLER CT","WHITE OAK CT","WICKEL ST","WILD FLOWER CT","WILD LILAC DR","WILDTREE LN","WILEY CT","WILLERT DR","WILLIAMS AVE","WILLOW GLEN WAY","WILLOW LN","WINANS LN","WINDAM CT","WINDROSE DR","WINDSOR CT","WINTER HAVEN DR","WINTERPARK LN","WISTERIA LN","WOLFE AVE","WOOD MINT DR","WOODLAND DR","WRIGHT ST","WYNDFAIR DR","XAVIER AVE","YALE AVE","YALE CT","YALONDA LN","YONAN CT","YORKTOWN CT","YOSEMITE ST","YOUNGSTOWN RD","YVONNE CT","ZACH CT","ZANE WAY","ZEPHYR CT","ZINA LN","ZINFANDEL LN",];
+                    var suggestions = [];
+                    for (i=0;i<choices.length;i++)
+                        if (~choices[i].toLowerCase().indexOf(term)) suggestions.push(choices[i]);
+                    suggest(suggestions);
+                }
+            });
+</script>
+
+ 
+</div>
+
+<br/><br/>
+
+
+</div>
+</article>
+
+<script src="/_scripts/html2canvas.min.js" type="text/javascript"></script>
+<link rel="stylesheet" href="/_scripts/jquery.fancyMessenger.css" />
+<script src="/_scripts/jquery.fancyMessenger.js"></script>
+<script>
+$.fancyMessenger({
+  text:{
+    heading:'Send us your feedback',
+    body:'<form name="feedbackform" id="feedbackform"><input type="hidden" id="ss_img" name="ss_img"><input type="hidden" id="session_id" name="session_id"><input class="form-control form-control-sm" type="email" placeholder="Contact email address" value="" id="email" name="email"/><textarea id="feedback" name="feedback" class="form-control form-control-sm" placeholder="What do you like or dislike about this page?"></textarea><button class="btn btn-light btn-sm">Send</button></form>',
+    sent:'Thanks for your feedback!',
+    invalidEmail:'Invalid e-mail!'
+  },
+});
+</script>
+
+
+
+<div id="rightbar">
+ <div id="contactinfo">
+  <b>For more information or concerns about a building permit, please contact:</b><br/><br/>
+Building and Safety Division<br/>
+156 S. Broadway, Ste. 130<br/>
+Turlock, CA 95380-5454<br/>
+(209) 668-5560<br/>
+<a href="mailto:building@turlock.ca.us">building@turlock.ca.us</a><br/>
+Monday - Friday, 8AM - 5PM<br/><br/>
+
+ </div>
+</div>
+
+
+</div>
+</div>
+
+<div style="position:relative;background-color:#222222;width:100%;margin-top:5px;">
+<br/><br/>
+<center>
+<div id="google_translate_element"></div>
+</center>
+
+ <div class="container1130" style="padding-top:60px;padding-bottom:50px;max-width:1130px;">
+  <div class="evenly">
+   <div class="item" id="item1">
+    <div style="font-size: 24px;font-weight: bold;color:white;padding-bottom:20px;">Popular Pages</div>
+    <a href="/watersewergarbageservice">Water, Sewer & Garbage Service</a><br/>
+    <a href="/government/turlockcitycouncil/councilmeetings.asp">City Council Meetings</a><br/>
+    <a href="/animalservices/shelteranimals">Adoptable Animals</a><br/>
+    <a href="/workingforus">Working for Us</a><br/>
+   </div>
+   <div class="item" id="item2">
+    <div style="font-size: 24px;font-weight: bold;color:white;padding-bottom:20px;">Contact Us</div>
+    <a href="/aboutturlock/phonenumbers">Phone Numbers</a><br/>
+    <a href="/aboutturlock/socialmedia">Social Media</a><br/>
+    <a href="/aboutturlock/emailaddresses">Email Addresses</a><br/>
+    <a href="/aboutturlock/addressesdirections">Addresses & Directions</a><br/>
+   </div>
+   <div class="item" id="item3">
+    <div style="font-size: 24px;font-weight: bold;color:white;padding-bottom:20px;">Stay Informed</div>
+    <a href="/stayinformed/pressreleases">Press Releases</a><br/>
+    <a href="/stayinformed/emailalerts">Email Alerts</a><br/>
+    <a href="/stayinformed/socialmedia">Follow Us on Social Media</a><br/>
+    <a href="/government/turlockcitycouncil/councilmeetings.asp">City Council Meetings</a><br/>
+	<a href="/_pdf/files/2025 Turlock_Strategic Communications Plan.pdf">2025 Turlock Strategic Communications Plan</a><br/>
+    <a href="/stayinformed/DownloadMyTurlock">Download MyTurlock</a><br/>
+   </div>
+  </div>
+ </div>
+
+
+
+
+ <br/><br/><br/>
+
+
+<script type="text/javascript">
+function googleTranslateElementInit() {
+  new google.translate.TranslateElement({pageLanguage: 'en', includedLanguages: 'ar,en,es,jv,ko,pa,pt,ru,zh-CN', layout: google.translate.TranslateElement.InlineLayout.SIMPLE}, 'google_translate_element');
+}
+</script>
+
+<script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+
+
+ <div class="credits noindex">Icons made by <a href="http://www.freepik.com" title="Freepik">Freepik</a> from <a href="http://www.flaticon.com" title="Flaticon">www.flaticon.com</a> is licensed by <a href="http://creativecommons.org/licenses/by/3.0/" title="Creative Commons BY 3.0" target="_blank">CC 3.0 BY</a></div>
+ <br/><br/><br/>
+
+
+</div>
+
+
+<a href="#0" class="cd-top">Top</a>
+
+<script src="/_scripts/turlock.js"></script>
+<script src="/jsonmenu.asp"></script>
+
+<script>
+$("<br/><br/><h4>Other Links in the Building Permits Section</h4><a class=gobox href=/buildinginturlock/buildingsafety/buildingpermits/onlinepermits.asp>Online Permits</a><br/><a class=gobox href=/buildinginturlock/buildingsafety/buildingpermits/unpermittedconstruction.asp>Unpermitted Construction</a><br/><a class=gobox href=/buildinginturlock/buildingsafety/buildingpermits/residentialsolar.asp>Residential Solar</a><br/><a class=gobox href=/buildinginturlock/buildingsafety/planreview.asp>Plan Review</a><br/><a class=gobox href=/buildinginturlock/buildingsafety/inspections>Inspections</a><br/><a class=gobox href=/buildinginturlock/buildingsafety/currentcodedesigncriteria.asp>Current Code & Design Criteria</a><br/><a class=gobox href=/buildinginturlock/buildingsafety/ADU.asp>ADU Pre-Drawn Plans</a><br/><a class=gobox href=/buildinginturlock/buildingsafety/postentitlementpermits>Post Entitlement Permits</a><br/><br/><br/>").appendTo("#mcont");
+</script>
+
+
+
+
+
+
+</body>
+
+</html>

@@ -1,35 +1,43 @@
-import { describe, expect, it } from "vitest";
-import { getAdapter, listAdapters, registerAdapter, supportsAlerts, fromLegacyResult } from "./registry";
+import { describe, expect, it, vi } from "vitest";
+vi.mock("../storage", () => ({ storage: {} }));
+import { readFileSync } from "fs";
+import { getAdapter, getAdapterFor, isLegacyAdapter, listScrapableLabels, registerJurisdictionAdapter, renderScrapablePlatformsModule, supportsAlerts, fromLegacyResult } from "./registry";
+import { SCRAPABLE_PLATFORM_LABELS, ADAPTER_JURISDICTIONS, isScrapablePlatform } from "../../shared/scrapable-platforms";
+import type { PortalAdapter } from "./types";
 
 describe("adapter registry", () => {
-  it("wraps the seven legacy adapters with listRecent off", () => {
-    for (const label of ["SmartGov", "Skagit County", "Tyler EnerGov", "eTRAKiT", "Accela", "Click2Gov", "FTG Portal"]) {
-      const a = getAdapter(label);
-      expect(a, label).not.toBeNull();
-      expect(a!.capabilities.listRecent, label).toBe(false);
-      expect(supportsAlerts(label)).toBe(false);
-    }
-    expect(getAdapter("Tyler Technologies")?.platform).toBe("Tyler EnerGov");
-    expect(getAdapter("Custom / GovPlatform")?.platform).toBe("Skagit County");
-    expect(listAdapters().length).toBeGreaterThanOrEqual(7);
-  });
-
-  it("resolves the directory's label variants, never a different platform", () => {
-    expect(getAdapter("eTRAKiT (CentralSquare)")?.platform).toBe("eTRAKiT");
-    expect(getAdapter("Tyler EnerGov Citizen Self Service")?.platform).toBe("Tyler EnerGov");
-    expect(getAdapter("Accela Citizen Access")?.platform).toBe("Accela");
-    expect(getAdapter("Oregon ePermitting (Accela)")?.platform).toBe("Accela");
+  it("resolves exact labels and aliases case-insensitively", () => {
+    expect(getAdapter("Accela")).not.toBeNull();
+    expect(getAdapter("accela citizen access")).toBe(getAdapter("Accela"));
+    expect(getAdapter("  TYLER ENERGOV ")).toBe(getAdapter("Tyler EnerGov"));
     expect(getAdapter("City building permits page")).toBeNull();
-    expect(getAdapter("iWorQ")).toBeNull();
     expect(getAdapter(null)).toBeNull();
   });
-
-  it("a registered adapter replaces the legacy wrapper and reports alerts support", () => {
-    registerAdapter({ platform: "TestPortal", aliases: ["TestPortal CSS"], capabilities: { search: ["address"], listRecent: true, detail: false }, async search() { return []; }, async listRecent() { return []; } });
-    expect(supportsAlerts("testportal css")).toBe(true);
-    expect(getAdapter("TestPortal (cloud)")?.platform).toBe("TestPortal");
+  it("marks the scraper.ts wrappers as legacy (no listRecent)", () => {
+    const a = getAdapter("Skagit County")!;
+    expect(isLegacyAdapter(a)).toBe(true);
+    expect(a.capabilities.listRecent).toBe(false);
+    expect(supportsAlerts("Skagit County")).toBe(false);
   });
-
+  it("prefers a jurisdiction-specific adapter over the platform adapter", () => {
+    const fake: PortalAdapter = { platform: "Test open data", capabilities: { search: ["address"], listRecent: true, detail: false }, search: async () => [], listRecent: async () => [] };
+    registerJurisdictionAdapter("Testville, ZZ", fake);
+    expect(getAdapterFor({ platform: "Accela", jurisdiction: "testville, zz" })).toBe(fake);
+    expect(getAdapterFor({ platform: "Accela", jurisdiction: "Elsewhere, ZZ" })).toBe(getAdapter("Accela"));
+    expect(getAdapterFor({ platform: null, jurisdiction: null })).toBeNull();
+    expect(isLegacyAdapter(fake)).toBe(false);
+  });
+  it("keeps shared/scrapable-platforms.ts in sync with the registry (run scripts/sync-scrapable-platforms.ts)", () => {
+    const onDisk = readFileSync(new URL("../../shared/scrapable-platforms.ts", import.meta.url), "utf8");
+    // The test above registered a fake jurisdiction; compare the platform labels only, and the committed
+    // jurisdiction list against the registry minus that fake.
+    const labels = listScrapableLabels();
+    expect([...SCRAPABLE_PLATFORM_LABELS]).toEqual(labels);
+    for (const l of labels) expect(isScrapablePlatform(l.toUpperCase())).toBe(true);
+    const rendered = renderScrapablePlatformsModule({ excludeJurisdictions: ["testville, zz"] });
+    expect(onDisk).toBe(rendered);
+    expect(ADAPTER_JURISDICTIONS.every((j) => j === j.toLowerCase())).toBe(true);
+  });
   it("maps a legacy ScrapeResult to a PermitRecord, dropping rows without a permit number", () => {
     const base = { permitType: null, status: null, address: "1 Oak St", applicantName: null, contractorName: "Acme", description: null, issuedDate: "2026-10-01", parcelNumber: null, expirationDate: null, finalizedDate: null, district: null, contacts: [] };
     expect(fromLegacyResult({ ...base, permitNumber: null }, { databaseId: 1, jurisdiction: "X, OR" })).toBeNull();

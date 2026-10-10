@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+  
+<link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon/favicon-16x16.png">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+  <link rel="stylesheet" href="/css/bundle.css">
+  <title>MilamCountyPermits.com</title>
+  <script>window.STATUS_LABELS = {} || {};</script>
+  <script>window.JURISDICTION_LABELS = {"county":{"key":"county","field":"jurisdictionCounty","row":"County","short":"County","long":"County","highlight":false,"hasList":false},"countyPrecinct":{"key":"countyPrecinct","field":"jurisdictionCountyPrecinct","row":"County Precinct","short":"County Precinct","long":"County Precinct","highlight":false,"hasList":false},"esd":{"key":"esd","field":"jurisdictionESD","row":"ESD Jurisdiction","short":"ESD","long":"Emergency Services District","highlight":false,"hasList":true},"municipal":{"key":"municipal","field":"jurisdictionMunicipal","row":"Municipal Jurisdiction","short":"Municipal","long":"Municipal Jurisdiction","highlight":false,"hasList":true},"fireStation":{"key":"fireStation","field":"jurisdictionFireStation","row":"Fire Station","short":"Fire Station","long":"Fire Station","highlight":false,"hasList":false},"fireResponseArea":{"key":"fireResponseArea","field":"jurisdictionFireResponseArea","row":"Fire Response Area","short":"Fire Response Area","long":"Fire Response Area","highlight":false,"hasList":false},"waterUtility":{"key":"waterUtility","field":"jurisdictionWaterUtility","row":"Water Utility","short":"Water Utility","long":"Water Utility","highlight":false,"hasList":false},"other":{"key":"other","field":"jurisdictionOther","row":"Other Jurisdiction","short":"Other","long":"Other Jurisdiction","highlight":false,"hasList":false},"esdRow":"ESD Jurisdiction","esdShort":"ESD","esdLong":"Emergency Services District","esdHighlight":false,"anyConfigured":true} || {};</script>
+  <script>(function(){try{var t=localStorage.getItem('theme')||'light';if(t==='auto')t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.setAttribute('data-bs-theme',t)}catch(e){}})()</script></head>
+<body id="body" class="fi-ground">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <svg xmlns="http://www.w3.org/2000/svg" class="d-none">
+    <symbol id="darkModeCheck" viewBox="0 0 16 16">
+      <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
+    </symbol>
+    <symbol id="circle-half" viewBox="0 0 16 16">
+      <path d="M8 15A7 7 0 1 0 8 1v14zm0 1A8 8 0 1 1 8 0a8 8 0 0 1 0 16z"/>
+    </symbol>
+    <symbol id="moon-stars-fill" viewBox="0 0 16 16">
+      <path d="M6 .278a.768.768 0 0 1 .08.858 7.208 7.208 0 0 0-.878 3.46c0 4.021 3.278 7.277 7.318 7.277.527 0 1.04-.055 1.533-.16a.787.787 0 0 1 .81.316.733.733 0 0 1-.031.893A8.349 8.349 0 0 1 8.344 16C3.734 16 0 12.286 0 7.71 0 4.266 2.114 1.312 5.124.06A.752.752 0 0 1 6 .278z"/>
+      <path d="M10.794 3.148a.217.217 0 0 1 .412 0l.387 1.162c.173.518.579.924 1.097 1.097l1.162.387a.217.217 0 0 1 0 .412l-1.162.387a1.734 1.734 0 0 0-1.097 1.097l-.387 1.162a.217.217 0 0 1-.412 0l-.387-1.162A1.734 1.734 0 0 0 9.31 6.593l-1.162-.387a.217.217 0 0 1 0-.412l1.162-.387a1.734 1.734 0 0 0 1.097-1.097l.387-1.162zM13.863.099a.145.145 0 0 1 .274 0l.258.774c.115.346.386.617.732.732l.774.258a.145.145 0 0 1 0 .274l-.774.258a1.156 1.156 0 0 0-.732.732l-.258.774a.145.145 0 0 1-.274 0l-.258-.774a1.156 1.156 0 0 0-.732-.732l-.774-.258a.145.145 0 0 1 0-.274l.774-.258c.346-.115.617-.386.732-.732L13.863.1z"/>
+    </symbol>
+    <symbol id="sun-fill" viewBox="0 0 16 16">
+      <path d="M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0zm0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13zm8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5zM3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8zm10.657-5.657a.5.5 0 0 1 0 .707l-1.414 1.415a.5.5 0 1 1-.707-.708l1.414-1.414a.5.5 0 0 1 .707 0zm-9.193 9.193a.5.5 0 0 1 0 .707L3.05 13.657a.5.5 0 0 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0zm9.193 2.121a.5.5 0 0 1-.707 0l-1.414-1.414a.5.5 0 0 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707zM4.464 4.465a.5.5 0 0 1-.707 0L2.343 3.05a.5.5 0 1 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .708z"/>
+    </symbol>
+  </svg>
+  <nav aria-label="Primary" class="navbar navbar-dark hdr1 mb-3 px-2" id="header1" style="background-color: #00287f;">
+  <div class="container-fluid d-flex flex-nowrap p-0" style="max-width: 1800px;">
+      <a class="navbar-brand d-none d-lg-inline ms-1 ms-lg-2" href="/">MilamCountyPermits.com</a>
+    <ul class="navbar-nav me-auto">
+            <li class="nav-item d-none d-md-inline">
+              <span class="hdr1-burn" data-burn-chip><span class="hdr1-burn-dot" data-burn-dot aria-hidden="true"></span>Open Burning <span class="hdr1-burn-status" id="openBurningStatus" data-burn-badge-class="hdr1-burn-status"></span></span>
+            </li>
+    </ul>
+    
+    <div class="dropdown bd-mode-toggle me-2">
+      <button class="btn btn-secondary dropdown-toggle d-flex align-items-center navbar-button"
+              id="bd-theme"
+              type="button"
+              aria-expanded="false"
+              data-bs-toggle="dropdown"
+              aria-label="Toggle theme (auto)">
+        <svg class="bi my-1 theme-icon-active" width="1em" height="1em"><use href="#circle-half"></use></svg>
+        <span class="visually-hidden" id="bd-theme-text">Toggle theme</span>
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="bd-theme-text">
+        <li>
+          <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="light" aria-pressed="false">
+            <svg class="bi me-2 opacity-50" width="1em" height="1em"><use href="#sun-fill"></use></svg>
+            Light
+            <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#darkModeCheck"></use></svg>
+          </button>
+        </li>
+        <li>
+          <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="dark" aria-pressed="false">
+            <svg class="bi me-2 opacity-50" width="1em" height="1em"><use href="#moon-stars-fill"></use></svg>
+            Dark
+            <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#darkModeCheck"></use></svg>
+          </button>
+        </li>
+        <li>
+          <button type="button" class="dropdown-item d-flex align-items-center active" data-bs-theme-value="auto" aria-pressed="true">
+            <svg class="bi me-2 opacity-50" width="1em" height="1em"><use href="#circle-half"></use></svg>
+            Auto
+            <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#darkModeCheck"></use></svg>
+          </button>
+        </li>
+      </ul>
+    </div>
+      <a href="https://www.fireinspection360.com/users/login?redirect=MilamTX" class="btn btn-primary me-2 navbar-button"><span><i class="fa-solid fa-user"></i></span><span class="ms-2">Login or Register</span></a>
+      <a href="/users/azure" class="btn btn-danger navbar-button"><span><i class="fa-brands fa-microsoft"></i></span><span class="ms-2">County Employee</span></a>
+  </div>
+</nav>
+
+<!-- Help Modal -->
+<div class="modal fade" id="helpModal" tabindex="-1" role="dialog" aria-labelledby="helpModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="helpModalLabel"><i class="fa-regular fa-comment-dots"></i> Have a comment or question?</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div>For assistance contact Joshua Todd, Milam County Fire Marshal at 254-482-2341 or <a href="/cdn-cgi/l/email-protection#43252a31262e2231302b222f032e2a2f222e202c362d373a6d2d2637"><span class="__cf_email__" data-cfemail="ddbbb4afb8b0bcafaeb5bcb19db0b4b1bcb0beb2a8b3a9a4f3b3b8a9">[email&#160;protected]</span></a>.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+  <div class="container-fluid" id="bodyContainer" style="max-width: 1800px;margin: auto; height: 100%;">
+    <div class="row d-flex flex-nowrap m-0">
+      
+      
+      <div class="col p-0" style="width:70%">
+        <div id="browserMessage"></div>
+        <main id="main-content" tabindex="-1">
+          
+          
+          
+          <style>
+  /* The list archetype (views/_shared/permits/list.handlebars is the reference):
+     a 12px card carrying the rail from the accent partial, a masthead with the
+     search box on its right, the table at the .925rem scanning tier inside a
+     10px scroll box, a state-aware empty state, the fleet footer row. Surfaces
+     and inks are Bootstrap tokens only - a literal has no dark twin. */
+  .ppl-crumb { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; font-size: .875rem;
+    margin-bottom: .6rem; color: var(--bs-secondary-color); }
+  .ppl-crumb a { text-decoration: none; }
+  .ppl-crumb i { font-size: .8rem; }
+  .ppl-crumb [aria-current] { color: var(--bs-body-color); font-weight: 600; }
+  /* RADIUS SCALE (design standard 4.5): 12px card, 10px inner panels, 999px pills.
+     The card's top rail is painted by the accent partial from its accent class -
+     background-color only in here, never the shorthand (it would erase the rail). */
+  .ppl-card { border-radius: 12px; }
+  .ppl-head { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: flex-end;
+    justify-content: space-between; margin-bottom: .6rem; }
+  .ppl-title { margin-bottom: .1rem; }
+  .ppl-sub { font-size: .85rem; color: var(--bs-secondary-color); margin-bottom: 0; }
+  .ppl-f { display: flex; flex-direction: column; gap: .15rem; }
+  /* micro-labels take full body ink, not the muted secondary: at .62rem with
+     uppercase + letter-spacing, contrast is what buys legibility */
+  .ppl-f-lbl { font-size: .62rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 600;
+    color: var(--bs-body-color); margin: 0; line-height: 1.3; }
+  /* inputs never below 16px on a phone (iOS zooms the page on focus) */
+  .ppl-search { width: 260px; max-width: 100%; }
+  @media (max-width: 575.98px) {
+    .ppl-f { flex: 1 1 100%; }
+    .ppl-search { width: 100%; font-size: 1rem; }
+  }
+  .ppl-notice { font-size: .9rem; }
+  /* the scroll box wraps the table AFTER .DataTable() - written into the markup it
+     would land outside the wrapper and swallow the pager */
+  .ppl-tblwrap { overflow: auto; border: 1px solid var(--bs-border-color); border-radius: 10px; margin-top: .35rem; }
+  /* data-surface type scale: scanning tables at .925rem, badges at .75em of the
+     cell so they track the table's size rather than bundle.css's fixed 12px */
+  .ppl-tblwrap .dataTable { margin-bottom: 0; font-size: .925rem; }
+  .ppl-tblwrap .dataTable .badge { font-size: .75em; }
+  .ppl-tblwrap .dataTable tbody tr:last-child > td { border-bottom: 0; }
+  .ppl-card table.dataTable thead th { font-size: .68rem; text-transform: uppercase;
+    letter-spacing: .06em; color: var(--bs-body-color); white-space: nowrap; }
+  /* DataTables ships the sort arrows at opacity .125 resting, near-invisible
+     against a header. Both arrows of the stacked pair stay present at rest so the
+     heading never shifts when sorted; the active one goes full strength. The
+     active rule must follow the resting one - equal specificity. */
+  .ppl-card table.dataTable thead > tr > th.sorting::before,
+  .ppl-card table.dataTable thead > tr > th.sorting::after,
+  .ppl-card table.dataTable thead > tr > th.sorting_asc::before,
+  .ppl-card table.dataTable thead > tr > th.sorting_asc::after,
+  .ppl-card table.dataTable thead > tr > th.sorting_desc::before,
+  .ppl-card table.dataTable thead > tr > th.sorting_desc::after { opacity: .35; }
+  .ppl-card table.dataTable thead > tr > th.sorting_asc::before,
+  .ppl-card table.dataTable thead > tr > th.sorting_desc::after { opacity: 1; }
+  /* the whole row is the link (public/scripts/tenant-layout.js navigates any
+     tr[url] on mousedown); the number is also a real anchor for the keyboard */
+  .ppl-card tbody tr[url] { cursor: pointer; }
+  .ppl-card td { font-variant-numeric: tabular-nums; }
+  .ppl-card td .badge { white-space: nowrap; }
+  /* the chip helper bakes me-2 for prose; in a cell of its own it needs none */
+  .ppl-card td .pt-chip { margin-right: 0; }
+  .ppl-muted { color: var(--bs-secondary-color); font-style: italic; }
+  /* state-aware empty state (fleet anatomy: wrapper div + inline aria-hidden icon) */
+  .ppl-empty { padding: 2.5rem 1rem 2.75rem; text-align: center; white-space: normal; }
+  .ppl-empty-ico { font-size: 1.8rem; color: var(--bs-secondary-color); opacity: .55; margin-bottom: .6rem; }
+  .ppl-empty-t { font-weight: 650; font-size: 1rem; margin-bottom: .3rem; }
+  .ppl-empty-d { color: var(--bs-secondary-color); max-width: 52ch; margin: 0 auto .35rem; font-size: .85rem; }
+  .ppl-empty .btn { margin-top: .5rem; }
+  /* the footer row: the info line's own padding-top defeats align-items-center,
+     so it is zeroed here and the space bought back as mt-2 on the row in `dom` */
+  .ppl-card div.dataTables_info { padding-top: 0; }
+</style>
+<style>
+  /* Every section card and every modal wears a coloured top rail naming its
+     category, the Status Frame treatment from the inspection details page.
+     ONE rail thickness for the whole page, and it is the SAME token that page
+     uses (--xp-rail is the THICKNESS, never a colour - do not overload it).
+
+     A card declares its accent ONCE, with an .xp-accent-* class. The rail and
+     the section icon both read that declaration, so the two cannot drift apart
+     the way a hand-paired border colour and icon colour do.
+
+     Two custom properties per accent, because they are not the same job:
+       --xp-accent      the rail. A 4px decorative bar; the heading beside it
+                        carries the meaning, so a bright hue is fine here, and
+                        the same hue works in both themes.
+       --xp-accent-ink  the icon. Text-sized, so it is measured - and it needs
+                        a DARK TWIN, because an ink chosen for white is
+                        unreadable on #212529 and vice versa. The bright rail
+                        hues are nowhere near the bar in light mode (teal
+                        2.13:1, cyan 1.96:1, amber 1.63:1), which is why an
+                        icon must never just inherit the rail colour.
+
+     Measured against the WORST surface the ink can land on in each theme -
+     the darkest light surface (--bs-tertiary-bg #f8f9fa) and the lightest
+     dark one (--bs-secondary-bg #343a40), not merely the card background:
+
+       accent   light ink   on #f8f9fa   dark ink   on #343a40
+       primary  #0a58ca     6.11         #6ea8fe    4.76
+       purple   #59359a     8.30         #c29ffa    5.28
+       teal     #097269     5.50         #7beacc    7.93
+       cyan     #087990     4.80         #6edff6    7.42
+       orange   #a5490b     5.60         #feb272    6.48
+       amber    #8a6803     4.90         #ffda6a    8.49
+       pink     #a52a68     6.36         #e685b5    4.59
+       indigo   #520dc2     9.07         #ccc0ff    6.88
+       green    #146c43     6.12         #75b798    4.92
+       danger   #b02a37     6.16         #ea868f    4.55
+       muted    #5c6268     5.86         #adb5bd    5.55
+
+     AND THEY ARE MEASURED AGAINST EACH OTHER, not only against the surface.
+     An ink that clears contrast can still be indistinguishable from the ink
+     on the next card, and the two failures are independent - every value in
+     the table above passed its contrast bar the whole time this was broken.
+     The floor is now deltaE 20.0 in BOTH themes (green+teal light, and
+     indigo+purple dark). It used to be 8.7 light / 12.5 dark:
+
+       teal   #0f6f54 -> #097269 (light), #79dfc1 -> #7beacc (dark)
+       indigo #c5b3fd -> #ccc0ff (dark only; light was already 37.8)
+
+     Teal moved rather than green because green is the anchored one - it has
+     to keep reading as Bootstrap success - and because `--bs-teal` #20c997
+     and `--bs-success` #198754 are only ~10deg apart in hue to begin with, so
+     darkening both for contrast is what compressed them. There is not much
+     room here: teal now sits 20.0 from green and 20.4 from cyan, between the
+     two, and a wider gap is not available without teal ceasing to be teal
+     (an unconstrained search returns near-black and neon). `scripts/
+     check-accent-collisions.js` holds the floor at 18, which is the 2 units
+     of slack that leaves - re-run it after touching any value here.
+
+     `danger` is for SEVERITY, and only severity - an open-findings card, a
+     card in an error state - never for decoration. Red on this system means
+     something is wrong, the same way it does on the inspection details page.
+
+     Amber's light ink is DARKER than Bootstrap's own
+     --bs-warning-text-emphasis, which measures 4.33:1 and does not clear the
+     bar; indigo's dark ink is LIGHTER than indigo-300 (#a370f7, 3.41:1).
+     Re-measure before changing any of them - BOTH ways: contrast against the
+     surface, and deltaE against every other ink.
+
+     This used to say "purple and indigo read alike in dark mode - keep them
+     off the same page", which was true and was the wrong remedy: it made a
+     palette defect into a rule every page author had to remember, and two
+     pages did not (users/details and announcements/manage carried the pair
+     for months). The same was true of green+teal, which was WORSE at 8.7 and
+     sat on eight pages - and nobody had noticed that one at all, because
+     green and teal are correct category choices for "fees/completed" and
+     "history", so every page was using them exactly as intended. A rule that
+     asks authors to avoid a pair is a rule that gets forgotten; separating
+     the values and checking them is not. */
+  :root { --xp-rail: 4px; }
+
+  /* THE RAIL IS THE CARD'S OWN BACKGROUND, and every other way of drawing it
+     has a specific failure:
+
+       border-top: 4px solid  - the browser MITRES the 4px accent into the 1px
+         side borders around the corner arc, so the colour bleeds diagonally
+         down each corner and reads as a rendering artifact.
+       an absolutely-positioned ::before - nothing clips it. Giving the bar
+         `border-radius: inherit` does not help: the box is only 4px tall, so
+         the browser scales a 12px radius down to 4px, and the bar's ends then
+         sit OUTSIDE the card's 12px curve and poke past the corners. That
+         shipped for one round and is exactly what it looks like.
+       ::before plus overflow: hidden - how the analytics pages clip theirs,
+         and correct there, but not portable: the ITM one-page form puts a
+         position-absolute street-suggestion dropdown INSIDE its Property card,
+         and hiding overflow would clip it.
+
+     A background gradient is clipped to the card's border-radius by the
+     browser, for free, with no pseudo-element and no overflow change - so the
+     ends follow the corner exactly and nothing can escape the card.
+
+     THE ONE THING TO WATCH: a rule that sets the `background` SHORTHAND on an
+     accented card resets background-image and silently erases the rail. Use
+     `background-color` on such rules (the ITM forms' .xp-card.xp-found is the
+     one in the fleet, and the gate checks for others).
+     Two consequences worth knowing: the card's border box is untouched, so
+     nothing shifts; and the include no longer has to come after the page's
+     own style block, because there is no border shorthand left to reset it.
+     If anyone ever reverts this to border-top, that ordering trap comes back.
+     (Written in prose deliberately - a literal style tag inside a stylesheet
+     comment is the sort of thing that gets read as markup by the next tool
+     along, and the house rule is to describe tags rather than write them.) */
+  .xp-accent-primary, .xp-accent-purple, .xp-accent-teal, .xp-accent-cyan,
+  .xp-accent-orange, .xp-accent-amber, .xp-accent-pink, .xp-accent-indigo,
+  .xp-accent-green, .xp-accent-danger, .xp-accent-muted, .xp-railed {
+    background-image: linear-gradient(var(--xp-accent), var(--xp-accent));
+    background-repeat: no-repeat;
+    background-size: 100% var(--xp-rail);
+    background-position: top left;
+    /* padding-box on both, so the bar sits just INSIDE the 1px border - the
+       same place the analytics pages' absolutely-positioned bar sits - rather
+       than under it, which would leave the border painting a grey line over
+       its top pixel. */
+    background-origin: padding-box;
+    background-clip: padding-box;
+  }
+  /* .xp-ink-* IS THE SAME INK WITHOUT THE RAIL. Every .xp-accent-* class is in
+     the selector list above, so it paints a 4px bar - which is right on a card
+     and wrong on an icon in a tab strip, a heading or a chip. The two families
+     therefore share ONE declaration per accent rather than sitting in separate
+     rules: the ink is measured against the worst surface in each theme, and a
+     second copy of a measured value is how the tab and the card it opens come
+     to disagree about what purple means. Nothing else changes - .xp-ink-* is
+     absent from the rail selector list by construction, so it cannot paint
+     one, and the classes are new, so no existing page is affected. */
+  .xp-accent-primary, .xp-ink-primary { --xp-accent: var(--bs-primary); --xp-accent-ink: #0a58ca; }
+  .xp-accent-purple, .xp-ink-purple  { --xp-accent: var(--bs-purple);  --xp-accent-ink: #59359a; }
+  .xp-accent-teal, .xp-ink-teal    { --xp-accent: var(--bs-teal);    --xp-accent-ink: #097269; }
+  .xp-accent-cyan, .xp-ink-cyan    { --xp-accent: var(--bs-cyan);    --xp-accent-ink: #087990; }
+  .xp-accent-orange, .xp-ink-orange  { --xp-accent: var(--bs-orange);  --xp-accent-ink: #a5490b; }
+  .xp-accent-amber, .xp-ink-amber   { --xp-accent: var(--bs-warning); --xp-accent-ink: #8a6803; }
+  .xp-accent-pink, .xp-ink-pink    { --xp-accent: var(--bs-pink);    --xp-accent-ink: #a52a68; }
+  .xp-accent-indigo, .xp-ink-indigo  { --xp-accent: var(--bs-indigo);  --xp-accent-ink: #520dc2; }
+  .xp-accent-green, .xp-ink-green   { --xp-accent: var(--bs-success); --xp-accent-ink: #146c43; }
+  .xp-accent-danger, .xp-ink-danger  { --xp-accent: var(--bs-danger);  --xp-accent-ink: #b02a37; }
+  .xp-accent-muted, .xp-ink-muted   { --xp-accent: #adb5bd;           --xp-accent-ink: #5c6268; }
+  /* Only the INK flips - the rail hue is decorative and reads in both themes.
+     Redefining just the one property keeps a single declaration per accent. */
+  [data-bs-theme="dark"] .xp-accent-primary, [data-bs-theme="dark"] .xp-ink-primary { --xp-accent-ink: #6ea8fe; }
+  [data-bs-theme="dark"] .xp-accent-purple, [data-bs-theme="dark"] .xp-ink-purple  { --xp-accent-ink: #c29ffa; }
+  [data-bs-theme="dark"] .xp-accent-teal, [data-bs-theme="dark"] .xp-ink-teal    { --xp-accent-ink: #7beacc; }
+  [data-bs-theme="dark"] .xp-accent-cyan, [data-bs-theme="dark"] .xp-ink-cyan    { --xp-accent-ink: #6edff6; }
+  [data-bs-theme="dark"] .xp-accent-orange, [data-bs-theme="dark"] .xp-ink-orange  { --xp-accent-ink: #feb272; }
+  [data-bs-theme="dark"] .xp-accent-amber, [data-bs-theme="dark"] .xp-ink-amber   { --xp-accent-ink: #ffda6a; }
+  [data-bs-theme="dark"] .xp-accent-pink, [data-bs-theme="dark"] .xp-ink-pink    { --xp-accent-ink: #e685b5; }
+  [data-bs-theme="dark"] .xp-accent-indigo, [data-bs-theme="dark"] .xp-ink-indigo  { --xp-accent-ink: #ccc0ff; }
+  [data-bs-theme="dark"] .xp-accent-green, [data-bs-theme="dark"] .xp-ink-green   { --xp-accent-ink: #75b798; }
+  [data-bs-theme="dark"] .xp-accent-danger, [data-bs-theme="dark"] .xp-ink-danger  { --xp-accent-ink: #ea868f; }
+  [data-bs-theme="dark"] .xp-accent-muted, [data-bs-theme="dark"] .xp-ink-muted   { --xp-accent-ink: #adb5bd; }
+  /* A modal needed a compound selector when the rail was a border, to beat
+     Bootstrap's own .modal-content border at equal specificity. The
+     pseudo-element competes with nothing, so that rule is gone - one less
+     thing to keep in step. .modal-content is already position: relative, and
+     it clips nothing, so its rail behaves like any card's. */
+  /* A LEFT rail - the same paint, the same token, rotated. Add .xp-lrail
+     beside an accent class (or set --xp-accent directly) on a panel whose
+     tone belongs on its leading edge: an attention band, a severity panel,
+     a callout.
+
+     A LEFT RAIL IS NEVER border-left, for the reason given above for
+     border-top: the browser MITRES the thick accent into the 1px top and
+     bottom borders around the corner arc, so the colour bleeds diagonally at
+     each corner and reads as a rendering artifact. It is the same defect,
+     rotated, and it is what this class exists to prevent.
+
+     ONE THICKNESS PER PAGE: --xp-rail governs both edges. A left rail at a
+     different width than the top rails on the same page reads as two
+     different systems.
+
+     THE CALLER MUST ADD THE RAIL BACK TO ITS OWN padding-left:
+       padding-left: calc(<the element's inset> + var(--xp-rail));
+     A border sits OUTSIDE the padding box and a padding-box background does
+     not, so converting one to the other silently eats that much of the
+     content's inset - no layout shift, nothing to see in the diff, the text
+     just creeps toward the rail. The bar for "is the spacing right" is the
+     element's OWN padding-right, never a number you pick.
+
+     The `background` SHORTHAND trap applies here exactly as it does to the
+     top rails: a tinted panel must set background-COLOR, or it erases its
+     own rail.
+
+     THE COLOUR TOKEN IS --xp-lrail, WHICH WAS ALREADY THE FLEET'S WORD FOR
+     IT - nine views (the incidents/users analytics setup banners, My Day's
+     inspection rows, the ITM config policy and system cards, the ITM form's
+     deficiency rows) each declared `--xp-lrail: <colour>` and then repeated
+     these six background declarations inline. This class is those six lines,
+     once; adopting it there is deleting them and keeping the declaration.
+     An accent-classed card that sets no --xp-lrail falls back to its
+     --xp-accent, so .xp-accent-danger + .xp-lrail needs no extra token. */
+  .xp-lrail {
+    background-image: linear-gradient(var(--xp-lrail, var(--xp-accent)), var(--xp-lrail, var(--xp-accent)));
+    background-repeat: no-repeat;
+    background-size: var(--xp-rail) 100%;
+    background-position: left top;
+    background-origin: padding-box;
+    background-clip: padding-box;
+  }
+
+  /* The section icon. Inherits its card's accent, so a card states its colour
+     in exactly one place. Outside an accented card it falls back to the
+     surrounding text colour rather than to a hue that would look deliberate. */
+  .xp-ico { color: var(--xp-accent-ink, inherit); }
+
+  /* The kit's own .fa rule sets line-height: 1, so an icon in a 1.5em line box
+     sits ~4px high next to its text. Two classes deep to beat .fa on
+     specificity rather than on source order, and inherit rather than a margin
+     nudge, which is a magic number tied to today's font size. */
+  .xp-card h2 i.fa-solid,
+  .xp-card h3 i.fa-solid,
+  .modal-title i.fa-solid,
+  .xp-wrap h1 i.fa-solid { line-height: inherit; }
+</style>
+<nav class="ppl-crumb" aria-label="Breadcrumb">
+  <a href="/">Home</a>
+  <i class="fa-solid fa-angle-right" aria-hidden="true"></i>
+  <span aria-current="page">Construction Permits</span>
+</nav>
+
+<div class="card ppl-card xp-accent-primary">
+  <div class="card-body">
+    <div class="ppl-head">
+      <div>
+        <h1 class="h4 ppl-title">Construction Permits</h1>
+        <p class="ppl-sub">Construction Permits with activity within the past 36 months.</p>
+      </div>
+      <div class="ppl-f">
+        <label class="ppl-f-lbl" for="pplSearch">Search</label>
+        <input type="search" class="form-control form-control-sm ppl-search" id="pplSearch"
+               placeholder="Name, address, or permit number" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="alert alert-warning py-2 px-3 mb-2 ppl-notice" id="pplNotice" role="status" hidden></div>
+
+    <table id="publicPermits" class="dataTable table table-sm table-stripes" style="width:100%">
+      <thead>
+        <tr></tr>
+      </thead>
+    </table>
+  </div>
+</div>
+        </main>
+          <footer class="mt-3 text-center">
+            
+            <div><small>Part of the <a href="https://www.fireinspection360.com">FireInspection360.com</a> network | <span style="white-space:nowrap;"><i class="fa-regular fa-copyright"></i> Fire Safety Technical Services, LLC</span></small></div>
+            <div><small><a href="/terms">Terms of Service</a> | <a href="/privacypolicy">Privacy Policy</a></small></div>
+          </footer>
+      </div>
+    </div>
+  </div>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script type="text/javascript" src="/scripts/bundle.js"></script>
+  <script type="text/javascript" src="/scripts/bundle-moment.js"></script>
+  <script type="text/javascript" src="/scripts/bundle-tables.js"></script>
+
+  <script>
+  // Exported by helpers/hbs.js and passed by the route, so a browser-rendered
+  // badge or chip cannot drift from a server-rendered one. Never copied here.
+  const STATUS_BADGE_STYLES = {"On Hold":"bg-yellow","Ready for Assignment":"text-bg-info","Under Review":"text-bg-primary","Approved":"text-bg-success","Not Approved":"text-bg-danger","Accepted - No review":"text-bg-secondary","Awaiting Response":"text-bg-danger","Revision Required":"bg-maroon","Missing":"text-bg-danger","In Progress":"bg-purple","In Progress - Paused":"bg-purple","Pending":{"cls":"text-primary","style":"box-shadow: inset 0 0 0 2px #0d6efd;background-color: transparent;"},"Ready for Scheduling":"text-bg-info","Scheduled":"text-bg-primary","Completed":"text-bg-success","Passed":"text-bg-success","Failed":"text-bg-danger","Failed - No Reinspection":{"cls":"text-danger","style":"box-shadow: inset 0 0 0 2px #dc3545;background-color: transparent;"},"Reinspection Required":"bg-maroon","Incomplete":"text-bg-dark","Cancelled":"text-bg-dark","Processing":"bg-orange","Fee Required":"text-bg-warning","Verified":"text-bg-success","Inspection Pending":"text-bg-primary","Ready to Activate":"text-bg-secondary","Active - Burning allowed":"text-bg-success","Expired":"text-bg-dark","Accepted":"text-bg-success","Assigned":"text-bg-warning","Verification Pending":"text-bg-info","Active":"text-bg-success","Inactive":"text-bg-secondary","Upcoming":"text-bg-secondary","Due Now":"text-bg-primary","Past Due":"bg-maroon","Completed: Issues Found":"text-bg-danger","Completed: No Issues":"text-bg-success","Open":"text-bg-primary","Cold Case":"text-bg-secondary","Ready for Review":"text-bg-info","Reviewed & Approved":"text-bg-success","Closed":"text-bg-dark","New":"bg-yellow","Needs Info":"bg-orange","Acknowledged":"text-bg-primary","Planned":"text-bg-info","Released":"text-bg-success","Declined":"text-bg-secondary","Duplicate":"text-bg-dark","Answered":"text-bg-success","Submitted":"bg-orange","Clarification Requested":"text-bg-warning","Fee Estimate Sent":"text-bg-warning","Fulfilled":"text-bg-success","No Records Found":"text-bg-secondary","Denied":"text-bg-danger","Withdrawn":"text-bg-dark","Resolved":"text-bg-success","Fee Due":"text-bg-danger","Paid":"text-bg-success","Voided":"text-bg-warning"} || {};
+  const PROPERTY_TYPE_MARKERS = {"Site":{"icon":"fa-map-location-dot","short":"Site","word":"Site"},"Building":{"icon":"fa-building","short":"Building","word":"Building","abbr":"Bldg"},"Tenant":{"icon":"fa-key","short":"Tenant","word":"Tenant","abbr":"Ten"},"Mobile":{"icon":"fa-truck","short":"Mobile","word":"Mobile"},"Multiple Buildings":{"icon":"fa-building","short":"Buildings","word":"Multiple Buildings","abbr":"Bldgs"},"Multiple Tenants":{"icon":"fa-key","short":"Tenants","word":"Multiple Tenants","abbr":"Tens"}} || {};
+  // The page's copy, derived by helpers/permitPublicList.js from the tenant's
+  // configured categories - the same helper the row endpoint filters by.
+  const PPL_COPY = {"title":"Construction Permits","subtitle":"Construction Permits with activity within the past 36 months.","emptySearch":"No construction permits match your search.","emptyList":"No construction permits have had activity within the past 36 months.","categories":["Construction"],"windowMonths":36} || {};
+  const PPL_PAGE_LENGTHS = [10,15,20,30] || [10, 15, 20, 30];
+  const PPL_DEFAULT_PAGE_LENGTH = 15 || 15;
+
+  function escapeHtml(str) {
+    return String(str == null ? '' : str).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function statusLabel(s) {
+    return (window.STATUS_LABELS || {})[s] || s || '';
+  }
+  // Property TYPE is a monochrome chip built from the received table - a filled
+  // colour badge always means STATUS. An unknown type is its escaped word.
+  function propertyTypeChipHtml(t) {
+    if (!t) return '';
+    const m = PROPERTY_TYPE_MARKERS[t];
+    if (!m) return escapeHtml(t);
+    return '<span class="pt-chip">' +
+      (m.icon ? '<i class="fa-solid ' + m.icon + '" aria-hidden="true"></i>' : '') +
+      escapeHtml(m.short) + '</span>';
+  }
+  function statusBadgeHtml(s) {
+    const style = STATUS_BADGE_STYLES[s];
+    const label = statusLabel(s);
+    if (!style) return escapeHtml(label);
+    const cls = typeof style === 'string' ? style : style.cls;
+    const inline = (typeof style === 'object' && style.style) ? ' style="' + escapeHtml(style.style) + '"' : '';
+    return '<span class="badge rounded-pill ' + cls + '"' + inline + '>' + escapeHtml(label) + '</span>';
+  }
+  function permitPath(id) {
+    return '/public/permits/details/' + encodeURIComponent(String(id == null ? '' : id));
+  }
+  // Every column escapes on the DISPLAY branch and hands the raw value to every
+  // other type (sort, filter, type detection) - DataTables writes cell data as
+  // HTML, and name, address and type are text typed by an applicant.
+  function plain(data, type) {
+    return type === 'display' ? escapeHtml(data || '') : (data || '');
+  }
+  const COLUMNS = [
+    { name: 'propertyType', data: 'propertyType', title: 'Type', orderable: false,
+      render: function (data, type) { return type === 'display' ? propertyTypeChipHtml(data) : (data || ''); } },
+    { name: 'name', data: 'name', title: 'Property or Project', orderable: false, render: plain },
+    { name: 'address', data: 'address', title: 'Address', orderable: false,
+      render: function (data, type) {
+        if (type !== 'display') return data || '';
+        return data ? escapeHtml(data) : '<span class="ppl-muted">No address on file</span>';
+      } },
+    { name: 'permitNumber', data: 'permitNumber', title: 'Permit #', orderable: true,
+      render: function (data, type, row) {
+        if (type !== 'display') return data || '';
+        return '<a href="' + permitPath(row && row.id) + '">' + escapeHtml(data || '') + '</a>';
+      } },
+    { name: 'permitType', data: 'permitType', title: 'Permit Type', orderable: false, render: plain },
+    { name: 'status', data: 'status', title: 'Status', orderable: false,
+      render: function (data, type) { return type === 'display' ? statusBadgeHtml(data) : statusLabel(data); } },
+    { name: 'statusDate', data: 'statusDate', title: 'Status Date', orderable: true, render: plain }
+  ];
+  // The two empty states, from the response's own counts: a search that matched
+  // nothing points at the box with a way out; a list with nothing in its window
+  // explains itself in the helper's words.
+  function emptyHtml(searched) {
+    if (searched) {
+      return '<div class="ppl-empty">' +
+        '<div class="ppl-empty-ico"><i class="fa-solid fa-filter" aria-hidden="true"></i></div>' +
+        '<div class="ppl-empty-t">' + escapeHtml(PPL_COPY.emptySearch) + '</div>' +
+        '<p class="ppl-empty-d">Try fewer words, or the street number on its own.</p>' +
+        '<button type="button" class="btn btn-sm btn-outline-secondary" id="pplEmptyClear">Clear search</button>' +
+        '</div>';
+    }
+    return '<div class="ppl-empty">' +
+      '<div class="ppl-empty-ico"><i class="fa-solid fa-file-signature" aria-hidden="true"></i></div>' +
+      '<div class="ppl-empty-t">Nothing to show</div>' +
+      '<p class="ppl-empty-d">' + escapeHtml(PPL_COPY.emptyList) + '</p>' +
+      '</div>';
+  }
+
+  $(document).ready(function () {
+    // the header row from COLUMNS - one list drives the headings and the cells
+    const headRow = document.querySelector('#publicPermits thead tr');
+    COLUMNS.forEach(function (c) {
+      const th = document.createElement('th');
+      th.setAttribute('scope', 'col');
+      th.textContent = c.title;
+      headRow.appendChild(th);
+    });
+    // a failed request is reported inline below, never as DataTables' alert()
+    $.fn.dataTable.ext.errMode = 'none';
+    const notice = document.getElementById('pplNotice');
+    const searchInput = document.getElementById('pplSearch');
+
+    const table = $('#publicPermits').DataTable({
+      "order": [[ COLUMNS.findIndex(function (c) { return c.name === 'statusDate'; }), 'desc' ]],
+      "pageLength": PPL_DEFAULT_PAGE_LENGTH,
+      "lengthMenu": PPL_PAGE_LENGTHS,
+      "processing": true,
+      "stateSave": true,
+      "stateDuration": -1,
+      "serverSide": true,
+      "searchDelay": 400,
+      "ajax": {
+        "url": '/api/v1/permits/datatables/list/public',
+        "type": "POST"
+      },
+      "dom": "<'row'<'col-sm-12'tr>>" +
+        "<'row mt-2 align-items-center'<'col-12 col-md-4'i><'col-6 col-md-4'l><'col-6 col-md-4 d-flex justify-content-md-end'p>>",
+      "language": {
+        "info": "Showing _START_-_END_ of _TOTAL_ permits",
+        "infoEmpty": "",
+        "infoFiltered": "",
+        "lengthMenu": "Rows per page _MENU_",
+        "emptyTable": emptyHtml(false),
+        "zeroRecords": emptyHtml(false)
+      },
+      "columns": COLUMNS,
+      "createdRow": function (row, data) {
+        $(row).attr('url', permitPath(data.id));
+      }
+    });
+    $('#publicPermits').wrap('<div class="ppl-tblwrap" />');
+
+    // The empty message is static at init, so it is refreshed per response from
+    // the response's OWN counts: rows exist but none matched (a search), or the
+    // window is empty. The box's value is not the signal - a saved state can
+    // restore a search the reader no longer sees typed.
+    table.on('xhr', function (e, settings, json) {
+      notice.hidden = true;
+      const searched = !!(json && json.recordsTotal > 0 && json.recordsFiltered === 0);
+      settings.oLanguage.sZeroRecords = emptyHtml(searched);
+      settings.oLanguage.sEmptyTable = emptyHtml(searched);
+    });
+    table.on('error.dt', function () {
+      notice.textContent = 'The permits could not be loaded. Check your connection and try again in a moment.';
+      notice.hidden = false;
+    });
+    // the empty cell is re-rendered every draw, so the clear action is delegated
+    $('#publicPermits').on('click', '#pplEmptyClear', function () {
+      searchInput.value = '';
+      table.search('').draw();
+    });
+
+    // the search box (replaces the built-in filter input; same table.search
+    // pipeline, so a saved-state search restores into it)
+    searchInput.value = table.search() || '';
+    // waits for the typing to stop and never has two searches on the server at
+    // once (public/scripts/fi360-datatables-search.js)
+    window.fi360DataTableSearch.bind(table, searchInput);
+  });
+</script>
+
+  
+  <noscript>
+    <div id="noscript-warning">JavaScript must be enabled for this site to function correctly.</div>
+  </noscript>
+
+  <script src="/scripts/tenant-layout.js"></script>
+  <script>
+
+        // Open burning status for Public users and users not logged in
+        fi360BurnStatus({ badge: 'badge badge-sm', deniedMessages: {"Denied: County burn ban":"Open burning denied due to a county burn ban.",
+            "Denied: Red Flag Warning":"Open burning denied due to a red flag warning.",
+            "Denied: High winds (>22 mph)":"Open burning denied due to high winds (>22 mph).",
+            "Denied: Low winds (<6 mph)":"Open burning denied due to low winds (< 6 mph)."} });
+
+  </script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4bc70e2c01a94c73b74392e4234840661791215815920" integrity="sha512-L0ha0OXavK/8okipN9F8BtP84dg9DUhPERbBXzwI6dgTA55d2+yweo3pn5CSFYs45/r8md2+xvUPtTdvTNRfjA==" data-cf-beacon='{"version":"2024.11.0","token":"1174b79baf404e5bb98fcd4a0c3ecf32","spa":2}' crossorigin="anonymous"></script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a487869a6e5f746d',t:'MTc5MTY1NTIzOA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

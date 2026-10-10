@@ -1,0 +1,24 @@
+{
+  "storefront": {
+    "url": "https://cheltenhamtownship.portal.opengov.com/",
+    "status": 200,
+    "capturedDate": "2026-10-10",
+    "file": "cheltenham-storefront.html",
+    "redactions": "Client keys, tokens, license keys, client IDs and the embedded pusher secret in the environment config; Google Maps URL key. No government fields removed.",
+    "originalSha256": "285d1d4dc624b34b07eeab3a5f9a3958e188929ec1a12f969809d8458dd740f5"
+  },
+  "discovery": {
+    "appBundle": "https://cheltenhamtownship.portal.opengov.com/sha-8330821/assets/store3-be94a329144a5395701b370e5c7acd56.js",
+    "appBundleSha256": "ccfc6824e26208f7aa91c1b4af1ec3d689b47c5594c3b54e0192ec58ad965af4",
+    "observedMechanism": "Ember storefront with React integration. Browser network captured general_settings/1; public app code identifies search_results and JSON:API record routes. Newburyport address input remained Searching while the challenge credential was unavailable. No challenge interaction or clearance reuse."
+  },
+  "apiResponses": {
+    "index": "requests.json",
+    "count": 22,
+    "bodyPolicy": "Each numbered JSON file is the complete unmodified HTTP response body. No credentials, cookies or response headers retained."
+  },
+  "liveResults": {
+    "file": "live-results.json",
+    "note": "Adapter invocation logs, not government record fixtures. count=null means error, not no results. Initial Watertown redirects failed before the redirect fix; subsequent invocations supersede those. Recent calls return the unsupported sentinel and issue no portal requests."
+  }
+}

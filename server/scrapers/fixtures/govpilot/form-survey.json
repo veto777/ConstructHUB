@@ -1,0 +1,345 @@
+[
+  {
+    "jurisdiction": "Cranbury, NJ",
+    "url": "https://main.govpilot.com/web/public/23ab5fde-290_Construction-Permit-Township-of-Cranbury?uid=7199&ust=NJ&pu=1&id=0",
+    "platform": "GovPilot",
+    "sourceUrl": "https://www.cranburytownship.org/1352/Departments",
+    "linkStatus": "unconfirmed",
+    "index": 0,
+    "status": 200,
+    "lookup": "ADDSEL=dcee8,1",
+    "fixture": "survey-form-0.html"
+  },
+  {
+    "jurisdiction": "Columbine Valley, CO",
+    "url": "https://main.govpilot.com/web/public/7ae3f635-ff5_Building-Permit-Application-With-Plan-Review-COLUMBINE-VALLEY?uid=9360&ust=CO&pu=1&id=0",
+    "platform": "GovPilot",
+    "sourceUrl": "https://columbinevalley.org/building-permits/",
+    "linkStatus": "verified",
+    "index": 1,
+    "status": 200,
+    "lookup": "ADDSEL0"
+  },
+  {
+    "jurisdiction": "Columbia County, WA",
+    "url": "https://main.govpilot.com/web/public/35a46a9f-cd7_Building-Permit-COLUMBIA-COUNTY?uid=16026&ust=WA&pu=1&id=0",
+    "platform": "GovPilot",
+    "sourceUrl": "https://www.columbiacountywa.gov/69/Planning-and-Building",
+    "linkStatus": "verified",
+    "index": 2,
+    "status": 200,
+    "lookup": "ADDSEL"
+  },
+  {
+    "jurisdiction": "Jackson County, MS",
+    "url": "https://main.govpilot.com/web/public/e259a9e3-663_Construction-Primary-Permits-Jackson-County?uid=8329&ust=MS&pu=1&id=0",
+    "platform": "GovPilot",
+    "sourceUrl": "https://co.jackson.ms.us/542/Building-Department",
+    "linkStatus": "verified",
+    "index": 3,
+    "status": 200,
+    "lookup": "ADDSEL"
+  },
+  {
+    "jurisdiction": "Allendale, NJ",
+    "url": "https://main.govpilot.com/web/public/1a9bef4e-272_Dumpster-Permit-Application-ALLENDALE?uid=6902&ust=NJ&pu=1&id=0",
+    "platform": "GovPilot",
+    "sourceUrl": "https://www.allendalenj.gov/residents-businesses/applications-licenses-and-permits/",
+    "linkStatus": "verified",
+    "index": 4,
+    "status": 200,
+    "lookup": "ADDSEL"
+  },
+  {
+    "jurisdiction": "Avalon, NJ",
+    "url": "https://main.govpilot.com/web/public/8cbc19df-997_Construction-Permit-Borough-of-Avalon?uid=6913&ust=NJ&pu=1&id=0",
+    "platform": "GovPilot (Construction Permit / Inspection Request)",
+    "sourceUrl": "https://avalonboro.net/government/department-of-administration/avalon-construction-2/",
+    "linkStatus": "verified",
+    "index": 5,
+    "status": 200,
+    "lookup": "ADDSEL=dcee8,1",
+    "fixture": "survey-form-5.html"
+  },
+  {
+    "jurisdiction": "Bellmawr, NJ",
+    "url": "https://main.govpilot.com/web/public/0762f203-a28_Construction-Permit-Borough-of-Bellmawr?uid=6925&ust=NJ&pu=1&id=0",
+    "platform": "GovPilot (Construction Permit)",
+    "sourceUrl": "https://www.bellmawr.com/167/Construction-Permits",
+    "linkStatus": "verified",
+    "index": 6,
+    "status": 200,
+    "lookup": "ADDSEL"
+  },
+  {
+    "jurisdiction": "Dell Rapids, SD",
+    "url": "https://main.govpilot.com/web/public/fc014230-7f0_Building-Permit-DELL-RAPIDS-CITY?uid=42114&ust=SD&pu=1&id=0",
+    "platform": "GovPilot",
+    "sourceUrl": "https://www.cityofdellrapids.org/",
+    "linkStatus": "verified",
+    "index": 7,
+    "status": 200,
+    "lookup": "ADDSEL"
+  },
+  {
+    "jurisdiction": "Jamestown, NY",
+    "url": "https://main.govpilot.com/web/public/2901be25-4e4_Building-Permit-JAMESTOWN-CITY?uid=34308&ust=NY&pu=1&id=0",
+    "platform": "GovPilot (Building Permit Application)",
+    "sourceUrl": "https://www.jamestownny.gov/",
+    "linkStatus": "verified",
+    "index": 8,
+    "status": 200,
+    "lookup": "ADDSEL"
+  },
+  {
+    "jurisdiction": "La Salle, IL",
+    "url": "https://main.govpilot.com/web/public/bf5b91f8-885_Construction-Permit-Application-lasallecitylasalleil?uid=61091&ust=IL&pu=1&id=0",
+    "platform": "GovPilot",
+    "sourceUrl": "https://www.lasalle-il.gov/index.php/departments/building-department",
+    "linkStatus": "verified",
+    "index": 9,
+    "status": 200,
+    "lookup": "ADDSEL"
+  },
+  {
+    "jurisdiction": "Maplewood, NJ",
+    "url": "https://main.govpilot.com/web/public/129d48cb-7b2_Construction-Permit-Township-of-Maplewood?uid=7127&ust=NJ&pu=1&id=0",
+    "platform": "GovPilot (Construction Permit)",
+    "sourceUrl": "https://www.maplewoodnj.gov/government/community-development/construction-division/how-to-submit-a-construction-permit-application-obtain-inspections",
+    "linkStatus": "verified",
+    "index": 10,
+    "status": 200,
+    "lookup": "ADDSEL=dcee8,1",
+    "fixture": "survey-form-10.html"
+  },
+  {
+    "jurisdiction": "Ovilla, TX",
+    "url": "https://main.govpilot.com/web/public/9d877c44-37f_Residential-Building-Permit-Ovilla-City?uid=9219&ust=TX&pu=1&id=0",
+    "platform": "GovPilot",
+    "sourceUrl": "https://www.cityofovilla.org/20/Permits",
+    "linkStatus": "verified",
+    "index": 11,
+    "status": 200,
+    "lookup": "ADDSEL"
+  },
+  {
+    "jurisdiction": "Stevens Point, WI",
+    "url": "https://main.govpilot.com/web/public/ecc321fd-e1c_Construction-Permit-Application-account?uid=45924&ust=WI&pu=1&id=",
+    "platform": "GovPilot",
+    "sourceUrl": "https://stevenspoint.com/579/Building-Permits",
+    "linkStatus": "verified",
+    "index": 12,
+    "status": 200,
+    "lookup": "ADDSEL0"
+  },
+  {
+    "jurisdiction": "Atlantic City, NJ",
+    "url": "https://main.govpilot.com/web/public/a89a84ca-389_Report-a-Concern-atlanticcity?uid=6910&ust=NJ&pu=1&id=0",
+    "platform": "GovPilot",
+    "sourceUrl": "https://www.acnj.gov/",
+    "linkStatus": "unconfirmed",
+    "index": 13,
+    "status": 200,
+    "lookup": "ADDSEL"
+  },
+  {
+    "jurisdiction": "Bladensburg, MD",
+    "url": "https://main.govpilot.com/web/public/c47cf6c7-88d_Report-a-Concern-BLADENSBURG-TOWN?uid=62679&ust=MD&pu=1&id=0",
+    "platform": "GovPilot",
+    "sourceUrl": "https://bladensburgmd.gov/",
+    "linkStatus": "unconfirmed",
+    "index": 15,
+    "status": 200,
+    "lookup": "ADDSEL"
+  },
+  {
+    "jurisdiction": "Brielle, NJ",
+    "url": "https://main.govpilot.com/web/public/41b0935c-1a0_Report-a-Concern-BRIELLE?uid=7223&ust=NJ&pu=1&id=0",
+    "platform": "GovPilot",
+    "sourceUrl": "https://briellenj.gov/",
+    "linkStatus": "unconfirmed",
+    "index": 17,
+    "status": 200,
+    "lookup": null
+  },
+  {
+    "jurisdiction": "Clark, NJ",
+    "url": "https://main.govpilot.com/web/public/f45048da-fa3_Construction-Permit-Township-of-Clark?uid=7353&ust=NJ&pu=1&id=0",
+    "platform": "GovPilot (Construction Permit)",
+    "sourceUrl": "https://www.ourclark.com/152/Construction",
+    "linkStatus": "unconfirmed",
+    "index": 18,
+    "status": 200,
+    "lookup": "ADDSEL=dcee8,1",
+    "fixture": "survey-form-18.html"
+  },
+  {
+    "jurisdiction": "Hackensack, NJ",
+    "url": "https://main.govpilot.com/web/public/af17756d-db2_Construction-Permit-Inspection-Request-hackensack?uid=6978&ust=NJ&pu=1&id=0",
+    "platform": "GovPilot (Construction inspection request)",
+    "sourceUrl": "https://www.hackensack.org/building-housing-and-land-use/",
+    "linkStatus": "unconfirmed",
+    "index": 21,
+    "status": 200,
+    "lookup": "ADDSEL=dcee8,1",
+    "fixture": "survey-form-21.html"
+  },
+  {
+    "jurisdiction": "Haddon Township, NJ",
+    "url": "https://main.govpilot.com/web/public/c93a191c-fde_Construction-Permit-Township-of-Haddon?uid=7071&ust=NJ&pu=1&id=0",
+    "platform": "GovPilot (Construction Permit / Inspections)",
+    "sourceUrl": "https://www.haddontwp.com/departmets/construction-office/",
+    "linkStatus": "unconfirmed",
+    "index": 22,
+    "status": 200,
+    "lookup": "ADDSEL=dcee8,1",
+    "fixture": "survey-form-22.html"
+  },
+  {
+    "jurisdiction": "Harvey, IL",
+    "url": "https://main.govpilot.com/web/public/2c7843d0-4bf_Report-a-Concern-harveyIL?uid=7676&ust=IL&pu=1&id=0",
+    "platform": "GovPilot",
+    "sourceUrl": "https://cityofharveyil.gov/",
+    "linkStatus": "unconfirmed",
+    "index": 23,
+    "status": 200,
+    "lookup": "ADDSEL"
+  },
+  {
+    "jurisdiction": "Hopatcong, NJ",
+    "url": "https://main.govpilot.com/web/public/b0f7b21a-4cf_Construction-Permit-Hopatcong?uid=7400&ust=NJ&pu=1&id=0",
+    "platform": "GovPilot (Construction Permit)",
+    "sourceUrl": "https://hopatcong.org/departments/construction/index.php",
+    "linkStatus": "unconfirmed",
+    "index": 24,
+    "status": 200,
+    "lookup": "ADDSEL=dcee8,1",
+    "fixture": "survey-form-24.html"
+  },
+  {
+    "jurisdiction": "Leonia, NJ",
+    "url": "https://main.govpilot.com/web/public/85b6e58c-197_Construction-Permit-Borough-of-Leonia?uid=7020&ust=NJ&pu=1&id=0",
+    "platform": "GovPilot",
+    "sourceUrl": "https://www.leonianj.gov/borough-government/borough-departments/building-department",
+    "linkStatus": "unconfirmed",
+    "index": 26,
+    "status": 200,
+    "lookup": "ADDSEL=dcee8,1",
+    "fixture": "survey-form-26.html"
+  },
+  {
+    "jurisdiction": "Livingston, NJ",
+    "url": "https://main.govpilot.com/web/public/81d03c4f-96e_Construction-Permit-Township-of-Livingston?uid=7126&ust=NJ&pu=1&id=0",
+    "platform": "GovPilot (Construction Permit)",
+    "sourceUrl": "https://www.livingstonnj.org/",
+    "linkStatus": "unconfirmed",
+    "index": 27,
+    "status": 200,
+    "lookup": "ADDSEL=dcee8,1",
+    "fixture": "survey-form-27.html"
+  },
+  {
+    "jurisdiction": "Manasquan, NJ",
+    "url": "https://main.govpilot.com/web/public/092cfbd5-1b2_Report-a-Concern-manasquan?uid=7244&ust=NJ&pu=1&id=0",
+    "platform": "GovPilot",
+    "sourceUrl": "https://www.manasquan-nj.gov/",
+    "linkStatus": "unconfirmed",
+    "index": 28,
+    "status": 200,
+    "lookup": "ADDSEL"
+  },
+  {
+    "jurisdiction": "Millstone Township, NJ",
+    "url": "https://main.govpilot.com/web/public/6829df5a-aa7_Construction-Permit-Millstone-Township?uid=7658&ust=NJ&pu=1&id=0",
+    "platform": "GovPilot (Construction Permit Application)",
+    "sourceUrl": "https://millstonenj.gov/departments/construction-department/",
+    "linkStatus": "unconfirmed",
+    "index": 29,
+    "status": 200,
+    "lookup": "ADDSEL"
+  },
+  {
+    "jurisdiction": "Oakland, NJ",
+    "url": "https://main.govpilot.com/web/public/42050a43-356_Construction-Permit-Borough-of-Oakland?uid=7004&ust=NJ&pu=1&id=0",
+    "platform": "GovPilot (Construction Permit)",
+    "sourceUrl": "https://www.oakland-nj.gov/1233/Construction-and-Code-Enforcement",
+    "linkStatus": "unconfirmed",
+    "index": 32,
+    "status": 200,
+    "lookup": "ADDSEL=dcee8,1",
+    "fixture": "survey-form-32.html"
+  },
+  {
+    "jurisdiction": "Point Pleasant Beach, NJ",
+    "url": "https://main.govpilot.com/web/public/5e28bcce-27a_Open-Records-Request-pointpleasantbeach?uid=7316&ust=NJ&pu=1&id=1",
+    "platform": "GovPilot",
+    "sourceUrl": "https://pointpleasantbeach.gov/",
+    "linkStatus": "unconfirmed",
+    "index": 33,
+    "status": 200,
+    "lookup": null
+  },
+  {
+    "jurisdiction": "Pontiac, IL",
+    "url": "https://main.govpilot.com/web/public/5e463fcb-bc2_Building-Permit-PONTIAC-CITY?uid=61199&ust=IL&pu=1&id=0",
+    "platform": "GovPilot",
+    "sourceUrl": "https://www.pontiac.org/363/Permit-Applications",
+    "linkStatus": "unconfirmed",
+    "index": 35,
+    "status": 200,
+    "lookup": "ADDSEL"
+  },
+  {
+    "jurisdiction": "Rutland, VT",
+    "url": "https://main.govpilot.com/web/public/d3ee9d6d-001_Building-Permit-RUTLAND-CITY?uid=44313&ust=VT&pu=1&id=0",
+    "platform": "GovPilot",
+    "sourceUrl": "https://www.rutlandcity.org/departments/building-department/",
+    "linkStatus": "unconfirmed",
+    "index": 37,
+    "status": 200,
+    "lookup": "ADDSEL"
+  },
+  {
+    "jurisdiction": "Shamong, NJ",
+    "url": "https://main.govpilot.com/web/public/c3a238be-13b_Construction-Permit-SHAMONG-TWP?uid=7741&ust=NJ&pu=1&id=0",
+    "platform": "GovPilot (Construction Permit Inspection Request)",
+    "sourceUrl": "https://www.shamong.net/department_contacts__hours/building_code_construction_permits__zoning/index.php",
+    "linkStatus": "unconfirmed",
+    "index": 38,
+    "status": 200,
+    "lookup": "ADDSEL=dcee8,1",
+    "fixture": "survey-form-38.html"
+  },
+  {
+    "jurisdiction": "South Orange, NJ",
+    "url": "https://main.govpilot.com/web/public/a8d14ee2-52b_Construction-Permit-Inspection-Request-southorangevillage?uid=6977&ust=NJ&pu=1&id=0",
+    "platform": "GovPilot (Construction inspection request)",
+    "sourceUrl": "https://www.southorange.org/558/Permit-License-Application-Forms",
+    "linkStatus": "unconfirmed",
+    "index": 39,
+    "status": 200,
+    "lookup": "ADDSEL=dcee8,1",
+    "fixture": "survey-form-39.html"
+  },
+  {
+    "jurisdiction": "Trenton, NJ",
+    "url": "https://main.govpilot.com/web/public/21fac3e5-64c_Construction-Permit-Application-trenton?uid=7197&ust=NJ&pu=1&id=0",
+    "platform": "GovPilot (Construction Permit Application)",
+    "sourceUrl": "https://www.trentonnj.org/9/How-Do-I",
+    "linkStatus": "unconfirmed",
+    "index": 40,
+    "status": 200,
+    "lookup": "ADDSEL0"
+  },
+  {
+    "jurisdiction": "Union, NJ",
+    "url": "https://main.govpilot.com/web/public/50a30bd8-d7b_Construction-Permit-Inspection-Request-uniontownship?uid=6840&ust=NJ&pu=1&id=0",
+    "platform": "GovPilot (Construction Permit Inspection Request)",
+    "sourceUrl": "https://www.uniontownship.com/134/Building-Department",
+    "linkStatus": "unconfirmed",
+    "index": 41,
+    "status": 200,
+    "lookup": "ADDSEL=dcee8,1",
+    "fixture": "survey-form-41.html"
+  }
+]

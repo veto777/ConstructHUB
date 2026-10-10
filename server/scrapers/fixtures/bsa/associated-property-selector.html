@@ -1,0 +1,29 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+
+    
+    
+
+<!-- Following allows you to define scripts before rendering the actual partial view contents.
+     Needed to handle an issue where the telerik grids need to access their client functions when rendered -->
+    
+    
+
+    <div class="t-widget t-grid" gridDeleteMessage="Are you sure you wish to delete the selected record?" gridDeleteMessageTitle="Delete Selected Record" gridDeleteTitle="Confirm Deletion" gridUseMdbDeletionModal="False" id="GridAssociatedProperties"><table cellspacing="0"><colgroup><col /><col /><col /><col /><col /></colgroup><thead class="t-grid-header"><tr><th class="t-header" scope="col" style="display:none"><span class="t-link">Property Guid</span></th><th class="t-header" scope="col"><span class="t-link">Address</span></th><th class="t-header" scope="col"><span class="t-link">Lot</span></th><th class="t-header" scope="col"><span class="t-link">Block</span></th><th class="t-header" scope="col"><span class="t-link">Subdivision</span></th><th class="t-header" scope="col"><span class="t-link">Occupant Name</span></th></tr></thead><tbody><tr class="t-no-data"><td colspan="5">No records to display.</td></tr></tbody></table><div class="t-grid-pager t-grid-bottom"><div class="t-status"><a class="t-icon t-refresh" href="/CD_PropertySearchV3/CdPropertySelectModal?GridAssociatedProperties-size=20&amp;uid=2757&amp;parcelNumber=14015700110454">Refresh</a></div><div class="t-pager t-reset"><a class="t-link t-state-disabled" href="#"><span class="t-icon t-arrow-first">first</span></a><a class="t-link t-state-disabled" href="#"><span class="t-icon t-arrow-prev">prev</span></a><div class="t-numeric"><span class="t-state-active">1</span></div><a class="t-link t-state-disabled" href="#"><span class="t-icon t-arrow-next">next</span></a><a class="t-link t-state-disabled" href="#"><span class="t-icon t-arrow-last">last</span></a></div><div class="t-status-text">Displaying items 0 - 0 of 0</div></div></div><script type="text/javascript">
+	if(!jQuery.telerik){
+	jQuery.ajax({
+	url:"/Scripts/2011.3.1115/telerik.common.min.js",
+	dataType:"script",
+	cache:false,
+	success:function(){
+	jQuery.telerik.load(["/Scripts/2011.3.1115/jquery-1.6.4.min.js","/Scripts/2011.3.1115/telerik.common.min.js","/Scripts/2011.3.1115/telerik.grid.min.js"],function(){ jQuery('#GridAssociatedProperties').tGrid({columns:[{"attr":" style=\"display:none;\"","title":"Property Guid","hidden":true,"member":"PropertyGuid","type":"Object"},{"title":"Address","member":"AddressDisplayString","type":"String"},{"title":"Lot","member":"Lot","type":"String"},{"title":"Block","member":"Block","type":"String"},{"title":"Subdivision","member":"Subdivision","type":"String"},{"title":"Occupant Name","member":"NameOccupant","type":"String"}], pageSize:20, total:0, currentPage:1, pageSizesInDropDown:["5","10","20","50"], pageOnScroll:false, selectable:true, ajax:{"selectUrl":"/CD_PropertySearchV3/GridAssociatedPropertiesSelectBinding?command=Telerik.Web.Mvc.GridCommand\u0026parcelNumber=14015700110454\u0026GridAssociatedProperties-size=20\u0026uid=2757"}, onDelete:onGridDelete, onDataBinding:bsaGrid.onAjaxGridDataBinding, onDataBound:bsaGrid.onAjaxGridDataBound, onEdit:onGridEdit, onError:bsaGrid.onAjaxGridError, onRowSelect:cdSiteSearchPropertySelectModal.associatedPropertiesGridRowSelect, noRecordsTemplate:'No records to display.'}); });
+	}});}else{
+	jQuery.telerik.load(["/Scripts/2011.3.1115/jquery-1.6.4.min.js","/Scripts/2011.3.1115/telerik.common.min.js","/Scripts/2011.3.1115/telerik.grid.min.js"],function(){ jQuery('#GridAssociatedProperties').tGrid({columns:[{"attr":" style=\"display:none;\"","title":"Property Guid","hidden":true,"member":"PropertyGuid","type":"Object"},{"title":"Address","member":"AddressDisplayString","type":"String"},{"title":"Lot","member":"Lot","type":"String"},{"title":"Block","member":"Block","type":"String"},{"title":"Subdivision","member":"Subdivision","type":"String"},{"title":"Occupant Name","member":"NameOccupant","type":"String"}], pageSize:20, total:0, currentPage:1, pageSizesInDropDown:["5","10","20","50"], pageOnScroll:false, selectable:true, ajax:{"selectUrl":"/CD_PropertySearchV3/GridAssociatedPropertiesSelectBinding?command=Telerik.Web.Mvc.GridCommand\u0026parcelNumber=14015700110454\u0026GridAssociatedProperties-size=20\u0026uid=2757"}, onDelete:onGridDelete, onDataBinding:bsaGrid.onAjaxGridDataBinding, onDataBound:bsaGrid.onAjaxGridDataBound, onEdit:onGridEdit, onError:bsaGrid.onAjaxGridError, onRowSelect:cdSiteSearchPropertySelectModal.associatedPropertiesGridRowSelect, noRecordsTemplate:'No records to display.'}); });
+	}
+
+</script><div class="modal-footer-container"><button class="btn btn-bsa-secondary" id="bsa-e0698e49-c31c-4ec9-b6ea-9277f522cfad_DYNAMICKEY_" name="bsa-e0698e49-c31c-4ec9-b6ea-9277f522cfad_DYNAMICKEY_" type="Button" onclick="cdSiteSearchPropertySelectModal.cancelButtonClicked()" onkeydown="if(event.keyCode == 90){ cdSiteSearchPropertySelectModal.cancelButtonClicked() }">Cancel</button><button class="btn btn-bsa-primary" id="bsa-b7724938-3f36-4cde-b5fd-ba6cd17c6b92_DYNAMICKEY_" name="bsa-b7724938-3f36-4cde-b5fd-ba6cd17c6b92_DYNAMICKEY_" type="Button" onclick="cdSiteSearchPropertySelectModal.selectButtonClicked()" onkeydown="if(event.keyCode == 90){ cdSiteSearchPropertySelectModal.selectButtonClicked() }">Select</button></div>
+
+
+</html>

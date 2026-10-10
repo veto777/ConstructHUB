@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
+
+	<!-- bootstrap 3.0.2 -->
+	<link href="/mo_jeffersoncounty/portal/themes/AdminLTE-2.1.1/bootstrap/css/bootstrap.min.css" rel="stylesheet" type="text/css" />
+    <!-- Font Awesome Icons -->
+    <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+    <!-- Ionicons -->
+    <link href="https://code.ionicframework.com/ionicons/2.0.1/css/ionicons.min.css" rel="stylesheet" type="text/css" />
+	<!-- Theme style -->
+	<link href="/mo_jeffersoncounty/portal/themes/AdminLTE-2.1.1/dist/css/AdminLTE.css" rel="stylesheet" type="text/css" />
+     <!-- AdminLTE Skins. Choose a skin from the css/skins
+         folder instead of downloading all of them to reduce the load. -->
+    <link href="/mo_jeffersoncounty/portal/themes/AdminLTE-2.1.1/dist/css/skins/_all-skins.min.css" rel="stylesheet" type="text/css" />
+    <!-- Style custom -->
+    <link href="/mo_jeffersoncounty/portal/themes/AdminLTE-2.1.1/dist/css/style.css" rel="stylesheet" type="text/css" />
+
+	<link rel="stylesheet" type="text/css" href="/mo_jeffersoncounty/portal/css/foundation.css" />
+	<link rel="stylesheet" type="text/css" href="/mo_jeffersoncounty/portal/css/custom.css" />
+
+	<script src="/mo_jeffersoncounty/portal/js/vendor/modernizr.js"></script>
+	<script src="/mo_jeffersoncounty/portal/js/vendor/jquery.js"></script>
+	<script src="/mo_jeffersoncounty/portal/js/custom/tableManager.js"></script>
+	<script type="text/javascript">
+        // basic usage
+        $(document).ready(function() {			
+	        if ($('.tablemanager').length > 0) {
+                $('.tablemanager').tablemanager({
+                    firstSort: [[1, 0], [2, 0]],
+                    appendFilterby: true,
+                    dateFormat: [[4, "mm-dd-yyyy"]],
+                    debug: true,
+                    vocabulary: {
+                        voc_filter_by: 'Filter By',
+                        voc_type_here_filter: 'Enter search terms here...',
+                        voc_show_rows: 'Rows Per Page'
+                    },
+                    pagination: true,
+                    showrows: [50, 100, 200],
+                });
+            }
+			$.ajax({
+				url: '../automated/portalHtml',
+				type: 'GET',
+				dataType: 'html',
+				success: function(data) {
+					// if data is a string, extract the contents of the first textarea in data
+					if (typeof data === 'string' && $('.tablemanager').length == 0) {
+						var html_data = $.parseHTML(data);
+						var permit_table = $(html_data).filter("#permits").val();
+						var project_table = $(html_data).filter("#projects").val();
+						var license_table = $(html_data).filter("#licenses").val();
+						var complaints_table = $(html_data).filter("#complaints").val();
+						const tablemanager = $('.tablemanager');
+						
+						// if this page is for permits, append the permit table
+						if ($(".portal:contains(Search Permits and Apply Online)").length > 0 || $(".art-postheader:contains(Permit)").length > 0 || $(".box-title:contains(Permit)").length > 0) {
+							$(".portal:eq(0)").append(permit_table);		
+							if (tablemanager.length > 0) tablemanager.tablemanager({
+								firstSort: [[1, 0], [2, 0]],
+								appendFilterby: true,
+								dateFormat: [[4, "mm-dd-yyyy"]],
+								debug: true,
+								vocabulary: {
+									voc_filter_by: 'Filter By',
+									voc_type_here_filter: 'Enter search terms here...',
+									voc_show_rows: 'Rows Per Page'
+								},
+								pagination: true,
+								showrows: [50, 100, 200],
+							});
+						}
+
+						// if this page is for projects, append the project table
+						if ($(".portal:contains(Search Projects and Apply Online)").length > 0 || $(".art-postheader:contains(Project)").length > 0 || $(".box-title:contains(Planning)").length > 0) {
+							$(".portal:eq(0)").append(project_table);
+							if (tablemanager.length > 0) tablemanager.tablemanager({
+								firstSort: [[1, 0], [2, 0]],
+								appendFilterby: true,
+								dateFormat: [[4, "mm-dd-yyyy"]],
+								debug: true,
+								vocabulary: {
+									voc_filter_by: 'Filter By',
+									voc_type_here_filter: 'Enter search terms here...',
+									voc_show_rows: 'Rows Per Page'
+								},
+								pagination: true,
+								showrows: [50, 100, 200],
+							});
+						}
+
+						// if this page is for licenses, append the license table
+						if ($(".portal:contains(Search Licenses and Apply Online)").length > 0 || $(".art-postheader:contains(License)").length > 0 || $(".box-title:contains(License)").length > 0) {
+							$(".portal:eq(0)").append(license_table);
+                            if (tableManager.length > 0) {
+                                tableManager.tablemanager({
+                                    firstSort: [[1, 0], [2, 0]],
+                                    appendFilterby: true,
+                                    dateFormat: [[4, "mm-dd-yyyy"]],
+                                    debug: true,
+                                    vocabulary: {
+                                        voc_filter_by: 'Filter By',
+                                        voc_type_here_filter: 'Enter search terms here...',
+                                        voc_show_rows: 'Rows Per Page'
+                                    },
+                                    pagination: true,
+                                    showrows: [50, 100, 200],
+                                });
+                            }
+						}
+
+						// if this page is for complaints, append the complaints table
+						if ($(".portal:contains(Complaints & Violations)").length > 0 || $(".art-postheader:contains(Complaints & Violations)").length > 0 || $(".box-title:contains(Complaints & Violations)").length > 0) {
+							$(".portal:eq(0)").append(complaints_table);
+							if (tableManager.length > 0) tablemanager.tablemanager({
+								firstSort: [[1, 0], [2, 0]],
+								appendFilterby: true,
+								dateFormat: [[4, "mm-dd-yyyy"]],
+								debug: true,
+								vocabulary: {
+									voc_filter_by: 'Filter By',
+									voc_type_here_filter: 'Enter search terms here...',
+									voc_show_rows: 'Rows Per Page'
+								},
+								pagination: true,
+								showrows: [50, 100, 200],
+							});
+						}
+					}
+				}
+			});
+        });
+	</script>
+
+	<!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+	<!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+        <!--[if lt IE 9]>
+          <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+          <script src="https://oss.maxcdn.com/libs/respond.js/1.3.0/respond.min.js"></script>
+          <![endif]-->
+
+ 	<title>Citizen Portal</title>
+
+</head>
+
+<body class="skin-blue sidebar-mini layout-top-nav">
+
+    <!-- Site wrapper -->
+    <div class="wrapper">
+
+            			    <header class="main-header">
+				    <nav class="navbar navbar-static-top">
+					    <div class="container">
+						    <div class="navbar-header">
+							    <a href="./" class="navbar-brand">Citizen Portal</a>
+						    </div>
+
+						    <!-- Collect the nav links, forms, and other content for toggling -->
+						    <div class="collapse navbar-collapse pull-left" id="navbar-collapse">
+							    <ul class="nav navbar-nav">
+								    <li><a href="/mo_jeffersoncounty/portal/index.php?r=site/login">Login</a></li>
+								    <li><a href="/mo_jeffersoncounty/portal/index.php?r=users/create">Register</a></li>
+                                                                            <li><a href="/mo_jeffersoncounty/portal/index.php?r=publicRecordsSearch/index">Public Records Search</a></li>
+                                    							    </ul>
+						    </div>
+						    <!-- /.navbar-collapse -->
+					    </div>
+					    <!-- /.container-fluid -->
+				    </nav>
+			    </header>
+	            	    
+    <!-- Left side column. contains the logo and sidebar -->
+
+<!-- Right side column. Contains the navbar and content of the page -->
+    <div class="content-wrapper">
+
+        <!-- Content Header (Page header) -->
+        <section class="content-header">
+                            <!-- breadcrumbs -->
+                    </section>
+
+        <!-- Main content -->
+        <section class="content">
+            <div class="container">
+			<div class="box box-primary">
+			<div class="box-body">			
+				<br>
+				<div class="portal">
+<div class="portal-logo">&nbsp;</div>
+<img style="display: block; margin-left: auto; margin-right: auto;" src="https://www.civicgov4.com/mo_jeffersoncounty/images/uploads/main_header_landscape.png?timestamp=1758813315" alt="" />
+<p>&nbsp;</p>
+<p><span style="font-size: 1.5em;">Permitting, Planning &amp; Zoning, Contractor License and Inspections Portal!</span></p>
+<p>This portal provides the public 24/7 access to the following online services:</p>
+<div class="portal-menu">
+<ul>
+<li><a href="https://www.civicgov4.com/mo_jeffersoncounty/portal/index.php?r=portalPosts/view&amp;id=2" target="_blank">Permits</a></li>
+<li><a href="https://www.civicgov4.com/mo_jeffersoncounty/portal/index.php?r=portalPosts/view&amp;id=3" target="_blank">Planning and Zoning</a></li>
+<li><a href="https://www.civicgov4.com/mo_jeffersoncounty/portal/index.php?r=portalPosts/view&amp;id=5" target="_blank">Contractor Licenses</a></li>
+<li><a href="https://www.civicgov4.com/mo_jeffersoncounty/portal/index.php?r=portalPosts/view&amp;id=4" target="_blank"> Request for Inspections</a></li>
+<li><a href="https://seeclickfix.com/web_portal/7Gk49AmTseiH8VyAaLwTRGGq/issues/map">Report a Complaint</a></li>
+</ul>
+</div>
+</div>			</div>		
+			<div class="box-footer">
+				<p style="text-align: center">
+					<a href="?r=site/login" class="btn btn-primary">Log In</a>
+					<a href="?r=users/create" class="btn btn-primary">Register</a>
+				</p>
+			</div>
+		</div>
+	</div>        </section><!-- /.content -->
+
+    </div><!-- /.right-side -->
+
+
+            <footer class="main-footer">
+                <div class="pull-right hidden-xs">
+                    <strong>Community Development 4.0 Citizen Portal</strong>
+                </div>
+	            <strong>Copyright &copy; 2026 <a href="http://www.civicgovcloud.com/" target="_civicgov">CivicPlus</a></strong>
+            </footer>
+
+
+          <div class='control-sidebar-bg'></div>
+
+    </div><!-- ./wrapper -->
+    <script>
+	    $(document).ready(function() {
+            $(".sidebar-toggle").click(function(e) {
+                e.preventDefault();
+                $("body").toggleClass('sidebar-collapse');
+                $("body").toggleClass('sidebar-open');
+            });
+	    });
+    </script>
+    <!-- Bootstrap 3.3.2 JS -->
+    <script src="/mo_jeffersoncounty/portal/themes/AdminLTE-2.1.1/bootstrap/js/bootstrap.min.js" type="text/javascript"></script>
+    <!-- SlimScroll -->
+    <script src="/mo_jeffersoncounty/portal/themes/AdminLTE-2.1.1/plugins/slimScroll/jquery.slimscroll.min.js" type="text/javascript"></script>
+    <!-- FastClick -->
+    <script src='/mo_jeffersoncounty/portal/themes/AdminLTE-2.1.1/plugins/fastclick/fastclick.min.js'></script>
+    <!-- AdminLTE App -->
+    <script src="/mo_jeffersoncounty/portal/themes/AdminLTE-2.1.1/dist/js/app.min.js" type="text/javascript"></script>
+    
+    <!-- AudioEye snippet -->
+    <script type="text/javascript">!function () {
+        var b = function () {
+            window.__AudioEyeSiteHash = "69257278ee3a58e381f2deba1979e0fe";
+            var a = document.createElement("script");
+            a.src = "https://wsmcdn.audioeye.com/aem.js";
+            a.type = "text/javascript";
+            a.setAttribute("async", "");
+            document.getElementsByTagName("body")[0].appendChild(a)
+        };
+        "complete" !== document.readyState ? window.addEventListener ? window.addEventListener("load", b) : window.attachEvent && window.attachEvent("onload", b) : b()
+    }();</script>
+    <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4bc70e2c01a94c73b74392e4234840661791215815920" integrity="sha512-L0ha0OXavK/8okipN9F8BtP84dg9DUhPERbBXzwI6dgTA55d2+yweo3pn5CSFYs45/r8md2+xvUPtTdvTNRfjA==" data-cf-beacon='{"version":"2024.11.0","token":"5d67ece54f8942c281a8c491127b5bf8","spa":2}' crossorigin="anonymous"></script>
+</body>
+</html>

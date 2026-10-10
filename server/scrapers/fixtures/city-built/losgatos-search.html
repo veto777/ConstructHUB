@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7" lang="en"> <![endif]-->
+<!--[if IE 7]>         <html class="no-js lt-ie9 lt-ie8" lang="en"> <![endif]-->
+<!--[if IE 8]>         <html class="no-js lt-ie9" lang="en"> <![endif]-->
+<!--[if gt IE 8]><!-->
+<html class="no-js" lang="en-US">
+<!--<![endif]-->
+<head>
+	<!-- Published by OpenCities, 1.38.0.1 -->
+
+    
+        
+    
+    
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="theme-color" content="#4D6A7A"/>
+    <title>Home Town of Los Gatos Permits</title>
+	<meta name="generator" content="OpenCities - https://granicus.com/product/opencities" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Using mobile-web-app-capable for now to enable full-screen experience on supported platforms -->
+    <!-- Note: This tag works mainly on Android Chrome. It does NOT enable full-screen mode on iOS Safari. -->
+    <!-- For iOS, the correct tag is: <meta name="apple-mobile-web-app-capable" content="yes"> -->
+    <!-- TODO: Monitor for updated meta tag standards from Apple or other browser vendors -->
+    <meta name="mobile-web-app-capable" content="yes" />
+        <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://permits.losgatosca.gov/Home" />
+    <meta property="og:title" content="Town of Los Gatos Permits" />
+    <meta property="twitter:card" content="summary" />
+    <meta property="twitter:title" content="Town of Los Gatos Permits" />
+    <link rel="canonical" href="https://permits.losgatosca.gov/Home" />
+
+    
+    
+    <script>
+        (function () {
+            if (window.__UNLOAD_LAZY_PATCH__) return;
+            window.__UNLOAD_LAZY_PATCH__ = true;
+
+            var supportsPageHide = ("onpagehide" in window);
+            var mappedType = supportsPageHide ? "pagehide" : "beforeunload";
+            var nativeAdd = window.addEventListener;
+            var nativeRemove = window.removeEventListener;
+            var unloadMap = null;
+            var patched = false;
+
+            function ensurePatched() {
+                if (patched) return;
+                unloadMap = new WeakMap();
+
+                window.addEventListener = function (type, listener, options) {
+                    if (type === "unload") {
+                        var wrapped = function (evt) {
+                            if (supportsPageHide && evt.persisted) return;
+                            listener.call(this, evt);
+                        };
+                        unloadMap.set(listener, wrapped);
+                        return nativeAdd.call(this, mappedType, wrapped, options);
+                    }
+                    return nativeAdd.call(this, type, listener, options);
+                };
+
+                window.removeEventListener = function (type, listener, options) {
+                    if (type === "unload") {
+                        var wrapped = unloadMap.get(listener);
+                        if (wrapped) {
+                            nativeRemove.call(this, mappedType, wrapped, options);
+                            unloadMap.delete(listener);
+                        }
+                        return;
+                    }
+                    return nativeRemove.call(this, type, listener, options);
+                };
+
+                var orig = null;
+                Object.defineProperty(window, "onunload", {
+                    configurable: true, enumerable: true,
+                    get: function () { return orig; },
+                    set: function (h) {
+                        orig = h;
+                        if (typeof h === "function") window.addEventListener("unload", h);
+                    }
+                });
+                patched = true;
+            }
+
+            window.addEventListener = function (type, listener, options) {
+                if (type === "unload") {
+                    ensurePatched();
+                    return window.addEventListener(type, listener, options);
+                }
+                return nativeAdd.call(this, type, listener, options);
+            };
+
+            window.removeEventListener = function (type, listener, options) {
+                if (type === "unload" && !patched) {
+                    return;
+                }
+                return nativeRemove.call(this, type, listener, options);
+            };
+
+            function patchTelerik() {
+                ensurePatched();
+                var ns = window.RadAjaxNamespace;
+                if (!ns || !ns.EventManager || !ns.EventManager.Add || ns.EventManager.__UnloadPatched) return;
+                var origAdd = ns.EventManager.Add;
+                ns.EventManager.Add = function (el, evtName, handler, clientId) {
+                    if (el === window && evtName === "unload") {
+                        return window.addEventListener("unload", handler);
+                    }
+                    return origAdd.call(this, el, evtName, handler, clientId);
+                };
+                ns.EventManager.__UnloadPatched = true;
+            }
+
+            if (window.RadAjaxNamespace)
+                patchTelerik();
+            else (window.requestIdleCallback || function (cb)
+            {
+                setTimeout(cb, 120);
+            })(patchTelerik);
+        })();
+    </script>
+    <!-- Preconnecting to Google Fonts servers -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <!-- Defer Roboto font loading to avoid render-blocking -->
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            const robotoLink = document.createElement('link');
+            robotoLink.rel = 'stylesheet';
+            robotoLink.href = 'https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap';
+            document.head.appendChild(robotoLink);
+        });
+    </script>
+
+    <style>
+        .gm-style, .gm-style * {
+            font-family: 'Roboto', system-ui, -apple-system, "Segoe UI", Arial, sans-serif !important;
+        }
+    </style>
+
+    <script>
+        document.documentElement.className = document.documentElement.className.replace(/\bno-js\b/g, "js");
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    
+        
+            <script type="text/javascript">
+                window.__oc_flags_ImprovedBreakpointEventHandling = true;
+            </script>
+            
+        
+    
+    
+    
+        <script type="text/javascript">
+            var __metaQueryBreakpoints = {
+                'sc-size-4': '(max-width: 480px)',
+                'sc-size-3': '(min-width: 480px) and (max-width: 768px)',
+                'sc-size-2': '(min-width: 768px) and (max-width: 992px)',
+                'sc-size-1': '(min-width: 992px)'
+            }
+
+            var __ocSizePoints = [
+                { min: 0, name: 'sc-size-4' },
+                { min: 480, name: 'sc-size-3' },
+                { min: 768, name: 'sc-size-2' },
+                { min: 992, name: 'sc-size-1' }
+            ];
+
+        </script>
+    
+
+    <!-- Framework Section -->
+    
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+    <script>window.jQuery || document.write('<script src="/files/templates/00000000-0000-0000-0000-000000000000/08c94499-9c34-49c8-867a-1f4d4c0f61e7/v/282/jquery-1.12.4.min.js?seamlessts=639263242445645539" ><\/script>')</script>
+
+    <!--Google Maps API Loader – Improved Version to avoid Warning
+    This script loads the Google Maps JavaScript API using a dynamic and async method.
+    It replaces the old static <script> tag to avoid performance warnings from Google.
+
+    Dynamically creates the <script> tag with loading = async for better performance
+    Builds the API URL with required libraries(places, geometry, marker, geocoding)
+    Uses a Promise and callback(google.maps.__ib__) to confirm when the script is ready
+
+    It Avoids Google’s warning about direct script loading
+    Improves page load speed by loading the API asynchronously-->
+
+    
+        <script>
+            (function (root) {
+                root.OpenCities = root.OpenCities || {};
+                if (!root.OpenCities.GoogleMapsLoader) {
+                    root.OpenCities.GoogleMapsLoader = {
+                        _cbs: [],
+                        _ready: false,
+                        onReady: function (cb) {
+                            if (this._ready) { try { cb(); } catch (e) { console.error(e); } }
+                            else if (typeof cb === 'function') this._cbs.push(cb);
+                        },
+                        _fire: function () {
+                            if (this._ready) return;
+                            this._ready = true;
+                            var q = this._cbs.splice(0);
+                            for (var i = 0; i < q.length; i++) {
+                                try { q[i](); } catch (e) { console.error(e); }
+                            }
+                        }
+                    };
+                }
+            })(window);
+
+            (g => {
+                var h, a, k, p = "The Google Maps JavaScript API", c = "google", l = "importLibrary", q = "__ib__",
+                    m = document, b = window;
+                b = b[c] || (b[c] = {});
+                var d = b.maps || (b.maps = {}), r = new Set, e = new URLSearchParams,
+                    u = () => h || (h = new Promise(async (resolve, reject) => {
+                        a = m.createElement("script");
+                        e.set("libraries", [...r] + "");
+                        for (k in g) e.set(k.replace(/[A-Z]/g, t => "_" + t[0].toLowerCase()), g[k]);
+                        e.set("callback", c + ".maps." + q);
+                        a.src = "https://maps." + c + "apis.com/maps/api/js?" + e.toString();
+                        a.loading = "async";
+                        a.async = true;
+                        a.defer = true;
+                        d[q] = resolve;
+                        a.onerror = () => reject(Error(p + " could not load."));
+                        a.nonce = m.querySelector("script[nonce]")?.nonce || "";
+                        m.head.append(a);
+                    }));
+                if (d[l]) {
+                    console.warn(p + " only loads once. Ignoring duplicate load.");
+                } else {
+                    d[l] = (f, ...n) => (r.add(f), u().then(() => d[l](f, ...n)));
+                }
+            })({
+                key: "AIzaSyB1y9bSgTCJBfAM4iNaEDx-tVQFugrn1J4",
+                v: "3.65"
+            });
+
+            (async () => {
+                try {
+                    if (!google?.maps?.importLibrary) return;
+
+                    if (!window.OpenCities.__mapsLibsPromise) {
+                        window.OpenCities.__mapsLibsPromise = Promise.all([
+                            google.maps.importLibrary('maps'),
+                            google.maps.importLibrary('places'),
+                            google.maps.importLibrary('geocoding'),
+                            google.maps.importLibrary('marker'),
+                            google.maps.importLibrary('geometry')
+                        ]);
+                    }
+                    await window.OpenCities.__mapsLibsPromise;
+
+                    if (window.OpenCities?.GoogleMapsLoader) {
+                        window.OpenCities.GoogleMapsLoader._fire();
+                    }
+                } catch (err) {
+                    console.error('Google Maps failed to initialise', err);
+                }
+            })();
+        </script>
+    
+    <script src="/files/templates/00000000-0000-0000-0000-000000000000/08c94499-9c34-49c8-867a-1f4d4c0f61e7/v/282/modernizr.custom.710f3bf.js?seamlessts=639263242445645539" defer></script>
+    
+    <!--// End Framework Section -->
+    <!-- OpenCities Section -->
+    <script>
+        var OpenCities = OpenCities || {};
+        OpenCities.Paths = {
+            SiteTemplate: '/files/templates/00000000-0000-0000-0000-000000000000/08c94499-9c34-49c8-867a-1f4d4c0f61e7/v/282/',
+            ThemePath: '/files/templates/00000000-0000-0000-0000-000000000000/08c94499-9c34-49c8-867a-1f4d4c0f61e7/v/282/'
+        };
+    </script>
+    <script src='/ocapi/f3f01f8a-9860-4b82-85c2-7596835ac57a/en-US/websitesettings.js'></script>
+    <script src="/files/templates/00000000-0000-0000-0000-000000000000/08c94499-9c34-49c8-867a-1f4d4c0f61e7/v/282/oc_head.js?applied=20230203121025"></script>
+    <!-- Script Combine. To enter debug mode for this browser session, enter OcScriptCombineDebug=true as a querystring -->
+<link href="/files/oc-templates/00000000-0000-0000-0000-000000000000/08c94499-9c34-49c8-867a-1f4d4c0f61e7/v/282/oc_grid.css~oc_style.css~oc_wizard_style.css~oc_main.css~oc_forms.css~oc_wizard.css~oc_wizard_menu.css~oc_main_s1.css~oc_wizard_s1.css~oc_wizard_menu_s1.css~oc_grid_s1.css~OcScriptCombine_Minify0?uniqueid=20230203121025" rel="stylesheet" type="text/css">
+    <!-- Script Combine. To enter debug mode for this browser session, enter OcScriptCombineDebug=true as a querystring -->
+<link href="/files/oc-templates/00000000-0000-0000-0000-000000000000/08c94499-9c34-49c8-867a-1f4d4c0f61e7/v/282/client_style.css~client.css~client_menu.css~client_s1.css~client_menu_s1.css~client_forms.css~OcScriptCombine_Minify0?uniqueid=20230203121025" rel="stylesheet" type="text/css">
+    <script>
+(function (BackgroundSettings, $, undefined) {
+    BackgroundSettings.initialise = function () {
+        this.Application = {"CSSSelector":".content-outer-container","EnableFade":false,"MediaType":"image"};
+    };
+} (OpenCities.BackgroundSettings = OpenCities.BackgroundSettings || {}, jQuery));
+OpenCities.BackgroundSettings.initialise();
+</script>
+    
+    <!-- Script Combine. To enter debug mode for this browser session, enter OcScriptCombineDebug=true as a querystring -->
+<link href="/files/oc-templates/00000000-0000-0000-0000-000000000000/08c94499-9c34-49c8-867a-1f4d4c0f61e7/v/282/oc_print.css~client_print.css~OcScriptCombine_Minify0?uniqueid=20230203121025" rel="stylesheet" type="text/css" media="print">
+    <!-- Script Combine. To enter debug mode for this browser session, enter OcScriptCombineDebug=true as a querystring -->
+<script src="/files/oc-templates/00000000-0000-0000-0000-000000000000/08c94499-9c34-49c8-867a-1f4d4c0f61e7/v/282/external_plugins.js~oc_form_helper.js~oc_main.js~plugins.js~oc_main_init.js~OcScriptCombine_Minify0?uniqueid=20230203121025" defer="true"></script>
+    
+    
+
+                                <script>!function(e){var n="https://s.go-mpulse.net/boomerang/";if("False"=="True")e.BOOMR_config=e.BOOMR_config||{},e.BOOMR_config.PageParams=e.BOOMR_config.PageParams||{},e.BOOMR_config.PageParams.pci=!0,n="https://s2.go-mpulse.net/boomerang/";if(window.BOOMR_API_key="DYTCK-JM9C8-ED4EP-C3GGK-Z575H",function(){function e(){if(!r){var e=document.createElement("script");e.id="boomr-scr-as",e.src=window.BOOMR.url,e.async=!0,o.appendChild(e),r=!0}}function t(e){r=!0;var n,t,a,i,d=document,O=window;if(window.BOOMR.snippetMethod=e?"if":"i",t=function(e,n){var t=d.createElement("script");t.id=n||"boomr-if-as",t.src=window.BOOMR.url,BOOMR_lstart=(new Date).getTime(),e=e||d.body,e.appendChild(t)},!window.addEventListener&&window.attachEvent&&navigator.userAgent.match(/MSIE [67]\./))return window.BOOMR.snippetMethod="s",void t(o,"boomr-async");a=document.createElement("IFRAME"),a.src="about:blank",a.title="",a.role="presentation",a.loading="eager",i=(a.frameElement||a).style,i.width=0,i.height=0,i.border=0,i.display="none",o.appendChild(a);try{O=a.contentWindow,d=O.document.open()}catch(_){n=document.domain,a.src="javascript:var d=document.open();d.domain='"+n+"';void 0;",O=a.contentWindow,d=O.document.open()}if(n)d._boomrl=function(){this.domain=n,t()},d.write("<bo"+"dy onload='document._boomrl();'>");else if(O._boomrl=function(){t()},O.addEventListener)O.addEventListener("load",O._boomrl,!1);else if(O.attachEvent)O.attachEvent("onload",O._boomrl);d.close()}function a(e){window.BOOMR_onload=e&&e.timeStamp||(new Date).getTime()}if(!window.BOOMR||!window.BOOMR.version&&!window.BOOMR.snippetExecuted){window.BOOMR=window.BOOMR||{},window.BOOMR.snippetStart=(new Date).getTime(),window.BOOMR.snippetExecuted=!0,window.BOOMR.snippetVersion=14,window.BOOMR.url=n+"DYTCK-JM9C8-ED4EP-C3GGK-Z575H";var i=document.currentScript||document.getElementsByTagName("script")[0],o=i.parentNode,r=!1,d=document.createElement("link");if(d.relList&&"function"==typeof d.relList.supports&&d.relList.supports("preload")&&"as"in d)window.BOOMR.snippetMethod="p",d.href=window.BOOMR.url,d.rel="preload",d.as="script",d.addEventListener("load",e),d.addEventListener("error",function(){t(!0)}),setTimeout(function(){if(!r)t(!0)},3e3),BOOMR_lstart=(new Date).getTime(),o.appendChild(d);else t(!1);if(window.addEventListener)window.addEventListener("load",a,!1);else if(window.attachEvent)window.attachEvent("onload",a)}}(),"".length>0)if(e&&"performance"in e&&e.performance&&"function"==typeof e.performance.setResourceTimingBufferSize)e.performance.setResourceTimingBufferSize();!function(){if(BOOMR=e.BOOMR||{},BOOMR.plugins=BOOMR.plugins||{},!BOOMR.plugins.AK){var n=""=="true"?1:0,t="",a="f7cvujyx3mbnm2wkql7a-f-ef00b75cd-clientnsv4-s.akamaihd.net",i="false"=="true"?2:1,o={"ak.v":"41","ak.cp":"1700628","ak.ai":parseInt("1075935",10),"ak.ol":"0","ak.cr":9,"ak.ipv":4,"ak.proto":"http/1.1","ak.rid":"a81c539d","ak.r":42172,"ak.a2":n,"ak.m":"","ak.n":"essl","ak.cport":59822,"ak.gh":"23.218.252.22","ak.quicv":"","ak.tlsv":"tls1.3","ak.0rtt":"","ak.0rtt.ed":"","ak.csrc":"-","ak.acc":"bbr","ak.t":"1791656702","ak.ak":"hOBiQwZUYzCg5VSAfCLimQ==i6iIz9EFUQ7wl1ZLVAqP1W86ljHh1dCh1wCQvF8zvEV/ZUtiEhTFKJrsbsTV5VEiG+XIL/QgE6f78bc++/f4omr1lY+M0WSviBW0/H9G1U7X5y1nO2/msTxwvcZWdnCLc+e+3BVNIHpq/gmIf4Ixxn5vBd9ggkg+1PbIWTOf53ESmqT96MmwcuED6A9sASW1FS3R8Bn7XnPsU3sKOyH6S1qGLWeUp2sExWtK5keF9b99XUTcgRuCGQDftKXX/mL++gBT4hPtS/zUzVrpvPDJGuisQFDCdCNfZy4LP7D5nQo4PDuaQ3QnkcthMxmAqZhmPvtd7VBekTLClfrCI8uFLN5sez6Vav722zA+CndAcVx+lfd16hCrdWEzSJHziO1CCmsz1pkXX0rmaXS7tZFK9QhUfpBU9nOT+1rUWitj9Is=","ak.pv":"354","ak.dpoabenc":"","ak.tf":i};if(""!==t)o["ak.ruds"]=t;var r={i:!1,av:function(n){var t="http.initiator";if(n&&(!n[t]||"spa_hard"===n[t]))o["ak.feo"]=void 0!==e.aFeoApplied?1:0,BOOMR.addVar(o)},rv:function(){var e=["ak.cport","ak.cr","ak.csrc","ak.gh","ak.ipv","ak.m","ak.n","ak.ol","ak.proto","ak.quicv","ak.tlsv","ak.0rtt","ak.0rtt.ed","ak.r","ak.acc","ak.t","ak.tf"];BOOMR.removeVar(e)}};BOOMR.plugins.AK={akVars:o,akDNSPreFetchDomain:a,init:function(){if(!r.i){var e=BOOMR.subscribe;e("before_beacon",r.av,null,null),e("onbeacon",r.rv,null,null),r.i=!0}return this},is_complete:function(){return!0}}}}()}(window);</script></head>
+<body class="body layout-modern  site-search-always-visble  content-type-oc-profile content-template-oc-default group-template-oc-empty-with-default-header page-name-home page-sequence-1 page-depth-1 page-section-1 website-type-primary device-desktop " id="body-top">
+    <div id="skip-to-content-container">
+        <a href="#main-content" class="visuallyhidden focusable" id="skip-to-content-link">Skip to main content</a>
+    </div>
+    <script>
+        // OCNOW-11988 (Cursor): Proactively focus skip link when returning from browser chrome.
+        // Must run inline (not deferred oc_main.js) so focus is intercepted before NVDA speaks footer.
+        (function () {
+            var awaitingReentry = false;
+            var inertSupported = 'inert' in HTMLElement.prototype;
+
+            function isExplicitlyOutsideDocument(node) {
+                return node != null && !document.documentElement.contains(node);
+            }
+
+            function getSkipContainer() {
+                return document.getElementById('skip-to-content-container');
+            }
+
+            function getSkipLink() {
+                return document.getElementById('skip-to-content-link');
+            }
+
+            function applyGuard() {
+                awaitingReentry = true;
+                if (!inertSupported) {
+                    return;
+                }
+                var skipContainer = getSkipContainer();
+                var children = document.body.children;
+                for (var i = 0; i < children.length; i++) {
+                    if (children[i] !== skipContainer) {
+                        children[i].setAttribute('inert', '');
+                    }
+                }
+            }
+
+            function clearGuard() {
+                awaitingReentry = false;
+                if (!inertSupported) {
+                    return;
+                }
+                var children = document.body.children;
+                for (var i = 0; i < children.length; i++) {
+                    children[i].removeAttribute('inert');
+                }
+            }
+
+            function isSkipLinkElement(target) {
+                if (!target) {
+                    return false;
+                }
+                var skipContainer = getSkipContainer();
+                return target.id === 'skip-to-content-link' ||
+                    (skipContainer && skipContainer.contains(target));
+            }
+
+            function focusSkipLink() {
+                var skipLink = getSkipLink();
+                if (!skipLink) {
+                    return;
+                }
+                if (window.scrollY > 0) {
+                    window.scrollTo(0, 0);
+                }
+                skipLink.focus({ preventScroll: true });
+            }
+
+            function scheduleGuardIfDocumentLostFocus() {
+                window.setTimeout(function () {
+                    if (!document.hasFocus()) {
+                        applyGuard();
+                    }
+                }, 0);
+            }
+
+            document.addEventListener('focusout', function (e) {
+                if (isExplicitlyOutsideDocument(e.relatedTarget)) {
+                    applyGuard();
+                }
+            }, true);
+
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Tab') {
+                    scheduleGuardIfDocumentLostFocus();
+                } else if (e.key === 'F6' || (e.key === 'l' && e.ctrlKey)) {
+                    scheduleGuardIfDocumentLostFocus();
+                }
+            }, true);
+
+            window.addEventListener('focus', function () {
+                if (!awaitingReentry) {
+                    return;
+                }
+                applyGuard();
+                focusSkipLink();
+            }, true);
+
+            document.addEventListener('focusin', function (e) {
+                var reentryFromChrome = awaitingReentry || isExplicitlyOutsideDocument(e.relatedTarget);
+                if (!reentryFromChrome) {
+                    return;
+                }
+                if (isSkipLinkElement(e.target)) {
+                    clearGuard();
+                    return;
+                }
+                applyGuard();
+                focusSkipLink();
+                clearGuard();
+            }, true);
+        })();
+    </script>
+    <form name="mainForm" method="post" action="/Home" id="mainForm">
+<div>
+<input type="hidden" name="ctl04_seamless_script_manager_TSM" id="ctl04_seamless_script_manager_TSM" value="" />
+<input type="hidden" name="__EVENTTARGET" id="__EVENTTARGET" value="" />
+<input type="hidden" name="__EVENTARGUMENT" id="__EVENTARGUMENT" value="" />
+<input type="hidden" name="__SEAMLESSVIEWSTATE" id="__SEAMLESSVIEWSTATE" value="H4sIAAAAAAAEAAFwAI//oyrpjGDSw/RhG1SIUgvaGZ7n8fm0oUMLGrPq6D5o+4Db4cS8j4b06kNdtYlp6cnYnGG9AsTXrT41XKxyPsSIf5KdXSmNn8YVAhVKIEfenQ/64Ch4kzhpP9/iI6NL1aDifogKuk4ZvkLCRUVfx9ZGWZJHI7FwAAAA" />
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="" />
+</div>
+
+<script type="text/javascript">
+//<![CDATA[
+var theForm = document.forms['mainForm'];
+if (!theForm) {
+    theForm = document.mainForm;
+}
+function __doPostBack(eventTarget, eventArgument) {
+    if (!theForm.onsubmit || (theForm.onsubmit() != false)) {
+        theForm.__EVENTTARGET.value = eventTarget;
+        theForm.__EVENTARGUMENT.value = eventArgument;
+        theForm.submit();
+    }
+}
+//]]>
+</script>
+
+
+<script src="/WebResource.axd?d=pynGkmcFUV13He1Qd6_TZEwxevNHYVPiVa1Imd_CfwV7Ab8FE1aS0qMo2VVt5LKJo2QwSrlAqlF7-BPzzVxibA2&amp;t=639190581332169432" type="text/javascript"></script>
+
+
+<script src="/Telerik.Web.UI.WebResource.axd?_TSM_HiddenField_=ctl04_seamless_script_manager_TSM&amp;compress=1&amp;_TSM_CombinedScripts_=%3b%3bSystem.Web.Extensions%2c+Version%3d4.0.0.0%2c+Culture%3dneutral%2c+PublicKeyToken%3d31bf3856ad364e35%3aen-GB%3add3ac3d5-1e29-4112-8fed-529caffa8f24%3aea597d4b%3ab25378d2" type="text/javascript"></script>
+<script src="/ScriptResource.axd?d=EYVjNsQ7oYmzBqCI0dkEyYe0LYmPcVFL4WPcQCXhKfQwUqkAT7lLra0za-OLMuUUcCyPINdTVMHIWti96-8R_oN-trjXUUZnJRzckxTjid4ecctwwEJyNI-05jZYvXHBRiEKL0MUQMEyEJ2FXanyE1uBk88RxZ1wVK6AUn9D4v8rW-LNx2OOtB8vE3hC8P0jk4XZt7GAPiCeYQolxUlwFZA8cuOfgd4u08OASxFdh8mChz3A0YHhuwRrXGVlulfs9SJVkAvulhjdHYIIp1SRohDxt9acTwxUQrOlxuxC847b00zOOWg9SlpwD_iBuQQ1rOK9WH9O_wN9c2TXm4GeXaQHHT4yQ9IlzZXw6th8ch3f-k_n1yYeeurDMbwChXW1Vh_7rpu00kgmegsg9w2J3ququXIPfy2Gq8IscVTmtwouupfmUzAOicU_yESgQ-dG0" type="text/javascript"></script>
+    <script type="text/javascript">
+//<![CDATA[
+Sys.WebForms.PageRequestManager._initialize('ctl04$seamless_script_manager', 'mainForm', [], [], [], 90, '');
+//]]>
+</script>
+
+<script type="text/javascript">
+    try{
+        function SeamlessEndRequestHandler(sender, args) {
+            try {
+                var dataItems = args.get_dataItems();
+                if(dataItems.ctl04_seamless_script_manager)
+                    document.getElementById('__SEAMLESSVIEWSTATE').value = dataItems.ctl04_seamless_script_manager;
+            }
+            catch (e) { }
+        }
+
+        Sys.WebForms.PageRequestManager.getInstance().add_endRequest(SeamlessEndRequestHandler);
+    }
+    catch (e) { }
+</script>
+
+    <div class="unsupported-browser-warning js-element"></div>
+    
+    <div hidden>
+        <span id="new-window-0">opens in new tab or window </span>
+    </div>
+    <div class="overlay-container"></div>
+    
+    <div class="background-container">
+        <div class="page-container">
+            <!-- OC Layout Element GROUP TEMPLATE -->
+            <!--groupTemplateStart--><header>
+            <div class="print-header-outer-container print-element">
+<img src="/files/templates/00000000-0000-0000-0000-000000000000/08c94499-9c34-49c8-867a-1f4d4c0f61e7/v/281/print-header.png" alt="Town of Los Gatos - Logo" />
+</div>
+            <div class="toolbar-outer-container">
+  <div class="toolbar-inner-container clearfix">
+    <div class="toolbar-item toolbar-quicklinks toolbar-display-dropdown">
+	<button type="button" aria-controls="toolbar-quicklinks-drop-down" aria-expanded="false" class="toolbar-button toolbar-button-quicklinks js-element"><span>Quick Links</span><i aria-hidden="true"></i></button>	
+	<div id="toolbar-quicklinks-drop-down" class="toolbar-drop-down toolbar-quicklinks-drop-down clearfix">
+		<ul>
+		  <li><a href="tel:408-354-6876" class="oc-icon-b oc-i--none link-type-phone"><span>Phone</span></a></li>
+		</ul>
+	</div>
+</div>
+  </div>
+</div>
+            <div class="header-outer-container">
+    <div class="header-container header-layout-2  clearfix">
+			<div class="header-site-logo">
+				<a href="https://permits.losgatosca.gov/Home" lang="en-US" aria-label="Town of Los Gatos - Home - Logo">
+				</a>
+			</div>
+		    <div class="header-website-settings">
+                <button id="btn-mob-nav" type="button" aria-expanded="false" aria-controls="nav">
+                    <i aria-hidden="true"></i><span class="side-menu-btn-text">Menu</span>
+                </button>
+        	</div>
+			
+			<div class="header-search-control-container" id="header-search">
+				<div class="search-inner-container">
+					<div class="sc-search-panel" onkeypress="javascript:return WebForm_FireDefaultButton(event, &#39;ctl06_btnSearch&#39;)">
+	<label for="ctl06_txtSearch" id="ctl06_lblSearch" class="sc-search-label">Search</label><input name="ctl06$txtSearch" type="text" id="ctl06_txtSearch" class="sc-search-text" placeholder="Search for a service or a page" /><input type="submit" name="ctl06$btnSearch" value="Search" id="ctl06_btnSearch" class="sc-search-button" />
+</div>
+					<div role="status" id="predictiveResults"></div>
+				</div>
+			</div>
+    </div>
+</div>
+<div class="navigation-outer-container">
+	<div id="nav" role="navigation" class="navigation-container navigation-container-option-1" data-menu-type="horizontal" aria-label="primary">
+        <div class="grid">
+            <div class="col-xs-12">                
+                <ul class="sf-menu" id="sc-main-menu"><li class="nav-section-quarters-1 nav-active-path nav-active-page first-item nav-item-seq-1">
+<a href="https://permits.losgatosca.gov/Home" class="nav-level-1 "  target="">
+	<i class="item-icon" aria-hidden="true"></i><span class="item-text">Home</span>
+</a>
+</li>
+          
+            <li class="nav-section-quarters-1   nav-item-seq-2">
+<a href="https://permits.losgatosca.gov/Permit-Decision-Tool" class="nav-level-1 "  target="">Permit Decision Tool</a>
+</li>
+          
+            <li class="nav-section-quarters-2   nav-item-seq-3">
+<a href="https://permits.losgatosca.gov/Planning" class="nav-level-1 nav-has-children"  target="">Planning</a>
+<button aria-label="Expand" aria-haspopup="true" class="mobnav-subarrow" aria-controls="sc-menu-second-level-nav-item-seq-3">
+              <i aria-hidden="true"></i>
+              </button>
+<ul id="sc-menu-second-level-nav-item-seq-3">
+
+          
+            <li class=" "><a  href="https://permits.losgatosca.gov/Planning/Manage-My-Records" class=""  target="">Manage My Records</a></li><li class=" "><a  href="https://permits.losgatosca.gov/Planning/Search-Records" class=""  target="">Search Records</a></li><li class=" "><a  href="https://permits.losgatosca.gov/Planning/Planning-Pre-Application" class=""  target="">Planning Pre-Application</a></li><li class=" "><a  href="https://permits.losgatosca.gov/Planning/Planning-Forms-Applications-and-Checklists" class=""  target="_blank">Planning Forms, Applications, Checklists</a></li><li class=" "><a  href="https://permits.losgatosca.gov/Planning/Apply-for-a-Sidewalk-Vending-Permit" class=""  target="">Apply for a Sidewalk Vending Permit</a></li></ul></li>
+          
+            <li class="nav-section-quarters-2   nav-item-seq-4">
+<a href="https://permits.losgatosca.gov/Building" class="nav-level-1 nav-has-children"  target="">Building</a>
+<button aria-label="Expand" aria-haspopup="true" class="mobnav-subarrow" aria-controls="sc-menu-second-level-nav-item-seq-4">
+              <i aria-hidden="true"></i>
+              </button>
+<ul id="sc-menu-second-level-nav-item-seq-4">
+
+          
+            <li class=" "><a  href="https://permits.losgatosca.gov/Building/Building-Manage-My-Records" class=""  target="">Building - Manage My Records</a></li><li class=" "><a  href="https://permits.losgatosca.gov/Building/Search-Records" class=""  target="">Search Records</a></li><li class=" "><a  href="https://permits.losgatosca.gov/Building/Building-Pre-Application" class=""  target="">Building Pre-Application</a></li><li class=" "><a  href="https://permits.losgatosca.gov/Building/Building-Forms" class=""  target="_blank">Building Forms</a></li></ul></li>
+          
+            <li class="nav-section-quarters-3   nav-item-seq-5">
+<a href="https://permits.losgatosca.gov/Engineering" class="nav-level-1 nav-has-children"  target="">Engineering</a>
+<button aria-label="Expand" aria-haspopup="true" class="mobnav-subarrow" aria-controls="sc-menu-second-level-nav-item-seq-5">
+              <i aria-hidden="true"></i>
+              </button>
+<ul id="sc-menu-second-level-nav-item-seq-5">
+
+          
+            <li class=" "><a  href="https://permits.losgatosca.gov/Engineering/Manage-My-Records" class=""  target="">Manage My Records</a></li><li class=" "><a  href="https://permits.losgatosca.gov/Engineering/Engineering-Forms-Documents-and-Information" class=""  target="_blank">Engineering Forms, Documents, Information</a></li><li class=" "><a  href="https://permits.losgatosca.gov/Engineering/Search-Records" class=""  target="">Search Records</a></li></ul></li>
+          
+            <li class="nav-section-quarters-3   nav-item-seq-6">
+<a href="https://permits.losgatosca.gov/Services" class="nav-level-1 "  target="">Services</a>
+</li>
+          
+            </ul>
+            </div>
+        </div>
+    </div>
+</div>
+            </header>
+            <div class="content-outer-container">
+                <div id="main" role="main" class="main-outer-container no-background clearfix">
+                        <div class="content-main-container">
+                                                    
+                            <!-- OC Layout Element Conent Template -->
+                            <!--normalTemplateStart--><div class="visuallyhidden"><h1 class='oc-page-title '>Home</h1></div><div id="main-content"><section class="row-index-1"><div class="row-container full-width clearfix"><div class="row-content-container full-width clearfix"><div id="OcSlideshow" class="slideshow-widget profile-slideshow slideshow-layout-2" data-source-folder-name="Home" data-animation-style="fade" ><div class="controls"></div><div class="slides"><article id="OcSlideshow-panel-1" class="slide slide-1 anchor-image-CC"  style="background-image:url('/files/content/public/v/32/home/slideshow/welcome/downtownlosgatos.jpg')" >
+	<span class="anchor-or-span">
+	
+		<div class="slide-text">
+			<div class="slide-text-inner">
+				<h2 class="sub-title">Welcome</h2>
+      
+				<p >Apply for Building, Planning, and Parks and Public Works permits using this portal. <br/><br/>Not sure what type of permit you need? Take advantage of the Permit Decision Tool, which will help guide you to the right permit to apply for!<br/><br/>If you have any questions, or need support, please contact the appropriate department for your permit type.</p>
+			</div>
+		</div>
+	
+		<img src="/files/content/public/v/32/home/slideshow/welcome/downtownlosgatos.jpg" alt="DowntownLosGatos.jpg" />	
+	</span>
+</article>
+          </div></div></div></div></section><section class="row-index-2"><div class="row-container full-width clearfix"><div class="row-content-container fixed-width clearfix">
+<div class="do-it-online do-it-online-format-1 top-task-homepage top-task-homepage-format-1 clearfix" data-total-results="6"><div class="grid"><div class="col-xs-12 col-m-6 col-lg-4">
+			<a href="https://permits.losgatosca.gov/Permit-Decision-Tool" class="profile-list item-0" target="_self" >
+				<i class="item-icon form" aria-hidden="true"></i>
+				<h2>Permit Decision Tool</h2>
+				<p>Our Permit Decision Tool will help you learn if you need a permit for your project.</p>
+			</a>
+		</div><div class="col-xs-12 col-m-6 col-lg-4">
+			<a href="https://permits.losgatosca.gov/Planning" class="profile-list item-1" target="_self" >
+				<i class="item-icon blueprint" aria-hidden="true"></i>
+				<h2>Planning Permits</h2>
+				<p>Apply for permits, submit for plan review, and resubmittals.</p>
+			</a>
+		</div><div class="col-xs-12 col-m-6 col-lg-4">
+			<a href="https://permits.losgatosca.gov/Building" class="profile-list item-2" target="_self" >
+				<i class="item-icon hard-hat" aria-hidden="true"></i>
+				<h2>Building Permits</h2>
+				<p>Apply for building permits of Commercial and Residential construction.</p>
+			</a>
+		</div><div class="col-xs-12 col-m-6 col-lg-4">
+			<a href="https://permits.losgatosca.gov/Engineering" class="profile-list item-3" target="_self" >
+				<i class="item-icon shovel" aria-hidden="true"></i>
+				<h2>Engineering Services</h2>
+				<p>Land development compliance with Town Standards, map reviews, and traffic engineering.</p>
+			</a>
+		</div><div class="col-xs-12 col-m-6 col-lg-4">
+			<a href="https://permits.losgatosca.gov/Schedule-Inspection" class="profile-list item-4" target="_self" >
+				<i class="item-icon clipboard" aria-hidden="true"></i>
+				<h2>Schedule Inspection</h2>
+				<p>Here you can schedule inspections for active permits.</p>
+			</a>
+		</div><div class="col-xs-12 col-m-6 col-lg-4">
+			<a href="https://permits.losgatosca.gov/Login-and-Manage-My-Records" class="profile-list item-5" target="_self" >
+				<i class="item-icon form" aria-hidden="true"></i>
+				<h2>Login and Manage My Records</h2>
+				<p>Login, view application status, upload documents, and pay fees.</p>
+			</a>
+		</div></div></div>
+
+</div></div></section></div><!--normalTemplateEnd-->
+                        </div>
+                        <div class="back-to-top-container text-center">
+                            <a href="#body-top" id="back-to-top"><i aria-hidden="true"></i><span class="js-visuallyhidden">Back to top</span></a>
+                        </div>
+                </div>
+            </div><!--groupTemplateEnd-->
+            <footer>
+                
+                    <div class="footer-outer-container footer-first-row">
+                        <div class="footer-container clearfix">
+                            <div class="grid grid-pad">
+                                <div class="col-xs-12 col-s-6 col-m-4 col-lg-4" >
+	
+			<h2 class="visuallyhidden">Site Footer</h2>
+			<h3 class="footer-title">Contact Us</h3>
+			
+	<p>Community Development Department&nbsp;<br />
+<span style="font-size: 1em; font-family: inherit;">110 E. Main St.<br /></span><span style="font-size: 1em; font-family: inherit;">Los Gatos, CA 95030<br />
+408-354-6872&nbsp; &nbsp;</span></p>
+<p>Planning Division<br />
+408-354-6874<br />
+Planning@losgatosca.gov&nbsp;</p>
+<p>Building Division<br />
+408-354-6876<br />
+Building@losgatosca.gov&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+
+
+	<ul class="footer-links with-icons ">   </ul>
+	
+</div><div class="col-xs-12 col-s-6 col-m-4 col-lg-4" >
+	
+	<p>&nbsp;</p>
+<p>Public Works Engineering<br />
+<span style="font-size: 1em; font-family: inherit;">41 Miles Avenue<br /></span><span style="font-size: 1em; font-family: inherit;">Los Gatos, CA 95030<br />
+408-399-5771<br /></span><span style="font-size: 1em; font-family: inherit;">PPWPermits@losgatosca.gov</span></p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+
+
+	<ul class="footer-links with-icons ">   </ul>
+	
+</div><div class="col-xs-12 col-s-6 col-m-4 col-lg-4" >
+	
+			<h2 class="visuallyhidden">Site Footer</h2>
+			<h3 class="footer-title">Counter Hours</h3>
+			
+	<p>Monday - Friday<br />
+8 a.m. - 1 p.m.</p>
+
+
+	<ul class="footer-links with-icons ">   </ul>
+	
+</div><div class="col-xs-12 col-s-6 col-m-4 col-lg-4" >
+	
+			<h2 class="visuallyhidden">Site Footer</h2>
+			<h3 class="footer-title">Quick Link</h3>
+			
+	
+	<ul class="footer-links with-icons ">  <li class="footer-link-">
+	<a href="https://www.losgatosca.gov/" target="_self"  >
+<i aria-hidden="true"></i>Town of Los Gatos
+</a>
+</li>
+           </ul>
+	
+</div>
+                            </div>
+                        </div>
+                    </div>
+                
+                <div class="footer-outer-container footer-second-row">
+                    <div class="footer-container clearfix">
+                        <div class="grid grid-pad footer-secondary-links">
+                            <div class="col-xs-12 col-m-7">
+                                
+                                    
+                                
+                            </div>
+                            <div class="col-xs-12 col-m-5 powered-by">
+                                <div class="right">
+                                    &copy; 2026 Town of Los Gatos&nbsp;|&nbsp;<span class="powered-by">Powered by <a href="https://granicus.com/solution/govaccess/opencities/" target="_blank">Granicus</a></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <script src="/files/oc-resources/b9015858-988c-48a4-9473-7c193df083e4/JsTextSnippets.js?ocsvclang=en-US" type="text/javascript"></script><script></script>
+    
+    
+    <!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-80565566-2"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-KZYZJG0V9Z');
+  gtag('config', 'UA-80565566-2');
+</script>
+    
+    
+
+<script type="text/javascript">
+//<![CDATA[
+window.__TsmHiddenField = $get('ctl04_seamless_script_manager_TSM');//]]>
+</script>
+</form>
+</body>
+</html>

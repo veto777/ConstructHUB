@@ -1,0 +1,405 @@
+[
+  {
+    "slug": "cityview",
+    "target": {
+      "jurisdiction": "Downers Grove, IL",
+      "url": "https://cvportal.downers.us/Permit/Application",
+      "platform": "CityView",
+      "sourceUrl": "https://cvportal.downers.us/?utm_source=downers&utm_medium=cms&utm_campaign=permits_featured&utm_id=permits_2023",
+      "linkStatus": "unconfirmed"
+    },
+    "type": "permit",
+    "value": "26-ELC-0131",
+    "started": "2026-10-10T17:55:02.480Z",
+    "count": 1,
+    "elapsedMs": 2579,
+    "requests": [
+      {
+        "url": "https://cvportal.downers.us/Permit/Locator",
+        "method": "GET",
+        "status": 200,
+        "file": "downers-permit-0.html"
+      },
+      {
+        "url": "https://cvportal.downers.us/Permit/LocatorResults?searchValue=26-ELC-0131&category=&appealPeriodStatusesOnly=False&isInspectionSearch=False&pageNumber=0",
+        "method": "GET",
+        "status": 200,
+        "file": "downers-permit-1.json"
+      },
+      {
+        "url": "https://cvportal.downers.us/Permit/Status?permitId=85622",
+        "method": "GET",
+        "status": 200,
+        "file": "downers-permit-2.html"
+      }
+    ]
+  },
+  {
+    "slug": "cityview",
+    "target": {
+      "jurisdiction": "Monroe, NC",
+      "url": "https://cvportal.monroenc.org/portal",
+      "platform": "CityView",
+      "sourceUrl": "https://www.monroenc.org/240/Permit-Center",
+      "linkStatus": "verified"
+    },
+    "type": "address",
+    "value": "100 Main",
+    "started": "2026-10-10T17:54:23.447Z",
+    "count": 0,
+    "elapsedMs": 1207,
+    "requests": [
+      {
+        "url": "https://cvportal.monroenc.org/portal/Permit/Locator",
+        "method": "GET",
+        "status": 200,
+        "file": "monroe-address-0.html"
+      },
+      {
+        "url": "https://cvportal.monroenc.org/portal/Permit/LocatorResults?searchValue=100+Main&category=&appealPeriodStatusesOnly=False&isInspectionSearch=False&pageNumber=0",
+        "method": "GET",
+        "status": 200,
+        "file": "monroe-address-1.json"
+      }
+    ]
+  },
+  {
+    "slug": "cityview",
+    "target": {
+      "jurisdiction": "Carrollton, TX",
+      "url": "https://cityserve.cityofcarrollton.com/CityViewPortal/Permit/Locator",
+      "platform": "CityView Portal (Harris/Granicus)",
+      "sourceUrl": null,
+      "linkStatus": "verified"
+    },
+    "type": "address",
+    "value": "1111 S Main St",
+    "started": "2026-10-10T17:52:34.455Z",
+    "count": 49,
+    "elapsedMs": 3354,
+    "requests": [
+      {
+        "url": "https://cityserve.cityofcarrollton.com/CityViewPortal/Permit/Locator",
+        "method": "GET",
+        "status": 200,
+        "file": "carrollton-address-0.html"
+      },
+      {
+        "url": "https://cityserve.cityofcarrollton.com/CityViewPortal/Permit/LocatorResults?searchValue=1111+S+Main+St&category=&appealPeriodStatusesOnly=False&isInspectionSearch=False&pageNumber=0",
+        "method": "GET",
+        "status": 200,
+        "file": "carrollton-address-1.json"
+      },
+      {
+        "url": "https://cityserve.cityofcarrollton.com/CityViewPortal/Permit/LocatorResults?searchValue=1111+S+Main+St&category=&appealPeriodStatusesOnly=False&isInspectionSearch=False&pageNumber=1",
+        "method": "GET",
+        "status": 200,
+        "file": "carrollton-address-2.json"
+      },
+      {
+        "url": "https://cityserve.cityofcarrollton.com/CityViewPortal/Permit/LocatorResults?searchValue=1111+S+Main+St&category=&appealPeriodStatusesOnly=False&isInspectionSearch=False&pageNumber=2",
+        "method": "GET",
+        "status": 200,
+        "file": "carrollton-address-3.json"
+      }
+    ]
+  },
+  {
+    "slug": "cityview",
+    "target": {
+      "jurisdiction": "Madison County, AL",
+      "url": "https://cityview.madisoncountyal.gov/Portal/",
+      "platform": "CityView",
+      "sourceUrl": "https://www.madisoncountyal.gov/departments/inspection",
+      "linkStatus": "verified"
+    },
+    "type": "address",
+    "value": "100 Main",
+    "started": "2026-10-10T17:53:02.185Z",
+    "error": "CityView challenge/access denial",
+    "name": "PortalBlockedError",
+    "status": 403,
+    "elapsedMs": 1171,
+    "requests": [
+      {
+        "url": "https://cityview.madisoncountyal.gov/Portal/Permit/Locator",
+        "method": "GET",
+        "status": 302,
+        "file": "madison-address-0.html"
+      },
+      {
+        "url": "https://cityview.madisoncountyal.gov/Portal/",
+        "method": "GET",
+        "status": 200,
+        "file": "madison-address-1.html"
+      }
+    ]
+  },
+  {
+    "slug": "cityview",
+    "target": {
+      "jurisdiction": "Downers Grove, IL",
+      "url": "https://cvportal.downers.us/Permit/Application",
+      "platform": "CityView",
+      "sourceUrl": "https://cvportal.downers.us/?utm_source=downers&utm_medium=cms&utm_campaign=permits_featured&utm_id=permits_2023",
+      "linkStatus": "unconfirmed"
+    },
+    "type": "address",
+    "value": "6840 MAIN ST",
+    "started": "2026-10-10T17:54:59.777Z",
+    "count": 15,
+    "elapsedMs": 1223,
+    "requests": [
+      {
+        "url": "https://cvportal.downers.us/Permit/Locator",
+        "method": "GET",
+        "status": 200,
+        "file": "downers-address-0.html"
+      },
+      {
+        "url": "https://cvportal.downers.us/Permit/LocatorResults?searchValue=6840+MAIN+ST&category=&appealPeriodStatusesOnly=False&isInspectionSearch=False&pageNumber=0",
+        "method": "GET",
+        "status": 200,
+        "file": "downers-address-1.json"
+      }
+    ]
+  },
+  {
+    "slug": "cityview",
+    "target": {
+      "jurisdiction": "Monroe, NC",
+      "url": "https://cvportal.monroenc.org/portal",
+      "platform": "CityView",
+      "sourceUrl": "https://www.monroenc.org/240/Permit-Center",
+      "linkStatus": "verified"
+    },
+    "type": "permit",
+    "value": "PR21200420",
+    "started": "2026-10-10T17:55:41.286Z",
+    "count": 1,
+    "elapsedMs": 2580,
+    "requests": [
+      {
+        "url": "https://cvportal.monroenc.org/portal/Permit/Locator",
+        "method": "GET",
+        "status": 200,
+        "file": "monroe-permit-0.html"
+      },
+      {
+        "url": "https://cvportal.monroenc.org/portal/Permit/LocatorResults?searchValue=PR21200420&category=&appealPeriodStatusesOnly=False&isInspectionSearch=False&pageNumber=0",
+        "method": "GET",
+        "status": 200,
+        "file": "monroe-permit-1.json"
+      },
+      {
+        "url": "https://cvportal.monroenc.org/Portal/Permit/Status?permitId=28715",
+        "method": "GET",
+        "status": 200,
+        "file": "monroe-permit-2.html"
+      }
+    ]
+  },
+  {
+    "slug": "cityview",
+    "target": {
+      "jurisdiction": "Manheim, PA",
+      "url": "https://cityview.manheimtownship.org/CityViewPortal",
+      "platform": "CityView Portal",
+      "sourceUrl": "https://www.manheimtownship.org/478/Planning-Zoning",
+      "linkStatus": "verified"
+    },
+    "type": "address",
+    "value": "100 Main",
+    "started": "2026-10-10T17:57:16.882Z",
+    "error": "CityView challenge/access denial",
+    "name": "PortalBlockedError",
+    "status": 403,
+    "elapsedMs": 556,
+    "requests": [
+      {
+        "url": "https://cityview.manheimtownship.org/CityViewPortal/Permit/Locator",
+        "method": "GET",
+        "status": 200,
+        "file": "manheim-address-0.html"
+      }
+    ]
+  },
+  {
+    "slug": "cityview",
+    "target": {
+      "jurisdiction": "Downers Grove, IL",
+      "url": "https://cvportal.downers.us/Permit/Application",
+      "platform": "CityView",
+      "sourceUrl": "https://cvportal.downers.us/?utm_source=downers&utm_medium=cms&utm_campaign=permits_featured&utm_id=permits_2023",
+      "linkStatus": "unconfirmed"
+    },
+    "type": "detail",
+    "value": "26-ELC-0131",
+    "started": "2026-10-10T17:55:06.516Z",
+    "count": 1,
+    "elapsedMs": 2480,
+    "requests": [
+      {
+        "url": "https://cvportal.downers.us/Permit/Locator",
+        "method": "GET",
+        "status": 200,
+        "file": "downers-detail-run-0.html"
+      },
+      {
+        "url": "https://cvportal.downers.us/Permit/LocatorResults?searchValue=26-ELC-0131&category=&appealPeriodStatusesOnly=False&isInspectionSearch=False&pageNumber=0",
+        "method": "GET",
+        "status": 200,
+        "file": "downers-detail-run-1.json"
+      },
+      {
+        "url": "https://cvportal.downers.us/Permit/Status?permitId=85622",
+        "method": "GET",
+        "status": 200,
+        "file": "downers-detail-run-2.html"
+      }
+    ]
+  },
+  {
+    "slug": "cityview",
+    "target": {
+      "jurisdiction": "Monroe, NC",
+      "url": "https://cvportal.monroenc.org/portal",
+      "platform": "CityView",
+      "sourceUrl": "https://www.monroenc.org/240/Permit-Center",
+      "linkStatus": "verified"
+    },
+    "type": "address",
+    "value": "109 S MAIN ST",
+    "started": "2026-10-10T17:55:07.054Z",
+    "count": 5,
+    "elapsedMs": 1258,
+    "requests": [
+      {
+        "url": "https://cvportal.monroenc.org/portal/Permit/Locator",
+        "method": "GET",
+        "status": 200,
+        "file": "monroe-main-address-0.html"
+      },
+      {
+        "url": "https://cvportal.monroenc.org/portal/Permit/LocatorResults?searchValue=109+S+MAIN+ST&category=&appealPeriodStatusesOnly=False&isInspectionSearch=False&pageNumber=0",
+        "method": "GET",
+        "status": 200,
+        "file": "monroe-main-address-1.json"
+      }
+    ]
+  },
+  {
+    "slug": "cityview",
+    "target": {
+      "jurisdiction": "Carrollton, TX",
+      "url": "https://cityserve.cityofcarrollton.com/CityViewPortal/Permit/Locator",
+      "platform": "CityView Portal (Harris/Granicus)",
+      "sourceUrl": null,
+      "linkStatus": "verified"
+    },
+    "type": "recent",
+    "value": "2026-10-03T00:00:00Z",
+    "started": "2026-10-10T17:55:16.999Z",
+    "count": 0,
+    "elapsedMs": 0,
+    "requests": []
+  },
+  {
+    "slug": "cityview",
+    "target": {
+      "jurisdiction": "Downers Grove, IL",
+      "url": "https://cvportal.downers.us/Permit/Application",
+      "platform": "CityView",
+      "sourceUrl": "https://cvportal.downers.us/?utm_source=downers&utm_medium=cms&utm_campaign=permits_featured&utm_id=permits_2023",
+      "linkStatus": "unconfirmed"
+    },
+    "type": "recent",
+    "value": "2026-10-03T00:00:00Z",
+    "started": "2026-10-10T17:55:10.453Z",
+    "count": 0,
+    "elapsedMs": 0,
+    "requests": []
+  },
+  {
+    "slug": "cityview",
+    "target": {
+      "jurisdiction": "Carrollton, TX",
+      "url": "https://cityserve.cityofcarrollton.com/CityViewPortal/Permit/Locator",
+      "platform": "CityView Portal (Harris/Granicus)",
+      "sourceUrl": null,
+      "linkStatus": "verified"
+    },
+    "type": "permit",
+    "value": "PRMH202605452",
+    "started": "2026-10-10T17:55:11.933Z",
+    "count": 1,
+    "elapsedMs": 3573,
+    "requests": [
+      {
+        "url": "https://cityserve.cityofcarrollton.com/CityViewPortal/Permit/Locator",
+        "method": "GET",
+        "status": 200,
+        "file": "carrollton-permit-0.html"
+      },
+      {
+        "url": "https://cityserve.cityofcarrollton.com/CityViewPortal/Permit/LocatorResults?searchValue=PRMH202605452&category=&appealPeriodStatusesOnly=False&isInspectionSearch=False&pageNumber=0",
+        "method": "GET",
+        "status": 200,
+        "file": "carrollton-permit-1.json"
+      },
+      {
+        "url": "https://cityserve.cityofcarrollton.com/CityViewPortal/Permit/Status?permitId=238398",
+        "method": "GET",
+        "status": 200,
+        "file": "carrollton-permit-2.html"
+      }
+    ]
+  },
+  {
+    "slug": "cityview",
+    "target": {
+      "jurisdiction": "Monroe, NC",
+      "url": "https://cvportal.monroenc.org/portal",
+      "platform": "CityView",
+      "sourceUrl": "https://www.monroenc.org/240/Permit-Center",
+      "linkStatus": "verified"
+    },
+    "type": "recent",
+    "value": "2026-10-03T00:00:00Z",
+    "started": "2026-10-10T17:56:16.832Z",
+    "count": 0,
+    "elapsedMs": 1,
+    "requests": []
+  },
+  {
+    "capture": "initial manual survey; exact timestamp not retained",
+    "date": "2026-10-10",
+    "requests": [
+      {
+        "file": "downers-main.json",
+        "url": "https://cvportal.downers.us/Permit/LocatorResults",
+        "method": "GET",
+        "query": {
+          "searchValue": "Main",
+          "pageNumber": "0",
+          "isInspectionSearch": "False",
+          "appealPeriodStatusesOnly": "False",
+          "category": ""
+        },
+        "status": 200
+      },
+      {
+        "file": "downers-detail.html",
+        "url": "https://cvportal.downers.us/Permit/Status?permitId=85622",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "file": "naples-captcha.html",
+        "url": "https://cityview2.iharriscomputer.com/CityofNaplesFlorida/Permit/Locator",
+        "method": "GET",
+        "status": 200
+      }
+    ]
+  }
+]

@@ -1,0 +1,57 @@
+[
+  {
+    "permitnum": "08BLD-06810",
+    "description": "Work Descripton: IMMINENT DANGER OF COLLAPSE - Demolish existing structure to grade.\r\n\r\nHistorical Import Type: Permits Residential Double (Two-Family Unit) Demolition\r\nUser: JMUNSTER\r\nTracking: 186172552223\r\nStatus: Certificate Issued No Meter\r\nStatus Date: 1/11/2011 12:00:00 AM\r\n\r\nOwner: Devrouax Charles\r\nOwner Address: Et-Al 2504 W. Friendship Drive, Harvey, LA 70058\r\nOwner Edited By: 9/16/2008 by JMUNSTER",
+    "applieddate": "2017-03-16T08:21:28.000",
+    "issuedate": "2008-09-21T00:00:00.000",
+    "statuscurrent": "Application Acceptance - Approved No Review",
+    "originaladdress1": "3608 1St St",
+    "originalcity": "New Orleans",
+    "originalstate": "LA",
+    "permitclass": "Two-Family",
+    "workclass": "Demolition",
+    "permittype": "DEMO",
+    "permittypedesc": "Demolition",
+    "statusdate": "2017-03-16T08:21:28.000",
+    "totalsqft": "0.0",
+    "link": {
+      "url": "http://onestopapp.nola.gov/Redirect.aspx?SearchString="
+    },
+    "estprojectcost": "10000.0",
+    "expiresdate": "2009-03-21T00:00:00.000",
+    "publisher": "City of New Orleans",
+    "fee": "125.0",
+    "workclassmapped": "Existing",
+    "permitclassmapped": "Residential",
+    "permittypemapped": "Demolition",
+    "statuscurrentmapped": "Application Accepted"
+  },
+  {
+    "permitnum": "11BLD-08166",
+    "description": "Work Descripton: DEMOLISH EXISTING SINGLE TO GRADE AS PER OWNER’S REQUEST AND NCDC APPROVAL. A LICENSED PLUMBER MUST SECURE A SEPARATE PERMIT FROM THE SEWERAGE AND WATER BOARD TO CAP OFF SEWER LINES AND REMOVE WATER METERS PRIOR TO DEMOLITION. ANY FURTHER USE SHALL REQUIRE A SEPARATE PERMIT.\r\n\r\nHistorical Import Type: Permits Residential Single (One-Family Unit) Demolition\r\nUser: RMAXWELL\r\nTracking: 86193557009\r\nStatus: Permit Issuance Active\r\nStatus Date: 1/11/2012 12:00:00 AM\r\n\r\nOwner: Mcguire Vera L W\r\nOwner Address: 225 Canna Lily Circle, Driftwood, TX 78619\r\nOwner Phone: 512 879 8727\r\nOwner Edited By: 11/30/2011 by RMAXWELL",
+    "applieddate": "2012-01-11T00:00:00.000",
+    "issuedate": "2012-01-11T00:00:00.000",
+    "statuscurrent": "Inspection - Pending",
+    "originaladdress1": "2725 Amelia St",
+    "originalcity": "New Orleans",
+    "originalstate": "LA",
+    "originalzip": "70115",
+    "permitclass": "Single Family",
+    "workclass": "Demolition",
+    "permittype": "DEMO",
+    "permittypedesc": "Demolition",
+    "statusdate": "2012-07-09T00:00:00.000",
+    "totalsqft": "0.0",
+    "link": {
+      "url": "http://onestopapp.nola.gov/Redirect.aspx?SearchString="
+    },
+    "estprojectcost": "6240.0",
+    "expiresdate": "2012-07-11T00:00:00.000",
+    "publisher": "City of New Orleans",
+    "fee": "380.0",
+    "workclassmapped": "Existing",
+    "permitclassmapped": "Residential",
+    "permittypemapped": "Demolition",
+    "statuscurrentmapped": "Inspection Phase"
+  }
+]

@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+
+
+
+<html lang="en">
+  <head><meta charset="utf-8" /><meta name="description" content="SmartGov Public Portal by Granicus" /><meta name="author" content="Granicus" /><title>
+	Coconino County Public Portal
+</title><link href="/Styles/redmond/jquery-ui-1.9.0.custom.min.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Scripts/bootstrap/css/bootstrap.min.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/font-awesome/css/font-awesome.min.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/toastr.min.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/jquery.Jcrop.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/notifications/main.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/chosen.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/ils-daterangepicker.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/site.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/ils-custom.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/sgc-business.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/payment-vendors.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/landing-page.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/dropzone/dropzonecustom.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/StandardStyles.css?v=v2026.17" rel="stylesheet" type="text/css" />
+
+<link rel="icon" type="image/x-icon" href="/img/favicon.ico">
+<script type='text/javascript' src='/Scripts/jquery/jquery.min.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/jqueryui/jquery-ui.min.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/jquery.ba-throttle-debounce.min.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/jquery.tablesorter.min.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/FormSupport.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/ajaxupload.min.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/jquery.Jcrop.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/bootstrap/js/bootstrap.bundle.min.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/toastr.min.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/portal-scripts.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/ils.infieldlabel.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/ils-daterangepicker.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/notifications/notification.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Dialog.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/PortalAttachmentSupport.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/parcel.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/location-entry-map.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/dropzone/dropzone.min.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/landingPage.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/sgcBusinessLicense.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/ApplicationSearchHelper.js?v=v2026.17'></script>
+
+<script type='text/javascript' src='/Scripts/Shared/StringUtil.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/ErrorSupport.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/ListSupport.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/portal-map-support.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Maps/esri-map.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/AttachmentSupport.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/inputMask/jquery.inputmask.bundle.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/ils-list.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/ils-overlay.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/ils-autocomplete.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/ils-datepicker.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/Controls.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/StencilSupport.js?v=v2026.17'></script>
+
+
+<script>
+  FormSupport.applicationRoot = "";
+  FormSupport._rootImagePath = "~/img/";
+</script>
+
+<script type="text/javascript">
+    function googleTranslateElementInit() {
+        new google.translate.TranslateElement({ pageLanguage: 'en', layout: google.translate.TranslateElement.InlineLayout.HORIZONTAL }, 'google_translate_element');
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const script = document.createElement('script');
+        script.src = '//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
+        script.async = true;
+        document.head.appendChild(script);
+    });
+</script>
+
+<script type="text/javascript">
+    FormSupport.applicationRoot = "";
+    document.addEventListener(
+        "btnclick",
+        function (event) { SgSupport.handleBrButtonClick(event) },
+        false
+    );
+    document.addEventListener(
+        "datePickerChanged",
+        function (event) { SgSupport.handleDatePickerChange(event) },
+        false
+    );
+</script>
+
+<!-- Initialize the smartgov stencil components -->
+<script type='module' src='/Scripts/sgcomps/www/build/sgcomps.esm.js?v=v2026.17'></script>
+
+<script nomodule='' src='/Scripts/sgcomps/www/build/sgcomps.js?v=v2026.17'></script>
+
+
+    <script type="text/javascript" src="/Scripts/Shared/PendoHelper.js"></script>
+    <script type="text/javascript" src="/Scripts/Shared/GXAHelper.js"></script>
+    
+          
+
+
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+    (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+          
+    ga('create', 'UA-41213900-2', 'smartgovcommunity.com');
+    ga('send', 'pageview');
+</script></head>
+    
+  <body class="site-mode" data-bs-spy="scroll" data-bs-target="#scroll-target" data-offset="65">
+    <div class="site-content-container">
+       
+       
+      
+
+<!-- top bar with logo -->
+<section id="top-bar-section">
+  <div class="top-bar-container">
+    <div class="sgc-container"> 
+          <span>
+            <a href="/Public/Home"><img src="/Public/BannerImage" alt="Permitting Home"></a>
+          </span>
+        
+        <span class="login-nav float-end">
+          
+          <a href="/Register/RegisterUser">Sign Up</a> or <a href="/Public/Account/LogIn">Log In</a>
+              
+        </span>
+    </div> 
+  </div> 
+</section> <!-- /top-bar section -->  
+
+      
+      <section id="main-content">
+        <div class="main-content-container">
+          <div class="sgc-container">
+            <div class="row">
+              <div class="col-lg-12">
+                <div class="site-mode-content-box">
+                  
+    <div class="row row-centered">    
+        <div class="col-lg-12 min-template-controls-container">
+            <div class="row row-centered">
+                <div class="col-lg-12">
+                    <div class="row row-centered">
+                        <div class="col-lg-10">              
+                                        
+                        </div>
+                    </div>
+                </div>        
+            </div>
+            <div class="row row-centered">
+                <div class="col-lg-10">  
+                    
+    <form id="_form_25713" method="post" action="/ApplicationPublic/ApplicationSearch" onsubmit="return false;">
+<input type="hidden" name="_conv" value="1" />
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="search-options float-end">
+                    <a href="javascript:void(0);" onclick="FormSupport.submitAction( 'AdvancedSearch' );"><i class="fa fa-search"></i> <small>Advanced Search</small></a>
+                </div>
+            </div>
+        </div>
+        <div class="search-container" tabindex="0" aria-label="Enter at least 2 characters.">
+            <div class="row">
+                <div class="col-lg-12">
+                    <div class="search-input">
+                        <label for="query" data-margin-left="80px" data-margin-top="10px" class="infield-label">Enter a permit or license number, address, or name</label>
+                        <i class="sprite-search"></i>
+                        <input type="text" id="query" name="query" class="search-input-control st-w-80" onkeydown="ApplicationSearch.searchKeyHandler(event);" value="Main"/>
+                        <button  type="button" id="Search" name="Search" style="margin-top:5px" class="sgc-square-button-primary ils-button-location-both" onclick="ApplicationSearch.initiateSearch();; return false;">Search</button>
+                        
+                        
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-lg-12 st-text-center m-t-md">
+                    <span class="help-block">Enter at least 2 characters</span>
+                </div>
+            </div>
+        </div>
+        <br>
+        <div id="search-results" class="search-results">
+            
+    <main data-initial-focus="true" tabindex="0" aria-label="Search Results.">
+        <div class="clearfix">
+            <div class="float-end muted">44 results</div>
+        </div>
+     
+            <div class="search-result-item">
+            <article tabindex="0" role="navigation" aria-label="Search Result1,">
+                <div class="search-result-title">
+                    <a tabindex="-1" href="javascript:void(0);" onclick="FormSupport.submitAction( 'Detail/94fa6bd1-43de-4e7c-8e47-aed901895e07' );">
+                        EQ-22-1477
+                    </a>
+                </div>
+                <div class="row">
+                    <div class="col-lg-3">
+    
+                            <div class="">1. Site Investigation (First Step for Septic)</div>  
+                            <div class="">Step 7 of 7: CLOSED - This permit has completed the process and been closed., 8/8/2022</div>
+    
+                    </div>
+    
+                        <div class="col-lg-3">
+                            <div>146 E BIGHORN TRL</div>
+                            <div>WILLIAMS, AZ </div>
+                        </div>
+    
+                        <div class="col-lg-3">
+    
+                        </div>
+                    </div>
+                </div>
+            </article>
+     
+            <div class="search-result-item">
+            <article tabindex="0" role="navigation" aria-label="Search Result2,">
+                <div class="search-result-title">
+                    <a tabindex="-1" href="javascript:void(0);" onclick="FormSupport.submitAction( 'Detail/8c817b17-9938-4100-b428-0e45fe62b794' );">
+                        BD-11-0516
+                    </a>
+                </div>
+                <div class="row">
+                    <div class="col-lg-3">
+    
+                            <div class="">Commercial - Electric</div>  
+                            <div class="">Step 7 of 7: CLOSED - This permit has completed the process and been closed., 7/19/2011</div>
+    
+                    </div>
+    
+                        <div class="col-lg-3">
+                            <div>12913 E OLD ROUTE 66</div>
+                            <div>,  </div>
+                        </div>
+    
+                        <div class="col-lg-3">
+    
+                                <div class="">MAINE CONSOLIDATED SCHOOL DIST #10</div>  
+                                <div class="">PWI SOLAR CONSTRUCTION, INC</div>
+    
+                        </div>
+                    </div>
+                </div>
+            </article>
+     
+            <div class="search-result-item">
+            <article tabindex="0" role="navigation" aria-label="Search Result3,">
+                <div class="search-result-title">
+                    <a tabindex="-1" href="javascript:void(0);" onclick="FormSupport.submitAction( 'Detail/0cdec5c8-19fa-4740-bf5f-885b077d2c47' );">
+                        PZ-LDP-00-099
+                    </a>
+                </div>
+                <div class="row">
+                    <div class="col-lg-3">
+    
+                            <div class="">Land Division Permit to combine parcels</div>  
+                            <div class="">Step 5 of 7: ISSUED - Permit has been issued. If applicable, scroll to the &quot;Inspections&quot; section to request inspections in the order shown in your portal. Refer to the Inspector Area Schedule as applicable to your permit type. Inspections requested out of order may be charged re-inspection fees. A request for a date DOES NOT mean it has been scheduled. If you have a minor revision to your plans, please e-mail plansubmittals@coconino.az.gov to request the Revision After Issue process., 5/31/2011</div>
+    
+                    </div>
+    
+                        <div class="col-lg-3">
+                            <div>MAINE AVE</div>
+                            <div>PARKS, AZ </div>
+                        </div>
+    
+                        <div class="col-lg-3">
+    
+                                <div class="">HANSON ROBERT &amp; MARY CPWROS</div>  
+                                <div class=""></div>
+    
+                        </div>
+                    </div>
+                </div>
+            </article>
+     
+            <div class="search-result-item">
+            <article tabindex="0" role="navigation" aria-label="Search Result4,">
+                <div class="search-result-title">
+                    <a tabindex="-1" href="javascript:void(0);" onclick="FormSupport.submitAction( 'Detail/676d8579-59e8-4de6-9a92-c667503c9207' );">
+                        PZ-LDP-01-072
+                    </a>
+                </div>
+                <div class="row">
+                    <div class="col-lg-3">
+    
+                            <div class="">Land Division Permit to combine parcels</div>  
+                            <div class="">Step 5 of 7: ISSUED - Permit has been issued. If applicable, scroll to the &quot;Inspections&quot; section to request inspections in the order shown in your portal. Refer to the Inspector Area Schedule as applicable to your permit type. Inspections requested out of order may be charged re-inspection fees. A request for a date DOES NOT mean it has been scheduled. If you have a minor revision to your plans, please e-mail plansubmittals@coconino.az.gov to request the Revision After Issue process., 4/8/2011</div>
+    
+                    </div>
+    
+                        <div class="col-lg-3">
+                            <div>MAINE AVE</div>
+                            <div>PARKS, AZ </div>
+                        </div>
+    
+                        <div class="col-lg-3">
+    
+                                <div class="">HANSON ROBERT &amp; MARY CPWROS</div>  
+                                <div class=""></div>
+    
+                        </div>
+                    </div>
+                </div>
+            </article>
+     
+            <div class="search-result-item">
+            <article tabindex="0" role="navigation" aria-label="Search Result5,">
+                <div class="search-result-title">
+                    <a tabindex="-1" href="javascript:void(0);" onclick="FormSupport.submitAction( 'Detail/23f6bbfc-7e7a-47ae-81f5-15593f9351dc' );">
+                        BD-10-1962
+                    </a>
+                </div>
+                <div class="row">
+                    <div class="col-lg-3">
+    
+                            <div class="">Commercial - Electric</div>  
+                            <div class="">Step 7 of 7: CLOSED - This permit has completed the process and been closed., 12/23/2010</div>
+    
+                    </div>
+    
+                        <div class="col-lg-3">
+                            <div>12913 E OLD ROUTE 66</div>
+                            <div>,  </div>
+                        </div>
+    
+                        <div class="col-lg-3">
+    
+                                <div class="">MAINE CONSOLIDATED SCHOOL DIST #10</div>  
+                                <div class="">ALPHA TECHNOLOGIES SERVICES INC</div>
+    
+                        </div>
+                    </div>
+                </div>
+            </article>
+     
+            <div class="search-result-item">
+            <article tabindex="0" role="navigation" aria-label="Search Result6,">
+                <div class="search-result-title">
+                    <a tabindex="-1" href="javascript:void(0);" onclick="FormSupport.submitAction( 'Detail/e8d68650-e518-45f2-aa07-bb35b49d59d1' );">
+                        BD-10-0807
+                    </a>
+                </div>
+                <div class="row">
+                    <div class="col-lg-3">
+    
+                            <div class="">Commercial - Re-Roof</div>  
+                            <div class="">Step 7 of 7: CLOSED - This permit has completed the process and been closed., 7/19/2010</div>
+    
+                    </div>
+    
+                        <div class="col-lg-3">
+                            <div>12913 E OLD ROUTE 66</div>
+                            <div>,  </div>
+                        </div>
+    
+                        <div class="col-lg-3">
+    
+                                <div class="">MAINE CONSOLIDATED SCHOOL DIST #10</div>  
+                                <div class="">SHORTS SHINGLE AND SHAKE SERVI</div>
+    
+                        </div>
+                    </div>
+                </div>
+            </article>
+     
+            <div class="search-result-item">
+            <article tabindex="0" role="navigation" aria-label="Search Result7,">
+                <div class="search-result-title">
+                    <a tabindex="-1" href="javascript:void(0);" onclick="FormSupport.submitAction( 'Detail/02517175-0996-41d2-a846-50a5ee92ba5b' );">
+                        BD-09-0587
+                    </a>
+                </div>
+                <div class="row">
+                    <div class="col-lg-3">
+    
+                            <div class="">Commercial - Re-Roof</div>  
+                            <div class="">Step 7 of 7: CLOSED - This permit has completed the process and been closed., 6/12/2009</div>
+    
+                    </div>
+    
+                        <div class="col-lg-3">
+                            <div>12913 E OLD ROUTE 66</div>
+                            <div>,  </div>
+                        </div>
+    
+                        <div class="col-lg-3">
+    
+                                <div class="">MAINE CONSOLIDATED SCHOOL DIST #10</div>  
+                                <div class="">SHORTS SHINGLE AND SHAKE SERVI</div>
+    
+                        </div>
+                    </div>
+                </div>
+            </article>
+     
+            <div class="search-result-item">
+            <article tabindex="0" role="navigation" aria-label="Search Result8,">
+                <div class="search-result-title">
+                    <a tabindex="-1" href="javascript:void(0);" onclick="FormSupport.submitAction( 'Detail/ca75176c-915b-481b-be28-18d6c482b6e3' );">
+                        BLD-00-1357
+                    </a>
+                </div>
+                <div class="row">
+                    <div class="col-lg-3">
+    
+                            <div class="">Legacy - Building Permits</div>  
+                            <div class="">Step 7 of 7: CLOSED - This permit has completed the process and been closed., 6/9/2009</div>
+    
+                    </div>
+    
+                        <div class="col-lg-3">
+                            <div>12913 E OLD ROUTE 66</div>
+                            <div>,  </div>
+                        </div>
+    
+                        <div class="col-lg-3">
+    
+                        </div>
+                    </div>
+                </div>
+            </article>
+     
+            <div class="search-result-item">
+            <article tabindex="0" role="navigation" aria-label="Search Result9,">
+                <div class="search-result-title">
+                    <a tabindex="-1" href="javascript:void(0);" onclick="FormSupport.submitAction( 'Detail/aa93e1de-b9a5-4668-8721-b37ebd5a3758' );">
+                        BLD-01-0358
+                    </a>
+                </div>
+                <div class="row">
+                    <div class="col-lg-3">
+    
+                            <div class="">Legacy - Building Permits</div>  
+                            <div class="">Step 7 of 7: CLOSED - This permit has completed the process and been closed., 6/9/2009</div>
+    
+                    </div>
+    
+                        <div class="col-lg-3">
+                            <div>12913 E OLD ROUTE 66</div>
+                            <div>,  </div>
+                        </div>
+    
+                        <div class="col-lg-3">
+    
+                        </div>
+                    </div>
+                </div>
+            </article>
+     
+            <div class="search-result-item">
+            <article tabindex="0" role="navigation" aria-label="Search Result10,">
+                <div class="search-result-title">
+                    <a tabindex="-1" href="javascript:void(0);" onclick="FormSupport.submitAction( 'Detail/4e272b5e-4452-4557-a86e-f2048823f92c' );">
+                        BLD-00-1517
+                    </a>
+                </div>
+                <div class="row">
+                    <div class="col-lg-3">
+    
+                            <div class="">Legacy - Building Permits</div>  
+                            <div class="">Step 7 of 7: CLOSED - This permit has completed the process and been closed., 6/9/2009</div>
+    
+                    </div>
+    
+                        <div class="col-lg-3">
+                            <div>12913 E OLD ROUTE 66</div>
+                            <div>,  </div>
+                        </div>
+    
+                        <div class="col-lg-3">
+    
+                        </div>
+                    </div>
+                </div>
+            </article>
+    
+    </main>
+    <input type="hidden" id="_applicationSearchPage" name="_applicationSearchPage" value="0" />
+    <div class="search-results-paging" role="navigation" aria-label="Pagination.">
+        <ul>
+            
+            <li><span class="search-results-page search-results-page-active">1</span></li>
+            
+            <li><a href="#" onclick="ApplicationSearchResults.gotoPage(1)" aria-label="Go To Page 2."><span class="search-results-page">2</span></a></li>
+            
+            <li><a href="#" onclick="ApplicationSearchResults.gotoPage(2)" aria-label="Go To Page 3."><span class="search-results-page">3</span></a></li>
+            
+            <li><a href="#" onclick="ApplicationSearchResults.gotoPage(3)" aria-label="Go To Page 4."><span class="search-results-page">4</span></a></li>
+            
+            <li><a href="#" onclick="ApplicationSearchResults.gotoPage(4)" aria-label="Go To Page 5."><span class="search-results-page">5</span></a></li>
+            
+            <li><a href="#" onclick="ApplicationSearchResults.gotoPage(1)" aria-label="Go To Next Page."><span class="search-results-page"><i class="fas fa-chevron-right"></i></span></a></li>
+            
+        </ul>
+    </div>
+    
+
+<script>
+    var ApplicationSearchResults = {
+        gotoPage: function( pageNumber ) 
+        {
+            $( '#_applicationSearchPage').val(pageNumber);
+            FormSupport.contentAction('SearchPage', $('#search-results'));
+            window.scrollTo(0);
+        }
+    };
+</script>
+        </div>
+    </form>
+
+
+                </div> <!-- /col-lg-10 -->     
+            </div>  <!-- /row -->
+        </div> <!-- /col-lg-12 -->   
+    </div> <!-- /row -->
+    
+    <script>
+        var ApplicationSearch =
+        {
+            initiateSearch: function () {
+                var value = $('#query').val();
+
+                value = ApplicationSearchHelper.sanitizeSearchText(value);
+
+                // TO DO: Move this check into helper js file
+                if (value.length >= 2) {
+                    $('#query').val(value);
+                    $('#Search').prop('disabled', true);
+                    FormSupport.submitAction('Search');
+                }
+            },
+
+            searchKeyHandler(event) {
+                if (event.key === 'Enter') {
+                    event.stopPropagation();
+                    event.preventDefault();
+                    var searchButton = document.getElementById('Search');
+                    if (searchButton) {
+                        searchButton.click();
+                    }
+                }
+            }
+        };
+    </script>
+
+            
+                </div>
+              </div> <!-- /span12 -->
+            </div> <!-- /row -->
+          </div> <!-- /container -->          
+        </div> <!-- /main-content-container -->
+      </section>
+
+      
+
+<footer>
+  <div class="footer-container">
+    <div class="container">
+      <div class="row">
+        <div class="offset-lg-3 col-lg-2">
+          <a href="http://www.coconino.az.gov" target="_blank">Coconino County</a>
+        </div>
+        <div class="col-lg-2">
+           <a href="/Public/PrivacyPolicy">Privacy Policy</a>
+        </div>
+        <div class="col-lg-2">
+          <a href="/Public/RefundPolicy">Refund Policy</a>
+        </div>
+      </div> <!-- /row -->
+         
+      <div class='footer-custom-links'>
+<div class='row'>
+<div class='offset-lg-5 col-lg-2'>
+<a href='http://coconino.az.gov/FormCenter/Community-Development-18/Community-Development-Customer-Satisfact-122'>Customer Satisfaction Survey</a>
+</div>
+</div>
+</div>
+
+
+      <div class="row">
+        <div class="col-lg-12">
+          <div class="powered-by-container">
+              Powered by SmartGov, &copy; 2011 - 2026 <a target="_blank"  href="https://granicus.com/">Granicus</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+    <script type="text/javascript">
+        FormSupport.ready(function () {
+            // Dynamic padding to prevent footer overlap.
+            var mainContainer = $("div.main-content-container");
+            var footerHeight = $("div.footer-container").outerHeight();
+            var isSiteMode = $("body").hasClass("site-mode");
+
+            if (isSiteMode && mainContainer.outerHeight() && footerHeight) {
+                mainContainer.css("padding-bottom", `${footerHeight + 70}px`);
+            }
+        });
+    </script>
+</footer>
+                              
+    </div> <!-- /site-content-container -->
+    <script type="text/javascript"> 
+        // if we are using pendo, initialize it
+        $(document).ready
+        (
+            function () {
+                  PendoHelper.init("1ecfdd71-f46c-451b-7f50-e31729715fd2", "",
+                    "", "", "", "", "SGP");
+            }
+        );
+    </script>
+    
+  </body>
+</html>

@@ -1,0 +1,78 @@
+[
+  {
+    "permit_nbr": "23016-90000-19250",
+    "primary_address": "1865 N CURSON AVE",
+    "zip_code": "90046",
+    "cd": "4",
+    "pin_nbr": "150B177   345",
+    "apn": "5551010039",
+    "zone": "RE15-1-H",
+    "apc": "Central",
+    "cpa": "Hollywood",
+    "cnc": "Hollywood Hills West",
+    "hl": "YES",
+    "ct": "1941.01",
+    "permit_group": "Building",
+    "permit_type": "Bldg-Alter/Repair",
+    "permit_sub_type": "1 or 2 Family Dwelling",
+    "use_code": "1",
+    "use_desc": "Dwelling - Single Family",
+    "issue_date": "2023-06-12T00:00:00.000",
+    "status_desc": "Permit Finaled",
+    "status_date": "2023-07-05T00:00:00.000",
+    "valuation": "5600",
+    "type_lat_lon": "ADDRESS",
+    "lat": "34.10531",
+    "lon": "-118.35533",
+    "work_desc": "Re-roof with Class A or B roof covering material weighing less than 6 pounds per sq. ft. over existing solid sheathing 28 Squares. Class A roof covering is required within Very High Fire Hazard Severity Zone (VHFHSZ). For residential roof replacement > 50% of the total roof area, apply Cool Roof Product labeled and certified by Cool Roof Rating Council (CRRC). Cool Roof may be required for non-residential buildings per Title 24, Part 6, Section 141.0(b)2B.",
+    "ev": "N",
+    "solar": "N",
+    "business_unit": "Express Permit",
+    "refresh_time": "2026-10-04T00:00:00.000",
+    "geolocation": {
+      "type": "Point",
+      "coordinates": [
+        -118.35533,
+        34.10531
+      ]
+    }
+  },
+  {
+    "permit_nbr": "24016-10000-36278",
+    "primary_address": "6937 ESTEPA DR",
+    "zip_code": "91042",
+    "cd": "7",
+    "pin_nbr": "198B201   132",
+    "apn": "2572031021",
+    "zone": "RE11-1",
+    "apc": "North Valley",
+    "cpa": "Sunland-E LaTuna Cyn-Lakevw Ter-Shadow Hls-Tujunga",
+    "cnc": "Sunland-Tujunga",
+    "hl": "YES",
+    "ct": "1014.00",
+    "permit_group": "Building",
+    "permit_type": "Bldg-Alter/Repair",
+    "permit_sub_type": "1 or 2 Family Dwelling",
+    "use_code": "1",
+    "use_desc": "Dwelling - Single Family",
+    "issue_date": "2024-11-13T00:00:00.000",
+    "status_desc": "Permit Finaled",
+    "status_date": "2024-11-30T00:00:00.000",
+    "valuation": "9900",
+    "type_lat_lon": "PIN",
+    "lat": "34.24146715",
+    "lon": "-118.28325616",
+    "work_desc": "Re-roof with Class A or B material weighing less than 6 pounds per sq. ft. over existing solid sheathing___20___Squares. Class A roof covering is required within Very High Fire Hazard Severity Zone (VHFHSZ). Forresidential roof replacement &gt; 50% of the total roof area, apply Cool Roof Product labeled and certified by CoolRoof Rating Council (CRRC). Cool Roof may be required for non-residential buildings per Title 24, Part 6,Section 141.0(b) 2B.",
+    "ev": "N",
+    "solar": "N",
+    "business_unit": "Express Permit",
+    "refresh_time": "2026-10-04T00:00:00.000",
+    "geolocation": {
+      "type": "Point",
+      "coordinates": [
+        -118.28325616,
+        34.24146715
+      ]
+    }
+  }
+]

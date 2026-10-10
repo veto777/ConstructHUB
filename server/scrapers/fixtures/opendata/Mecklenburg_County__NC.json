@@ -1,0 +1,323 @@
+{
+  "objectIdFieldName": "objectid",
+  "globalIdFieldName": "",
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": {
+    "wkid": 4326,
+    "latestWkid": 4326
+  },
+  "fields": [
+    {
+      "name": "objectid",
+      "alias": "objectid",
+      "type": "esriFieldTypeOID"
+    },
+    {
+      "name": "permitnum",
+      "alias": "Permit Number",
+      "type": "esriFieldTypeString",
+      "length": 40
+    },
+    {
+      "name": "permitdesc",
+      "alias": "Permit Description",
+      "type": "esriFieldTypeString",
+      "length": 4000
+    },
+    {
+      "name": "permitstat",
+      "alias": "Permit Status",
+      "type": "esriFieldTypeString",
+      "length": 4000
+    },
+    {
+      "name": "permittype",
+      "alias": "Permit Type",
+      "type": "esriFieldTypeString",
+      "length": 4000
+    },
+    {
+      "name": "projname",
+      "alias": "Project Name",
+      "type": "esriFieldTypeString",
+      "length": 4000
+    },
+    {
+      "name": "projnum",
+      "alias": "Project Number",
+      "type": "esriFieldTypeString",
+      "length": 4000
+    },
+    {
+      "name": "projdesc",
+      "alias": "Project Description",
+      "type": "esriFieldTypeString",
+      "length": 4000
+    },
+    {
+      "name": "projphase",
+      "alias": "Project Phase",
+      "type": "esriFieldTypeString",
+      "length": 4000
+    },
+    {
+      "name": "projadd",
+      "alias": "Project Address",
+      "type": "esriFieldTypeString",
+      "length": 4000
+    },
+    {
+      "name": "zipcode",
+      "alias": "Project ZIP Code",
+      "type": "esriFieldTypeString",
+      "length": 9
+    },
+    {
+      "name": "addressid",
+      "alias": "Address ID",
+      "type": "esriFieldTypeInteger"
+    },
+    {
+      "name": "cntystcode",
+      "alias": "Street ID",
+      "type": "esriFieldTypeString",
+      "length": 20
+    },
+    {
+      "name": "xcoord",
+      "alias": "X-coord",
+      "type": "esriFieldTypeBigInteger"
+    },
+    {
+      "name": "ycoord",
+      "alias": "Y-Coord",
+      "type": "esriFieldTypeBigInteger"
+    },
+    {
+      "name": "parcelnum",
+      "alias": "Parcel ID",
+      "type": "esriFieldTypeString",
+      "length": 4000
+    },
+    {
+      "name": "taxjuris",
+      "alias": "Tax Jurisdiction",
+      "type": "esriFieldTypeString",
+      "length": 4000
+    },
+    {
+      "name": "subdiv",
+      "alias": "Subdivision",
+      "type": "esriFieldTypeString",
+      "length": 4000
+    },
+    {
+      "name": "zonecode",
+      "alias": "Zoning Designation",
+      "type": "esriFieldTypeString",
+      "length": 4000
+    },
+    {
+      "name": "npa_number",
+      "alias": "NPA ",
+      "type": "esriFieldTypeInteger"
+    },
+    {
+      "name": "typeofbldg",
+      "alias": "Building Type",
+      "type": "esriFieldTypeString",
+      "length": 4000
+    },
+    {
+      "name": "numunits",
+      "alias": "Number of Units",
+      "type": "esriFieldTypeBigInteger"
+    },
+    {
+      "name": "usdcdesc",
+      "alias": "USDC Description",
+      "type": "esriFieldTypeString",
+      "length": 4000
+    },
+    {
+      "name": "issuedate",
+      "alias": "Permit Issue Date",
+      "type": "esriFieldTypeDate",
+      "length": 8
+    },
+    {
+      "name": "compldate",
+      "alias": "Completion Date",
+      "type": "esriFieldTypeDate",
+      "length": 8
+    },
+    {
+      "name": "bldgcost",
+      "alias": "Building Cost",
+      "type": "esriFieldTypeDouble"
+    },
+    {
+      "name": "constrtype",
+      "alias": "Construction Type",
+      "type": "esriFieldTypeString",
+      "length": 4000
+    },
+    {
+      "name": "occupancy",
+      "alias": "Occupancy",
+      "type": "esriFieldTypeString",
+      "length": 4000
+    },
+    {
+      "name": "prmtfeetype",
+      "alias": "Permit Fee Type",
+      "type": "esriFieldTypeString",
+      "length": 4000
+    },
+    {
+      "name": "worktype",
+      "alias": "Work Type",
+      "type": "esriFieldTypeString",
+      "length": 4000
+    },
+    {
+      "name": "workdesc",
+      "alias": "Work Description",
+      "type": "esriFieldTypeString",
+      "length": 4000
+    },
+    {
+      "name": "heatsqft",
+      "alias": "Heated Sq/Ft",
+      "type": "esriFieldTypeBigInteger"
+    },
+    {
+      "name": "unheatsqft",
+      "alias": "Unheated Sq/Ft",
+      "type": "esriFieldTypeBigInteger"
+    },
+    {
+      "name": "totalsqft",
+      "alias": "Total Sq/Ft",
+      "type": "esriFieldTypeBigInteger"
+    },
+    {
+      "name": "ownname",
+      "alias": "Owner Name",
+      "type": "esriFieldTypeString",
+      "length": 4000
+    },
+    {
+      "name": "owncity",
+      "alias": "Owner City",
+      "type": "esriFieldTypeString",
+      "length": 4000
+    },
+    {
+      "name": "ownstate",
+      "alias": "Owner State",
+      "type": "esriFieldTypeString",
+      "length": 4000
+    },
+    {
+      "name": "ownzipcode",
+      "alias": "Owner ZIP Code",
+      "type": "esriFieldTypeBigInteger"
+    }
+  ],
+  "features": [
+    {
+      "attributes": {
+        "objectid": 1,
+        "permitnum": "B4680449",
+        "permitdesc": "M. Brinkerhoff - Facilitator - 8.13.24 Sent to UnitsAltera Albemarle RoadDemolish/Move Off. SF Dwelling Detached.",
+        "permitstat": "Complete",
+        "permittype": "One/Two Family",
+        "projname": "Altera Albemarle Road Demolish/Move Off. SF Dwelling Detache",
+        "projnum": "463915",
+        "projdesc": "",
+        "projphase": "Closed",
+        "projadd": "12425  ALBEMARLE RD   ",
+        "zipcode": "28227",
+        "addressid": 28930,
+        "cntystcode": "52",
+        "xcoord": 1509130,
+        "ycoord": 540014,
+        "parcelnum": "11120107",
+        "taxjuris": "MECKLENBURG",
+        "subdiv": null,
+        "zonecode": "UR-2(cd)",
+        "npa_number": 228,
+        "typeofbldg": "Existing Bldg",
+        "numunits": 1,
+        "usdcdesc": "645 - One Family",
+        "issuedate": 1724169600000,
+        "compldate": 1726761611000,
+        "bldgcost": 18333,
+        "constrtype": "5B     * WOOD FRAME/UNPROTECTED",
+        "occupancy": "R3     * RESIDENTIAL - SINGLE FAMILY",
+        "prmtfeetype": "Demolition",
+        "worktype": "",
+        "workdesc": "Altera Albemarle Road",
+        "heatsqft": 926,
+        "unheatsqft": null,
+        "totalsqft": 926,
+        "ownname": "LE HILL",
+        "owncity": "Charlotte",
+        "ownstate": "NC",
+        "ownzipcode": 28208
+      },
+      "geometry": {
+        "x": -80.64370896041717,
+        "y": 35.22262930277387
+      }
+    },
+    {
+      "attributes": {
+        "objectid": 2,
+        "permitnum": "B4803939",
+        "permitdesc": "Replacement Permit - 457028 SM COMM EPS Salon Luna Interior Renovatio - Salon Luna Interior Renovation",
+        "permitstat": "Complete",
+        "permittype": "Commercial",
+        "projname": "457028 SM COMM EPS Salon Luna Interior Renovatio",
+        "projnum": "457028",
+        "projdesc": "",
+        "projphase": "Open",
+        "projadd": "3708  EASTWAY DR   ",
+        "zipcode": "28205",
+        "addressid": 114354,
+        "cntystcode": "2598",
+        "xcoord": 1466770,
+        "ycoord": 534297,
+        "parcelnum": "12911320",
+        "taxjuris": "CHARLOTTE",
+        "subdiv": null,
+        "zonecode": "OFC",
+        "npa_number": 2,
+        "typeofbldg": "Existing Bldg",
+        "numunits": 1,
+        "usdcdesc": "437 - Commercial - Plan Review (Upfits, Additions, Repair)",
+        "issuedate": 1745510400000,
+        "compldate": 1786114173000,
+        "bldgcost": 100000,
+        "constrtype": "5B     * WOOD FRAME/UNPROTECTED",
+        "occupancy": "B      * BUSINESS",
+        "prmtfeetype": "Construction",
+        "worktype": "",
+        "workdesc": "",
+        "heatsqft": null,
+        "unheatsqft": null,
+        "totalsqft": 978,
+        "ownname": "Yessica Pina",
+        "owncity": "Charlotte",
+        "ownstate": "NC",
+        "ownzipcode": 28205
+      },
+      "geometry": {
+        "x": -80.78518024644443,
+        "y": 35.20491314044624
+      }
+    }
+  ],
+  "exceededTransferLimit": true
+}

@@ -1,0 +1,136 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>City of Eugene - Planning and Development - Building Permit Search Results</title>
+    <link rel="shortcut icon" href="/Content/Images/favicon.ico" />
+    <script src="/Scripts/jquery-1.6.2.min.js"></script>
+
+    <link type="text/css" rel="stylesheet" media="all" href="/Content/Reset.css" />
+    <link type="text/css" rel="stylesheet" media="print" href="/Content/Print.css" />
+    <link type="text/css" rel="stylesheet" media="all" href="/Content/jquery-ui-1.8.20.custom.css" />
+    <link rel="stylesheet" href="/Content/Site.css" />
+    <script src="/Scripts/jquery-1.6.2.min.js"></script>
+    <script src="/Scripts/jquery-ui-1.8.20.custom.min.js"></script>
+    <script src="/Scripts/jquery.validate.min.js"></script>
+    <script src="/Scripts/modernizr.custom.min.js"></script>
+
+    <style type="text/css">
+        input[type="submit"].ui-state-default,
+        input[type="button"].ui-state-default,
+        .ui-button-text {
+            font-size: 12px;
+            font-weight: normal;
+        }
+
+        div.ui-datepicker {
+            font-size: 10px;
+        }
+
+
+
+        #debug-message {
+            color: Red;
+            font-weight: bold;
+            font-size: larger;
+            float: right;
+            margin: 1em;
+        }
+    </style>
+
+    <script type="text/javascript">
+        $(document).ready(function () {
+            $('input:submit, input:button, button').button();
+            $('input:text').focus(function () { this.select(); });
+            $.validator.addMethod('phone', function (phone, element) {
+                phone = phone.replace(/\s+/g, '');
+                return this.optional(element) || phone.length > 9 &&
+                    phone.match(/^[2-9]\d{2}-\d{3}-\d{4}$/);
+            }, 'Please enter a valid phone number');
+        });
+    </script>
+
+    
+    <link type="text/css" rel="stylesheet" href="/Content/jquery.datatables.css" />
+    <script type="text/javascript" src="/Scripts/jquery.datatables.min.js"></script>
+    <script type="text/javascript" src="/Scripts/jquery.datatables.tools.min.js"></script>
+    <script type="text/javascript">
+		function LoadMap()
+		{
+			var url = '/Maps/SearchResultsMap/50e091d9-1de7-4821-9364-ab6e9bb1f552';
+
+			$('#search-map-frame').attr('src', url);
+			$('#search-map-container').css('display', 'block');
+			$('#search-map-button').css('display', 'none');
+		}
+    </script>
+    <style type="text/css">
+        #search-map-container {
+            display: none;
+        }
+
+        #search-map-button {
+            width: 100%;
+            text-align: center;
+        }
+
+        th.table-project-name {
+            width: 15em;
+        }
+    </style>
+
+
+    <script type="text/javascript">
+        $(document).ready(function () {
+            $('button').button();
+        });
+    </script>
+
+        <script type="text/javascript">
+            var _gaq = _gaq || [];
+            _gaq.push(['_setAccount', 'UA-34287918-3']);
+            _gaq.push(['_trackPageview']);
+
+            (function () {
+                var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+                ga.src = ('https:' === document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+                var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+            })();
+        </script>
+</head>
+<body>
+    <noscript><div>The City of Eugene's interactive <b>PDD Online Services Center</b> requires that Javascript be enabled in your browser.</div></noscript>
+    <div id="page">
+        <div id="header">
+            <div id="logo">
+                <a href="https://www.eugene-or.gov/"><img id="citylogo" src="/Content/Images/city-logo-90x90.jpg" alt="City of Eugene" /></a>
+            </div>
+            <div id="title">
+                <div class="custom_h1">Planning and Development Department</div>
+                <div id="menu">
+<a class="inactive" href="/">Home</a><a class="inactive" href="/Maps">Maps</a><a class="active" href="/BuildingPermits">Building Permits</a><a class="inactive" href="/CodeCompliance">Code Compliance</a><a class="inactive" href="/LandUse">Land Use</a><a class="inactive" href="/RentalHousing">Rental Housing</a><a class="inactive" href="/GreenBuilding">Waste Prevention</a>                </div>
+            </div>
+        </div>
+        <div id="main">
+            
+
+
+<h2>Building Permit Search Results</h2>
+<fieldset>
+    <button id="new-search-button-right" onclick="window.location.href='PermitSearch'">New Search</button>
+    <h3>Search by Date Received: October 3, 2026 - October 10, 2026</h3>
+<p id="search-results-empty">
+    No records were found matching the search parameters you entered.  If this is not the result you
+    expected, please review the search terms you used and try again.
+</p></fieldset>
+        </div>
+        <div id="footer">
+            Copyright &copy;2026 City of Eugene. All rights reserved.
+        </div>
+    </div>
+
+    
+</body>
+</html>

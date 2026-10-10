@@ -1,0 +1,305 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>Permit Choice</title><meta name="viewport" content="width=device-width">
+<link rel="stylesheet" type="text/css" href="/vision6noteswrapper5/bootstrap/css/bootstrap.min.css">
+<link rel="stylesheet" type="text/css" href="/vision6noteswrapper5/css/customLotusNotes.default.css">
+<script type="text/javascript" src="/vision6noteswrapper5/jquery/jquery.min.js"></script>
+<script type="text/javascript" src="/vision6noteswrapper5/bootstrap/js/bootstrap.min.js"></script>
+<script type="text/javascript" src="/public/permits/onlinepermits.nsf/sweetalert2.all.min.js"></script>
+<script language="JavaScript" type="text/javascript">
+<!-- 
+function checkForm(theForm) {	var message = '';	var fname = '';		var workType = $('input[name="workType"]:checked').val() || '';	if (workType == '') {     	message += "Please select the type of permit you want<br>";		fname = fname == '' ? '#workType1' : fname;	} else if (workType == 'electricalOther' || workType == 'mechanicalOther' || workType == 'plumbingOther') {		if ($('#other').val() == '') {		   	message += "Provide a short description<br>";			fname = fname == '' ? '#other' : fname;		}	}			if (message != '') {		$(fname).focus();		Swal.fire({			title: '<span style="font-size: 0.6em">Please enter the following field(s) and try again</span>',			html: '<div style="font-size: 0.8em">' + message + '</div>',			confirmButtonColor: '#337ab7',			confirmButtonText: 'OK',		});		return false;	}		return true;}
+// -->
+</script>
+
+<script language="JavaScript" type="text/javascript">
+<!-- 
+document._domino_target = "_self";
+function _doClick(v, o, t, h) {
+  var form = document._DominoForm;
+  if (form.onsubmit) {
+     var retVal = form.onsubmit();
+     if (typeof retVal == "boolean" && retVal == false)
+       return false;
+  }
+  var target = document._domino_target;
+  if (o.href != null) {
+    if (o.target != null)
+       target = o.target;
+  } else {
+    if (t != null)
+      target = t;
+  }
+  form.target = target;
+  form.__Click.value = v;
+  if (h != null)
+    form.action += h;
+  form.submit();
+  return false;
+}
+// -->
+</script>
+</head>
+<body text="#000000" bgcolor="#FFFFFF">
+
+<form onsubmit="return checkForm(this);return true;" method="post" action="/public/permits/onlinepermits.nsf/index.html?OpenForm&amp;Seq=1" name="_DominoForm">
+<input type="hidden" name="__Click" value="0"><script type= "text/javascript">$(document.body).addClass("front_end_body site_standardsitetemplate");</script>
+<link rel="Shortcut Icon" href="/vision6noteswrapper5/favicon.ico">
+<style id="poshytip-css-tip-yellow" type="text/css">
+div.tip-yellow {
+visibility: hidden;
+position: absolute;
+top: 0;
+left: 0;
+}
+div.tip-yellow table, div.tip-yellow td {
+margin: 0;
+font-family: inherit;
+font-size: inherit;
+font-weight: inherit;
+font-style: inherit;
+font-variant: inherit;
+}
+div.tip-yellow td.tip-bg-image span {
+display: block;
+font: 1px/1px sans-serif;
+height: 10px;
+width: 10px;
+overflow: hidden;
+}
+div.tip-yellow td.tip-right {
+background-position: 100% 0;
+}
+div.tip-yellow td.tip-bottom {
+background-position: 100% 100%;
+}
+div.tip-yellow td.tip-left {
+background-position: 0 100%;
+}
+div.tip-yellow div.tip-inner {
+background-position: -10px -10px;
+}
+div.tip-yellow div.tip-arrow {
+visibility: hidden;
+position: absolute;
+overflow: hidden;
+font: 1px/1px sans-serif;
+}
+</style>
+<noscript>
+<div class="noscript_alert"><span>Please enable JavaScript in your browser for a better user experience.</span></div>
+</noscript>
+<div class="sitewrapper site_template mainSpan_wrapper">
+<div class="mainSpan" id="mainSpan_wrapper_Screen">
+<header id="siteheader" class="">
+<a id="home_link" href="http://www.cor.net">Home</a>
+<a href="javascript:void(0);" class="menu_trigger mobile_only">Menu</a>
+<div id="headercolumn" class="site_template_column  column sortable_col header_column">
+<div id="top_nav">
+<a href="https://www.cor.net/our-city/city-contacts">Contact Us</a>
+<a href="https://www.cor.net/departments/human-resources/job-openings">Employment</a>
+<a href="https://www.cor.net/government/transparency-initiative">Transparency</a>
+</div>
+</div>
+</header>
+<div class="standardlayout clearfix" id="sitebody">
+<div id="ColumnUserControl1" class="column  top_col  clearfix">
+<div class=" main_menu_widget">
+<link rel="stylesheet" type="text/css" href="/vision6noteswrapper5/css/dropdownmegamenu.css">
+<nav id="menuContainer_170_0_1" class="mainnav">
+<ul class="dropdownmenu clearfix">
+<li id="dropdownrootitem1" class='megamenu_first'><a class='dropdownrootitem1 active' href='https://www.cor.net/home'>Home</a></li>
+<li id="dropdownrootitem3" class='megamenu_first'><a class='dropdownrootitem3' href='https://www.cor.net/our-city'>Our City</a></li>
+<li id="dropdownrootitem4" class='megamenu_first'><a class='dropdownrootitem4' href='https://www.cor.net/departments-7'>Departments</a></li>
+<li id="dropdownrootitem5" class='megamenu_first'><a class='dropdownrootitem5' href='https://www.cor.net/government'>Government</a></li>
+<li id="dropdownrootitem6" class='megamenu_first'><a class='dropdownrootitem6' href='https://www.cor.net/businesses'>Businesses</a></li>
+<li id="dropdownrootitem2" class='megamenu_first'><a class='dropdownrootitem2' href='https://www.cor.net/services-6'>Services</a></li>
+<li id="dropdownrootitem7" class='megamenu_first'><a class='dropdownrootitem7' href='https://www.cor.net/i-want-to'>I Want To...</a></li>
+ </ul>
+</nav>
+</div>
+</div>
+<div id="ColumnUserControl2" class="column left_col">
+<nav class="nocontent sidenav mobile_list">
+<ul>
+<li class="sidenav_expanded sidenav_haschildren">
+<a href="http://www.cor.net/?navid=366">Permits Home</a>
+<ul>
+<li><a href="/public/permits/permitInquiry.nsf/index.html">Permits Search</a></li>
+<li class="sidenav_expanded sidenav_haschildren"><a>Apply Online</a></li>
+<ul>
+<li><a href="./index.html">For Permits</a></li>
+<li><a href="/public/permits/permitInquiry.nsf/inspectionIndex.html?openForm">For Inspections</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</div>
+<div id="ColumnUserControl3" class="column right_col">
+<a id="pagebody"></a>
+<header class="title_widget clearfix"></header>
+<div class="normal_content_area content_area clearfix"><div>
+<h1>Permit Application</h1>
+<h2>This is step 1 of 6</h2>
+<div class="content_area normal_content_area clearfix">
+ 
+<p>Use this system to apply for Miscellaneous Trade Permits. At present, this system supports only those permits that do not require plans. Select one of the permit choices below and then answer the rest of the questions on this page to get started.</p>
+ 
+ 
+<p class="fw-bold">If you are a contractor and you do not yet have an online account with the city, please <a href="/public/permits/onlinepermits.nsf/newAccount.html">create a new online account</a> before starting.</p>
+ 
+<p>Please contact the Richardson Building Inspection department at 972-744-4180 if you need assistance.</p>
+ 
+
+ 
+<div class="card mb-2">
+<div class="card-header">Choose your permit type</div>
+<div class="card-body">
+<div class="row"> 
+<div class="col-md-4" style="padding-left: 10px">
+<h3 style="font-size:1.125rem">Electrical</h3>
+<div class="mb-0 form-check">
+<input class="form-check-input" type="radio" name="workType" value="TMPL" id="workType1">
+<label class="form-check-label" for="workType1">Temporary Pole</label>
+</div>
+<div class="mb-0 form-check">
+<input  class="form-check-input" type="radio" name="workType" value="signs" id="workType2">
+<label class="form-check-label" for="workType2">Signs</label>
+</div>
+<div class="mb-0 form-check">
+<input class="form-check-input" type="radio" name="workType" value="outlets" id="workType3">
+<label  class="form-check-label" for="workType3">Outlets</label>
+</div>
+<div class="mb-0 form-check">
+<input class="form-check-input" type="radio" name="workType" value="motors" id="workType4">
+<label  class="form-check-label" for="workType4">Motors</label>
+</div>
+<div class="mb-0 form-check">
+<input class="form-check-input" type="radio" name="workType" value="electricalOther" id="workType5">
+<label  class="form-check-label" for="workType5">Other Electrical</label>
+</div>
+</div>
+ 
+<div class="col-md-4" style="padding-left: 10px">
+<h3 style="font-size:1.125rem">Mechanical</h3>
+<div class="mb-0 form-check">
+<input class="form-check-input" type="radio" name="workType" value="condenserReplacement" id="workType11">
+<label  class="form-check-label" for="workType11">Condenser Replacement</label>
+</div>
+<div class="mb-0 form-check">
+<input class="form-check-input" type="radio" name="workType" value="furnaceReplacement" id="workType12">
+<label  class="form-check-label" for="workType12">Furnace Replacement</label>
+</div>
+<div class="mb-0 form-check">
+<input class="form-check-input" type="radio" name="workType" value="mechanicalOther" id="workType13">
+<label  class="form-check-label" for="workType13">Other Mechanical</label>
+</div>
+</div>
+ 
+<div class="col-md-4" style="padding-left: 10px">
+<h3 style="font-size:1.125rem">Plumbing/Gas</h3>
+<div class="mb-0 form-check">
+<input class="form-check-input" type="radio" name="workType" value="waterHeater" id="workType21">
+<label  class="form-check-label" for="workType21">Water Heater</label>
+</div>
+<div class="mb-0 form-check">
+<input class="form-check-input" type="radio" name="workType" value="sewerRelay" id="workType22">
+<label  class="form-check-label" for="workType22">Sewer Relay</label>
+</div>
+<div class="mb-0 form-check">
+<input class="form-check-input" type="radio" name="workType" value="sewerReplacement" id="workType23">
+<label  class="form-check-label" for="workType23">Sewer Replacement</label>
+</div>
+<div class="mb-0 form-check">
+<input class="form-check-input" type="radio" name="workType" value="gasRelay" id="workType24">
+<label  class="form-check-label" for="workType24">Gas Relay</label>
+</div>
+<div class="mb-0 form-check">
+<input class="form-check-input" type="radio" name="workType" value="gasReplacement" id="workType25">
+<label  class="form-check-label" for="workType25">Gas Replacement</label>
+</div>
+<div class="mb-0 form-check">
+<input class="form-check-input" type="radio" name="workType" value="lawnSprinkler" id="workType26">
+<label  class="form-check-label" for="workType26">Lawn Sprinkler</label>
+</div>
+<div class="mb-0 form-check">
+<input class="form-check-input" type="radio" name="workType" value="plumbingOther" id="workType27">
+<label  class="form-check-label" for="workType27">Other Plumbing/Gas</label>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="row mb-2">
+<p class="mb-0 pb-0">If "other", provide a short description</p>
+
+<input name="other" value="" id="other" class="form-control" style="width:100%">
+</div>
+<div class="row mb-2">
+<p class="mb-0 pb-0">Please describe the work in detail</p>
+
+<textarea name="workDescription" class="form-control" rows="4" cols="20"></textarea>
+
+</div>
+<p class="text-center mt-4">
+<button class="btn btn-warning" style="padding: 5px 20px" type="reset" name="B2">Reset</button>
+<button class="btn btn-primary" style="padding: 5px 20px" type="submit" name="B1">Next >></button>
+</p>
+</div>
+</div>
+</div></div>
+</div>
+</div>
+<footer id="page_footer" class="">
+<div id="footercolumn" class="site_template_column  footer_column">
+<div class="footer_location">
+<div style="text-align: center;">
+2360 Campbell Creek Blvd. Suite 550<br>
+Richardson, TX 75082
+<p>&nbsp;</p>
+</div>
+</div>
+<div class="footer_phone">
+<div class="footerLH" style="text-align: center;">
+<a href="tel:972-744-4100">972-744-4100</a>
+<p style="line-height: 1.5em; margin-bottom: 0; padding-bottom: 0; font-size:100%">Mailing Address: P.O. Box 830309 Richardson, TX 75083-0309</p>
+<a href="https://www.cor.net/departments/capital-projects-engineering/public-project-input/capital-project-tracker-map" target="_blank" title="View Richardson Projects">View Richardson Projects</a>&nbsp;|&nbsp;<a href="https://www.cor.net/departments/community-services/code-enforcement/express-a-concern" target="_blank" title="Report an Issue">Report an Issue</a>
+</div>
+<style>
+    div.footerLH a{
+    min-width: 44px;
+    min-height: 44px;
+    }
+</style>
+</div>
+<div class="social_icons">
+<a href="https://www.cor.net/our-city/system-pages-do-not-delete/follow-us" target="_self" title="Facebook Icon"><img src="/vision6noteswrapper5/images/facebook.png" alt="Facebook Icon"></a>
+<a href="mailto:askrichardsonconcern@cor.net" target="_self" title="Email Icon"><img src="/vision6noteswrapper5/images/mail.png" alt="Email Icon"></a>
+</div>
+<p class="footer_copyright">
+<a href="https://granicus.com/government-website-design?utm_source=customer&amp;utm_medium=footer&amp;utm_campaign=govAccesswebsite">Website Design by Granicus</a>
+ - Connecting People and Government
+</p>
+<div class="footer_contact">
+<p class="linksHover" style="line-height:1.5em;">Accommodations for Persons with Disabilities call Lindsay Turman,
+<a href="tel:9727440908" style="text-decoration: underline;">972-744-0908</a> or <a href="mailto:ADACoordinator@cor.gov" style="text-decoration: underline;">ADACoordinator@cor.gov</a><br>
+Visit <a href="https://www.cor.net/services/ada-compliance-accommodations" target="_blank" rel="noopener" style="text-decoration: underline;">www.cor.net/ADA</a> for more information.</p>
+<style>
+    .linksHover a:hover, a:focus{
+    text-decoration: underline;
+    font-weight:800;
+    }
+</style>
+</div>
+</div>
+</footer>
+<div id="view-options">
+<a href="javascript:void(0);" id="view-full" onclick="viewfullsite()" class="mobile_only">View Full Site</a>
+</div>
+</div>
+</div></form>
+</body>
+</html>

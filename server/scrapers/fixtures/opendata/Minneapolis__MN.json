@@ -1,0 +1,294 @@
+{
+  "objectIdFieldName": "OBJECTID",
+  "uniqueIdField": {
+    "name": "OBJECTID",
+    "isSystemMaintained": true
+  },
+  "globalIdFieldName": "",
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": {
+    "wkid": 4326,
+    "latestWkid": 4326
+  },
+  "fields": [
+    {
+      "name": "OBJECTID",
+      "type": "esriFieldTypeOID",
+      "alias": "OBJECTID",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null,
+      "required": true
+    },
+    {
+      "name": "Display",
+      "type": "esriFieldTypeString",
+      "alias": "Display",
+      "sqlType": "sqlTypeOther",
+      "length": 88,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "APN",
+      "type": "esriFieldTypeString",
+      "alias": "APN",
+      "sqlType": "sqlTypeOther",
+      "length": 28,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Longitude",
+      "type": "esriFieldTypeDouble",
+      "alias": "Longitude",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Latitude",
+      "type": "esriFieldTypeDouble",
+      "alias": "Latitude",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Neighborhoods_Desc",
+      "type": "esriFieldTypeString",
+      "alias": "Neighborhoods_Desc",
+      "sqlType": "sqlTypeOther",
+      "length": 64,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Wards",
+      "type": "esriFieldTypeString",
+      "alias": "Wards",
+      "sqlType": "sqlTypeOther",
+      "length": 4,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "applicantName",
+      "type": "esriFieldTypeString",
+      "alias": "applicantName",
+      "sqlType": "sqlTypeOther",
+      "length": 112,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "permitNumber",
+      "type": "esriFieldTypeString",
+      "alias": "permitNumber",
+      "sqlType": "sqlTypeOther",
+      "length": 22,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "dwellingUnitsNew",
+      "type": "esriFieldTypeString",
+      "alias": "dwellingUnitsNew",
+      "sqlType": "sqlTypeOther",
+      "length": 508,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "dwellingUnitsEliminated",
+      "type": "esriFieldTypeString",
+      "alias": "dwellingUnitsEliminated",
+      "sqlType": "sqlTypeOther",
+      "length": 508,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "permitType",
+      "type": "esriFieldTypeString",
+      "alias": "permitType",
+      "sqlType": "sqlTypeOther",
+      "length": 20,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "occupancyType",
+      "type": "esriFieldTypeString",
+      "alias": "occupancyType",
+      "sqlType": "sqlTypeOther",
+      "length": 18,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "workType",
+      "type": "esriFieldTypeString",
+      "alias": "workType",
+      "sqlType": "sqlTypeOther",
+      "length": 20,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "status",
+      "type": "esriFieldTypeString",
+      "alias": "status",
+      "sqlType": "sqlTypeOther",
+      "length": 20,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "milestone",
+      "type": "esriFieldTypeString",
+      "alias": "milestone",
+      "sqlType": "sqlTypeOther",
+      "length": 32,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "permit_Value",
+      "type": "esriFieldTypeDouble",
+      "alias": "permit_Value",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "totalFees",
+      "type": "esriFieldTypeDouble",
+      "alias": "totalFees",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "comments",
+      "type": "esriFieldTypeString",
+      "alias": "comments",
+      "sqlType": "sqlTypeOther",
+      "length": 510,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "issueDate",
+      "type": "esriFieldTypeDate",
+      "alias": "issueDate",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "completeDate",
+      "type": "esriFieldTypeDate",
+      "alias": "completeDate",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "fullName",
+      "type": "esriFieldTypeString",
+      "alias": "fullName",
+      "sqlType": "sqlTypeOther",
+      "length": 156,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "applicantAddress1",
+      "type": "esriFieldTypeString",
+      "alias": "applicantAddress1",
+      "sqlType": "sqlTypeOther",
+      "length": 80,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "applicantCity",
+      "type": "esriFieldTypeString",
+      "alias": "applicantCity",
+      "sqlType": "sqlTypeOther",
+      "length": 44,
+      "domain": null,
+      "defaultValue": null
+    }
+  ],
+  "exceededTransferLimit": true,
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 1,
+        "Display": "1 1ST ST S",
+        "APN": "2302924320528",
+        "Longitude": -93.26725,
+        "Latitude": 44.98295,
+        "Neighborhoods_Desc": "Downtown West",
+        "Wards": "3",
+        "applicantName": "NORTHLAND MECHANICAL CONTRACTORS, INC",
+        "permitNumber": "BLDG716044",
+        "dwellingUnitsNew": null,
+        "dwellingUnitsEliminated": null,
+        "permitType": "Plumbing",
+        "occupancyType": "Comm",
+        "workType": "ComNoFdBv",
+        "status": "Closed",
+        "milestone": "Closed",
+        "permit_Value": 0,
+        "totalFees": 122.8,
+        "comments": "3 FOUNTAIN PUMPS",
+        "issueDate": 1530179304000,
+        "completeDate": 1542273082000,
+        "fullName": "MPLS PARK & RECREATION BOARD",
+        "applicantAddress1": "9001 SCENCE CENTER DR",
+        "applicantCity": "NEW HOPE"
+      },
+      "geometry": {
+        "x": -93.26725775241461,
+        "y": 44.98295799396616
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 2,
+        "Display": "1 33RD ST W",
+        "APN": "0302824240048",
+        "Longitude": -93.27813,
+        "Latitude": 44.94277,
+        "Neighborhoods_Desc": "Lyndale",
+        "Wards": "8",
+        "applicantName": "B and D Plumbing Heating and A/C Inc",
+        "permitNumber": "BLDG1075485",
+        "dwellingUnitsNew": null,
+        "dwellingUnitsEliminated": null,
+        "permitType": "Plumbing",
+        "occupancyType": "TH",
+        "workType": "Res",
+        "status": "Closed",
+        "milestone": "Closed",
+        "permit_Value": 0,
+        "totalFees": 125.2,
+        "comments": "Remodel - Main Bath: Install Tub, Faucet, Toilet, Lav Sink & Faucet.",
+        "issueDate": 1721898203000,
+        "completeDate": 1730986047000,
+        "fullName": "KISMET PROPERTIES LLC",
+        "applicantAddress1": "12821 44th CT NE",
+        "applicantCity": "St Michael"
+      },
+      "geometry": {
+        "x": -93.2781377499756,
+        "y": 44.94277798735306
+      }
+    }
+  ]
+}

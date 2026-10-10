@@ -1,0 +1,241 @@
+{
+  "displayFieldName": "PERMIT_NUMBER",
+  "fieldAliases": {
+    "OBJECTID": "OBJECTID",
+    "PERMIT_NUMBER": "PERMIT_NUMBER",
+    "DESCRIPTION": "DESCRIPTION",
+    "APPLICATION_DATE": "APPLICATION_DATE",
+    "ISSUE_DATE": "ISSUE_DATE",
+    "FINALED_DATE": "FINALED_DATE",
+    "EXPIRATION_DATE": "EXPIRATION_DATE",
+    "PERMIT_STATUS": "PERMIT_STATUS",
+    "MAILING_ADDRESS": "MAILING_ADDRESS",
+    "MAILING_CITY": "MAILING_CITY",
+    "MAILING_STATE": "MAILING_STATE",
+    "MAILING_POSTAL_CODE": "MAILING_POSTAL_CODE",
+    "DISTRICT": "DISTRICT",
+    "PERMIT_TYPE": "PERMIT_TYPE",
+    "WORK_CLASS": "WORK_CLASS",
+    "SQUARE_FEET": "SQUARE_FEET",
+    "PROPOSED_USE": "PROPOSED_USE",
+    "VALUATION": "VALUATION",
+    "TOTAL_FEE_AMOUNT": "TOTAL_FEE_AMOUNT",
+    "CONTRACTOR": "CONTRACTOR",
+    "LINK": "LINK",
+    "PIN": "PIN",
+    "X": "X",
+    "Y": "Y"
+  },
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": {
+    "wkid": 4326,
+    "latestWkid": 4326
+  },
+  "fields": [
+    {
+      "name": "OBJECTID",
+      "type": "esriFieldTypeOID",
+      "alias": "OBJECTID"
+    },
+    {
+      "name": "PERMIT_NUMBER",
+      "type": "esriFieldTypeString",
+      "alias": "PERMIT_NUMBER",
+      "length": 50
+    },
+    {
+      "name": "DESCRIPTION",
+      "type": "esriFieldTypeString",
+      "alias": "DESCRIPTION",
+      "length": 1073741822
+    },
+    {
+      "name": "APPLICATION_DATE",
+      "type": "esriFieldTypeDate",
+      "alias": "APPLICATION_DATE",
+      "length": 8
+    },
+    {
+      "name": "ISSUE_DATE",
+      "type": "esriFieldTypeDate",
+      "alias": "ISSUE_DATE",
+      "length": 8
+    },
+    {
+      "name": "FINALED_DATE",
+      "type": "esriFieldTypeDate",
+      "alias": "FINALED_DATE",
+      "length": 8
+    },
+    {
+      "name": "EXPIRATION_DATE",
+      "type": "esriFieldTypeDate",
+      "alias": "EXPIRATION_DATE",
+      "length": 8
+    },
+    {
+      "name": "PERMIT_STATUS",
+      "type": "esriFieldTypeString",
+      "alias": "PERMIT_STATUS",
+      "length": 50
+    },
+    {
+      "name": "MAILING_ADDRESS",
+      "type": "esriFieldTypeString",
+      "alias": "MAILING_ADDRESS",
+      "length": 1000
+    },
+    {
+      "name": "MAILING_CITY",
+      "type": "esriFieldTypeString",
+      "alias": "MAILING_CITY",
+      "length": 50
+    },
+    {
+      "name": "MAILING_STATE",
+      "type": "esriFieldTypeString",
+      "alias": "MAILING_STATE",
+      "length": 2
+    },
+    {
+      "name": "MAILING_POSTAL_CODE",
+      "type": "esriFieldTypeString",
+      "alias": "MAILING_POSTAL_CODE",
+      "length": 50
+    },
+    {
+      "name": "DISTRICT",
+      "type": "esriFieldTypeString",
+      "alias": "DISTRICT",
+      "length": 100
+    },
+    {
+      "name": "PERMIT_TYPE",
+      "type": "esriFieldTypeString",
+      "alias": "PERMIT_TYPE",
+      "length": 50
+    },
+    {
+      "name": "WORK_CLASS",
+      "type": "esriFieldTypeString",
+      "alias": "WORK_CLASS",
+      "length": 50
+    },
+    {
+      "name": "SQUARE_FEET",
+      "type": "esriFieldTypeDouble",
+      "alias": "SQUARE_FEET"
+    },
+    {
+      "name": "PROPOSED_USE",
+      "type": "esriFieldTypeString",
+      "alias": "PROPOSED_USE",
+      "length": 50
+    },
+    {
+      "name": "VALUATION",
+      "type": "esriFieldTypeDouble",
+      "alias": "VALUATION"
+    },
+    {
+      "name": "TOTAL_FEE_AMOUNT",
+      "type": "esriFieldTypeDouble",
+      "alias": "TOTAL_FEE_AMOUNT"
+    },
+    {
+      "name": "CONTRACTOR",
+      "type": "esriFieldTypeString",
+      "alias": "CONTRACTOR",
+      "length": 200
+    },
+    {
+      "name": "LINK",
+      "type": "esriFieldTypeString",
+      "alias": "LINK",
+      "length": 250
+    },
+    {
+      "name": "PIN",
+      "type": "esriFieldTypeString",
+      "alias": "PIN",
+      "length": 50
+    },
+    {
+      "name": "X",
+      "type": "esriFieldTypeDouble",
+      "alias": "X"
+    },
+    {
+      "name": "Y",
+      "type": "esriFieldTypeDouble",
+      "alias": "Y"
+    }
+  ],
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 1,
+        "PERMIT_NUMBER": "0941568",
+        "DESCRIPTION": "64E L/2217 L/PENSELWOOD DR ON L JUST BEFORE CORNER OF PRESTON PLACE///SFD 1 ST ATT GAR FIN.   W/U PRE-FAB FP POR DECK",
+        "APPLICATION_DATE": 754531200000,
+        "ISSUE_DATE": 754531200000,
+        "FINALED_DATE": 777081600000,
+        "EXPIRATION_DATE": null,
+        "PERMIT_STATUS": "Complete",
+        "MAILING_ADDRESS": "1017 PENSELWOOD DR",
+        "MAILING_CITY": null,
+        "MAILING_STATE": "NC",
+        "MAILING_POSTAL_CODE": null,
+        "DISTRICT": "Wake County",
+        "PERMIT_TYPE": "Residential Building",
+        "WORK_CLASS": "Single Family Dwelling",
+        "SQUARE_FEET": 2217,
+        "PROPOSED_USE": "101A   CONVENTIONAL ONE-FAMILY HOUSE",
+        "VALUATION": 136400,
+        "TOTAL_FEE_AMOUNT": null,
+        "CONTRACTOR": null,
+        "LINK": "https://energovcitizenaccess.tylertech.com/WakeCountyNC/SelfService#/permit/CE5CC693-499F-453F-A682-FB5D309EA502",
+        "PIN": "1734777003",
+        "X": -78.53562745,
+        "Y": 35.80170376
+      },
+      "geometry": {
+        "x": -78.53563002690106,
+        "y": 35.80171084390991
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 2,
+        "PERMIT_NUMBER": "0020614",
+        "DESCRIPTION": "FROM 64E TAKE HWY 96 EXIT TO ZEB, R OFF RAMP   L ONTO E NORTH ST, CROSS OVER SHEPARD SCHOOL   RD, LOT ON R AT X OF NORTH&GILL(MOBILE HOME)",
+        "APPLICATION_DATE": 998352000000,
+        "ISSUE_DATE": 998352000000,
+        "FINALED_DATE": 1002672000000,
+        "EXPIRATION_DATE": null,
+        "PERMIT_STATUS": "Complete",
+        "MAILING_ADDRESS": "402 NORTH ST",
+        "MAILING_CITY": null,
+        "MAILING_STATE": "NC",
+        "MAILING_POSTAL_CODE": null,
+        "DISTRICT": "Zebulon",
+        "PERMIT_TYPE": "Manufactured Home Permit",
+        "WORK_CLASS": "New and Replacement",
+        "SQUARE_FEET": 0,
+        "PROPOSED_USE": "112   MANUFACTURED HOME",
+        "VALUATION": 5000,
+        "TOTAL_FEE_AMOUNT": 91,
+        "CONTRACTOR": null,
+        "LINK": "https://energovcitizenaccess.tylertech.com/WakeCountyNC/SelfService#/permit/F9977DCA-3BCF-4E3A-A9B3-C5E09C5C3C8C",
+        "PIN": "2705463624",
+        "X": -78.31071536,
+        "Y": 35.82702903
+      },
+      "geometry": {
+        "x": -78.31071786827431,
+        "y": 35.82703612591391
+      }
+    }
+  ],
+  "exceededTransferLimit": true
+}

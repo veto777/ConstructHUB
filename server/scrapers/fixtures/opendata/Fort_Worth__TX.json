@@ -1,0 +1,347 @@
+{
+  "objectIdFieldName": "ObjectId",
+  "uniqueIdField": {
+    "name": "ObjectId",
+    "isSystemMaintained": true
+  },
+  "globalIdFieldName": "",
+  "fields": [
+    {
+      "name": "Unique_ID",
+      "type": "esriFieldTypeString",
+      "alias": "Unique_ID",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Count_",
+      "type": "esriFieldTypeInteger",
+      "alias": "Count",
+      "sqlType": "sqlTypeInteger",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Permit_No",
+      "type": "esriFieldTypeString",
+      "alias": "Permit_No",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Permit_Type",
+      "type": "esriFieldTypeString",
+      "alias": "Permit_Type",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Permit_SubType",
+      "type": "esriFieldTypeString",
+      "alias": "Permit_SubType",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Permit_Category",
+      "type": "esriFieldTypeString",
+      "alias": "Permit_Category",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "B1_SPECIAL_TEXT",
+      "type": "esriFieldTypeString",
+      "alias": "B1_SPECIAL_TEXT",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "B1_WORK_DESC",
+      "type": "esriFieldTypeString",
+      "alias": "B1_WORK_DESC",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Addr_No",
+      "type": "esriFieldTypeInteger",
+      "alias": "Addr_No",
+      "sqlType": "sqlTypeInteger",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Direction",
+      "type": "esriFieldTypeString",
+      "alias": "Direction",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Street_Name",
+      "type": "esriFieldTypeString",
+      "alias": "Street_Name",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Street_Suffix",
+      "type": "esriFieldTypeString",
+      "alias": "Street_Suffix",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Street_Suffix_Dir",
+      "type": "esriFieldTypeString",
+      "alias": "Street_Suffix_Dir",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Full_Street_Address",
+      "type": "esriFieldTypeString",
+      "alias": "Full_Street_Address",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Zip_Code",
+      "type": "esriFieldTypeInteger",
+      "alias": "Zip_Code",
+      "sqlType": "sqlTypeInteger",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "B1_LOT",
+      "type": "esriFieldTypeString",
+      "alias": "B1_LOT",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "B1_BLOCK",
+      "type": "esriFieldTypeString",
+      "alias": "B1_BLOCK",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "B1_TRACT",
+      "type": "esriFieldTypeString",
+      "alias": "B1_TRACT",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "B1_LEGAL_DESC",
+      "type": "esriFieldTypeString",
+      "alias": "B1_LEGAL_DESC",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Owner_Full_Name",
+      "type": "esriFieldTypeString",
+      "alias": "Owner_Full_Name",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "File_Date",
+      "type": "esriFieldTypeDate",
+      "alias": "File_Date",
+      "sqlType": "sqlTypeTimestamp2",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Current_Status",
+      "type": "esriFieldTypeString",
+      "alias": "Current_Status",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Status_Date",
+      "type": "esriFieldTypeDate",
+      "alias": "Status_Date",
+      "sqlType": "sqlTypeTimestamp2",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Location_1",
+      "type": "esriFieldTypeString",
+      "alias": "Location_1",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "JobValue",
+      "type": "esriFieldTypeString",
+      "alias": "JobValue",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Use_Type",
+      "type": "esriFieldTypeString",
+      "alias": "Use_Type",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Specific_Use",
+      "type": "esriFieldTypeString",
+      "alias": "Specific_Use",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Units",
+      "type": "esriFieldTypeString",
+      "alias": "Units",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SqFt",
+      "type": "esriFieldTypeString",
+      "alias": "SqFt",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ObjectId",
+      "type": "esriFieldTypeOID",
+      "alias": "ObjectId",
+      "sqlType": "sqlTypeInteger",
+      "domain": null,
+      "defaultValue": null
+    }
+  ],
+  "exceededTransferLimit": true,
+  "features": [
+    {
+      "attributes": {
+        "Unique_ID": "19EST-000001896774113572",
+        "Count_": null,
+        "Permit_No": "19EST-000012",
+        "Permit_Type": "Design Review",
+        "Permit_SubType": "HCLC",
+        "Permit_Category": "NA",
+        "B1_SPECIAL_TEXT": "Terrell Heights - Non-contributing",
+        "B1_WORK_DESC": null,
+        "Addr_No": 1128,
+        "Direction": null,
+        "Street_Name": "STELLA",
+        "Street_Suffix": "ST",
+        "Street_Suffix_Dir": null,
+        "Full_Street_Address": null,
+        "Zip_Code": 76104,
+        "B1_LOT": "8",
+        "B1_BLOCK": "21",
+        "B1_TRACT": null,
+        "B1_LEGAL_DESC": "UNION DEPOT ADDITION Block 21 Lot 8",
+        "Owner_Full_Name": null,
+        "File_Date": 1552953600000,
+        "Current_Status": "Pending",
+        "Status_Date": 1552990021080,
+        "Location_1": "(32.740736548814247, -97.312717937681597)",
+        "JobValue": null,
+        "Use_Type": null,
+        "Specific_Use": null,
+        "Units": null,
+        "SqFt": null,
+        "ObjectId": 1
+      }
+    },
+    {
+      "attributes": {
+        "Unique_ID": "23EST-0000001489472",
+        "Count_": null,
+        "Permit_No": "23EST-000049",
+        "Permit_Type": "Design Review",
+        "Permit_SubType": "HCLC",
+        "Permit_Category": "NA",
+        "B1_SPECIAL_TEXT": "5508 Truman Drive New Construction",
+        "B1_WORK_DESC": null,
+        "Addr_No": null,
+        "Direction": null,
+        "Street_Name": null,
+        "Street_Suffix": null,
+        "Street_Suffix_Dir": null,
+        "Full_Street_Address": null,
+        "Zip_Code": null,
+        "B1_LOT": "A-3",
+        "B1_BLOCK": "25",
+        "B1_TRACT": null,
+        "B1_LEGAL_DESC": "ROSEDALE PARK ADDITION Block 25 Lot A",
+        "Owner_Full_Name": null,
+        "File_Date": 1703635200000,
+        "Current_Status": "Pending",
+        "Status_Date": 1703679888670,
+        "Location_1": null,
+        "JobValue": null,
+        "Use_Type": null,
+        "Specific_Use": null,
+        "Units": null,
+        "SqFt": null,
+        "ObjectId": 2
+      }
+    }
+  ]
+}

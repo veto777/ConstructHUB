@@ -1,0 +1,388 @@
+{
+  "displayFieldName": "BID_NAME",
+  "fieldAliases": {
+    "OBJECTID": "OBJECTID",
+    "PROJECT_ID": "PROJECT_ID",
+    "PROJECT_TYPE": "PROJECT_TYPE",
+    "PROJECT_PROCESSING_CODE": "PROJECT_PROCESSING_CODE",
+    "PROJECT_TITLE": "PROJECT_TITLE",
+    "PROJECT_SCOPE": "PROJECT_SCOPE",
+    "APPROVAL_ID": "APPROVAL_ID",
+    "APPROVAL_TYPE": "APPROVAL_TYPE",
+    "APPROVAL_STATUS": "APPROVAL_STATUS",
+    "APPROVAL_SCOPE": "APPROVAL_SCOPE",
+    "APPROVAL_PERMIT_HOLDER": "APPROVAL_PERMIT_HOLDER",
+    "BID_NAME": "BID_NAME",
+    "CPA_NAME": "CPA_NAME",
+    "MAD_NAME": "MAD_NAME",
+    "TPA": "TPA",
+    "ZONE": "PROMISE_ZONE",
+    "COZ_NAME": "COZ_NAME",
+    "DATE_LAST_UPDATED": "DATE_LAST_UPDATED",
+    "APPROVAL_CATEGORY": "APPROVAL_CATEGORY",
+    "JOB_ID": "JOB_ID",
+    "PROJECT_STATUS": "PROJECT_STATUS",
+    "JOB_BC_CODE_DESCRIPTION": "JOB_BC_CODE_DESCRIPTION",
+    "JOB_BC_CODE": "JOB_BC_CODE",
+    "PROJECT_TRUST_ACCOUNT_NO": "PROJECT_TRUST_ACCOUNT_NO",
+    "GIS_LATITUDE": "GIS_LATITUDE",
+    "APPROVAL_URL": "APPROVAL_URL",
+    "GIS_ADDRESS": "GIS_ADDRESS",
+    "GIS_LONGITUDE": "GIS_LONGITUDE",
+    "APPROVAL_ISSUE_DATE": "APPROVAL_ISSUE_DATE",
+    "GIS_ZIP": "GIS_ZIP",
+    "APPROVAL_EXPIRE_DATE": "APPROVAL_EXPIRE_DATE",
+    "APPROVAL_CLOSE_DATE": "APPROVAL_CLOSE_DATE",
+    "PROJECT_DECISION_TYPE": "PROJECT_DECISION_TYPE",
+    "JOB_DRAWING_NUMBER": "JOB_DRAWING_NUMBER",
+    "APPROVAL_CREATE_DATE": "APPROVAL_CREATE_DATE",
+    "PROJECT_CREATE_DATE": "PROJECT_CREATE_DATE",
+    "PROJECT_DEEMEDCOMPLETE_DATE": "PROJECT_DEEMEDCOMPLETE_DATE",
+    "GIS_APN": "GIS_APN",
+    "GIS_COUNCILDISTRICT": "GIS_COUNCILDISTRICT",
+    "PROJECT_URL": "PROJECT_URL"
+  },
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": {
+    "wkid": 4326,
+    "latestWkid": 4326
+  },
+  "fields": [
+    {
+      "name": "OBJECTID",
+      "type": "esriFieldTypeOID",
+      "alias": "OBJECTID"
+    },
+    {
+      "name": "PROJECT_ID",
+      "type": "esriFieldTypeString",
+      "alias": "PROJECT_ID",
+      "length": 255
+    },
+    {
+      "name": "PROJECT_TYPE",
+      "type": "esriFieldTypeString",
+      "alias": "PROJECT_TYPE",
+      "length": 255
+    },
+    {
+      "name": "PROJECT_PROCESSING_CODE",
+      "type": "esriFieldTypeString",
+      "alias": "PROJECT_PROCESSING_CODE",
+      "length": 255
+    },
+    {
+      "name": "PROJECT_TITLE",
+      "type": "esriFieldTypeString",
+      "alias": "PROJECT_TITLE",
+      "length": 255
+    },
+    {
+      "name": "PROJECT_SCOPE",
+      "type": "esriFieldTypeString",
+      "alias": "PROJECT_SCOPE",
+      "length": 1073741822
+    },
+    {
+      "name": "APPROVAL_ID",
+      "type": "esriFieldTypeString",
+      "alias": "APPROVAL_ID",
+      "length": 255
+    },
+    {
+      "name": "APPROVAL_TYPE",
+      "type": "esriFieldTypeString",
+      "alias": "APPROVAL_TYPE",
+      "length": 255
+    },
+    {
+      "name": "APPROVAL_STATUS",
+      "type": "esriFieldTypeString",
+      "alias": "APPROVAL_STATUS",
+      "length": 255
+    },
+    {
+      "name": "APPROVAL_SCOPE",
+      "type": "esriFieldTypeString",
+      "alias": "APPROVAL_SCOPE",
+      "length": 1073741822
+    },
+    {
+      "name": "APPROVAL_PERMIT_HOLDER",
+      "type": "esriFieldTypeString",
+      "alias": "APPROVAL_PERMIT_HOLDER",
+      "length": 255
+    },
+    {
+      "name": "BID_NAME",
+      "type": "esriFieldTypeString",
+      "alias": "BID_NAME",
+      "length": 30
+    },
+    {
+      "name": "CPA_NAME",
+      "type": "esriFieldTypeString",
+      "alias": "CPA_NAME",
+      "length": 35
+    },
+    {
+      "name": "MAD_NAME",
+      "type": "esriFieldTypeString",
+      "alias": "MAD_NAME",
+      "length": 50
+    },
+    {
+      "name": "TPA",
+      "type": "esriFieldTypeString",
+      "alias": "TPA",
+      "length": 30
+    },
+    {
+      "name": "ZONE",
+      "type": "esriFieldTypeString",
+      "alias": "PROMISE_ZONE",
+      "length": 50
+    },
+    {
+      "name": "COZ_NAME",
+      "type": "esriFieldTypeString",
+      "alias": "COZ_NAME",
+      "length": 20
+    },
+    {
+      "name": "DATE_LAST_UPDATED",
+      "type": "esriFieldTypeDate",
+      "alias": "DATE_LAST_UPDATED",
+      "length": 8
+    },
+    {
+      "name": "APPROVAL_CATEGORY",
+      "type": "esriFieldTypeString",
+      "alias": "APPROVAL_CATEGORY",
+      "length": 255
+    },
+    {
+      "name": "JOB_ID",
+      "type": "esriFieldTypeString",
+      "alias": "JOB_ID",
+      "length": 255
+    },
+    {
+      "name": "PROJECT_STATUS",
+      "type": "esriFieldTypeString",
+      "alias": "PROJECT_STATUS",
+      "length": 255
+    },
+    {
+      "name": "JOB_BC_CODE_DESCRIPTION",
+      "type": "esriFieldTypeString",
+      "alias": "JOB_BC_CODE_DESCRIPTION",
+      "length": 255
+    },
+    {
+      "name": "JOB_BC_CODE",
+      "type": "esriFieldTypeString",
+      "alias": "JOB_BC_CODE",
+      "length": 255
+    },
+    {
+      "name": "PROJECT_TRUST_ACCOUNT_NO",
+      "type": "esriFieldTypeString",
+      "alias": "PROJECT_TRUST_ACCOUNT_NO",
+      "length": 255
+    },
+    {
+      "name": "GIS_LATITUDE",
+      "type": "esriFieldTypeDouble",
+      "alias": "GIS_LATITUDE"
+    },
+    {
+      "name": "APPROVAL_URL",
+      "type": "esriFieldTypeString",
+      "alias": "APPROVAL_URL",
+      "length": 255
+    },
+    {
+      "name": "GIS_ADDRESS",
+      "type": "esriFieldTypeString",
+      "alias": "GIS_ADDRESS",
+      "length": 255
+    },
+    {
+      "name": "GIS_LONGITUDE",
+      "type": "esriFieldTypeDouble",
+      "alias": "GIS_LONGITUDE"
+    },
+    {
+      "name": "APPROVAL_ISSUE_DATE",
+      "type": "esriFieldTypeDate",
+      "alias": "APPROVAL_ISSUE_DATE",
+      "length": 8
+    },
+    {
+      "name": "GIS_ZIP",
+      "type": "esriFieldTypeString",
+      "alias": "GIS_ZIP",
+      "length": 255
+    },
+    {
+      "name": "APPROVAL_EXPIRE_DATE",
+      "type": "esriFieldTypeDate",
+      "alias": "APPROVAL_EXPIRE_DATE",
+      "length": 8
+    },
+    {
+      "name": "APPROVAL_CLOSE_DATE",
+      "type": "esriFieldTypeDate",
+      "alias": "APPROVAL_CLOSE_DATE",
+      "length": 8
+    },
+    {
+      "name": "PROJECT_DECISION_TYPE",
+      "type": "esriFieldTypeString",
+      "alias": "PROJECT_DECISION_TYPE",
+      "length": 255
+    },
+    {
+      "name": "JOB_DRAWING_NUMBER",
+      "type": "esriFieldTypeString",
+      "alias": "JOB_DRAWING_NUMBER",
+      "length": 255
+    },
+    {
+      "name": "APPROVAL_CREATE_DATE",
+      "type": "esriFieldTypeDate",
+      "alias": "APPROVAL_CREATE_DATE",
+      "length": 8
+    },
+    {
+      "name": "PROJECT_CREATE_DATE",
+      "type": "esriFieldTypeDate",
+      "alias": "PROJECT_CREATE_DATE",
+      "length": 8
+    },
+    {
+      "name": "PROJECT_DEEMEDCOMPLETE_DATE",
+      "type": "esriFieldTypeDate",
+      "alias": "PROJECT_DEEMEDCOMPLETE_DATE",
+      "length": 8
+    },
+    {
+      "name": "GIS_APN",
+      "type": "esriFieldTypeString",
+      "alias": "GIS_APN",
+      "length": 255
+    },
+    {
+      "name": "GIS_COUNCILDISTRICT",
+      "type": "esriFieldTypeString",
+      "alias": "GIS_COUNCILDISTRICT",
+      "length": 255
+    },
+    {
+      "name": "PROJECT_URL",
+      "type": "esriFieldTypeString",
+      "alias": "PROJECT_URL",
+      "length": 255
+    }
+  ],
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 1,
+        "PROJECT_ID": "PRJ-1101196",
+        "PROJECT_TYPE": "Sign",
+        "PROJECT_PROCESSING_CODE": "Standard",
+        "PROJECT_TITLE": "Standard-Sign:10165/Mc Kellar",
+        "PROJECT_SCOPE": "MIRA MESA. Sign Permit to demolish and remove the existing double-faced monument sign and install one (1)  single-faced Illuminated Monument Sign to an existing commercial building. OC-1-1",
+        "APPROVAL_ID": "PMT-3235703",
+        "APPROVAL_TYPE": "Approval - Construction - Sign Pmt",
+        "APPROVAL_STATUS": "Closed",
+        "APPROVAL_SCOPE": "MIRA MESA. Sign Permit to demolish and remove the existing double-faced monument sign and install one (1)  single-faced Illuminated Monument Sign to an existing commercial building. OC-1-1",
+        "APPROVAL_PERMIT_HOLDER": "Integrated Sign Associates",
+        "BID_NAME": null,
+        "CPA_NAME": "MIRA MESA",
+        "MAD_NAME": "Mira Mesa",
+        "TPA": "Y",
+        "ZONE": "N",
+        "COZ_NAME": "N-APP-1",
+        "DATE_LAST_UPDATED": 1791504000000,
+        "APPROVAL_CATEGORY": "Sign Permit",
+        "JOB_ID": "JOB-055447",
+        "PROJECT_STATUS": "Closed",
+        "JOB_BC_CODE_DESCRIPTION": "Signs - Permanent",
+        "JOB_BC_CODE": "3272",
+        "PROJECT_TRUST_ACCOUNT_NO": null,
+        "GIS_LATITUDE": 32.904522,
+        "APPROVAL_URL": "https://aca-prod.accela.com/SANDIEGO/Cap/CapDetail.aspx?Module=DSD&TabName=DSD&capID1=REC23&capID2=00000&capID3=025XN&agencyCode=SANDIEGO&IsToShowInspection=",
+        "GIS_ADDRESS": "10165 Mc Kellar Ct, San Diego, CA 92121",
+        "GIS_LONGITUDE": -117.200076,
+        "APPROVAL_ISSUE_DATE": 1690502400000,
+        "GIS_ZIP": "92121",
+        "APPROVAL_EXPIRE_DATE": 1713830400000,
+        "APPROVAL_CLOSE_DATE": 1698278400000,
+        "PROJECT_DECISION_TYPE": "Ministerial",
+        "JOB_DRAWING_NUMBER": null,
+        "APPROVAL_CREATE_DATE": 1689897600000,
+        "PROJECT_CREATE_DATE": 1689724800000,
+        "PROJECT_DEEMEDCOMPLETE_DATE": 1690156800000,
+        "GIS_APN": "3410322000",
+        "GIS_COUNCILDISTRICT": "6",
+        "PROJECT_URL": "https://aca-prod.accela.com/SANDIEGO/Cap/CapDetail.aspx?Module=DSD&TabName=DSD&capID1=REC23&capID2=00000&capID3=024SE&agencyCode=SANDIEGO&IsToShowInspection="
+      },
+      "geometry": {
+        "x": -117.2000879217036,
+        "y": 32.904526782246435
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 2,
+        "PROJECT_ID": null,
+        "PROJECT_TYPE": null,
+        "PROJECT_PROCESSING_CODE": null,
+        "PROJECT_TITLE": null,
+        "PROJECT_SCOPE": null,
+        "APPROVAL_ID": "PMT-3040450",
+        "APPROVAL_TYPE": "Traffic Control Plan-Permit",
+        "APPROVAL_STATUS": "Pending Invoice Payment",
+        "APPROVAL_SCOPE": null,
+        "APPROVAL_PERMIT_HOLDER": "Sabrina Robertson",
+        "BID_NAME": "La Jolla",
+        "CPA_NAME": "LA JOLLA",
+        "MAD_NAME": "LA JOLLA | 2",
+        "TPA": "Y",
+        "ZONE": "N",
+        "COZ_NAME": "N-APP-2",
+        "DATE_LAST_UPDATED": 1791504000000,
+        "APPROVAL_CATEGORY": "Traffic Control Permit",
+        "JOB_ID": null,
+        "PROJECT_STATUS": null,
+        "JOB_BC_CODE_DESCRIPTION": null,
+        "JOB_BC_CODE": null,
+        "PROJECT_TRUST_ACCOUNT_NO": null,
+        "GIS_LATITUDE": 32.845895,
+        "APPROVAL_URL": "https://aca-prod.accela.com/SANDIEGO/Cap/CapDetail.aspx?Module=DSD&TabName=DSD&capID1=REC19&capID2=00000&capID3=017P9&agencyCode=SANDIEGO&IsToShowInspection=",
+        "GIS_ADDRESS": "828 Prospect St, San Diego, CA 92037",
+        "GIS_LONGITUDE": -117.276762,
+        "APPROVAL_ISSUE_DATE": null,
+        "GIS_ZIP": "92037",
+        "APPROVAL_EXPIRE_DATE": null,
+        "APPROVAL_CLOSE_DATE": null,
+        "PROJECT_DECISION_TYPE": null,
+        "JOB_DRAWING_NUMBER": null,
+        "APPROVAL_CREATE_DATE": 1560988800000,
+        "PROJECT_CREATE_DATE": null,
+        "PROJECT_DEEMEDCOMPLETE_DATE": null,
+        "GIS_APN": "3500701800",
+        "GIS_COUNCILDISTRICT": "1",
+        "PROJECT_URL": null
+      },
+      "geometry": {
+        "x": -117.27677393037447,
+        "y": 32.845899771382584
+      }
+    }
+  ],
+  "exceededTransferLimit": true
+}

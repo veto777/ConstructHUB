@@ -1,3 +1,5 @@
+import { hasJurisdictionAdapter, isScrapablePlatform } from "./scrapable-platforms";
+
 /** Source-listed links remain usable when automated verification is inconclusive. */
 export function governmentLinksAvailable(row: { isActive: boolean; linkStatus?: string | null }): boolean {
   return row.isActive && ['live', 'verified', 'unconfirmed'].includes(row.linkStatus || '');
@@ -7,13 +9,19 @@ export function governmentLinksForDisplay<T extends { isActive: boolean; linkSta
   return governmentLinksAvailable(row) ? row : { ...row, portalUrl: null, searchUrl: null };
 }
 
-/** Portal availability does not imply that an automated records adapter exists. */
-export function canScrapeGovernmentPortal(row: { platform: string | null; searchUrl: string | null; portalUrl: string | null }): boolean {
+/** Portal availability does not imply that an automated records adapter exists.
+ * The answer comes from the adapter registry (server/scrapers/registry.ts) via the generated
+ * shared/scrapable-platforms.ts: a platform label/alias with an adapter, or a jurisdiction with its own
+ * open-data adapter. Keep the row's jurisdiction in the call when you have it.
+ */
+export function canScrapeGovernmentPortal(row: { platform: string | null; searchUrl: string | null; portalUrl: string | null; jurisdiction?: string | null }): boolean {
   const value = row.searchUrl || row.portalUrl;
-  if (!value || !row.platform) return false;
+  if (!value) return false;
   let url: URL;
   try { url = new URL(value); } catch { return false; }
   if (!['http:', 'https:'].includes(url.protocol)) return false;
+  if (hasJurisdictionAdapter(row.jurisdiction)) return true;
+  if (!row.platform) return false;
   if (row.platform === 'eTRAKiT') {
     // The current adapter is specific to Bellingham. Do not label its records
     // as another city's until the adapter accepts and verifies a target URL.
@@ -22,7 +30,7 @@ export function canScrapeGovernmentPortal(row: { platform: string | null; search
   if (['Skagit County', 'Custom / GovPlatform'].includes(row.platform)) {
     return ['skagitcounty.net', 'www.skagitcounty.net'].includes(url.hostname);
   }
-  return ['SmartGov', 'Tyler EnerGov', 'Tyler Technologies', 'Accela', 'Click2Gov', 'FTG Portal'].includes(row.platform);
+  return isScrapablePlatform(row.platform);
 }
 
 /** The permit catalog verifies portal URLs, not the legacy hardcoded contacts.

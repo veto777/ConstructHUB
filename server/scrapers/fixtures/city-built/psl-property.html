@@ -1,0 +1,683 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+    <head><meta name="google-site-verification" content="aHNG28JNg0JE1ptxQoa9L5z9ItlhRslF3e9yvrJQuYw" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>
+	Property Search
+</title><link href="/favicon.ico" rel="shortcut icon" type="image/x-icon" /><link href="/Content/themes/base/jquery-ui.css" rel="stylesheet" />
+
+        <!-- Font Awesome -->
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,400,500,600,700" />
+        <!--begin::Global Stylesheets Bundle(mandatory for all pages)-->
+        <link href="/assets/plugins/global/plugins.bundle.css" rel="stylesheet" type="text/css" /><link href="/assets/css/style.bundle.css?id=1" rel="stylesheet" type="text/css" />
+        <!--end::Global Stylesheets Bundle-->
+        <link href="../Content/Site.css" rel="stylesheet" /><link rel="stylesheet" type="text/css" href="../Styles/sliderman.css" /><link href="/Styles/ui-southstreet/css/south-street/jquery-ui-1.8.22.custom.css" rel="Stylesheet" type="text/css" /><link rel="stylesheet" href="/Styles/ui-SouthStreet/development-bundle/themes/south-street/jquery.ui.all.css" />
+        <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.3.2/jquery.min.js"></script><noscript></noscript>
+        <link rel="stylesheet" type="text/css" href="/styles/jkmegamenu.css" />
+        <script type="text/javascript" src='https://www.google.com/recaptcha/api.js'></script><noscript></noscript>
+
+        <link rel="Shortcut Icon" href="/favicon.ico" />
+
+        <style type="text/css">
+            .loginTemplate
+            {
+                text-align: right;
+                padding-right: 10px;
+            }
+        </style>
+    </head>
+
+    <body id="kt_body"
+        class="header-fixed header-tablet-and-mobile-fixed toolbar-enabled toolbar-fixed toolbar-tablet-and-mobile-fixed aside-enabled aside-fixed"
+        style="--kt-toolbar-height: 55px; --kt-toolbar-height-tablet-and-mobile: 55px">
+        <!-- Sidebar -->
+        <!--begin::Aside-->
+        <div id="kt_aside" class="aside aside-dark aside-hoverable" data-kt-drawer="true" data-kt-drawer-name="aside"
+            data-kt-drawer-activate="{default: true, lg: false}" data-kt-drawer-overlay="true"
+            data-kt-drawer-width="{default:'200px', '300px': '250px'}" data-kt-drawer-direction="start"
+            data-kt-drawer-toggle="#kt_aside_mobile_toggle">
+            <!--begin::Brand-->
+            <div class="aside-logo flex-column-auto" id="kt_aside_logo">
+                <!--begin::Logo-->
+                <a href="https://www.cityofpsl.com/Government/Your-City-Government/Departments/Building" target="_blank">
+                    <img alt="Logo" width="150px" height="75px"
+                        src="https://www.cityofpsl.com/files/oc-templates/00000000-0000-0000-0000-000000000000/d17a80c3-a98f-43d4-b37c-90cea1158564/v/293/City-of-Horizontal-WhiteWstroke.png?t=638615818367718737"
+                        class="h-60px logo" />
+                </a>
+                <!--end::Logo-->
+                <!--begin::Aside toggler-->
+                <div id="kt_aside_toggle" class="btn btn-icon w-auto px-0 btn-active-color-primary aside-toggle me-n2"
+                    data-kt-toggle="true" data-kt-toggle-state="active" data-kt-toggle-target="body"
+                    data-kt-toggle-name="aside-minimize">
+                    <i class="ki-outline ki-double-left fs-1 rotate-180"></i>
+                </div>
+                <!--end::Aside toggler-->
+            </div>
+            <!--end::Brand-->
+            <!--begin::Aside menu-->
+            <div class="aside-menu flex-column-fluid">
+                <!--begin::Aside Menu-->
+                <div class="hover-scroll-overlay-y" id="kt_aside_menu_wrapper" data-kt-scroll="true"
+                    data-kt-scroll-activate="{default: false, lg: true}" data-kt-scroll-height="auto"
+                    data-kt-scroll-dependencies="#kt_aside_logo, #kt_aside_footer" data-kt-scroll-wrappers="#kt_aside_menu"
+                    data-kt-scroll-offset="0">
+                    <!--begin::Menu-->
+                    <div class="menu menu-column menu-title-gray-800 menu-state-title-primary menu-state-icon-primary menu-state-bullet-primary menu-arrow-gray-500"
+                        id="#kt_aside_menu" data-kt-menu="true">
+                        <!--begin:Menu item-->
+                        <div data-kt-menu-trigger="click" class="menu-item here show menu-accordion">
+                            
+                        </div>
+                        <!--end:Menu item-->
+                        <!--begin:Menu item-->
+                        <div class="menu-item pt-5">
+                            <!--begin:Menu content-->
+                            <div class="menu-content">   
+                                <a href="/Bldg/PropertySearch.aspx" target="_self">
+                                    <span class="menu-heading fw-bold fs-7">Search Permits on a Property</span>
+                                </a>
+                            </div>
+                            <!--end:Menu content-->
+                        </div>
+                        <!--end:Menu item-->
+                        <!--begin:Menu item-->
+                        <div class="menu-item pt-5">
+                            <!--begin:Menu content-->
+                            <div class="menu-content">   
+                                <a href="/Bldg/DocumentUploads.aspx" target="_self">
+                                    <span class="menu-heading fw-bold fs-7">Upload Permit Documents</span>
+                                </a>
+                            </div>
+                            <!--end:Menu content-->
+                        </div>
+                        <!--end:Menu item-->
+                        <!--begin:Menu item-->
+                        <div class="menu-item pt-5">
+                            <!--begin:Menu content-->
+                            <div class="menu-content">   
+                                <a href="/SignIn/ApplyFor.aspx" target="_self">
+                                    <span class="menu-heading fw-bold fs-7">Contractor E-Permits Portal</span>
+                                </a>
+                            </div>
+                            <!--end:Menu content-->
+                        </div>
+                        <!--end:Menu item-->
+                        <!--begin:Menu item-->
+                        <div class="menu-item pt-5">
+                            <!--begin:Menu content-->
+                            <div class="menu-content">   
+                                <a href="https://www.cityofpsl.com/Government/Your-City-Government/Departments/Building/Addressing-Division" target="_blank">
+                                    <span class="menu-heading fw-bold fs-7">Addressing</span>
+                                </a>
+                            </div>
+                            <!--end:Menu content-->
+                        </div>
+                        <!--end:Menu item-->
+                        <!--begin:Menu item-->
+                        <div class="menu-item pt-5">
+                            <!--begin:Menu content-->
+                            <div class="menu-content">   
+                                <a href="https://www.cityofpsl.com/Government/Your-City-Government/Departments/Building/Building-Forms-Documents" target="_blank">
+                                    <span class="menu-heading fw-bold fs-7">Building Forms & Documents</span>
+                                </a>
+                            </div>
+                            <!--end:Menu content-->
+                        </div>
+                        <!--end:Menu item-->
+                        <!--begin:Menu item-->
+                        <div class="menu-item pt-5">
+                            <!--begin:Menu content-->
+                            <div class="menu-content">   
+                                <a href="https://www.cityofpsl.com/Government/Your-City-Government/Departments/Building/Building-Online-Services" target="_blank">
+                                    <span class="menu-heading fw-bold fs-7">Building Online Services</span>
+                                </a>
+                            </div>
+                            <!--end:Menu content-->
+                        </div>
+                        <!--end:Menu item-->
+                        <!--begin:Menu item-->
+                        <div class="menu-item pt-5">
+                            <!--begin:Menu content-->
+                            <div class="menu-content">   
+                                <a href="https://www.cityofpsl.com/Government/Your-City-Government/Departments/Building/Building-Compliance-Management-Division" target="_blank">
+                                    <span class="menu-heading fw-bold fs-7">Building Compliance Management Division</span>
+                                </a>
+                            </div>
+                            <!--end:Menu content-->
+                        </div>
+                        <!--end:Menu item-->
+                        <!--begin:Menu item-->
+                        <div class="menu-item pt-5">
+                            <!--begin:Menu content-->
+                            <div class="menu-content">   
+                                <a href="https://www.cityofpsl.com/Government/Your-City-Government/Departments/Building/Inspections" target="_blank">
+                                    <span class="menu-heading fw-bold fs-7">Inspections</span>
+                                </a>
+                            </div>
+                            <!--end:Menu content-->
+                        </div>
+                        <!--end:Menu item-->
+                        <!--begin:Menu item-->
+                        <div class="menu-item pt-5">
+                            <!--begin:Menu content-->
+                            <div class="menu-content">   
+                                <a href="https://www.cityofpsl.com/Government/Your-City-Government/Departments/Building/Milestone-Inspections" target="_blank">
+                                    <span class="menu-heading fw-bold fs-7">Milestone Inspections</span>
+                                </a>
+                            </div>
+                            <!--end:Menu content-->
+                        </div>
+                        <!--end:Menu item-->
+                        <!--begin:Menu item-->
+                        <div class="menu-item pt-5">
+                            <!--begin:Menu content-->
+                            <div class="menu-content">   
+                                <a href="https://www.cityofpsl.com/government/departments/building/permit-applications-checklists" target="_blank">
+                                    <span class="menu-heading fw-bold fs-7">Permit Applications, Fees &amp; Checklists</span>
+                                </a>
+                            </div>
+                            <!--end:Menu content-->
+                        </div>
+                        <!--end:Menu item-->
+                        <!--begin:Menu item-->
+                        <div class="menu-item pt-5">
+                            <!--begin:Menu content-->
+                            <div class="menu-content">   
+                                <a href="https://www.cityofpsl.com/Government/Your-City-Government/Departments/Building/Plan-Review" target="_blank">
+                                    <span class="menu-heading fw-bold fs-7">Plan Review</span>
+                                </a>
+                            </div>
+                            <!--end:Menu content-->
+                        </div>
+                        <!--end:Menu item-->
+                        <!--begin:Menu item-->
+                        <div class="menu-item pt-5">
+                            <!--begin:Menu content-->
+                            <div class="menu-content">   
+                                <a href="https://www.cityofpsl.com/Government/Your-City-Government/Departments/Building/Utilization-Report" target="_blank">
+                                    <span class="menu-heading fw-bold fs-7">Utilization Report</span>
+                                </a>
+                            </div>
+                            <!--end:Menu content-->
+                        </div>
+                        <!--end:Menu item-->
+                    </div>
+                    <!--end::Menu-->
+                </div>
+                <!--end::Aside menu-->
+            </div>
+            <!--end::Aside menu-->
+            <!--begin::Footer-->
+
+            <!--end::Footer-->
+        </div>
+        <!--end::Aside-->
+
+        <!-- Wrapper -->
+        <div class="wrapper d-flex flex-column flex-row-fluid" id="kt_wrapper">
+            <!-- Header -->
+            <!--begin::Header-->
+            <div id="kt_header" class="header align-items-stretch">
+                <!--begin::Container-->
+                <div class="container-fluid d-flex align-items-stretch justify-content-between">
+                    <!--begin::Aside mobile toggle-->
+                    <div class="d-flex align-items-center d-lg-none ms-n4 me-1" title="Show aside menu">
+                        <div class="btn btn-icon btn-active-color-white" id="kt_aside_mobile_toggle">
+                            <i class="ki-outline ki-burger-menu fs-1"></i>
+                        </div>
+                    </div>
+                    <!--end::Aside mobile toggle-->
+                    <!--begin::Mobile logo-->
+                    <div class="d-flex align-items-center flex-grow-1 flex-lg-grow-0">
+                        <a href="https://www.cityofpsl.com/Government/Your-City-Government/Departments/Building" class="d-lg-none" target="_blank">
+                            <img alt="Logo"
+                                src="https://www.cityofpsl.com/files/oc-templates/00000000-0000-0000-0000-000000000000/d17a80c3-a98f-43d4-b37c-90cea1158564/v/293/City-of-Horizontal-WhiteWstroke.png?t=638615818367718737"
+                                class="h-25px" />
+                        </a>
+                    </div>
+                    <!--end::Mobile logo-->
+                    <!--begin::Wrapper-->
+                    <div class="d-flex align-items-stretch justify-content-between flex-lg-grow-1">
+                        <!--begin::Navbar-->
+                        <div class="d-flex align-items-stretch" id="kt_header_nav">
+                            <!--begin::Menu wrapper-->
+                            <div class="header-menu align-items-stretch" data-kt-drawer="true"
+                                data-kt-drawer-name="header-menu" data-kt-drawer-activate="{default: true, lg: false}"
+                                data-kt-drawer-overlay="true" data-kt-drawer-width="{default:'200px', '300px': '250px'}"
+                                data-kt-drawer-direction="end" data-kt-drawer-toggle="#kt_header_menu_mobile_toggle"
+                                data-kt-swapper="true" data-kt-swapper-mode="prepend"
+                                data-kt-swapper-parent="{default: '#kt_body', lg: '#kt_header_nav'}">
+                                <!--begin::Menu-->
+                                <div class="menu menu-rounded menu-column menu-lg-row menu-root-here-bg-desktop menu-active-bg menu-state-primary menu-title-gray-800 menu-arrow-gray-500 align-items-stretch my-5 my-lg-0 px-2 px-lg-0 fw-semibold fs-6"
+                                    id="#kt_header_menu" data-kt-menu="true">
+                                    <!--begin:Menu item-->
+                                    <div data-kt-menu-trigger="{default: 'click', lg: 'hover'}"
+                                        data-kt-menu-placement="bottom-start"
+                                        class="menu-item here show menu-here-bg menu-lg-down-accordion me-0 me-lg-2">
+                                        <!--begin:Menu link-->
+                                       
+                                        <!--end:Menu link-->
+                                        <!--begin:Menu sub-->
+                                        <div
+                                            class="menu-sub menu-sub-lg-down-accordion menu-sub-lg-dropdown p-0 w-100 w-lg-850px">
+                                            <!--begin:Dashboards menu-->
+                                         
+                                            <!--end:Dashboards menu-->
+                                        </div>
+                                        <!--end:Menu sub-->
+                                    </div>
+                                    <!--end:Menu item-->
+
+                                </div>
+                                <!--end::Menu-->
+                            </div>
+                            <!--end::Menu wrapper-->
+                        </div>
+                        <!--end::Navbar-->
+                    </div>
+                    <!--end::Wrapper-->
+                </div>
+                <!--end::Container-->
+            </div>
+            <!--end::Header-->
+
+            <!-- Main Content Area -->
+            <div class="content d-flex flex-column flex-column-fluid" id="kt_content">
+                <main id="content" class="flex-fill">
+                    <!-- Page-specific content goes here -->
+                    <!--begin::Content-->
+                    <div class="content d-flex flex-column flex-column-fluid" id="kt_content">
+                        <!--begin::Toolbar-->
+                        <div class="toolbar" id="kt_toolbar">
+                            <!--begin::Container-->
+                            <div id="kt_toolbar_container" class="container-fluid d-flex flex-stack">
+                                
+
+                                 
+
+                            </div>
+                            <!--end::Container-->
+                        </div>
+                        <!--end::Toolbar-->
+                        <!-- Main Section to fill remaining space -->
+                        <main id="main-content" class="flex-fill">
+                            <!-- Page Content -->
+                            <main>
+                                <form method="post" action="./PropertySearch.aspx" onsubmit="javascript:return WebForm_OnSubmit();" id="ctl01">
+<div class="aspNetHidden">
+<input type="hidden" name="__EVENTTARGET" id="__EVENTTARGET" value="" />
+<input type="hidden" name="__EVENTARGUMENT" id="__EVENTARGUMENT" value="" />
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="89RA0yJLEaGD2QTipUUV4pQDo+nkcVfdPqYb5wY2pbCSzZy2BV2GXCfqsglmLVnmkvgF54O/aUKctkieU0Vw6xoaBd4GT0nIO7INeYtt093yvCVYHCHamNyoltFOI5QrT/MfrO/iJXtpRSsnoBH/puSJP/+urEvsvWt4/xlPtpNXCFEZJbcWLq4lb3hIrj1fFYgqdB6ar/0KsZrN+zX7wQwkWJffXpNyn1HInRaaKccQetnKWPvz+NvOPUJQWgSrS1FJlD3c8ckACk4CyE8I274xiZ9M3cBzIIrQjjukiTPuOno+WDyt4Hqp+5l4jhCJOA/RcLuOrqki5hgj3ChoSW8mUwqk1fMUv9EOnug6zlEjN1KCD4FYFNxPW9+HEKMNE99109I69mo/dc7ocb6lkQ==" />
+</div>
+
+<script type="text/javascript">
+//<![CDATA[
+var theForm = document.forms['ctl01'];
+if (!theForm) {
+    theForm = document.ctl01;
+}
+function __doPostBack(eventTarget, eventArgument) {
+    if (!theForm.onsubmit || (theForm.onsubmit() != false)) {
+        theForm.__EVENTTARGET.value = eventTarget;
+        theForm.__EVENTARGUMENT.value = eventArgument;
+        theForm.submit();
+    }
+}
+//]]>
+</script>
+
+
+
+<script src="/ScriptResource.axd?d=B8Ubu4whqvPquZdCCJq4AXrY0JpNmd1Z82kN4ACOS6aWpg3xexnA9bM4D7j1KxfITfRpoR3HhGQKBaHS3gwUvzTK8uZV83KRuPv0bsy2KdURlA6q9P2s1A6h5Y2dDakrwCe6sUAPEKe4SepuwwKr5FDQrIOz3LCXlEFK_n8kHH41&amp;t=ffffffffbec1863d" type="text/javascript"></script>
+<script src="/ScriptResource.axd?d=0GLNQGsDYs0lcrE7GtCt52H-sxhzIbnkXmCIhpnlogw3jeBJZtj1qo41WOq7dPUEVHf-3vcd0JsDCn_3g2TtolStyRPzrdS9kBNsyqk_jV6GISa2Q_IPR5K_wAS1ivskqaOOyPEN0GGVOphesJjJ3_H1RrneXpgABntSA_KGC7WZW_vRGiw_GKRo1Q5tD6qy0&amp;t=ffffffffbec1863d" type="text/javascript"></script>
+<script src="../Scripts/WebForms/WebForms.js" type="text/javascript"></script>
+<script src="../Scripts/WebForms/WebUIValidation.js" type="text/javascript"></script>
+<script src="../Scripts/WebForms/MenuStandards.js" type="text/javascript"></script>
+<script src="../Scripts/WebForms/GridView.js" type="text/javascript"></script>
+<script src="../Scripts/WebForms/DetailsView.js" type="text/javascript"></script>
+<script src="../Scripts/WebForms/TreeView.js" type="text/javascript"></script>
+<script src="../Scripts/WebForms/WebParts.js" type="text/javascript"></script>
+<script src="../Scripts/WebForms/Focus.js" type="text/javascript"></script>
+<script src="../Scripts/maskedinput.js" type="text/javascript"></script>
+<script type="text/javascript">
+//<![CDATA[
+function WebForm_OnSubmit() {
+if (typeof(ValidatorOnSubmit) == "function" && ValidatorOnSubmit() == false) return false;
+return true;
+}
+//]]>
+</script>
+
+<div class="aspNetHidden">
+
+	<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="93DE318E" />
+	<input type="hidden" name="__SCROLLPOSITIONX" id="__SCROLLPOSITIONX" value="0" />
+	<input type="hidden" name="__SCROLLPOSITIONY" id="__SCROLLPOSITIONY" value="0" />
+	<input type="hidden" name="__VIEWSTATEENCRYPTED" id="__VIEWSTATEENCRYPTED" value="" />
+	<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="ISqVQu+OEnNiBe9xR5BmoCDMSIPP+Sa2DUxC7wvJ98WQlB1snVcNYt6fSFV48zk5O8MUN4wxvSKjXsQS+epn/vYumrHqM0b6jMoqHL0qc1cSWB6+3s+3IO0kJxeryKyBavs9OhsJzbRN6t46RCAGnYOBnYIuzWqhgo+2HUc4zM0NUpdzFRWe8q+MxNUB84Pv43aE8/KLOXzy2Hs+t5Sv4T0/UD/TYM8m4dtABs0B/tuy0tEvtryjj6A+7BXXh7ds31kZHq1+NNonbIxxuo3eRCfrhc4s1lPhsduTMaZve/w=" />
+</div>
+                                    <div class="loginTemplate">
+                                        
+                                    </div>
+                                    <script type="text/javascript">
+//<![CDATA[
+Sys.WebForms.PageRequestManager._initialize('ctl00$ctl16', 'ctl01', [], [], [], 90, 'ctl00');
+//]]>
+</script>
+
+                                    
+    <style type="text/css">
+        strong {
+            font-style: oblique;
+        }
+        .adabox {
+            background-color:#F6F6F6;
+            border: 2px solid #698FDA;
+            border-radius: 5px;
+            width:98%;
+            height:auto !important;
+            margin-left:auto !important;
+            margin-right:auto !important;
+            margin-top:15px;
+            padding: 2px 10px 10px 10px;
+            Box-shadow: 0px 0px 2px 2px #CCCCCC,
+            12px 12px 0px 8px rgba(0,0,0,0.0) inset;
+            font-size:medium;
+            transition:ease-in-out .5s;
+            font-family: Arial !important;
+            margin-bottom:15px;
+        }
+        .auto-style1 {
+            height: 29px;
+        }
+        .PinkColor{
+            background-color:pink;
+            height:100%;
+            width:100%; 
+        }
+    </style>
+
+    <script type="text/javascript">
+        (function (i, s, o, g, r, a, m) {
+            i['GoogleAnalyticsObject'] = r; i[r] = i[r] || function () {
+                (i[r].q = i[r].q || []).push(arguments)
+            }, i[r].l = 1 * new Date(); a = s.createElement(o),
+            m = s.getElementsByTagName(o)[0]; a.async = 1; a.src = g; m.parentNode.insertBefore(a, m)
+        })(window, document, 'script', '//www.google-analytics.com/analytics.js', 'ga');
+
+        ga('create', 'UA-54535947-1', 'auto');
+        ga('send', 'pageview');
+    </script>
+    <noscript>This application requires JavaScript.  Please enable JavaScript or use a different browser.</noscript>
+
+
+                                    <div align="center">
+                                        
+                                        
+                                        
+                                    </div>
+
+                                    <div id="page-content-wrapper">
+                                        <div class="container-fluid">
+                                            <div class="row">
+                                                <div class="col-12">
+                                                    
+
+    
+
+    
+
+    <div class="adabox">
+    
+        <div style="margin:0 auto; text-align:center;">
+             <h2>Property Search</h2>
+            <p>
+                How to search for permits on a property: Enter the house number and street address. (less is best) Click Submit. Next click on the <span style="color:red">Property KEY</span> to bring up all permits on that property. Please note – Two addresses may show. One is from our current system and the other is "Legacy data" from an older system. You need to check BOTH addresses.<br /><br />
+
+                If your address is NOT showing try clearing your search and only searching by house # or only by street name.  If you are unsure what the abbreviations for status or permit types are please view the codes below:<br /><br />
+
+                <a href="../Files/PDF/Insp/Permit Status Codes.pdf" style="color:blue">Click For Permit Status Codes</a><br />
+                <a href="../Files/PDF/Insp/Permit Type by Type Code.pdf" style="color:blue">Click For Permit Type Codes</a><br /><br />
+
+                Addresses showing in red mean there may be a possible violation or issue on the property. You will need to email <a href="mailto:ContractorLicensing@cityofpsl.com" style="color:blue"> ContractorLicensing@cityofpsl.com</a> for additional information. Please allow 2-4 days for responses.<br /><br />
+
+                If you are conducting a "Title Search" or "Open Permit Search" you will need to contact the <a href="https://www.cityofpsl.com/Government/Your-City-Government/Departments/Finance-Department/Lien-Services" style="color:blue">Lien Services Division</a> for further information.
+            </p>
+
+            <span id="MainContent_lblSpecial">**No special characters in search.**</span>
+        </div><br />
+
+        <div align="center">
+           <table>
+                <tr>
+                    <td><strong><label for="MainContent_textboxHouseNo" id="MainContent_lblHouseNo">House #:</label></strong></td>
+                    <td><input name="ctl00$MainContent$textboxHouseNo" type="text" id="MainContent_textboxHouseNo" />
+                        <div>
+                            <span id="MainContent_rev18" style="color:Red;display:none;">No special characters.</span>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong><label for="MainContent_textboxStreet" id="MainContent_lblStreet">Street:</label></strong></td>
+                    <td><input name="ctl00$MainContent$textboxStreet" type="text" id="MainContent_textboxStreet" />
+                        <div>
+                            <span id="MainContent_rev1" style="color:Red;display:none;">No special characters.</span>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong><label for="MainContent_textboxDirection" id="MainContent_lblDirection">Direction:</label></strong></td>
+                    <td><input name="ctl00$MainContent$textboxDirection" type="text" id="MainContent_textboxDirection" />
+                        <div>
+                            <span id="MainContent_rev2" style="color:Red;display:none;">No special characters.</span>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong><label for="MainContent_textboxSection" id="MainContent_lblSection">Section:</label></strong></td>
+                    <td><input name="ctl00$MainContent$textboxSection" type="text" id="MainContent_textboxSection" />
+                        <div>
+                            <span id="MainContent_rev3" style="color:Red;display:none;">No special characters.</span>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong><label for="MainContent_textboxBlock" id="MainContent_lblBlock">Block:</label></strong></td>
+                    <td><input name="ctl00$MainContent$textboxBlock" type="text" id="MainContent_textboxBlock" />
+                        <div>
+                            <span id="MainContent_rev4" style="color:Red;display:none;">No special characters.</span>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td><strong><label for="MainContent_textboxLot" id="MainContent_lblLot">Lot:</label></strong></td>
+                    <td><input name="ctl00$MainContent$textboxLot" type="text" id="MainContent_textboxLot" />
+                       <div>
+
+                        </div>
+                        <span id="MainContent_rev5" style="visibility:hidden;"></span>
+
+                    </td>
+                </tr>
+                <div id="MainContent_PanelRecaptcha">
+	
+                    <tr>
+                        <td>&nbsp</td>
+                    </tr>
+                    <tr>
+                        <td colspan="2"><div class="g-recaptcha" data-sitekey="6LeyOBMTAAAAADNMuKyvXcHjuk_k8cfWuwwn60u_"></div></td>
+                    </tr>
+                
+</div>
+                <tr>
+                    <td>&nbsp</td>
+                </tr>
+                <tr>
+                    <td style="text-align:center" colspan="2"><input type="submit" name="ctl00$MainContent$buttonSubmit" value="Submit" onclick="javascript:WebForm_DoPostBackWithOptions(new WebForm_PostBackOptions(&quot;ctl00$MainContent$buttonSubmit&quot;, &quot;&quot;, true, &quot;&quot;, &quot;&quot;, false, false))" id="MainContent_buttonSubmit" class="btn btn-success" />&nbsp&nbsp&nbsp&nbsp&nbsp
+                        <input type="submit" name="ctl00$MainContent$buttonClear" value="Clear" id="MainContent_buttonClear" class="btn btn-success" /></td>
+                </tr>
+            </table>
+        </div><br />
+    
+        <br />
+
+        <br />
+
+        <div style="text-align:center">
+            <h3>Legacy Data</h3><br />
+            
+        </div><br />
+
+        
+    </div>
+
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                
+<script type="text/javascript">
+//<![CDATA[
+var Page_Validators =  new Array(document.getElementById("MainContent_rev18"), document.getElementById("MainContent_rev1"), document.getElementById("MainContent_rev2"), document.getElementById("MainContent_rev3"), document.getElementById("MainContent_rev4"), document.getElementById("MainContent_rev5"));
+//]]>
+</script>
+
+<script type="text/javascript">
+//<![CDATA[
+var MainContent_rev18 = document.all ? document.all["MainContent_rev18"] : document.getElementById("MainContent_rev18");
+MainContent_rev18.controltovalidate = "MainContent_textboxHouseNo";
+MainContent_rev18.errormessage = "No special characters.";
+MainContent_rev18.display = "Dynamic";
+MainContent_rev18.evaluationfunction = "RegularExpressionValidatorEvaluateIsValid";
+MainContent_rev18.validationexpression = "^[0-9a-zA-Z ]+$";
+var MainContent_rev1 = document.all ? document.all["MainContent_rev1"] : document.getElementById("MainContent_rev1");
+MainContent_rev1.controltovalidate = "MainContent_textboxStreet";
+MainContent_rev1.errormessage = "No special characters.";
+MainContent_rev1.display = "Dynamic";
+MainContent_rev1.evaluationfunction = "RegularExpressionValidatorEvaluateIsValid";
+MainContent_rev1.validationexpression = "^[0-9a-zA-Z ]+$";
+var MainContent_rev2 = document.all ? document.all["MainContent_rev2"] : document.getElementById("MainContent_rev2");
+MainContent_rev2.controltovalidate = "MainContent_textboxDirection";
+MainContent_rev2.errormessage = "No special characters.";
+MainContent_rev2.display = "Dynamic";
+MainContent_rev2.evaluationfunction = "RegularExpressionValidatorEvaluateIsValid";
+MainContent_rev2.validationexpression = "^[0-9a-zA-Z ]+$";
+var MainContent_rev3 = document.all ? document.all["MainContent_rev3"] : document.getElementById("MainContent_rev3");
+MainContent_rev3.controltovalidate = "MainContent_textboxSection";
+MainContent_rev3.errormessage = "No special characters.";
+MainContent_rev3.display = "Dynamic";
+MainContent_rev3.evaluationfunction = "RegularExpressionValidatorEvaluateIsValid";
+MainContent_rev3.validationexpression = "^[0-9a-zA-Z ]+$";
+var MainContent_rev4 = document.all ? document.all["MainContent_rev4"] : document.getElementById("MainContent_rev4");
+MainContent_rev4.controltovalidate = "MainContent_textboxBlock";
+MainContent_rev4.errormessage = "No special characters.";
+MainContent_rev4.display = "Dynamic";
+MainContent_rev4.evaluationfunction = "RegularExpressionValidatorEvaluateIsValid";
+MainContent_rev4.validationexpression = "^[0-9a-zA-Z ]+$";
+var MainContent_rev5 = document.all ? document.all["MainContent_rev5"] : document.getElementById("MainContent_rev5");
+MainContent_rev5.controltovalidate = "MainContent_textboxLot";
+MainContent_rev5.evaluationfunction = "RegularExpressionValidatorEvaluateIsValid";
+MainContent_rev5.validationexpression = "^[0-9a-zA-Z ]+$";
+//]]>
+</script>
+
+
+<script type="text/javascript">
+//<![CDATA[
+
+var Page_ValidationActive = false;
+if (typeof(ValidatorOnLoad) == "function") {
+    ValidatorOnLoad();
+}
+
+function ValidatorOnSubmit() {
+    if (Page_ValidationActive) {
+        return ValidatorCommonOnSubmit();
+    }
+    else {
+        return true;
+    }
+}
+        
+theForm.oldSubmit = theForm.submit;
+theForm.submit = WebForm_SaveScrollPositionSubmit;
+
+theForm.oldOnSubmit = theForm.onsubmit;
+theForm.onsubmit = WebForm_SaveScrollPositionOnSubmit;
+
+document.getElementById('MainContent_rev18').dispose = function() {
+    Array.remove(Page_Validators, document.getElementById('MainContent_rev18'));
+}
+
+document.getElementById('MainContent_rev1').dispose = function() {
+    Array.remove(Page_Validators, document.getElementById('MainContent_rev1'));
+}
+
+document.getElementById('MainContent_rev2').dispose = function() {
+    Array.remove(Page_Validators, document.getElementById('MainContent_rev2'));
+}
+
+document.getElementById('MainContent_rev3').dispose = function() {
+    Array.remove(Page_Validators, document.getElementById('MainContent_rev3'));
+}
+
+document.getElementById('MainContent_rev4').dispose = function() {
+    Array.remove(Page_Validators, document.getElementById('MainContent_rev4'));
+}
+
+document.getElementById('MainContent_rev5').dispose = function() {
+    Array.remove(Page_Validators, document.getElementById('MainContent_rev5'));
+}
+//]]>
+</script>
+</form>
+                                <!-- /#page-content-wrapper -->
+                            </main>
+
+                        </main>
+                    </div>
+                    <!--end::Content-->
+                </main>
+            </div>
+            <!-- Footer -->
+            <!--begin::Footer-->
+            <div class="footer py-4 d-flex flex-lg-column" id="kt_footer">
+                <!--begin::Container-->
+                <div class="container-fluid d-flex flex-column flex-md-row align-items-center justify-content-between">
+                    <!--begin::Copyright-->
+                    <div class="text-gray-900 order-2 order-md-1">
+                        <span class="text-muted fw-semibold me-1">2024&copy;</span>
+                        <a href="" target="_blank" class="text-gray-800 text-hover-primary">City of Port St. Lucie Information Technology</a>
+                    </div>
+                    <!--end::Copyright-->
+
+                </div>
+                <!--end::Container-->
+            </div>
+            <!--end::Footer-->
+        </div>
+
+         <!-- Scrolltop -->
+        <div id="kt_scrolltop" class="scrolltop" data-kt-scrolltop="true">
+            <i class="ki-outline ki-arrow-up"></i>
+        </div>
+        <script>var hostUrl = "/assets/";</script>
+
+         <!--begin::Global Javascript Bundle(mandatory for all pages)-->
+        <script src="/assets/plugins/global/plugins.bundle.js"></script>
+        <script src="/assets/js/scripts.bundle.js"></script>
+        <!--end::Global Javascript Bundle-->
+        
+        
+        <script src="/Scripts/Scripts/jquery-ui-1.12.1.js"></script>
+        <noscript></noscript>
+        <script src="/Scripts/maskedinput.js"></script>
+        <noscript></noscript>
+        <script src="/Scripts/timepicker.js"></script>
+        <noscript></noscript>
+        <!-- Menu Toggle Script -->
+
+        <script type="text/javascript" src='https://www.google.com/recaptcha/api.js'></script>
+        <noscript>This application requires JavaScript.  Please enable JavaScript or use a different browser.</noscript>
+    </body>
+</html>

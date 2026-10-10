@@ -1,0 +1,293 @@
+{
+  "objectIdFieldName": "OBJECTID",
+  "uniqueIdField": {
+    "name": "OBJECTID",
+    "isSystemMaintained": true
+  },
+  "globalIdFieldName": "",
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": {
+    "wkid": 4326,
+    "latestWkid": 4326
+  },
+  "fields": [
+    {
+      "name": "OBJECTID",
+      "type": "esriFieldTypeOID",
+      "alias": "OBJECTID",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null,
+      "required": true
+    },
+    {
+      "name": "B1_ALT_ID",
+      "type": "esriFieldTypeString",
+      "alias": "B1_ALT_ID",
+      "sqlType": "sqlTypeOther",
+      "length": 30,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "B1_PER_GROUP",
+      "type": "esriFieldTypeString",
+      "alias": "B1_PER_GROUP",
+      "sqlType": "sqlTypeOther",
+      "length": 30,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "B1_PER_TYPE",
+      "type": "esriFieldTypeString",
+      "alias": "B1_PER_TYPE",
+      "sqlType": "sqlTypeOther",
+      "length": 30,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "B1_PER_SUB_TYPE",
+      "type": "esriFieldTypeString",
+      "alias": "B1_PER_SUB_TYPE",
+      "sqlType": "sqlTypeOther",
+      "length": 30,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "B1_PER_CATEGORY",
+      "type": "esriFieldTypeString",
+      "alias": "B1_PER_CATEGORY",
+      "sqlType": "sqlTypeOther",
+      "length": 30,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "GENERAL_TYPE",
+      "type": "esriFieldTypeString",
+      "alias": "GENERAL_TYPE",
+      "sqlType": "sqlTypeOther",
+      "length": 30,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "B1_PARCEL_NBR",
+      "type": "esriFieldTypeString",
+      "alias": "B1_PARCEL_NBR",
+      "sqlType": "sqlTypeOther",
+      "length": 30,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "COLS_KEY",
+      "type": "esriFieldTypeInteger",
+      "alias": "COLS_KEY",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SITE_ADDRESS",
+      "type": "esriFieldTypeString",
+      "alias": "SITE_ADDRESS",
+      "sqlType": "sqlTypeOther",
+      "length": 100,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "B1_SITUS_ZIP",
+      "type": "esriFieldTypeString",
+      "alias": "B1_SITUS_ZIP",
+      "sqlType": "sqlTypeOther",
+      "length": 10,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "PERMIT_STATUS",
+      "type": "esriFieldTypeString",
+      "alias": "PERMIT_STATUS",
+      "sqlType": "sqlTypeOther",
+      "length": 31,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "APPLICANT_BUS_NAME",
+      "type": "esriFieldTypeString",
+      "alias": "APPLICANT_BUS_NAME",
+      "sqlType": "sqlTypeOther",
+      "length": 255,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "APPLICANT_FULL_NAME",
+      "type": "esriFieldTypeString",
+      "alias": "APPLICANT_FULL_NAME",
+      "sqlType": "sqlTypeOther",
+      "length": 220,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SQFT",
+      "type": "esriFieldTypeDouble",
+      "alias": "SQFT",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "G3_VALUE_TTL",
+      "type": "esriFieldTypeDouble",
+      "alias": "G3_VALUE_TTL",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ISSUED_YEAR",
+      "type": "esriFieldTypeInteger",
+      "alias": "ISSUED_YEAR",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ISSUED_DT",
+      "type": "esriFieldTypeDate",
+      "alias": "ISSUED_DT",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "LAST_STATUS_DT",
+      "type": "esriFieldTypeDate",
+      "alias": "LAST_STATUS_DT",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "CONST_TYPE_CODE",
+      "type": "esriFieldTypeString",
+      "alias": "CONST_TYPE_CODE",
+      "sqlType": "sqlTypeOther",
+      "length": 4,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "VALUE_DESC",
+      "type": "esriFieldTypeString",
+      "alias": "VALUE_DESC",
+      "sqlType": "sqlTypeOther",
+      "length": 100,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ACA_URL",
+      "type": "esriFieldTypeString",
+      "alias": "ACA_URL",
+      "sqlType": "sqlTypeOther",
+      "length": 150,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "UNITS",
+      "type": "esriFieldTypeInteger",
+      "alias": "UNITS",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "B1_APPL_STATUS",
+      "type": "esriFieldTypeString",
+      "alias": "B1_APPL_STATUS",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    }
+  ],
+  "exceededTransferLimit": true,
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 1,
+        "B1_ALT_ID": "PMLSM1602159",
+        "B1_PER_GROUP": "Building",
+        "B1_PER_TYPE": "Multi Family",
+        "B1_PER_SUB_TYPE": "MEP",
+        "B1_PER_CATEGORY": "Plumbing",
+        "GENERAL_TYPE": "Multi Family - Other",
+        "B1_PARCEL_NBR": " 010161540",
+        "COLS_KEY": 1499753,
+        "SITE_ADDRESS": "3831 CHARBONNETT CT",
+        "B1_SITUS_ZIP": "43232",
+        "PERMIT_STATUS": "Final Inspection Approved",
+        "APPLICANT_BUS_NAME": "WATER HEATERS PLUS INC",
+        "APPLICANT_FULL_NAME": null,
+        "SQFT": null,
+        "G3_VALUE_TTL": 0,
+        "ISSUED_YEAR": 2016,
+        "ISSUED_DT": 1466035200000,
+        "LAST_STATUS_DT": 1466985600000,
+        "CONST_TYPE_CODE": "",
+        "VALUE_DESC": null,
+        "ACA_URL": "https://ca.columbus.gov/permits/urlrouting.ashx?type=1000&Module=Building&capID1=16CAP&capID2=00000&capID3=008IX&AgencyCode=COLUMBUS",
+        "UNITS": null,
+        "B1_APPL_STATUS": "Closed"
+      },
+      "geometry": {
+        "x": -82.89436272115879,
+        "y": 39.92138622766679
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 2,
+        "B1_ALT_ID": "RSWDR1803525",
+        "B1_PER_GROUP": "Building",
+        "B1_PER_TYPE": "1,2,3 Family",
+        "B1_PER_SUB_TYPE": "Structural",
+        "B1_PER_CATEGORY": "Roof, Siding, Windows, Doors",
+        "GENERAL_TYPE": "1,2,3 Family - Other",
+        "B1_PARCEL_NBR": " 01016569600",
+        "COLS_KEY": 164423,
+        "SITE_ADDRESS": "2406 BRIERS DR",
+        "B1_SITUS_ZIP": "43209",
+        "PERMIT_STATUS": "Permit Issued",
+        "APPLICANT_BUS_NAME": "ADVANTAGE WINDOW AND DOOR COMPANY",
+        "APPLICANT_FULL_NAME": null,
+        "SQFT": 903,
+        "G3_VALUE_TTL": 2685,
+        "ISSUED_YEAR": 2018,
+        "ISSUED_DT": 1532908800000,
+        "LAST_STATUS_DT": 1532908800000,
+        "CONST_TYPE_CODE": "434",
+        "VALUE_DESC": "Additions, Alterations and Conversions - Residential",
+        "ACA_URL": "https://ca.columbus.gov/permits/urlrouting.ashx?type=1000&Module=Building&capID1=18CAP&capID2=00000&capID3=00O6Q&AgencyCode=COLUMBUS",
+        "UNITS": 1,
+        "B1_APPL_STATUS": "Expired Permit"
+      },
+      "geometry": {
+        "x": -82.92886317506162,
+        "y": 39.92805956837213
+      }
+    }
+  ]
+}

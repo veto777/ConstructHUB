@@ -1,0 +1,55 @@
+
+
+    <div class="clearfix">
+        <div class="float-end muted st-mr-md">Page 2 of 11 results</div>    
+    </div>
+     
+            <div class="search-result-item">
+                <div class="search-result-title">
+                    <a href="javascript:void(0);" onclick="FormSupport.submitAction( 'Detail/b400ae0f-194d-4922-90f3-6c862b021627' );">
+                        BLD-91-0435
+                    </a>
+                </div>
+                <div class="row">
+                    <div class="col-lg-3">
+    
+                            <div class="">Legacy - Building Permits</div>  
+                            <div class="">Step 7 of 7: CLOSED - This permit has completed the process and been closed., 7/16/1991</div>
+    
+                    </div>
+    
+                        <div class="col-lg-3">
+                            <div>MAIN &amp; MOENAVE</div>
+                            <div>,  </div>
+                        </div>
+    
+                        <div class="col-lg-3">
+    
+                        </div>
+                </div>
+            </div>
+                
+    <input type="hidden" id="_applicationSearchPage" name="_applicationSearchPage" value="1" />
+    <div class="search-results-paging">
+        <ul>
+            
+            <li><a href="#" onclick="ApplicationSearchAdvancedResults.gotoPage(0)"><span class="search-results-page"><i class="fas fa-chevron-left"></i></span></a></li>
+            
+            <li><a href="#" onclick="ApplicationSearchAdvancedResults.gotoPage(0)"><span class="search-results-page">1</span></a></li>
+            
+            <li><span class="search-results-page search-results-page-active">2</span></li>
+            
+        </ul>
+    </div>
+    
+
+<script>
+    var ApplicationSearchAdvancedResults = {
+        gotoPage: function( pageNumber ) 
+        {
+            $( '#_applicationSearchPage' ).val( pageNumber );
+            FormSupport.contentAction( '~/ApplicationPublic/ApplicationSearchAdvanced/SearchPage', $( '#search-results' ) ); 
+            window.scrollTo( 0 );
+        }
+    };
+</script>

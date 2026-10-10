@@ -1,0 +1,304 @@
+{
+  "rows": [
+    {
+      "cartodb_id": 1,
+      "the_geom": "0101000020E610000027B2388BB0CD52C0DA3C12F22C004440",
+      "the_geom_webmercator": "0101000020110F00009AD2D14589F05FC10590996617905241",
+      "permitnumber": "EP-2024-003069",
+      "addressobjectid": "610278946",
+      "parcel_id_num": "222378",
+      "permittype": "Electrical",
+      "permitdescription": "Electrical Permit",
+      "commercialorresidential": "Residential",
+      "typeofwork": "New Construction",
+      "approvedscopeofwork": "Electrical Permit for combo RP-2024-002819",
+      "permitissuedate": "2025-05-07T04:00:00Z",
+      "status": "Completed",
+      "applicanttype": "Professional / Tradesperson",
+      "contractorname": "FRED DINARDO JR",
+      "contractoraddress1": "FRED DINARDO JR\n2516 S. CHADWICK ST\nPHILADELPHIA, PA  19145\nUSA",
+      "contractoraddress2": null,
+      "contractorcity": null,
+      "contractorstate": null,
+      "contractorzip": null,
+      "mostrecentinsp": "2025-06-25T15:14:33Z",
+      "opa_account_num": "888001944",
+      "address": "4088 CONSHOHOCKEN AVE",
+      "unit_type": null,
+      "unit_num": "# A10",
+      "zip": "19131-2826",
+      "censustract": "012204",
+      "council_district": "4",
+      "opa_owner": "4050 CONSHOHOCKEN ROAD LP",
+      "systemofrecord": "ECLIPSE",
+      "geocode_x": 2678902.37354485,
+      "geocode_y": 253558.42797806,
+      "posse_jobid": "705198904",
+      "gdb_geomattr_data": null,
+      "objectid": 1,
+      "usecategories": null,
+      "occupancytype": null,
+      "permitcompleteddate": "2025-06-25T15:45:13Z",
+      "numberofunits": null,
+      "certificateofoccupancydate": null,
+      "certificateofoccupancyrequired": null,
+      "parentjobid": "700701691",
+      "certificateofoccupancylink": null,
+      "zoningpermitjobid": null,
+      "numberofstories": null,
+      "denialdocumentlink": null,
+      "areaofdisturbance": null,
+      "denialdate": null
+    },
+    {
+      "cartodb_id": 2,
+      "the_geom": "0101000020E6100000DE03602192CF52C0FE2BA892E4054440",
+      "the_geom_webmercator": "0101000020110F00002BF2C14BBBF35FC1A6EAB8A96E965241",
+      "permitnumber": "MP-2021-006647",
+      "addressobjectid": "15809586",
+      "parcel_id_num": "85802",
+      "permittype": "Mechanical",
+      "permitdescription": "Mechanical / Fuel Gas Permit",
+      "commercialorresidential": "Residential",
+      "typeofwork": "New Construction",
+      "approvedscopeofwork": "Mechanical / Fuel Gas Permit for combo RP-2021-007237",
+      "permitissuedate": "2022-12-28T05:00:00Z",
+      "status": "Completed",
+      "applicanttype": "Professional / Tradesperson",
+      "contractorname": "FRED DINARDO JR",
+      "contractoraddress1": "FRED DINARDO JR\n2516 S. CHADWICK ST\nPHILADELPHIA, PA  19145\nUSA",
+      "contractoraddress2": null,
+      "contractorcity": null,
+      "contractorstate": null,
+      "contractorzip": null,
+      "mostrecentinsp": "2023-02-03T20:10:14Z",
+      "opa_account_num": "212440300",
+      "address": "7510 NEWLAND ST",
+      "unit_type": null,
+      "unit_num": null,
+      "zip": "19128-4133",
+      "censustract": "021900",
+      "council_district": "4",
+      "opa_owner": "SINGLETARY LEON JAMES III, BLAND JOSEPH NATHANIEL",
+      "systemofrecord": "ECLIPSE",
+      "geocode_x": 2670209.15229268,
+      "geocode_y": 269587.98413301,
+      "posse_jobid": "402168885",
+      "gdb_geomattr_data": null,
+      "objectid": 2,
+      "usecategories": null,
+      "occupancytype": null,
+      "permitcompleteddate": "2023-02-06T13:44:44Z",
+      "numberofunits": null,
+      "certificateofoccupancydate": null,
+      "certificateofoccupancyrequired": null,
+      "parentjobid": "350448024",
+      "certificateofoccupancylink": null,
+      "zoningpermitjobid": null,
+      "numberofstories": null,
+      "denialdocumentlink": null,
+      "areaofdisturbance": null,
+      "denialdate": null
+    }
+  ],
+  "time": 0.002,
+  "fields": {
+    "cartodb_id": {
+      "type": "number",
+      "pgtype": "int8"
+    },
+    "the_geom": {
+      "type": "geometry",
+      "wkbtype": "Unknown",
+      "dims": 2,
+      "srid": 4326
+    },
+    "the_geom_webmercator": {
+      "type": "geometry",
+      "wkbtype": "Unknown",
+      "dims": 2,
+      "srid": 3857
+    },
+    "permitnumber": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "addressobjectid": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "parcel_id_num": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "permittype": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "permitdescription": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "commercialorresidential": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "typeofwork": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "approvedscopeofwork": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "permitissuedate": {
+      "type": "date",
+      "pgtype": "timestamptz"
+    },
+    "status": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "applicanttype": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "contractorname": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "contractoraddress1": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "contractoraddress2": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "contractorcity": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "contractorstate": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "contractorzip": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "mostrecentinsp": {
+      "type": "date",
+      "pgtype": "timestamptz"
+    },
+    "opa_account_num": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "address": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "unit_type": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "unit_num": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "zip": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "censustract": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "council_district": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "opa_owner": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "systemofrecord": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "geocode_x": {
+      "type": "number",
+      "pgtype": "numeric"
+    },
+    "geocode_y": {
+      "type": "number",
+      "pgtype": "numeric"
+    },
+    "posse_jobid": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "gdb_geomattr_data": {
+      "type": "bytea",
+      "pgtype": "bytea"
+    },
+    "objectid": {
+      "type": "number",
+      "pgtype": "int4"
+    },
+    "usecategories": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "occupancytype": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "permitcompleteddate": {
+      "type": "date",
+      "pgtype": "timestamptz"
+    },
+    "numberofunits": {
+      "type": "number",
+      "pgtype": "int4"
+    },
+    "certificateofoccupancydate": {
+      "type": "date",
+      "pgtype": "timestamptz"
+    },
+    "certificateofoccupancyrequired": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "parentjobid": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "certificateofoccupancylink": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "zoningpermitjobid": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "numberofstories": {
+      "type": "number",
+      "pgtype": "numeric"
+    },
+    "denialdocumentlink": {
+      "type": "string",
+      "pgtype": "varchar"
+    },
+    "areaofdisturbance": {
+      "type": "number",
+      "pgtype": "numeric"
+    },
+    "denialdate": {
+      "type": "date",
+      "pgtype": "timestamptz"
+    }
+  },
+  "total_rows": 2
+}

@@ -1,0 +1,404 @@
+[
+  {
+    "jurisdiction": "Portage County, OH",
+    "url": "https://portagecountyoh.portal.opengov.com/",
+    "query": {
+      "type": "address",
+      "value": "100 Main St"
+    },
+    "time": "2026-10-10T17:48:34.525Z",
+    "elapsedMs": 347,
+    "count": null,
+    "error": "OpenGov tenant has disabled public address search",
+    "blocked": true,
+    "status": 403,
+    "samples": []
+  },
+  {
+    "jurisdiction": "Portage County, OH",
+    "url": "https://portagecountyoh.portal.opengov.com/",
+    "query": {
+      "type": "permit",
+      "value": "2026"
+    },
+    "time": "2026-10-10T17:48:34.872Z",
+    "elapsedMs": 968,
+    "count": null,
+    "error": "OpenGov tenant has disabled public permit search",
+    "blocked": true,
+    "status": 403,
+    "samples": []
+  },
+  {
+    "jurisdiction": "Portage County, OH",
+    "url": "https://portagecountyoh.portal.opengov.com/",
+    "query": {
+      "type": "company",
+      "value": "Construction"
+    },
+    "time": "2026-10-10T17:48:35.840Z",
+    "elapsedMs": 0,
+    "count": null,
+    "error": "OpenGov does not support verified company search",
+    "blocked": false,
+    "status": null,
+    "samples": []
+  },
+  {
+    "jurisdiction": "Portage County, OH",
+    "url": "https://portagecountyoh.portal.opengov.com/",
+    "query": {
+      "type": "recent",
+      "value": "2026-10-03T00:00:00.000Z"
+    },
+    "time": "2026-10-10T17:48:35.840Z",
+    "elapsedMs": 1,
+    "count": 0,
+    "samples": []
+  },
+  {
+    "jurisdiction": "Cheltenham, PA",
+    "url": "https://cheltenhamtownship.portal.opengov.com/",
+    "query": {
+      "type": "address",
+      "value": "100 Main St"
+    },
+    "time": "2026-10-10T17:48:35.841Z",
+    "elapsedMs": 986,
+    "count": null,
+    "error": "OpenGov tenant has disabled public address search",
+    "blocked": true,
+    "status": 403,
+    "samples": []
+  },
+  {
+    "jurisdiction": "Cheltenham, PA",
+    "url": "https://cheltenhamtownship.portal.opengov.com/",
+    "query": {
+      "type": "permit",
+      "value": "2026"
+    },
+    "time": "2026-10-10T17:48:36.827Z",
+    "elapsedMs": 1011,
+    "count": null,
+    "error": "OpenGov tenant has disabled public permit search",
+    "blocked": true,
+    "status": 403,
+    "samples": []
+  },
+  {
+    "jurisdiction": "Cheltenham, PA",
+    "url": "https://cheltenhamtownship.portal.opengov.com/",
+    "query": {
+      "type": "company",
+      "value": "Construction"
+    },
+    "time": "2026-10-10T17:48:37.839Z",
+    "elapsedMs": 0,
+    "count": null,
+    "error": "OpenGov does not support verified company search",
+    "blocked": false,
+    "status": null,
+    "samples": []
+  },
+  {
+    "jurisdiction": "Cheltenham, PA",
+    "url": "https://cheltenhamtownship.portal.opengov.com/",
+    "query": {
+      "type": "recent",
+      "value": "2026-10-03T00:00:00.000Z"
+    },
+    "time": "2026-10-10T17:48:37.839Z",
+    "elapsedMs": 0,
+    "count": 0,
+    "samples": []
+  },
+  {
+    "jurisdiction": "Vestavia Hills, AL",
+    "url": "https://vestaviahillsal.portal.opengov.com/",
+    "query": {
+      "type": "address",
+      "value": "100 Main St"
+    },
+    "time": "2026-10-10T17:48:37.839Z",
+    "elapsedMs": 7312,
+    "count": null,
+    "error": "Portal returned HTTP 403 for https://api-east.viewpointcloud.com/v2/vestaviahillsal/search_results?criteria=location&key=100+Main+St&ignoreCommunity=true&fetchNumber=100",
+    "blocked": true,
+    "status": 403,
+    "samples": []
+  },
+  {
+    "jurisdiction": "Vestavia Hills, AL",
+    "url": "https://vestaviahillsal.portal.opengov.com/",
+    "query": {
+      "type": "permit",
+      "value": "2026"
+    },
+    "time": "2026-10-10T17:48:45.151Z",
+    "elapsedMs": 7216,
+    "count": null,
+    "error": "Portal returned HTTP 403 for https://api-east.viewpointcloud.com/v2/vestaviahillsal/search_results?criteria=record&key=2026&ignoreCommunity=true&fetchNumber=100",
+    "blocked": true,
+    "status": 403,
+    "samples": []
+  },
+  {
+    "jurisdiction": "Vestavia Hills, AL",
+    "url": "https://vestaviahillsal.portal.opengov.com/",
+    "query": {
+      "type": "company",
+      "value": "Construction"
+    },
+    "time": "2026-10-10T17:48:52.367Z",
+    "elapsedMs": 0,
+    "count": null,
+    "error": "OpenGov does not support verified company search",
+    "blocked": false,
+    "status": null,
+    "samples": []
+  },
+  {
+    "jurisdiction": "Vestavia Hills, AL",
+    "url": "https://vestaviahillsal.portal.opengov.com/",
+    "query": {
+      "type": "recent",
+      "value": "2026-10-03T00:00:00.000Z"
+    },
+    "time": "2026-10-10T17:48:52.368Z",
+    "elapsedMs": 0,
+    "count": 0,
+    "samples": []
+  },
+  {
+    "jurisdiction": "Newburyport, MA",
+    "url": "https://newburyportma.portal.opengov.com/search",
+    "query": {
+      "type": "address",
+      "value": "100 Main St"
+    },
+    "time": "2026-10-10T17:48:52.368Z",
+    "elapsedMs": 7194,
+    "count": null,
+    "error": "Portal returned HTTP 403 for https://api-east.viewpointcloud.com/v2/newburyportma/search_results?criteria=location&key=100+Main+St&ignoreCommunity=true&fetchNumber=100",
+    "blocked": true,
+    "status": 403,
+    "samples": []
+  },
+  {
+    "jurisdiction": "Newburyport, MA",
+    "url": "https://newburyportma.portal.opengov.com/search",
+    "query": {
+      "type": "permit",
+      "value": "2026"
+    },
+    "time": "2026-10-10T17:48:59.562Z",
+    "elapsedMs": 7199,
+    "count": null,
+    "error": "Portal returned HTTP 403 for https://api-east.viewpointcloud.com/v2/newburyportma/search_results?criteria=record&key=2026&ignoreCommunity=true&fetchNumber=100",
+    "blocked": true,
+    "status": 403,
+    "samples": []
+  },
+  {
+    "jurisdiction": "Newburyport, MA",
+    "url": "https://newburyportma.portal.opengov.com/search",
+    "query": {
+      "type": "company",
+      "value": "Construction"
+    },
+    "time": "2026-10-10T17:49:06.761Z",
+    "elapsedMs": 0,
+    "count": null,
+    "error": "OpenGov does not support verified company search",
+    "blocked": false,
+    "status": null,
+    "samples": []
+  },
+  {
+    "jurisdiction": "Newburyport, MA",
+    "url": "https://newburyportma.portal.opengov.com/search",
+    "query": {
+      "type": "recent",
+      "value": "2026-10-03T00:00:00.000Z"
+    },
+    "time": "2026-10-10T17:49:06.762Z",
+    "elapsedMs": 0,
+    "count": 0,
+    "samples": []
+  },
+  {
+    "jurisdiction": "Watertown Town, MA",
+    "url": "https://watertownma.viewpointcloud.com/categories/1071",
+    "query": {
+      "type": "address",
+      "value": "100 Main St"
+    },
+    "time": "2026-10-10T17:49:06.762Z",
+    "elapsedMs": 86,
+    "count": null,
+    "error": "OpenGov HTTP 301: https://watertownma.viewpointcloud.com",
+    "blocked": false,
+    "status": null,
+    "samples": []
+  },
+  {
+    "jurisdiction": "Watertown Town, MA",
+    "url": "https://watertownma.viewpointcloud.com/categories/1071",
+    "query": {
+      "type": "permit",
+      "value": "2026"
+    },
+    "time": "2026-10-10T17:49:06.848Z",
+    "elapsedMs": 929,
+    "count": null,
+    "error": "OpenGov HTTP 301: https://watertownma.viewpointcloud.com",
+    "blocked": false,
+    "status": null,
+    "samples": []
+  },
+  {
+    "jurisdiction": "Watertown Town, MA",
+    "url": "https://watertownma.viewpointcloud.com/categories/1071",
+    "query": {
+      "type": "company",
+      "value": "Construction"
+    },
+    "time": "2026-10-10T17:49:07.778Z",
+    "elapsedMs": 0,
+    "count": null,
+    "error": "OpenGov does not support verified company search",
+    "blocked": false,
+    "status": null,
+    "samples": []
+  },
+  {
+    "jurisdiction": "Watertown Town, MA",
+    "url": "https://watertownma.viewpointcloud.com/categories/1071",
+    "query": {
+      "type": "recent",
+      "value": "2026-10-03T00:00:00.000Z"
+    },
+    "time": "2026-10-10T17:49:07.778Z",
+    "elapsedMs": 0,
+    "count": 0,
+    "samples": []
+  },
+  {
+    "jurisdiction": "Watertown Town, MA",
+    "url": "https://watertownma.viewpointcloud.com/categories/1071",
+    "query": {
+      "type": "address",
+      "value": "100 Main St"
+    },
+    "time": "2026-10-10T17:49:46.467Z",
+    "elapsedMs": 7686,
+    "count": null,
+    "error": "Portal returned HTTP 403 for https://api-east.viewpointcloud.com/v2/watertownma/search_results?criteria=location&key=100+Main+St&ignoreCommunity=true&fetchNumber=100",
+    "blocked": true,
+    "status": 403,
+    "samples": []
+  },
+  {
+    "jurisdiction": "Watertown Town, MA",
+    "url": "https://watertownma.viewpointcloud.com/categories/1071",
+    "query": {
+      "type": "permit",
+      "value": "2026"
+    },
+    "time": "2026-10-10T17:49:54.154Z",
+    "elapsedMs": 7263,
+    "count": null,
+    "error": "Portal returned HTTP 403 for https://api-east.viewpointcloud.com/v2/watertownma/search_results?criteria=record&key=2026&ignoreCommunity=true&fetchNumber=100",
+    "blocked": true,
+    "status": 403,
+    "samples": []
+  },
+  {
+    "jurisdiction": "Watertown Town, MA",
+    "url": "https://watertownma.viewpointcloud.com/categories/1071",
+    "query": {
+      "type": "company",
+      "value": "Construction"
+    },
+    "time": "2026-10-10T17:50:01.417Z",
+    "elapsedMs": 0,
+    "count": null,
+    "error": "OpenGov does not support verified company search",
+    "blocked": false,
+    "status": null,
+    "samples": []
+  },
+  {
+    "jurisdiction": "Watertown Town, MA",
+    "url": "https://watertownma.viewpointcloud.com/categories/1071",
+    "query": {
+      "type": "recent",
+      "value": "2026-10-03T00:00:00.000Z"
+    },
+    "time": "2026-10-10T17:50:01.418Z",
+    "elapsedMs": 0,
+    "count": 0,
+    "samples": []
+  },
+  {
+    "jurisdiction": "Portage County, OH",
+    "url": "https://portagecountyoh.portal.opengov.com/",
+    "query": {
+      "type": "recent",
+      "value": "2026-10-03T17:51:43.614Z"
+    },
+    "time": "2026-10-10T17:51:43.614Z",
+    "elapsedMs": 0,
+    "count": 0,
+    "samples": []
+  },
+  {
+    "jurisdiction": "Cheltenham, PA",
+    "url": "https://cheltenhamtownship.portal.opengov.com/",
+    "query": {
+      "type": "recent",
+      "value": "2026-10-03T17:51:43.614Z"
+    },
+    "time": "2026-10-10T17:51:43.614Z",
+    "elapsedMs": 0,
+    "count": 0,
+    "samples": []
+  },
+  {
+    "jurisdiction": "Vestavia Hills, AL",
+    "url": "https://vestaviahillsal.portal.opengov.com/",
+    "query": {
+      "type": "recent",
+      "value": "2026-10-03T17:51:43.614Z"
+    },
+    "time": "2026-10-10T17:51:43.614Z",
+    "elapsedMs": 0,
+    "count": 0,
+    "samples": []
+  },
+  {
+    "jurisdiction": "Newburyport, MA",
+    "url": "https://newburyportma.portal.opengov.com/search",
+    "query": {
+      "type": "recent",
+      "value": "2026-10-03T17:51:43.614Z"
+    },
+    "time": "2026-10-10T17:51:43.614Z",
+    "elapsedMs": 0,
+    "count": 0,
+    "samples": []
+  },
+  {
+    "jurisdiction": "Watertown Town, MA",
+    "url": "https://watertownma.viewpointcloud.com/categories/1071",
+    "query": {
+      "type": "recent",
+      "value": "2026-10-03T17:51:43.614Z"
+    },
+    "time": "2026-10-10T17:51:43.614Z",
+    "elapsedMs": 0,
+    "count": 0,
+    "samples": []
+  }
+]

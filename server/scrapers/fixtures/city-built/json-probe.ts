@@ -1,0 +1,2 @@
+import{writeFileSync}from'node:fs';import{politeFetch}from'../../polite-fetch';
+const[name,url,body]=process.argv.slice(2);const res=await politeFetch(url,body?{method:'POST',body:new URLSearchParams(JSON.parse(body)),headers:{'content-type':'application/x-www-form-urlencoded'}}:{},{minDelayMs:1000,retries:0});const text=await res.text();writeFileSync(`server/scrapers/fixtures/city-built/${name}.json`,text);console.log(res.status,text.slice(0,9000));

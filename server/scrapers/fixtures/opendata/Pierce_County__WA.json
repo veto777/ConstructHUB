@@ -1,0 +1,377 @@
+{
+  "objectIdFieldName": "OBJECTID",
+  "uniqueIdField": {
+    "name": "OBJECTID",
+    "isSystemMaintained": true
+  },
+  "globalIdFieldName": "",
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": {
+    "wkid": 4326,
+    "latestWkid": 4326
+  },
+  "fields": [
+    {
+      "name": "OBJECTID",
+      "type": "esriFieldTypeOID",
+      "alias": "OBJECTID",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "applicationNumber",
+      "type": "esriFieldTypeInteger",
+      "alias": "applicationNumber",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "applicationType",
+      "type": "esriFieldTypeString",
+      "alias": "applicationType",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "applicationStatus",
+      "type": "esriFieldTypeString",
+      "alias": "applicationStatus",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "parcelNumber",
+      "type": "esriFieldTypeString",
+      "alias": "parcelNumber",
+      "sqlType": "sqlTypeOther",
+      "length": 30,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "workType",
+      "type": "esriFieldTypeString",
+      "alias": "workType",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "buildingType",
+      "type": "esriFieldTypeString",
+      "alias": "buildingType",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "housingType",
+      "type": "esriFieldTypeString",
+      "alias": "housingType",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "sqFtTotal",
+      "type": "esriFieldTypeDouble",
+      "alias": "sqFtTotal",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "buildingValuation",
+      "type": "esriFieldTypeDouble",
+      "alias": "buildingValuation",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "dwellingUnits",
+      "type": "esriFieldTypeString",
+      "alias": "dwellingUnits",
+      "sqlType": "sqlTypeOther",
+      "length": 5,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "stories",
+      "type": "esriFieldTypeString",
+      "alias": "stories",
+      "sqlType": "sqlTypeOther",
+      "length": 5,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "powerCompany",
+      "type": "esriFieldTypeString",
+      "alias": "powerCompany",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "sewageDisposal",
+      "type": "esriFieldTypeString",
+      "alias": "sewageDisposal",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "acreage",
+      "type": "esriFieldTypeDouble",
+      "alias": "acreage",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "projectValue",
+      "type": "esriFieldTypeDouble",
+      "alias": "projectValue",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "projectId",
+      "type": "esriFieldTypeInteger",
+      "alias": "projectId",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "applicationDept",
+      "type": "esriFieldTypeString",
+      "alias": "applicationDept",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "applicationDate",
+      "type": "esriFieldTypeDate",
+      "alias": "applicationDate",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "submittalDate",
+      "type": "esriFieldTypeDate",
+      "alias": "submittalDate",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "approvalDate",
+      "type": "esriFieldTypeDate",
+      "alias": "approvalDate",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "denialDate",
+      "type": "esriFieldTypeDate",
+      "alias": "denialDate",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "issuedDate",
+      "type": "esriFieldTypeDate",
+      "alias": "issuedDate",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "finalDate",
+      "type": "esriFieldTypeDate",
+      "alias": "finalDate",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "workDescription",
+      "type": "esriFieldTypeString",
+      "alias": "workDescription",
+      "sqlType": "sqlTypeOther",
+      "length": 255,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "siteAddress",
+      "type": "esriFieldTypeString",
+      "alias": "siteAddress",
+      "sqlType": "sqlTypeOther",
+      "length": 255,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "projectName",
+      "type": "esriFieldTypeString",
+      "alias": "projectName",
+      "sqlType": "sqlTypeOther",
+      "length": 255,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "XCoord",
+      "type": "esriFieldTypeDouble",
+      "alias": "XCoord",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "YCoord",
+      "type": "esriFieldTypeDouble",
+      "alias": "YCoord",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "publicWater",
+      "type": "esriFieldTypeString",
+      "alias": "publicWater",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "urlOnlinePermits",
+      "type": "esriFieldTypeString",
+      "alias": "urlOnlinePermits",
+      "sqlType": "sqlTypeOther",
+      "length": 255,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "lotsSubmitted",
+      "type": "esriFieldTypeString",
+      "alias": "lotsSubmitted",
+      "sqlType": "sqlTypeOther",
+      "length": 5,
+      "domain": null,
+      "defaultValue": null
+    }
+  ],
+  "exceededTransferLimit": true,
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 1,
+        "applicationNumber": 4,
+        "applicationType": "Plumbing",
+        "applicationStatus": "Cancelled",
+        "parcelNumber": "0220072023",
+        "workType": null,
+        "buildingType": null,
+        "housingType": null,
+        "sqFtTotal": null,
+        "buildingValuation": null,
+        "dwellingUnits": null,
+        "stories": null,
+        "powerCompany": null,
+        "sewageDisposal": null,
+        "acreage": null,
+        "projectValue": null,
+        "projectId": 50332,
+        "applicationDept": "*BUILDING*",
+        "applicationDate": 499910400000,
+        "submittalDate": null,
+        "approvalDate": 499910400000,
+        "denialDate": null,
+        "issuedDate": 499910400000,
+        "finalDate": 824601600000,
+        "workDescription": "NEW PLUMBING FOR SINGLE FAMILY RESIDENCE",
+        "siteAddress": "1269 KAMUS DR",
+        "projectName": null,
+        "XCoord": 1118390.6822,
+        "YCoord": 702895.3784,
+        "publicWater": null,
+        "urlOnlinePermits": "https://pals.piercecountywa.gov/palsonline/permitSearch/permit/departmentStatus?applPermitId=4",
+        "lotsSubmitted": null
+      },
+      "geometry": {
+        "x": -122.60184784163869,
+        "y": 47.241701901638855
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 2,
+        "applicationNumber": 5,
+        "applicationType": "Construction Residential",
+        "applicationStatus": "Final",
+        "parcelNumber": "0217263025",
+        "workType": "New Structure",
+        "buildingType": "House/plex",
+        "housingType": null,
+        "sqFtTotal": 720,
+        "buildingValuation": 7912.8,
+        "dwellingUnits": "1",
+        "stories": "0",
+        "powerCompany": "Not Specified",
+        "sewageDisposal": null,
+        "acreage": null,
+        "projectValue": null,
+        "projectId": 50332,
+        "applicationDept": "*BUILDING*",
+        "applicationDate": 499910400000,
+        "submittalDate": null,
+        "approvalDate": 499996800000,
+        "denialDate": null,
+        "issuedDate": 499996800000,
+        "finalDate": 547862400000,
+        "workDescription": "CONSTRUCTION OF A POLE BLDG.",
+        "siteAddress": "7102 HARTS LAKE LOOP RD S",
+        "projectName": null,
+        "XCoord": 1134282.2822,
+        "YCoord": 587184.9934,
+        "publicWater": "N",
+        "urlOnlinePermits": "https://pals.piercecountywa.gov/palsonline/permitSearch/permit/departmentStatus?applPermitId=5",
+        "lotsSubmitted": null
+      },
+      "geometry": {
+        "x": -122.52592824198634,
+        "y": 46.92569359606406
+      }
+    }
+  ]
+}

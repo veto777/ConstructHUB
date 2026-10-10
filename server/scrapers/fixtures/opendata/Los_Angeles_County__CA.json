@@ -1,0 +1,579 @@
+{
+  "objectIdFieldName": "OBJECTID",
+  "uniqueIdField": {
+    "name": "OBJECTID",
+    "isSystemMaintained": true
+  },
+  "globalIdFieldName": "",
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": {
+    "wkid": 4326,
+    "latestWkid": 4326
+  },
+  "fields": [
+    {
+      "name": "OBJECTID",
+      "type": "esriFieldTypeOID",
+      "alias": "OBJECTID",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "MODULENAME",
+      "type": "esriFieldTypeString",
+      "alias": "MODULENAME",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "CASENUMBER",
+      "type": "esriFieldTypeString",
+      "alias": "CASENUMBER",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "PROJECTNAME",
+      "type": "esriFieldTypeString",
+      "alias": "PROJECTNAME",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SPATIALTYPE",
+      "type": "esriFieldTypeString",
+      "alias": "SPATIALTYPE",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "APPLY_DATE",
+      "type": "esriFieldTypeDate",
+      "alias": "APPLY_DATE",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "COMPLETE_DATE",
+      "type": "esriFieldTypeDate",
+      "alias": "COMPLETE_DATE",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "EXPIRE_DATE",
+      "type": "esriFieldTypeDate",
+      "alias": "EXPIRE_DATE",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "STATUS",
+      "type": "esriFieldTypeString",
+      "alias": "STATUS",
+      "sqlType": "sqlTypeOther",
+      "length": 255,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "DESCRIPTION",
+      "type": "esriFieldTypeString",
+      "alias": "DESCRIPTION",
+      "sqlType": "sqlTypeOther",
+      "length": 1073741822,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "CASENAME",
+      "type": "esriFieldTypeString",
+      "alias": "CASENAME",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "WORKCLASS_NAME",
+      "type": "esriFieldTypeString",
+      "alias": "WORKCLASS_NAME",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "USE_CURR",
+      "type": "esriFieldTypeString",
+      "alias": "USE_CURR",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "USE_CURR_ADDL_DETAILS",
+      "type": "esriFieldTypeString",
+      "alias": "USE_CURR_ADDL_DETAILS",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "USE_STATUS1",
+      "type": "esriFieldTypeString",
+      "alias": "USE_STATUS1",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "USE_PROPOSED1",
+      "type": "esriFieldTypeString",
+      "alias": "USE_PROPOSED1",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "USE_PROPOSED1_ADDL",
+      "type": "esriFieldTypeString",
+      "alias": "USE_PROPOSED1_ADDL",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "USE_STATUS2",
+      "type": "esriFieldTypeString",
+      "alias": "USE_STATUS2",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "USE_PROPOSED2",
+      "type": "esriFieldTypeString",
+      "alias": "USE_PROPOSED2",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "USE_PROPOSED2_ADDL",
+      "type": "esriFieldTypeString",
+      "alias": "USE_PROPOSED2_ADDL",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "USE_STATUS3",
+      "type": "esriFieldTypeString",
+      "alias": "USE_STATUS3",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "USE_PROPOSED3",
+      "type": "esriFieldTypeString",
+      "alias": "USE_PROPOSED3",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "USE_PROPOSED3_ADDL",
+      "type": "esriFieldTypeString",
+      "alias": "USE_PROPOSED3_ADDL",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "AFFORDABLE_HOUSING",
+      "type": "esriFieldTypeSmallInteger",
+      "alias": "AFFORDABLE_HOUSING",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "STYLE_CATEGORY",
+      "type": "esriFieldTypeString",
+      "alias": "STYLE_CATEGORY",
+      "sqlType": "sqlTypeOther",
+      "length": 500,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "MAIN_ADDRESS",
+      "type": "esriFieldTypeString",
+      "alias": "MAIN_ADDRESS",
+      "sqlType": "sqlTypeOther",
+      "length": 2000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "MAIN_AIN",
+      "type": "esriFieldTypeString",
+      "alias": "MAIN_AIN",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "LAST_INSPECTION_DATE",
+      "type": "esriFieldTypeDate",
+      "alias": "LAST_INSPECTION_DATE",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ISSUANCE_DATE",
+      "type": "esriFieldTypeDate",
+      "alias": "ISSUANCE_DATE",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "PERMIT_VALUATION",
+      "type": "esriFieldTypeDouble",
+      "alias": "PERMIT_VALUATION",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "DISTRICT_DISPLAY",
+      "type": "esriFieldTypeString",
+      "alias": "DISTRICT_DISPLAY",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "PROJECT_NAME",
+      "type": "esriFieldTypeString",
+      "alias": "PROJECT_NAME",
+      "sqlType": "sqlTypeOther",
+      "length": 2000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ACCESSORY_DWELLING_UNIT",
+      "type": "esriFieldTypeSmallInteger",
+      "alias": "ACCESSORY_DWELLING_UNIT",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "PW_ADDRESS_TYPE",
+      "type": "esriFieldTypeString",
+      "alias": "PW_ADDRESS_TYPE",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SUP_DIST",
+      "type": "esriFieldTypeString",
+      "alias": "SUP_DIST",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "COUNTYWIDE_STAT_AREA",
+      "type": "esriFieldTypeString",
+      "alias": "COUNTYWIDE_STAT_AREA",
+      "sqlType": "sqlTypeOther",
+      "length": 2000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "NEW_DWELLING_UNITS",
+      "type": "esriFieldTypeInteger",
+      "alias": "NEW_DWELLING_UNITS",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "JUNIOR_ADU",
+      "type": "esriFieldTypeString",
+      "alias": "JUNIOR_ADU",
+      "sqlType": "sqlTypeOther",
+      "length": 2000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "STAT_CLASS",
+      "type": "esriFieldTypeString",
+      "alias": "STAT_CLASS",
+      "sqlType": "sqlTypeOther",
+      "length": 2000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "DISASTER_LOSS",
+      "type": "esriFieldTypeString",
+      "alias": "DISASTER_LOSS",
+      "sqlType": "sqlTypeOther",
+      "length": 2000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "DISASTER_TYPE",
+      "type": "esriFieldTypeString",
+      "alias": "DISASTER_TYPE",
+      "sqlType": "sqlTypeOther",
+      "length": 2000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "REBUILD_PROGRESS",
+      "type": "esriFieldTypeString",
+      "alias": "REBUILD_PROGRESS",
+      "sqlType": "sqlTypeOther",
+      "length": 2000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "REBUILD_APP_RECEIVED",
+      "type": "esriFieldTypeString",
+      "alias": "REBUILD_APP_RECEIVED",
+      "sqlType": "sqlTypeOther",
+      "length": 2000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ZONING_REV_CLEARED",
+      "type": "esriFieldTypeString",
+      "alias": "ZONING_REV_CLEARED",
+      "sqlType": "sqlTypeOther",
+      "length": 2000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "BUILD_PLAN_REV_PROC",
+      "type": "esriFieldTypeString",
+      "alias": "BUILD_PLAN_REV_PROC",
+      "sqlType": "sqlTypeOther",
+      "length": 2000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "BUILD_PLAN_APPROVED",
+      "type": "esriFieldTypeString",
+      "alias": "BUILD_PLAN_APPROVED",
+      "sqlType": "sqlTypeOther",
+      "length": 2000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "BUILD_PERMIT_ISSUED",
+      "type": "esriFieldTypeString",
+      "alias": "BUILD_PERMIT_ISSUED",
+      "sqlType": "sqlTypeOther",
+      "length": 2000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "REBUILD_IN_CONS",
+      "type": "esriFieldTypeString",
+      "alias": "REBUILD_IN_CONS",
+      "sqlType": "sqlTypeOther",
+      "length": 2000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "CONS_COMPLETED",
+      "type": "esriFieldTypeString",
+      "alias": "CONS_COMPLETED",
+      "sqlType": "sqlTypeOther",
+      "length": 2000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "STRUCT_TYPE_DISP",
+      "type": "esriFieldTypeString",
+      "alias": "STRUCT_TYPE_DISP",
+      "sqlType": "sqlTypeOther",
+      "length": 2000,
+      "domain": null,
+      "defaultValue": null
+    }
+  ],
+  "exceededTransferLimit": true,
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 17236,
+        "MODULENAME": "PermitManagement",
+        "CASENUMBER": "PROPRPT-000004-2018",
+        "PROJECTNAME": "",
+        "SPATIALTYPE": "Address",
+        "APPLY_DATE": 1514880000000,
+        "COMPLETE_DATE": null,
+        "EXPIRE_DATE": null,
+        "STATUS": "New",
+        "DESCRIPTION": null,
+        "CASENAME": "Property Report",
+        "WORKCLASS_NAME": "Property Report",
+        "USE_CURR": null,
+        "USE_CURR_ADDL_DETAILS": null,
+        "USE_STATUS1": null,
+        "USE_PROPOSED1": null,
+        "USE_PROPOSED1_ADDL": null,
+        "USE_STATUS2": null,
+        "USE_PROPOSED2": null,
+        "USE_PROPOSED2_ADDL": null,
+        "USE_STATUS3": null,
+        "USE_PROPOSED3": null,
+        "USE_PROPOSED3_ADDL": null,
+        "AFFORDABLE_HOUSING": null,
+        "STYLE_CATEGORY": null,
+        "MAIN_ADDRESS": " 18105 Wakecrest Drive, Malibu CA 90265",
+        "MAIN_AIN": "4443011026",
+        "LAST_INSPECTION_DATE": null,
+        "ISSUANCE_DATE": null,
+        "PERMIT_VALUATION": 0,
+        "DISTRICT_DISPLAY": "SD-3",
+        "PROJECT_NAME": null,
+        "ACCESSORY_DWELLING_UNIT": null,
+        "PW_ADDRESS_TYPE": null,
+        "SUP_DIST": "3",
+        "COUNTYWIDE_STAT_AREA": "Unincorporated - Santa Monica Mountains",
+        "NEW_DWELLING_UNITS": null,
+        "JUNIOR_ADU": null,
+        "STAT_CLASS": null,
+        "DISASTER_LOSS": null,
+        "DISASTER_TYPE": null,
+        "REBUILD_PROGRESS": null,
+        "REBUILD_APP_RECEIVED": null,
+        "ZONING_REV_CLEARED": null,
+        "BUILD_PLAN_REV_PROC": null,
+        "BUILD_PLAN_APPROVED": null,
+        "BUILD_PERMIT_ISSUED": null,
+        "REBUILD_IN_CONS": null,
+        "CONS_COMPLETED": null,
+        "STRUCT_TYPE_DISP": null
+      },
+      "geometry": {
+        "x": -118.56980679401705,
+        "y": 34.04442506873433
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 17237,
+        "MODULENAME": "PermitManagement",
+        "CASENUMBER": "PROPRPT-000003-2018",
+        "PROJECTNAME": "",
+        "SPATIALTYPE": "Address",
+        "APPLY_DATE": 1514880000000,
+        "COMPLETE_DATE": null,
+        "EXPIRE_DATE": null,
+        "STATUS": "New",
+        "DESCRIPTION": null,
+        "CASENAME": "Property Report",
+        "WORKCLASS_NAME": "Property Report",
+        "USE_CURR": null,
+        "USE_CURR_ADDL_DETAILS": null,
+        "USE_STATUS1": null,
+        "USE_PROPOSED1": null,
+        "USE_PROPOSED1_ADDL": null,
+        "USE_STATUS2": null,
+        "USE_PROPOSED2": null,
+        "USE_PROPOSED2_ADDL": null,
+        "USE_STATUS3": null,
+        "USE_PROPOSED3": null,
+        "USE_PROPOSED3_ADDL": null,
+        "AFFORDABLE_HOUSING": null,
+        "STYLE_CATEGORY": null,
+        "MAIN_ADDRESS": " 2112 Tortuga Street, Acton CA 93510",
+        "MAIN_AIN": "3056023015",
+        "LAST_INSPECTION_DATE": null,
+        "ISSUANCE_DATE": null,
+        "PERMIT_VALUATION": 0,
+        "DISTRICT_DISPLAY": "SD-5",
+        "PROJECT_NAME": null,
+        "ACCESSORY_DWELLING_UNIT": null,
+        "PW_ADDRESS_TYPE": null,
+        "SUP_DIST": "5",
+        "COUNTYWIDE_STAT_AREA": "Unincorporated - Acton",
+        "NEW_DWELLING_UNITS": null,
+        "JUNIOR_ADU": null,
+        "STAT_CLASS": null,
+        "DISASTER_LOSS": null,
+        "DISASTER_TYPE": null,
+        "REBUILD_PROGRESS": null,
+        "REBUILD_APP_RECEIVED": null,
+        "ZONING_REV_CLEARED": null,
+        "BUILD_PLAN_REV_PROC": null,
+        "BUILD_PLAN_APPROVED": null,
+        "BUILD_PERMIT_ISSUED": null,
+        "REBUILD_IN_CONS": null,
+        "CONS_COMPLETED": null,
+        "STRUCT_TYPE_DISP": null
+      },
+      "geometry": {
+        "x": -118.1590371327368,
+        "y": 34.48427983421079
+      }
+    }
+  ]
+}
