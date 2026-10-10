@@ -842,6 +842,9 @@ export default function SearchPage() {
                       <span className={`block truncate ${db.status === "running" ? "font-medium" : db.status === "pending" || db.status === "skipped" ? "text-muted-foreground/60" : ""}`}>
                         {db.name}
                       </span>
+                      {db.status === "running" && (liveStatus?.elapsedMs ?? 0) > 15000 && (
+                        <span className="block text-xs text-muted-foreground">Slow portal — still trying (gives up at 75 s)</span>
+                      )}
                       {db.status === "error" && db.message && (
                         <span className="block text-destructive break-words" data-testid={`status-db-message-${db.id}`}>{db.message}</span>
                       )}

@@ -232,6 +232,17 @@ export async function startLiveSearch(
   };
 
   const MAX_CONCURRENT = 4;
+  // Hard ceiling per portal so one slow site (Tyler EnerGov self-service pages can take minutes)
+  // never leaves the whole search spinning: past this the portal is reported as timed out and the
+  // search finishes with everything else. Adapters keep their own, shorter deadlines.
+  const LIVE_SEARCH_PORTAL_BUDGET_MS = 75_000;
+  const withPortalBudget = <T,>(work: Promise<T>): Promise<T> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const budget = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`timed out after ${LIVE_SEARCH_PORTAL_BUDGET_MS / 1000}s`)), LIVE_SEARCH_PORTAL_BUDGET_MS);
+    });
+    return Promise.race([work, budget]).finally(() => clearTimeout(timer));
+  };
 
   const processDb = async (db: typeof activeDbs[0]) => {
     const dbEntry = job.databases.find(d => d.id === db.id)!;
@@ -265,7 +276,7 @@ export async function startLiveSearch(
       const url = db.searchUrl || db.portalUrl!;
       const jobId = dbEntry.jobId;
 
-      const scrapeResults = await scrapeByPlatform(
+      const scrapeResults = await withPortalBudget(scrapeByPlatform(
         db.platform as ScraperPlatform,
         url,
         searchValue,
@@ -275,7 +286,7 @@ export async function startLiveSearch(
         queryId,
         jobId,
         db.jurisdiction
-      );
+      ));
 
       // Every adapter catches its own failure (browser launch, timeout, portal
       // change, login wall), records it on its scrape job and returns what it
@@ -289,7 +300,9 @@ export async function startLiveSearch(
       if (outcome.status === "error") log(`Live search error on ${db.name}: ${outcome.message}`, "scraper");
     } catch (err: any) {
       dbEntry.status = "error";
-      dbEntry.message = `Not searched: ${scrapeFailureReason(err?.message)}`;
+      dbEntry.message = /^timed out after/i.test(String(err?.message ?? ""))
+        ? `Timed out after ${LIVE_SEARCH_PORTAL_BUDGET_MS / 1000}s — slow portal; search it on its own to retry`
+        : `Not searched: ${scrapeFailureReason(err?.message)}`;
       log(`Live search error on ${db.name}: ${err.message}`, "scraper");
     }
 
@@ -903,7 +916,7 @@ export async function scrapeEnerGov(
     const applicationUrl = enerGovApplicationUrl(portalSearchUrl);
     ({ page, context } = await createIsolatedPage());
     const activeContext = context;
-    deadline = setTimeout(() => { expired = true; void activeContext.close().catch(() => {}); }, 120_000);
+    deadline = setTimeout(() => { expired = true; void activeContext.close().catch(() => {}); }, 70_000);
     page.setDefaultTimeout(20_000);
     const tenantResponses: Promise<any[]>[] = [];
     page.on('response', response => {
