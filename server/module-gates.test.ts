@@ -5,6 +5,7 @@
  * workers skip owners whose plan no longer includes them.
  */
 import { beforeAll, afterAll, describe, it, expect, vi } from 'vitest';
+import { ALACARTE, ALACARTE_PRICING_HREF, alacarteItemForModule } from '@shared/alacarte';
 import express from 'express';
 import type { AddressInfo } from 'node:net';
 import { randomUUID } from 'node:crypto';
@@ -134,7 +135,10 @@ describe('Module routes answer 402 below the plan that includes them', () => {
       for (const path of paths) {
         const refused = await call(users[DENIED_USER[module]!], path);
         expect(refused.status, path).toBe(402);
-        expect(refused.data, path).toEqual({ code: 'plan_required', requiredPlan: planForModule(module), message: expect.stringContaining(MODULE_NAMES[module]) });
+        // The body also names the à la carte item that sells the module on its own (shared/alacarte.ts).
+        const item = alacarteItemForModule(module);
+        expect(refused.data, path).toEqual({ code: 'plan_required', requiredPlan: planForModule(module), message: expect.stringContaining(MODULE_NAMES[module]),
+          ...(item ? { alacarte: { key: item, name: ALACARTE[item].name, href: ALACARTE_PRICING_HREF } } : {}) });
         for (const user of [users.canceled]) expect((await call(user, path)).status, `${path} canceled`).toBe(402);
         for (const user of [users.agency, users.legacy, users.admin]) expect((await call(user, path)).status, `${path} as ${user}`).toBe(200);
         expect((await call(null, path)).status, `${path} signed out`).toBe(401);

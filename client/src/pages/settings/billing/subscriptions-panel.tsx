@@ -12,6 +12,8 @@ import {
   planPriceCents, type EntitlementsInfo, type SubscriptionInfo,
 } from "@/lib/pricing-display";
 import { formatDate } from "./format";
+import type { AlacarteMe } from "@/components/alacarte-cards";
+import { ALACARTE, alacartePriceCents } from "@shared/alacarte";
 import { useBillingPortal } from "./use-billing-portal";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -51,6 +53,9 @@ export function SubscriptionsPanel({ onChangePlan, onManageBilling, showActions 
   const { data: entitlements } = useQuery<EntitlementsInfo>({ queryKey: ["/api/entitlements"] });
   // The AI Call Assistant is its own subscription (server/voice/subscription.ts): one line of its own on the statement.
   const { data: callAssistant } = useQuery<CallAssistantSubscriptionInfo>({ queryKey: CALL_ASSISTANT_SUBSCRIPTION_KEY });
+  // Tools bought à la carte (shared/alacarte.ts): each its own subscription, one line each, at the tier it is billed at now.
+  const { data: alacarte } = useQuery<AlacarteMe>({ queryKey: ["/api/alacarte/me"] });
+  const alacarteRows = (alacarte?.items ?? []).filter((i) => i.key && i.hasLiveSubscription);
   const view = describeSubscription(subscription);
   const plan = view.live && view.planKey ? PLANS[view.planKey] : null;
   const interval: BillingInterval = view.interval ?? "month";
@@ -199,6 +204,26 @@ export function SubscriptionsPanel({ onChangePlan, onManageBilling, showActions 
                 </span>
               ) : (
                 <span className="text-muted-foreground" data-testid="text-subscription-call-assistant">Not subscribed (a separate service, bought on Pricing)</span>
+              )}
+            </Row>
+            <Row label="À la carte">
+              {alacarteRows.length === 0 ? (
+                <span className="text-muted-foreground" data-testid="text-subscription-no-alacarte">None (any tool can be bought on its own, on Pricing)</span>
+              ) : (
+                <ul className="space-y-1" data-testid="list-subscription-alacarte">
+                  {alacarteRows.map((item) => (
+                    <li key={item.key!} className="flex flex-wrap justify-between gap-x-4" data-testid={`row-subscription-alacarte-${item.key}`}>
+                      <span>
+                        {ALACARTE[item.key!].name}
+                        {item.quantity > 1 ? <span className="text-muted-foreground"> × {item.quantity}</span> : null}
+                        <span className="text-muted-foreground"> · {STATUS_LABELS[item.status] ?? item.status}{item.cancelAtPeriodEnd ? ", ends at period end" : ""}{item.tier === "addon" ? ", add-on price" : ", standalone price"}</span>
+                      </span>
+                      <span className="tabular-nums text-muted-foreground">
+                        {formatUsd(item.quantity * alacartePriceCents(item.key!, item.tier, item.interval ?? "month"))}{intervalSuffix(item.interval ?? "month")}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               )}
             </Row>
             {total !== null && (
