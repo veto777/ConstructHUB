@@ -1,0 +1,2503 @@
+ <!-- START DATE PICKER-->
+<link href="/assets/global/plugins/bootstrap-datepicker/css/bootstrap-datepicker3.min.css" rel="stylesheet" type="text/css" />
+<!-- END DATE PICKER-->
+<style type="text/css">
+/*Code edited by Sanchit for changing background of all text boxes. (02/13/2020)*/
+.portlet.viewlight {padding: 12px 10px 15px 10px;background-color: #fff;}
+.viewreadonly{background-color: #cbcbce !important;cursor:default !important;border-bottom: 1px solid #c2cad8 !important;font-style: italic;font-weight: 600;}
+/*.viewreadonly{background-color: #f3f3f4 !important;cursor:default !important;border-bottom: 1px solid #c2cad8 !important;font-style: italic;font-weight: 600;}*/
+.transactionsfont{font-size: 12px;}
+.showpartialcontent{white-space: nowrap;width: 30ch;overflow: hidden;text-overflow: ellipsis;}
+.sectionmargin{margin-bottom: 20px;}
+/*All Permit form css*/
+.form-horizontal .form-group.form-md-line-input {padding-top: 6px !important; margin-bottom: 0px !important; margin: 0 0px 0px 0px !important; }
+.form-group.form-md-line-input {margin: 0 0 0px 0 !important; padding-top: 0px !important; }
+.form-control {height: 30px !important;font-size: 12px !important;}
+textarea.form-control {height: auto !important;}
+label {font-size: 12px !important;}
+.control-label{text-align: left !important;}
+/*Tent Form css*/
+.checkbox_radio_readonly {cursor: default !important;}
+/*Residential Form css*/
+.horizontal-line{width:100%;color:#337ab7;background-color:rgba(51, 122, 183,0.7);height:1px}
+.red-font{color:red}
+.section-heading{font-weight:bold;color:#337ab7}
+/*.md-checkbox label, .md-radio label, .row label, label, .font-label{color:#1b1a1a;}*/
+.textarea-bg{background-color:rgba(232, 234, 237,0.7) !important}
+.inline-text-box{border: 0;border-bottom: 1px solid #c2cad8;background: none;outline: none !important;box-shadow: none !important;}
+textarea{resize:none}
+.section-border{border:1px solid #888888;padding:10px}
+.title-bg{background:#555;color:#fff !important;padding:2.5px;}
+.title-bg label {color:#fff !important; margin-bottom: 1px !important;}
+.title-text{font-size:14px;margin-top:40px}
+.form-group.form-md-line-input .form-control{background-color:#cbcbce !important}
+/*.form-group.form-md-line-input .form-control{background-color:#f3f3f4 !important}*/
+.form-body{ padding:0 !important;}
+.SameAsWidth {width: 6.33333% !important;color:white !important;padding-right: 0 !important;}
+@media screen and (max-width: 480px) {.SameAsWidth {width: 20.33333% !important;color:white !important;}}
+.pr-0 {padding-right: 0 ;}
+.pl-0 {padding-left: 0 ;}
+.pb-0 {padding-bottom: 0 ;}
+.pt-0 {padding-top: 0;}
+.display-none {display: none;}
+.display-inline {display: inline;}
+.mr-0 {margin-right: 0;}
+.mt-0 {margin-top: 0;}
+/*Plumbing Form CSS*/
+.letter{max-width:25px;text-align:center}
+/*All Form CSS*/
+#lbl_AppSameAsOwner, #lbl_AgntSameAsApp, .title-bg .fa {color: #ffffff;}
+#span_AppSameAsOwner, #span_AgntSameAsApp{border-color: #ffffff;}
+/* Worker's CSS*/
+#portlet_show_workers, #portlet_show_affidavit{ background-color:#f4f5f7;padding-bottom: 10px;padding-top:20px;}
+#WCNoEmployee, #OwnerAgent, #OwnerNameDeclare, #AppNameDeclare{ max-width:200px;}
+#WCAppName{ width:40%; min-width:300px;}
+#OwnerAgent{max-width:400px;}
+#EstimatedCost{ width:100%;}
+.word-wrap{ word-wrap:break-word;}
+/*Residential Form CSS*/
+#div_BuildingSetbacks1, #div_BuildingSetbacks2, #div_BuildingSetbacks3{border:1px dotted #333;padding-left:25px;padding-right:25px;}
+#div_BuildingSetbacks3{padding-bottom: 25px;}
+/*Sign Permit Form CSS*/
+.font-weight-600{font-weight: 600;}
+.date-picker {border-bottom: 1px solid #c2cad8 !important; cursor: auto !important;}
+/*For All Building View Form CSS*/
+.md-radio-inline, .md-radio, .check, .box, .md-radiobtn, .md-radio label, .date-picker, .md-checkbox, .md-checkbox label {cursor:default !important;}
+
+
+</style>
+
+
+</head>
+<div class="portlet light viewpage" id="PrintForm">
+    <div class="portlet-title">
+        <div class="caption font-label">
+            <i class="icon-settings font-label"></i>
+            <span class="caption-subject bold uppercase">APPLICATION FOR PERMIT TO PERFORM ELECTRICAL WORK</span>
+        </div>
+    </div>
+
+    <div class="portlet-body">
+
+        <!-- BEGIN VALIDATION STATES-->
+
+        <div class="portlet light portlet-fit portlet-form ">
+            <!-- BEGIN FORM-->
+            <form action="" class="form-horizontal" id="ElectricalPermit" method="post">
+
+                <div class="form-body">
+                    <div class="alert alert-danger display-hide">
+                        <button type="button" class="btn green print_app" id="print_app" name="print_app">Print</button>
+
+                        <button class="close" data-close="alert"></button> You have some form errors. Please check below.
+
+                    </div>
+
+                    <div class="alert alert-success display-hide">
+
+                        <button class="close" data-close="alert"></button> Your form validation is successful!
+
+                    </div>
+
+
+
+                    <div class="row ">
+
+                        <div class="col-md-offset-5 col-md-3">
+                            <button type="button" class="btn green print_app" id="print_app" name="print_app">Print</button>
+                            <button type="button" class="btn default exitView" id="exitView" name="exitView">Exit</button>
+                        </div>
+
+                    </div>
+                    <div class="form-group form-md-line-input ">
+
+                        <label class="col-md-12 text-center">All work to be performed in accordance with the Massachusetts Electrical Code (MEC), 527 CMR 12.00
+                        </label>
+                        <label class="col-md-12 text-center">This document is not the "official" B.F.P.R. application. This on-line application is identical to the B.F.P.R. application minus the state seal. An applicant may apply for a permit with either the "on-line" application or the state application.</label>
+
+                        <label class="col-md-12 text-center">
+
+                            <b>(PLEASE PRINT IN INK OR TYPE ALL INFORMATION) </b>
+
+                        </label>
+
+                    </div>
+
+                    <div class="form-group form-md-line-input">
+                        <!-- <div class="col-md-12">
+                            <div class="row">
+                                <div class="col-md-1 control-label col-md-offset-6 col-md-offset-9">
+                                    <label class="">Date</label>
+                                </div>
+                                <div class="col-md-2">
+                                    <input class="form-control form-control-inline input-small date-picker viewreadonly" readonly="" disabled size="10" type="text" name="AppDate" id="AppDate" />
+                                    
+                                    <span class="help-block"> Select date </span>
+                                </div>
+                            </div>
+                        </div> -->
+                        <!-- <div class="col-md-12">
+                            <div class="row">
+                                <label class="col-md-1half control-label text-left pr-0" for="form_control_1"><b>City or Town of</b></label>
+                                <div class="col-md-3">
+                                    <input type="text" class="form-control viewreadonly" readonly=""  placeholder="" name="CityOrTownName" id="CityOrTownName">
+                                    
+                                </div>
+                                <label class="col-md-5 control-label text-left" for="form_control_1">To the Inspector of Wires:</label>
+                            </div>
+                        </div> -->
+
+                    </div>
+
+                    <!-- <div class="sectionmargin">
+                    <div class="form-group form-md-line-input">
+                        <div class="col-md-12">
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <label class="" for="form_control_1">
+                                        By this application the undersigned gives notice of his or her intention to perform the electrical work described below.
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                 </div> -->
+
+                    <!--- Start Common Information -->
+
+
+
+
+                    <!--- section 0 Start -->
+                    <div class="sectionmargin">
+                        <div class="form-group form-md-line-input section-border">
+                            <div class="col-md-12 title-bg">
+                                <div class="row">
+                                    <label class="col-md-12 ">
+                                        <b>APPLICATION DETAILS</b>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="row"></div>
+
+                            <div class="row">
+
+                                <div class="form-group form-md-line-input">
+                                    <label class="col-md-1half"> Application #: </label>
+                                    <div class="col-md-2">
+                                        <input type="text" readonly name="AppNo" id="AppNo" class="form-control viewreadonly " />
+                                        <div class="form-control-focus"> </div>
+                                    </div>
+
+                                    <label class="col-md-1">Date Issued:</label>
+                                    <div class="col-md-2">
+                                        <input type="text" readonly name="IssueDate" id="IssueDate" class="form-control viewreadonly " />
+                                        <div class="form-control-focus"> </div>
+                                    </div>
+
+
+                                    <label class="col-md-1"> Permit #:</label>
+                                    <div class="col-md-2">
+                                        <input type="text" readonly name="PermitNumber" id="PermitNumber" class="form-control viewreadonly " />
+                                        <div class="form-control-focus"> </div>
+                                    </div>
+
+                                    <label class="col-md-1"> Date Paid: </label>
+                                    <div class="col-md-1half">
+                                        <input type="text" name="DatePaid" id="DatePaid" readonly class="form-control viewreadonly " />
+                                        <div class="form-control-focus"> </div>
+                                    </div>
+                                </div>
+
+
+                                <div class="form-group form-md-line-input">
+
+                                    <label class="col-md-1half"> Fee Payable: ($)</label>
+                                    <div class="col-md-2">
+                                        <input type="text" readonly name="FeePayable" id="FeePayable" class="form-control viewreadonly " />
+                                        <div class="form-control-focus"> </div>
+                                    </div>
+
+                                    <label class="col-md-1"> Fee Paid: ($) </label>
+                                    <div class="col-md-2">
+                                        <input type="text" readonly name="FeePaid" id="FeePaid" class="form-control viewreadonly " />
+                                        <div class="form-control-focus"> </div>
+                                    </div>
+
+
+
+                                    <label class="col-md-1">Receipt # : </label>
+                                    <div class="col-md-2">
+                                        <input type="text" readonly name="Receipt" id="Receipt" class="form-control viewreadonly " />
+                                    </div>
+
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                    <!--- section 0 End -->
+
+
+
+
+
+                    <!--- section 1 Start -->
+                    <div class="sectionmargin">
+                        <div class="form-group form-md-line-input section-border">
+                            <div class="col-md-12 title-bg">
+                                <div class="row">
+                                    <label class="col-md-4">
+                                        <b>SECTION 1 - SITE INFORMATION</b>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="row"></div>
+                            <div class="row">
+                                <div class="form-group form-md-line-input">
+                                    <label class="col-md-1half">Street Name </label>
+                                    <div class="col-md-4">
+                                        <input type="text" name="StrName" id="StrName " class="form-control viewreadonly" readonly />
+                                    </div>
+                                    <label class="col-md-1half col-md-offset-1">Map Block Lot </label>
+                                    <div class="col-md-4">
+                                        <input type="text" name="MapBlockLotSelect" id="MapBlockLotSelect " class="form-control viewreadonly" readonly />
+                                    </div>
+
+                                </div>
+
+                                <div class="form-group form-md-line-input">
+                                    <label class="col-md-1half  ">Street Number</label>
+                                    <div class="col-md-4">
+                                        <input type="text" name="StrNumber" id="StrNumber " class="form-control viewreadonly" readonly />
+                                    </div>
+
+
+                                    <label class="col-md-1half col-md-offset-1 ">Zone</label>
+                                    <div class="col-md-4">
+                                        <input type="text" name="Zone" id="Zone " class="form-control viewreadonly" readonly />
+                                    </div>
+                                </div>
+                                <div class="form-group form-md-line-input">
+
+                                    <label class="col-md-1half">Unit Number</label>
+                                    <div class="col-md-4">
+                                        <input type="text" name="UnitNumber" id="UnitNumber" class="form-control viewreadonly" readonly="" />
+                                        <div class="form-control-focus"> </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <input type="hidden" name="ParcelId" id="ParcelId" />
+                        </div>
+                    </div>
+                    <!--- section 1 End -->
+
+
+                    <!-- section 2 Start -->
+                    <div class="sectionmargin">
+                        <div class="form-group form-md-line-input section-border">
+                            <div class="col-md-12 title-bg">
+                                <div class="row">
+                                    <label class="col-md-12">
+                                        <b>SECTION 2 - OWNER INFORMATION</b>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="row"></div>
+                            <div class="row">
+                                <div class="form-group form-md-line-input">
+                                    <label class="col-md-1half">Owner Name </label>
+                                    <div class="col-md-10half">
+                                        <input type="text" class="form-control viewreadonly" readonly placeholder="" name="OwnerName" id="OwnerName">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="form-group form-md-line-input">
+                                    <label class="col-md-1half">Street Number</label>
+                                    <div class="col-md-2">
+                                        <input type="text" class="form-control viewreadonly" readonly name="OwnerStNum" id="OwnerStNum">
+                                    </div>
+                                    <label class="col-md-1 col-md-offset-1 pr-0">Street Name</label>
+                                    <div class="col-md-6half">
+                                        <input type="text" class="form-control viewreadonly" readonly name="OwnerStName" id="OwnerStName">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="form-group form-md-line-input">
+                                    <label class="col-md-1half">City</label>
+                                    <div class="col-md-2">
+                                        <input type="text" class="form-control viewreadonly" readonly name="OwnerCity" id="OwnerCity">
+
+                                    </div>
+
+                                    <label class="col-md-1 col-md-offset-1">State</label>
+                                    <div class="col-md-2half">
+                                        <input type="text" class="form-control viewreadonly" readonly name="OwnerState" id="OwnerState">
+
+                                    </div>
+                                    <label class="col-md-1 col-md-offset-1">Zip</label>
+                                    <div class="col-md-2">
+                                        <input type="text" class="form-control viewreadonly" readonly name="OwnerZip" id="OwnerZip">
+
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="form-group form-md-line-input">
+                                    <label class="col-md-1half">Telephone</label>
+                                    <div class="col-md-2">
+                                        <input type="text" class="form-control viewreadonly" readonly placeholder="" name="OwnerPhone" id="OwnerPhone">
+
+                                    </div>
+                                    <label class="col-md-1 col-md-offset-1">Email</label>
+                                    <div class="col-md-6half">
+                                        <input type="text" class="form-control viewreadonly" readonly placeholder="" name="OwnerEmail" id="OwnerEmail">
+
+                                    </div>
+
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                    <!--- Section 2 End -->
+
+                    <!-- section 3 Start -->
+                    <div class="sectionmargin">
+                        <div class="form-group form-md-line-input section-border">
+                            <div class="col-md-12 title-bg">
+                                <div class="row">
+                                    <label class="col-md-12">
+                                        <b>SECTION 3 - APPLICANT INFORMATION</b>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="row"></div>
+
+                            <div class="row">
+
+                                <div class="form-group form-md-line-input">
+                                    <label class="col-md-1half">Applicant Name </label>
+                                    <div class="col-md-10half">
+                                        <input type="text" class="form-control viewreadonly" readonly placeholder="" name="AppName" id="AppName">
+
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            <div class="row">
+
+                                <div class="form-group form-md-line-input">
+                                    <label class="col-md-1half">Street Number</label>
+                                    <div class="col-md-2">
+                                        <input type="text" class="form-control viewreadonly" readonly name="AppStNum" id="AppStNum">
+
+                                    </div>
+                                    <label class="col-md-offset-1 col-md-1 pr-0">Street Name</label>
+                                    <div class="col-md-6half">
+                                        <input type="text" class="form-control viewreadonly" readonly name="AppStName" id="AppStName">
+
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            <div class="row">
+
+                                <div class="form-group form-md-line-input">
+                                    <label class="col-md-1half">City</label>
+                                    <div class="col-md-2">
+                                        <input type="text" class="form-control viewreadonly" readonly name="AppCity" id="AppCity">
+
+                                    </div>
+
+                                    <label class="col-md-1 col-md-offset-1 ">State</label>
+                                    <div class="col-md-2half">
+                                        <input type="text" class="form-control viewreadonly" readonly name="AppState" id="AppState">
+
+                                    </div>
+                                    <label class="col-md-1 col-md-offset-1 ">Zip</label>
+                                    <div class="col-md-2">
+                                        <input type="text" class="form-control viewreadonly" readonly name="AppZip" id="AppZip">
+
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+
+                                <div class="form-group form-md-line-input">
+                                    <label class="col-md-1half">Telephone</label>
+                                    <div class="col-md-2">
+                                        <input type="text" class="form-control viewreadonly" readonly placeholder="" name="AppPhone" id="AppPhone">
+
+                                    </div>
+                                    <label class="col-md-1 col-md-offset-1">Email</label>
+                                    <div class="col-md-6half">
+                                        <input type="text" class="form-control viewreadonly" readonly placeholder="" name="AppEmail" id="AppEmail">
+
+                                    </div>
+
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                    <!--- Section 3 end -->
+
+                    <!--- Section 4 start -->
+                    <div class="sectionmargin">
+                        <div class="form-group form-md-line-input section-border">
+                            <div class="col-md-12 title-bg">
+                                <div class="row">
+                                    <label class="col-md-12"><b>SECTION 4 - MAILING ADDRESS</b></label>
+                                </div>
+                            </div>
+                            <div class="row"></div>
+                            <div class="row">
+
+                                <div class="form-group form-md-line-input">
+                                    <label class="col-md-1half">Street Number</label>
+                                    <div class="col-md-2">
+                                        <input type="text" class="form-control viewreadonly" readonly name="MailStNum" id="MailStNum">
+
+                                    </div>
+                                    <label class="col-md-1 col-md-offset-1 control-label pr-0">Street Name</label>
+                                    <div class="col-md-6half">
+                                        <input type="text" class="form-control viewreadonly" readonly name="MailStName" id="MailStName">
+
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            <div class="row">
+                                <div class="form-group form-md-line-input">
+                                    <label class="col-md-1half">City</label>
+                                    <div class="col-md-2">
+                                        <input type="text" class="form-control viewreadonly" readonly name="MailCity" id="MailCity">
+
+                                    </div>
+
+                                    <label class="col-md-1 col-md-offset-1 ">State</label>
+                                    <div class="col-md-2half">
+                                        <input type="text" class="form-control viewreadonly" readonly name="MailState" id="MailState">
+
+                                    </div>
+                                    <label class="col-md-1  col-md-offset-1 ">Zip</label>
+                                    <div class="col-md-2">
+                                        <input type="text" class="form-control viewreadonly" readonly name="MailZip" id="MailZip">
+
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!--- Section 4 end -->
+
+                    <!--- Section 5 begin -->
+                    <div class="sectionmargin">
+                        <div class="form-group form-md-line-input section-border">
+                            <div class="col-md-12 title-bg">
+                                <div class="row">
+                                    <label class="col-md-4">
+                                        <b>SECTION 5 - WORK DETAILS</b>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="row"></div>
+
+                            <div class="row">
+                                <div class="form-group form-md-line-input">
+                                    <label class="col-md-4" for="form_control_1">Is this permit in conjunction with a building permit?</label>
+                                    <div class="col-md-2half">
+                                        <div class="md-radio-inline">
+                                            <div class="md-radio">
+                                                <input type="radio" disabled value="Yes" id="PermitConjunction1" name="PermitConjunction" class="md-radiobtn">
+                                                <label for="PermitConjunction1" value="Yes">
+                                                    <span></span>
+                                                    <span class="check"></span>
+                                                    <span class="box"></span> Yes
+                                                </label>
+                                            </div>
+                                            <div class="md-radio">
+                                                <input type="radio" disabled id="PermitConjunction2" name="PermitConjunction" class="md-radiobtn" value="No">
+                                                <label for="PermitConjunction2">
+                                                    <span></span>
+                                                    <span class="check"></span>
+                                                    <span class="box"></span> No
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- <div class="col-md-1"><span class="btn btn-primary" id="PermitConjunctionUncheck" title="uncheck" name="PermitConjunctionUncheck">Uncheck</span></div>
+                                    <label class="col-md-5" for="form_control_1">(Select Appropriate Option)</label> -->
+                                </div>
+                            </div>
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <div class="col-md-3half">
+                                        <div class="row">
+                                            <div class="col-md-5half">
+                                                <label class="" for="form_control_1">Purpose of Building</label>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <input type="text" name="PurposeBuildingSelect" id="PurposeBuildingSelect" class="form-control viewreadonly" readonly />
+                                            </div>
+                                        </div>
+                                    </div>
+
+
+                                    <!-- <div class="col-md-3">
+                                    <div class="row">
+                                        <div class="col-md-6 pr-0">
+                                            <label class="" for="form_control_1">Utility Authorization No.</label>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <input type="text" class="form-control viewreadonly" readonly  placeholder="" name="AuthorizeNo" id="AuthorizeNo">
+                                            
+                                        </div>
+                                    </div>
+                                </div>
+                             
+
+                                <div class="col-md-1">
+                                    <div class="md-checkbox-inline">
+                                        <div class="md-checkbox">
+                                            <input type="checkbox" id="AuthorizeApplicable" name="AuthorizeApplicable" class="md-check" disabled>
+                                            <label for="AuthorizeApplicable">
+                                                <span></span>
+                                                <span class="check"></span>
+                                                <span class="box"></span>Applicable
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-2half">
+                                        <div class="md-radio-inline">
+                                       
+                                            <div class="md-radio">
+                                                <input type="radio" value="NationalGrid" id="UtilityCompany1" name="UtilityCompany" class="md-radiobtn" disabled>
+                                                <label for="UtilityCompany1">
+                                                    <span></span>
+                                                    <span class="check"></span>
+                                                    <span class="box"></span> National Grid
+                                                </label>
+                                                
+                                            </div> 
+                                            
+                                            <div class="md-radio">
+                                                <input type="radio" id="UtilityCompany2" name="UtilityCompany" class="md-radiobtn" value="Eversource" disabled>
+                                                <label for="UtilityCompany2">
+                                                    <span></span>
+                                                    <span class="check"></span>
+                                                    <span class="box"></span> Eversource
+                                                </label>
+                                                
+                                            </div>
+                                        </div>
+                                    </div>
+                                 
+                                <div class="col-md-2">
+                                    <div class="md-checkbox-inline">
+                                        <div class="md-checkbox">
+                                            <input type="checkbox" disabled  id="AuthorizeNoNA" name="AuthorizeNoNA" class="md-check">
+                                            <label for="AuthorizeNoNA">
+                                                <span></span>
+                                                <span class="check"></span>
+                                                <span class="box"></span>Not Applicable
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div> -->
+
+                                </div>
+                            </div>
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+
+                                    <div class="col-md-1half">
+                                    <label class="" for="form_control_1">Utility Company</label>
+                                </div>
+
+
+                                <div class="col-md-2half pr-0 w30">
+                                <div class="md-radio-inline">
+                                    
+                                        <div class="md-radio">
+                                            <input type="radio" id="AuthorizeNoNA2" name="AuthorizeNoNA" class="md-radiobtn" value="AuthorizeApplicable" disabled>
+                                            <label for="AuthorizeNoNA2">
+                                                <span></span>
+                                                <span class="check"></span>
+                                                <span class="box"></span> Applicable </label>
+                                        </div>
+                                    <div class="md-radio">
+                    <input type="radio" id="AuthorizeNoNA1" name="AuthorizeNoNA" class="md-radiobtn" value="AuthorizeNoNA" disabled>
+                                        <label for="AuthorizeNoNA1" >
+                                            <span></span>
+                                            <span class="check"></span>
+                                            <span class="box"></span> Not Applicable </label>
+                                    </div>
+                                           
+                                    </div>
+                                </div>
+
+
+                                    <div class="col-md-2half w35">
+                                        <div class="md-radio-inline">
+                                            <div id="AuthorizeNoDiv1">
+
+                                                <div class="md-radio">
+                                                    <input type="radio" value="NationalGrid" id="UtilityCompany1" name="UtilityCompany" class="md-radiobtn" disabled>
+                                                    <label for="UtilityCompany1">
+                                                        <span></span>
+                                                        <span class="check"></span>
+                                                        <span class="box"></span> National Grid
+                                                    </label>
+
+                                                </div>
+
+                                                <div class="md-radio">
+                                                    <input type="radio" id="UtilityCompany2" name="UtilityCompany" class="md-radiobtn" value="Eversource" disabled>
+                                                    <label for="UtilityCompany2">
+                                                        <span></span>
+                                                        <span class="check"></span>
+                                                        <span class="box"></span> Eversource
+                                                    </label>
+
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-3 w22 pr-0">
+                                        <div class="row">
+                                            <div class="col-md-4">
+                                                <label class="" for="form_control_1">Utility Auth. No.</label>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <input type="text" class="form-control viewreadonly" readonly placeholder="" name="AuthorizeNo" id="AuthorizeNo">
+
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    
+                                </div>
+                            </div>
+
+                            <!-- <div class="form-group form-md-line-input">
+                            <div class="row">
+
+                            
+
+                                <div class="col-md-1half">
+                                    <label class="" for="form_control_1"><span class="required" aria-required="true"> * </span>Utility Company</label>
+                                </div>
+
+                                <div class="col-md-3 pr-0 w30">
+                                <div class="md-radio-inline">
+                                    
+                                        <div class="md-radio">
+                                            <input type="radio" id="AuthorizeNoNA2" name="AuthorizeNoNA" class="md-radiobtn" value="AuthorizeApplicable" disabled>
+                                            <label for="AuthorizeNoNA2">
+                                                <span></span>
+                                                <span class="check"></span>
+                                                <span class="box"></span> Applicable </label>
+                                        </div>
+                                    <div class="md-radio">
+                    <input type="radio" id="AuthorizeNoNA1" name="AuthorizeNoNA" class="md-radiobtn" value="AuthorizeNoNA" disabled>
+                                        <label for="AuthorizeNoNA1" >
+                                            <span></span>
+                                            <span class="check"></span>
+                                            <span class="box"></span> Not Applicable </label>
+                                    </div>
+                                           
+                                    </div>
+                                </div>
+
+
+                                 <div class="col-md-2half pr-0">
+                                <div class="row display-none AuthorizeNoDiv1" id="AuthorizeNoDiv1">
+                             <div class="col-md-2half" style="white-space: nowrap;">
+                                    <div class="md-radio-inline">
+                                        
+
+                                            <div class="md-radio">
+                                                <input type="radio" value="NationalGrid" id="UtilityCompany1" name="UtilityCompany" class="md-radiobtn" disabled>
+                                                <label for="UtilityCompany1">
+                                                    <span></span>
+                                                    <span class="check"></span>
+                                                    <span class="box"></span> National Grid
+                                                </label>
+                                            </div>
+
+                                            <div class="md-radio">
+                                                <input type="radio" id="UtilityCompany2" name="UtilityCompany" class="md-radiobtn" value="Eversource" disabled>
+                                                <label for="UtilityCompany2">
+                                                    <span></span>
+                                                    <span class="check"></span>
+                                                    <span class="box"></span> Eversource
+                                                </label>
+                                            </div>
+                                            <span id="UtilityCompanyErr" class="display-none"></span>
+                                        
+
+                                    </div>
+                                </div>
+                        </div>
+                    </div>
+
+                               
+
+                                <div class="col-md-2half w30">
+                                    <div class="row display-none" id="AuthorizeNoDiv">
+                                        <div class="col-md-5">
+                                            <label class="" for="form_control_1"><span class="required" aria-required="true"> * </span>Utility Auth. No.</label>
+                                        </div>
+                                        
+                                            <div class="col-md-6half pr-0 w15">
+                                                <input type="text" class="form-control viewreadonly" placeholder="" name="AuthorizeNo" id="AuthorizeNo" readonly>
+                                                <div class="form-control-focus removeFocus"> </div>
+                                            </div>
+                                        
+                                    </div>
+                                </div>
+
+                                
+                            </div>
+                        </div> -->
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <div class="col-md-1half">
+                                        <label class="" for="form_control_1">Existing Service</label>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <div class="row">
+                                            <div class="col-md-8">
+                                                <input type="text" class="form-control viewreadonly" readonly placeholder="" name="ExtService" id="ExtService">
+
+                                            </div>
+                                            <div class="col-md-1">
+                                                <label class="" for="form_control_1">Amps</b>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <div class="row">
+                                            <div class="col-md-8">
+                                                <input type="text" class="form-control viewreadonly" readonly placeholder="" name="Amps1" id="Amps1">
+
+                                            </div>
+                                            <div class="col-md-1">
+                                                <label class="" for="form_control_1"><b>Volts</b></label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="row">
+                                            <div class="col-md-12">
+                                                <div class="md-radio-inline text-center">
+                                                    <div class="md-radio">
+                                                        <input type="radio" disabled value="Overhead" id="OverheadExisting1" name="OverheadExisting" class="md-radiobtn">
+                                                        <label for="OverheadExisting1">
+                                                            <span></span>
+                                                            <span class="check"></span>
+                                                            <span class="box"></span> Overhead
+                                                        </label>
+                                                    </div>
+                                                    <div class="md-radio">
+                                                        <input type="radio" disabled id="OverheadExisting2" name="OverheadExisting" class="md-radiobtn" value="Undgrd">
+                                                        <label for="OverheadExisting2">
+                                                            <span></span>
+                                                            <span class="check"></span>
+                                                            <span class="box"></span> Undgrd
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <!-- <div class="col-md-2">
+                                            <span class="btn btn-primary" id="Volts1Uncheck" title="Uncheck" name="Volts1Uncheck">Uncheck</span>
+                                        </div> -->
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <div class="row">
+                                            <div class="col-md-7 pr-0">
+                                                <label class="" for="form_control_1">No. of Meters</label>
+                                            </div>
+                                            <div class="col-md-5">
+                                                <input type="text" class="form-control viewreadonly" readonly placeholder="" name="NoMeters1" id="NoMeters1">
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <div class="col-md-1half">
+                                        <label class="" for="form_control_1">New Service</label>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <div class="row">
+                                            <div class="col-md-8">
+                                                <input type="text" class="form-control viewreadonly" readonly placeholder="" name="NewService" id="NewService">
+
+                                            </div>
+                                            <div class="col-md-1">
+                                                <label class="" for="form_control_1">Amps</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <div class="row">
+                                            <div class="col-md-8">
+                                                <input type="text" class="form-control viewreadonly" readonly placeholder="" name="Amps2" id="Amps2">
+
+                                            </div>
+                                            <div class="col-md-1">
+                                                <label class="" for="form_control_1"><b>Volts</b></label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="row">
+                                            <div class="col-md-12">
+                                                <div class="md-radio-inline text-center">
+                                                    <div class="md-radio">
+                                                        <input type="radio" disabled value="Overhead" id="OverheadNew1" name="OverheadNew" class="md-radiobtn">
+                                                        <label for="OverheadNew1">
+                                                            <span></span>
+                                                            <span class="check"></span>
+                                                            <span class="box"></span> Overhead
+                                                        </label>
+                                                    </div>
+                                                    <div class="md-radio">
+                                                        <input type="radio" disabled value="Undgrd" id="OverheadNew2" name="OverheadNew" class="md-radiobtn">
+                                                        <label for="OverheadNew2">
+                                                            <span></span>
+                                                            <span class="check"></span>
+                                                            <span class="box"></span> Undgrd
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <!-- <div class="col-md-4">
+                                            <span class="btn btn-primary" id="Volts2Uncheck" title="Uncheck" name="Volts2Uncheck">Uncheck</span>
+                                        </div> -->
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <div class="row">
+                                            <div class="col-md-7 pr-0">
+                                                <label class="" for="form_control_1">No. of Meters</label>
+                                            </div>
+                                            <div class="col-md-5">
+                                                <input type="text" class="form-control viewreadonly" readonly placeholder="" name="NoMeters2" id="NoMeters2">
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <label class="col-md-3half" for="form_control_1">Number of Feeders and Ampacity</label>
+                                    <div class="col-md-8half">
+                                        <input type="text" class="form-control viewreadonly" readonly placeholder="" name="FeedersAmpacity" id="FeedersAmpacity">
+
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group form-md-line-input">
+                                <!-- <div class="row">
+                                <label class="col-md-3half" for="form_control_1">Location and Nature of Proposed Electrical Work:</label>
+                                <div class="col-md-8half">
+                                    <textarea class="form-control textarea-bg viewreadonly" readonly="" placeholder="" name="NatureElectricalWork" id="NatureElectricalWork"></textarea>
+                                    
+                                </div>
+                            </div> -->
+
+                                <div class="row">
+                                    <label class="col-md-3half" for="form_control_1">Location and Nature of Proposed Electrical Work</label>
+                                    <div class="col-md-8half">
+                                        <div class="viewreadonly">
+                                            <label name="BriefDescription" id="BriefDescription" style="font-weight: 600;"></label>
+                                        </div>
+
+                                        <div class="form-control-focus"> </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <label class="col-md-12" for="form_control_1">Completion of the following table may be waived by the Inspector of Wires.</label>
+                                </div>
+                            </div>
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="row">
+                                            <div class="col-md-6 pr-0">
+                                                <label class="" for="form_control_1">No. of Recessed Fixtures</label>
+                                            </div>
+                                            <div class="col-md-5">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="NoRecessedFixtures" id="NoRecessedFixtures" />
+
+                                            </div>
+                                            <div class="col-md-1"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="row">
+                                            <div class="col-md-7half pr-0">
+                                                <label class="" for="form_control_1">No. of Ceil.-Susp. (Paddle) Fans</label>
+                                            </div>
+                                            <div class="col-md-3half">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="NoCeil" id="NoCeil" />
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="row">
+                                            <div class="col-md-5 pr-0">
+                                                <label class="" for="form_control_1">No. of Transformers</label>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="NoTransformers" id="NoTransformers" />
+
+                                            </div>
+                                            <div class="col-md-3 pr-0">
+                                                <label class="" for="form_control_1">Total KVA</label>
+                                            </div>
+                                            <!-- <div class="col-md-1"></div> -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="row">
+                                            <div class="col-md-6 pr-0">
+                                                <label class="" for="form_control_1">No. of Lighting Outlets</label>
+                                            </div>
+                                            <div class="col-md-5">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="NoLightingOutlets" id="NoLightingOutlets" />
+
+                                            </div>
+                                            <div class="col-md-1"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="row">
+                                            <div class="col-md-4half">
+                                                <label class="" for="form_control_1">No. of Hot Tubs</label>
+                                            </div>
+                                            <div class="col-md-6half">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="NoHotTubs" id="NoHotTubs" />
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="row">
+                                            <div class="col-md-3 pr-0">
+                                                <label class="" for="form_control_1">Generators </label>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <input class="form-control viewreadonly" readonly name="Generators" id="Generators" />
+
+                                            </div>
+                                            <div class="col-md-3 pr-0">
+                                                <label class="" for="form_control_1">Total KVA</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="row">
+                                            <div class="col-md-6 pr-0">
+                                                <label class="" for="form_control_1">No. of Lighting Fixtures</label>
+                                            </div>
+                                            <div class="col-md-5">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="NoLightingFixtures" id="NoLightingFixtures" />
+
+                                            </div>
+                                            <div class="col-md-1"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-5">
+                                        <div class="row">
+                                            <div class="col-md-3half pr-0">
+                                                <label class="" for="form_control_1">Swimming Pool</label>
+                                            </div>
+                                            <div class="col-md-8half pr-0">
+                                                <div class="md-radio-inline">
+                                                    <div class="md-radio mr-0">
+                                                        <input type="radio" disabled value="AboveGround" id="SwimmingPool1" name="SwimmingPool" class="md-radiobtn">
+                                                        <label for="SwimmingPool1" value="Yes">
+                                                            <span></span>
+                                                            <span class="check"></span>
+                                                            <span class="box"></span> Above grnd.
+                                                        </label>
+                                                    </div>
+                                                    <div class="md-radio">
+                                                        <input type="radio" disabled value="InGround" id="SwimmingPool2" name="SwimmingPool" class="md-radiobtn">
+                                                        <label for="SwimmingPool2">
+                                                            <span></span>
+                                                            <span class="check"></span>
+                                                            <span class="box"></span> In-grnd.
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <!-- <div class="col-md-2">
+                                            <span class="btn btn-primary" id="SwimmingPoolUncheck" title="Uncheck" name="SwimmingPoolUncheck">Uncheck</span>
+                                        </div> -->
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="row">
+                                            <div class="col-md-6 pr-0">
+                                                <label class=" " for="form_control_1">No. of Oil Burners</label>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="NoOilBanners" id="NoOilBanners" />
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="row">
+                                            <div class="col-md-6half pr-0">
+                                                <label class="" for="form_control_1">No. of Emergency Lighting Battery Units</label>
+                                            </div>
+                                            <div class="col-md-4half">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="NoEmergencyLightingBattery" id="NoEmergencyLightingBattery" />
+
+                                            </div>
+
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="row">
+                                            <div class="col-md-4half pr-0">
+                                                <label class="" for="form_control_1">No. of Receptacle Outlets</label>
+                                            </div>
+                                            <div class="col-md-7half">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="NoReceptacleOutlets" id="NoReceptacleOutlets" />
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <div class="row">
+                                            <div class="col-md-4 pr-0">
+                                                <label class=" " for="form_control_1">Fire Alarms</label>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="FireAlarms" id="FireAlarms" />
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="row">
+                                            <div class="col-md-4half">
+                                                <label class=" " for="form_control_1">No. Zones</label>
+                                            </div>
+                                            <div class="col-md-5half">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="NoZones" id="NoZones" />
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="row">
+                                            <div class="col-md-5half pr-0">
+                                                <label class="" for="form_control_1">No. of Switches</label>
+                                            </div>
+                                            <div class="col-md-5half">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="NoSwitches" id="NoSwitches" />
+
+                                            </div>
+                                            <!-- <div class="col-md-1"></div> -->
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="row">
+                                            <div class="col-md-6half pr-0">
+                                                <label class="" for="form_control_1">No. of Gas Burners</label>
+                                            </div>
+                                            <div class="col-md-5half">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="NoGasBurners" id="NoGasBurners" />
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="row">
+                                            <div class="col-md-6half">
+                                                <label class=" " for="form_control_1">No. of Detection and Initiating Devices</label>
+                                            </div>
+                                            <div class="col-md-4half">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="NoDetection" id="NoDetection" />
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="row">
+                                            <div class="col-md-5 pr-0">
+                                                <label class=" " for="form_control_1">No. of Ranges</label>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="NoRanges" id="NoRanges" />
+
+                                            </div>
+
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <label for="form_control_1">No. of Air Cond.</label>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="NoAirCond" id="NoAirCond" />
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="row">
+                                            <div class="col-md-3 pr-0">
+                                                <label class=" " for="form_control_1">Total Tons</label>
+                                            </div>
+                                            <div class="col-md-8">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="TotalTons" id="TotalTons" />
+
+                                            </div>
+                                            <div class="col-md-1"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <label class=" " for="form_control_1">No. of Alerting Devices</label>
+                                            </div>
+                                            <div class="col-md-5">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="NoAlertingDevices" id="NoAlertingDevices" />
+
+                                            </div>
+                                            <div class="col-md-1"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="row">
+                                            <div class="col-md-6 pr-0">
+                                                <label for="form_control_1">No. of Waste Disposers</label>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="NoWasteDisposers" id="NoWasteDisposers" />
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <div class="col-md-8">
+                                        <div class="row">
+                                            <div class="col-md-3">
+                                                <label class=" " for="form_control_1"><b>Heat Pump Totals :</b></label>
+                                            </div>
+                                            <div class="col-md-9">
+                                                <div class="row">
+                                                    <div class="col-md-3">
+                                                        <div class="row">
+                                                            <div class="col-sm-6">
+                                                                <label class="" for="form_control_1">Number</label>
+                                                            </div>
+                                                            <div class="col-sm-6">
+                                                                <input class="form-control viewreadonly" readonly placeholder="" name="HPTNumber" id="HPTNumber" />
+
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-1"></div>
+                                                    <div class="col-md-3">
+                                                        <div class="row">
+                                                            <div class="col-sm-4">
+                                                                <label class="" for="form_control_1">Tons</label>
+                                                            </div>
+                                                            <div class="col-sm-8">
+                                                                <input class="form-control viewreadonly" readonly placeholder="" name="HPTTons" id="HPTTons" />
+
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-1"></div>
+                                                    <div class="col-md-3">
+                                                        <div class="row">
+                                                            <div class="col-sm-4">
+                                                                <label class="" for="form_control_1">KW</label>
+                                                            </div>
+                                                            <div class="col-sm-8">
+                                                                <input class="form-control viewreadonly" readonly placeholder="" name="HPTKW" id="HPTKW" />
+
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="row">
+                                            <div class="col-md-5half">
+                                                <label class="" for="form_control_1"> No. of Dishwashers</label>
+                                            </div>
+                                            <div class="col-md-6half">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="NoDishwashers" id="NoDishwashers" />
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="row">
+                                            <div class="col-md-8">
+                                                <label class="" for="form_control_1">No. of Self-Contained Detection/Alerting Devices</label>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="NoSelfContained" id="NoSelfContained" />
+
+                                            </div>
+                                            <div class="col-md-1"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="row">
+                                            <div class="col-md-4 pr-0">
+                                                <label class="" for="form_control_1">Space/Area Heating KW</label>
+                                            </div>
+                                            <div class="col-md-8">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="SpaceHeatingKW" id="SpaceHeatingKW" />
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="row">
+                                            <div class="col-md-1half">
+                                                <label class="" for="form_control_1"><b>Local</b></label>
+                                            </div>
+                                            <div class="col-md-10halfs pr-0">
+                                                <div class="md-radio-inline">
+                                                    <div class="md-radio">
+                                                        <input type="radio" disabled value="Muncipal" id="Local1" name="Local" class="md-radiobtn">
+                                                        <label for="Local1">
+                                                            <span></span>
+                                                            <span class="check"></span>
+                                                            <span class="box"></span>Muncipal Connection</label>
+                                                    </div>
+                                                    <div class="md-radio">
+                                                        <input type="radio" disabled value="Other" id="Local2" name="Local" class="md-radiobtn">
+                                                        <label for="Local2">
+                                                            <span></span>
+                                                            <span class="check"></span>
+                                                            <span class="box"></span>Other </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <!-- <div class="col-md-3">
+                                        <span class="btn btn-primary" id="LocalUncheck" title="Uncheck" name="LocalUncheck">Uncheck</span>
+                                    </div> -->
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="row">
+                                            <div class="col-md-5half">
+                                                <label class="" for="form_control_1">No. of Dryers</label>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="NoDryers" id="NoDryers" />
+
+                                            </div>
+                                            <div class="col-md-1"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="row">
+                                            <div class="col-md-6half pr-0">
+                                                <label class="" for="form_control_1">Heating Appliances</label>
+                                            </div>
+                                            <div class="col-md-5half">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="HeatingAppliances" id="HeatingAppliances" />
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="row">
+                                            <div class="col-md-7half">
+                                                <label class="" for="form_control_1">Security Systems: No. of Devices or its Equivalent</label>
+                                            </div>
+                                            <div class="col-md-3half">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="SecuritySystems" id="SecuritySystems" />
+
+                                            </div>
+                                            <div class="col-md-1"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="row">
+                                            <div class="col-md-4half pr-0">
+                                                <label class="" for="form_control_1">No. of Signs</label>
+                                            </div>
+                                            <div class="col-md-7">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="NoSigns" id="NoSigns" />
+
+                                            </div>
+                                            <div class="col-md-1"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="row">
+                                            <div class="col-md-5 pr-0">
+                                                <label class="" for="form_control_1">No. of Ballasts</label>
+                                            </div>
+                                            <div class="col-md-7">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="NoBallasts" id="NoBallasts" />
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="row">
+                                            <div class="col-md-5half pr-0">
+                                                <label class="" for="form_control_1"> No. of Water Heaters</label>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="NoWaterHeaters" id="NoWaterHeaters" />
+
+                                            </div>
+                                            <label class="col-md-1" for="form_control_1">KW</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="row">
+                                            <div class="col-md-5 pr-0">
+                                                <label class="" for="form_control_1">No. of Motors</label>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="NoMotors" id="NoMotors" />
+
+                                            </div>
+                                            <div class="col-md-1"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-5">
+                                        <div class="row">
+                                            <div class="col-md-6half">
+                                                <label class="" for="form_control_1">No. of Hydromassage Bathtubs</label>
+                                            </div>
+                                            <div class="col-md-5half">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="NoHydromassageBathtubs" id="NoHydromassageBathtubs" />
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <div class="col-md-8">
+                                        <div class="row">
+                                            <div class="col-md-5 pr-0">
+                                                <label class="" for="form_control_1"> Data Wiring: No. of Devices or its Equivalent</label>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="NoDataWiring" id="NoDataWiring" />
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="row">
+                                            <div class="col-md-3">
+                                                <label class="" for="form_control_1">Total HP</label>
+                                            </div>
+                                            <div class="col-md-9">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="TotalHP" id="TotalHP" />
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <div class="col-md-8">
+                                        <div class="row">
+                                            <div class="col-md-6half pr-0">
+                                                <label class="" for="form_control_1">Telecommunications Wiring: No. of Devices or its Equivalent</label>
+                                            </div>
+                                            <div class="col-md-4half">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="NoTeleWiring" id="NoTeleWiring" />
+
+                                            </div>
+                                            <div class="col-md-1"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="row">
+                                            <div class="col-md-2">
+                                                <label class="" for="form_control_1">Other</label>
+                                            </div>
+                                            <div class="col-md-10">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="Other" id="Other" />
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <div class="row">
+                                            <div class="col-md-5 pr-0">
+                                                <label class="" for="form_control_1">Work to Start</label>
+                                            </div>
+                                            <div class="col-md-7">
+                                                <input class="form-control form-control-inline date-picker viewreadonly" disabled="" size="10" type="text" name="WorkStartDate" />
+                                                <span class="help-block"> Select date </span>
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <label class="col-md-7" for="form_control_1">Inspections to be requested in accordance with MEC Rule 10, and upon completion.</label>
+                                    <div class="form-group form-md-line-input">
+
+                                        <div class="row"></div>
+                                        <div class="col-md-2half">
+                                            <label class="" for="form_control_1">Number of Inspections requested</label>
+                                        </div>
+
+                                        <div class="form-group form-md-line-input">
+                                            <div class="col-md-3">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="NoOfInps" id="NoOfInps" />
+                                                <div class="form-control-focus"> </div>
+                                            </div>
+
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- End section 5 -->
+
+                    <!--- Section 6 start -->
+                    <div class="sectionmargin">
+                        <div class="form-group form-md-line-input section-border">
+                            <div class="col-md-12 title-bg">
+                                <div class="row">
+                                    <label class="col-md-12">
+                                        <b>SECTION 6 - CONTRACTOR INFORMATION</b>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="row"></div>
+
+                            <div class="form-group form-md-line-input">
+                            <div class="row">
+                            <div class="col-md-6 pr-0">
+                                <div class="md-radio-inline">
+                                    <div class="md-radio">
+                                        <input type="radio" id="Homeowner1" disabled name="Homeowner" class="md-radiobtn" value="Homeowner">
+                                        <label for="Homeowner1">
+                                            <span></span>
+                                            <span class="check"></span>
+                                            <span class="box"></span> Homeowner </label>
+                                    </div>
+                                        <div class="md-radio">
+                                            <input type="radio" id="Homeowner2" name="Homeowner" class="md-radiobtn" value="Applicant" disabled>
+                                            <label for="Homeowner2">
+                                                <span></span>
+                                                <span class="check"></span>
+                                                <span class="box"></span> Applicant or Agent </label>
+                                        </div>
+                                           <div class="md-radio">
+                                        <input type="radio" id="Homeowner3" name="Homeowner" class="md-radiobtn" value="Contractor" disabled>
+                                        <label for="Homeowner3">
+                                            <span></span>
+                                            <span class="check"></span>
+                                            <span class="box"></span> Contractor </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                            <div class="row">
+                                <div class="form-group form-md-line-input">
+                                    <div class="col-md-12">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="row">
+                                                    <div class="col-md-3">
+                                                        <label class="" for="form_control_1">Name</label>
+                                                    </div>
+                                                    <div class="col-md-8">
+                                                        <!-- <input type="text" name="ConNameSelect" id="ConNameSelect " class="form-control viewreadonly" readonly  /> -->
+                                                        <input type="text" class="form-control viewreadonly" readonly="" name="ConName" id="ConName">
+                                                    </div>
+                                                    <div class="col-md-1"></div>
+                                                </div>
+                                            </div>
+                                            <!-- <div class="col-md-6">
+                                                <div class="row">
+                                                    <div class="col-md-3">
+                                                        <label class="" for="form_control_1">Type</label>
+                                                    </div>
+                                                    <div class="col-md-9">
+                                                        <input class="form-control viewreadonly" readonly placeholder="" name="ConLicType" id="ConLicType" />
+                                                    </div>
+                                                </div>
+                                            </div> -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="row">
+                                            <div class="col-md-3">
+                                                <label class="" for="form_control_1">LIC No.</label>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="ConLicNum" id="ConLicNum" />
+
+                                            </div>
+                                            <div class="col-md-2">
+                                            <a onclick="verifymadol();" class="btn btn-primary" name="LCSLicNum_verify" id="LCSLicNum_verify">Verify</a>
+                                        </div>
+                                            <div class="col-md-1"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="row">
+                                            <div class="col-md-3 pr-0">
+                                                <label class="" for="form_control_1">Expiration Date</label>
+                                            </div>
+                                            <div class="col-md-9">
+                                                <input class="form-control form-control-inline date-picker viewreadonly" disabled="" type="text" name="ConLicExpDate" id="ConLicExpDate" />
+                                                <span class="help-block"> Select date </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="row">
+                                            <div class="col-md-3">
+                                                <label class="" for="form_control_1">Firm Name</label>
+                                            </div>
+                                            <div class="col-md-8">
+                                                <input type="text" class="form-control viewreadonly" readonly name="BusName" id="BusName">
+
+                                            </div>
+                                            <div class="col-md-1"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="row">
+                                            <div class="col-md-3">
+                                                <label class="" for="form_control_1">Type</label>
+                                            </div>
+                                            <!-- <div class="col-md-9">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="BusLicType" id="BusLicType" />
+                                            </div> -->
+                                            <div class="col-md-2 control-label">
+                                            <div class="md-checkbox">
+                                                <input type="checkbox" value="A1" id="A1" name="TypeOfFirm[]" class="md-check" disabled>
+                                                <label for="A1">
+                                                    <span></span>
+                                                    <span class="check"></span>
+                                                    <span class="box"></span>A-1 </label>
+                                            </div>
+                                        </div>
+                                        <label class="col-md-1" style="margin-top: 8px;">Or</label>
+                                        <div class="col-md-2 control-label">
+                                            <div class="md-checkbox">
+                                                <input type="checkbox" value="C1" id="C1" name="TypeOfFirm[]" class="md-check" disabled>
+                                                <label for="C1">
+                                                    <span></span>
+                                                    <span class="check"></span>
+                                                    <span class="box"></span>C-1</label>
+                                            </div>
+                                        </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="row">
+                                            <div class="col-md-3">
+                                                <label class="" for="form_control_1">
+                                                    </span>LIC No.</label>
+                                            </div>
+                                            <div class="col-md-8">
+                                                <input class="form-control viewreadonly" readonly placeholder="" name="BusLicNum" id="BusLicNum" />
+
+                                            </div>
+                                            <div class="col-md-1"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="row">
+                                            <div class="col-md-3">
+                                                <label class="" for="form_control_1">
+                                                    </span>Expiration Date</label>
+                                            </div>
+                                            <div class="col-md-9">
+                                                <input class="form-control form-control-inline date-picker viewreadonly" disabled="" type="text" name="BusLicExpDate" id="BusLicExpDate" />
+                                                <span class="help-block"> Select date </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div> -->
+ 
+                            <!-- 3 new Contractors -->
+                        <div class="form-group form-md-line-input">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <label class="" for="form_control_1">
+                                            Master/Systems Licensee:</label>
+                                        </div>
+                                        <div class="col-md-8">
+                                            <input class="form-control viewreadonly" readonly name="MasterLicName" id="MasterLicName" />
+                                            <div class="form-control-focus"> </div>
+                                        </div>
+                                        <div class="col-md-1"></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <label class="" for="form_control_1">
+                                                LIC No.</label>
+                                        </div>
+                                        <div class="col-md-8">
+                                            <input class="form-control viewreadonly" readonly name="MasterLicNum" id="MasterLicNum" />
+                                            <div class="form-control-focus"> </div>
+                                        </div>
+                                        <div class="col-md-1"></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <label class="" for="form_control_1">
+                                                Expiration Date</label>
+                                        </div>
+                                        <div class="col-md-9">
+                                            <input class="form-control form-control-inline date-picker" readonly="" type="text" name="MasterLicExpDate" id="MasterLicExpDate" disabled />
+                                            <span class="help-block"> Select date </span>
+                                            <div class="form-control-focus"> </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group form-md-line-input">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <label class="" for="form_control_1">
+                                            Journeyman Licensee:</label>
+                                        </div>
+                                        <div class="col-md-8">
+                                            <input class="form-control viewreadonly" readonly name="JourneymanLicName" id="JourneymanLicName" />
+                                            <div class="form-control-focus"> </div>
+                                        </div>
+                                        <div class="col-md-1"></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <label class="" for="form_control_1">
+                                                LIC No.</label>
+                                        </div>
+                                        <div class="col-md-8">
+                                            <input class="form-control viewreadonly" readonly name="JourneymanLicNum" id="JourneymanLicNum" />
+                                            <div class="form-control-focus"> </div>
+                                        </div>
+                                        <div class="col-md-1"></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <label class="" for="form_control_1">
+                                                Expiration Date</label>
+                                        </div>
+                                        <div class="col-md-9">
+                                            <input class="form-control form-control-inline date-picker" readonly="" type="text" name="JourneymanLicExpDate" id="JourneymanLicExpDate" disabled />
+                                            <span class="help-block"> Select date </span>
+                                            <div class="form-control-focus"> </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group form-md-line-input">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <label class="" for="form_control_1">
+                                            Security System Business </label>
+                                        </div>
+                                        <div class="col-md-8">
+                                            <input class="form-control viewreadonly" readonly  name="SLicName" id="SLicName" />
+                                            <div class="form-control-focus"> </div>
+                                        </div>
+                                        <div class="col-md-1"></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <label class="" for="form_control_1">
+                                                S-LIC No.</label>
+                                        </div>
+                                        <div class="col-md-8">
+                                            <input class="form-control viewreadonly" readonly placeholder="" name="SLicNum" id="SLicNum" />
+                                            <div class="form-control-focus"> </div>
+                                        </div>
+                                        <div class="col-md-1"></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="row">
+                                        <div class="col-md-3">
+                                            <label class="" for="form_control_1">
+                                                Expiration Date</label>
+                                        </div>
+                                        <div class="col-md-9">
+                                            <input class="form-control form-control-inline date-picker" readonly="" type="text" name="SLicExpDate" id="SLicExpDate" disabled />
+                                            <span class="help-block"> Select date </span>
+                                            <div class="form-control-focus"> </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- End 3 new Cont -->
+
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="row">
+                                            <div class="col-md-3">
+                                                <label class="">Street Number</label>
+                                            </div>
+                                            <div class="col-md-8">
+                                                <input type="text" class="form-control viewreadonly" readonly name="ConStNum" id="ConStNum">
+
+                                            </div>
+                                            <div class="col-md-1"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="row">
+                                            <div class="col-md-3">
+                                                <label class="">Street Name</label>
+                                            </div>
+                                            <div class="col-md-9">
+                                                <input type="text" class="form-control viewreadonly" readonly name="ConStName" id="ConStName">
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="row">
+                                            <div class="col-md-4half">
+                                                <label class="">City</label>
+                                            </div>
+                                            <div class="col-md-7">
+                                                <input type="text" class="form-control viewreadonly" readonly name="ConCity" id="ConCity" />
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="row">
+                                            <div class="col-md-2">
+                                                <label class="">State</label>
+                                            </div>
+                                            <div class="col-md-8">
+                                                <input type="text" class="form-control viewreadonly" readonly name="ConState" id="ConState">
+
+                                            </div>
+                                            <div class="col-md-1"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="row">
+                                            <div class="col-md-2">
+                                                <label class="">Zip</label>
+                                            </div>
+                                            <div class="col-md-10">
+                                                <input type="text" class="form-control viewreadonly" readonly name="ConZip" id="ConZip">
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="row">
+                                            <div class="col-md-3">
+                                                <label class="" for="form_control_1">Telephone No.</label>
+                                            </div>
+                                            <div class="col-md-8">
+                                                <input type="text" class="form-control viewreadonly" readonly placeholder="" name="ConPhone" id="ConPhone">
+
+                                            </div>
+                                            <div class="col-md-1"></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="row">
+                                            <div class="col-md-3 pr-0">
+                                                <label class="" for="form_control_1"> Alternate Tel. No.</label>
+                                            </div>
+                                            <div class="col-md-9">
+                                                <input type="text" class="form-control viewreadonly" readonly placeholder="" name="ConAltPhone" id="ConAltPhone">
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <div class="col-md-1half">
+                                        <label class="">Email</label>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <input type="text" class="form-control viewreadonly" readonly name="ConEmail" id="ConEmail">
+
+                                    </div>
+                                    <!-- <div class="col-md-2">
+                                        <div class="md-checkbox-inline">
+                                            <div class="md-checkbox">
+                                                <input type="checkbox" id="Homeowner" name="Homeowner" class="md-check" disabled>
+                                                <label for="Homeowner">
+                                                    <span></span>
+                                                    <span class="check"></span>
+                                                    <span class="box"></span>Homeowner or authorized agent
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div> -->
+                                </div>
+                            </div>
+
+                            <!-- <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <label class="col-md-7">Per M.G.L.c. 147, s. 57-61, security work requires Department of public Safety "S" License</label>
+                                    <label class="col-md-1 "> Lic. No. </label>
+                                    <div class="col-md-4">
+                                        <input type="text" class="form-control viewreadonly" readonly name="DeptPublicSafetyLICNo" id="DeptPublicSafetyLICNo">
+
+                                    </div>
+                                </div>
+                            </div> -->
+
+                        </div>
+                    </div>
+                    <!--- End Section 6 -->
+
+                    <!-- section Start -->
+                    <div class="sectionmargin hideonprint">
+                        <div class="form-group form-md-line-input section-border">
+
+
+                            <div class="col-md-12 title-bg">
+                                <div class="row">
+                                    <label class="col-md-12 ">
+                                        <b>WORKER'S COMPENSATION INSURANCE AFFIDAVIT (M.G.L. c. 152 ß 25C(6)) </b>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="row"></div>
+
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <div class="form-group form-md-line-input">
+                                        <label class=""><a class="btn btn-primary" data-target="#show_workers" id="show_workers_div" data-toggle="modal" data-original-title="" title="Open Affidavit" name="show_workers_div">Worker's comp form</a>
+
+                                        </label>
+
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="show_workers" class="modal fade" tabindex="-1" aria-hidden="true" data-backdrop="static" data-keyboard="false"></div>
+                        </div>
+                    </div>
+                    <!--- Section End -->
+
+
+                    <!--- Section 7 BEGIN -->
+                    <div class="sectionmargin">
+                        <div class="form-group form-md-line-input section-border">
+                            <div class="col-md-12 title-bg">
+                                <div class="row">
+                                    <label class="col-md-4">
+                                        <b>SECTION 7 - ESTIMATED COST </b>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="row"></div>
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="row">
+                                            <div class="col-md-4half pr-0">
+                                                <label class="control-label" for="form_control_1">Estimated Value of Work</label>
+                                            </div>
+                                            <div class="col-md-7half">
+                                                <div class="input-group">
+                                                    <span class="input-group-addon pb-0 pl-0"><i class="fa fa-dollar"></i></span>
+                                                    <input class="form-control control-label inline-text-box viewreadonly " readonly="" type="number" name="EstimatedCost" id="EstimatedCost" />
+
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="row">
+                                            <div class="col-md-5">
+                                                <label class="" for="form_control_1">(When by municipal policy.)</label>
+                                            </div>
+                                            <div class="col-md-7">
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                    <!--- section 7 end -->
+                    <!--- End Common Information  -->
+
+
+
+                    <!--- Section 8 start -->
+                    <div class="sectionmargin">
+                        <div class="form-group form-md-line-input section-border">
+
+                            <div class="col-md-12 title-bg">
+                                <div class="row">
+                                    <label class="col-md-12 "><b>SECTION 8 - OWNER'S INSURANCE/AUTHORIZATION</b></label>
+                                </div>
+                            </div>
+                            <div class="row"></div>
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <div class="form-group form-md-line-input">
+                                        <div class="row">
+                                            <label class="col-md-12"><b>INSURANCE COVERAGE :</b></label>
+                                        </div>
+                                        <div class="row">
+                                            <label class="col-md-12">I have a current liability insurance policy or its substantial equivalent which meets the requirements of MGL Ch. 142.</label>
+                                            <div class="col-md-12 pr-0">
+                                                <div class="md-radio-inline">
+                                                    <div class="md-radio">
+                                                        <input type="radio" disabled value="Owner" id="InsuranceCov1" name="InsuranceCoverage" class="md-radiobtn">
+                                                        <label for="InsuranceCov1" value="Yes">
+                                                            <span></span>
+                                                            <span class="check"></span>
+                                                            <span class="box"></span> Yes </label>
+                                                    </div>
+                                                    <div class="md-radio">
+                                                        <input type="radio" disabled value="Contractor" id="InsuranceCov2" name="InsuranceCoverage" class="md-radiobtn">
+                                                        <label for="InsuranceCov2">
+                                                            <span></span>
+                                                            <span class="check"></span>
+                                                            <span class="box"></span> No </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <!-- <div class="col-md-7">
+                                            <span class="btn btn-primary" id="InsuranceCoverageUncheck" title="uncheck" name="InsuranceCoverageUncheck">Uncheck</span>
+                                        </div> -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row display-none" id="coverage">
+                                <div class="form-group form-md-line-input">
+                                    <label class="col-md-12">Please indicate the type coverage by checking the appropriate box.</label>
+                                </div>
+                            </div>
+
+                            <div class="row display-none" id="coverage1">
+                                <div class="col-md-12 pr-0">
+                                    <div class="md-radio-inline">
+                                        <div class="md-radio">
+                                            <input type="radio" disabled value="Owner" id="InsurancePolicy" name="Insurance" class="md-radiobtn">
+                                            <label for="InsurancePolicy" value="Yes">
+                                                <span></span>
+                                                <span class="check"></span>
+                                                <span class="box"></span> A liability insurance policy </label>
+                                        </div>
+                                        <div class="md-radio">
+                                            <input type="radio" disabled value="Contractor" id="Indemnity" name="Insurance" class="md-radiobtn">
+                                            <label for="Indemnity">
+                                                <span></span>
+                                                <span class="check"></span>
+                                                <span class="box"></span> Other type of indemnity </label>
+                                        </div>
+
+                                        <div class="md-radio">
+                                            <input type="radio" disabled value="Contractor" id="Bond" name="Insurance" class="md-radiobtn">
+                                            <label for="Bond">
+                                                <span></span>
+                                                <span class="check"></span>
+                                                <span class="box"></span> Bond </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <label class="col-md-12"><b>OWNER'S INSURANCE WAIVER :</b></label>
+                                </div>
+
+                                <div class="row">
+                                    <label class="col-md-12"> I am aware that the licensee does not have the insurance coverage required by Chapter 142 of the Massachusetts General Laws, and that my signature on this permit application waives this requirement.</b></label>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-12 pr-0">
+                                        <div class="md-radio-inline">
+                                            <div class="md-radio">
+                                                <input type="radio" disabled value="Owner" id="Owner" name="InsuranceWaiver" class="md-radiobtn">
+                                                <label for="Owner">
+                                                    <span></span>
+                                                    <span class="check"></span>
+                                                    <span class="box"></span> Owner </label>
+                                            </div>
+                                            <div class="md-radio">
+                                                <input type="radio" disabled value="Agent" id="Agent" name="InsuranceWaiver" class="md-radiobtn">
+                                                <label for="Agent">
+                                                    <span></span>
+                                                    <span class="check"></span>
+                                                    <span class="box"></span> Agent </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- <div class="col-md-7">
+                                    <span class="btn btn-primary" id="InsuranceWaiver1" title="uncheck" name="InsuranceWaiver1">Uncheck</span>
+                                </div> -->
+                                </div>
+                            </div>
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <label class="col-md-1half control-label pr-0">Owner Email</label>
+                                    <div class="col-md-3half">
+                                        <input type="text" class="form-control viewreadonly" readonly name="OwnerEmailAutoFill" id="OwnerEmail">
+                                    </div>
+
+                                    <label class="col-md-1 control-label">
+                                        <div class="text-center">OR</div>
+                                    </label>
+                                    <div class="col-md-5half control-label">
+                                        <div class="md-checkbox">
+                                            <input type="checkbox" id="CopySignedContract" name="CopySignedContract" class="md-check" disabled>
+                                            <label for="CopySignedContract">
+                                                <span></span>
+                                                <span class="check"></span>
+                                                <span class="box"></span>Copy of Signed Contract to be attached after submitting application </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row form-group form-md-line-input">
+                                <div class="row">
+                                    <div class="col-md-9">
+                                        <div class="md-checkbox">
+                                            <input type="checkbox" disabled id="OwnerAuthDec" name="OwnerAuthDec" class="md-check">
+                                            <label for="OwnerAuthDec">
+                                                <span></span>
+                                                <span class="check"></span>
+                                                <span class="box"></span><b>I do hereby certify under the pains & penalties of perjury that the information provided above is true and correct.</b></label>
+                                        </div>
+                                    </div>
+
+
+                                    <div class="col-md-3">
+                                        <div class="row">
+                                            <div class="col-md-3">
+                                                <label class="col-md-1 control-label">Date</label>
+                                            </div>
+                                            <div class="col-md-9">
+                                                <input class="form-control form-control-inline date-picker viewreadonly" disabled="" readonly="" type="text" name="OwnerAuthDate" id="OwnerAuthDate" />
+                                                <span class="help-block"> Select date </span>
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+
+
+                        </div>
+                    </div>
+                    <!--- Section 8 end -->
+
+                    <!--- Section 9 BEGIN -->
+                    <div class="sectionmargin">
+                        <div class="form-group form-md-line-input section-border">
+                            <div class="col-md-12 title-bg">
+                                <div class="row">
+                                    <label class="col-md-4">
+                                        <b>SECTION 9 - DECLARATION</b>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="row"></div>
+
+
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <label class="col-md-12">I,
+                                        <div class="display-inline">
+                                            <input type="text" class="form-control inline-text-box viewreadonly  display-inline" readonly="" placeholder="" name="OwnerAgent" id="OwnerAgent">
+
+                                        </div>
+                                        as Owner/Authorized Agent hereby declare that the statements and information on the foregoing application are true and accurate, to the best of my knowledge and belief. Signed under the pains and penalties of perjury.
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="form-group form-md-line-input">
+                                <div class="row">
+                                    <div class="col-md-8">
+                                        <div class="md-checkbox">
+                                            <input type="checkbox" disabled id="Declaration" name="Declaration" class="md-check">
+                                            <label for="Declaration">
+                                                <span></span>
+                                                <span class="check"></span>
+                                                <span class="box"></span><b>I do hereby certify under the pains & penalties of perjury that the information provided above is true and correct.</b></label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-1"></div>
+                                    <div class="col-md-3">
+                                        <div class="row">
+                                            <div class="col-md-3">
+                                                <label class="col-md-1 control-label">Date</label>
+                                            </div>
+                                            <div class="col-md-9">
+                                                <input class="form-control form-control-inline date-picker viewreadonly" disabled="" readonly="" type="text" name="DeclarationDate" id="DeclarationDate" />
+                                                <span class="help-block"> Select date </span>
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                    <!--- section 9 end -->
+
+                    <!--  <div class="form-group form-md-line-input">
+                    <div class="row">
+                        <div class="col-md-10">
+                            <label><b><font color="red">* Indicates Mandatory Field.</font></b></label>
+                        </div>
+                    </div>
+                </div> -->
+
+                    <div class="form-actions">
+
+                        <div class="row">
+
+                            <div class="col-md-offset-5 col-md-3">
+
+                                <!-- <button type="submit" class="btn green" id="submit_form" name="submit_form">Submit</button> -->
+                                <button type="button" class="btn green print_app" id="print_app" name="print_app">Print</button>
+                                <button type="button" class="btn default exitView" id="exitView" name="exitView">Exit</button>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </form>
+        </div>
+    </div>
+</div>
+  
+<!--common js part-->
+<script type="text/javascript">
+var UserId="";
+
+var pageURL = $(location).attr("href"); //ControllerURL = "controller";
+
+if (pageURL.indexOf("applications.php") > 0 || pageURL.indexOf("buildinghome.php") > 0 || pageURL.indexOf("archivedapplication.php") > 0 ||  pageURL.indexOf("deletedapplications.php") > 0 ||  pageURL.indexOf("printapplication.php") > 0 ||  pageURL.indexOf("inspectionhome.php") > 0) {
+  Dept="";
+    ControllerURL = "controller";
+    lochref = 'buildinghome.php';
+    JsURL= "js";
+} else if (pageURL.indexOf("userapplication.php") > 0 || pageURL.indexOf("userindex.php") > 0 ||  pageURL.indexOf("publicview.php") > 0 ||  pageURL.indexOf("publicview_.php") > 0) {
+  Dept="building/";
+    ControllerURL = Dept+"controller";
+     JsURL= Dept+"js";
+    lochref = 'userindex.php';
+}else if (pageURL.indexOf("renewalhome.php") > 0 ) {
+    JsURL= "js";
+    Dept="";
+    ControllerURL = "controller";
+    lochref = 'renewalhome.php';
+}
+
+$(".exitView").click(function()
+	{
+			
+		$('#details_section').hide();
+     $('body,html').animate({
+         scrollTop: 0
+     });
+        
+	});
+
+function pad(number, length) 
+  {
+   
+    var str = '' + number;
+    while (str.length < length) 
+    {
+        str = '0' + str;
+    }
+   
+    return str;
+
+  }
+
+          // Form PDF Download
+  var pageURL = $(location).attr("href");
+  if (pageURL.indexOf("applications.php") > 0 || pageURL.indexOf("buildinghome.php") > 0 )
+      {
+          Dept= '';
+      }
+  else if (pageURL.indexOf("userapplication.php") > 0 || pageURL.indexOf("userindex.php") > 0 ||  pageURL.indexOf("publicview.php") > 0 ||  pageURL.indexOf("publicview_.php") > 0 || pageURL.indexOf("thankyoupage.php"))
+      {
+          Dept= 'building/';
+      }
+
+   $('#btnDownloadResidentialPlans').attr('href', Dept+'ResidentialPlansExaminerReview.pdf');
+  $('#btnDownloadResidentialPlans').attr('download','ResidentialPlansExaminerReview.pdf');
+ 
+
+//trench,sheet metal,ci
+function getAppDetails(response)
+    {
+          //Application Details
+
+                 var arr = $.parseJSON(response);
+                 var ApplicationDetail = arr['Application']; 
+                 var PaymentDetail = arr['PaymentDetails'];
+                 var AmountPayable = arr['AmountPayable'];
+                 var AutoIncrePrefix= arr['AutoIncrePrefix'];
+                 var FeePaid= PaymentDetail['AmountPaid'];
+                 // var Receipt1= PaymentDetail['AutoIncreId'];
+                 // //alert(FeePaid);
+
+                 // if(Receipt1==null || Receipt1=="null" || Receipt1==""){
+                 //     var Receipt='';
+                 // }else{
+                 //   var ReceiptNo= pad(Receipt1,4);
+                 //    var Receipt=AutoIncrePrefix+ReceiptNo;
+                 // }
+                 var Receipt1= PaymentDetail['ReceiptNumber'];
+                 if(Receipt1==null || Receipt1=="null" || Receipt1==""){
+                     var Receipt='';
+                 }else{
+                    var Receipt=Receipt1;
+                 }
+
+                 var DatePaid= convertdate(PaymentDetail['PaymentDate']);
+                 var AutoIncre=pad(ApplicationDetail['AutoIncreId'],4);
+                 var AutoId=AutoIncrePrefix+AutoIncre;
+
+                 $('input:text[name=AppNo]').val(AutoId);
+                 $('input:text[name=PermitNumber]').val(ApplicationDetail['PermitNumber']);
+                 $('input:text[name=IssueDate]').val(convertdate(ApplicationDetail['IssueDate']));
+                 $('input:text[name=FeePaid]').val(parseFloat(FeePaid).toFixed(2));
+
+
+                 $('input:text[name=FeePayable]').val(parseFloat(AmountPayable).toFixed(2));
+                 //amount payable end
+                 $('input:text[name=Receipt]').val(Receipt);
+                 //alert(DatePaid);
+                 $('input:text[name=DatePaid]').val(DatePaid);
+      }
+      // SECTION 5 - CONSTRUCTION SERVICES
+        function verify() {
+            window.open("https://madpl.mylicense.com/Verification/Search.aspx", '', 'width=850,height=550,top=50,left=50,resizable=yes,scrollbars=yes');
+        }
+
+        function verifymadol() {
+            window.open("https://occupationallicensingandpermitting.mass.gov/madol/s/license-search-page", '', 'width=850,height=550,top=50,left=50,resizable=yes,scrollbars=yes');
+        }
+        
+        function verifyhic() {
+            window.open("https://services.oca.state.ma.us/hic/licenseelist.aspx", '', 'width=850,height=550,top=50,left=50,resizable=yes,scrollbars=yes');
+        }
+
+        // Start Electrical, Plumbing, Mechnical, sheet metal
+        function verifypegsh() {
+            window.open("https://elicensing21.mass.gov/CitizenAccess/GeneralProperty/PropertyLookUp.aspx?isLicensee=Y", '', 'width=850,height=550,top=50,left=50,resizable=yes,scrollbars=yes');
+        }
+        // End Electrical, Plumbing, Mechnical, sheet metal
+        
+        // SECTION 6 -  WORKER'S COMP INSTRUCTION
+        function instruction()
+        {
+
+
+        if (pageURL.indexOf("applications.php") > 0 || pageURL.indexOf("buildinghome.php") > 0 || pageURL.indexOf("archivedapplication.php") > 0) {
+             window.open('/assets/instructions/maaffidavit/instructions.pdf');
+          } else if (pageURL.indexOf("userapplication.php") > 0 || pageURL.indexOf("userindex.php") > 0 ||  pageURL.indexOf("publicview.php") > 0 ||  pageURL.indexOf("publicview_.php") > 0) {
+           window.open('/assets/instructions/maaffidavit/instructions.pdf');
+          }
+
+
+        }
+        
+
+        //START for SheetMetal Application
+        //for Check at www.mass.gov/dpl
+        function LicenseNumCheck() {
+            window.open("//www.mass.gov/dpl", '', 'width=850,height=550,top=50,left=50,resizable=yes,scrollbars=yes');
+        }
+        //END for SheetMetal Application
+</script><script type="text/javascript">
+    var ApplicationId = "18b141c4-c309-11f1-9153-12716692ccab";
+    $.getScript(JsURL + "/electrical.js");
+</script>

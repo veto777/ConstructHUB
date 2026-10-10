@@ -4,10 +4,11 @@ import { politeFetch, PortalBlockedError } from "./polite-fetch";
 
 export function permitEyesPublicUrl(input: string): string {
   const u = new URL(input);
-  if (u.protocol !== "https:" || !/^(?:[a-z0-9-]+\.)?permiteyes\.us$/i.test(u.hostname) || u.username || u.password) {
+  if (u.protocol !== "https:" || !/^(?:[a-z0-9-]+\.)?permiteyes\.us$/i.test(u.hostname) || u.username || u.password || u.port) {
     throw new Error("Unsupported PermitEyes portal: expected the public PHP layout on permiteyes.us");
   }
   if (!/^\/[a-z0-9_-]+\/(?:[a-z0-9_-]+\.php)?$/i.test(u.pathname)) throw new Error("Unsupported PermitEyes tenant path");
+  if (u.pathname.toLowerCase().startsWith("/berkshire/")) throw new Error("PermitEyes Berkshire shared portal requires an unverified municipality filter");
   const file = u.pathname.split("/").pop()!;
   if (!/publicview\.php$/i.test(file)) u.pathname = u.pathname.replace(/[^/]*$/, "publicview.php");
   u.search = ""; u.hash = "";
@@ -78,17 +79,19 @@ export function parsePermitEyesResults(payload: unknown, layout: PermitEyesLayou
       u.search = new URLSearchParams({ application_id: id, permit_file: file, permit_editfile: link.attr("data-permit-editfile") ?? "", PermitId: link.attr("data-permit-id") ?? "" }).toString();
       sourceUrl = u.href;
     }
-    records.push({ permitNumber, databaseId: ctx.databaseId, jurisdiction: ctx.jurisdiction, address: cell(layout.address), permitType: cell(layout.type), status: cell(layout.status), description: cell(layout.description), issuedAt: permitEyesDate(cell(layout.issued)), appliedAt: permitEyesDate(cell(layout.applied)), contractorName: null, contractorLicense: null, applicantName: cell(layout.name), ownerName: null, parcel: null, valuation: null, expiresAt: null, sourceUrl, raw: { cells: row } });
+    records.push({ permitNumber, databaseId: ctx.databaseId, jurisdiction: ctx.jurisdiction, address: cell(layout.address), lat: null, lng: null, workClass: null, permitType: cell(layout.type), status: cell(layout.status), description: cell(layout.description), issuedAt: permitEyesDate(cell(layout.issued)), appliedAt: permitEyesDate(cell(layout.applied)), contractorName: null, contractorLicense: null, applicantName: cell(layout.name), ownerName: null, parcel: null, valuation: null, expiresAt: null, sourceUrl, raw: { cells: row } });
   }
   return { records, total: Number(data.recordsFiltered), rowCount: data.data.length };
 }
 
 async function read(ctx: AdapterCtx, url: string, init?: RequestInit): Promise<string> {
-  const response = await politeFetch(url, init, { minDelayMs: Math.max(1000, ctx.politeness.minDelayMs) });
+  const response = await politeFetch(url, { ...init, redirect: "manual" }, { minDelayMs: Math.max(1000, ctx.politeness.minDelayMs) });
+  if (response.status >= 300 && response.status < 400 && /login/i.test(response.headers.get("location") ?? "")) throw new PortalBlockedError(url, 401, "PermitEyes redirected to login");
   if (!response.ok) throw new Error(`PermitEyes HTTP ${response.status}: ${url}`);
   if (/login(?:user)?\.php/i.test(new URL(response.url || url).pathname)) throw new PortalBlockedError(url, 401, "PermitEyes redirected to login");
   const body = await response.text();
   if (/cf-chl-|captcha|verify you are human/i.test(body)) throw new PortalBlockedError(url, 403, "PermitEyes challenge");
+  if (/<input[^>]*type=["\']password["\']/i.test(body)) throw new PortalBlockedError(url, 401, "PermitEyes returned a login form");
   return body;
 }
 

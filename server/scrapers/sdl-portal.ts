@@ -30,9 +30,11 @@ export function sdlSearchUrl(base: string, q: { type: PermitSearchType; value: s
     if (!q.value.trim()) throw new Error("SDL requires a nonempty query");
     p.set(field, q.value.trim());
   } else {
-    // The public calendar sends Unix seconds; SDL interprets these as calendar dates.
-    p.set("psd", String(Date.parse(`${q.since}T00:00:00Z`) / 1000));
-    p.set("ped", String(Date.parse(`${q.until}T00:00:00Z`) / 1000));
+    // The public calendar sends Unix seconds, and SDL compares timestamps.
+    // Recorded same-day midnight bounds missed real permits. Pad the native
+    // range for timezone/day boundaries, then filter the returned issue dates.
+    p.set("psd", String(Date.parse(`${q.since}T00:00:00Z`) / 1000 - 86400));
+    p.set("ped", String(Date.parse(`${q.until}T00:00:00Z`) / 1000 + 2 * 86400));
   }
   url.search = p.toString();
   return url.href;
@@ -46,7 +48,7 @@ function date(value: string | null): string | null {
 }
 
 export function parseSdlResults(html: string, ctx: Pick<AdapterCtx, "databaseId" | "jurisdiction">, base: string): { records: PermitRecord[]; truncated: boolean } {
-  const $ = cheerio.load(html);
+  const $ = cheerio.load(html, { sourceCodeLocationInfo: true });
   if (/cf-chl-|captcha|verify you are human/i.test(html)) throw new PortalBlockedError(base, 403, "SDL challenge");
   if ($('input[type="password"]').length) throw new PortalBlockedError(base, 401, "SDL permit search requires login");
   const table = $("table").filter((_, e) => $(e).find("thead").text().includes("Control #") && $(e).find("thead").text().includes("Permit #")).first();
@@ -75,13 +77,14 @@ export function parseSdlResults(html: string, ctx: Pick<AdapterCtx, "databaseId"
       if (url.origin !== new URL(base).origin || !url.pathname.startsWith(new URL(base).pathname + "/building/permits/")) throw new Error("SDL returned an unexpected record link");
       sourceUrl = url.href;
     }
-    records.push({ permitNumber, databaseId: ctx.databaseId, jurisdiction: ctx.jurisdiction, address: field("Location"), status: field("Status"), issuedAt: date(field("Issue Date")), appliedAt: null, expiresAt: null, permitType: headers.includes("Subcodes") ? field("Subcodes") : null, workClass: field("Work Type"), description: field("Work Description"), parcel: null, contractorName: null, contractorLicense: null, applicantName: null, ownerName: null, valuation: null, sourceUrl, raw: { html: $.html(row) } });
+    records.push({ permitNumber, databaseId: ctx.databaseId, jurisdiction: ctx.jurisdiction, address: field("Location"), lat: null, lng: null, status: field("Status"), issuedAt: date(field("Issue Date")), appliedAt: null, expiresAt: null, permitType: headers.includes("Subcodes") ? field("Subcodes") : null, workClass: field("Work Type"), description: field("Work Description"), parcel: null, contractorName: null, contractorLicense: null, applicantName: null, ownerName: null, valuation: null, sourceUrl, raw: { html: html.slice(row.sourceCodeLocation!.startOffset, row.sourceCodeLocation!.endOffset) } });
   });
   return { records, truncated: /Only the first \d+ are displayed/i.test($.text()) };
 }
 
 async function fetchResults(ctx: AdapterCtx, base: string, url: string) {
-  const response = await politeFetch(url, undefined, { minDelayMs: Math.max(1000, ctx.politeness.minDelayMs) });
+  const response = await politeFetch(url, { redirect: "manual" }, { minDelayMs: Math.max(1000, ctx.politeness.minDelayMs) });
+  if (response.status >= 300 && response.status < 400 && /(?:^|\/)login(?:[?\/]|$)/i.test(response.headers.get("location") ?? "")) throw new PortalBlockedError(url, 401, "SDL redirected to login");
   if (!response.ok) throw new Error(`SDL HTTP ${response.status}: ${url}`);
   if (new URL(response.url || url).pathname === "/login") throw new PortalBlockedError(url, 401, "SDL redirected to login");
   return parseSdlResults(await response.text(), ctx, base);
@@ -92,8 +95,6 @@ const adapter: PortalAdapter = {
   aliases: [
     "SDL",
     "SDL Permit Portal",
-    "SDL Portal (Building Department Online)",
-    "SDL Portal (Building Department Portal)",
     "SDL Portal (Building Inspection Portal)",
     "SDL Portal (Building Inspection)",
     "SDL Portal (Building Permits)",
@@ -119,7 +120,6 @@ const adapter: PortalAdapter = {
     "SDL Portal (Status of Building Permit)",
     "SDL Portal (borough construction permits)",
     "SDL Portal (city construction permits)",
-    "SDL Portal (permit and property information)",
     "SDL Portal (permit application)",
     "SDL Portal (permit search)",
     "SDL Portal (permit status search)"
@@ -145,8 +145,10 @@ const adapter: PortalAdapter = {
         const mid = Math.floor((Date.parse(from) + Date.parse(to)) / 2 / 86400000) * 86400000;
         return [...await range(from, new Date(mid).toISOString().slice(0, 10)), ...await range(new Date(mid + 86400000).toISOString().slice(0, 10), to)];
       }
-      if (result.records.some(r => !r.issuedAt || r.issuedAt < from || r.issuedAt > to)) throw new Error("SDL did not honor the issue-date filter");
-      return result.records;
+      const paddedStart = new Date(Date.parse(from) - 86400000).toISOString().slice(0, 10);
+      const paddedEnd = new Date(Date.parse(to) + 2 * 86400000).toISOString().slice(0, 10);
+      if (result.records.some(r => !r.issuedAt || r.issuedAt < paddedStart || r.issuedAt > paddedEnd)) throw new Error("SDL did not honor the issue-date filter");
+      return result.records.filter(r => r.issuedAt! >= from && r.issuedAt! <= to);
     }
     return range(start, end);
   },

@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en" class="h-100"> <!-- h-100 for msticky footer -->
+  <head>
+    
+    <title>SDL Portal</title>
+    
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <!-- Le HTML5 shim, for IE6-8 support of HTML elements -->
+    <!--[if lt IE 9]>
+        <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+
+    <!-- <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous"> -->
+    <script src="https://kit.fontawesome.com/1c8d835d57.js" crossorigin="anonymous"></script>
+
+    <!--[if gte IE 9]><!-->
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+    <script src="/static/lib/bs4/js/bootstrap.bundle.min.js"></script>
+    <!--<![endif]-->
+    <!--[if IE 9]>
+      <script src="https://cdn.jsdelivr.net/gh/coliff/bootstrap-ie8/js/bootstrap-ie9.min.js"></script>
+      <link href="https://cdn.jsdelivr.net/gh/coliff/bootstrap-ie8/css/bootstrap-ie9.min.css" rel="stylesheet">
+    <![endif]-->
+    <!--[if lte IE 8]>
+      <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
+      <script src="https://cdn.jsdelivr.net/gh/coliff/bootstrap-ie8/js/bootstrap-ie8.min.js"></script>
+      <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.js"></script>
+      <link href="https://cdn.jsdelivr.net/gh/coliff/bootstrap-ie8/css/bootstrap-ie8.min.css" rel="stylesheet">
+    <![endif]-->
+
+    <!-- BS flatly css -->
+    <link href="/static/lib/bs4/css/flatly_4.4.1.min.css" rel="stylesheet">
+    <!-- portal general css -->
+    <link href="/static/css/siteV4.css" rel="stylesheet">
+
+    <script>
+        var hostUrl = "https://www.sdlportal.com";
+        var pathUrl = "";
+        var muniUrl = "";
+        var isHomePage = false;
+        var gm_api_key = "";
+    </script>
+    
+
+
+    <!-- General Helper Libraries -->
+    <script src="/static/lib/modernizr/js/modernizr-latest.js"></script>
+    <script src="/static/lib/moment/moment.min.js"></script>
+    <script src="/static/js/sdl.util.v4.js?v=15"></script>
+
+    <!-- town search auto complete library -->
+    <script src="https://cdn.jsdelivr.net/autocomplete.js/0/autocomplete.jquery.min.js"></script>
+
+    
+    
+
+    
+    
+    
+    
+    
+
+    
+
+    <script type="text/javascript">
+      (function(e,c){if(!c.__SV){var l,h;window.mixpanel=c;c._i=[];c.init=function(q,r,f){function t(d,a){var g=a.split(".");2==g.length&&(d=d[g[0]],a=g[1]);d[a]=function(){d.push([a].concat(Array.prototype.slice.call(arguments,0)))}}var b=c;"undefined"!==typeof f?b=c[f]=[]:f="mixpanel";b.people=b.people||[];b.toString=function(d){var a="mixpanel";"mixpanel"!==f&&(a+="."+f);d||(a+=" (stub)");return a};b.people.toString=function(){return b.toString(1)+".people (stub)"};l="disable time_event track track_pageview track_links track_forms track_with_groups add_group set_group remove_group register register_once alias unregister identify name_tag set_config reset opt_in_tracking opt_out_tracking has_opted_in_tracking has_opted_out_tracking clear_opt_in_out_tracking start_batch_senders start_session_recording stop_session_recording people.set people.set_once people.unset people.increment people.append people.union people.track_charge people.clear_charges people.delete_user people.remove".split(" ");for(h=0;h<l.length;h++)t(b,l[h]);var n="set set_once union unset remove delete".split(" ");b.get_group=function(){function d(p){a[p]=function(){b.push([g,[p].concat(Array.prototype.slice.call(arguments,0))])}}for(var a={},g=["get_group"].concat(Array.prototype.slice.call(arguments,0)),m=0;m<n.length;m++)d(n[m]);return a};c._i.push([q,r,f])};c.__SV=1.2;var k=e.createElement("script");k.type="text/javascript";k.async=!0;k.src="undefined"!==typeof MIXPANEL_CUSTOM_LIB_URL?MIXPANEL_CUSTOM_LIB_URL:"file:"===e.location.protocol&&"//cdn.mxpnl.com/libs/mixpanel-2-latest.min.js".match(/^\/\//)?"https://cdn.mxpnl.com/libs/mixpanel-2-latest.min.js":"//cdn.mxpnl.com/libs/mixpanel-2-latest.min.js";e=e.getElementsByTagName("script")[0];e.parentNode.insertBefore(k,e)}})(document,window.mixpanel||[]);
+      mixpanel.init('b6a7d0177e02ab659ea92993fdfa9c04', {
+        autocapture: true,
+        record_sessions_percent: 100,
+      });
+    </script>
+
+  </head>
+    <body class="d-flex flex-column h-100"> <!-- sticky footer -->
+        <header>
+            
+                
+                <nav class="navbar navbar-expand-md navbar-dark  bg-sdl">
+                    <a class="navbar-brand mr-0 mr-lg-3" href="/">
+                        <img src="https://storage.googleapis.com/sdlportal_static_assets/SDL_Portal_Web_Logo_White.png" alt="SDL Portal" width="240px" />
+                    </a>
+
+                    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbar-main-collapse" aria-controls="navbar-main-collapse" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                    </button>
+
+                    <div class="collapse navbar-collapse" id="navbar-main-collapse">
+                        <ul class="navbar-nav mr-auto">
+                            <li class="nav-item ">
+                                <a class="nav-link" href="/docs">Help <span class="d-none d-md-inline-block">Center</span></a>
+                            </li>
+                            <li class="nav-item"><a class="nav-link" href="https://getsdl.com/products/">Products</a></li>
+                            <li class="nav-item"><a class="nav-link" href="https://getsdl.com/about-us/ ">About</a></li>
+                        </ul>
+                        
+                            <div class="btn-group navbar-btn">
+                                <a class="btn btn-outline-light" href="/login">Sign In</a>
+                                <a class="btn btn-outline-light" href="/signup">Sign Up</a>
+                            </div>
+                        
+                    </div>
+                </nav>
+                
+            
+            
+            
+        </header>
+        <main >
+            
+    <div class="container d-flex justify-content-center mt-2 mt-md-5 ">
+    
+        <div class="card-group " style="min-height: 325px;max-width: 750px">
+            <div class="card d-none d-md-flex text-center border-light text-white pt-3" style="min-width: 375px;" >
+                <div class="card-body bg-transparent border-bottom-0 pt-1">
+                    
+                        <div class="mx-auto login-img-holder">
+                            <i class="fas fa-user-circle fa-7x mt-5"></i>
+                            <div class='card-title h4'>Citizen Portal Login</div>
+                        </div>   
+                     
+                </div>
+                <div class="card-footer bg-white border-top-0">
+                    <img src="https://storage.googleapis.com/sdlportal_static_assets/SDL_Portal_Web_Logo.png" class="mx-auto d-block" alt="SDL Portal Login" style="max-width: 250px;" width="240px"> 
+                </div>
+            </div>
+
+            <div class="card" style="min-width: 300px;">
+                <div class="card-header border-bottom-0 bg-transparent text-dark">
+                    <div class='card-title h3 text-center my-2 d-md-none '><i class="fas fa-user-circle mr-1"></i>Citizen Portal Login</div>
+                    
+                </div>
+                <div class="card-body pb-0 pt-2 pt-md-4">
+                    <form id="signin-form" method="POST">
+                        <div class="form-group">
+                            <label for="user" class="sr-only">Email address</label>
+                            <div class="input-group mb-1">
+                                <div class="input-group-prepend">
+                                <span class="input-group-text bg-white" ><i class="fas fa-user"></i></span>
+                                </div>
+                                <input name="user" class="form-control form-control-lg rounded-right" placeholder="User name or email address" required="" autofocus="" maxlength="100"   >
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="pwd" class="sr-only">Password</label>
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text bg-white" ><i class="fas fa-lock"></i></span>
+                                </div>
+                                <input type="password" name="pwd" class="form-control form-control-lg  rounded-right" placeholder="Password" required=""  >
+                            </div>
+                        </div>
+
+                        <div class="signAsSDLUser collapse mt-1">
+                            <div class="form-group">
+                                <label for="town-search-signin" class="sr-only">Employee Account Town</label>
+                                <div class="input-group">
+                                    <input id="town-search-signin" name="town" type="text" class="form-control  form-control-lg  rounded-left" placeholder="Select a Town" value="" data-sdl-validation-element="#midSDL" autocomplete="new" >
+                                    <span class="input-group-append">
+                                        <button id="wr-location-search-trigger" class="btn btn-sdl rounded-right" type="button"><i class="fas fa-search"></i></button>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="d-none">
+                                <input type="hidden" id="midSDL" name="mid" value="" class="" >
+                            </div>
+                        </div>
+                        <input type="hidden" id="redirect" name="redirect" value="https://www.sdlportal.com/towns/nj/hunterdon/raritantwp/search2?st=permits&amp;as=1&amp;limit=100&amp;stps=all&amp;stpd=all&amp;psd=1790985600&amp;ped=1791590400">
+                        
+                            <button id="signin-trigger" class="btn btn-lg btn-sdl btn-block mt-2 text-uppercase" type="submit" disabled >Sign in</button>
+                        
+                    </form>
+                    
+                    <div id="sso-error-block" class="d-none alert bg-white text-dark border border-danger my-2 py-2 small">
+                        <i class="fas fa-exclamation-circle text-danger mr-1"></i>Single sign-on did not complete. Try again, or sign in another way.
+                    </div>
+                    <div id="sso-loading" class="d-none text-center text-muted my-2">
+                        <i class="fas fa-spinner fa-spin mr-1"></i>Checking sign-in options&hellip;
+                    </div>
+                    <div id="sso-signin-block" class="d-none">
+                        <div class="alert bg-white text-dark border border-info my-2 py-2 small">
+                            <i class="fas fa-info-circle text-info mr-1"></i>Single sign-on is required for this organization. Use the button below to continue.
+                        </div>
+                        <a id="sso-signin-link" href="#" class="btn btn-lg btn-sdl btn-block text-uppercase">Sign in with SSO</a>
+                    </div>
+                </div>
+                <div class="card-footer bg-white text-dark border-top-0 small">
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="checkbox" id="signAsSDLUser" autocomplete="off" >
+                        <label class="form-check-label" >Sign in with a municipal employee account.</label>
+                    </div>
+
+                    <div class="text-center">
+                        <a href="/forgot">Forgot password</a> | <a href="/signup">Create an account</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    
+    </div>
+
+
+
+            
+            
+        </main>
+        
+            
+            <footer class="footer mt-auto py-3 d-print-none">
+                <div class="container text-center">
+                    <ul class="list-inline">
+                        <li class="list-inline-item"><a class="text-dark" href="https://www.spatialdatalogic.com">Home</a></li>
+                        <li class="list-inline-item"><a class="text-dark" href="https://www.spatialdatalogic.com/terms">Terms of Service</a></li>
+                        <li class="list-inline-item"><a class="text-dark" href="https://www.spatialdatalogic.com/privacy">Privacy</a></li>
+                        <li class="list-inline-item"><a class="text-dark" href="https://spatialdatalogic.com/resources/sdl-news">News</a></li>
+                    </ul>
+                    <ul class="list-inline">
+                        <li class="list-inline-item"><a class="text-dark fab fa-twitter" href="https://twitter.com/SDLSales" aria-label="SDL on X" target="_blank" rel="noopener noreferrer"></a></li>
+                        <li class="list-inline-item"><a class="text-dark fab fa-facebook" href="https://www.facebook.com/pages/Spatial-Data-Logic/521682907926250" aria-label="SDL on Facebook" target="_blank" rel="noopener noreferrer"></a></li>
+                    </ul>
+                    <div class="text-dark">
+                        <p>&copy; 2026 SDL. All Rights Reserved</p>
+                    </div>
+                </div>
+            </footer>
+            
+        
+
+        
+        
+
+    
+    <!-- Switch Towns Modal -->
+    <div class="modal fade" id="switchTownsModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="exampleModalLabel">Switch Towns</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                  <p>Search by town name and select one from the list that appears below.</p>
+                  <div class="input-group w-100">
+                    <input type="text" class="form-control" id="town-search" placeholder="Find a Town" aria-label="Town search">
+                    <div class="input-group-append d-none d-md-flex">
+                      <div class="input-group-text"><i class="fas fa-search"></i></div>
+                    </div>
+                  </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancel</button>
+              </div>
+            </div>
+        </div>
+    </div>
+
+     <!-- Help Widget -->
+    
+        
+        <div id="sdl-help-trigger" style='display:none;' data-hlp-mid="">
+        <button type="button" class="btn btn-sdl rounded-pill d-print-none"><i class="fas fa-question-circle fa-lg"></i><span class='d-none d-sm-inline'> Help</span></button>
+        </div>
+
+        <div id="sdl-help-modal" class="modal fade text-dark" tabindex="-1" role="dialog" data-backdrop=false >
+            <div class="modal-dialog  modal-dialog-scrollable" role="document">
+                <div class="modal-content">
+                    <div class="modal-header p-2 text-center bg-light">
+                        <h6 class="modal-title w-100">Help</h6>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body accordian" id="help-container">
+                        <div class='help-general'></div>
+                        <div class='help-account'></div>
+                        <div class='help-property'></div>
+                        <div class='help-permit'></div>
+                        <div class='help-inspection'></div>
+                        <div class='help-unordered'></div>
+                        <div  class='help-technical'>
+                            <div class="card mb-1">
+                                <div class="card-header p-2 clickable collapsed text-dark bg-white" data-toggle="collapse" href="#help-technical" data-parent="#help-container" aria-expanded="false">
+                                    <h6 class="m-0">I have a technical issue</h6>
+                                </div>
+                                <div class="p-2 small card-body collapse" id="help-technical">
+                                    <div>
+                                        <strong>PLEASE READ:</strong> The SDL Portal is a 3rd party company contracted by your town and can only assist with any technical issues and errors related to the portal or your account. If you have questions about your applications, town process, or need emergency assistance, please contact your town directly.
+                                    </div>
+                                    <a type="button" href="https://help.getsdl.com/kb-tickets/new" target="_blank" class="btn btn-sdl btn-sm btn-block">Contact SDL for Technical Assistance</a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                    </div>
+
+                    <div class='modal-footer'>
+                        <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Close</button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <script>$('#sdl-help-trigger').sdlHelp();</script>
+        
+    
+    
+
+    
+    <script>(function(d){var s = d.createElement("script");s.setAttribute("data-account", "NQWh9waQr3");s.setAttribute("src", "https://cdn.userway.org/widget.js");(d.body || d.head).appendChild(s);})(document)</script><noscript>Please ensure Javascript is enabled for purposes of <a href="https://userway.org">website accessibility</a></noscript>
+    
+    </body>
+    
+
+    
+    
+
+    
+        
+    
+
+    
+    
+
+
+    
+    
+
+    
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-19533412-5', 'sdlportal.com');
+      ga('send', 'pageview');
+
+    </script>
+    
+    <script>$(".site-messages > .site-message").sdlMessage();</script>
+</html>
