@@ -22,12 +22,15 @@ export function canScrapeGovernmentPortal(row: { platform: string | null; search
   if (!['http:', 'https:'].includes(url.protocol)) return false;
   if (hasJurisdictionAdapter(row.jurisdiction)) return true;
   if (!row.platform) return false;
-  if (row.platform === 'eTRAKiT') {
-    // The current adapter is specific to Bellingham. Do not label its records
-    // as another city's until the adapter accepts and verifies a target URL.
-    return url.hostname === 'permits.cob.org' && /^\/etrakit\//i.test(url.pathname);
-  }
+  // eTRAKiT: the current adapter is multi-tenant — it derives the application root
+  // from the target URL (/eTRAKiT/, /etrakit3/, /etrakit_prod/, /community-etrakit/ or
+  // a web-root install) and verifies the response is an eTRAKiT permit-search form before
+  // searching (server/scrapers/etrakit.ts; etrakit.REPORT.md 2026-10-10, verified on
+  // Hillsborough/Shasta/Hanover). Nothing is hard-wired to one tenant, so eTRAKiT falls
+  // through to isScrapablePlatform below like any other verified-link adapter platform.
   if (['Skagit County', 'Custom / GovPlatform'].includes(row.platform)) {
+    // Skagit's adapter is single-tenant (skagitcounty.net only); do not label another
+    // host's records as searchable until it accepts and verifies a target URL.
     return ['skagitcounty.net', 'www.skagitcounty.net'].includes(url.hostname);
   }
   return isScrapablePlatform(row.platform);

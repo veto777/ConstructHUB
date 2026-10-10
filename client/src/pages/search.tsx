@@ -43,8 +43,10 @@ import {
   Eye,
   Building,
   Globe,
+  Map as MapIcon,
 } from "lucide-react";
 import type { PermitDatabase, County } from "@shared/schema";
+import { PermitMap, type MapPortal } from "@/components/permit-map";
 
 function normalizeStatus(status: string | null | undefined): string {
   if (!status) return "Unknown";
@@ -115,6 +117,15 @@ function parseDate(dateStr: string | null | undefined): Date | null {
 
 export default function SearchPage() {
   const { toast } = useToast();
+  const [showMap, setShowMap] = useState(false);
+  const searchBoxRef = useRef<HTMLDivElement>(null);
+  // A dot on the coverage map prefills the search scope for that jurisdiction, then
+  // brings the search box into view — the owner's "find them manually" path.
+  const handlePickFromMap = (p: MapPortal) => {
+    if (p.state) setScopeState(p.state);
+    setScopeLocation(p.jurisdictionType === "county" ? `county-${p.countyId}` : `city-${p.databaseId}`);
+    requestAnimationFrame(() => searchBoxRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  };
   // The form (and the running search's id) live in the address bar, so a refresh or a
   // "Search again" link from History reopens the same search: ?state=&loc=&type=&q=&sid=
   const [searchType, setSearchType] = useState(initialSearchType);
@@ -157,7 +168,7 @@ export default function SearchPage() {
   });
 
   // `searchable` (nationwide live-searchable portals) is used when the server reports it.
-  const { data: dbCounts } = useQuery<{ total: number; county: number; city: number; searchable?: number }>({
+  const { data: dbCounts } = useQuery<{ total: number; county: number; city: number; searchable?: number; searchableCounty?: number; searchableCity?: number; searchableStates?: number }>({
     queryKey: ["/api/databases/counts"],
   });
 
@@ -543,6 +554,23 @@ export default function SearchPage() {
       />
 
       <section className="space-y-4" aria-label="Search form">
+        {/* US coverage map (owner request): states fill blue where county permits are
+            searchable; every searchable portal is a clickable orange dot. Collapsible so it
+            never breaks the page on mobile; lazy-rendered so it only loads when opened. */}
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => setShowMap((v) => !v)}
+            aria-expanded={showMap}
+            data-testid="button-toggle-map"
+            className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm g-text hover:g-card-2"
+          >
+            <MapIcon className="h-4 w-4" />
+            {showMap ? "Hide coverage map" : "Show coverage map"}
+            {showMap ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </button>
+          {showMap && <PermitMap onPick={handlePickFromMap} />}
+        </div>
         <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Search by" data-testid="select-search-type">
           {searchTypes.map((type) => (
             <GooglePill
@@ -558,7 +586,7 @@ export default function SearchPage() {
           ))}
         </div>
 
-        <div className="g-search" role="search">
+        <div className="g-search" role="search" ref={searchBoxRef}>
           <IconComponent aria-hidden="true" />
           <input
             type="search"
@@ -584,11 +612,15 @@ export default function SearchPage() {
           />
         </div>
         <p className="g-text-2 text-sm" data-testid="text-scope-count">
-          {scopedDbCount !== null
-            ? `${portalCount(scopedDbCount)} ${scopePlace}`
-            : scopeState !== "all" && databasesLoading
-              ? `Counting searchable portals ${scopePlace}…`
-              : "Searches every live-searchable portal nationwide"}
+          {scopeState === "all"
+            ? (typeof dbCounts?.searchable === "number"
+                ? `${dbCounts.searchable.toLocaleString()} searchable portals in ${dbCounts.searchableStates ?? 50} states (${(dbCounts.searchableCounty ?? 0).toLocaleString()} counties)`
+                : "Searches every live-searchable portal nationwide")
+            : scopedDbCount !== null
+              ? `${portalCount(scopedDbCount)} ${scopePlace}`
+              : databasesLoading
+                ? `Counting searchable portals ${scopePlace}…`
+                : "Searches every live-searchable portal nationwide"}
         </p>
 
         <div className="space-y-1.5">
