@@ -59,13 +59,19 @@ describe('capabilities and detail variations', () => {
 });
 
 
-it('registers case-insensitive aliases and enables only the verified alert labels',async()=>{
- const {getAdapter,supportsAlerts}=await import('./registry');
- expect(getAdapter('CITY-SITE')?.platform).toBe('City-built');
- expect(getAdapter('City permit portal')).toBe(adapter);
- expect(supportsAlerts('WATS (county-specific)')).toBe(true);
- expect(supportsAlerts('City of Eugene custom (Planning and Development permit search)')).toBe(true);
- expect(supportsAlerts('County portal')).toBe(false);
+it('resolves verified city-built jurisdictions and leaves generic labels unsearchable',async()=>{
+ const {getAdapterFor,getAdapter}=await import('./registry');
+ // The five verified recent-permit feeds are alert-capable, keyed by jurisdiction.
+ expect(getAdapterFor({platform:'WATS (county-specific)',jurisdiction:'St. Johns County, FL'})?.capabilities.listRecent).toBe(true);
+ expect(getAdapterFor({platform:'town online permitting',jurisdiction:'Ocean City, MD'})?.capabilities.listRecent).toBe(true);
+ // A conservative dispatcher jurisdiction is searchable but not alert-capable.
+ const houston=getAdapterFor({platform:'Houston Permitting Center',jurisdiction:'Houston, TX'});
+ expect(houston?.capabilities.search).toContain('address');
+ expect(houston?.capabilities.listRecent).toBe(false);
+ // Generic/ambiguous labels must NOT resolve to the throwing dispatcher for unbuilt hosts.
+ expect(getAdapter('CITY-SITE')).toBeNull();
+ expect(getAdapter('City permit portal')).toBeNull();
+ expect(getAdapter('County portal')).toBeNull();
  expect(getAdapter(null)).toBeNull();
 });
 
@@ -123,12 +129,12 @@ describe('Houston WebFOCUS data', () => {
         expect(() => stringTable('ARstrings=[process.exit()]')).toThrow('nonliteral');
         expect(stringTable("ARstrings=['O\\'NEIL', 0, '\\u0041'];")).toEqual(["O'NEIL", 0, 'A']);
     });
-    it('resolves every implemented non-null catalog label', async () => {
-        const { getAdapter } = await import('./registry');
+    it('resolves every implemented catalog jurisdiction by jurisdiction string', async () => {
+        const { getAdapterFor } = await import('./registry');
         const rows = JSON.parse(fixture('classification.json'));
         for (const row of rows.filter((r: any) => supportedHosts.includes(new URL(r.url).host))) {
             expect(() => capabilitiesFor({ searchUrl: row.url })).not.toThrow();
-            if (row.platform !== null) expect(getAdapter(row.platform)?.platform).toBeTruthy();
+            expect(getAdapterFor({ platform: row.platform, jurisdiction: row.jurisdiction })?.platform).toBeTruthy();
         }
     });
 });

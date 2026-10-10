@@ -209,11 +209,17 @@ import opendataAdapter, { OPENDATA_JURISDICTIONS } from "./opendata";
 registerAdapter(opendataAdapter);
 for (const jurisdiction of OPENDATA_JURISDICTIONS) registerJurisdictionAdapter(jurisdiction, opendataAdapter);
 
+// City-built is a host dispatcher that only serves the 19 jurisdictions whose per-site adapter was built and
+// verified; its generic catalog labels ("City-built", "Online permitting", "City portal", "County portal", ...)
+// also sit on hundreds of unrelated custom sites it cannot search. Register it BY JURISDICTION so only the
+// verified places count as searchable (canScrapeGovernmentPortal) — never by those generic labels. The five
+// facades carry the real per-host capabilities (verified recent-permit feeds -> listRecent true); the other ten
+// jurisdictions use the conservative dispatcher (search only, no alerts).
 import cityBuiltAdapter, { watsAdapter, eugeneAdapter, lyonAdapter, palmAdapter, oceanAdapter, pprbdAdapter } from "./city-built";
-registerAdapter(cityBuiltAdapter);
-registerAdapter(watsAdapter);
-registerAdapter(eugeneAdapter);
-registerAdapter(lyonAdapter);
-registerAdapter(palmAdapter);
-registerAdapter(oceanAdapter);
-registerAdapter(pprbdAdapter);
+registerJurisdictionAdapter("St. Johns County, FL", watsAdapter);
+registerJurisdictionAdapter("Eugene, OR", eugeneAdapter);
+registerJurisdictionAdapter("Lyon County, NV", lyonAdapter);
+registerJurisdictionAdapter("Palm Coast, FL", palmAdapter);
+registerJurisdictionAdapter("Ocean City, MD", oceanAdapter);
+for (const j of ["El Paso County, CO", "Manitou Springs, CO", "Monument, CO", "Woodland Park, CO"]) registerJurisdictionAdapter(j, pprbdAdapter);
+for (const j of ["Houston, TX", "Independence, MO", "Coconut Creek, FL", "Summit County, OH", "Garden Grove, CA", "Johnston County, NC", "Milam County, TX", "Williamson County, TX", "Hays County, TX", "Kaufman County, TX"]) registerJurisdictionAdapter(j, cityBuiltAdapter);
