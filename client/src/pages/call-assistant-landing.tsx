@@ -1,7 +1,9 @@
 /**
  * /call-assistant — the AI Call Assistant's marketing page, for signed-out
- * visitors (public header + footer) and signed-in users (inside the dashboard
- * frame; the main sidebar's "Call Assistant" entry lands here).
+ * visitors (public header + footer). Signed-in users who have the CRM get the
+ * in-app tool instead (App.tsx routes /call-assistant to CrmCallAssistantPage,
+ * and the CRM host's old /crm/call-assistant link redirects here), so this
+ * landing page and its "In the App" section are effectively signed-out-only.
  *
  * Design B ("editorial warmth", see landing.tsx): Fraunces + Plus Jakarta Sans
  * on cream paper, navy grid panels, one orange. The shared pieces live in
@@ -343,7 +345,7 @@ export default function CallAssistantLandingPage() {
         <ScreensSection page={{ title: "AI Call Assistant" }} screens={FEATURE_SCREENS.callAssistant ?? []} n="02" tone="paper" />
 
         {/* The voices */}
-        <section id="voices" className="py-20 lg:py-28 px-4 sm:px-6 lg:px-8 scroll-mt-16" data-testid="section-ca-voices">
+        <section id="voices" className="py-20 lg:py-28 px-4 sm:px-6 lg:px-8 bg-mkt-paper-2 border-b border-mkt-rule scroll-mt-16" data-testid="section-ca-voices">
           <div className="max-w-7xl mx-auto">
             <div className="grid lg:grid-cols-12 gap-6 lg:gap-10 items-end mb-12">
               <div className="lg:col-span-7">

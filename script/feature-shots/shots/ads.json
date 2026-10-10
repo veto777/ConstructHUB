@@ -279,6 +279,6 @@
   "route": "/settings?tab=api-usage",
   "wait": "Keys used",
   "alt": "API usage dashboard showing units and requests over the last 30 days as a stacked bar chart by API key, with totals and a per-day breakdown.",
-  "caption": "API usage by key over the last 30 days"
+  "caption": "API usage by key, day by day"
  }
 ]
