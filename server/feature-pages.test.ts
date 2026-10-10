@@ -30,6 +30,8 @@ const kebab = (key: string) => key.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowe
 /** The keys the template branch was asked to register (the dashboard's tiles + the platform pages). */
 const EXPECTED_KEYS = [
   "gbp", "reviews", "profileGuard", "rankingGrid", "gbpContent", "social", "siteScan", "media",
+  // The SEO suite (a stub: the à la carte SEO items' Compare page, shared/alacarte.ts).
+  "seo",
   "clickGuard", "ipTracker", "vpnShield", "cloudflare", "searchConsole", "domains", "mailAlerts",
   "permits", "property", "competitors", "adsManager", "lsaLeads",
   "crm", "crmSchedule", "crmLeads", "texting", "jobcam", "agency",

@@ -22,6 +22,7 @@ import rankingGrid from "./rankingGrid";
 import gbpContent from "./gbpContent";
 import social from "./social";
 import siteScan from "./siteScan";
+import seo from "./seo";
 import media from "./media";
 import clickGuard from "./clickGuard";
 import ipTracker from "./ipTracker";
@@ -66,7 +67,7 @@ export const FEATURE_GROUPS: readonly { key: FeatureGroupKey; label: string; blu
 /** Every template page, in catalogue order (the dashboard's tile order within each group). */
 export const FEATURE_PAGES: readonly FeaturePage[] = [
   // Grow
-  gbp, reviews, profileGuard, rankingGrid, gbpContent, social, siteScan, media,
+  gbp, reviews, profileGuard, rankingGrid, gbpContent, social, siteScan, seo, media,
   // Protect
   clickGuard, ipTracker, vpnShield, cloudflare, searchConsole, domains, mailAlerts,
   // Win jobs
