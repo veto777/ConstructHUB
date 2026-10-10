@@ -393,6 +393,12 @@ export async function registerRoutes(
   (await import("./ops/app-review-watch")).startAppReviewWatch();
   const { registerApiKeyRoutes } = await import("./account/api-key-routes");
   registerApiKeyRoutes(app, getDevUser, await import("./account/api-keys"));
+  // The Code API (/api/dev/v1): source code for agents and developers through 24–48 h chdev_ tokens
+  // that platform admins issue from /admin/code-api after a Google re-verification (server/dev-api).
+  const { ensureDevApiSchema } = await import("./dev-api/tokens");
+  await ensureDevApiSchema();
+  const { registerDevApi } = await import("./dev-api/routes");
+  registerDevApi(app, getDevUser);
   const { registerIntegrationsRoute } = await import("./account/integrations-route");
   registerIntegrationsRoute(app, getDevUser);
   const { ensureGbpContentSchema, registerContentRoutes, startContentWorker } = await import("./gbp/content");

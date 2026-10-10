@@ -3,7 +3,7 @@ import { ensureAppleAuthSchema, registerAppleAuthRoutes } from "./apple-auth";
 import { ensureAppConnectionsSchema, registerAppConnections } from "./app-connections";
 import { safeNextPath } from "./app-shell";
 import { ensureAppAuthSchema, mintAppCode, consumeAppCode, appAuthHost, appChallenge } from "./app-auth";
-import { requireRecentAuth, markRecentAuth, trustedDevice, rememberDevice, activateTwoFactor, consumeRecoveryCode, revokeDevices, securityChanged } from "./account-security";
+import { requireRecentAuth, markRecentAuth, markGoogleVerified, trustedDevice, rememberDevice, activateTwoFactor, consumeRecoveryCode, revokeDevices, securityChanged } from "./account-security";
 import { encryptToken, decryptToken } from "./gbp/token-crypto";
 import { logActivity } from "./account-events";
 import { rateLimit, takeBudget } from "./growth-limits";
@@ -327,6 +327,7 @@ export async function setupAuth(app: Express) {
           const nextPath = safeNextPath(req.session.authNext) ?? "/settings?tab=security";
           delete req.session.authNext;
           const ok = !err && user && req.user?.id === reauth.userId && user.id === reauth.userId && reauth.expires > Date.now();
+          if (ok) markGoogleVerified(req, user.id);
           if (ok && !user.totpEnabled) {
             markRecentAuth(req, user.id);
             try { await logActivity(req, user.id, "security.reauthenticated", { method: "google" }); } catch { /* audit is best-effort here */ }

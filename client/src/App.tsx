@@ -112,6 +112,7 @@ const SeoContentPage = lazyPage(() => import("@/pages/seo/content"));
 const SeoBacklinksPage = lazyPage(() => import("@/pages/seo/backlinks"));
 const SeoCompetitorsPage = lazyPage(() => import("@/pages/seo/competitors"));
 const AdminAccessPage = lazyPage(() => import("@/pages/admin-access"));
+const AdminCodeApiPage = lazyPage(() => import("@/pages/admin-code-api"));
 const AdminIssuesPage = lazyPage(() => import("@/pages/admin-issues"));
 const AdminTicketsPage = lazyPage(() => import("@/pages/admin-tickets"));
 const AdminYoutubePage = lazyPage(() => import("@/pages/admin-youtube"));
@@ -279,6 +280,8 @@ function DashboardRouter() {
       <Route path="/admin/feature-pages" component={AdminFeaturePagesPage} />
       {/* Platform admins: give an account a plan for 1–1000 days, extend or revoke it (the API answers 403 to anyone else). */}
       <Route path="/admin/access" component={AdminAccessPage} />
+      {/* Platform admins: 24–48 h Code API tokens for agents and developers (the API answers 403 to anyone else). */}
+      <Route path="/admin/code-api" component={AdminCodeApiPage} />
       {/* Platform admins: the issue desk — captured failures and Claude's reports (the API answers 403 to anyone else). */}
       <Route path="/admin/issues" component={AdminIssuesPage} />
       <Route path="/admin/tickets" component={AdminTicketsPage} />
@@ -418,7 +421,7 @@ function PublicRouter() {
 const SIGNED_IN_ONLY = [
   "/search", "/schedules", "/history", "/media-library", "/gmb-monitor", "/ranking-grid",
   "/social-media", "/guides", "/tutorials", "/cloudflare", "/search-console", "/seo", "/lsa-leads", "/lsa-account-manager", "/settings",
-  "/agency", "/locations", "/domains", "/mail-alerts", "/gbp-content", "/listing-editor", "/admin/feature-pages", "/admin/access", "/admin/issues", "/admin/youtube",
+  "/agency", "/locations", "/domains", "/mail-alerts", "/gbp-content", "/listing-editor", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/youtube",
   ...(SHOW_COMPETITOR_INTEL ? ["/competitors"] : []),
   ...(SHOW_GOOGLE_REVIEWS ? ["/google-reviews"] : []),
 ];
@@ -437,7 +440,7 @@ function SignedOutFallback() {
 
 /** Tab titles for the growth app; pages that set their own title are left alone. */
 const DEFAULT_TITLE = "ConstructHUB — Nationwide Contractor Services";
-const SELF_TITLED = ["/media-library", "/privacy", "/terms", "/support", "/crm-terms", "/crm-privacy", "/features", "/done-for-you", "/admin/feature-pages", "/admin/access", "/admin/issues", "/admin/youtube"];
+const SELF_TITLED = ["/media-library", "/privacy", "/terms", "/support", "/crm-terms", "/crm-privacy", "/features", "/done-for-you", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/youtube"];
 /** Feature and service pages title themselves from their content (seo.title). */
 const isSelfTitled = (location: string) =>
   SELF_TITLED.includes(location) || location.startsWith("/features/") || location.startsWith("/done-for-you/");
