@@ -205,5 +205,6 @@ registerAdapter(permitlink);
 
 registerAdapter(enerGovAdapter);
 
-import opendataAdapter from "./opendata";
+import opendataAdapter, { OPENDATA_JURISDICTIONS } from "./opendata";
 registerAdapter(opendataAdapter);
+for (const jurisdiction of OPENDATA_JURISDICTIONS) registerJurisdictionAdapter(jurisdiction, opendataAdapter);
