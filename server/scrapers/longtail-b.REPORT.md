@@ -7,7 +7,7 @@ Survey written before adapter implementation. 418 input entries; counts are entr
 | Cityworks | 33 | Baltimore County MD; Bonneville County ID; Jefferson County ID | No anonymous search in sampled portals; Baltimore is a Timmons login page; hosted PublicAccess login has allowGuest=false. Also opened Alpharetta GA, Beaumont TX and Carmel IN: allowGuest=false. | Not available anonymously | ASP.NET login / Angular PublicAccess. No login attempted. |
 | CommunityCore | 27 | Northglenn CO; Minneola FL; Superior CO | Northglenn and Minneola settings enable address, permit, parcel and owner search; Superior settings disable search. Search service requires RecaptchaToken header. | No date search in public search component | Angular /api/v1/public-portal/{registrationId}/settings; CAPTCHA-gated search excluded, no bypass attempted. |
 | GovBuilt | 22 | Milan IL; Westwood KS; Sunset Valley TX | Milan and Westwood expose Activity Search Tool: reference number, address and name. Business-name search is license-only. Sunset Valley landing exposes application forms, no search link. | Created Date/Last Activity window; issue/application-date listing not verified | Anonymous GET /PublicReport/GetAllContentToolModels; tenant is host; paginated JSON. |
-| CitySquared | 21 | Bethel CT; Charlestown RI; Fairfield CT | Public property lookup and property-linked records; permit-number and contractor filters under investigation. | Not yet verified | Angular hash tenant; public Municity5 tenant directory selects service host. Read-only WCF JSON endpoints. |
+| CitySquared | 21 | Bethel CT; Charlestown RI; Fairfield CT | Public property lookup and permit API verified; address/permit search, tenant-dependent applicant-name search; no contractor search. | Yes, PermitDate and optional ApplicaDate1; server-side date filters | Angular hash tenant; public Municity5 tenant directory selects service host. Read-only WCF JSON endpoints. |
 | Evolve | 20 | Chester County SC; York SC; Bryan County GA | Permit Search linked in all three. Chester/York search forms verified: address, permit number, contractor and parcel; York also subdivision. | Yes, Date Range option in Chester and York | ASP.NET WebForms __doPostBack; session/viewstate. |
 | GovOutreach | 18 | Freeland PA; Brightwaters NY; Rancho Viejo TX | HTTP 200 app shell for all three. Freeland and Brightwaters browser attempts remained Loading; no usable search established. | Not established | React app with api.govoutreach.com core endpoints. Do not classify loading failure as zero records. |
 | CityInspect | 18 | Carbon County UT; Iron County UT; Sanpete County UT | Carbon and Sanpete login walls; Iron registration form includes CAPTCHA. No public records search linked. | Not available anonymously | Login/registration/inspection-request workflows; no account created. |
@@ -19,7 +19,9 @@ Initial HTTP survey: all 24 sampled stored URLs returned HTTP 200; HTML alone wa
 
 ## Complete grouping
 
-| Group | Entries |
+All 418 entries are counted once. Spelling variants are consolidated. Host identity takes precedence for migrated vendor brands (for example, some IDT Plans labels now point to GeoCivix hosts). Groups marked Other have no established common vendor mechanism. Only the 8 largest groups above were surveyed for search capability; all smaller groups remain unimplemented here.
+
+| Vendor / group | Entries |
 |---|---:|
 | Cityworks | 33 |
 | CommunityCore | 27 |
@@ -31,145 +33,98 @@ Initial HTTP survey: all 24 sampled stored URLs returned HTTP 200; HTML alone wa
 | FastTrackGov | 16 |
 | PermitTrax | 15 |
 | LOGIS | 14 |
+| CivicPlus | 13 |
+| LAMA | 12 |
 | RTVision | 12 |
-| Simplicity | 6 |
-| LAMA | 5 |
-| Geocivix | 5 |
-| SagesGov | 4 |
-| CivicPlus | 4 |
-| CivicReview | 4 |
-| Edmunds | 4 |
-| IDT Plans | 3 |
-| MaintStar | 3 |
-| PeopleGIS SimpliCity | 3 |
-| CTS city permit center | 3 |
-| ePlanSoft GoPost electronic plan submittal | 3 |
-| GeoCivix | 3 |
-| TRAISR | 3 |
-| Camino | 3 |
-| County building permit information | 2 |
-| SagesGov permitting portal | 2 |
-| MaintStar permit portal | 2 |
-| City building permit information | 2 |
-| AccessGov online building permit application | 2 |
-| OnLAMA (Online LAMA) | 2 |
-| LAMA Online Permitting Portal | 2 |
-| SAGES permitting portal | 2 |
-| Jotform online application | 2 |
-| Avolve ProjectDox | 2 |
-| iMS (Intuitive Municipal Services) | 2 |
-| EdgeSoft Online Permit Counter | 2 |
-| CivicReview building permit application portal | 2 |
-| Innoprise Citizen Access | 2 |
-| ACC Community Portal (Salesforce) | 2 |
-| Oracle Permitting and Licensing (OPAL) | 2 |
-| Laserfiche | 2 |
-| EdgeSoft Citizen Access Portal | 2 |
-| ePlanSoft GoPost | 2 |
-| Clariti permit portal | 2 |
-| SAGES online permitting | 1 |
-| Intuitive Municipal Solutions (iMS) permitting portal | 1 |
-| City permit forms and development information | 1 |
-| SimplePermit (commercial permits) | 1 |
-| ArcGIS Survey123 permit application | 1 |
-| Village building permit information | 1 |
-| City Permitting Information | 1 |
-| City online building permit form (CivicPlus Form Center) | 1 |
-| CivicPlus online permit application | 1 |
-| City online building permit application (CivicPlus Form Center) | 1 |
-| Edmunds construction permit self-service | 1 |
-| Permit Information | 1 |
-| Jotform building permit application | 1 |
-| Public Information Request / Public Use Permit Application | 1 |
-| City building permit form and zoning information | 1 |
-| AccessGOV | 1 |
-| AccessGov property improvement permit form | 1 |
-| Edmunds permit portal | 1 |
-| Town building permits information | 1 |
-| eProcess360 building permit portal | 1 |
-| CityReporter permit portal | 1 |
-| POSSE (county system) | 1 |
-| Avolve ProjectDox (ePlans) | 1 |
-| MaintStar Planning & Development Citizen Portal (via county link) | 1 |
-| OnlineGovt Citizen Portal | 1 |
-| eProcess360 online building permit application | 1 |
-| IDT Plans (ePlan Review) | 1 |
-| LAMA (independent city) | 1 |
-| SeamlessDocs online building permit application | 1 |
-| CivicPlus FormCenter (online ILP application) | 1 |
-| LAMA online services portal | 1 |
-| CivicPlus Form Center online permit application | 1 |
-| CivicPlus FormCenter online permit application | 1 |
-| City online building permit application (FormCenter) | 1 |
-| Geocivix permit portal | 1 |
-| City online Building & Remodel Permit application (CivicPlus Form Center) | 1 |
-| City online applications (CivicReview) | 1 |
-| City online forms (CivicPlus Form Center) | 1 |
-| LAMA Permit Web Portal | 1 |
-| City-specific (ePlans Review plan review portal) | 1 |
-| ProjectDox (electronic plan submittal) | 1 |
-| CentralSquare Citizen Self Service | 1 |
-| Revize online forms | 1 |
-| CentralSquare PublicAccess | 1 |
-| ProjectDox/Avolve ePlan portal | 1 |
-| OnlineGovt contractor permit portal | 1 |
-| eProcess360 online permitting portal | 1 |
-| JotForm | 1 |
-| SAGES citizen portal | 1 |
-| CentralSquare (city portal) | 1 |
-| Jotform online building permit application | 1 |
-| Online Permit Center (RelayView) | 1 |
-| Oracle Permitting and Licensing (public self-service) | 1 |
-| Laserfiche Forms online building permit application | 1 |
-| POSSE online permit portal | 1 |
-| MaintStar Customer Portal | 1 |
-| Citizen self-service (cts.city) | 1 |
-| Government Window online building permit | 1 |
-| Yolo County Online Permits (Clariti) | 1 |
-| CTS permit portal | 1 |
-| Salesforce applicant permit portal | 1 |
-| Clariti | 1 |
-| Laserfiche Forms (online permit application) | 1 |
-| PIPER online permitting portal | 1 |
-| Salesforce Permits & Inspections Portal (independent city) | 1 |
-| Salesforce E-Permitting Portal (independent city) | 1 |
-| Infor Dynamic Portal | 1 |
-| Laserfiche Forms (city) | 1 |
-| Online building permit application (Laserfiche Forms) | 1 |
-| Oracle Public Sector Permitting | 1 |
-| iMS (Intuitive Municipal Solutions) | 1 |
-| City of Evanston permit hub (ArcGIS Hub) | 1 |
-| CTS ePlan and Permit Center | 1 |
-| BFSbox online permit application | 1 |
-| ePlanSoft GoPost plan submittal portal | 1 |
-| Simplicity (MapsOnline) | 1 |
-| Salesforce Permits & Inspections Portal | 1 |
-| TRAISR Online Permit | 1 |
-| Camino permitting portal | 1 |
-| Aktivov citizen portal | 1 |
-| MaintStar Citizen Portal | 1 |
-| ePlanSoft GO-POST (ePlan review portal) | 1 |
-| Edmunds GovTech Online Permit Application | 1 |
-| CivicReview building permit application (via city link) | 1 |
-| City-built Knack Building & Codes Portal | 1 |
-| Oracle Permitting and Licensing (self-service) | 1 |
-| Centricity Permit Portal | 1 |
-| CMRpay customer permit portal | 1 |
-| Salesforce E-Permitting Portal | 1 |
-| MaintStar (Novato Permits) | 1 |
-| UES CitizenPortal | 1 |
-| MaintStar Civic Portal | 1 |
-| Revize | 1 |
-| e-PlanSoft goPost online submittal portal | 1 |
-| Edmunds GovTech | 1 |
-| POSSE LMS Public Permit Portal | 1 |
-| Infor Rhythm (Online Permitting System) | 1 |
-| Clariti (Camino/OnCamino) | 1 |
-| Computronix POSSE | 1 |
-| NovoTX (Permitting Portal) | 1 |
-| Camino (Permitting & Registration Portal) | 1 |
-| ePlanSoft GoPost (ePlan Review) | 1 |
-| CTS city plan check / permit center | 1 |
-| Clariti (Camino) | 1 |
-| Camino (Online Application Portal) | 1 |
-| Maintstar Permit Public | 1 |
+| GeoCivix | 12 |
+| Camino / Clariti | 12 |
+| MaintStar | 11 |
+| SagesGov | 10 |
+| Simplicity | 10 |
+| ePlanSoft | 9 |
+| Edmunds | 8 |
+| CivicReview | 8 |
+| Salesforce | 7 |
+| CTS | 7 |
+| Laserfiche | 6 |
+| Jotform | 5 |
+| Avolve / ProjectDox | 5 |
+| CentralSquare | 5 |
+| Oracle | 5 |
+| iMS | 4 |
+| AccessGov | 4 |
+| POSSE | 4 |
+| EdgeSoft | 4 |
+| TRAISR | 4 |
+| eProcess360 | 3 |
+| Other: County building permit information | 2 |
+| Other: City building permit information | 2 |
+| OnlineGovt | 2 |
+| Revize | 2 |
+| Other: City permit forms and development information | 1 |
+| Other: SimplePermit (commercial permits) | 1 |
+| Other: ArcGIS Survey123 permit application | 1 |
+| Other: Village building permit information | 1 |
+| Other: City Permitting Information | 1 |
+| Other: Permit Information | 1 |
+| Other: Public Information Request / Public Use Permit Application | 1 |
+| Other: City building permit form and zoning information | 1 |
+| Other: Town building permits information | 1 |
+| Other: CityReporter permit portal | 1 |
+| Other: SeamlessDocs online building permit application | 1 |
+| IDT Plans | 1 |
+| Other: City-specific (ePlans Review plan review portal) | 1 |
+| Other: Online Permit Center (RelayView) | 1 |
+| Other: Government Window online building permit | 1 |
+| Other: PIPER online permitting portal | 1 |
+| Other: Infor Dynamic Portal | 1 |
+| Other: City of Evanston permit hub (ArcGIS Hub) | 1 |
+| Other: BFSbox online permit application | 1 |
+| Other: Aktivov citizen portal | 1 |
+| Other: City-built Knack Building & Codes Portal | 1 |
+| Other: Centricity Permit Portal | 1 |
+| Other: CMRpay customer permit portal | 1 |
+| Other: UES CitizenPortal | 1 |
+| Other: Infor Rhythm (Online Permitting System) | 1 |
+| Other: NovoTX (Permitting Portal) | 1 |
+
+## Survey sources opened
+
+Each of these 24 stored URLs returned HTTP 200 in the initial HTML survey. Dynamic-app results and login/registration limitations are in the table above. No permit-count claim is made from HTTP status alone.
+
+- Cityworks: Baltimore County, MD — https://cityworkspro.baltimorecountymd.gov/PLLPortal/
+- Cityworks: Bonneville County, ID — https://app06.cityworksonline.com/CLIENT_BonnevilleCoID-public/login
+- Cityworks: Jefferson County, ID — https://app04.cityworksonline.com/CLIENT_JeffersonCoID-public/login
+- CommunityCore: Northglenn, CO — https://app.communitycore.com/app/public-portal/662c19d4-af95-4582-b1b8-67bf05daea70
+- CommunityCore: Minneola, FL — https://app.communitycore.com/app/public-portal/0f0dbbfa-460b-4494-b2db-08ad7caeb902
+- CommunityCore: Superior, CO — https://app.communitycore.com/app/public-portal/59de19d7-ed3b-4b27-8dce-18f77664872a
+- GovBuilt: Milan, IL — https://milanil.govbuilt.com/
+- GovBuilt: Westwood, KS — https://westwood.govbuilt.com/#page-top
+- GovBuilt: Sunset Valley, TX — https://sunsetvalleytx.govbuilt.com/
+- CitySquared: Bethel, CT — https://www.citysquared.com/#/app/BethelTownCT/landing
+- CitySquared: Charlestown, RI — https://citysquared.com/#/app/CharlestownTownRI/landing
+- CitySquared: Fairfield, CT — https://citysquared.com/#/app/FairfieldTownCT/landing
+- Evolve: Chester County, SC — https://evolvepublic.infovisionsoftware.com/chester/
+- Evolve: York, SC — https://evolve-public.infovisionsoftware.com/YorkCity/
+- Evolve: Bryan County, GA — https://evolvepublic.infovisionsoftware.com/BryanCounty/
+- GovOutreach: Freeland, PA — https://app.govoutreach.com/freelandboroughpa/public/permits
+- GovOutreach: Brightwaters, NY — https://app.govoutreach.com/brightwatersny/public/permits
+- GovOutreach: Rancho Viejo, TX — https://app.govoutreach.com/ranchoviejotowntx/public/permits
+- CityInspect: Carbon County, UT — https://carboncounty.cityinspect.com/login
+- CityInspect: Iron County, UT — https://ironcounty.cityinspect.com/register?registration_id=15ccc64ec1d01c
+- CityInspect: Sanpete County, UT — https://sanpete.cityinspect.com/login
+- FastTrackGov: Douglas County, MN — https://douglasctmn.portal.fasttrackgov.com/Common/ApplicationLinks.aspx
+- FastTrackGov: Barnegat, NJ — https://barnegatnj.portal.fasttrackgov.com/Common/ApplicationLinks.aspx
+- FastTrackGov: Denville, NJ — https://denvillenj.portal.fasttrackgov.com/Common/ApplicationLinks.aspx
+
+## Final implementation and verification
+
+Two adapters: govbuilt.ts and citysquared.ts, each registered under its own labels. Combined URL-shape coverage: 43/418 entries (22 GovBuilt + 21 CitySquared). This is not 43 verified working tenants. Six tenants passed live adapter searches; a seventh (Sunset Valley) failed with HTTP 404. Exact queries, timestamps, counts, samples and failures are in govbuilt.REPORT.md and citysquared.REPORT.md.
+
+CitySquared recent listings for 2026-10-03 through 2026-10-10: Bethel 31; Charlestown 50; Fairfield 157. GovBuilt listRecent=false because creation/activity dates cannot honestly be relabeled issued/applied dates. Neither adapter supports verified contractor/company/license search yet. No government records or fixtures were fabricated.
+
+Recorded fixtures and offline tests cover the two implemented adapters. The normal Vitest command hits EROFS in the container's read-only node_modules/.vite-temp; `--configLoader runner` uses the existing repository config without that temporary bundle. `npx tsc --noEmit -p .` passed both baseline and final checks. No server or database was started. No push was performed.
+
+Follow-up priorities: validate more Cityworks tenants for genuine guest/public search; seek approved machine-readable access for CAPTCHA-gated CommunityCore; implement Evolve (20 entries) and FastTrackGov (16 entries), whose public forms already expose real date filters; investigate GovOutreach's loading failures. Do not infer that every portal in a login-only sample is globally incapable of public search.
+
+Final verification (2026-10-10): `npx vitest run server/scrapers/govbuilt.test.ts server/scrapers/citysquared.test.ts --configLoader runner` — 2 files passed, 26 tests passed. `npx tsc --noEmit -p .` — exit 0. Code diff whitespace checks passed. The staged raw clearcreek-detail.html fixture has the server’s original trailing blank line; git flags it as a whitespace warning, and it is retained to preserve the fetched response. Initial shipping commit: f4ceee65; final commit contains CitySquared, GovBuilt detail, fixtures and completed reports.

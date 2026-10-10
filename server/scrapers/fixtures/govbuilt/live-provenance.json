@@ -1,0 +1,16 @@
+[
+  {
+    "file": "westwood-address.json",
+    "url": "https://westwood.govbuilt.com/PublicReport/GetAllContentToolModels?searchText=2809+W+50th&filter=Address&contentType=case&type=&days=0&subType=&isHideClosedStatus=false&Start=1&Length=100&SortBy=Created+Date&SortType=desc&draw=1",
+    "status": 200,
+    "requestBody": null,
+    "capturedAt": "2026-10-10 UTC"
+  },
+  {
+    "file": "clearcreek-address.json",
+    "url": "https://clearcreekcounty.govbuilt.com/PublicReport/GetAllContentToolModels?searchText=701+Beaver&filter=Address&contentType=case&type=&days=0&subType=&isHideClosedStatus=false&Start=1&Length=100&SortBy=Created+Date&SortType=desc&draw=1",
+    "status": 200,
+    "requestBody": null,
+    "capturedAt": "2026-10-10 UTC"
+  }
+]

@@ -1,6 +1,14 @@
 import * as cheerio from "cheerio";
 import type { AdapterCtx, PermitRecord, PermitSearchType, PortalAdapter } from "./types";
-import { politeJson, politeText, PortalBlockedError } from "./polite-fetch";
+import { politeText, PortalBlockedError } from "./polite-fetch";
+
+async function publicJson(url: string, options: { minDelayMs: number }): Promise<unknown> {
+  const body = await politeText(url, undefined, options);
+  if (/cf-chl-|g-recaptcha|h-captcha|<title>\s*(?:Just a moment|Attention Required)|verify you are human/i.test(body)) {
+    throw new PortalBlockedError(url, 403, "GovBuilt JSON endpoint presents an anti-bot challenge");
+  }
+  return JSON.parse(body);
+}
 
 const filters: Partial<Record<PermitSearchType, string>> = {
   address: "Address", permit: "ReferenceNumber", name: "Name",
@@ -69,10 +77,34 @@ export function parseGovbuiltRecord(row: Record<string, unknown>, ctx: Pick<Adap
   };
 }
 
+/** Public case report, only fetched when the search row explicitly enables it. */
+export function parseGovbuiltDetail(html: string, record: PermitRecord): PermitRecord {
+  const $ = cheerio.load(html);
+  const values = new Map<string, string>();
+  $("table.info-table td").each((_i, cell) => {
+    const label = $(cell).children("b").first().text().trim().replace(/:$/, "");
+    const copy = $(cell).clone();
+    copy.children("b").remove();
+    if (label) values.set(label, copy.text().trim());
+  });
+  const number = [...values.entries()].find(([label]) => /Number$/.test(label))?.[1];
+  if (!$("table.permit").length || number !== record.permitNumber) throw new Error("GovBuilt public detail does not match the requested permit");
+  const descriptionCard = $(".card").filter((_i, el) => $(el).children("h5").first().text().trim() === "Description").first().clone();
+  descriptionCard.children("h5").remove();
+  const description = descriptionCard.text().trim();
+  return {
+    ...record, parcel: text(values.get("Parcel #")),
+    description: description && description !== "No Description Available" ? description : null,
+    workClass: text(values.get("Sub Types")) ?? record.workClass,
+    status: text(values.get("Status")) ?? record.status,
+    raw: { row: record.raw, html },
+  };
+}
+
 const adapter: PortalAdapter = {
   platform: "GovBuilt",
   aliases: ["GovBuilt online permit portal", "GovBuilt permitting platform", "GovBuilt (PDS of Kenton County)", "GovBuilt permitting portal", "GovBuilt online services portal"],
-  capabilities: { search: ["address", "permit", "name"], listRecent: false, detail: false },
+  capabilities: { search: ["address", "permit", "name"], listRecent: false, detail: true },
   async search(ctx, q) {
     const base = govbuiltBase(ctx.searchUrl);
     govbuiltRequest(base, q); // Validate before network access.
@@ -88,8 +120,9 @@ const adapter: PortalAdapter = {
     const records: PermitRecord[] = [];
     const seen = new Set<string>();
     let read = 0;
+    let excluded = 0;
     for (let page = 1; page <= 100; page++) {
-      const data = parseGovbuiltPage(await politeJson(govbuiltRequest(base, q, page), undefined, opts));
+      const data = parseGovbuiltPage(await publicJson(govbuiltRequest(base, q, page), opts));
       if (data.rows.length === 0 && read < data.total) throw new Error("GovBuilt pagination ended before the reported total");
       for (const row of data.rows) {
         const id = String(row.contentItemId);
@@ -97,11 +130,26 @@ const adapter: PortalAdapter = {
         seen.add(id);
         const record = parseGovbuiltRecord(row, ctx);
         if (record) records.push(record);
+        else excluded++;
       }
       read += data.rows.length;
-      if (read >= data.total) return records;
+      if (read >= data.total) {
+        if (excluded) ctx.log(`GovBuilt omitted ${excluded} cases not explicitly labeled as permits`);
+        if (excluded && records.length === 0) throw new Error("GovBuilt returned cases without an explicit permit classification; cannot report a genuine no-results search");
+        return records;
+      }
     }
     throw new Error("GovBuilt search exceeded 100 pages; narrow the query");
+  },
+  async detail(ctx, permitNumber) {
+    const results = (await adapter.search(ctx, { type: "permit", value: permitNumber })).filter(record => record.permitNumber.toLowerCase() === permitNumber.trim().toLowerCase());
+    if (results.length > 1) throw new Error("GovBuilt permit number is ambiguous");
+    const record = results[0];
+    if (!record) return null;
+    if (!record.sourceUrl) return record;
+    const html = await politeText(record.sourceUrl, undefined, { minDelayMs: Math.max(1000, ctx.politeness.minDelayMs) });
+    if (/cf-chl-|g-recaptcha|h-captcha|verify you are human/i.test(html)) throw new PortalBlockedError(record.sourceUrl, 403, "GovBuilt detail presents an anti-bot challenge");
+    return parseGovbuiltDetail(html, record);
   },
   async listRecent(ctx) {
     govbuiltBase(ctx.searchUrl);

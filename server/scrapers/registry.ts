@@ -90,3 +90,6 @@ registerAdapter(legacy("FTG Portal", [], ["name", "company"]));
 
 import govbuilt from "./govbuilt";
 registerAdapter(govbuilt);
+
+import citysquared from "./citysquared";
+registerAdapter(citysquared);
