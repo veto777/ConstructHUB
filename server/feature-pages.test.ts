@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import fs from "fs";
 import path from "path";
 import express from "express";
+import sharp from "sharp";
 import type { AddressInfo } from "net";
 import {
   EXTERNAL_FEATURE_PAGES, FEATURE_CATALOGUE, FEATURE_GROUPS, FEATURE_PAGES, FEATURES_PATH, READY_FEATURE_PAGES,
@@ -27,6 +28,8 @@ const root = path.resolve(import.meta.dirname, "..");
 const dir = path.join(root, "shared/feature-pages");
 const read = (file: string) => fs.readFileSync(path.join(root, file), "utf8");
 const kebab = (key: string) => key.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+/** Number words the caption guide bans (the "one list"/"one inbox" idiom is fine on purpose). */
+const SPELLED_NUMBER = /\b(two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million)\b/i;
 
 /** The keys the template branch was asked to register (the dashboard's tiles + the platform pages). */
 const EXPECTED_KEYS = [
@@ -76,7 +79,7 @@ describe("feature page registry", () => {
     for (const page of FEATURE_PAGES) expect(index).toContain(`import ${page.key} from "./${page.key}";`);
   });
 
-  it("shows only real, described screenshots: every one is a captured image of a known page", () => {
+  it("shows only real, described screenshots: every one is a captured image of a known page", async () => {
     for (const [key, screens] of Object.entries(FEATURE_SCREENS)) {
       expect(FEATURE_CATALOGUE.some((e) => e.key === key), key).toBe(true);
       for (const shot of screens) {
@@ -85,11 +88,35 @@ describe("feature page registry", () => {
         expect(shot.alt.length, shot.src).toBeGreaterThan(20);
         expect(shot.caption.length, shot.src).toBeGreaterThan(5);
         // Captions are page copy too: no prices, stats or promises (the image itself carries the sample data).
-        expect(`${shot.alt} ${shot.caption}`, shot.src).not.toMatch(/\$\s?\d|testimonial|guarantee|#1\b|\b\d+%/i);
+        expect(`${shot.alt} ${shot.caption}`, shot.src).not.toMatch(/\$\s?\d|testimonial|guarantee|#1\b|\b\d+%|\b\d+x\b|saves \d+ hours/i);
+        // The guide's caption rule is stricter than alt's: never a number in it,
+        // spelled out or not ("Four modules…", "over the last 30 days" both broke it).
+        expect(shot.caption, shot.src).not.toMatch(/\d/);
+        expect(shot.caption, shot.src).not.toMatch(SPELLED_NUMBER);
         expect(shot.width).toBeGreaterThan(0);
         expect(shot.height).toBeGreaterThan(0);
+        // The manifest's dimensions must match the file on disk (a hand edit would cause CLS).
+        const file = path.join(root, "client/public", shot.src);
+        const meta = await sharp(file).metadata();
+        expect(meta.width, shot.src).toBe(shot.width);
+        expect(meta.height, shot.src).toBe(shot.height);
+        // All screens are lazy-loaded below the fold, but keep them lean anyway.
+        expect(fs.statSync(file).size, shot.src).toBeLessThanOrEqual(200 * 1024);
       }
     }
+  });
+
+  it("every ready page shows at least one screen, and no captured image is orphaned on disk", () => {
+    // Reverse coverage: iterating FEATURE_SCREENS alone would let a future
+    // ready page ship with no "In the App" section at all.
+    for (const page of FEATURE_PAGES) {
+      if (page.status !== "ready") continue;
+      expect(FEATURE_SCREENS[page.key]?.length ?? 0, page.key).toBeGreaterThan(0);
+    }
+    const referenced = new Set(Object.values(FEATURE_SCREENS).flat().map((s) => s.src));
+    const shotsDir = path.join(root, "client/public/feature-shots");
+    const orphans = fs.readdirSync(shotsDir).filter((f) => f.endsWith(".webp") && !referenced.has(`/feature-shots/${f}`));
+    expect(orphans).toEqual([]);
   });
 
   it("covers every dashboard tile, in the dashboard's groups", () => {

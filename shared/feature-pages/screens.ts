@@ -50,7 +50,7 @@ export const FEATURE_SCREENS: Readonly<Record<string, readonly FeatureScreen[]>>
   ],
   "customerApi": [
     {"src":"/feature-shots/customerApi-1.webp","alt":"ConstructHUB API reference listing endpoints grouped by resource, each with its HTTP method, path, required scope and description.","caption":"The API reference, generated from the OpenAPI spec","url":"constructhub.us/developers","width":1600,"height":1000},
-    {"src":"/feature-shots/customerApi-2.webp","alt":"API usage dashboard showing units and requests over the last 30 days as a stacked bar chart by API key, with totals and a per-day breakdown.","caption":"API usage by key over the last 30 days","url":"constructhub.us/settings?tab=api-usage","width":1600,"height":1000},
+    {"src":"/feature-shots/customerApi-2.webp","alt":"API usage dashboard showing units and requests over the last 30 days as a stacked bar chart by API key, with totals and a per-day breakdown.","caption":"API usage by key, day by day","url":"constructhub.us/settings?tab=api-usage","width":1600,"height":1000},
   ],
   "domains": [
     {"src":"/feature-shots/domains-1.webp","alt":"Domain inventory with eight sample domains showing registrar, mapped location, expiry date, auto-renew status, nameservers and last DNS check.","caption":"Every client domain with expiry, auto-renew and DNS","url":"constructhub.us/domains","width":1600,"height":1000},
@@ -90,7 +90,7 @@ export const FEATURE_SCREENS: Readonly<Record<string, readonly FeatureScreen[]>>
     {"src":"/feature-shots/mailAlerts-1.webp","alt":"Provider inbox listing forwarded alerts from Google Business Profile, Search Console, Google Ads, Cloudflare and a domain registrar, with severity labels and read status.","caption":"Provider alerts from Google, registrars and more in one inbox","url":"constructhub.us/mail-alerts","width":1600,"height":1000},
   ],
   "masterClass": [
-    {"src":"/feature-shots/masterClass-1.webp","alt":"The Master Class overview with four in-depth modules, 50 state guides and the course module list.","caption":"Four modules and a guide for every state","url":"constructhub.us/master-class","width":1600,"height":1000},
+    {"src":"/feature-shots/masterClass-1.webp","alt":"The Master Class overview with four in-depth modules, 50 state guides and the course module list.","caption":"Modules and a state guide for every state","url":"constructhub.us/master-class","width":1600,"height":1000},
     {"src":"/feature-shots/masterClass-2.webp","alt":"The Master Class state guide for Colorado, showing licensing, workers comp, tax and bond requirements with links to the state agencies.","caption":"State guide: Colorado licensing, insurance and taxes","url":"constructhub.us/master-class","width":1600,"height":1000},
   ],
   "media": [
@@ -133,7 +133,7 @@ export const FEATURE_SCREENS: Readonly<Record<string, readonly FeatureScreen[]>>
   ],
   "social": [
     {"src":"/feature-shots/social-1.webp","alt":"Social Media calendar and queue for a roofing business, with search and status filters and scheduled posts for Facebook and Instagram.","caption":"One calendar and queue for every account","url":"constructhub.us/social-media?business=910001&tab=queue","width":1600,"height":1000},
-    {"src":"/feature-shots/social-2.webp","alt":"AI-generated draft posts waiting for approval with Approve and queue buttons, above published posts with their Blotato submission status.","caption":"AI drafts wait for approval; published posts show their status","url":"constructhub.us/social-media?business=910001&tab=queue","width":1600,"height":1000},
+    {"src":"/feature-shots/social-2.webp","alt":"AI-generated draft posts waiting for approval with Approve and queue buttons, above published posts with their submission status.","caption":"AI drafts wait for approval; published posts show their status","url":"constructhub.us/social-media?business=910001&tab=queue","width":1600,"height":1000},
   ],
   "texting": [
     {"src":"/feature-shots/texting-1.webp","alt":"Client record with the text messages the office and crew sent to a homeowner, each logged with sender and time.","caption":"Texts to clients, logged on the client record","url":"portal.constructhub.us/crm/clients/40000000-0002-4000-8000-000000000001?portal=1","width":1600,"height":1043},
