@@ -1,0 +1,2093 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+	<link rel="icon" href="/PublicTheme/Image/favicon.png" type="image/gif" sizes="16x16">
+    
+    <title>Westwood</title>
+    
+
+    <!-- Bootstrap core CSS -->
+    
+
+    <!-- Custom fonts for this template -->
+    
+    <link href="https://fonts.googleapis.com/css?family=Montserrat:400,700" rel="stylesheet" type="text/css">
+    <link href='https://fonts.googleapis.com/css?family=Kaushan+Script' rel='stylesheet' type='text/css'>
+    <link href='https://fonts.googleapis.com/css?family=Droid+Serif:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+    <link href='https://fonts.googleapis.com/css?family=Roboto+Slab:400,100,300,700' rel='stylesheet' type='text/css'>
+
+  <!-- FontAwesome Icons -->
+          
+          
+          <script src="https://kit.fontawesome.com/4346585e01.js" crossorigin="anonymous"></script> 
+     <!-- Froala Editor Css -->
+    <link href="/GovBuilt.FroalaEditor/vendors/froala-editor/css/froala_editor.pkgd.css" rel="stylesheet" type="text/css" />
+    <link href="/GovBuilt.FroalaEditor/vendors/froala-editor/css/plugins.pkgd.css" rel="stylesheet" type="text/css" />
+    <link href="/GovBuilt.FroalaEditor/vendors/tui-image-editor/tui-image-editor.min.css" rel="stylesheet" type="text/css" />
+    <link href="/GovBuilt.FroalaEditor/vendors/tui-color-picker/tui-color-picker.min.css" rel="stylesheet" type="text/css" />
+    <link href="/GovBuilt.FroalaEditor/vendors/froala-editor/css/third_party/image_tui.min.css" rel="stylesheet" type="text/css" />
+    <link href="/GovBuilt.FroalaEditor/css/orchard-core-froala-editor.min.css" rel="stylesheet" type="text/css" />
+
+
+    <!-- Bootstrap core JavaScript -->
+    
+    
+    
+
+	 <!-- Custom styles for this template -->
+    
+    
+
+    <!-- Plugin JavaScript -->
+    
+    
+    <!-- Contact form JavaScript -->
+
+    <!-- Custom scripts for this template -->
+    
+    
+
+
+
+    <script crossorigin="anonymous" integrity="sha384-1H217gwSVyLSIfaLxHbE7dRb3v4mYCKbpQvzx0cegeju1MVsGrX5xXxAvs/HgeFs" src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="/PublicReport/Scripts/urlConfig.js?v=5M0S8iMpI8a6Nru8HB_R6VgXx7qx0WMhlrdmMpMGym4"></script>
+<script>
+    if (typeof urlConfig !== undefined) {
+        urlConfig.GetAllContentToolModels = '/PublicReport/GetAllContentToolModels';
+        urlConfig.GetLicenseFormat = '/PublicReport/PublicReport/GetLicenseFormat';
+        urlConfig.GetCaseOrLicenseInspectionsByCaseIdOrLicenseId = '/PublicReport/PublicReport/GetCaseOrLicenseInspectionsByCaseIdOrLicenseId';
+        urlConfig.GetCaseSubTypeByTypeId = '/PublicReport/PublicReport/GetCaseSubTypesByTypeId';
+        urlConfig.GetLicenseSubTypeByTypeId = '/PublicReport/PublicReport/GetLicenseSubTypesByTypeId';
+    }
+</script>
+    
+    <link href="/OrchardCore.Case/Styles/style.css?v=y4jHpZOksqddWwVW1OrNX6XhN5hvN5XLAw5MC1s22jc" rel="stylesheet" type="text/css" />
+<link href="/OrchardCore.Case/Styles/graph.css?v=8jsEMcGU21Sj9k-_EcUPcuMdsWPWP3SGmQwLCX-OFjY" rel="stylesheet" type="text/css" />
+<link href="/PublicReport/Styles/SearchTool.css?v=by4CvS3Wa3TXDJ8yNez-9PfkHNhpOZSuV-gcWkP1Xl0" rel="stylesheet" type="text/css" />
+<link href="/GovBuilt.Resource/css/StandardDialogs.css?v=QmzyEZr6iWwMe3iXEgRmmbEhEbYI8G83yx8QF-wEmLY" rel="stylesheet" type="text/css" />
+<link href="https://cdn.govbuilt.com/contents/bootstrap/5.3.8/css/bootstrap-multiselect.css" rel="stylesheet" type="text/css" />
+<link crossorigin="anonymous" href="https://cdn.jsdelivr.net/npm/vue-multiselect@2.1.6/dist/vue-multiselect.min.css" integrity="sha384-PPH/T7V86Z1+B4eMPef4FJXLD5fsTpObWoCoK3CiNtSX7aji+5qxpOCn1f2TDYAM" rel="stylesheet" type="text/css" />
+<link crossorigin="anonymous" href="https://cdn.jsdelivr.net/npm/trumbowyg@2.31.0/dist/ui/trumbowyg.min.css" integrity="sha384-LqNrbFfMePpQMO6AvQziSnLgdzv/vMiSjDkui1MEXDoKDfMObOzIdGhi1Sl+fpEz" rel="stylesheet" type="text/css" />
+<link href="/OrchardCore.Resources/Styles/trumbowyg/trumbowyg-plugins.min.css?v=EOoT-zWfO4DQBSm_5WNyv0hdCwKlt1DI6IcP2475Gbo" rel="stylesheet" type="text/css" />
+<link href="/GovBuilt.Resource/css/datatable/jquery.dataTables.min.css?v=fc1cAgc3GomdVnpsrtNI7HdDNJc9T5YzD-lXtlOYBzY" rel="stylesheet" type="text/css" />
+<link href="/GovBuilt.Resource/css/datatable/rowReorder.dataTables.min.css?v=fUMLwHbxog8H4FAdUNjmra9UeSDR6zliaJEMpS_tgVU" rel="stylesheet" type="text/css" />
+<link href="/GovBuilt.Resource/css/datatable/responsive.dataTables.min.css?v=WQteKlNq8bI4NDjqGzH3LfmYgLMPtZ7VEZibqngee-g" rel="stylesheet" type="text/css" />
+<link href="https://js.arcgis.com/4.24/esri/css/main.css" rel="stylesheet" type="text/css" />
+<link href="/GovBuilt.Resource/css/bootstrap/bootstrap.min.css?v=lGUC-vKaf3vAM0zzXx9-Urg4tXwUnMXOeJ_kJwyRcQs" rel="stylesheet" type="text/css" />
+<link crossorigin="anonymous" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha384-DyZ88mC6Up2uqS4h/KRgHuoeGwBcD4Ng9SiP4dIRy0EXTlnuz47vAwmeGwVChigm" rel="stylesheet" type="text/css" />
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.1/css/all.min.css" rel="stylesheet" type="text/css" />
+<link href="https://pro.fontawesome.com/releases/v6.0.0-beta3/css/all.css" rel="stylesheet" type="text/css" />
+<link href="/PublicTheme/css/agency.css?v=34_MaPOgANozPya8944ZUE6uKEOTEwEoeLNcJ6arbqs" rel="stylesheet" type="text/css" />
+<link href="/Common/css/bootstrap/bootstrap-grid-ext.min.css?v=6VpbIvxtlClyDAOydiuwCAsFpvqAWv7gxwdR3q8sHaw" rel="stylesheet" type="text/css" />
+<style type="text/css">
+    .esri-popup__header {
+        display: inherit !important;
+    }
+
+    .esri-component.esri-search.esri-widget {
+        position: absolute;
+        margin-left: 3rem;
+    }
+
+    @media only screen and (max-width: 600px) {
+        .form-group {
+            padding: 0px 10px !important;
+            margin-top: 0.75rem !important;
+        }
+    }
+
+    .btn-info:hover {
+        color: #fff !important;
+    }
+</style>
+	<style>
+      .auth-form{
+        margin-top:4rem;
+      }
+     #logo_margin{
+        margin-right: 0 !important;
+    width: fit-content;
+     }  
+     
+    .navbar-brand{
+      padding: 10px;
+    }
+    #mainNav{
+    background-color:rgba(0, 0, 0, 0.51);
+        padding-top: 0px;
+    padding-bottom: 0px;
+    }
+    #mainNav .navbar-nav .nav-item .nav-link {
+    font-size: 14px;
+    font-weight: 700;
+    color:#fff !important;
+    font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    }
+
+    
+    .menu-dropdown a, .menu-dropdown a:hover {
+        font-size: 100%;
+        font-weight: 700;
+    }
+    .menu-dropdown {
+        padding: 1.1em 1em;
+    }
+    
+    @media (max-width: 768px) {
+  #mainNav .navbar-nav .nav-item .nav-link {
+    color: #fff;
+}
+    
+    .navbar .nav-item-mobile {
+  padding:.5rem .5rem;
+}
+  .menu-dropdown>a, .menu-dropdown>a:hover {
+    color: #fff;
+}
+  .menu-dropdown {
+    padding: 10px 0 !important;
+}
+  }
+#main{
+      margin-top:6rem;
+ }    
+.profileRow{margin-top:150px;}
+    
+    section {
+    padding: 10px 0 0 0 !important;
+}
+    /* adds some margin below the link sets  */
+.navbar .dropdown-menu div[class*="col"] {
+   margin-bottom:1rem;
+}
+
+.navbar .dropdown-menu {
+  border:none;
+  background-color:rgb(0, 0, 0) !important;
+}
+.nav-item {
+    padding: 0px 10px;
+}
+    
+/* breakpoint and up - mega dropdown styles */
+@media screen and (min-width: 992px) {
+  
+  /* remove the padding from the navbar so the dropdown hover state is not broken */
+.navbar {
+  padding-top:0px;
+  padding-bottom:0px;
+}
+    .navbar .nav-item-mobile {
+  padding:2.3rem .5rem;
+}
+
+/* makes the dropdown full width  */
+.navbar .dropdown {position:static;}
+
+.navbar .dropdown-menu {
+      width: 100%;
+    left: -1px;
+    right: 0;
+    top: 82px;
+}
+  
+  /* shows the dropdown menu on hover */
+.navbar .dropdown:hover .dropdown-menu, .navbar .dropdown .dropdown-menu:hover {
+  display:block!important;
+}
+  
+  .navbar .dropdown-menu {
+    border: 1px solid rgba(0,0,0,.15);
+    background-color: #fff;
+  }
+
+}
+.inner-nav-link{
+  font-size:14px !important;
+  font-weight: 100 !important;
+}       
+.alertBar{
+    margin-bottom:0px;
+    color: #ffffff;
+    background-color: #ea6d79;
+    border-color: #ec5262;
+    position:fixed;
+    width:100%;
+    border-radius:0px;
+    z-index: 99;
+    top: 0;
+    max-height: 50px;
+    overflow: hidden;
+    min-height: 50px;
+    left: 0;
+  }
+  @media (max-width: 768px) {
+  .alertBar{
+    	min-height: 95px;
+  }
+    
+    #main-div {
+    margin-top: 170px !important;
+      min-height: 25.2rem;
+}
+    
+    @media (max-width: 768px) {
+  #main-div{
+    	margin-top:230px !important;
+  }
+
+        
+    * {box-sizing: border-box;}
+body {font-family: Verdana, sans-serif;}
+.mySlides {display: none;}
+img {vertical-align: middle;}
+
+/* Slideshow container */
+.slideshow-container {
+  max-width: 1000px;
+  position: relative;
+  margin: auto;
+}
+
+/* Caption text */
+.text {
+  color: #f2f2f2;
+  font-size: 15px;
+  padding: 8px 12px;
+  position: absolute;
+  bottom: 8px;
+  width: 100%;
+  text-align: center;
+}
+
+/* Number text (1/3 etc) */
+.numbertext {
+  color: #f2f2f2;
+  font-size: 12px;
+  padding: 8px 12px;
+  position: absolute;
+  top: 0;
+}
+
+/* The dots/bullets/indicators */
+.dot {
+  height: 15px;
+  width: 15px;
+  margin: 0 2px;
+  background-color: #bbb;
+  border-radius: 50%;
+  display: inline-block;
+  transition: background-color 0.6s ease;
+}
+
+.active {
+  background-color: #717171;
+}
+
+/* Fading animation */
+.fade {
+  -webkit-animation-name: fade;
+  -webkit-animation-duration: 1.5s;
+  animation-name: fade;
+  animation-duration: 1.5s;
+}
+
+@-webkit-keyframes fade {
+  from {opacity: .4} 
+  to {opacity: 1}
+}
+
+
+
+@keyframes fade {
+  from {opacity: .4} 
+  to {opacity: 1}
+}
+    
+    #mainNav .navbar-nav .nav-item .nav-link-active  {
+    color: #fed136;
+}
+
+a {
+   color: #e9c872;
+}
+  a:hover {
+    color: #e9c872;
+} 
+.modalFullScreen {
+    max-width: 100%;
+      max-height: calc(100vh - 143px);
+}
+ #mainNav .navbar-nav .nav-item .nav-link:hover{
+        color: #fed136 !important;
+        }
+
+
+</style>
+
+</head>
+<body id="page-top" class="fr-view" dir="ltr">
+    <nav class="navbar navbar-expand-lg navbar-dark fixed-top" id="mainNav">
+        <div class="container">
+            <a class="navbar-brand js-scroll-trigger" id="logo_margin" href="/#page-top">
+              <img style="max-width: 125px;height: 70px;" src="/media/layout/Westwood-Kansas.png" />
+          </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" href="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+           <style>
+  .mega-menu{
+  	padding: 10px 0px;
+  	overflow:auto;
+  	max-height: 77vh;
+  	margin-top: 10px;
+  }
+  @media only screen and (max-width: 600px) {
+ .mega-menu{
+  	padding: 10px 0px;
+  	overflow:auto;
+  	max-height: 50vh;
+  	margin-top: 10px;
+  }
+}
+@media only screen and (max-width: 1200px) and (min-width: 992px){
+   #logo_margin{
+       margin-right: 0%;
+   }
+   #mainNav .navbar-nav .nav-item .nav-link {
+      font-size: 12px;
+   }
+}  
+</style>
+<div class="collapse navbar-collapse" id="navbarSupportedContent">
+    <ul class="navbar-nav mr-auto">
+      
+        
+          <li class="nav-item dropdown nav-item-mobile">
+            <a class="nav-link text-uppercase dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+              Mission Woods
+            </a>
+            <div class="dropdown-menu mega-menu" aria-labelledby="navbarDropdown">
+            <div class="container">
+              <div class="row">
+                  
+                <div class="col-md-3 col-sm-6">
+                    
+                    <span class="text-uppercase text-white" style="font-weight:700;font-size:14px;font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';">
+                    	
+                         <a class="nav-link inner-nav-link" href="/mission-woods-services">Mission Woods Services</a>
+                    	
+                  </span>
+                  	
+                  </div>
+                  
+                <div class="col-md-3 col-sm-6">
+                    
+                    <span class="text-uppercase text-white" style="font-weight:700;font-size:14px;font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';">
+                    	
+                         <a class="nav-link inner-nav-link" href="https://www.missionwoods-ks.org/">Mission Woods Website</a>
+                    	
+                  </span>
+                  	
+                  </div>
+                  
+              </div>
+            </div>
+          </div>
+          </li>
+      
+      
+        
+          <li class="nav-item dropdown nav-item-mobile">
+            <a class="nav-link text-uppercase dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+              Westwood
+            </a>
+            <div class="dropdown-menu mega-menu" aria-labelledby="navbarDropdown">
+            <div class="container">
+              <div class="row">
+                  
+                <div class="col-md-3 col-sm-6">
+                    
+                    <span class="text-uppercase text-white" style="font-weight:700;font-size:14px;font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';">
+                    	
+                         <a class="nav-link inner-nav-link" href="/westwood-services">Westwood Services</a>
+                    	
+                  </span>
+                  	
+                  </div>
+                  
+                <div class="col-md-3 col-sm-6">
+                    
+                    <span class="text-uppercase text-white" style="font-weight:700;font-size:14px;font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';">
+                    	
+                         <a class="nav-link inner-nav-link" href="https://www.westwoodks.org/">Westwood Website</a>
+                    	
+                  </span>
+                  	
+                  </div>
+                  
+              </div>
+            </div>
+          </div>
+          </li>
+      
+      
+        
+          <li class="nav-item dropdown nav-item-mobile">
+            <a class="nav-link text-uppercase dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+              Westwood Hills
+            </a>
+            <div class="dropdown-menu mega-menu" aria-labelledby="navbarDropdown">
+            <div class="container">
+              <div class="row">
+                  
+                <div class="col-md-3 col-sm-6">
+                    
+                    <span class="text-uppercase text-white" style="font-weight:700;font-size:14px;font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';">
+                    	
+                         <a class="nav-link inner-nav-link" href="/westwood-hills-services">Westwood Hills Services</a>
+                    	
+                  </span>
+                  	
+                  </div>
+                  
+                <div class="col-md-3 col-sm-6">
+                    
+                    <span class="text-uppercase text-white" style="font-weight:700;font-size:14px;font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';">
+                    	
+                         <a class="nav-link inner-nav-link" href="https://www.westwoodhillsks.gov/">Westwood Hills Website</a>
+                    	
+                  </span>
+                  	
+                  </div>
+                  
+              </div>
+            </div>
+          </div>
+          </li>
+      
+      
+        
+          <li class="nav-item dropdown nav-item-mobile">
+            <a class="nav-link text-uppercase dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+              Site Help/FAQS
+            </a>
+            <div class="dropdown-menu mega-menu" aria-labelledby="navbarDropdown">
+            <div class="container">
+              <div class="row">
+                  
+                <div class="col-md-3 col-sm-6">
+                    
+                    <span class="text-uppercase text-white" style="font-weight:700;font-size:14px;font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';">
+                    	
+                         <a class="nav-link inner-nav-link" href="/how-to-create-account">How To Create Account</a>
+                    	
+                  </span>
+                  	
+                  </div>
+                  
+                <div class="col-md-3 col-sm-6">
+                    
+                    <span class="text-uppercase text-white" style="font-weight:700;font-size:14px;font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';">
+                    	
+                         <a class="nav-link inner-nav-link" href="/faq">FAQs</a>
+                    	
+                  </span>
+                  	
+                  </div>
+                  
+                <div class="col-md-3 col-sm-6">
+                    
+                    <span class="text-uppercase text-white" style="font-weight:700;font-size:14px;font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';">
+                    	
+                         <a class="nav-link inner-nav-link" href="/activitysearchtool">Activity Search Tool</a>
+                    	
+                  </span>
+                  	
+                  </div>
+                  
+              </div>
+            </div>
+          </div>
+          </li>
+      
+      
+        
+      <style>
+.cartCountBadge{
+    position: absolute;
+    top: -10px;
+    border-radius: 50%;
+    background: red;
+    color: white;
+    text-align: center;
+    font-size: 10px;
+    padding: 4px 7px;
+    left: unset;
+    right: 0;
+}
+.w-fit {
+  width: fit-content !important;
+}
+
+</style>
+      	<li class="nav-item nav-item-mobile">
+          <span class="text-uppercase text-white" style="font-weight:700;font-size:14px;font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';">
+        	<a class="nav-link  position-relative w-fit" href="/Cart"><i class="fas fa-shopping-cart" style="font-size: 20px;color:#fff;"></i>
+   <span class="cartCountBadge">0</span></a>
+          </span>
+        </li>
+   <script>
+        $.ajax({
+                url: "https://westwood.govbuilt.com/GetCartItemCount",
+                async: true,
+                method: 'GET',
+                success: function (data) {
+                 $(".cartCountBadge").text(data);
+                },
+                error: function (error) {
+                  $(".cartCountBadge").text(0);
+                }
+            });
+   </script>
+      
+      
+      
+    <li class="nav-item nav-item-mobile">
+      <a href="/Profile" class="nav-link js-scroll-trigger">
+        MY PROFILE
+      </a>
+    </li>
+    
+    
+    </ul>
+  </div>
+        </div>
+    </nav>
+    
+    <div class="container" id="main">
+      
+        <style>
+            .container {
+              padding-right: 0px;
+              padding-left: 0px;
+          } 
+          #mainNav .navbar-nav .nav-item .nav-link:hover{
+        color: #fed136 !important;
+        }
+        </style>
+        
+
+
+
+
+
+
+
+
+
+        <template id="confirmRemoveModalMetadata" data-title="Delete" data-message="Are you sure you want to delete this element?" data-ok-text="Ok" data-cancel-text="Cancel" data-ok-class="btn-danger" data-cancel-class="btn-secondary"></template>
+
+
+
+
+
+
+
+
+<div class="title-container">
+    <h1 class="fs-3">Activity Search Tool</h1>
+</div>
+<style>
+    .fa-caret-down::before,
+    .fa-caret-down::after {
+        position: relative;
+        display: block;
+        height: 1px;
+        transition: 0.3s ease-in-out;
+    }
+
+    .fa-caret-down::after {
+        left: 6px;
+        top: 1px;
+        height: 39px;
+        transform: rotate(-180deg);
+    }
+
+    .arrow-btn.active .fa-caret-down::before {
+        transform: rotate(-180deg);
+    }
+
+    .arrow-btn.active .fa-caret-down::after {
+        transform: rotate(90deg);
+    }
+
+    .hidden {
+        display: none !important;
+    }
+
+    .has-filter .multiselect-search {
+        padding-left: 34px;
+    }
+
+    .has-filter .form-control-feedback {
+        position: absolute;
+        margin-left: 10px;
+    }
+
+    .multiselect-selected-text {
+        font-family: inherit;
+        letter-spacing: 0;
+        font-size: inherit;
+    }
+
+    .multi-select-caselicensetype .multiselect-container.dropdown-menu.show {
+        overflow: auto;
+        max-height: 330px;
+    }
+
+    .dropdown-toggle::after {
+        float: none !important;
+    }
+
+    .fullScreen {
+        width: 100%;
+        height: 100%;
+        position: fixed;
+        top: 0px;
+        z-index: 9999;
+        left: 0;
+        background: rgba(255, 255, 255, 1);
+    }
+
+    .widgetShowDiv {
+        margin:  0 !important;  
+        border: 1px solid #a7a7a7 !important;
+    }
+    @media (max-width: 768px) {
+        .tab-pane.active,.nav-tabs .active {
+        background-color: transparent;
+    }
+    }
+</style>
+
+<div class="searchbar-container">
+    <div class="searchbar-container-wrapper w-100">
+        <div class="searchbar-advance-filter d-flex w-100 flex-mobile-wrap">
+            <div class="day-select-option">
+                <select id="days-dropdown" class="form-select" aria-label="Filter by Date Range">
+                    <option value="30">Last 30 days</option>
+                    <option value="90">Last 3 months</option>
+                    <option value="180">Last 6 months</option>
+                    <option value="365">Last 12 months</option>
+                    <option value="0">Beyond 12 months</option>
+                </select>
+            </div>
+
+            <select id="filter-dropdown" class="form-select flex-mobile-wrap" aria-label="Filter By">
+                <option value="ReferenceNumber">Reference Number</option>
+                    <option value="Name">Name</option>
+                <option value="Address">Address</option>
+                        <option value="BusinessName">Business Name (License Only)</option>
+            </select>
+            <div class="filter-search d-flex" data-silktide="ignore">
+                <label for="contentSearchBar" class="visually-hidden">Search</label>
+                <input type="search" id="contentSearchBar" class="form-control" placeholder="Search"/>
+                <button id="search-submit" type="button">
+                    <span class="visually-hidden">Search</span>
+                    <i class="fa fa-search" aria-hidden="true"></i>
+                </button>
+                <button class="btn btn-secondary arrow-btn ms-auto" id="arrowClick" style="margin-left: 10px!important;" aria-label="Toggle advanced search">
+                    <i class="fa fa-caret-down activity-item-btn" aria-hidden="true"></i>
+                </button>
+            </div>
+        </div>
+        <div class="searchbar-advance-filter d-flex flex-mobile-wrap" id="advancedSearch">
+            <div class="form-group contentType">
+                <select id="contentType" class="form-select" style="width:200px;" aria-label="Content Type">
+                    <option value="All">All</option>
+                        <option value="case">Case</option>
+                        <option value="license">License</option>
+                </select>
+            </div>
+
+            <div class="case_filter" data-silktide="ignore">
+                <div class="case-row d-flex flex-mobile-wrap">
+                    
+
+<div id="caseTypes" class="case-type-dropdown">
+
+
+    <div class="multi-select-caselicensetype">
+        <select id="caseType_Select" class="multiselect-ui form-select" multiple="multiple" aria-label="Case Type"></select>
+    </div>
+
+
+    <input type="hidden" name="caseType" id="caseType" class="caseType" />
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    <input type="hidden" id="hiddenCaseTypeId" value="" />
+
+
+<div id="caseSubTypes" class="case-type-dropdown">
+
+
+    <div class="multi-select-caselicensetype">
+        <select id="caseSubType_Select" class="multiselect-ui form-select" multiple="multiple" aria-label="Case Sub Type"></select>
+    </div>
+
+
+    <input type="hidden" name="caseSubType" id="caseSubType" class="caseSubType" />
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                        <input type="hidden" id="hiddenCaseSubTypeId" value="" />
+                </div>
+            </div>
+            <div class="license_filter" data-silktide="ignore">
+                <div class="case-row d-flex flex-mobile-wrap">
+                    
+
+<div id="licenseTypes" class="case-type-dropdown">
+
+
+    <div class="multi-select-caselicensetype">
+        <select id="licenseType_Select" class="multiselect-ui form-select" multiple="multiple" aria-label="License Type"></select>
+    </div>
+
+
+    <input type="hidden" name="licenseType" id="licenseType" class="licenseType" />
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    <input type="hidden" id="hiddenLicenseTypeId" value="" />
+
+
+<div id="licenseSubTypes" class="case-type-dropdown">
+
+
+    <div class="multi-select-caselicensetype">
+        <select id="licenseSubType_Select" class="multiselect-ui form-select" multiple="multiple" aria-label="License Sub Type"></select>
+    </div>
+
+
+    <input type="hidden" name="licenseSubType" id="licenseSubType" class="licenseSubType" />
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                        <input type="hidden" id="hiddenLicenseSubTypeId" value="" />
+                </div>
+            </div>
+            <div class="form-group hide-items">
+                <label for="isHideCloseStatus">
+                        <input type="checkbox" class="form-group" id="isHideCloseStatus" aria-label="Hide Closed Items" />
+                    Hide Closed Items
+                </label>
+            </div>
+        </div>
+    </div>
+</div>
+<br />
+
+<input type="hidden" id="content-json-string" />
+<input type="hidden" id="hiddenToken" value="" />
+<input type="hidden" id="hiddenIsInspectionScoreShowOnActivitySearchTool" value="False" />
+<input type="hidden" id="hiddenIsShowPhoneNumberByDefault" value="False" />
+<input type="hidden" id="hiddenIsShowNameByDefault" value="True" />
+
+<div class="row">
+    <div class="col-md-12">
+        <ul class="nav nav-tabs">
+            <li class="active item-list-view" role="presentation"><a class="nav-link active" data-bs-toggle="tab" href="#listView">List View</a></li>
+            <li class="" role="presentation"><a class="nav-link" data-bs-toggle="tab" href="#mapView">Map View</a></li>
+        </ul>
+        <div class="tab-content" style="border: 1px solid #ddd;padding: 15px;">
+            <div id="listView" class="tab-pane fade in active show">
+                <table id="publicContentTable">
+                </table>
+            </div>
+            <div class="tab-pane fade" id="mapView">
+                <div class="widgetShowDiv" id="widgetDivID" style="padding: 6px 0px;min-height: 60vh;">
+                    <div class="pull-right widgetAction">
+                        <span title="FullScreen" id="fullScreen" aria-label="Enter Full Screen">
+                            <i class="fa fa-expand-arrows-alt" aria-hidden="true"></i>
+                        </span>
+                        <span id="exitFullScreen" style="display:none;" title="Exit FullScreen" aria-label="Exit Full Screen">
+                            <i class="fa fa-compress" aria-hidden="true"></i>
+                        </span>
+                        <input type="hidden" value="Map" />
+                    </div><br />
+                    <hr style="margin:0px;" />
+                    <div class="widgetChart" id="Widget_Esri_Map">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade " id="LicenseFormatModal" tabindex="-1" role="dialog" aria-labelledby="LicenseFormatModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content ">
+            <div class="modal-header">
+                <h2 class="modal-title fs-5" id="LicenseFormatModalLabel">License</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="LicenceContainerDoc">
+                    <i class="fa fa-download" aria-hidden="true"></i>
+                    <a href="#" aria-label="Download License">Download License</a>
+                </div>
+                <div id="LicenceContainerFormat"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="btnPrint" onclick="printlicense()" class="publish-button btn btn-success" aria-label="Print License">Print</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" aria-label="Close">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Inspection Score Modal -->
+<div class="modal fade" id="inspectionScoreModal" tabindex="-1" aria-labelledby="inspectionScoreModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title fs-5" id="inspectionScoreModalLabel">Inspection Score(s)</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div style="max-height: 400px;overflow-y: auto;">
+                    <table id="inspectionScoreTable" class="table">
+                        <thead>
+                            <tr>
+                                <th scope="col">Inspection Type</th>
+                                <th scope="col">Score</th>
+                                <th scope="col">Date</th>
+                                <th scope="col">Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Data will be filled dynamically here -->
+                        </tbody>
+                    </table>
+                    <p id="noDataMessage" style="display: none;">No data available in table</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" aria-label="Close">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="loading" style="display:none;">Loading&#8230;</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        <style>  
+    }</style>
+    
+        
+ 
+        
+    </div><br/><br/>
+	<div class="container-fluid divFooter" style="background: #000 !important;bottom: 0;position: relative;">
+		
+
+<div class="widget-container">
+
+    <div class="widget widget-html-widget">
+    <div class="widget-body">
+        
+
+<div class="field field-type-htmlfield field-name-html-widget-content">
+    <!-- Footer -->
+<footer>
+    <div class="container">
+        <div class="row">
+            <div class="col-md-4">
+                <a href="https://www.govbuilt.com" target="_blank">  
+                     <span class="copyright" style="padding: 10px;color: #fff;font-size: 10px;">
+Government Websites by GovBuilt, <span style="font-size: 8px;">an MCCi brand</span>
+</span>
+                </a>
+            </div>
+            <div class="col-md-4">
+                <ul class="list-inline social-buttons">
+                    <li class="list-inline-item">
+                        <a href="https://twitter.com/westwoodks?lang=en" target="_blank">
+<i class="fa-brands fa-x-twitter"></i>
+                        </a>
+                    </li>
+                    <li class="list-inline-item">
+                        <a href="https://www.facebook.com/City-of-Westwood-Kansas-Government-135577499846102" target="_blank">
+                            <i class="fab fa-facebook"></i>
+                        </a>
+                    </li>
+                    <li class="list-inline-item">
+                        <a href="https://www.linkedin.com/company/city-of-westwood-kansas/" target="_blank">
+                            <i class="fab fa-linkedin"></i>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+            <div class="col-md-4">
+                <ul class="list-inline quicklinks">
+                    <li class="list-inline-item">
+                            <a href="/admin">Staff Portal</a>
+                     </li>
+                    <li class="list-inline-item">
+                        <a href="privacypolicy">Privacy Policy</a>
+                    </li>
+                    <li class="list-inline-item">
+                        <a href="termsofuse">Terms of Use</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</footer>
+
+<div class="container">
+		<div class="row googletranslater">
+		    <div id="google_translate_element" class=" "></div>
+		</div>
+	</div>
+</div>
+
+    </div>
+</div>
+
+</div>
+
+	</div>
+    <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>                
+    <script src="/GovBuilt.Resource/js/StandardDialogs.min.js?v=_qBoYEN-Xu419TaJ_lO3pFVxrP7LnfIxNX82uUTKmQA"></script>
+<script src="/OrchardCore.Case/Scripts/casegraph.js?v=vaf-Y--UxbOggYvNUiEIbzG2Fl5HxmA99h5dja9AtlU"></script>
+<script src="/GovBuilt.Resource/Scripts/datatable/jquery.dataTables.min.js?v=fnC9snACCTjioR4XK0P89_aNWlhy_yRMo5jqjcWVY3w"></script>
+<script src="/PublicReport/Scripts/SearchTool.js?v=8bWxUzHV2rPlwmw-bd8qeCzuQJdkHkkL5DjPcTrn88s"></script>
+<script src="/OrchardCore.Case/Scripts/styleScript.js?v=lUse585igh0Myv9lsz8oVhAtBdemOf0hHlvfOjuIDo8"></script>
+<script src="https://cdn.govbuilt.com/contents/bootstrap/5.3.8/js/bootstrap-multiselect.js"></script>
+<script crossorigin="anonymous" integrity="sha384-YVYXhPGIH/Gmcr0W5Rin4PcpcsG1a4pcdUUod1CnbDEJut7XiUaJtSlNKeRLJBPk" src="https://cdn.jsdelivr.net/npm/vue@2.7.16/dist/vue.min.js"></script>
+<script crossorigin="anonymous" integrity="sha384-/jkFGhPVLS9HIUzX09xB5W3coE5q1X5NXZA/PuOAdOaRxUPczlZmKzYEq9QcJnW0" src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
+<script crossorigin="anonymous" integrity="sha384-qUA1xXJiX23E4GOeW/XHtsBkV9MUcHLSjhi3FzO08mv8+W8bv5AQ1cwqLskycOTs" src="https://cdn.jsdelivr.net/npm/vuedraggable@2.24.3/dist/vuedraggable.umd.min.js"></script>
+<script crossorigin="anonymous" integrity="sha384-1LMjDEezsSgzlRgsyFIAvLW7FWSdFIHqBGjUa+ad5EqtK1FORC8XpTJ/pahxj5GB" src="https://cdn.jsdelivr.net/npm/jquery-resizable-dom@0.35.0/dist/jquery-resizable.min.js"></script>
+<script crossorigin="anonymous" integrity="sha384-l4+mVm18V4OOdz6MWO+OmyVods549M2rNdB/NAJkyPmPzuILPswXpFbMBJR9VtSm" src="https://cdn.jsdelivr.net/npm/trumbowyg@2.31.0/dist/trumbowyg.min.js"></script>
+<script src="/OrchardCore.Resources/Scripts/trumbowyg/trumbowyg-plugins.min.js?v=zWfI3xNTLadJfcoa0G_lktZdTnB3QKcTuqYOLxvxDRM"></script>
+<script src="/OrchardCore.ContentFields/Scripts/trumbowyg.media.tag.min.js?v=kw_A3W40RRngT82REqR4WWmkjk46l5FPPoKYyrw5zYs"></script>
+<script src="/OrchardCore.Resources/Scripts/trumbowyg/trumbowyg.shortcodes.min.js?v=GmOvFCJsKuTs4B0jNQJr7EZNGsOajcxaY0TcsG6KVoY"></script>
+<script src="/OrchardCore.Themes/Scripts/theme-head/theme-head.min.js?v=iqEkKdbO8qXZbTh9l58jQq_0Ba9W4Fn5DLUoWrdBCcQ"></script>
+<script src="/OrchardCore.Resources/Scripts/trumbowyg/trumbowyg.theme.min.js?v=oU8QQSEEGGUFfMSmNS7gZvtqN8nX55pnjpV_Hk-eshY"></script>
+<script crossorigin="anonymous" integrity="sha384-a4eXewRTYCwYdFtSnMCZTNtiXrfdul6aQdueRgHPAx2y1Ldp0QaFdCTpOx0ycsXU" src="https://cdn.jsdelivr.net/npm/vue-multiselect@2.1.6/dist/vue-multiselect.min.js"></script>
+<script src="/AdvancedForms/Scripts/contentPickerAF.js?v=AQi-lewOBImPACRNDCpivspHngwkuafT4-YqKi6vDyQ"></script>
+<script src="/GovBuilt.Resource/Scripts/datatable/dataTables.rowReorder.min.js?v=qG5YgXSGle2AEsxWvw3omKf9L6seaHWByo9Z6ZRT8kQ"></script>
+<script src="/GovBuilt.Resource/Scripts/datatable/dataTables.responsive.min.js?v=UM-KViXhUh2GPbsLnByEwjX9mIm6stNyYc02HmnDSLI"></script>
+<script defer="" src="https://js.arcgis.com/4.24/"></script>
+<script src="/GovBuilt.GIS/Scripts/Esri_Map_ActivitySearchTool.js?v=_EFTMiM1c5At9a2Asb1jk9MYu8EmTsuWT8eclBqu-A8"></script>
+<script defer="" src="/GovBuilt.GIS/Scripts/EsriOAuthFE.js?v=l-LiT298r1oC5Y9Q6KrVoNyCL1C_3y6-V15b6RbIpr0"></script>
+<script src="/GovBuilt.Resource/Scripts/bootstrap/bootstrap.bundle.min.js?v=rxIzctgtnR2dIJoqmR7ygw2ecyG2kubCBBstzOs1Ms8"></script>
+<script src="/PublicTheme/vendor/jquery-easing/jquery.easing.min.js?v=H3cjtrm_ztDeuhCN9I4yh4iN2Ybx_y1RM7rMmAesA0k"></script>
+<script src="/PublicTheme/js/agency.min.js?v=AQXrNI3YoJvc0QA9eGI2zR1Gl4TAzHUBqreLvax5Pt8"></script>
+<script src="/GovBuilt.Resource/js/FECommon.min.js?v=BBOumJEKZYxR96WiPBwdPakzWrMXypwNzBLzyxJXUXE"></script>
+<script>
+    // Define a custom jQuery event
+    $.event.special.DOMSubtreeModified = {
+        setup: function () {
+            var targetNode = this;
+            var config = { childList: true, subtree: true };
+
+            var observer = new MutationObserver(function (mutations) {
+                $(targetNode).trigger('DOMSubtreeModified');
+            });
+
+            observer.observe(this, config);
+
+            // Store observer instance so it can be later disconnected if needed
+            $(this).data('DOMSubtreeModifiedObserver', observer);
+        },
+        teardown: function () {
+            var observer = $(this).data('DOMSubtreeModifiedObserver');
+            if (observer) {
+                observer.disconnect();
+            }
+        }
+    };
+</script>
+<script>
+    (function () {
+        const caseType_Picker = {
+            selectId: '#caseType_Select',
+            inputId: '#caseType',
+            $select: null,
+            contentType: 'CaseType',
+            allItems: [],
+            preSelectedIds: [],
+            nonSelectedText : "Select Case Type",
+            ariaLabel: "Case Type",
+            isEnableFilter: "True" === "True",
+            includeSelectAllOption : "True" === "True",
+            numberDisplayed: 1,
+            selectedIds: '',
+            isUserOpenedDropdown: false,
+            usePreload: "False" === "True",
+            preDefinedList : [],
+            init: function () {
+                const self = this;
+                self.$select = $(self.selectId);
+                self.$select.multiselect({
+                    nonSelectedText: self.nonSelectedText,
+                    enableFiltering: self.isEnableFilter,
+                    enableCaseInsensitiveFiltering: true,
+                    includeSelectAllOption: self.includeSelectAllOption,
+                    numberDisplayed: self.numberDisplayed,
+                    onChange: self.fillInput.bind(self, false, false),
+                    onSelectAll: self.fillInput.bind(self, false, false),
+                    onDeselectAll: self.fillInput.bind(self, false, false),
+                    onInitialized: function () {
+                        self.fillInput(true, false);
+                        self.applyAriaLabels();
+                    },
+                    onDropdownShown: function (event) {
+                        self.isUserOpenedDropdown = true;
+                    },
+                    onDropdownHidden: function (event) {
+                        if (self.isUserOpenedDropdown) {
+                            self.onDropdownClosed();
+                            self.isUserOpenedDropdown = false;
+                        }
+                    }
+                });
+                self.fetchAllItems();
+            },
+            fetchAllItems: function () {
+                const self = this;
+
+                if (self.usePreload) {
+                    self.allItems = self.preDefinedList.sort((a, b) =>
+                        a.displayText.localeCompare(b.displayText, undefined, { sensitivity: 'base' })
+                    );
+                    self.bindItems();
+                    return;
+                }
+
+                var url = self.getSearchUrl();
+                $.ajax({
+                    url: url,
+                    type: 'GET',
+                    dataType: 'json',
+                    success: function (data) {
+                        if (!Array.isArray(data)) {
+                            console.error("Invalid response format", data);
+                            self.bindItems();
+                            return;
+                        }
+                        self.allItems = data.sort((a, b) =>
+                            a.displayText.localeCompare(b.displayText, undefined, { sensitivity: 'base' })
+                        );
+                        self.bindItems();
+                    },
+                    error: function () {
+                        console.error("Failed to fetch items.");
+                    }
+                });
+            },
+            bindItems: function (items) {
+                const self = this;
+                const list = items || self.allItems;  // use items if passed, otherwise fallback
+                self.$select.empty();
+
+                list.forEach(item => {
+                    self.$select.append($('<option>', {
+                        value: item.id,
+                        text: item.displayText
+                    }));
+                });
+                self.$select.multiselect('rebuild');
+                self.applyAriaLabels();
+                if (Array.isArray(self.preSelectedIds) && self.preSelectedIds.length > 0) {
+                    self.$select.val(self.preSelectedIds);
+                    self.$select.multiselect('refresh');
+                }
+
+                self.fillInput(true, false);
+            },
+            applyAriaLabels: function () {
+                const self = this;
+                const $btnGroup = self.$select.parent();
+                $btnGroup.find('.multiselect.dropdown-toggle').attr('aria-label', self.ariaLabel);
+                if (self.isEnableFilter) {
+                    $btnGroup.find('.multiselect-search').attr('aria-label', self.ariaLabel + ' Search');
+                }
+            },
+            setNonSelectedText: function(newText){
+                if (newText){
+                    const self = this;
+                    self.nonSelectedText = newText;
+                    self.$select.multiselect('setOptions', {
+                        nonSelectedText: newText
+                    });
+                    self.$select.multiselect('rebuild');
+                }
+            },
+            setContentType: function(contentType){
+                if (contentType){
+                    const self = this;
+                    self.contentType = contentType;
+                    self.fetchAllItems();
+                }
+            },
+            selectByValue : function(ids){
+                if (!ids) {
+                    ids = '';
+                }
+                const self = this;
+                const idArray = ids.split(',').map(id => id.trim()).filter(id => id !== '');
+                self.$select.val(idArray);
+                self.$select.multiselect('refresh');
+                self.fillInput(false, true);
+            },
+            fillInput: function (isInitilize = false, isSystemSelect = false) {
+                const selectedItems = $(this.selectId).val();
+                const selectedIds = selectedItems ? selectedItems.join(",") : "";
+                $(this.inputId).val(selectedIds);
+                this.selectedIds = selectedIds;
+                if(isInitilize){
+                    this.onInitilizedCallback();
+                }else if(isSystemSelect){
+                    this.onValueChangeBySystemCallback();
+                }else{
+                    this.onValueChangeCallback();
+                }
+            },
+            getSearchUrl: function () {
+                if (this.contentType == 'TeamMember'){
+                    return `/Admin/OrchardCore.TeamMember/Admin/GetTeamMemberDropDownList`;
+                } else if ('True' == 'True' && 'CaseType' == "CaseType") {
+                    return `/PublicReport/PublicReport/GetAllowedCaseType?contentType=CaseType`;
+                } else if ('True' == 'True' && 'CaseType' == "LicenseType") {
+                    return `/PublicReport/PublicReport/GetAllowedLicenseType?contentType=LicenseType`;
+                } else if ('True' == 'True' && 'CaseType' == "CaseSubTypes") {
+                    var caseTypeId = $('#hiddenCaseTypeId').val();
+                    return `/PublicReport/PublicReport/GetCaseSubTypesByTypeId?caseTypeId=${caseTypeId}`;
+                } else if ('True' == 'True' && 'CaseType' == "LicenseSubType") {
+                    var licenseTypeId = $('#hiddenLicenseTypeId').val();
+                    return `/PublicReport/PublicReport/GetLicenseSubTypesByTypeId?licenseTypeId=${licenseTypeId}`;
+                }
+                else if ('False' == 'True' && 'CaseType' == "LicenseType") {
+                return `/OrchardCore.License/License/GetAllowedLicenseType`;
+                }
+                else if ('False' == 'True' && 'CaseType' == "LicenseSubType") {
+                return `/OrchardCore.License/License/GetLicenseSubTypes`;
+                }
+                else {
+                    return `/GovBuilt.Resource/Resource/GetSelectList?contentType=${this.contentType}`;
+                }
+            },
+            disable: function (isClearValue) {
+                this.$select.multiselect('disable');
+                if(isClearValue){
+                    this.selectByValue('');
+                }
+            },
+            enable: function () {
+                this.$select.multiselect('enable');
+            },
+            onValueChangeCallback : function(){
+            },
+            onInitilizedCallback: function(){
+            },
+            onValueChangeBySystemCallback: function(){
+            },
+            onDropdownClosed: function(){
+            }
+        };
+
+        window['caseType_Picker'] = caseType_Picker;
+        window['caseType_Picker'].init();
+    })();
+</script>
+<script>
+    (function () {
+        const caseSubType_Picker = {
+            selectId: '#caseSubType_Select',
+            inputId: '#caseSubType',
+            $select: null,
+            contentType: 'CaseSubTypes',
+            allItems: [],
+            preSelectedIds: [],
+            nonSelectedText : "Select Case Sub Type",
+            ariaLabel: "Case Sub Type",
+            isEnableFilter: "True" === "True",
+            includeSelectAllOption : "True" === "True",
+            numberDisplayed: 1,
+            selectedIds: '',
+            isUserOpenedDropdown: false,
+            usePreload: "False" === "True",
+            preDefinedList : [],
+            init: function () {
+                const self = this;
+                self.$select = $(self.selectId);
+                self.$select.multiselect({
+                    nonSelectedText: self.nonSelectedText,
+                    enableFiltering: self.isEnableFilter,
+                    enableCaseInsensitiveFiltering: true,
+                    includeSelectAllOption: self.includeSelectAllOption,
+                    numberDisplayed: self.numberDisplayed,
+                    onChange: self.fillInput.bind(self, false, false),
+                    onSelectAll: self.fillInput.bind(self, false, false),
+                    onDeselectAll: self.fillInput.bind(self, false, false),
+                    onInitialized: function () {
+                        self.fillInput(true, false);
+                        self.applyAriaLabels();
+                    },
+                    onDropdownShown: function (event) {
+                        self.isUserOpenedDropdown = true;
+                    },
+                    onDropdownHidden: function (event) {
+                        if (self.isUserOpenedDropdown) {
+                            self.onDropdownClosed();
+                            self.isUserOpenedDropdown = false;
+                        }
+                    }
+                });
+                self.fetchAllItems();
+            },
+            fetchAllItems: function () {
+                const self = this;
+
+                if (self.usePreload) {
+                    self.allItems = self.preDefinedList.sort((a, b) =>
+                        a.displayText.localeCompare(b.displayText, undefined, { sensitivity: 'base' })
+                    );
+                    self.bindItems();
+                    return;
+                }
+
+                var url = self.getSearchUrl();
+                $.ajax({
+                    url: url,
+                    type: 'GET',
+                    dataType: 'json',
+                    success: function (data) {
+                        if (!Array.isArray(data)) {
+                            console.error("Invalid response format", data);
+                            self.bindItems();
+                            return;
+                        }
+                        self.allItems = data.sort((a, b) =>
+                            a.displayText.localeCompare(b.displayText, undefined, { sensitivity: 'base' })
+                        );
+                        self.bindItems();
+                    },
+                    error: function () {
+                        console.error("Failed to fetch items.");
+                    }
+                });
+            },
+            bindItems: function (items) {
+                const self = this;
+                const list = items || self.allItems;  // use items if passed, otherwise fallback
+                self.$select.empty();
+
+                list.forEach(item => {
+                    self.$select.append($('<option>', {
+                        value: item.id,
+                        text: item.displayText
+                    }));
+                });
+                self.$select.multiselect('rebuild');
+                self.applyAriaLabels();
+                if (Array.isArray(self.preSelectedIds) && self.preSelectedIds.length > 0) {
+                    self.$select.val(self.preSelectedIds);
+                    self.$select.multiselect('refresh');
+                }
+
+                self.fillInput(true, false);
+            },
+            applyAriaLabels: function () {
+                const self = this;
+                const $btnGroup = self.$select.parent();
+                $btnGroup.find('.multiselect.dropdown-toggle').attr('aria-label', self.ariaLabel);
+                if (self.isEnableFilter) {
+                    $btnGroup.find('.multiselect-search').attr('aria-label', self.ariaLabel + ' Search');
+                }
+            },
+            setNonSelectedText: function(newText){
+                if (newText){
+                    const self = this;
+                    self.nonSelectedText = newText;
+                    self.$select.multiselect('setOptions', {
+                        nonSelectedText: newText
+                    });
+                    self.$select.multiselect('rebuild');
+                }
+            },
+            setContentType: function(contentType){
+                if (contentType){
+                    const self = this;
+                    self.contentType = contentType;
+                    self.fetchAllItems();
+                }
+            },
+            selectByValue : function(ids){
+                if (!ids) {
+                    ids = '';
+                }
+                const self = this;
+                const idArray = ids.split(',').map(id => id.trim()).filter(id => id !== '');
+                self.$select.val(idArray);
+                self.$select.multiselect('refresh');
+                self.fillInput(false, true);
+            },
+            fillInput: function (isInitilize = false, isSystemSelect = false) {
+                const selectedItems = $(this.selectId).val();
+                const selectedIds = selectedItems ? selectedItems.join(",") : "";
+                $(this.inputId).val(selectedIds);
+                this.selectedIds = selectedIds;
+                if(isInitilize){
+                    this.onInitilizedCallback();
+                }else if(isSystemSelect){
+                    this.onValueChangeBySystemCallback();
+                }else{
+                    this.onValueChangeCallback();
+                }
+            },
+            getSearchUrl: function () {
+                if (this.contentType == 'TeamMember'){
+                    return `/Admin/OrchardCore.TeamMember/Admin/GetTeamMemberDropDownList`;
+                } else if ('True' == 'True' && 'CaseSubTypes' == "CaseType") {
+                    return `/PublicReport/PublicReport/GetAllowedCaseType?contentType=CaseType`;
+                } else if ('True' == 'True' && 'CaseSubTypes' == "LicenseType") {
+                    return `/PublicReport/PublicReport/GetAllowedLicenseType?contentType=LicenseType`;
+                } else if ('True' == 'True' && 'CaseSubTypes' == "CaseSubTypes") {
+                    var caseTypeId = $('#hiddenCaseTypeId').val();
+                    return `/PublicReport/PublicReport/GetCaseSubTypesByTypeId?caseTypeId=${caseTypeId}`;
+                } else if ('True' == 'True' && 'CaseSubTypes' == "LicenseSubType") {
+                    var licenseTypeId = $('#hiddenLicenseTypeId').val();
+                    return `/PublicReport/PublicReport/GetLicenseSubTypesByTypeId?licenseTypeId=${licenseTypeId}`;
+                }
+                else if ('False' == 'True' && 'CaseSubTypes' == "LicenseType") {
+                return `/OrchardCore.License/License/GetAllowedLicenseType`;
+                }
+                else if ('False' == 'True' && 'CaseSubTypes' == "LicenseSubType") {
+                return `/OrchardCore.License/License/GetLicenseSubTypes`;
+                }
+                else {
+                    return `/GovBuilt.Resource/Resource/GetSelectList?contentType=${this.contentType}`;
+                }
+            },
+            disable: function (isClearValue) {
+                this.$select.multiselect('disable');
+                if(isClearValue){
+                    this.selectByValue('');
+                }
+            },
+            enable: function () {
+                this.$select.multiselect('enable');
+            },
+            onValueChangeCallback : function(){
+            },
+            onInitilizedCallback: function(){
+            },
+            onValueChangeBySystemCallback: function(){
+            },
+            onDropdownClosed: function(){
+            }
+        };
+
+        window['caseSubType_Picker'] = caseSubType_Picker;
+        window['caseSubType_Picker'].init();
+    })();
+</script>
+<script>
+    (function () {
+        const licenseType_Picker = {
+            selectId: '#licenseType_Select',
+            inputId: '#licenseType',
+            $select: null,
+            contentType: 'LicenseType',
+            allItems: [],
+            preSelectedIds: [],
+            nonSelectedText : "Select License Type",
+            ariaLabel: "License Type",
+            isEnableFilter: "True" === "True",
+            includeSelectAllOption : "True" === "True",
+            numberDisplayed: 1,
+            selectedIds: '',
+            isUserOpenedDropdown: false,
+            usePreload: "False" === "True",
+            preDefinedList : [],
+            init: function () {
+                const self = this;
+                self.$select = $(self.selectId);
+                self.$select.multiselect({
+                    nonSelectedText: self.nonSelectedText,
+                    enableFiltering: self.isEnableFilter,
+                    enableCaseInsensitiveFiltering: true,
+                    includeSelectAllOption: self.includeSelectAllOption,
+                    numberDisplayed: self.numberDisplayed,
+                    onChange: self.fillInput.bind(self, false, false),
+                    onSelectAll: self.fillInput.bind(self, false, false),
+                    onDeselectAll: self.fillInput.bind(self, false, false),
+                    onInitialized: function () {
+                        self.fillInput(true, false);
+                        self.applyAriaLabels();
+                    },
+                    onDropdownShown: function (event) {
+                        self.isUserOpenedDropdown = true;
+                    },
+                    onDropdownHidden: function (event) {
+                        if (self.isUserOpenedDropdown) {
+                            self.onDropdownClosed();
+                            self.isUserOpenedDropdown = false;
+                        }
+                    }
+                });
+                self.fetchAllItems();
+            },
+            fetchAllItems: function () {
+                const self = this;
+
+                if (self.usePreload) {
+                    self.allItems = self.preDefinedList.sort((a, b) =>
+                        a.displayText.localeCompare(b.displayText, undefined, { sensitivity: 'base' })
+                    );
+                    self.bindItems();
+                    return;
+                }
+
+                var url = self.getSearchUrl();
+                $.ajax({
+                    url: url,
+                    type: 'GET',
+                    dataType: 'json',
+                    success: function (data) {
+                        if (!Array.isArray(data)) {
+                            console.error("Invalid response format", data);
+                            self.bindItems();
+                            return;
+                        }
+                        self.allItems = data.sort((a, b) =>
+                            a.displayText.localeCompare(b.displayText, undefined, { sensitivity: 'base' })
+                        );
+                        self.bindItems();
+                    },
+                    error: function () {
+                        console.error("Failed to fetch items.");
+                    }
+                });
+            },
+            bindItems: function (items) {
+                const self = this;
+                const list = items || self.allItems;  // use items if passed, otherwise fallback
+                self.$select.empty();
+
+                list.forEach(item => {
+                    self.$select.append($('<option>', {
+                        value: item.id,
+                        text: item.displayText
+                    }));
+                });
+                self.$select.multiselect('rebuild');
+                self.applyAriaLabels();
+                if (Array.isArray(self.preSelectedIds) && self.preSelectedIds.length > 0) {
+                    self.$select.val(self.preSelectedIds);
+                    self.$select.multiselect('refresh');
+                }
+
+                self.fillInput(true, false);
+            },
+            applyAriaLabels: function () {
+                const self = this;
+                const $btnGroup = self.$select.parent();
+                $btnGroup.find('.multiselect.dropdown-toggle').attr('aria-label', self.ariaLabel);
+                if (self.isEnableFilter) {
+                    $btnGroup.find('.multiselect-search').attr('aria-label', self.ariaLabel + ' Search');
+                }
+            },
+            setNonSelectedText: function(newText){
+                if (newText){
+                    const self = this;
+                    self.nonSelectedText = newText;
+                    self.$select.multiselect('setOptions', {
+                        nonSelectedText: newText
+                    });
+                    self.$select.multiselect('rebuild');
+                }
+            },
+            setContentType: function(contentType){
+                if (contentType){
+                    const self = this;
+                    self.contentType = contentType;
+                    self.fetchAllItems();
+                }
+            },
+            selectByValue : function(ids){
+                if (!ids) {
+                    ids = '';
+                }
+                const self = this;
+                const idArray = ids.split(',').map(id => id.trim()).filter(id => id !== '');
+                self.$select.val(idArray);
+                self.$select.multiselect('refresh');
+                self.fillInput(false, true);
+            },
+            fillInput: function (isInitilize = false, isSystemSelect = false) {
+                const selectedItems = $(this.selectId).val();
+                const selectedIds = selectedItems ? selectedItems.join(",") : "";
+                $(this.inputId).val(selectedIds);
+                this.selectedIds = selectedIds;
+                if(isInitilize){
+                    this.onInitilizedCallback();
+                }else if(isSystemSelect){
+                    this.onValueChangeBySystemCallback();
+                }else{
+                    this.onValueChangeCallback();
+                }
+            },
+            getSearchUrl: function () {
+                if (this.contentType == 'TeamMember'){
+                    return `/Admin/OrchardCore.TeamMember/Admin/GetTeamMemberDropDownList`;
+                } else if ('True' == 'True' && 'LicenseType' == "CaseType") {
+                    return `/PublicReport/PublicReport/GetAllowedCaseType?contentType=CaseType`;
+                } else if ('True' == 'True' && 'LicenseType' == "LicenseType") {
+                    return `/PublicReport/PublicReport/GetAllowedLicenseType?contentType=LicenseType`;
+                } else if ('True' == 'True' && 'LicenseType' == "CaseSubTypes") {
+                    var caseTypeId = $('#hiddenCaseTypeId').val();
+                    return `/PublicReport/PublicReport/GetCaseSubTypesByTypeId?caseTypeId=${caseTypeId}`;
+                } else if ('True' == 'True' && 'LicenseType' == "LicenseSubType") {
+                    var licenseTypeId = $('#hiddenLicenseTypeId').val();
+                    return `/PublicReport/PublicReport/GetLicenseSubTypesByTypeId?licenseTypeId=${licenseTypeId}`;
+                }
+                else if ('False' == 'True' && 'LicenseType' == "LicenseType") {
+                return `/OrchardCore.License/License/GetAllowedLicenseType`;
+                }
+                else if ('False' == 'True' && 'LicenseType' == "LicenseSubType") {
+                return `/OrchardCore.License/License/GetLicenseSubTypes`;
+                }
+                else {
+                    return `/GovBuilt.Resource/Resource/GetSelectList?contentType=${this.contentType}`;
+                }
+            },
+            disable: function (isClearValue) {
+                this.$select.multiselect('disable');
+                if(isClearValue){
+                    this.selectByValue('');
+                }
+            },
+            enable: function () {
+                this.$select.multiselect('enable');
+            },
+            onValueChangeCallback : function(){
+            },
+            onInitilizedCallback: function(){
+            },
+            onValueChangeBySystemCallback: function(){
+            },
+            onDropdownClosed: function(){
+            }
+        };
+
+        window['licenseType_Picker'] = licenseType_Picker;
+        window['licenseType_Picker'].init();
+    })();
+</script>
+<script>
+    (function () {
+        const licenseSubType_Picker = {
+            selectId: '#licenseSubType_Select',
+            inputId: '#licenseSubType',
+            $select: null,
+            contentType: 'LicenseSubType',
+            allItems: [],
+            preSelectedIds: [],
+            nonSelectedText : "Select Sub License Type",
+            ariaLabel: "License Sub Type",
+            isEnableFilter: "True" === "True",
+            includeSelectAllOption : "True" === "True",
+            numberDisplayed: 1,
+            selectedIds: '',
+            isUserOpenedDropdown: false,
+            usePreload: "False" === "True",
+            preDefinedList : [],
+            init: function () {
+                const self = this;
+                self.$select = $(self.selectId);
+                self.$select.multiselect({
+                    nonSelectedText: self.nonSelectedText,
+                    enableFiltering: self.isEnableFilter,
+                    enableCaseInsensitiveFiltering: true,
+                    includeSelectAllOption: self.includeSelectAllOption,
+                    numberDisplayed: self.numberDisplayed,
+                    onChange: self.fillInput.bind(self, false, false),
+                    onSelectAll: self.fillInput.bind(self, false, false),
+                    onDeselectAll: self.fillInput.bind(self, false, false),
+                    onInitialized: function () {
+                        self.fillInput(true, false);
+                        self.applyAriaLabels();
+                    },
+                    onDropdownShown: function (event) {
+                        self.isUserOpenedDropdown = true;
+                    },
+                    onDropdownHidden: function (event) {
+                        if (self.isUserOpenedDropdown) {
+                            self.onDropdownClosed();
+                            self.isUserOpenedDropdown = false;
+                        }
+                    }
+                });
+                self.fetchAllItems();
+            },
+            fetchAllItems: function () {
+                const self = this;
+
+                if (self.usePreload) {
+                    self.allItems = self.preDefinedList.sort((a, b) =>
+                        a.displayText.localeCompare(b.displayText, undefined, { sensitivity: 'base' })
+                    );
+                    self.bindItems();
+                    return;
+                }
+
+                var url = self.getSearchUrl();
+                $.ajax({
+                    url: url,
+                    type: 'GET',
+                    dataType: 'json',
+                    success: function (data) {
+                        if (!Array.isArray(data)) {
+                            console.error("Invalid response format", data);
+                            self.bindItems();
+                            return;
+                        }
+                        self.allItems = data.sort((a, b) =>
+                            a.displayText.localeCompare(b.displayText, undefined, { sensitivity: 'base' })
+                        );
+                        self.bindItems();
+                    },
+                    error: function () {
+                        console.error("Failed to fetch items.");
+                    }
+                });
+            },
+            bindItems: function (items) {
+                const self = this;
+                const list = items || self.allItems;  // use items if passed, otherwise fallback
+                self.$select.empty();
+
+                list.forEach(item => {
+                    self.$select.append($('<option>', {
+                        value: item.id,
+                        text: item.displayText
+                    }));
+                });
+                self.$select.multiselect('rebuild');
+                self.applyAriaLabels();
+                if (Array.isArray(self.preSelectedIds) && self.preSelectedIds.length > 0) {
+                    self.$select.val(self.preSelectedIds);
+                    self.$select.multiselect('refresh');
+                }
+
+                self.fillInput(true, false);
+            },
+            applyAriaLabels: function () {
+                const self = this;
+                const $btnGroup = self.$select.parent();
+                $btnGroup.find('.multiselect.dropdown-toggle').attr('aria-label', self.ariaLabel);
+                if (self.isEnableFilter) {
+                    $btnGroup.find('.multiselect-search').attr('aria-label', self.ariaLabel + ' Search');
+                }
+            },
+            setNonSelectedText: function(newText){
+                if (newText){
+                    const self = this;
+                    self.nonSelectedText = newText;
+                    self.$select.multiselect('setOptions', {
+                        nonSelectedText: newText
+                    });
+                    self.$select.multiselect('rebuild');
+                }
+            },
+            setContentType: function(contentType){
+                if (contentType){
+                    const self = this;
+                    self.contentType = contentType;
+                    self.fetchAllItems();
+                }
+            },
+            selectByValue : function(ids){
+                if (!ids) {
+                    ids = '';
+                }
+                const self = this;
+                const idArray = ids.split(',').map(id => id.trim()).filter(id => id !== '');
+                self.$select.val(idArray);
+                self.$select.multiselect('refresh');
+                self.fillInput(false, true);
+            },
+            fillInput: function (isInitilize = false, isSystemSelect = false) {
+                const selectedItems = $(this.selectId).val();
+                const selectedIds = selectedItems ? selectedItems.join(",") : "";
+                $(this.inputId).val(selectedIds);
+                this.selectedIds = selectedIds;
+                if(isInitilize){
+                    this.onInitilizedCallback();
+                }else if(isSystemSelect){
+                    this.onValueChangeBySystemCallback();
+                }else{
+                    this.onValueChangeCallback();
+                }
+            },
+            getSearchUrl: function () {
+                if (this.contentType == 'TeamMember'){
+                    return `/Admin/OrchardCore.TeamMember/Admin/GetTeamMemberDropDownList`;
+                } else if ('True' == 'True' && 'LicenseSubType' == "CaseType") {
+                    return `/PublicReport/PublicReport/GetAllowedCaseType?contentType=CaseType`;
+                } else if ('True' == 'True' && 'LicenseSubType' == "LicenseType") {
+                    return `/PublicReport/PublicReport/GetAllowedLicenseType?contentType=LicenseType`;
+                } else if ('True' == 'True' && 'LicenseSubType' == "CaseSubTypes") {
+                    var caseTypeId = $('#hiddenCaseTypeId').val();
+                    return `/PublicReport/PublicReport/GetCaseSubTypesByTypeId?caseTypeId=${caseTypeId}`;
+                } else if ('True' == 'True' && 'LicenseSubType' == "LicenseSubType") {
+                    var licenseTypeId = $('#hiddenLicenseTypeId').val();
+                    return `/PublicReport/PublicReport/GetLicenseSubTypesByTypeId?licenseTypeId=${licenseTypeId}`;
+                }
+                else if ('False' == 'True' && 'LicenseSubType' == "LicenseType") {
+                return `/OrchardCore.License/License/GetAllowedLicenseType`;
+                }
+                else if ('False' == 'True' && 'LicenseSubType' == "LicenseSubType") {
+                return `/OrchardCore.License/License/GetLicenseSubTypes`;
+                }
+                else {
+                    return `/GovBuilt.Resource/Resource/GetSelectList?contentType=${this.contentType}`;
+                }
+            },
+            disable: function (isClearValue) {
+                this.$select.multiselect('disable');
+                if(isClearValue){
+                    this.selectByValue('');
+                }
+            },
+            enable: function () {
+                this.$select.multiselect('enable');
+            },
+            onValueChangeCallback : function(){
+            },
+            onInitilizedCallback: function(){
+            },
+            onValueChangeBySystemCallback: function(){
+            },
+            onDropdownClosed: function(){
+            }
+        };
+
+        window['licenseSubType_Picker'] = licenseSubType_Picker;
+        window['licenseSubType_Picker'].init();
+    })();
+</script>
+<script defer="">
+    $(document).ready(function () {
+        Esri_Map.isAccessAdminPanel = 'False' == "True";
+
+        Esri_Map.init('Widget_Esri_Map');
+        Esri_Map.MapMarker = '/media/Esri Pin/map-marker.png';
+        Esri_Map.Sketch = true;
+        Esri_Map.latitudeField = '39.03995492200821';
+        Esri_Map.longitudeField = '-94.61516736865224';
+        Esri_Map.defaultMapZoom = '15';
+        Esri_Map.additionalSearchSource = '';
+        Esri_Map.isDisableGlobalEsriSearch = 'False';
+        Esri_Map.defaultFrontEndBaseMap = '{&quot;contentItemId&quot;:&quot;48vs7c6xv9pv1s60pgwc3g16mp&quot;,&quot;id&quot;:&quot;satellite&quot;,&quot;url&quot;:&quot;&quot;,&quot;name&quot;:&quot;satellite&quot;,&quot;citizenService&quot;:&quot;&quot;,&quot;staffService&quot;:&quot;&quot;}' ? JSON.parse('{"contentItemId":"48vs7c6xv9pv1s60pgwc3g16mp","id":"satellite","url":"","name":"satellite","citizenService":"","staffService":""}') : "";
+        Esri_Map.requireGisAccountLogin = 'False' == "True";
+        Esri_Map.gisLoginErrorMessage = "\u003Cp\u003EGIS Map Authentication is not validated correctly. Refresh page and try again.\u003Cbr\u003EIf issue persists, please contact administration\u003C/p\u003E";
+        RenderEsriMapLoad();
+    });
+</script>
+<script>
+    $(".loading").show();
+    $(document).ready(function () {
+        initSearchTool("True" === "True", 'Address', 'All', '30');
+    });
+
+    function locationShowOnMap(latitude, longitude) {
+        $('a[href="#listView"]').parent('li').removeClass('active');
+        $('a[href="#mapView"]').parent('li').addClass('active');
+        $('a[href="#listView"]').removeClass("active");
+        $('a[href="#mapView"]').addClass("active");
+        $('#listView').removeClass("in active show");
+        $('#mapView').addClass("active show");
+        $('a[href="#mapView"]').click();
+        Esri_Map.ZoomToMarker(latitude, longitude);
+    }
+    $(".widgetAction #fullScreen").click(function () {
+        var div = $(this).parent();
+        $(this).hide();
+        $(div).find("#exitFullScreen").show();
+        $(div).find("a").hide();
+        $(div).find("label").hide();
+        $(div).parent().find(".widgetChart").addClass("widgetChartfull");
+        $(div).parent().addClass("fullScreen");
+    });
+
+    $('#search-submit').click(function () { GetSearchByFilterValue(); });
+
+    $(".widgetAction #exitFullScreen").click(function () {
+        var div = $(this).parent();
+        $(this).hide();
+        $(div).find("#fullScreen").show();
+        $(div).find("a").show();
+        $(div).find("label").show();
+        $(div).parent().find(".widgetChart").removeClass("widgetChartfull");
+        $(div).parent().removeClass("fullScreen");
+    });
+
+    $('a[href="#mapView"]').click(function () {
+        $('a[href="#listView"]').removeClass("active");
+        $('a[href="#mapView"]').addClass("active");
+        $('#listView').removeClass("in active show");
+        $('#mapView').addClass("active show");
+    });
+</script>
+<script>
+    $(document).ready(function () {
+        var pagerLabelMap = {
+            '«': 'Go to first page', '<<': 'Go to first page',
+            '‹': 'Go to previous page', '<': 'Go to previous page',
+            '›': 'Go to next page', '>': 'Go to next page',
+            '»': 'Go to last page', '>>': 'Go to last page',
+            '…': 'More pages', '...': 'More pages'
+        };
+        $('ul.pager a, ul.pagination a, nav[aria-label] a').each(function () {
+            var text = $(this).text().trim();
+            if (pagerLabelMap[text] && !$(this).attr('aria-label')) {
+                $(this).attr('aria-label', pagerLabelMap[text]);
+            }
+        });
+    });
+</script>
+    
+        
+         
+        <style>      
+            .formio-form a{
+                color: #0d6efd !important;
+            }
+            .formio-form a:hover {
+                color: #003f84 !important;
+            }
+
+                    #formsDataList .yellow-head {
+    background-color: #fed136 !important;
+}
+        </style>        
+          
+</body>  
+  <script>
+    $(document).ready(function () { 
+    
+       $('#modalIFrame').find('.modal-header').append('<a id="modalFullScreen" title="FullScreen" href="javascript:void(0)"><i class="fa fa-arrows-alt"></i></a><a id="modalExitFullScreen" style="display:none;" href="javascript:void(0)" title="Exit FullScreen"><i class="fa fa-compress"></i></a>');
+       var url = "https://westwood.govbuilt.com/media/project_type_pdf/westwoodPermit_ProjectType.pdf";  
+       $(document).on('change', 'input[name="data[projectType][]"]', function (e) {
+              
+          e.preventDefault();
+          if($(this).val() === "fence" && $(this).is(':checked')){
+            
+            var urlFence = url+"#page=59"; 
+            $("#modalIFrame").modal('show');
+            $('#display_IFrame').attr('src', urlFence);
+            $('#display_IFrame_Title').text("Regulations");
+    
+          }else if($(this).val() === "newConstruction" && $(this).is(':checked')){
+            
+            var urlNew = url+"#page=49";
+            $("#modalIFrame").modal('show');
+            $('#display_IFrame').attr('src', urlNew);
+            $('#display_IFrame_Title').text("Regulations");
+            
+          }else if($(this).val() === "addition" && $(this).is(':checked')){
+            
+            var urlAdd = url+"#page=57";
+            $("#modalIFrame").modal('show');
+            $('#display_IFrame').attr('src', urlAdd);
+            $('#display_IFrame_Title').text("Regulations");
+    
+          }else if($(this).val() === "driveway" && $(this).is(':checked')){
+            
+            var urlDriveway = url+"#page=61";
+            $("#modalIFrame").modal('show');
+            $('#display_IFrame').attr('src', urlDriveway);
+            $('#display_IFrame_Title').text("Regulations");
+    
+          }          
+      });
+    });
+    
+    $(document).on('click', '#modalFullScreen', function (e) {
+        var div = $(this).parent();
+        $(this).hide();
+        $(div).find("#modalExitFullScreen").show();
+        $('#modalIFrame').find('.modal-dialog').removeClass("modal-lg");
+        $('#modalIFrame').find('.modal-dialog').css( "max-width", "100%" );
+    	$('#modalIFrame').find('.modal-content').css( "max-height", "calc(100vh - 60px)" );
+    	$("#display_IFrame").css("height","80%");
+    	$('#modalIFrame').find('.modal-body').css( "max-height", "460px" );
+    });  
+    
+    $(document).on('click', '#modalExitFullScreen', function (e) {
+        var div = $(this).parent();
+        $(this).hide();
+        $(div).find("#modalFullScreen").show();
+        $('#modalIFrame').find('.modal-dialog').addClass("modal-lg");
+        $('#modalIFrame').find('.modal-dialog').css("max-width", "800px");
+    	$('#modalIFrame').find('.modal-content').css( "max-height", "calc(100vh - 60px)" );
+    	$("#display_IFrame").css("height","100%");
+    	$('#modalIFrame').find('.modal-body').css( "max-height", "460px" );
+        /*$('#modalIFrame').find('.embed-responsive').css("height", "612px");*/
+    });
+    
+    $(document).on('hide.bs.modal', '#modalIFrame', function (e) {
+        $('#display_IFrame').attr('src', "");
+    });
+  </script>
+ <script>
+            //google dropdown
+            function googleTranslateElementInit() {
+                new google.translate.TranslateElement({ pageLanguage: "en", includedLanguages: "en,es", layout: google.translate.TranslateElement.InlineLayout.SIMPLE }, "google_translate_element");
+            }
+        </script> 
+
+
+<script>
+    function SearchResult(){
+        var searchStr = $(".search-input").val();
+        $("#myInputautocomplete-list").remove();
+        if(searchStr != "" && searchStr.length > 2){
+            $.ajax({
+                url: "https://westwood.govbuilt.com/SearchRecommendations?Terms="+searchStr,
+                async: true,
+                method: 'GET',
+                success: function (data) {
+                    if(data != undefined && data != null && data.statusCode != undefined && data.statusCode != null && data.statusCode == 200 && data.searchResult.length > 0){
+                        
+                        $('<div id="myInputautocomplete-list" class="autocomplete-items" ></div>').insertAfter(".search-input");
+                        $.each(data.searchResult, function () {
+                            $("#myInputautocomplete-list").append('<div>'+this+'</div>');
+                        });                          
+                    }
+                },
+                error: function (error) {
+                    
+                }
+            }); 
+        } 
+    }    
+    $(document).ready(function () {
+       $(".search-input").keyup(delay(function (e) {
+            SearchResult();
+        }, 800));
+    });  
+    function delay(callback, ms) {
+        var timer = 0;
+        return function () {
+            var context = this, args = arguments;
+            clearTimeout(timer);
+            timer = setTimeout(function () {
+                callback.apply(context, args);
+            }, ms || 0);
+        };
+    }  
+       $('input').attr('autocomplete', 'off');
+</script>
+<input type="hidden" id="AdvFormTags" value='[]' />
+</html>

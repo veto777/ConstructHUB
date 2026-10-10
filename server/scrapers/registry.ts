@@ -185,3 +185,9 @@ import bsaAdapter from "./bsa";
 registerAdapter(bsaAdapter);
 
 registerAdapter(accela);
+
+import govbuilt from "./govbuilt";
+registerAdapter(govbuilt);
+
+import citysquared from "./citysquared";
+registerAdapter(citysquared);
