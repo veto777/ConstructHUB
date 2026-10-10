@@ -32,6 +32,7 @@ import {
   CalendarDays, StickyNote, FolderOpen,
 } from "lucide-react";
 import { useUrlParam } from "@/hooks/use-url-param";
+import { caughtPrivatelyCount, describeReviewEscalationThreshold, normalizeReviewEscalationThreshold, REVIEW_ESCALATION_THRESHOLD_CHOICES } from "@shared/review-flow";
 
 // Pacific time with the real abbreviation (PDT in summer, PST in winter).
 const formatPST = (dateStr: string) => {
@@ -147,6 +148,12 @@ export default function GoogleReviewsPage() {
   const { data: templates = [] } = useQuery<any[]>({
     queryKey: ["/api/review-templates"],
   });
+
+  // Feedback routing: the score below which a client's feedback came to the owner privately first.
+  const { data: escalation } = useQuery<{ reviewEscalationThreshold: number }>({
+    queryKey: ["/api/review-escalation-settings"],
+  });
+  const escalationThreshold = normalizeReviewEscalationThreshold(escalation?.reviewEscalationThreshold);
 
   const { data: user } = useQuery<any>({
     queryKey: ["/api/auth/me"],
@@ -484,7 +491,7 @@ export default function GoogleReviewsPage() {
       <PageHeader
         title={<span data-testid="text-reviews-title">Google Reviews</span>}
         description={pageTab === "requests"
-          ? "Ask every client for a Google review with one professional feedback flow."
+          ? "Hear it first. Set the score that comes to you privately; everything above it goes straight to Google."
           : "Read and reply to the reviews on your Google Business Profiles."}
         actions={pageTab === "requests" ? (
           <Button onClick={openSendDialog} data-testid="button-new-review-request">
@@ -501,10 +508,11 @@ export default function GoogleReviewsPage() {
 
         <TabsContent value="requests" className="mt-5 sm:mt-6">
           <div className="space-y-5 sm:space-y-6">
-            <StatGrid cols={4}>
+            <StatGrid cols={5}>
               <Stat label="Total sent" testId="stat-total-sent" value={reviews.filter((r: any) => r.status !== "scheduled" && r.status !== "suppressed").length} />
               <Stat label="Google links opened" testId="stat-google-links-opened" tone="good" value={reviews.filter((r: any) => r.googleLinkOpened).length} />
-              <Stat label="Positive feedback" testId="stat-positive" tone="good" value={reviews.filter((r: any) => r.feedbackRating >= 9).length} />
+              <Stat label="Positive feedback" testId="stat-positive" tone="good" value={reviews.filter((r: any) => r.feedbackRating != null && r.feedbackRating >= escalationThreshold).length} hint={`scored ${escalationThreshold} or more`} />
+              <Stat label="Caught privately" testId="stat-caught-privately" tone="warn" value={caughtPrivatelyCount(reviews)} hint="came to you first" />
               <Stat label="Awaiting response" testId="stat-pending" value={reviews.filter((r: any) => r.status === "sent" && !r.unsubscribed).length} />
             </StatGrid>
 
@@ -568,12 +576,17 @@ export default function GoogleReviewsPage() {
                             <div className="flex flex-wrap items-center gap-2">
                               <p className="text-sm font-medium" data-testid={`text-client-name-${review.id}`}>{review.clientName}</p>
                               {getStatusBadge(review)}
-                              {review.feedbackRating && (
+                              {review.feedbackRating && review.privateFeedbackAt ? (
+                                <Badge variant="outline" className="border-amber-500/60 text-xs text-amber-700 dark:text-amber-300" title="Scored below your threshold: the private form came first (expand to read it)" data-testid={`badge-private-feedback-${review.id}`}>
+                                  <MessageSquare className="mr-1 h-3 w-3" aria-hidden="true" />
+                                  Private feedback · {review.feedbackRating}/10
+                                </Badge>
+                              ) : review.feedbackRating ? (
                                 <Badge variant="outline" className="text-xs">
                                   <Star className="mr-0.5 h-3 w-3 text-amber-500" aria-hidden="true" />
                                   {review.feedbackRating}/10
                                 </Badge>
-                              )}
+                              ) : null}
                               {review.status === "sent" && review.remindersSent > 0 && (
                                 <Badge variant="outline" className="text-xs">
                                   <Bell className="mr-0.5 h-3 w-3" aria-hidden="true" />
@@ -804,7 +817,7 @@ export default function GoogleReviewsPage() {
                               ) : null}
                             </div>
 
-                            {(review.feedbackComments || review.feedbackCategories || (review.feedbackRating && review.feedbackRating < 9)) && (
+                            {(review.feedbackComments || review.feedbackCategories || (review.feedbackRating && review.privateFeedbackAt)) && (
                               <div className="mt-3 rounded-lg border bg-muted/30 p-3">
                                 <p className="mb-1 text-xs font-medium">Private feedback</p>
                                 {review.feedbackCategories && Array.isArray(review.feedbackCategories) && review.feedbackCategories.length > 0 && (
@@ -817,7 +830,7 @@ export default function GoogleReviewsPage() {
                                 {review.feedbackComments && (
                                   <p className="text-xs text-muted-foreground">{review.feedbackComments}</p>
                                 )}
-                                {review.feedbackRating && review.feedbackRating < 9 && !review.feedbackComments && !(review.feedbackCategories && Array.isArray(review.feedbackCategories) && review.feedbackCategories.length > 0) && (
+                                {review.feedbackRating && review.privateFeedbackAt && !review.feedbackComments && !(review.feedbackCategories && Array.isArray(review.feedbackCategories) && review.feedbackCategories.length > 0) && (
                                   <p className="text-xs italic text-muted-foreground">No written feedback provided</p>
                                 )}
                               </div>
@@ -943,6 +956,8 @@ export default function GoogleReviewsPage() {
                 </div>
               )}
             </Section>
+
+            <FeedbackRoutingCard />
 
             <ReminderSettingsCard />
 
@@ -2421,6 +2436,80 @@ function ReminderSettingsCard() {
           </div>
         </div>
       )}
+    </Section>
+  );
+}
+
+/**
+ * Feedback routing: the owner's escalation threshold (shared/review-flow.ts). Scores below it go to the
+ * private form first and alert the owner; scores at or above it go straight to the Google ask. The
+ * Google link is shown to every client either way — this card never changes that.
+ */
+function FeedbackRoutingCard() {
+  const { toast } = useToast();
+  const { data: settings, isLoading } = useQuery<{ reviewEscalationThreshold: number }>({
+    queryKey: ["/api/review-escalation-settings"],
+  });
+  const saved = normalizeReviewEscalationThreshold(settings?.reviewEscalationThreshold);
+  const [draft, setDraft] = useState<number | null>(null);
+  const threshold = draft ?? saved;
+
+  const saveMutation = useMutation({
+    mutationFn: async (reviewEscalationThreshold: number) => {
+      await apiRequest("PUT", "/api/review-escalation-settings", { reviewEscalationThreshold });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/review-escalation-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/reviews/list"] });
+      setDraft(null);
+      toast({ title: "Feedback routing saved" });
+    },
+    onError: (err: any) => toast({ title: "Failed to save feedback routing", description: apiErrorMessage(err), variant: "destructive" }),
+  });
+
+  return (
+    <Section
+      testId="card-feedback-routing"
+      title="Feedback routing"
+      description="Hear problems before Google does: pick the score that comes to you privately first."
+      actions={<StatusPill tone="info" data-testid="badge-feedback-routing">{threshold >= 10 ? "Only 10s" : `Below ${threshold}`}</StatusPill>}
+    >
+      <div className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-[220px_1fr] sm:items-start">
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+              Private feedback below
+            </Label>
+            <Select value={String(threshold)} onValueChange={(v) => setDraft(parseInt(v, 10))} disabled={isLoading}>
+              <SelectTrigger data-testid="select-escalation-threshold"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {[...new Set<number>([...REVIEW_ESCALATION_THRESHOLD_CHOICES, threshold])].sort((a, b) => a - b).map((n) => (
+                  <SelectItem key={n} value={String(n)} data-testid={`option-escalation-threshold-${n}`}>
+                    {n >= 10 ? "10 — only 10s go straight to Google" : `${n} — scores below ${n} come to you first`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="text-sm leading-relaxed text-muted-foreground sm:pt-7" data-testid="text-escalation-summary">
+            {describeReviewEscalationThreshold(threshold)}
+          </p>
+        </div>
+        <Notice tone="info" title="What the alert carries">
+          Name, score, job and the client's own words, in the bell and by email the moment they send it (and on Telegram when your LSA alert bot is linked). Google's rules forbid review gating, so the Google link is never withheld from anyone: this only decides who you hear from first.
+        </Notice>
+        <div className="flex justify-end">
+          <Button
+            variant="outline"
+            onClick={() => saveMutation.mutate(threshold)}
+            disabled={saveMutation.isPending || draft === null || draft === saved}
+            data-testid="button-save-feedback-routing"
+          >
+            {saveMutation.isPending ? "Saving…" : "Save feedback routing"}
+          </Button>
+        </div>
+      </div>
     </Section>
   );
 }

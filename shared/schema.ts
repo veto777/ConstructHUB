@@ -700,6 +700,10 @@ export const reviewRequests = pgTable("review_requests", {
   deletedAt: timestamp("deleted_at"),
   unsubscribed: boolean("unsubscribed").notNull().default(false),
   scheduledFor: timestamp("scheduled_for"),
+  // Feedback routing (shared/review-flow.ts): set when the score was below the owner's threshold and the private
+  // form came first; escalationAlertedAt once the owner alert went out (server/review-escalation.ts).
+  privateFeedbackAt: timestamp("private_feedback_at"),
+  escalationAlertedAt: timestamp("escalation_alerted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

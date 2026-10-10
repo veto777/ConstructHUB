@@ -1,5 +1,7 @@
 import { governmentLinksForDisplay, governmentLinksAvailable, canScrapeGovernmentPortal, governmentPermitForDisplay } from "@shared/government-links";
 import { getReferralSettings, saveReferralSettings, referralSettingsInput } from "./referral-settings";
+import { getReviewEscalationThreshold, saveReviewEscalationThreshold, reviewEscalationSettingsInput, escalatePrivateFeedback } from "./review-escalation";
+import { isPrivateFirstScore } from "@shared/review-flow";
 import { reserveMonthlyQuota, refundQuota, refundReservation, gridCreditCost, monthlyUsage, resetsAt, type QuotaReservation } from "./growth-quotas";
 import { isConfigured as dataforseoConfigured, normalizeBusinessName } from "./seo/dataforseo";
 import { lookupPoint as lookupGridPoint, gridEstimateUsd } from "./seo/grid";
@@ -5787,6 +5789,8 @@ function main() {
         // Lets a reopened link resume on the finished step instead of the rating form.
         lastStep: request.lastStep,
         referralOffer: await getReferralSettings(request.userId).then(s => s.enabled ? s.offer : null),
+        // Routing only (shared/review-flow.ts): the Google link above is shown on every step whatever the score.
+        escalationThreshold: await getReviewEscalationThreshold(request.userId),
         preview,
       });
     } catch (err: any) {
@@ -5795,29 +5799,39 @@ function main() {
   });
 
   // The customer's 1-10 rating submit on /review/<token>: records the private rating and improvement
-  // notes, stops reminders, and marks the request positive/negative feedback (9+ is positive).
+  // notes, stops reminders, and marks the request positive/negative feedback against the owner's
+  // escalation threshold (shared/review-flow.ts, default 8). A score below it is stamped
+  // privateFeedbackAt; when the private form is saved (stage "private") the owner is alerted once
+  // (server/review-escalation.ts). showReview is ALWAYS true: the Google link is never conditioned on the score.
   app.post("/api/review/:token/feedback", async (req, res) => {
     try {
       const request = await storage.getReviewRequestByToken(String(req.params.token));
       if (!request) return res.status(404).json({ message: "Review request not found" });
 
-      const { rating, categories, comments } = req.body;
+      const { rating, categories, comments, stage } = req.body;
       if (!Number.isInteger(rating) || rating < 1 || rating > 10) {
         return res.status(400).json({ message: "Rating must be between 1 and 10" });
       }
 
       if (isOwnerPreview(req, request)) return res.json({ success: true, showReview: true, preview: true, recorded: false });
 
-      const status = rating >= 9 ? "positive_feedback" : "negative_feedback";
-      await storage.updateReviewRequest(request.id, {
+      const threshold = await getReviewEscalationThreshold(request.userId);
+      const privateFirst = isPrivateFirstScore(rating, threshold);
+      const status = privateFirst ? "negative_feedback" : "positive_feedback";
+      const updated = await storage.updateReviewRequest(request.id, {
         feedbackRating: rating,
         feedbackCategories: categories || null,
         feedbackComments: comments || null,
         status,
         nextReminderAt: null,
+        privateFeedbackAt: privateFirst ? (request.privateFeedbackAt || new Date()) : null,
       });
+      // The private form's save: alert the owner now, with the client's own words (once per request).
+      if (privateFirst && stage === "private" && updated) {
+        await escalatePrivateFeedback(updated, threshold);
+      }
 
-      res.json({ success: true, showReview: true });
+      res.json({ success: true, showReview: true, privateFirst });
     } catch (err: any) {
       res.status(500).json({ message: "Failed to submit feedback" });
     }
@@ -6101,6 +6115,20 @@ function main() {
     const parsed = referralSettingsInput.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Enabled offers need terms of 1–500 characters" });
     res.json(await saveReferralSettings(user.id, parsed.data));
+  });
+
+  // Google Reviews → "Feedback routing": the score threshold (1–10, default 8) below which a client's
+  // score goes to private feedback first and alerts the owner. Routing and alerting only — every client
+  // is still shown the Google link (shared/review-flow.ts).
+  app.get("/api/review-escalation-settings", async (req, res) => {
+    const user = getDevUser(req, res); if (!user) return;
+    res.json({ reviewEscalationThreshold: await getReviewEscalationThreshold(user.id) });
+  });
+  app.put("/api/review-escalation-settings", async (req, res) => {
+    const user = getDevUser(req, res); if (!user) return;
+    const parsed = reviewEscalationSettingsInput.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "The threshold must be a whole number from 1 to 10" });
+    res.json(await saveReviewEscalationThreshold(user.id, parsed.data.reviewEscalationThreshold));
   });
 
   // Review reminders are a Team-and-up tool (shared/plans.ts reviewReminders): the settings

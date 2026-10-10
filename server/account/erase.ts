@@ -22,7 +22,7 @@ const USER_TABLES = [
   "business_locations", "citation_campaigns", "competitor_listings", "competitor_scans", "crm_members",
   "edge_actions", "edge_assets", "edge_jobs", "edge_location_links", "gmb_listings", "google_profile_reviews",
   "lsa_accounts", "lsa_connections", "lsa_leads", "lsa_manager_accounts", "media_folders", "media_photos",
-  "ranking_grid_scans", "review_recipient_preferences", "review_referral_settings", "review_reminder_settings",
+  "ranking_grid_scans", "review_escalation_settings", "review_recipient_preferences", "review_referral_settings", "review_reminder_settings",
   "review_requests", "review_templates", "search_queries", "tracked_domains",
 ] as const;
 

@@ -6,6 +6,12 @@ export async function ensureGrowthSchema() {
     CREATE TABLE IF NOT EXISTS review_referral_settings (
       user_id integer PRIMARY KEY, enabled boolean NOT NULL DEFAULT false, offer text NOT NULL DEFAULT ''
     );
+    CREATE TABLE IF NOT EXISTS review_escalation_settings (
+      user_id integer PRIMARY KEY, threshold integer NOT NULL DEFAULT 8 CHECK (threshold BETWEEN 1 AND 10),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+    ALTER TABLE review_requests ADD COLUMN IF NOT EXISTS private_feedback_at timestamp;
+    ALTER TABLE review_requests ADD COLUMN IF NOT EXISTS escalation_alerted_at timestamp;
     CREATE TABLE IF NOT EXISTS review_recipient_preferences (
       user_id integer NOT NULL, email text NOT NULL, unsubscribed boolean NOT NULL DEFAULT true,
       updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(user_id,email)
