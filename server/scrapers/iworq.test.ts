@@ -3,6 +3,9 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { PortalBlockedError, politeFetch } from "./polite-fetch";
 import adapter, { buildSearchUrl, discoverSearchUrls, inspectSearchForm, parseIworqDate, parsePermitTable, parsePortalUrl, selectSearchField } from "./iworq";
 import type { AdapterCtx } from "./types";
+import { getAdapter, supportsAlerts } from "./registry";
+
+vi.mock("../scraper", () => ({ scrapeByPlatform: vi.fn() }));
 
 vi.mock("./polite-fetch", async importOriginal => ({
   ...await importOriginal<typeof import("./polite-fetch")>(),
@@ -19,10 +22,18 @@ const ctx = (url = douglasHome): AdapterCtx => ({
 const mockFetch = vi.mocked(politeFetch);
 beforeEach(() => vi.resetAllMocks());
 
- describe("iWorQ URL and form discovery", () => {
+describe("iWorQ URL and form discovery", () => {
+  it("registers every supported alias case-insensitively and keeps alerts disabled", () => {
+    for (const label of [adapter.platform, ...adapter.aliases!]) {
+      expect(getAdapter(label.toUpperCase())).toBe(adapter);
+      expect(supportsAlerts(label)).toBe(false);
+    }
+    expect(getAdapter("iWorQ permit portal (via county link)")).toBeNull();
+  });
   it("supports both shared and tenant hosts, and clears stored search tokens", () => {
     expect(parsePortalUrl(northLiberty).tenant).toBe("NORTHLIBERTY");
     expect(parsePortalUrl(douglasHome).kind).toBe("home");
+    expect(parsePortalUrl("http://cityoftrenton.portal.iworq.net/portalhome/cityoftrenton").tenant).toBe("cityoftrenton");
     expect(parsePortalUrl(`${northLiberty}?search=old&g-recaptcha-response=secret`).url.href).toBe(northLiberty);
     expect(parsePortalUrl("https://cottonwoodheights.portal.iworq.net/COTTONWOODHEIGHTS/new-permit/600/1032").kind).toBe("application");
   });
@@ -31,7 +42,7 @@ beforeEach(() => vi.resetAllMocks());
     "https://portal.iworq.net.evil.test/NORTHLIBERTY/permits/600",
     "https://evilportal.iworq.net/NORTHLIBERTY/permits/600",
     "https://user:password@portal.iworq.net/NORTHLIBERTY/permits/600",
-    "http://portal.iworq.net/NORTHLIBERTY/permits/600",
+    "ftp://portal.iworq.net/NORTHLIBERTY/permits/600",
     "https://portal.iworq.net/NORTHLIBERTY/permits/600/other",
     "https://owego2.portal.iworq.net/OWEGO/cases/400",
   ])("rejects nonpermit or unsafe URL %s", url => expect(() => parsePortalUrl(url)).toThrow());
@@ -80,6 +91,7 @@ describe("real public North Liberty listing", () => {
   it("retains raw rows and does not invent an issue date from generic Date", () => {
     const row = records()[0];
     expect(row.raw?.html).toContain("10/09/2026");
+    expect(fixture("northliberty-search")).toContain(row.raw?.html);
     expect(row.issuedAt).toBeNull();
     expect(row.appliedAt).toBeNull();
   });

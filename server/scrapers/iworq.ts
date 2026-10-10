@@ -14,9 +14,9 @@ type PortalLocation = { url: URL; tenant: string; kind: "home" | "permits" | "ap
 /** Accept only catalogued iWorQ portal routes, never government landing pages. */
 export function parsePortalUrl(value: string): PortalLocation {
   const url = new URL(value);
-  if (url.protocol !== "https:" || url.username || url.password || url.port ||
+  if (!/^https?:$/.test(url.protocol) || url.username || url.password || url.port ||
       !/^(?:[a-z0-9_-]+\.)?portal\.iworq\.net$/i.test(url.hostname)) {
-    throw new IworqUnsupportedError(`Not an iWorQ HTTPS permit portal: ${value}`);
+    throw new IworqUnsupportedError(`Not an iWorQ HTTP(S) permit portal: ${value}`);
   }
   const home = /^\/portalhome\/([a-z0-9_-]+)\/?$/i.exec(url.pathname);
   const records = /^\/([a-z0-9_-]+)\/permits\/\d+\/?$/i.exec(url.pathname);
@@ -175,7 +175,10 @@ async function fetchPage(ctx: AdapterCtx, url: string): Promise<{ html: string; 
       const location = response.headers.get("location");
       if (!location) throw new Error(`iWorQ redirect without Location at ${url}`);
       const next = new URL(location, url);
-      if (next.origin !== new URL(url).origin) throw new IworqUnsupportedError(`iWorQ redirected outside the tenant portal: ${next.href}`);
+      const previous = new URL(url);
+      const httpsUpgrade = previous.protocol === "http:" && next.protocol === "https:" &&
+        next.hostname === previous.hostname && !next.port && !next.username && !next.password;
+      if (next.origin !== previous.origin && !httpsUpgrade) throw new IworqUnsupportedError(`iWorQ redirected outside the tenant portal: ${next.href}`);
       url = next.href;
       continue;
     }
