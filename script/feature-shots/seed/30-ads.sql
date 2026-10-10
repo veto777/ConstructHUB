@@ -15,10 +15,10 @@ END $$;
 -- ===================================================================================================
 -- Click Guard / IP Tracker / VPN Shield: tracked sites 930001-930003 and their visits
 -- ===================================================================================================
-DELETE FROM click_visits WHERE domain_id BETWEEN 930001 AND 930009;
-DELETE FROM blocked_ips  WHERE domain_id BETWEEN 930001 AND 930009;
-DELETE FROM vpn_visits   WHERE domain_id BETWEEN 930001 AND 930009;
-DELETE FROM tracked_domains WHERE id BETWEEN 930001 AND 930009;
+DELETE FROM click_visits WHERE domain_id BETWEEN 930001 AND 930003;
+DELETE FROM blocked_ips  WHERE domain_id BETWEEN 930001 AND 930003;
+DELETE FROM vpn_visits   WHERE domain_id BETWEEN 930001 AND 930003;
+DELETE FROM tracked_domains WHERE id BETWEEN 930001 AND 930003;
 
 INSERT INTO tracked_domains (id, user_id, domain, tracking_id, name, is_active, settings, created_at) OVERRIDING SYSTEM VALUE VALUES
  (930001, 1, 'summitroofing.example', 'a0f5e2c1-93a0-4b1d-8c11-sample930001', 'Summit Roofing Co.', true,

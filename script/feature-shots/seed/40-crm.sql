@@ -8,7 +8,7 @@
 \set ON_ERROR_STOP on
 begin;
 do $$ begin
-  if current_database() not like 'constructhub_dev_%' then
+  if current_database() not like 'constructhub\_dev\_%' then
     raise exception 'refusing to seed %: lane databases (constructhub_dev_*) only', current_database();
   end if;
 end $$;
