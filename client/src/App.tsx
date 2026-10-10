@@ -269,6 +269,7 @@ function DashboardRouter() {
       {/* Google Ads landing doors: the same pages, reached only from an ad (server/ads-landing.ts). */}
       <Route path="/googleads-features" component={FeaturesCataloguePage} />
       <Route path="/googleads-crm">{() => <FeatureAdLanding slug="crm" />}</Route>
+      <Route path="/googleads-pricing" component={PricingPage} />
       <Route path="/features/:slug" component={FeaturePageRoute} />
       {/* Every done-for-you service's page (shared/dfy-pages), inside the app frame when signed in. */}
       <Route path="/done-for-you" component={DfyCataloguePage} />
@@ -384,6 +385,7 @@ function PublicRouter() {
       {/* Google Ads landing doors: the same pages, reached only from an ad (server/ads-landing.ts). */}
       <Route path="/googleads-features" component={FeaturesCataloguePage} />
       <Route path="/googleads-crm">{() => <FeatureAdLanding slug="crm" />}</Route>
+      <Route path="/googleads-pricing" component={PricingPage} />
       <Route path="/features/:slug" component={FeaturePageRoute} />
       <Route path="/done-for-you" component={DfyCataloguePage} />
       <Route path="/done-for-you/:slug" component={DfyPageRoute} />

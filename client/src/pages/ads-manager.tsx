@@ -1,8 +1,9 @@
+import { DEFAULT_SUFFIX, negativeLists, type RecommendationStep } from '@shared/ads-playbook';
 import { AppPage, Section, Notice, appTable, appTableCards } from "@/components/app-ui";
 import { GoogleSectionHeader, GooglePill } from "@/components/google";
 import { ToolTabs } from "@/components/tool";
 import { Search } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, apiErrorMessage } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
@@ -13,53 +14,149 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { useUrlParam } from '@/hooks/use-url-param';
 import { PlanRequired, planRequiredFrom, pollUnlessPlanRequired } from '@/components/plan-required';
-type Tab='accounts'|'invitations'|'plans'|'jobs'|'findings';
-const labels:Record<Tab,string>={accounts:'Client accounts',invitations:'Access invitations',plans:'Protection previews',jobs:'Queue',findings:'Health audit'};
+type Tab='recommendations'|'accounts'|'invitations'|'plans'|'jobs'|'findings'|'landing';
+const labels:Record<Tab,string>={recommendations:'Recommendations',accounts:'Client accounts',invitations:'Access invitations',plans:'Protection previews',jobs:'Queue',findings:'Health audit',landing:'Landing door'};
+
+function DoorReplay({sessionId}:{sessionId:string}) {
+  const target=useRef<HTMLDivElement>(null);
+  const [error,setError]=useState('');
+  useEffect(()=>{
+    let cancelled=false, player:{ $destroy:()=>void }|undefined;
+    setError('');
+    void Promise.all([
+      import('rrweb-player'), import('rrweb-player/dist/style.css'),
+      apiRequest('GET',`/api/ads-lp/rr/${encodeURIComponent(sessionId)}`).then(r=>r.json()),
+    ]).then(([{default:Player},_css,data])=>{
+      if(cancelled||!target.current)return;
+      // The bundled Svelte component exposes $destroy; its published types
+      // omit that inherited API when Svelte is not installed by the host app.
+      player=new Player({target:target.current,props:{events:data.events,width:Math.min(960,target.current.clientWidth||640),height:500,autoPlay:false}}) as unknown as {$destroy:()=>void};
+    }).catch(e=>{if(!cancelled)setError(apiErrorMessage(e));});
+    return ()=>{cancelled=true;player?.$destroy();};
+  },[sessionId]);
+  return <>{error&&<p role="alert">{error}</p>}<div ref={target} className="overflow-auto"/></>;
+}
+function LandingDoorTab() {
+  const [replay,setReplay]=useState<string|null>(null);
+  const hits=useQuery<any>({queryKey:['/api/ads-lp/hits'],refetchInterval:10000});
+  const columns=['Time','Door','Action','Reason','IP','Country','Campaign key','Device','Network','Recording'];
+  return <Section flush>
+    <CardHeader><CardTitle>Landing door</CardTitle></CardHeader>
+    <CardContent className="space-y-3">
+      {hits.error&&<p role="alert">{apiErrorMessage(hits.error)}</p>}
+      {hits.isLoading?<p>Loading…</p>:<div className="overflow-x-auto border rounded"><table className={appTable.table}>
+        <thead><tr className="border-b text-left">{columns.map(c=><th key={c} className="p-3">{c}</th>)}</tr></thead>
+        <tbody>{(hits.data?.items||[]).map((hit:any)=><tr key={hit.id} className="border-b">
+          {[new Date(hit.at).toLocaleString(),hit.door,hit.action,hit.reason,hit.ip,hit.country,hit.campaign_key,hit.device,hit.network].map((value,i)=><td key={i} className="p-3">{value||'—'}</td>)}
+          <td className="p-3">{hit.session_id?<Button variant="outline" size="sm" onClick={()=>setReplay(hit.session_id)}>Replay</Button>:'No recording'}</td>
+        </tr>)}</tbody>
+      </table></div>}
+      {!hits.isLoading&&!hits.error&&!hits.data?.items?.length&&<p>No door visits yet.</p>}
+      <Dialog open={!!replay} onOpenChange={open=>{if(!open)setReplay(null);}}><DialogContent className="max-w-5xl"><DialogHeader><DialogTitle>Door replay</DialogTitle></DialogHeader>{replay&&<DoorReplay sessionId={replay}/>}</DialogContent></Dialog>
+    </CardContent>
+  </Section>;
+}
 const defaults=['jobs','careers','salary','training','DIY','tutorial','free','cheap'];
 function Pager({page,total,setPage}:{page:number;total:number;setPage:(n:number)=>void}) {return <div className="flex flex-wrap items-center gap-3 text-sm"><Button variant="outline" disabled={page<=1} onClick={()=>setPage(page-1)}>Previous</Button><span>Page {page} · {total} results</span><Button variant="outline" disabled={page*25>=total} onClick={()=>setPage(page+1)}>Next</Button></div>;}
 export default function AdsManagerPage() {
   const qc=useQueryClient();
+  const me=useQuery<{isPlatformAdmin?:boolean}>({queryKey:['/api/auth/me']});
   // The section lives in the URL (?tab=jobs) so a reload or a shared link keeps it.
   const [tabParam,setTabParam]=useUrlParam('tab');
-  const tab:Tab=(Object.keys(labels) as string[]).includes(tabParam??'')?tabParam as Tab:'accounts';
-  const setTab=(t:Tab)=>setTabParam(t==='accounts'?null:t);
+  const tab:Tab=(Object.keys(labels) as string[]).includes(tabParam??'')?tabParam as Tab:'recommendations';
+  const setTab=(t:Tab)=>setTabParam(t==='recommendations'?null:t);
   const [q,setQ]=useState(''),[filter,setFilter]=useState(''),[lsa,setLsa]=useState(''),[page,setPage]=useState(1);
   const [selected,setSelected]=useState<string[]>([]),[all,setAll]=useState(false),[message,setMessage]=useState(''),[manager,setManager]=useState('');
   const [kind,setKind]=useState('presence'),[keywords,setKeywords]=useState(defaults.join('\n')),[listName,setListName]=useState('Contractor starter negatives'),[placements,setPlacements]=useState('');
   const [schedule,setSchedule]=useState('MONDAY,09:00,17:00\nTUESDAY,09:00,17:00\nWEDNESDAY,09:00,17:00\nTHURSDAY,09:00,17:00\nFRIDAY,09:00,17:00'),[campaignIds,setCampaignIds]=useState('');
+  const [stepIds,setStepIds]=useState<string[]>([]),[negativeList,setNegativeList]=useState<'contractor'|'software'>('contractor');
+  const [suffix,setSuffix]=useState(DEFAULT_SUFFIX),[suffixMode,setSuffixMode]=useState<'set'|'append'>('set');
+  const accountTab=tab==='accounts'||tab==='recommendations';
   const [replaceList,setReplaceList]=useState(false);
   const [inviteText,setInviteText]=useState(''),[invitePreview,setInvitePreview]=useState(false),[reviewed,setReviewed]=useState(false),[mapping,setMapping]=useState('');
+  const [mappingOpen,setMappingOpen]=useState(false);
   const [operationQ,setOperationQ]=useState('');
+  const [linkCustomer,setLinkCustomer]=useState(''),[linkMessage,setLinkMessage]=useState('');
+  const [linking,setLinking]=useState<{customerId:string;batchId:string}|null>(null);
+  const linkAccount=useMutation({mutationFn:async()=>{
+    const id=linkCustomer.trim();
+    if(!/^(?:\d{10}|\d{3}-\d{3}-\d{4})$/.test(id)) throw new Error('Enter a 10-digit Google Ads customer ID.');
+    const result=await (await apiRequest('POST','/api/ads/link',{customerId:id,confirm:true})).json();
+    return {customerId:id.replaceAll('-',''),batchId:result.batchId};
+  },onMutate:()=>setLinkMessage('Linking…'),onSuccess:result=>setLinking(result),onError:e=>setLinkMessage(apiErrorMessage(e))});
+  useEffect(()=>{
+    if(!linking)return;
+    let stopped=false,timer:ReturnType<typeof setTimeout>;
+    const finish=(message:string)=>{if(stopped)return;setLinkMessage(message);setLinking(null);qc.invalidateQueries({queryKey:['ads-list']});};
+    const deadline=setTimeout(()=>{finish('Still processing. Check Queue for progress.');stopped=true;clearTimeout(timer);},60000);
+    const poll=async()=>{
+      try {
+        // Search the same accounts endpoint independently of the table's current filters/page.
+        const params=new URLSearchParams({page:'1',q:linking.customerId,status:'',lsa:''});
+        const [accounts,jobs,invitations]=await Promise.all([
+          qc.fetchQuery<any>({queryKey:['ads-list','accounts',params.toString()],staleTime:0,queryFn:async()=>(await apiRequest('GET',`/api/ads/accounts?${params}`)).json()}),
+          apiRequest('GET',`/api/ads/jobs?batch=${linking.batchId}&q=${linking.customerId}`).then(r=>r.json()),
+          apiRequest('GET',`/api/ads/invitations?q=${linking.customerId}`).then(r=>r.json()),
+        ]);
+        if(stopped)return;
+        if(accounts.items.some((a:any)=>a.customer_id===linking.customerId&&a.status==='ENABLED')) {finish('Linked. Syncing campaigns now.');return;}
+        const job=jobs.items.find((j:any)=>j.kind==='link');
+        if(job&&['failed','unknown','cancelled'].includes(job.status)) {finish(job.error||'Linking stopped. Check Queue for details.');return;}
+        if(job?.status==='done'&&invitations.items.some((i:any)=>i.customer_id===linking.customerId&&i.status==='pending')) {
+          finish(`Invitation sent. The owner of ${linking.customerId} must accept it in Google Ads (Admin → Access and security → Managers), or use Access invitations to email them.`);return;
+        }
+      }catch(e){if(!stopped){finish(apiErrorMessage(e));return;}}
+      if(!stopped)timer=setTimeout(poll,3000);
+    };
+    void poll();
+    return ()=>{stopped=true;clearTimeout(timer);clearTimeout(deadline);};
+  },[linking,qc]);
   useEffect(()=>setReviewed(false),[selected]);
   const [previewId,setPreviewId]=useState<string|null>(null),[previewPage,setPreviewPage]=useState(1);
   const [domainQ,setDomainQ]=useState(''),[domainPage,setDomainPage]=useState(1),[campaignCustomer,setCampaignCustomer]=useState(''),[campaignQ,setCampaignQ]=useState(''),[campaignPage,setCampaignPage]=useState(1);
   const status=useQuery<any>({queryKey:['/api/ads/status'],refetchInterval:pollUnlessPlanRequired(10000)});
   const params=new URLSearchParams({page:String(page),q,status:filter,lsa});
-  const data=useQuery<any>({queryKey:['ads-list',tab,params.toString()],queryFn:async()=> (await apiRequest('GET',`/api/ads/${tab}?${params}`)).json(),refetchInterval:pollUnlessPlanRequired(5000)});
+  const listTab=accountTab?'accounts':tab;
+  const data=useQuery<any>({queryKey:['ads-list',listTab,params.toString()],enabled:tab!=='landing',queryFn:async()=> (await apiRequest('GET',`/api/ads/${listTab}?${params}`)).json(),refetchInterval:pollUnlessPlanRequired(5000)});
   const detail=useQuery<any>({queryKey:['ads-preview',previewId,previewPage,operationQ],enabled:!!previewId,queryFn:async()=>(await apiRequest('GET',`/api/ads/plans/${previewId}?page=${previewPage}&limit=25&q=${encodeURIComponent(operationQ)}`)).json()});
   const domains=useQuery<any>({queryKey:['ads-domains',domainQ,domainPage],enabled:tab==='accounts',queryFn:async()=>(await apiRequest('GET',`/api/ads/domains?q=${encodeURIComponent(domainQ)}&page=${domainPage}`)).json()});
   const campaigns=useQuery<any>({queryKey:['ads-campaigns',campaignCustomer,campaignQ,campaignPage],enabled:!!campaignCustomer,queryFn:async()=>(await apiRequest('GET',`/api/ads/accounts/${campaignCustomer}/campaigns?q=${encodeURIComponent(campaignQ)}&page=${campaignPage}`)).json()});
   const action=useMutation({mutationFn:async({path,body}:{path:string;body:unknown})=>(await apiRequest('POST',`/api/ads${path}`,body)).json(),onSuccess:r=>{setMessage(r.message||`Queued ${r.queued??1}. Review progress in Queue.`);setSelected([]);setReviewed(false);setInvitePreview(false);qc.invalidateQueries({queryKey:['ads-list']});qc.invalidateQueries({queryKey:['/api/ads/status']});if(r.url)window.location.assign(r.url);},onError:e=>setMessage(apiErrorMessage(e))});
   const run=(path:string,body:unknown)=>action.mutate({path,body});
-  const switchTab=(t:Tab)=>{setTab(t);setPage(1);setQ('');setFilter('');setLsa('');setSelected([]);setAll(false);setReviewed(false);};
+  const switchTab=(t:Tab)=>{if(accountTab&&(t==='accounts'||t==='recommendations')){setTab(t);return;}setTab(t);setPage(1);setQ('');setFilter('');setLsa('');setSelected([]);setAll(false);setReviewed(false);};
   const select=(id:string)=>{setReviewed(false);setSelected(s=>s.includes(id)?s.filter(x=>x!==id):[...s,id]);};
   const selection=all?{filter:{q,lsa}}:{ids:selected};
   const lines=(s:string)=>s.split('\n').map(s=>s.trim()).filter(Boolean);
+  const parseSchedule=()=>lines(schedule).map(line=>{const [day,start,end]=line.split(',').map(s=>s.trim());if(!/^(?:[01]\d|2[0-4]):(?:00|15|30|45)$/.test(start)||!/^(?:[01]\d|2[0-4]):(?:00|15|30|45)$/.test(end))throw new Error('Invalid time');const [sh,sm]=start.split(':').map(Number),[eh,em]=end.split(':').map(Number);return {dayOfWeek:day,startHour:sh,startMinute:['ZERO','FIFTEEN','THIRTY','FORTY_FIVE'][sm/15],endHour:eh,endMinute:['ZERO','FIFTEEN','THIRTY','FORTY_FIVE'][em/15]};});
+  const recommendations=useMutation({mutationFn:async()=>{
+    const inputs:any={};
+    if(stepIds.includes('negative'))inputs.negative={list:negativeList};
+    if(stepIds.includes('suffix'))inputs.suffix={suffix,mode:suffixMode};
+    if(stepIds.includes('schedule'))inputs.schedule={slots:parseSchedule()};
+    if(stepIds.includes('placement'))inputs.placement={urls:lines(placements)};
+    return (await apiRequest('POST','/api/ads/recommendations/preview',{selection,stepIds:stepIds.filter(id=>id!=='ip'||ipAvailable),inputs,requestId:crypto.randomUUID()})).json();
+  },onSuccess:r=>{setMessage(`${r.queued} previews queued — review and confirm them on Protection previews${r.skipped.length ? '. Skipped: '+r.skipped.map((s:any)=>s.customerId+' / '+s.stepId+': '+s.reason).join('; ') : ''}`);switchTab('plans');qc.invalidateQueries({queryKey:['ads-list']});},onError:e=>setMessage(apiErrorMessage(e))});
   const previewProtection=()=>{
     try {
       let v:any={kind};if(kind!=='placement'&&campaignIds.trim())v.campaignIds=campaignIds.split(',').map(s=>s.trim());
       if(kind==='negative')v={...v,name:listName,keywords:lines(keywords),mode:replaceList?'replace':'add'};
       if(kind==='placement')v.urls=lines(placements);
-      if(kind==='schedule')v.slots=lines(schedule).map(line=>{const [day,start,end]=line.split(',').map(s=>s.trim());if(!/^(?:[01]\d|2[0-4]):(?:00|15|30|45)$/.test(start)||!/^(?:[01]\d|2[0-4]):(?:00|15|30|45)$/.test(end))throw new Error('Invalid time');const [sh,sm]=start.split(':').map(Number),[eh,em]=end.split(':').map(Number);return {dayOfWeek:day,startHour:sh,startMinute:['ZERO','FIFTEEN','THIRTY','FORTY_FIVE'][sm/15],endHour:eh,endMinute:['ZERO','FIFTEEN','THIRTY','FORTY_FIVE'][em/15]};});
+      if(kind==='schedule')v.slots=parseSchedule();
       run('/bulk',{selection,kind:'preview',action:v,requestId:crypto.randomUUID()});
     }catch{setMessage('Check schedule format: DAY,HH:MM,HH:MM with 15-minute boundaries.');}
   };
   const enabled=status.data?.connected&&status.data?.grant?.verified;
   const rows:any[]=data.data?.items||[];
+  const accountScope=all?{filter:{q,lsa}}:{ids:selected};
+  const scopeInfo=useQuery<{total:number;mapped:number}>({queryKey:['ads-recommendation-scope',accountScope],enabled:tab==='recommendations'&&(all||selected.length>0),queryFn:async()=>(await apiRequest('POST','/api/ads/recommendations/scope',{selection:accountScope})).json(),refetchInterval:10000});
+  const ipAvailable=!!scopeInfo.data?.mapped&&!scopeInfo.isError;
+  const accountCount=all?(scopeInfo.data?.total??0):selected.length;
   const planGate=[status.error,data.error].find(e=>planRequiredFrom(e));
   // Google's page format (owner, 2026-10-07): a quiet header, pill tabs and actions, hairline cards.
   const header=<GoogleSectionHeader as="h1" title="Agency Ads & LSA manager" description="Manage client access and review ad protections before applying them." flush actions={planGate ? null : status.data?.connected ? <GooglePill variant="solid" label="Discover clients" disabled={action.isPending} onClick={()=>run('/sync',{kind:'discover'})} /> : <GooglePill variant="solid" label="Connect MCC with Google" disabled={!status.data?.configured||action.isPending} onClick={()=>run('/connect',{managerId:manager||status.data?.defaultManagerId})} />} />;
-  if(planGate)return <AppPage className="[&_select]:max-w-full [&_select]:min-h-10 [&_button]:min-h-10 [&_h3]:text-base [&_p]:text-sm">{header}<PlanRequired module="adsManager" error={planGate} className="max-w-3xl"/></AppPage>;
+  const tabs=<ToolTabs as="group" label="Ads manager sections">{(Object.keys(labels) as Tab[]).filter(t=>t!=='landing'||me.data?.isPlatformAdmin).map(t=><GooglePill key={t} label={labels[t]} selected={tab===t} ariaPressed={tab===t} onClick={()=>switchTab(t)} />)}</ToolTabs>;
+  if(tab==='landing')return <AppPage>{header}{tabs}{me.isLoading?<p>Loading…</p>:me.data?.isPlatformAdmin?<LandingDoorTab/>:<p>Platform admin access required.</p>}</AppPage>;
+  if(planGate)return <AppPage className="[&_select]:max-w-full [&_select]:min-h-10 [&_button]:min-h-10 [&_h3]:text-base [&_p]:text-sm">{header}{me.data?.isPlatformAdmin&&tabs}<PlanRequired module="adsManager" error={planGate} className="max-w-3xl"/></AppPage>;
   return <AppPage className="[&_select]:max-w-full [&_select]:min-h-10 [&_button]:min-h-10 [&_h3]:text-base [&_p]:text-sm">
     {header}
     {message&&<p role="status" className="rounded border p-3">{message}</p>}
@@ -73,19 +170,43 @@ export default function AdsManagerPage() {
         {status.data?.connected&&<><Button variant="outline" disabled={action.isPending||!enabled} onClick={()=>run('/sync',{kind:'poll'})}>Poll invitations</Button><Button variant="outline" disabled={action.isPending} onClick={()=>{if(window.confirm('Remove local MCC credentials and cancel queued work? Revoke Google access separately in your Google Account.'))run('/disconnect',{confirm:true});}}>Disconnect MCC</Button></>}
       </div>
     </CardContent></Section>
-    <ToolTabs as="group" label="Ads manager sections">{(Object.keys(labels) as Tab[]).map(t=><GooglePill key={t} label={labels[t]} selected={tab===t} ariaPressed={tab===t} onClick={()=>switchTab(t)} />)}</ToolTabs>
+    {tabs}
+    {tab==='accounts'&&<Card><CardHeader><CardTitle className="text-base">Add a Google Ads account</CardTitle></CardHeader><CardContent>
+      <form className="flex flex-wrap gap-2" onSubmit={e=>{e.preventDefault();if(!linkAccount.isPending&&!linking)linkAccount.mutate();}}>
+        <Input className="w-full sm:max-w-xs" aria-label="Client Google Ads customer ID" placeholder="000-000-0000" value={linkCustomer} onChange={e=>setLinkCustomer(e.target.value)} disabled={linkAccount.isPending||!!linking}/>
+        <Button type="submit" disabled={!enabled||!linkCustomer.trim()||linkAccount.isPending||!!linking}>Link account</Button>
+      </form>{linkMessage&&<p role="status" className="mt-3">{linkMessage}</p>}
+    </CardContent></Card>}
     <div className="flex flex-wrap gap-3"><div className="g-search w-full sm:max-w-sm" role="search"><Search aria-hidden="true" /><input type="search" aria-label="Search accounts or records" placeholder={tab==='findings'?'Search audit findings':'Search name or customer ID'} value={q} onChange={e=>{setQ(e.target.value);setPage(1);setAll(false);setSelected([]);}}/></div><details className="w-full sm:w-auto"><summary className="g-pill cursor-pointer list-none [&::-webkit-details-marker]:hidden">Filters</summary><div className="flex flex-col sm:flex-row gap-3 py-3">
-      <label>Filter <select className="border rounded p-2 bg-background" aria-label="Status filter" value={filter} onChange={e=>{setFilter(e.target.value);setPage(1);setSelected([]);setAll(false);}}><option value="">All</option>{(tab==='accounts'?['ENABLED','SUSPENDED','CANCELED','UNLINKED']:tab==='findings'?['warning','unknown','info']:tab==='invitations'?['queued','pending','accepted','rejected','cancelled','unknown','failed']:tab==='plans'?['preview','queued','applying','applied','reversed','failed','unknown','expired','no_change']:['queued','running','done','failed','unknown','cancelled']).map(s=><option key={s}>{s}</option>)}</select></label>
-      {tab==='accounts'&&<label>LSA <select className="border rounded p-2 bg-background" aria-label="LSA filter" value={lsa} onChange={e=>{setLsa(e.target.value);setPage(1);setAll(false);setSelected([]);}}><option value="">All accounts</option><option value="true">LSA identified</option><option value="false">No LSA campaigns found</option><option value="unknown">Not checked</option></select></label>}
+      <label>Filter <select className="border rounded p-2 bg-background" aria-label="Status filter" value={filter} onChange={e=>{setFilter(e.target.value);setPage(1);setSelected([]);setAll(false);}}><option value="">All</option>{(accountTab?['ENABLED','SUSPENDED','CANCELED','UNLINKED']:tab==='findings'?['warning','unknown','info']:tab==='invitations'?['queued','pending','accepted','rejected','cancelled','unknown','failed']:tab==='plans'?['preview','queued','applying','applied','reversed','failed','unknown','expired','no_change']:['queued','running','done','failed','unknown','cancelled']).map(s=><option key={s}>{s}</option>)}</select></label>
+      {accountTab&&<label>LSA <select className="border rounded p-2 bg-background" aria-label="LSA filter" value={lsa} onChange={e=>{setLsa(e.target.value);setPage(1);setAll(false);setSelected([]);}}><option value="">All accounts</option><option value="true">LSA identified</option><option value="false">No LSA campaigns found</option><option value="unknown">Not checked</option></select></label>}
     </div></details></div>
     <div className="flex flex-wrap gap-3 items-center">
-      {['accounts','plans','invitations'].includes(tab)&&<><Button variant="outline" onClick={()=>setSelected([...new Set([...selected,...rows.filter(r=>tab!=='accounts'||(!r.manager&&r.status==='ENABLED')).map(r=>r.customer_id&&tab==='accounts'?r.customer_id:r.id)])])}>Select this page</Button><Button variant="ghost" onClick={()=>{setSelected([]);setAll(false);}}>Clear selection</Button><span>{selected.length} selected</span></>}
-      {tab==='accounts'&&<><label className="flex gap-2"><input type="checkbox" checked={all} onChange={e=>{setAll(e.target.checked);setSelected([]);}}/>All active clients matching search / LSA filter (max 1,000)</label><Button variant="outline" disabled={!enabled||(!all&&!selected.length)||action.isPending} onClick={()=>run('/bulk',{selection,kind:'audit',requestId:crypto.randomUUID()})}>Queue health audit</Button></>}
+      {['recommendations','accounts','plans','invitations'].includes(tab)&&<><Button variant="outline" onClick={()=>setSelected([...new Set([...selected,...rows.filter(r=>!accountTab||(!r.manager&&r.status==='ENABLED')).map(r=>r.customer_id&&accountTab?r.customer_id:r.id)])])}>Select this page</Button><Button variant="ghost" onClick={()=>{setSelected([]);setAll(false);}}>Clear selection</Button><span>{selected.length} selected</span></>}
+      {accountTab&&<><label className="flex gap-2"><input type="checkbox" checked={all} onChange={e=>{setAll(e.target.checked);setSelected([]);}}/>All active clients matching search / LSA filter (max 1,000)</label><Button variant="outline" disabled={!enabled||(!all&&!selected.length)||action.isPending} onClick={()=>run('/bulk',{selection,kind:'audit',requestId:crypto.randomUUID()})}>Queue health audit</Button></>}
     </div>
-    {data.isLoading?<p>Loading…</p>:!rows.length?<p>No records. Connect and discover clients, or adjust the filter.</p>:<div className="overflow-x-auto border rounded"><table className={appTable.table}><thead className={appTableCards.thead}><tr className={appTableCards.tr + " border-b text-left"}><th className="p-3">Select / account</th><th>Details</th><th>Status</th><th>Actions</th></tr></thead><tbody>{rows.map(r=>{const id=tab==='accounts'?r.customer_id:String(r.id);return <tr key={id} className={appTableCards.tr + " border-b"} data-testid="ads-row"><td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Select / account: </span>{['accounts','plans','invitations'].includes(tab)&&<input aria-label={`Select ${id}`} disabled={tab==='accounts'&&(r.manager||r.status!=='ENABLED')} type="checkbox" checked={selected.includes(id)} onChange={()=>select(id)} className="mr-2"/>}{r.customer_id||'Agency'}{tab==='accounts'&&<p className="font-medium">{r.name||'Name unavailable'}</p>}</td><td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Details: </span>{tab==='accounts'?<>{r.manager?'Manager':r.lsa===null?'LSA not checked':r.lsa?'LSA account':'No LSA campaigns found'}<p>{r.currency||'Currency unknown'} · {r.timezone||'Timezone unknown'}</p><p>Click Guard domain ID: {r.domain_id||'Not mapped'}</p><p>{r.synced_at?`Checked ${new Date(r.synced_at).toLocaleString()}`:'Never audited'}</p></>:tab==='findings'?<><strong>{r.title}</strong><p>{r.detail}</p></>:<>{r.kind||r.email}{r.email_status&&<p>Email: {r.email_status}</p>}<p className="text-muted-foreground break-all">{r.id}</p></>}{r.error&&<p role="alert" className="text-destructive">{r.error}</p>}</td><td className={appTableCards.td}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Status: </span><Badge variant="outline">{r.status||r.severity}</Badge></td><td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Actions: </span>{tab==='plans'&&<Button size="sm" variant="outline" onClick={()=>{setPreviewId(r.id);setPreviewPage(1);setOperationQ('');}}>Review preview</Button>}{tab==='accounts'&&!r.manager&&<Button size="sm" variant="outline" onClick={()=>{setCampaignCustomer(r.customer_id);setCampaignPage(1);setCampaignQ('');}}>Campaigns</Button>}{tab==='findings'&&r.fix&&(r.fix.url?<a className="underline text-primary" href={r.fix.url} target={r.fix.url.startsWith('https:')?'_blank':undefined} rel="noreferrer">{r.fix.label}</a>:<Button size="sm" variant="outline" onClick={()=>{switchTab('accounts');setSelected([r.customer_id]);setKind(r.fix.action.kind);setMessage('Review protection settings below, then queue a preview.');}}>{r.fix.label}</Button>)}</td></tr>;})}</tbody></table></div>}
+    {data.isLoading?<p>Loading…</p>:!rows.length?<p>No records. Connect and discover clients, or adjust the filter.</p>:<div className="overflow-x-auto border rounded"><table className={appTable.table}><thead className={appTableCards.thead}><tr className={appTableCards.tr + " border-b text-left"}><th className="p-3">Select / account</th><th>Details</th><th>Status</th><th>Actions</th></tr></thead><tbody>{rows.map(r=>{const id=accountTab?r.customer_id:String(r.id);return <tr key={id} className={appTableCards.tr + " border-b"} data-testid="ads-row"><td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Select / account: </span>{['recommendations','accounts','plans','invitations'].includes(tab)&&<input aria-label={`Select ${id}`} disabled={accountTab&&(r.manager||r.status!=='ENABLED')} type="checkbox" checked={selected.includes(id)} onChange={()=>select(id)} className="mr-2"/>}{r.customer_id||'Agency'}{accountTab&&<p className="font-medium">{r.name||'Name unavailable'}</p>}</td><td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Details: </span>{accountTab?<>{r.manager?'Manager':r.lsa===null?'LSA not checked':r.lsa?'LSA account':'No LSA campaigns found'}<p>{r.currency||'Currency unknown'} · {r.timezone||'Timezone unknown'}</p><p>Click Guard domain ID: {r.domain_id||'Not mapped'}</p><p>{r.synced_at?`Checked ${new Date(r.synced_at).toLocaleString()}`:'Never audited'}</p></>:tab==='findings'?<><strong>{r.title}</strong><p>{r.detail}</p></>:<>{r.kind||r.email}{r.email_status&&<p>Email: {r.email_status}</p>}<p className="text-muted-foreground break-all">{r.id}</p></>}{r.error&&<p role="alert" className="text-destructive">{r.error}</p>}</td><td className={appTableCards.td}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Status: </span><Badge variant="outline">{r.status||r.severity}</Badge></td><td className={appTableCards.td + " min-w-0 break-words"}><span className="mr-2 text-xs font-medium text-muted-foreground sm:hidden">Actions: </span>{tab==='plans'&&<Button size="sm" variant="outline" onClick={()=>{setPreviewId(r.id);setPreviewPage(1);setOperationQ('');}}>Review preview</Button>}{accountTab&&!r.manager&&<Button size="sm" variant="outline" onClick={()=>{setCampaignCustomer(r.customer_id);setCampaignPage(1);setCampaignQ('');}}>Campaigns</Button>}{tab==='findings'&&r.fix&&(r.fix.url?<a className="underline text-primary" href={r.fix.url} target={r.fix.url.startsWith('https:')?'_blank':undefined} rel="noreferrer">{r.fix.label}</a>:<Button size="sm" variant="outline" onClick={()=>{switchTab('accounts');setSelected([r.customer_id]);setKind(r.fix.action.kind);setMessage('Review protection settings below, then queue a preview.');}}>{r.fix.label}</Button>)}</td></tr>;})}</tbody></table></div>}
     <Pager page={page} total={data.data?.total||0} setPage={setPage}/>
+    {tab==='recommendations'&&<div className="space-y-4">
+      <p>Select client accounts above and choose the changes to preview. Nothing is selected by default, and nothing changes until you confirm a preview. If applying one change makes another preview stale, preview the remaining change again.</p>
+      {(status.data?.playbook||[]).map((step:RecommendationStep)=><Section flush key={step.id}>
+        <CardHeader><CardTitle className="g-card__title g-card__title--md"><label className="flex items-center gap-3">
+          {step.recommendation!=='info'&&<input type="checkbox" aria-label={step.title} checked={stepIds.includes(step.id)&&(step.id!=='ip'||ipAvailable)} disabled={step.id==='ip'&&!ipAvailable} onChange={e=>setStepIds(ids=>e.target.checked?[...ids.filter(id=>id!==step.id),step.id]:ids.filter(id=>id!==step.id))}/>}
+          {step.title}</label></CardTitle><Badge variant="outline">{step.recommendation==='recommended'?'Recommended':step.recommendation==='info'?'Set up outside Google Ads':'Optional'}</Badge></CardHeader>
+        <CardContent className="space-y-3"><p>{step.why}</p><p>{step.what}</p>
+          {step.id==='ip'&&<><p>{ipAvailable?'Accounts without a mapped site will be skipped.':'Map a Click Guard site first'}</p><Button variant="outline" onClick={()=>{setMappingOpen(true);switchTab('accounts');}}>Open Click Guard domain mapping</Button></>}
+          {step.inputs?.type==='negative-list'&&<><fieldset><legend>Advertiser type</legend>{step.inputs.choices?.map(choice=><label className="flex gap-2" key={choice.value}><input type="radio" name="recommendation-negative-list" value={choice.value} checked={negativeList===choice.value} onChange={()=>setNegativeList(choice.value as 'contractor'|'software')}/>{choice.label}</label>)}</fieldset><p>Contractors keep homeowner searches such as “near me” and “roof repair”. Review “free” and “cheap” before confirming; they can exclude free estimates.</p><details><summary>Review selected keyword list</summary><p>{negativeLists[negativeList].join(', ')}</p></details></>}
+          {step.inputs?.type==='suffix'&&<><Input aria-label="Campaign tracking suffix" maxLength={1000} value={suffix} onChange={e=>setSuffix(e.target.value)}/><label>Suffix mode <select className="border rounded p-2 bg-background" value={suffixMode} onChange={e=>setSuffixMode(e.target.value as 'set'|'append')}><option value="set">Set (replace existing)</option><option value="append">Append to existing</option></select></label></>}
+          {step.inputs?.type==='schedule'&&<><Textarea aria-label="Recommended ad schedule" value={schedule} onChange={e=>setSchedule(e.target.value)}/><p>Enter your hours: DAY,HH:MM,HH:MM · 15-minute boundaries, max six intervals per day. Uses each account’s timezone. Omitted days do not run.</p></>}
+          {step.inputs?.type==='placement'&&<Textarea aria-label="Recommended excluded placements" placeholder="One reviewed domain/path per line" value={placements} onChange={e=>setPlacements(e.target.value)}/>}
+          {step.links?.map(link=><a className="underline text-primary mr-4" key={link.href} href={link.href}>{link.label}</a>)}
+        </CardContent>
+      </Section>)}
+      <Button disabled={!enabled||recommendations.isPending||accountCount===0||!stepIds.some(id=>id!=='ip'||ipAvailable)} onClick={()=>recommendations.mutate()}>Preview selected for {accountCount} accounts</Button>
+      {scopeInfo.error&&<p role="alert">{apiErrorMessage(scopeInfo.error)}</p>}
+    </div>}
     {tab==='accounts'&&<>
-      <details className="space-y-3"><summary className="cursor-pointer py-3 text-sm font-medium">Advanced · Bulk protections and domain mapping</summary><Section flush><CardHeader><CardTitle className="g-card__title g-card__title--md">Bulk protection preview</CardTitle></CardHeader><CardContent className="space-y-3">
+      <details open={mappingOpen} onToggle={e=>setMappingOpen(e.currentTarget.open)} className="space-y-3"><summary className="cursor-pointer py-3 text-sm font-medium">Advanced · Bulk protections and domain mapping</summary><Section flush><CardHeader><CardTitle className="g-card__title g-card__title--md">Bulk protection preview</CardTitle></CardHeader><CardContent className="space-y-3">
         <p>Applies to selected clients. Each account gets its own preview. No Google settings change until you confirm those previews.</p>
         <label className="block">Protection <select aria-label="Protection" className="border rounded p-2 bg-background" value={kind} onChange={e=>setKind(e.target.value)}><option value="presence">Presence-only location targeting</option><option value="ip">Click Guard IP exclusions (rotate oldest)</option><option value="negative">Shared negative keywords</option><option value="placement">Account-wide placement exclusions (Display / PMax)</option><option value="schedule">Ad schedule</option></select></label>
         {kind!=='placement'&&<Input aria-label="Campaign IDs" placeholder="Optional campaign IDs, comma separated; otherwise all supported (max 100/client)" value={campaignIds} onChange={e=>setCampaignIds(e.target.value)}/>}
@@ -94,7 +215,7 @@ export default function AdsManagerPage() {
         {kind==='schedule'&&<><Textarea aria-label="Ad schedule" value={schedule} onChange={e=>setSchedule(e.target.value)}/><p>DAY,HH:MM,HH:MM · 15-minute boundaries, max six intervals per day. Replaces existing schedules in each account’s timezone. Omitted days do not run.</p></>}
         {kind==='ip'&&<p>Uses the newest 500 flagged IPs from each client’s mapped domain. Rotates the oldest observed exclusions to stay within Google’s 500/campaign limit. Preview lists every addition and removal.</p>}
         <Button variant="outline" disabled={!enabled||action.isPending||(!all&&!selected.length)} onClick={previewProtection}>Queue protection previews</Button>
-        <p className="text-muted-foreground text-sm">Alpine playbook: awaiting owner-approved steps. These are generic opt-in protections.</p>
+
       </CardContent></Section>
       <Section flush><CardHeader><CardTitle className="g-card__title g-card__title--md">Click Guard mapping</CardTitle></CardHeader><CardContent className="space-y-3"><p>Map each client to its own domain before using IP exclusions. Bulk format: customer ID,domain ID (one pair per line).</p><Input aria-label="Search Click Guard domains" value={domainQ} onChange={e=>{setDomainQ(e.target.value);setDomainPage(1);}}/>{domains.error&&<p role="alert">{apiErrorMessage(domains.error)}</p>}<p>{(domains.data?.items||[]).map((d:any)=>`${d.id}: ${d.domain}`).join(' · ')||'No matching Click Guard domains.'}</p><Pager page={domainPage} total={domains.data?.total||0} setPage={setDomainPage}/><Textarea aria-label="Client domain mappings" placeholder="1234567890,42" value={mapping} onChange={e=>setMapping(e.target.value)}/><Button variant="outline" disabled={action.isPending||!mapping.trim()} onClick={()=>{const parsed=lines(mapping).map(s=>s.split(',').map(s=>s.trim()));if(parsed.some(p=>p.length!==2||(p[1]&&!/^\d+$/.test(p[1])))){setMessage('Use customer ID,domain ID on each line. Leave domain ID blank to unmap.');return;}run('/domain-mappings',{mappings:parsed.map(([customerId,id])=>({customerId,domainId:id?Number(id):null}))});}}>Save domain mappings</Button></CardContent></Section>
     </details></>}

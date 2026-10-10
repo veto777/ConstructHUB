@@ -63,6 +63,51 @@ async function execute(job:any,api:AdsApi,g:any,deps:WorkerDeps) {
     if(accepted) await enqueue(user,g.connection_id,'discover',{},null,job.batch_id,`${job.batch_id}:accepted-discovery`);
     return;
   }
+  if(job.kind==='link') {
+    const links=await searchAll(api,g.manager_id,`SELECT customer_client_link.resource_name,customer_client_link.status,customer_client_link.manager_link_id FROM customer_client_link WHERE customer_client_link.client_customer = 'customers/${cid}'`);
+    const existing=links.map(r=>r.customerClientLink).find(l=>l?.status==='ACTIVE') || links.map(r=>r.customerClientLink).find(l=>l?.status==='PENDING');
+    const {rows:[inv]}=await pool.query(`INSERT INTO ads_invitations(user_id,customer_id,email) VALUES($1,$2,'')
+      ON CONFLICT(user_id,customer_id) WHERE status IN ('queued','pending','unknown') DO UPDATE SET updated_at=now() RETURNING *`,[user,cid]);
+    const step=async(value:string)=>{
+      job.payload={...p,invitationId:inv.id,step:value};
+      await pool.query('UPDATE ads_jobs SET payload=$2 WHERE id=$1',[job.id,JSON.stringify(job.payload)]);
+    };
+    const record=async(status:string,resource:string)=>pool.query('UPDATE ads_invitations SET status=$3,resource_name=$4,updated_at=now() WHERE user_id=$1 AND id=$2',[user,inv.id,status,resource]);
+    await step('lookup');
+    let resource=existing?.resourceName;
+    const resourcePattern=new RegExp(`^customers/${g.manager_id}/customerClientLinks/${cid}~(\\d+)$`);
+    if(!existing) {
+      const operation={create:{clientCustomer:`customers/${cid}`,status:'PENDING'}};
+      await api.link(g.manager_id,operation,true);
+      await step('creating');
+      await pool.query("UPDATE ads_invitations SET status='unknown',updated_at=now() WHERE user_id=$1 AND id=$2",[user,inv.id]);
+      const result=await api.link(g.manager_id,operation);
+      resource=result.result?.resourceName;
+      if(typeof resource!=='string'||!resourcePattern.test(resource)) throw new AdsError('Invitation outcome unknown. Poll links before retrying.',502,true);
+    }
+    const match=typeof resource==='string'?resource.match(resourcePattern):null;
+    if(!match) throw new AdsError('Google returned an invalid manager link.',502);
+    await record(existing?.status==='ACTIVE'?'accepted':'pending',resource);
+    if(existing?.status!=='ACTIVE') {
+      const linkId=String(existing?.managerLinkId ?? match[1]);
+      try {
+        await api.acceptManagerLink(cid,g.manager_id,linkId,true);
+        await step('accepting');
+        await record('unknown',resource);
+        const result=await api.acceptManagerLink(cid,g.manager_id,linkId);
+        if(result.results?.[0]?.resourceName!==`customers/${cid}/customerManagerLinks/${g.manager_id}~${linkId}`) throw new AdsError('Acceptance outcome unknown. Poll links before retrying.',502,true);
+      }catch(e) {
+        if(!(e instanceof AdsError) || e.status!==403 || e.uncertain) throw e;
+        await record('pending',resource);
+        await step('pending');
+        return;
+      }
+      await record('accepted',resource);
+    }
+    await step('accepted');
+    await enqueue(user,g.connection_id,'discover',{},null,job.batch_id,`${job.batch_id}:link-discovery`);
+    return;
+  }
   if(job.kind==='invite' || job.kind==='cancel-invite') {
     const {rows:[inv]}=await pool.query('SELECT * FROM ads_invitations WHERE user_id=$1 AND id=$2',[user,p.invitationId]);
     if(!inv) throw new AdsError('Invitation not found',404);
@@ -143,12 +188,12 @@ export async function runAdsWorker(deps:WorkerDeps={}) {
     const {rows:[r]}=await lock.query('SELECT pg_try_advisory_lock(8249,0) locked');
     if(!r.locked) return false;
     try {
-      await pool.query(`UPDATE ads_jobs SET status=CASE WHEN kind IN ('apply','invite','cancel-invite','invitation-email') THEN 'unknown' ELSE 'queued' END,
+      await pool.query(`UPDATE ads_jobs SET status=CASE WHEN kind IN ('apply','invite','link','cancel-invite','invitation-email') THEN 'unknown' ELSE 'queued' END,
         error='Worker interrupted; uncertain writes are not retried.' WHERE status='running'`);
       await pool.query("UPDATE ads_plans SET status='unknown',error='Worker interrupted; reconcile the Google account before retrying.' WHERE status='applying'");
       await pool.query("UPDATE ads_invitations i SET email_status='unknown' FROM ads_jobs j WHERE j.user_id=i.user_id AND j.payload->>'invitationId'=i.id::text AND j.kind='invitation-email' AND j.status='unknown' AND i.email_status='sending'");
       await pool.query("UPDATE ads_plans p SET status='unknown',error='Worker interrupted; reconcile the Google account before retrying.' FROM ads_jobs j WHERE j.user_id=p.user_id AND j.payload->>'planId'=p.id::text AND j.status='unknown' AND p.status='queued'");
-      const {rows:[job]}=await pool.query(`UPDATE ads_jobs SET status='running',started_at=now(),attempts=attempts+1 WHERE id=(SELECT id FROM ads_jobs WHERE status='queued' AND due_at<=now() AND ($1::integer IS NULL OR user_id=$1) ORDER BY CASE WHEN kind IN ('poll','invite','cancel-invite','invitation-email','apply') THEN 0 WHEN kind IN ('discover','preview','undo-preview') THEN 1 ELSE 2 END,due_at,created_at LIMIT 1 FOR UPDATE SKIP LOCKED) RETURNING *`,[deps.onlyUser||null]);
+      const {rows:[job]}=await pool.query(`UPDATE ads_jobs SET status='running',started_at=now(),attempts=attempts+1 WHERE id=(SELECT id FROM ads_jobs WHERE status='queued' AND due_at<=now() AND ($1::integer IS NULL OR user_id=$1) ORDER BY CASE WHEN kind IN ('poll','invite','link','cancel-invite','invitation-email','apply') THEN 0 WHEN kind IN ('discover','preview','undo-preview') THEN 1 ELSE 2 END,due_at,created_at LIMIT 1 FOR UPDATE SKIP LOCKED) RETURNING *`,[deps.onlyUser||null]);
       if(!job) return false;
       try {
         if(!await adsAllowed(job.user_id)) throw new AdsError(ADS_PLAN_PAUSED,402);
@@ -161,12 +206,13 @@ export async function runAdsWorker(deps:WorkerDeps={}) {
       } catch(e) {
         const message=e instanceof AdsError?e.message:'Ads operation failed. Review configuration and retry with a fresh preview.';
         const {rows:[plan]}=job.kind==='apply'?await pool.query('SELECT status FROM ads_plans WHERE user_id=$1 AND id=$2',[job.user_id,job.payload.planId]):{rows:[]};
-        const uncertain=e instanceof AdsError?e.uncertain:plan?.status==='applying';
+        const uncertain=e instanceof AdsError?e.uncertain:(plan?.status==='applying' || (job.kind==='link' && ['creating','accepting'].includes(job.payload.step)));
         if(e instanceof AdsError && e.status===401) await pool.query('UPDATE ads_grants SET reconnect_required=true,access_token=NULL WHERE user_id=$1 AND connection_id=$2',[job.user_id,job.connection_id]);
-        const retry=!['apply','invite','cancel-invite','invitation-email'].includes(job.kind) && job.attempts<5 && e instanceof AdsError && [429,503].includes(e.status);
+        const retry=!['apply','invite','link','cancel-invite','invitation-email'].includes(job.kind) && job.attempts<5 && e instanceof AdsError && [429,503].includes(e.status);
         await pool.query(`UPDATE ads_jobs SET status=$2,error=$3,finished_at=CASE WHEN $2='queued' THEN NULL ELSE now() END,due_at=now()+interval '1 minute'*$4 WHERE id=$1`,[job.id,retry?'queued':uncertain?'unknown':'failed',message,Math.min(60,2**job.attempts)]);
         if(job.kind==='apply' && plan?.status!=='applied') await pool.query('UPDATE ads_plans SET status=$3,error=$4 WHERE user_id=$1 AND id=$2',[job.user_id,job.payload.planId,uncertain?'unknown':'failed',message]);
         if(job.kind==='invite') await pool.query("UPDATE ads_invitations SET status=$3 WHERE user_id=$1 AND id=$2 AND status IN ('queued','unknown')",[job.user_id,job.payload.invitationId,uncertain?'unknown':'failed']);
+        if(job.kind==='link' && job.payload.invitationId) await pool.query("UPDATE ads_invitations SET status=$3,updated_at=now() WHERE user_id=$1 AND id=$2 AND status IN ('queued','unknown')",[job.user_id,job.payload.invitationId,uncertain?'unknown':job.payload.step==='accepting'?'pending':'failed']);
         if(job.customer_id) await pool.query('UPDATE ads_accounts SET error=$3 WHERE user_id=$1 AND customer_id=$2',[job.user_id,job.customer_id,message]);
         await logActivity(null,job.user_id,'ads.job_failed',{jobId:job.id,kind:job.kind,status:uncertain?'unknown':'failed',message});
       }

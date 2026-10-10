@@ -12,6 +12,7 @@ export interface AdsApi {
   search(cid: string, query: string, pageToken?: string): Promise<{results: any[]; nextPageToken?: string}>;
   mutate(cid: string, operations: any[], validateOnly?: boolean): Promise<any>;
   link(manager: string, operation: any, validateOnly?: boolean): Promise<any>;
+  acceptManagerLink(client: string, manager: string, linkId: string, validateOnly?: boolean): Promise<any>;
 }
 export async function takeAdsQuota() {
   // Database-shared smooth 240 QPM, including validation calls; independent of GBP's budget.
@@ -27,15 +28,16 @@ export class AdsClient implements AdsApi {
     customerId.parse(manager);
     if (!/^v\d+$/.test(version)) throw new AdsError('Invalid Google Ads API version');
   }
-  private async request(cid: string, endpoint: string, body: unknown, write: boolean): Promise<any> {
+  private async request(cid: string, endpoint: string, body: unknown, write: boolean, login = this.manager): Promise<any> {
     customerId.parse(cid);
+    customerId.parse(login);
     const token = await this.token();
     await this.quota();
     let r: Response;
     try {
       r = await this.http(`https://googleads.googleapis.com/${this.version}/customers/${cid}/${endpoint}`, {
         method: 'POST', redirect:'error', headers: {Authorization: `Bearer ${token}`, ...(process.env.GOOGLE_ADS_DEVELOPER_TOKEN ? {'developer-token': process.env.GOOGLE_ADS_DEVELOPER_TOKEN} : {}),
-          'login-customer-id': this.manager, 'Content-Type': 'application/json'}, body: JSON.stringify(body), signal: AbortSignal.timeout(20000),
+          'login-customer-id': login, 'Content-Type': 'application/json'}, body: JSON.stringify(body), signal: AbortSignal.timeout(20000),
       });
     } catch { throw new AdsError(write ? 'Google write outcome unknown. Reconcile in Google before retrying.' : 'Google temporarily unavailable.', 503, write); }
     if (!r.ok) throw new AdsError(r.status === 401 ? 'Reconnect Google Ads.' : r.status === 403 ? 'Google denied access. Check MCC permissions and Google Cloud project Ads API approval.' : r.status === 429 ? 'Google quota reached; queued reads retry later.' : 'Google rejected the request. Review account permissions, API version and supported campaign settings.', r.status === 429 ? 429 : r.status >= 500 ? 503 : r.status, write && r.status >= 500);
@@ -55,6 +57,13 @@ export class AdsClient implements AdsApi {
   link(manager: string, operation: any, validateOnly = false) {
     // CustomerClientLinkService takes a singular operation and returns result, not results[].
     return this.request(manager, 'customerClientLinks:mutate', {operation, validateOnly}, !validateOnly);
+  }
+  acceptManagerLink(client: string, manager: string, linkId: string, validateOnly = false) {
+    customerId.parse(manager);
+    if (!/^\d+$/.test(linkId)) throw new AdsError('Invalid manager link ID');
+    return this.request(client, 'customerManagerLinks:mutate', {operations:[{update:{
+      resourceName:`customers/${client}/customerManagerLinks/${manager}~${linkId}`,status:'ACTIVE',
+    },updateMask:'status'}],validateOnly}, !validateOnly, client);
   }
 }
 export async function oauthTokens(body: Record<string,string>, http: typeof fetch = fetch) {

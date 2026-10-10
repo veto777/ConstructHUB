@@ -1,4 +1,47 @@
+## 2026-10-10 — Alpine door intelligence and replay (ads/door-hardening; not deployed)
+
+Ported X4BNet datacenter/VPN IPv4+IPv6 feeds (startup / 12-hour refresh, keep the last good lists on failure),
+native CIDR matching, ipinfo privacy/ASN lookup and optional `IPQS_API_KEY`, a 30-day `ip_intel_cache`, and
+a 1.5-second response budget with `uncertain` hits enriched afterwards. Bot/proxy hits maintain a 60-day
+landing ban refreshed every 10 minutes. Owner and DNS-verified Google exceptions precede exclusions.
+Added rrweb recording on all three doors, immediate normal-fetch full snapshots, ordered/idempotent
+5-second batches, lifecycle flushing, masked inputs, 10 MB / 30-minute caps, and `ads_lp_rr` storage.
+Replay/hit-list endpoints require `requirePlatformAdmin`; the Ads manager's Landing door tab shows the
+last 200 hits. Recording retention runs every 24 hours under the existing Ads worker advisory lock.
+
+**Behavior choice requiring review:** Alpine's supplied 2026-10-09 implementation serves the public page
+in place for every verdict to support “every visit” recording. This port follows that behavior: block /
+redirect verdicts still log, ban and exclude IPs, but no longer produce HTTP 403 / 302 responses on normal
+door requests. The user was asked about the conflict with preserving ConstructHUB's enforcement and
+had not replied when this entry was written. Verified Google alone receives a recorder-off marker.
+Ordinary allowed US visitors remain unexcluded by default, as requested for the nationwide campaign.
+Alpine-only Turnstile/probe/conversion machinery, site-wide bans, range escalation and automatic
+exclusion of every served visitor were not ported. This lane does not change edge configuration.
+
+Validation: Node 20.19.6, `npx tsc --noEmit -p .` clean; the requested three-file Vitest command passes
+56 tests (verdicts, IPv4/IPv6, cache/failure/budget behavior, HTTP endpoint contracts with mocked storage,
+browser recording transport and cache headers). No live-database or deployed-edge test was run.
+`rrweb` and `rrweb-player` were installed only in this worktree's ignored `.cache/door-deps`; local
+`node_modules` now links shared packages individually plus these private packages, without modifying
+the shared dependency directory. `package-lock.json` is untouched per lane scope; the integrating lane
+must reconcile it with the two new dependencies. Commit is blocked: `.git` points to the absent
+`/home/veto/ConstructHUB/.git/worktrees/ConstructHUB-door2`. No Git metadata was fabricated, and
+`.alpine-ref` was not staged. No merge or deployment.
+
+## 2026-10-10 — /googleads-pricing door; constructhub.us in Click Guard (ads/pricing-door)
+
+The 2026-10-09 Performance Max campaign (681-225-6576, under MCC 831-008-9188) now lands on the door
+`/googleads-pricing` (= `/pricing`) with key `ch_price_2026` in the final-URL suffix, so the Alpine rules apply:
+verified-Google crawler only, bots 403 + Click Guard block, click id + key required, non-US and hosting
+networks sent to the public page. Live .env: `ADS_LP_KEYS` (+ch_price_2026), `ADS_LP_DOMAIN=constructhub.us`,
+`ADS_LP_ALLOW_IPS` (office). Click Guard site `constructhub.us` (tracked_domains id 1, owner support@) is
+mapped to the ad account, so the Ads manager "IP exclusions" protection pushes door blocks to the campaign.
+
 # ConstructHUB — Handoff
+
+## 2026-10-10 — One-click Google Ads link (ads/one-click-link)
+
+Added the Client accounts “Link account” flow: look up existing links, create PENDING via `customerClientLinks:mutate` as the manager, then accept ACTIVE via `customerManagerLinks:mutate` with the client's login-customer-id and the connected user's token. Writes retain crash/uncertainty protection; accepted links queue discovery, and denied acceptance leaves a pending invitation for polling and Access invitations email. Fixed snapshots by selecting the five `campaign_criterion.ad_schedule` subfields instead of the prohibited bare message. The owner's Construct HUB account **681-225-6576 was linked by hand on 2026-10-09 before this shipped**. Validation: TypeScript clean; 54 tests passed using temporary local Postgres. Commit blocked in this environment because the original worktree Git metadata is missing. No merge or deployment.
 
 _Last updated 2026-10-09. Repo: `veto777/ConstructHUB` (private). Local: `/home/veto/ConstructHUB` on the tower._
 
@@ -1366,3 +1409,11 @@ Built in lanes on `voice/*` branches; not deployed to production by any lane.
   and the Alpine cut-over of +1 360-585-8200 (RUNBOOK §10 — owner decision only).
 - **Dev stage currently on the tower:** engine from `~/ConstructHUB-voice-infra/voice` via a systemd drop-in +
   a dev app on :8201 (RUNBOOK §11, teardown steps there).
+
+## Ads recommendations — 2026-10-10 (ads/recommendations lane)
+
+Implemented the owner-approved Alpine playbook in `server/ads/playbook.ts` with seven versioned steps, shared metadata/defaults in `shared/ads-playbook.ts`, contractor-default versus software negative lists, explicit schedule/placement inputs, and the external landing-door setup links. `client/src/pages/ads-manager.tsx` now opens on Recommendations, reuses client selection, starts every action unchecked, exposes the input editors and mapping shortcut, and queues previews before switching to Protection previews. `server/ads/routes.ts` adds selection counts and the transactional, deduplicated per-account/per-step preview endpoint with unmapped IP skips. `server/ads/protections.ts` adds validated set/append campaign suffixes, observed suffix snapshots, old → new summaries, inverse updates and existing stale-state protection. No generic door key is added. Existing whole-account stale checks remain: after one preview changes an account, other previews from the earlier snapshot may need to be regenerated.
+
+Validation: Node v20.19.6 is available at `/node/bin` (the requested `$HOME/.nvm` path is absent). `npx tsc --noEmit -p .` passed. Added 26 standalone tests in `server/ads/recommendations.test.ts`, all passed, plus two real-worker/DB integration tests in `server/ads/ads.test.ts` for confirmation, idempotency, suffix reversal and outside-edit rejection. Full `npx vitest run server/ads --configLoader runner`: 36 passed, 46 skipped; the DB suite fails setup because `DATABASE_URL` is absent and localhost:5432 refuses connections. This is not a clean full-suite result. No Google calls, merge or deploy performed.
+
+Commit blocked by the supplied environment: Git is not installed, and `.git` points to `/home/veto/ConstructHUB/.git/worktrees/ConstructHUB-recs`, which does not exist (the parent checkout contains only dependencies). Changes are left in the authorized lane files. Restore the actual worktree metadata and local development DB, rerun both requested checks, then `git add -A` and commit on `ads/recommendations`.
