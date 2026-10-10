@@ -12,14 +12,15 @@
  * they take the shared content shape (LandingContent), and the few lines that
  * differ — the back link, the compare link, the closing headline — are props.
  */
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import { ArrowRight, CheckCircle2, ChevronDown, Minus } from "lucide-react";
-import type { FeatureCompare, FeatureHeading, LandingContent } from "@shared/feature-pages/types";
+import type { FeatureCompare, FeatureHeading, FeatureScreen, LandingContent } from "@shared/feature-pages/types";
 import type { FeaturePriceSummary } from "@shared/feature-pages/pricing";
 import { competitorPriceLabel, comparePricesNote } from "@shared/feature-pages/compare";
 import { SALES_REP_LABEL } from "@shared/plan-copy";
 import { GabeAvatar, StandingGator } from "@/components/mascot";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { FEATURE_ICON_COMPONENTS } from "./icons";
 import { H2, Kicker, LEAD, PANEL_RULE, TEXT_LINK } from "./primitives";
 
@@ -203,6 +204,78 @@ export function StepsSection({ page, n, tone }: { page: LandingContent; n: strin
           </li>
         ))}
       </ol>
+    </Band>
+  );
+}
+
+// ── In the app (screenshots) ─────────────────────────────────────────────────
+
+/**
+ * Real screens of the feature, captured from the app running on a sample account
+ * (script/feature-shots, shared/feature-pages/screens.ts). One large framed shot,
+ * thumbnails to switch, a click opens it full size. Every image says "Sample data".
+ */
+export function ScreensSection({ page, screens, n, tone }: { page: Pick<LandingContent, "title" | "headings">; screens: readonly FeatureScreen[]; n: string; tone: Tone }) {
+  const [active, setActive] = useState(0);
+  const [zoom, setZoom] = useState(false);
+  if (!screens.length) return null;
+  const shot = screens[Math.min(active, screens.length - 1)];
+  const heading = page.headings?.screens ?? {
+    title: "See It ", em: "in the App",
+    intro: `Real ${page.title} screens from ConstructHUB, shown with a sample account's data.`,
+  };
+  return (
+    <Band id="in-the-app" n={n} kicker="In the App" heading={heading} tone={tone} testId="section-feature-screens">
+      <figure className="mt-12" data-testid="figure-feature-screen">
+        <div className="rounded-2xl border border-mkt-rule bg-mkt-card shadow-[0_24px_60px_-28px_rgba(15,23,42,0.35)] overflow-hidden">
+          <div className="flex items-center gap-3 border-b border-mkt-rule px-4 py-2.5" aria-hidden>
+            <span className="flex gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-mkt-rule" />
+              <span className="h-2.5 w-2.5 rounded-full bg-mkt-rule" />
+              <span className="h-2.5 w-2.5 rounded-full bg-mkt-rule" />
+            </span>
+            <span className="min-w-0 flex-1 truncate rounded-md bg-mkt-paper-2 px-3 py-1 text-[12px] text-mkt-muted">{shot.url}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setZoom(true)}
+            className="block w-full cursor-zoom-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-mkt-orange"
+            aria-label={`Open full size: ${shot.caption}`}
+            data-testid="button-feature-screen-zoom"
+          >
+            <img src={shot.src} alt={shot.alt} width={shot.width} height={shot.height} className="block w-full h-auto" decoding="async" loading="lazy" />
+          </button>
+        </div>
+        <figcaption className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[15px] text-mkt-ink-soft">
+          <span>{shot.caption}</span>
+          <span className="rounded-full border border-mkt-rule px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-mkt-muted" data-testid="badge-feature-sample-data">
+            Sample data
+          </span>
+        </figcaption>
+      </figure>
+      {screens.length > 1 && (
+        <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4" role="group" aria-label={`${page.title} screens`}>
+          {screens.map((s, i) => (
+            <button
+              key={s.src}
+              type="button"
+              onClick={() => setActive(i)}
+              aria-pressed={i === active}
+              className={`group overflow-hidden rounded-xl border-2 bg-mkt-card text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mkt-orange ${i === active ? "border-mkt-orange" : "border-mkt-rule hover:border-mkt-ink"}`}
+              data-testid={`button-feature-screen-${i}`}
+            >
+              <img src={s.src} alt="" width={s.width} height={s.height} className="block w-full h-auto" decoding="async" loading="lazy" />
+              <span className="block px-3 py-2 text-[13px] leading-snug text-mkt-ink-soft">{s.caption}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      <Dialog open={zoom} onOpenChange={setZoom}>
+        <DialogContent className="max-w-[min(96vw,1600px)] p-2 sm:p-3">
+          <DialogTitle className="sr-only">{shot.caption}</DialogTitle>
+          <img src={shot.src} alt={shot.alt} width={shot.width} height={shot.height} className="block w-full h-auto rounded-lg" />
+        </DialogContent>
+      </Dialog>
     </Band>
   );
 }

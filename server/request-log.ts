@@ -25,7 +25,7 @@ const NEVER_CAPTURED = ["/api/agency", "/api/sitescan", "/api/admin/sitescan", "
 const NEVER_LOGGED = [
   "/api/auth/", "/api/gbp/connect", "/api/social", "/api/ads", "/api/cloudflare", "/api/gsc",
   "/api/v1", "/api/account/api-keys", "/api/crm/voice", "/api/voice-internal",
-  "/api/admin/issues", "/api/ops-internal", "/api/ops/",
+  "/api/admin/issues", "/api/ops-internal", "/api/ops/", "/api/dev/", "/api/admin/dev-tokens",
 ];
 
 /** Site-scan paths carry 64-hex report tokens in the URL; the log shows ":token" instead. */

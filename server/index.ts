@@ -26,6 +26,9 @@ registerVoiceProxy(app, httpServer);
 import { isPublicApiPath, rejectApiKeysOutsidePublicApi } from "./public-api/guard";
 import { apiError, codeForStatus } from "./public-api/errors";
 app.use(rejectApiKeysOutsidePublicApi);
+// A Code API token (chdev_…) authenticates ONLY /api/dev/v1 (server/dev-api/guard.ts).
+import { rejectDevTokensOutsideDevApi } from "./dev-api/guard";
+app.use(rejectDevTokensOutsideDevApi);
 
 declare module "http" {
   interface IncomingMessage {

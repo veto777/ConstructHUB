@@ -147,3 +147,11 @@ what a search engine reads first about the feature. The reference is `siteScan.t
 - [ ] `inDepth`, if written: 2–5 paragraphs, 250–500 words, every claim with a source.
 - [ ] The page reads well at 390 px (long words in the H1 can wrap; keep the swipe short).
 - [ ] Look at it: `/features/<slug>` signed out (public header) and signed in (sidebar).
+
+## Screenshots ("In the App")
+
+The one place a page shows sample data is its screenshots, and only as images: real screens of the app captured
+from a sample account in a throwaway lane (`script/feature-shots/README.md`), always labelled "Sample data" on the
+page. The page's text still follows every rule above: no sample customers, stats or testimonials in the copy, and
+a screenshot's caption describes what the screen does ("Review requests with open and click tracking"), never a
+number in it. Screens are listed in the generated `shared/feature-pages/screens.ts`; re-shoot rather than edit it.

@@ -21,6 +21,8 @@ import {
   Siren, Send, Settings2, FlaskConical, CheckCircle2, ChevronDown, ShieldBan, Ban, FileBarChart, type LucideIcon,
 } from "lucide-react";
 import { GabeAvatar } from "@/components/mascot";
+import { ScreensSection } from "@/components/feature-landing/sections";
+import { FEATURE_SCREENS } from "@shared/feature-pages/screens";
 import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
 import { TalkToSalesDialog } from "@/components/talk-to-sales";
 import {
@@ -338,13 +340,14 @@ export default function CallAssistantLandingPage() {
             </ol>
           </div>
         </section>
+        <ScreensSection page={{ title: "AI Call Assistant" }} screens={FEATURE_SCREENS.callAssistant ?? []} n="02" tone="paper" />
 
         {/* The voices */}
         <section id="voices" className="py-20 lg:py-28 px-4 sm:px-6 lg:px-8 scroll-mt-16" data-testid="section-ca-voices">
           <div className="max-w-7xl mx-auto">
             <div className="grid lg:grid-cols-12 gap-6 lg:gap-10 items-end mb-12">
               <div className="lg:col-span-7">
-                <Kicker n="02">The Voices</Kicker>
+                <Kicker n="03">The Voices</Kicker>
                 <h2 className={H2}>Women and Men Voices. <em className="text-mkt-orange-ink">You Pick Who Answers.</em></h2>
               </div>
               <p className={`lg:col-span-5 ${LEAD} lg:pb-1`}>
@@ -378,7 +381,7 @@ export default function CallAssistantLandingPage() {
           <div className="max-w-7xl mx-auto">
             <div className="grid lg:grid-cols-12 gap-6 lg:gap-10 items-end mb-12">
               <div className="lg:col-span-7">
-                <Kicker n="03">Agent Studio</Kicker>
+                <Kicker n="04">Agent Studio</Kicker>
                 <h2 className={H2}>Fine-Tune <em className="text-mkt-orange-ink">Every Question and Answer</em></h2>
               </div>
               <p className={`lg:col-span-5 ${LEAD} lg:pb-1`}>
@@ -407,7 +410,7 @@ export default function CallAssistantLandingPage() {
         <section id="calls" className="py-20 lg:py-28 px-4 sm:px-6 lg:px-8 scroll-mt-16" data-testid="section-ca-calls">
           <div className="max-w-7xl mx-auto grid lg:grid-cols-12 gap-10 lg:gap-14 items-start">
             <div className="lg:col-span-6">
-              <Kicker n="04">Calls &amp; CRM</Kicker>
+              <Kicker n="05">Calls &amp; CRM</Kicker>
               <h2 className={H2}>Every Call Lands in <em className="text-mkt-orange-ink">Your CRM</em></h2>
               <p className={`mt-5 ${LEAD}`}>
                 Read the lead before you call back. Every call is in the call log with what was said and what happened next.
@@ -446,7 +449,7 @@ export default function CallAssistantLandingPage() {
         <section id="pricing" className="py-20 lg:py-28 px-4 sm:px-6 lg:px-8 bg-mkt-paper-2 border-y border-mkt-rule scroll-mt-16" data-testid="section-ca-pricing">
           <div className="max-w-6xl mx-auto">
             <div className="text-center">
-              <Kicker n="05" className="justify-center">Pricing</Kicker>
+              <Kicker n="06" className="justify-center">Pricing</Kicker>
               <h2 className={H2}>{TierCountWord} Tiers. <em className="text-mkt-orange-ink">Pick Your Call Volume.</em></h2>
             </div>
             <p className="mt-5 text-center text-[16px] text-mkt-ink-soft max-w-2xl mx-auto" data-testid="text-call-assistant-price">
@@ -515,7 +518,7 @@ export default function CallAssistantLandingPage() {
         {/* FAQ */}
         <section id="faq" className="py-20 lg:py-28 px-4 sm:px-6 lg:px-8 scroll-mt-16" data-testid="section-ca-faq">
           <div className="max-w-3xl mx-auto">
-            <Kicker n="06">Questions</Kicker>
+            <Kicker n="07">Questions</Kicker>
             <h2 className={H2}>Before You <em className="text-mkt-orange-ink">Switch It On</em></h2>
             <div className="mt-10 border-t border-mkt-rule">
               {faqs().map((item, i) => (
@@ -534,7 +537,7 @@ export default function CallAssistantLandingPage() {
         {/* In depth: the long-form explanation (IN_DEPTH), as on every feature page */}
         <section id="in-depth" className="py-20 lg:py-28 px-4 sm:px-6 lg:px-8 bg-mkt-paper-2 border-t border-mkt-rule scroll-mt-16" data-testid="section-ca-in-depth">
           <div className="max-w-3xl mx-auto">
-            <Kicker n="07">In Depth</Kicker>
+            <Kicker n="08">In Depth</Kicker>
             <h2 className={H2}>An AI Answering Service for <em className="text-mkt-orange-ink">Contractors</em></h2>
             <div className="mt-8 space-y-5 text-[16.5px] text-mkt-ink-soft leading-[1.75] [&>p]:max-w-[35rem]" data-testid="text-ca-in-depth">
               {IN_DEPTH.map((para) => <p key={para}>{para}</p>)}

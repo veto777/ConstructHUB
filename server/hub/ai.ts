@@ -23,6 +23,7 @@
  *   pinned provider" holds even if .env drifts.
  */
 import OpenAI from "openai";
+import { fallbackSettings, runWithFallback } from "../ai-fallback";
 import { aiModel, aiTimeoutMs } from "../ai-config";
 import type { buildRequest } from "./prompt";
 
@@ -163,6 +164,12 @@ export function completionOf(res: ChatResponseLike): HubCompletion {
   };
 }
 
+/**
+ * On TruthCoder (the default), a question TruthCoder fails or is slow to answer (half the Hub
+ * timeout, at most AI_FALLBACK_AFTER_MS) goes to OpenAI's cheapest approved model with the
+ * OpenAI body (owner, 2026-10-10: TruthCoder first, then the cheapest OpenAI model). Off until
+ * an OpenAI key is set (../ai-fallback.ts). In "openai" mode there is no fallback.
+ */
 export function hubAiClient(env: NodeJS.ProcessEnv = process.env): HubAi {
   const provider = hubProvider(env);
   const client = new OpenAI({
@@ -171,10 +178,18 @@ export function hubAiClient(env: NodeJS.ProcessEnv = process.env): HubAi {
     timeout: hubTimeoutMs(),
     maxRetries: 0,
   });
+  let fallbackClient: OpenAI | null = null;
   return {
     async complete(body, signal) {
       const params = providerBody(provider, body) as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming;
-      const res = await client.chat.completions.create(params, { signal, maxRetries: 0 });
+      if (provider === "openai") return completionOf(await client.chat.completions.create(params, { signal, maxRetries: 0 }));
+      const cfg = fallbackSettings(env);
+      const res = await runWithFallback(
+        (s) => client.chat.completions.create(params, { signal: s, maxRetries: 0 }),
+        (s, f) => (fallbackClient ??= new OpenAI({ apiKey: f.key, baseURL: OPENAI_BASE_URL, timeout: hubTimeoutMs(), maxRetries: 0 }))
+          .chat.completions.create(providerBody("openai", { ...body, model: f.model }) as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming, { signal: s, maxRetries: 0 }),
+        { signal, env, label: "hub", waitMs: cfg ? Math.min(cfg.afterMs, Math.floor(hubTimeoutMs() / 2)) : undefined, fallbackTimeoutMs: hubTimeoutMs() },
+      );
       return completionOf(res);
     },
   };

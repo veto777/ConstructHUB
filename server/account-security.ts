@@ -11,6 +11,8 @@ import { decryptToken, encryptToken } from './gbp/token-crypto';
 
 declare module 'express-session' { interface SessionData {
   recentAuth?: { userId: number; at: number };
+  /** The last Google step-up that matched this user (the Code API admin page needs one from the last 15 minutes). */
+  googleVerified?: { userId: number; at: number };
   reauthEmail?: { userId: number; hash: string; expires: number; attempts: number };
   pending2FAExpires?: number;
 } }
@@ -25,6 +27,14 @@ export function requireRecentAuth(req: Request, res: Response, next?: NextFuncti
   next?.(); return true;
 }
 export function markRecentAuth(req: Request, userId: number) { req.session.recentAuth = { userId, at: Date.now() }; }
+/** How long a Google step-up counts as "verified with Google" for issuing a Code API token. */
+export const GOOGLE_STEP_UP_MS = 15 * 60 * 1000;
+export function markGoogleVerified(req: Request, userId: number) { req.session.googleVerified = { userId, at: Date.now() }; }
+/** When this session last confirmed `userId` with Google, if within GOOGLE_STEP_UP_MS; else null. */
+export function googleVerifiedAt(req: Request, userId: number): number | null {
+  const v = req.session?.googleVerified;
+  return v && v.userId === userId && v.at <= Date.now() && Date.now() - v.at < GOOGLE_STEP_UP_MS ? v.at : null;
+}
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
 /** "veto@gmail.com" -> "v***@gmail.com": names where a code went without printing the whole address. */
 export const maskEmail = (email: unknown): string | null =>

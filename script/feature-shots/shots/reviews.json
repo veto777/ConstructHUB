@@ -1,0 +1,233 @@
+[
+ {
+  "key": "reviews",
+  "n": 1,
+  "route": "/google-reviews",
+  "wait": "Maria Delgado",
+  "alt": "Google Reviews page in ConstructHUB showing review request totals and a list of sample client requests with scheduled, pending, positive and Google-link-opened statuses.",
+  "caption": "Review requests with open, click and rating tracking"
+ },
+ {
+  "key": "reviews",
+  "n": 2,
+  "route": "/google-reviews?tab=profile-reviews",
+  "wait": "Rachel Morgan",
+  "actions": [
+   {
+    "click": "[data-testid=dropdown-location-filter]"
+   },
+   {
+    "click": "[data-testid=option-location-loc-910001]"
+   },
+   {
+    "wait": 500
+   },
+   {
+    "scroll": "[data-testid=card-profile-review-92001]"
+   },
+   {
+    "wait": 300
+   }
+  ],
+  "alt": "Google profile reviews tab showing a star rating breakdown, review filters and a synced five-star review with an AI reply suggestion waiting for approval.",
+  "caption": "Synced Google reviews with AI reply drafts you approve"
+ },
+ {
+  "key": "reviews",
+  "n": 3,
+  "route": "/review/fs-b-sample-review-92006",
+  "wait": "How was your experience",
+  "_note": "Capture WITHOUT SHOTS_EMAIL (signed out), otherwise the page shows the owner-preview banner. Token belongs to an already-clicked sample request, so opening it changes nothing.",
+  "actions": [
+   {
+    "click": "[data-testid=button-rating-9]"
+   },
+   {
+    "wait": 300
+   }
+  ],
+  "alt": "The feedback page a client opens from the email: the company name, a Leave a Google Review button offered to everyone, and a private 1 to 10 rating with 9 selected.",
+  "caption": "What your client sees: a private rating, and Google offered to everyone",
+  "signedOut": true
+ },
+ {
+  "key": "lsaLeads",
+  "n": 1,
+  "route": "/lsa-leads",
+  "wait": "Your Google Ads accounts",
+  "_note": "The LSA screen renders only when the server has GOOGLE_ADS_CLIENT_ID/SECRET/DEVELOPER_TOKEN set (placeholders are enough); otherwise it shows 'Google Ads setup is required'.",
+  "alt": "LSA Leads page showing the Google Ads connection with last sync time and a list of Local Services Ads accounts with lead and charged-lead counts.",
+  "caption": "Every Local Services Ads account in one list"
+ },
+ {
+  "key": "lsaLeads",
+  "n": 2,
+  "route": "/lsa-leads",
+  "wait": "Your Google Ads accounts",
+  "actions": [
+   {
+    "click": "text=Summit Roofing Co. \u2013 Denver"
+   },
+   {
+    "wait": 1000
+   }
+  ],
+  "alt": "One LSA account opened: totals for leads, charged leads, disputes and spend, filters, and lead cards with type, charge, contact and Good or Bad rating buttons.",
+  "caption": "Leads with charges, ratings and dispute tools"
+ },
+ {
+  "key": "social",
+  "n": 1,
+  "route": "/social-media?business=910001&tab=queue",
+  "wait": "Hail season",
+  "actions": [
+   {
+    "scroll": "[aria-label='Post status filter']"
+   },
+   {
+    "wait": 300
+   }
+  ],
+  "alt": "Social Media calendar and queue for a roofing business, with search and status filters and scheduled posts for Facebook and Instagram.",
+  "caption": "One calendar and queue for every account"
+ },
+ {
+  "key": "social",
+  "n": 2,
+  "route": "/social-media?business=910001&tab=queue",
+  "wait": "Hail season",
+  "actions": [
+   {
+    "scroll": "text=Review highlight"
+   },
+   {
+    "wait": 300
+   }
+  ],
+  "alt": "AI-generated draft posts waiting for approval with Approve and queue buttons, above published posts with their Blotato submission status.",
+  "caption": "AI drafts wait for approval; published posts show their status"
+ },
+ {
+  "key": "media",
+  "n": 1,
+  "route": "/photos",
+  "wait": "Business info",
+  "actions": [
+   {
+    "click": "[data-testid=button-toggle-business]"
+   },
+   {
+    "click": "[data-testid=select-saved-location-trigger]"
+   },
+   {
+    "click": "[data-testid=select-location-910001]"
+   },
+   {
+    "click": "[data-testid=switch-service-area-enabled]"
+   },
+   {
+    "fill": "[data-testid=input-manual-cities]",
+    "value": "Aurora, CO, Lakewood, CO, Englewood, CO, Littleton, CO, Arvada, CO, Wheat Ridge, CO"
+   },
+   {
+    "click": "[data-testid=button-add-manual-cities]"
+   },
+   {
+    "click": "[data-testid=select-category] button"
+   },
+   {
+    "click": "[data-testid=category-option-roofing]"
+   },
+   {
+    "press": "Escape"
+   },
+   {
+    "click": "text=Category & keywords"
+   },
+   {
+    "wait": 6000
+   },
+   {
+    "scroll": "text=Or add specific cities manually"
+   },
+   {
+    "wait": 300
+   }
+  ],
+  "alt": "SEO photo optimizer set up for a roofing business: six Denver-area service-area cities selected and roofing keywords chosen for the next batch of photos.",
+  "caption": "Service-area cities and keywords for every photo"
+ },
+ {
+  "key": "media",
+  "n": 2,
+  "route": "/media-library",
+  "wait": "Highland job site",
+  "alt": "Media Library listing job photo folders with dates, client addresses and a GPS tag on folders that embed coordinates.",
+  "caption": "Job photo folders with GPS from the client address"
+ },
+ {
+  "key": "media",
+  "n": 3,
+  "route": "/media-library",
+  "wait": "Highland job site",
+  "actions": [
+   {
+    "click": "text=Highland job site"
+   },
+   {
+    "wait": 1000
+   }
+  ],
+  "alt": "A Media Library folder open, showing a grid of job photos with SEO file names, sizes and a GPS Embedded badge.",
+  "caption": "Optimized photos saved with SEO file names"
+ },
+ {
+  "key": "agency",
+  "n": 1,
+  "route": "/agency",
+  "wait": "Your locations",
+  "actions": [
+   {
+    "scroll": "[data-testid=agency-location-92004]"
+   },
+   {
+    "wait": 300
+   }
+  ],
+  "alt": "Agency workspace Locations tab with location and reconnect counts, client and status filters, and client businesses shown as Google-style listings.",
+  "caption": "Every client location in one workspace"
+ },
+ {
+  "key": "agency",
+  "n": 2,
+  "route": "/agency?tab=clients",
+  "wait": "Peakline Exteriors",
+  "alt": "Agency Clients tab with a new-client form and client workspaces showing contact email, folder, tags and notes.",
+  "caption": "Client workspaces with folders, tags and notes"
+ },
+ {
+  "key": "agency",
+  "n": 3,
+  "route": "/agency",
+  "wait": "Your locations",
+  "actions": [
+   {
+    "click": "[aria-label='Select Summit Roofing Co.']"
+   },
+   {
+    "click": "[aria-label='Select Summit Roofing Co. Aurora']"
+   },
+   {
+    "click": "[aria-label='Select Summit Roofing Co. Lakewood']"
+   },
+   {
+    "scroll": "text=Apply to selected locations"
+   },
+   {
+    "wait": 300
+   }
+  ],
+  "alt": "Three locations selected in the agency workspace with the Apply to selected locations panel open for a bulk action.",
+  "caption": "Bulk actions across selected locations"
+ }
+]

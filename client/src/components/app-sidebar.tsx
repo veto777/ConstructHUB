@@ -6,7 +6,7 @@ import { Ticket,
   HardHat, Globe, ShieldAlert, ExternalLink, ShieldCheck, BadgeCheck,
   Settings, Skull, Megaphone, TrendingUp, Fingerprint, ShieldOff, Star, PlusCircle,
   Layers, Wrench, BookOpen, Rocket, FolderOpen, Users, PhoneCall,
-  KanbanSquare, ArrowRight, Bell, Lock, Phone, LayoutGrid, Store, KeyRound, Bug, PlayCircle, PenLine,
+  KanbanSquare, ArrowRight, Bell, Lock, Phone, LayoutGrid, Store, KeyRound, Code2, Bug, PlayCircle, PenLine,
 } from "lucide-react";
 import { PLANS, planForModule, type ModuleKey } from "@shared/plans";
 import { lockedLanding, toolAccess, type ToolAccessContext } from "@/lib/tool-access";
@@ -667,6 +667,17 @@ export function AppSidebar() {
                       <KeyRound className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-primary" />
                       <span>Access grants</span>
 
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {/* 24–48 hour Code API tokens: agents and developers change the code on their own GitHub branch. */}
+              {user?.isPlatformAdmin === true && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild data-active={location === "/admin/code-api"}>
+                    <Link href="/admin/code-api" data-testid="link-nav-admin-code-api" className="flex items-center gap-2 w-full">
+                      <Code2 className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-primary" />
+                      <span>Code API</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

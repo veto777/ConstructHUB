@@ -13,6 +13,7 @@ import {
 } from "@shared/feature-pages";
 import { allowanceLine, allowanceValue, featurePlanGap, featurePriceSummary, singularUnit } from "@shared/feature-pages/pricing";
 import { FEATURE_ICONS } from "@shared/feature-pages/types";
+import { FEATURE_SCREENS } from "@shared/feature-pages/screens";
 import { DASHBOARD_TILES } from "@shared/dashboard";
 import { ADDONS, CALL_ASSISTANT_TIERS, PLANS, PLAN_KEYS } from "@shared/plans";
 import { CRM_ADDONS, CRM_PLANS, CRM_PLAN_KEYS } from "@shared/crm-plans";
@@ -69,10 +70,26 @@ describe("feature page registry", () => {
   });
 
   it("gives every feature its own content file, and every content file is registered", () => {
-    const files = fs.readdirSync(dir).filter((f) => f.endsWith(".ts") && !["index.ts", "types.ts", "pricing.ts", "compare.ts"].includes(f));
+    const files = fs.readdirSync(dir).filter((f) => f.endsWith(".ts") && !["index.ts", "types.ts", "pricing.ts", "compare.ts", "screens.ts"].includes(f));
     expect(files.map((f) => f.replace(/\.ts$/, "")).sort()).toEqual(FEATURE_PAGES.map((p) => p.key).sort());
     const index = read("shared/feature-pages/index.ts");
     for (const page of FEATURE_PAGES) expect(index).toContain(`import ${page.key} from "./${page.key}";`);
+  });
+
+  it("shows only real, described screenshots: every one is a captured image of a known page", () => {
+    for (const [key, screens] of Object.entries(FEATURE_SCREENS)) {
+      expect(FEATURE_CATALOGUE.some((e) => e.key === key), key).toBe(true);
+      for (const shot of screens) {
+        expect(shot.src, key).toMatch(new RegExp(`^/feature-shots/${key}-\\d+\\.webp$`));
+        expect(fs.existsSync(path.join(root, "client/public", shot.src)), shot.src).toBe(true);
+        expect(shot.alt.length, shot.src).toBeGreaterThan(20);
+        expect(shot.caption.length, shot.src).toBeGreaterThan(5);
+        // Captions are page copy too: no prices, stats or promises (the image itself carries the sample data).
+        expect(`${shot.alt} ${shot.caption}`, shot.src).not.toMatch(/\$\s?\d|testimonial|guarantee|#1\b|\b\d+%/i);
+        expect(shot.width).toBeGreaterThan(0);
+        expect(shot.height).toBeGreaterThan(0);
+      }
+    }
   });
 
   it("covers every dashboard tile, in the dashboard's groups", () => {
