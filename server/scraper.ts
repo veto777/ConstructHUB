@@ -216,30 +216,36 @@ export async function startLiveSearch(
 
   liveSearchJobs.set(searchId, job);
 
-  const mapSearchType = (platform: string | null, searchType: string): string => {
-    if (platform === "SmartGov") return "address";
-    return searchType;
+  // A registry adapter declares which search types its portal offers. When the portal cannot run this
+  // one, answer from what earlier searches cached for that portal instead of forcing a wrong query.
+  const registry = await import("./scrapers/registry");
+  const supportedSearches = (db: typeof activeDbs[0]): string[] | null => {
+    const adapter = registry.getAdapterFor({ platform: db.platform, jurisdiction: db.jurisdiction });
+    if (!adapter || registry.isLegacyAdapter(adapter)) return null;
+    return adapter.capabilities.search;
   };
 
   const MAX_CONCURRENT = 4;
 
   const processDb = async (db: typeof activeDbs[0]) => {
     const dbEntry = job.databases.find(d => d.id === db.id)!;
-    const effectiveSearchType = mapSearchType(db.platform, searchType);
+    const effectiveSearchType = searchType;
 
-    if (db.platform === "SmartGov" && searchType !== "address" && searchType !== "permit") {
+    const supported = supportedSearches(db);
+    if (supported && !supported.includes(searchType)) {
+      const offers = supported.length ? supported.join("/") : "no";
       try {
         const cachedResults = await storage.searchLocalResultsByDatabase(searchType, searchValue, db.id);
         dbEntry.status = "completed";
         dbEntry.resultsFound = cachedResults.length;
         dbEntry.message = cachedResults.length > 0
-          ? `Found ${cachedResults.length} cached results (SmartGov only supports address search on site)`
-          : "No cached results (SmartGov only supports address search - try an address search first)";
+          ? `Found ${cachedResults.length} cached results (${db.platform} offers ${offers} search on site)`
+          : `No cached results (${db.platform} offers ${offers} search on site - try one of those first)`;
         job.totalResultsFound = job.databases.reduce((sum, d) => sum + d.resultsFound, 0);
       } catch {
         dbEntry.status = "completed";
         dbEntry.resultsFound = 0;
-        dbEntry.message = "SmartGov only supports address search on site";
+        dbEntry.message = `${db.platform} offers ${offers} search on site`;
       }
       liveSearchJobs.set(searchId, { ...job });
       return;
