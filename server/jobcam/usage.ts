@@ -11,6 +11,7 @@ import {
   JOBCAM_STORAGE_TIERS_GB, type JobcamStorageTierGb,
 } from "@shared/jobcam-storage";
 import { UPLOAD_TTL_MS } from "./upload-state";
+import { getCrmEntitlements } from "../crm/entitlements";
 
 export type JobcamUsage = { bytes: number; mediaCount: number; photoCount: number; videoCount: number };
 
@@ -67,6 +68,17 @@ export type JobcamStorageSnapshot = {
   tierGb: JobcamStorageTierGb;
 };
 
+/**
+ * The storage the org's CRM plan includes (CrmPlanLimits.jobcamStorageGb: 5 GB,
+ * 1 TB on Elite). The org's own size (set by an admin) counts when it is larger.
+ */
+async function planJobcamStorageGb(orgId: string, exec: Exec): Promise<number> {
+  const { rows: [o] } = await exec.execute(sql`SELECT owner_user_id FROM crm_orgs WHERE id = ${orgId}`);
+  if (!o?.owner_user_id) return 0;
+  const crm = await getCrmEntitlements(Number(o.owner_user_id));
+  return crm.active ? crm.limits?.jobcamStorageGb ?? 0 : 0;
+}
+
 /** The row every read assumes: an org that has never uploaded still has a size (the included one). */
 export async function ensureJobcamUsageRow(orgId: string, exec: Exec = db): Promise<void> {
   await exec.execute(sql`INSERT INTO jobcam_org_usage (org_id) VALUES (${orgId}) ON CONFLICT (org_id) DO NOTHING`);
@@ -94,7 +106,9 @@ export async function jobcamStorageSnapshot(orgId: string, opts: { exec?: Exec; 
       (SELECT COALESCE(SUM(bytes), 0) FROM jobcam_media
         WHERE org_id = ${orgId} AND status = 'processing' AND deleted_at IS NULL)
     )::bigint AS pending`);
-  return { usedBytes: Number(u?.bytes ?? 0), pendingBytes: Number(p?.pending ?? 0), tierGb: jobcamTierOrIncluded(u?.storage_tier_gb) };
+  const orgGb = jobcamTierOrIncluded(u?.storage_tier_gb);
+  const planGb = await planJobcamStorageGb(orgId, exec);
+  return { usedBytes: Number(u?.bytes ?? 0), pendingBytes: Number(p?.pending ?? 0), tierGb: jobcamTierOrIncluded(Math.max(orgGb, planGb)) };
 }
 
 export type JobcamStorageRefusal = ReturnType<typeof jobcamStorageLimitBody>;

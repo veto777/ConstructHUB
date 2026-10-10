@@ -6,18 +6,15 @@
  * a platform plan grants NO CRM seats (shared/plans.ts, every tier `crmSeats: 0`)
  * and a CRM plan grants NO platform tools.
  *
- * Pricing rule (owner): half of Housecall Pro, on both billing modes. Verified
- * against housecallpro.com/pricing on 2026-10-07:
- *     Basic      $79/mo   $59/mo billed annually ($708/yr)   1 user
- *     Essentials $189/mo  $149/mo billed annually ($1,788/yr) 5 users
- *     Max        $329/mo  $299/mo billed annually ($3,588/yr) 8 users
- *     Extra user $35/mo
- * Half of each, rounded to a clean price point, is the table below.
+ * Prices (owner, 2026-10-09): Basic $49, Essentials $99, Max $199, Elite $499.
+ * Elite (owner): up to 35 seats, 5,000 team text segments, 3 client-texting
+ * numbers, 1 TB of JobCam, 250,000 CRM API units. Basic, Essentials and Max
+ * keep the limits they had at $39 / $94 / $164 (the earlier half-of-Housecall-
+ * Pro book).
  *
- * NOTE: the platform's annual multiplier (ANNUAL_MONTHS in plans.ts)
- * does NOT apply here. Housecall Pro discounts annual ~25%, so matching it at
- * half required an explicit annual price per tier (~9x monthly). Read annual
- * prices from `annualCents`; never derive them with ANNUAL_MONTHS.
+ * Annual is 11x monthly (one month free), the owner's rule for the platform
+ * plans (ANNUAL_MONTHS in plans.ts). It is still written out per plan in
+ * `annualCents`; read annual prices from there.
  *
  * Money is in cents.
  */
@@ -35,11 +32,16 @@ import { CALL_ASSISTANT_NOT_INCLUDED_LINE } from "./plans";
 export const CRM_JOBCAM_ADDON_MONTHLY_CENTS = 3900;
 /** owner gave $39/mo; no annual discount assumed — owner to confirm (12 x $39). */
 export const CRM_JOBCAM_ADDON_ANNUAL_CENTS = 12 * CRM_JOBCAM_ADDON_MONTHLY_CENTS;
-const JOBCAM_FEATURE = `JobCam — job photos & video, ${JOBCAM_INCLUDED_GB} GB included`;
+const storageLabel = (gb: number) => (gb >= 1000 && gb % 1000 === 0 ? `${gb / 1000} TB` : `${gb.toLocaleString("en-US")} GB`);
+const jobcamFeature = (gb: number) => `JobCam — job photos & video, ${storageLabel(gb)} included`;
+/** Elite's JobCam storage (owner: 1 TB). A size on JOBCAM_STORAGE_TIERS_GB. */
+const ELITE_JOBCAM_GB = 1000;
+/** Elite's seat count is a ceiling: no extra seats are sold on it (owner: "up to 35"). */
+const ELITE_SEATS = 35;
 const JOBCAM_NOT_INCLUDED = `JobCam — job photos & video (add it for $${CRM_JOBCAM_ADDON_MONTHLY_CENTS / 100}/mo, or move up to Max, where it is included)`;
 
-export type CrmPlanKey = "crm_basic" | "crm_essentials" | "crm_max";
-export const CRM_PLAN_KEYS: readonly CrmPlanKey[] = ["crm_basic", "crm_essentials", "crm_max"];
+export type CrmPlanKey = "crm_basic" | "crm_essentials" | "crm_max" | "crm_elite";
+export const CRM_PLAN_KEYS: readonly CrmPlanKey[] = ["crm_basic", "crm_essentials", "crm_max", "crm_elite"];
 
 export type CrmPlanLimits = {
   /** Team seats included. -1 means unlimited (fair use). */
@@ -50,8 +52,10 @@ export type CrmPlanLimits = {
   documentsPerMonth: number;
   /** Team alert texts (shared number), segments per month. */
   teamTextSegments: number;
-  /** "none" | bring-your-own SignalWire or the texting add-on | one number included. */
+  /** "none" | the customer's own carrier account or the texting add-on | numbers included. */
   clientTexting: "none" | "byo_or_addon" | "included";
+  /** Client-texting numbers on our carrier that come with the plan (0 unless clientTexting is "included"). */
+  textingNumbersIncluded: number;
   /** Online payments (card/ACH via Stripe) on estimates and invoices. */
   onlinePayments: boolean;
   /** The client-facing portal (approve estimates, pay invoices, message). */
@@ -87,6 +91,8 @@ export type CrmPlan = {
    */
   notIncluded: string[];
   limits: CrmPlanLimits;
+  /** Extra seats can be bought on top of `limits.seats`. False = the seat count is a ceiling. */
+  sellsExtraSeats: boolean;
 };
 
 /**
@@ -103,7 +109,7 @@ const PLATFORM_NOT_INCLUDED: readonly string[] = [
 
 export const CRM_PLANS: Record<CrmPlanKey, CrmPlan> = {
   crm_basic: {
-    key: "crm_basic", name: "CRM Basic", monthlyCents: 3900, annualCents: 34800,
+    key: "crm_basic", name: "CRM Basic", monthlyCents: 4900, annualCents: 53900,
     tagline: "One person, running jobs end to end.",
     features: [
       "1 seat",
@@ -123,56 +129,82 @@ export const CRM_PLANS: Record<CrmPlanKey, CrmPlan> = {
       ...PLATFORM_NOT_INCLUDED,
     ],
     limits: {
-      seats: 1, clients: -1, documentsPerMonth: -1, teamTextSegments: 0, clientTexting: "none",
+      seats: 1, clients: -1, documentsPerMonth: -1, teamTextSegments: 0, clientTexting: "none", textingNumbersIncluded: 0,
       onlinePayments: true, clientPortal: true, scheduling: true, priceBook: true, jobCosting: false,
       apiUnitsPerMonth: 0, jobcam: false, jobcamStorageGb: JOBCAM_INCLUDED_GB,
     },
+    sellsExtraSeats: true,
   },
   crm_essentials: {
-    key: "crm_essentials", name: "CRM Essentials", monthlyCents: 9400, annualCents: 88800,
+    key: "crm_essentials", name: "CRM Essentials", monthlyCents: 9900, annualCents: 108900,
     tagline: "A crew — scheduling, texting and job costing.",
     features: [
       "Everything in Basic",
       "5 seats",
       "Team alert texts — 500 segments / month",
-      "Client texting with your own SignalWire number (or the texting add-on)",
+      "Client texting — the texting add-on, or connect your own carrier account",
       "Change orders, budget lines and job costing",
       "CRM API — 10,000 units / month",
       "Priority email support",
     ],
     notIncluded: [
-      "A client-texting number on our carrier (bring your own, or add one)",
+      "A client-texting number (add one, or move up to Max, where one is included)",
       JOBCAM_NOT_INCLUDED,
       ...PLATFORM_NOT_INCLUDED,
     ],
     limits: {
-      seats: 5, clients: -1, documentsPerMonth: -1, teamTextSegments: 500, clientTexting: "byo_or_addon",
+      seats: 5, clients: -1, documentsPerMonth: -1, teamTextSegments: 500, clientTexting: "byo_or_addon", textingNumbersIncluded: 0,
       onlinePayments: true, clientPortal: true, scheduling: true, priceBook: true, jobCosting: true,
       apiUnitsPerMonth: 10_000, jobcam: false, jobcamStorageGb: JOBCAM_INCLUDED_GB,
     },
+    sellsExtraSeats: true,
   },
   crm_max: {
-    key: "crm_max", name: "CRM Max", monthlyCents: 16400, annualCents: 178800,
+    key: "crm_max", name: "CRM Max", monthlyCents: 19900, annualCents: 218900,
     tagline: "A full office — more seats, a number included.",
     features: [
       "Everything in Essentials",
       "8 seats",
       "Team alert texts — 1,500 segments / month",
       "1 client-texting number included",
-      JOBCAM_FEATURE,
+      jobcamFeature(JOBCAM_INCLUDED_GB),
       "CRM API — 50,000 units / month",
       "Priority support + onboarding call",
     ],
     notIncluded: [...PLATFORM_NOT_INCLUDED],
     limits: {
-      seats: 8, clients: -1, documentsPerMonth: -1, teamTextSegments: 1500, clientTexting: "included",
+      seats: 8, clients: -1, documentsPerMonth: -1, teamTextSegments: 1500, clientTexting: "included", textingNumbersIncluded: 1,
       onlinePayments: true, clientPortal: true, scheduling: true, priceBook: true, jobCosting: true,
       apiUnitsPerMonth: 50_000, jobcam: true, jobcamStorageGb: JOBCAM_INCLUDED_GB,
     },
+    sellsExtraSeats: true,
+  },
+  crm_elite: {
+    key: "crm_elite", name: "CRM Elite", monthlyCents: 49900, annualCents: 548900,
+    tagline: "A large operation — up to 35 seats, 3 numbers, 1 TB of JobCam.",
+    features: [
+      "Everything in Max",
+      `Up to ${ELITE_SEATS} seats`,
+      "Team alert texts — 5,000 segments / month",
+      "3 client-texting numbers included",
+      jobcamFeature(ELITE_JOBCAM_GB),
+      "CRM API — 250,000 units / month",
+      "Priority support + onboarding call",
+    ],
+    notIncluded: [
+      `Seats above ${ELITE_SEATS} (talk to us)`,
+      ...PLATFORM_NOT_INCLUDED,
+    ],
+    limits: {
+      seats: ELITE_SEATS, clients: -1, documentsPerMonth: -1, teamTextSegments: 5000, clientTexting: "included", textingNumbersIncluded: 3,
+      onlinePayments: true, clientPortal: true, scheduling: true, priceBook: true, jobCosting: true,
+      apiUnitsPerMonth: 250_000, jobcam: true, jobcamStorageGb: ELITE_JOBCAM_GB,
+    },
+    sellsExtraSeats: false,
   },
 };
 
-/** One more CRM seat, beyond the plan's included count. Half of Housecall Pro's $35. */
+/** One more CRM seat, beyond the plan's included count (not sold on Elite). Half of Housecall Pro's $35. */
 export const CRM_EXTRA_SEAT_MONTHLY_CENTS = 1700;
 export const CRM_EXTRA_SEAT_ANNUAL_CENTS = 17000;
 /** Self-serve ceiling on extra seats; above it is a sales conversation. */

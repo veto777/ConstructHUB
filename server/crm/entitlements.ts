@@ -136,12 +136,12 @@ export function crmEntitlementsFromRow(
   isAdmin: boolean,
 ): CrmEntitlements {
   // ConstructHUB staff and beta accounts use the CRM without a subscription.
-  const top = CRM_PLANS.crm_max;
+  const top = CRM_PLANS.crm_elite;
   if (isAdmin) {
-    return { ...NO_CRM, plan: "crm_max", limits: top.limits, seats: -1, jobcam: true, status: row.status ?? null, active: true, via: "admin" };
+    return { ...NO_CRM, plan: "crm_elite", limits: top.limits, seats: -1, jobcam: true, status: row.status ?? null, active: true, via: "admin" };
   }
   if (row.beta_at) {
-    return { ...NO_CRM, plan: "crm_max", limits: top.limits, seats: -1, jobcam: true, status: row.status ?? null, active: true, via: "beta" };
+    return { ...NO_CRM, plan: "crm_elite", limits: top.limits, seats: -1, jobcam: true, status: row.status ?? null, active: true, via: "beta" };
   }
   const status: string | null = row.status ?? null;
   const live = !!status && (ACCESS_STATUSES as readonly string[]).includes(status);

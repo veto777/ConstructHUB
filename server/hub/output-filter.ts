@@ -94,7 +94,8 @@ const PLAN_WORD_OK = new Set([
 ]);
 // From server/pricing-copy.test.ts: the plans sold before 2026-09-30 and retired copy.
 const LEGACY_PLAN = /\b(Standard|Professional|Business|Premium|Gold|Platinum)\s+(plan|plans|member|members|subscriber|subscribers|tier)\b/i;
-const LEGACY_WORDS = [/\bPlatinum\b/, /\$995\b/, /\$499\/mo/, /Unlimited everything/i, /\$9,999/, /billed separately/i, /separate membership/i];
+// $499/mo was a retired price until 2026-10-09; it is now CRM Elite's, so it is no longer a legacy word.
+const LEGACY_WORDS = [/\bPlatinum\b/, /\$995\b/, /Unlimited everything/i, /\$9,999/, /billed separately/i, /separate membership/i];
 const COMMERCIAL: RegExp[] = [
   /\b\d+\s?%\s?(off|discount)/i, /\bcoupons?\b/i, /\bpromo(tion|tional)? codes?\b/i, /\bdiscount codes?\b/i,
   /\blifetime (deal|plan|access)\b/i, /\bmoney[- ]back\b/i, /\bprice[- ]match/i, /\bfree trial/i, /\bunlimited\b/i,

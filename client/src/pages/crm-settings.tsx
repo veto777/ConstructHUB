@@ -1428,7 +1428,7 @@ export default function CrmSettingsPage() {
               ) : smsStatus?.configured ? (
                 <>
                   <div className="font-medium" data-testid="text-sms-configured">
-                    Texting via SignalWire from {smsStatus.fromNumber}
+                    Texting from {smsStatus.fromNumber}
                   </div>
                   <div className="text-xs text-muted-foreground">
                     Reminder texts and re-engagement alerts send as real SMS.

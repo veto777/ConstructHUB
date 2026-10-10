@@ -89,11 +89,11 @@ describe("pricing display: comparison tables (shared/plan-matrix.ts)", () => {
 
   it("has a cell for every plan in every row", () => {
     for (const r of rows) expect(Object.keys(r.cells).sort()).toEqual([...PLAN_KEYS].sort());
-    for (const r of crmMatrixRows()) expect(Object.keys(r.cells).sort()).toEqual(["crm_basic", "crm_essentials", "crm_max"]);
+    for (const r of crmMatrixRows()) expect(Object.keys(r.cells).sort()).toEqual(["crm_basic", "crm_elite", "crm_essentials", "crm_max"]);
     // The columns are the price book's display order, Unlimited the hero.
     expect(businessToolsColumns().map((c) => c.key)).toEqual([...PLAN_KEYS]);
     expect(businessToolsColumns().find((c) => c.hero)?.key).toBe("agency");
-    expect(crmMatrixColumns().find((c) => c.hero)?.key).toBe("crm_max");
+    expect(crmMatrixColumns().find((c) => c.hero)?.key).toBe("crm_elite");
   });
 
   it("is derived from the limits: counts step up the ladder, -1 reads as the unlimited cell", () => {
@@ -162,13 +162,16 @@ describe("pricing display: comparison tables (shared/plan-matrix.ts)", () => {
   });
 
   it("derives the CRM rows from CRM_PLANS (a separate product)", () => {
-    expect(crmByKey.seats.cells).toEqual({ crm_basic: 1, crm_essentials: 5, crm_max: 8 });
+    expect(crmByKey.seats.cells).toEqual({ crm_basic: 1, crm_essentials: 5, crm_max: 8, crm_elite: 35 });
     expect(crmByKey.clients.cells.crm_basic).toBe(UNLIMITED_CELL);
     expect(crmByKey.documents.cells.crm_max).toBe(UNLIMITED_CELL);
-    expect(crmByKey.teamTexts.cells).toEqual({ crm_basic: false, crm_essentials: 500, crm_max: 1500 });
-    expect(crmByKey.jobCosting.cells).toEqual({ crm_basic: false, crm_essentials: true, crm_max: true });
-    expect(crmByKey.jobcam.cells).toEqual({ crm_basic: "Add-on $39", crm_essentials: "Add-on $39", crm_max: true });
-    expect(crmByKey.apiUnits.cells).toEqual({ crm_basic: false, crm_essentials: 10_000, crm_max: 50_000 });
+    expect(crmByKey.teamTexts.cells).toEqual({ crm_basic: false, crm_essentials: 500, crm_max: 1500, crm_elite: 5000 });
+    expect(crmByKey.jobCosting.cells).toEqual({ crm_basic: false, crm_essentials: true, crm_max: true, crm_elite: true });
+    expect(crmByKey.jobcam.cells).toEqual({ crm_basic: "Add-on $39", crm_essentials: "Add-on $39", crm_max: true, crm_elite: true });
+    expect(crmByKey.apiUnits.cells).toEqual({ crm_basic: false, crm_essentials: 10_000, crm_max: 50_000, crm_elite: 250_000 });
+    expect(crmByKey.clientTexting.cells).toEqual({
+      crm_basic: false, crm_essentials: "The texting add-on, or your own carrier account", crm_max: "1 number included", crm_elite: "3 numbers included",
+    });
     expect(crmByKey.trial.cells.crm_basic).toBe("7 days");
     // The platform matrix has no CRM rows — the CRM is its own product.
     expect(byKey.seats).toBeUndefined();

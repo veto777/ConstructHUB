@@ -1,6 +1,6 @@
 # Plan matrix
 
-_generated from `shared/plan-matrix.ts` on 2026-10-09 — do not edit by hand. Regenerate with `npm run pricing:matrix` after any price-book change (shared/plans.ts, shared/crm-plans.ts). See docs/pricing/README.md._
+_generated from `shared/plan-matrix.ts` on 2026-10-10 — do not edit by hand. Regenerate with `npm run pricing:matrix` after any price-book change (shared/plans.ts, shared/crm-plans.ts). See docs/pricing/README.md._
 
 Money is in US dollars. Yearly platform billing is 11× the monthly price (1 month free); CRM yearly prices are their own. "🕒 Coming" marks a row or module that is promised on the plan but not live yet (shared/plans.ts `COMING_MODULES`). ⭐ = the hero plan. There is no per-location pricing and no extra-location add-on: outgrow a plan and you move up.
 
@@ -51,20 +51,20 @@ Money is in US dollars. Yearly platform billing is 11× the monthly price (1 mon
 
 ## CRM (Customer Relations Management) — a separate product
 
-| Feature | **CRM Basic**<br>$39/mo · $348/yr<br><sup>One person, running jobs end to end.</sup> | **CRM Essentials**<br>$94/mo · $888/yr<br><sup>A crew — scheduling, texting and job costing.</sup> | **CRM Max** ⭐<br>$164/mo · $1,788/yr<br><sup>A full office — more seats, a number included.</sup> |
-| --- | --- | --- | --- |
-| Team seats | 1 | 5 | 8 |
-| Clients & jobs | 🟣 Unlimited | 🟣 Unlimited | 🟣 Unlimited |
-| Estimates & invoices / month<br><sup>Online card and ACH payments on every plan.</sup> | 🟣 Unlimited | 🟣 Unlimited | 🟣 Unlimited |
-| Scheduling & dispatch calendar | ✅ | ✅ | ✅ |
-| Client portal | ✅ | ✅ | ✅ |
-| Change orders + job costing | ❌ | ✅ | ✅ |
-| Team text alert segments / month | ❌ | 500 | 1,500 |
-| Client texting | ❌ | Your own SignalWire number or the texting add-on | 1 number included |
-| JobCam — job photos & video | Add-on $39 | Add-on $39 | ✅ |
-| CRM API units / month | ❌ | 10,000 | 50,000 |
-| Support | Email support | Priority email support | Priority support + onboarding call |
-| Free trial | 7 days | 7 days | 7 days |
+| Feature | **CRM Basic**<br>$49/mo · $539/yr<br><sup>One person, running jobs end to end.</sup> | **CRM Essentials**<br>$99/mo · $1,089/yr<br><sup>A crew — scheduling, texting and job costing.</sup> | **CRM Max**<br>$199/mo · $2,189/yr<br><sup>A full office — more seats, a number included.</sup> | **CRM Elite** ⭐<br>$499/mo · $5,489/yr<br><sup>A large operation — up to 35 seats, 3 numbers, 1 TB of JobCam.</sup> |
+| --- | --- | --- | --- | --- |
+| Team seats | 1 | 5 | 8 | 35 |
+| Clients & jobs | 🟣 Unlimited | 🟣 Unlimited | 🟣 Unlimited | 🟣 Unlimited |
+| Estimates & invoices / month<br><sup>Online card and ACH payments on every plan.</sup> | 🟣 Unlimited | 🟣 Unlimited | 🟣 Unlimited | 🟣 Unlimited |
+| Scheduling & dispatch calendar | ✅ | ✅ | ✅ | ✅ |
+| Client portal | ✅ | ✅ | ✅ | ✅ |
+| Change orders + job costing | ❌ | ✅ | ✅ | ✅ |
+| Team text alert segments / month | ❌ | 500 | 1,500 | 5,000 |
+| Client texting | ❌ | The texting add-on, or your own carrier account | 1 number included | 3 numbers included |
+| JobCam — job photos & video | Add-on $39 | Add-on $39 | ✅ | ✅ |
+| CRM API units / month | ❌ | 10,000 | 50,000 | 250,000 |
+| Support | Email support | Priority email support | Priority support + onboarding call | Priority support + onboarding call |
+| Free trial | 7 days | 7 days | 7 days | 7 days |
 
 ## Add-ons
 

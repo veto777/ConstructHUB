@@ -669,12 +669,12 @@ describe("owner 2026-10-08: the AI Call Assistant is a separate service — new 
     expect(delivered("The Call Assistant costs $249/month and works with Pro ($99/month).")).toContain("$99/month");
     // Codex #7: the same for the CRM, the add-ons and the extra number — no sentence-wide exemption; each amount is
     // bound to the product clause it sits in, occurrence by occurrence.
-    blocked("The Call Assistant works with CRM and costs $39/month.", "O9");
+    blocked("The Call Assistant works with CRM and costs $49/month.", "O9");
     blocked("The Call Assistant is an add-on and costs $29/month.", "O9");
     blocked("The Call Assistant works with extra locations and costs $19/month.", "O9");
     blocked("The Call Assistant includes extra numbers and costs $5/month.", "O9");
-    blocked("The CRM is $39/month and the Call Assistant costs $39/month.", "O9");
-    expect(delivered("The CRM is $39/month; the Call Assistant is a separate service from $249/month.")).toContain("$39/month");
+    blocked("The CRM is $49/month and the Call Assistant costs $49/month.", "O9");
+    expect(delivered("The CRM is $49/month; the Call Assistant is a separate service from $249/month.")).toContain("$49/month");
     expect(withCents([99000])(`Pro is $99/month or ${formatUsd(PLANS.pro.annualCents)}/year; the Call Assistant is a separate service from $249/month.`)).toMatchObject({ ok: true });
     expect(withCents([1900])("The Call Assistant is a separate service; extra locations are $19/month on your plan.")).toMatchObject({ ok: true });
     expect(delivered("1. The AI Call Assistant: from $249/mo, no plan needed.")).toContain("$249/mo");

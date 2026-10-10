@@ -5,20 +5,22 @@ import {
 import { PLANS, PLAN_KEYS, ADDONS, CALL_ASSISTANT_FROM_CENTS, CALL_ASSISTANT_TIERS } from "@shared/plans";
 import { crmPlanPriceSpec, crmSeatPriceSpec, planPriceSpec, roleOfPrice } from "../billing/prices";
 
-/** Housecall Pro's published prices on 2026-10-07 (housecallpro.com/pricing), in cents. */
-const HOUSECALL = {
-  crm_basic: { month: 7900, yearPerMonth: 5900, users: 1 },
-  crm_essentials: { month: 18900, yearPerMonth: 14900, users: 5 },
-  crm_max: { month: 32900, yearPerMonth: 29900, users: 8 },
+/** The owner's CRM price book (2026-10-09), in cents; annual is 11x monthly (one month free). */
+const OWNER_BOOK = {
+  crm_basic: { month: 4900, seats: 1 },
+  crm_essentials: { month: 9900, seats: 5 },
+  crm_max: { month: 19900, seats: 8 },
+  crm_elite: { month: 49900, seats: 35 },
 } as const;
 
 describe("the CRM is a separate product", () => {
-  it("costs half of Housecall Pro or less, monthly and yearly, with the same seats (owner, 2026-10-07)", () => {
+  it("charges the owner's prices, annual 11x monthly, with the owner's seats (owner, 2026-10-09)", () => {
+    expect([...CRM_PLAN_KEYS]).toEqual(Object.keys(OWNER_BOOK));
     for (const key of CRM_PLAN_KEYS) {
-      const ours = CRM_PLANS[key], theirs = HOUSECALL[key];
-      expect(ours.monthlyCents, key).toBeLessThanOrEqual(theirs.month / 2);
-      expect(ours.annualCents, key).toBeLessThanOrEqual((theirs.yearPerMonth * 12) / 2);
-      expect(ours.limits.seats, key).toBe(theirs.users);
+      const ours = CRM_PLANS[key], book = OWNER_BOOK[key];
+      expect(ours.monthlyCents, key).toBe(book.month);
+      expect(ours.annualCents, key).toBe(11 * book.month);
+      expect(ours.limits.seats, key).toBe(book.seats);
       expect(crmPlanPriceCents(key, "month")).toBe(ours.monthlyCents);
       expect(crmPlanPriceCents(key, "year")).toBe(ours.annualCents);
     }

@@ -35,11 +35,11 @@ const annualBasic = { plan: "crm_basic", interval: "year", extraSeats: 0 } as co
 beforeEach(() => vi.clearAllMocks());
 
 describe("CRM recurring change preview and purchase confirmation", () => {
-  it("quotes Basic plus retained JobCam at $816/year, matching the billed item amounts", async () => {
+  it("quotes Basic plus retained JobCam at $1,007/year, matching the billed item amounts", async () => {
     const sub = subscription();
     const preview = crmChangePreview(sub, annualBasic);
     expect(preview.order.jobcam).toBe(true);
-    expect(preview.recurringCents).toBe(81600);
+    expect(preview.recurringCents).toBe(100700);
     let billedCents = 0;
     await crmChangeItems(describeCrmSubscription(sub), preview.order, async (spec) => {
       billedCents += spec.params.unit_amount!;
@@ -47,7 +47,7 @@ describe("CRM recurring change preview and purchase confirmation", () => {
     });
     expect(billedCents).toBe(preview.recurringCents);
     const review = crmPurchaseReview(annualBasic, preview);
-    expect(review.price).toBe("$816/yr");
+    expect(review.price).toBe("$1,007/yr");
     expect(review.included).toContain("JobCam add-on retained — included in the total");
     expect(review.notIncluded.join(" ")).not.toContain("JobCam");
     expect(review.note).toContain("prorated");
@@ -55,10 +55,10 @@ describe("CRM recurring change preview and purchase confirmation", () => {
 
   it("retains and includes extra seats in the full annual recurring order", () => {
     const preview = crmChangePreview(subscription(true, 2), { interval: "year" });
-    expect(preview.recurringCents).toBe(115600);
+    expect(preview.recurringCents).toBe(134700);
     expect(preview.order.extraSeats).toBe(2);
     const review = crmPurchaseReview(annualBasic, preview);
-    expect(review.price).toBe("$1,156/yr");
+    expect(review.price).toBe("$1,347/yr");
     expect(review.included).toContain("2 extra seats (3 seats in all)");
     expect(review.notIncluded.join(" ")).not.toContain("Extra seats");
   });
@@ -67,7 +67,7 @@ describe("CRM recurring change preview and purchase confirmation", () => {
     const sub = subscription();
     const preview = crmChangePreview(sub, { plan: "crm_max", interval: "year" });
     expect(preview.order.jobcam).toBe(false);
-    expect(preview.recurringCents).toBe(178800);
+    expect(preview.recurringCents).toBe(218900);
     const items = await crmChangeItems(describeCrmSubscription(sub), preview.order, async (spec) => spec.lookupKey);
     expect(items).toContainEqual({ id: "jobcam", deleted: true });
     const review = crmPurchaseReview(annualBasic, preview);
@@ -77,15 +77,15 @@ describe("CRM recurring change preview and purchase confirmation", () => {
 
   it("does not invent an add-on for Basic without JobCam or a fresh checkout", () => {
     const preview = crmChangePreview(subscription(false), annualBasic);
-    expect(preview.recurringCents).toBe(34800);
+    expect(preview.recurringCents).toBe(53900);
     for (const review of [crmPurchaseReview(annualBasic, preview), crmPurchaseReview(annualBasic)]) {
-      expect(review.price).toBe("$348/yr");
+      expect(review.price).toBe("$539/yr");
       expect(review.notIncluded.join(" ")).toContain("JobCam");
     }
   });
 
   it("honors explicit removal and rejects invalid intervals", () => {
-    expect(crmChangePreview(subscription(), { ...annualBasic, jobcam: false }).recurringCents).toBe(34800);
+    expect(crmChangePreview(subscription(), { ...annualBasic, jobcam: false }).recurringCents).toBe(53900);
     expect(() => crmChangePreview(subscription(), { interval: "week" })).toThrow("monthly or yearly");
   });
 });
@@ -116,7 +116,7 @@ describe("CRM change-preview route", () => {
     await handle({ user: { id: 42 }, body: { ...annualBasic, recurringCents: 1, userId: 999 } }, res);
     expect(mocks.row).toHaveBeenCalledWith(42);
     expect(mocks.retrieve).toHaveBeenCalledWith("sub_crm");
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ recurringCents: 81600 }));
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ recurringCents: 100700 }));
     expect(mocks.update).not.toHaveBeenCalled();
     expect(mocks.query).not.toHaveBeenCalled();
   });

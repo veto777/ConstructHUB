@@ -67,6 +67,9 @@ export function parseCrmOrder(body: any, fallback?: Partial<CrmOrder>): CrmOrder
   if (typeof rawSeats !== "number" || !Number.isInteger(rawSeats) || rawSeats < 0) {
     throw new BillingRequestError(400, "Extra seats must be a whole number, 0 or more.", "bad_quantity");
   }
+  if (rawSeats > 0 && !CRM_PLANS[plan].sellsExtraSeats) {
+    throw new BillingRequestError(400, `${CRM_PLANS[plan].name} includes up to ${CRM_PLANS[plan].limits.seats} seats and has no extra seats. Set extra seats to 0, or talk to us about more.`, "no_extra_seats");
+  }
   if (rawSeats > CRM_EXTRA_SEAT_MAX) {
     throw new BillingRequestError(409, `For more than ${CRM_EXTRA_SEAT_MAX} extra seats, talk to a sales rep.`, "talk_to_sales");
   }

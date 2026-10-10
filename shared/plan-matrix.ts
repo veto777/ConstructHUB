@@ -269,8 +269,9 @@ export function crmMatrixRows(): CrmMatrixRow[] {
       key: "clientTexting", label: "Client texting",
       cell: (p) =>
         p.limits.clientTexting === "none" ? false
-          : p.limits.clientTexting === "included" ? "1 number included"
-          : "Your own SignalWire number or the texting add-on",
+          : p.limits.clientTexting === "included"
+            ? `${p.limits.textingNumbersIncluded} number${p.limits.textingNumbersIncluded === 1 ? "" : "s"} included`
+          : "The texting add-on, or your own carrier account",
     }),
     crmRow({
       key: "jobcam", label: "JobCam — job photos & video",
@@ -282,11 +283,11 @@ export function crmMatrixRows(): CrmMatrixRow[] {
   ];
 }
 
-/** The three CRM columns, cheapest first — CRM Max is the hero. */
+/** The CRM columns, cheapest first — CRM Elite (the top plan) is the hero. */
 export function crmMatrixColumns(): CrmMatrixColumn[] {
   return CRM_PLAN_KEYS.map((key) => ({
     key, name: CRM_PLANS[key].name, tagline: CRM_PLANS[key].tagline,
     monthlyCents: CRM_PLANS[key].monthlyCents, annualCents: CRM_PLANS[key].annualCents,
-    hero: key === "crm_max",
+    hero: key === "crm_elite",
   }));
 }

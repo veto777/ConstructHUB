@@ -91,8 +91,10 @@ describe("jobcam storage sizes", () => {
 });
 
 describe("JobCam in the CRM plan model", () => {
-  it("is included in CRM Max only, and listed as not included on Basic and Essentials", () => {
-    expect(CRM_PLAN_KEYS.map((k) => CRM_PLANS[k].limits.jobcam)).toEqual([false, false, true]);
+  it("is included in CRM Max and Elite, and listed as not included on Basic and Essentials", () => {
+    expect(CRM_PLAN_KEYS.map((k) => CRM_PLANS[k].limits.jobcam)).toEqual([false, false, true, true]);
+    expect(CRM_PLANS.crm_elite.features).toContain("JobCam — job photos & video, 1 TB included");
+    expect(CRM_PLANS.crm_elite.limits.jobcamStorageGb).toBe(1000);
     expect(cheapestCrmPlanWhere((l) => l.jobcam)).toBe("crm_max");
     expect(CRM_PLANS.crm_max.features).toContain("JobCam — job photos & video, 5 GB included");
     for (const k of ["crm_basic", "crm_essentials"] as const) {
@@ -102,7 +104,7 @@ describe("JobCam in the CRM plan model", () => {
       ]);
     }
     expect(CRM_PLANS.crm_max.notIncluded.join(" ")).not.toMatch(/JobCam/);
-    for (const k of CRM_PLAN_KEYS) expect(CRM_PLANS[k].limits.jobcamStorageGb).toBe(JOBCAM_INCLUDED_GB);
+    for (const k of CRM_PLAN_KEYS) expect(CRM_PLANS[k].limits.jobcamStorageGb).toBe(k === "crm_elite" ? 1000 : JOBCAM_INCLUDED_GB);
   });
 
   it("no platform plan or platform add-on sells JobCam", () => {
@@ -193,6 +195,11 @@ describe("the JobCam add-on on a CRM order", () => {
     expect(parseCrmOrder({ plan: "crm_basic", jobcam: true })).toEqual({ plan: "crm_basic", interval: "month", extraSeats: 0, jobcam: true });
     expect(parseCrmOrder({ plan: "crm_essentials", interval: "year", jobcam: true }).jobcam).toBe(true);
     expect(() => parseCrmOrder({ plan: "crm_max", jobcam: true })).toThrowError(/already included in CRM Max/);
+    expect(() => parseCrmOrder({ plan: "crm_elite", jobcam: true })).toThrowError(/already included in CRM Elite/);
+    // Elite's 35 seats are a ceiling (owner: "up to 35"): no extra seats on it, while Max still sells them.
+    expect(() => parseCrmOrder({ plan: "crm_elite", extraSeats: 1 })).toThrowError(/up to 35 seats and has no extra seats/);
+    expect(parseCrmOrder({ plan: "crm_elite", extraSeats: 0 }).extraSeats).toBe(0);
+    expect(parseCrmOrder({ plan: "crm_max", extraSeats: 3 }).extraSeats).toBe(3);
     expect(() => parseCrmOrder({ jobcam: true })).toThrowError(/Choose a CRM plan/);
     expect(() => parseCrmOrder({ plan: "crm_basic", jobcam: "yes" })).toThrowError(/on or off/);
     expect(parseCrmOrder({ plan: "crm_basic" }).jobcam).toBe(false);
@@ -213,7 +220,7 @@ describe("the JobCam add-on on a CRM order", () => {
   });
 
   it("adds one line at the add-on's price, removes it, re-prices it on an interval change", async () => {
-    const plan = { ...item("si_plan", "crm_plan", "crm_basic"), price: { id: "new_chub_v1_crmplan_crm_basic_month_3900" } };
+    const plan = { ...item("si_plan", "crm_plan", "crm_basic"), price: { id: `new_chub_v1_crmplan_crm_basic_month_${CRM_PLANS.crm_basic.monthlyCents}` } };
     const base = { planItem: plan, seatItem: null, jobcamItem: null, extraSeats: 0 } as any;
     expect(await crmChangeItems(base, { plan: "crm_basic", interval: "month", extraSeats: 0, jobcam: true }, priceId))
       .toEqual([{ price: "new_chub_v1_crmaddon_jobcam_month_3900", quantity: 1 }]);
@@ -222,7 +229,7 @@ describe("the JobCam add-on on a CRM order", () => {
     expect(await crmChangeItems(withAddon, { plan: "crm_basic", interval: "month", extraSeats: 0, jobcam: false }, priceId))
       .toEqual([{ id: "si_jc", deleted: true }]);
     expect(await crmChangeItems(withAddon, { plan: "crm_basic", interval: "year", extraSeats: 0, jobcam: true }, priceId)).toEqual([
-      { id: "si_plan", price: "new_chub_v1_crmplan_crm_basic_year_34800", quantity: 1 },
+      { id: "si_plan", price: "new_chub_v1_crmplan_crm_basic_year_53900", quantity: 1 },
       { id: "si_jc", price: "new_chub_v1_crmaddon_jobcam_year_46800", quantity: 1 },
     ]);
     // Moving to CRM Max: the plan changes and the add-on line goes (the plan covers JobCam).
@@ -261,8 +268,8 @@ describe("who has JobCam (crmEntitlementsFromRow → jobcamAccessFrom)", () => {
   });
 
   it("platform admins and beta accounts are never gated", () => {
-    expect(access(row(null), true)).toEqual({ entitled: true, via: "admin", plan: "crm_max" });
-    expect(access(row(null, { beta_at: new Date() }))).toEqual({ entitled: true, via: "beta", plan: "crm_max" });
+    expect(access(row(null), true)).toEqual({ entitled: true, via: "admin", plan: "crm_elite" });
+    expect(access(row(null, { beta_at: new Date() }))).toEqual({ entitled: true, via: "beta", plan: "crm_elite" });
     expect(access(row("crm_basic", { beta_at: new Date() })).via).toBe("beta");
   });
 

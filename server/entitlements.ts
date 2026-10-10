@@ -637,7 +637,7 @@ export function textingNumbersAllowance(
   const included = ent.allowances?.textingNumbersIncluded ?? 0;
   const bought = ent.addons.texting_number ?? 0;
   if (included === UNLIMITED || bought === UNLIMITED) return UNLIMITED;
-  const crmIncluded = crm?.active && crm.limits?.clientTexting === "included" ? 1 : 0;
+  const crmIncluded = crm?.active && crm.limits?.clientTexting === "included" ? Math.max(0, crm.limits.textingNumbersIncluded ?? 1) : 0;
   return included + crmIncluded + bought;
 }
 

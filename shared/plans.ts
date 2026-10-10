@@ -233,7 +233,7 @@ const PRO_MODULES: PlanModules = {
 const AGENCY_MODULES: PlanModules = { ...PRO_MODULES, agencyWorkspace: true, scheduledReports: true, permitAlerts: true, gridWatches: true };
 /** Everything. */
 const ALL_MODULES: PlanModules = { ...AGENCY_MODULES, whiteLabel: true, masterClass: true };
-const CRM_NOT_INCLUDED_LINE = "The ConstructHUB CRM — estimates, invoices, scheduling and the client portal (a separate product, from $39/mo)";
+const CRM_NOT_INCLUDED_LINE = "The ConstructHUB CRM — estimates, invoices, scheduling and the client portal (a separate product, from $49/mo)";
 
 // ── AI Call Assistant: a SEPARATE SERVICE ───────────────────────────────────
 // Owner, 2026-10-08 (late evening): the AI Call Assistant is sold on its own

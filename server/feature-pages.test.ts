@@ -251,8 +251,9 @@ describe("the CRM is a separate product on every feature page (owner, 2026-10-07
     expect(s.headline).toBe("CRM add-on");
     expect(s.price).toBe(formatUsd(CRM_ADDONS.jobcam.monthlyCents));
     for (const k of CRM_ADDONS.jobcam.availableOn) expect(s.priceTail).toContain(CRM_PLANS[k].name);
+    expect(s.priceTail).toContain(`included in ${CRM_PLANS[includedIn[0]].name}`);
     for (const k of includedIn) {
-      expect(s.priceTail).toContain(`included in ${CRM_PLANS[k].name} (${formatUsd(CRM_PLANS[k].monthlyCents)}/mo)`);
+      expect(s.priceTail).toContain(`${CRM_PLANS[k].name} (${formatUsd(CRM_PLANS[k].monthlyCents)}/mo)`);
       expect(s.priceNote).toContain(`${CRM_PLANS[k].name} (${formatUsd(CRM_PLANS[k].monthlyCents)}/mo)`);
     }
   });

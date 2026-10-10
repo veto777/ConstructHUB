@@ -53,9 +53,12 @@ SEO data beyond the plan's allowance is prepaid credit in packs of $25 / $50 / $
 
 | Plan | Monthly | Annual | Seats | Not in this plan |
 | --- | --- | --- | --- | --- |
-| CRM Basic (`:102`) | $39 | $348 | 1 | extra seats ($17/mo each, line 172), texting, change orders and job costing, JobCam |
-| CRM Essentials (`:128`) | $94 | $888 | 5 | a texting number on our carrier, JobCam |
-| CRM Max (`:151`) | $164 | $1,788 | 8 | — (JobCam, 1 client-texting number and 5 GB of JobCam storage are in it) |
+| CRM Basic | $49 | $539 | 1 | extra seats ($17/mo each, line 172), texting, change orders and job costing, JobCam |
+| CRM Essentials | $99 | $1,089 | 5 | a texting number on our carrier, JobCam |
+| CRM Max | $199 | $2,189 | 8 | — (JobCam, 1 client-texting number and 5 GB of JobCam storage are in it) |
+| CRM Elite | $499 | $5,489 | up to 35 (no extra seats) | — (JobCam with 1 TB, 3 client-texting numbers, 5,000 team text segments, 250,000 CRM API units) |
+
+Prices set by the owner 2026-10-09; annual is 11 × monthly (one month free).
 
 Every CRM plan: unlimited clients and jobs, estimates, invoices and payments, online card and ACH
 payments, client portal, schedule and dispatch calendar, price book (`:105-113`).
@@ -272,9 +275,9 @@ The three CRM competitors' pricing pages were read again **without a summariser*
 3. **What none of the six shows on the pages fetched** is a permit-office directory or county property
    records. That, and the honesty of the links, is the differentiator that is ours.
 4. **Price pairs that are provable on 2026-10-08** (list price, monthly billing, same seat count):
-   CRM Basic $39 vs Housecall Pro Basic $79 (1 user); CRM Essentials $94 vs $189 (5 users); CRM Max
-   $164 vs $329 (8 users). CRM Basic $39 vs Leap CRM Essential $79 (1 user). Against Jobber Core there
-   is **no price advantage** ($39 vs $49 month to month; $348 vs $348 a year). In every pair the
+   CRM Basic $49 vs Housecall Pro Basic $79 (1 user); CRM Essentials $99 vs $189 (5 users); CRM Max
+   $199 vs $329 (8 users). CRM Basic $49 vs Leap CRM Essential $79 (1 user). Against Jobber Core there
+   is **no price advantage** ($49 vs $49 month to month; $539 vs $348 a year — Jobber is cheaper yearly). In every pair the
    feature lists differ, and a pair may only be shown with that said.
 5. **JobCam vs CompanyCam** is a comparison we lose on depth; the only true line is "the camera is
    inside the CRM, filed to the same job as the estimate and the invoice".

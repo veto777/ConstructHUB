@@ -163,7 +163,7 @@ describe("opt-out suppression seam (real test DB)", () => {
     clearSmsEntitlementCache();
     const entitled = Object.fromEntries(await Promise.all(Object.entries(byPlan).map(async ([plan, id]) => [plan, await orgSmsEntitled(id)])));
     expect(entitled).toEqual({ starter: true, team: true, pro: true, growth: true, agency: true, standard: true, gold: true, platinum: true });
-    expect(SMS_NEEDS_PLAN).toBe("Text messaging is included with the CRM Essentials and CRM Max plans. Change your CRM plan in Pricing to turn it on.");
+    expect(SMS_NEEDS_PLAN).toBe("Text messaging is included with the CRM Essentials, CRM Max and CRM Elite plans. Change your CRM plan in Pricing to turn it on.");
     expect(smsPlanRequired()).toEqual({ code: "plan_required", requiredPlan: "starter", message: SMS_NEEDS_PLAN, planAllowsSms: false });
   });
 

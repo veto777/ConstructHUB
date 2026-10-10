@@ -266,8 +266,9 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
           // A platform admin can't buy the add-on (the button is hidden) and texting is on (orgSmsEntitled).
           included: admin ? "Included (own or dedicated number)"
             : allowances.clientTexting === "none" ? "Not included"
-            : allowances.clientTexting === "included" ? "1 number included"
-            : "Your SignalWire number or the texting add-on",
+            : allowances.clientTexting === "included"
+              ? `${allowances.textingNumbersIncluded || 1} number${(allowances.textingNumbersIncluded || 1) === 1 ? "" : "s"} included`
+            : "Your own carrier account or the texting add-on",
           excluded: allowances.clientTexting === "none",
           used: null,
           addon: allowances.clientTexting === "none" ? undefined : "texting_number",

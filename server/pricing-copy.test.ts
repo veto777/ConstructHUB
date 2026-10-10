@@ -33,7 +33,8 @@ import { INFO_CONTENT } from "../client/src/lib/info-content";
  */
 
 const LEGACY_PLAN = /\b(Standard|Professional|Business|Premium|Gold|Platinum)\s+(plan|plans|member|members|subscriber|subscribers|tier)\b/i;
-const LEGACY_WORDS = [/\bPlatinum\b/, /\$995\b/, /\$499\/mo/, /Unlimited everything/i, /\$9,999/, /billed separately/i, /separate membership/i];
+// $499/mo was a retired price until 2026-10-09; it is now CRM Elite's, so it is no longer a legacy word.
+const LEGACY_WORDS = [/\bPlatinum\b/, /\$995\b/, /Unlimited everything/i, /\$9,999/, /billed separately/i, /separate membership/i];
 
 /** Every "$1,234"-style amount in a text, in cents. */
 function dollarAmounts(text: string): number[] {
@@ -315,12 +316,12 @@ describe("emails and in-app help", () => {
 
   it("the SMS info tip names the texting plans from the price book", () => {
     const body = INFO_CONTENT["settings-sms"].body.join(" ");
-    // Every platform plan carries team text alerts; the CRM's Essentials and Max do too.
+    // Every platform plan carries team text alerts; the CRM's Essentials, Max and Elite do too.
     expect(body).toContain(TEXTING_PLANS);
     expect(TEXTING_PLANS).toBe("Solo, Team, Pro, Agency and Unlimited");
     expect(body).toContain(CRM_TEXTING_PLANS);
-    expect(body).toContain(`${CLIENT_NUMBER_INCLUDED_PLANS} each include one number`);
-    expect(CLIENT_NUMBER_INCLUDED_PLANS).toBe("CRM Max, Agency and Unlimited");
+    expect(body).toContain(`${CLIENT_NUMBER_INCLUDED_PLANS} include at least one number`);
+    expect(CLIENT_NUMBER_INCLUDED_PLANS).toBe("CRM Max, CRM Elite, Agency and Unlimited");
   });
 });
 

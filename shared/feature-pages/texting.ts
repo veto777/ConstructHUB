@@ -82,7 +82,7 @@ const page: FeaturePage = {
     {
       icon: "phone",
       title: "A number of your own",
-      body: "A number we set up for you on ConstructHUB's carrier, or your own SignalWire account billed to you. Your account's token is stored encrypted.",
+      body: "A number we set up for you on ConstructHUB's carrier, or your own carrier account billed to you. Your account's token is stored encrypted.",
     },
     {
       icon: "shield-check",
@@ -117,7 +117,7 @@ const page: FeaturePage = {
   faqs: [
     {
       q: "What do I need to text my clients?",
-      a: `A number of your own. Carriers no longer let one shared number text on behalf of many businesses, so the shared ConstructHUB number only texts your own team. ${CLIENT_NUMBER_INCLUDED_PLANS} each include a client-texting number we set up for you; on the ${NUMBER_ADDON} platform plans it is the ${ADDONS.texting_number.name} add-on. You can also connect your own SignalWire account. Either way, the number needs its carrier registration (10DLC).`,
+      a: `A number of your own. Carriers no longer let one shared number text on behalf of many businesses, so the shared ConstructHUB number only texts your own team. ${CLIENT_NUMBER_INCLUDED_PLANS} each include a client-texting number we set up for you; on the ${NUMBER_ADDON} platform plans it is the ${ADDONS.texting_number.name} add-on. You can also connect your own carrier account. Either way, the number needs its carrier registration (10DLC).`,
     },
     {
       q: "Which plans include texting, and how many texts?",
@@ -152,7 +152,7 @@ const page: FeaturePage = {
         "quick message.",
       "Which number a text comes from matters. Team alerts can use the shared ConstructHUB number with nothing to set " +
         "up. Texting clients needs a number of your own: a number set up for you on ConstructHUB's carrier, or your own " +
-        "SignalWire account, whose token is stored encrypted. The CRM never sends a client text from the shared number. " +
+        "carrier account, whose token is stored encrypted. The CRM never sends a client text from the shared number. " +
         "If your own account's details are incomplete, texts fall back to the shared number, which only texts your team.",
       "Texts are counted in segments, the unit carriers bill. A plain text fits 160 characters in one segment and 153 " +
         "in each segment after that. A single emoji, a curly quote or most accented capital letters switch the whole text " +

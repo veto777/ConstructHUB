@@ -83,7 +83,7 @@ describe("CRM seat refusals", () => {
     expect(refused.status).toBe(402);
     expect(refused.data).toMatchObject({
       code: "crm_plan_required",
-      message: "The ConstructHUB CRM is its own subscription, separate from the ConstructHUB platform plans, from $39/mo. Choose a CRM plan to open it.",
+      message: "The ConstructHUB CRM is its own subscription, separate from the ConstructHUB platform plans, from $49/mo. Choose a CRM plan to open it.",
       href: "/pricing#crm",
     });
   });
@@ -153,7 +153,7 @@ describe("Texting a client without a texting plan", () => {
     expect(refused.status).toBe(402);
     expect(refused.data).toEqual({
       code: "plan_required", requiredPlan: "starter", planAllowsSms: false,
-      message: "Text messaging is included with the CRM Essentials and CRM Max plans. Change your CRM plan in Pricing to turn it on.",
+      message: "Text messaging is included with the CRM Essentials, CRM Max and CRM Elite plans. Change your CRM plan in Pricing to turn it on.",
     });
   });
 });

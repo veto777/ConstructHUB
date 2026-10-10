@@ -116,15 +116,17 @@ export function CrmPlanCards({ interval, signedIn, returnTo = "pricing" }: {
   const pending = checkout.isPending || change.isPending;
 
   const seatCents = interval === "year" ? CRM_EXTRA_SEAT_ANNUAL_CENTS : CRM_EXTRA_SEAT_MONTHLY_CENTS;
-  const totalCents = (plan: CrmPlanKey) => crmPlanPriceCents(plan, interval) + extraSeats * seatCents;
-  const isCurrent = (plan: CrmPlanKey) => live && sub?.plan === plan && sub?.interval === interval && sub?.extraSeats === extraSeats;
+  // Elite's seat count is a ceiling: the extra-seat stepper does not apply to it.
+  const seatsFor = (plan: CrmPlanKey) => (CRM_PLANS[plan].sellsExtraSeats ? extraSeats : 0);
+  const totalCents = (plan: CrmPlanKey) => crmPlanPriceCents(plan, interval) + seatsFor(plan) * seatCents;
+  const isCurrent = (plan: CrmPlanKey) => live && sub?.plan === plan && sub?.interval === interval && sub?.extraSeats === seatsFor(plan);
 
   const choose = (plan: CrmPlanKey) => {
     if (!signedIn) {
       setLocation(`/auth?mode=signup&next=${encodeURIComponent(`/pricing${interval === "year" ? "?interval=year" : ""}#crm`)}`);
       return;
     }
-    setReview({ plan, interval, extraSeats });
+    setReview({ plan, interval, extraSeats: seatsFor(plan) });
   };
 
   const changeQuote = useQuery<ChangePreview>({
@@ -156,7 +158,7 @@ export function CrmPlanCards({ interval, signedIn, returnTo = "pricing" }: {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
         {CRM_PLAN_KEYS.map((key) => {
           const plan = CRM_PLANS[key];
           const current = isCurrent(key);
@@ -219,7 +221,7 @@ export function CrmPlanCards({ interval, signedIn, returnTo = "pricing" }: {
         </div>
         {extraSeats > 0 && (
           <span className="text-muted-foreground" data-testid="text-crm-seat-totals">
-            {CRM_PLAN_KEYS.map((k) => `${CRM_PLANS[k].name} ${usd(totalCents(k))}${per(interval)}`).join(" · ")}
+            {CRM_PLAN_KEYS.map((k) => `${CRM_PLANS[k].name} ${usd(totalCents(k))}${per(interval)}${CRM_PLANS[k].sellsExtraSeats ? "" : ` (up to ${CRM_PLANS[k].limits.seats} seats, no extra seats)`}`).join(" · ")}
           </span>
         )}
       </div>
