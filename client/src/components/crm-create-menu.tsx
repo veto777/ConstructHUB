@@ -484,12 +484,11 @@ function MessageDialog({ open, onOpenChange, onNavigate }: {
                 <p className="text-xs text-muted-foreground" data-testid="text-texting-off-hint">
                   {smsStatus?.configured && smsStatus?.canTextClients === false ? (
                     <>
-                      Texting clients needs your own number — connect one in{" "}
+                      Texting clients needs a client-texting number — set one up in{" "}
                       <Link href="/crm/settings#sms" data-testid="link-enable-texting" onClick={leave}
                         className="text-primary hover:underline font-medium">
                         Settings → SMS
-                      </Link>{" "}
-                      (your own carrier registration).
+                      </Link>.
                     </>
                   ) : (
                     <>

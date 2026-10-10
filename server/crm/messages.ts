@@ -69,7 +69,7 @@ export async function deliverQuickMessage(args: {
   body: string;
   orgName: string;
   replyTo?: string;
-  /** The org's custom_fields — picks ITS sender (own number / own account). */
+  /** The org's custom_fields — picks ITS sender (shared number / its client-texting number). */
   orgCustomFields?: unknown;
   /** Known org — enables the STOP opt-out suppression check. */
   orgId?: string;

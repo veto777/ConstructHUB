@@ -12,7 +12,7 @@ import { inNativeApp } from "./app-shell";
 const TEXTING_NOTE = inNativeApp()
   ? "Texting sends bid reminders to clients and texts you the moment a bid is signed, money lands, or a client re-opens their estimate."
   : `Texting comes with ${TEXTING_EITHER_LINE}: team text alerts on every one of them, and client texts from ` +
-    `your own carrier account or a texting number of ours (${CLIENT_NUMBER_INCLUDED_PLANS} include at least one number).`;
+    `a texting number of ours (${CLIENT_NUMBER_INCLUDED_PLANS} include at least one number).`;
 
 export interface InfoEntry {
   title: string;

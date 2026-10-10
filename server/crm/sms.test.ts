@@ -265,7 +265,7 @@ describe("reminders + reengagement alerts against the dev server", () => {
     expect(t.status).toBe(503);
   });
 
-  it("reminder emails the client; the TEXT leg is refused on the shared platform number (client texting is BYO-only)", async () => {
+  it("reminder emails the client; the TEXT leg is refused on the shared platform number (client texting needs a client-texting number)", async () => {
     const { est } = await makeSentEstimate();
 
     const r1 = await api(`/api/crm/estimates/${est.id}/remind`, { method: "POST", body: "{}" }, cookie);
@@ -499,50 +499,24 @@ describe("per-org sender resolution (pure)", () => {
     });
   });
 
-  it("'byo' uses the org's own space/project/token/number", async () => {
-    const { resolveSmsSender, encryptSmsSecret } = await import("./sms");
+  it("a stored legacy 'byo' (own SignalWire account) resolves to the platform sender", async () => {
+    const { resolveSmsSender, orgSmsConfig } = await import("./sms");
+    const legacy = {
+      sms: {
+        mode: "byo", spaceUrl: "https://acme.signalwire.com/", projectId: "acme-proj",
+        apiTokenEnc: "v1.aaaa.bbbb.cccc", fromNumber: "+15553334444",
+      },
+    };
+    expect(orgSmsConfig(legacy)).toEqual({ mode: "platform", fromNumber: "+15553334444" });
     await withSwEnv(PLATFORM, () => {
-      const s = resolveSmsSender({
-        sms: {
-          mode: "byo", spaceUrl: "https://acme.signalwire.com/", projectId: "acme-proj",
-          apiTokenEnc: encryptSmsSecret("acme-tok"), fromNumber: "+15553334444",
-        },
-      });
-      expect(s).toEqual({
-        mode: "byo", space: "acme.signalwire.com", project: "acme-proj",
-        token: "acme-tok", from: "+15553334444",
+      expect(resolveSmsSender(legacy)).toEqual({
+        mode: "platform", space: "construct-hub.signalwire.com", project: "plat-proj",
+        token: "plat-tok", from: "+15550000000",
       });
     });
-  });
-
-  it("an incomplete 'byo' falls back to the platform sender — texts never vanish", async () => {
-    const { resolveSmsSender } = await import("./sms");
-    await withSwEnv(PLATFORM, () => {
-      const s = resolveSmsSender({ sms: { mode: "byo", spaceUrl: "acme.signalwire.com", projectId: "acme-proj" } });
-      expect(s?.mode).toBe("platform");
-    });
-  });
-
-  it("a byo org can text even when the platform has no carrier at all", async () => {
-    const { resolveSmsSender, encryptSmsSecret } = await import("./sms");
+    // No platform carrier → nothing can send; the org's old account is never used.
     await withSwEnv({}, () => {
-      const s = resolveSmsSender({
-        sms: {
-          mode: "byo", spaceUrl: "acme.signalwire.com", projectId: "acme-proj",
-          apiTokenEnc: encryptSmsSecret("acme-tok"), fromNumber: "+15553334444",
-        },
-      });
-      expect(s).toMatchObject({ mode: "byo", from: "+15553334444" });
-      expect(resolveSmsSender(null)).toBeNull();
+      expect(resolveSmsSender(legacy)).toBeNull();
     });
-  });
-
-  it("the encrypted token round-trips and is never plaintext at rest", async () => {
-    const { encryptSmsSecret, decryptSmsSecret } = await import("./sms");
-    const enc = encryptSmsSecret("super-secret-token");
-    expect(enc).not.toContain("super-secret-token");
-    expect(enc.startsWith("v1.")).toBe(true);
-    expect(decryptSmsSecret(enc)).toBe("super-secret-token");
-    expect(decryptSmsSecret("garbage")).toBeNull();
   });
 });

@@ -458,8 +458,8 @@ export function registerCrmPortalRoutes(app: Express, getDevUser: GetUser): void
     }).where(eq(crmEstimates.id, est.id)).returning();
 
     // Text the estimate link too, when the org (or this send) asked for it and
-    // the client actually has a mobile. CLIENT texts require the org's OWN
-    // registered number/account (BYO/dedicated) — carriers banned the shared
+    // the client actually has a mobile. CLIENT texts require the org's own
+    // registered client-texting number (dedicated) — carriers banned the shared
     // platform number texting on behalf of many businesses, so a platform-mode
     // org gets a clear refusal, never a silent platform-number send.
     // Best-effort: a carrier hiccup never undoes a send that already happened.

@@ -201,7 +201,7 @@ describe("buildDashboard (development database)", () => {
     // Activity leads; the month's quota (also the header's meter) comes last.
     expect(tile(p, "permits").metrics.map((m) => m.key)).toEqual(["searches7d", "lastSearch", "searches"]);
     expect(tile(p, "permits").metrics[2]).toMatchObject({ key: "searches", value: 0, limit: l.permitSearches });
-    // Solo includes a protected website and client texting (BYO/add-on), so both are on the checklist.
+    // Solo includes a protected website and client texting (the add-on), so both are on the checklist.
     expect(p.checklist.map((c) => c.key)).toEqual(["connectGoogle", "addLocation", "turnOnGuard", "runSiteScan", "requestReviews", "protectWebsite", "setUpCrm", "inviteTeammate", "addTextingNumber"]);
   });
 

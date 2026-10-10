@@ -21,7 +21,7 @@ import type { Express } from "express";
 import { z } from "zod";
 import fs from "fs";
 import path from "path";
-import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { db } from "../db";
 import {
   crmCustomers, crmEstimates, crmMembers, crmOrgs, crmProjects,
@@ -74,18 +74,17 @@ export function smsConfigured(): boolean {
 /** What the Settings card renders — never leaks the auth token. */
 export function smsStatus(orgCustomFields?: unknown) {
   const missing = smsMissingEnv();
-  // An org on its OWN account can text even when the platform has no carrier.
   const sender = resolveSmsSender(orgCustomFields);
   return {
     configured: Boolean(sender),
-    // Only meaningful for platform/dedicated senders; a BYO org fills its own.
+    // Both senders run on the platform carrier account, so these env vars matter to every org.
     missing,
     provider: sender ? "signalwire" : null,
     mode: sender?.mode ?? orgSmsConfig(orgCustomFields).mode,
     fromNumber: sender?.from ?? null,
     /** False on the shared platform number: carriers banned one platform
      *  texting on behalf of many businesses, so CLIENT-facing texts need the
-     *  org's own registered number/account. Contractor-facing notifications
+     *  org's own registered client-texting number. Contractor-facing notifications
      *  (a brand texting its own users) stay allowed either way. */
     canTextClients: orgCanTextClients(orgCustomFields),
   };
@@ -206,70 +205,37 @@ export function clearSmsLimitWarnings(): void {
   limitWarned.clear();
 }
 
-// ── Per-org sender: shared platform number, own number, or own account ─────
+// ── Per-org sender: shared platform number or a client-texting number ──────
 
 /**
  * Every org picks how its texts go out (Settings → SMS):
  *   "platform"  — the shared ConstructHUB number (default; nothing to set up)
- *   "dedicated" — the org's own number, provisioned in ConstructHUB's carrier
- *                 account: platform credentials, THEIR number in the From
- *   "byo"       — the org's own SignalWire account entirely: their space,
- *                 project, token and number, billed and 10DLC-registered to
- *                 them. The token is encrypted at rest (AES-256-GCM).
+ *   "dedicated" — a client-texting number ConstructHUB sets up on its own
+ *                 carrier account: platform credentials, THEIR number in the From
  *
- * Anything missing or malformed falls back to the platform sender rather
+ * Customers never bring their own carrier account. A legacy stored "byo"
+ * reads as "platform". Anything missing or malformed falls back to the platform sender rather
  * than failing a send — an org can never silently lose its texts to a typo.
  */
-export type OrgSmsMode = "platform" | "dedicated" | "byo";
+export type OrgSmsMode = "platform" | "dedicated";
 export type OrgSmsConfig = {
   mode: OrgSmsMode;
   fromNumber?: string | null;
-  spaceUrl?: string | null;
-  projectId?: string | null;
-  /** AES-256-GCM blob — never the raw token. */
-  apiTokenEnc?: string | null;
 };
-
-const smsBoxKey = () =>
-  createHash("sha256")
-    .update(`sms-secret-box:${process.env.SESSION_SECRET || "dev-only-insecure-session-secret"}`)
-    .digest();
-
-export function encryptSmsSecret(plain: string): string {
-  const iv = randomBytes(12);
-  const c = createCipheriv("aes-256-gcm", smsBoxKey(), iv);
-  const ct = Buffer.concat([c.update(plain, "utf8"), c.final()]);
-  return `v1.${iv.toString("base64")}.${c.getAuthTag().toString("base64")}.${ct.toString("base64")}`;
-}
-
-export function decryptSmsSecret(enc: string): string | null {
-  try {
-    const [v, iv, tag, ct] = enc.split(".");
-    if (v !== "v1") return null;
-    const d = createDecipheriv("aes-256-gcm", smsBoxKey(), Buffer.from(iv, "base64"));
-    d.setAuthTag(Buffer.from(tag, "base64"));
-    return Buffer.concat([d.update(Buffer.from(ct, "base64")), d.final()]).toString("utf8");
-  } catch {
-    return null;
-  }
-}
 
 export function orgSmsConfig(customFields: unknown): OrgSmsConfig {
   const raw = (customFields as Record<string, any> | null | undefined)?.sms;
-  const mode: OrgSmsMode =
-    raw?.mode === "dedicated" || raw?.mode === "byo" ? raw.mode : "platform";
+  // Anything but "dedicated" (including a legacy "byo") is the platform sender.
+  const mode: OrgSmsMode = raw?.mode === "dedicated" ? "dedicated" : "platform";
   return {
     mode,
     fromNumber: raw?.fromNumber ?? null,
-    spaceUrl: raw?.spaceUrl ?? null,
-    projectId: raw?.projectId ?? null,
-    apiTokenEnc: raw?.apiTokenEnc ?? null,
   };
 }
 
 export type SmsSender = {
   space: string; project: string; token: string; from: string;
-  /** Which of the three modes actually produced this sender. */
+  /** Which of the two modes actually produced this sender. */
   mode: OrgSmsMode;
 };
 
@@ -293,15 +259,6 @@ function platformSender(): Omit<SmsSender, "mode"> | null {
 export function resolveSmsSender(customFields: unknown): SmsSender | null {
   const cfg = orgSmsConfig(customFields);
   const platform = platformSender();
-
-  if (cfg.mode === "byo") {
-    const token = cfg.apiTokenEnc ? decryptSmsSecret(cfg.apiTokenEnc) : null;
-    const space = cfg.spaceUrl?.replace(/^https?:\/\//, "").replace(/\/$/, "") || null;
-    if (space && cfg.projectId && token && cfg.fromNumber) {
-      return { space, project: cfg.projectId, token, from: cfg.fromNumber, mode: "byo" };
-    }
-    return platform ? { ...platform, mode: "platform" } : null; // incomplete BYO → platform
-  }
 
   if (cfg.mode === "dedicated" && cfg.fromNumber && platform) {
     // Their number, the platform's carrier account.
@@ -355,8 +312,8 @@ export async function dedicatedSmsAllowed(orgId: string | undefined, number: str
   }
 }
 
-/** Client/homeowner texting is only allowed when the org brought its OWN
- *  registered number/account — never on the shared platform number. */
+/** Client/homeowner texting is only allowed from the org's own registered
+ *  client-texting number — never from the shared platform number. */
 export function orgCanTextClients(customFields: unknown): boolean {
   const s = resolveSmsSender(customFields);
   return !!s && s.mode !== "platform";
@@ -456,8 +413,8 @@ async function signalwireSend(to: string, body: string, sender: SmsSender): Prom
 /**
  * Send a text: SignalWire when a sender resolves, the recording log provider
  * when nothing can send — check `result.provider` before telling a user a
- * text "went out". Pass the org's customFields to use ITS sender (own number
- * or own account); omit them for platform-level sends.
+ * text "went out". Pass the org's customFields to use ITS sender (its
+ * client-texting number, if set up); omit them for platform-level sends.
  *
  * Pass orgId whenever the org is known: a number on the opt-out list (STOP)
  * is SKIPPED and reported (`ok:false`, error names the opt-out) — never
@@ -819,9 +776,8 @@ export function registerCrmSmsRoutes(app: Express, getDevUser: GetUser): void {
   /** Send a real test text — manageIntegrations only. Honest 503 when the
    *  carrier env vars are missing (the log provider is for system sends, not
    *  for pretending a test reached a phone). */
-  /** The org's own sender setup: shared platform number, own number, or own
-   *  SignalWire account. manageIntegrations only; the token is write-only
-   *  (stored encrypted, never returned). */
+  /** The org's sender setup: the shared platform number or a client-texting
+   *  number on ConstructHUB's carrier. manageIntegrations only. */
   app.put("/api/crm/sms/sender", async (req: any, res) => {
     const user = getDevUser(req, res);
     if (!user) return;
@@ -831,22 +787,15 @@ export function registerCrmSmsRoutes(app: Express, getDevUser: GetUser): void {
     if (!(await orgSmsEntitled(ctx.org.id))) return res.status(402).json(smsPlanRequired());
 
     const parsed = z.object({
-      mode: z.enum(["platform", "dedicated", "byo"]),
+      mode: z.enum(["platform", "dedicated"]),
       fromNumber: z.string().max(20).nullable().optional(),
-      spaceUrl: z.string().max(200).nullable().optional(),
-      projectId: z.string().max(100).nullable().optional(),
-      /** Raw token — encrypted here, never stored or echoed in the clear. */
-      apiToken: z.string().max(200).nullable().optional(),
     }).safeParse(req.body ?? {});
     if (!parsed.success) return res.status(400).json({ message: "Invalid SMS sender", issues: parsed.error.issues });
     const p = parsed.data;
 
     const from = p.fromNumber ? normalizePhone(p.fromNumber) : null;
     if (p.mode !== "platform" && !from) {
-      return res.status(400).json({ message: "A valid From number is required for your own number or account." });
-    }
-    if (p.mode === "byo" && !(p.spaceUrl && p.projectId)) {
-      return res.status(400).json({ message: "Your own account needs a space URL and project id." });
+      return res.status(400).json({ message: "A valid From number is required for a client-texting number." });
     }
 
     const ownerId = ctx.org.ownerUserId;
@@ -879,21 +828,7 @@ export function registerCrmSmsRoutes(app: Express, getDevUser: GetUser): void {
       if (p.mode === "platform") {
         delete cf.sms;
       } else {
-        cf.sms = {
-          mode: p.mode,
-          fromNumber: from,
-          spaceUrl: p.mode === "byo" ? p.spaceUrl : null,
-          projectId: p.mode === "byo" ? p.projectId : null,
-          // Keep the stored token when the form leaves it blank (edit without
-          // re-typing); clear it when switching away from BYO.
-          apiTokenEnc: p.mode === "byo"
-            ? (p.apiToken ? encryptSmsSecret(p.apiToken) : prior.apiTokenEnc ?? null)
-            : null,
-        };
-        if (p.mode === "byo" && !cf.sms.apiTokenEnc) {
-          res.status(400).json({ message: "Your own account needs an API token." });
-          return null;
-        }
+        cf.sms = { mode: p.mode, fromNumber: from };
       }
       const [row] = await tx.update(crmOrgs)
         .set({ customFields: cf, updatedAt: new Date() })

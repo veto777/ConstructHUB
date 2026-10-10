@@ -52,8 +52,8 @@ export type CrmPlanLimits = {
   documentsPerMonth: number;
   /** Team alert texts (shared number), segments per month. */
   teamTextSegments: number;
-  /** "none" | the customer's own carrier account or the texting add-on | numbers included. */
-  clientTexting: "none" | "byo_or_addon" | "included";
+  /** "none" | the texting add-on | numbers included. */
+  clientTexting: "none" | "addon" | "included";
   /** Client-texting numbers on our carrier that come with the plan (0 unless clientTexting is "included"). */
   textingNumbersIncluded: number;
   /** Online payments (card/ACH via Stripe) on estimates and invoices. */
@@ -142,7 +142,7 @@ export const CRM_PLANS: Record<CrmPlanKey, CrmPlan> = {
       "Everything in Basic",
       "5 seats",
       "Team alert texts — 500 segments / month",
-      "Client texting — the texting add-on, or connect your own carrier account",
+      "Client texting — the texting add-on",
       "Change orders, budget lines and job costing",
       "CRM API — 10,000 units / month",
       "Priority email support",
@@ -153,7 +153,7 @@ export const CRM_PLANS: Record<CrmPlanKey, CrmPlan> = {
       ...PLATFORM_NOT_INCLUDED,
     ],
     limits: {
-      seats: 5, clients: -1, documentsPerMonth: -1, teamTextSegments: 500, clientTexting: "byo_or_addon", textingNumbersIncluded: 0,
+      seats: 5, clients: -1, documentsPerMonth: -1, teamTextSegments: 500, clientTexting: "addon", textingNumbersIncluded: 0,
       onlinePayments: true, clientPortal: true, scheduling: true, priceBook: true, jobCosting: true,
       apiUnitsPerMonth: 10_000, jobcam: false, jobcamStorageGb: JOBCAM_INCLUDED_GB,
     },

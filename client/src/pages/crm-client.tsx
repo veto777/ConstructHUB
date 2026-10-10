@@ -1526,9 +1526,9 @@ export default function CrmClientPage() {
                     </label>
                   )}
                   {canEstimate && !e.approvedAt && !e.declinedAt && smsStatus?.canTextClients === false && c.phone && (
-                    <span className="text-xs text-muted-foreground" title="Connect your own number to text clients — Settings → Text messaging. Client texting needs your own carrier registration."
-                      data-testid={`note-send-sms-byo-${e.id}`}>
-                      Texting clients needs your own number (Settings → Text messaging)
+                    <span className="text-xs text-muted-foreground" title="Texting clients needs a client-texting number — set one up in Settings → Text messaging."
+                      data-testid={`note-send-sms-number-${e.id}`}>
+                      Texting clients needs a client-texting number (Settings → Text messaging)
                     </span>
                   )}
                   {canEstimate && !e.approvedAt && !e.declinedAt && (

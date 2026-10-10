@@ -170,7 +170,7 @@ describe("pricing display: comparison tables (shared/plan-matrix.ts)", () => {
     expect(crmByKey.jobcam.cells).toEqual({ crm_basic: "Add-on $39", crm_essentials: "Add-on $39", crm_max: true, crm_elite: true });
     expect(crmByKey.apiUnits.cells).toEqual({ crm_basic: false, crm_essentials: 10_000, crm_max: 50_000, crm_elite: 250_000 });
     expect(crmByKey.clientTexting.cells).toEqual({
-      crm_basic: false, crm_essentials: "The texting add-on, or your own carrier account", crm_max: "1 number included", crm_elite: "3 numbers included",
+      crm_basic: false, crm_essentials: "The texting add-on", crm_max: "1 number included", crm_elite: "3 numbers included",
     });
     expect(crmByKey.trial.cells.crm_basic).toBe("7 days");
     // The platform matrix has no CRM rows — the CRM is its own product.

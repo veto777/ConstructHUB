@@ -271,7 +271,7 @@ export function crmMatrixRows(): CrmMatrixRow[] {
         p.limits.clientTexting === "none" ? false
           : p.limits.clientTexting === "included"
             ? `${p.limits.textingNumbersIncluded} number${p.limits.textingNumbersIncluded === 1 ? "" : "s"} included`
-          : "The texting add-on, or your own carrier account",
+          : "The texting add-on",
     }),
     crmRow({
       key: "jobcam", label: "JobCam — job photos & video",

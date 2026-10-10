@@ -11,7 +11,7 @@ const entry: HelpDraft = {
     "Choose Send.",
     "To tick it by default: Settings → SMS → switch on “Text estimates to clients”.",
   ],
-  howItWorks: "The text goes to the mobile number on the client's page. The box only appears when texting is set up with your own number and the client has a phone number; a client without one gets the email only.",
+  howItWorks: "The text goes to the mobile number on the client's page. The box only appears when texting is set up with a client-texting number and the client has a phone number; a client without one gets the email only.",
   needs: ["A ConstructHub CRM plan — the CRM is a separate product with its own plans.", "Your own texting number set up in Settings.", "A mobile number on the client."],
 };
 export default entry;

@@ -198,7 +198,7 @@ test.describe("settings shell — desktop", () => {
     await expect(page.getByTestId("limit-teamTextSegments-included")).toContainText(L.teamTextSegments === 0 ? "Not included" : `${n(L.teamTextSegments)} / mo`);
     if (L.teamTextSegments !== 0) await expect(page.getByTestId("limit-teamTextSegments-used")).toContainText(`37 of ${n(L.teamTextSegments)} this month`);
     await expect(page.getByTestId("limit-clientTexting-included")).toContainText(
-      L.clientTexting === "none" ? "Not included" : L.clientTexting === "included" ? "included" : "carrier account",
+      L.clientTexting === "none" ? "Not included" : L.clientTexting === "included" ? "included" : "texting add-on",
     );
     // The price book carries the API allowance, so the API rows are always there (Pro: its monthly units).
     await expect(page.getByTestId("limit-apiUnitsPerMonth-included")).toContainText(`${n((PLANS.pro.limits as any).apiUnitsPerMonth)} / mo`);

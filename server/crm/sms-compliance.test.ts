@@ -1,8 +1,8 @@
 /**
  * SMS compliance pivot — the carrier-required behavior:
  *
- *   1. Client/homeowner texting is gated to orgs with their OWN registered
- *      number/account (BYO/dedicated) — never the shared platform number.
+ *   1. Client/homeowner texting is gated to orgs with their own registered
+ *      client-texting number (dedicated) — never the shared platform number.
  *   2. STOP / HELP / START inbound webhook + opt-out suppression on send.
  *   3. SMS consent capture (explicit timestamp on the member).
  *   4. Voice "check your email" nudge (calls need no carrier campaign).
@@ -85,7 +85,7 @@ afterEach(() => vi.unstubAllGlobals());
 // ── Part 1: gating, suppression seam, voice (pure / db-seam) ───────────────
 
 describe("orgCanTextClients (pure)", () => {
-  it("platform sender may NOT text clients; dedicated and BYO may; no sender may not", async () => {
+  it("platform sender may NOT text clients; dedicated may; no sender may not", async () => {
     await withSwEnv(SW_ENV, () => {
       // Platform (no org sms config) — refused even though a sender exists.
       expect(resolveSmsSender(null)?.mode).toBe("platform");
@@ -95,20 +95,10 @@ describe("orgCanTextClients (pure)", () => {
       // Dedicated: their number on the platform account.
       expect(orgCanTextClients({ sms: { mode: "dedicated", fromNumber: "+15551234567" } })).toBe(true);
 
-      // BYO: complete own-account config. Token via the module's encryptor.
-      return (async () => {
-        const { encryptSmsSecret } = await import("./sms");
-        const byo = {
-          sms: {
-            mode: "byo", fromNumber: "+15557654321",
-            spaceUrl: "acme.signalwire.com", projectId: "p1",
-            apiTokenEnc: encryptSmsSecret("tok"),
-          },
-        };
-        expect(orgCanTextClients(byo)).toBe(true);
-        // Incomplete BYO falls back to platform → still refused for clients.
-        expect(orgCanTextClients({ sms: { mode: "byo", fromNumber: "+15557654321" } })).toBe(false);
-      })();
+      // A stored legacy own-account sender reads as the shared number → refused for clients.
+      expect(orgCanTextClients({
+        sms: { mode: "byo", fromNumber: "+15557654321", spaceUrl: "acme.signalwire.com", projectId: "p1", apiTokenEnc: "v1.x.y.z" },
+      })).toBe(false);
     });
     // Nothing can send at all (no platform env, no org config) → refused.
     await withSwEnv({}, () => {
@@ -400,7 +390,7 @@ describe("SMS compliance against the dev server", () => {
     return est.body;
   }
 
-  it("platform org: the estimate-send client text is refused with the BYO reason; email still sends", async () => {
+  it("platform org: the estimate-send client text is refused with the own-number reason; email still sends", async () => {
     const status = await api("/api/crm/sms/status", {}, cookie);
     expect(status.status).toBe(200);
     expect(status.body.canTextClients).toBe(false); // dev org is on the shared number
@@ -417,52 +407,27 @@ describe("SMS compliance against the dev server", () => {
     expect(send.body.smsError).toContain("Client texting needs your own number");
   });
 
-  it("BYO org: the client text is ATTEMPTED (not gated) — and fails honestly against the unreachable account", async () => {
+  it("the own-SignalWire-account sender is gone: PUT mode \"byo\" is refused 400 and changes nothing", async () => {
     const sender = await api("/api/crm/sms/sender", {
       method: "PUT",
       body: JSON.stringify({
         mode: "byo", fromNumber: "+15550100009",
-        // Port 9 (discard) fails fast — the point is the send is ATTEMPTED,
-        // not that a fake account delivers.
         spaceUrl: "127.0.0.1:9", projectId: "proj-vitest", apiToken: "tok-vitest",
       }),
     }, cookie);
-    expect(sender.status).toBe(200);
-    expect(sender.body.canTextClients).toBe(true);
-
-    try {
-      const cust = await makeCustomer();
-      const est = await makeEstimate(cust.id);
-      const send = await api(`/api/crm/estimates/${est.id}/send`, {
-        method: "POST", body: JSON.stringify({ sms: true }),
-      }, cookie);
-      expect(send.status).toBe(200);
-      expect(send.body.emailed).toBe(true);
-      expect(send.body.smsTo).toBeTruthy(); // the send went out the door…
-      expect(send.body.smsError ?? "").not.toContain("Client texting needs your own number");
-      expect(send.body.texted).toBe(false); // …and honestly failed at the fake account
-
-      // The message-center text route is likewise no longer gated for BYO.
-      const msg = await api("/api/crm/messages", {
-        method: "POST", body: JSON.stringify({ customerId: cust.id, channel: "text", body: "hi" }),
-      }, cookie);
-      expect(msg.status).not.toBe(409);
-    } finally {
-      const back = await api("/api/crm/sms/sender", {
-        method: "PUT", body: JSON.stringify({ mode: "platform" }),
-      }, cookie);
-      expect(back.status).toBe(200);
-      expect(back.body.canTextClients).toBe(false);
-    }
+    expect(sender.status).toBe(400);
+    const status = await api("/api/crm/sms/status", {}, cookie);
+    expect(status.body.mode).not.toBe("byo");
+    expect(status.body.canTextClients).toBe(false);
   });
 
-  it("platform org: message-center text is refused 409 with the BYO reason", async () => {
+  it("platform org: message-center text is refused 409 with the own-number reason", async () => {
     const cust = await makeCustomer();
     const msg = await api("/api/crm/messages", {
       method: "POST", body: JSON.stringify({ customerId: cust.id, channel: "text", body: "hi" }),
     }, cookie);
     // No sender at all in dev → the older "not configured" refusal ALSO names
-    // a path; on a configured platform sender it's the BYO reason. Either way
+    // a path; on a configured platform sender it's the own-number reason. Either way
     // the client is NOT texted from the shared number.
     expect(msg.status).toBe(409);
   });

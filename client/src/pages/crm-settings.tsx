@@ -317,16 +317,13 @@ export default function CrmSettingsPage() {
   });
   // Which number this company's texts come FROM.
   const [senderForm, setSenderForm] = useState<{
-    mode: "platform" | "dedicated" | "byo"; fromNumber: string; spaceUrl: string; projectId: string; apiToken: string;
-  }>({ mode: "platform", fromNumber: "", spaceUrl: "", projectId: "", apiToken: "" });
+    mode: "platform" | "dedicated"; fromNumber: string;
+  }>({ mode: "platform", fromNumber: "" });
   useEffect(() => {
     const sms = (org?.customFields as any)?.sms;
     setSenderForm({
-      mode: sms?.mode === "dedicated" || sms?.mode === "byo" ? sms.mode : "platform",
+      mode: sms?.mode === "dedicated" ? "dedicated" : "platform",
       fromNumber: sms?.fromNumber ?? "",
-      spaceUrl: sms?.spaceUrl ?? "",
-      projectId: sms?.projectId ?? "",
-      apiToken: "", // write-only: never echoed back
     });
   }, [org?.customFields]);
 
@@ -334,14 +331,10 @@ export default function CrmSettingsPage() {
     mutationFn: async () => (await apiRequest("PUT", "/api/crm/sms/sender", {
       mode: senderForm.mode,
       fromNumber: senderForm.fromNumber.trim() || null,
-      spaceUrl: senderForm.spaceUrl.trim() || null,
-      projectId: senderForm.projectId.trim() || null,
-      apiToken: senderForm.apiToken.trim() || null,
     })).json(),
     onSuccess: () => {
       invalidateOrg();
       queryClient.invalidateQueries({ queryKey: ["/api/crm/sms/status"] });
-      setSenderForm((f) => ({ ...f, apiToken: "" }));
       toast({ title: "Text sender saved" });
     },
     onError: (e: any) => toast({ title: "Could not save the sender", description: apiErrorMessage(e), variant: "destructive" }),
@@ -1437,7 +1430,7 @@ export default function CrmSettingsPage() {
                     <div className="text-xs text-amber-600 dark:text-amber-400 mt-1" data-testid="text-sms-client-note">
                       The shared number texts YOUR team only (bids signed, money landed, client re-opens).
                       Texting CLIENTS needs your own number — pick "My own number" below. That number needs
-                      your own carrier registration (10DLC); carriers no longer allow a shared number to text
+                      its carrier registration (10DLC); carriers no longer allow a shared number to text
                       on behalf of many businesses.
                     </div>
                   )}
@@ -1485,7 +1478,6 @@ export default function CrmSettingsPage() {
                   ) : senderForm.mode === "dedicated" ? (
                     <SelectItem value="dedicated">My own number (set up on the website)</SelectItem>
                   ) : null}
-                  <SelectItem value="byo">My own SignalWire account (billed to me)</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -1501,34 +1493,6 @@ export default function CrmSettingsPage() {
                       Ask us to provision this number for you — it stays on ConstructHUB's carrier account.
                     </p>
                   )}
-                </div>
-              )}
-
-              {senderForm.mode === "byo" && (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="sms-space">SignalWire space URL</Label>
-                    <Input id="sms-space" placeholder="yourcompany.signalwire.com"
-                      value={senderForm.spaceUrl}
-                      onChange={(e) => setSenderForm((f) => ({ ...f, spaceUrl: e.target.value }))}
-                      data-testid="input-sms-space" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="sms-project">Project ID</Label>
-                    <Input id="sms-project" value={senderForm.projectId}
-                      onChange={(e) => setSenderForm((f) => ({ ...f, projectId: e.target.value }))}
-                      data-testid="input-sms-project" />
-                  </div>
-                  <div className="space-y-1.5 sm:col-span-2">
-                    <Label htmlFor="sms-token">API token</Label>
-                    <Input id="sms-token" type="password" placeholder="leave blank to keep the saved token"
-                      value={senderForm.apiToken}
-                      onChange={(e) => setSenderForm((f) => ({ ...f, apiToken: e.target.value }))}
-                      data-testid="input-sms-token" />
-                    <p className="text-xs text-muted-foreground">
-                      Stored encrypted and never shown again. Your texts bill to your own SignalWire account.
-                    </p>
-                  </div>
                 </div>
               )}
 
@@ -1550,9 +1514,8 @@ export default function CrmSettingsPage() {
                 clients without a mobile just get the email.
               </p>
               {smsStatus?.canTextClients === false && (
-                <p className="text-xs text-amber-600 dark:text-amber-400" data-testid="note-sms-estimates-byo">
-                  Connect your own number to text clients — "Which number your texts come from" above.
-                  Client texting needs your own carrier registration.
+                <p className="text-xs text-amber-600 dark:text-amber-400" data-testid="note-sms-estimates-number">
+                  Clients are texted from a client-texting number — set one up in "Which number your texts come from" above.
                 </p>
               )}
             </div>

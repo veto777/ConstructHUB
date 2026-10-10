@@ -67,8 +67,8 @@ export type PlanLimits = {
   agencySeats: number;
   /** Team alert texts (shared number), segments per month. */
   teamTextSegments: number;
-  /** "none" | bring-your-own SignalWire or the texting add-on | one number included. */
-  clientTexting: "none" | "byo_or_addon" | "included";
+  /** "none" | the texting add-on | numbers included. */
+  clientTexting: "none" | "addon" | "included";
   /** AI review replies may publish without a human approving each one. */
   autoPublishAiReplies: boolean;
   reviewTemplates: number;
@@ -350,7 +350,7 @@ export const PLANS: Record<PlanKey, Plan> = {
     limits: {
       locations: 1, clientWorkspaces: 0, guardCadenceMinutes: 60, gridCredits: 3, gridCreditsPerLocation: 0, competitorScans: 1,
       protectedSites: 1, siteScans: 2, siteScansPerLocation: 0, permitSearches: 10, agencySeats: 1,
-      teamTextSegments: 200, clientTexting: "byo_or_addon", textingNumbersIncluded: 0, autoPublishAiReplies: false, reviewTemplates: 5,
+      teamTextSegments: 200, clientTexting: "addon", textingNumbersIncluded: 0, autoPublishAiReplies: false, reviewTemplates: 5,
       apiUnitsPerMonth: 0, apiRatePerMinute: 60, historyDays: 90, gabeQuestions: 100,
       ...SEO_PLAN_LIMITS.starter,
     },
@@ -385,7 +385,7 @@ export const PLANS: Record<PlanKey, Plan> = {
     limits: {
       locations: 10, clientWorkspaces: 0, guardCadenceMinutes: 30, gridCredits: 10, gridCreditsPerLocation: 0, competitorScans: 5,
       protectedSites: 3, siteScans: 5, siteScansPerLocation: 0, permitSearches: 50, agencySeats: 3,
-      teamTextSegments: 500, clientTexting: "byo_or_addon", textingNumbersIncluded: 0, autoPublishAiReplies: false, reviewTemplates: 20,
+      teamTextSegments: 500, clientTexting: "addon", textingNumbersIncluded: 0, autoPublishAiReplies: false, reviewTemplates: 20,
       apiUnitsPerMonth: 0, apiRatePerMinute: 60, historyDays: 90, gabeQuestions: 300,
       ...SEO_PLAN_LIMITS.team,
     },
@@ -428,7 +428,7 @@ export const PLANS: Record<PlanKey, Plan> = {
     limits: {
       locations: 25, clientWorkspaces: 0, guardCadenceMinutes: 15, gridCredits: 20, gridCreditsPerLocation: 0, competitorScans: 10,
       protectedSites: 10, siteScans: 15, siteScansPerLocation: 0, permitSearches: 100, agencySeats: 5,
-      teamTextSegments: 1000, clientTexting: "byo_or_addon", textingNumbersIncluded: 0, autoPublishAiReplies: true, reviewTemplates: 20,
+      teamTextSegments: 1000, clientTexting: "addon", textingNumbersIncluded: 0, autoPublishAiReplies: true, reviewTemplates: 20,
       apiUnitsPerMonth: 50_000, apiRatePerMinute: 60, historyDays: 365, gabeQuestions: 1000,
       ...SEO_PLAN_LIMITS.pro,
     },

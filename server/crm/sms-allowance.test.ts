@@ -142,9 +142,9 @@ describe("dedicated sender allocation", () => {
     expect(res.body.message).toContain("Your account includes 1 client-texting number");
     expect(state.update).not.toHaveBeenCalled();
   });
-  it.each(["byo", "platform"])("checks a same-number switch from %s at capacity", async (mode) => {
+  it("checks a same-number switch from the shared number at capacity", async () => {
     plans("starter", "crm_essentials");
-    state.org.customFields = { sms: { mode, fromNumber: number } };
+    state.org.customFields = { sms: { mode: "platform", fromNumber: number } };
     expect((await save()).statusCode).toBe(403);
     expect(state.execute).toHaveBeenCalledTimes(2);
     const query = new PgDialect().sqlToQuery(state.execute.mock.calls[1][0]);
@@ -154,8 +154,8 @@ describe("dedicated sender allocation", () => {
     expect(query.params).toEqual([7]);
     expect(state.update).not.toHaveBeenCalled();
   });
-  it("allows a same-number BYO switch when the allowance has room", async () => {
-    state.org.customFields = { sms: { mode: "byo", fromNumber: number } };
+  it("allows a same-number switch from the shared number when the allowance has room", async () => {
+    state.org.customFields = { sms: { mode: "platform", fromNumber: number } };
     expect((await save()).statusCode).toBe(200);
     expect(state.execute).toHaveBeenCalledTimes(2);
   });
@@ -199,7 +199,7 @@ describe("dedicated sender allocation", () => {
     expect((await save()).statusCode).toBe(200);
   });
   it("allows reuse of a number already dedicated elsewhere on this account", async () => {
-    state.org.customFields = { sms: { mode: "byo", fromNumber: number } };
+    state.org.customFields = { sms: { mode: "platform", fromNumber: number } };
     state.used = 1;
     state.assigned = true;
     expect((await save()).statusCode).toBe(200);

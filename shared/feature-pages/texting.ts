@@ -12,8 +12,8 @@ import { CLIENT_NUMBER_INCLUDED_PLANS, CRM_TEXTING_PLANS, CRM_TEXT_SEGMENTS_LINE
  *     the 1st (UTC) when spent: server/crm/sms.ts (planIncludesTexting, orgSmsEntitled, reserveSmsSegments,
  *     sendSms), server/growth-quotas.ts (texts → teamTextSegments)
  *   - segments as the carrier bills them (GSM-7 vs UCS-2): server/crm/sms-segments.ts
- *   - three senders (shared number / own number on our carrier, provisioned on request / own SignalWire
- *     account, token encrypted), client texts only from an own number: server/crm/sms.ts resolveSmsSender,
+ *   - two senders (shared number / own number on our carrier, provisioned on request; no customer-owned
+ *     carrier accounts), client texts only from an own number: server/crm/sms.ts resolveSmsSender,
  *     orgCanTextClients, PUT /api/crm/sms/sender; client/src/pages/crm-settings.tsx (SMS card)
  *   - event alerts per channel (in-app / email / text): shared/schema.ts CRM_NOTIFICATION_PREFS,
  *     server/crm/notify.ts, server/crm/sms.ts textOrgOwners
@@ -82,7 +82,7 @@ const page: FeaturePage = {
     {
       icon: "phone",
       title: "A number of your own",
-      body: "A number we set up for you on ConstructHUB's carrier, or your own carrier account billed to you. Your account's token is stored encrypted.",
+      body: "A number we set up for you on ConstructHUB's carrier.",
     },
     {
       icon: "shield-check",
@@ -117,7 +117,7 @@ const page: FeaturePage = {
   faqs: [
     {
       q: "What do I need to text my clients?",
-      a: `A number of your own. Carriers no longer let one shared number text on behalf of many businesses, so the shared ConstructHUB number only texts your own team. ${CLIENT_NUMBER_INCLUDED_PLANS} each include a client-texting number we set up for you; on the ${NUMBER_ADDON} platform plans it is the ${ADDONS.texting_number.name} add-on. You can also connect your own carrier account. Either way, the number needs its carrier registration (10DLC).`,
+      a: `A number of your own. Carriers no longer let one shared number text on behalf of many businesses, so the shared ConstructHUB number only texts your own team. ${CLIENT_NUMBER_INCLUDED_PLANS} each include a client-texting number we set up for you; on the ${NUMBER_ADDON} platform plans it is the ${ADDONS.texting_number.name} add-on. The number needs its carrier registration (10DLC).`,
     },
     {
       q: "Which plans include texting, and how many texts?",
@@ -138,8 +138,8 @@ const page: FeaturePage = {
   ],
   // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"):
   // the alert events and channels: shared/schema.ts CRM_NOTIFICATION_PREFS, server/crm/notify.ts; client texts: server/crm/portal.ts,
-  // server/crm/sms.ts, server/crm/messages.ts; the senders, encrypted BYO token, client texts never from the shared number, an
-  // incomplete own account falling back to the shared one: server/crm/sms.ts resolveSmsSender, orgCanTextClients; segment sizes
+  // server/crm/sms.ts, server/crm/messages.ts; the two senders, client texts never from the shared number:
+  // server/crm/sms.ts resolveSmsSender, orgCanTextClients; segment sizes
   // (160/153, 70/67, one character switches the whole text): server/crm/sms-segments.ts; reserve before send, refund on a
   // carrier refusal, a spent month skipped: server/crm/sms.ts sendSms / reserveSmsSegments; STOP words, START, HELP, opted-out
   // numbers never texted, other replies not shown: server/crm/sms.ts inbound webhook, isSmsOptedOut.
@@ -151,9 +151,8 @@ const page: FeaturePage = {
         "go to homeowners: the estimate link when you send it, a reminder about an estimate that's still waiting, or a " +
         "quick message.",
       "Which number a text comes from matters. Team alerts can use the shared ConstructHUB number with nothing to set " +
-        "up. Texting clients needs a number of your own: a number set up for you on ConstructHUB's carrier, or your own " +
-        "carrier account, whose token is stored encrypted. The CRM never sends a client text from the shared number. " +
-        "If your own account's details are incomplete, texts fall back to the shared number, which only texts your team.",
+        "up. Texting clients needs a number of your own: a number set up for you on ConstructHUB's carrier. The CRM never " +
+        "sends a client text from the shared number, which only texts your team.",
       "Texts are counted in segments, the unit carriers bill. A plain text fits 160 characters in one segment and 153 " +
         "in each segment after that. A single emoji, a curly quote or most accented capital letters switch the whole text " +
         "to a different encoding: 70 characters in one segment and 67 in each one after. Every text your CRM sends is counted " +

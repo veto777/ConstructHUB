@@ -229,10 +229,10 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("monthly text allow
   // crm_plan_required without one (server/crm/tenancy.ts). CRM Basic adds no
   // text allowance, so the Pro owner's monthly cap stays the platform plan's
   // teamTextSegments. `plan` null = no platform plan (no texting entitlement).
-  async function account(plan: string | null, crmPlan = "crm_basic"): Promise<Account> {
+  async function account(plan: string | null, crmPlan = "crm_basic", addons: Record<string, number> = {}): Promise<Account> {
     const { rows: [user] } = await db.query("insert into users(email,display_name,email_verified) values($1,'P-Text meter',true) returning id", [`p-sms-meter-${randomUUID()}@example.invalid`]);
     users.push(user.id);
-    if (plan) await db.query("insert into subscriptions(user_id,plan,status,stripe_subscription_id) values($1,$2,'active',$3)", [user.id, plan, `sub_p_${randomUUID()}`]);
+    if (plan) await db.query("insert into subscriptions(user_id,plan,status,stripe_subscription_id,addons) values($1,$2,'active',$3,$4)", [user.id, plan, `sub_p_${randomUUID()}`, JSON.stringify(addons)]);
     await db.query("insert into crm_subscriptions(user_id,plan,status) values($1,$2,'active')", [user.id, crmPlan]);
     const sid = randomUUID(); sids.push(sid);
     await db.query("insert into session(sid,sess,expire) values($1,$2,now()+interval '1 hour')", [sid, JSON.stringify({ cookie: { maxAge: 3600000 }, passport: { user: user.id } })]);
@@ -271,11 +271,12 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("monthly text allow
     if (!ready) throw new Error("Text meter test server did not start");
     // CRM Basic only (no platform plan): the owner has no texting plan.
     noTextPlan = await account(null);
-    pro = await account("pro");
-    // The Pro org texts clients from its own (unreachable) SignalWire account.
-    const sender = await api("/api/crm/sms/sender", pro, "PUT", { mode: "byo", fromNumber: "+15550106666", spaceUrl: "127.0.0.1:9", projectId: "p-meter-byo", apiToken: "tok-p-meter" });
+    // The texting-number add-on grants no text segments, so the cap stays Pro's.
+    pro = await account("pro", "crm_basic", { texting_number: 1 });
+    // The Pro org texts clients from a client-texting number on the (unreachable) platform carrier.
+    const sender = await api("/api/crm/sms/sender", pro, "PUT", { mode: "dedicated", fromNumber: "+15550106666" });
     expect(sender.status).toBe(200);
-    expect(sender.body).toMatchObject({ mode: "byo", canTextClients: true, planAllowsSms: true });
+    expect(sender.body).toMatchObject({ mode: "dedicated", canTextClients: true, planAllowsSms: true });
   }, 90_000);
 
   afterAll(async () => {

@@ -264,11 +264,11 @@ export function LimitsUsageSection({ go }: SettingsSectionProps) {
           key: "clientTexting",
           label: "Two-way client texting",
           // A platform admin can't buy the add-on (the button is hidden) and texting is on (orgSmsEntitled).
-          included: admin ? "Included (own or dedicated number)"
+          included: admin ? "Included (dedicated number)"
             : allowances.clientTexting === "none" ? "Not included"
             : allowances.clientTexting === "included"
               ? `${allowances.textingNumbersIncluded || 1} number${(allowances.textingNumbersIncluded || 1) === 1 ? "" : "s"} included`
-            : "Your own carrier account or the texting add-on",
+            : "The texting add-on",
           excluded: allowances.clientTexting === "none",
           used: null,
           addon: allowances.clientTexting === "none" ? undefined : "texting_number",
