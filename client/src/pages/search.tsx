@@ -117,7 +117,7 @@ function parseDate(dateStr: string | null | undefined): Date | null {
 
 export default function SearchPage() {
   const { toast } = useToast();
-  const [showMap, setShowMap] = useState(false);
+  const [showMap, setShowMap] = useState(true);
   const searchBoxRef = useRef<HTMLDivElement>(null);
   // A dot on the coverage map prefills the search scope for that jurisdiction, then
   // brings the search box into view — the owner's "find them manually" path.
