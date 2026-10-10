@@ -87,3 +87,8 @@ registerAdapter(legacy("eTRAKiT", [], ["permit", "name", "company"]));
 registerAdapter(legacy("Accela", ["Accela Citizen Access"], ["address", "permit", "name"]));
 registerAdapter(legacy("Click2Gov", [], ["address", "permit", "name"]));
 registerAdapter(legacy("FTG Portal", [], ["name", "company"]));
+
+import cityviewAdapter from "./cityview";
+registerAdapter(cityviewAdapter);
+import govpilotAdapter from "./govpilot";
+registerAdapter(govpilotAdapter);
