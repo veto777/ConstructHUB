@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
+import { PortalBlockedError } from './polite-fetch';
 import adapter, { parsePermitlinkTable, permitlinkDate, permitlinkFilters, permitlinkUrl } from './permitlink';
 import type { AdapterCtx } from './types';
 const ctx: AdapterCtx = { databaseId: 7, databaseName: 'Thompson', jurisdiction: 'Thompson, CT', searchUrl: 'https://permitlinkusa-online.com/csp/thompsonct/DocumentLink.PublicLogin.cls', portalUrl: null, browser: vi.fn(), log: vi.fn(), politeness: { minDelayMs: 1000 } };
@@ -22,7 +23,7 @@ describe('PermitLink guest permits', () => {
     expect(out.records.some(r => r.permitNumber === 'Draft')).toBe(false);
     const record = out.records.find(r => r.permitNumber === '26-35IWA')!;
     expect(record).toMatchObject({ address: '0 WEST THOMPSON RD', status: 'Closed', issuedAt: null, contractorName: null, sourceUrl: null });
-    expect(record.raw?.html).toContain('zenvalue=');
+    expect(record.raw?.html).toContain('zenValue=');
   });
   it('parses a captured filtered DOM without returning stale initial rows', () => {
     const out = parsePermitlinkTable(fixture('thompson-filtered-dom.html'), ctx);
@@ -40,4 +41,37 @@ describe('PermitLink guest permits', () => {
     expect(await adapter.listRecent(ctx, '2026-10-03')).toEqual([]);
     expect(ctx.browser).not.toHaveBeenCalled();
   });
+  it('normalizes real Deep River and Middlefield issue dates', () => {
+    const deep = parsePermitlinkTable(fixture('deepriver-guest.html'), { ...ctx, jurisdiction: 'Deep River, CT' });
+    const middle = parsePermitlinkTable(fixture('middlefield-guest.html'), { ...ctx, jurisdiction: 'Middlefield, CT' });
+    expect(deep.records.find(r => r.permitNumber === '26-2D')).toMatchObject({ address: '103 UNION ST', status: 'Approved', issuedAt: '2026-10-07', contractorName: null });
+    expect(middle.records.find(r => r.permitNumber === '26-24P')).toMatchObject({ address: '11 CIDER MILL RD', status: 'Approved', issuedAt: '2026-10-07' });
+  });
+  it('returns no records only when a real empty table is present', () => {
+    const out = parsePermitlinkTable(fixture('thompson-empty-dom.html'), ctx);
+    expect(out).toEqual({ records: [], rowIds: [] });
+  });
+  it('keeps the original response row byte-for-byte', () => {
+    const html = fixture('thompson-guest.html');
+    const out = parsePermitlinkTable(html, ctx);
+    expect(html).toContain(out.records[0].raw!.html);
+  });
+
+  it('throws a typed block and closes its browser context on HTTP 403', async () => {
+    const listeners: Record<string, (...args: any[]) => void> = {};
+    const page = {
+      setDefaultTimeout: vi.fn(), on: vi.fn((event, callback) => { listeners[event] = callback; }),
+      goto: vi.fn(async () => listeners.response({ status: () => 403, url: () => ctx.searchUrl, request: () => ({ resourceType: () => 'document' }) })),
+    };
+    const browser = { route: vi.fn(), newPage: vi.fn(async () => page), close: vi.fn() };
+    await expect(adapter.search({ ...ctx, browser: vi.fn(async () => browser as any) }, { type: 'permit', value: '26-35IWA' })).rejects.toBeInstanceOf(PortalBlockedError);
+    expect(browser.close).toHaveBeenCalledOnce();
+  });
+  it('closes the browser on a navigation failure instead of reporting no matches', async () => {
+    const page = { setDefaultTimeout: vi.fn(), on: vi.fn(), goto: vi.fn().mockRejectedValue(new Error('Connection failed')) };
+    const browser = { route: vi.fn(), newPage: vi.fn(async () => page), close: vi.fn() };
+    await expect(adapter.search({ ...ctx, browser: vi.fn(async () => browser as any) }, { type: 'address', value: 'Main' })).rejects.toThrow('Connection failed');
+    expect(browser.close).toHaveBeenCalledOnce();
+  });
+
 });

@@ -15,8 +15,8 @@ export function govwellTenant(input: string): { origin: string; slug: string } {
   return { origin: 'https://app.govwell.com', slug };
 }
 
-export const GOVWELL_DASHBOARDS_QUERY = `query($slug:String!){organizationBySlug(slug:$slug){id slug publishedViewDashboards{id uuid name recordType{id} views{id viewType columns{columnTemplateGeneratedId displayLabel} filters{columnTemplateGeneratedId}}}}}`;
-export const GOVWELL_ROWS_QUERY = `query($dashboardId:Int!,$inputs:[GetViewDashboardViewDataInput!]!){getViewsDataForViewDashboard(dashboardId:$dashboardId,inputs:$inputs){totalCount rows{id record{id uuid identifier issuedIdentifier isDraft isTest submittedAt expirationDate displayStatus{name} recordTemplate{name recordType{isContact isViolationsModule}} mainBackwardsCompatibleLocationInformation{address{str} parcelDisplayName propertyOwner}} columns{__typename ... on ViewDataElementDate{date} ... on ViewDataElementDateTime{dateTime} ... on ViewDataElementString{string} ... on ViewDataElementFieldType{field{label type str num date contact{firstName lastName companyName} record{recordTemplate{name} applicantCompanyOrRequestedToJoinCompany{name} applicantUser{firstName lastName}}}}}}}}`;
+export const GOVWELL_DASHBOARDS_QUERY = `query($slug:String!){organizationBySlug(slug:$slug){id slug publishedViewDashboards{id uuid name recordType{id} views{id viewType columns{columnTemplateGeneratedId displayLabel} filters{columnTemplateGeneratedId bool isNull date{type exactStart exactEnd exactStartDateTime exactEndDateTime shouldIncludeTime relativeToTodayCount relativeToTodayDelayType relativeToTodayDirection} number{comparison number} membership{type optionsSelected}}}}}}`;
+export const GOVWELL_ROWS_QUERY = `query($dashboardId:Int!,$inputs:[GetViewDashboardViewDataInput!]!){getViewsDataForViewDashboard(dashboardId:$dashboardId,inputs:$inputs){totalCount rows{id record{id uuid identifier issuedIdentifier isDraft isTest submittedAt expirationDate displayStatus{name} recordTemplate{name recordType{isContact isViolationsModule}} mainBackwardsCompatibleLocationInformation{address{str} parcelDisplayName propertyOwner}} columns{__typename ... on ViewDataElementDate{date} ... on ViewDataElementDateTime{dateTime} ... on ViewDataElementString{string} ... on ViewDataElementCompany{company{name}} ... on ViewDataElementUser{user{firstName lastName}} ... on ViewDataElementFieldType{field{label type str num date contact{firstName lastName companyName} record{recordTemplate{name} applicantCompanyOrRequestedToJoinCompany{name} applicantUser{firstName lastName}}}}}}}}`;
 
 async function graphql(ctx: AdapterCtx, query: string, variables: Json): Promise<Json> {
   const { origin } = govwellTenant(ctx.searchUrl);
@@ -33,21 +33,47 @@ async function graphql(ctx: AdapterCtx, query: string, variables: Json): Promise
 const str = (v: unknown): string | null => typeof v === 'string' && v.trim() ? v.trim() : null;
 export function govwellDate(v: unknown): string | null {
   const s = str(v);
-  return s && /^\d{4}-\d{2}-\d{2}(?:T.*)?$/.test(s) && Number.isFinite(Date.parse(s)) ? s : null;
+  if (!s || !/^\d{4}-\d{2}-\d{2}(?:T.*)?$/.test(s) || !Number.isFinite(Date.parse(s))) return null;
+  const calendarDay = new Date(s.slice(0, 10));
+  return Number.isFinite(calendarDay.getTime()) && calendarDay.toISOString().slice(0, 10) === s.slice(0, 10) ? s : null;
+}
+
+/** Public record-reference labels explicitly separate number, contact, company and submission date. */
+export function govwellContractor(field: Json): string | null {
+  if (!/contractor/i.test(field.record?.recordTemplate?.name ?? '')) return null;
+  const structured = str(field.record?.applicantCompanyOrRequestedToJoinCompany?.name)
+    ?? str([field.record?.applicantUser?.firstName, field.record?.applicantUser?.lastName].filter(Boolean).join(' '));
+  if (structured) return structured;
+  const parts = str(field.str)?.split(' | ');
+  if (!parts || !/^#/.test(parts[0]) || !/^Submitted \d{1,2}\/\d{1,2}\/\d{2,4}$/.test(parts[parts.length - 1])) return null;
+  return parts.length === 4 ? str(parts[2]) : parts.length === 3 ? str(parts[1]) : null;
+}
+
+export function govwellDateFilter(column: 'RecordIssuedDate' | 'RecordSubmittedDate', since: string) {
+  if (!govwellDate(since)) throw new Error('GovWell recent listing requires an ISO date');
+  return [{ columnTemplateGeneratedId: column, date: { type: 'Exact', exactStart: since.slice(0, 10) } }];
 }
 
 /** columns are positional and tenant-defined; never reuse another tenant's field IDs. */
 export function parseGovwellRow(row: Json, view: GovWellView, ctx: AdapterCtx): PermitRecord | null {
   const r = row.record;
   if (!r) throw new Error('GovWell record dashboard returned a row without a record');
-  if (r.isDraft || r.isTest || r.recordTemplate?.recordType?.isContact || r.recordTemplate?.recordType?.isViolationsModule) return null;
+  if (r.isDraft || r.isTest || r.recordTemplate?.recordType?.isViolationsModule) return null;
   const permitNumber = str(r.issuedIdentifier) ?? str(r.identifier);
   if (!permitNumber) throw new Error('GovWell record missing its identifier');
   if (!Array.isArray(row.columns) || row.columns.length !== view.columns.length) throw new Error('GovWell dashboard columns changed');
   const byId = (id: string): Json[] => row.columns[view.columns.findIndex(c => c.columnTemplateGeneratedId === id)] ?? [];
   const fields: Json[] = row.columns.flat().flatMap((v: Json) => v?.field ? [v.field] : []);
   const contactName = (f: Json) => str(f.contact?.companyName) ?? str([f.contact?.firstName, f.contact?.lastName].filter(Boolean).join(' ')) ?? (f.type === 'Record' ? null : str(f.str));
-  const contractor = fields.filter(f => /contractor/i.test(f.label)).map(f => contactName(f) ?? (/contractor/i.test(f.record?.recordTemplate?.name ?? '') ? str(f.record?.applicantCompanyOrRequestedToJoinCompany?.name) ?? str([f.record?.applicantUser?.firstName, f.record?.applicantUser?.lastName].filter(Boolean).join(' ')) : null)).filter(Boolean);
+  const contractor = fields.filter(f => /contractor/i.test(f.label) && !/license/i.test(f.label)).map(f => contactName(f) ?? govwellContractor(f)).filter(Boolean);
+  view.columns.forEach((column, index) => {
+    if (/contractor/i.test(column.displayLabel) && !/license/i.test(column.displayLabel)) {
+      for (const element of row.columns[index] ?? []) {
+        const name = str(element.string) ?? str(element.company?.name) ?? (element.field ? contactName(element.field) ?? govwellContractor(element.field) : null);
+        if (name) contractor.push(name);
+      }
+    }
+  });
   const location = r.mainBackwardsCompatibleLocationInformation;
   const { origin, slug } = govwellTenant(ctx.searchUrl);
   const valuation = fields.find(f => /(?:estimated.*cost|cost.*construction|valuation)/i.test(f.label) && f.type === 'Currency');
@@ -63,7 +89,7 @@ export function parseGovwellRow(row: Json, view: GovWellView, ctx: AdapterCtx): 
     valuation: typeof valuation?.num === 'number' && Number.isFinite(valuation.num) ? valuation.num : null,
     contractorName: contractor.length ? [...new Set(contractor)].join('; ') : null,
     contractorLicense: str(fields.find(f => /contractor.*license|license.*number/i.test(f.label))?.str),
-    applicantName: fields.find(f => /^applicant$/i.test(f.label)) ? contactName(fields.find(f => /^applicant$/i.test(f.label))!) : null,
+    applicantName: (fields.find(f => /^applicant$/i.test(f.label)) ? contactName(fields.find(f => /^applicant$/i.test(f.label))!) : null) ?? str(byId('RecordApplicant')[0]?.string) ?? str([byId('RecordApplicant')[0]?.user?.firstName, byId('RecordApplicant')[0]?.user?.lastName].filter(Boolean).join(' ')),
     ownerName: str(location?.propertyOwner) ?? (fields.find(f => /property owner/i.test(f.label)) ? contactName(fields.find(f => /property owner/i.test(f.label))!) : null),
     sourceUrl: str(r.uuid) ? `${origin}/${slug}/public-record/${encodeURIComponent(r.uuid)}` : null,
     raw: row,
@@ -79,19 +105,23 @@ async function dashboards(ctx: AdapterCtx): Promise<{ dashboard: Dashboard; view
   const org = data.organizationBySlug;
   if (!org || org.slug !== slug || !Array.isArray(org.publishedViewDashboards)) throw new Error('GovWell tenant not found or invalid dashboard response');
   if (!org.publishedViewDashboards.length) throw new Error('GovWell tenant has no published public record dashboards');
-  return org.publishedViewDashboards.map((dashboard: Dashboard) => {
-    const view = dashboard.views.find(v => v.viewType === 'RecordsForPublicInModule' && v.filters.length === 0);
-    if (!view) throw new Error(`GovWell dashboard ${dashboard.name} has no supported unfiltered public record view`);
-    return { dashboard, view };
-  });
+  const selected: { dashboard: Dashboard; view: GovWellView }[] = [];
+  for (const dashboard of org.publishedViewDashboards as Dashboard[]) {
+    const publicViews = dashboard.views.filter(v => v.viewType === 'RecordsForPublicInModule');
+    if (!publicViews.length) throw new Error(`GovWell dashboard ${dashboard.name} has no supported public record view`);
+    const all = publicViews.find(v => v.filters.length === 0);
+    for (const view of all ? [all] : publicViews) selected.push({ dashboard, view });
+  }
+  return selected;
 }
 async function collect(ctx: AdapterCtx, dashboard: Dashboard, view: GovWellView, value: string, filters: unknown[] = []): Promise<PermitRecord[]> {
   const out: PermitRecord[] = [];
   const ids = new Set<unknown>();
   for (let offset = 0; offset < 10000; offset += 50) {
-    const data = await graphql(ctx, GOVWELL_ROWS_QUERY, govwellSearchRequest(dashboard.id, view.id, value, offset, filters));
+    const data = await graphql(ctx, GOVWELL_ROWS_QUERY, govwellSearchRequest(dashboard.id, view.id, value, offset, [...view.filters, ...filters]));
     const result = data.getViewsDataForViewDashboard?.[0];
     if (!result || !Number.isInteger(result.totalCount) || result.totalCount < 0 || !Array.isArray(result.rows)) throw new Error('Malformed GovWell record page');
+    if (offset === 0) ctx.log(`Public dashboard ${dashboard.name}, view ${view.id}: ${result.totalCount} matching rows`);
     for (const row of result.rows) {
       if (ids.has(row.id)) throw new Error('GovWell repeated a row during pagination; retry search');
       ids.add(row.id);
@@ -106,7 +136,7 @@ async function collect(ctx: AdapterCtx, dashboard: Dashboard, view: GovWellView,
 const adapter: PortalAdapter = {
   platform: 'GovWell',
   aliases: ['GovWell permit portal', 'GovWell Permit Portal', 'GovWell online permitting', 'GovWell online building permit applications', 'GovWell building permit application', 'GovWell (Butte-Silver Bow permitting portal)', 'GovWell (Bellevue Permits Portal)', 'GovWell (town zoning permits)', 'GovWell online permits'],
-  capabilities: { search: ['address', 'permit'], listRecent: false, detail: false },
+  capabilities: { search: ['address', 'permit', 'company', 'name', 'keyword'], listRecent: true, detail: true },
   async search(ctx, q) {
     govwellTenant(ctx.searchUrl);
     if (!adapter.capabilities.search.includes(q.type)) throw new Error(`GovWell does not support ${q.type} search`);
@@ -115,12 +145,35 @@ const adapter: PortalAdapter = {
     const out = new Map<string, PermitRecord>();
     for (const { dashboard, view } of await dashboards(ctx)) {
       for (const record of await collect(ctx, dashboard, view, value)) {
-        const field = q.type === 'permit' ? record.permitNumber : record.address;
-        if (field?.toLowerCase().includes(value.toLowerCase())) out.set(record.sourceUrl ?? record.permitNumber, record);
+        const companyIndex = view.columns.findIndex(c => c.columnTemplateGeneratedId === 'RecordApplicantCompany');
+        const companies = ((record.raw?.columns as Json[][])[companyIndex] ?? []).map(e => e.company?.name ?? e.string).filter(Boolean);
+        const field = q.type === 'permit' ? record.permitNumber : q.type === 'address' ? record.address : q.type === 'company' ? [record.contractorName, ...companies].filter(Boolean).join(' ') : [record.applicantName, record.ownerName, record.contractorName].filter(Boolean).join(' ');
+        if (q.type === 'keyword' || field?.toLowerCase().includes(value.toLowerCase())) out.set(record.sourceUrl ?? record.permitNumber, record);
       }
     }
     return [...out.values()];
   },
-  async listRecent(ctx) { govwellTenant(ctx.searchUrl); return []; },
+  async listRecent(ctx, since) {
+    govwellTenant(ctx.searchUrl);
+    // Two server-side date queries implement issued OR submitted, never a text-search scan.
+    const filters = [govwellDateFilter('RecordIssuedDate', since), govwellDateFilter('RecordSubmittedDate', since)];
+    const out = new Map<string, PermitRecord>();
+    for (const { dashboard, view } of await dashboards(ctx)) {
+      for (let i = 0; i < filters.length; i++) {
+        for (const record of await collect(ctx, dashboard, view, '', filters[i])) {
+          if (i === 0 && record.issuedAt?.includes('T') && Date.parse(record.issuedAt) < Date.parse(since)) continue;
+          if (i === 1 && (!record.appliedAt || Date.parse(record.appliedAt) < Date.parse(since))) continue;
+          out.set(record.sourceUrl ?? record.permitNumber, record);
+        }
+      }
+    }
+    return [...out.values()];
+  },
+  async detail(ctx, permitNumber) {
+    const matches = (await adapter.search(ctx, { type: 'permit', value: permitNumber }))
+      .filter(r => r.permitNumber.toLowerCase() === permitNumber.trim().toLowerCase());
+    if (matches.length > 1) throw new Error('GovWell permit number is ambiguous across public dashboards');
+    return matches[0] ?? null;
+  },
 };
 export default adapter;

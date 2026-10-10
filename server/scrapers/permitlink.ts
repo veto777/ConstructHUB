@@ -28,7 +28,7 @@ export function permitlinkFilters(type: string, value: string): Record<string, s
 
 /** Preserve each complete HTML row, including its government-side document ID. */
 export function parsePermitlinkTable(html: string, ctx: AdapterCtx): { records: PermitRecord[]; rowIds: string[] } {
-  const $ = cheerio.load(html);
+  const $ = cheerio.load(html, { sourceCodeLocationInfo: true });
   const headers = $('th[id^="th_"]').map((_, e) => $(e).attr('id')!.replace(/^th_/, '').replace(/_\d+$/, '')).get();
   if (!headers.includes('PermitID') || !headers.includes('Location')) throw new Error('PermitLink public permit table missing or changed');
   const records: PermitRecord[] = [];
@@ -50,7 +50,7 @@ export function parsePermitlinkTable(html: string, ctx: AdapterCtx): { records: 
       issuedAt: permitlinkDate(values.Issued ?? ''), appliedAt: permitlinkDate(values.Applied ?? ''), expiresAt: null,
       valuation: null, contractorName: text('Contractor'), contractorLicense: null,
       applicantName: null, ownerName: text('Owner'), sourceUrl: null,
-      raw: { html: $.html(e) },
+      raw: { html: e.sourceCodeLocation ? html.slice(e.sourceCodeLocation.startOffset, e.sourceCodeLocation.endOffset) : $.html(e) },
     });
   });
   return { records, rowIds };
@@ -69,12 +69,29 @@ const adapter: PortalAdapter = {
       // Also retain the honest header on every routed request.
       // ZEN's broker serializes per-session state. Use its own public read-only UI,
       // with every request rate-limited, rather than replay opaque session tokens.
+      let requestQueue = Promise.resolve();
       await browser.route('**/*', async route => {
         const request = route.request();
-        if (failure || new URL(request.url()).hostname !== new URL(url).hostname || ['image', 'font', 'stylesheet', 'media'].includes(request.resourceType())) return route.abort();
-        await rateLimitHost(request.url(), Math.max(1000, ctx.politeness.minDelayMs));
-        if (failure) return route.abort();
-        await route.continue({ headers: { ...request.headers(), 'user-agent': USER_AGENT } });
+        if (failure || !/^(?:www\.)?permitlink(?:online|usa-online|usaonline)\.com$/i.test(new URL(request.url()).hostname) || ['image', 'font', 'stylesheet', 'media'].includes(request.resourceType())) return route.abort();
+        const pending = requestQueue.then(async () => {
+          await rateLimitHost(request.url(), Math.max(1000, ctx.politeness.minDelayMs));
+          if (failure) { await route.abort(); return; }
+          // Wait for completion as well as spacing starts: only one vendor request in flight.
+          let done!: () => void;
+          const finished = new Promise<void>(resolve => { done = resolve; });
+          const onFinished = (r: typeof request) => { if (r === request) done(); };
+          browser.on('requestfinished', onFinished);
+          browser.on('requestfailed', onFinished);
+          try {
+            await route.continue({ headers: { ...request.headers(), 'user-agent': USER_AGENT } });
+            await finished;
+          } finally {
+            browser.off('requestfinished', onFinished);
+            browser.off('requestfailed', onFinished);
+          }
+        });
+        requestQueue = pending.catch(() => {});
+        await pending;
       });
       const page = await browser.newPage();
       page.setDefaultTimeout(60000);
@@ -90,12 +107,16 @@ const adapter: PortalAdapter = {
       if (failure) throw failure;
       const body = await page.locator('body').innerText();
       if (/captcha|verify you are human|access denied|just a moment/i.test(body)) throw new PortalBlockedError(url, 403, 'PermitLink public page presented a challenge');
+      if (!await page.locator('th[id^="th_PermitID_"]').count() && /registered users|sign in|login/i.test(body)) throw new PortalBlockedError(url, 401, 'PermitLink guest table redirected to a login page');
       await page.waitForFunction(() => {
         const table = (window as any).zenPage?.getComponentById('table');
         return table && table.progressBarTimerId == null && document.querySelector('th[id^="th_PermitID_"]');
       });
       const refresh = async (nextPage?: number) => {
-        const previous = await page.evaluate(() => (window as any).zenPage.getComponentById('table').lastUpdate);
+        const previous = await page.evaluate(() => ({
+          updated: (window as any).zenPage.getComponentById('table').lastUpdate,
+          firstRow: document.querySelector('tr[zenvalue]')?.getAttribute('zenvalue'),
+        }));
         await page.evaluate(({ filters, nextPage }) => {
           const table = (window as any).zenPage.getComponentById('table');
           if (nextPage) { table.gotoPage(nextPage); return; }
@@ -107,10 +128,13 @@ const adapter: PortalAdapter = {
           }
           table.executeQuery();
         }, { filters, nextPage });
-        await page.waitForFunction(previous => {
+        await page.waitForFunction(({ previous, nextPage }) => {
           const table = (window as any).zenPage.getComponentById('table');
-          return table.lastUpdate !== previous && table.progressBarTimerId == null;
-        }, previous);
+          const changed = nextPage
+            ? Number(table.currPage) === nextPage && document.querySelector('tr[zenvalue]')?.getAttribute('zenvalue') !== previous.firstRow
+            : table.lastUpdate !== previous.updated;
+          return changed && table.progressBarTimerId == null;
+        }, { previous, nextPage });
         if (failure) throw failure;
       };
       ctx.log('Applying public table filters');
