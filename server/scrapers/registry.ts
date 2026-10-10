@@ -7,6 +7,7 @@
  * server/scrapers/ replace these wrappers by calling `registerAdapter`.
  */
 import accela from "./accela";
+import enerGovAdapter from "./energov";
 import { scrapeByPlatform, type ScrapeResult } from "../scraper";
 import type { AdapterCtx, PermitRecord, PermitSearchType, PortalAdapter } from "./types";
 
@@ -150,7 +151,6 @@ function legacy(platform: string, aliases: string[], search: PermitSearchType[])
 // The 7 adapters in server/scraper.ts. Labels and aliases mirror scrapeByPlatform's switch.
 registerAdapter(smartgov);
 registerAdapter(legacy("Skagit County", ["Custom / GovPlatform"], ["address", "permit", "name"]));
-registerAdapter(legacy("Tyler EnerGov", ["Tyler Technologies", "Tyler EnerGov Self Service"], ["address", "permit", "name"]));
 registerAdapter(etrakit);
 registerAdapter(click2gov);
 registerAdapter(ftg);
@@ -196,3 +196,5 @@ import govwell from './govwell';
 registerAdapter(govwell);
 import permitlink from './permitlink';
 registerAdapter(permitlink);
+
+registerAdapter(enerGovAdapter);

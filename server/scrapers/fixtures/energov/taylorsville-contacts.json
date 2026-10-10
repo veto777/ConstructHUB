@@ -1,0 +1,58 @@
+{
+  "PageCount": 1,
+  "TotalFound": 3,
+  "CacheKey": "",
+  "Result": [
+    {
+      "ModuleId": 1,
+      "EntityId": "3c958845-64bb-4f4e-a47d-c457573dc6c2",
+      "ContactTypeId": "D6DCD76F-6CCF-45D5-B776-71DBB114B144",
+      "ContactTypeName": "Applicant",
+      "GlobalEntityName": "Precision Air Management",
+      "FirstName": "Katie",
+      "LastName": "LaRose",
+      "IsBilling": true,
+      "IsBillingDisplayText": "Yes",
+      "Title": "",
+      "ContactStatus": "N/A",
+      "ContactId": "c94f9766-b3f3-4dff-bbcf-6301d35bb93e",
+      "GlobalEntityId": "3df068ed-42e1-4552-a8fb-85dc9816fbc8"
+    },
+    {
+      "ModuleId": 1,
+      "EntityId": "3c958845-64bb-4f4e-a47d-c457573dc6c2",
+      "ContactTypeId": "0A5D5D44-8BBC-4343-BBED-6A58BB673BC2",
+      "ContactTypeName": "Contractor",
+      "GlobalEntityName": "Precision Air Management LLC",
+      "FirstName": "David C",
+      "LastName": "Butler",
+      "IsBilling": false,
+      "IsBillingDisplayText": "No",
+      "Title": "",
+      "ContactStatus": "Pending",
+      "ContactId": "73827191-4e07-45f4-9121-29cd04c9f227",
+      "GlobalEntityId": "8b35303e-8dd0-4fc2-9b2a-b89ff7cac4f8"
+    },
+    {
+      "ModuleId": 1,
+      "EntityId": "3c958845-64bb-4f4e-a47d-c457573dc6c2",
+      "ContactTypeId": "959EBD4C-472D-4775-B8CE-A53B0077AADA",
+      "ContactTypeName": "Owner",
+      "GlobalEntityName": "",
+      "FirstName": "Davencrest",
+      "LastName": "HOA",
+      "IsBilling": false,
+      "IsBillingDisplayText": "No",
+      "Title": "",
+      "ContactStatus": "Pending",
+      "ContactId": "b3bb4aac-7fbf-453d-aa85-9ff47f2e2758",
+      "GlobalEntityId": "136b3e57-3c31-4a3f-b715-92d71c70b7fd"
+    }
+  ],
+  "Success": true,
+  "ErrorMessage": "",
+  "ValidationErrorMessage": "",
+  "ConcurrencyErrorMessage": "",
+  "StatusCode": 200,
+  "BrokenRules": []
+}
