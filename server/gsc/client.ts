@@ -37,7 +37,11 @@ export class SearchConsoleClient {
         r.status === 401
           ? "Reconnect Search Console"
           : r.status === 403
-            ? "Search Console access denied; check property permissions"
+            // Google's 403 is usually not a property permission at all: on 2026-10-10 every connection failed
+            // because the Search Console API was disabled in the Cloud project. Say what Google said.
+            ? /not been used in project|is disabled/i.test(d?.error?.message ?? "")
+              ? "Search Console API is disabled in the Google Cloud project; enable it and retry"
+              : "Search Console access denied; check property permissions"
             : r.status === 429
               ? "Search Console quota reached"
               : "Search Console request rejected",

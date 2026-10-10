@@ -1,0 +1,111 @@
+• I'll start by reading the two governing docs myself and getting the diff shape, then fan out the detailed sweeps to subagents.
+
+• I have the rules and the diff tail. Let me see the full changed file list and the seed/shot inventory, then fan out subagents.
+
+• Verified. Now the visual sweep of all 73 screenshots, split across 7 parallel reviewers.
+
+• All 7 image reviewers completed. Reading the full swarm output.
+
+• All evidence is in. Compiling the final review.
+
+  ---
+
+  # Kimi review — "In the App" screenshots (`7c88413f..2b1f9259`)
+
+  **Method:** I read `README.md`/`BRIEF.md`, the full diff, `sections.tsx`, `screens.ts`, `types.ts`, `capture.mjs`, `manifest.mjs`, the vitest, and the writing guide first-hand; five explore agents audited all 2,400+ lines of seeds, all 4 shot-spec JSONs, the page wiring, and the prerender/SEO path; seven agents visually inspected all 73 screenshots at full resolution (with cropped re-reads of small text). Nothing was modified.
+
+  ## 1. Safety of the sample data — mostly clean, a few real-name collisions
+
+  **OK — the mechanical rules hold everywhere.** Every phone in seeds and on screen is 555-01xx (e.g. `30-ads.sql:228`, `20-reviews.sql:121-133`); every person/business email and domain is `*.example`; every IP (seeds and pixels) is inside 192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24 or 2001:db8::/32 (verified by crop in clickGuard, ipTracker, vpnShield, cloudflare, adsManager-3 shots); all Google Ads customer IDs are 555-prefixed fakes (`30-ads.sql:166-175`); place IDs are literally `sample-place-summit-denver` (visible in gbp-3); all provider tokens are `'sample-placeholder-not-a-token'`; API-key hashes are of throwaway strings (`30-ads.sql:1830-1838`); no `ChIJ…`, no secrets. Reviewer names and review text are invented and internally reference only the fictional businesses (`20-reviews.sql:137-192`).
+
+  **OK — no invented government data.** None of the 7 seed files inserts permit portals, permit numbers, assessor offices or property records (agents checked every INSERT target). The permits/property screenshots show the app's real pre-existing directory — real Colorado counties, "64 offices" = Colorado's actual 64 counties (`permits-2`, `property-1`). The two seeded license strings (`40-crm.sql:51 'SAMPLE-RC-0140'`, `41-call-assistant.sql:76 "(sample) SR-00000"`) are sample-marked but are invented license numbers — borderline; genericize to "Licensed and insured in Colorado".
+
+  **MEDIUM — real-business name collisions.** The brief's hardest fiction rule ("never resemble a real company") is bent four times:
+  - `30-ads.sql:174` — **"Foothills Fence Co." seeded with `status='SUSPENDED'`** and "resolve billing". Real Foothills Fence companies exist; the adsManager-1 screenshot shows a same-named real-world business's ad account suspended. Rename (this is the one I'd fix first).
+  - `30-ads.sql:175,275,283` — "Copper Creek Concrete", near a real Aurora CO "Copper Creek Construction".
+  - `20-reviews.sql:43,96,188` — "Mile High Concrete & Paving"; real "Mile High Concrete*" businesses exist in Denver.
+  - `20-reviews.sql:45,107,191` — "Foothills Fence & Deck"; also collides. And `agency-1.webp` shows "Peakline Exteriors" while a real Peakline Roofing & Exteriors operates in Calgary (likely coincidental, but verify).
+
+  **LOW** — `jobcam-2.webp` shows meter-precise GPS (39.74800, −104.95910 ±6 m). The point is fictional, but it exceeds the brief's "Denver, CO"-level vagueness bar; round coordinates in `40-crm.sql` jobcam rows. **LOW/info** — real Google no-reply sender addresses in `10-gbp.sql:329-339` are the app's recognized provider senders (needed for the mail-alerts screen to classify); fine. Real Denver-metro city/ZIP names are explicitly allowed. The keyword-stuffed competitor names in `competitors-1/2` ("Best Cheap Roofers Near Me Denver", "Top Rated #1 Affordable Roofing Denver", `10-gbp.sql:262,270`) are seeded fictional rows with 555 phones and `.example` sites — I confirmed they are not live Google Places data.
+
+  ## 2. Can the seeds or scripts ever touch production?
+
+  **OK for the main body, one real gap.**
+  - `30-ads.sql:9-13`, `10-gbp.sql:8-13`, `20-reviews.sql:6-11`, `41-call-assistant.sql:5-8` all run the `current_database() NOT LIKE 'constructhub\_dev\_%'` DO block before any DML, inside a transaction, with deletes scoped to exactly the fixed sample ids/markers they insert (verified idempotent, incl. the Cloudflare cascade FKs).
+  - `capture.mjs:11` throws unless `SHOTS_BASE` matches `^http://(127.0.0.1|localhost):\d+$` — production URLs are unreachable even via env. Creds come only from env (`SHOTS_EMAIL`/`SHOTS_PASSWORD`); the session cache is written `mode 0o600` (`capture.mjs:31`).
+  - `40-crm-photos.mjs` imports only sharp/fs/path — no network, no DB, no credentials; draws procedural SVG houses; writes only `tmp/jobcam/…`.
+  - **Nothing imports these scripts.** Grep for `feature-shots` outside the script dir hits only the generated `screens.ts`, a `types.ts` comment, the vitest (string paths only), and docs. `package.json` has no feature-shots script; nothing runs at boot, in tests, or in the build (`script/build.ts` clean).
+
+  **HIGH — `00-identity.sql` has no guard at all.** The entire file is `update users set display_name='Sam Rivera', company_name='Summit Roofing Co.' where id::text='1'` — no DO block, no transaction. Pointed at any non-lane database (including production), it silently renames user 1. It's the only seed that violates the owner's stated invariant. Fix: wrap in the same guard + `BEGIN`/`COMMIT`.
+
+  **LOW — `40-crm.sql:11`** uses unescaped `constructhub_dev_%` (in PL/pgSQL `_` is a one-char wildcard), so it would also match e.g. `constructhub_devX…`. The other files escape `\_`. **LOW** — `30-ads.sql:18-21` deletes `domain_id BETWEEN 930001 AND 930009` but inserts only 930001-930003; harmless inside the reserved id space, but tighten.
+
+  ## 3. The page
+
+  **OK — numbering and guards.** Feature pages number sections automatically from a single `order` array (`feature-landing.tsx:95-104`), so inserting ScreensSection first shifts every later kicker by one with no content-file edits; no hardcoded kicker numbers exist in `shared/feature-pages/*.ts`. On `/call-assistant` the hand-renumbered kickers were correctly shifted (01 How It Works → 02 In the App (`call-assistant-landing.tsx:343`) → 03-08), no duplicates or gaps. Pages with no screens (`seo`, stub) are handled twice: `?? []` + `n("screens", screens.length>0)` (`feature-landing.tsx:103-104`) and `if (!screens.length) return null` (`sections.tsx:221`).
+
+  **MEDIUM(weak)/LOW — `/call-assistant` shade alternation broke at the insert.** The page hardcodes backgrounds; the new section got `tone="paper"` while the Voices band after it is also unshaded → two adjacent plain bands (02+03), and parity is flipped for everything after. Cosmetic; fix by re-shading Voices…In Depth back to S-P-S-P-S-P-S-P, or accept.
+
+  **OK — accessibility.** Thumbnails are buttons with `aria-pressed` (`sections.tsx:263`) inside a `role="group"` with `aria-label` (:257); decorative thumb imgs `alt=""` with visible captions (:267-268); the main image is a real `<button>` with `aria-label="Open full size…"` and an orange `focus-visible` ring (:242-243); the zoom dialog is Radix (focus trap + focus restore) with an sr-only `DialogTitle` (:275). Only nit: no `DialogDescription` (dev-mode console warning).
+
+  **OK — layout/CLS/lazy/dark mode.** 1-screen pages get no thumbnail strip (:256); 4+ screens wrap in a 2/3-col grid (:257). All imgs have `width`/`height` + `loading="lazy"` + `decoding="async"` (:246, :267) — no CLS. Frame and captions use `bg-mkt-card`/`border-mkt-rule` tokens that re-theme in `.dark .mkt-editorial` (:230; index.css:1234-1242); at 390px the address bar truncates and thumbs go 2-col — checked and fine. Note the light-UI screenshot inside a dark frame is a bit stark but legible.
+
+  **OK — signed-in frame.** Feature pages render inside the dashboard for signed-in users (App.tsx:886-915); the zoom dialog portals to `body` at `z-50` so it stacks over the app header, and `useStartAtTop` scrolls the app `main` too. Pre-existing caveats, not from this diff: Radix scroll-lock only locks `body` (dashboard `main` can scroll behind the dialog). **LOW** — stale header comment `call-assistant-landing.tsx:1-4` still claims signed-in users see the landing page; they actually get the CRM tool (App.tsx:268), so that page's new section is effectively signed-out-only.
+
+  ## 4. SEO / prerender
+
+  **OK with corrections to the premises.** The pages are prerendered as full DOM (`script/prerender.ts:126-137`), so the `<img alt width height loading="decoding">`, captions and "Sample data" badge are all in the served HTML; no `dist/` exists in this checkout, but the JSX guarantees the attributes. **Correction: the main image IS lazy** (`sections.tsx:246`) — your note said it isn't. That's the right call: the section sits mid-page under the hero, so nothing here touches LCP, and `fetchpriority` would be wrong.
+
+  **OK — weight.** 4.5 MB / 73 files (avg ~61 KB, max 113 KB) spread over 32 pages = roughly 100-250 KB per page, all lazy/async. Not a first-paint problem. Real inefficiency is mobile resolution: phone renders the main image at ~358px and thumbs at ~173px from 1600px sources (~4.5-9× oversize). **LOW** — add a ~800w `srcset` variant (thumbnails never exceed ~390px) or generate a 640-800w thumb derivative in `capture.mjs`/`manifest.mjs`.
+
+  **LOW (missed opportunity)** — no per-page `og:image`: `seoHeadFor` hardcodes `/og-image.png` for every page (`shared/seo.ts:250`). The main shot is the ideal share card; ship a 1200×630 crop per feature.
+
+  **LOW-MEDIUM — address-bar URLs.** They're real routes, but `/google-reviews` is in `SIGNED_IN_ONLY` (App.tsx:426) and every `portal.constructhub.us/crm…` URL requires an account **and a paid CRM plan** (anonymous portal visitors get the login screen, App.tsx:708-711). Showing them in a browser chrome on a public page slightly overstates accessibility; the "Sample data" badge addresses the data, not access. Acceptable for an "in the app" section, but consider a lock glyph/tooltip on sign-in-gated URLs.
+
+  ## 5. The test (`server/feature-pages.test.ts:79-93`)
+
+  **Catches:** a missing image (`existsSync` :84), a src/key mismatch (:83), missing/short alt or caption (:85-86), `$`-prices, `%` stats, "testimonial/guarantee/#1" in alt+caption (:88), non-positive width/height (:89-90), and an unknown page key (:81).
+
+  **Misses:**
+  - **Reverse coverage — MEDIUM.** It iterates `FEATURE_SCREENS`, not the catalogue, so a future page with *no* screens passes silently. (Today every non-stub page has screens; nothing enforces it.)
+  - **Spelled-out numbers/stats — MEDIUM, and it has already shipped violations.** The regex only blocks `$\d`, `\d+%`, `testimonial|guarantee|#1`; "Four modules and a guide for every state" (`crm.json:192`) and "API usage by key over the last 30 days" (`ads.json:282`) pass while breaking the guide's "caption … never a number in it".
+  - **No on-disk verification of width/height** — a hand-edited `screens.ts` with wrong dims (CLS) passes. **No orphan check** — an image on disk no page references passes (currently zero orphans; I diffed specs vs disk: 73=73). **No file-size cap** (oversized webp passes). A hand-added alt inventing "saves 10 hours" / "\d+x" also passes (those patterns are only checked for page JSON at :160, not screens).
+  - It can't (and shouldn't try to) verify alt text matches pixels — that stays a human step; good that the README requires looking at every image.
+
+  ## 6. Copy rules
+
+  Beyond the two numbered captions above (**MEDIUM**): a long tail of "one …" captions ("one list", "one inbox", "one-click fix previews") is idiomatic — I'd not enforce the guide that literally. **LOW** — `social-2`'s alt names "Blotato" (`reviews.json:~107`, `screens.ts:136`), a third-party SaaS, in marketing alt text; the guide says name no other software product. Reword to "their submission status" (it's visible on screen; Blotato stays fine in the guides screenshot where it's the app's own help content). Alt texts otherwise follow the rules: factual, one sentence, no prices/promises/superlatives (no `$`, `%`, "best/#1" anywhere).
+
+  ## 7. Anything else — app bugs visible in the screenshots
+
+  The capture-notes worries are mostly resolved: **no empty charts or empty states remain** in the Click Guard / IP Tracker shots (all tables populated and internally consistent — one agent re-verified the traffic math and cross-shot ties like "16 visits in 24 hours"). Header wrapping and raw ids do survive, in these prospect-visible forms:
+
+  - **MEDIUM** — `cloudflare-1` and `searchConsole-1` show a yellow "Background processing is disabled. Queued work will wait until the owner enables the site integration worker." banner — true lane state, but it reads "the product is half-configured" on two marketing pages. Re-shoot with the integration worker enabled.
+  - **MEDIUM** — `media-3`: the "Highland job site" folder of a *roofing* company contains 11 interior-flooring photos (hardwood, carpet, staircase refinishing) with matching SEO filenames — seeded (`20-reviews.sql:251-270`); exactly the nonsense a prospect would screenshot.
+  - **MEDIUM** — app copy bugs now frozen into marketing images: `customerApi-2` table headers wrap mid-word ("Reque sts"/"Uni ts"); `siteScan-2` heading renders "History & score trend 8" (stray unstyled count); `competitors-1` stat card "Some signals Risk" vs "Few signals"/"More signals"; `masterClass-2` "Secretary of S…" + raw "link unconfirmed"; `texting-2` contradicts itself ("My own number, billed through ConstructHUB" vs "Ask us to provision this number… stays on ConstructHUB's carrier account"); `adsManager-2` seeded pluralization "1 campaigns lost…"/"1 campaigns are not presence-only" (`30-ads.sql:181,184`).
+  - **LOW** — `reviews-2` rating bars sum to 102% (63/13/13/13/0); `crm-2` status chips 8+3+0 ≠ All 16; `callAssistant-1` "24 minutes this month" vs "26 minutes on the phone"; `callAssistant-3` row numbers skip #4/#9 (seeded deletions); `gabe-2` "ConstructHub" vs "ConstructHUB" casing; `gabe-1` demos Gabe with "Chat with Gabe is off right now"; `gbp-2` "Direction s" mid-word wrap; `permits-2` duplicated "Denver, CO" dropdown entry and a "911, 3520 malland" placeholder; `property-1` "Contact for property records in Adams County." is broken template copy; `masterClass-1`'s fourth stat column is a CTA; `mailAlerts-1` tags every alert "Unmapped / ambiguous client" (undercuts the feature) and seeds an off-niche `denverhairepair.example` domain.
+  - **LOW** — framing: several shots are clipped mid-row at the frame edge (adsManager-1 bottom SUSPENDED row, adsManager-2 top row behind the sticky tab bar, lsaLeads-2, cloudflare-2, searchConsole-2, domains-1, profileGuard-2, social-2, agency-3, guides-1) — re-shoot scrolled or with `fullHeight`.
+  - **LOW** — synthetic-data tells: identical seconds across timestamps (:51:28/:27 cadence in searchConsole-1, mailAlerts-1, texting-1, social-2), media-3 file sizes in an arithmetic progression (176, 189, 203… KB), sequential `sub_fsb0xxx` ids. Individually invisible; pages are labelled "Sample data" so acceptable, but jitter the seconds for believability.
+
+  ## Prioritized fix list
+
+  1. **HIGH** — Add the lane-guard DO block + transaction to `script/feature-shots/seed/00-identity.sql:2`; fix the unescaped wildcard in `40-crm.sql:11`.
+  2. **MEDIUM** — Rename colliding sample businesses: "Foothills Fence Co." (`30-ads.sql:174`, shown SUSPENDED — first priority), "Copper Creek Concrete" (`30-ads.sql:175`), "Mile High Concrete & Paving" (`20-reviews.sql:43,96,188`), "Foothills Fence & Deck" (`20-reviews.sql:45,107,191`), verify "Peakline Exteriors"; add a "google the name first" step to `BRIEF.md`; re-shoot adsManager-1/agency-1.
+  3. **MEDIUM** — Re-shoot `cloudflare-1`/`searchConsole-1` with the site integration worker enabled (kill the yellow banner).
+  4. **MEDIUM** — Fix media seeds (`20-reviews.sql:251-270`): roofing photo filenames/captions, not flooring; re-shoot `media-3`.
+  5. **MEDIUM** — Fix the app copy bugs visible in shots: customerApi header wrap, siteScan-2 stray "8", "Some signals Risk", masterClass-2 "link unconfirmed", texting-2 contradiction, "1 campaigns" pluralization (seed strings `30-ads.sql:181,184`).
+  6. **MEDIUM** — Captions per the guide: drop the numbers in `customerApi-2` ("over the last 30 days") and `masterClass-1` ("Four modules…"); drop "Blotato" from social-2's alt.
+  7. **MEDIUM** — Harden `server/feature-pages.test.ts`: require every non-stub catalogue key to have screens; extend the caption regex to spelled-out numbers/\d+x/"saves … hours"; assert width/height match the image on disk; fail on unreferenced images; cap file size.
+  8. **LOW** — `/call-assistant`: restore shade alternation after section 02; fix the stale signed-in comment (`call-assistant-landing.tsx:1-4`).
+  9. **LOW** — Address-bar policy: small lock/"sign-in required" hint on gated URLs (`portal.constructhub.us/crm…`, `/google-reviews`) or accept as-is.
+  10. **LOW** — Per-page `og:image` from the main shot (1200×630 crop) in `shared/seo.ts`.
+  11. **LOW** — Generate an ~800w `srcset` variant (thumbs render ≤390px) in `capture.mjs`; add `sizes`.
+  12. **LOW** — Round jobcam GPS to neighborhood level (`40-crm.sql`; jobcam-2 shows ±6 m).
+  13. **LOW** — Re-shoot clipped frames (list above) with `fullHeight` or better scroll position; fix reviews-2's 102% rounding, permits-2's duplicate "Denver, CO" + placeholder, property-1's template copy.
+  14. **LOW** — Jitter timestamp seconds / vary file sizes / non-sequential submission ids in seeds.
+  15. **LOW** — mailAlerts seed: at least one mapped client alert; drop the off-niche hair-repair domain; genericize the two sample license strings.
+
+  ## Verdict
+
+  **KEEP LIVE.** This is a well-built change: the guard rails, fictional-data discipline, generated-manifest pipeline, prerendered SEO markup, and accessibility are all genuinely solid — the sample data is scrubbed to an impressive degree (documentation-range IPs, 555 phones, `sample-place-*` ids, internally consistent cross-shot data, zero PII found across 73 inspected images), and nothing here can run at boot, in a build, or against production except one unguarded 2-line SQL file that is inert until someone points it at the wrong database. No CRITICAL or user-facing HIGH defect warrants rolling back a valuable, owner-requested feature. But don't call it done: fix item 1 (the unguarded identity seed) and item 2 (a real-world fence company shown with a suspended ad account, plus three more near-collisions) in the next commit, re-shoot the four worst screenshots (banner shots, media-3, clipped frames), and let the vitest start enforcing the coverage and caption rules it currently misses — everything else is polish that can ride the following deploy.
+
