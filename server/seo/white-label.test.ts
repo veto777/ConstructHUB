@@ -284,6 +284,7 @@ const SPECS: Record<string, { url: string; body?: unknown }[]> = {
   "POST /api/seo/sites/:id/report/send": [{ url: "/api/seo/sites/1/report/send", body: { recipients: ["owner@example.com"] } }],
   "GET /api/seo/usage": [{ url: "/api/seo/usage" }],
   "GET /api/seo/locations": [{ url: "/api/seo/locations?q=tampa" }],
+  "GET /api/seo/locations/:code": [{ url: "/api/seo/locations/1027510" }],
   "POST /api/seo/sites/:id/star": [{ url: "/api/seo/sites/1/star", body: { starred: true } }],
   "POST /api/seo/sites/:id/settings": [{ url: "/api/seo/sites/1/settings", body: { businessName: "Acme Roofing" } }],
   "GET /api/seo/alerts": [{ url: "/api/seo/alerts" }, { url: "/api/seo/alerts?kind=rank_drop&limit=5" }, { url: "/api/seo/alerts?siteId=1&before=7" }],
@@ -309,7 +310,7 @@ const SPECS: Record<string, { url: string; body?: unknown }[]> = {
 const ASKS_PROVIDER = new Set([
   "POST /api/seo/sites/:id/keywords/volumes", "POST /api/seo/keywords/research", "POST /api/seo/sites/:id/backlinks/refresh", "POST /api/seo/explorer", "POST /api/seo/report",
   "POST /api/seo/sites/:id/grid/locate", "POST /api/seo/sites/:id/keyword-watch/snapshot", "POST /api/seo/opportunities", "POST /api/seo/keyword", "POST /api/seo/gap", "POST /api/seo/keywords/bulk", "POST /api/seo/content", "POST /api/seo/batch",
-  "POST /api/seo/sites/:id/ai/ask", "POST /api/seo/ai/mentions", "GET /api/seo/locations", "POST /api/seo/sites/:id/competitors",
+  "POST /api/seo/sites/:id/ai/ask", "POST /api/seo/ai/mentions", "GET /api/seo/locations", "GET /api/seo/locations/:code", "POST /api/seo/sites/:id/competitors",
 ]);
 
 const registered = (): string[] => {
@@ -340,7 +341,7 @@ describe("every SEO route, as a customer", () => {
     const routes = [...new Set(registered())];
     expect(routes.filter((r) => !SPECS[r]), `${HOW} These routes have no request in SPECS (white-label.test.ts), so nothing checks what they return`).toEqual([]);
     expect(Object.keys(SPECS).filter((r) => !routes.includes(r)), "SPECS lists routes that are no longer registered — remove them").toEqual([]);
-    expect(routes.length, "the number of /api/seo routes changed: add the new ones to SPECS, then update this count").toBe(94);
+    expect(routes.length, "the number of /api/seo routes changed: add the new ones to SPECS, then update this count").toBe(95);
   });
 
   for (const mode of Object.keys(PROVIDER)) {
@@ -512,7 +513,7 @@ describe("the admin view is for platform admins only", () => {
     expect(customer.status).toBe(200);
     expect(customer.leaks).toEqual([]);
     expect(customer.body.admin).toBeUndefined();
-    expect(Object.keys(customer.body).sort()).toEqual(["alertsUndelivered", "alertsUnread", "configured", "credits", "holds", "packs", "prices", "quotes", "resetsAt", "usage"]);
+    expect(Object.keys(customer.body).sort()).toEqual(["alertsUndelivered", "alertsUnread", "configured", "credits", "googleKeywords", "holds", "packs", "prices", "quotes", "resetsAt", "usage"]);
     // Customer prices are whole cents at the customer's rate — never the wholesale figure they are worked out from.
     for (const cents of [...Object.values(customer.body.prices), ...Object.values(customer.body.holds)] as number[]) expect(Number.isInteger(cents) && cents >= 1).toBe(true);
     expect(admin.body.admin).toMatchObject({ vendor: "DataForSEO", configured: true, capUsd: 100, spentUsd: 12.345678 });
