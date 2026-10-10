@@ -165,7 +165,7 @@ export function registerDevApi(app: Express, getUser: GetUser, deps: { repo?: ()
     const input = validateIssue(req.body ?? {});
     if (typeof input === "string") return void res.status(400).json({ message: input });
     if (!who.totpEnabled || !who.totpSecret) {
-      return void res.status(403).json({ totp: "setup", message: "Turn on two-step sign-in (an authenticator app) in Settings → Security first." });
+      return void res.status(403).json({ totp: "setup", message: "Set up your authenticator app first: step 2 on this page." });
     }
     const strikes = wrongCodes.get(who.admin.id);
     if (strikes && Date.now() - strikes.since >= LOCK_MS) wrongCodes.delete(who.admin.id);
