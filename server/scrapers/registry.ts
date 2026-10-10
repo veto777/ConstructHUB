@@ -170,3 +170,8 @@ import cityviewAdapter from "./cityview";
 registerAdapter(cityviewAdapter);
 import govpilotAdapter from "./govpilot";
 registerAdapter(govpilotAdapter);
+
+import permitEyesAdapter from "./permiteyes";
+import sdlPortalAdapter from "./sdl-portal";
+registerAdapter(permitEyesAdapter);
+registerAdapter(sdlPortalAdapter);
