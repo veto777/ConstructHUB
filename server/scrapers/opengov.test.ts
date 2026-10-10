@@ -9,6 +9,7 @@ vi.mock("./polite-fetch", async importOriginal => {
 vi.mock("../scraper", () => ({ scrapeByPlatform: vi.fn() }));
 
 import adapter, { apiFromHtml, parseJson, parseRecord, portalIdentity, searchIds, searchRequest } from "./opengov";
+import { IMPLEMENTED_SEARCH_TYPES } from "./opengov";
 import { politeFetch, PortalBlockedError } from "./polite-fetch";
 import { getAdapter, supportsAlerts } from "./registry";
 
@@ -121,7 +122,9 @@ describe("adapter's public access boundary", () => {
     const c = ctx();
     await expect(adapter.search(c, { type: "company", value: "Construction" })).rejects.toThrow(/does not support/);
     expect(await adapter.listRecent(c, "2026-10-03T00:00:00.000Z")).toEqual([]);
-    expect(adapter.capabilities).toEqual({ search: ["address", "permit"], listRecent: false, detail: false });
+    // Blocked on every tenant tried (Turnstile / public search disabled): not searchable until a live run succeeds.
+    expect(adapter.capabilities).toEqual({ search: [], listRecent: false, detail: false });
+    expect(IMPLEMENTED_SEARCH_TYPES).toEqual(["address", "permit"]);
     expect(fetchMock).not.toHaveBeenCalled();
   });
   it("registers every handled label case-insensitively without enabling alerts", () => {

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { PortalBlockedError, politeFetch } from "./polite-fetch";
 import adapter, { buildSearchUrl, discoverSearchUrls, inspectSearchForm, parseIworqDate, parsePermitTable, parsePortalUrl, selectSearchField } from "./iworq";
+import { IMPLEMENTED_SEARCH_TYPES } from "./iworq";
 import type { AdapterCtx } from "./types";
 import { getAdapter, supportsAlerts } from "./registry";
 
@@ -153,6 +154,9 @@ describe("search failures remain failures, not empty results", () => {
   it("does not claim alerts or emulate date listing with searches", async () => {
     expect(adapter.capabilities.listRecent).toBe(false);
     expect(adapter.capabilities.detail).toBe(false);
+    // Every tenant's search is reCAPTCHA-protected: not searchable until a live run succeeds.
+    expect(adapter.capabilities.search).toEqual([]);
+    expect(IMPLEMENTED_SEARCH_TYPES).toEqual(["address", "permit", "name", "company"]);
     await expect(adapter.listRecent(ctx(northLiberty), "2026-10-03T00:00:00Z")).resolves.toEqual([]);
     expect(mockFetch).not.toHaveBeenCalled();
     await expect(adapter.listRecent(ctx("https://example.org/"), "2026-10-03")).rejects.toThrow();

@@ -204,6 +204,9 @@ async function searchPages(ctx: AdapterCtx): Promise<string[]> {
   return links;
 }
 
+/** Field types the adapter can submit once a tenant's search is not CAPTCHA-protected. */
+export const IMPLEMENTED_SEARCH_TYPES: PermitSearchType[] = ["address", "permit", "name", "company"];
+
 const adapter: PortalAdapter = {
   platform: "iWorQ",
   aliases: [
@@ -217,11 +220,15 @@ const adapter: PortalAdapter = {
     "iWorQ (zoning & floodplain permits)", "iWorQ (Permit Management)", "iWorQ (Building and Zoning Permits)",
     "iWorQ (Building Permit)", "iWorQ Permit Portal",
   ],
-  capabilities: { search: ["address", "permit", "name", "company"], listRecent: false, detail: false },
+  // Declared empty on purpose: every iWorQ search form inspected (7 tenants, 15 live searches) sits behind
+  // invisible reCAPTCHA, so no tenant could be searched. IMPLEMENTED_SEARCH_TYPES keeps the working code path
+  // reachable if the vendor ever exposes an unprotected search; flip capabilities.search to it only after a
+  // successful live run on 3 tenants (see iworq.REPORT.md).
+  capabilities: { search: [], listRecent: false, detail: false },
   async search(ctx, q) {
     parsePortalUrl(ctx.searchUrl);
     if (!q.value?.trim()) throw new Error("iWorQ search requires a nonempty query");
-    if (!adapter.capabilities.search.includes(q.type)) throw new IworqUnsupportedError(`iWorQ ${q.type} search is not supported`);
+    if (!IMPLEMENTED_SEARCH_TYPES.includes(q.type)) throw new IworqUnsupportedError(`iWorQ ${q.type} search is not supported`);
     const urls = await searchPages(ctx);
     const records: PermitRecord[] = [];
     // Preflight every module before submitting searches: a blocked historical

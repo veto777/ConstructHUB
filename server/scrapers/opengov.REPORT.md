@@ -188,3 +188,10 @@ Validation:
 - npx tsc --noEmit -p .: passed, exit 0.
 
 Fixture provenance: fixtures/opengov/provenance.json records source URLs, original shell/bundle hashes, and redactions. Numbered JSON response bodies are untouched. The shell fixture redacts embedded client credentials/keys; no government values were altered. targets.json remains untracked and is not committed. No app server, database, subagents, or pushes were used.
+
+## Capability note (fleet merge, 2026-10-10)
+Every live search in this report was blocked by the vendor's anti-bot protection (Cloudflare Turnstile HTTP 403 on the search API, or public search disabled in general_settings); 0 records were
+retrieved on any tenant. The adapter therefore declares `capabilities.search: []` and `listRecent: false`, so
+`canScrapeGovernmentPortal` and the "Alerts supported" badge do not present these portals as searchable. The
+search code is kept intact (the implemented field types stay listed in the adapter file) so it can be switched on
+if the vendor ever opens an unprotected endpoint; do not re-enable it without a successful live run on 3 tenants.

@@ -169,6 +169,9 @@ async function search(ctx: AdapterCtx, q: { type: PermitSearchType; value: strin
   return [...new Map(records.map(record => [record.sourceUrl, record])).values()];
 }
 
+/** Query types search() implements, pending an unblocked tenant. */
+export const IMPLEMENTED_SEARCH_TYPES: PermitSearchType[] = ["address", "permit"];
+
 const adapter: PortalAdapter = {
   platform: "OpenGov",
   aliases: [
@@ -224,7 +227,11 @@ const adapter: PortalAdapter = {
     "OpenGov (Building permits)",
     "ViewPoint Cloud"
   ],
-  capabilities: { search: ["address", "permit"], listRecent: false, detail: false },
+  // Declared empty on purpose: on every tenant tried (5 tenants, 12 live searches) the record-search API
+  // answered HTTP 403 behind Cloudflare Turnstile or public search was disabled in general_settings, so no
+  // tenant could be searched. search() still implements address and permit queries (IMPLEMENTED_SEARCH_TYPES)
+  // for the day the vendor opens the endpoint; re-enable only after a successful live run on 3 tenants.
+  capabilities: { search: [], listRecent: false, detail: false },
   search,
   async listRecent(ctx) {
     portalIdentity(ctx.searchUrl);

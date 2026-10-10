@@ -197,3 +197,10 @@ Follow-up should seek an officially supported public data export/API or governme
 Validation: 31 offline tests passed with `npx vitest run server/scrapers/iworq.test.ts --configLoader runner`. `npx tsc --noEmit -p .` passed. The exact default Vitest command could not load its config because the environment mounts node_modules/.vite-temp read-only (EROFS). The runner flag avoids that write without changing repository configuration. Tests mock politeFetch and legacy scraper imports; no network or database is needed. No application server was started.
 
 Fixtures are real fetched HTML responses. Only CSRF tokens and CAPTCHA payload secrets were redacted. No government rows were manufactured or edited. The network logs also record the automatic CAPTCHA traffic from the initial Cottonwood page load. targets.json is not committed. No pushes were performed.
+
+## Capability note (fleet merge, 2026-10-10)
+Every live search in this report was blocked by the vendor's anti-bot protection (invisible reCAPTCHA on every search form); 0 records were
+retrieved on any tenant. The adapter therefore declares `capabilities.search: []` and `listRecent: false`, so
+`canScrapeGovernmentPortal` and the "Alerts supported" badge do not present these portals as searchable. The
+search code is kept intact (the implemented field types stay listed in the adapter file) so it can be switched on
+if the vendor ever opens an unprotected endpoint; do not re-enable it without a successful live run on 3 tenants.
