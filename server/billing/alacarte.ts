@@ -34,7 +34,6 @@ import { getEntitlements } from "../entitlements";
 import { getCrmEntitlements } from "../crm/entitlements";
 import { forgetDashboard } from "../dashboard/cache";
 import { ACCESS_STATUSES, TALK_TO_SALES_CODE, type BillingInterval } from "@shared/plans";
-import { CRM_PLANS } from "@shared/crm-plans";
 import {
   ALACARTE, ALACARTE_KEYS, ALACARTE_MAX_QUANTITY, ALACARTE_PRICING_HREF, alacarteAlreadyCovered, alacartePriceCents, alacarteTierFor, isAlacarteKey,
   type AlacarteAccount, type AlacarteKey, type AlacarteTier,
@@ -328,11 +327,6 @@ export function registerAlacarteBillingRoutes(app: Express, deps: AlacarteBillin
       const ent = account.entitlements;
       if (ent.isPlatformAdmin) {
         return res.status(400).json({ message: `Your account already includes ${it.name} — no payment needed.` });
-      }
-      if (it.requiresCrmPlan && !account.crmPlanActive) {
-        throw new BillingRequestError(409,
-          `${it.name} is sold on top of a CRM plan today (from $${CRM_PLANS.crm_basic.monthlyCents / 100}/mo): choose a CRM plan first, then add ${it.name}. Stand-alone ${it.name} is coming.`,
-          "crm_plan_required");
       }
       const have = { modules: ent.modules, allowances: ent.allowances, addons: ent.addons, alacarte: activeKeysOf(rows) };
       if (it.grants.crmJobcam && account.crmJobcam && !have.alacarte.includes(order.key)) {

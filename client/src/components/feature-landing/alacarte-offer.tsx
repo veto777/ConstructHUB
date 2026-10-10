@@ -12,7 +12,6 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowRight, Check, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
-import { apiErrorCode } from "@/lib/plan-errors";
 import { formatUsd, intervalSuffix } from "@/lib/pricing-display";
 import type { AlacarteMe } from "@/components/alacarte-cards";
 import type { FeaturePriceSummary } from "@shared/feature-pages/pricing";
@@ -28,7 +27,6 @@ export function offerLine(key: AlacarteKey, tier: AlacarteTier, signedIn: boolea
   const per = it.unit ? ` per ${it.unit}` : "";
   const standalone = `${formatUsd(alacartePriceCents(key, "standalone", INTERVAL))}${intervalSuffix(INTERVAL)}`;
   const addon = `${formatUsd(alacartePriceCents(key, "addon", INTERVAL))}${intervalSuffix(INTERVAL)}`;
-  if (it.requiresCrmPlan) return `${addon}${per} on top of any CRM plan; stand-alone ${it.name} (${standalone}) is coming.`;
   if (signedIn && tier === "addon") return `${addon}${per} as an add-on to your plan (${standalone} on its own).`;
   return `${standalone}${per} on its own, or ${addon}${per} as an add-on to any plan.`;
 }
@@ -43,8 +41,7 @@ export function AlacarteOffer({ keys, price, slug, signedIn }: { keys: AlacarteK
     mutationFn: async (key: AlacarteKey) => (await apiRequest("POST", "/api/alacarte/checkout", { key, interval: INTERVAL, quantity: 1, returnTo: "feature" })).json(),
     onSuccess: (data) => { if (data?.url) window.location.href = data.url; },
     onError: (err, key) => {
-      if (apiErrorCode(err) === "crm_plan_required") { toast({ title: `${ALACARTE[key].name} needs a CRM plan`, description: apiErrorMessage(err) }); setLocation("/pricing#crm"); return; }
-      toast({ title: "Couldn't start checkout", description: apiErrorMessage(err), variant: "destructive" });
+      toast({ title: `Couldn't start checkout for ${ALACARTE[key].name}`, description: apiErrorMessage(err), variant: "destructive" });
     },
   });
   const buy = (key: AlacarteKey) => {
@@ -60,7 +57,6 @@ export function AlacarteOffer({ keys, price, slug, signedIn }: { keys: AlacarteK
         const row = held.get(key);
         const active = !!row?.active;
         const covered = !!me?.covered.includes(key) || !!me?.isPlatformAdmin;
-        const needsCrm = !!it.requiresCrmPlan && signedIn && !!me && !me.crmPlanActive && !active;
         const pending = checkout.isPending && checkout.variables === key;
         return (
           <div key={key} className="bg-mkt-card border border-mkt-rule rounded-2xl p-6 lg:p-7 text-left" data-testid={`card-feature-alacarte-${key}`}>
@@ -73,8 +69,6 @@ export function AlacarteOffer({ keys, price, slug, signedIn }: { keys: AlacarteK
                 <span className={`${BTN_OUTLINE} ${BTN_LG} cursor-default`} data-testid={`button-feature-alacarte-${key}`}><Check className="h-4 w-4 text-mkt-orange-ink" /> Active on your account</span>
               ) : covered ? (
                 <span className={`${BTN_OUTLINE} ${BTN_LG} cursor-default`} data-testid={`button-feature-alacarte-${key}`}><Check className="h-4 w-4 text-mkt-orange-ink" /> Included in your plan</span>
-              ) : needsCrm ? (
-                <Link href="/pricing#crm" className={`${BTN_PRIMARY} ${BTN_LG}`} data-testid={`button-feature-alacarte-${key}`}>Choose a CRM plan first <ArrowRight className="h-4 w-4" /></Link>
               ) : (
                 <button type="button" onClick={() => buy(key)} disabled={checkout.isPending} className={`${BTN_PRIMARY} ${BTN_LG}`} data-testid={`button-feature-alacarte-${key}`}>
                   {pending && <Loader2 className="h-4 w-4 animate-spin" />}

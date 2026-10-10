@@ -60,7 +60,7 @@ Money is in US dollars. Yearly platform billing is 11× the monthly price (1 mon
 | Client portal | ✅ | ✅ | ✅ | ✅ |
 | Change orders + job costing | ❌ | ✅ | ✅ | ✅ |
 | Team text alert segments / month | ❌ | 500 | 1,500 | 5,000 |
-| Client texting | ❌ | The texting add-on, or your own carrier account | 1 number included | 3 numbers included |
+| Client texting | ❌ | The texting add-on | 1 number included | 3 numbers included |
 | JobCam — job photos & video | Add-on $39 | Add-on $39 | ✅ | ✅ |
 | CRM API units / month | ❌ | 10,000 | 50,000 | 250,000 |
 | Support | Email support | Priority email support | Priority support + onboarding call | Priority support + onboarding call |
@@ -69,7 +69,7 @@ Money is in US dollars. Yearly platform billing is 11× the monthly price (1 mon
 ## Add-ons
 
 - **Extra team seat** — $15/mo or $165/yr — on: Team, Pro, Agency
-- **Extra protected website** — $15/mo or $165/yr — on: Solo, Team, Pro, Agency
+- **Extra protected website** — $39/mo or $429/yr — on: Solo, Team, Pro, Agency
 - **Client texting number** — $29/mo or $319/yr + $29 setup — on: Solo, Team, Pro, Agency, Unlimited
 - **Competitor scan pack** — $19/mo or $209/yr — on: Solo, Team, Pro, Agency, Unlimited
 - **Grid scan pack** — $10/mo or $110/yr — on: Solo, Team, Pro, Agency, Unlimited

@@ -18,7 +18,7 @@ describe("the à la carte price line", () => {
     expect(alacartePriceNote("reviews", "standalone", "year", false)).toBe(`${formatUsd(Math.round(alacartePriceCents("reviews", "standalone", "year") / 12))}/mo billed yearly · or ${formatUsd(alacartePriceCents("reviews", "addon", "year"))}/yr as an add-on to any plan`);
     // Overlapping add-ons quote the existing add-on's price.
     expect(alacartePriceNote("seo_basic", "standalone", "month", false)).toBe("or $29/mo as an add-on to any plan");
-    expect(alacartePriceNote("click_guard", "standalone", "month", false)).toBe("or $15/mo per website as an add-on to any plan");
+    expect(alacartePriceNote("click_guard", "standalone", "month", false)).toBe("or $39/mo per website as an add-on to any plan");
   });
 
   it("on a plan: the add-on price alone, and why", () => {
@@ -55,7 +55,9 @@ describe("the tab on /pricing", () => {
     expect(cards).toContain("ALACARTE_LINKED.map");
     expect(cards).toContain("ALACARTE_ADDON_ONLY.map");
     // "Active" for a tool the account holds; "Included in your plan" for one the plan covers; the CRM gate for JobCam.
-    for (const label of ["Active", "Included in your plan", "Choose a CRM plan first", "Update payment"]) expect(cards).toContain(label);
+    for (const label of ["Active", "Included in your plan", "Update payment"]) expect(cards).toContain(label);
+    // JobCam stands alone (owner, 2026-10-10): no CRM gate on the card.
+    expect(cards).not.toContain("Choose a CRM plan first");
     expect(cards).not.toMatch(/\$\s?\d/);
     expect(cards).not.toMatch(/SignalWire/);
     // Signed out, the Buy button goes to sign-in and back to the tab.

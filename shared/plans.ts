@@ -637,7 +637,10 @@ export const ADDONS: Record<AddonKey, Addon> = {
   // the key stays so a stored subscription that holds one still reads.
   extra_location: { key: "extra_location", name: "Extra location", description: "One more Google Business Profile location. No longer sold: a bigger plan includes more.", monthlyCents: 1900, annualCents: 19000, availableOn: [], grants: { locations: 1 } },
   extra_seat: { key: "extra_seat", name: "Extra team seat", description: "One more team seat.", monthlyCents: 1500, annualCents: 16500, availableOn: ["team", "pro", "growth"], grants: { agencySeats: 1 } },
-  protected_site: { key: "protected_site", name: "Extra protected website", description: "Click Guard + IP Tracker + VPN Shield for one more website.", monthlyCents: 1500, annualCents: 16500, availableOn: ["starter", "team", "pro", "growth"], grants: { protectedSites: 1 } },
+  // Owner, 2026-10-10: $39/mo (was $15), the same price as the à la carte Click Guard add-on tier (shared/alacarte.ts
+  // click_guard reuses this add-on), so a new buyer pays the same either way. Existing subscribers keep the Stripe
+  // Price they were sold at: the lookup key carries the cents, so nothing re-prices them (server/billing/prices.ts).
+  protected_site: { key: "protected_site", name: "Extra protected website", description: "Click Guard + IP Tracker + VPN Shield for one more website.", monthlyCents: 3900, annualCents: 42900, availableOn: ["starter", "team", "pro", "growth"], grants: { protectedSites: 1 } },
   texting_number: { key: "texting_number", name: "Client texting number", description: "A registered texting number on our carrier for texting your clients; texts count against your plan's monthly text allowance.", monthlyCents: 2900, annualCents: 31900, setupCents: 2900, availableOn: ["starter", "team", "pro", "growth", "agency"], grants: {} },
   competitor_pack: { key: "competitor_pack", name: "Competitor scan pack", description: "10 more Competitor Intel scans each month.", monthlyCents: 1900, annualCents: 20900, availableOn: ["starter", "team", "pro", "growth", "agency"], grants: { competitorScans: 10 } },
   grid_pack: { key: "grid_pack", name: "Grid scan pack", description: "10 more ranking-grid credits each month.", monthlyCents: 1000, annualCents: 11000, availableOn: ["starter", "team", "pro", "growth", "agency"], grants: { gridCredits: 10 } },

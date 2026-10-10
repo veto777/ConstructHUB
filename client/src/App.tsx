@@ -475,6 +475,8 @@ const sidebarStyle = {
  */
 // …and /crm/report-issue: a person locked out by the paywall can still tell us something is wrong.
 const CRM_GATE_OPEN = [/^\/crm\/join/, /^\/crm\/admin/, /^\/admin/, /^\/auth/, /^\/crm-terms/, /^\/crm-privacy/, /^\/crm\/report-issue/];
+/** The JobCam-only shell's pages (server/crm/jobcam-shell.ts lists the API side): JobCam, and the clients/projects shots are filed to. */
+const JOBCAM_SHELL_OPEN = [/^\/crm\/jobcam/, /^\/crm\/projects\/[^/]+\/jobcam/, /^\/crm\/clients/, /^\/crm\/projects(\/|$)/];
 function CrmPlanGate({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
@@ -485,7 +487,22 @@ function CrmPlanGate({ children }: { children: React.ReactNode }) {
     const timer = window.setInterval(() => { void queryClient.invalidateQueries({ queryKey: ["/api/crm/me"] }); }, 2500);
     return () => window.clearInterval(timer);
   }, [justPaid, me?.crm?.active]);
-  if (!me?.crm || me.crm.active || CRM_GATE_OPEN.some((re) => re.test(location))) return <>{children}</>;
+  if (!me?.crm || CRM_GATE_OPEN.some((re) => re.test(location))) return <>{children}</>;
+  // JobCam bought à la carte with no CRM plan (owner, 2026-10-10): JobCam and the clients/projects it files to
+  // are open; home lands on JobCam; every other CRM page shows the CRM plans (server/crm/jobcam-shell.ts).
+  if (me.crm.active && me.crm.jobcamOnly) {
+    if (location === "/" || location === "/crm") return <Redirect to="/crm/jobcam" />;
+    if (JOBCAM_SHELL_OPEN.some((re) => re.test(location))) return <>{children}</>;
+    return (
+      <div data-testid="page-crm-jobcam-only">
+        <p className="mx-auto max-w-2xl px-4 pt-10 text-center text-sm text-muted-foreground" data-testid="text-crm-jobcam-only">
+          Your account has JobCam on its own. The rest of the CRM — estimates, invoices, scheduling, payments and texting — needs a CRM plan.
+        </p>
+        <CrmPaywall isOwner={!!me.crm.isOwner} orgName={me.org?.name} />
+      </div>
+    );
+  }
+  if (me.crm.active) return <>{children}</>;
   if (justPaid) return <div className="p-10 text-center text-muted-foreground" data-testid="text-crm-activating">Activating your CRM plan…</div>;
   return <CrmPaywall isOwner={!!me.crm.isOwner} orgName={me.org?.name} />;
 }

@@ -26,10 +26,13 @@
  *     subscriptions: the tab links their cards (ALACARTE_LINKED) and never
  *     duplicates their checkout. The client texting number is an add-on only
  *     (ADDONS.texting_number), listed as such (ALACARTE_ADDON_ONLY).
- *   - JobCam: the CRM add-on (CRM_ADDONS.jobcam) sold here at the add-on price
- *     on top of an active CRM plan. Stand-alone JobCam with no CRM plan needs a
- *     CRM shell that does not exist yet (`requiresCrmPlan`): the standalone
- *     price is listed as coming and the checkout refuses it until it ships.
+ *   - JobCam: the CRM's JobCam (CRM_ADDONS.jobcam) sold here. On a CRM plan that
+ *     sells the add-on it IS that add-on; with no CRM plan at all (owner,
+ *     2026-10-10: "all features should have a standalone access") the purchase
+ *     grants a JobCam-only CRM shell — the owner's org, JobCam, clients and
+ *     projects to file shots to, the included storage — while the rest of the
+ *     CRM stays locked behind a CRM plan (server/crm/entitlements.ts jobcamOnly,
+ *     server/crm/tenancy.ts JOBCAM_SHELL_PATHS).
  *
  * Money is in cents.
  */
@@ -74,7 +77,7 @@ export type AlacarteGrants = {
   limits?: Partial<Record<CountLimitKey, number>>;
   /** AI review replies may publish without a human approving each one. */
   autoPublishAiReplies?: boolean;
-  /** JobCam on the account's CRM plan (shared/crm-plans.ts CRM_ADDONS.jobcam). */
+  /** JobCam on the CRM (shared/crm-plans.ts CRM_ADDONS.jobcam): the add-on on a CRM plan, or the JobCam-only shell without one. */
   crmJobcam?: boolean;
 };
 
@@ -100,8 +103,6 @@ export type AlacarteItem = {
   unit?: string;
   /** A part of the item that is promised but still being built (its module sits in COMING_MODULES). */
   comingPart?: string;
-  /** Sold on top of an active CRM plan only, until the stand-alone shell ships (JobCam). */
-  requiresCrmPlan?: boolean;
   /** One of these per account (the two SEO suites). */
   exclusiveGroup?: "seo";
 };
@@ -172,7 +173,7 @@ export const ALACARTE: Record<AlacarteKey, AlacarteItem> = {
     { comingPart: COMING_MODULES.includes("permitAlerts") ? MODULE_NAMES.permitAlerts : undefined }),
   jobcam: item("jobcam", CRM_ADDONS.jobcam.name,
     "Job-site photos and video filed to each project and client, with a per-shot client switch and share links you can password, expire and revoke.",
-    5900, CRM_ADDONS.jobcam.monthlyCents, { crmJobcam: true }, "jobcam", { requiresCrmPlan: true }),
+    5900, CRM_ADDONS.jobcam.monthlyCents, { crmJobcam: true }, "jobcam"),
   master_class: item("master_class", MODULE_NAMES.masterClass,
     "The contractor course: website, SEO, Google Business Profile and Google Ads, with licensing guides for all 50 states.",
     9900, 4900, { modules: ["masterClass"] }, "master-class"),

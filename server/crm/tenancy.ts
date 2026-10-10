@@ -20,6 +20,7 @@ import { authorizeObjectRequest } from "./object-access";
 import { PLANS, type AddonKey, type PlanKey } from "@shared/plans";
 import { getEntitlements, raiseHint, plural, inUse, textingNumbersAllowance, type Entitlements } from "../entitlements";
 import { getCrmEntitlements, crmPlanRequiredBody } from "./entitlements";
+import { jobcamShellPath, jobcamOnlyBody } from "./jobcam-shell";
 import { CRM_PLANS, cheapestCrmPlanWhere, CRM_EXTRA_SEAT_MONTHLY_CENTS, type CrmPlanKey } from "@shared/crm-plans";
 
 export type OrgContext = {
@@ -142,8 +143,10 @@ async function crmPlanOk(req: any, res: any, ctx: OrgContext): Promise<boolean> 
   const path = String(req?.originalUrl || req?.path || "").split("?")[0];
   if (CRM_OPEN_PATHS.some((re) => re.test(path))) return true;
   const crm = await getCrmEntitlements(ctx.org.ownerUserId);
-  if (crm.active) return true;
-  res.status(402).json(crmPlanRequiredBody());
+  // JobCam bought à la carte with no CRM plan (owner, 2026-10-10): JobCam and the clients/projects shots are
+  // filed to are open; the rest of the CRM still needs a CRM plan (./jobcam-shell.ts).
+  if (crm.active && (!crm.jobcamOnly || jobcamShellPath(path))) return true;
+  res.status(402).json(crm.jobcamOnly ? jobcamOnlyBody(crmPlanRequiredBody()) : crmPlanRequiredBody());
   return false;
 }
 

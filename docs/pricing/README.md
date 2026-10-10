@@ -64,10 +64,15 @@ paid plan) and an **add-on** monthly price (an active paid Business Tools plan
 or CRM plan — `isAddonPrice` / `alacarteTierFor`). Annual is `ANNUAL_MONTHS`
 × monthly like everything else. Items that overlap a platform add-on (the two
 SEO suites, the protected website) name it in `existingAddon`: their add-on
-tier IS that add-on's price and grants, never a parallel product. JobCam is
-sold on top of an active CRM plan only (`requiresCrmPlan`) until a stand-alone
-CRM shell exists; permit alerts show as coming while `permitAlerts` sits in
-`COMING_MODULES`. The CRM and the Call Assistant are already stand-alone and
+tier IS that add-on's price and grants, never a parallel product (owner,
+2026-10-10: the protected website is $39/mo either way; existing
+`protected_site` subscribers keep the Stripe Price they were sold at, since the
+lookup key carries the cents). JobCam with no CRM plan opens a **JobCam-only
+CRM shell** (`server/crm/entitlements.ts` `jobcamOnly`: the owner's org, JobCam
+with the included storage, and the clients/projects shots are filed to; every
+other CRM route answers 402 `crm_plan_required` — `server/crm/jobcam-shell.ts`);
+on a CRM plan that sells the add-on it is that add-on. Permit alerts show as
+coming while `permitAlerts` sits in `COMING_MODULES`. The CRM and the Call Assistant are already stand-alone and
 are linked from the tab (`ALACARTE_LINKED`); the texting number stays an
 add-on only (`ALACARTE_ADDON_ONLY`).
 

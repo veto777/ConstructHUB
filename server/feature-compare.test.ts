@@ -137,7 +137,7 @@ describe("every Compare section", () => {
     expect(offerLine("gbp", "standalone", false)).toBe("$39/mo per location on its own, or $24/mo per location as an add-on to any plan.");
     expect(offerLine("reviews", "addon", true)).toBe("$39/mo as an add-on to your plan ($59/mo on its own).");
     expect(offerLine("seo_basic", "standalone", true)).toBe("$59/mo on its own, or $29/mo as an add-on to any plan.");
-    expect(offerLine("jobcam", "standalone", false)).toBe("$39/mo on top of any CRM plan; stand-alone JobCam ($59/mo) is coming.");
+    expect(offerLine("jobcam", "standalone", false)).toBe("$59/mo on its own, or $39/mo as an add-on to any plan.");
     // A signed-in account that lacks a tool and lands on its route gets the landing page (the route gate).
     const app = read("client/src/App.tsx");
     expect(app.match(/<ToolRouteGate location=\{location\}><DashboardRouter \/><\/ToolRouteGate>/g)?.length).toBe(2);

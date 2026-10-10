@@ -19,7 +19,7 @@ describe("the à la carte price book", () => {
       gbp: [3900, 2400], reviews: [5900, 3900], gridrank: [4900, 2900], competitor_intel: [2900, 1900], site_scan: [2900, 1900],
       ai_posts: [3900, 2400], ads_manager: [12900, 7900],
       // Overlaps an existing add-on: the add-on tier is that add-on's price (brief: never a parallel product).
-      click_guard: [6900, ADDONS.protected_site.monthlyCents],
+      click_guard: [6900, 3900],
       seo_basic: [5900, ADDONS.seo_basic.monthlyCents], seo_pro: [12900, ADDONS.seo_pro.monthlyCents],
       website_tools: [5900, 3900], social: [4900, 2900], permits: [19900, 12900], jobcam: [5900, CRM_ADDONS.jobcam.monthlyCents], master_class: [9900, 4900],
     });
@@ -43,6 +43,12 @@ describe("the à la carte price book", () => {
     expect(alacartePriceCents("seo_basic", "addon", "year")).toBe(ADDONS.seo_basic.annualCents);
     expect(alacartePriceCents("seo_pro", "addon", "year")).toBe(ADDONS.seo_pro.annualCents);
     expect(alacartePriceCents("click_guard", "addon", "year")).toBe(ADDONS.protected_site.annualCents);
+    // Owner, 2026-10-10: the protected website is $39/mo either way (the add-on and the à la carte add-on tier agree).
+    expect(ADDONS.protected_site.monthlyCents).toBe(3900);
+    expect(ADDONS.protected_site.annualCents).toBe(42900);
+    // Owner, 2026-10-10: the protected website is $39/mo either way (the add-on and the à la carte add-on tier agree).
+    expect(ADDONS.protected_site.monthlyCents).toBe(3900);
+    expect(ADDONS.protected_site.annualCents).toBe(42900);
   });
 
   it("the add-on price applies to any account with an active Business Tools plan or CRM plan; standalone otherwise", () => {
@@ -82,8 +88,9 @@ describe("the à la carte price book", () => {
     expect(ALACARTE.master_class.grants).toEqual({ modules: ["masterClass"] });
     // Permit alerts are being built: the card says so while the module is in COMING_MODULES.
     expect(!!ALACARTE.permits.comingPart).toBe(COMING_MODULES.includes("permitAlerts"));
-    // JobCam stand-alone needs the CRM shell: sold on a CRM plan only until then.
-    expect(ALACARTE.jobcam.requiresCrmPlan).toBe(true);
+    // JobCam stands alone (owner, 2026-10-10): with no CRM plan the purchase grants the CRM's JobCam shell
+    // (server/crm/entitlements.ts jobcamOnly); nothing in the price book ties it to a CRM plan.
+    expect("requiresCrmPlan" in ALACARTE.jobcam).toBe(false);
   });
 
   it("lays active items over a stand-alone account (no plan) and over a plan's allowances, only ever raising", () => {

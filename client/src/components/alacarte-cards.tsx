@@ -10,12 +10,11 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Check, ExternalLink, Loader2, Lock } from "lucide-react";
+import { Check, ExternalLink, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
-import { apiErrorCode } from "@/lib/plan-errors";
 import { formatUsd, intervalSuffix } from "@/lib/pricing-display";
 import { TEXT_LINK } from "@/components/feature-landing/primitives";
 import { trackEvent } from "@/lib/gtag";
@@ -70,13 +69,7 @@ export function AlacarteCards({ interval, signedIn }: { interval: BillingInterva
       (await apiRequest("POST", "/api/alacarte/checkout", body)).json(),
     onSuccess: (data) => { if (data?.url) window.location.href = data.url; },
     onError: (err, body) => {
-      const code = apiErrorCode(err);
-      if (code === "crm_plan_required") {
-        toast({ title: `${ALACARTE[body.key].name} needs a CRM plan`, description: apiErrorMessage(err), action: undefined });
-        setLocation("/pricing#crm");
-        return;
-      }
-      toast({ title: "Couldn't start checkout", description: apiErrorMessage(err), variant: "destructive" });
+      toast({ title: `Couldn't start checkout for ${ALACARTE[body.key].name}`, description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -97,7 +90,6 @@ export function AlacarteCards({ interval, signedIn }: { interval: BillingInterva
           const active = !!row?.active;
           const paused = !!row && !row.active && row.hasLiveSubscription;
           const covered = !!me?.covered.includes(key) || !!me?.isPlatformAdmin;
-          const needsCrm = !!it.requiresCrmPlan && signedIn && !!me && !me.crmPlanActive && !active;
           const quantity = quantities[key] ?? 1;
           const pending = checkout.isPending && checkout.variables?.key === key;
           const cents = alacartePriceCents(key, tier, interval) * quantity;
@@ -111,7 +103,6 @@ export function AlacarteCards({ interval, signedIn }: { interval: BillingInterva
                 {active && <Badge variant="outline" className="font-sans text-[10px] rounded-full border-mkt-ink text-mkt-ink" data-testid={`badge-alacarte-active-${key}`}><Check className="w-3 h-3 mr-1 text-mkt-orange-ink" />Active{row!.quantity > 1 ? ` × ${row!.quantity}` : ""}{row!.cancelAtPeriodEnd ? " · ends at period end" : ""}</Badge>}
                 {paused && <Badge variant="outline" className="font-sans text-[10px] rounded-full border-red-600 text-red-700" data-testid={`badge-alacarte-paused-${key}`}>Payment needed</Badge>}
                 {it.comingPart && <Badge variant="outline" className="font-sans text-[10px] rounded-full border-mkt-orange text-mkt-orange-ink" data-testid={`badge-alacarte-coming-${key}`}>{it.comingPart}: coming soon</Badge>}
-                {it.requiresCrmPlan && <Badge variant="outline" className="font-sans text-[10px] rounded-full border-mkt-rule text-mkt-muted" data-testid={`badge-alacarte-crm-${key}`}>On a CRM plan</Badge>}
               </div>
               <p className="mt-3 text-[14px] text-mkt-ink-soft leading-relaxed flex-1">{it.pitch}</p>
               <div className="mt-5 font-display font-semibold text-mkt-ink leading-none whitespace-nowrap" data-testid={`text-alacarte-price-${key}`}>
@@ -120,9 +111,7 @@ export function AlacarteCards({ interval, signedIn }: { interval: BillingInterva
                 {it.unit && <span className="font-sans text-[12px] font-medium text-mkt-muted ml-1">· {quantity} {it.unit}{quantity === 1 ? "" : "s"}</span>}
               </div>
               <p className="mt-2 text-[12.5px] leading-relaxed text-mkt-muted min-h-[2.5rem]" data-testid={`text-alacarte-note-${key}`}>
-                {it.requiresCrmPlan
-                  ? `${priceLabel(key, "addon", interval)} on top of any CRM plan. Stand-alone ${it.name} (${priceLabel(key, "standalone", interval)}) is coming.`
-                  : alacartePriceNote(key, tier, interval, signedIn)}
+                {alacartePriceNote(key, tier, interval, signedIn)}
               </p>
               {it.unit && !active && (
                 <label className="mt-2 flex items-center gap-2 text-[13px] text-mkt-ink-soft">
@@ -147,10 +136,6 @@ export function AlacarteCards({ interval, signedIn }: { interval: BillingInterva
                 ) : covered ? (
                   <Button variant="outline" disabled className="w-full border-2 border-mkt-rule bg-transparent text-mkt-ink-soft h-11 rounded-lg" data-testid={`button-alacarte-${key}`}>
                     <Check className="w-4 h-4 mr-1 text-mkt-orange-ink" /> Included in your plan
-                  </Button>
-                ) : needsCrm ? (
-                  <Button variant="outline" className={`w-full ${OUTLINE_BUTTON}`} onClick={() => setLocation("/pricing#crm")} data-testid={`button-alacarte-${key}`}>
-                    <Lock className="w-4 h-4 mr-1" /> Choose a CRM plan first
                   </Button>
                 ) : (
                   <Button className={`w-full ${tier === "addon" ? NAVY_BUTTON : OUTLINE_BUTTON}`} variant={tier === "addon" ? "default" : "outline"} disabled={busy} onClick={() => buy(key)} data-testid={`button-alacarte-${key}`}>

@@ -20,7 +20,8 @@ import { CRM_PLANS, cheapestCrmPlanWhere, crmAddonAvailableOn, type CrmPlanKey }
 /** Why a workspace has JobCam — or that it does not (`via: null`). */
 export type JobcamAccess = {
   entitled: boolean;
-  via: "plan" | "addon" | "admin" | "beta" | null;
+  /** "alacarte": JobCam bought on its own with no CRM plan (shared/alacarte.ts; the JobCam-only shell). */
+  via: "plan" | "addon" | "admin" | "beta" | "alacarte" | null;
   /** The owner's CRM plan, when there is one (staff and beta read as the top plan). */
   plan: CrmPlanKey | null;
 };
@@ -34,6 +35,8 @@ export function jobcamAccessFrom(ent: Pick<CrmEntitlements, "active" | "via" | "
   const none: JobcamAccess = { entitled: false, via: null, plan: ent.plan };
   if (!ent.active) return none;
   if (ent.via === "admin" || ent.via === "beta") return { entitled: true, via: ent.via, plan: ent.plan };
+  // JobCam à la carte with no CRM plan: the JobCam-only shell (server/crm/entitlements.ts).
+  if (ent.via === "jobcam") return { entitled: true, via: "alacarte", plan: null };
   if (ent.limits?.jobcam) return { entitled: true, via: "plan", plan: ent.plan };
   if (ent.jobcamAddon && crmAddonAvailableOn("jobcam", ent.plan)) return { entitled: true, via: "addon", plan: ent.plan };
   return none;
