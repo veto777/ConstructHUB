@@ -1,0 +1,309 @@
+[
+ {
+  "key": "gbp",
+  "n": 1,
+  "route": "/locations?q=Summit",
+  "wait": "Summit Roofing Co. Lakewood",
+  "alt": "Business Profile Locations page listing three Summit Roofing Co. locations in Denver, Aurora and Lakewood, each linked to Google with rating, review count, hours and quick actions.",
+  "caption": "Every Google Business Profile location in one list"
+ },
+ {
+  "key": "gbp",
+  "n": 2,
+  "route": "/locations?location=910001&tab=insights&group=week",
+  "wait": "Google performance",
+  "actions": [
+   {
+    "scroll": "text=Week of Sep 14"
+   },
+   {
+    "wait": 500
+   }
+  ],
+  "alt": "Insights tab for the Denver location showing weekly Google performance: Maps and Search impressions, website clicks, calls and direction requests.",
+  "caption": "Weekly Google views, calls, clicks and directions per location"
+ },
+ {
+  "key": "gbp",
+  "n": 3,
+  "route": "/locations?location=910001&tab=info",
+  "wait": "Location Information",
+  "alt": "Location Info tab for Summit Roofing Co. in Denver showing the business name, description, service areas, phone, categories, website and hours synced from Google.",
+  "caption": "The full profile, synced from Google"
+ },
+ {
+  "key": "profileGuard",
+  "n": 1,
+  "route": "/locations?location=910001&tab=guard",
+  "wait": "Pending changes and history",
+  "actions": [
+   {
+    "scroll": "text=Pending changes and history"
+   },
+   {
+    "wait": 500
+   }
+  ],
+  "alt": "Profile Guard for the Denver location listing detected Google profile edits, such as a changed website and category, with the approved value beside the detected value and Approve or Reject buttons.",
+  "caption": "Profile Guard catches edits to your Google profile"
+ },
+ {
+  "key": "profileGuard",
+  "n": 2,
+  "route": "/gmb-monitor",
+  "wait": "Peakline Exteriors",
+  "actions": [
+   {
+    "click": "[data-testid=button-history-910001]"
+   },
+   {
+    "wait": 800
+   }
+  ],
+  "alt": "GMB Edit Monitor with watched Google listings and the edit history of Summit Roofing Co., showing before and after values for website, category and phone changes.",
+  "caption": "Edit history with before and after values"
+ },
+ {
+  "key": "gbpContent",
+  "n": 1,
+  "route": "/gbp-content?location=910001",
+  "wait": "Calendar, queue",
+  "actions": [
+   {
+    "click": "text=AI drafts and style"
+   },
+   {
+    "fill": "[aria-label=Instructions]",
+    "value": "Write a short fall post for our Denver customers about free roof inspections before the first snow. Friendly, no hype, end with a call to action."
+   },
+   {
+    "fill": "label:has-text(\"Example descriptions\") textarea",
+    "value": "Hail season recap: our crews inspected over 300 Denver roofs this summer. Book a free inspection before the snow flies."
+   },
+   {
+    "fill": "[aria-label=\"Post draft\"]",
+    "value": "Snow is on the way. Before the first storm hits Denver, let our crew give your roof a free 21-point check: shingles, flashing, vents, gutters and attic insulation. It takes about an hour and you get photos of everything we find. Call (303) 555-0142 to book your free inspection."
+   },
+   {
+    "scroll": "text=Editable style guidance"
+   },
+   {
+    "wait": 500
+   }
+  ],
+  "alt": "Posts and photos editor with AI drafting instructions, saved style guidance for the business, and an AI-drafted Google post ready to review before it is scheduled.",
+  "caption": "AI drafts posts in your voice, you approve them"
+ },
+ {
+  "key": "gbpContent",
+  "n": 2,
+  "route": "/gbp-content?location=910001",
+  "wait": "Calendar, queue",
+  "actions": [
+   {
+    "scroll": "text=Before and after: cedar shake"
+   },
+   {
+    "wait": 500
+   }
+  ],
+  "alt": "Posts and photos queue for Summit Roofing Co. with scheduled Google posts and photo captions, each with its publish time and status.",
+  "caption": "Posts and photo captions queued on a schedule"
+ },
+ {
+  "key": "gbpContent",
+  "n": 3,
+  "route": "/gbp-content?location=910001",
+  "wait": "Calendar, queue",
+  "actions": [
+   {
+    "click": "role=button[name=\"Calendar\"]"
+   },
+   {
+    "scroll": "text=Is your attic ready"
+   },
+   {
+    "wait": 500
+   }
+  ],
+  "alt": "Calendar view of scheduled and published Google Business Profile posts and photos, grouped by day.",
+  "caption": "Calendar view of everything going to Google"
+ },
+ {
+  "key": "rankingGrid",
+  "n": 1,
+  "route": "/ranking-grid",
+  "wait": "roofing contractor",
+  "actions": [
+   {
+    "click": "[data-testid=card-scan-910001] .cursor-pointer"
+   },
+   {
+    "wait": 3000
+   },
+   {
+    "scroll": "[data-testid=img-ranking-map]"
+   },
+   {
+    "wait": 800
+   }
+  ],
+  "alt": "Ranking grid scan for the keyword roofing contractor: a 7 by 7 grid of colored rank markers over a map of Denver, green near the shop and red further out.",
+  "caption": "Where you rank on Google Maps, point by point"
+ },
+ {
+  "key": "rankingGrid",
+  "n": 2,
+  "route": "/ranking-grid",
+  "wait": "roofing contractor",
+  "actions": [
+   {
+    "click": "[data-testid=button-view-report-910001]"
+   },
+   {
+    "wait": 3000
+   }
+  ],
+  "alt": "Full ranking grid report with average rank, top-3 coverage, rank distribution and the competitors that outrank the business.",
+  "caption": "Full report with rank distribution and competitors"
+ },
+ {
+  "key": "competitors",
+  "n": 1,
+  "route": "/competitors",
+  "wait": "Roofing Contractor",
+  "actions": [
+   {
+    "click": "[data-testid=card-scan-910001] .cursor-pointer"
+   },
+   {
+    "wait": 1500
+   }
+  ],
+  "alt": "Competitor market scan for roofing contractors in Denver with 12 competitors found, an overview, and counts of listings with few, some or more review signals.",
+  "caption": "A market scan of local competitors"
+ },
+ {
+  "key": "competitors",
+  "n": 2,
+  "route": "/competitors",
+  "wait": "Roofing Contractor",
+  "actions": [
+   {
+    "click": "[data-testid=card-scan-910001] .cursor-pointer"
+   },
+   {
+    "wait": 1500
+   },
+   {
+    "click": "[data-testid=button-review-analysis-910003]"
+   },
+   {
+    "wait": 800
+   }
+  ],
+  "alt": "Review analysis for a competitor listing, showing good and bad review counts, repeated common phrases, generic reviews and reviewer photo share.",
+  "caption": "Review signals worth a closer look",
+  "clip": "[data-testid=card-competitor-910003]"
+ },
+ {
+  "key": "mailAlerts",
+  "n": 1,
+  "route": "/mail-alerts",
+  "wait": "Someone suggested",
+  "actions": [
+   {
+    "scroll": "text=Your Business Profile category was updated"
+   },
+   {
+    "wait": 400
+   }
+  ],
+  "alt": "Provider inbox listing forwarded alerts from Google Business Profile, Search Console, Google Ads, Cloudflare and a domain registrar, with severity labels and read status.",
+  "caption": "Provider alerts from Google, registrars and more in one inbox"
+ },
+ {
+  "key": "domains",
+  "n": 1,
+  "route": "/domains",
+  "wait": "summitgutters",
+  "actions": [
+   {
+    "scroll": "text=denverhailrepair.example"
+   },
+   {
+    "wait": 400
+   }
+  ],
+  "alt": "Domain inventory with eight sample domains showing registrar, mapped location, expiry date, auto-renew status, nameservers and last DNS check.",
+  "caption": "Every client domain with expiry, auto-renew and DNS"
+ },
+ {
+  "key": "domains",
+  "n": 2,
+  "route": "/domains",
+  "wait": "summitgutters",
+  "actions": [
+   {
+    "click": "[data-testid=list-domain-jobs] summary"
+   },
+   {
+    "scroll": "[data-testid=section-domain-jobs]"
+   },
+   {
+    "wait": 400
+   }
+  ],
+  "alt": "DNS change preview for summitroofing.example showing the records before and after adding a TXT verification record, waiting for confirmation.",
+  "caption": "Preview DNS changes before they go live"
+ },
+ {
+  "key": "reinstatement",
+  "n": 1,
+  "route": "/reinstatement",
+  "wait": "Tell us about your suspension",
+  "actions": [
+   {
+    "fill": "[data-testid=input-reinstate-name]",
+    "value": "Sam Rivera"
+   },
+   {
+    "fill": "[data-testid=input-reinstate-email]",
+    "value": "sam@summitroofing.example"
+   },
+   {
+    "fill": "[data-testid=input-reinstate-business]",
+    "value": "Summit Roofing Co. Lakewood"
+   },
+   {
+    "fill": "[data-testid=input-reinstate-website]",
+    "value": "https://summitroofing.example/lakewood"
+   },
+   {
+    "fill": "[data-testid=input-reinstate-address]",
+    "value": "Lakewood, CO 80226"
+   },
+   {
+    "click": "[data-testid=select-business-type]"
+   },
+   {
+    "click": "role=option[name=\"Service area business (no storefront)\"]"
+   },
+   {
+    "fill": "[data-testid=textarea-problem-description]",
+    "value": "Our Lakewood profile was suspended last week after we updated the service area. No reason was given. We have already checked the guidelines and the business name matches our signage."
+   },
+   {
+    "wait": 300
+   },
+   {
+    "click": "text=Tell us about your suspension"
+   },
+   {
+    "wait": 300
+   }
+  ],
+  "alt": "Profile reinstatement page with the flat project rate, the initial review time, and a request form filled in for a suspended Lakewood location.",
+  "caption": "Request help with a suspended Google profile"
+ }
+]

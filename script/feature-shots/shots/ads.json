@@ -1,0 +1,284 @@
+[
+ {
+  "key": "clickGuard",
+  "n": 1,
+  "route": "/google-ads?tab=fraud",
+  "wait": "IP address",
+  "alt": "Click Guard traffic signals for a roofing website, listing blocked IP addresses with the reason each was flagged (repeat ad clicks, shared device fingerprint, bot user agents), whether it was blocked automatically or manually, and the date.",
+  "caption": "Repeat ad clickers and bots, blocked automatically"
+ },
+ {
+  "key": "clickGuard",
+  "n": 2,
+  "route": "/google-ads?tab=traffic",
+  "wait": "NO REFERRER DATA",
+  "alt": "Click Guard traffic sources table showing page loads, unique visitors and share of traffic by referring domain over the last 7 days.",
+  "caption": "Where your ad and website traffic comes from"
+ },
+ {
+  "key": "clickGuard",
+  "n": 3,
+  "route": "/google-ads?tab=settings",
+  "wait": "Your domains",
+  "alt": "Click Guard domain settings listing three protected websites with total visits, unique visitors, blocked IPs and suspicious visits for each.",
+  "caption": "Every protected site with its visits, blocks and flags"
+ },
+ {
+  "key": "ipTracker",
+  "n": 1,
+  "route": "/ip-tracker?tab=visitors",
+  "wait": "visitors",
+  "alt": "IP Tracker visitor list showing each website visitor's IP address, visits, pages viewed, city, browser and last seen time, with visitors online now and a suspicious visitor marked.",
+  "caption": "Every visitor, live, with location and device"
+ },
+ {
+  "key": "ipTracker",
+  "n": 2,
+  "route": "/ip-tracker?tab=visitors",
+  "wait": "visitors",
+  "actions": [
+   {
+    "fill": "input[type=search]",
+    "value": "198.51.100.201"
+   },
+   {
+    "wait": 600
+   },
+   {
+    "click": "text=198.51.100.201"
+   },
+   {
+    "wait": 1500
+   }
+  ],
+  "alt": "An expanded IP Tracker visitor record flagged as suspicious, showing browser, operating system, device, screen size, time zone, first and last visit, total visits and recent ad-click activity with landing pages.",
+  "caption": "One visitor's full history and device details"
+ },
+ {
+  "key": "ipTracker",
+  "n": 3,
+  "route": "/ip-tracker?tab=pages",
+  "alt": "IP Tracker pages report listing each page of a roofing website with hits, unique visitors and share of traffic.",
+  "caption": "Which pages visitors actually land on"
+ },
+ {
+  "key": "vpnShield",
+  "n": 1,
+  "route": "/vpn-shield",
+  "wait": "Top VPN providers",
+  "alt": "VPN Shield overview with total VPN or proxy detections, detections today, visits blocked and unique VPN IP addresses, plus a breakdown of detections by country.",
+  "caption": "VPN and proxy traffic at a glance"
+ },
+ {
+  "key": "vpnShield",
+  "n": 2,
+  "route": "/vpn-shield?tab=blocked",
+  "wait": "flagged visit",
+  "alt": "VPN Shield flagged visits list showing each IP address with its detection method (datacenter IP range, WebRTC leak, VPN extension), whether it was blocked or only logged, location and time.",
+  "caption": "Each flagged visit with how it was detected"
+ },
+ {
+  "key": "adsManager",
+  "n": 1,
+  "route": "/ads-manager?tab=accounts",
+  "wait": "Peakline Exteriors",
+  "actions": [
+   {
+    "scroll": "text=Redstone Restoration"
+   }
+  ],
+  "alt": "Agency Ads and LSA manager client accounts table listing connected Google Ads accounts with customer ID, LSA status, currency and time zone, linked Click Guard site, last audit time and account status.",
+  "caption": "All client Google Ads accounts under one agency login"
+ },
+ {
+  "key": "adsManager",
+  "n": 2,
+  "route": "/ads-manager?tab=findings",
+  "wait": "presence-only",
+  "actions": [
+   {
+    "scroll": "text=Review call tracking"
+   }
+  ],
+  "alt": "Ads health audit findings for client accounts, such as campaigns not set to presence-only targeting, search terms with spend and no conversions, missing ad schedules and budget-limited campaigns, each with a fix button.",
+  "caption": "Health audit findings with one-click fix previews"
+ },
+ {
+  "key": "adsManager",
+  "n": 3,
+  "route": "/ads-manager?tab=plans",
+  "wait": "Review preview",
+  "actions": [
+   {
+    "click": "text=Review preview"
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "clip": "[role=dialog]",
+  "alt": "Protection change preview dialog listing the exact Google Ads changes to be made: IP exclusions from Click Guard added to two search campaigns, with a warning and the number of operations.",
+  "caption": "Review every change before it touches Google Ads"
+ },
+ {
+  "key": "siteScan",
+  "n": 1,
+  "route": "/site-scan?scan=93000000-0000-4000-8000-00000000f004",
+  "wait": "What raised or lowered",
+  "actions": [
+   {
+    "scroll": "h2:has-text(\"Technical\")"
+   }
+  ],
+  "alt": "Site Scan report for a contractor website with an overall score and Local, Content, Technical, Performance and AI Readiness scores, followed by prioritized findings with why each matters and how to fix it.",
+  "caption": "A finished scan: scores and prioritized fixes"
+ },
+ {
+  "key": "siteScan",
+  "n": 2,
+  "route": "/site-scan?scan=93000000-0000-4000-8000-00000000f004",
+  "wait": "What raised or lowered",
+  "actions": [
+   {
+    "scroll": "[data-testid=section-scan-history]"
+   }
+  ],
+  "alt": "Site Scan history listing past scans of several client websites with dates, overall scores and the score change since the prior scan.",
+  "caption": "Scan history and score trend for every client"
+ },
+ {
+  "key": "siteScan",
+  "n": 3,
+  "route": "/site-scan?scan=93000000-0000-4000-8000-00000000f004",
+  "wait": "What raised or lowered",
+  "actions": [
+   {
+    "scroll": "h2:has-text(\"Content\")"
+   }
+  ],
+  "alt": "Site Scan findings for local and content issues, such as duplicate titles and images missing alt text, each with impact, Google guidance link, fix steps and affected URLs.",
+  "caption": "Each finding explained, with steps and affected pages"
+ },
+ {
+  "key": "cloudflare",
+  "n": 1,
+  "route": "/cloudflare",
+  "wait": "summitroofing.example",
+  "alt": "Cloudflare protection page listing connected client websites (zones) with status, linked locations and last sync time.",
+  "caption": "Client Cloudflare zones in one list"
+ },
+ {
+  "key": "cloudflare",
+  "n": 2,
+  "route": "/cloudflare",
+  "wait": "summitroofing.example",
+  "actions": [
+   {
+    "click": "button:has-text(\"summitroofing.example\")"
+   },
+   {
+    "wait": 1500
+   },
+   {
+    "scroll": "h3:has-text(\"Flagged IPs\")"
+   }
+  ],
+  "alt": "Cloudflare zone details showing IP addresses flagged by Click Guard with the reason for each and a button to add it to an edge blocking rule preview.",
+  "caption": "Push Click Guard's flagged IPs to the edge"
+ },
+ {
+  "key": "cloudflare",
+  "n": 3,
+  "route": "/cloudflare",
+  "wait": "summitroofing.example",
+  "actions": [
+   {
+    "click": "[data-testid=tab-connection-edge-audit]"
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "alt": "Cloudflare edge audit listing rule changes for client zones, one applied IP block and one ads-path rule awaiting review, with before and after snapshots and an undo button.",
+  "caption": "Every edge rule change audited, with undo"
+ },
+ {
+  "key": "searchConsole",
+  "n": 1,
+  "route": "/search-console",
+  "wait": "summitroofing.example",
+  "alt": "Google Search Console page listing client properties with access level, linked locations and last sync time.",
+  "caption": "Every client's Search Console property in one place"
+ },
+ {
+  "key": "searchConsole",
+  "n": 2,
+  "route": "/search-console",
+  "wait": "summitroofing.example",
+  "actions": [
+   {
+    "click": "button:has-text(\"sc-domain:summitroofing.example\")"
+   },
+   {
+    "wait": 1500
+   },
+   {
+    "click": "select[aria-label=Breakdown]"
+   },
+   {
+    "press": "ArrowDown"
+   },
+   {
+    "press": "Enter"
+   },
+   {
+    "wait": 1500
+   },
+   {
+    "scroll": "h3:has-text(\"Search analytics\")"
+   }
+  ],
+  "alt": "Search analytics for a roofing website broken down by search query, showing clicks, impressions, click-through rate and average position per day.",
+  "caption": "Search queries with clicks, impressions and position"
+ },
+ {
+  "key": "searchConsole",
+  "n": 3,
+  "route": "/search-console",
+  "wait": "summitroofing.example",
+  "actions": [
+   {
+    "click": "button:has-text(\"sc-domain:summitroofing.example\")"
+   },
+   {
+    "wait": 1500
+   },
+   {
+    "scroll": "h3:has-text(\"Inspections\")"
+   }
+  ],
+  "alt": "Search Console sitemaps and URL inspection results for a website, showing which pages are indexed, crawled but not indexed, or not found.",
+  "caption": "Sitemaps and index status for each page"
+ },
+ {
+  "key": "customerApi",
+  "n": 1,
+  "route": "/developers",
+  "wait": "Endpoints",
+  "actions": [
+   {
+    "scroll": "text=Google Business Profile locations and their reviews"
+   }
+  ],
+  "alt": "ConstructHUB API reference listing endpoints grouped by resource, each with its HTTP method, path, required scope and description.",
+  "caption": "The API reference, generated from the OpenAPI spec"
+ },
+ {
+  "key": "customerApi",
+  "n": 2,
+  "route": "/settings?tab=api-usage",
+  "wait": "Keys used",
+  "alt": "API usage dashboard showing units and requests over the last 30 days as a stacked bar chart by API key, with totals and a per-day breakdown.",
+  "caption": "API usage by key over the last 30 days"
+ }
+]

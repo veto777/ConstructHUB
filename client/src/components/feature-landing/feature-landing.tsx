@@ -15,6 +15,7 @@ import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
 import { FEATURE_CATALOGUE, featurePagePath, type FeaturePage } from "@shared/feature-pages";
+import { FEATURE_SCREENS } from "@shared/feature-pages/screens";
 import { featurePlanGap, featurePriceSummary } from "@shared/feature-pages/pricing";
 import { SALES_REP_LABEL } from "@shared/plan-copy";
 import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
@@ -27,7 +28,7 @@ import {
 } from "./primitives";
 import {
   AudienceSection, CardsSection, CompareSection, FaqSection, FeatureHero, FinalCta, InDepthSection, PricingSection, RelatedSection,
-  SpotlightSection, StepsSection, type Tone,
+  ScreensSection, SpotlightSection, StepsSection, type Tone,
 } from "./sections";
 import { AlacarteOffer } from "./alacarte-offer";
 
@@ -98,6 +99,9 @@ export function FeatureLanding({ page }: { page: FeaturePage }) {
     return String(order.length).padStart(2, "0");
   };
   const tone = (id: string): Tone => (order.indexOf(id) % 2 === 0 ? "paper-2" : "paper");
+  // Real screens of the feature on a sample account (owner, 2026-10-10: "All the features pages needs examples of the pages!").
+  const screens = FEATURE_SCREENS[page.key] ?? [];
+  const nScreens = n("screens", screens.length > 0);
   const nSteps = n("steps", page.steps.length > 0);
   const nCards = n("cards", page.cards.length > 0);
   const nSpot = n("spotlight", !!page.spotlight);
@@ -120,6 +124,7 @@ export function FeatureLanding({ page }: { page: FeaturePage }) {
           salesCta={salesCta(BTN_OUTLINE, "hero")}
           tryIt={tryIt}
         />
+        <ScreensSection page={page} screens={screens} n={nScreens} tone={tone("screens")} />
         <StepsSection page={page} n={nSteps} tone={tone("steps")} />
         <CardsSection page={page} n={nCards} tone={tone("cards")} />
         <SpotlightSection page={page} n={nSpot} tone={tone("spotlight")} />

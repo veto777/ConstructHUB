@@ -1,0 +1,342 @@
+[
+ {
+  "key": "crm",
+  "n": 1,
+  "route": "/crm?portal=1",
+  "wait": "Needs attention",
+  "alt": "ConstructHub CRM home for Summit Roofing Co. showing open estimates, jobs won, unscheduled jobs, open invoices, pipeline value, follow-ups due and a team activity feed.",
+  "caption": "CRM home: the numbers, follow-ups and team activity at a glance"
+ },
+ {
+  "key": "crm",
+  "n": 2,
+  "route": "/crm/clients?portal=1",
+  "wait": "Maria Delgado",
+  "alt": "CRM client list with Denver-area homeowners and HOAs, their contact details, city and bid status such as Job Won or Undecided.",
+  "caption": "Every client with their own portal and bid status"
+ },
+ {
+  "key": "crm",
+  "n": 3,
+  "route": "/crm/inbox?portal=1",
+  "wait": "Maria Delgado",
+  "actions": [
+   {
+    "click": "[data-testid=thread-40000000-0002-4000-8000-000000000001]"
+   },
+   {
+    "wait": 600
+   }
+  ],
+  "alt": "CRM Messages inbox with client threads waiting for a reply and an open conversation between a homeowner and the roofing crew.",
+  "caption": "One inbox for client messages, with reply timers"
+ },
+ {
+  "key": "crmLeads",
+  "n": 1,
+  "route": "/crm/pipeline?portal=1",
+  "wait": "Roof leak over the garage",
+  "alt": "CRM pipeline board with roofing leads, estimating, proposal-sent and approved projects, each card showing project number, value and trade.",
+  "caption": "Lead pipeline from first call to approved job"
+ },
+ {
+  "key": "crmLeads",
+  "n": 2,
+  "route": "/crm/pipeline?portal=1",
+  "wait": "Roof leak over the garage",
+  "actions": [
+   {
+    "scroll": "[data-testid=stage-col-proposal_sent]"
+   },
+   {
+    "wait": 400
+   }
+  ],
+  "alt": "Sales stages of the CRM pipeline: estimating, proposal sent and approved roofing projects with their dollar values.",
+  "caption": "Sales stages with the value of every bid"
+ },
+ {
+  "key": "crmSchedule",
+  "n": 1,
+  "route": "/crm/schedule?portal=1",
+  "actions": [
+   {
+    "click": "[data-testid=select-calendar-scope]"
+   },
+   {
+    "click": "[data-testid=scope-all]"
+   },
+   {
+    "wait": 600
+   }
+  ],
+  "alt": "CRM schedule month view for October with the whole crew calendar: inspections, tear-offs, gutter installs and material deliveries.",
+  "caption": "The whole crew calendar in one month view"
+ },
+ {
+  "key": "crmSchedule",
+  "n": 2,
+  "route": "/crm/schedule?portal=1&view=week",
+  "actions": [
+   {
+    "click": "[data-testid=select-calendar-scope]"
+   },
+   {
+    "click": "[data-testid=scope-all]"
+   },
+   {
+    "click": "[data-testid=button-cal-next]"
+   },
+   {
+    "wait": 600
+   }
+  ],
+  "alt": "CRM schedule week view listing next week's roofing visits by day with start times.",
+  "caption": "Week view for dispatching crews"
+ },
+ {
+  "key": "jobcam",
+  "n": 1,
+  "route": "/crm/jobcam?portal=1",
+  "wait": "Recent",
+  "alt": "JobCam recent feed with before, damage, progress and after pictures from roofing jobs, tags, starred items and client-visible markers.",
+  "caption": "Every job-site photo, tagged and filed to its project"
+ },
+ {
+  "key": "jobcam",
+  "n": 2,
+  "route": "/crm/jobcam?portal=1",
+  "wait": "Recent",
+  "actions": [
+   {
+    "click": "[data-testid=jobcam-tile-40000000-000d-4000-8000-000000000006]"
+   },
+   {
+    "wait": 800
+   }
+  ],
+  "alt": "JobCam photo viewer showing a finished roof with the time taken, the crew member, GPS location, project, tag, caption and a visible-to-client switch.",
+  "caption": "Time, place, crew and project stamped on every shot"
+ },
+ {
+  "key": "texting",
+  "n": 1,
+  "route": "/crm/clients/40000000-0002-4000-8000-000000000001?portal=1",
+  "wait": "Maria Delgado",
+  "clip": "[data-testid=section-notes]",
+  "alt": "Client record with the text messages the office and crew sent to a homeowner, each logged with sender and time.",
+  "caption": "Texts to clients, logged on the client record"
+ },
+ {
+  "key": "gabe",
+  "n": 1,
+  "route": "/",
+  "wait": "Good",
+  "actions": [
+   {
+    "click": "[data-testid=hub-launcher]"
+   },
+   {
+    "wait": 1500
+   }
+  ],
+  "alt": "The ConstructHUB dashboard with Gabe, the built-in guide, open beside the Needs you today list, offering quick questions about plans, the CRM and getting started.",
+  "caption": "Gabe, the built-in guide, on your dashboard",
+  "keepHub": true
+ },
+ {
+  "key": "gabe",
+  "n": 2,
+  "route": "/",
+  "wait": "Good",
+  "actions": [
+   {
+    "click": "[data-testid=hub-launcher]"
+   },
+   {
+    "wait": 1200
+   },
+   {
+    "click": "[data-testid=hub-chip-crm]"
+   },
+   {
+    "wait": 2500
+   }
+  ],
+  "alt": "Gabe answering the quick question about what the CRM includes, inside the chat panel on the dashboard.",
+  "caption": "Quick questions answered in the chat panel",
+  "keepHub": true
+ },
+ {
+  "key": "guides",
+  "n": 1,
+  "route": "/social-media?tab=guides",
+  "wait": "Find a guide",
+  "actions": [
+   {
+    "scroll": "[aria-label=\"Guide topics\"]"
+   },
+   {
+    "wait": 500
+   }
+  ],
+  "alt": "The Guides page with a Find a guide list of topics and the first step-by-step walkthrough below it.",
+  "caption": "Step-by-step guides for every tool"
+ },
+ {
+  "key": "masterClass",
+  "n": 1,
+  "route": "/master-class",
+  "wait": "Master Class",
+  "alt": "The Master Class overview with four in-depth modules, 50 state guides and the course module list.",
+  "caption": "Four modules and a guide for every state"
+ },
+ {
+  "key": "masterClass",
+  "n": 2,
+  "route": "/master-class",
+  "wait": "Master Class",
+  "actions": [
+   {
+    "click": "role=tab[name=\"State guide\"]"
+   },
+   {
+    "click": "text=Select your state..."
+   },
+   {
+    "click": "role=option[name=\"Colorado\"]"
+   },
+   {
+    "wait": 1000
+   }
+  ],
+  "alt": "The Master Class state guide for Colorado, showing licensing, workers comp, tax and bond requirements with links to the state agencies.",
+  "caption": "State guide: Colorado licensing, insurance and taxes"
+ },
+ {
+  "key": "permits",
+  "n": 1,
+  "route": "/search",
+  "wait": "searchable portals",
+  "actions": [
+   {
+    "click": "[data-testid=select-scope-state]"
+   },
+   {
+    "click": "role=option[name=\"Colorado\"]"
+   },
+   {
+    "wait": 800
+   },
+   {
+    "click": "[data-testid=select-scope-location]"
+   },
+   {
+    "fill": "[data-testid=input-location-search]",
+    "value": "Denver"
+   },
+   {
+    "wait": 500
+   },
+   {
+    "click": "role=option >> text=Denver County"
+   },
+   {
+    "click": "role=radio[name=\"Keyword\"]"
+   },
+   {
+    "fill": "[data-testid=input-search-value]",
+    "value": "roof"
+   },
+   {
+    "wait": 500
+   }
+  ],
+  "alt": "The permit search form set to a keyword search for roof across the two searchable permit portals in Denver County, Colorado.",
+  "caption": "Search live permit portals by address, keyword, name or permit number"
+ },
+ {
+  "key": "permits",
+  "n": 2,
+  "route": "/search",
+  "wait": "searchable portals",
+  "actions": [
+   {
+    "click": "[data-testid=select-scope-state]"
+   },
+   {
+    "click": "role=option[name=\"Colorado\"]"
+   },
+   {
+    "wait": 1000
+   },
+   {
+    "click": "[data-testid=select-scope-location]"
+   },
+   {
+    "wait": 600
+   }
+  ],
+  "alt": "The search area picker for Colorado listing each county with its number of searchable permit portals and the cities under it.",
+  "caption": "Pick a state, county or city to search"
+ },
+ {
+  "key": "property",
+  "n": 1,
+  "route": "/property",
+  "wait": "offices",
+  "actions": [
+   {
+    "click": "[data-testid=select-state-filter]"
+   },
+   {
+    "click": "role=option[name=\"Colorado\"]"
+   },
+   {
+    "wait": 1000
+   }
+  ],
+  "alt": "Property records filtered to Colorado, listing 64 county assessor offices with links to each portal and a call button.",
+  "caption": "County assessor portals for ownership, values and tax records"
+ },
+ {
+  "key": "callAssistant",
+  "n": 1,
+  "route": "/call-assistant",
+  "wait": "calls answered",
+  "alt": "The AI Call Assistant overview with the last 30 days of results: calls answered, estimate requests, urgent calls sent to a person, questions answered and spam blocked.",
+  "caption": "Every call answered, sorted by what happened"
+ },
+ {
+  "key": "callAssistant",
+  "n": 2,
+  "route": "/call-assistant?tab=studio",
+  "wait": "Company name",
+  "alt": "The Call Assistant agent studio with the company profile for the sample roofing business and sections for services, service area, policies, persona, intake questions and escalations.",
+  "caption": "Agent studio: teach the assistant your business"
+ },
+ {
+  "key": "callAssistant",
+  "n": 3,
+  "route": "/call-assistant?tab=calls",
+  "wait": "Spam blocked",
+  "alt": "The Call Assistant call log listing recent sample calls with caller, city, outcome and a one-line summary of each call.",
+  "caption": "Call log with outcomes and summaries",
+  "actions": [
+   {
+    "scroll": "text=Skylight and re-roof"
+   },
+   {
+    "wait": 500
+   }
+  ]
+ },
+ {
+  "key": "texting",
+  "n": 2,
+  "route": "/crm/settings?portal=1#sms",
+  "clip": "[data-testid=card-sms]",
+  "alt": "The CRM's text messaging settings card showing the company's texting number as configured.",
+  "caption": "Your company's own texting number, set up in Settings"
+ }
+]

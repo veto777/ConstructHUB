@@ -157,11 +157,29 @@ export type LandingContent = {
   /** Optional long-form explanation, its own band near the end of the page (FeatureInDepth). */
   inDepth?: FeatureInDepth;
   /** Overrides for the section headings (defaults live in the template). */
-  headings?: Partial<Record<"steps" | "cards" | "audience" | "pricing" | "faq" | "related", FeatureHeading>>;
+  headings?: Partial<Record<"screens" | "steps" | "cards" | "audience" | "pricing" | "faq" | "related", FeatureHeading>>;
   /** <title> and meta description (search results, link previews). */
   seo: { title: string; description: string };
   /** Repo paths that back the claims on the page — where a reviewer checks them. */
   sources: string[];
+};
+
+/**
+ * One screenshot of the feature in the app, captured from a SAMPLE account in a throwaway lane
+ * (script/feature-shots). The page always labels it "Sample data". Listed per page key in the
+ * generated shared/feature-pages/screens.ts — never hand-edited, never a real customer's account.
+ */
+export type FeatureScreen = {
+  /** Public path of the image, e.g. "/feature-shots/reviews-1.webp". */
+  src: string;
+  /** What the image shows, one sentence (screen readers, image search). */
+  alt: string;
+  /** The short line under the image. */
+  caption: string;
+  /** The address shown in the frame's bar, e.g. "constructhub.us/google-reviews". */
+  url: string;
+  width: number;
+  height: number;
 };
 
 /**
