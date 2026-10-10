@@ -1,0 +1,38 @@
+[
+  {
+    "file": "pottawattamie-search.html",
+    "url": "https://www.citizenserve.com/Portal/PortalController?Action=showSearchPage&ctzPagePrefix=Portal_&installationID=220&type=Permit",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:44:48.218998+00:00",
+    "redactions": [
+      "uniqueID"
+    ]
+  },
+  {
+    "file": "richfield-search.html",
+    "url": "https://www4.citizenserve.com/Portal/PortalController?Action=showSearchPage&ctzPagePrefix=Portal_&installationID=420&type=Permit",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:44:57.266942+00:00",
+    "redactions": [
+      "uniqueID"
+    ]
+  },
+  {
+    "file": "merriam-search.html",
+    "url": "https://www.citizenserve.com/Portal/PortalController?Action=showSearchPage&ctzPagePrefix=Portal_&installationID=212&type=Permit",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:45:06.331886+00:00",
+    "redactions": [
+      "uniqueID"
+    ]
+  },
+  {
+    "file": "pottawattamie-reports.html",
+    "url": "https://www.citizenserve.com/Portal/PortalController?Action=showPortalReports&ctzPagePrefix=Portal_&installationID=220",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:51:16.407627+00:00",
+    "redactions": [
+      "uniqueID"
+    ]
+  }
+]

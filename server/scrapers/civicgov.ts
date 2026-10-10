@@ -88,7 +88,9 @@ export function parseCivicgovPermit(row: Row, parcel: Row, ctx: Pick<AdapterCtx,
 // An isolated, in-memory cookie jar per search. Cookies/tokens are never logged or returned.
 function session(ctx: AdapterCtx, base: URL) {
   const cookies = new Map<string, string>();
+  let requests = 0;
   return async (url: string, csrf?: string): Promise<string> => {
+    if (++requests > 250) throw new Error("CivicGov search exceeds 250 requests; narrow the address (no partial results returned)");
     const target = new URL(url);
     if (target.origin !== base.origin || target.pathname !== base.pathname) throw new Error("CivicGov cross-tenant request refused");
     const response = await politeFetch(url, {
