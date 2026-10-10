@@ -30,6 +30,41 @@ export default function AdsManagerPage() {
   const [replaceList,setReplaceList]=useState(false);
   const [inviteText,setInviteText]=useState(''),[invitePreview,setInvitePreview]=useState(false),[reviewed,setReviewed]=useState(false),[mapping,setMapping]=useState('');
   const [operationQ,setOperationQ]=useState('');
+  const [linkCustomer,setLinkCustomer]=useState(''),[linkMessage,setLinkMessage]=useState('');
+  const [linking,setLinking]=useState<{customerId:string;batchId:string}|null>(null);
+  const linkAccount=useMutation({mutationFn:async()=>{
+    const id=linkCustomer.trim();
+    if(!/^(?:\d{10}|\d{3}-\d{3}-\d{4})$/.test(id)) throw new Error('Enter a 10-digit Google Ads customer ID.');
+    const result=await (await apiRequest('POST','/api/ads/link',{customerId:id,confirm:true})).json();
+    return {customerId:id.replaceAll('-',''),batchId:result.batchId};
+  },onMutate:()=>setLinkMessage('Linking…'),onSuccess:result=>setLinking(result),onError:e=>setLinkMessage(apiErrorMessage(e))});
+  useEffect(()=>{
+    if(!linking)return;
+    let stopped=false,timer:ReturnType<typeof setTimeout>;
+    const finish=(message:string)=>{if(stopped)return;setLinkMessage(message);setLinking(null);qc.invalidateQueries({queryKey:['ads-list']});};
+    const deadline=setTimeout(()=>{finish('Still processing. Check Queue for progress.');stopped=true;clearTimeout(timer);},60000);
+    const poll=async()=>{
+      try {
+        // Search the same accounts endpoint independently of the table's current filters/page.
+        const params=new URLSearchParams({page:'1',q:linking.customerId,status:'',lsa:''});
+        const [accounts,jobs,invitations]=await Promise.all([
+          qc.fetchQuery<any>({queryKey:['ads-list','accounts',params.toString()],staleTime:0,queryFn:async()=>(await apiRequest('GET',`/api/ads/accounts?${params}`)).json()}),
+          apiRequest('GET',`/api/ads/jobs?batch=${linking.batchId}&q=${linking.customerId}`).then(r=>r.json()),
+          apiRequest('GET',`/api/ads/invitations?q=${linking.customerId}`).then(r=>r.json()),
+        ]);
+        if(stopped)return;
+        if(accounts.items.some((a:any)=>a.customer_id===linking.customerId&&a.status==='ENABLED')) {finish('Linked. Syncing campaigns now.');return;}
+        const job=jobs.items.find((j:any)=>j.kind==='link');
+        if(job&&['failed','unknown','cancelled'].includes(job.status)) {finish(job.error||'Linking stopped. Check Queue for details.');return;}
+        if(job?.status==='done'&&invitations.items.some((i:any)=>i.customer_id===linking.customerId&&i.status==='pending')) {
+          finish(`Invitation sent. The owner of ${linking.customerId} must accept it in Google Ads (Admin → Access and security → Managers), or use Access invitations to email them.`);return;
+        }
+      }catch(e){if(!stopped){finish(apiErrorMessage(e));return;}}
+      if(!stopped)timer=setTimeout(poll,3000);
+    };
+    void poll();
+    return ()=>{stopped=true;clearTimeout(timer);clearTimeout(deadline);};
+  },[linking,qc]);
   useEffect(()=>setReviewed(false),[selected]);
   const [previewId,setPreviewId]=useState<string|null>(null),[previewPage,setPreviewPage]=useState(1);
   const [domainQ,setDomainQ]=useState(''),[domainPage,setDomainPage]=useState(1),[campaignCustomer,setCampaignCustomer]=useState(''),[campaignQ,setCampaignQ]=useState(''),[campaignPage,setCampaignPage]=useState(1);
@@ -74,6 +109,12 @@ export default function AdsManagerPage() {
       </div>
     </CardContent></Section>
     <ToolTabs as="group" label="Ads manager sections">{(Object.keys(labels) as Tab[]).map(t=><GooglePill key={t} label={labels[t]} selected={tab===t} ariaPressed={tab===t} onClick={()=>switchTab(t)} />)}</ToolTabs>
+    {tab==='accounts'&&<Card><CardHeader><CardTitle className="text-base">Add a Google Ads account</CardTitle></CardHeader><CardContent>
+      <form className="flex flex-wrap gap-2" onSubmit={e=>{e.preventDefault();if(!linkAccount.isPending&&!linking)linkAccount.mutate();}}>
+        <Input className="w-full sm:max-w-xs" aria-label="Client Google Ads customer ID" placeholder="000-000-0000" value={linkCustomer} onChange={e=>setLinkCustomer(e.target.value)} disabled={linkAccount.isPending||!!linking}/>
+        <Button type="submit" disabled={!enabled||!linkCustomer.trim()||linkAccount.isPending||!!linking}>Link account</Button>
+      </form>{linkMessage&&<p role="status" className="mt-3">{linkMessage}</p>}
+    </CardContent></Card>}
     <div className="flex flex-wrap gap-3"><div className="g-search w-full sm:max-w-sm" role="search"><Search aria-hidden="true" /><input type="search" aria-label="Search accounts or records" placeholder={tab==='findings'?'Search audit findings':'Search name or customer ID'} value={q} onChange={e=>{setQ(e.target.value);setPage(1);setAll(false);setSelected([]);}}/></div><details className="w-full sm:w-auto"><summary className="g-pill cursor-pointer list-none [&::-webkit-details-marker]:hidden">Filters</summary><div className="flex flex-col sm:flex-row gap-3 py-3">
       <label>Filter <select className="border rounded p-2 bg-background" aria-label="Status filter" value={filter} onChange={e=>{setFilter(e.target.value);setPage(1);setSelected([]);setAll(false);}}><option value="">All</option>{(tab==='accounts'?['ENABLED','SUSPENDED','CANCELED','UNLINKED']:tab==='findings'?['warning','unknown','info']:tab==='invitations'?['queued','pending','accepted','rejected','cancelled','unknown','failed']:tab==='plans'?['preview','queued','applying','applied','reversed','failed','unknown','expired','no_change']:['queued','running','done','failed','unknown','cancelled']).map(s=><option key={s}>{s}</option>)}</select></label>
       {tab==='accounts'&&<label>LSA <select className="border rounded p-2 bg-background" aria-label="LSA filter" value={lsa} onChange={e=>{setLsa(e.target.value);setPage(1);setAll(false);setSelected([]);}}><option value="">All accounts</option><option value="true">LSA identified</option><option value="false">No LSA campaigns found</option><option value="unknown">Not checked</option></select></label>}

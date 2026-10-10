@@ -32,7 +32,7 @@ const api:AdsApi={search:vi.fn(async(_cid,q)=>{
   })};
   state=appliedDocument({before:state,operations,inverseTemplates:[],summary:[],warnings:[]},result).after;
   return result;
-}),link:vi.fn(async(_m,_op,validate)=>validate?{}:{result:{resourceName:`customers/${manager}/customerClientLinks/${cid}~42`}})};
+}),acceptManagerLink:vi.fn(async(client,manager,linkId,validate)=>validate?{}:{results:[{resourceName:`customers/${client}/customerManagerLinks/${manager}~${linkId}`}]}),link:vi.fn(async(_m,_op,validate)=>validate?{}:{result:{resourceName:`customers/${manager}/customerClientLinks/${cid}~42`}})};
 const make=async()=>api;
 const seedState=()=>{
   const s=emptyState();s.campaign=[normalize('campaign',{id:'10',resourceName:`customers/${cid}/campaigns/10`,name:'Fixture search',status:'ENABLED',advertisingChannelType:'SEARCH',geoTargetTypeSetting:{positiveGeoTargetType:'PRESENCE_OR_INTEREST'}})];return s;
@@ -73,6 +73,22 @@ afterAll(async()=>{
   await pool.query('DELETE FROM blocked_ips WHERE domain_id=$1',[domain]);await pool.query('DELETE FROM business_locations WHERE user_id=ANY($1)',[[user,other]]);await pool.query('DELETE FROM users WHERE id=ANY($1)',[[user,other]]);await pool.query('DELETE FROM tracked_domains WHERE id=$1',[domain]);await pool.query("DELETE FROM growth_budgets WHERE key=ANY($1)",[[`ads-queue:${user}`,`ads-queue:${other}`]]);await pool.end();
 });
 describe('Google Ads HTTP contract (all Google calls mocked)',()=>{
+  it('accepts from the client login with plural operations, validation and uncertain-write handling',async()=>{
+    const http=vi.fn(async()=>new Response('{}')),quota=vi.fn(async()=>{});
+    const client=new AdsClient(manager,async()=>'fixture',http as any,quota,'v25');
+    await client.acceptManagerLink(cid,manager,'42',true);
+    await client.acceptManagerLink(cid,manager,'42');
+    for(const [i,validateOnly] of [true,false].entries()) {
+      const [url,init]=http.mock.calls[i] as any;
+      expect(url).toContain(`/customers/${cid}/customerManagerLinks:mutate`);
+      expect(init.headers['login-customer-id']).toBe(cid);
+      expect(JSON.parse(init.body)).toEqual({operations:[{update:{resourceName:`customers/${cid}/customerManagerLinks/${manager}~42`,status:'ACTIVE'},updateMask:'status'}],validateOnly});
+    }
+    expect(quota).toHaveBeenCalledTimes(2);
+    http.mockRejectedValueOnce(new Error('network'));
+    await expect(client.acceptManagerLink(cid,manager,'42')).rejects.toMatchObject({uncertain:true});
+    expect(http).toHaveBeenCalledTimes(3);
+  });
   it('uses singular invitation operation/result, manager header, validation-only and normalized IDs',async()=>{
     const http=vi.fn(async()=>new Response(JSON.stringify({result:{resourceName:'fixture'}}))),quota=vi.fn(async()=>{});
     const client=new AdsClient(manager,async()=>'secret-fixture',http as any,quota,'v25');
@@ -106,6 +122,13 @@ describe('Google Ads HTTP contract (all Google calls mocked)',()=>{
   });
 });
 describe('Protections and reversibility',()=>{
+  it('selects schedule subfields and preserves the nested schedule in snapshots',async()=>{
+    expect(STATE_QUERIES.campaignCriterion).not.toMatch(/campaign_criterion\.ad_schedule(?:\s|,|$)/);
+    for(const field of ['day_of_week','start_hour','start_minute','end_hour','end_minute']) expect(STATE_QUERIES.campaignCriterion).toContain(`campaign_criterion.ad_schedule.${field}`);
+    const adSchedule={dayOfWeek:'MONDAY',startHour:9,startMinute:'ZERO',endHour:17,endMinute:'ZERO'};
+    state.campaignCriterion=[{resourceName:`customers/${cid}/campaignCriteria/10~1`,campaign:state.campaign[0].resourceName,adSchedule}];
+    expect((await readState(api,cid)).campaignCriterion[0].adSchedule).toEqual(adSchedule);
+  });
   it('rotates oldest observed IPs to 500 while preserving newest flags',()=>{
     state.campaignCriterion=Array.from({length:500},(_,i)=>normalize('campaignCriterion',{resourceName:`customers/${cid}/campaignCriteria/10~${i+1}`,campaign:state.campaign[0].resourceName,negative:true,ipBlock:{ipAddress:`10.0.${Math.floor(i/250)}.${i%250+1}`}}));
     const old=state.campaignCriterion[100].resourceName;
@@ -139,6 +162,72 @@ describe('Protections and reversibility',()=>{
   });
 });
 describe('Owner-scoped routes, durable queue and agency scale',()=>{
+  it('refuses self, enabled accounts, malformed IDs and missing confirmation',async()=>{
+    for(const id of [manager,cid]) expect((await call('/link',{customerId:id,confirm:true})).statusCode).toBe(409);
+    expect((await call('/link',{customerId:'bad',confirm:true})).statusCode).toBe(400);
+    expect((await call('/link',{customerId:'1234567891'})).statusCode).toBe(400);
+    expect(api.link).not.toHaveBeenCalled();
+  });
+  it('dedupes normalized link requests and logs them without Google calls',async()=>{
+    const first=await call('/link',{customerId:'123-456-7891',confirm:true});
+    const second=await call('/link',{customerId:'1234567891',confirm:true});
+    expect(first.statusCode).toBe(202);expect(second.body.batchId).toBe(first.body.batchId);
+    expect((await pool.query("SELECT * FROM ads_jobs WHERE user_id=$1 AND kind='link'",[user])).rows).toHaveLength(1);
+    expect((await pool.query("SELECT 1 FROM account_activity WHERE user_id=$1 AND kind='ads.link_requested'",[user])).rowCount).toBe(2);
+    expect(api.search).not.toHaveBeenCalled();expect(api.link).not.toHaveBeenCalled();
+  });
+  it('creates then accepts a link, records acceptance and enqueues discovery',async()=>{
+    const job=await enqueue(user,connection,'link',{},cid);
+    await tick();
+    expect(api.link).toHaveBeenCalledTimes(2);expect(api.acceptManagerLink).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(api.link).mock.invocationCallOrder[1]).toBeLessThan(vi.mocked(api.acceptManagerLink).mock.invocationCallOrder[0]);
+    expect((await pool.query('SELECT * FROM ads_invitations WHERE user_id=$1',[user])).rows[0]).toMatchObject({status:'accepted',resource_name:`customers/${manager}/customerClientLinks/${cid}~42`});
+    expect((await pool.query("SELECT * FROM ads_jobs WHERE user_id=$1 AND kind='discover'",[user])).rows[0]).toMatchObject({batch_id:job.batch_id,dedupe:`${job.batch_id}:link-discovery`});
+  });
+  it.each([true,false])('leaves acceptance denied at validation=%s pending and available for email',async(validation)=>{
+    await enqueue(user,connection,'link',{},cid);
+    if(!validation) vi.mocked(api.acceptManagerLink).mockResolvedValueOnce({});
+    vi.mocked(api.acceptManagerLink).mockRejectedValueOnce(new AdsError('Denied',403));
+    await tick();
+    expect((await pool.query('SELECT * FROM ads_invitations WHERE user_id=$1',[user])).rows[0]).toMatchObject({status:'pending',resource_name:`customers/${manager}/customerClientLinks/${cid}~42`});
+    expect((await pool.query("SELECT 1 FROM ads_jobs WHERE user_id=$1 AND kind='discover'",[user])).rowCount).toBe(0);
+    await pool.query("UPDATE ads_accounts SET status='UNLINKED' WHERE user_id=$1 AND customer_id=$2",[user,cid]);
+    expect((await call('/invitations',{confirm:true,requestId:randomUUID(),clients:[{customerId:cid,email:'owner@example.invalid'}]})).statusCode).toBe(202);
+    await tick();expect(mail).toHaveBeenCalledTimes(1);expect(api.link).toHaveBeenCalledTimes(2);
+  });
+  it.each(['ACTIVE','PENDING'])('reuses an existing %s link',async(status)=>{
+    vi.mocked(api.search).mockResolvedValueOnce({results:[{customerClientLink:{status,managerLinkId:'43',resourceName:`customers/${manager}/customerClientLinks/${cid}~43`}}]});
+    await enqueue(user,connection,'link',{},cid);await tick();
+    expect(api.link).not.toHaveBeenCalled();
+    if(status==='ACTIVE') expect(api.acceptManagerLink).not.toHaveBeenCalled();
+    else expect(api.acceptManagerLink).toHaveBeenCalledWith(cid,manager,'43');
+    expect((await pool.query('SELECT status FROM ads_invitations WHERE user_id=$1',[user])).rows[0].status).toBe('accepted');
+    expect((await pool.query("SELECT 1 FROM ads_jobs WHERE user_id=$1 AND kind='discover'",[user])).rowCount).toBe(1);
+  });
+  it.each(['CANCELED','INACTIVE','REFUSED'])('creates a fresh link after %s',async(status)=>{
+    vi.mocked(api.search).mockResolvedValueOnce({results:[{customerClientLink:{status,managerLinkId:'41',resourceName:`customers/${manager}/customerClientLinks/${cid}~41`}}]});
+    await enqueue(user,connection,'link',{},cid);await tick();
+    expect(api.link).toHaveBeenCalledTimes(2);expect(api.acceptManagerLink).toHaveBeenCalledWith(cid,manager,'42');
+  });
+  it.each(['creating','accepting'])('persists %s before the write and never replays an uncertain outcome',async(step)=>{
+    const write=async()=>{
+      expect((await pool.query("SELECT payload FROM ads_jobs WHERE user_id=$1 AND kind='link'",[user])).rows[0].payload.step).toBe(step);
+      throw new AdsError('Unknown write',503,true);
+    };
+    if(step==='creating') vi.mocked(api.link).mockResolvedValueOnce({}).mockImplementationOnce(write);
+    else vi.mocked(api.acceptManagerLink).mockResolvedValueOnce({}).mockImplementationOnce(write);
+    const job=await enqueue(user,connection,'link',{},cid);await tick();await tick();
+    expect((await pool.query('SELECT status FROM ads_jobs WHERE id=$1',[job.id])).rows[0].status).toBe('unknown');
+    expect((await pool.query('SELECT status FROM ads_invitations WHERE user_id=$1',[user])).rows[0].status).toBe('unknown');
+    expect(api.link).toHaveBeenCalledTimes(2);
+    expect(api.acceptManagerLink).toHaveBeenCalledTimes(step==='creating'?0:2);
+  });
+  it('does not replay an interrupted link job',async()=>{
+    const job=await enqueue(user,connection,'link',{step:'accepting'},cid);
+    await pool.query("UPDATE ads_jobs SET status='running' WHERE id=$1",[job.id]);await tick();
+    expect((await pool.query('SELECT status FROM ads_jobs WHERE id=$1',[job.id])).rows[0].status).toBe('unknown');
+    expect(api.link).not.toHaveBeenCalled();expect(api.acceptManagerLink).not.toHaveBeenCalled();
+  });
   it('paginates/searches/filters >1000 accounts and 1000 seeded locations without Google calls',async()=>{
     const a=await call('/accounts?limit=25&page=1'),b=await call('/accounts?limit=25&page=2');expect(a.body.total).toBe(1001);expect(a.body.items).toHaveLength(25);expect(b.body.items[0].customer_id).not.toBe(a.body.items[0].customer_id);
     expect((await call('/accounts?lsa=true')).body.total).toBe(500);expect((await call('/accounts?q=scale%20fixture%20999')).body.items).toHaveLength(1);

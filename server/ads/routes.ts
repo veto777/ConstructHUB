@@ -105,6 +105,17 @@ export function registerAdsRoutes(app:Express,auth:(req:any,res:any)=>any,option
     const p=z.object({kind:z.enum(['discover','poll'])}).strict().parse(req.body),g=await grant(user,false);await reserve(user,1);
     res.status(202).json(await enqueue(user,g.connection_id,p.kind,{}));
   });
+  route('post','/link',async(req,res,user)=>{
+    const p=z.object({customerId,confirm:z.literal(true)}).strict().parse(req.body);
+    const g=await grant(user);await reserve(user,1);
+    if(p.customerId===g.manager_id) throw new AdsError('The manager cannot link to itself.',409);
+    const job=await withAgencyLock(user,async c=>{
+      if((await c.query("SELECT 1 FROM ads_accounts WHERE user_id=$1 AND customer_id=$2 AND status='ENABLED'",[user,p.customerId])).rowCount) throw new AdsError('This account is already linked.',409);
+      return enqueue(user,g.connection_id,'link',{},p.customerId,randomUUID(),`link:${p.customerId}`,c);
+    });
+    await logActivity(req,user,'ads.link_requested',{customerId:p.customerId,batchId:job.batch_id});
+    res.status(202).json({batchId:job.batch_id});
+  });
   // Client accounts tab: ads_accounts (?q name/customer_id, ?status, ?lsa, 25/page) with
   // manager/LSA flags, currency/timezone, mapped Click Guard domain_id, last audit time.
   route('get','/accounts',async(req,res,user)=>{
@@ -167,7 +178,13 @@ export function registerAdsRoutes(app:Express,auth:(req:any,res:any)=>any,option
       if((await c.query('SELECT id FROM ads_jobs WHERE user_id=$1 AND dedupe=$2',[user,dedupe])).rowCount)continue;
       if((await c.query('SELECT 1 FROM ads_accounts WHERE user_id=$1 AND customer_id=$2 AND status=\'ENABLED\'',[user,client.customerId])).rowCount) throw new AdsError('A selected client is already linked.',409);
       const {rows:[inv]}=await c.query(`INSERT INTO ads_invitations(user_id,customer_id,email) VALUES($1,$2,$3) ON CONFLICT DO NOTHING RETURNING id`,[user,client.customerId,client.email]);
-      if(!inv) throw new AdsError('An invitation is already pending or needs reconciliation for this client.',409);
+      if(!inv) {
+        // One-click linking can leave a pending invitation without an email recipient.
+        const {rows:[pending]}=await c.query("UPDATE ads_invitations SET email=$3,updated_at=now() WHERE user_id=$1 AND customer_id=$2 AND status='pending' AND resource_name IS NOT NULL AND email='' AND email_status='not_sent' RETURNING id",[user,client.customerId,client.email]);
+        if(!pending) throw new AdsError('An invitation is already pending or needs reconciliation for this client.',409);
+        await enqueue(user,g.connection_id,'invitation-email',{invitationId:pending.id},client.customerId,p.requestId,`email:${pending.id}`,c);
+        continue;
+      }
       await enqueue(user,g.connection_id,'invite',{invitationId:inv.id},client.customerId,p.requestId,dedupe,c);
     }await c.query('COMMIT');}catch(e){await c.query('ROLLBACK');throw e;}});
     await logActivity(req,user,'ads.invitations_confirmed',{count:p.clients.length,batchId:p.requestId});res.status(202).json({queued:p.clients.length,batchId:p.requestId});

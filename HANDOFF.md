@@ -1,5 +1,9 @@
 # ConstructHUB — Handoff
 
+## 2026-10-10 — One-click Google Ads link (ads/one-click-link)
+
+Added the Client accounts “Link account” flow: look up existing links, create PENDING via `customerClientLinks:mutate` as the manager, then accept ACTIVE via `customerManagerLinks:mutate` with the client's login-customer-id and the connected user's token. Writes retain crash/uncertainty protection; accepted links queue discovery, and denied acceptance leaves a pending invitation for polling and Access invitations email. Fixed snapshots by selecting the five `campaign_criterion.ad_schedule` subfields instead of the prohibited bare message. The owner's Construct HUB account **681-225-6576 was linked by hand on 2026-10-09 before this shipped**. Validation: TypeScript clean; 54 tests passed using temporary local Postgres. Commit blocked in this environment because the original worktree Git metadata is missing. No merge or deployment.
+
 _Last updated 2026-10-09. Repo: `veto777/ConstructHUB` (private). Local: `/home/veto/ConstructHUB` on the tower._
 
 ## 💰 2026-10-09 — price book rebuild, Lane A: enforcement (branch `pricing/rebuild`, NOT deployed)
