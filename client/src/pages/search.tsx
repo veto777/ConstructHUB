@@ -117,7 +117,6 @@ function parseDate(dateStr: string | null | undefined): Date | null {
 
 export default function SearchPage() {
   const { toast } = useToast();
-  const [showMap, setShowMap] = useState(true);
   const searchBoxRef = useRef<HTMLDivElement>(null);
   // A dot on the coverage map prefills the search scope for that jurisdiction, then
   // brings the search box into view — the owner's "find them manually" path.
@@ -558,18 +557,8 @@ export default function SearchPage() {
             searchable; every searchable portal is a clickable orange dot. Collapsible so it
             never breaks the page on mobile; lazy-rendered so it only loads when opened. */}
         <div className="space-y-2">
-          <button
-            type="button"
-            onClick={() => setShowMap((v) => !v)}
-            aria-expanded={showMap}
-            data-testid="button-toggle-map"
-            className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm g-text hover:g-card-2"
-          >
-            <MapIcon className="h-4 w-4" />
-            {showMap ? "Hide coverage map" : "Show coverage map"}
-            {showMap ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          </button>
-          {showMap && <PermitMap onPick={handlePickFromMap} />}
+          
+          <PermitMap onPick={handlePickFromMap} />
         </div>
         <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Search by" data-testid="select-search-type">
           {searchTypes.map((type) => (

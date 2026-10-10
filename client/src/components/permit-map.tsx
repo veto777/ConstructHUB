@@ -1,13 +1,15 @@
 /**
  * US permit-coverage map for the Search Permits page. States fill blue where at
  * least one COUNTY permit portal is live-searchable; every searchable portal is a
- * clickable orange dot (the "find them manually" path). Zoom + pan with a reset.
+ * clickable orange dot (the "find them manually" path). State codes label each
+ * state; zooming in separates the dots and labels them by jurisdiction.
  * Data: GET /api/permits/map (same searchable predicate as the headline count);
  * centroids are public US Census Gazetteer (server/data/jurisdiction-coords.json).
  */
-import { useMemo, useState } from "react";
+import { useMemo, useState, Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from "react-simple-maps";
+import { geoCentroid } from "d3-geo";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ExternalLink, Search as SearchIcon, Plus, Minus, RotateCcw, X, MapPin } from "lucide-react";
@@ -42,15 +44,17 @@ const FIPS_USPS: Record<string, string> = {
   "56":"WY","72":"PR",
 };
 
+const MAX_ZOOM = 32;
+
 type Cell = { key: string; lat: number; lng: number; portals: MapPortal[]; hasCounty: boolean };
 
 // Degrees of lat/lng merged into one dot at a given zoom (0 = show every site).
 function gridStep(zoom: number): number {
-  if (zoom >= 6) return 0;
-  if (zoom >= 4) return 0.12;
-  if (zoom >= 2.5) return 0.35;
-  if (zoom >= 1.5) return 0.7;
-  return 1.3;
+  if (zoom >= 4.5) return 0;
+  if (zoom >= 3) return 0.12;
+  if (zoom >= 2.5) return 0.3;
+  if (zoom >= 1.5) return 0.6;
+  return 1.2;
 }
 
 export function PermitMap({ onPick }: { onPick: (p: MapPortal) => void }) {
@@ -80,7 +84,6 @@ export function PermitMap({ onPick }: { onPick: (p: MapPortal) => void }) {
       c.portals.push(p);
       if (p.jurisdictionType === "county") c.hasCounty = true;
     }
-    // Centre each merged dot on its members.
     for (const c of by.values()) {
       c.lat = c.portals.reduce((s, p) => s + (p.lat as number), 0) / c.portals.length;
       c.lng = c.portals.reduce((s, p) => s + (p.lng as number), 0) / c.portals.length;
@@ -88,15 +91,19 @@ export function PermitMap({ onPick }: { onPick: (p: MapPortal) => void }) {
     return Array.from(by.values());
   }, [located, zoom]);
 
-  const clamp = (z: number) => Math.max(1, Math.min(12, z));
+  const clamp = (z: number) => Math.max(1, Math.min(MAX_ZOOM, z));
   const reset = () => { setZoom(1); setCenter([-97, 38]); setSelected(null); };
+  // Names appear once the dots have been separated (individual portals).
+  const showNames = zoom >= 4.5;
+  const stateLabelSize = Math.max(2.6, 9 / Math.sqrt(zoom));
 
   return (
     <div className="permit-map rounded-xl border g-card overflow-hidden">
       <style>{`
         .permit-map { --map-land: hsl(var(--muted)); --map-land-stroke: hsl(var(--background));
           --map-blue: hsl(var(--primary) / 0.32); --map-blue-stroke: hsl(var(--primary) / 0.6);
-          --map-dot: #f97316; --map-dot-stroke: #ffffff; }
+          --map-dot: #f97316; --map-dot-stroke: #ffffff; --map-state: hsl(var(--foreground) / 0.55);
+          --map-name: hsl(var(--foreground) / 0.85); --map-name-bg: hsl(var(--background) / 0.78); }
         .dark .permit-map { --map-blue: hsl(var(--primary) / 0.45); --map-dot: #fb923c; --map-dot-stroke: hsl(var(--background)); }
         .permit-map .rsm-geography { outline: none; }
       `}</style>
@@ -105,7 +112,7 @@ export function PermitMap({ onPick }: { onPick: (p: MapPortal) => void }) {
         <span className="inline-flex items-center gap-1.5"><span className="inline-block h-3 w-4 rounded-sm" style={{ background: "var(--map-blue)", border: "1px solid var(--map-blue-stroke)" }} />County permits searchable</span>
         <span className="inline-flex items-center gap-1.5"><span className="inline-block h-3 w-4 rounded-sm" style={{ background: "var(--map-land)" }} />No county portal yet</span>
         <span className="inline-flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: "var(--map-dot)", border: "1.5px solid var(--map-dot-stroke)" }} />Searchable portal</span>
-        {data && <span className="ml-auto">{data.summary.withCoords.toLocaleString()} portals mapped</span>}
+        {data && <span className="ml-auto">{data.summary.withCoords.toLocaleString()} portals mapped · zoom in for names</span>}
       </div>
 
       <div className="relative">
@@ -114,31 +121,51 @@ export function PermitMap({ onPick }: { onPick: (p: MapPortal) => void }) {
         {data && (
           <>
             <div className="absolute right-2 top-2 z-10 flex flex-col gap-1">
-              <Button type="button" variant="outline" size="icon" className="h-8 w-8" aria-label="Zoom in" onClick={() => setZoom((z) => clamp(z * 1.5))}><Plus className="h-4 w-4" /></Button>
-              <Button type="button" variant="outline" size="icon" className="h-8 w-8" aria-label="Zoom out" onClick={() => setZoom((z) => clamp(z / 1.5))}><Minus className="h-4 w-4" /></Button>
+              <Button type="button" variant="outline" size="icon" className="h-8 w-8" aria-label="Zoom in" onClick={() => setZoom((z) => clamp(z * 1.6))}><Plus className="h-4 w-4" /></Button>
+              <Button type="button" variant="outline" size="icon" className="h-8 w-8" aria-label="Zoom out" onClick={() => setZoom((z) => clamp(z / 1.6))}><Minus className="h-4 w-4" /></Button>
               <Button type="button" variant="outline" size="icon" className="h-8 w-8" aria-label="Reset map" onClick={reset}><RotateCcw className="h-4 w-4" /></Button>
             </div>
             <ComposableMap projection="geoAlbersUsa" width={975} height={610} projectionConfig={{ scale: 1300 }} style={{ width: "100%", height: "auto", background: "transparent" }}>
-              <ZoomableGroup zoom={zoom} center={center} minZoom={1} maxZoom={12} onMoveEnd={({ zoom: z, coordinates }) => { setZoom(z); setCenter(coordinates as [number, number]); }}>
+              <ZoomableGroup zoom={zoom} center={center} minZoom={1} maxZoom={MAX_ZOOM} onMoveEnd={({ zoom: z, coordinates }) => { setZoom(z); setCenter(coordinates as [number, number]); }}>
                 <Geographies geography="/us-states-10m.json">
                   {({ geographies }: any) => geographies.map((geo: any) => {
                     const usps = FIPS_USPS[geo.id as string];
                     const blue = usps ? blueStates.has(usps) : false;
+                    const centroid = geoCentroid(geo) as [number, number];
+                    const validCentroid = Number.isFinite(centroid?.[0]) && Number.isFinite(centroid?.[1]);
                     return (
-                      <Geography key={geo.rsmKey} geography={geo}
-                        fill={blue ? "var(--map-blue)" : "var(--map-land)"}
-                        stroke="var(--map-land-stroke)" strokeWidth={0.5}
-                        style={{ default: { outline: "none" }, hover: { outline: "none", fill: blue ? "var(--map-blue-stroke)" : "var(--map-land)" }, pressed: { outline: "none" } }} />
+                      <Fragment key={geo.rsmKey}>
+                        <Geography geography={geo}
+                          fill={blue ? "var(--map-blue)" : "var(--map-land)"}
+                          stroke="var(--map-land-stroke)" strokeWidth={0.5}
+                          style={{ default: { outline: "none" }, hover: { outline: "none", fill: blue ? "var(--map-blue-stroke)" : "var(--map-land)" }, pressed: { outline: "none" } }} />
+                        {usps && validCentroid && (
+                          <Marker coordinates={centroid}>
+                            <text textAnchor="middle" dy="0.32em" fontSize={stateLabelSize} fill="var(--map-state)"
+                              style={{ pointerEvents: "none", fontWeight: 700, letterSpacing: "0.02em" }}>{usps}</text>
+                          </Marker>
+                        )}
+                      </Fragment>
                     );
                   })}
                 </Geographies>
                 {cells.map((c) => {
                   const r = (c.hasCounty ? 4.2 : 2.9) / Math.sqrt(zoom);
+                  const single = c.portals.length === 1;
+                  const nameFont = Math.max(2.2, 7 / Math.sqrt(zoom));
+                  const label = single ? c.portals[0].jurisdiction : `${c.portals.length} portals`;
                   return (
                     <Marker key={c.key} coordinates={[c.lng, c.lat]} onClick={() => setSelected(c)} style={{ default: { cursor: "pointer" }, hover: { cursor: "pointer" }, pressed: {} }}>
-                      <circle r={r} fill="var(--map-dot)" stroke="var(--map-dot-stroke)" strokeWidth={r > 3 ? 1 : 0.6} opacity={0.92} />
-                      {c.portals.length > 1 && zoom < 6 && (
+                      {/* Enlarged transparent hit target so the dot is easy to click/tap. */}
+                      <circle r={Math.max(r + 2.5, 6 / Math.sqrt(zoom))} fill="transparent" />
+                      <circle r={r} fill="var(--map-dot)" stroke="var(--map-dot-stroke)" strokeWidth={r > 3 ? 1 : 0.6} opacity={0.94} />
+                      {c.portals.length > 1 && zoom < 4.5 && (
                         <text textAnchor="middle" y={r * 0.5} fontSize={r * 1.1} fill="var(--map-dot-stroke)" style={{ pointerEvents: "none", fontWeight: 700 }}>{c.portals.length}</text>
+                      )}
+                      {showNames && (
+                        <text x={r + nameFont * 0.5} dy="0.32em" fontSize={nameFont} fill="var(--map-name)"
+                          stroke="var(--map-name-bg)" strokeWidth={nameFont * 0.22} paintOrder="stroke"
+                          style={{ pointerEvents: "none", fontWeight: 600 }}>{label}</text>
                       )}
                     </Marker>
                   );
