@@ -131,7 +131,7 @@ export default function SeoDashboardPage() {
   useEffect(() => { if (dash.isSuccess && hash === "sites") scrollToSites(); }, [dash.isSuccess, hash]);
 
   return (
-    <SeoShell title="SEO" description="Your sites at a glance: authority, backlinks, estimated search traffic and rankings." site={site} onSite={onSite} sites={sites} status={status}>
+    <SeoShell title="SEO Suite" description="Your sites at a glance: authority, backlinks, estimated search traffic and rankings." site={site} onSite={onSite} sites={sites} status={status}>
       {dash.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading your sites…</p>}
       {dash.isError && <div className="g-callout mb-4" role="alert" data-testid="seo-dashboard-error"><h3>Couldn't load your sites</h3><p>{apiErrorMessage(dash.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void dash.refetch()}>Try again</button></div>}
       {dash.isSuccess && cards.length === 0 && !sites.isError && (

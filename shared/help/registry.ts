@@ -645,7 +645,7 @@ const entries: Draft[] = [
     needs: ["Any plan; scans are counted against the plan’s monthly Site Scans."],
   },
   {
-    key: "seo", group: "Tools", route: "/seo", title: "SEO",
+    key: "seo", group: "Tools", route: "/seo", title: "SEO Suite",
     whatItIs: "A rank tracker and research tools: where your site ranks on Google for the keywords you choose, checked every week.",
     whatItDoes: "Five tabs. Rank tracker shows each keyword’s position on desktop and mobile with movement since the last check. Site explorer looks up any website’s search traffic, keywords, backlinks and competitors. Keywords returns up to 50 related searches with volume, cost per click and difficulty. Backlinks shows who links to your site. Competitors lists keywords a competitor ranks for and you do not.",
     howToUse: [
