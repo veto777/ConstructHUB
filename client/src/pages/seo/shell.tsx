@@ -36,6 +36,8 @@ export type SeoCreditsInfo = { includedCents: number; includedUsedCents: number;
 export type SeoPrices = { explorerReport: number; reportPage: number; adsReport?: number; gridLocate?: number; gridPer100?: number; keywordOverview: number; keywordResearch: number; competitorGap: number; backlinkRefresh: number; rankChecksPer100: number; linkIntersect?: number; bulkBase?: number; bulkPer100?: number; searchVolumes?: number; aiChatgpt?: number; aiGemini?: number; aiPerplexity?: number; aiMentions?: number; batchBase?: number; batchPer100?: number; contentSearch?: number; mentions?: number; mentionsRetry?: number };
 export type SeoStatus = {
   configured: boolean;
+  /** Google's own keyword numbers answer the Keywords explorer free (volume, cost per click, bids, months, ideas). */
+  googleKeywords?: boolean;
   usage: SeoUsage;
   credits: SeoCreditsInfo;
   prices: SeoPrices;

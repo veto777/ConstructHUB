@@ -64,7 +64,7 @@ import { serpGroups } from "./serp-groups";
 import { dashboardRanks, groupNameSql } from "./dashboard";
 import { aiSummary } from "./ai-summary";
 import { watchSetting, setKeywordWatch, takeKeywordSnapshot, keywordWatchView, comparePick, KW_SNAPSHOT_ESTIMATE_USD } from "./keyword-watch";
-import { searchLocations, locationByCode } from "./locations";
+import { searchLocations, locationByCode, ensureLocations } from "./locations";
 import { resolvePlace, placeCodeInput } from "./place";
 import { plannerConfigured, plannerIdeas, type PlannerMetrics } from "./google-planner";
 import { freeIdeaPage, freeFilterRefusal, freeOverview, googleNumbers, keywordVolumes, FREE_IDEAS_MAX } from "./free-keywords";
@@ -346,7 +346,8 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     // The customer's SEO data credit and what each lookup costs them (shared/seo-credits.ts).
     const credits = await creditStatus(user, ent.allowances?.seoCreditCents ?? 0);
     // alertsUndelivered: this account's alerts whose delivery was given up after repeated tries (they stay on the page, marked).
-    const body: Record<string, unknown> = { configured: isConfigured(), alertsUnread: await unreadAlerts(user), alertsUndelivered: await undeliveredAlerts(user), usage, credits, prices: SEO_PRICES, holds: SEO_HOLDS, quotes: SEO_QUOTES, packs: SEO_CREDIT_PACKS, resetsAt: resetsAt() };
+    // googleKeywords: Google's own keyword numbers answer the Keywords explorer free (server/seo/google-planner.ts).
+    const body: Record<string, unknown> = { configured: isConfigured(), googleKeywords: plannerConfigured(), alertsUnread: await unreadAlerts(user), alertsUndelivered: await undeliveredAlerts(user), usage, credits, prices: SEO_PRICES, holds: SEO_HOLDS, quotes: SEO_QUOTES, packs: SEO_CREDIT_PACKS, resetsAt: resetsAt() };
     if (isPlatformAdmin(req.user)) {
       const budget = await budgetStatus(user);
       // What is still outstanding platform-wide: refunds owed to customers (never given up) and alert deliveries given up.
@@ -1486,6 +1487,14 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     if (q.trim().length < 2) return res.json({ items: [] });
     if (!isConfigured()) return notReady(res);
     res.json({ items: await searchLocations(q) });
+  });
+  // One place by its code (a `place` in an address): its name and kind, or null. Free.
+  route("get", "/api/seo/locations/:code", async (req, res) => {
+    const code = Number(req.params.code);
+    if (!Number.isInteger(code) || code <= 0) return res.status(400).json({ message: "Not a place code." });
+    if (!isConfigured()) return notReady(res);
+    await ensureLocations();
+    res.json({ place: await locationByCode(code) });
   });
 
   // Tracking settings for one site: the business name on its Google profile (to find it in the map pack) and alerts.

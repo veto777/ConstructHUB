@@ -116,7 +116,7 @@ export const seoLinks = {
    * town grid to one service's row and one town's column (the words as the grid shows them) — a row or column heading
    * writes them.
    */
-  keywords: (keyword: string, p: { view?: "one" | "bulk" | "lists" | "area"; table?: string; locationCode?: number; languageCode?: string; section?: "volume" | "serp" | "features" | "ideas" | "cpc" | "results"; month?: string; intent?: string; list?: number; topic?: string; show?: "gaps" | "weak" | "strong" | "unknown"; sort?: string; offset?: number; limit?: number; service?: string; town?: string } = {}) =>
+  keywords: (keyword: string, p: { view?: "one" | "bulk" | "lists" | "area"; table?: string; locationCode?: number; languageCode?: string; /** A US place (its code from the place picker): the numbers and results for there. */ place?: number; section?: "volume" | "serp" | "features" | "ideas" | "cpc" | "results"; month?: string; intent?: string; list?: number; topic?: string; show?: "gaps" | "weak" | "strong" | "unknown"; sort?: string; offset?: number; limit?: number; service?: string; town?: string } = {}) =>
     `/seo/keywords${qs({ keyword, ...p })}`,
 
   /**
