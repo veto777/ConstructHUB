@@ -1,0 +1,384 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+          "http://www.w3.org/TR/html4/strict.dtd">
+<HTML>
+<HEAD>
+    <META id=RLT_STANDARDS_MODE_META http-equiv=X-UA-Compatible content=IE =9>
+    <META name=mycharsetmeta http-equiv=Content-Type content="text/html; charset=UTF-8">
+    <META name=Generation content="Created in release 8105, Generation 3">
+    <SCRIPT type=text/javascript>
+    //confidential_id=IBI_OptionsScript
+        var szHtmlAlias = "/ibi_apps"; var szRunTimeHtmlAlias = "runTimeHtmlAlias"; var cgipath = "cgipath"; var ibirls = "ibirls3"; var rltdyncalendar = "rltdyncalendar"; var map = "ibimap"; var olap = "olap"; var olappanebase = "olappanebase"; var olapdrill = "olapdrill"; var ibiOptions = new Array(cgipath, ibirls, rltdyncalendar); var nlsScript = "/javaassist/nls.js"; var glbScript = "/javaassist/ibi/html/js/ibigbl.js"; var replacePart = "<replace>";
+        var scriptTemplate = '<SCRIPT src="' + replacePart + '" type="text/javascript"><\/SCRIPT>'; if (typeof (szRunTimeHtmlAlias) === 'string' && szRunTimeHtmlAlias.indexOf('/') == 0) szHtmlAlias = szRunTimeHtmlAlias; document.write(scriptTemplate.replace(replacePart, szHtmlAlias + nlsScript)); document.write(scriptTemplate.replace(replacePart, szHtmlAlias + glbScript));</SCRIPT>
+
+    <SCRIPT type=text/javascript>
+    //confidential_id=IBI_ibigblloadCss
+        if (typeof ibigblloadCss === 'function') { ibigblloadCss(null); addIntlTranslatedJS("composertrans.js"); } else { alert("JavaScript alias '/ibi_apps'  is not valid"); window.location("about:blank"); }</SCRIPT>
+    <TITLE>HtmlPage</TITLE>
+    <SCRIPT type=text/javascript>
+    //confidential_id=clientEventHandlersJS
+
+
+        //Begin function window_onload
+        function window_onload() {
+
+            UpdateData();
+
+            // TODO: Add your event handler code here
+
+        }
+        //End function window_onload
+
+        //Begin function SELTD_onclick
+        function SELTD_onclick(ctrl) {
+            chgDisplay();
+        }
+        //End function SELTD_onclick
+    </SCRIPT>
+
+    <SCRIPT id=clientEventHandlers2 type=text/javascript>
+        function chgDisplay() {
+            var n;
+            var len = document.getElementsByName("SELTD").length;
+            for (n = 0; n < len; n++) {
+                if (document.getElementsByName("SELTD")[n].checked) {
+                    SRH.value = "";
+                    if (n == 10) {
+                        PTYPE.style.display = "block";
+                        SRH.style.display = "none";
+                    }
+                    else {
+                        SRH.style.display = "block";
+                        PTYPE.style.display = "none";
+                    }
+                }
+            }
+        }
+
+
+
+
+
+    </SCRIPT>
+
+    <SCRIPT for=window type=text/javascript eventname="onload">window.onload = function () { window_onload(); }</SCRIPT>
+    <LINK id=ITEM3 rel=stylesheet type=text/css UserSuppliedFullPath="1" rtFileName="cgipathsub/ibi_html/javaassist/ibi/html/composer/themes/nonBindows/IBI-Themes/default_theme.css">
+    <LINK id=ITEM1 rel=stylesheet type=text/css rtFileName="sp_pwe_sty_webpage.css">
+</HEAD>
+<BODY class=pagebody style="OVERFLOW: auto" bgColor=#99ccff maptype="0" elementtype="21" thumbnailscale="4" edaconnectionrequired="true" nextelementuniquenumber="8">
+    <FORM id=form1 style="HEIGHT: 50px; POSITION: absolute; LEFT: 440px; Z-INDEX: 1; TOP: 510px; WIDTH: 200px" onsubmit="OnExecute(this);return false;" method=post form_dist_between_desc_and_input="10" form_hor_dist_between_controls="10" vert_dist_between_controls="10" form_number_of_columns="4" form_number_of_visible_rows="4" form_prompt_location="1" form_type="1" default_slider_type="4" form_newline_chain="1" requests_list="13" fexlist_list="form1" tempwidth="1446" tempheight="292" autoExecute="false" persistentuniqueid="compUid_17" name="form1">
+        &nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <INPUT tabIndex=1 class="IBIfield IBI_button IBI_btn-run" id=form1Submit style="HEIGHT: 22px; POSITION: absolute; LEFT: 30px; Z-INDEX: 2; TOP: 10px; WIDTH: 38px" type=submit value=" " autoExecute="false" name="submit1">&nbsp; <INPUT tabIndex=3 class="IBIfield IBI_button IBI_btn-defer" id=form1Defer style="HEIGHT: 22px; POSITION: absolute; LEFT: 48px; Z-INDEX: 4; DISPLAY: none; TOP: 23px; WIDTH: 38px" onclick="OnExecute(this);return false;" type=button value=" " requests_list="6" persistentuniqueid="compUid_7" name="button1"> <INPUT tabIndex=4 class="IBIfield IBI_button IBI_btn-schedule" id=form1Schedule style="HEIGHT: 22px; POSITION: absolute; LEFT: 134px; Z-INDEX: 5; DISPLAY: none; TOP: 23px; WIDTH: 38px" onclick="OnExecute(this);return false;" type=button value=" " requests_list="7" persistentuniqueid="compUid_8" name="button2"> <input type="hidden" name="as_sfid" value="REDACTED" /><input type="hidden" name="as_fid" value="REDACTED" /></form><FORM class="IBIfield IBI_ReportControlPanel IBI_rounded_m" id=form12 style="HEIGHT: 100px; POSITION: absolute; LEFT: 40px; Z-INDEX: 29; TOP: 20px; WIDTH: 150px" form_dist_between_desc_and_input="10" form_hor_dist_between_controls="10" vert_dist_between_controls="10" form_number_of_columns="4" form_number_of_visible_rows="4" form_prompt_location="1" form_type="1" default_slider_type="4" form_newline_chain="1" fexlist_list="form1Submit" method="post" name="form12">
+            <INPUT tabIndex=29 class="IBIfield IBI_button IBI_btn-reset" id=form12Reset style="HEIGHT: 20px; POSITION: absolute; LEFT: 110px; Z-INDEX: 30; TOP: 10px; WIDTH: 70px" type=reset size=36 value=Reset name="reset2">
+        <input type="hidden" name="as_sfid" value="REDACTED" /><input type="hidden" name="as_fid" value="REDACTED" /></FORM>
+    </FORM>
+    <SPAN tabIndex=27 id=text6 style="FONT-SIZE: 10pt; HEIGHT: 32px; FONT-FAMILY: Arial; POSITION: absolute; LEFT: 70px; Z-INDEX: 27; TOP: 60px; WIDTH: 621px" elementtype="4" persistentuniqueid="compUid_23">Basic permit history is available for the previous 3 years. For a complete history or other records, please contact the Open Records section at 832-394-8800 or <U><A id=anchor2 href="http://houstontx.gov/publicinformation" name="anchor2">houstontx.gov/publicinformation</A>&nbsp;</U>.<br />This site uses pop-up windows. Please turn off your browser's pop-upblocker. </SPAN>
+
+
+    <SPAN tabIndex=26 id=text5 style="FONT-SIZE: 10pt; HEIGHT: 16px; FONT-FAMILY: Arial; POSITION: absolute; COLOR: red; LEFT: 20px; Z-INDEX: 26; TOP: 60px; WIDTH: 36px" elementtype="4" persistentuniqueid="compUid_22">NOTE</SPAN>
+
+     
+
+    <FIELDSET class=ParameterGroupBox id=groupbox1 style="HEIGHT: 250px; POSITION: absolute; LEFT: 10px; TOP: 330px; WIDTH: 700px">
+        <LABEL tabIndex=17 id=LABEL_SRH style="CURSOR: default; HEIGHT: 20px; POSITION: absolute; COLOR: black; LEFT: 30px; Z-INDEX: 18; TOP: 10px; WIDTH: 80px" for=SRH name="edit6">Search Info</LABEL> <INPUT tabIndex=18 id=SRH style="OVERFLOW: visible; HEIGHT: 22px; OVERFLOW-Y: visible; POSITION: absolute; LEFT: 128px; Z-INDEX: 19; DISPLAY: block; TOP: 10px; WIDTH: 470px" size=51 hspace=0 persistentuniqueid="compUid_7" requiredfield="0" boundtovariable="1" defaultlocation="0,0,21,133" defaultselection="1" name="SRH"> <LABEL tabIndex=9 id=label8 style="CURSOR: default; HEIGHT: 10px; POSITION: absolute; COLOR: black; LEFT: 30px; Z-INDEX: 10; TOP: 90px; WIDTH: 70px" for=edit2 name="edit2">
+            Date From
+        </LABEL><INPUT width=0 tabIndex=10 id=edit2 style="HEIGHT: 21px; POSITION: absolute; LEFT: 130px; TOP: 90px; WIDTH: 131px" hspace=0 elementtype="14" persistentuniqueid="compUid_3" requiredfield="0" boundtovariable="1" defaultlocation="0,0,21,133" defaultselection="1" calendardata="0/0/-10;0/0/10" calendardatatype="1" ibiformat="YYMD" name="BDT"> <LABEL tabIndex=11 id=label9 style="CURSOR: default; HEIGHT: 10px; POSITION: absolute; COLOR: black; LEFT: 370px; Z-INDEX: 12; TOP: 90px; WIDTH: 60px" for=edit3 name="edit3">Date To</LABEL> <INPUT width=0 tabIndex=12 id=edit3 style="HEIGHT: 21px; POSITION: absolute; LEFT: 450px; TOP: 90px; WIDTH: 131px" hspace=0 elementtype="14" persistentuniqueid="compUid_4" requiredfield="0" boundtovariable="1" defaultlocation="0,0,21,133" defaultselection="1" calendardata="0/0/-10;0/0/10" calendardatatype="1" ibiformat="YYMD" name="EDT"> <LABEL tabIndex=13 id=label10 style="CURSOR: default; HEIGHT: 20px; POSITION: absolute; COLOR: black; LEFT: 30px; Z-INDEX: 14; TOP: 140px; WIDTH: 90px" for=edit4 name="edit4">Valuation MIN</LABEL> <INPUT tabIndex=14 id=edit4 style="OVERFLOW: visible; HEIGHT: 22px; OVERFLOW-Y: visible; POSITION: absolute; LEFT: 130px; Z-INDEX: 15; TOP: 140px; WIDTH: 153px" hspace=0 value=" " persistentuniqueid="compUid_5" requiredfield="0" boundtovariable="1" defaultlocation="0,0,21,133" defaultselection="1" name="edit4"> <LABEL tabIndex=15 id=label11 style="CURSOR: default; HEIGHT: 10px; POSITION: absolute; COLOR: black; LEFT: 330px; Z-INDEX: 16; TOP: 140px; WIDTH: 100px" for=edit5 name="edit5">Valuation MAX</LABEL> <INPUT tabIndex=16 id=edit5 style="OVERFLOW: visible; HEIGHT: 22px; OVERFLOW-Y: visible; POSITION: absolute; LEFT: 450px; Z-INDEX: 17; TOP: 140px; WIDTH: 153px" hspace=0 value=" " persistentuniqueid="compUid_6" requiredfield="0" boundtovariable="1" defaultlocation="0,0,21,133" defaultselection="1" name="edit5"> <SELECT tabIndex=22 id=PTYPE style="POSITION: absolute; LEFT: 130px; TOP: 10px; WIDTH: 153px" size=1 persistentuniqueid="compUid_9" requiredfield="1" boundtovariable="1" defaultlocation="0,0,21,133" defaultselection="1" readOnly="false" hspace="0" maxLength="2147483647" vspace="0" loop="1" start="fileopen" indeterminate="false" CHECKED="false" width="0" name="PTYPE">
+            <OPTION value=SD displaytext="Demolition" noinput="0">
+                Demolition
+            </OPTION>
+            <OPTION value=11 selected displaytext="Electrical" noinput="0">Electrical</OPTION>
+            <OPTION value=FM displaytext="Fire Marshal" noinput="0">Fire Marshal</OPTION>
+            <OPTION value=14 displaytext="Merchanical" noinput="0">Merchanical</OPTION>
+            <OPTION value=OC displaytext="Occupancy Inspection" noinput="0">Occupancy Inspection</OPTION>
+            <OPTION value=12 displaytext="Plumbing" noinput="0">Plumbing</OPTION>
+            <OPTION value=SI displaytext="Signs" noinput="0">Signs</OPTION>
+            <OPTION value=13 displaytext="Structural" noinput="0">Structural</OPTION>
+            <OPTION value=MD displaytext="Multi Discipline" noinput="0">Multi Discipline</OPTION>
+        </SELECT> <LABEL tabIndex=28 id=label23 style="CURSOR: default; HEIGHT: 20px; POSITION: absolute; COLOR: black; LEFT: 278px; Z-INDEX: 28; TOP: 210px; WIDTH: 80px" for=SRH persistentuniqueid="compUid_25" name="edit6">Search Info</LABEL>
+    </FIELDSET>&nbsp;
+    <FIELDSET class=ParameterGroupBox id=groupbox2 style="HEIGHT: 200px; POSITION: absolute; LEFT: 10px; TOP: 120px; WIDTH: 700px">
+        <SPAN tabIndex=20 id=SELTD language=javascript style="OVERFLOW: hidden; HEIGHT: 170px; OVERFLOW-Y: auto; POSITION: absolute; TEXT-ALIGN: left; LEFT: 40px; Z-INDEX: 0; TOP: 10px; WIDTH: 620px" contentEditable=false onclick=SELTD_onclick(this) elementtype="12" persistentuniqueid="compUid_8" requiredfield="1" boundtovariable="1" defaultlocation="0,0,21,133" defaultselection="1" readOnly="false" hspace="0" maxLength="2147483647" vspace="0" loop="1" start="fileopen" indeterminate="false" CHECKED="false" width="0" columns="3" groupChildren="1" value="PN" size="20" height="0" name="SELTD">
+            <TABLE id=table1 style="HEIGHT: 100%; TEXT-ALIGN: left; WIDTH: 100%" contentEditable=false cellSpacing=0 cellPadding=0>
+                <TBODY>
+                    <TR>
+                        <TD noWrap><LABEL id=SELTD_LABEL_0 style="CURSOR: default" for=SELTD_PN><INPUT tabIndex=20 id=SELTD_PN type=radio CHECKED value=PN defaultselection="1" displaytext="Project Number" noinput="0" name="SELTD">Project Number</LABEL></TD>
+                        <TD noWrap>
+                            <LABEL id=SELTD_LABEL_1 style="CURSOR: default" for=SELTD_BN>
+                                <INPUT tabIndex=20 id=SELTD_BN type=radio value=BN defaultselection="1" displaytext="Buyer's Name" noinput="0" name="SELTD">Buyer's Name
+                            </LABEL>
+                        </TD>
+                        <TD noWrap><LABEL id=SELTD_LABEL_2 style="CURSOR: default" for=SELTD_ZC><INPUT tabIndex=20 id=SELTD_ZC type=radio value=ZC defaultselection="1" displaytext="Zip Code" noinput="0" name="SELTD">Zip Code</LABEL></TD>
+                    </TR>
+                    <TR>
+                        <TD noWrap><LABEL id=SELTD_LABEL_3 style="CURSOR: default" for=SELTD_JA><INPUT tabIndex=20 id=SELTD_JA type=radio value=JA defaultselection="1" displaytext="Job Address" noinput="0" name="SELTD">Job Address</LABEL></TD>
+                        <TD noWrap><LABEL id=SELTD_LABEL_4 style="CURSOR: default" for=SELTD_BA><INPUT tabIndex=20 id=SELTD_BA type=radio value=BA defaultselection="1" displaytext="Buyer's Address" noinput="0" name="SELTD">Buyer's Address</LABEL></TD>
+                        <TD noWrap><LABEL id=SELTD_LABEL_5 style="CURSOR: default" for=SELTD_CM><INPUT tabIndex=20 id=SELTD_CM type=radio value=CM defaultselection="1" displaytext="Commercial (Category B)" noinput="0" name="SELTD">Commercial (Category B)</LABEL></TD>
+                    </TR>
+                    <TR>
+                        <TD noWrap><LABEL id=SELTD_LABEL_6 style="CURSOR: default" for=SELTD_AN><INPUT tabIndex=20 id=SELTD_AN type=radio value=AN defaultselection="1" displaytext="Applicant Name" noinput="0" name="SELTD">Applicant Name</LABEL></TD>
+                        <TD noWrap><LABEL id=SELTD_LABEL_7 style="CURSOR: default" for=SELTD_OO><INPUT tabIndex=20 id=SELTD_OO type=radio value=OO defaultselection="1" displaytext="Owner Occupant" noinput="0" name="SELTD">Owner Occupant</LABEL></TD>
+                        <TD noWrap><LABEL id=SELTD_LABEL_8 style="CURSOR: default" for=SELTD_RD><INPUT tabIndex=20 id=SELTD_RD type=radio value=RD defaultselection="1" displaytext="Residential (Category 3)" noinput="0" name="SELTD">Residential (Category 3)</LABEL></TD>
+                    </TR>
+                    <TR>
+                        <TD noWrap><LABEL id=SELTD_LABEL_9 style="CURSOR: default" for=SELTD_PT><INPUT tabIndex=20 id=SELTD_PT type=radio value=PT defaultselection="1" displaytext="Permit Type" noinput="0" name="SELTD">Permit Type</LABEL></TD>
+                        <TD noWrap>
+                            <LABEL id=SELTD_LABEL_10 style="CURSOR: default" for=SELTD_BU>
+                                <INPUT tabIndex=20 id=SELTD_BU type=radio value=BU defaultselection="1" displaytext="Building Use" noinput="0" name="SELTD">Building Use
+                            </LABEL>
+                        </TD>
+                        <TD noWrap><LABEL id=SELTD_LABEL_11 style="CURSOR: default" for=SELTD_MF><INPUT tabIndex=20 id=SELTD_MF type=radio value=MF defaultselection="1" displaytext="Multi Family" noinput="0" name="SELTD">Multi Family</LABEL></TD>
+                    </TR>
+                </TBODY>
+            </TABLE>
+        </SPAN>
+    </FIELDSET> <SPAN tabIndex=23 id=text1 style="HEIGHT: 30px; POSITION: absolute; COLOR: #0000ff; LEFT: 20px; Z-INDEX: 23; TOP: 20px; WIDTH: 260px" elementtype="4"><FONT style="FONT-SIZE: 14pt; COLOR: #0099ff">Online Sold Permit Search</FONT></SPAN>
+    <SPAN tabIndex=24 id=text2 style="HEIGHT: 50px; POSITION: absolute; LEFT: 10px; Z-INDEX: 24; TOP: 620px; WIDTH: 703px" elementtype="4">
+        <DIV elementtype="4">If you feel a project violates deed restrictions, please contact the Office of the City Attorney's <U><A id=anchor2 href="https://www.houstontx.gov/legal/deed.html" name="anchor2">Deed Restriction Enforcement Team</A>&nbsp;</U></font></DIV>
+        <DIV elementtype="4">If you suspect work is being done without a permit, please report it to <U><A id=anchor2 href="http://www.houstontx.gov/311/" name="anchor2">311</A>&nbsp;</U>.</DIV>
+    </SPAN><INPUT id=layoutinfo style="POSITION: absolute; LEFT: -100px; TOP: -100px" type=hidden schedulecontrolids="form1Schedule" resourcectrlids="ITEM3" name="inputhidden1"><INPUT id=ibiapp_app style="POSITION: absolute; LEFT: -100px; TOP: -100px" type=hidden value=soldpermits name="ibiapp_app"><INPUT id=ibic_server style="POSITION: absolute; LEFT: -100px; TOP: -100px" type=hidden value=EDASERVE isdataserversarea="1" name="ibic_server"><xml id=focus_xmlelement>
+        <script type="text/xml" nextelementuniquenumber="25">
+            <rootxmlnode focoption="_FOC_NULL" top="100" left="10" width="150" height="130">
+                <variables>
+                    <variable controltype="12" parametercreatedinreslay="0" type="prompt" desc="Report Format" name="WFFMT" default="" textvarname="" accept="0" select="0" create="1" top="70" left="30" width="60" height="20" inbinding="1">
+                        <link linktype="default">
+                        <condition default="1" name="Default" whattodowithcontrol="4" valuescompareoperator="0" parameterscompareoperator="0" conditionmultiselectoperator="0">
+                            <data_info checkForDuplicateValues="0" displayfield="WFFMT" datafield="WFFMT" datasource="" datatype="0" selectedvalue="" operation="" slider_range_from="" slider_range_to="" previewvalue="HTML" sourcetype="typeMaster" ibif_ex="">
+                                <static_values>
+                                    <static value="HTML" display="HTML" selected="1" noinput="0">
+
+                                    </static><static value="PDF" display="PDF" selected="0" noinput="0"></static><static value="EXL2K" display="Excel 2000" selected="0" noinput="0"></static><static value="EXL2K FORMULA" display="Excel Formula" selected="0" noinput="0"></static><static value="AHTML" display="HTML Active Report" selected="0" noinput="0"></static>
+                                </static_values>
+                            </data_info>
+                        </condition></link>
+                        <requestid id="6"></requestid>
+                        <requestid id="7"></requestid>
+                    </variable>
+                    <variable controltype="7" parametercreatedinreslay="0" type="prompt" desc="Select the report" name="RPTID" default="" textvarname="" accept="0" select="0" create="1" top="70" left="140" width="60" height="20" inbinding="1">
+                        <link linktype="default">
+                        <condition default="1" name="Default" whattodowithcontrol="4" valuescompareoperator="0" parameterscompareoperator="0" conditionmultiselectoperator="0">
+                            <data_info checkForDuplicateValues="0" displayfield="RPTID" datafield="RPTID" datasource="" datatype="0" selectedvalue="" operation="" slider_range_from="" slider_range_to="" previewvalue="internet_sold_pmts" sourcetype="typeMaster">
+                                <static_values>
+                                    <static value="internet_sold_pmts" display="internet_sold_pmts called by sp001ah" selected="1" noinput="0"></static>
+                                </static_values>
+                            </data_info>
+                        </condition></link>
+                        <requestid id="7"></requestid>
+                    </variable>
+                    <variable controltype="7" parametercreatedinreslay="0" type="default" desc="BDT" name="BDT" default=" " textvarname="" accept="0" select="0" create="1" top="70" left="140" width="60" height="20" inbinding="1">
+                        <link linktype="default" from="compUid_3" persistentuniqueid="compUid_22">
+                        <condition default="1" name="Default" whattodowithcontrol="4" valuescompareoperator="0" parameterscompareoperator="0" conditionmultiselectoperator="0">
+                            <data_info checkForDuplicateValues="0" displayfield="BDT" datafield="BDT" datasource="" datatype="0" selectedvalue=" " operation="" slider_range_from="" slider_range_to="" previewvalue=" " sourcetype="typeMaster" linktype="none" ibif_ex="">
+                                <static_values>
+                                    <static value=" " display=" " selected="1" noinput="0">
+
+                                    </static>
+                                </static_values>
+                            </data_info>
+                        </condition></link>
+                        <requestid id="6"></requestid>
+                        <requestid id="13"></requestid>
+                    </variable>
+                    <variable controltype="7" parametercreatedinreslay="0" type="default" desc="EDT" name="EDT" default=" " textvarname="" accept="0" select="0" create="1" top="70" left="250" width="60" height="20" inbinding="1">
+                        <link linktype="default" from="compUid_4" persistentuniqueid="compUid_21">
+                        <condition default="1" name="Default" whattodowithcontrol="4" valuescompareoperator="0" parameterscompareoperator="0" conditionmultiselectoperator="0">
+                            <data_info checkForDuplicateValues="0" displayfield="EDT" datafield="EDT" datasource="" datatype="0" selectedvalue=" " operation="" slider_range_from="" slider_range_to="" previewvalue=" " sourcetype="typeMaster" linktype="none" ibif_ex="">
+                                <static_values><static value=" " display=" " selected="1" noinput="0"></static></static_values>
+                            </data_info>
+                        </condition></link>
+                        <requestid id="6"></requestid>
+                        <requestid id="13"></requestid>
+                    </variable>
+                    <variable controltype="7" parametercreatedinreslay="0" type="default" desc="VALMN" name="VALMN" default=" " textvarname="" accept="0" select="0" create="1" top="70" left="360" width="60" height="20" inbinding="1">
+                        <link linktype="default" from="compUid_5">
+                        <condition default="1" name="Default" whattodowithcontrol="4" valuescompareoperator="0" parameterscompareoperator="0" conditionmultiselectoperator="0">
+                            <data_info checkForDuplicateValues="0" displayfield="VALMN" datafield="VALMN" datasource="" datatype="0" selectedvalue=" " operation="" slider_range_from="" slider_range_to="" previewvalue=" " sourcetype="typeMaster" ibif_ex="">
+                                <static_values><static value=" " display=" " selected="1" noinput="0"></static></static_values>
+                            </data_info>
+                        </condition></link>
+                        <requestid id="6"></requestid>
+                        <requestid id="13"></requestid>
+                    </variable>
+                    <variable controltype="7" parametercreatedinreslay="0" type="default" desc="VALMX" name="VALMX" default=" " textvarname="" accept="0" select="0" create="1" top="70" left="470" width="60" height="20" inbinding="1">
+                        <link linktype="default" from="compUid_6">
+                        <condition default="1" name="Default" whattodowithcontrol="4" valuescompareoperator="0" parameterscompareoperator="0" conditionmultiselectoperator="0">
+                            <data_info checkForDuplicateValues="0" displayfield="VALMX" datafield="VALMX" datasource="" datatype="0" selectedvalue=" " operation="" slider_range_from="" slider_range_to="" previewvalue=" " sourcetype="typeMaster" ibif_ex="">
+                                <static_values>
+                                    <static value=" " display=" " selected="1" noinput="0">
+
+                                    </static>
+                                </static_values>
+                            </data_info>
+                        </condition></link>
+                        <requestid id="6"></requestid>
+                        <requestid id="13"></requestid>
+                    </variable>
+                    <variable controltype="7" parametercreatedinreslay="0" type="default" desc="SRH" name="SRH" default="14112584" textvarname="" accept="0" select="0" create="1" top="70" left="580" width="60" height="20" inbinding="1">
+                        <link linktype="default" from="compUid_7">
+                        <condition default="1" name="Default" whattodowithcontrol="4" valuescompareoperator="0" parameterscompareoperator="0" conditionmultiselectoperator="0">
+                            <data_info checkForDuplicateValues="0" displayfield="SRH" datafield="SRH" datasource="" datatype="0" selectedvalue="14112584" operation="" slider_range_from="" slider_range_to="" previewvalue="14112584" sourcetype="typeMaster" ibif_ex="">
+                                <static_values><static value="14112584" display="14112584" selected="1" noinput="0"></static></static_values>
+                            </data_info>
+                        </condition></link>
+                        <requestid id="6"></requestid>
+                        <requestid id="13"></requestid>
+                    </variable>
+                    <variable controltype="7" parametercreatedinreslay="0" type="default" desc="SELTD" name="SELTD" default="PN" textvarname="" accept="0" select="0" create="1" top="70" left="690" width="60" height="20" inbinding="1">
+                        <link linktype="default" from="compUid_8" persistentuniqueid="compUid_17">
+                        <condition default="1" name="Default" whattodowithcontrol="4" valuescompareoperator="0" parameterscompareoperator="0" conditionmultiselectoperator="0">
+                            <data_info checkForDuplicateValues="0" displayfield="SELTD" datafield="SELTD" datasource="" datatype="0" selectedvalue="PN" operation="" slider_range_from="" slider_range_to="" previewvalue="PN" sourcetype="typeMaster" linktype="none" ibif_ex="">
+                                <static_values><static value="PN" display="PN" selected="1" noinput="0"></static></static_values>
+                            </data_info>
+                        </condition></link>
+                        <requestid id="6"></requestid>
+                        <requestid id="13"></requestid>
+                    </variable>
+                    <variable controltype="7" parametercreatedinreslay="0" type="default" desc="PTYPE" name="PTYPE" default="FOC_NONE" textvarname="" accept="0" select="0" create="1" top="70" left="800" width="60" height="20" inbinding="1">
+                        <link linktype="default" from="compUid_9" persistentuniqueid="compUid_23">
+                        <condition default="1" name="Default" whattodowithcontrol="4" valuescompareoperator="0" parameterscompareoperator="0" conditionmultiselectoperator="0">
+                            <data_info checkForDuplicateValues="0" displayfield="PTYPE" datafield="PTYPE" datasource="" datatype="0" selectedvalue="FOC_NONE" operation="" slider_range_from="" slider_range_to="" previewvalue="FOC_NONE" sourcetype="typeMaster" linktype="none" ibif_ex="">
+                                <static_values>
+                                    <static value="_FOC_NULL" display="FOC_NONE" selected="1" noinput="0">
+
+                                    </static>
+                                </static_values>
+                            </data_info>
+                        </condition></link>
+                        <requestid id="6"></requestid>
+                        <requestid id="7"></requestid>
+                        <requestid id="13"></requestid>
+                    </variable>
+                    <variable controltype="7" parametercreatedinreslay="0" type="unresolved" desc="ERRTITLE" name="ERRTITLE" default="" textvarname="" accept="0" select="0" create="1">
+                        <link linktype="default" from="compUid_5">
+                        <condition default="1" name="Default" whattodowithcontrol="4" valuescompareoperator="0" parameterscompareoperator="0" conditionmultiselectoperator="0">
+                            <data_info checkForDuplicateValues="0" displayfield="ERRTITLE" datafield="ERRTITLE" datasource="" datatype="0" selectedvalue="" operation="" slider_range_from="" slider_range_to="" previewvalue="" sourcetype="typeMaster" ibif_ex=""></data_info>
+                        </condition></link>
+                        <requestid id="13"></requestid>
+                    </variable>
+                    <variable controltype="7" parametercreatedinreslay="0" type="unresolved" desc="ERRMSG1" name="ERRMSG1" default="" textvarname="" accept="0" select="0" create="1">
+                        <link linktype="default" from="compUid_3">
+                        <condition default="1" name="Default" whattodowithcontrol="4" valuescompareoperator="0" parameterscompareoperator="0" conditionmultiselectoperator="0">
+                            <data_info checkForDuplicateValues="0" displayfield="ERRMSG1" datafield="ERRMSG1" datasource="" datatype="0" selectedvalue="" operation="" slider_range_from="" slider_range_to="" previewvalue="" sourcetype="typeMaster" ibif_ex="">
+                            </data_info>
+                        </condition></link>
+                        <requestid id="13"></requestid>
+                    </variable>
+                    <variable controltype="7" parametercreatedinreslay="0" type="unresolved" desc="ERRMSG2" name="ERRMSG2" default="" textvarname="" accept="0" select="0" create="1">
+                        <link linktype="default" from="compUid_4">
+                        <condition default="1" name="Default" whattodowithcontrol="4" valuescompareoperator="0" parameterscompareoperator="0" conditionmultiselectoperator="0">
+                            <data_info checkForDuplicateValues="0" displayfield="ERRMSG2" datafield="ERRMSG2" datasource="" datatype="0" selectedvalue="" operation="" slider_range_from="" slider_range_to="" previewvalue="" sourcetype="typeMaster" ibif_ex="">
+
+                            </data_info>
+                        </condition></link>
+                        <requestid id="13"></requestid>
+                    </variable><variable controltype="7" parametercreatedinreslay="0" type="unresolved" desc="nbsp" name="nbsp" default="" textvarname="" accept="0" select="0" create="0"><link linktype="default"><condition default="1" name="Default" whattodowithcontrol="4" valuescompareoperator="0" parameterscompareoperator="0" conditionmultiselectoperator="0"><data_info datatype="0" modifiedrequest="0" displayfield="nbsp" datafield="nbsp" datasource="" ibif_ex="" selectedvalue="" operation="" slider_range_from="" slider_range_to="" previewvalue=""></data_info></condition></link><requestid id="13"></requestid></variable>
+                </variables>
+                <input_controls>
+                    <input_control bindcontrolid="compUid_3" elementtype="14" name="BDT" id="edit2" multiple="0" onetimepopulated="1" inbinding="1" top="20" left="140" width="60" height="20">
+                        <link linktype="default" persistentuniqueid="compUid_3">
+                        <condition default="1" name="Default" whattodowithcontrol="0" valuescompareoperator="0" parameterscompareoperator="0" conditionmultiselectoperator="0">
+                            <data_info checkForDuplicateValues="0" datatype="0" datasource="" addalloption="0" sourcetype="typeMaster" cacheruntimedata="0" accept="0" operation="NONE" selectedvalue="" calendardata="0/0/-10;0/0/10" calendardatatype="1" ibiformat="YYMD">
+                                <static_values>
+                                    <static value="" display="" selected="1" noinput="0"></static>
+                                </static_values>
+                            </data_info>
+                        </condition></link>
+                    </input_control>
+                    <input_control bindcontrolid="compUid_4" elementtype="14" name="EDT" id="edit3" multiple="0" onetimepopulated="1" inbinding="1" top="20" left="250" width="60" height="20">
+                        <link linktype="default" persistentuniqueid="compUid_4">
+                        <condition default="1" name="Default" whattodowithcontrol="0" valuescompareoperator="0" parameterscompareoperator="0" conditionmultiselectoperator="0">
+                            <data_info checkForDuplicateValues="0" datatype="0" datasource="" addalloption="0" sourcetype="typeMaster" cacheruntimedata="0" accept="0" operation="NONE" selectedvalue="" calendardata="0/0/-10;0/0/10" calendardatatype="1" ibiformat="YYMD">
+                                <static_values>
+                                    <static value="" display="" selected="1" noinput="0">
+
+                                    </static>
+                                </static_values>
+                            </data_info>
+                        </condition></link>
+                    </input_control>
+                    <input_control bindcontrolid="compUid_5" elementtype="7" name="edit4" id="edit4" multiple="0" onetimepopulated="1" inbinding="1" top="20" left="360" width="60" height="20">
+                        <link linktype="default" persistentuniqueid="compUid_6">
+                        <condition default="1" name="Default" whattodowithcontrol="0" valuescompareoperator="0" parameterscompareoperator="0" conditionmultiselectoperator="0">
+                            <data_info checkForDuplicateValues="0" datatype="0" datasource="" addalloption="0" sourcetype="typeMaster" cacheruntimedata="0" accept="0" operation="NONE">
+                                <static_values><static value=" " display=" " selected="1" noinput="0"></static></static_values>
+                            </data_info>
+                        </condition></link>
+                    </input_control>
+                    <input_control bindcontrolid="compUid_6" elementtype="7" name="edit5" id="edit5" multiple="0" onetimepopulated="1" inbinding="1" top="20" left="470" width="60" height="20">
+                        <link linktype="default" persistentuniqueid="compUid_7">
+                        <condition default="1" name="Default" whattodowithcontrol="0" valuescompareoperator="0" parameterscompareoperator="0" conditionmultiselectoperator="0">
+                            <data_info checkForDuplicateValues="0" datatype="0" datasource="" addalloption="0" sourcetype="typeMaster" cacheruntimedata="0" accept="0" operation="NONE">
+                                <static_values><static value=" " display=" " selected="1" noinput="0"></static></static_values>
+                            </data_info>
+                        </condition></link>
+                    </input_control>
+                    <input_control bindcontrolid="compUid_7" elementtype="7" name="SRH" id="SRH" multiple="0" onetimepopulated="1" inbinding="1" top="20" left="580" width="60" height="20">
+                        <link linktype="default" persistentuniqueid="compUid_5">
+                        <condition default="1" name="Default" whattodowithcontrol="0" valuescompareoperator="0" parameterscompareoperator="0" conditionmultiselectoperator="0">
+                            <data_info checkForDuplicateValues="0" datatype="0" datasource="" addalloption="0" sourcetype="typeMaster" cacheruntimedata="0" accept="0" operation="NONE" selectedvalue="">
+                                <static_values>
+                                    <static value="" display="" selected="1" noinput="0">
+
+                                    </static>
+                                </static_values>
+                            </data_info>
+                        </condition></link>
+                    </input_control>
+                    <input_control bindcontrolid="compUid_8" elementtype="12" name="SELTD" id="SELTD" multiple="0" onetimepopulated="1" inbinding="1" top="20" left="690" width="60" height="20">
+                        <link linktype="default" persistentuniqueid="compUid_8">
+                        <condition default="1" name="Default" whattodowithcontrol="0" valuescompareoperator="0" parameterscompareoperator="0" conditionmultiselectoperator="0">
+                            <data_info checkForDuplicateValues="0" datatype="0" datasource="" addalloption="0" sourcetype="typeMaster" cacheruntimedata="0" accept="0" operation="NONE" modifiedrequest="0">
+                                <static_values>
+                                    <static value="PN" display="Project Number" selected="1" noinput="0"></static>
+                                    <static value="BN" display="Buyer's Name" selected="0" noinput="0"></static>
+                                    <static value="ZC" display="Zip Code" selected="0" noinput="0"></static>
+                                    <static value="JA" display="Job Address" selected="0" noinput="0"></static>
+                                    <static value="BA" display="Buyer's Address" selected="0" noinput="0"></static>
+                                    <static value="CM" display="Commercial (Category B)" selected="0" noinput="0"></static>
+                                    <static value="AN" display="Applicant Name" selected="0" noinput="0"></static>
+                                    <static value="OO" display="Owner Occupant" selected="0" noinput="0"></static>
+                                    <static value="RD" display="Residential (Category 3)" selected="0" noinput="0"></static>
+                                    <static value="PT" display="Permit Type" selected="0" noinput="0"></static>
+                                    <static value="BU" display="Building Use" selected="0" noinput="0"></static>
+                                    <static value="MF" display="Multi Family" selected="0" noinput="0"></static>
+                                </static_values>
+                            </data_info>
+                        </condition></link>
+                    </input_control>
+                    <input_control bindcontrolid="compUid_9" elementtype="8" name="PTYPE" id="PTYPE" multiple="0" onetimepopulated="1" inbinding="1" top="20" left="800" width="60" height="20">
+                        <link linktype="default" persistentuniqueid="compUid_9">
+                        <condition default="1" name="Default" whattodowithcontrol="0" valuescompareoperator="0" parameterscompareoperator="0" conditionmultiselectoperator="0">
+                            <data_info checkForDuplicateValues="0" datatype="0" datasource="" addalloption="0" sourcetype="typeMaster" cacheruntimedata="0" accept="0" operation="NONE" modifiedrequest="0">
+                                <static_values>
+                                    <static value="SD" display="Demolition" selected="0" noinput="0">
+
+                                    </static>
+                                    <static value="11" display="Electrical" selected="1" noinput="0"></static>
+                                    <static value="FM" display="Fire Marshal" selected="0" noinput="0"></static>
+                                    <static value="14" display="Merchanical" selected="0" noinput="0"></static>
+                                    <static value="OC" display="Occupancy Inspection" selected="0" noinput="0"></static>
+                                    <static value="12" display="Plumbing" selected="0" noinput="0"></static>
+                                    <static value="SI" display="Signs" selected="0" noinput="0"></static>
+                                    <static value="13" display="Structural" selected="0" noinput="0"></static>
+                                    <static value="MD" display="Multi Discipline" selected="0" noinput="0"></static>
+                                </static_values>
+                            </data_info>
+                        </condition></link>
+                    </input_control>
+                </input_controls>
+                <other_bound_objects></other_bound_objects>
+                <requests nextrequestsid="14">
+                    <request requestid="6" sourcetype="typeFex" targettype="defer" targetname="_blank" ibif_ex="app/online_permit_se.fex" IBIMR_domain="planning/planning.htm" IBIMR_folder="#soldpermitso" IBIMR_dir="#hpcreportsf3" IBIMR_sub_action="MR_STD_REPORT" activereport="0" reportcolumns="" reportrealcolumns="" ibiapp_app=""></request>
+                    <request requestid="7" sourcetype="typeschedule" targettype="reportcaster" targetname="EmailLibraryFTP" ibif_ex="app/online_permit_se.fex" IBIMR_domain="planning/planning.htm" IBIMR_folder="#soldpermitso" IBIMR_dir="#hpcreportsf3" IBIMR_sub_action="MR_STD_REPORT" activereport="0" reportcolumns="" reportrealcolumns="" ibiapp_app=""></request>
+                    <request requestid="13" sourcetype="typeFex" targettype="window" targetname="_blank" ibif_ex="online_per_se.fex" activereport="0" reportcolumns="" reportrealcolumns="" ibiapp_app="soldpermits"></request>
+                </requests>
+            </rootxmlnode>
+        </script>
+    </xml>
+</BODY>
+<SCRIPT type=text/javascript>
+    //confidential_id=IBI_loader
+    if (ibigblInitInfo.testOptions(rltdyncalendar) && (typeof setDateRange === 'function')) { setDateRange(); setupDocCalendars(); }
+    if (typeof doBeforeLoad === 'function') { doBeforeLoad(); } function AdjustChildrenPosition() {
+    }
+
+</SCRIPT>
+</HTML>
+<!-- cc yfkvf -->

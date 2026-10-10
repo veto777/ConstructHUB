@@ -15,7 +15,7 @@ import { DFY_PAGES, dfyPagePath } from "./dfy-pages";
 
 export const APP_ROUTE_PATTERNS: readonly string[] = [
   // Signed-out and signed-in pages (PublicRouter, DashboardRouter).
-  "/landing", "/auth", "/search", "/databases", "/property", "/schedules", "/history", "/photos", "/media-library",
+  "/landing", "/auth", "/search", "/databases", "/property", "/schedules", "/history", "/permit-alerts", "/photos", "/media-library",
   "/gmb-monitor", "/google-profile", "/ranking-grid", "/competitors", "/competitors-landing", "/agency", "/locations", "/domains",
   "/mail-alerts", "/gbp-content", "/listing-editor", "/social-media", "/guides", "/tutorials", "/cloudflare", "/search-console", "/seo", "/seo/rank-tracker", "/seo/local-grid", "/seo/plan", "/seo/audit", "/seo/alerts", "/seo/mentions", "/seo/usage", "/seo/reports", "/seo/ai", "/seo/batch", "/seo/content", "/seo/explorer", "/seo/keywords", "/seo/backlinks", "/seo/competitors", "/site-scan",
   "/free-site-scan", "/site-scan/report/*", "/master-class", "/master-class-landing", "/google-ads", "/ads-manager",

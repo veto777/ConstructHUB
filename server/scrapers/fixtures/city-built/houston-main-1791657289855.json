@@ -1,0 +1,112 @@
+/*
+File: pwe_sty_webpage.css
+Desc: This is the standard cascading style sheet for WF HTML pages.
+----------------------------------------------------------------------------------------------
+05/22/2012 - Sharon Alston - Copied from dw_sty_launch_page.css
+*/
+/* Silver     #CCCCCC */
+/* White      #FFFFFF */
+/* Light Blue #99CCFF */
+ 
+* {font-family: arial;
+   font-size: 9pt}
+ 
+.PageBody {
+            background-color: #99CCFF /* will set background to light blue if browser cannot handle the gradient */
+            /* IE gradient silver (#99CCFF) to white (#FFFFFF) */
+            filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#99CCFF', endColorstr='#FFFFFF');
+          }
+ 
+/* styling for parameter group boxes */
+.ParameterGroupBox
+          { 
+            font-size: 90%;
+            font-weight: 600;
+            color: #0080C0;  /* blue */
+            background-color: #CCCCCC;   /* will set background to light silver if browser cannot handle the gradient */
+            /* IE gradient silver (#CCCCCC) to white (#FFFFFF) */
+            filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#CCCCCC', endColorstr='#FFFFFF');
+            vertical-align: middle;
+            text-align: center
+}
+ 
+/* styling for TABS */
+.tabitemsclass
+          { 
+            font-size: 90%;
+            font-weight: 600;
+            color: #0080C0;  /* blue */
+            background-color: #CCCCCC;   /* will set background to light silver if browser cannot handle the gradient */
+            /* IE gradient silver (#CCCCCC) to white (#FFFFFF) */
+            filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#CCCCCC', endColorstr='#FFFFFF');
+            vertical-align: middle;
+            text-align: center
+}
+ 
+.HelpDrillDown 
+          { color: #0080C0;  /* blue */
+            font-weight: 800
+          }
+ 
+H1, H2, H3, H4, H5, H6, .PageHeading
+          { color: #0080C0;  /* blue */
+            text-align: Center;
+            font-size: 150%;
+            font-weight: 900 }
+ 
+.ReportName
+          { color: #0080C0;  /* blue */
+            font-size: 110%;
+            font-weight: 900 
+          }
+ 
+.MessageHeading
+          { color: #0080C0;  /* blue */
+            font-size: 150%;
+            font-weight: 900;
+            text-align: Center;
+           }
+ 
+.MessageBody
+          { color: black;
+            text-align: Center;
+            font-weight: 900 }
+ 
+.HelpItem
+          { color: black;
+            text-align: Left;
+            font-weight: 800;
+            background-color: #CCCCCC;
+            border: thin solid black;
+            /* IE gradient silver (#CCCCCC) to white (#FFFFFF) */
+            filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#CCCCCC', endColorstr='#FFFFFF');
+          }
+ 
+.ControlLabel, .ReportFormatSelection
+          { font-weight: 700;
+            color: black }
+ 
+ 
+A:link    { color: blue; 
+            text-decoration: underline }
+A:hover   { color: red; 
+            text-decoration: none; 
+            background-color: #FFFF99;
+            font-weight: 500; 
+            font-size: 105% }
+A:active  { color: red; 
+            background: yellow; 
+            text-decoration: none }
+A:visited { color: green; 
+            text-decoration: underline }
+ 
+ 
+.ReportFormatSelection
+          { font-weight: 400;
+            font-size: 85%;
+            border: 1px solid black }
+ 
+ 
+ 
+ 
+ 

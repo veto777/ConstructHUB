@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head id="ctl00_Head1"><title>
+	Permit Search
+</title><meta http-equiv="Content-Type" content="charset=utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<script type="text/javascript" src="../CommonControls/ui/scripts/jquery-1.11.0.min.js"></script>
+	<script type="text/javascript" src="../CommonControls/ui/scripts/jquery-ui-1.10.4.custom.min.js"></script>
+	<script type="text/javascript" src="../CommonControls/ui/scripts/jquery.tristate.js"></script>
+	<script type="text/javascript" src="../CommonControls/ui/scripts/jquery.maskedinput-1.3.1.min.js"></script>
+	<script type="text/javascript" src="../CommonControls/ui/scripts/shared.js"></script>
+	<link id="ctl00_Link1" rel="Stylesheet" type="text/css" href="../CommonControls/ui/style/smoothness/jquery-ui-1.10.4.custom.css" /><link id="ctl00_Link2" rel="Stylesheet" type="text/css" href="../CommonControls/ui/style/shared.css" /><link id="ctl00_Link3" rel="Stylesheet" type="text/css" href="../ui/style/style.css" /><link id="ctl00_Link4" rel="Stylesheet" type="text/css" href="../ui/style/client.css" /><link id="ctl00_lnkAppModern" rel="stylesheet" type="text/css" href="../ui/style/app-modern.css" /><link id="ctl00_lnkClientTheme" rel="stylesheet" type="text/css" href="../ui/style/themes/lyon.css" /></head>
+<body class="app-shell">
+	<form method="post" action="./PermitSearch.aspx" id="aspnetForm">
+<div class="aspNetHidden">
+<input type="hidden" name="__EVENTTARGET" id="__EVENTTARGET" value="" />
+<input type="hidden" name="__EVENTARGUMENT" id="__EVENTARGUMENT" value="" />
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="/wEPDwUJNjE5NTk4ODU0D2QWAmYPZBYEAgEPZBYCAggPFgIeBGhyZWYFGn4vdWkvc3R5bGUvdGhlbWVzL2x5b24uY3NzZAIDD2QWDgIBDw8WAh4HVmlzaWJsZWhkZAICDw8WAh4LTmF2aWdhdGVVcmwFDn4vRGVmYXVsdC5hc3B4ZGQCBw9kFgoCAw8PFgIeBmVycm9yczLMAQABAAAA/////wEAAAAAAAAABAEAAAB/U3lzdGVtLkNvbGxlY3Rpb25zLkdlbmVyaWMuTGlzdGAxW1tTeXN0ZW0uU3RyaW5nLCBtc2NvcmxpYiwgVmVyc2lvbj00LjAuMC4wLCBDdWx0dXJlPW5ldXRyYWwsIFB1YmxpY0tleVRva2VuPWI3N2E1YzU2MTkzNGUwODldXQMAAAAGX2l0ZW1zBV9zaXplCF92ZXJzaW9uBgAACAgJAgAAAAAAAAABAAAAEQIAAAAAAAAAC2QWBGYPFCsAAg8WBB4LXyFEYXRhQm91bmRnHgtfIUl0ZW1Db3VudGZkZGQCAg8UKwACZGRkAg8PD2QWAh4LcGxhY2Vob2xkZXIFGmUuZy4sIDMzLTM5LTI4LTAwMDgtMDAtMDc5ZAIrDxAPFgYeDURhdGFUZXh0RmllbGQFBE5hbWUeDkRhdGFWYWx1ZUZpZWxkBQJJZB8EZ2QQFQ0NU2VsZWN0IHN0YXR1cwhBcHByb3ZlZBJBd2FpdGluZ0NvbXBsZXRpb24JQ29tcGxldGVkC0Rpc2FwcHJvdmVkB0V4cGlyZWQHSW1wYXNzZQpJbiBQcm9jZXNzBklzc3VlZAdQZW5kaW5nDFBlcm1pdENsb3NlZAdSZXZva2VkBlZvaWRlZBUNDVNlbGVjdCBzdGF0dXMFNjIxMjgDMzE2BTYyMTI5BTU2NzkzBTYyMTMyBTYyMjcyBTU2Nzg3BDEwMDAFNjIyNDQFNjIzMTUFNjIxMzAFNjIxMzEUKwMNZ2dnZ2dnZ2dnZ2dnZ2RkAi8PEA8WBh8HBQRUeXBlHwgFDnBlcm1pdFR5cGVDb2RlHwRnZBAVdRJTZWxlY3QgcGVybWl0IHR5cGUVQ29tbWVyY2lhbCAvIEFkZGl0aW9uI0NvbW1lcmNpYWwgLyBCYXR0ZXJ5IFN0b3JhZ2UgU3lzdGVtEkNvbW1lcmNpYWwgLyBDb2FjaBxDb21tZXJjaWFsIC8gQ29tbWVyY2lhbCBTaWduF0NvbW1lcmNpYWwgLyBEZW1vbGl0aW9uJUNvbW1lcmNpYWwgLyBFbGVjdHJpYyAmIEdhcyByZWNvbm5lY3QqQ29tbWVyY2lhbCAvIEVsZWN0cmljIFBhbmVsIFVuZGVyIDQwMCBBbXBzF0NvbW1lcmNpYWwgLyBFbGVjdHJpY2FsJkNvbW1lcmNpYWwgLyBFbGlnaWJsZSBGYWNpbGl0eSBSZXF1ZXN0EkNvbW1lcmNpYWwgLyBGZW5jZS1Db21tZXJjaWFsIC8gRmxvb2RwbGFpbiBEZXZlbG9wbWVudCBBZ3JlZW1lbnQcQ29tbWVyY2lhbCAvIEZvdW5kYXRpb24gT25seRNDb21tZXJjaWFsIC8gR2FyYWdlFUNvbW1lcmNpYWwgLyBHYXMgbGluZS5Db21tZXJjaWFsIC8gR2VuZXJhdG9yIGFuZCBiYWNrdXAgcG93ZXIgc291cmNlFENvbW1lcmNpYWwgLyBHcmFkaW5nH0NvbW1lcmNpYWwgLyBHcmVhc2UgSW50ZXJjZXB0b3IXQ29tbWVyY2lhbCAvIE1lY2hhbmljYWwfQ29tbWVyY2lhbCAvIE1pbmktU3RvcmFnZSBVbml0cxpDb21tZXJjaWFsIC8gTWlzY2VsbGFuZW91cx1Db21tZXJjaWFsIC8gTmV3IENvbnN0cnVjdGlvbixDb21tZXJjaWFsIC8gT3BlcmF0aW9uYWwgQnVzaW5lc3MgSW5zcGVjdGlvbhlDb21tZXJjaWFsIC8gUGF0aW8gQ292ZXJzFUNvbW1lcmNpYWwgLyBQbHVtYmluZxFDb21tZXJjaWFsIC8gUG9vbCNDb21tZXJjaWFsIC8gUHJlLUFwcGxpY2F0aW9uIFJldmlldxRDb21tZXJjaWFsIC8gUmUtUm9vZipDb21tZXJjaWFsIC8gUmVpbnN0YWxsL1JlbW92YWwgU29sYXIgQXJyYXkeQ29tbWVyY2lhbCAvIFJlbW9kZWwgb3IgUmVwYWlyF0NvbW1lcmNpYWwgLyBTaGVsbCBPbmx5QkNvbW1lcmNpYWwgLyBTaXRlIEltcHJvdmVtZW50cyAiQnVpbGRpbmcgUGVybWl0cyBQcml2YXRlIFByb3BlcnR5Ih9Db21tZXJjaWFsIC8gU29sYXIgU2hpbmdsZSBSb29mIkNvbW1lcmNpYWwgLyBTb2xhci9XaW5kIEdlbmVyYXRpb24fQ29tbWVyY2lhbCAvIFRlbmFudCBJbXByb3ZlbWVudBdDb21tZXJjaWFsIC8gV2F0ZXIgTGluZSxDb21tZXJjaWFsIC8gV2lyZWxlc3MgQ29tbXVuaWNhdGlvbiBGYWNpbGl0eSFDb21tZXJjaWFsIFNlcnZpY2UgLyBNb2RpZmljYXRpb24YQ29tbWVyY2lhbCBTZXJ2aWNlIC8gTmV3H0Rpc2NvdmVyeSBJbnZlc3RpZ2F0aW9uIC8gT3RoZXI4RGlzY292ZXJ5IEludmVzdGlnYXRpb24gLyBQbGFubmluZyBBcHBsaWNhdGlvbiBVdGlsaXRpZXMxRGlzY292ZXJ5IEludmVzdGlnYXRpb24gLyBQcmVzc3VyZSBhbmQgRmxvdyBDaGVjayFSZXNpZGVudGlhbCAvIEFjY2Vzc29yeSBTdHJ1Y3R1cmUkUmVzaWRlbnRpYWwgLyBCYXR0ZXJ5IFN0b3JhZ2UgU3lzdGVtKFJlc2lkZW50aWFsIC8gQnVpbGRpbmcgLSBQdWJsaWMgQnVpbGRpbmclUmVzaWRlbnRpYWwgLyBCdWlsZGluZyBQZXJtaXQgUHJpbm91dBlSZXNpZGVudGlhbCAvIENvbmRvbWluaXVtK1Jlc2lkZW50aWFsIC8gQ29udmVydCBHYXJhZ2UgdG8gR3Vlc3QgSG91c2UsUmVzaWRlbnRpYWwgLyBDb252ZXJ0IEdhcmFnZSB0byBMaXZpbmcgU3BhY2UrUmVzaWRlbnRpYWwgLyBDb252ZXJ0IEdhcmdlIHRvIFNhbGVzIE9mZmljZSZSZXNpZGVudGlhbCAvIENvbnZlcnQgT2ZmaWNlIHRvIEdhcmFnZStSZXNpZGVudGlhbCAvIENvbnZlcnQgT2ZmaWNlIHRvIFJlc2lkZW50aWFsJ1Jlc2lkZW50aWFsIC8gQ29udmVydCBTaG9wIHRvIFJlc2lkZW5jZRJSZXNpZGVudGlhbCAvIERlY2sYUmVzaWRlbnRpYWwgLyBEZW1vbGl0aW9uFFJlc2lkZW50aWFsIC8gRHVwbGV4GFJlc2lkZW50aWFsIC8gRWxlY3RyaWNhbChSZXNpZGVudGlhbCAvIEVsZWN0cmljYWwgJiBHYXMgcmVjb25uZWN0LVJlc2lkZW50aWFsIC8gRWxlY3RyaWNhbCBQYW5lbCBVbmRlciA0MDAgQW1wcxNSZXNpZGVudGlhbCAvIEZlbmNlL1Jlc2lkZW50aWFsIC8gRmxvb2QgUGxhaW4gRGV2ZWxvcG1lbnQgQWdyZWVtZW50HVJlc2lkZW50aWFsIC8gRm91bmRhdGlvbiBPbmx5FFJlc2lkZW50aWFsIC8gR2FyYWdlHFJlc2lkZW50aWFsIC8gR2FyYWdlIFJlbW9kZWwWUmVzaWRlbnRpYWwgLyBHYXMgbGluZS9SZXNpZGVudGlhbCAvIEdlbmVyYXRvciBhbmQgYmFja3VwIHBvd2VyIHNvdXJjZRxSZXNpZGVudGlhbCAvIEdyYWRpbmcgUGVybWl0GVJlc2lkZW50aWFsIC8gR3Vlc3QgSG91c2UuUmVzaWRlbnRpYWwgLyBNYW51ZmFjdHVyZWQgSG9tZSAtIDggcHQuIHN5c3RlbTFSZXNpZGVudGlhbCAvIE1hbnVmYWN0dXJlZCBIb21lIC0gRm91bmRhdGlvbiBPbmx5KlJlc2lkZW50aWFsIC8gTWFudWZhY3R1cmVkIEhvbWUgQ29udmVyc2lvbiNSZXNpZGVudGlhbCAvIE1hbnVmYWN0dXJlZCBIb21lIFNldDBSZXNpZGVudGlhbCAvIE1hbnVmYWN0dXJlZCBIb21lIFNldCAmIENvbnZlcnNpb24fUmVzaWRlbnRpYWwgLyBNYXN0ZXIgU3RvY2sgUGxhbhhSZXNpZGVudGlhbCAvIE1lY2hhbmljYWwlUmVzaWRlbnRpYWwgLyBNZXRhbCBTdG9yYWdlIENvbnRhaW5lcilSZXNpZGVudGlhbCAvIE1IIENvbnZlcnNpb24gJiA4IHB0LiBDb21ibxtSZXNpZGVudGlhbCAvIE1pc2NlbGxhbmVvdXMsUmVzaWRlbnRpYWwgLyBNdWx0aS1GYW1pbHkgLSBJbmRpdmlkdWFsIFVuaXQgUmVzaWRlbnRpYWwgLyBNdWx0aS1GYW1pbHkgLSBOZXckUmVzaWRlbnRpYWwgLyBNdWx0aS1GYW1pbHkgLSBSZW1vZGVsKlJlc2lkZW50aWFsIC8gTmV3IE1hbnVmYWN0dXJlZCBIb21lIENvbWJvIBpSZXNpZGVudGlhbCAvIFBhdGlvIENvdmVycxZSZXNpZGVudGlhbCAvIFBsdW1iaW5nFlJlc2lkZW50aWFsIC8gUG9vbC9TcGEjUmVzaWRlbnRpYWwgLyBQcmUtQXBwaWNhdGlvbiBSZXZpZXcVUmVzaWRlbnRpYWwgLyBSZS1Sb29mK1Jlc2lkZW50aWFsIC8gUmVpbnN0YWxsL1JlbW92YWwgU29sYXIgQXJyYXkYUmVzaWRlbnRpYWwgLyBSZWxvY2F0aW9uJFJlc2lkZW50aWFsIC8gUmVzaWRlbnRpYWwgRGVtb2xpdGlvbiZSZXNpZGVudGlhbCAvIFJlc2lkZW50aWFsIFBlbGxldCBTdG92ZSNSZXNpZGVudGlhbCAvIFJlc2lkZW50aWFsIFdvb2RzdG92ZRxSZXNpZGVudGlhbCAvIFJldGFpbmluZyBXYWxsFFJlc2lkZW50aWFsIC8gU2VwdGljH1Jlc2lkZW50aWFsIC8gU2VwdGljICYgRWxlY3RyaWMTUmVzaWRlbnRpYWwgLyBTZXdlch5SZXNpZGVudGlhbCAvIFNld2VyICYgRWxlY3RyaWMbUmVzaWRlbnRpYWwgLyBTZXdlciAmIFdhdGVyMlJlc2lkZW50aWFsIC8gU2luZ2xlIEZhbWlseSAtIEFkZGl0aW9uIHdpdGggR2FyYWdlLlJlc2lkZW50aWFsIC8gU2luZ2xlIEZhbWlseSAtIE5ldyBDb25zdHJ1Y3Rpb24lUmVzaWRlbnRpYWwgLyBTaW5nbGUgRmFtaWx5IC0gUmVtb2RlbCVSZXNpZGVudGlhbCAvIFNpbmdsZSBGYW1pbHkgLSBSZXBlYXRzMFJlc2lkZW50aWFsIC8gU2luZ2xlIEZhbWlseSBSZXNpZGVuY2UgLSBBZGRpdGlvbjNSZXNpZGVudGlhbCAvIFNpbmdsZSBGYW1pbHkgUmVzaWRlbmNlIC0gRmlyZSBSZXBhaXIgUmVzaWRlbnRpYWwgLyBTb2xhciBTaGluZ2xlIFJvb2YjUmVzaWRlbnRpYWwgLyBTb2xhci9XaW5kIEdlbmVyYXRpb24kUmVzaWRlbnRpYWwgLyBUdWIvc2hvd2VyIHJlcGxhY2VtZW50GFJlc2lkZW50aWFsIC8gV2F0ZXIgTGluZSVSZXNpZGVudGlhbCAvIFdpbmRvdy9kb29yIHJlcGxhY2VtZW50IVJvYWRzIC8gRW5jcm9hY2ht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" />
+</div>
+
+<script type="text/javascript">
+//<![CDATA[
+var theForm = document.forms['aspnetForm'];
+if (!theForm) {
+    theForm = document.aspnetForm;
+}
+function __doPostBack(eventTarget, eventArgument) {
+    if (!theForm.onsubmit || (theForm.onsubmit() != false)) {
+        theForm.__EVENTTARGET.value = eventTarget;
+        theForm.__EVENTARGUMENT.value = eventArgument;
+        theForm.submit();
+    }
+}
+//]]>
+</script>
+
+
+<script src="/CitizenPortal/WebResource.axd?d=W8i76J0qBu7LoYOB1JMC5mPfY_F_SL1rME5Hm83wbu99C74zX1gV7liN1hGgSYpjtlCkAfV-L2XrcTzqgymF4jEFSNcWUuavhjxeiWEI0BY1&amp;t=639190581332169432" type="text/javascript"></script>
+
+
+<script src="/CitizenPortal/ScriptResource.axd?d=oUDJxarjJYtSF_wCnc-bqTHBRKXE82B66fObn9ErnycXt4Zk05EIf-AWT5oN489fmfLUuPROU0KsxMr2hYfU6lKmpgKV4dDansmW2aHqaoinC_ghEK7KwlBIFGqgNN3zpYOflidy80gsWy0hgvJtIxGxRHx-kWYZ-8UDNeyE9Qdm5F9T_m2zHOJ9b4Y6tqFM0&amp;t=ffffffffbec1863d" type="text/javascript"></script>
+<script type="text/javascript">
+//<![CDATA[
+if (typeof(Sys) === 'undefined') throw new Error('ASP.NET Ajax client-side framework failed to load.');
+//]]>
+</script>
+
+<script src="/CitizenPortal/ScriptResource.axd?d=yp97I2X5mCfcKWTvbMq23-HjgM9FhPVltNI5C98W1f7TnDsxknZFTiEEtCycOm6r8j-ugGArFRRaKAZPP4gZ5ktwMgpNKmPvnmNiwca3uwcWJD44ho-D0qDXTjmQdlxeHPPQhQwRqSmFNxTp_22A8v3MlcVq6FHrrsLIZT0bQaYMrA-PnJbOK0iOjn5bzAZqWuymvgNCdOgyqRq_yYWdhQ2&amp;t=ffffffffbec1863d" type="text/javascript"></script>
+<div class="aspNetHidden">
+
+	<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="CD35E594" />
+	<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="/wEdAJYBmjmRbQwnVa7D90N1PFBjrkoUsa2qfYPWnnwHGVGzs0NMQDPFJNsX1EUy+SWwoKjpZ27iQis7n2UrTBD97Pv2ULcQawXqlGiygj8kqITfTvihN8B03bgkNzeiheBLJdViDLlME4O3IKfM3qX9mfg2UtNXDsI+h3zxLvhkOr3hLJfUs2ychlfPFIpIh2Hs3K9Mk4TLhAPR7T6VVIw/J3ZkgSn9GwsrvbRxUPUpSWelPX9cjNzHOGyrDQ8mnNQfY3B2bc/ZumLDJ5CcSzDPCZW+vxQgacKE4DkwxlJorZ7hxBGgOcsIKeKbB/tDxB7BetURrRuuookoufTaK7TzuDGkeu9FNmUzQJFIqfjDcm2YxikJDJx+dzXwIdF7wRO0wne7nCJj0+VraAuzfmANhjHb1UubslVOzUopBqhR+7qzSrVjCJjygwiHpNZ0eCoJG0zuTAAhP+NiCicp6qmHJuJLjGGtVyI0vnjr4BsjRRnD13UgO7ri4XjT4dFvBs+VbbKBWxHcBXenkQ0luuJ7TWtHB0wFLT6nAAkPzORXAFHan6mNAafRy9m0MrG0VPTAYs2KZMMult4TF3nZ0ZgVFV4dqaXtowbwN16zX3mYymUsAj4d22ud7bdy1E/fJWSczkjlJWeUTVU80vAfWaMTa8TpI09AWvRIPsZGDT0NjDu35oqTz8+TaSYlak7D3mFIk+Ej3FaknJ2zrhTKAUDckDhsrGLj3vrG2CEflJkQZSsneGNr2jm2wQISwoNQoOEc6WUK166LtISvcLgfC45UQRiSxtV9N/yBWk+FTyrCSp6AtN3Nd/Kd/abn5sVaS6oQo09beH/xLk4WOPlvF6trmrzwXHISvXC73jBX++2ad5Kli3fdQtsrpVHMcE0x+9/CWEmsleqJsCa9gxGYgbG9pXpVG01pnAgXyZ5R84vLfvSkdOS3pN/1gmFhDt9JZTMr25PxJzwzplbxpJbjiEgcisn0dEyHcA0cEg+uttxunvHe6Y8dz/SgXJG4eGy1kuMQm+Qppim52edQZnLYp9VkULe6Qik/C6Y7W4DWIgGUeN0JWQyLvlKobcRUxtunMhY+bdLa8Qj7wkttd91ZGQMjcyys2k5T8VSgsQWQrBGjDSf8TEkjNC/moL0TaEN85x/Kz5RZBNdpLZWLZRBCZSSZ8WyN+/Jpil3cONbw29J15PvYCxxH7Tnsek+swMN2XSBsVV4TNGnvZ0A6CiTTDzPpALrt9im2wJFU3FDMa76dWmitGFci1jD6N01HoVrGmb9QlGbV2HoqdVs6XGHUE8+2jHCgMabAZzHOkpY/wkGB5raQFi9Jf01OYMVMkUXiFZa78nk4ap4tBioH9lD5nmNMPviqvKkPujEJr3bLWWv8AVoxHSqnpRowXlUo/P/OsKMD3Er2WuhVwGHAu4e0O4cysIdz3L+ie4+PGh2OqvTqhcdvq3lfg+79TtbfK2sdbDCGsBuneVxE9wOWkTKJc09H4iy5Ey6lBIMlRcgohtMdBH7w26or6/lhNAzIO953tn9UsMsMfGW8BMceL7zg5pUnoitajug0ueVzL9BJ7DonneKfEC4bDrjSoerVBJaMKH0lXtZEj0+mjB8g5PnGom/pDWV8LkYxx5+fyXA5kYa8+jSRnIi9W35GfGzPCb7h07zGdFb49L4fWtp361pMBKvLmX2V8+h3NxKlRjjoQz1SFsqu5sxrb/BzK3lKnZFH7/h+VCGzA0xy2VdQ9FTeRCtLHcUDojT5TGy2HdyQKitKUU5Ub1WCJU33tIeyTJ3aeT51dg226xrl15ERPKaB+z5QO/n8ier8oMG1PGmV3f5kXPQKCdcTj9lBBo2+UPuP4wekqkCAtoGspzrir9aftEJv/dVFDkIsR4PS1h7I0nbcW9g/YJewlXgBWYJpr7yMoxaFyENGW/jntdCeNDuzG84/tQpJ2mJQo5iMoqBg/gne5mULe0n1y4SDog/U42PJJ2sCsw/glFbCQF0QCeAU3VlxTj93c+koKCI6/nJnDc+IMV6G012i9p90SwN0XuAvUWGiUpM4+fsogrI8wyRdUe2D5t6boU4g0aTrQhePENPyyM1r/XYkspiRu7Yw/RUIYJiKCBFtTPdBH3SenM3+ZuC6ae5bGXmFyWgAevFsbdSeHdygffehwxPWebEw9E65v7OdyeoVYgIXORhWOHx10AMQE46oFiaNnwR8PAQru5gBZYszs24LSqeTESzn/L9chkunNlam87iH6l6isaiu/CkPop5j5pAPqbKSC/zxalxlIUABbMvmVGyUZZfy3izwwphaef3gUJLOYm9St2EN02zAqSC9mGNboS7Djjsv8Xr/8Vh7QsPaldsiH5J/HR0tgYfloUSgjd4mLL/AtNqUiaXEu/Ra61UWH0APP/PmLFcpzK2x5bdaq/3xorxMYzevK5huHkaz+IL7PHcCqL08Wm+iGQLJxyWMrZq0nwnLtZkMbs23KXTdtV4cZc8lqTMLfoQQq1EIm3sBXt+rUIAupSRFqmnANTee+WNd2sRALcTt1WYS7HrHD++N4BO7CGm6+aK9HpwqYxzGm36rQ6iY5acwiA2ctFIUCBrqXUbK32l/mfzYGzdC/UWe+RTG+Bbn5yav1dCba90sT8WWWlf/sBijD37uiBIfsUoD18YwezJFyD4moJz3C/0uK/Yf/VI/PBkVwkQmudG/+WXtcZoabFRILWqWwJR8BCjuViq0BuKB+Gp8D9W0NkHLeJK8E5B6vrsZ9qHJkz2ONYgghPMKW/SXGM+yW1sLLyK7vb1Oml8hzAGUj11LMLaqnTU5xIQLp/uMpHVX0BOSasSdKk8XCjOO1UHQ9Po5JMTfSa3FPVsz+ksgn+hVtysSUjsZ7RkU0Lvsk0b/4IRfjGyVu7DLVtCgfr2vRxTl8JKaM072i2zKlktDVgNmXEviMSDO2MGNINgbT0fnscMBav5yDLdo1SVQ+qIDOeOAS7+Ao4iCp9K2uY3td5DyslmVDFKLtbfUfbK3WlCXYfn9UOfJUfpG7BQHBWVAePpVtAt7qWEKY7461uB5wF9KR9AbuczcYY+z0c94pzyd+SzpOUlZG0hhBMUMjUNjym+00ZnEUIpa0MuZOXAVWFJnLbDILI7ys7MXmdhEb47jYaR6KuoPa46XZPE9UZBQPpmmdT94N2GHLAboeBTRVaIiL+6IOCBvxjnfZEQj8v4/R6l1MTTZerrlzDoLHQER/kh3CxRsz4A0fBLY9UIaRPI=" />
+</div>
+	<a href="#mainArea" class="app-skip-link">Skip to main content</a>
+	<script type="text/javascript">
+//<![CDATA[
+Sys.WebForms.PageRequestManager._initialize('ctl00$ScriptManager1', 'aspnetForm', [], [], [], 90, 'ctl00');
+//]]>
+</script>
+
+	
+	<header class="app-header" role="banner">
+	<div id="topArea" class="app-header__primary">
+		<div style="float:left;"><a id="ctl00_hypHomepage" href="../Default.aspx"><img id="ctl00_imgClientLogo" src="../ui/images/client/logo.png" alt="Citizen Portal" style="border:0px;" /></a></div>
+		
+        <div class="userInfo">
+			
+			<a id="ctl00_LoginStatusControl" href="javascript:__doPostBack(&#39;ctl00$LoginStatusControl$ctl02&#39;,&#39;&#39;)">Login</a>  | <a id="ctl00_hypHelp" href="../HelpUI/Help.aspx">Help</a>
+		</div>
+	</div>
+	<nav id="iconGrid" class="app-header__toolbar" aria-label="Application actions">
+		
+				<div class="icon" style="z-index:4;" title="Home">
+					<div class="iconText" onclick="window.location.href='../Default.aspx';">Home</div>
+				</div>
+				<div class="icon" style="z-index:4;" title="Website Feedback">
+					<div class="iconText" onclick="feedback();return false;">Website Feedback</div>
+				</div>
+                    <div class="icon" style="z-index:4;display:none;" title="Permit Questions">
+					<div class="iconText" onclick="PermitQuestion();return false;">Permit Questions</div>
+				</div>
+			
+		
+	</nav>
+	</header>
+	
+	<div id="mainArea" class="app-layout__content" role="main" tabindex="-1">
+				
+
+
+
+<div class="panelContainer app-layout__main">
+<div class="search-page">
+    <div class="search-card">
+        <div class="search-card__header">
+            <div>
+                <h1 class="search-title">Permit Search</h1>
+                <p class="search-helper">Enter one or more search criteria below to find permits. Leave fields blank to search all values.</p>
+            </div>
+            <button type="button" class="search-tips-toggle" id="searchTipsToggle" aria-expanded="false" aria-controls="searchTipsPanel">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg>
+                Search Tips
+            </button>
+        </div>
+
+        <div class="search-tips-panel" id="searchTipsPanel" hidden>
+            <div class="search-tips-panel__title">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 21h6v-1.5H9V21zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17h8v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm2.85 11.1l-.85.6V15h-4v-1.3l-.85-.6C7.8 12.16 7 10.63 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.63-.8 3.16-2.15 4.1z"/></svg>
+                Search Tips
+            </div>
+            <ul>
+                <li>Leave fields blank to search all values.</li>
+                <li>Use at least one specific field (such as Permit Number, Address, or Parcel ID) for best results.</li>
+                <li>Date ranges are optional. If only one date is entered, results will include that date and beyond.</li>
+                <li>The more information you provide, the more accurate your results.</li>
+            </ul>
+        </div>
+
+        
+
+
+        <div class="search-form-grid" role="search" aria-label="Permit search criteria">
+            <div class="form-field">
+                <label for="ctl00_BodyPlaceHolder_txbPermitNumber" class="form-label">Permit Number</label>
+                <input name="ctl00$BodyPlaceHolder$txbPermitNumber" type="text" id="ctl00_BodyPlaceHolder_txbPermitNumber" class="form-input" placeholder="e.g., BLDG-24-1234" />
+            </div>
+
+            <div class="form-field">
+                <span class="form-label" id="lblSubmissionDate">Submission Date</span>
+                <div class="date-range" role="group" aria-labelledby="lblSubmissionDate">
+                    <input name="ctl00$BodyPlaceHolder$txbSubmissionDateBegin" type="text" value="10/03/2026" id="ctl00_BodyPlaceHolder_txbSubmissionDateBegin" class="datepicker form-input" aria-label="Submission date from" placeholder="MM/DD/YYYY" />
+                    <span class="date-range__sep" aria-hidden="true">-</span>
+                    <input name="ctl00$BodyPlaceHolder$txbSubmissionDateEnd" type="text" value="10/10/2026" id="ctl00_BodyPlaceHolder_txbSubmissionDateEnd" class="datepicker form-input" aria-label="Submission date to" placeholder="MM/DD/YYYY" />
+                </div>
+            </div>
+
+            <div class="form-field">
+                <label for="ctl00_BodyPlaceHolder_txbParcelID" class="form-label">Parcel ID (APN)</label>
+                <input name="ctl00$BodyPlaceHolder$txbParcelID" type="text" id="ctl00_BodyPlaceHolder_txbParcelID" class="form-input" placeholder="e.g., 33-39-28-0008-00-079" />
+            </div>
+
+            <div class="form-field">
+                <span class="form-label" id="lblIssuedDate">Issued Date</span>
+                <div class="date-range" role="group" aria-labelledby="lblIssuedDate">
+                    <input name="ctl00$BodyPlaceHolder$txbIssuedDateBegin" type="text" id="ctl00_BodyPlaceHolder_txbIssuedDateBegin" class="datepicker form-input" aria-label="Issued date from" placeholder="MM/DD/YYYY" />
+                    <span class="date-range__sep" aria-hidden="true">-</span>
+                    <input name="ctl00$BodyPlaceHolder$txbIssuedDateEnd" type="text" id="ctl00_BodyPlaceHolder_txbIssuedDateEnd" class="datepicker form-input" aria-label="Issued date to" placeholder="MM/DD/YYYY" />
+                </div>
+            </div>
+
+            <div class="form-field">
+                <label for="ctl00_BodyPlaceHolder_txbContractorBusinessName" class="form-label">Contractor Business Name</label>
+                <input name="ctl00$BodyPlaceHolder$txbContractorBusinessName" type="text" id="ctl00_BodyPlaceHolder_txbContractorBusinessName" class="form-input" />
+            </div>
+
+            <div class="form-field">
+                <label for="ctl00_BodyPlaceHolder_txbContractorQualifierName" class="form-label">Contractor Qualifier Name</label>
+                <input name="ctl00$BodyPlaceHolder$txbContractorQualifierName" type="text" id="ctl00_BodyPlaceHolder_txbContractorQualifierName" class="form-input" />
+            </div>
+
+            <div class="form-field">
+                <label for="ctl00_BodyPlaceHolder_txbOwnerName" class="form-label">Owner Name</label>
+                <input name="ctl00$BodyPlaceHolder$txbOwnerName" type="text" id="ctl00_BodyPlaceHolder_txbOwnerName" class="form-input" />
+            </div>
+
+            <div class="form-field">
+                <label for="ctl00_BodyPlaceHolder_txtProjectName" class="form-label">Project Name</label>
+                <input name="ctl00$BodyPlaceHolder$txtProjectName" type="text" id="ctl00_BodyPlaceHolder_txtProjectName" class="form-input" />
+            </div>
+
+            <div class="form-field">
+                <span class="form-label" id="lblExpirationDate">Expiration Date</span>
+                <div class="date-range" role="group" aria-labelledby="lblExpirationDate">
+                    <input name="ctl00$BodyPlaceHolder$txbExpirationDateBegin" type="text" id="ctl00_BodyPlaceHolder_txbExpirationDateBegin" class="datepicker form-input" aria-label="Expiration date from" placeholder="MM/DD/YYYY" />
+                    <span class="date-range__sep" aria-hidden="true">-</span>
+                    <input name="ctl00$BodyPlaceHolder$txbExpirationDateEnd" type="text" id="ctl00_BodyPlaceHolder_txbExpirationDateEnd" class="datepicker form-input" aria-label="Expiration date to" placeholder="MM/DD/YYYY" />
+                </div>
+            </div>
+
+            <div class="form-field">
+                <label for="ctl00_BodyPlaceHolder_ddlStatus" class="form-label">Permit Status</label>
+                <select name="ctl00$BodyPlaceHolder$ddlStatus" id="ctl00_BodyPlaceHolder_ddlStatus" class="form-select">
+	<option selected="selected" value="Select status">Select status</option>
+	<option value="62128">Approved</option>
+	<option value="316">AwaitingCompletion</option>
+	<option value="62129">Completed</option>
+	<option value="56793">Disapproved</option>
+	<option value="62132">Expired</option>
+	<option value="62272">Impasse</option>
+	<option value="56787">In Process</option>
+	<option value="1000">Issued</option>
+	<option value="62244">Pending</option>
+	<option value="62315">PermitClosed</option>
+	<option value="62130">Revoked</option>
+	<option value="62131">Voided</option>
+
+</select>
+            </div>
+
+            <div class="form-field form-field-wide">
+                <label for="ctl00_BodyPlaceHolder_ddlType" class="form-label">Permit Type</label>
+                <select name="ctl00$BodyPlaceHolder$ddlType" id="ctl00_BodyPlaceHolder_ddlType" class="form-select">
+	<option selected="selected" value="">Select permit type</option>
+	<option value="1002982">Commercial / Addition</option>
+	<option value="1003327">Commercial / Battery Storage System</option>
+	<option value="1002987">Commercial / Coach</option>
+	<option value="1002998">Commercial / Commercial Sign</option>
+	<option value="1003151">Commercial / Demolition</option>
+	<option value="1003204">Commercial / Electric &amp; Gas reconnect</option>
+	<option value="1003170">Commercial / Electric Panel Under 400 Amps</option>
+	<option value="1002991">Commercial / Electrical</option>
+	<option value="1003314">Commercial / Eligible Facility Request</option>
+	<option value="1002992">Commercial / Fence</option>
+	<option value="1003255">Commercial / Floodplain Development Agreement</option>
+	<option value="1002983">Commercial / Foundation Only</option>
+	<option value="1002993">Commercial / Garage</option>
+	<option value="1002997">Commercial / Gas line</option>
+	<option value="1003183">Commercial / Generator and backup power source</option>
+	<option value="1003154">Commercial / Grading</option>
+	<option value="1002999">Commercial / Grease Interceptor</option>
+	<option value="1002994">Commercial / Mechanical</option>
+	<option value="1002988">Commercial / Mini-Storage Units</option>
+	<option value="1002989">Commercial / Miscellaneous</option>
+	<option value="1002990">Commercial / New Construction</option>
+	<option value="1003303">Commercial / Operational Business Inspection</option>
+	<option value="1003184">Commercial / Patio Covers</option>
+	<option value="1002995">Commercial / Plumbing</option>
+	<option value="1002996">Commercial / Pool</option>
+	<option value="1003258">Commercial / Pre-Application Review</option>
+	<option value="1002985">Commercial / Re-Roof</option>
+	<option value="1003322">Commercial / Reinstall/Removal Solar Array</option>
+	<option value="1003000">Commercial / Remodel or Repair</option>
+	<option value="1002984">Commercial / Shell Only</option>
+	<option value="1003002">Commercial / Site Improvements &quot;Building Permits Private Property&quot;</option>
+	<option value="1003273">Commercial / Solar Shingle Roof</option>
+	<option value="1003155">Commercial / Solar/Wind Generation</option>
+	<option value="1002986">Commercial / Tenant Improvement</option>
+	<option value="1003001">Commercial / Water Line</option>
+	<option value="1003304">Commercial / Wireless Communication Facility</option>
+	<option value="1003022">Commercial Service / Modification</option>
+	<option value="1003021">Commercial Service / New</option>
+	<option value="1003072">Discovery Investigation / Other</option>
+	<option value="1003028">Discovery Investigation / Planning Application Utilities</option>
+	<option value="1003026">Discovery Investigation / Pressure and Flow Check</option>
+	<option value="1002949">Residential / Accessory Structure</option>
+	<option value="1003328">Residential / Battery Storage System</option>
+	<option value="1003010">Residential / Building - Public Building</option>
+	<option value="1003006">Residential / Building Permit Prinout</option>
+	<option value="1002943">Residential / Condominium</option>
+	<option value="1002970">Residential / Convert Garage to Guest House</option>
+	<option value="1002976">Residential / Convert Garage to Living Space</option>
+	<option value="1002972">Residential / Convert Garge to Sales Office</option>
+	<option value="1002975">Residential / Convert Office to Garage</option>
+	<option value="1002973">Residential / Convert Office to Residential</option>
+	<option value="1002969">Residential / Convert Shop to Residence</option>
+	<option value="1002950">Residential / Deck</option>
+	<option value="1003152">Residential / Demolition</option>
+	<option value="1002944">Residential / Duplex</option>
+	<option value="1002945">Residential / Electrical</option>
+	<option value="1002977">Residential / Electrical &amp; Gas reconnect</option>
+	<option value="1003169">Residential / Electrical Panel Under 400 Amps</option>
+	<option value="1003153">Residential / Fence</option>
+	<option value="1003252">Residential / Flood Plain Development Agreement</option>
+	<option value="1002979">Residential / Foundation Only</option>
+	<option value="1002946">Residential / Garage</option>
+	<option value="1002980">Residential / Garage Remodel</option>
+	<option value="1002965">Residential / Gas line</option>
+	<option value="1003181">Residential / Generator and backup power source</option>
+	<option value="1003012">Residential / Grading Permit</option>
+	<option value="1002967">Residential / Guest House</option>
+	<option value="1003008">Residential / Manufactured Home - 8 pt. system</option>
+	<option value="1003003">Residential / Manufactured Home - Foundation Only</option>
+	<option value="1003005">Residential / Manufactured Home Conversion</option>
+	<option value="1003004">Residential / Manufactured Home Set</option>
+	<option value="1003007">Residential / Manufactured Home Set &amp; Conversion</option>
+	<option value="1003256">Residential / Master Stock Plan</option>
+	<option value="1002947">Residential / Mechanical</option>
+	<option value="1003324">Residential / Metal Storage Container</option>
+	<option value="1003011">Residential / MH Conversion &amp; 8 pt. Combo</option>
+	<option value="1002958">Residential / Miscellaneous</option>
+	<option value="1002948">Residential / Multi-Family - Individual Unit</option>
+	<option value="1002957">Residential / Multi-Family - New</option>
+	<option value="1002953">Residential / Multi-Family - Remodel</option>
+	<option value="1003171">Residential / New Manufactured Home Combo </option>
+	<option value="1003182">Residential / Patio Covers</option>
+	<option value="1003227">Residential / Plumbing</option>
+	<option value="1002951">Residential / Pool/Spa</option>
+	<option value="1003259">Residential / Pre-Appication Review</option>
+	<option value="1002954">Residential / Re-Roof</option>
+	<option value="1003323">Residential / Reinstall/Removal Solar Array</option>
+	<option value="1002956">Residential / Relocation</option>
+	<option value="1002974">Residential / Residential Demolition</option>
+	<option value="1002966">Residential / Residential Pellet Stove</option>
+	<option value="1002964">Residential / Residential Woodstove</option>
+	<option value="1003009">Residential / Retaining Wall</option>
+	<option value="1002959">Residential / Septic</option>
+	<option value="1002960">Residential / Septic &amp; Electric</option>
+	<option value="1002961">Residential / Sewer</option>
+	<option value="1002963">Residential / Sewer &amp; Electric</option>
+	<option value="1002981">Residential / Sewer &amp; Water</option>
+	<option value="1002968">Residential / Single Family - Addition with Garage</option>
+	<option value="1002952">Residential / Single Family - New Construction</option>
+	<option value="1002955">Residential / Single Family - Remodel</option>
+	<option value="1003180">Residential / Single Family - Repeats</option>
+	<option value="1002962">Residential / Single Family Residence - Addition</option>
+	<option value="1002978">Residential / Single Family Residence - Fire Repair</option>
+	<option value="1003272">Residential / Solar Shingle Roof</option>
+	<option value="1003156">Residential / Solar/Wind Generation</option>
+	<option value="1003312">Residential / Tub/shower replacement</option>
+	<option value="1002971">Residential / Water Line</option>
+	<option value="1003311">Residential / Window/door replacement</option>
+	<option value="1003015">Roads / Encroachment/Right of Way</option>
+	<option value="1003017">Roads / Roads Blanket Permit</option>
+	<option value="1003016">Roads / Roads Permit Printout Default</option>
+	<option value="1003104">Subdivision Civil Improvements</option>
+	<option value="1003014">Utilities / Utilities Permit Printout</option>
+	<option value="1003013">Utilities / Water/Wastewater</option>
+	<option value="1003157">Will Serve / Commercial</option>
+	<option value="1003158">Will Serve / Residential</option>
+
+</select>
+            </div>
+
+            <div class="form-field">
+                <label for="ctl00_BodyPlaceHolder_txbAddress" class="form-label">Address</label>
+                <input name="ctl00$BodyPlaceHolder$txbAddress" type="text" id="ctl00_BodyPlaceHolder_txbAddress" class="form-input" />
+            </div>
+
+            <div class="form-field">
+                <label for="ctl00_BodyPlaceHolder_txbCity" class="form-label">City</label>
+                <input name="ctl00$BodyPlaceHolder$txbCity" type="text" id="ctl00_BodyPlaceHolder_txbCity" class="form-input" />
+            </div>
+
+            <div class="form-field form-field-wide">
+                <label for="ctl00_BodyPlaceHolder_txtWorkDescription" class="form-label">Work Description</label>
+                <input name="ctl00$BodyPlaceHolder$txtWorkDescription" type="text" id="ctl00_BodyPlaceHolder_txtWorkDescription" class="form-input" placeholder="e.g., New garage, remodel kitchen, electrical upgrade" />
+            </div>
+
+            <div class="search-tip-banner" role="note">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                <span><strong>Tip:</strong> Enter more than one search criteria for more accurate results.</span>
+            </div>
+
+            <div class="form-actions">
+                <input type="submit" name="ctl00$BodyPlaceHolder$btnClear" value="Clear" id="ctl00_BodyPlaceHolder_btnClear" class="btncommon btn-outline" />
+                <input type="submit" name="ctl00$BodyPlaceHolder$btnSearch" value="Search" id="ctl00_BodyPlaceHolder_btnSearch" class="btncommon btn-primary btn-search" />
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript">
+(function () {
+    var toggle = document.getElementById('searchTipsToggle');
+    var panel = document.getElementById('searchTipsPanel');
+    if (!toggle || !panel) return;
+    toggle.addEventListener('click', function () {
+        var isHidden = panel.hasAttribute('hidden');
+        if (isHidden) {
+            panel.removeAttribute('hidden');
+            toggle.setAttribute('aria-expanded', 'true');
+        } else {
+            panel.setAttribute('hidden', '');
+            toggle.setAttribute('aria-expanded', 'false');
+        }
+    });
+})();
+</script>
+
+<div id="ctl00_BodyPlaceHolder_pnlSearchResults" class="search-results">
+	
+    <div class="search-results__header">
+        <span><span id="ctl00_BodyPlaceHolder_lblResultCount">25</span> results.</span>
+        <span class="search-results__export"><a id="ctl00_BodyPlaceHolder_btnExport" href="javascript:__doPostBack(&#39;ctl00$BodyPlaceHolder$btnExport&#39;,&#39;&#39;)">Export to Excel</a></span>
+    </div>
+
+    <table class="dgcommon data-grid" cellspacing="0" rules="all" border="1" id="ctl00_BodyPlaceHolder_dgSearchResults" style="width:100%;border-collapse:collapse;">
+		<tr class="headerstyle">
+			<td>Permit #</td><td>Project Name</td><td>Address</td><td>City</td><td>Permit Type</td><td>Submission Date</td><td>Expiration Date</td><td>Status</td><td>Completed Date</td><td>CO Date</td><td>Revision Number</td>
+		</tr><tr class="itemstyle">
+			<td align="center" style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl02_lblPermitNumber">26-1193</span>
+                    
+                </td><td>&nbsp;</td><td>106 OAKMONT DR </td><td>MARK TWAIN</td><td>Residential / Pool/Spa</td><td style="white-space:nowrap;">10-09-2026</td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl02_lblStatus">Disapproved</span>
+                </td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">&nbsp;</td><td>&nbsp;</td>
+		</tr><tr class="alternatingitemstyle">
+			<td align="center" style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl03_lblPermitNumber">26-1192</span>
+                    
+                </td><td>&nbsp;</td><td>704 ROBERTS CREEK DR </td><td>DAYTON</td><td>Residential / Single Family Residence - Fire Repair</td><td style="white-space:nowrap;">10-08-2026</td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl03_lblStatus">In Process</span>
+                </td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">&nbsp;</td><td>&nbsp;</td>
+		</tr><tr class="itemstyle">
+			<td align="center" style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl04_lblPermitNumber">26-1191</span>
+                    
+                </td><td>duplicatre applicatoin</td><td>48 WELLS FARGO AVE </td><td>MARK TWAIN</td><td>Residential / Single Family - New Construction</td><td style="white-space:nowrap;">10-08-2026</td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl04_lblStatus">Voided</span>
+                </td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">&nbsp;</td><td>&nbsp;</td>
+		</tr><tr class="alternatingitemstyle">
+			<td align="center" style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl05_lblPermitNumber">26-1190</span>
+                    
+                </td><td>&nbsp;</td><td>170 NUGGET LN </td><td>DAYTON VALLEY</td><td>Roads / Roads Blanket Permit</td><td style="white-space:nowrap;">10-08-2026</td><td style="white-space:nowrap;">4-06-2027</td><td style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl05_lblStatus">Issued</span>
+                </td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">&nbsp;</td><td>&nbsp;</td>
+		</tr><tr class="itemstyle">
+			<td align="center" style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl06_lblPermitNumber">26-1189</span>
+                    
+                </td><td>&nbsp;</td><td>6385 W EMPEY DR </td><td>STAGECOACH</td><td>Roads / Encroachment/Right of Way</td><td style="white-space:nowrap;">10-08-2026</td><td style="white-space:nowrap;">4-06-2027</td><td style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl06_lblStatus">Approved</span>
+                </td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">&nbsp;</td><td>&nbsp;</td>
+		</tr><tr class="alternatingitemstyle">
+			<td align="center" style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl07_lblPermitNumber">26-1188</span>
+                    
+                </td><td>&nbsp;</td><td>303 MONTE CRISTO DR </td><td>DAYTON</td><td>Residential / Re-Roof</td><td style="white-space:nowrap;">10-08-2026</td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl07_lblStatus">Disapproved</span>
+                </td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">&nbsp;</td><td>&nbsp;</td>
+		</tr><tr class="itemstyle">
+			<td align="center" style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl08_lblPermitNumber">26-1187</span>
+                    
+                </td><td>&nbsp;</td><td>2405 E 10TH ST </td><td>SILVER SPRINGS</td><td>Residential / Accessory Structure</td><td style="white-space:nowrap;">10-07-2026</td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl08_lblStatus">In Process</span>
+                </td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">&nbsp;</td><td>&nbsp;</td>
+		</tr><tr class="alternatingitemstyle">
+			<td align="center" style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl09_lblPermitNumber">26-1186</span>
+                    
+                </td><td>&nbsp;</td><td>365 IMPERIAL RD </td><td>DAYTON</td><td>Residential / Accessory Structure</td><td style="white-space:nowrap;">10-07-2026</td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl09_lblStatus">In Process</span>
+                </td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">&nbsp;</td><td>&nbsp;</td>
+		</tr><tr class="itemstyle">
+			<td align="center" style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl10_lblPermitNumber">26-1185</span>
+                    
+                </td><td>&nbsp;</td><td>203 ALPINE DR </td><td>DAYTON VALLEY</td><td>Residential / Window/door replacement</td><td style="white-space:nowrap;">10-07-2026</td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl10_lblStatus">Disapproved</span>
+                </td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">&nbsp;</td><td>&nbsp;</td>
+		</tr><tr class="alternatingitemstyle">
+			<td align="center" style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl11_lblPermitNumber">26-1184</span>
+                    
+                </td><td>&nbsp;</td><td>303 MONTE CRISTO DR </td><td>DAYTON</td><td>Residential / Re-Roof</td><td style="white-space:nowrap;">10-07-2026</td><td style="white-space:nowrap;">4-06-2027</td><td style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl11_lblStatus">Disapproved</span>
+                </td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">&nbsp;</td><td>&nbsp;</td>
+		</tr><tr class="itemstyle">
+			<td align="center" style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl12_lblPermitNumber">26-1183</span>
+                    
+                </td><td>&nbsp;</td><td>787 MONICO DR </td><td>MARK TWAIN</td><td>Residential / Mechanical</td><td style="white-space:nowrap;">10-07-2026</td><td style="white-space:nowrap;">4-05-2027</td><td style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl12_lblStatus">Issued</span>
+                </td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">&nbsp;</td><td>&nbsp;</td>
+		</tr><tr class="alternatingitemstyle">
+			<td align="center" style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl13_lblPermitNumber">26-1182</span>
+                    
+                </td><td>&nbsp;</td><td>2201 KADDEN WAY </td><td>MARK TWAIN</td><td>Residential / Mechanical</td><td style="white-space:nowrap;">10-07-2026</td><td style="white-space:nowrap;">4-07-2027</td><td style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl13_lblStatus">Approved</span>
+                </td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">&nbsp;</td><td>&nbsp;</td>
+		</tr><tr class="itemstyle">
+			<td align="center" style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl14_lblPermitNumber">26-1181</span>
+                    
+                </td><td>&nbsp;</td><td>44 MILES RD </td><td>MOUND HOUSE</td><td>Commercial / Plumbing</td><td style="white-space:nowrap;">10-07-2026</td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl14_lblStatus">Disapproved</span>
+                </td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">&nbsp;</td><td>&nbsp;</td>
+		</tr><tr class="alternatingitemstyle">
+			<td align="center" style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl15_lblPermitNumber">26-1180</span>
+                    
+                </td><td>&nbsp;</td><td>1965 S HWY 95A </td><td>FERNLEY</td><td>Commercial / New Construction</td><td style="white-space:nowrap;">10-06-2026</td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl15_lblStatus">Disapproved</span>
+                </td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">&nbsp;</td><td>&nbsp;</td>
+		</tr><tr class="itemstyle">
+			<td align="center" style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl16_lblPermitNumber">26-1179</span>
+                    
+                </td><td>2845 E 9th</td><td>10 WYONNA WAY </td><td>MASON VALLEY</td><td>Residential / New Manufactured Home Combo </td><td style="white-space:nowrap;">10-06-2026</td><td style="white-space:nowrap;">4-05-2027</td><td style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl16_lblStatus">Disapproved</span>
+                </td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">&nbsp;</td><td>&nbsp;</td>
+		</tr><tr class="alternatingitemstyle">
+			<td align="center" style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl17_lblPermitNumber">26-1178</span>
+                    
+                </td><td>&nbsp;</td><td>11 GREEN ACRES LN </td><td>MASON VALLEY</td><td>Residential / Electrical</td><td style="white-space:nowrap;">10-06-2026</td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl17_lblStatus">In Process</span>
+                </td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">&nbsp;</td><td>&nbsp;</td>
+		</tr><tr class="itemstyle">
+			<td align="center" style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl18_lblPermitNumber">26-1177</span>
+                    
+                </td><td>2845 E 9th</td><td>2845 E 9TH ST </td><td>SILVER SPRINGS</td><td>Residential / New Manufactured Home Combo </td><td style="white-space:nowrap;">10-06-2026</td><td style="white-space:nowrap;">4-05-2027</td><td style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl18_lblStatus">Disapproved</span>
+                </td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">&nbsp;</td><td>&nbsp;</td>
+		</tr><tr class="alternatingitemstyle">
+			<td align="center" style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl19_lblPermitNumber">26-1176</span>
+                    
+                </td><td>SHEATING INSPECTION REQUIRED</td><td>10 COLONY ESTATES DR </td><td>WELLINGTON</td><td>Residential / Re-Roof</td><td style="white-space:nowrap;">10-06-2026</td><td style="white-space:nowrap;">4-06-2027</td><td style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl19_lblStatus">Issued</span>
+                </td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">&nbsp;</td><td>&nbsp;</td>
+		</tr><tr class="itemstyle">
+			<td align="center" style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl20_lblPermitNumber">26-1175</span>
+                    
+                </td><td>&nbsp;</td><td>125 LAKES BLVD </td><td>DAYTON VALLEY</td><td>Commercial / Plumbing</td><td style="white-space:nowrap;">10-06-2026</td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl20_lblStatus">Disapproved</span>
+                </td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">&nbsp;</td><td>&nbsp;</td>
+		</tr><tr class="alternatingitemstyle">
+			<td align="center" style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl21_lblPermitNumber">26-1174</span>
+                    
+                </td><td>&nbsp;</td><td>1303 GRASSLAND RD </td><td>MARK TWAIN</td><td>Residential / Mechanical</td><td style="white-space:nowrap;">10-06-2026</td><td style="white-space:nowrap;">4-04-2027</td><td style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl21_lblStatus">Issued</span>
+                </td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">&nbsp;</td><td>&nbsp;</td>
+		</tr><tr class="itemstyle">
+			<td align="center" style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl22_lblPermitNumber">26-1173</span>
+                    
+                </td><td>&nbsp;</td><td>90 ARTIST VIEW RD </td><td>WELLINGTON</td><td>Residential / Mechanical</td><td style="white-space:nowrap;">10-06-2026</td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl22_lblStatus">Disapproved</span>
+                </td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">&nbsp;</td><td>&nbsp;</td>
+		</tr><tr class="alternatingitemstyle">
+			<td align="center" style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl23_lblPermitNumber">26-1172</span>
+                    
+                </td><td>GARAGE ONLY - SHEATING INSPECTION REQUIRED</td><td>33 PANAVISTA CIR </td><td>MASON VALLEY</td><td>Residential / Re-Roof</td><td style="white-space:nowrap;">10-06-2026</td><td style="white-space:nowrap;">4-07-2027</td><td style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl23_lblStatus">Completed</span>
+                </td><td style="white-space:nowrap;">10-09-2026</td><td style="white-space:nowrap;">&nbsp;</td><td>&nbsp;</td>
+		</tr><tr class="itemstyle">
+			<td align="center" style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl24_lblPermitNumber">26-1171</span>
+                    
+                </td><td>not required in Zone D</td><td>436 HWY 338 </td><td>SMITH</td><td>Residential / Flood Plain Development Agreement</td><td style="white-space:nowrap;">10-05-2026</td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl24_lblStatus">Voided</span>
+                </td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">&nbsp;</td><td>&nbsp;</td>
+		</tr><tr class="alternatingitemstyle">
+			<td align="center" style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl25_lblPermitNumber">26-1170</span>
+                    
+                </td><td>&nbsp;</td><td>5905 APACHE DR </td><td>STAGECOACH</td><td>Commercial / Operational Business Inspection</td><td style="white-space:nowrap;">10-05-2026</td><td style="white-space:nowrap;">4-03-2027</td><td style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl25_lblStatus">Issued</span>
+                </td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">&nbsp;</td><td>&nbsp;</td>
+		</tr><tr class="itemstyle">
+			<td align="center" style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl26_lblPermitNumber">26-1169</span>
+                    
+                </td><td>&nbsp;</td><td>326 TORREY PINES DR </td><td>DAYTON VALLEY</td><td>Residential / Patio Covers</td><td style="white-space:nowrap;">10-04-2026</td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">
+                    <span id="ctl00_BodyPlaceHolder_dgSearchResults_ctl26_lblStatus">In Process</span>
+                </td><td style="white-space:nowrap;">&nbsp;</td><td style="white-space:nowrap;">&nbsp;</td><td>&nbsp;</td>
+		</tr>
+	</table>
+
+</div>
+
+
+
+</div>
+
+	</div>
+
+	<footer id="bottomArea" class="app-footer" role="contentinfo">
+		<div style="float:right;">Powered by <a href="http://www.clearvillageinc.com/" onclick="window.open(this.href);return false;">SAGE from Clear Village, Inc.</a></div>
+		<div>&copy; 2026 <span id="ctl00_lblClientName">Lyon County</span> ( <!-- <a id="ctl00_hlContact" href="../Contact.aspx">contact</a> | --> <a id="ctl00_hlHomePage" onclick="window.open(this.href);return false;" href="https://www.lyon-county.org/">homepage</a> )</div>
+	    
+    </footer>
+
+	<div id="pnlFeedback" style="width:450px;display:none;" class="jsmodal_dialog">
+		<div class="jsmodal_header">Feedback</div>
+
+		Your suggestions help improve the website. Please share your ideas and suggestions using the form below. If you are encountering any difficulties, please let us know.<br />
+		<br />
+		
+			Email Address: <input type="text" id="txtEmailOverride" style="margin-bottom:3px;" /><br /> <div style="color:red;font-weight: bold;">A return email address required</div>
+		
+		
+		<textarea id="txbFeedback" rows="5" cols="10" style="width:99%;margin-bottom:3px;"></textarea>
+		<br />
+
+		<div id="waitFeedback" class="waitable">
+			<input type="button" value="Send Feedback" class="jsmodal_close waitHide" onclick="submitFeedback();" /> &nbsp; <input type="button" value="Close" class="jsmodal_close waitHide" />
+			<span class="waitShow" style="font-weight:bold;">Please wait...</span>
+		</div>
+	</div>
+
+	<script type="text/javascript">
+		// <![CDATA[
+	    function feedback() {
+	        // Bring up the feedback dialog.
+	        JsModalDialog('pnlFeedback', function () {
+	            $('#txbFeedback').focus();
+	        });
+	    }
+
+	    function submitFeedback() {
+	        wait('waitFeedback'); // Disable the submit button.
+
+	        // Gather the feedback information.
+	        var text = $('#txbFeedback').val();
+	        var url = document.location.href;
+	        var emailOverride = $('#txtEmailOverride').val();
+	        var emailOverrideCtr = $('#txtEmailOverride');
+
+	        if (text.length === 0) {
+	            alert('Please enter feedback text.');
+	            unwait('waitFeedback');
+	            return;
+	        }
+	        var isVisible = emailOverrideCtr.is(':visible');
+	        if (isVisible === true && emailOverride.length===0) {
+	            alert('Please enter email.');
+	            unwait('waitFeedback');
+	            feedback();
+	            return;
+            } 
+
+	        var payload = { 'Text': text, 'Url': url, 'EmailOverride': emailOverride };
+
+	        var req = new Sys.Net.WebRequest();
+	        req.set_url('/CitizenPortal/CitizenPortalService.svc/json/Feedback');
+	        req.get_headers()["Content-Type"] = 'application/json';
+	        req.set_httpVerb('POST');
+	        req.set_body(window.JSON.stringify(payload));
+	        req.add_completed(submitFeedback_callback); // callback not needed.
+	        req.invoke();
+
+	        unwait('waitFeedback');
+	    }
+
+	    function submitFeedback_callback(executor, eventArgs) {
+	        alert('Feedback Submitted.  Thank you.');
+	    }
+
+	    (function (i, s, o, g, r, a, m) { i['GoogleAnalyticsObject'] = r; i[r] = i[r] || function () { (i[r].q = i[r].q || []).push(arguments) }, i[r].l = 1 * new Date(); a = s.createElement(o), m = s.getElementsByTagName(o)[0]; a.async = 1; a.src = g; m.parentNode.insertBefore(a, m) })(window, document, 'script', '//www.google-analytics.com/analytics.js', 'ga');
+	    ga('create', '', 'auto');
+	    ga('send', 'pageview');
+		// ]]>
+	</script>
+
+    <div id="pnlPermitQuestion" style="width:450px;display:none;" class="jsmodal_dialog">
+		<div class="jsmodal_header">Permit Questions</div>
+
+		We welcome your suggestions to improve this website.  Use the space below for your comments or permitting questions.<br />
+		<br />
+		
+			Email Address: <input type="text" id="txtEmailOverridePermit" style="margin-bottom:3px;" /><br /><div style="color:red;font-weight: bold;">A return email address required</div>
+		
+		
+		<textarea id="txbPermitQuestion" rows="5" cols="10" style="width:99%;margin-bottom:3px;"></textarea>
+		<br />
+
+		<div id="waitPermitQuestion" class="waitable">
+			<input type="button" value="Send Permit Question" class="jsmodal_close waitHide" onclick="submitPermitQuestion();" /> &nbsp; <input type="button" value="Close" class="jsmodal_close waitHide" />
+			<span class="waitShow" style="font-weight:bold;">Please wait...</span>
+		</div>
+	</div>
+
+	<script type="text/javascript">
+		// <![CDATA[
+	    function PermitQuestion() {
+	        // Bring up the PermitQuestion dialog.
+	        JsModalDialog('pnlPermitQuestion', function () {
+	            $('#txbPermitQuestion').focus();
+	        });
+	    }
+
+	    function submitPermitQuestion() {
+	        wait('waitPermitQuestion'); // Disable the submit button.
+
+	        // Gather the PermitQuestion information.
+	        var text = $('#txbPermitQuestion').val();
+	        var url = document.location.href;
+	        var emailOverride = $('#txtEmailOverridePermit').val();
+	        var emailOverrideCtr = $('#txtEmailOverridePermit');
+
+	        if (text.length === 0) {
+	            alert('Please enter Permit Question text.');
+	            unwait('waitPermitQuestion');
+	            return;
+	        }
+	        var isVisible = emailOverrideCtr.is(':visible');
+	        if (isVisible === true && emailOverride.length === 0) {
+	            alert('Please enter email.');
+	            unwait('waitPermitQuestion');
+	            PermitQuestion();
+	            return;
+	        } 
+	        var payload = { 'Text': text, 'Url': url, 'EmailOverride': emailOverride };
+
+	        var req = new Sys.Net.WebRequest();
+	        req.set_url('/CitizenPortal/CitizenPortalService.svc/json/PermitQuestion');
+	        req.get_headers()["Content-Type"] = 'application/json';
+	        req.set_httpVerb('POST');
+	        req.set_body(window.JSON.stringify(payload));
+	        req.add_completed(submitPermitQuestion_callback); // callback not needed.
+	        req.invoke();
+
+	        unwait('waitPermitQuestion');
+	    }
+
+	    function submitPermitQuestion_callback(executor, eventArgs) {
+	        alert('Permit Question Submitted.  Thank you.');
+	    }
+
+		
+	</script>
+	</form>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4bc70e2c01a94c73b74392e4234840661791215815920" integrity="sha512-L0ha0OXavK/8okipN9F8BtP84dg9DUhPERbBXzwI6dgTA55d2+yweo3pn5CSFYs45/r8md2+xvUPtTdvTNRfjA==" data-cf-beacon='{"version":"2024.11.0","token":"adf475bdb574480287448ea79fa032ea","spa":2}' crossorigin="anonymous"></script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+{
+  "objectIdFieldName": "ObjectId",
+  "uniqueIdField": {
+    "name": "ObjectId",
+    "isSystemMaintained": true
+  },
+  "globalIdFieldName": "",
+  "fields": [
+    {
+      "name": "latest_date",
+      "type": "esriFieldTypeDate",
+      "alias": "latest_date",
+      "sqlType": "sqlTypeDate",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    }
+  ],
+  "features": [
+    {
+      "attributes": {
+        "latest_date": 1790899200000
+      }
+    }
+  ]
+}

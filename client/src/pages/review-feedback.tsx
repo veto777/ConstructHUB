@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useRoute } from "wouter";
+import { isPrivateFirstScore, normalizeReviewEscalationThreshold, routeAfterRating } from "@shared/review-flow";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -91,12 +92,17 @@ const ratingEmojis: Record<number, string> = {
 
 const THEME_COLOR = "#f59e0b";
 
-export default function ReviewFeedbackPage() {
+/**
+ * The client's page. The Google review link is rendered above every step whatever the score (the
+ * "always" link): the owner's threshold (shared/review-flow.ts) only decides whether the private form
+ * comes before the Google step. `initialStep`/`initialRating` exist for the markup tests only.
+ */
+export default function ReviewFeedbackPage({ initialStep, initialRating }: { initialStep?: Step; initialRating?: number; params?: unknown } = {}) {
   const [, params] = useRoute("/review/:token");
   const token = params?.token || "";
 
-  const [step, setStep] = useState<Step>("rating");
-  const [rating, setRating] = useState(0);
+  const [step, setStep] = useState<Step>(initialStep ?? "rating");
+  const [rating, setRating] = useState(initialRating ?? 0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [comments, setComments] = useState("");
@@ -114,7 +120,6 @@ export default function ReviewFeedbackPage() {
   const [showCopyWarning, setShowCopyWarning] = useState(false);
   const [showPhotoReminder, setShowPhotoReminder] = useState(false);
   const [skippedDescribe, setSkippedDescribe] = useState(false);
-  const isHighRating = rating >= 9;
   const isCompleted = step === "done" || step === "bonus_reviews";
   const restored = useRef(false);
   const skipTrackStep = useRef<Step | null>(null);
@@ -140,6 +145,9 @@ export default function ReviewFeedbackPage() {
   // The signed-in owner opening their own link (the eye icon): the server records nothing,
   // so the page sends nothing either and always starts at the rating step.
   const preview = reviewData?.preview === true;
+  // The owner's score threshold: below it the private form comes first (routing only, never the Google link).
+  const escalationThreshold = normalizeReviewEscalationThreshold(reviewData?.escalationThreshold);
+  const isHighRating = rating > 0 && !isPrivateFirstScore(rating, escalationThreshold);
   /** Customer-progress beacons; never sent from the owner's preview. */
   const track = (path: string, body?: unknown, keepalive = false) => {
     if (preview || !token) return;
@@ -178,13 +186,14 @@ export default function ReviewFeedbackPage() {
     if (!Number.isInteger(saved) || saved < 1 || saved > 10) return;
     const next: Step = reviewData.lastStep === "done" || reviewData.lastStep === "bonus_reviews"
       ? "done"
-      : saved >= 9 ? (reviewData.referralOffer ? "referral" : "describe") : "improvement";
+      : routeAfterRating(saved, normalizeReviewEscalationThreshold(reviewData.escalationThreshold), !!reviewData.referralOffer);
     setRating(saved);
     skipTrackStep.current = next;
     setStep(next);
   }, [reviewData]);
 
-  const postFeedback = async () => {
+  // stage "private" is the private form's save: the server alerts the owner then (sub-threshold scores only).
+  const postFeedback = async (stage: "rating" | "private") => {
     if (preview) return { success: true, preview: true, recorded: false };
     const res = await fetch(`/api/review/${token}/feedback`, {
       method: "POST",
@@ -193,6 +202,7 @@ export default function ReviewFeedbackPage() {
         rating,
         categories: selectedCategories.length > 0 ? selectedCategories : undefined,
         comments: comments || undefined,
+        stage,
       }),
     });
     if (!res.ok) throw new Error("Unable to save your request. Please try again.");
@@ -200,26 +210,15 @@ export default function ReviewFeedbackPage() {
   };
 
   const feedbackMutation = useMutation({
-    mutationFn: postFeedback,
+    mutationFn: () => postFeedback("rating"),
     onSuccess: () => {
-      if (isHighRating) {
-        setStep(reviewData?.referralOffer ? "referral" : "describe");
-      } else {
-        setStep("improvement");
-      }
+      setStep(routeAfterRating(rating, escalationThreshold, !!reviewData?.referralOffer));
     },
   });
 
+  // The private form's save: the owner hears it now; the client goes on to the Google step like everyone.
   const improvementMutation = useMutation({
-    mutationFn: postFeedback,
-    onSuccess: () => {
-      setStep("done");
-    },
-  });
-
-  // "Help me draft my honest review" keeps the private notes already typed.
-  const saveImprovementMutation = useMutation({
-    mutationFn: postFeedback,
+    mutationFn: () => postFeedback("private"),
     onSuccess: () => {
       setStep("describe");
     },
@@ -435,7 +434,7 @@ export default function ReviewFeedbackPage() {
             <p className="text-xs text-muted-foreground">Everyone is welcome to review. No private feedback or referral participation is required, and no reward is offered for a review.</p>
           </div>
         )}
-        {[feedbackMutation.error, improvementMutation.error, saveImprovementMutation.error, completeFlowMutation.error].some(Boolean) && (
+        {[feedbackMutation.error, improvementMutation.error, completeFlowMutation.error].some(Boolean) && (
           <p role="alert" className="mb-4 text-sm text-destructive">Unable to save your request. Please try again.</p>
         )}
 
@@ -532,10 +531,10 @@ export default function ReviewFeedbackPage() {
                   <MessageSquare className="w-8 h-8 text-gray-500" />
                 </div>
                 <h2 className="text-xl sm:text-2xl font-bold" data-testid="text-improvement-heading">
-                  Help Us Improve
+                  What could we have done better?
                 </h2>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Your honest feedback is completely private and helps us deliver better service.
+                  Your answer goes privately to {companyName} right away, so they can make it right. You'll be offered the Google review option next, as every client is.
                 </p>
               </div>
 
@@ -582,9 +581,9 @@ export default function ReviewFeedbackPage() {
                 data-testid="button-submit-improvement"
               >
                 {improvementMutation.isPending ? (
-                  <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Submitting...</>
+                  <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Sending...</>
                 ) : (
-                  <><ThumbsUp className="w-5 h-5 mr-2" /> Submit Feedback</>
+                  <><ThumbsUp className="w-5 h-5 mr-2" /> Send private feedback</>
                 )}
               </Button>
 
@@ -592,17 +591,6 @@ export default function ReviewFeedbackPage() {
                 <Lock className="w-3 h-3" />
                 Your feedback is completely confidential
               </p>
-
-              <Button
-                variant="outline"
-                className="w-full"
-                disabled={saveImprovementMutation.isPending}
-                onClick={() => (selectedCategories.length > 0 || comments.trim()) ? saveImprovementMutation.mutate() : setStep("describe")}
-                data-testid="button-improvement-draft"
-              >
-                {saveImprovementMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Help me draft my honest review
-              </Button>
 
               {reviewData?.googleProfileUrl && (
                 <div className="pt-2 border-t space-y-3 text-center" data-testid="section-improvement-google-review">

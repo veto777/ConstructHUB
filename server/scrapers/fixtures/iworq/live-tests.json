@@ -1,0 +1,782 @@
+[
+  {
+    "at": "2026-10-10T17:49:46.178Z",
+    "elapsedMs": 2135,
+    "command": [
+      "npx",
+      "tsx",
+      "server/scrapers/live-harness.ts",
+      "iworq",
+      "targets.json",
+      "Douglas County, OR",
+      "search",
+      "address",
+      "100 Main St"
+    ],
+    "exitCode": 2,
+    "result": {
+      "target": {
+        "jurisdiction": "Douglas County, OR",
+        "url": "https://douglascounty.portal.iworq.net/portalhome/douglascounty",
+        "platform": "iWorQ",
+        "sourceUrl": "https://www.douglascountyor.gov/192/Building",
+        "linkStatus": "verified"
+      },
+      "mode": "search",
+      "error": "iWorQ public permit search requires reCAPTCHA at https://douglascounty.portal.iworq.net/DOUGLASCOUNTY/permits/600; automated search was not submitted",
+      "blocked": true
+    },
+    "stderr": "BLOCKED: iWorQ public permit search requires reCAPTCHA at https://douglascounty.portal.iworq.net/DOUGLASCOUNTY/permits/600; automated search was not submitted\n"
+  },
+  {
+    "at": "2026-10-10T17:49:49.415Z",
+    "elapsedMs": 2277,
+    "command": [
+      "npx",
+      "tsx",
+      "server/scrapers/live-harness.ts",
+      "iworq",
+      "targets.json",
+      "Douglas County, OR",
+      "search",
+      "permit",
+      "2026"
+    ],
+    "exitCode": 2,
+    "result": {
+      "target": {
+        "jurisdiction": "Douglas County, OR",
+        "url": "https://douglascounty.portal.iworq.net/portalhome/douglascounty",
+        "platform": "iWorQ",
+        "sourceUrl": "https://www.douglascountyor.gov/192/Building",
+        "linkStatus": "verified"
+      },
+      "mode": "search",
+      "error": "iWorQ public permit search requires reCAPTCHA at https://douglascounty.portal.iworq.net/DOUGLASCOUNTY/permits/600; automated search was not submitted",
+      "blocked": true
+    },
+    "stderr": "BLOCKED: iWorQ public permit search requires reCAPTCHA at https://douglascounty.portal.iworq.net/DOUGLASCOUNTY/permits/600; automated search was not submitted\n"
+  },
+  {
+    "at": "2026-10-10T17:49:52.793Z",
+    "elapsedMs": 2088,
+    "command": [
+      "npx",
+      "tsx",
+      "server/scrapers/live-harness.ts",
+      "iworq",
+      "targets.json",
+      "Douglas County, OR",
+      "search",
+      "company",
+      "Construction"
+    ],
+    "exitCode": 2,
+    "result": {
+      "target": {
+        "jurisdiction": "Douglas County, OR",
+        "url": "https://douglascounty.portal.iworq.net/portalhome/douglascounty",
+        "platform": "iWorQ",
+        "sourceUrl": "https://www.douglascountyor.gov/192/Building",
+        "linkStatus": "verified"
+      },
+      "mode": "search",
+      "error": "iWorQ public permit search requires reCAPTCHA at https://douglascounty.portal.iworq.net/DOUGLASCOUNTY/permits/600; automated search was not submitted",
+      "blocked": true
+    },
+    "stderr": "BLOCKED: iWorQ public permit search requires reCAPTCHA at https://douglascounty.portal.iworq.net/DOUGLASCOUNTY/permits/600; automated search was not submitted\n"
+  },
+  {
+    "at": "2026-10-10T17:49:55.981Z",
+    "elapsedMs": 622,
+    "command": [
+      "npx",
+      "tsx",
+      "server/scrapers/live-harness.ts",
+      "iworq",
+      "targets.json",
+      "Douglas County, OR",
+      "recent",
+      "2026-10-03T00:00:00Z"
+    ],
+    "exitCode": 0,
+    "result": {
+      "target": {
+        "jurisdiction": "Douglas County, OR",
+        "url": "https://douglascounty.portal.iworq.net/portalhome/douglascounty",
+        "platform": "iWorQ",
+        "sourceUrl": "https://www.douglascountyor.gov/192/Building",
+        "linkStatus": "verified"
+      },
+      "mode": "recent",
+      "args": [
+        "2026-10-03T00:00:00Z"
+      ],
+      "count": 0,
+      "capabilities": {
+        "search": [
+          "address",
+          "permit",
+          "name",
+          "company"
+        ],
+        "listRecent": false,
+        "detail": false
+      },
+      "records": []
+    },
+    "stderr": "2026-10-10T17:49:56.584Z [iworq] iWorQ listRecent unsupported: no verified unprotected issue/application-date listing; alerts disabled\nDouglas County, OR (iWorQ) recent: 0 record(s) in 0s\n"
+  },
+  {
+    "at": "2026-10-10T17:49:57.704Z",
+    "elapsedMs": 1970,
+    "command": [
+      "npx",
+      "tsx",
+      "server/scrapers/live-harness.ts",
+      "iworq",
+      "targets.json",
+      "Graham County, AZ",
+      "search",
+      "address",
+      "100 Main St"
+    ],
+    "exitCode": 2,
+    "result": {
+      "target": {
+        "jurisdiction": "Graham County, AZ",
+        "url": "https://grahamcounty.portal.iworq.net/portalhome/grahamcounty",
+        "platform": "iWorQ Citizen Portal",
+        "sourceUrl": "https://www.graham.az.gov/327/permits-hearing-forms",
+        "linkStatus": "verified"
+      },
+      "mode": "search",
+      "error": "iWorQ public permit search requires reCAPTCHA at https://grahamcounty.portal.iworq.net/grahamcounty/permits/600; automated search was not submitted",
+      "blocked": true
+    },
+    "stderr": "BLOCKED: iWorQ public permit search requires reCAPTCHA at https://grahamcounty.portal.iworq.net/grahamcounty/permits/600; automated search was not submitted\n"
+  },
+  {
+    "at": "2026-10-10T17:50:00.776Z",
+    "elapsedMs": 2015,
+    "command": [
+      "npx",
+      "tsx",
+      "server/scrapers/live-harness.ts",
+      "iworq",
+      "targets.json",
+      "Graham County, AZ",
+      "search",
+      "permit",
+      "2026"
+    ],
+    "exitCode": 2,
+    "result": {
+      "target": {
+        "jurisdiction": "Graham County, AZ",
+        "url": "https://grahamcounty.portal.iworq.net/portalhome/grahamcounty",
+        "platform": "iWorQ Citizen Portal",
+        "sourceUrl": "https://www.graham.az.gov/327/permits-hearing-forms",
+        "linkStatus": "verified"
+      },
+      "mode": "search",
+      "error": "iWorQ public permit search requires reCAPTCHA at https://grahamcounty.portal.iworq.net/grahamcounty/permits/600; automated search was not submitted",
+      "blocked": true
+    },
+    "stderr": "BLOCKED: iWorQ public permit search requires reCAPTCHA at https://grahamcounty.portal.iworq.net/grahamcounty/permits/600; automated search was not submitted\n"
+  },
+  {
+    "at": "2026-10-10T17:50:03.892Z",
+    "elapsedMs": 615,
+    "command": [
+      "npx",
+      "tsx",
+      "server/scrapers/live-harness.ts",
+      "iworq",
+      "targets.json",
+      "Graham County, AZ",
+      "recent",
+      "2026-10-03T00:00:00Z"
+    ],
+    "exitCode": 0,
+    "result": {
+      "target": {
+        "jurisdiction": "Graham County, AZ",
+        "url": "https://grahamcounty.portal.iworq.net/portalhome/grahamcounty",
+        "platform": "iWorQ Citizen Portal",
+        "sourceUrl": "https://www.graham.az.gov/327/permits-hearing-forms",
+        "linkStatus": "verified"
+      },
+      "mode": "recent",
+      "args": [
+        "2026-10-03T00:00:00Z"
+      ],
+      "count": 0,
+      "capabilities": {
+        "search": [
+          "address",
+          "permit",
+          "name",
+          "company"
+        ],
+        "listRecent": false,
+        "detail": false
+      },
+      "records": []
+    },
+    "stderr": "2026-10-10T17:50:04.486Z [iworq] iWorQ listRecent unsupported: no verified unprotected issue/application-date listing; alerts disabled\nGraham County, AZ (iWorQ Citizen Portal) recent: 0 record(s) in 0s\n"
+  },
+  {
+    "at": "2026-10-10T17:50:05.607Z",
+    "elapsedMs": 1470,
+    "command": [
+      "npx",
+      "tsx",
+      "server/scrapers/live-harness.ts",
+      "iworq",
+      "targets.json",
+      "North Liberty, IA",
+      "search",
+      "address",
+      "1252 Trinity Ln"
+    ],
+    "exitCode": 2,
+    "result": {
+      "target": {
+        "jurisdiction": "North Liberty, IA",
+        "url": "https://portal.iworq.net/NORTHLIBERTY/permits/600",
+        "platform": "iWorQ (Permit Search)",
+        "sourceUrl": "https://northlibertyiowa.gov/permits/",
+        "linkStatus": "verified"
+      },
+      "mode": "search",
+      "error": "iWorQ public permit search requires reCAPTCHA at https://portal.iworq.net/NORTHLIBERTY/permits/600; automated search was not submitted",
+      "blocked": true
+    },
+    "stderr": "BLOCKED: iWorQ public permit search requires reCAPTCHA at https://portal.iworq.net/NORTHLIBERTY/permits/600; automated search was not submitted\n"
+  },
+  {
+    "at": "2026-10-10T17:50:08.178Z",
+    "elapsedMs": 1389,
+    "command": [
+      "npx",
+      "tsx",
+      "server/scrapers/live-harness.ts",
+      "iworq",
+      "targets.json",
+      "North Liberty, IA",
+      "search",
+      "permit",
+      "20261133"
+    ],
+    "exitCode": 2,
+    "result": {
+      "target": {
+        "jurisdiction": "North Liberty, IA",
+        "url": "https://portal.iworq.net/NORTHLIBERTY/permits/600",
+        "platform": "iWorQ (Permit Search)",
+        "sourceUrl": "https://northlibertyiowa.gov/permits/",
+        "linkStatus": "verified"
+      },
+      "mode": "search",
+      "error": "iWorQ public permit search requires reCAPTCHA at https://portal.iworq.net/NORTHLIBERTY/permits/600; automated search was not submitted",
+      "blocked": true
+    },
+    "stderr": "BLOCKED: iWorQ public permit search requires reCAPTCHA at https://portal.iworq.net/NORTHLIBERTY/permits/600; automated search was not submitted\n"
+  },
+  {
+    "at": "2026-10-10T17:50:10.668Z",
+    "elapsedMs": 1403,
+    "command": [
+      "npx",
+      "tsx",
+      "server/scrapers/live-harness.ts",
+      "iworq",
+      "targets.json",
+      "North Liberty, IA",
+      "search",
+      "company",
+      "Construction"
+    ],
+    "exitCode": 2,
+    "result": {
+      "target": {
+        "jurisdiction": "North Liberty, IA",
+        "url": "https://portal.iworq.net/NORTHLIBERTY/permits/600",
+        "platform": "iWorQ (Permit Search)",
+        "sourceUrl": "https://northlibertyiowa.gov/permits/",
+        "linkStatus": "verified"
+      },
+      "mode": "search",
+      "error": "iWorQ public permit search requires reCAPTCHA at https://portal.iworq.net/NORTHLIBERTY/permits/600; automated search was not submitted",
+      "blocked": true
+    },
+    "stderr": "BLOCKED: iWorQ public permit search requires reCAPTCHA at https://portal.iworq.net/NORTHLIBERTY/permits/600; automated search was not submitted\n"
+  },
+  {
+    "at": "2026-10-10T17:50:13.171Z",
+    "elapsedMs": 669,
+    "command": [
+      "npx",
+      "tsx",
+      "server/scrapers/live-harness.ts",
+      "iworq",
+      "targets.json",
+      "North Liberty, IA",
+      "recent",
+      "2026-10-03T00:00:00Z"
+    ],
+    "exitCode": 0,
+    "result": {
+      "target": {
+        "jurisdiction": "North Liberty, IA",
+        "url": "https://portal.iworq.net/NORTHLIBERTY/permits/600",
+        "platform": "iWorQ (Permit Search)",
+        "sourceUrl": "https://northlibertyiowa.gov/permits/",
+        "linkStatus": "verified"
+      },
+      "mode": "recent",
+      "args": [
+        "2026-10-03T00:00:00Z"
+      ],
+      "count": 0,
+      "capabilities": {
+        "search": [
+          "address",
+          "permit",
+          "name",
+          "company"
+        ],
+        "listRecent": false,
+        "detail": false
+      },
+      "records": []
+    },
+    "stderr": "2026-10-10T17:50:13.817Z [iworq] iWorQ listRecent unsupported: no verified unprotected issue/application-date listing; alerts disabled\nNorth Liberty, IA (iWorQ (Permit Search)) recent: 0 record(s) in 0s\n"
+  },
+  {
+    "at": "2026-10-10T17:50:14.940Z",
+    "elapsedMs": 1050,
+    "command": [
+      "npx",
+      "tsx",
+      "server/scrapers/live-harness.ts",
+      "iworq",
+      "targets.json",
+      "Clay County, NC",
+      "search",
+      "address",
+      "100 Main St"
+    ],
+    "exitCode": 2,
+    "result": {
+      "target": {
+        "jurisdiction": "Clay County, NC",
+        "url": "https://portal.iworq.net/CLAYCOUNTY/new-request/700/3481",
+        "platform": "iWorQ",
+        "sourceUrl": "https://www.claync.us/building-department",
+        "linkStatus": "verified"
+      },
+      "mode": "search",
+      "error": "No public permit search linked at https://portal.iworq.net/portalhome/CLAYCOUNTY; this application/inspection portal has no discoverable public records search",
+      "blocked": false
+    },
+    "stderr": "ERROR: No public permit search linked at https://portal.iworq.net/portalhome/CLAYCOUNTY; this application/inspection portal has no discoverable public records search\n"
+  },
+  {
+    "at": "2026-10-10T17:50:17.092Z",
+    "elapsedMs": 1025,
+    "command": [
+      "npx",
+      "tsx",
+      "server/scrapers/live-harness.ts",
+      "iworq",
+      "targets.json",
+      "Clay County, NC",
+      "search",
+      "permit",
+      "2026"
+    ],
+    "exitCode": 2,
+    "result": {
+      "target": {
+        "jurisdiction": "Clay County, NC",
+        "url": "https://portal.iworq.net/CLAYCOUNTY/new-request/700/3481",
+        "platform": "iWorQ",
+        "sourceUrl": "https://www.claync.us/building-department",
+        "linkStatus": "verified"
+      },
+      "mode": "search",
+      "error": "No public permit search linked at https://portal.iworq.net/portalhome/CLAYCOUNTY; this application/inspection portal has no discoverable public records search",
+      "blocked": false
+    },
+    "stderr": "ERROR: No public permit search linked at https://portal.iworq.net/portalhome/CLAYCOUNTY; this application/inspection portal has no discoverable public records search\n"
+  },
+  {
+    "at": "2026-10-10T17:50:19.218Z",
+    "elapsedMs": 604,
+    "command": [
+      "npx",
+      "tsx",
+      "server/scrapers/live-harness.ts",
+      "iworq",
+      "targets.json",
+      "Clay County, NC",
+      "recent",
+      "2026-10-03T00:00:00Z"
+    ],
+    "exitCode": 0,
+    "result": {
+      "target": {
+        "jurisdiction": "Clay County, NC",
+        "url": "https://portal.iworq.net/CLAYCOUNTY/new-request/700/3481",
+        "platform": "iWorQ",
+        "sourceUrl": "https://www.claync.us/building-department",
+        "linkStatus": "verified"
+      },
+      "mode": "recent",
+      "args": [
+        "2026-10-03T00:00:00Z"
+      ],
+      "count": 0,
+      "capabilities": {
+        "search": [
+          "address",
+          "permit",
+          "name",
+          "company"
+        ],
+        "listRecent": false,
+        "detail": false
+      },
+      "records": []
+    },
+    "stderr": "2026-10-10T17:50:19.804Z [iworq] iWorQ listRecent unsupported: no verified unprotected issue/application-date listing; alerts disabled\nClay County, NC (iWorQ) recent: 0 record(s) in 0s\n"
+  },
+  {
+    "at": "2026-10-10T17:51:35.951Z",
+    "elapsedMs": 1997,
+    "command": [
+      "npx",
+      "tsx",
+      "server/scrapers/live-harness.ts",
+      "iworq",
+      "targets.json",
+      "Kennesaw, GA",
+      "search",
+      "address",
+      "100 Main St"
+    ],
+    "exitCode": 2,
+    "result": {
+      "target": {
+        "jurisdiction": "Kennesaw, GA",
+        "url": "https://kennesaw.portal.iworq.net/portalhome/kennesaw",
+        "platform": "iWorQ permit portal",
+        "sourceUrl": "https://kennesawdevelopment.com/business-assistance/start-a-business",
+        "linkStatus": "verified"
+      },
+      "mode": "search",
+      "error": "iWorQ public permit search requires reCAPTCHA at https://kennesaw.portal.iworq.net/KENNESAW/permits/600; automated search was not submitted",
+      "blocked": true
+    },
+    "stderr": "BLOCKED: iWorQ public permit search requires reCAPTCHA at https://kennesaw.portal.iworq.net/KENNESAW/permits/600; automated search was not submitted\n"
+  },
+  {
+    "at": "2026-10-10T17:51:39.050Z",
+    "elapsedMs": 2219,
+    "command": [
+      "npx",
+      "tsx",
+      "server/scrapers/live-harness.ts",
+      "iworq",
+      "targets.json",
+      "Kennesaw, GA",
+      "search",
+      "permit",
+      "2026"
+    ],
+    "exitCode": 2,
+    "result": {
+      "target": {
+        "jurisdiction": "Kennesaw, GA",
+        "url": "https://kennesaw.portal.iworq.net/portalhome/kennesaw",
+        "platform": "iWorQ permit portal",
+        "sourceUrl": "https://kennesawdevelopment.com/business-assistance/start-a-business",
+        "linkStatus": "verified"
+      },
+      "mode": "search",
+      "error": "iWorQ public permit search requires reCAPTCHA at https://kennesaw.portal.iworq.net/KENNESAW/permits/600; automated search was not submitted",
+      "blocked": true
+    },
+    "stderr": "BLOCKED: iWorQ public permit search requires reCAPTCHA at https://kennesaw.portal.iworq.net/KENNESAW/permits/600; automated search was not submitted\n"
+  },
+  {
+    "at": "2026-10-10T17:51:42.369Z",
+    "elapsedMs": 653,
+    "command": [
+      "npx",
+      "tsx",
+      "server/scrapers/live-harness.ts",
+      "iworq",
+      "targets.json",
+      "Kennesaw, GA",
+      "recent",
+      "2026-10-03T00:00:00Z"
+    ],
+    "exitCode": 0,
+    "result": {
+      "target": {
+        "jurisdiction": "Kennesaw, GA",
+        "url": "https://kennesaw.portal.iworq.net/portalhome/kennesaw",
+        "platform": "iWorQ permit portal",
+        "sourceUrl": "https://kennesawdevelopment.com/business-assistance/start-a-business",
+        "linkStatus": "verified"
+      },
+      "mode": "recent",
+      "args": [
+        "2026-10-03T00:00:00Z"
+      ],
+      "count": 0,
+      "capabilities": {
+        "search": [
+          "address",
+          "permit",
+          "name",
+          "company"
+        ],
+        "listRecent": false,
+        "detail": false
+      },
+      "records": []
+    },
+    "stderr": "2026-10-10T17:51:43.004Z [iworq] iWorQ listRecent unsupported: no verified unprotected issue/application-date listing; alerts disabled\nKennesaw, GA (iWorQ permit portal) recent: 0 record(s) in 0s\n"
+  },
+  {
+    "at": "2026-10-10T17:51:44.123Z",
+    "elapsedMs": 1960,
+    "command": [
+      "npx",
+      "tsx",
+      "server/scrapers/live-harness.ts",
+      "iworq",
+      "targets.json",
+      "Cottonwood Heights, UT",
+      "search",
+      "address",
+      "100 Main St"
+    ],
+    "exitCode": 2,
+    "result": {
+      "target": {
+        "jurisdiction": "Cottonwood Heights, UT",
+        "url": "https://cottonwoodheights.portal.iworq.net/COTTONWOODHEIGHTS/new-permit/600/1032",
+        "platform": "iWorQ",
+        "sourceUrl": "https://www.cottonwoodheights.utah.gov/doing-business/building-permits",
+        "linkStatus": "verified"
+      },
+      "mode": "search",
+      "error": "iWorQ public permit search requires reCAPTCHA at https://cottonwoodheights.portal.iworq.net/COTTONWOODHEIGHTS/permits/600; automated search was not submitted",
+      "blocked": true
+    },
+    "stderr": "BLOCKED: iWorQ public permit search requires reCAPTCHA at https://cottonwoodheights.portal.iworq.net/COTTONWOODHEIGHTS/permits/600; automated search was not submitted\n"
+  },
+  {
+    "at": "2026-10-10T17:51:47.183Z",
+    "elapsedMs": 1935,
+    "command": [
+      "npx",
+      "tsx",
+      "server/scrapers/live-harness.ts",
+      "iworq",
+      "targets.json",
+      "Cottonwood Heights, UT",
+      "search",
+      "permit",
+      "2026"
+    ],
+    "exitCode": 2,
+    "result": {
+      "target": {
+        "jurisdiction": "Cottonwood Heights, UT",
+        "url": "https://cottonwoodheights.portal.iworq.net/COTTONWOODHEIGHTS/new-permit/600/1032",
+        "platform": "iWorQ",
+        "sourceUrl": "https://www.cottonwoodheights.utah.gov/doing-business/building-permits",
+        "linkStatus": "verified"
+      },
+      "mode": "search",
+      "error": "iWorQ public permit search requires reCAPTCHA at https://cottonwoodheights.portal.iworq.net/COTTONWOODHEIGHTS/permits/600; automated search was not submitted",
+      "blocked": true
+    },
+    "stderr": "BLOCKED: iWorQ public permit search requires reCAPTCHA at https://cottonwoodheights.portal.iworq.net/COTTONWOODHEIGHTS/permits/600; automated search was not submitted\n"
+  },
+  {
+    "at": "2026-10-10T17:51:50.219Z",
+    "elapsedMs": 561,
+    "command": [
+      "npx",
+      "tsx",
+      "server/scrapers/live-harness.ts",
+      "iworq",
+      "targets.json",
+      "Cottonwood Heights, UT",
+      "recent",
+      "2026-10-03T00:00:00Z"
+    ],
+    "exitCode": 0,
+    "result": {
+      "target": {
+        "jurisdiction": "Cottonwood Heights, UT",
+        "url": "https://cottonwoodheights.portal.iworq.net/COTTONWOODHEIGHTS/new-permit/600/1032",
+        "platform": "iWorQ",
+        "sourceUrl": "https://www.cottonwoodheights.utah.gov/doing-business/building-permits",
+        "linkStatus": "verified"
+      },
+      "mode": "recent",
+      "args": [
+        "2026-10-03T00:00:00Z"
+      ],
+      "count": 0,
+      "capabilities": {
+        "search": [
+          "address",
+          "permit",
+          "name",
+          "company"
+        ],
+        "listRecent": false,
+        "detail": false
+      },
+      "records": []
+    },
+    "stderr": "2026-10-10T17:51:50.762Z [iworq] iWorQ listRecent unsupported: no verified unprotected issue/application-date listing; alerts disabled\nCottonwood Heights, UT (iWorQ) recent: 0 record(s) in 0s\n"
+  },
+  {
+    "at": "2026-10-10T17:51:51.881Z",
+    "elapsedMs": 1903,
+    "command": [
+      "npx",
+      "tsx",
+      "server/scrapers/live-harness.ts",
+      "iworq",
+      "targets.json",
+      "Chamblee, GA",
+      "search",
+      "address",
+      "100 Main St"
+    ],
+    "exitCode": 2,
+    "result": {
+      "target": {
+        "jurisdiction": "Chamblee, GA",
+        "url": "https://chamblee.portal.iworq.net/portalhome/chamblee",
+        "platform": "iWorQ permit portal",
+        "sourceUrl": "https://www.chambleega.com/planning_and_development/applications_and_forms.php",
+        "linkStatus": "verified"
+      },
+      "mode": "search",
+      "error": "iWorQ public permit search requires reCAPTCHA at https://chamblee.portal.iworq.net/CHAMBLEE/permits/601; automated search was not submitted",
+      "blocked": true
+    },
+    "stderr": "BLOCKED: iWorQ public permit search requires reCAPTCHA at https://chamblee.portal.iworq.net/CHAMBLEE/permits/601; automated search was not submitted\n"
+  },
+  {
+    "at": "2026-10-10T17:51:54.885Z",
+    "elapsedMs": 1911,
+    "command": [
+      "npx",
+      "tsx",
+      "server/scrapers/live-harness.ts",
+      "iworq",
+      "targets.json",
+      "Chamblee, GA",
+      "search",
+      "permit",
+      "2026"
+    ],
+    "exitCode": 2,
+    "result": {
+      "target": {
+        "jurisdiction": "Chamblee, GA",
+        "url": "https://chamblee.portal.iworq.net/portalhome/chamblee",
+        "platform": "iWorQ permit portal",
+        "sourceUrl": "https://www.chambleega.com/planning_and_development/applications_and_forms.php",
+        "linkStatus": "verified"
+      },
+      "mode": "search",
+      "error": "iWorQ public permit search requires reCAPTCHA at https://chamblee.portal.iworq.net/CHAMBLEE/permits/601; automated search was not submitted",
+      "blocked": true
+    },
+    "stderr": "BLOCKED: iWorQ public permit search requires reCAPTCHA at https://chamblee.portal.iworq.net/CHAMBLEE/permits/601; automated search was not submitted\n"
+  },
+  {
+    "at": "2026-10-10T17:51:57.898Z",
+    "elapsedMs": 1901,
+    "command": [
+      "npx",
+      "tsx",
+      "server/scrapers/live-harness.ts",
+      "iworq",
+      "targets.json",
+      "Chamblee, GA",
+      "search",
+      "name",
+      "Smith"
+    ],
+    "exitCode": 2,
+    "result": {
+      "target": {
+        "jurisdiction": "Chamblee, GA",
+        "url": "https://chamblee.portal.iworq.net/portalhome/chamblee",
+        "platform": "iWorQ permit portal",
+        "sourceUrl": "https://www.chambleega.com/planning_and_development/applications_and_forms.php",
+        "linkStatus": "verified"
+      },
+      "mode": "search",
+      "error": "iWorQ public permit search requires reCAPTCHA at https://chamblee.portal.iworq.net/CHAMBLEE/permits/601; automated search was not submitted",
+      "blocked": true
+    },
+    "stderr": "BLOCKED: iWorQ public permit search requires reCAPTCHA at https://chamblee.portal.iworq.net/CHAMBLEE/permits/601; automated search was not submitted\n"
+  },
+  {
+    "at": "2026-10-10T17:52:00.900Z",
+    "elapsedMs": 582,
+    "command": [
+      "npx",
+      "tsx",
+      "server/scrapers/live-harness.ts",
+      "iworq",
+      "targets.json",
+      "Chamblee, GA",
+      "recent",
+      "2026-10-03T00:00:00Z"
+    ],
+    "exitCode": 0,
+    "result": {
+      "target": {
+        "jurisdiction": "Chamblee, GA",
+        "url": "https://chamblee.portal.iworq.net/portalhome/chamblee",
+        "platform": "iWorQ permit portal",
+        "sourceUrl": "https://www.chambleega.com/planning_and_development/applications_and_forms.php",
+        "linkStatus": "verified"
+      },
+      "mode": "recent",
+      "args": [
+        "2026-10-03T00:00:00Z"
+      ],
+      "count": 0,
+      "capabilities": {
+        "search": [
+          "address",
+          "permit",
+          "name",
+          "company"
+        ],
+        "listRecent": false,
+        "detail": false
+      },
+      "records": []
+    },
+    "stderr": "2026-10-10T17:52:01.465Z [iworq] iWorQ listRecent unsupported: no verified unprotected issue/application-date listing; alerts disabled\nChamblee, GA (iWorQ permit portal) recent: 0 record(s) in 0s\n"
+  }
+]

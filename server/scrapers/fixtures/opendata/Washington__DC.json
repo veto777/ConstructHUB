@@ -1,0 +1,355 @@
+{
+  "objectIdFieldName": "OBJECTID",
+  "globalIdFieldName": "GLOBALID",
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": {
+    "wkid": 4326,
+    "latestWkid": 4326
+  },
+  "fields": [
+    {
+      "name": "DCRAINTERNALNUMBER",
+      "alias": "DLCP Internal Number",
+      "type": "esriFieldTypeDouble"
+    },
+    {
+      "name": "ISSUE_DATE",
+      "alias": "Issue Date",
+      "type": "esriFieldTypeDate",
+      "length": 8
+    },
+    {
+      "name": "PERMIT_ID",
+      "alias": "Permit Identifier",
+      "type": "esriFieldTypeString",
+      "length": 20
+    },
+    {
+      "name": "PERMIT_TYPE_NAME",
+      "alias": "Permit Type Name",
+      "type": "esriFieldTypeString",
+      "length": 30
+    },
+    {
+      "name": "PERMIT_SUBTYPE_NAME",
+      "alias": "Permit Subtype Name",
+      "type": "esriFieldTypeString",
+      "length": 50
+    },
+    {
+      "name": "PERMIT_CATEGORY_NAME",
+      "alias": "Permit Category Name",
+      "type": "esriFieldTypeString",
+      "length": 50
+    },
+    {
+      "name": "APPLICATION_STATUS_NAME",
+      "alias": "Application Status Name",
+      "type": "esriFieldTypeString",
+      "length": 25
+    },
+    {
+      "name": "FULL_ADDRESS",
+      "alias": "Full Address",
+      "type": "esriFieldTypeString",
+      "length": 200
+    },
+    {
+      "name": "DESC_OF_WORK",
+      "alias": "Description of Work",
+      "type": "esriFieldTypeString",
+      "length": 4000
+    },
+    {
+      "name": "SSL",
+      "alias": "Square, Suffix, Lot",
+      "type": "esriFieldTypeString",
+      "length": 20
+    },
+    {
+      "name": "ZONING",
+      "alias": "Zoning",
+      "type": "esriFieldTypeString",
+      "length": 50
+    },
+    {
+      "name": "PERMIT_APPLICANT",
+      "alias": "Permit Applicant",
+      "type": "esriFieldTypeString",
+      "length": 2000
+    },
+    {
+      "name": "FEE_TYPE",
+      "alias": "Fee Type",
+      "type": "esriFieldTypeString",
+      "length": 200
+    },
+    {
+      "name": "FEES_PAID",
+      "alias": "Fees Paid",
+      "type": "esriFieldTypeInteger"
+    },
+    {
+      "name": "OWNER_NAME",
+      "alias": "Owner Name",
+      "type": "esriFieldTypeString",
+      "length": 255
+    },
+    {
+      "name": "CITY",
+      "alias": "City",
+      "type": "esriFieldTypeString",
+      "length": 20
+    },
+    {
+      "name": "STATE",
+      "alias": "State",
+      "type": "esriFieldTypeString",
+      "length": 2
+    },
+    {
+      "name": "LATITUDE",
+      "alias": "Latitude",
+      "type": "esriFieldTypeDouble"
+    },
+    {
+      "name": "LONGITUDE",
+      "alias": "Longitude",
+      "type": "esriFieldTypeDouble"
+    },
+    {
+      "name": "XCOORD",
+      "alias": "X Coordinate",
+      "type": "esriFieldTypeDouble"
+    },
+    {
+      "name": "YCOORD",
+      "alias": "Y Coordinate",
+      "type": "esriFieldTypeDouble"
+    },
+    {
+      "name": "ZIPCODE",
+      "alias": "Zip Code",
+      "type": "esriFieldTypeInteger"
+    },
+    {
+      "name": "MARADDRESSREPOSITORYID",
+      "alias": "Master Address Repository Identifier",
+      "type": "esriFieldTypeDouble"
+    },
+    {
+      "name": "DCSTATADDRESSKEY",
+      "alias": "DC Stat Address Key",
+      "type": "esriFieldTypeDouble"
+    },
+    {
+      "name": "DCSTATLOCATIONKEY",
+      "alias": "DC Stat Location Key",
+      "type": "esriFieldTypeInteger"
+    },
+    {
+      "name": "WARD",
+      "alias": "Ward",
+      "type": "esriFieldTypeString",
+      "length": 5
+    },
+    {
+      "name": "ANC",
+      "alias": "Advisory Neighborhood Commission",
+      "type": "esriFieldTypeString",
+      "length": 10
+    },
+    {
+      "name": "SMD",
+      "alias": "Single Member District",
+      "type": "esriFieldTypeString",
+      "length": 20
+    },
+    {
+      "name": "DISTRICT",
+      "alias": "District",
+      "type": "esriFieldTypeString",
+      "length": 60
+    },
+    {
+      "name": "PSA",
+      "alias": "Police Service Area",
+      "type": "esriFieldTypeString",
+      "length": 10
+    },
+    {
+      "name": "NEIGHBORHOODCLUSTER",
+      "alias": "Neighborhood Cluster",
+      "type": "esriFieldTypeString",
+      "length": 16
+    },
+    {
+      "name": "HOTSPOT2006NAME",
+      "alias": "Hot Spot 2006 Name",
+      "type": "esriFieldTypeString",
+      "length": 50
+    },
+    {
+      "name": "HOTSPOT2005NAME",
+      "alias": "Hot Spot 2005 Name",
+      "type": "esriFieldTypeString",
+      "length": 50
+    },
+    {
+      "name": "HOTSPOT2004NAME",
+      "alias": "Hot Spot 2007 Name",
+      "type": "esriFieldTypeString",
+      "length": 50
+    },
+    {
+      "name": "BUSINESSIMPROVEMENTDISTRICT",
+      "alias": "Business Improvement District",
+      "type": "esriFieldTypeString",
+      "length": 100
+    },
+    {
+      "name": "LASTMODIFIEDDATE",
+      "alias": "Last Modified Date",
+      "type": "esriFieldTypeDate",
+      "length": 8
+    },
+    {
+      "name": "GLOBALID",
+      "alias": "GLOBALID",
+      "type": "esriFieldTypeGlobalID",
+      "length": 38
+    },
+    {
+      "name": "CREATED_USER",
+      "alias": "CREATED_USER",
+      "type": "esriFieldTypeString",
+      "length": 255
+    },
+    {
+      "name": "CREATED_DATE",
+      "alias": "CREATED_DATE",
+      "type": "esriFieldTypeDate",
+      "length": 8
+    },
+    {
+      "name": "LAST_EDITED_USER",
+      "alias": "LAST_EDITED_USER",
+      "type": "esriFieldTypeString",
+      "length": 255
+    },
+    {
+      "name": "LAST_EDITED_DATE",
+      "alias": "LAST_EDITED_DATE",
+      "type": "esriFieldTypeDate",
+      "length": 8
+    },
+    {
+      "name": "OBJECTID",
+      "alias": "OBJECTID",
+      "type": "esriFieldTypeOID"
+    }
+  ],
+  "features": [
+    {
+      "attributes": {
+        "DCRAINTERNALNUMBER": 112602071,
+        "ISSUE_DATE": 1769403600000,
+        "PERMIT_ID": "B2602071",
+        "PERMIT_TYPE_NAME": "CONSTRUCTION",
+        "PERMIT_SUBTYPE_NAME": "ALTERATION AND REPAIR",
+        "PERMIT_CATEGORY_NAME": "NA",
+        "APPLICATION_STATUS_NAME": "PERMIT ISSUED",
+        "FULL_ADDRESS": "224 LONGFELLOW ST NW, WASHINGTON, DC 20011",
+        "DESC_OF_WORK": "NEW DECK.  ROLL UP DOOR.  REPLACE FENCE.",
+        "SSL": "3332    0039",
+        "ZONING": "R-3",
+        "PERMIT_APPLICANT": "JAMES  KILLETTE",
+        "FEE_TYPE": "1.95 (AAREFEEGRN);165.00 (ALTREPAIR);19.50 (GREENBLDG);16.50 (AAREFEE2);165.00 (FILINGFEE);16.50 (AAREFEE)",
+        "FEES_PAID": 384,
+        "OWNER_NAME": "LONGFELLOW STREET ONE LLC",
+        "CITY": null,
+        "STATE": null,
+        "LATITUDE": 38.95748308,
+        "LONGITUDE": -77.01517607,
+        "XCOORD": 398684.63,
+        "YCOORD": 143286.49,
+        "ZIPCODE": null,
+        "MARADDRESSREPOSITORYID": 244889,
+        "DCSTATADDRESSKEY": null,
+        "DCSTATLOCATIONKEY": null,
+        "WARD": "4",
+        "ANC": "ANC 4B",
+        "SMD": "4B08",
+        "DISTRICT": "FOURTH",
+        "PSA": "406",
+        "NEIGHBORHOODCLUSTER": "Cluster 17",
+        "HOTSPOT2006NAME": null,
+        "HOTSPOT2005NAME": null,
+        "HOTSPOT2004NAME": null,
+        "BUSINESSIMPROVEMENTDISTRICT": null,
+        "LASTMODIFIEDDATE": 1791471249000,
+        "GLOBALID": "{5D659AEA-E314-68C6-E063-782F520A4054}",
+        "CREATED_USER": "OCTO_ETL",
+        "CREATED_DATE": 1791538129000,
+        "LAST_EDITED_USER": "OCTO_ETL",
+        "LAST_EDITED_DATE": 1791538129000,
+        "OBJECTID": 1167654459
+      },
+      "geometry": {
+        "x": -77.0151783600765,
+        "y": 38.95749054228512
+      }
+    },
+    {
+      "attributes": {
+        "DCRAINTERNALNUMBER": 10172600342,
+        "ISSUE_DATE": 1769403600000,
+        "PERMIT_ID": "AH2600342",
+        "PERMIT_TYPE_NAME": "CONSTRUCTION",
+        "PERMIT_SUBTYPE_NAME": "MISCELLANEOUS",
+        "PERMIT_CATEGORY_NAME": "AFTER HOURS",
+        "APPLICATION_STATUS_NAME": "EXPIRED",
+        "FULL_ADDRESS": "200 MASSACHUSETTS AVE NW, WASHINGTON, DC 20001",
+        "DESC_OF_WORK": "AFTER HOURS WORK PERMIT IN CONJUNCTION WITH TL2600017, INTERIOR 6TH FLOOR OFFICE BUILDOUT.\n5AM TO 7AM.  MONDAY THROUGH FRIDAY.  5AM TO 7PM, FEBRUARY 16, 2026, WASHINGTON'S BIRTHDAY, PER ANC APPROVAL.  CONTACT:  JESSE ADKINS 301-623-1047.",
+        "SSL": "0564    0859",
+        "ZONING": "D-4",
+        "PERMIT_APPLICANT": "SAM  HOLLEN",
+        "FEE_TYPE": "3.30 (MISCEFFE);33.00 (MISC)",
+        "FEES_PAID": 36,
+        "OWNER_NAME": "CAPITOL CROSSING I LLC",
+        "CITY": null,
+        "STATE": null,
+        "LATITUDE": 38.89896651,
+        "LONGITUDE": -77.01408898,
+        "XCOORD": 398777.85,
+        "YCOORD": 136790.67,
+        "ZIPCODE": null,
+        "MARADDRESSREPOSITORYID": 312234,
+        "DCSTATADDRESSKEY": null,
+        "DCSTATLOCATIONKEY": null,
+        "WARD": "6",
+        "ANC": "ANC 6E",
+        "SMD": "6E08",
+        "DISTRICT": "FIRST",
+        "PSA": "101",
+        "NEIGHBORHOODCLUSTER": "Cluster 8",
+        "HOTSPOT2006NAME": null,
+        "HOTSPOT2005NAME": null,
+        "HOTSPOT2004NAME": null,
+        "BUSINESSIMPROVEMENTDISTRICT": "Downtown BID",
+        "LASTMODIFIEDDATE": 1791471249000,
+        "GLOBALID": "{5D659AEA-E315-68C6-E063-782F520A4054}",
+        "CREATED_USER": "OCTO_ETL",
+        "CREATED_DATE": 1791538129000,
+        "LAST_EDITED_USER": "OCTO_ETL",
+        "LAST_EDITED_DATE": 1791538129000,
+        "OBJECTID": 1167654460
+      },
+      "geometry": {
+        "x": -77.01409126467476,
+        "y": 38.898974296267035
+      }
+    }
+  ],
+  "exceededTransferLimit": true
+}

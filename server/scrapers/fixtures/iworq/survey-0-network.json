@@ -1,0 +1,131 @@
+[
+  {
+    "event": "request",
+    "method": "GET",
+    "url": "https://douglascounty.portal.iworq.net/portalhome/douglascounty",
+    "data": null
+  },
+  {
+    "event": "response",
+    "status": 200,
+    "url": "https://douglascounty.portal.iworq.net/portalhome/douglascounty"
+  },
+  {
+    "event": "request",
+    "method": "GET",
+    "url": "https://douglascounty.portal.iworq.net/js/client.js",
+    "data": null
+  },
+  {
+    "event": "request",
+    "method": "GET",
+    "url": "https://fonts.googleapis.com/css?family=Raleway:300,400,600",
+    "data": null
+  },
+  {
+    "event": "request",
+    "method": "GET",
+    "url": "https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css",
+    "data": null
+  },
+  {
+    "event": "request",
+    "method": "GET",
+    "url": "https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css",
+    "data": null
+  },
+  {
+    "event": "request",
+    "method": "GET",
+    "url": "https://douglascounty.portal.iworq.net/fontawesome-pro-6/css/all.min.css",
+    "data": null
+  },
+  {
+    "event": "request",
+    "method": "GET",
+    "url": "https://douglascounty.portal.iworq.net/css/home.css?v=0.0.2",
+    "data": null
+  },
+  {
+    "event": "request",
+    "method": "GET",
+    "url": "https://douglascounty.portal.iworq.net/css/deleteConfirmation.css",
+    "data": null
+  },
+  {
+    "event": "request",
+    "method": "GET",
+    "url": "https://s3.amazonaws.com/iworq-upload/NACMOMSEBAY/5/17589057-poweredby-light.png",
+    "data": null
+  },
+  {
+    "event": "request",
+    "method": "GET",
+    "url": "https://s3.amazonaws.com/iworq-upload/DOUGLASCOUNTY/5/11414362-DCSeal.gif",
+    "data": null
+  },
+  {
+    "event": "request",
+    "method": "GET",
+    "url": "https://code.jquery.com/ui/1.13.2/jquery-ui.min.js",
+    "data": null
+  },
+  {
+    "event": "response",
+    "status": 200,
+    "url": "https://douglascounty.portal.iworq.net/js/client.js"
+  },
+  {
+    "event": "response",
+    "status": 200,
+    "url": "https://fonts.googleapis.com/css?family=Raleway:300,400,600"
+  },
+  {
+    "event": "response",
+    "status": 200,
+    "url": "https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css"
+  },
+  {
+    "event": "response",
+    "status": 200,
+    "url": "https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css"
+  },
+  {
+    "event": "response",
+    "status": 200,
+    "url": "https://douglascounty.portal.iworq.net/fontawesome-pro-6/css/all.min.css"
+  },
+  {
+    "event": "response",
+    "status": 200,
+    "url": "https://douglascounty.portal.iworq.net/css/home.css?v=0.0.2"
+  },
+  {
+    "event": "response",
+    "status": 200,
+    "url": "https://douglascounty.portal.iworq.net/css/deleteConfirmation.css"
+  },
+  {
+    "event": "request",
+    "method": "GET",
+    "url": "https://fonts.gstatic.com/s/raleway/v37/1Ptxg8zYS_SKggPN4iEgvnHyvveLxVvaorCIPrQ.ttf",
+    "data": null
+  },
+  {
+    "event": "request",
+    "method": "GET",
+    "url": "https://douglascounty.portal.iworq.net/fontawesome-pro-6/webfonts/fa-solid-900.woff2",
+    "data": null
+  },
+  {
+    "event": "request",
+    "method": "GET",
+    "url": "https://fonts.gstatic.com/s/raleway/v37/1Ptxg8zYS_SKggPN4iEgvnHyvveLxVsEpbCIPrQ.ttf",
+    "data": null
+  },
+  {
+    "event": "response",
+    "status": 200,
+    "url": "https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"
+  }
+]

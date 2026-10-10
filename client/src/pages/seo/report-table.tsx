@@ -29,7 +29,7 @@ import { marketParams } from "./keyword-links";
 import { addressFromFilters, bandOfPosition, canonicalScope, DEFAULT_LIMIT, filtersFromAddress, filterWords, HAS, LIMITS, MAX_OFFSET, pageFromAddress, pathOfUrl, SCOPED, scopePathOf, SORT_LABELS, sortKeyOf, SORTS_BY_DATE, sortWords, type Filters, type Scope, type TableKey } from "./explorer-filters";
 
 export { scopePathOf, canonicalScope, type TableKey } from "./explorer-filters";
-type Page = { table: TableKey; target: string; capped?: boolean; rows: any[]; sourceRows?: number; total: number | null; limit: number; offset: number; sort: string; fetchedAt: string };
+type Page = { table: TableKey; target: string; capped?: boolean; /** "google": Google's own keyword ideas, free (server/seo/free-keywords.ts). */ source?: string; rows: any[]; sourceRows?: number; total: number | null; limit: number; offset: number; sort: string; fetchedAt: string };
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const strip = (u: string | null | undefined) => (u ?? "").replace(/^https?:\/\/(www\.)?/, "");
@@ -213,9 +213,13 @@ function csvOf(cols: Col[], rows: any[]): string {
 /** Reports that differ by country; link reports are the same everywhere, so they are not bought again per country. */
 const BY_COUNTRY: ReadonlySet<TableKey> = new Set<TableKey>(["keywords", "paidKeywords", "pages", "competitors", "subdomains", "ads", "matchingTerms", "relatedTerms", "questions"]);
 
-export function ReportView({ table, domain, keyword, status, onExplore, onTrack, trackLabel, extraAction, market, linked = false, siteId }: {
+export function ReportView({ table, domain, keyword, status, onExplore, onTrack, trackLabel, extraAction, market, linked = false, siteId, placeCode, google = false }: {
   /** The country to look at (United States when absent). */
   market?: { locationCode: number; languageCode: string };
+  /** A US state, county, city, ZIP code or metro area: the keyword ideas tables take their numbers for there. */
+  placeCode?: number;
+  /** Google's own keyword ideas answer the idea tables (free): they carry no difficulty or intent, so those boxes and the "Easiest" order are not offered. */
+  google?: boolean;
   /** The filters live in the address (links.ts explorer words): read on arrival and whenever it changes, written on "Apply filters". */
   linked?: boolean;
   /** The tracked site this report is of, when it is one: a referring domain's links can then open on the Backlinks page, picked out. */
@@ -276,7 +280,9 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
   // Belt and braces with the remount: a sort the report does not have is never sent.
   const sortKey = sortKeyOf(table, sort);
   const loc = market && BY_COUNTRY.has(table) ? market.locationCode : undefined, lang = market && BY_COUNTRY.has(table) ? market.languageCode : undefined;
-  const body = useMemo(() => ({ ...(domain ? { domain } : { keyword }), table, sort: sortKey, filters, limit, offset, ...(loc ? { locationCode: loc, languageCode: lang } : {}), ...(scoped && scope ? { path: scope.path, exactPage: scope.exact } : {}) }), [domain, keyword, table, sortKey, filters, limit, offset, loc, lang, scoped, scope]);
+  const ideasTable = table === "matchingTerms" || table === "relatedTerms" || table === "questions";
+  const googleIdeas = google && ideasTable;
+  const body = useMemo(() => ({ ...(domain ? { domain } : { keyword }), table, sort: sortKey, filters, limit, offset, ...(loc ? { locationCode: loc, languageCode: lang } : {}), ...(placeCode && ideasTable ? { placeCode } : {}), ...(scoped && scope ? { path: scope.path, exactPage: scope.exact } : {}) }), [domain, keyword, table, sortKey, filters, limit, offset, loc, lang, placeCode, ideasTable, scoped, scope]);
   const queryKey = ["/api/seo/report", body];
   const saved = useQuery<{ page: Page } | null>({
     queryKey, enabled: !!target, retry: false, staleTime: 5 * 60_000,
@@ -297,8 +303,8 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
     onError: (e) => toast({ title: "Couldn't run the report", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const page = saved.data?.page ?? null;
-  const cols = COLS[table];
-  const has = (f: string) => HAS[f]?.includes(table);
+  const cols = googleIdeas ? COLS[table].filter((c) => !/difficulty|intent/i.test(String(c.label))) : COLS[table];
+  const has = (f: string) => !!HAS[f]?.includes(table) && !(googleIdeas && (f === "difficulty" || f === "intent"));
   // The Ads report is one small lookup for every ad; the others are bought a page at a time.
   const priceKey = table === "ads" && status?.prices?.adsReport != null ? "adsReport" as const : "reportPage" as const;
   const price = status?.prices ? money(status.prices[priceKey] ?? status.prices.reportPage) : "";
@@ -388,7 +394,7 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
         )}
         <label className="g-text-2 flex items-center gap-1 text-[12px]">Sort
           <select className="g-input g-select !w-auto !py-1" value={sort} onChange={(e) => chooseSort(e.target.value)} data-testid="report-sort">
-            {SORT_LABELS[table].map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            {SORT_LABELS[table].filter(([k]) => !(googleIdeas && k === "difficulty")).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
           </select>
         </label>
         <label className="g-text-2 flex items-center gap-1 text-[12px]">Rows
@@ -440,7 +446,7 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
         <>
           <div className="g-text-2 mb-2 flex flex-wrap items-center justify-between gap-2 text-[13px]">
             <span data-testid="report-meta">
-              {page.rows.length ? `Rows ${fmtNum(from)}–${fmtNum(to)}` : "No rows"}{page.total != null ? ` of ${fmtNum(page.total)}` : ""}{page.capped ? " most recent (Google's library gives no more; the site may have run others)" : ""} ·{" "}
+              {page.rows.length ? `Rows ${fmtNum(from)}–${fmtNum(to)}` : "No rows"}{page.total != null ? ` of ${fmtNum(page.total)}` : ""}{page.capped ? " most recent (Google's library gives no more; the site may have run others)" : ""}{page.source === "google" ? " · Google's own keyword ideas, free" : ""} ·{" "}
               {/* The date this page of rows was looked up: that month's lookups on the Usage page, as every other "as of" does. */}
               <Fig href={seoLinks.usage({ month: page.fetchedAt.slice(0, 7) })} testId="link-report-as-of" label={`as of ${fmtDate(page.fetchedAt)} — when this page of rows was looked up; that month's lookups on the Usage page`}>as of {fmtDate(page.fetchedAt)}</Fig>
             </span>
@@ -476,7 +482,7 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px]">
             <button type="button" className="g-pill min-h-[44px]" disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - limit))} data-testid="button-prev-page">← Previous</button>
             <button type="button" className="g-pill min-h-[44px]" disabled={(page.sourceRows ?? page.rows.length) < limit || (page.total != null && to >= page.total) || offset + limit > MAX_OFFSET} onClick={() => setOffset(offset + limit)} data-testid="button-next-page">Next →</button>
-            <span className="g-text-2">{whole ? "Paging through these is free." : `A page you haven't opened yet costs about ${price}.`}</span>
+            <span className="g-text-2">{whole || page.source === "google" ? "Paging through these is free." : `A page you haven't opened yet costs about ${price}.`}</span>
           </div>
         </>
       )}

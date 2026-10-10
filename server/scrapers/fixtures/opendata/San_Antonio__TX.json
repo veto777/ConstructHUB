@@ -1,0 +1,130 @@
+{
+  "help": "https://data.sanantonio.gov/api/3/action/help_show?name=datastore_search",
+  "success": true,
+  "result": {
+    "filters": {
+      "PERMIT TYPE": "Comm New Building Permit"
+    },
+    "include_total": true,
+    "limit": 2,
+    "records_format": "objects",
+    "resource_id": "c21106f9-3ef5-4f3a-8604-f992b4db7512",
+    "total_estimation_threshold": null,
+    "records": [
+      {
+        "_id": 2,
+        "PERMIT TYPE": "Comm New Building Permit",
+        "PERMIT #": "COM-BLG-PMT24-40200788",
+        "PROJECT NAME": "Building No: N/A; Unit No: N/A",
+        "WORK TYPE": "New",
+        "ADDRESS": "8751 STATE HWY 151, City of San Antonio, TX 78245",
+        "LOCATION": null,
+        "X_COORD": "2076498.5",
+        "Y_COORD": "13708187.9",
+        "DATE SUBMITTED": "2024-08-02",
+        "DATE ISSUED": "2025-01-01",
+        "DECLARED VALUATION": "3500000.0",
+        "AREA (SF)": "9110.0",
+        "PRIMARY CONTACT": "Taco Palenque",
+        "CD": "6",
+        "NCD": null,
+        "HD": null
+      },
+      {
+        "_id": 31,
+        "PERMIT TYPE": "Comm New Building Permit",
+        "PERMIT #": "COM-BLG-PMT24-40200661",
+        "PROJECT NAME": "Building No: 1; Unit No: N/A",
+        "WORK TYPE": "New",
+        "ADDRESS": "6215 BRITNEY CIRCLE, City of San Antonio, TX 78233",
+        "LOCATION": null,
+        "X_COORD": "2168099.4",
+        "Y_COORD": "13747119.3",
+        "DATE SUBMITTED": "2023-01-25",
+        "DATE ISSUED": "2025-01-02",
+        "DECLARED VALUATION": "3222000.0",
+        "AREA (SF)": "567816.0",
+        "PRIMARY CONTACT": "SAGE ARCHITECTURE",
+        "CD": "10",
+        "NCD": null,
+        "HD": null
+      }
+    ],
+    "fields": [
+      {
+        "id": "_id",
+        "type": "int"
+      },
+      {
+        "id": "PERMIT TYPE",
+        "type": "text"
+      },
+      {
+        "id": "PERMIT #",
+        "type": "text"
+      },
+      {
+        "id": "PROJECT NAME",
+        "type": "text"
+      },
+      {
+        "id": "WORK TYPE",
+        "type": "text"
+      },
+      {
+        "id": "ADDRESS",
+        "type": "text"
+      },
+      {
+        "id": "LOCATION",
+        "type": "text"
+      },
+      {
+        "id": "X_COORD",
+        "type": "text"
+      },
+      {
+        "id": "Y_COORD",
+        "type": "text"
+      },
+      {
+        "id": "DATE SUBMITTED",
+        "type": "text"
+      },
+      {
+        "id": "DATE ISSUED",
+        "type": "text"
+      },
+      {
+        "id": "DECLARED VALUATION",
+        "type": "text"
+      },
+      {
+        "id": "AREA (SF)",
+        "type": "text"
+      },
+      {
+        "id": "PRIMARY CONTACT",
+        "type": "text"
+      },
+      {
+        "id": "CD",
+        "type": "text"
+      },
+      {
+        "id": "NCD",
+        "type": "text"
+      },
+      {
+        "id": "HD",
+        "type": "text"
+      }
+    ],
+    "_links": {
+      "start": "/api/3/action/datastore_search?filters=%7B%22PERMIT+TYPE%22%3A%22Comm+New+Building+Permit%22%7D&limit=2&resource_id=c21106f9-3ef5-4f3a-8604-f992b4db7512",
+      "next": "/api/3/action/datastore_search?filters=%7B%22PERMIT+TYPE%22%3A%22Comm+New+Building+Permit%22%7D&limit=2&resource_id=c21106f9-3ef5-4f3a-8604-f992b4db7512&offset=2"
+    },
+    "total": 941,
+    "total_was_estimated": false
+  }
+}

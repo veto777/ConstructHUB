@@ -1,0 +1,44 @@
+[
+  {
+    "file": "charlestown-name.json",
+    "url": "https://municity5.com/M5Services/M5Service.svc/Customer/CharlestownTownRI/FilteredSearch",
+    "status": 200,
+    "requestBody": "{\"base\":\"Permit\",\"fields\":[{\"Permit\":\"Permit_ID\"},{\"Permit\":\"PermitNo\"},{\"Permit\":\"PermitType\"},{\"Permit\":\"PermitDate\"},{\"Permit\":\"PermStatus\"},{\"Permit\":\"Description\"},{\"Permit\":\"ApplName\"},{\"Permit\":\"ApplicaDate1\"},{\"Permit\":\"ConstCost\"},{\"Permit\":\"ConstructionType\"},{\"Permit\":\"LegalAddress\"}],\"filters\":[{\"name\":\"ApplName\",\"operator\":\"like\",\"entity\":\"Permit\",\"value\":\"Peter Sherman\"}],\"limit\":100,\"sort\":\"Permit.Permit_ID\",\"order\":\"asc\",\"includeDeleted\":false,\"fieldsToSearchBy\":\"\",\"defaultSort\":\"\",\"relationships\":{\"Parents\":[],\"Children\":[],\"Siblings\":[]}}",
+    "capturedAt": "2026-10-10 UTC"
+  },
+  {
+    "file": "charlestown-issued.json",
+    "url": "https://municity5.com/M5Services/M5Service.svc/Customer/CharlestownTownRI/FilteredSearch",
+    "status": 200,
+    "requestBody": "{\"base\":\"Permit\",\"fields\":[{\"Permit\":\"Permit_ID\"},{\"Permit\":\"PermitNo\"},{\"Permit\":\"PermitType\"},{\"Permit\":\"PermitDate\"},{\"Permit\":\"PermStatus\"},{\"Permit\":\"Description\"},{\"Permit\":\"ApplName\"},{\"Permit\":\"ApplicaDate1\"},{\"Permit\":\"ConstCost\"},{\"Permit\":\"ConstructionType\"},{\"Permit\":\"LegalAddress\"}],\"filters\":[{\"name\":\"PermitDate\",\"operator\":\"greaterthanorequals\",\"entity\":\"Permit\",\"value\":\"2026-10-03\"},{\"name\":\"PermitDate\",\"operator\":\"lessthan\",\"entity\":\"Permit\",\"value\":\"2026-10-11\"}],\"limit\":100,\"sort\":\"Permit.Permit_ID\",\"order\":\"asc\",\"includeDeleted\":false,\"fieldsToSearchBy\":\"\",\"defaultSort\":\"\",\"relationships\":{\"Parents\":[],\"Children\":[],\"Siblings\":[]}}",
+    "capturedAt": "2026-10-10 UTC"
+  },
+  {
+    "file": "charlestown-applied.json",
+    "url": "https://municity5.com/M5Services/M5Service.svc/Customer/CharlestownTownRI/FilteredSearch",
+    "status": 200,
+    "requestBody": "{\"base\":\"Permit\",\"fields\":[{\"Permit\":\"Permit_ID\"},{\"Permit\":\"PermitNo\"},{\"Permit\":\"PermitType\"},{\"Permit\":\"PermitDate\"},{\"Permit\":\"PermStatus\"},{\"Permit\":\"Description\"},{\"Permit\":\"ApplName\"},{\"Permit\":\"ApplicaDate1\"},{\"Permit\":\"ConstCost\"},{\"Permit\":\"ConstructionType\"},{\"Permit\":\"LegalAddress\"}],\"filters\":[{\"name\":\"ApplicaDate1\",\"operator\":\"greaterthanorequals\",\"entity\":\"Permit\",\"value\":\"2026-10-03\"},{\"name\":\"ApplicaDate1\",\"operator\":\"lessthan\",\"entity\":\"Permit\",\"value\":\"2026-10-11\"}],\"limit\":100,\"sort\":\"Permit.Permit_ID\",\"order\":\"asc\",\"includeDeleted\":false,\"fieldsToSearchBy\":\"\",\"defaultSort\":\"\",\"relationships\":{\"Parents\":[],\"Children\":[],\"Siblings\":[]}}",
+    "capturedAt": "2026-10-10 UTC"
+  },
+  {
+    "file": "fairfield-public-fields.json",
+    "url": "https://services6.municity5.com/M5Services/M5Service.svc/Customer/FairfieldTownCT/PublicFields?entity=Permit",
+    "status": 200,
+    "requestBody": null,
+    "capturedAt": "2026-10-10 UTC"
+  },
+  {
+    "file": "fairfield-recent-page1.json",
+    "url": "https://services6.municity5.com/M5Services/M5Service.svc/Customer/FairfieldTownCT/FilteredSearch",
+    "status": 200,
+    "requestBody": "{\"base\":\"Permit\",\"fields\":[{\"Permit\":\"Permit_ID\"},{\"Permit\":\"PermitDate\"},{\"Permit\":\"PermitNo\"},{\"Permit\":\"PermitType\"},{\"Permit\":\"ExperationDate\"},{\"Permit\":\"PermStatus\"},{\"Permit\":\"ConstCost\"},{\"Permit\":\"LegalAddr\"},{\"Permit\":\"ConstructionType\"}],\"filters\":[{\"name\":\"PermitDate\",\"operator\":\"greaterthanorequals\",\"entity\":\"Permit\",\"value\":\"2026-10-03\"},{\"name\":\"PermitDate\",\"operator\":\"lessthan\",\"entity\":\"Permit\",\"value\":\"2026-10-11\"}],\"limit\":100,\"sort\":\"Permit.Permit_ID\",\"order\":\"asc\",\"includeDeleted\":false,\"fieldsToSearchBy\":\"\",\"defaultSort\":\"\",\"relationships\":{\"Parents\":[],\"Children\":[],\"Siblings\":[]}}",
+    "capturedAt": "2026-10-10 UTC"
+  },
+  {
+    "file": "fairfield-recent-page2.json",
+    "url": "https://services6.municity5.com/M5Services/M5Service.svc/Customer/FairfieldTownCT/FilteredSearch",
+    "status": 200,
+    "requestBody": "{\"base\":\"Permit\",\"fields\":[{\"Permit\":\"Permit_ID\"},{\"Permit\":\"PermitDate\"},{\"Permit\":\"PermitNo\"},{\"Permit\":\"PermitType\"},{\"Permit\":\"ExperationDate\"},{\"Permit\":\"PermStatus\"},{\"Permit\":\"ConstCost\"},{\"Permit\":\"LegalAddr\"},{\"Permit\":\"ConstructionType\"}],\"filters\":[{\"name\":\"PermitDate\",\"operator\":\"greaterthanorequals\",\"entity\":\"Permit\",\"value\":\"2026-10-03\"},{\"name\":\"PermitDate\",\"operator\":\"lessthan\",\"entity\":\"Permit\",\"value\":\"2026-10-11\"},{\"name\":\"Permit_ID\",\"operator\":\"greaterthan\",\"entity\":\"Permit\",\"value\":248063}],\"limit\":100,\"sort\":\"Permit.Permit_ID\",\"order\":\"asc\",\"includeDeleted\":false,\"fieldsToSearchBy\":\"\",\"defaultSort\":\"\",\"relationships\":{\"Parents\":[],\"Children\":[],\"Siblings\":[]}}",
+    "capturedAt": "2026-10-10 UTC"
+  }
+]

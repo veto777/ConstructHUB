@@ -195,7 +195,7 @@ export class Brain {
     this.compiled = opts.compiled;
     this.timezone = opts.timezone;
     this.caller = opts.caller;
-    this.client = opts.client ?? aiClient({ timeoutFallbackMs: 20_000, maxRetries: 0 });
+    this.client = opts.client ?? aiClient({ timeoutFallbackMs: 20_000, maxRetries: 0, fallbackAfterMs: Number(process.env.AI_FALLBACK_VOICE_AFTER_MS) || 8_000 });
     this.model = opts.model ?? aiModel();
     this.now = opts.now ?? (() => new Date());
     this.tag = opts.tag ?? "voice-sim";

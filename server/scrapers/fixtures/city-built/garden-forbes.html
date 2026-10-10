@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta content="IE=Edge,chrome=1" http-equiv="X-UA-Compatible">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>GG Building Permits</title>
+<meta name="csrf-param" content="authenticity_token" />
+<meta name="csrf-token" content="g1mbfrpDKF-FaueHUM742LTToHJEsyjD3WrwUASFwl_HyZ2waGg78hS_03PjjzM4aHGI4ICMj4iy5pjaQL_BVQ" />
+<!-- Le HTML5 shim, for IE6-8 support of HTML elements -->
+<!--[if lt IE 9]>
+<script src="//cdnjs.cloudflare.com/ajax/libs/html5shiv/3.6.1/html5shiv.js"></script>
+<![endif]-->
+<!-- External CSS Libraries -->
+<link crossorigin="anonymous" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" rel="stylesheet">
+<script crossorigin="anonymous" src="https://kit.fontawesome.com/5c375246da.js"></script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.10.0/css/bootstrap-datepicker3.min.css" rel="stylesheet">
+<link href="https://cdn.datatables.net/2.3.7/css/dataTables.dataTables.css" rel="stylesheet">
+<!-- Custom Application CSS -->
+<link href="/buildingpermit/css/application.css" media="all" rel="stylesheet">
+<!-- Favicon links -->
+<link href="/images/apple-touch-icon-144x144.png" rel="apple-touch-icon-precomposed" sizes="144x144">
+<link href="/images/apple-touch-icon-114x114.png" rel="apple-touch-icon-precomposed" sizes="114x114">
+<link href="/images/apple-touch-icon-72x72.png" rel="apple-touch-icon-precomposed" sizes="72x72">
+<link href="/images/apple-touch-icon.png" rel="apple-touch-icon-precomposed">
+<link href="/images/favicon.ico" rel="shortcut icon">
+<!-- External JavaScript Libraries -->
+<script crossorigin="anonymous" integrity="sha384-1H217gwSVyLSIfaLxHbE7dRb3v4mYCKbpQvzx0cegeju1MVsGrX5xXxAvs/HgeFs" src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<!-- %script{src: 'https://code.jquery.com/jquery-1.12.4.min.js', integrity: 'sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=', crossorigin: 'anonymous'} -->
+<script crossorigin="anonymous" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/3.3.7/js/bootstrap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.10.0/js/bootstrap-datepicker.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.10.0/locales/bootstrap-datepicker.es.min.js"></script>
+<script crossorigin="anonymous" src="https://cdn.datatables.net/2.3.7/js/dataTables.js"></script>
+<!-- Rails and Application JavaScript -->
+<script src="/buildingpermit/js/rails.js"></script>
+<script src="/buildingpermit/js/application.js"></script>
+
+</head>
+<body>
+<div class="container-fluid">
+<div class="navbar navbar-default">
+<a class="navbar-brand" href="http://www.ci.garden-grove.ca.us">
+<div class="navbar-brand" id="logo"></div>
+</a>
+<p class="title navbar-text navbar-left hidden-xs hidden-sm">Garden Grove Building Permits</p>
+<div class="navbar-header">
+<button class="navbar-toggle" data-target=".navbar-collapse" data-toggle="collapse" type="button">
+MENU
+<span class="fa-stack fa-lg">
+<i class="fa fa-square-o fa-stack-2x"></i>
+<i class="fa fa-bars fa-stack-1x"></i>
+</span>
+</button>
+</div>
+<div class="collapse navbar-collapse" id="navbar">
+<ul class="nav navbar-nav nav-pills">
+<li>
+<a href="/buildingpermit/start/index"><i class="fa fa-fw fa-home"></i>
+Home
+</a></li>
+<li>
+<a href="/buildingpermit/permits/search"><i class="fa fa-fw fa-search"></i>
+Find Permits
+</a></li>
+<li>
+<a href="/buildingpermit/inspections/new"><i class="fa fa-fw fa-inbox"></i>
+Schedule Inspection
+</a></li>
+<li>
+<a href="/buildingpermit/inspections/search"><i class="fa fa-fw fa-check-circle"></i>
+Check/Cancel Inspection
+</a></li>
+</ul>
+</div>
+</div>
+</div>
+<div class="container">
+<div class="row">
+
+<h2>Find Permits</h2>
+<form class="form-inline" action="/buildingpermit/permits/search" accept-charset="UTF-8" method="get"><input type="hidden" name="utf8" value="&#x2713;" autocomplete="off" /><input type="text" name="search" id="search" value="10871 FORBES" placeholder="Address or Permit#" class="form-control" autofocus="autofocus" />
+<input type="submit" value="Search" class="btn btn-primary" data-disable-with="Search" />
+</form><p>
+<div class="table-responsive">
+<table class="table table-hover table-bordered">
+<caption>New system results</caption>
+<thead>
+<tr>
+<th>permit number</th>
+<th>date</th>
+<th>status</th>
+<th>work type</th>
+<th>work description</th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+</div>
+
+<div class="table-responsive">
+<table class="table table-hover table-bordered">
+<caption>Search results</caption>
+<thead>
+<tr>
+<th>permit number</th>
+<th>issued</th>
+<th>status</th>
+<th>work description</th>
+<th>fees</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<th class="nowrap" scope="row">
+<a href="/buildingpermit/permits/search?permit_id=217185">13-1510</a>
+</th>
+<td class="nowrap">Jul 16, 2013</td>
+<td>Inspections</td>
+<td>INSTALLATION OF PALLET RACK </td>
+<td>
+$930.96
+</td>
+</tr>
+<tr>
+<th class="nowrap" scope="row">
+<a href="/buildingpermit/permits/search?permit_id=181734">80952</a>
+</th>
+<td class="nowrap">Aug 11, 2005</td>
+<td>Finaled</td>
+<td>TYPE: ELECTRIC. REPLACE DAMAGED MAIN WITH SAME.   </td>
+<td>
+
+</td>
+</tr>
+<tr>
+<th class="nowrap" scope="row">
+<a href="/buildingpermit/permits/search?permit_id=176507">76509</a>
+</th>
+<td class="nowrap">Nov 04, 2004</td>
+<td>Finaled</td>
+<td>TYPE: SIGNS. WALL SIGN CHANNEL LETTERS   </td>
+<td>
+
+</td>
+</tr>
+<tr>
+<th class="nowrap" scope="row">
+<a href="/buildingpermit/permits/search?permit_id=175227">75415</a>
+</th>
+<td class="nowrap">Aug 31, 2004</td>
+<td>Inspections</td>
+<td>TYPE: MISCELLANEOUS. STORAGE RACKS   </td>
+<td>
+
+</td>
+</tr>
+<tr>
+<th class="nowrap" scope="row">
+<a href="/buildingpermit/permits/search?permit_id=174660">74926</a>
+</th>
+<td class="nowrap">Aug 04, 2004</td>
+<td>Inspections</td>
+<td>TYPE: FIRE SPRINKLERS. ADDING SYSTEM UNDER MEZZANINE UPSTGARIS DROPS FROM EXIST.SYSTEM  </td>
+<td>
+
+</td>
+</tr>
+<tr>
+<th class="nowrap" scope="row">
+<a href="/buildingpermit/permits/search?permit_id=173876">74247</a>
+</th>
+<td class="nowrap">Jun 22, 2004</td>
+<td>Finaled</td>
+<td>TYPE: H/AC. ADD 2ND FLOOR OFFICE/1ST FLOOR PROD ROOM.  </td>
+<td>
+
+</td>
+</tr>
+<tr>
+<th class="nowrap" scope="row">
+<a href="/buildingpermit/permits/search?permit_id=173663">74063</a>
+</th>
+<td class="nowrap">Jun 15, 2004</td>
+<td>Finaled</td>
+<td>TYPE: ELECTRIC. SECOND FLOOR OFFICES/FIRST FLOOR PRODUCTION ROOM  </td>
+<td>
+
+</td>
+</tr>
+<tr>
+<th class="nowrap" scope="row">
+<a href="/buildingpermit/permits/search?permit_id=173084">73561</a>
+</th>
+<td class="nowrap">May 17, 2004</td>
+<td>Finaled</td>
+<td>TYPE: COMMERCIAL BUILDING. ADD SECOND FLOOR OFFICES IN EXISTING SHELL BLDG/CREATE FIRST FLOOR PRODUCTION  </td>
+<td>
+
+</td>
+</tr>
+<tr>
+<th class="nowrap" scope="row">
+<a href="/buildingpermit/permits/search?permit_id=155409">58658</a>
+</th>
+<td class="nowrap">Jul 27, 2001</td>
+<td>Finaled</td>
+<td>TYPE: REPAIRS. T/O EXIST, APPLY (2) PLY #5 ROCK CAP HOT MOPPED.  </td>
+<td>
+
+</td>
+</tr>
+<tr>
+<th class="nowrap" scope="row">
+<a href="/buildingpermit/permits/search?permit_id=117501">26620</a>
+</th>
+<td class="nowrap">Dec 21, 1994</td>
+<td>Finaled</td>
+<td>TYPE: H/AC. INSTALL NEW HEATER TO REPLACE OLD HEATER  </td>
+<td>
+
+</td>
+</tr>
+<tr>
+<th class="nowrap" scope="row">
+<a href="/buildingpermit/permits/search?permit_id=60004">12612</a>
+</th>
+<td class="nowrap">Apr 09, 1992</td>
+<td>Finaled</td>
+<td>TYPE: ELECTRIC. SUPPLEMENTAL TO PERMIT #11329   </td>
+<td>
+
+</td>
+</tr>
+<tr>
+<th class="nowrap" scope="row">
+<a href="/buildingpermit/permits/search?permit_id=44689">11329</a>
+</th>
+<td class="nowrap">Dec 19, 1991</td>
+<td>Inspections</td>
+<td>TYPE: ELECTRIC. 2 SUB PANELS DISCONNECT FOR 60 KVA  </td>
+<td>
+
+</td>
+</tr>
+<tr>
+<th class="nowrap" scope="row">
+<a href="/buildingpermit/permits/search?permit_id=130838">3797</a>
+</th>
+<td class="nowrap">Aug 31, 1990</td>
+<td>Finaled</td>
+<td>TYPE: FIRE SPRINKLERS. FIRE SPRINKLERS   </td>
+<td>
+
+</td>
+</tr>
+<tr>
+<th class="nowrap" scope="row">
+<a href="/buildingpermit/permits/search?permit_id=129297">3667</a>
+</th>
+<td class="nowrap">Aug 27, 1990</td>
+<td>Finaled</td>
+<td>TYPE: ELECTRIC.    </td>
+<td>
+
+</td>
+</tr>
+<tr>
+<th class="nowrap" scope="row">
+<a href="/buildingpermit/permits/search?permit_id=116616">2587</a>
+</th>
+<td class="nowrap">Jun 19, 1990</td>
+<td>Inspections</td>
+<td>TYPE: PLUMBING. 1 CLARIFIER - 6 RECEPTORS   </td>
+<td>
+
+</td>
+</tr>
+<tr>
+<th class="nowrap" scope="row">
+<a href="/buildingpermit/permits/search?permit_id=115414">2485</a>
+</th>
+<td class="nowrap">Jun 13, 1990</td>
+<td>Finaled</td>
+<td>TYPE: ELECTRIC. NEW CONSTRUCTION   </td>
+<td>
+
+</td>
+</tr>
+<tr>
+<th class="nowrap" scope="row">
+<a href="/buildingpermit/permits/search?permit_id=115063">2455</a>
+</th>
+<td class="nowrap">Jun 11, 1990</td>
+<td>Finaled</td>
+<td>TYPE: ALTERATIONS TO OTHER BUILDINGS. T. I. ADD STORAGE AREA 1624 SQ. FT   </td>
+<td>
+
+</td>
+</tr>
+<tr>
+<th class="nowrap" scope="row">
+<a href="/buildingpermit/permits/search?permit_id=112649">2250</a>
+</th>
+<td class="nowrap">May 30, 1990</td>
+<td>Finaled</td>
+<td>TYPE: H/AC. NEW HVAC   </td>
+<td>
+
+</td>
+</tr>
+<tr>
+<th class="nowrap" scope="row">
+<a href="/buildingpermit/permits/search?permit_id=111077">2117</a>
+</th>
+<td class="nowrap">May 21, 1990</td>
+<td>Finaled</td>
+<td>TYPE: FIRE SPRINKLERS. FIRE SPRINKLERS   </td>
+<td>
+
+</td>
+</tr>
+<tr>
+<th class="nowrap" scope="row">
+<a href="/buildingpermit/permits/search?permit_id=109978">2026</a>
+</th>
+<td class="nowrap">May 16, 1990</td>
+<td>Finaled</td>
+<td>TYPE: PLUMBING. NEW CONSTRUCTION   </td>
+<td>
+
+</td>
+</tr>
+<tr>
+<th class="nowrap" scope="row">
+<a href="/buildingpermit/permits/search?permit_id=108396">1903</a>
+</th>
+<td class="nowrap">May 09, 1990</td>
+<td>Finaled</td>
+<td>TYPE: FIRE SPRINKLERS. PHASE I SPRINKLER ALTERATION   </td>
+<td>
+
+</td>
+</tr>
+<tr>
+<th class="nowrap" scope="row">
+<a href="/buildingpermit/permits/search?permit_id=94741">1569</a>
+</th>
+<td class="nowrap">Apr 17, 1990</td>
+<td>Finaled</td>
+<td>TYPE: MISCELLANEOUS. ROOF REINFORCEMENT NEW COLUMNS &amp; BEAMS   </td>
+<td>
+
+</td>
+</tr>
+<tr>
+<th class="nowrap" scope="row">
+<a href="/buildingpermit/permits/search?permit_id=63121">1287</a>
+</th>
+<td class="nowrap">Mar 29, 1990</td>
+<td>Finaled</td>
+<td>TYPE: ELECTRIC. 800 AMP SERVICE   </td>
+<td>
+
+</td>
+</tr>
+<tr>
+<th class="nowrap" scope="row">
+<a href="/buildingpermit/permits/search?permit_id=99251">161692A</a>
+</th>
+<td class="nowrap">Jan 05, 1989</td>
+<td>Finaled</td>
+<td>TYPE: FIRE SPRINKLERS. BUILDING FIRE SPRINKLERS FIRE SPRINKLERS  </td>
+<td>
+
+</td>
+</tr>
+<tr>
+<th class="nowrap" scope="row">
+<a href="/buildingpermit/permits/search?permit_id=97506">159835A</a>
+</th>
+<td class="nowrap">Sep 27, 1988</td>
+<td>Finaled</td>
+<td>TYPE: PLUMBING. PLUMBING IND BLDG  </td>
+<td>
+
+</td>
+</tr>
+<tr>
+<th class="nowrap" scope="row">
+<a href="/buildingpermit/permits/search?permit_id=97243">159565A</a>
+</th>
+<td class="nowrap">Sep 14, 1988</td>
+<td>Finaled</td>
+<td>TYPE: ELECTRIC. ELECTRIC NEW BLDG  </td>
+<td>
+
+</td>
+</tr>
+<tr>
+<th class="nowrap" scope="row">
+<a href="/buildingpermit/permits/search?permit_id=96775">159064A</a>
+</th>
+<td class="nowrap">Aug 18, 1988</td>
+<td>Finaled</td>
+<td>TYPE: INDUSTRIAL BUILDING. BUILDING INDUSTRIAL BUILDING NEW CONST. IND. BLDG.  </td>
+<td>
+
+</td>
+</tr>
+</tbody>
+</table>
+<table class="table table-hover table-bordered">
+<caption>Archived Permit PDFs</caption>
+<thead>
+<tr>
+<th>permit number</th>
+<th>description</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+Unknown
+</td>
+<td>
+Permit for 10871 FORBES
+</td>
+<td><a href="https://ch.ggcity.org/archives8/public/download/252485">View PDF</a></td>
+</tr>
+<tr>
+<td>
+13-1510
+</td>
+<td>
+INSTALLATION OF PALLET RACK
+</td>
+<td><a href="https://ch.ggcity.org/archives8/public/download/176637">View PDF</a></td>
+</tr>
+<tr>
+<td>
+58658
+</td>
+<td>
+HOT MOPPED.
+</td>
+<td><a href="https://ch.ggcity.org/archives8/public/download/101099">View PDF</a></td>
+</tr>
+<tr>
+<td>
+76509
+</td>
+<td>
+Permit for 10871 FORBES AVE  92844
+</td>
+<td><a href="https://ch.ggcity.org/archives8/public/download/101100">View PDF</a></td>
+</tr>
+<tr>
+<td>
+74063
+</td>
+<td>
+PRODUCTION ROOM
+</td>
+<td><a href="https://ch.ggcity.org/archives8/public/download/89363">View PDF</a></td>
+</tr>
+<tr>
+<td>
+73561
+</td>
+<td>
+SHELL BLDG/CREATE FIRST FLOOR PRODUCTION
+</td>
+<td><a href="https://ch.ggcity.org/archives8/public/download/88037">View PDF</a></td>
+</tr>
+<tr>
+<td>
+73561
+</td>
+<td>
+SHELL BLDG/CREATE FIRST FLOOR PRODUCTION
+</td>
+<td><a href="https://ch.ggcity.org/archives8/public/download/88036">View PDF</a></td>
+</tr>
+<tr>
+<td>
+80952
+</td>
+<td>
+Permit for 10871 FORBES AVE  92844
+</td>
+<td><a href="https://ch.ggcity.org/archives8/public/download/80396">View PDF</a></td>
+</tr>
+<tr>
+<td>
+73623
+</td>
+<td>
+FLOOR PRODUCTION ROOM
+</td>
+<td><a href="https://ch.ggcity.org/archives8/public/download/77672">View PDF</a></td>
+</tr>
+<tr>
+<td>
+74247
+</td>
+<td>
+ROOM.
+</td>
+<td><a href="https://ch.ggcity.org/archives8/public/download/77673">View PDF</a></td>
+</tr>
+<tr>
+<td>
+10871 FORBES AVE
+</td>
+<td>
+Permit
+</td>
+<td><a href="https://ch.ggcity.org/archives8/public/download/54479">View PDF</a></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+</p>
+
+</div>
+</div>
+<!-- / %footer -->
+<!-- /   %p &copy; City of Garden Grove 2015 -->
+</body>
+</html>

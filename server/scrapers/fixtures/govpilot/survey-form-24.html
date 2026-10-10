@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html >
+<head>
+<title></title>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1.0'/>
+<meta http-equiv='X-UA-Compatible' content='IE=edge' ><meta http-equiv='cache-control' content='max-age=0' />
+<meta http-equiv='cache-control' content='no-cache' />
+<meta http-equiv='expires' content='0' />
+<meta http-equiv='expires' content='Tue, 01 Jan 1980 1:00:00 GMT' />
+<meta http-equiv='pragma' content='no-cache' />
+<META NAME='ROBOTS' CONTENT='NONE'>
+<META NAME='GOOGLEBOT' CONTENT='NOARCHIVE'>
+<link rel='stylesheet' href='//kendo.cdn.telerik.com/2020.2.617/styles/kendo.common.min.css' />
+<link rel='stylesheet' href='//kendo.cdn.telerik.com/2020.2.617/styles/kendo.rtl.min.css' />
+<link rel='stylesheet' href='//kendo.cdn.telerik.com/2020.2.617/styles/kendo.blueopal.min.css' />
+<link rel='stylesheet' href='//kendo.cdn.telerik.com/2020.2.617/styles/kendo.dataviz.min.css' />
+<link rel='stylesheet' href='//kendo.cdn.telerik.com/2020.2.617/styles/kendo.dataviz.blueopal.min.css' />
+<link rel='stylesheet' href='//kendo.cdn.telerik.com/2020.2.617/styles/kendo.default.mobile.min.css' />
+<script src='//kendo.cdn.telerik.com/2020.2.617/js/jquery.min.js'></script>
+<script src='//kendo.cdn.telerik.com/2020.2.617/js/kendo.all.min.js'></script>
+<link type='text/css' href='https://ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/themes/south-street/jquery-ui.css' rel='stylesheet'>
+<script type='text/javascript' src='https://ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/jquery-ui.min.js'></script>
+<!--[if IE]>
+<script src='js/excanvas.js'></script>
+<![endif]-->
+<script type='text/javascript' src='js/jquery.ui.touch-punch.min.js'></script>
+<link href='styles/jquery.signature.css' rel='stylesheet'>
+<script src='js/jquery.signature.js'></script>
+<script type='text/javascript' src='https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.10.6/moment.min.js'></script>
+<link href='js/global.css' rel='stylesheet'>
+<script src='js/global.js'></script>
+</head>
+<body >
+<div id='waiting' class='k-header' style='display:none;height:100%;width:100%;top:10px;left:10px;font-size:28px'>Transmitting Data,Please Wait...!</div>
+<div id='htoolbar'></div>
+<div id='main' style='position:relative;height: 100%;margin:0; border: 0;padding:0'>
+<form id='MAINFORM' onsubmit='return false;'>
+<img src='LOGO-logoURL'  class='globalFieldLOGO'  style='position: absolute; width:75px; height:75px; top: 30px; right: 0px; bottom: 0px; left: 20px' />
+<div class='k-block k-shadow' style='position: absolute;width: 1000px; height: 1165px;left: 5px; bottom: 0px; top: 135px; right: 0px;border: 1px solid #CCCCCC;background-color: #FFFFFF;'>
+</div>
+<button id='B9219' style='position:absolute;font-family:Segoe UI; font-size: 16px;top:825px;left:355px;font-weight: Normal; font-style:Normal;background-color: #319B47; color: #FFFFFF;height:30px; Width:300px;'>Add Mechanical</button>
+<button id='Bc397' style='position:absolute;font-family:Segoe UI; font-size: 16px;top:770px;left:680px;font-weight: Normal; font-style:Normal;background-color: #2A579A; color: #FFFFFF;height:30px; Width:300px;'>Add Plumbing</button>
+<button id='Bf143' style='position:absolute;font-family:Segoe UI; font-size: 16px;top:825px;left:680px;font-weight: Normal; font-style:Normal;background-color: #F19720; color: #FFFFFF;height:30px; Width:300px;'>Add Elevator</button>
+<button id='B680f' style='position:absolute;font-family:Segoe UI; font-size: 16px;top:770px;left:355px;font-weight: Normal; font-style:Normal;background-color: #7F51A1; color: #FFFFFF;height:30px; Width:300px;'>Add Electrical</button>
+<button id='B353b' style='position:absolute;font-family:Segoe UI; font-size: 16px;top:825px;left:30px;font-weight: Normal; font-style:Normal;background-color: #E51E25; color: #FFFFFF;height:30px; Width:300px;'>Add Fire Protection</button>
+<button id='B1f27' style='position:absolute;font-family:Segoe UI; font-size: 16px;top:770px;left:30px;font-weight: Normal; font-style:Normal;background-color: #1F1F1F; color: #FFFFFF;height:30px; Width:300px;'>Add Building</button>
+<button id='B402b' style='position:absolute;font-family:Segoe UI; font-size: 16px;top:1250px;left:355px;font-weight: Bold; font-style:Normal;background-color: #23A0DA; color: #FFFFFF;height:30px; Width:300px;'>Submit </button>
+<div id='N_512d_5c73a_0DIV' style='position:absolute;top:-320px;left:20px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px;'>
+<input id='N_512d_5c73a_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:300px;' />
+</div>
+<div id='C_0eb8_c9b5b_0DIV' style='position:absolute;top:-320px;left:320px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px; font-size:14px; font-family:Segoe UI;'>
+<input id='C_0eb8_c9b5b_0' type='checkbox'  />
+</div>
+<input  type='email' pattern='[A-Za-z0-9._+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,10}' title='email address, example: yourname@domain.com' id='T_7287_5d126_0'    style='position:absolute;top:-290px;left:20px;bottom:auto;right:auto;padding:0px;
+ border-color:#CCCCCC; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:300px;' class='k-textbox' />
+<div id='C_666d_9d317_0DIV' style='position:absolute;top:-290px;left:320px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px; font-size:14px; font-family:Segoe UI;'>
+<input id='C_666d_9d317_0' type='checkbox'  />
+</div>
+<input  type='email' pattern='[A-Za-z0-9._+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,10}' title='email address, example: yourname@domain.com' id='T_383a_d1421_0'    style='position:absolute;top:-260px;left:20px;bottom:auto;right:auto;padding:0px;
+ border-color:#CCCCCC; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:300px;' class='k-textbox' />
+<div id='C_9429_cb1f5_0DIV' style='position:absolute;top:-260px;left:320px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px; font-size:14px; font-family:Segoe UI;'>
+<input id='C_9429_cb1f5_0' type='checkbox'  />
+</div>
+<div id='D_b923_078a4_0DIV' style='position:absolute;top:-230px;left:20px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px;'>
+<input id='D_b923_078a4_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:300px;' />
+</div>
+<div id='C_a0e1_df675_0DIV' style='position:absolute;top:-230px;left:320px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px; font-size:14px; font-family:Segoe UI;'>
+<input id='C_a0e1_df675_0' type='checkbox'  />
+</div>
+<div id='L_5c2d_ff581_0DIV' style='position:absolute;top:-200px;left:20px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px;'>
+<select id='L_5c2d_ff581_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:300px;' > <option>Applied</option>
+<option>Plan Review</option>
+<option>Pending Payment</option>
+<option>Denied</option>
+<option>Finalled</option>
+<option>Closed</option>
+<option>Void</option>
+<option>On Hold</option>
+<option>Issued</option>
+<option>Abandoned</option>
+<option>Expired</option>
+</select>
+
+</div>
+<div id='C_499e_9f62a_0DIV' style='position:absolute;top:-200px;left:320px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px; font-size:14px; font-family:Segoe UI;'>
+<input id='C_499e_9f62a_0' type='checkbox'  />
+</div>
+<div id='MT_ce38_3a189_0DIV' style='position:absolute;top:-170px;left:20px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px;'>
+<input  id='MT_ce38_3a189_0'    style='position:absolute;font-size:14px; font-family:Segoe UI; color:#000000;border-color:gray;width:100%;height:100%' />
+</div>
+
+<div id='C_3752_440ed_0DIV' style='position:absolute;top:-170px;left:320px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px; font-size:14px; font-family:Segoe UI;'>
+<input id='C_3752_440ed_0' type='checkbox'  />
+</div>
+<input  type='email' pattern='[A-Za-z0-9._+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,10}' title='email address, example: yourname@domain.com' id='T_4a3e_c7eb5_0'    style='position:absolute;top:-140px;left:20px;bottom:auto;right:auto;padding:0px;
+ border-color:#CCCCCC; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:300px;' class='k-textbox' />
+<div id='N_595c_ID_-1DIV' style='position:absolute;top:-140px;left:320px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px;'>
+<input id='N_595c_ID_-1' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:300px;' />
+</div>
+<input maxlength='100'  id='T_7e75_50f70_0'   onchange='Tchanged("50f70",this.value)'  style='position:absolute;top:-110px;left:20px;bottom:auto;right:auto;padding:0px;
+ border-color:#CCCCCC; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:300px;' class='k-textbox' />
+<div id='MT_e647_89b9d_0DIV' style='position:absolute;top:-110px;left:320px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px;'>
+<input  id='MT_e647_89b9d_0'    style='position:absolute;font-size:14px; font-family:Segoe UI; color:#000000;border-color:gray;width:100%;height:100%' />
+</div>
+
+<input id='SN_bc7b_8a8d0_0' tabstop='false' readonly=''  style='position:absolute;top:345px;left:30px;bottom:auto;right:auto;padding:0px;
+ border-color:#CCCCCC; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:300px;' />
+<input id='SN_1ad9_c1edb_0' tabstop='false' readonly=''  style='position:absolute;top:345px;left:355px;bottom:auto;right:auto;padding:0px;
+ border-color:#CCCCCC; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:300px;' />
+<input  id='T_2bfb_3604a_0'  readonly='' onchange='Tchanged("3604a",this.value)'  style='position:absolute;top:345px;left:680px;bottom:auto;right:auto;padding:0px;
+ border-color:#CCCCCC; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:300px;' class='k-textbox' />
+<input maxlength='100'  id='T_43b9_71ba5_0'   onchange='Tchanged("71ba5",this.value)'  style='position:absolute;top:470px;left:30px;bottom:auto;right:auto;padding:0px;
+ border-color:#CCCCCC; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:300px;' class='k-textbox' />
+<input maxlength='50'  id='T_0258_bed98_0'   onchange='Tchanged("bed98",this.value)'  style='position:absolute;top:470px;left:355px;bottom:auto;right:auto;padding:0px;
+ border-color:#CCCCCC; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:300px;' class='k-textbox' />
+<input maxlength='10'  id='T_7dc0_25eed_0'   onchange='Tchanged("25eed",this.value)'  style='position:absolute;top:470px;left:680px;bottom:auto;right:auto;padding:0px;
+ border-color:#CCCCCC; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:85px;' class='k-textbox' />
+<input maxlength='10'  id='T_772f_ea68e_0'   onchange='Tchanged("ea68e",this.value)'  style='position:absolute;top:470px;left:787.5px;bottom:auto;right:auto;padding:0px;
+ border-color:#CCCCCC; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:85px;' class='k-textbox' />
+<input maxlength='10'  id='T_83bb_badb8_0'   onchange='Tchanged("badb8",this.value)'  style='position:absolute;top:470px;left:895px;bottom:auto;right:auto;padding:0px;
+ border-color:#CCCCCC; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:85px;' class='k-textbox' />
+<textarea maxlength='999'  id='T_677c_6d48f_0'  onchange='Tchanged("6d48f",this.value)' style='position:absolute;top:545px;left:30px;bottom:auto;right:auto;padding:0px;
+ border-color:#CCCCCC; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:150px; width:950px;'  class='k-textbox'></textarea>
+<div style='position: absolute;width: 100px; height: 30px;left: 471px; bottom: 0px; top: 1295px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #0EB8F1;font-weight: Normal; font-style:Normal;text-align:left;'></div>
+<div style='position: absolute;width: 255px; height: 40px;left: 35px; bottom: 0px; top: 265px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 24px; color: #00B0F0;font-weight: Normal; font-style:Normal;text-align:left;'>Permit Information</div>
+<div style='position: absolute;width: 625px; height: 30px;left: 35px; bottom: 0px; top: 520px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Work Description</div>
+<div style='position: absolute;width: 85px; height: 30px;left: 685px; bottom: 0px; top: 445px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Block</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 685px; bottom: 0px; top: 320px; right: 0px;border: 1px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Update</div>
+<div style='position: absolute;width: 85px; height: 30px;left: 792.5px; bottom: 0px; top: 445px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Lot </div>
+<div style='position: absolute;width: 300px; height: 85px;left: 345px; bottom: 0px; top: 35px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 28px; color: #000000;font-weight: Bold; font-style:Normal;text-align:center'>Construction Permit Application</div>
+<div style='position: absolute;width: 1000px; height: 5px;left: 0px; bottom: 0px; top: 5px; right: 0px;border: 0px solid #000000;background-color: #000000;font-family:Segoe UI; font-size: 14px; color: #0EB8F1;font-weight: Normal; font-style:Normal;text-align:left;'></div>
+<div class='globalFieldDIV' style='position: absolute;width: 300px; height: 105px;left: 700px; bottom: 0px; top: 25px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Normal; font-style:Normal;text-align:right'>{[CNAME]}<br>{[ADDR]}<br>{[CITY]}, {[STATE]} {[ZIP]}<br>{[APHONE]}<br>{[AWEBSITE]}</div>
+<div style='position: absolute;width: 300px; height: 40px;left: 35px; bottom: 0px; top: 710px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 24px; color: #00B0F0;font-weight: Normal; font-style:Normal;text-align:left;'>Add Inspection(s)</div>
+<div style='position: absolute;width: 85px; height: 30px;left: 900px; bottom: 0px; top: 445px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Qual</div>
+<div style='position: absolute;width: 140px; height: 30px;left: 35px; bottom: 0px; top: 320px; right: 0px;border: 1px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Permit #</div>
+<div style='position: absolute;width: 950px; height: 5px;left: 30px; bottom: 0px; top: 250px; right: 0px;border: 0px solid #000000;background-color: #000000;font-family:Segoe UI; font-size: 14px; color: #0EB8F1;font-weight: Normal; font-style:Normal;text-align:left;'></div>
+<div style='position: absolute;width: 1000px; height: 5px;left: 0px; bottom: 0px; top: 135px; right: 0px;border: 0px solid #000000;background-color: #000000;font-family:Segoe UI; font-size: 14px; color: #0EB8F1;font-weight: Normal; font-style:Normal;text-align:left;'></div>
+<div style='position: absolute;width: 300px; height: 40px;left: 35px; bottom: 0px; top: 395px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 24px; color: #00B0F0;font-weight: Normal; font-style:Normal;text-align:left;'>Project Information</div>
+<div style='position: absolute;width: 1000px; height: 5px;left: 5px; bottom: 0px; top: 1225px; right: 0px;border: 0px solid #000000;background-color: #000000;font-family:Segoe UI; font-size: 14px; color: #0EB8F1;font-weight: Normal; font-style:Normal;text-align:left;'></div>
+<div style='position: absolute;width: 620px; height: 30px;left: 30px; bottom: 0px; top: 155px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Look up your permit using work site address, permit number</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 360px; bottom: 0px; top: 320px; right: 0px;border: 1px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Control #</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 35px; bottom: 0px; top: 445px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Work Site</div>
+<div style='position: absolute;width: 1000px; height: 5px;left: 5px; bottom: 0px; top: 1300px; right: 0px;border: 0px solid #000000;background-color: #000000;font-family:Segoe UI; font-size: 14px; color: #0EB8F1;font-weight: Normal; font-style:Normal;text-align:left;'></div>
+<div style='position: absolute;width: 300px; height: 30px;left: 360px; bottom: 0px; top: 445px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Work Site Unit</div>
+<div class='k-block k-shadow' style='position: absolute;padding:5px;width: 950px; height: 320px;left: 30px; bottom: 0px; top: 885px; right: 0px;border: 1px solid #CCCCCC;background-color: #FFFFFF;font-family:Segoe UI; font-size: 12px; color: #FFFFFF;font-weight: Normal; font-style:Normal;'>
+<div id='GR_5c89' ></div>
+ </div>
+<div class='k-block k-shadow' style='position: absolute;padding: 5px;width: 950px; height: 50px;left: 25px; bottom: 0px; top: 180px; right: 0px;border: 1px solid #000000;background-color: #FFFFFF;'>
+<input id='addqs' style='width:930px;height:auto; font-family: Calibri; font-size: 14px;'/>
+</div>
+</form>
+</div>
+<div id='FORM_70303981-4cc1-40b6-82c9-a14be3931c4c' style='display:none;top:0;left:0;margin:0 auto;height:100%;border: 1px solid #000000;background-color: #FFFFFF;'>
+<p id='TI_70303981-4cc1-40b6-82c9-a14be3931c4c' style='font-size:16px;font-family:Segoe UI;color:#278EB8; margin:5px;top:0;left:0'></p>
+<div id='70303981-4cc1-40b6-82c9-a14be3931c4cL_8af9_3abc6_0DIV' style='position:absolute;top:112px;left:35px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px;'>
+<select id='70303981-4cc1-40b6-82c9-a14be3931c4cL_8af9_3abc6_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:300px;' > <option>Building</option>
+<option>Electrical</option>
+<option>Elevator</option>
+<option>Fire</option>
+<option>Mechanical</option>
+<option>Plumbing</option>
+</select>
+
+</div>
+<input maxlength='100'  id='70303981-4cc1-40b6-82c9-a14be3931c4cT_ea9c_35802_0'   onchange='Tchanged("35802",this.value)'  style='position:absolute;top:112px;left:675px;bottom:auto;right:auto;padding:0px;
+ border-color:#CCCCCC; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:300px;' class='k-textbox' />
+<input maxlength='300'  id='70303981-4cc1-40b6-82c9-a14be3931c4cT_ce53_25e13_0'   onchange='Tchanged("25e13",this.value)'  style='position:absolute;top:112px;left:995px;bottom:auto;right:auto;padding:0px;
+ border-color:#CCCCCC; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:300px;' class='k-textbox' />
+<div id='70303981-4cc1-40b6-82c9-a14be3931c4cD_8526_703c7_0DIV' style='position:absolute;top:562px;left:35px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px;'>
+<input id='70303981-4cc1-40b6-82c9-a14be3931c4cD_8526_703c7_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:300px;' />
+</div>
+<div id='70303981-4cc1-40b6-82c9-a14be3931c4cD_cc0c_975f3_0DIV' style='position:absolute;top:562px;left:355px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px;'>
+<input id='70303981-4cc1-40b6-82c9-a14be3931c4cD_cc0c_975f3_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:300px;' />
+</div>
+<div id='70303981-4cc1-40b6-82c9-a14be3931c4cD_c423_9308a_0DIV' style='position:absolute;top:562px;left:675px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px;'>
+<input id='70303981-4cc1-40b6-82c9-a14be3931c4cD_c423_9308a_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:300px;' />
+</div>
+<div id='70303981-4cc1-40b6-82c9-a14be3931c4cL_0709_b252f_0DIV' style='position:absolute;top:562px;left:995px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px;'>
+<select id='70303981-4cc1-40b6-82c9-a14be3931c4cL_0709_b252f_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:300px;' > <option>Requested</option>
+<option>Required</option>
+<option>Scheduled</option>
+<option>Pass</option>
+<option>Partial Pass</option>
+<option>Fail</option>
+<option>Cancelled</option>
+<option>Not Done</option>
+<option>Not Ready</option>
+<option>Not Home</option>
+<option>No Access</option>
+</select>
+
+</div>
+<input maxlength='100'  id='70303981-4cc1-40b6-82c9-a14be3931c4cT_33c9_67cb2_0'   onchange='Tchanged("67cb2",this.value)'  style='position:absolute;top:682px;left:35px;bottom:auto;right:auto;padding:0px;
+ border-color:#CCCCCC; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:300px;' class='k-textbox' />
+<div id='70303981-4cc1-40b6-82c9-a14be3931c4cMT_46bb_21eea_0DIV' style='position:absolute;top:682px;left:355px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px;'>
+<input  id='70303981-4cc1-40b6-82c9-a14be3931c4cMT_46bb_21eea_0'    style='position:absolute;font-size:14px; font-family:Segoe UI; color:#000000;border-color:gray;width:100%;height:100%' />
+</div>
+
+<input  type='email' pattern='[A-Za-z0-9._+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,10}' title='email address, example: yourname@domain.com' id='70303981-4cc1-40b6-82c9-a14be3931c4cT_6f9d_9c292_0'    style='position:absolute;top:682px;left:675px;bottom:auto;right:auto;padding:0px;
+ border-color:#CCCCCC; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:300px;' class='k-textbox' />
+<input maxlength='100'  id='70303981-4cc1-40b6-82c9-a14be3931c4cT_ac3e_636bb_0'  readonly='' onchange='Tchanged("636bb",this.value)'  style='position:absolute;top:802px;left:35px;bottom:auto;right:auto;padding:0px;
+ border-color:#D4D4D4; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#F7F7F7; height:30px; width:140px;' class='k-textbox' />
+<input maxlength='100'  id='70303981-4cc1-40b6-82c9-a14be3931c4cT_ac87_2fa8c_0'  readonly='' onchange='Tchanged("2fa8c",this.value)'  style='position:absolute;top:802px;left:195px;bottom:auto;right:auto;padding:0px;
+ border-color:#D4D4D4; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#F7F7F7; height:30px; width:140px;' class='k-textbox' />
+<div id='70303981-4cc1-40b6-82c9-a14be3931c4cN_9f33_82456_0DIV' style='position:absolute;top:802px;left:355px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:140px;'>
+<input id='70303981-4cc1-40b6-82c9-a14be3931c4cN_9f33_82456_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#F7F7F7;height:30px; width:140px;' />
+</div>
+<input maxlength='100'  id='70303981-4cc1-40b6-82c9-a14be3931c4cT_7ba3_0b70d_0'  readonly='' onchange='Tchanged("0b70d",this.value)'  style='position:absolute;top:877px;left:35px;bottom:auto;right:auto;padding:0px;
+ border-color:#D4D4D4; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#F7F7F7; height:30px; width:300px;' class='k-textbox' />
+<input maxlength='100'  id='70303981-4cc1-40b6-82c9-a14be3931c4cT_f4ef_87d3f_0'  readonly='' onchange='Tchanged("87d3f",this.value)'  style='position:absolute;top:877px;left:355px;bottom:auto;right:auto;padding:0px;
+ border-color:#D4D4D4; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#F7F7F7; height:30px; width:300px;' class='k-textbox' />
+<input maxlength='100'  id='70303981-4cc1-40b6-82c9-a14be3931c4cT_d9b7_7f142_0'  readonly='' onchange='Tchanged("7f142",this.value)'  style='position:absolute;top:877px;left:675px;bottom:auto;right:auto;padding:0px;
+ border-color:#D4D4D4; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#F7F7F7; height:30px; width:140px;' class='k-textbox' />
+<input maxlength='100'  id='70303981-4cc1-40b6-82c9-a14be3931c4cT_7e74_1e8ea_0'  readonly='' onchange='Tchanged("1e8ea",this.value)'  style='position:absolute;top:877px;left:835px;bottom:auto;right:auto;padding:0px;
+ border-color:#D4D4D4; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#F7F7F7; height:30px; width:140px;' class='k-textbox' />
+<input maxlength='100'  id='70303981-4cc1-40b6-82c9-a14be3931c4cT_c3e9_8a13e_0'  readonly='' onchange='Tchanged("8a13e",this.value)'  style='position:absolute;top:877px;left:995px;bottom:auto;right:auto;padding:0px;
+ border-color:#D4D4D4; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#F7F7F7; height:30px; width:140px;' class='k-textbox' />
+<textarea maxlength='999'  id='70303981-4cc1-40b6-82c9-a14be3931c4cT_841a_c200c_0' readonly='' onchange='Tchanged("c200c",this.value)' style='position:absolute;top:947px;left:35px;bottom:auto;right:auto;padding:0px;
+ border-color:#D4D4D4; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#F7F7F7; height:100px; width:620px;'  class='k-textbox'></textarea>
+<div id='70303981-4cc1-40b6-82c9-a14be3931c4cD_3816_af8f3_0DIV' style='position:absolute;top:986px;left:875px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px;'>
+<input id='70303981-4cc1-40b6-82c9-a14be3931c4cD_3816_af8f3_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#F7F7F7;height:30px; width:300px;' />
+</div>
+<div style='position: absolute;width: 300px; height: 40px;left: 40px; bottom: 0px; top: 727px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 24px; color: #00B0F0;font-weight: Normal; font-style:Normal;text-align:left;'>Permit Information</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 40px; bottom: 0px; top: 852px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #373E59;font-weight: Bold; font-style:Normal;text-align:left;'>Work Site</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 40px; bottom: 0px; top: 922px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #373E59;font-weight: Bold; font-style:Normal;text-align:left;'>Work Description</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 1000px; bottom: 0px; top: 87px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #373E59;font-weight: Bold; font-style:Normal;text-align:left;'>Instructions for Inspector</div>
+<div style='position: absolute;width: 140px; height: 30px;left: 840px; bottom: 0px; top: 852px; right: 0px;border: 1px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #373E59;font-weight: Bold; font-style:Normal;text-align:left;'>Lot</div>
+<div style='position: absolute;width: 140px; height: 30px;left: 200px; bottom: 0px; top: 777px; right: 0px;border: 1px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Permit #</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 680px; bottom: 0px; top: 537px; right: 0px;border: 0px solid #CCCCCC;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Request Date - 3rd Choice</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 680px; bottom: 0px; top: 87px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #373E59;font-weight: Bold; font-style:Normal;text-align:left;'>Inspection Type</div>
+<div style='position: absolute;width: 140px; height: 30px;left: 1000px; bottom: 0px; top: 852px; right: 0px;border: 1px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #373E59;font-weight: Bold; font-style:Normal;text-align:left;'>Qualifier</div>
+<div style='position: absolute;width: 140px; height: 30px;left: 360px; bottom: 0px; top: 777px; right: 0px;border: 1px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Permit Suffix</div>
+<div style='position: absolute;width: 300px; height: 40px;left: 40px; bottom: 0px; top: 486px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 24px; color: #00B0F0;font-weight: Normal; font-style:Normal;text-align:left;'>Request Dates</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 360px; bottom: 0px; top: 657px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #373E59;font-weight: Bold; font-style:Normal;text-align:left;'>Cell #</div>
+<div style='position: absolute;width: 300px; height: 40px;left: 40px; bottom: 0px; top: 41px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 24px; color: #00B0F0;font-weight: Normal; font-style:Normal;text-align:left;'>Construction Inspection</div>
+<div style='position: absolute;width: 755px; height: 300px;left: 35px; bottom: 0px; top: 146px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Normal; font-style:Normal;text-align:left;'><div style="max-width: 850px; margin: 20px auto; font-family: Arial, Helvetica, sans-serif; color: #2d3748;"><div style="background-color: #f8fafc; border: 1px solid #d9e2ec; border-radius: 8px; overflow: hidden;"><div style="background-color: #1f4e78; color: #ffffff; padding: 16px 20px;"><div style="font-size: 20px; font-weight: bold;">Inspection Schedule</div><div style="font-size: 13px; margin-top: 4px;">Available inspection days and time frames</div></div><table style="width: 100%; border-collapse: collapse; background-color: #ffffff;"><thead><tr style="background-color: #eaf1f7;"><th style="padding: 14px 16px; text-align: left; border-bottom: 2px solid #cbd5e0;">Inspector</th><th style="padding: 14px 16px; text-align: left; border-bottom: 2px solid #cbd5e0;">Inspection Type</th><th style="padding: 14px 16px; text-align: left; border-bottom: 2px solid #cbd5e0;">Available Days</th><th style="padding: 14px 16px; text-align: left; border-bottom: 2px solid #cbd5e0;">Time Frame</th></tr></thead><tbody><tr><td style="padding: 15px 16px; border-bottom: 1px solid #e2e8f0; font-weight: bold;">Bill O&rsquo;Connor</td><td style="padding: 15px 16px; border-bottom: 1px solid #e2e8f0;">Building / Plumbing</td><td style="padding: 15px 16px; border-bottom: 1px solid #e2e8f0;">Monday through Friday</td><td style="padding: 15px 16px; border-bottom: 1px solid #e2e8f0; white-space: nowrap;">11:00 AM &ndash; 3:00 PM</td></tr><tr style="background-color: #f8fafc;"><td style="padding: 15px 16px; border-bottom: 1px solid #e2e8f0; font-weight: bold;">Greg Chontow</td><td style="padding: 15px 16px; border-bottom: 1px solid #e2e8f0;">Electrical</td><td style="padding: 15px 16px; border-bottom: 1px solid #e2e8f0;">Monday and Wednesday</td><td style="padding: 15px 16px; border-bottom: 1px solid #e2e8f0; white-space: nowrap;">11:00 AM &ndash; 3:00 PM</td></tr><tr><td style="padding: 15px 16px; font-weight: bold;">Jim O&rsquo;Connor</td><td style="padding: 15px 16px;">Fire</td><td style="padding: 15px 16px;">Tuesday and Thursday</td><td style="padding: 15px 16px; white-space: nowrap;">10:00 AM &ndash; 12:00 PM</td></tr></tbody></table><div style="padding: 12px 16px; background-color: #f8fafc; border-top: 1px solid #d9e2ec; font-size: 12px; color: #5f6c7b;"><span style="color: #ff0000;">Inspection availability is subject to scheduling and confirmation. Please ensure inspection requests are submitted during the appropriate inspector's scheduled days and time frame.</span></div></div></div></div>
+<div style='position: absolute;width: 300px; height: 30px;left: 40px; bottom: 0px; top: 87px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #373E59;font-weight: Bold; font-style:Normal;text-align:left;'>Subcode</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 680px; bottom: 0px; top: 657px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #373E59;font-weight: Bold; font-style:Normal;text-align:left;'>Email</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 360px; bottom: 0px; top: 87px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #373E59;font-weight: Bold; font-style:Normal;text-align:left;'>Search Inspection Type</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 40px; bottom: 0px; top: 657px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #373E59;font-weight: Bold; font-style:Normal;text-align:left;'>Name</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 40px; bottom: 0px; top: 537px; right: 0px;border: 0px solid #CCCCCC;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Request Date - 1st Choice</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 1000px; bottom: 0px; top: 537px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #373E59;font-weight: Bold; font-style:Normal;text-align:left;'>Result</div>
+<div style='position: absolute;width: 140px; height: 30px;left: 40px; bottom: 0px; top: 777px; right: 0px;border: 1px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Control #</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 360px; bottom: 0px; top: 852px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #373E59;font-weight: Bold; font-style:Normal;text-align:left;'>Work Site Unit</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 360px; bottom: 0px; top: 537px; right: 0px;border: 0px solid #CCCCCC;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Request Date - 2nd Choice</div>
+<div style='position: absolute;width: 300px; height: 40px;left: 40px; bottom: 0px; top: 607px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 24px; color: #00B0F0;font-weight: Normal; font-style:Normal;text-align:left;'>Requestor</div>
+<div style='position: absolute;width: 140px; height: 30px;left: 680px; bottom: 0px; top: 852px; right: 0px;border: 1px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #373E59;font-weight: Bold; font-style:Normal;text-align:left;'>Block</div>
+<div class='lookup-container' id='LU_ac3aDIV' style='position: absolute;top:111px;left:355px;font-size:11px; font-family:Segoe UI; width:300px; height:30px;'>
+<input class='lookup-input' id='LU_ac3a' style='font-size:11px; font-family:Segoe UI; width:250px;'/>
+<a id='LU_ac3a_B' style='background:#def7ff;color:black'></a>
+</div>
+<div style='position:absolute;margin:10px;top:1068px;left:0;right:0;bottom:0'><button id='GLS_70303981-4cc1-40b6-82c9-a14be3931c4c' >Save</button>
+<button id='GLC_70303981-4cc1-40b6-82c9-a14be3931c4c' >Cancel</button>
+</div>
+
+</div>
+
+
+<div id='RESP' style='display:none;top:0;left:0;margin:0 auto;height: 543px;border: 1px solid #CCCCCC;background-color: #FFFFFF;'>
+<div class='k-block k-shadow' id='RESP_1772_71ba5_0' style='position: absolute;width: 300px; height: 30px;left: 365px; bottom: 0px; top: 153px; right: 0px;border: 1px solid #CCCCCC;background-color: #FFFFFF;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Normal; font-style:Normal;text-align:left;'></div>
+<div class='k-block k-shadow' id='RESP_fa83_078a4_0' style='position: absolute;width: 300px; height: 30px;left: 365px; bottom: 0px; top: 208px; right: 0px;border: 1px solid #CCCCCC;background-color: #FFFFFF;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Normal; font-style:Normal;text-align:left;'></div>
+<div class='k-block k-shadow' id='RESP_bee6_8a8d0_0' style='position: absolute;width: 300px; height: 30px;left: 365px; bottom: 0px; top: 263px; right: 0px;border: 1px solid #CCCCCC;background-color: #FFFFFF;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Normal; font-style:Normal;text-align:left;'></div>
+<div style='position: absolute;width: 1260px; height: 5px;left: 35px; bottom: 0px; top: 123px; right: 0px;border: 0px solid #000000;background-color: #000000;font-family:Segoe UI; font-size: 14px; color: #0EB8F1;font-weight: Normal; font-style:Normal;text-align:left;'></div>
+<div style='position: absolute;width: 300px; height: 30px;left: 40px; bottom: 0px; top: 208px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Date Entered:</div>
+<div style='position: absolute;width: 620px; height: 40px;left: 40px; bottom: 0px; top: 63px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 24px; color: #00B0F0;font-weight: Normal; font-style:Normal;text-align:left;'>Your request has been submitted successfully</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 40px; bottom: 0px; top: 263px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Permit #</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 40px; bottom: 0px; top: 153px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Work Site:</div>
+
+</div>
+<script id='GNB_70303981-4cc1-40b6-82c9-a14be3931c4c' type='text/x-kendo-template'>
+<a class='k-button' href='\#' onclick='return toolbar_click("G_74dbd")'>Add New Record</a>
+</script><script>
+var CheckLists = new Dictionary(),FREC={},CA={},RS={},MA={},TABS={},LU={},BU={},PROCTID='',ADDSEL=false,APNSEL=false,ASTYPE='',control;
+$(document).ready(function () {
+$('#B9219').kendoButton({ click: ActionButton });
+$('#Bc397').kendoButton({ click: ActionButton });
+$('#Bf143').kendoButton({ click: ActionButton });
+$('#B680f').kendoButton({ click: ActionButton });
+$('#B353b').kendoButton({ click: ActionButton });
+$('#B1f27').kendoButton({ click: ActionButton });
+$('#B402b').kendoButton({ click: Save });
+$('#N_512d_5c73a_0').kendoNumericTextBox({format:'#',ID:'5c73a',min:0,max:9999999,value:0, change: NFChanged});
+$('#N_512d_5c73a_0').data('kendoNumericTextBox').enable(false);
+$('#C_0eb8_c9b5b_0').kendoMobileSwitch({ID:'c9b5b',onLabel: 'YES',offLabel: 'NO', change: function (e) { CFChanged(this); }});$('#C_0eb8_c9b5b_0').data('kendoMobileSwitch').enable(false);
+$('#C_666d_9d317_0').kendoMobileSwitch({ID:'9d317',onLabel: 'YES',offLabel: 'NO', change: function (e) { CFChanged(this); }});$('#C_666d_9d317_0').data('kendoMobileSwitch').enable(false);
+$('#C_9429_cb1f5_0').kendoMobileSwitch({ID:'cb1f5',onLabel: 'YES',offLabel: 'NO', change: function (e) { CFChanged(this); }});$('#C_9429_cb1f5_0').data('kendoMobileSwitch').enable(false);
+$('#D_b923_078a4_0').kendoDatePicker({ID:'078a4', change: DFChanged});
+$('#C_a0e1_df675_0').kendoMobileSwitch({ID:'df675',onLabel: 'YES',offLabel: 'NO', change: function (e) { CFChanged(this); }});$('#C_a0e1_df675_0').data('kendoMobileSwitch').enable(false);
+$('#L_5c2d_ff581_0').kendoDropDownList({ID:'ff581', change: DFChanged,optionLabel: 'Select...'});$('#L_5c2d_ff581_0').data('kendoDropDownList').select(-1);
+$('#C_499e_9f62a_0').kendoMobileSwitch({ID:'9f62a',onLabel: 'YES',offLabel: 'NO', change: function (e) { CFChanged(this); }});$('#C_499e_9f62a_0').data('kendoMobileSwitch').enable(false);
+$('#MT_ce38_3a189_0').kendoMaskedTextBox({ mask: '(###) ###-####' });
+$('#C_3752_440ed_0').kendoMobileSwitch({ID:'440ed',onLabel: 'YES',offLabel: 'NO', change: function (e) { CFChanged(this); }});$('#C_3752_440ed_0').data('kendoMobileSwitch').enable(false);
+$('#N_595c_ID_-1').kendoNumericTextBox({ID:'ID',format:'#',spinners:false});
+control=$('#N_595c_ID_-1').data('kendoNumericTextBox');control.enable(false);
+$('#MT_e647_89b9d_0').kendoMaskedTextBox({ mask: '(###) ###-####' });
+
+ADDSEL=true;
+ASTYPE='ADDSEL=dcee8,1'
+sessionStorage.setItem('wnd', true);
+$('#70303981-4cc1-40b6-82c9-a14be3931c4cL_8af9_3abc6_0').kendoDropDownList({ID:'3abc6', change: DFChanged,optionLabel: 'Select...'});$('#70303981-4cc1-40b6-82c9-a14be3931c4cL_8af9_3abc6_0').data('kendoDropDownList').select(-1);
+$('#70303981-4cc1-40b6-82c9-a14be3931c4cD_8526_703c7_0').kendoDatePicker({ID:'703c7', change: DFChanged});
+$('#70303981-4cc1-40b6-82c9-a14be3931c4cD_8526_703c7_0').data('kendoDatePicker').enable(false);
+$('#70303981-4cc1-40b6-82c9-a14be3931c4cD_cc0c_975f3_0').kendoDatePicker({ID:'975f3', change: DFChanged});
+$('#70303981-4cc1-40b6-82c9-a14be3931c4cD_cc0c_975f3_0').data('kendoDatePicker').enable(false);
+$('#70303981-4cc1-40b6-82c9-a14be3931c4cD_c423_9308a_0').kendoDatePicker({ID:'9308a', change: DFChanged});
+$('#70303981-4cc1-40b6-82c9-a14be3931c4cD_c423_9308a_0').data('kendoDatePicker').enable(false);
+$('#70303981-4cc1-40b6-82c9-a14be3931c4cL_0709_b252f_0').kendoDropDownList({ID:'b252f', change: DFChanged,optionLabel: 'Select...'});$('#70303981-4cc1-40b6-82c9-a14be3931c4cL_0709_b252f_0').data('kendoDropDownList').select(-1);
+$('#70303981-4cc1-40b6-82c9-a14be3931c4cMT_46bb_21eea_0').kendoMaskedTextBox({ mask: '(###) ###-####' });
+$('#70303981-4cc1-40b6-82c9-a14be3931c4cN_9f33_82456_0').kendoNumericTextBox({format:'#',ID:'82456',min:0,max:9999999,value:0, change: NFChanged});
+$('#70303981-4cc1-40b6-82c9-a14be3931c4cN_9f33_82456_0').data('kendoNumericTextBox').enable(false);
+$('#70303981-4cc1-40b6-82c9-a14be3931c4cD_3816_af8f3_0').kendoDateTimePicker({ID:'af8f3', change: DFChanged});
+$('#70303981-4cc1-40b6-82c9-a14be3931c4cD_3816_af8f3_0').data('kendoDateTimePicker').enable(false);
+$('#LU_ac3a_B').kendoButton({ click: ActionButton ,icon: 'search'});
+$('#GLS_70303981-4cc1-40b6-82c9-a14be3931c4c').kendoButton({ click: ActionButton });
+$('#GLC_70303981-4cc1-40b6-82c9-a14be3931c4c').kendoButton({ click: ActionButton });
+
+PROCTID='dcee8';
+BU['B9219']={type:'B13',cid:'B9219', bid:'f7651195-1a2c-4bca-b7b2-5640c209e509'};
+BU['Bc397']={type:'B13',cid:'Bc397', bid:'ef1da680-89ac-4ec8-bd54-05bc16ad0db4'};
+BU['Bf143']={type:'B13',cid:'Bf143', bid:'cb3e2d21-5784-4ae4-bc99-d587cfe1fb33'};
+BU['B680f']={type:'B13',cid:'B680f', bid:'b625f188-a805-4817-8b39-d295df85fb18'};
+BU['B353b']={type:'B13',cid:'B353b', bid:'b0cff6e0-be3a-425a-878a-aca4aca3911c'};
+BU['B1f27']={type:'B13',cid:'B1f27', bid:'a3aa2e3b-cf2d-4902-b4b9-322a73b78e62'};
+BU['B402b']={type:'S',cid:'B402b', bid:'d0dc91fe-55f3-4594-b75d-682a50371c81'};
+CA['5c73a']={type:'N',cid:'N_512d_5c73a_0',field:'Permit Suffix', r:0,parentCont:'MAIN',NDV:'0'};
+CA['c9b5b']={type:'C',cid:'C_0eb8_c9b5b_0', r:0, field:'Sub - Plumbing'};
+CA['5d126']={type:'T',cid:'T_7287_5d126_0', r:0,parentCont:'MAIN', t:'Agent Email',em:1,field:'Agent Email',TDV:''};
+CA['9d317']={type:'C',cid:'C_666d_9d317_0', r:0, field:'Sub - Mechanical'};
+CA['d1421']={type:'T',cid:'T_383a_d1421_0', r:0,parentCont:'MAIN', t:'Owner Email',em:1,field:'Owner Email',TDV:''};
+CA['cb1f5']={type:'C',cid:'C_9429_cb1f5_0', r:0, field:'Sub - Fire'};
+CA['078a4']={type:'D',cid:'D_b923_078a4_0',dv:'0,DAY',field:'Date Entered', r:0,parentCont:'MAIN'};
+CA['df675']={type:'C',cid:'C_a0e1_df675_0', r:0, field:'Sub - Elevator'};
+CA['ff581']={type:'L',cid:'L_5c2d_ff581_0', r:0,parentCont:'MAIN', field:'Permit Status'};
+CA['9f62a']={type:'C',cid:'C_499e_9f62a_0', r:0, field:'Sub - Electrical'};
+CA['3a189']={type:'MT',cid:'MT_ce38_3a189_0', r:0,parentCont:'MAIN', t:'Responsible Person Cell',field:'Responsible Person Cell',TDV:''};
+CA['440ed']={type:'C',cid:'C_3752_440ed_0', r:0, field:'Sub - Building'};
+CA['c7eb5']={type:'T',cid:'T_4a3e_c7eb5_0', r:0,parentCont:'MAIN', t:'Responsible Person Email',em:1,field:'Responsible Person Email',TDV:''};
+CA['ID']={type:'N',cid:'N_595c_ID_-1',field:'Property ID', r:0,parentCont:'MAIN'};
+CA['50f70']={type:'T',cid:'T_7e75_50f70_0', r:0,parentCont:'MAIN', t:'Responsible Person Name',field:'Responsible Person Name',TDV:'',USE:''};
+CA['89b9d']={type:'MT',cid:'MT_e647_89b9d_0', r:0,parentCont:'MAIN', t:'Responsible Person Phone',field:'Responsible Person Phone',TDV:''};
+CA['8a8d0']={type:'SN',cid:'SN_bc7b_8a8d0_0',field:'Permit No', r:0};
+CA['c1edb']={type:'SN',cid:'SN_1ad9_c1edb_0',field:'Control No', r:0};
+CA['3604a']={type:'T',cid:'T_2bfb_3604a_0', r:0,parentCont:'MAIN', t:'Permit Suffix Text',field:'Permit Suffix Text',TDV:'',USE:''};
+CA['71ba5']={type:'T',cid:'T_43b9_71ba5_0', r:1,parentCont:'MAIN', t:'Work Site',field:'Work Site',TDV:'╟FADDRESS',USE:''};
+CA['bed98']={type:'T',cid:'T_0258_bed98_0', r:0,parentCont:'MAIN', t:'Work Site Unit',field:'Work Site Unit',TDV:'╟UNIT',USE:''};
+CA['25eed']={type:'T',cid:'T_7dc0_25eed_0', r:0,parentCont:'MAIN', t:'Block',field:'Block',TDV:'╟BLKNBR1',USE:''};
+CA['ea68e']={type:'T',cid:'T_772f_ea68e_0', r:0,parentCont:'MAIN', t:'Lot',field:'Lot',TDV:'╟LOTNBR1',USE:''};
+CA['badb8']={type:'T',cid:'T_83bb_badb8_0', r:0,parentCont:'MAIN', t:'Qual',field:'Qual',TDV:'╟QNBR1',USE:''};
+CA['6d48f']={type:'T',cid:'T_677c_6d48f_0', r:0,parentCont:'MAIN', t:'Work Description',field:'Work Description',TDV:'',USE:''};
+GR['GR_5c89'] ={TID:'G_74dbd',PTID:'dcee8',h:320,editor:'FORM_70303981-4cc1-40b6-82c9-a14be3931c4c',button:'GNB_70303981-4cc1-40b6-82c9-a14be3931c4c',required:false,minrows:1,tname:'Construction Inspections', columns: [
+{ field: 'Id', editable:false,hidden:true, type: 'string' },{TF:'Subcode', field: 'GF3abc6', title: 'Subcode', width: 150.338989257812, type: 'string',defaultValue: 'Building',values: [
+ { text:'Building',value:'Building' },
+ { text:'Electrical',value:'Electrical' },
+ { text:'Elevator',value:'Elevator' },
+ { text:'Fire',value:'Fire' },
+ { text:'Mechanical',value:'Mechanical' },
+ { text:'Plumbing',value:'Plumbing' },
+] },
+{TF:'Inspection Type', field: 'GF35802', title: 'Type', width: 133.086410522461, type: 'string' },
+{TF:'Requestor Email', field: 'GF9c292', title: 'Requestor Email', width: 145.777709960938, type: 'string' },
+{TF:'Request Date 1', field: 'GF703c7', title: 'Request Date 1', width: 172.4443359375, type: 'date', format: '{0:MM/dd/yyyy}' },
+{TF:'Request Date 2', field: 'GF975f3', title: 'Request Date 2', width: 167.110961914063, type: 'date', format: '{0:MM/dd/yyyy}' },
+{TF:'Request Date 3', field: 'GF9308a', title: 'Request Date 3', width: 80, type: 'date', format: '{0:MM/dd/yyyy}' },
+{ command: { name: 'LE_70303981-4cc1-40b6-82c9-a14be3931c4c', text: 'Edit', click: editsubrecord, title: '&nbsp;' } },
+{ command: ['destroy'], title: '&nbsp;' }]
+ };
+CA['70303981-4cc1-40b6-82c9-a14be3931c4c3abc6']={type:'L',cid:'70303981-4cc1-40b6-82c9-a14be3931c4cL_8af9_3abc6_0', r:0,parentCont:'70303981-4cc1-40b6-82c9-a14be3931c4c', field:'Subcode'};
+CA['70303981-4cc1-40b6-82c9-a14be3931c4c35802']={type:'T',cid:'70303981-4cc1-40b6-82c9-a14be3931c4cT_ea9c_35802_0', r:0,parentCont:'70303981-4cc1-40b6-82c9-a14be3931c4c', t:'Inspection Type',field:'Inspection Type',TDV:'',USE:''};
+CA['70303981-4cc1-40b6-82c9-a14be3931c4c25e13']={type:'T',cid:'70303981-4cc1-40b6-82c9-a14be3931c4cT_ce53_25e13_0', r:0,parentCont:'70303981-4cc1-40b6-82c9-a14be3931c4c', t:'Instruction',field:'Instruction',TDV:'',USE:''};
+CA['70303981-4cc1-40b6-82c9-a14be3931c4c703c7']={type:'D',cid:'70303981-4cc1-40b6-82c9-a14be3931c4cD_8526_703c7_0',field:'Request Date 1', r:0,parentCont:'70303981-4cc1-40b6-82c9-a14be3931c4c'};
+CA['70303981-4cc1-40b6-82c9-a14be3931c4c975f3']={type:'D',cid:'70303981-4cc1-40b6-82c9-a14be3931c4cD_cc0c_975f3_0',field:'Request Date 2', r:0,parentCont:'70303981-4cc1-40b6-82c9-a14be3931c4c'};
+CA['70303981-4cc1-40b6-82c9-a14be3931c4c9308a']={type:'D',cid:'70303981-4cc1-40b6-82c9-a14be3931c4cD_c423_9308a_0',field:'Request Date 3', r:0,parentCont:'70303981-4cc1-40b6-82c9-a14be3931c4c'};
+CA['70303981-4cc1-40b6-82c9-a14be3931c4cb252f']={type:'L',cid:'70303981-4cc1-40b6-82c9-a14be3931c4cL_0709_b252f_0', r:0,parentCont:'70303981-4cc1-40b6-82c9-a14be3931c4c', field:'Result'};
+CA['70303981-4cc1-40b6-82c9-a14be3931c4c67cb2']={type:'T',cid:'70303981-4cc1-40b6-82c9-a14be3931c4cT_33c9_67cb2_0', r:0,parentCont:'70303981-4cc1-40b6-82c9-a14be3931c4c', t:'Requestor',field:'Requestor',TDV:'',USE:''};
+CA['70303981-4cc1-40b6-82c9-a14be3931c4c21eea']={type:'MT',cid:'70303981-4cc1-40b6-82c9-a14be3931c4cMT_46bb_21eea_0', r:0,parentCont:'70303981-4cc1-40b6-82c9-a14be3931c4c', t:'Requestor Cell',field:'Requestor Cell',TDV:''};
+CA['70303981-4cc1-40b6-82c9-a14be3931c4c9c292']={type:'T',cid:'70303981-4cc1-40b6-82c9-a14be3931c4cT_6f9d_9c292_0', r:0,parentCont:'70303981-4cc1-40b6-82c9-a14be3931c4c', t:'Requestor Email',em:1,field:'Requestor Email',TDV:''};
+CA['70303981-4cc1-40b6-82c9-a14be3931c4c636bb']={type:'T',cid:'70303981-4cc1-40b6-82c9-a14be3931c4cT_ac3e_636bb_0', r:0,parentCont:'70303981-4cc1-40b6-82c9-a14be3931c4c', t:'Control No',field:'Control No',TDV:'',USE:''};
+CA['70303981-4cc1-40b6-82c9-a14be3931c4c2fa8c']={type:'T',cid:'70303981-4cc1-40b6-82c9-a14be3931c4cT_ac87_2fa8c_0', r:0,parentCont:'70303981-4cc1-40b6-82c9-a14be3931c4c', t:'Permit No',field:'Permit No',TDV:'',USE:''};
+CA['70303981-4cc1-40b6-82c9-a14be3931c4c82456']={type:'N',cid:'70303981-4cc1-40b6-82c9-a14be3931c4cN_9f33_82456_0',field:'Permit Suffix', r:0,parentCont:'70303981-4cc1-40b6-82c9-a14be3931c4c',NDV:'0'};
+CA['70303981-4cc1-40b6-82c9-a14be3931c4c0b70d']={type:'T',cid:'70303981-4cc1-40b6-82c9-a14be3931c4cT_7ba3_0b70d_0', r:0,parentCont:'70303981-4cc1-40b6-82c9-a14be3931c4c', t:'Work Site',field:'Work Site',TDV:'',USE:''};
+CA['70303981-4cc1-40b6-82c9-a14be3931c4c87d3f']={type:'T',cid:'70303981-4cc1-40b6-82c9-a14be3931c4cT_f4ef_87d3f_0', r:0,parentCont:'70303981-4cc1-40b6-82c9-a14be3931c4c', t:'Work Site Unit',field:'Work Site Unit',TDV:'',USE:''};
+CA['70303981-4cc1-40b6-82c9-a14be3931c4c7f142']={type:'T',cid:'70303981-4cc1-40b6-82c9-a14be3931c4cT_d9b7_7f142_0', r:0,parentCont:'70303981-4cc1-40b6-82c9-a14be3931c4c', t:'Block',field:'Block',TDV:'',USE:''};
+CA['70303981-4cc1-40b6-82c9-a14be3931c4c1e8ea']={type:'T',cid:'70303981-4cc1-40b6-82c9-a14be3931c4cT_7e74_1e8ea_0', r:0,parentCont:'70303981-4cc1-40b6-82c9-a14be3931c4c', t:'Lot',field:'Lot',TDV:'',USE:''};
+CA['70303981-4cc1-40b6-82c9-a14be3931c4c8a13e']={type:'T',cid:'70303981-4cc1-40b6-82c9-a14be3931c4cT_c3e9_8a13e_0', r:0,parentCont:'70303981-4cc1-40b6-82c9-a14be3931c4c', t:'Qual',field:'Qual',TDV:'',USE:''};
+CA['70303981-4cc1-40b6-82c9-a14be3931c4cc200c']={type:'T',cid:'70303981-4cc1-40b6-82c9-a14be3931c4cT_841a_c200c_0', r:0,parentCont:'70303981-4cc1-40b6-82c9-a14be3931c4c', t:'Work Description',field:'Work Description',TDV:'',USE:''};
+CA['70303981-4cc1-40b6-82c9-a14be3931c4caf8f3']={type:'D',cid:'70303981-4cc1-40b6-82c9-a14be3931c4cD_3816_af8f3_0',field:'Added Date', r:0,parentCont:'70303981-4cc1-40b6-82c9-a14be3931c4c',isTime:true};
+LU['LU_ac3a']={cid:'LU_ac3a',cfg:'1d564|f3627|Type here to lookup|af2cd:3abc6',fields:'f3627:35802',div:'FORM_70303981-4cc1-40b6-82c9-a14be3931c4c'};
+BU['GLS_70303981-4cc1-40b6-82c9-a14be3931c4c']={type:'GLS',tar:'FORM_70303981-4cc1-40b6-82c9-a14be3931c4c'};
+BU['GLC_70303981-4cc1-40b6-82c9-a14be3931c4c']={type:'GLC',tar:'FORM_70303981-4cc1-40b6-82c9-a14be3931c4c'};
+Logic={"Desc":null,"Events":[{"Actcode":"B","Actions":[{"ActionOrder":0,"ActionType":7,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Create sub record in [Construction Inspections] Action","EID":"49d75","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"7f142:25eed|636bb:c1edb|1e8ea:ea68e|2fa8c:8a8d0|82456:5c73a|8a13e:badb8|67cb2:50f70|21eea:3a189|9c292:c7eb5|c200c:6d48f|0b70d:71ba5|87d3f:bed98|","ID":"e0b2a","ModifyID":"74dbd","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":1,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Subcode] To [Building]","EID":"49d75","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"6a97e","ModifyID":"3abc6","ModifyTO":"Building","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":2,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Result] To [Requested]","EID":"49d75","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"f3034","ModifyID":"b252f","ModifyTO":"Requested","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":3,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Disable [Subcode] Field Action","EID":"49d75","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"56135","ModifyID":"3abc6","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":4,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Disable [Result] Field Action","EID":"49d75","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"aa2dc","ModifyID":"b252f","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":5,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Enable [Request Date 1] Field Action","EID":"49d75","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"b6d3f","ModifyID":"703c7","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":6,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Enable [Request Date 2] Field Action","EID":"49d75","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"94732","ModifyID":"975f3","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":7,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Enable [Request Date 3] Field Action","EID":"49d75","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"e8426","ModifyID":"9308a","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":8,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Added Date] To a calculated date","EID":"49d75","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"b2cb6","ModifyID":"af8f3","ModifyTO":"SD|0|DAY","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":9,"ActionType":1,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Hide [Added Date] Field or Container Action","EID":"49d75","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"40d9b","ModifyID":"af8f3","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":10,"ActionType":9,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Require [Request Date 1] Field Action","EID":"49d75","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"b715c","ModifyID":"703c7","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":11,"ActionType":9,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Require [Request Date 2] Field Action","EID":"49d75","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"08881","ModifyID":"975f3","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":12,"ActionType":9,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Require [Request Date 3] Field Action","EID":"49d75","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"f3db2","ModifyID":"9308a","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":13,"ActionType":9,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Require [Inspection Type] Field Action","EID":"49d75","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"8332a","ModifyID":"35802","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null}],
+"Desc":"(Button) Add Building","FieldCHTO":"","FieldID":"a3aa2e3b-cf2d-4902-b4b9-322a73b78e62","FieldOP":-1,"ID":"49d75","Mode":0,"RecordFilter":"","Usercode":"2"},
+{"Actcode":"B","Actions":[{"ActionOrder":0,"ActionType":7,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Create sub record in [Construction Inspections] Action","EID":"040ac","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"7f142:25eed|636bb:c1edb|1e8ea:ea68e|2fa8c:8a8d0|82456:5c73a|8a13e:badb8|67cb2:50f70|21eea:3a189|9c292:c7eb5|c200c:6d48f|0b70d:71ba5|87d3f:bed98|","ID":"2c2ee","ModifyID":"74dbd","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":2,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Result] To [Requested]","EID":"040ac","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"db4bc","ModifyID":"b252f","ModifyTO":"Requested","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":3,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Disable [Subcode] Field Action","EID":"040ac","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"ab073","ModifyID":"3abc6","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":4,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Disable [Result] Field Action","EID":"040ac","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"46220","ModifyID":"b252f","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":5,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Enable [Request Date 1] Field Action","EID":"040ac","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"618cb","ModifyID":"703c7","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":6,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Enable [Request Date 2] Field Action","EID":"040ac","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"b909a","ModifyID":"975f3","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":7,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Enable [Request Date 3] Field Action","EID":"040ac","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"03809","ModifyID":"9308a","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":8,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Added Date] To a calculated date","EID":"040ac","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"6c45b","ModifyID":"af8f3","ModifyTO":"SD|0|DAY","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":9,"ActionType":1,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Hide [Added Date] Field or Container Action","EID":"040ac","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"f1ced","ModifyID":"af8f3","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":10,"ActionType":9,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Require [Request Date 1] Field Action","EID":"040ac","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"59d2b","ModifyID":"703c7","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":11,"ActionType":9,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Require [Request Date 2] Field Action","EID":"040ac","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"1da6a","ModifyID":"975f3","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":12,"ActionType":9,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Require [Request Date 3] Field Action","EID":"040ac","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"64675","ModifyID":"9308a","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":13,"ActionType":9,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Require [Inspection Type] Field Action","EID":"040ac","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"c1512","ModifyID":"35802","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":1,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Subcode] To [Electrical]","EID":"040ac","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"3b83c","ModifyID":"3abc6","ModifyTO":"Electrical","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null}],
+"Desc":"(Button) Add Electrical","FieldCHTO":"","FieldID":"b625f188-a805-4817-8b39-d295df85fb18","FieldOP":-1,"ID":"040ac","Mode":0,"RecordFilter":"","Usercode":"2"},
+{"Actcode":"B","Actions":[{"ActionOrder":0,"ActionType":7,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Create sub record in [Construction Inspections] Action","EID":"dbecd","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"7f142:25eed|636bb:c1edb|1e8ea:ea68e|2fa8c:8a8d0|82456:5c73a|8a13e:badb8|67cb2:50f70|21eea:3a189|9c292:c7eb5|c200c:6d48f|0b70d:71ba5|87d3f:bed98|","ID":"75e9d","ModifyID":"74dbd","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":2,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Result] To [Requested]","EID":"dbecd","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"996a6","ModifyID":"b252f","ModifyTO":"Requested","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":3,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Disable [Subcode] Field Action","EID":"dbecd","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"606ec","ModifyID":"3abc6","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":4,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Disable [Result] Field Action","EID":"dbecd","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"ab9b7","ModifyID":"b252f","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":5,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Enable [Request Date 1] Field Action","EID":"dbecd","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"78e4a","ModifyID":"703c7","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":6,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Enable [Request Date 2] Field Action","EID":"dbecd","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"a1907","ModifyID":"975f3","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":7,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Enable [Request Date 3] Field Action","EID":"dbecd","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"25af9","ModifyID":"9308a","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":8,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Added Date] To a calculated date","EID":"dbecd","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"7412a","ModifyID":"af8f3","ModifyTO":"SD|0|DAY","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":9,"ActionType":1,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Hide [Added Date] Field or Container Action","EID":"dbecd","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"85e96","ModifyID":"af8f3","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":10,"ActionType":9,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Require [Request Date 1] Field Action","EID":"dbecd","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"7f4f8","ModifyID":"703c7","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":11,"ActionType":9,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Require [Request Date 2] Field Action","EID":"dbecd","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"44ab8","ModifyID":"975f3","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":12,"ActionType":9,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Require [Request Date 3] Field Action","EID":"dbecd","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"f3ef9","ModifyID":"9308a","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":13,"ActionType":9,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Require [Inspection Type] Field Action","EID":"dbecd","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"350cd","ModifyID":"35802","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":1,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Subcode] To [Plumbing]","EID":"dbecd","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"475ef","ModifyID":"3abc6","ModifyTO":"Plumbing","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null}],
+"Desc":"(Button) Add Plumbing","FieldCHTO":"","FieldID":"ef1da680-89ac-4ec8-bd54-05bc16ad0db4","FieldOP":-1,"ID":"dbecd","Mode":0,"RecordFilter":"","Usercode":"2"},
+{"Actcode":"B","Actions":[{"ActionOrder":0,"ActionType":7,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Create sub record in [Construction Inspections] Action","EID":"eb771","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"7f142:25eed|636bb:c1edb|1e8ea:ea68e|2fa8c:8a8d0|82456:5c73a|8a13e:badb8|67cb2:50f70|21eea:3a189|9c292:c7eb5|c200c:6d48f|0b70d:71ba5|87d3f:bed98|","ID":"4b576","ModifyID":"74dbd","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":2,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Result] To [Requested]","EID":"eb771","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"90d3c","ModifyID":"b252f","ModifyTO":"Requested","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":3,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Disable [Subcode] Field Action","EID":"eb771","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"b058b","ModifyID":"3abc6","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":4,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Disable [Result] Field Action","EID":"eb771","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"13501","ModifyID":"b252f","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":5,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Enable [Request Date 1] Field Action","EID":"eb771","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"4c7bc","ModifyID":"703c7","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":6,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Enable [Request Date 2] Field Action","EID":"eb771","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"627c5","ModifyID":"975f3","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":7,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Enable [Request Date 3] Field Action","EID":"eb771","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"16249","ModifyID":"9308a","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":8,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Added Date] To a calculated date","EID":"eb771","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"96654","ModifyID":"af8f3","ModifyTO":"SD|0|DAY","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":9,"ActionType":1,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Hide [Added Date] Field or Container Action","EID":"eb771","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"99aaa","ModifyID":"af8f3","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":10,"ActionType":9,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Require [Request Date 1] Field Action","EID":"eb771","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"ce14b","ModifyID":"703c7","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":11,"ActionType":9,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Require [Request Date 2] Field Action","EID":"eb771","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"c29a2","ModifyID":"975f3","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":12,"ActionType":9,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Require [Request Date 3] Field Action","EID":"eb771","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"cbbe0","ModifyID":"9308a","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":13,"ActionType":9,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Require [Inspection Type] Field Action","EID":"eb771","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"12c9d","ModifyID":"35802","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":1,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Subcode] To [Fire]","EID":"eb771","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"5358a","ModifyID":"3abc6","ModifyTO":"Fire","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null}],
+"Desc":"(Button) Add Fire","FieldCHTO":"","FieldID":"b0cff6e0-be3a-425a-878a-aca4aca3911c","FieldOP":-1,"ID":"eb771","Mode":0,"RecordFilter":"","Usercode":"2"},
+{"Actcode":"B","Actions":[{"ActionOrder":0,"ActionType":7,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Create sub record in [Construction Inspections] Action","EID":"c3baf","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"7f142:25eed|636bb:c1edb|1e8ea:ea68e|2fa8c:8a8d0|82456:5c73a|8a13e:badb8|67cb2:50f70|21eea:3a189|9c292:c7eb5|c200c:6d48f|0b70d:71ba5|87d3f:bed98|","ID":"f8920","ModifyID":"74dbd","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":2,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Result] To [Requested]","EID":"c3baf","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"ae588","ModifyID":"b252f","ModifyTO":"Requested","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":3,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Disable [Subcode] Field Action","EID":"c3baf","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"a7b42","ModifyID":"3abc6","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":4,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Disable [Result] Field Action","EID":"c3baf","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"90ae4","ModifyID":"b252f","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":5,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Enable [Request Date 1] Field Action","EID":"c3baf","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"1b683","ModifyID":"703c7","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":6,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Enable [Request Date 2] Field Action","EID":"c3baf","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"cafaf","ModifyID":"975f3","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":7,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Enable [Request Date 3] Field Action","EID":"c3baf","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"68f27","ModifyID":"9308a","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":8,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Added Date] To a calculated date","EID":"c3baf","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"6cf59","ModifyID":"af8f3","ModifyTO":"SD|0|DAY","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":9,"ActionType":1,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Hide [Added Date] Field or Container Action","EID":"c3baf","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"53eae","ModifyID":"af8f3","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":10,"ActionType":9,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Require [Request Date 1] Field Action","EID":"c3baf","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"3a1c5","ModifyID":"703c7","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":11,"ActionType":9,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Require [Request Date 2] Field Action","EID":"c3baf","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"a3de5","ModifyID":"975f3","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":12,"ActionType":9,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Require [Request Date 3] Field Action","EID":"c3baf","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"dc9a8","ModifyID":"9308a","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":13,"ActionType":9,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Require [Inspection Type] Field Action","EID":"c3baf","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"142dc","ModifyID":"35802","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":1,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Subcode] To [Mechanical]","EID":"c3baf","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"67d15","ModifyID":"3abc6","ModifyTO":"Mechanical","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null}],
+"Desc":"(Button) Add Mechanical","FieldCHTO":"","FieldID":"f7651195-1a2c-4bca-b7b2-5640c209e509","FieldOP":-1,"ID":"c3baf","Mode":0,"RecordFilter":"","Usercode":"2"},
+{"Actcode":"B","Actions":[{"ActionOrder":0,"ActionType":7,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Create sub record in [Construction Inspections] Action","EID":"3910a","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"7f142:25eed|636bb:c1edb|1e8ea:ea68e|2fa8c:8a8d0|82456:5c73a|8a13e:badb8|67cb2:50f70|21eea:3a189|9c292:c7eb5|c200c:6d48f|0b70d:71ba5|87d3f:bed98|","ID":"4653d","ModifyID":"74dbd","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":2,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Result] To [Requested]","EID":"3910a","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"6a82c","ModifyID":"b252f","ModifyTO":"Requested","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":3,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Disable [Subcode] Field Action","EID":"3910a","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"e26c2","ModifyID":"3abc6","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":4,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Disable [Result] Field Action","EID":"3910a","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"2a926","ModifyID":"b252f","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":5,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Enable [Request Date 1] Field Action","EID":"3910a","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"5100e","ModifyID":"703c7","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":6,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Enable [Request Date 2] Field Action","EID":"3910a","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"1c3af","ModifyID":"975f3","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":7,"ActionType":2,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Enable [Request Date 3] Field Action","EID":"3910a","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"8244b","ModifyID":"9308a","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":8,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Added Date] To a calculated date","EID":"3910a","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"ef2e8","ModifyID":"af8f3","ModifyTO":"SD|0|DAY","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":9,"ActionType":1,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Hide [Added Date] Field or Container Action","EID":"3910a","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"0543d","ModifyID":"af8f3","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":10,"ActionType":9,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Require [Request Date 1] Field Action","EID":"3910a","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"e5220","ModifyID":"703c7","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":11,"ActionType":9,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Require [Request Date 2] Field Action","EID":"3910a","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"2b8b0","ModifyID":"975f3","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":12,"ActionType":9,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Require [Request Date 3] Field Action","EID":"3910a","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"47ca8","ModifyID":"9308a","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":13,"ActionType":9,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Require [Inspection Type] Field Action","EID":"3910a","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"a3cc4","ModifyID":"35802","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":1,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Subcode] To [Elevator]","EID":"3910a","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"84668","ModifyID":"3abc6","ModifyTO":"Elevator","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null}],
+"Desc":"(Button) Add Elevator","FieldCHTO":"","FieldID":"cb3e2d21-5784-4ae4-bc99-d587cfe1fb33","FieldOP":-1,"ID":"3910a","Mode":0,"RecordFilter":"","Usercode":"2"},
+{"Actcode":"","Actions":[{"ActionOrder":0,"ActionType":3,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Pop-Up Message Action","EID":"7275a","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"This permit is not active.","ID":"198ed","ModifyID":"","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":1,"ActionType":20,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Disable multiple elements Action","EID":"7275a","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"5e89e","ModifyID":"<<(('id':'a3aa2e3b-cf2d-4902-b4b9-322a73b78e62','ecode':'B','etype':'Button','edesc':'Add Building')),(('id':'ef1da680-89ac-4ec8-bd54-05bc16ad0db4','ecode':'B','etype':'Button','edesc':'Add Plumbing')),(('id':'b625f188-a805-4817-8b39-d295df85fb18','ecode':'B','etype':'Button','edesc':'Add Electrical')),(('id':'b0cff6e0-be3a-425a-878a-aca4aca3911c','ecode':'B','etype':'Button','edesc':'Add Fire Protection')),(('id':'f7651195-1a2c-4bca-b7b2-5640c209e509','ecode':'B','etype':'Button','edesc':'Add Mechanical')),(('id':'cb3e2d21-5784-4ae4-bc99-d587cfe1fb33','ecode':'B','etype':'Button','edesc':'Add Elevator'))>>","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":"dcee8"},
+{"ActionOrder":2,"ActionType":5,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Disable [Submit ] Button Action","EID":"7275a","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"4311c","ModifyID":"d0dc91fe-55f3-4594-b75d-682a50371c81","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null}],
+"Desc":"Permit Status <> Issued","FieldCHTO":"Issued","FieldID":"ff581","FieldOP":1,"ID":"7275a","Mode":0,"RecordFilter":"","Usercode":"0"},
+{"Actcode":"","Actions":[{"ActionOrder":0,"ActionType":20,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Enable multiple elements Action","EID":"ab41e","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"1a35e","ModifyID":"<<(('id':'a3aa2e3b-cf2d-4902-b4b9-322a73b78e62','ecode':'B','etype':'Button','edesc':'Add Building')),(('id':'ef1da680-89ac-4ec8-bd54-05bc16ad0db4','ecode':'B','etype':'Button','edesc':'Add Plumbing')),(('id':'b625f188-a805-4817-8b39-d295df85fb18','ecode':'B','etype':'Button','edesc':'Add Electrical')),(('id':'b0cff6e0-be3a-425a-878a-aca4aca3911c','ecode':'B','etype':'Button','edesc':'Add Fire Protection')),(('id':'f7651195-1a2c-4bca-b7b2-5640c209e509','ecode':'B','etype':'Button','edesc':'Add Mechanical')),(('id':'cb3e2d21-5784-4ae4-bc99-d587cfe1fb33','ecode':'B','etype':'Button','edesc':'Add Elevator'))>>","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":"dcee8"},
+{"ActionOrder":1,"ActionType":5,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Enable [Submit ] Button Action","EID":"ab41e","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"ae68b","ModifyID":"d0dc91fe-55f3-4594-b75d-682a50371c81","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null}],
+"Desc":"Permit Status = Issued","FieldCHTO":"Issued","FieldID":"ff581","FieldOP":0,"ID":"ab41e","Mode":0,"RecordFilter":"","Usercode":"0"}],
+"Name":"","Type":1};
+RS['71ba5']={type:'T',cid:'RESP_1772_71ba5_0'};
+RS['078a4']={type:'D',cid:'RESP_fa83_078a4_0'};
+RS['8a8d0']={type:'SN',cid:'RESP_bee6_8a8d0_0'};
+
+ getData();
+ InitESN();});
+</script>
+</body>
+</html>

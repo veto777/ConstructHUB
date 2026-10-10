@@ -50,6 +50,12 @@ export interface PermitDirectoryCounts {
   withPortal: number;
   verifiedPortals: number;
   searchable: number;
+  /** Searchable portals that are county jurisdictions (the honest "(270 counties)" in the Search headline). */
+  searchableCounty: number;
+  /** Searchable portals that are city jurisdictions. */
+  searchableCity: number;
+  /** Distinct states with at least one searchable portal (the honest "in 50 states"). */
+  searchableStates: number;
   /** Towns with no portal of their own whose county issues their permits (linked to the county's portal). */
   viaCounty: number;
 }
@@ -310,10 +316,25 @@ export class DatabaseStorage implements IStorage {
         platform: permitDatabases.platform,
         searchUrl: permitDatabases.searchUrl,
         portalUrl: permitDatabases.portalUrl,
+        jurisdiction: permitDatabases.jurisdiction,
+        jurisdictionType: permitDatabases.jurisdictionType,
+        stateCode: counties.stateCode,
       })
       .from(permitDatabases)
-      .where(and(eq(permitDatabases.isActive, true), isNotNull(permitDatabases.platform), sql`${link} is not null`));
-    const searchable = candidates.filter(row => governmentLinksAvailable(row) && canScrapeGovernmentPortal(row)).length;
+      .leftJoin(counties, eq(counties.id, permitDatabases.countyId))
+      // No platform pre-filter: a jurisdiction-adapter portal can be searchable with a null platform,
+      // so the shared predicate must see those rows too — otherwise the headline count would fall
+      // short of /api/permits/map and the ?searchable=true list. isActive + a link are required by the
+      // predicate anyway, so they stay as safe pre-filters.
+      .where(and(eq(permitDatabases.isActive, true), sql`${link} is not null`));
+    // Reuse the exact searchable predicate so the Search headline and the /api/permits/map agree.
+    const searchableRows = candidates.filter(row => governmentLinksAvailable(row) && canScrapeGovernmentPortal(row));
+    const searchable = searchableRows.length;
+    const searchableCounty = searchableRows.filter(r => r.jurisdictionType === "county").length;
+    const searchableCity = searchableRows.filter(r => r.jurisdictionType === "city").length;
+    // The 50 states only — DC and territories are not "states" in the headline.
+    const NON_STATES = new Set(["DC", "PR", "GU", "VI", "AS", "MP"]);
+    const searchableStates = new Set(searchableRows.map(r => r.stateCode).filter((c): c is string => !!c && !NON_STATES.has(c))).size;
 
     const via = await db.execute(sql`select count(*)::int as n from ${permitDatabases} t
       join ${permitDatabases} c on c.jurisdiction = t.issued_by and c.jurisdiction_type = 'county'
@@ -321,7 +342,7 @@ export class DatabaseStorage implements IStorage {
         and c.is_active and c.link_status in ('live', 'verified', 'unconfirmed')
         and coalesce(nullif(c.portal_url, ''), nullif(c.search_url, '')) is not null`);
     const viaCounty = Number((via.rows[0] as any)?.n ?? 0);
-    return { total, county, city, withPortal, verifiedPortals, searchable, viaCounty };
+    return { total, county, city, withPortal, verifiedPortals, searchable, searchableCounty, searchableCity, searchableStates, viaCounty };
   }
 
   async createDatabase(data: InsertPermitDatabase): Promise<PermitDatabase> {

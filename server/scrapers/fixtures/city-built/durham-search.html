@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+   <meta charset="utf-8" />
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+   <title>Application Search</title>
+   <meta name="description" content="Land Development Office (LDO) City and County of Durham, North Carolina">
+   <meta name="author" content="Avenu Insights &amp; Analytics">
+
+   
+   <!-- Favicon -->
+   <link rel="shortcut icon" href="/DurhamWeb/assets/images/favicon.ico">
+
+   <!-- Switchery CSS -->
+   <link href="/DurhamWeb/assets/plugins/switchery/switchery.min.css" rel="stylesheet" />
+
+   <!-- Bootstrap CSS -->
+   <link href="/DurhamWeb/assets/css/bootstrap.min.css" rel="stylesheet" type="text/css" />
+
+   <!-- Font Awesome CSS -->
+   <link href="/DurhamWeb/assets/font-awesome/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+
+   <!-- Custom CSS -->
+   <link href="/DurhamWeb/assets/css/style.css" rel="stylesheet" type="text/css" />
+
+   <!-- BEGIN CSS for this page -->
+   <style>
+      .parsley-error {
+         border-color: #ff5d48 !important;
+      }
+
+      .parsley-errors-list.filled {
+         display: block;
+      }
+
+      .parsley-errors-list {
+         display: none;
+         margin: 0;
+         padding: 0;
+      }
+
+         .parsley-errors-list > li {
+            font-size: 12px;
+            list-style: none;
+            color: #ff5d48;
+            margin-top: 5px;
+         }
+
+      .form-section {
+         padding-left: 15px;
+         border-left: 2px solid #FF851B;
+         display: none;
+      }
+
+         .form-section.current {
+            display: inherit;
+         }
+   </style>
+   <!-- END CSS for this page -->
+   <!-- Date Picker CSS -->
+   <link href="/DurhamWeb/assets/plugins/datetimepicker/css/daterangepicker.css" rel="stylesheet" />
+</head>
+<body class="adminbody">
+   <div id="main">
+      <!-- top bar navigation -->
+      <div class="headerbar">
+         <!-- LOGO -->
+         <div class="headerbar-left">
+            <a target="_blank" href="https://durhamnc.gov/" class="logo"><img alt="logo" src="/DurhamWeb/assets/images/city_of_durham_logo2.jpg" /> </a>
+         </div>
+         <nav class="navbar-custom">
+            <ul class="list-inline menu-left mb-0">
+               <li class="float-left">
+                  <button class="button-menu-mobile open-left">
+                     <i class="fa fa-fw fa-bars"></i>
+                  </button>
+               </li>
+               <li class="list-inline-item dropdown notif float-right pt-3">
+               </li>
+            </ul>
+         </nav>
+      </div>
+      <!-- End Navigation -->
+      <!-- Left Sidebar -->
+      <div class="left main-sidebar">
+         <div class="sidebar-inner leftscroll">
+            <div id="sidebar-menu">
+               <ul>
+                  <li class="submenu">
+                     <a href="#" id="BaseMenuHome"><i class="fa fa-fw fa-home"></i> <span> Home </span> <span class="menu-arrow"></span></a>
+                     <ul class="list-unstyled">
+                        <li id="SubMenuHome"><a href="/DurhamWeb/">City of Durham LDO</a></li>
+                     </ul>
+                  </li>
+
+                  <li class="submenu">
+                     <a href="#" id="BaseMenuAccount"><i class="fa fa-fw fa-user"></i> <span> Account </span> <span class="menu-arrow"></span></a>
+                     <ul class="list-unstyled">
+                           <li id="SubMenuLogin"><a href="/DurhamWeb/Account/LoginIndex">Login</a></li>
+                           <li id="SubMenuRegister"><a href="/DurhamWeb/Account/RegistrationIndex">Register</a></li>
+                           <li id="SubMenuForgotPassword"><a href="/DurhamWeb/Account/ForgotPassword">Forgot Password</a></li>
+                     </ul>
+                  </li>
+
+                  <li class="submenu">
+                     <a href="#" id="BaseMenuSearch"><i class="fa fa-fw fa-search"></i> <span> Search <span class="col pl-1 pr-sm-0" style="width: 440px; text-align: left; font-size:smaller; font-style:italic; font-weight:400;">(Login not required)</span></span> <span class="menu-arrow"></span></a>
+                     <ul class="list-unstyled">
+                        <li id="SubMenuApplicationSearch"><a href="/DurhamWeb/Search/ApplicationSearch">Application/Permit (Print Permit)</a></li>
+                        <li id="SubMenuRelatedPermitSearch"><a href="/DurhamWeb/Search/RelatedPermitSearch">Permit/Related Permit Summary</a></li>
+                        <li id="SubMenuParcelSearch"><a href="/DurhamWeb/Search/ParcelSearch">Parcel by Parcel ID, PIN, Address or Owner Name</a></li>
+                        <li id="SubMenuInspectionSearch"><a href="/DurhamWeb/Search/InspectionSearch">Inspection</a></li>
+
+                     </ul>
+                  </li>
+
+
+
+
+
+               </ul>
+            <div class="clearfix"></div>
+         </div>
+         <div class="clearfix"></div>
+      </div>
+      </div>
+      <!-- End Sidebar -->
+
+      <div class="content-page">
+         <!-- Start content -->
+         <div class="content">
+            <div class="container-fluid">
+               
+
+               
+
+
+<h3 class="ml-1 pt-2">Application/Permit Search</h3>
+
+<form action="/DurhamWeb/Search/ApplicationSearch" method="post"><input name="__RequestVerificationToken" type="hidden" value="TC6u0gzmvbTvVaIosJpOGc8oHj386tbzkqKMtLLACv0N9vovZBlqm5eKGmdK1uCj5-p1J1EnJwvnylWNs7QooktJnIPQGHD0UqBfyam_lx81" />   <div class="row ml-1 pl-0">
+      <div class="col-sm pl-0">
+         <p class="text-left mb-0">
+            You can search for an application/permit by Permit Number, Project Name, or Address.
+         </p>
+         <p class="text-left">
+            You may leave information empty if it is unknown when searching (i.e. you can enter only Street Name and Street Number when searching by Address).
+         </p>
+      </div>
+   </div>
+   <div class="row mt-2 ml-1 pl-0" style="width: 960px;">
+      <div class="col-2 pl-0">Search By:</div>
+      <div class="col-2">
+         <select class="form-control form-control-sm" style="width: 200px;" id="applicationQueryType" name="ApplicationQueryType">
+            <option value="permit" selected>Permit Number</option>
+            <option value="project">Project Name</option>
+            <option value="address">Address</option>
+         </select>
+      </div>
+   </div>
+   <!-- Spacer. -->
+   <div class="row mt-1">
+      <div class="col"></div>
+   </div>
+   <!-- Permit number search field. -->
+   <div class="row" id="permitQueryFields">
+      <div class="col">
+         <div class="row ml-1 pl-0" style="width: 960px;">
+            <div class="col-2 pl-0">Application/Permit No.:</div>
+            <div class="col-2">
+               <input class="form-control form-control-sm" style="width: 200px;" id="PermitNumber" name="PermitNumber" placeholder="Enter permit #" type="text" maxlength="30" />
+            </div>
+         </div>
+      </div>
+   </div>
+   <!-- Project search fields. -->
+   <div class="row" id="projectQueryFields">
+      <div class="col">
+         <div class="row ml-1 pl-0" style="width: 960px;">
+            <div class="col-2 pl-0">Project Name:</div>
+            <div class="col-2">
+               <input class="form-control form-control-sm" style="width: 200px;" id="ProjectName" name="ProjectName" placeholder="Enter project name" type="text" maxlength="150" />
+            </div>
+         </div>
+      </div>
+   </div>
+   <!-- Address search fields. -->
+   <div class="row" id="addressQueryFields">
+      <div class="col">
+         <div class="row ml-1 pl-0" style="width: 960px;">
+            <div class="col-2 pl-0">Street Number:</div>
+            <div class="col-2">
+               <input class="form-control form-control-sm" style="width: 200px;" id="AddressStreetNumber" name="AddressStreetNumber" placeholder="Enter street number" type="text" maxlength="20" />
+            </div>
+         </div>
+
+         <div class="row ml-1 pl-0" style="width: 960px;">
+            <div class="col-2 pl-0">Street Name:</div>
+            <div class="col-2">
+               <input class="form-control form-control-sm" style="width: 200px;" id="AddressStreetName" name="AddressStreetName" placeholder="Enter street name" type="text" maxlength="255" />
+            </div>
+         </div>
+
+         <div class="row ml-1 pl-0" style="width: 960px;">
+            <div class="col-2 pl-0">Unit Number:</div>
+            <div class="col-2">
+               <input class="form-control form-control-sm" style="width: 200px;" id="AddressUnitNumber" name="AddressUnitNumber" placeholder="Enter unit number" type="text" maxlength="10" />
+            </div>
+         </div>
+      </div>
+   </div>
+   <div class="row mt-2 ml-1 pl-0">
+      <div class="col-2 pl-0"><button class="btn btn-primary" id="btnClear">Clear</button></div>
+      <div class="col-2 pr-0 mr-0"><button id="searchButton" class="btn btn-primary float-sm-right" type="submit">Search</button></div>
+   </div>
+</form>
+
+
+               
+                  
+
+
+            </div>
+            <!-- END container-fluid -->
+         </div>
+         <!-- END content -->
+      </div>
+      <!-- END content-page -->
+
+      <footer class="footer">
+         <span class="float-right">Copyright <a target="_blank" href="https://www.avenuinsights.com/">Avenu Insights &amp; Analytics</a></span>
+      </footer>
+   </div>
+   <!-- END main -->
+
+   <script src="/DurhamWeb/assets/js/modernizr.min.js"></script>
+   <script src="/DurhamWeb/assets/js/jquery.min.js"></script>
+   <script src="/DurhamWeb/assets/js/moment.min.js"></script>
+
+   <script src="/DurhamWeb/assets/js/popper.min.js"></script>
+   <script src="/DurhamWeb/assets/js/bootstrap.min.js"></script>
+
+   <script src="/DurhamWeb/assets/js/detect.js"></script>
+   <script src="/DurhamWeb/assets/js/fastclick.js"></script>
+   <script src="/DurhamWeb/assets/js/jquery.blockUI.js"></script>
+   <script src="/DurhamWeb/assets/js/jquery.nicescroll.js"></script>
+   <script src="/DurhamWeb/assets/js/jquery.scrollTo.min.js"></script>
+   <script src="/DurhamWeb/assets/plugins/switchery/switchery.min.js"></script>
+
+   <!-- App js -->
+   <script src="/DurhamWeb/assets/js/pikeadmin.js"></script>
+
+   <!-- BEGIN JavaScript for this page -->
+   <script src="/DurhamWeb/assets/plugins/parsleyjs/parsley.min.js"></script>
+   <script>
+      $('#form').parsley();
+   </script>
+
+   
+   <script>
+      $(document).ready(function () {
+         $("#BaseMenuSearch").addClass("active");
+         $("#SubMenuApplicationSearch").addClass("active");
+         $("#BaseMenuSearch").click();
+      });
+   </script>
+
+
+   
+   <script>
+      $(document).ready(function () {
+         $("#permitQueryFields").hide();
+         $("#projectQueryFields").hide();
+         $("#addressQueryFields").hide();
+         $("#permitQueryFields").show();
+
+         $("#applicationQueryType").change(function () {
+            $(this).find("option:selected").each(function () {
+               var optionValue = $(this).attr("value");
+
+               $("#permitQueryFields").hide();
+               $("#projectQueryFields").hide();
+               $("#addressQueryFields").hide();
+
+               if (optionValue == "permit") {
+                  $("#permitQueryFields").show();
+               }
+
+               if (optionValue == "project") {
+                  $("#projectQueryFields").show();
+               }
+
+               if (optionValue == "address") {
+                  $("#addressQueryFields").show();
+               }
+
+            });
+         });
+      });
+
+      $("#btnClear").click(function () {
+
+         $("#PermitNumber").val("");
+         $("#ProjectName").val("");
+         $("#AddressStreetNumber").val("");
+         $("#AddressStreetName").val("");
+         $("#AddressUnitNumber").val("");
+
+         return false;
+      });
+
+   </script>
+
+   <!-- END JavaScript for this page -->
+</body>
+</html>

@@ -1,0 +1,508 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+    <head id="Head1"><title>
+	
+    
+    Permit Application Search
+
+ - CityView Portal
+</title><meta http-equiv="Content-Style-Type" content="text/css" /><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /><meta http-equiv="X-UA-Compatible" content="IE=Edge" /><meta name="APIs-Google" content="noindex, nofollow, noarchive, nositelinkssearchbox, noimageindex" /><meta name="AdsBot-Google" content="noindex, nofollow, noarchive, nositelinkssearchbox, noimageindex" /><meta name="AdsBot-Google-Mobile" content="noindex, nofollow, noarchive, nositelinkssearchbox, noimageindex" /><meta name="color-scheme" content="light only" /><meta name="Mediapartners-Google" content="noindex, nofollow, noarchive, nositelinkssearchbox, noimageindex" /><meta name="robots" content="nofollow, noarchive, noimageindex" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+        <link rel="shortcut icon" href="/Portal/favicon.ico" />
+        <link rel="apple-touch-icon" href="/Portal/Content/apple-touch-icon.png" />
+
+        <script src="//ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+<script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.13.2/jquery-ui.min.js"></script>
+<script src="/Portal/Scripts/portal?v=2aAF3O4Hax53SjRny5C-rydwrd-ndowmi-OrAx2tDd81"></script>
+<link href="//ajax.googleapis.com/ajax/libs/jqueryui/1.13.2/themes/smoothness/jquery-ui.min.css" rel="stylesheet"/>
+<link href="/Portal/Content/portalcss?v=oqRbKiV3uBKkaBjHlEEDpTVnNy-BNQ-hXgxLSSosjJQ1" rel="stylesheet"/>
+
+            <script type="text/javascript">
+                var dojoConfig = {
+                    parseOnLoad: true,
+                    async: true,
+                    packages: [{
+                        name: "app",
+                        location: "/Portal/Scripts/",
+                    }],
+                };
+                var cityviewmap = null;
+            </script>
+            <link type="text/css" rel="stylesheet" href="//js.arcgis.com/3.45/esri/dijit/css/Gallery.css" media="none" onload="this.media=&#39;all&#39;" />
+            <link type="text/css" rel="stylesheet" href="//js.arcgis.com/3.45/esri/css/esri.css" media="none" onload="this.media=&#39;all&#39;" />
+            <script type="text/javascript" src="//js.arcgis.com/3.45/"></script>
+            <script src="/Portal/Scripts/portalmap?v=UoGZlcNZm72Ebbdhm_Eq4cfYmT8grEKu8ZqDdqU-URw1"></script>
+
+            <script type="text/javascript">
+                dataservice.initialize('/Portal/Property', '/Portal/Cemetery');
+            </script>
+        
+
+        <script type="text/javascript">
+            $(document).ready(function () {
+                
+
+                $("body").addClass("cv-customonsiteprod-status");
+                $("body").append('<div id="loadingPopup" class="cvpopup" style="display: none;" role="complementary"><p id="loadingPopupTitle" class="tabTitle">Please Wait</p><div id="loadingPopupText" class="cvpopup-contents"><span>This may take a few minutes.</span><div class="cv-loading-spinner"><div></div><div></div><div></div><div></div></div></div></div>');
+                setTimeout(function () { FocusOnCVElement(); }, 25);
+            });
+        </script>
+        
+    
+    
+    <meta name="description" content="Search for building permits." />
+    
+        <script type="text/javascript">
+            $(document).ready(function () {
+                $("#searchValue").autocomplete({
+                    source: function (request, response) {
+                        AutoCompleteRequest(request, response, '/Portal/Permit/PermitSearch', false, $('#category').val(), $('#appealPeriodStatusesOnly').val());
+                        },
+                        select: function (event, ui) {
+                            if (ui.item.value.indexOf("[There are no matches]") >= 0) {
+                                $("#searchValue").val("");
+                            } else {
+                                $("#pageNumber").val("0");
+                                $("#searchValue").val($('<div/>').html(ui.item.value.replace(/<pre>/g, "")).text());
+                                runLocatorSearch(locatorUrl, getSearchParams());
+                            }
+                            return false;
+                        },
+                        focus: function (event, ui) {
+                            if (ui.item.value.indexOf("[There are no matches]") >= 0) {
+                                $("#searchValue").val("");
+                            } else {
+                                $("#searchValue").val($('<div/>').html(ui.item.value.replace(/<pre>/g, "")).text());
+                            }
+                            return false;
+                        },
+                        delay: '1500',
+                    });
+                });
+        </script>
+    
+
+    <script type="text/javascript">
+        const locatorUrl = '/Portal/Permit/LocatorResults';
+
+        $(document).ready(function () {
+            $("#bsearch").click(function () {
+                $("#pageNumber").val("0");
+                runLocatorSearch(locatorUrl, getSearchParams());
+            });
+            $("#permitLocatorForm").on("keypress", function (event) {
+                if ((event.keyCode ? event.keyCode : event.which) == 13) {
+                    $(event.target).trigger("click");
+                    event.preventDefault();
+                    $("#pageNumber").val("0");
+                    runLocatorSearch(locatorUrl, getSearchParams());
+                }
+            });
+        });
+
+        function getSearchParams() {
+            return {
+                searchValue: $("#searchValue").val(),
+                jurisdictionFilter: $("#jurisdictionFilter").val(),
+                category: $("#category").val(),
+                appealPeriodStatusesOnly: $("#appealPeriodStatusesOnly").val(),
+                isInspectionSearch: $("#isInspectionSearch").val(),
+                pageNumber: $("#pageNumber").val(),
+            };
+        }
+
+        
+    </script>
+
+
+    <link href="/Portal/Content/Monroe/bootstrap.min.css?cdv=44" type="text/css" rel="stylesheet" />
+    <link href="/Portal/Content/Monroe/style.css?cdv=44" type="text/css" rel="stylesheet" />
+
+    <link href="/Portal/Content/customcv.css" rel="stylesheet" type="text/css" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+</head>
+
+    
+    <body id="Body">
+        
+
+<header class="header-wrap">
+    <div class="container">
+        <a href="https://www.monroenc.org" class="logo">
+            <img src="/Portal/Content/Monroe/logo.png" alt="Monroe" class="logo-normal" />
+            <img src="/Portal/Content/Monroe/logo-sticky.png" alt="Monroe" class="logo-sticky" />
+        </a>
+        <div class="header-right"></div>
+    </div>
+</header>
+
+        <section class="childPage-content-section">
+            <div class="container">
+                <h1 class="childPage-title">
+                    <span class="title-text" id="PageHeader"><span itemprop="name">CityView Portal</span></span>
+                </h1>
+                <div class="childPage-content-wrap">
+                    <div class="childPage-content-col content-col-noSidebar">
+                        <div class="childPage-content contentItem">
+                            <div class="breadcrumb">
+                                <span itemprop="breadcrumb" itemscope="" itemtype="https://schema.org/breadcrumb">
+                                    <span itemscope itemtype="http://schema.org/BreadcrumbList">
+                                        <span itemprop="itemListElement" itemscope itemtype="http://schema.org/ListItem">
+                                            <a href="https://www.monroenc.org/" class="breadcrumbLink" itemprop="item"><span itemprop="name">Home</span></a>
+                                            <meta itemprop="position" content="1" />
+                                        </span>
+                                        > 
+                                        <span itemprop="itemListElement" itemscope itemtype="http://schema.org/ListItem">
+                                            <a href="#" class="breadcrumbLink" itemprop="item"><span itemprop="name">CityView Portal</span></a>
+                                            <meta itemprop="position" content="3" />
+                                        </span>
+                                    </span>
+                                </span>
+                            </div>
+                            <div>
+                                <div>
+                                    <div class="SpacingBottom">
+                                        <div>
+                                            <div>
+                                                <div id="masterContent">
+                                                    <div id="contentPanel">
+                                                        
+
+<nav class="controlBar" data-cy="navControlBar" aria-label="CityView navigation links"> 
+    
+
+    <div class="cv-clear cv-noprint">
+        <ul class="cv-links-inlinelist">
+             
+                    <li>
+                        <span class="basicText"><a data-cy="lnkLogon" href="/Portal/Account/Logon">Sign In</a></span>&nbsp;/&nbsp;<span class="basicText"><a data-cy="lnkRegister" href="/Portal/Account/Register">Register</a></span>
+                    </li>
+                
+                <li><span class="basicText"><a data-cy="lnkMyShoppingCart" href="/Portal/Payment/MyShoppingCart" id="cv-myShoppingCart">My Shopping Cart (0)</a></span></li>   
+            
+
+            <li><span class="basicText"><a data-cy="lnkPortalHome" href="/Portal/">Portal Home</a></span></li>
+   
+            
+                <li><span class="basicText"><a data-cy="lnkPortalHelp" href="portal" target="_blank">Portal Help</a></span></li>
+            
+        </ul>
+    </div>
+</nav>    
+<div class="cv-clear"></div>
+
+                                                        <noscript>
+                                                            It seems JavaScript is either disabled or not supported by your browser.<br />
+                                                            JavaScript must be enabled in order for you to use CityView Portal.<br />
+                                                            Please enable JavaScript by changing your browser options and then <a href="/Portal/">try again</a>!
+                                                        </noscript>
+                                                        
+        
+    
+    <form action="/Portal/Permit/Locator" enctype="multipart/form-data" id="permitLocatorForm" method="post"><input name="__RequestVerificationToken" type="hidden" value="2R61cckFfD-mmS6hA2aioj9m5K41RwGi6uMOBUz7LSJ1UTJ4IO9zZVWS-vZ1MbHTV_EdZh6TycYgDkHlTOXHZBMtDOjSZmnouldMmz6mZBQ1" />
+        <h2 class="tabTitle">Permit Search</h2>
+        <br />
+
+        <div class="cv-clear"></div>
+        <fieldset>
+            <legend class="collapsible" aria-expanded="true" tabindex="0">
+                <h3><span class="cv-icon-chevron-down collapsibleTitle"></span>Search for Permits</h3>
+            </legend>
+
+            <div id="blksearchValue" class="cv-input-container cv-clear hasInlineHelp inputField" >
+   <div id="inlineHelp-searchValue" class="cv-inline-help">Begin typing an application number, address, Parcel number or  name/address of a contact on the permit and we will search existing permits.  If the item you are searching for appears, please select it from the list.</div><div class="cv-input-wrapper">
+<div class='cv-input-search'>
+<input aria-describedby="inlineHelp-searchValue" autocomplete="off" class="cv-search" data-cy="inp-searchValue" id="searchValue" name="searchValue" type="text" value="" />
+<input type='button' value='Go!' name='bsearch' id='bsearch'/>
+</div>
+
+</div>
+
+   <label class="cv-input-label" id="l_searchValue" for="searchValue">
+Search:<span id="r_searchValue" class="required" style="float:none;margin:0;visibility: hidden;">*</span></label>
+</div>    
+
+
+
+            
+                <div class="cv-clear">
+                    <div id="GpsLocation" class="cv-button-container">
+                        <div class="cv-single-btn-container">
+                            <input data-cy="btnbGpsLocation" type="button" value="Find Active Permits Near Me" id="bGpsLocation" onclick="gpsFindApplicationsNearMe();" class="cv-additionalsingle-btn" />
+                        </div>
+                    </div>
+                </div>
+            
+
+<input id="category" name="category" type="hidden" value="" />
+            <input id="pageNumber" name="pageNumber" type="hidden" value="0" />
+            <input id="appealPeriodStatusesOnly" name="appealPeriodStatusesOnly" type="hidden" value="False" />
+            <input id="isInspectionSearch" name="isInspectionSearch" type="hidden" value="False" />
+        </fieldset>
+
+        
+            <fieldset>
+                <legend id="locatorMapCollapsibleTitle" class="collapsible collapsedByDefault" aria-expanded="true" tabindex="0">
+                    <h3><span class="cv-icon-chevron-down collapsibleTitle"></span>Map</h3>
+                </legend>
+                
+
+
+    <script type="text/javascript">
+        var initParams;
+        var mapConfig;
+        var queryMapConfig;
+        var queryInitParams;
+        function initCityViewMap(showNearMe) {
+            var selectableLayer = "Parcels";
+            initParams = {
+                mapContainer: 'mapDiv',
+                legendContainer: 'legendContainer',
+                legendDiv: 'legendDiv',
+                legendToggleId: 'legendToggleSign',
+                legendVisibility: "OpenByDefault",
+                proxy: '/Portal/proxy.ashx',
+                imagePath: '/Portal/Content',
+                testLatitude: '',
+                testLongitude: '',
+                canSelect: true,
+                offset: 75,
+                onselect: function (data) {
+                    if (data && data.description) {
+                        $("#pageNumber").val("0");
+                        $("#searchValue").val(data.description);
+                        runLocatorSearch(locatorUrl, getSearchParams());
+                    } else if (selectableLayer && data && data.layerName && data.layerName.toLowerCase() === selectableLayer.toLowerCase()) {
+                        setJurisdiction(data.attributeValue);
+                    }
+                },
+                showNearMe: showNearMe,
+                runMapAreaSearch: runMapAreaSearch,
+                
+                canSearchByMapArea: false,
+                
+            };
+            mapConfig = cvMapConfig('{"CanSelect":true,"HasSecuredServices":true,"IsMultiSelect":false,"IsParcelSelect":true,"LegendVisibility":"OpenByDefault","LocationMarkers":[],"MapRelatedField":"ParcelNo","ParcelLayerField":"PIN","ParcelLayerName":"Parcels","ParcelLayerService":"https:\/\/geoview.monroenc.org\/arcgis\/rest\/services\/City_View_Public\/MapServer\/4","PortalMapName":"PublicPortalMap","QuoteMapRelatedField":true,"SelectableLayers":[{"CanSelect":true,"FieldName":"MapRelatedField","LayerAttributeAlias":"PIN","LayerAttributeName":"PIN","LayerId":-1,"LayerName":"Parcels","RequiresQuote":true,"TableFilter":"PRO","TableName":"GNLocationView"},{"CanSelect":true,"FieldName":"ParcelNo","LayerAttributeAlias":"PIN","LayerAttributeName":"PIN","LayerId":-1,"LayerName":"Parcels","RequiresQuote":true,"TableFilter":null,"TableName":"AssessView"}],"Services":[{"FeatureLayerMode":"OnDemand","SelectableLayers":["Parcels"],"ServiceType":"ArcGISDynamic","Url":"https:\/\/geoview.monroenc.org\/arcgis\/rest\/services\/City_View_Public\/MapServer"},{"FeatureLayerMode":"OnDemand","SelectableLayers":null,"ServiceType":"Geometry","Url":"https:\/\/geoview.monroenc.org\/arcgis\/rest\/services\/Utilities\/Geometry\/GeometryServer"}],"SpatalReferenceWKID":102719,"XMax":1547376.1027558164,"XMin":1528168.2401031156,"YMax":456481.04943179555,"YMin":447916.6303267607}');
+            queryMapConfig = jQuery.parseJSON('{"CanSelect":true,"HasSecuredServices":true,"IsMultiSelect":false,"IsParcelSelect":true,"LegendVisibility":"OpenByDefault","LocationMarkers":[],"MapRelatedField":"ParcelNo","ParcelLayerField":"PIN","ParcelLayerName":"Parcels","ParcelLayerService":"https:\/\/geoview.monroenc.org\/arcgis\/rest\/services\/City_View_Public\/MapServer\/4","PortalMapName":"PublicPortalMap","QuoteMapRelatedField":true,"SelectableLayers":[{"CanSelect":true,"FieldName":"MapRelatedField","LayerAttributeAlias":"PIN","LayerAttributeName":"PIN","LayerId":-1,"LayerName":"Parcels","RequiresQuote":true,"TableFilter":"PRO","TableName":"GNLocationView"},{"CanSelect":true,"FieldName":"ParcelNo","LayerAttributeAlias":"PIN","LayerAttributeName":"PIN","LayerId":-1,"LayerName":"Parcels","RequiresQuote":true,"TableFilter":null,"TableName":"AssessView"}],"Services":[{"FeatureLayerMode":"OnDemand","SelectableLayers":["Parcels"],"ServiceType":"ArcGISDynamic","Url":"https:\/\/geoview.monroenc.org\/arcgis\/rest\/services\/City_View_Public\/MapServer"},{"FeatureLayerMode":"OnDemand","SelectableLayers":null,"ServiceType":"Geometry","Url":"https:\/\/geoview.monroenc.org\/arcgis\/rest\/services\/Utilities\/Geometry\/GeometryServer"}],"SpatalReferenceWKID":102719,"XMax":1547376.1027558164,"XMin":1528168.2401031156,"YMax":456481.04943179555,"YMin":447916.6303267607}'.replace(/&quot;/g, '"'));
+            queryInitParams = {
+                proxy: '/Portal/proxy.ashx',
+                getLocationDescriptionsUrl: '/Portal/Permit/FindPermitsNearMe',
+                displayApplicationSearchResultsUrl: '/Portal/Permit/DisplayPermitsNearMe',
+                searchInputId: 'LocationSearch',
+                showResults: showLocatorResults,
+                latitude: '',
+                longitude: ''
+            };
+            cityviewmap = cvmap(initParams, mapConfig);
+            spatialQueryMap.configure(queryMapConfig, queryInitParams, true, '');
+        }
+
+        
+            $(document).ready(function () {
+                initCityViewMap(false);
+            });
+        
+        
+        function setJurisdiction(jurisdiction) {
+            $("#jurisdictionFilter").val($("#jurisdictionFilter option:first").val());
+            $('#jurisdictionFilter option[data-map="' + jurisdiction + '"]').prop('selected', true);
+            $("#searchValue").val("");
+            runLocatorSearch(locatorUrl, getSearchParams());
+        }
+
+        function runAutomaticSpatialSearch() {
+            runMapAreaSearch(cityviewmap.getExtentPoints(), cityviewmap.getSpatialReference().wkid);
+        }
+
+        function runMapAreaSearch(points, wkid) {
+            isMapAreaSearch = true;  // defined in locator pages
+            const data = {
+                Category: '',
+                WKID: wkid,
+                Points: points,
+                AppealPeriodStatusesOnly: false,
+                IsExciseTaxSearch: false,
+                IsRenewalsSearch: false,
+                IsSubmittalsSearch: false,
+                IsPumpingInformationSearch: false,
+                IsAppealPeriodCommentsSearch: false,
+                NewIntermentSearch: false,
+            };
+            $.ajax({
+                type: "POST",
+                url: '/Portal/Permit/LocatorResultsPolygon',
+                dataType: "json",
+                data: data,
+            }).done(function (spatialQueryResult) {
+                if (spatialQueryResult) {
+                    cityviewmap.showSearchResults(spatialQueryResult.LocationMarkers, true, false, true);
+                    $("#locatorSearchResults").html(spatialQueryResult.View);
+                }
+            });
+        }
+
+        function showMapAreaSearchResultsPage(pageNumber) {
+            var data = {
+                pageNumber: pageNumber
+            };
+            $.ajax({
+                type: "GET",
+                url: '/Portal/Permit/LocatorResultsPolygonPage',
+                data: data,
+            }).done(function (spatialQueryResult) {
+                if (spatialQueryResult) {
+                    $("#locatorSearchResults").html(spatialQueryResult.View);
+                }
+            });
+        }
+
+    </script>
+
+
+<div class="cv-searchresults-mapcontainer">
+    
+
+    <div class="cv-clear">
+        
+    </div>
+    <div class="cv-map-container">
+        <div id="mapDiv" class="cv-searchresults-map" />
+        <div id="legendContainer" class="cv-map-legend" onclick="toggleLegend();" style="display: none">
+            <span id="legendToggleSign">Legend&nbsp;&#45;</span>
+            <div id="legendDiv" class="cv-map-legend-div" tabindex="0"></div>
+        </div>
+        <div id="drawContainer" class="cv-map-drawcontainer" style="display:none">
+            <button id="drawRectangle" class="cv-map-drawrectangle" type="button" title="Draw Rectangle"></button>
+            <button id="drawPolygon" class="cv-map-drawpolygon" type="button" title="Draw Polygon"></button>
+        </div>
+    </div>
+</div>
+            </fieldset>
+        
+
+
+        <div id="locatorSearchResults">
+            
+
+
+        </div>
+    </form>
+    <script type="text/javascript"> 
+  $(document).ready(function () { 
+      $('legend.alwaysCollapsedByDefault').find('span.collapsibleTitle').removeClass('cv-icon-chevron-down'); 
+      $('legend.alwaysCollapsedByDefault').find('span.collapsibleTitle').addClass('cv-icon-chevron-right'); 
+      $('legend.alwaysCollapsedByDefault').attr('aria-expanded', false); 
+      $('legend.alwaysCollapsedByDefault').nextAll().each(function () { 
+          if ($(this).is('.collapsible')) { 
+              return false; 
+          } else { 
+              $(this).hide(); 
+          } 
+      }); 
+      $('legend.alwaysCollapsedByDefault').parent().nextAll().each(function () { 
+          if ($(this).is('fieldset')) { 
+              return false; 
+           } else { 
+              $(this).hide(); 
+          } 
+      }); 
+
+      $('#contentPanel').on('click keydown', '.collapsible', function (e) { 
+          if(e.type === 'keydown') { 
+			if(e.which !== 13 && e.which !== 32) { 
+				return; 
+			} else if (e.which === 32) { 
+				e.preventDefault(); 
+			}
+		  }
+          if( $(e.target).hasClass('infoQuestionMark') || $(e.target).hasClass('cvpopup') || ($(e.target).parent().length > 0 && $(e.target).parent().hasClass('cvpopup'))) { 
+              return false; 
+          }
+          var isVisible = false; 
+          var isLegendElement = $(this).is('legend'); 
+          if ($(this).find('span.collapsibleTitle').hasClass('cv-icon-chevron-down')) { 
+              isVisible = true; 
+              $(this).find('span.collapsibleTitle').removeClass('cv-icon-chevron-down'); 
+              $(this).find('span.collapsibleTitle').addClass('cv-icon-chevron-right'); 
+          } else { 
+              isVisible = false; 
+              $(this).find('span.collapsibleTitle').removeClass('cv-icon-chevron-right'); 
+              $(this).find('span.collapsibleTitle').addClass('cv-icon-chevron-down'); 
+          } 
+
+          $(this).attr('aria-expanded', !isVisible); 
+          $(this).nextAll().each(function () { 
+              if ($(this).is('.collapsible')) { 
+                 return false; 
+              }
+
+              if ($(this).is('.ignoreCollapse')) { 
+                    return true; 
+              }
+
+              if (!$(this).is('.cvpopup') && !$(this).is('#backgroundPopup')) { 
+                  $(this).attr('aria-hidden', isVisible); 
+                  if (isVisible) { 
+                      $(this).hide(); 
+                  } else { 
+                      $(this).show(); 
+                  }
+              } 
+          }); 
+      }); 
+  }); 
+</script>
+
+                                                        <div class="clear"></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="clear"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+
+<div class="cityviewBrand cv-clear" role="contentinfo">
+    Powered by <a href="https://www.municipalsoftware.com/" target="_blank" class="cv-underline">CityView</a>
+    <img src="/Portal/Content/CityViewClockTower.png" alt="CityView Logo" />
+</div>
+                        <div class="clearfix"></div>
+                    </div>
+                    <div class="clearfix"></div>
+                </div>
+            </div>
+        </section>
+
+        
+<footer class="footer-wrap">
+    <div class="container">
+        <div class="row">
+            <div class="col-sm-5 col-xs-12 footer-left">
+                <div class="footer-logo">
+                    <a href="#"><img src="/Portal/Content/Monroe/footer-logo.png" alt="" /></a>
+                </div>
+                <div class="footer-left-content">
+                    <p>
+                        City of Monroe, North Carolina
+                        <br />
+                        300 W Crowell Street, Monroe, NC 28112
+                        <br />
+                        <a href="tel:+7042824500">704-282-4500</a>
+                    </p>
+                </div>
+            </div>
+            <div class="col-sm-7 col-xs-12 footer-right">
+            </div>
+        </div>
+    </div>
+</footer>
+
+        <link href="https://fonts.googleapis.com/css?family=Raleway:400,500,700" rel="stylesheet">
+    </body>
+
+</html>

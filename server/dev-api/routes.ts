@@ -7,9 +7,11 @@
  *   POST   /api/admin/dev-tokens              issue: {name, holderType, hours 24–48, scopes} → token shown once
  *   DELETE /api/admin/dev-tokens/:id          revoke at once
  *   GET    /api/admin/dev-tokens/:id/activity the token's commits and its last requests
- *   Issuing needs an account signed in with Google AND a Google re-verification
+ *   Issuing needs an account signed in with Google, a Google re-verification
  *   in the last 15 minutes (owner, 2026-10-10: "Account admin with Google
- *   access and verification"). Revoking needs only the admin.
+ *   access and verification") AND the 6-digit code from the admin's
+ *   authenticator app, every time (owner, same day: "adding another layer of
+ *   protection … 2step"). Revoking needs only the admin.
  *
  * Code API (Authorization: Bearer chdev_…), DEV_API_BASE = /api/dev/v1:
  *   GET  /            this reference (no token)
@@ -32,7 +34,7 @@ import { pool } from "../db";
 import { requirePlatformAdmin } from "../crm/admin";
 import { originOk } from "../hub/access";
 import { logActivity, notifyUser } from "../account-events";
-import { googleVerifiedAt, GOOGLE_STEP_UP_MS } from "../account-security";
+import { googleVerifiedAt, GOOGLE_STEP_UP_MS, validTotp } from "../account-security";
 import { DEV_API_BASE } from "./guard";
 import { normalizeRepoPath, pathReadable, pathSensitive, writeRefusal } from "./paths";
 import { getRepo, MAX_CHANGES_PER_COMMIT, MAX_FILE_BYTES, RepoError, type Repo } from "./repo";
@@ -127,8 +129,8 @@ export function registerDevApi(app: Express, getUser: GetUser, deps: { repo?: ()
     if (!admin) return null;
     // The admins own sign-in only: an agency member acting for an admins account never issues code access.
     if (req.user?.id !== admin.id) { res.status(403).json({ message: "Only the admin themselves can manage Code API tokens." }); return null; }
-    const { rows: [u] } = await pool.query("SELECT google_id FROM users WHERE id=$1", [admin.id]);
-    return { admin: admin as { id: number; email: string }, googleLinked: !!u?.google_id };
+    const { rows: [u] } = await pool.query("SELECT google_id, totp_enabled, totp_secret FROM users WHERE id=$1", [admin.id]);
+    return { admin: admin as { id: number; email: string }, googleLinked: !!u?.google_id, totpEnabled: !!u?.totp_enabled && !!u?.totp_secret, totpSecret: (u?.totp_secret ?? null) as string | null };
   }
 
   app.get("/api/admin/dev-tokens", wrap(async (req, res) => {
@@ -141,12 +143,18 @@ export function registerDevApi(app: Express, getUser: GetUser, deps: { repo?: ()
       hours: { min: MIN_TOKEN_HOURS, max: MAX_TOKEN_HOURS }, maxLive: MAX_LIVE_TOKENS,
       verification: {
         googleLinked: who.googleLinked,
+        totpEnabled: who.totpEnabled,
         googleVerifiedUntil: verifiedAt ? new Date(verifiedAt + GOOGLE_STEP_UP_MS).toISOString() : null,
       },
       tokens: (await listTokens()).map((t) => tokenItem(t, repo)),
     });
   }));
 
+  // An authenticator code is good for one issue only (no replay inside its 30-90 s window), and
+  // 5 wrong codes lock issuing for 15 minutes (guessing 6 digits is then hopeless).
+  const usedCodes = new Map<number, { code: string; at: number }>();
+  const wrongCodes = new Map<number, { n: number; since: number }>();
+  const LOCK_MS = 15 * 60_000, MAX_WRONG = 5;
   app.post("/api/admin/dev-tokens", wrap(async (req, res) => {
     const who = await adminWithGoogle(req, res); if (!who) return;
     if (!originOk(req)) return void res.status(403).json({ message: "Forbidden" });
@@ -156,6 +164,24 @@ export function registerDevApi(app: Express, getUser: GetUser, deps: { repo?: ()
     }
     const input = validateIssue(req.body ?? {});
     if (typeof input === "string") return void res.status(400).json({ message: input });
+    if (!who.totpEnabled || !who.totpSecret) {
+      return void res.status(403).json({ totp: "setup", message: "Set up your authenticator app first: step 2 on this page." });
+    }
+    const strikes = wrongCodes.get(who.admin.id);
+    if (strikes && Date.now() - strikes.since >= LOCK_MS) wrongCodes.delete(who.admin.id);
+    else if (strikes && strikes.n >= MAX_WRONG) {
+      return void res.status(429).json({ totp: "locked", message: "Too many wrong authenticator codes. Wait 15 minutes and try again." });
+    }
+    const code = typeof req.body?.totpCode === "string" ? req.body.totpCode.replace(/\s/g, "") : "";
+    const last = usedCodes.get(who.admin.id);
+    if (!/^\d{6}$/.test(code) || (last && last.code === code && Date.now() - last.at < 120_000) || !validTotp(who.totpSecret, code)) {
+      const s = wrongCodes.get(who.admin.id) ?? { n: 0, since: Date.now() };
+      wrongCodes.set(who.admin.id, { n: s.n + 1, since: s.since });
+      await logActivity(req, who.admin.id, "security.code_token_bad_code", { attempt: s.n + 1 }).catch(() => {});
+      return void res.status(403).json({ totp: "invalid", message: "That authenticator code is wrong or expired. Enter the current 6-digit code." });
+    }
+    wrongCodes.delete(who.admin.id);
+    usedCodes.set(who.admin.id, { code, at: Date.now() });
     const repo = repoOf();
     if (!repo) return void res.status(503).json({ message: "The Code API is not set up on this server yet (DEV_API_REPO_URL)." });
     try { await assertUnderLimit(); } catch (e) {

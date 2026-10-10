@@ -158,7 +158,7 @@ export type PlanModules = {
   csvExport: boolean;
   /** Scheduled client email reports — LIVE: server/seo/site-report-send.ts, sent by server/seo/jobs.ts. */
   scheduledReports: boolean;
-  /** Permit alerts for new filings in a territory. COMING. */
+  /** Permit alerts for new filings in a territory — LIVE: server/permits (watches, hourly poller, email/text/Telegram digests). */
   permitAlerts: boolean;
   /** Weekly / monthly scheduled grid watches (server/seo/grid-monitor.ts). */
   gridWatches: boolean;
@@ -174,7 +174,10 @@ export type PlanModules = {
  * (server/seo/site-report-send.ts, run by server/seo/jobs.ts; schedules are
  * saved from the SEO Reports page, server/seo/routes.ts).
  */
-export const COMING_MODULES: readonly ModuleKey[] = ["csvExport", "permitAlerts"];
+export const COMING_MODULES: readonly ModuleKey[] = ["csvExport"];
+// 2026-10-10: permitAlerts left the list — permit alerts are built and shipping (server/permits/poller.ts
+// polls each watched jurisdiction hourly through server/scrapers/registry.ts; watches are saved from the
+// Permit Alerts page, server/permits/routes.ts). Coverage per portal follows each adapter's listRecent.
 export type ModuleKey = keyof PlanModules;
 
 /**

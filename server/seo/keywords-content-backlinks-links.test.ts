@@ -45,7 +45,7 @@ describe("the link look (viz-keywords.tsx): a cue without hovering, a focus outl
 
 describe("keywords explorer: intent is alive both ways (§4, the big one)", () => {
   it("the ideas table reads and writes the address", () => {
-    expect(keywords).toMatch(/<ReportView key=\{`\$\{ideas\}:\$\{o\.keyword\}:\$\{marketKey\(market\)\}`\} linked /);
+    expect(keywords).toMatch(/<ReportView key=\{`\$\{ideas\}:\$\{o\.keyword\}:\$\{scopeKey\}`\} linked /);
   });
   it("the intent is one of the four, and its chip shows only where a table can be narrowed by it", () => {
     expect(keywords).toMatch(/intent: \(INTENTS as readonly string\[\]\)\.includes\(intent \?\? ""\) \? intent! : undefined/);
@@ -203,7 +203,7 @@ describe("round 3 (Kimi round 2): the remaining figures, the address, honest wor
   it("keyword lists: 'Other keywords' opens its rows, the market words are the picked market's, an intent's title is honest", () => {
     expect(tagOf(lists, "link-topic-other")).toContain(`href={at("other")}`);
     expect(lists).not.toContain("intent for each. United States, Google.");
-    expect(lists).toContain('`Volume, difficulty, cost per click and intent for each. ${market?.label ?? "United States"}, Google.`');
+    expect(lists).toContain('`Volume, difficulty, cost per click and intent for each. ${placeWords(place, market?.label ?? "United States")}, Google.${place ?');
     expect(tagOf(lists, "link-keyword-intent")).toContain("the ideas table has no filter for this intent, so every idea is shown");
     expect(tagOf(gap, "link-gap-intent")).toContain("the ideas table has no filter for this intent, so every idea is shown");
   });

@@ -74,7 +74,11 @@ const MODULE_DETAILS: Record<ModuleKey, string[]> = {
   socialPublishing: ["Publish to YouTube and your social accounts from one place."],
   csvExport: ["Download any report or list as a CSV file."],
   scheduledReports: ["Client reports emailed on a schedule under your name."],
-  permitAlerts: ["An alert when a new permit is filed in a territory you watch."],
+  permitAlerts: [
+    "Watch an address, a parcel, a contractor, or the trades you care about in an area.",
+    "Each watched jurisdiction's portal is checked every hour, where its portal can list permits by date.",
+    "One digest per watch by email, text or Telegram, with a link to every match.",
+  ],
   gridWatches: ["A ranking grid that re-runs every week or month and shows what moved."],
   whiteLabel: ["Reports and client pages under your own brand, not ours."],
   masterClass: ["The complete Master Class course, included."],

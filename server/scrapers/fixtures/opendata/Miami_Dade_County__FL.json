@@ -1,0 +1,653 @@
+{
+  "objectIdFieldName": "ObjectId",
+  "uniqueIdField": {
+    "name": "ObjectId",
+    "isSystemMaintained": true
+  },
+  "globalIdFieldName": "GlobalID",
+  "fields": [
+    {
+      "name": "PermitIssuedDate",
+      "type": "esriFieldTypeDateOnly",
+      "alias": "PermitIssuedDate",
+      "sqlType": "sqlTypeDate",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ApplicationDate",
+      "type": "esriFieldTypeDate",
+      "alias": "ApplicationDate",
+      "sqlType": "sqlTypeTimestamp2",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "PermitNumber",
+      "type": "esriFieldTypeString",
+      "alias": "PermitNumber",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ProcessNumber",
+      "type": "esriFieldTypeString",
+      "alias": "ProcessNumber",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "MasterPermitNumber",
+      "type": "esriFieldTypeString",
+      "alias": "MasterPermitNumber",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "PermitType",
+      "type": "esriFieldTypeString",
+      "alias": "PermitType",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ResidentialCommercial",
+      "type": "esriFieldTypeString",
+      "alias": "ResidentialCommercial",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "EstimatedValue",
+      "type": "esriFieldTypeString",
+      "alias": "EstimatedValue",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ApplicationTypeCode",
+      "type": "esriFieldTypeInteger",
+      "alias": "ApplicationTypeCode",
+      "sqlType": "sqlTypeInteger",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ApplicationTypeDescription",
+      "type": "esriFieldTypeString",
+      "alias": "ApplicationTypeDescription",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ProposedUseCode",
+      "type": "esriFieldTypeInteger",
+      "alias": "ProposedUseCode",
+      "sqlType": "sqlTypeInteger",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ProposedUseDescription",
+      "type": "esriFieldTypeString",
+      "alias": "ProposedUseDescription",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "DetailDescriptionComments",
+      "type": "esriFieldTypeString",
+      "alias": "DetailDescriptionComments",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "FolioNumber",
+      "type": "esriFieldTypeString",
+      "alias": "FolioNumber",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "OwnerName",
+      "type": "esriFieldTypeString",
+      "alias": "OwnerName",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "LegalDescription1",
+      "type": "esriFieldTypeString",
+      "alias": "LegalDescription1",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "LegalDescription2",
+      "type": "esriFieldTypeString",
+      "alias": "LegalDescription2",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "PropertyAddress",
+      "type": "esriFieldTypeString",
+      "alias": "PropertyAddress",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ArchitectName",
+      "type": "esriFieldTypeString",
+      "alias": "ArchitectName",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ContractorNumber",
+      "type": "esriFieldTypeString",
+      "alias": "ContractorNumber",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ContractorName",
+      "type": "esriFieldTypeString",
+      "alias": "ContractorName",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ContractorAddress",
+      "type": "esriFieldTypeString",
+      "alias": "ContractorAddress",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ContractorCity",
+      "type": "esriFieldTypeString",
+      "alias": "ContractorCity",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ContractorState",
+      "type": "esriFieldTypeString",
+      "alias": "ContractorState",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ContractorZip",
+      "type": "esriFieldTypeString",
+      "alias": "ContractorZip",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ContractorPhone",
+      "type": "esriFieldTypeString",
+      "alias": "ContractorPhone",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SquareFootage",
+      "type": "esriFieldTypeString",
+      "alias": "SquareFootage",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "StructureUnits",
+      "type": "esriFieldTypeInteger",
+      "alias": "StructureUnits",
+      "sqlType": "sqlTypeInteger",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "StructureFloors",
+      "type": "esriFieldTypeInteger",
+      "alias": "StructureFloors",
+      "sqlType": "sqlTypeInteger",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Category1",
+      "type": "esriFieldTypeString",
+      "alias": "Category1",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "CategoryDescription1",
+      "type": "esriFieldTypeString",
+      "alias": "CategoryDescription1",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Category2",
+      "type": "esriFieldTypeString",
+      "alias": "Category2",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "CategoryDescription2",
+      "type": "esriFieldTypeString",
+      "alias": "CategoryDescription2",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Category3",
+      "type": "esriFieldTypeString",
+      "alias": "Category3",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "CategoryDescription3",
+      "type": "esriFieldTypeString",
+      "alias": "CategoryDescription3",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Category4",
+      "type": "esriFieldTypeString",
+      "alias": "Category4",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "CategoryDescription4",
+      "type": "esriFieldTypeString",
+      "alias": "CategoryDescription4",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Category5",
+      "type": "esriFieldTypeString",
+      "alias": "Category5",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "CategoryDescription5",
+      "type": "esriFieldTypeString",
+      "alias": "CategoryDescription5",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Category6",
+      "type": "esriFieldTypeString",
+      "alias": "Category6",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "CategoryDescription6",
+      "type": "esriFieldTypeString",
+      "alias": "CategoryDescription6",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Category7",
+      "type": "esriFieldTypeString",
+      "alias": "Category7",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "CategoryDescription7",
+      "type": "esriFieldTypeString",
+      "alias": "CategoryDescription7",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Category8",
+      "type": "esriFieldTypeString",
+      "alias": "Category8",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "CategoryDescription8",
+      "type": "esriFieldTypeString",
+      "alias": "CategoryDescription8",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Category9",
+      "type": "esriFieldTypeString",
+      "alias": "Category9",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "CategoryDescription9",
+      "type": "esriFieldTypeString",
+      "alias": "CategoryDescription9",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Category10",
+      "type": "esriFieldTypeString",
+      "alias": "Category10",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "CategoryDescription10",
+      "type": "esriFieldTypeString",
+      "alias": "CategoryDescription10",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "LastInspectionDate",
+      "type": "esriFieldTypeDate",
+      "alias": "LastInspectionDate",
+      "sqlType": "sqlTypeTimestamp2",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "LastApprovedInspDate",
+      "type": "esriFieldTypeDate",
+      "alias": "LastApprovedInspDate",
+      "sqlType": "sqlTypeTimestamp2",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "CoCcDate",
+      "type": "esriFieldTypeString",
+      "alias": "CoCcDate",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "PermitTotalFee",
+      "type": "esriFieldTypeString",
+      "alias": "PermitTotalFee",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Filler",
+      "type": "esriFieldTypeString",
+      "alias": "Filler",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "City",
+      "type": "esriFieldTypeString",
+      "alias": "City",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "State",
+      "type": "esriFieldTypeString",
+      "alias": "State",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ObjectId",
+      "type": "esriFieldTypeOID",
+      "alias": "ObjectId",
+      "sqlType": "sqlTypeInteger",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "GlobalID",
+      "type": "esriFieldTypeGlobalID",
+      "alias": "GlobalID",
+      "sqlType": "sqlTypeOther",
+      "length": 38,
+      "domain": null,
+      "defaultValue": "NEWID() WITH VALUES"
+    }
+  ],
+  "exceededTransferLimit": true,
+  "features": [
+    {
+      "attributes": {
+        "PermitIssuedDate": "2024-10-09",
+        "ApplicationDate": 1696910400000,
+        "PermitNumber": "2025001822",
+        "ProcessNumber": "C2024003887",
+        "MasterPermitNumber": "0000000000",
+        "PermitType": "BLDG",
+        "ResidentialCommercial": "C",
+        "EstimatedValue": "75000",
+        "ApplicationTypeCode": 8,
+        "ApplicationTypeDescription": "REPAIR",
+        "ProposedUseCode": 520,
+        "ProposedUseDescription": "5 UNITS OR MORE  - RESIDENTIAL",
+        "DetailDescriptionComments": "REPAIR",
+        "FolioNumber": "3049120463060",
+        "OwnerName": "INTERNATIONAL PARK CONDOMINIUM",
+        "LegalDescription1": "INTERNATIONAL PARK CONDO II",
+        "LegalDescription2": "UNIT COMM",
+        "PropertyAddress": "11800 SW 18 ST             COMM",
+        "ArchitectName": "NOT LISTED",
+        "ContractorNumber": "CGC1532895",
+        "ContractorName": "DIAMOND CONTRACTORS GROUP INC",
+        "ContractorAddress": "2423 SW 147TH AVE",
+        "ContractorCity": "MIAMI",
+        "ContractorState": "FL",
+        "ContractorZip": "33185",
+        "ContractorPhone": "(786)209-6294",
+        "SquareFootage": "10000",
+        "StructureUnits": 5,
+        "StructureFloors": 2,
+        "Category1": "0001",
+        "CategoryDescription1": "GENERAL (COUNTY)",
+        "Category2": null,
+        "CategoryDescription2": null,
+        "Category3": null,
+        "CategoryDescription3": null,
+        "Category4": null,
+        "CategoryDescription4": null,
+        "Category5": null,
+        "CategoryDescription5": null,
+        "Category6": null,
+        "CategoryDescription6": null,
+        "Category7": null,
+        "CategoryDescription7": null,
+        "Category8": null,
+        "CategoryDescription8": null,
+        "Category9": null,
+        "CategoryDescription9": null,
+        "Category10": null,
+        "CategoryDescription10": null,
+        "LastInspectionDate": null,
+        "LastApprovedInspDate": null,
+        "CoCcDate": null,
+        "PermitTotalFee": "1251322",
+        "Filler": null,
+        "City": "MIAMI",
+        "State": "FL",
+        "ObjectId": 1,
+        "GlobalID": "a2e7b596-e8f5-46ab-9ff8-56ba15bce505"
+      }
+    },
+    {
+      "attributes": {
+        "PermitIssuedDate": "2024-10-09",
+        "ApplicationDate": 1696910400000,
+        "PermitNumber": "2025001821",
+        "ProcessNumber": "C2024004352",
+        "MasterPermitNumber": "0000000000",
+        "PermitType": "BLDG",
+        "ResidentialCommercial": "C",
+        "EstimatedValue": "575000",
+        "ApplicationTypeCode": 8,
+        "ApplicationTypeDescription": "REPAIR",
+        "ProposedUseCode": 520,
+        "ProposedUseDescription": "5 UNITS OR MORE  - RESIDENTIAL",
+        "DetailDescriptionComments": "STRUCTURAL REPAIR",
+        "FolioNumber": "3049120463060",
+        "OwnerName": "INTERNATIONAL PARK CONDOMINIUM",
+        "LegalDescription1": "INTERNATIONAL PARK CONDO II",
+        "LegalDescription2": "UNIT COMM",
+        "PropertyAddress": "11800 SW 18 ST             COMM",
+        "ArchitectName": "NOT LISTED",
+        "ContractorNumber": "CGC1532895",
+        "ContractorName": "DIAMOND CONTRACTORS GROUP INC",
+        "ContractorAddress": "2423 SW 147TH AVE",
+        "ContractorCity": "MIAMI",
+        "ContractorState": "FL",
+        "ContractorZip": "33185",
+        "ContractorPhone": "(786)209-6294",
+        "SquareFootage": "1000",
+        "StructureUnits": 5,
+        "StructureFloors": 1,
+        "Category1": "0001",
+        "CategoryDescription1": "GENERAL (COUNTY)",
+        "Category2": null,
+        "CategoryDescription2": null,
+        "Category3": null,
+        "CategoryDescription3": null,
+        "Category4": null,
+        "CategoryDescription4": null,
+        "Category5": null,
+        "CategoryDescription5": null,
+        "Category6": null,
+        "CategoryDescription6": null,
+        "Category7": null,
+        "CategoryDescription7": null,
+        "Category8": null,
+        "CategoryDescription8": null,
+        "Category9": null,
+        "CategoryDescription9": null,
+        "Category10": null,
+        "CategoryDescription10": null,
+        "LastInspectionDate": null,
+        "LastApprovedInspDate": null,
+        "CoCcDate": null,
+        "PermitTotalFee": "1231186",
+        "Filler": null,
+        "City": "MIAMI",
+        "State": "FL",
+        "ObjectId": 2,
+        "GlobalID": "4a4584b6-100a-432e-9309-0cf5feba42ad"
+      }
+    }
+  ]
+}

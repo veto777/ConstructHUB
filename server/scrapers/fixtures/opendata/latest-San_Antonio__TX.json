@@ -1,0 +1,18 @@
+{
+  "help": "https://data.sanantonio.gov/api/3/action/help_show?name=datastore_search_sql",
+  "success": true,
+  "result": {
+    "sql": "SELECT max(\"DATE ISSUED\") AS latest_date FROM \"c21106f9-3ef5-4f3a-8604-f992b4db7512\"",
+    "records": [
+      {
+        "latest_date": "2026-10-02"
+      }
+    ],
+    "fields": [
+      {
+        "id": "latest_date",
+        "type": "text"
+      }
+    ]
+  }
+}

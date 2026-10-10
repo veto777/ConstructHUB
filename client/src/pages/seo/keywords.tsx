@@ -28,6 +28,7 @@ import { ReportView, type TableKey } from "./report-table";
 import { INTENTS, pathOfUrl } from "./explorer-filters";
 import { AddToList, BulkKeywords, KeywordLists } from "./keyword-lists";
 import { MarketPicker, useMarket } from "./market";
+import { PlacePicker, placeBody, placeWords, usePlace, type SeoPlace } from "./place";
 import { DEFAULT_MARKET, findMarket, marketKey, SEO_MARKETS, type SeoMarket } from "@shared/seo-markets";
 import { GradientSpark, MetricColumn, monthLabel, PALETTE } from "./viz";
 import { BarFigure, BLOCK_LINK, Card, FeatureTag, FIG_LINK, Heading, KdBadge, LINK_CUE, MetricRow, MonthlyBars, TEXT_LINK } from "./viz-keywords";
@@ -36,6 +37,10 @@ import { marketParams, useTrackedKeywords } from "./keyword-links";
 
 type Overview = {
   missing?: string[];
+  /** Google's own numbers only (volume, cost per click, bids, months): difficulty, who ranks and traffic potential come with the full lookup. */
+  free?: boolean;
+  /** The US place the numbers (and, on a full lookup, the results) are for; null = the whole country. */
+  place?: { code: number; label: string; kind: string } | null;
   keyword: string; fetchedAt: string;
   volume: number | null; cpc: number | null; difficulty: number | null; intent: string | null; competition: string | null;
   bidLow: number | null; bidHigh: number | null; results: number | null;
@@ -60,7 +65,7 @@ const SECTIONS: readonly Section[] = ["volume", "serp", "features", "ideas", "cp
 /** Which part of the overview a section lands on (the element ids below). */
 const SECTION_ID: Record<Section, string> = { volume: "keyword-trend", serp: "keyword-serp", features: "keyword-features", ideas: "keyword-ideas", cpc: "keyword-serp", results: "keyword-serp" };
 /** Every parameter the page honours, as read from the address. */
-type Address = { keyword: string; view?: Mode; table?: string; locationCode?: number; languageCode?: string; section?: Section; month?: string; intent?: string; list?: number; topic?: string; show?: "gaps" | "weak" | "strong" | "unknown" };
+type Address = { keyword: string; view?: Mode; table?: string; locationCode?: number; languageCode?: string; place?: number; section?: Section; month?: string; intent?: string; list?: number; topic?: string; show?: "gaps" | "weak" | "strong" | "unknown" };
 const SHOWS = ["gaps", "weak", "strong", "unknown"] as const;
 /** A pill-sized link or button that is 44 px tall on a phone. */
 const PILL = "g-pill g-pill--sm !min-h-11";
@@ -82,6 +87,7 @@ export default function SeoKeywordsPage() {
       view: view === "bulk" || view === "lists" || view === "area" ? view : undefined,
       table: table === "relatedTerms" || table === "questions" ? table : table === "matchingTerms" ? table : undefined,
       locationCode: Number(p.get("locationCode")) || undefined, languageCode: p.get("languageCode") || undefined,
+      place: Number(p.get("place")) || undefined,
       section: SECTIONS.find((s) => s === section), month: month && /^\d{4}-\d{2}$/.test(month) ? month : undefined,
       intent: (INTENTS as readonly string[]).includes(intent ?? "") ? intent! : undefined, list: Number(p.get("list")) || undefined,
       topic: topic?.trim() || undefined, show: SHOWS.find((s) => s === show),
@@ -99,14 +105,22 @@ export default function SeoKeywordsPage() {
   /** Keywords handed to the bulk analysis from a list. */
   const [bulkSeed] = useState("");
   const [market, setMarket] = useMarket();
-  const mk = { locationCode: market.locationCode, languageCode: market.languageCode };
+  const [place, setPlace] = usePlace(market, address.place);
+  /** The country and, for the United States, the place the numbers are for. */
+  const mk = { locationCode: market.locationCode, languageCode: market.languageCode, ...placeBody(place) };
+  /** Google's own keyword numbers answer first, free (the full lookup is bought on request). */
+  const googleKeywords = !!status.data?.googleKeywords;
+  /** The country and place on screen, as one key: an answer for another one is not shown over this one. */
+  const scopeKey = `${marketKey(market)}:${place?.code ?? 0}`;
+  /** Another place is another lookup: what is on screen is put away first, and the address says so (a link and a pick are one thing). */
+  const pickPlace = (p: SeoPlace | null) => { if ((p?.code ?? null) === (place?.code ?? null)) return; setOverview(null); setPlace(p); go({ place: p?.code }); };
   /** Another country is another lookup: what is on screen is put away first. */
   const changeMarket = (m: SeoMarket) => { if (marketKey(m) === marketKey(market)) return; setOverview(null); setMarket(m); };
   /** The country picker, on any view: the country is chosen, and the address says so (a link and a pick are one thing). */
   const pickMarket = (m: SeoMarket) => { changeMarket(m); go({ locationCode: m.locationCode, languageCode: m.languageCode }); };
   /** The country on screen right now, for answers that arrive later. */
-  const marketNow = useRef(marketKey(market));
-  marketNow.current = marketKey(market);
+  const marketNow = useRef(scopeKey);
+  marketNow.current = scopeKey;
   const unsaved = (d: { saved?: boolean }) => { if (d.saved === false) toast({ title: "Shown, but it couldn't be kept", description: "Opening this keyword again will not be free.", variant: "destructive" }); };
   /** Numbers from another country are not the site's numbers: the keyword is tracked without them. `m` is where the numbers came from (a list has its own country). */
   const inSiteMarket = (m: { locationCode: number; languageCode: string }) => !!site && site.locationCode === m.locationCode && site.languageCode === m.languageCode;
@@ -132,7 +146,7 @@ export default function SeoKeywordsPage() {
 
   // A keyword looked up in the last week opens without spending.
   const saved = useQuery<{ overview: Overview } | null>({
-    queryKey: ["/api/seo/keyword", keyword, marketKey(market)], enabled: !!keyword && !overview, retry: false,
+    queryKey: ["/api/seo/keyword", keyword, scopeKey], enabled: !!keyword && !overview, retry: false,
     queryFn: async () => { try { return await api("POST", "/api/seo/keyword", { keyword, peek: true, ...mk }); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
   });
   useEffect(() => { if (saved.data?.overview && !overview) setOverview(saved.data.overview); }, [saved.data, overview]);
@@ -160,6 +174,17 @@ export default function SeoKeywordsPage() {
     },
     onError: (e) => toast({ title: "Couldn't refresh that keyword", description: apiErrorMessage(e), variant: "destructive" }),
   });
+  /** The full lookup over Google's free numbers: difficulty, who ranks, traffic potential (about the overview's price). */
+  const full = useMutation({
+    mutationFn: (v: { keyword: string; market: string; body: typeof mk }) => api("POST", "/api/seo/keyword", { keyword: v.keyword, full: true, ...v.body }),
+    onSuccess: (data: { overview: Overview; saved?: boolean }, v) => {
+      void qc.invalidateQueries({ queryKey: ["/api/seo/status"] });
+      if (v.market !== marketNow.current) return;
+      unsaved(data);
+      setOverview((cur) => (cur && cur.keyword === data.overview.keyword ? data.overview : cur));
+    },
+    onError: (e) => toast({ title: "Couldn't get the full lookup", description: apiErrorMessage(e), variant: "destructive" }),
+  });
   const track = useMutation({
     // Five hundred at a time (the most one request takes), one after another; what was added is counted across them.
     // If one fails part-way, the ones before it stay tracked and the error says how many that was.
@@ -183,7 +208,7 @@ export default function SeoKeywordsPage() {
   });
 
   /** Look a keyword up: the address says which keyword first (so the back button returns to the one before), then it is bought. */
-  const submit = () => { const k = input.trim(); if (!k) return; setOverview(null); setKeyword(k.toLowerCase()); go({ keyword: k.toLowerCase(), section: undefined, month: undefined, table: undefined, intent: undefined }); lookup.mutate({ keyword: k, market: marketKey(market), body: mk }); };
+  const submit = () => { const k = input.trim(); if (!k) return; setOverview(null); setKeyword(k.toLowerCase()); go({ keyword: k.toLowerCase(), section: undefined, month: undefined, table: undefined, intent: undefined }); lookup.mutate({ keyword: k, market: scopeKey, body: mk }); };
   const configured = !!status.data?.configured;
   const affordable = canAfford(status.data, "keywordOverview");
   const price = status.data?.prices ? money(status.data.prices.keywordOverview) : "";
@@ -213,6 +238,7 @@ export default function SeoKeywordsPage() {
   const chips: { key: string; words: ReactNode; clear: () => void; label?: string }[] = [];
   if (mode === "one") {
     if (address.locationCode) chips.push({ key: "market", words: `Looked up in ${market.label}`, label: "Back to the United States", clear: () => { changeMarket(DEFAULT_MARKET); go({ locationCode: undefined, languageCode: undefined }); } });
+    if (place) chips.push({ key: "place", words: `Numbers for ${place.label} (${place.kind.toLowerCase()})`, label: "The whole United States", clear: () => pickPlace(null) });
     if (address.section && o) {
       const q = `"${o.keyword}"`;
       const words: Record<Section, string> = {
@@ -231,7 +257,7 @@ export default function SeoKeywordsPage() {
       <nav className="g-tabs" aria-label="Keywords explorer views">
         {([["one", "One keyword"], ["bulk", "Many keywords"], ["area", "Service × town"], ["lists", "My lists"]] as const).map(([m, label]) => <Link key={m} href={seoLinks.keywords(keyword ?? "", { view: m === "one" ? undefined : m })} aria-current={mode === m ? "page" : undefined} data-testid={`tab-keywords-${m}`}>{label}</Link>)}
       </nav>
-      {mode === "bulk" && <BulkKeywords key={bulkSeed} market={market} onMarket={pickMarket} initial={bulkSeed} status={status.data} site={site} onTrack={site ? (rows) => track.mutate({ rows, from: market }) : undefined} />}
+      {mode === "bulk" && <BulkKeywords key={bulkSeed} market={market} onMarket={pickMarket} place={place} onPlace={pickPlace} initial={bulkSeed} status={status.data} site={site} onTrack={site ? (rows) => track.mutate({ rows, from: market }) : undefined} />}
       {mode === "area" && <ServicePlanner site={site} status={status.data} onTrack={site ? (rows) => track.mutate({ rows, from: findMarket(site.locationCode, site.languageCode) ?? market }) : undefined} />}
       {mode === "lists" && <KeywordLists status={status.data} site={site} onTrack={site ? (rows, from) => track.mutate({ rows, from }) : undefined} />}
       {mode === "one" && (<>
@@ -242,15 +268,22 @@ export default function SeoKeywordsPage() {
           <input className="g-input w-full pl-9" placeholder="e.g. siding contractor" value={input} onChange={(e) => setInput(e.target.value)} data-testid="input-keyword" autoComplete="off" />
         </label>
         <MarketPicker value={market} onChange={pickMarket} disabled={lookup.isPending || refresh.isPending} />
-        <Button type="submit" disabled={busy || !input.trim() || !configured || !affordable} data-testid="button-keyword-lookup">
+        <PlacePicker value={place} onChange={pickPlace} market={market} disabled={lookup.isPending || refresh.isPending} />
+        <Button type="submit" disabled={busy || !input.trim() || !configured || (!affordable && !googleKeywords)} data-testid="button-keyword-lookup">
           {lookup.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Looking up…</> : "Look up"}
         </Button>
       </form>
-      <p className="g-text-2 mb-4 text-[13px]" data-testid="text-keyword-cost">
-        A keyword's overview costs about <Link href={seoLinks.usage()} className={TEXT_LINK} title="Usage and credit: what lookups cost and what is left this month" data-testid="link-keyword-price">{price}</Link> of your SEO data and is free to reopen for a week.{holdNote(status.data, "keywordOverview")} {market.label}, Google.{!affordable && " You don't have enough SEO data left — add credit above."}
-      </p>
+      {googleKeywords ? (
+        <p className="g-text-2 mb-4 text-[13px]" data-testid="text-keyword-cost">
+          Google's own numbers for {placeWords(place, market.label)} — search volume, cost per click, bids and four years of months — are free. The full lookup (difficulty, who ranks, traffic potential) costs about <Link href={seoLinks.usage()} className={TEXT_LINK} title="Usage and credit: what lookups cost and what is left this month" data-testid="link-keyword-price">{price}</Link> of your SEO data and is free to reopen for a week.{holdNote(status.data, "keywordOverview")}{!affordable && " You don't have enough SEO data left for the full lookup — add credit above."}
+        </p>
+      ) : (
+        <p className="g-text-2 mb-4 text-[13px]" data-testid="text-keyword-cost">
+          A keyword's overview costs about <Link href={seoLinks.usage()} className={TEXT_LINK} title="Usage and credit: what lookups cost and what is left this month" data-testid="link-keyword-price">{price}</Link> of your SEO data and is free to reopen for a week.{holdNote(status.data, "keywordOverview")} {placeWords(place, market.label)}, Google.{!affordable && " You don't have enough SEO data left — add credit above."}
+        </p>
+      )}
       {chips.length > 0 && <div data-testid="keyword-filters">{chips.map((c) => <ActiveFilter key={c.key} onClear={c.clear} clearLabel={c.label}>{c.words}</ActiveFilter>)}</div>}
-      {busy && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> {lookup.isPending ? "Getting volume, difficulty and the top results…" : "Opening the saved overview…"}</p>}
+      {busy && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> {lookup.isPending ? (googleKeywords ? "Getting Google's numbers…" : "Getting volume, difficulty and the top results…") : "Opening the saved overview…"}</p>}
       {!o && !busy && !keyword && <Empty testId="keywords-intro"><h3>Research any keyword</h3><p>Enter a search term to see its monthly volume over time, how hard it is to rank for, what an ad click costs, who held the top ten when it was looked up — and hundreds of related searches you can track.</p></Empty>}
       {!o && !busy && keyword && saved.isError && <div className="g-callout" role="alert" data-testid="keywords-saved-error"><h3>Couldn't check for a saved overview</h3><p>{apiErrorMessage(saved.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void saved.refetch()}>Try again</button></div>}
       {!o && !busy && keyword && !saved.isError && <Empty testId="keywords-not-found"><h3>No overview for "{keyword}" yet</h3><p>Press <b>Look up</b> to get it.</p></Empty>}
@@ -260,30 +293,36 @@ export default function SeoKeywordsPage() {
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <h2 className="text-[20px] font-medium [overflow-wrap:anywhere]" style={{ color: "var(--g-blue)" }}>"{o.keyword}"</h2>
             <Link href={seoLinks.usage({ month: o.fetchedAt.slice(0, 7) })} className={`${TEXT_LINK} text-[12px]`} title="When this overview was looked up — that month's lookups on the Usage page" data-testid="link-keyword-as-of">as of {fmtDate(o.fetchedAt)}</Link>
-            <button type="button" className={PILL} disabled={refresh.isPending || !configured || !affordable} onClick={() => refresh.mutate({ keyword: o.keyword, market: marketKey(market), body: mk })} title={`Looks it up again — about ${price}`} data-testid="button-keyword-refresh">{refresh.isPending ? <Loader2 className="animate-spin" /> : null} Refresh · {price}</button>
+            {o.free && <span className="g-text-2 text-[12px]" data-testid="text-keyword-free">Google's numbers for {placeWords(o.place ?? place, market.label)} · free</span>}
+            {!o.free && o.place && <span className="g-text-2 text-[12px]" data-testid="text-keyword-place">Searched from {o.place.label}</span>}
+            {o.free
+              ? <button type="button" className={PILL} disabled={full.isPending || !configured || !affordable} onClick={() => full.mutate({ keyword: o.keyword, market: scopeKey, body: mk })} title={`Difficulty, who ranks and traffic potential — about ${price}`} data-testid="button-keyword-full">{full.isPending ? <Loader2 className="animate-spin" /> : null} Full lookup · {price}</button>
+              : <button type="button" className={PILL} disabled={refresh.isPending || !configured || !affordable} onClick={() => refresh.mutate({ keyword: o.keyword, market: scopeKey, body: mk })} title={`Looks it up again — about ${price}`} data-testid="button-keyword-refresh">{refresh.isPending ? <Loader2 className="animate-spin" /> : null} Refresh · {price}</button>}
             <span className="ml-auto"><AddToList market={market} rows={[{ keyword: o.keyword, volume: o.volume, cpc: o.cpc, difficulty: o.difficulty, intent: o.intent }]} label="Save to a list" /></span>
             {site && <button type="button" className={PILL} disabled={track.isPending} onClick={() => track.mutate({ rows: [{ keyword: o.keyword, volume: o.volume, cpc: o.cpc, difficulty: o.difficulty }], from: market })} data-testid="button-track-keyword"><Plus /> Track on {site.domain}</button>}
             {site && isTracked && <Link href={seoLinks.rankTracker(site.id, { keyword: o.keyword })} className={`${PILL} ${LINK_CUE}`} title={`Already tracked on ${site.domain} — its checks in the rank tracker`} data-testid="link-tracked-keyword">In the rank tracker</Link>}
           </div>
           {/* The figures in one row, as Ahrefs lays a keyword out: volume with its trend, the difficulty badge, cost, intent, and what the #1 page gets. Each figure is a link to the part of the page that holds it (links.ts). */}
           <Card className="mb-4" testId="keyword-metrics">
-            <MetricRow cols={o.potential !== undefined ? 6 : 4}>
+            <MetricRow cols={o.potential !== undefined && !o.free ? 6 : 4}>
               <MetricColumn label="Search volume" value={<Link href={addr({ section: "volume", month: undefined })} className={FIG_LINK} title="The monthly chart" data-testid="link-volume">{fmtNum(o.volume)}</Link>}
                 foot={peak ? <Link href={addr({ section: "volume", month: peak.month })} className={TEXT_LINK} data-testid="link-volume-peak">Peak {fmtNum(peak.volume)} in {monthLabel(peak.month)}</Link> : "per month"}
                 chart={<Link href={addr({ section: "volume", month: undefined })} className={`${LINK_CUE} block min-h-11`} aria-label="Search volume by month" data-testid="link-volume-chart"><GradientSpark range height={44} points={trend} color={PALETTE.keywords} format={fmtNum} /></Link>} />
-              <MetricColumn label="Difficulty" value={<Link href={addr({ section: "serp" })} className={BLOCK_LINK} title="The pages it is worked out from" data-testid="link-difficulty"><KdBadge value={o.difficulty} size="lg" /></Link>}
-                foot={o.topAvg.referringDomains != null ? <Link href={addr({ section: "serp" })} className={TEXT_LINK} data-testid="link-top-avg">Top pages average {fmtNum(o.topAvg.referringDomains)} referring domains</Link> : "0–100"} />
+              <MetricColumn label="Difficulty" value={o.free
+                  ? <button type="button" className={PILL} disabled={full.isPending || !configured || !affordable} onClick={() => full.mutate({ keyword: o.keyword, market: scopeKey, body: mk })} title={`Difficulty, who ranks and traffic potential — about ${price}`} data-testid="button-difficulty-full">{full.isPending ? <Loader2 className="animate-spin" /> : null} Full lookup · {price}</button>
+                  : <Link href={addr({ section: "serp" })} className={BLOCK_LINK} title="The pages it is worked out from" data-testid="link-difficulty"><KdBadge value={o.difficulty} size="lg" /></Link>}
+                foot={o.free ? "With who ranks and traffic potential" : o.topAvg.referringDomains != null ? <Link href={addr({ section: "serp" })} className={TEXT_LINK} data-testid="link-top-avg">Top pages average {fmtNum(o.topAvg.referringDomains)} referring domains</Link> : "0–100"} />
               <MetricColumn label="Cost per click" value={<Link href={addr({ section: "cpc" })} className={FIG_LINK} title="No view lists the bids — this opens who ranks" data-testid="link-cpc">{o.cpc == null ? "—" : `$${o.cpc.toFixed(2)}`}</Link>}
                 foot={o.bidLow != null && o.bidHigh != null ? <Link href={addr({ section: "cpc" })} className={TEXT_LINK} data-testid="link-cpc-bids">Top-of-page bids ${o.bidLow.toFixed(2)}–${o.bidHigh.toFixed(2)}</Link> : o.competition ? <Link href={addr({ section: "cpc" })} className={TEXT_LINK} data-testid="link-cpc-bids">{cap(o.competition.toLowerCase())} ad competition</Link> : undefined} />
               <MetricColumn label="Intent" value={o.intent ? <Link href={addr({ section: "ideas", table: "matchingTerms", intent: (INTENTS as readonly string[]).includes(o.intent) ? o.intent : undefined })} className={`${FIG_LINK} text-[20px]`} title={(INTENTS as readonly string[]).includes(o.intent) ? "Matching terms, narrowed to this intent" : "Matching terms — the ideas table has no filter for this intent, so every idea is shown"} data-testid="link-intent">{cap(o.intent)}</Link> : "—"}
                 foot={o.results != null ? <Link href={addr({ section: "results" })} className={TEXT_LINK} data-testid="link-results">{fmtNum(o.results)} results</Link> : undefined} />
-              {o.potential !== undefined && <MetricColumn label="Traffic potential" value={o.potential ? <Link href={addr({ section: "ideas", table: "relatedTerms", intent: undefined })} className={FIG_LINK} title="The related terms the #1 page ranks for" data-testid="link-potential">{fmtNum(o.potential.traffic)}</Link> : "—"}
+              {o.potential !== undefined && !o.free && <MetricColumn label="Traffic potential" value={o.potential ? <Link href={addr({ section: "ideas", table: "relatedTerms", intent: undefined })} className={FIG_LINK} title="The related terms the #1 page ranks for" data-testid="link-potential">{fmtNum(o.potential.traffic)}</Link> : "—"}
                 foot={o.potential ? <Link href={addr({ section: "ideas", table: "relatedTerms", intent: undefined })} className={TEXT_LINK} data-testid="link-potential-note">{o.potential.keywords === 1 ? `Estimated visits a month the #1 page gets from search in ${market.label} — it ranks for one keyword` : o.potential.keywords == null ? `Estimated visits a month the #1 page gets from search in ${market.label}` : `Estimated visits a month the #1 page gets in ${market.label} from all ${fmtNum(o.potential.keywords)} keywords it ranks for`}</Link> : (o.missing ?? []).includes("potential") ? "Didn't load this time (not charged)" : "Not available for this keyword"} />}
-              {o.potential !== undefined && <MetricColumn label="Parent topic" value={o.potential?.parentTopic ? (o.potential.parentTopic === o.keyword ? <span className="text-[17px] leading-snug" data-testid="text-parent-topic">This keyword</span> : <Link href={seoLinks.keywords(o.potential.parentTopic, marketParams(market))} className={`${BLOCK_LINK} g-link text-left text-[17px] leading-snug [overflow-wrap:anywhere]`} title="Open this keyword (its saved overview, or the Look up button)" data-testid="button-parent-topic">{o.potential.parentTopic}</Link>) : "—"}
+              {o.potential !== undefined && !o.free && <MetricColumn label="Parent topic" value={o.potential?.parentTopic ? (o.potential.parentTopic === o.keyword ? <span className="text-[17px] leading-snug" data-testid="text-parent-topic">This keyword</span> : <Link href={seoLinks.keywords(o.potential.parentTopic, marketParams(market))} className={`${BLOCK_LINK} g-link text-left text-[17px] leading-snug [overflow-wrap:anywhere]`} title="Open this keyword (its saved overview, or the Look up button)" data-testid="button-parent-topic">{o.potential.parentTopic}</Link>) : "—"}
                 foot={o.potential?.parentTopic ? <Link href={addr({ section: "ideas", table: "relatedTerms", intent: undefined })} className={TEXT_LINK} data-testid="link-parent-topic-ideas">The search that sends the #1 page the most visits{o.potential.parentVolume != null ? ` — ${fmtNum(o.potential.parentVolume)} searches a month` : ""}</Link> : undefined} />}
             </MetricRow>
           </Card>
-          {o.potential === undefined && <p className="g-text-2 -mt-2 mb-4 text-[13px]" data-testid="text-potential-older">Traffic potential and parent topic were added after this overview was saved — Refresh to see them.</p>}
+          {o.potential === undefined && !o.free && <p className="g-text-2 -mt-2 mb-4 text-[13px]" data-testid="text-potential-older">Traffic potential and parent topic were added after this overview was saved — Refresh to see them.</p>}
           <div className="mb-4 grid gap-4 lg:grid-cols-3">
             <Card className="lg:col-span-2 scroll-mt-4" id="keyword-trend" testId="panel-keyword-trend">
               <Heading className="mb-2" note={monthAt ? <Link href={addr({ section: "volume", month: monthAt.month })} className={TEXT_LINK} title="The month marked on the chart — its own address" data-testid="link-volume-marked">{monthLabel(monthAt.month)} marked: {fmtNum(monthAt.volume)} searches</Link> : undefined}>Search volume by month</Heading>
@@ -301,15 +340,24 @@ export default function SeoKeywordsPage() {
             <Card className="scroll-mt-4" id="keyword-features" testId="panel-keyword-features">
               <Heading className="mb-2">On the results page</Heading>
               {/* A feature opens this card as its own address (links.ts `section` features): what the saved results page showed. */}
-              {o.features.length ? <div className="flex flex-wrap gap-1.5">{o.features.map((f) => <FeatureTag key={f} feature={f} label={FEATURE[f] ?? cap(f.replace(/_/g, " "))} href={addr({ section: "features" })} testId={`link-feature-${f}`} />)}</div> : <p className="g-text-2 text-[13px]">Plain results only.</p>}
-              <p className="g-text-2 mt-3 text-[12px]">{o.features.includes("local_pack") ? "The saved results had a map pack, so a strong Google Business Profile matters as much as the website." : "No map pack in the saved results, so the website is what competes here."}</p>
+              {o.free ? <p className="g-text-2 text-[13px]" data-testid="text-features-full">What the results page shows — a map pack, people also ask, an AI overview — comes with the full lookup{o.place || place ? `, as searched from ${placeWords(o.place ?? place)}` : ""}.</p>
+                : o.features.length ? <div className="flex flex-wrap gap-1.5">{o.features.map((f) => <FeatureTag key={f} feature={f} label={FEATURE[f] ?? cap(f.replace(/_/g, " "))} href={addr({ section: "features" })} testId={`link-feature-${f}`} />)}</div> : <p className="g-text-2 text-[13px]">Plain results only.</p>}
+              {!o.free && <p className="g-text-2 mt-3 text-[12px]">{o.features.includes("local_pack") ? "The saved results had a map pack, so a strong Google Business Profile matters as much as the website." : "No map pack in the saved results, so the website is what competes here."}</p>}
               {site && isTracked && <p className="g-text-2 mt-2 text-[12px]">Tracked on {site.domain}: <Link href={seoLinks.rankTracker(site.id, { keyword: o.keyword })} className={TEXT_LINK} data-testid="link-features-tracker">the results-page features of each weekly check</Link></p>}
             </Card>
           </div>
           <section className="mb-5 scroll-mt-4" id="keyword-serp" data-testid="panel-keyword-serp">
-            <Heading className="mb-2" note={<>Google's top results as saved on <Link href={seoLinks.usage({ month: o.fetchedAt.slice(0, 7) })} className={TEXT_LINK} title="When these results were saved — that month's lookups on the Usage page" data-testid="link-serp-saved-on">{fmtDate(o.fetchedAt)}</Link> (desktop)</>}>Who ranks</Heading>
-            {(o.missing?.length ?? 0) > 0 && <p className="g-text-2 mb-2 text-[13px]" role="status" data-testid="text-keyword-missing">{[o.missing!.includes("results") ? "The top results" : null, o.missing!.includes("authority") ? "Site authority" : null, o.missing!.includes("potential") ? "Traffic potential and parent topic" : null].filter(Boolean).join(", ").replace(/, ([^,]*)$/, " and $1") || "Part of this overview"} didn't load this time; you were not charged for that part. Refresh looks the whole keyword up again.</p>}
-            {o.serp.length ? (
+            <Heading className="mb-2" note={o.free ? undefined : <>Google's top results as saved on <Link href={seoLinks.usage({ month: o.fetchedAt.slice(0, 7) })} className={TEXT_LINK} title="When these results were saved — that month's lookups on the Usage page" data-testid="link-serp-saved-on">{fmtDate(o.fetchedAt)}</Link> (desktop{o.place ? `, searched from ${o.place.label}` : ""})</>}>Who ranks</Heading>
+            {o.free && (
+              <div className="g-callout" data-testid="keyword-serp-full">
+                <h3>Who ranks, difficulty and traffic potential</h3>
+                <p>Google's free numbers don't say who holds the top ten{place ? ` in ${place.label}` : ""} or how hard it is to rank. The full lookup gets them — about {price} of your SEO data, free to reopen for a week.</p>
+                <Button className="mt-2" disabled={full.isPending || !configured || !affordable} onClick={() => full.mutate({ keyword: o.keyword, market: scopeKey, body: mk })} data-testid="button-serp-full">{full.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}Full lookup — about {price}</Button>
+                {!affordable && <p className="mt-2 text-[13px]" style={{ color: "var(--g-red)" }}>Not enough SEO data left — add credit above.</p>}
+              </div>
+            )}
+            {!o.free && (o.missing?.length ?? 0) > 0 && <p className="g-text-2 mb-2 text-[13px]" role="status" data-testid="text-keyword-missing">{[o.missing!.includes("results") ? "The top results" : null, o.missing!.includes("authority") ? "Site authority" : null, o.missing!.includes("potential") ? "Traffic potential and parent topic" : null].filter(Boolean).join(", ").replace(/, ([^,]*)$/, " and $1") || "Part of this overview"} didn't load this time; you were not charged for that part. Refresh looks the whole keyword up again.</p>}
+            {o.free ? null : o.serp.length ? (
               <div className="overflow-x-auto">
               <table className="g-table">
                 <thead><tr><th className="num w-10">#</th><th>Page</th><th className="num">Site authority</th><th></th></tr></thead>
@@ -333,7 +381,7 @@ export default function SeoKeywordsPage() {
             {IDEAS.map(([k, label]) => <Link key={k} href={addr({ table: k, intent: undefined })} aria-current={ideas === k ? "page" : undefined} data-testid={`tab-ideas-${k}`}>{label}</Link>)}
           </nav>
           {/* `linked`: the table's filter boxes (intent among them) read the address on arrival and write it on Apply. */}
-          <ReportView key={`${ideas}:${o.keyword}:${marketKey(market)}`} linked market={market} table={ideas} keyword={o.keyword} status={status.data} extraAction={(rows, clear) => <AddToList market={market} rows={rows} onDone={clear} />} onTrack={site ? (rows) => track.mutateAsync({ rows, from: market }) : undefined} trackLabel={site ? `Track on ${site.domain}` : undefined} />
+          <ReportView key={`${ideas}:${o.keyword}:${scopeKey}`} linked market={market} placeCode={place?.code} google={googleKeywords} table={ideas} keyword={o.keyword} status={status.data} extraAction={(rows, clear) => <AddToList market={market} rows={rows} onDone={clear} />} onTrack={site ? (rows) => track.mutateAsync({ rows, from: market }) : undefined} trackLabel={site ? `Track on ${site.domain}` : undefined} />
           {!site && <p className="g-text-2 mt-2 text-[13px]">Add a site above to track keywords from these lists.</p>}
           </section>
         </div>

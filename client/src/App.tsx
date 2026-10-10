@@ -51,6 +51,7 @@ import GbpContentPage from "@/pages/gbp-content";
 import ListingEditorPage from "@/pages/listing-editor";
 import DomainsPage from "@/pages/domains";
 import MailAlertsPage from "@/pages/mail-alerts";
+import PermitAlertsPage from "@/pages/permit-alerts";
 import LocationsPage from "@/pages/locations";
 import MasterClassPage from "@/pages/master-class";
 import ReinstatementPage from "@/pages/reinstatement";
@@ -213,6 +214,7 @@ function DashboardRouter() {
       <Route path="/property" component={PropertyPage} />
       <Route path="/schedules" component={SchedulesPage} />
       <Route path="/history" component={HistoryPage} />
+      <Route path="/permit-alerts" component={PermitAlertsPage} />
       <Route path="/photos" component={PhotosPage} />
       <Route path="/media-library" component={MediaLibraryPage} />
       <Route path="/gmb-monitor" component={GmbMonitorPage} />
@@ -419,7 +421,7 @@ function PublicRouter() {
 
 /** Dashboard routes that need an account (everything else here is public). */
 const SIGNED_IN_ONLY = [
-  "/search", "/schedules", "/history", "/media-library", "/gmb-monitor", "/ranking-grid",
+  "/search", "/schedules", "/history", "/permit-alerts", "/media-library", "/gmb-monitor", "/ranking-grid",
   "/social-media", "/guides", "/tutorials", "/cloudflare", "/search-console", "/seo", "/lsa-leads", "/lsa-account-manager", "/settings",
   "/agency", "/locations", "/domains", "/mail-alerts", "/gbp-content", "/listing-editor", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/youtube",
   ...(SHOW_COMPETITOR_INTEL ? ["/competitors"] : []),
@@ -446,12 +448,12 @@ const isSelfTitled = (location: string) =>
   SELF_TITLED.includes(location) || location.startsWith("/features/") || location.startsWith("/done-for-you/");
 const PAGE_TITLES: Record<string, string> = {
   "/search": "Search Permits", "/databases": "Database Directory", "/property": "Property Records",
-  "/schedules": "Scrape Schedules", "/history": "Search History", "/photos": "Photo Optimizer",
+  "/schedules": "Scrape Schedules", "/history": "Search History", "/permit-alerts": "Permit Alerts", "/photos": "Photo Optimizer",
   "/gmb-monitor": "GMB Edit Monitor", "/ranking-grid": "GMB Ranking Grid", "/pricing": "Pricing",
   "/competitors": "Competitor Intel", "/agency": "Agency", "/locations": "Locations", "/domains": "Domains",
   "/mail-alerts": "Mail Alerts", "/gbp-content": "Posts & Photos", "/listing-editor": "Listing editor", "/social-media": "Social Media",
   "/guides": "Guides", "/tutorials": "Tutorials", "/cloudflare": "Cloudflare", "/search-console": "Search Console", "/site-scan": "Site Scan",
-  "/seo": "SEO", "/seo/rank-tracker": "Rank tracker", "/seo/local-grid": "Local grid", "/seo/plan": "SEO action plan", "/seo/audit": "Site audit", "/seo/alerts": "SEO alerts", "/seo/mentions": "SEO mentions", "/seo/usage": "SEO data usage", "/seo/reports": "SEO reports", "/seo/ai": "AI visibility", "/seo/batch": "Batch analysis", "/seo/content": "Content explorer", "/seo/explorer": "Site explorer", "/seo/keywords": "Keywords explorer", "/seo/backlinks": "Backlinks", "/seo/competitors": "Competitors",
+  "/seo": "SEO Suite", "/seo/rank-tracker": "Rank tracker", "/seo/local-grid": "Local grid", "/seo/plan": "SEO action plan", "/seo/audit": "Site audit", "/seo/alerts": "SEO alerts", "/seo/mentions": "SEO mentions", "/seo/usage": "SEO data usage", "/seo/reports": "SEO reports", "/seo/ai": "AI visibility", "/seo/batch": "Batch analysis", "/seo/content": "Content explorer", "/seo/explorer": "Site explorer", "/seo/keywords": "Keywords explorer", "/seo/backlinks": "Backlinks", "/seo/competitors": "Competitors",
   "/master-class": "Master Class", "/reinstatement": "Reinstatement", "/google-business": "Google Business",
   "/google-ads": "Click Guard", "/ads-manager": "Agency Ads & LSA", "/google-ads-guide": "Google Ads Guide",
   "/google-ad-fraud": "Ad Fraud", "/lsa-guide": "LSA Guide", "/lsa-leads": "LSA Leads", "/ip-tracker": "IP Tracker",

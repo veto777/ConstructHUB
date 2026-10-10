@@ -1,0 +1,50 @@
+[
+  {
+    "permitno": "554239",
+    "status": "Finaled",
+    "stno": "10408",
+    "stname": "BIT AND SPUR",
+    "suffix": "LN",
+    "city": "POTOMAC",
+    "state": "MD",
+    "zip": "20854",
+    "addeddate": "2010-11-12T11:11:58.000",
+    "issueddate": "2010-12-02T01:12:00.000",
+    "finaleddate": "2019-01-23T10:01:14.000",
+    "buildingarea": "1151",
+    "declaredvaluation": "0",
+    "description": "ALTERATION AND ADDITION 367SQ FT; ALTER 775 SQ FT",
+    "applicationtype": "BUILDING RESIDENTIAL PERMIT",
+    "worktype": "ADD",
+    "usecode": "SINGLE FAMILY DWELLING",
+    "location": {
+      "latitude": "39.016664",
+      "longitude": "-77.21477",
+      "human_address": "{\"address\": \"10408 BIT AND SPUR LN\", \"city\": \"POTOMAC\", \"state\": \"MD\", \"zip\": \"20854\"}"
+    }
+  },
+  {
+    "permitno": "762841",
+    "status": "Finaled",
+    "stno": "612",
+    "stname": "WOODSIDE",
+    "suffix": "PKWY",
+    "city": "SILVER SPRING",
+    "state": "MD",
+    "zip": "20910",
+    "addeddate": "2016-07-07T11:07:59.000",
+    "issueddate": "2016-11-07T09:11:33.000",
+    "finaleddate": "2018-01-23T12:01:08.000",
+    "buildingarea": "1850",
+    "declaredvaluation": "450000",
+    "description": "Addition 1850 square feet, Alter 671 square feet",
+    "applicationtype": "BUILDING RESIDENTIAL PERMIT",
+    "worktype": "ADD",
+    "usecode": "SINGLE FAMILY DWELLING",
+    "location": {
+      "latitude": "39.000757",
+      "longitude": "-77.019525",
+      "human_address": "{\"address\": \"612 WOODSIDE PKWY\", \"city\": \"SILVER SPRING\", \"state\": \"MD\", \"zip\": \"20910\"}"
+    }
+  }
+]

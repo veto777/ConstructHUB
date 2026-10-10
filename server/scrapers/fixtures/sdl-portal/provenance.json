@@ -1,0 +1,237 @@
+{
+  "hazlet-nj-recent-2026-10-03-1.txt": {
+    "url": "https://www.sdlportal.com/towns/nj/monmouth/hazlettwp/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=1790899200&ped=1791763200",
+    "method": "GET",
+    "status": 200,
+    "finalUrl": "https://www.sdlportal.com/towns/nj/monmouth/hazlettwp/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=1790899200&ped=1791763200",
+    "time": "2026-10-10T17:58:49.841Z",
+    "sha256": "8dd685324bb6eca9fa4a80cc4371d04c96aa3e3da33d39aed0d92b54f3ccc4f5"
+  },
+  "monmouth-beach-nj-recent-2026-10-03-1.txt": {
+    "url": "https://www.sdlportal.com/towns/nj/monmouth/monmouthbeach/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=1790899200&ped=1791763200",
+    "method": "GET",
+    "status": 200,
+    "finalUrl": "https://www.sdlportal.com/towns/nj/monmouth/monmouthbeach/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=1790899200&ped=1791763200",
+    "time": "2026-10-10T17:58:51.877Z",
+    "sha256": "1830422592142786df9f49b945717338cc25da055a02b2f37721d7155015db02"
+  },
+  "raritan-nj-recent-2026-10-03-1.txt": {
+    "url": "https://www.sdlportal.com/towns/nj/hunterdon/raritantwp/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=1790985600&ped=1791590400",
+    "method": "GET",
+    "status": 200,
+    "finalUrl": "https://www.sdlportal.com/login?redirect=https%3A%2F%2Fwww.sdlportal.com%2Ftowns%2Fnj%2Fhunterdon%2Fraritantwp%2Fsearch2%3Fst%3Dpermits%26as%3D1%26limit%3D100%26stps%3Dall%26stpd%3Dall%26psd%3D1790985600%26ped%3D1791590400",
+    "time": "2026-10-10T17:52:38.030Z",
+    "sha256": "52c51fdcdb7fd4bdcb0334e2b048618b5375dec2c0745469e801258b1a7d82c1"
+  },
+  "spring-lake-heights-nj-recent-2026-10-03-1.txt": {
+    "url": "https://www.sdlportal.com/towns/nj/monmouth/springlakeheights/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=1790985600&ped=1791590400",
+    "method": "GET",
+    "status": 200,
+    "finalUrl": "https://www.sdlportal.com/login?redirect=https%3A%2F%2Fwww.sdlportal.com%2Ftowns%2Fnj%2Fmonmouth%2Fspringlakeheights%2Fsearch2%3Fst%3Dpermits%26as%3D1%26limit%3D100%26stps%3Dall%26stpd%3Dall%26psd%3D1790985600%26ped%3D1791590400",
+    "time": "2026-10-10T17:52:38.821Z",
+    "sha256": "4adf8e5163854c57cc958656d8b4af57257da7c3b71b25f9de8ed141ec7d1b34"
+  },
+  "hazlet-nj-search-address-1.txt": {
+    "url": "https://www.sdlportal.com/towns/nj/monmouth/hazlettwp/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=0&ped=0&loc=17+CROMAN+COURT",
+    "method": "GET",
+    "status": 200,
+    "finalUrl": "https://www.sdlportal.com/towns/nj/monmouth/hazlettwp/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=0&ped=0&loc=17+CROMAN+COURT",
+    "time": "2026-10-10T17:53:28.595Z",
+    "sha256": "7852a322368e6ac2e7b48149b1affe5130f74f80c0285a3bf972a87bc7bd8f2d"
+  },
+  "hazlet-nj-search-permit-1.txt": {
+    "url": "https://www.sdlportal.com/towns/nj/monmouth/hazlettwp/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=0&ped=0&pc=2026-0685",
+    "method": "GET",
+    "status": 200,
+    "finalUrl": "https://www.sdlportal.com/towns/nj/monmouth/hazlettwp/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=0&ped=0&pc=2026-0685",
+    "time": "2026-10-10T17:53:30.402Z",
+    "sha256": "aeee3384eb9d4c92dd928596c97e5c81f477f1639d8a3788382e51f0cbe10ac1"
+  },
+  "hazlet-nj-search-keyword-1.txt": {
+    "url": "https://www.sdlportal.com/towns/nj/monmouth/hazlettwp/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=0&ped=0&kw=ConstructHUB-no-such-work-20261010",
+    "method": "GET",
+    "status": 200,
+    "finalUrl": "https://www.sdlportal.com/towns/nj/monmouth/hazlettwp/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=0&ped=0&kw=ConstructHUB-no-such-work-20261010",
+    "time": "2026-10-10T17:56:53.961Z",
+    "sha256": "f72d21c06266aac63ada3d6964a2cf9247e359088580655bf8852c219f84510c"
+  },
+  "monmouth-beach-nj-search-address-1.txt": {
+    "url": "https://www.sdlportal.com/towns/nj/monmouth/monmouthbeach/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=0&ped=0&loc=1+Ocean",
+    "method": "GET",
+    "status": 200,
+    "finalUrl": "https://www.sdlportal.com/towns/nj/monmouth/monmouthbeach/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=0&ped=0&loc=1+Ocean",
+    "time": "2026-10-10T17:53:32.620Z",
+    "sha256": "612df8b6b1c5287f6239e03ad63af289101da3ba45da7de3595145af84ebdbad"
+  },
+  "monmouth-beach-nj-search-permit-1.txt": {
+    "url": "https://www.sdlportal.com/towns/nj/monmouth/monmouthbeach/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=0&ped=0&pc=260155",
+    "method": "GET",
+    "status": 200,
+    "finalUrl": "https://www.sdlportal.com/towns/nj/monmouth/monmouthbeach/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=0&ped=0&pc=260155",
+    "time": "2026-10-10T18:02:33.347Z",
+    "sha256": "319cfcd71a8a8406ea8b8f84c83c569af9c0b64fdda8df13df89e4b26660c4f1"
+  },
+  "raritan-nj-search-address-1.txt": {
+    "url": "https://www.sdlportal.com/towns/nj/hunterdon/raritantwp/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=0&ped=0&loc=100+Main+St",
+    "method": "GET",
+    "status": 302,
+    "finalUrl": "https://www.sdlportal.com/towns/nj/hunterdon/raritantwp/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=0&ped=0&loc=100+Main+St",
+    "time": "2026-10-10T17:53:34.288Z",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "raritan-nj-search-permit-1.txt": {
+    "url": "https://www.sdlportal.com/towns/nj/hunterdon/raritantwp/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=0&ped=0&pc=2026",
+    "method": "GET",
+    "status": 302,
+    "finalUrl": "https://www.sdlportal.com/towns/nj/hunterdon/raritantwp/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=0&ped=0&pc=2026",
+    "time": "2026-10-10T17:53:34.899Z",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "spring-lake-heights-nj-search-address-1.txt": {
+    "url": "https://www.sdlportal.com/towns/nj/monmouth/springlakeheights/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=0&ped=0&loc=100+Main+St",
+    "method": "GET",
+    "status": 302,
+    "finalUrl": "https://www.sdlportal.com/towns/nj/monmouth/springlakeheights/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=0&ped=0&loc=100+Main+St",
+    "time": "2026-10-10T17:53:35.462Z",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "spring-lake-heights-nj-search-permit-1.txt": {
+    "url": "https://www.sdlportal.com/towns/nj/monmouth/springlakeheights/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=0&ped=0&pc=2026",
+    "method": "GET",
+    "status": 302,
+    "finalUrl": "https://www.sdlportal.com/towns/nj/monmouth/springlakeheights/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=0&ped=0&pc=2026",
+    "time": "2026-10-10T17:53:36.145Z",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "cherry-hill-nj-recent-2026-10-03-1.txt": {
+    "url": "https://www.sdlportal.com/towns/nj/camden/cherryhilltwp/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=1790899200&ped=1791763200",
+    "method": "GET",
+    "status": 200,
+    "finalUrl": "https://www.sdlportal.com/towns/nj/camden/cherryhilltwp/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=1790899200&ped=1791763200",
+    "time": "2026-10-10T17:58:54.574Z",
+    "sha256": "ea6f411cac3820e28828417094593f3b8f7c85f15ea8d435c8622718307d18c4"
+  },
+  "cherry-hill-nj-search-address-1.txt": {
+    "url": "https://www.sdlportal.com/towns/nj/camden/cherryhilltwp/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=0&ped=0&loc=304+NATURE+DR",
+    "method": "GET",
+    "status": 200,
+    "finalUrl": "https://www.sdlportal.com/towns/nj/camden/cherryhilltwp/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=0&ped=0&loc=304+NATURE+DR",
+    "time": "2026-10-10T17:56:48.885Z",
+    "sha256": "3eff812648bfa38dfd65a267e5cf15244cc88e323f8f6e094d696b76ea9433de"
+  },
+  "cherry-hill-nj-search-permit-1.txt": {
+    "url": "https://www.sdlportal.com/towns/nj/camden/cherryhilltwp/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=0&ped=0&pc=20262895",
+    "method": "GET",
+    "status": 200,
+    "finalUrl": "https://www.sdlportal.com/towns/nj/camden/cherryhilltwp/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=0&ped=0&pc=20262895",
+    "time": "2026-10-10T17:56:51.794Z",
+    "sha256": "1c720e9f27cd8c18bcf22fe06b345ab496f3700b6fb04689a06959132dfe4861"
+  },
+  "hazlet-padded-day-2026-10-05.html": {
+    "url": "https://www.sdlportal.com/towns/nj/monmouth/hazlettwp/search2?st=permits&as=1&limit=100&stps=all&stpd=all&psd=1791072000&ped=1791331200",
+    "method": "GET",
+    "status": 200,
+    "time": "2026-10-10T17:59:11.930Z",
+    "sha256": "fbd4951bdb94be07ba7a08dee04dbd3067eafddc29fcd4ca21331059f88d20bf"
+  },
+  "cherryhill-search.html": {
+    "capturedOn": "2026-10-10",
+    "note": "Initial live survey response; source and method are documented in the vendor REPORT.md.",
+    "sha256": "52c1789f091f6d7f01b9deffa7d0fed73da90b9d159c25dc1ee882c8aa103c17"
+  },
+  "monmouth.html": {
+    "capturedOn": "2026-10-10",
+    "note": "Initial live survey response; source and method are documented in the vendor REPORT.md.",
+    "sha256": "7a92814f49b4312be748e0e909b5c77ded5ac272075dc16d6458dff8b529b681"
+  },
+  "delaware-search.html": {
+    "capturedOn": "2026-10-10",
+    "note": "Initial live survey response; source and method are documented in the vendor REPORT.md.",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "hazlet-day-2026-10-05.html": {
+    "capturedOn": "2026-10-10",
+    "note": "Initial live survey response; source and method are documented in the vendor REPORT.md.",
+    "sha256": "6a89d7afb56c501b66f516dcd9823d5792e9ff661fda61cf445322b903d38768"
+  },
+  "sample-detail.html": {
+    "capturedOn": "2026-10-10",
+    "note": "Initial live survey response; source and method are documented in the vendor REPORT.md.",
+    "sha256": "22819e39b35653f027152108450d6f2a4c6ee58dd964ecd0add99876a1820df2"
+  },
+  "search.js": {
+    "capturedOn": "2026-10-10",
+    "note": "Initial live survey response; source and method are documented in the vendor REPORT.md.",
+    "sha256": "7e5c696d4e7ac761c61a1f5a7d88a2a9eba8bd327efd245f3b7e53575ed47bb9"
+  },
+  "hazlet.html": {
+    "capturedOn": "2026-10-10",
+    "note": "Initial live survey response; source and method are documented in the vendor REPORT.md.",
+    "sha256": "27b8e3ef6968382013335fe042752d6da753a278bd486206c9b664f285faa16e"
+  },
+  "cherryhill-inspection.html": {
+    "capturedOn": "2026-10-10",
+    "note": "Initial live survey response; source and method are documented in the vendor REPORT.md.",
+    "sha256": "a8bcfbe4a1dec43a75dc9041e60687dcc562c2e324587a76959ef321bae0fa1e"
+  },
+  "hazlet-middle.html": {
+    "capturedOn": "2026-10-10",
+    "note": "Initial live survey response; source and method are documented in the vendor REPORT.md.",
+    "sha256": "5d60e036b7d562e06fe4ae53ed507e4dc6fe4978d678318f179ebc07733b6cd9"
+  },
+  "hazlet-main.html": {
+    "capturedOn": "2026-10-10",
+    "note": "Initial live survey response; source and method are documented in the vendor REPORT.md.",
+    "sha256": "4081d72c55568eab5196bb31789461ed9a0cb9211d850b6f94fbd442209482e1"
+  },
+  "springlake.html": {
+    "capturedOn": "2026-10-10",
+    "note": "Initial live survey response; source and method are documented in the vendor REPORT.md.",
+    "sha256": "7a3f1c20aab507372ffb8498fe24e1395357bc5aabdd3ea6171b7d23e21712d9"
+  },
+  "hazlet-range-2026-10-05-2026-10-06.html": {
+    "capturedOn": "2026-10-10",
+    "note": "Initial live survey response; source and method are documented in the vendor REPORT.md.",
+    "sha256": "538195b341260c8b38a4e533247cdf3180fa39f7ca7a963827db367eb5972890"
+  },
+  "hazlet-recent.html": {
+    "capturedOn": "2026-10-10",
+    "note": "Initial live survey response; source and method are documented in the vendor REPORT.md.",
+    "sha256": "cf86978288e551d86bb411fa27d42e5a39567697e7312722e9dada6fca5db008"
+  },
+  "hazlet-day-2026-10-06.html": {
+    "capturedOn": "2026-10-10",
+    "note": "Initial live survey response; source and method are documented in the vendor REPORT.md.",
+    "sha256": "72ef67c5ad0f15b722a58a5c5df316703827667e2b238de60375dff5e32fc832"
+  },
+  "delaware-application.html": {
+    "capturedOn": "2026-10-10",
+    "note": "Initial live survey response; source and method are documented in the vendor REPORT.md.",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "hazlet-main.json": {
+    "capturedOn": "2026-10-10",
+    "note": "Initial live survey response; source and method are documented in the vendor REPORT.md.",
+    "sha256": "33e71e35cf4ad59e34172c62c91ccc13dd44ad9c8459f82c4067440d6508093c"
+  },
+  "hazlet-range-2026-10-06-2026-10-07.html": {
+    "capturedOn": "2026-10-10",
+    "note": "Initial live survey response; source and method are documented in the vendor REPORT.md.",
+    "sha256": "17c9d361d104689b8d964b8e3e6cb861ccba9515a9a73305e94150b8744b61f6"
+  },
+  "hazlet-dates-noon.html": {
+    "capturedOn": "2026-10-10",
+    "note": "Initial live survey response; source and method are documented in the vendor REPORT.md.",
+    "sha256": "17c9d361d104689b8d964b8e3e6cb861ccba9515a9a73305e94150b8744b61f6"
+  },
+  "hazlet-dates-eastern.html": {
+    "capturedOn": "2026-10-10",
+    "note": "Initial live survey response; source and method are documented in the vendor REPORT.md.",
+    "sha256": "204ef6abbbcf6cf89f648bca0519c35fc23d4f73ec883491af0045376749ae46"
+  },
+  "raritan.html": {
+    "capturedOn": "2026-10-10",
+    "note": "Initial live survey response; source and method are documented in the vendor REPORT.md.",
+    "sha256": "b70fe88d417d76f5a7e04e3eef3ca16a2c077eae5f0d7defbc3a9bdb6dd61072"
+  }
+}

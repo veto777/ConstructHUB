@@ -1,0 +1,4780 @@
+[
+  {
+    "jurisdiction": "Hays County, TX",
+    "url": "https://www.hayscountypermits.com/",
+    "type": "permit",
+    "value": "2026-004",
+    "time": "2026-10-10T18:08:58.795Z",
+    "elapsedMs": 1618,
+    "count": 5,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "2026-0048",
+        "jurisdiction": "Hays County, TX",
+        "databaseId": 0,
+        "address": "5115 FM 110",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Site Preparation & Foundation",
+        "workClass": null,
+        "description": "Riley's Point Buzzy Bee Gas Station",
+        "status": "Awaiting Response",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://www.hayscountypermits.com/public/permits/details/696f9672ec62968a0f07b5d0"
+      },
+      {
+        "permitNumber": "2026-0042",
+        "jurisdiction": "Hays County, TX",
+        "databaseId": 0,
+        "address": "1645 SH 80",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Site Preparation & Foundation",
+        "workClass": null,
+        "description": "Bodega Convenience Store",
+        "status": "Awaiting Response",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://www.hayscountypermits.com/public/permits/details/6968f9ab94f7c23d2921801a"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Hays County, TX",
+    "url": "https://www.hayscountypermits.com/",
+    "type": "address",
+    "value": "5115 FM 110",
+    "time": "2026-10-10T18:09:00.414Z",
+    "elapsedMs": 81,
+    "count": 1,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "2026-0048",
+        "jurisdiction": "Hays County, TX",
+        "databaseId": 0,
+        "address": "5115 FM 110",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Site Preparation & Foundation",
+        "workClass": null,
+        "description": "Riley's Point Buzzy Bee Gas Station",
+        "status": "Awaiting Response",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://www.hayscountypermits.com/public/permits/details/696f9672ec62968a0f07b5d0"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Hays County, TX",
+    "url": "https://www.hayscountypermits.com/",
+    "type": "permit",
+    "value": "2026-0048",
+    "time": "2026-10-10T18:09:00.496Z",
+    "elapsedMs": 1001,
+    "count": 1,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "2026-0048",
+        "jurisdiction": "Hays County, TX",
+        "databaseId": 0,
+        "address": "5115 FM 110",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Site Preparation & Foundation",
+        "workClass": null,
+        "description": "Riley's Point Buzzy Bee Gas Station",
+        "status": "Awaiting Response",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://www.hayscountypermits.com/public/permits/details/696f9672ec62968a0f07b5d0"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Hays County, TX",
+    "url": "https://www.hayscountypermits.com/",
+    "type": "recent",
+    "value": "2026-10-03T18:09:01.497Z",
+    "time": "2026-10-10T18:09:01.497Z",
+    "elapsedMs": 0,
+    "count": 0,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": []
+  },
+  {
+    "jurisdiction": "Johnston County, NC",
+    "url": "https://www.johnstonnc.gov/content.cfm?id=1843",
+    "type": "address",
+    "value": "102 MAIN",
+    "time": "2026-10-10T18:09:01.498Z",
+    "elapsedMs": 283,
+    "count": 3,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "174579",
+        "jurisdiction": "Johnston County, NC",
+        "databaseId": 0,
+        "address": "102 MAIN ST, PINE LEVEL",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "COMMERCIAL REMODEL",
+        "workClass": null,
+        "description": null,
+        "status": null,
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 132365,
+        "contractorName": "CAROLINA BUILDING SYSTEMS",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      },
+      {
+        "permitNumber": "189485",
+        "jurisdiction": "Johnston County, NC",
+        "databaseId": 0,
+        "address": "102 MAIN ST, PINE LEVEL",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "CHANGE OF TENANT",
+        "workClass": null,
+        "description": null,
+        "status": null,
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 60,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Johnston County, NC",
+    "url": "https://www.johnstonnc.gov/content.cfm?id=1843",
+    "type": "address",
+    "value": "102 MAIN ST, PINE LEVEL",
+    "time": "2026-10-10T18:09:01.782Z",
+    "elapsedMs": 4263,
+    "count": 0,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": []
+  },
+  {
+    "jurisdiction": "Johnston County, NC",
+    "url": "https://www.johnstonnc.gov/content.cfm?id=1843",
+    "type": "permit",
+    "value": "174579",
+    "time": "2026-10-10T18:09:06.045Z",
+    "elapsedMs": 286,
+    "count": 1,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "174579",
+        "jurisdiction": "Johnston County, NC",
+        "databaseId": 0,
+        "address": "102 MAIN ST, PINE LEVEL",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "COMMERCIAL REMODEL",
+        "workClass": null,
+        "description": null,
+        "status": null,
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 132365,
+        "contractorName": "CAROLINA BUILDING SYSTEMS",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Johnston County, NC",
+    "url": "https://www.johnstonnc.gov/content.cfm?id=1843",
+    "type": "recent",
+    "value": "2026-10-03T18:09:06.332Z",
+    "time": "2026-10-10T18:09:06.332Z",
+    "elapsedMs": 0,
+    "count": 0,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": []
+  },
+  {
+    "jurisdiction": "Kaufman County, TX",
+    "url": "https://www.kaufmancountypermits.com/",
+    "type": "permit",
+    "value": "2026-004",
+    "time": "2026-10-10T18:09:06.332Z",
+    "elapsedMs": 495,
+    "count": 2,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "2026-0044",
+        "jurisdiction": "Kaufman County, TX",
+        "databaseId": 0,
+        "address": "3115 MISTY LN",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Building",
+        "workClass": null,
+        "description": "Maplewood Meadows Phase 1A Amenity Center",
+        "status": "Approved",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://www.kaufmancountypermits.com/public/permits/details/6966b8b16dbf61fcc219913f"
+      },
+      {
+        "permitNumber": "2026-0041",
+        "jurisdiction": "Kaufman County, TX",
+        "databaseId": 0,
+        "address": "1065 IRON GATE BLVD",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Automatic / Alternative Fire Extinguishing System",
+        "workClass": null,
+        "description": "OAK VIEW FORNEY SELF STORAGE",
+        "status": "Approved",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://www.kaufmancountypermits.com/public/permits/details/69667db680c3e77016df3120"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Kaufman County, TX",
+    "url": "https://www.kaufmancountypermits.com/",
+    "type": "address",
+    "value": "3115 MISTY LN",
+    "time": "2026-10-10T18:09:06.828Z",
+    "elapsedMs": 580,
+    "count": 3,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "2026-0244",
+        "jurisdiction": "Kaufman County, TX",
+        "databaseId": 0,
+        "address": "3115 MISTY LN",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Automatic / Alternative Fire Extinguishing System",
+        "workClass": null,
+        "description": "Maplewood Meadows Phase 1A Amenity Center",
+        "status": "Approved",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://www.kaufmancountypermits.com/public/permits/details/69b9b17e6cc8d254bf1f7c90"
+      },
+      {
+        "permitNumber": "2026-0278",
+        "jurisdiction": "Kaufman County, TX",
+        "databaseId": 0,
+        "address": "3115 MISTY LN",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Fire Alarm / Detection System",
+        "workClass": null,
+        "description": "Maplewood Meadows Phase 1A Amenity Center",
+        "status": "Approved",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://www.kaufmancountypermits.com/public/permits/details/69c19b1b272b034e22514107"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Kaufman County, TX",
+    "url": "https://www.kaufmancountypermits.com/",
+    "type": "permit",
+    "value": "2026-0044",
+    "time": "2026-10-10T18:09:07.408Z",
+    "elapsedMs": 997,
+    "count": 1,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "2026-0044",
+        "jurisdiction": "Kaufman County, TX",
+        "databaseId": 0,
+        "address": "3115 MISTY LN",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Building",
+        "workClass": null,
+        "description": "Maplewood Meadows Phase 1A Amenity Center",
+        "status": "Approved",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://www.kaufmancountypermits.com/public/permits/details/6966b8b16dbf61fcc219913f"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Kaufman County, TX",
+    "url": "https://www.kaufmancountypermits.com/",
+    "type": "recent",
+    "value": "2026-10-03T18:09:08.405Z",
+    "time": "2026-10-10T18:09:08.405Z",
+    "elapsedMs": 0,
+    "count": 0,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": []
+  },
+  {
+    "jurisdiction": "Milam County, TX",
+    "url": "https://www.milamcountypermits.com/",
+    "type": "permit",
+    "value": "2026-004",
+    "time": "2026-10-10T18:09:08.406Z",
+    "elapsedMs": 357,
+    "count": 4,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "2026-0044",
+        "jurisdiction": "Milam County, TX",
+        "databaseId": 0,
+        "address": "9140 N US HIGHWAY 77",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Building",
+        "workClass": null,
+        "description": "Offsite Pump Station",
+        "status": "Approved",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://www.milamcountypermits.com/public/permits/details/6a99f20adb22a3bb7944f394"
+      },
+      {
+        "permitNumber": "2026-0042",
+        "jurisdiction": "Milam County, TX",
+        "databaseId": 0,
+        "address": "9140 N US HIGHWAY 77",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Building",
+        "workClass": null,
+        "description": "Offsite Pump Station",
+        "status": "Approved",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://www.milamcountypermits.com/public/permits/details/6a9244fbc78b024c05d7ae8b"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Milam County, TX",
+    "url": "https://www.milamcountypermits.com/",
+    "type": "address",
+    "value": "9140 N US HIGHWAY 77",
+    "time": "2026-10-10T18:09:08.763Z",
+    "elapsedMs": 702,
+    "count": 2,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "2026-0044",
+        "jurisdiction": "Milam County, TX",
+        "databaseId": 0,
+        "address": "9140 N US HIGHWAY 77",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Building",
+        "workClass": null,
+        "description": "Offsite Pump Station",
+        "status": "Approved",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://www.milamcountypermits.com/public/permits/details/6a99f20adb22a3bb7944f394"
+      },
+      {
+        "permitNumber": "2026-0042",
+        "jurisdiction": "Milam County, TX",
+        "databaseId": 0,
+        "address": "9140 N US HIGHWAY 77",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Building",
+        "workClass": null,
+        "description": "Offsite Pump Station",
+        "status": "Approved",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://www.milamcountypermits.com/public/permits/details/6a9244fbc78b024c05d7ae8b"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Milam County, TX",
+    "url": "https://www.milamcountypermits.com/",
+    "type": "permit",
+    "value": "2026-0044",
+    "time": "2026-10-10T18:09:09.465Z",
+    "elapsedMs": 996,
+    "count": 1,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "2026-0044",
+        "jurisdiction": "Milam County, TX",
+        "databaseId": 0,
+        "address": "9140 N US HIGHWAY 77",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Building",
+        "workClass": null,
+        "description": "Offsite Pump Station",
+        "status": "Approved",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://www.milamcountypermits.com/public/permits/details/6a99f20adb22a3bb7944f394"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Milam County, TX",
+    "url": "https://www.milamcountypermits.com/",
+    "type": "recent",
+    "value": "2026-10-03T18:09:10.461Z",
+    "time": "2026-10-10T18:09:10.461Z",
+    "elapsedMs": 0,
+    "count": 0,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": []
+  },
+  {
+    "jurisdiction": "St. Johns County, FL",
+    "url": "https://webapp.sjcfl.us/watswebx/Permit/SearchPermit.aspx",
+    "type": "address",
+    "value": "MAIN",
+    "time": "2026-10-10T18:09:10.461Z",
+    "elapsedMs": 8763,
+    "count": 537,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "license",
+        "name"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "12611699",
+        "jurisdiction": "St. Johns County, FL",
+        "databaseId": 0,
+        "address": "224 N MAIN ST STE B",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": null,
+        "workClass": "500C",
+        "description": null,
+        "status": "Open",
+        "issuedAt": "2026-10-09",
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": "EXEMPT",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://webapp.sjcfl.us/watswebx/Permit/BLPermit.aspx?PermitNo=12611699&PopUp=1"
+      },
+      {
+        "permitNumber": "12611192",
+        "jurisdiction": "St. Johns County, FL",
+        "databaseId": 0,
+        "address": "109 N MAIN ST",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": null,
+        "workClass": "435C",
+        "description": null,
+        "status": "Open",
+        "issuedAt": "2026-09-25",
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": "BURCHFIELD, JOSEPH G",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://webapp.sjcfl.us/watswebx/Permit/BLPermit.aspx?PermitNo=12611192&PopUp=1"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "St. Johns County, FL",
+    "url": "https://webapp.sjcfl.us/watswebx/Permit/SearchPermit.aspx",
+    "type": "address",
+    "value": "224 N MAIN ST STE B",
+    "time": "2026-10-10T18:09:19.224Z",
+    "elapsedMs": 8134,
+    "count": 1,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "license",
+        "name"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "12611699",
+        "jurisdiction": "St. Johns County, FL",
+        "databaseId": 0,
+        "address": "224 N MAIN ST STE B",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Building",
+        "workClass": null,
+        "description": "Interior Build-Out - Bloom and Renew",
+        "status": null,
+        "issuedAt": "2026-10-09",
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 0,
+        "contractorName": null,
+        "contractorLicense": "EXEMPT",
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://webapp.sjcfl.us/watswebx/Permit/BLPermit.aspx?PermitNo=12611699&PopUp=1"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "St. Johns County, FL",
+    "url": "https://webapp.sjcfl.us/watswebx/Permit/SearchPermit.aspx",
+    "type": "permit",
+    "value": "12611699",
+    "time": "2026-10-10T18:09:27.358Z",
+    "elapsedMs": 1196,
+    "count": 1,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "license",
+        "name"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "12611699",
+        "jurisdiction": "St. Johns County, FL",
+        "databaseId": 0,
+        "address": "224 N MAIN ST STE B",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Building",
+        "workClass": null,
+        "description": "Interior Build-Out - Bloom and Renew",
+        "status": null,
+        "issuedAt": "2026-10-09",
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 0,
+        "contractorName": null,
+        "contractorLicense": "EXEMPT",
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://webapp.sjcfl.us/watswebx/Permit/BLPermit.aspx?PermitNo=12611699&PopUp=1"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "St. Johns County, FL",
+    "url": "https://webapp.sjcfl.us/watswebx/Permit/SearchPermit.aspx",
+    "type": "company",
+    "value": "BURCHFIELD, JOSEPH G",
+    "time": "2026-10-10T18:09:28.555Z",
+    "elapsedMs": 31906,
+    "error": "Error: St. Johns: missing result count (portal failure or changed layout)"
+  },
+  {
+    "jurisdiction": "St. Johns County, FL",
+    "url": "https://webapp.sjcfl.us/watswebx/Permit/SearchPermit.aspx",
+    "type": "recent",
+    "value": "2026-10-03T18:10:00.462Z",
+    "time": "2026-10-10T18:10:00.462Z",
+    "elapsedMs": 13584,
+    "count": 808,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "license",
+        "name"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "12611650",
+        "jurisdiction": "St. Johns County, FL",
+        "databaseId": 0,
+        "address": "205 DUCKWOOD LN",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": null,
+        "workClass": "434E",
+        "description": null,
+        "status": "Open",
+        "issuedAt": "2026-10-10",
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": "THOMAS, JONATHAN THEODORE",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://webapp.sjcfl.us/watswebx/Permit/BLPermit.aspx?PermitNo=12611650&PopUp=1"
+      },
+      {
+        "permitNumber": "12611651",
+        "jurisdiction": "St. Johns County, FL",
+        "databaseId": 0,
+        "address": "3081 S PONTE VEDRA BLVD",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": null,
+        "workClass": "434E",
+        "description": null,
+        "status": "Open",
+        "issuedAt": "2026-10-10",
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": "THOMAS, JONATHAN THEODORE",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://webapp.sjcfl.us/watswebx/Permit/BLPermit.aspx?PermitNo=12611651&PopUp=1"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Summit County, OH",
+    "url": "https://permitsearch.summitoh.net/",
+    "type": "address",
+    "value": "445 S MAIN ST",
+    "time": "2026-10-10T18:10:14.046Z",
+    "elapsedMs": 5494,
+    "count": 11,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": true
+    },
+    "samples": [
+      {
+        "permitNumber": "CPR210041",
+        "jurisdiction": "Summit County, OH",
+        "databaseId": 0,
+        "address": "445 S MAIN ST, AKRON 44311",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Bldg Standards - Commercial Plan Review",
+        "workClass": null,
+        "description": null,
+        "status": "CLOSED",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://permitsearch.summitoh.net/PermitResult?PermitNumber=CPR210041"
+      },
+      {
+        "permitNumber": "ME2101462",
+        "jurisdiction": "Summit County, OH",
+        "databaseId": 0,
+        "address": "3445 S MAIN ST, COVENTRY TWP 44319",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Bldg Standards - Mechanical",
+        "workClass": null,
+        "description": null,
+        "status": "DENIED",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://permitsearch.summitoh.net/PermitResult?PermitNumber=ME2101462"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Summit County, OH",
+    "url": "https://permitsearch.summitoh.net/",
+    "type": "address",
+    "value": "445 S MAIN ST, AKRON 44311",
+    "time": "2026-10-10T18:10:19.540Z",
+    "elapsedMs": 2923,
+    "count": 4,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": true
+    },
+    "samples": [
+      {
+        "permitNumber": "CPR210041",
+        "jurisdiction": "Summit County, OH",
+        "databaseId": 0,
+        "address": "445 S MAIN ST, AKRON 44311",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Bldg Standards - Commercial Plan Review",
+        "workClass": null,
+        "description": null,
+        "status": "CLOSED",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://permitsearch.summitoh.net/PermitResult?PermitNumber=CPR210041"
+      },
+      {
+        "permitNumber": "RPR240950",
+        "jurisdiction": "Summit County, OH",
+        "databaseId": 0,
+        "address": "445 S MAIN ST 44312",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Bldg Standards - Residential Plan Review",
+        "workClass": null,
+        "description": null,
+        "status": "COMPLY",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://permitsearch.summitoh.net/PermitResult?PermitNumber=RPR240950"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Summit County, OH",
+    "url": "https://permitsearch.summitoh.net/",
+    "type": "permit",
+    "value": "CPR210041",
+    "time": "2026-10-10T18:10:22.463Z",
+    "elapsedMs": 1014,
+    "count": 1,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": true
+    },
+    "samples": [
+      {
+        "permitNumber": "CPR210041",
+        "jurisdiction": "Summit County, OH",
+        "databaseId": 0,
+        "address": "445 S MAIN ST, AKRON 44311",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Building",
+        "workClass": "Plan Review",
+        "description": null,
+        "status": "CLOSED",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": "2120-01-19",
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": "Katie Veasey Gillette",
+        "ownerName": null,
+        "sourceUrl": "https://permitsearch.summitoh.net/PermitResult?PermitNumber=CPR210041"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Summit County, OH",
+    "url": "https://permitsearch.summitoh.net/",
+    "type": "recent",
+    "value": "2026-10-03T18:10:23.478Z",
+    "time": "2026-10-10T18:10:23.478Z",
+    "elapsedMs": 0,
+    "count": 0,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": true
+    },
+    "samples": []
+  },
+  {
+    "jurisdiction": "Williamson County, TX",
+    "url": "https://www.wilcopermits.com/",
+    "type": "permit",
+    "value": "2026-004",
+    "time": "2026-10-10T18:10:23.478Z",
+    "elapsedMs": 314,
+    "count": 4,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "2026-0041",
+        "jurisdiction": "Williamson County, TX",
+        "databaseId": 0,
+        "address": "2912 CR 175",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Building",
+        "workClass": null,
+        "description": "2912 CR 175",
+        "status": "Approved",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://www.wilcopermits.com/public/permits/details/6973ebd782949df8b5b5ea3f"
+      },
+      {
+        "permitNumber": "2026-0040",
+        "jurisdiction": "Williamson County, TX",
+        "databaseId": 0,
+        "address": "12527 W FM 487",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Building",
+        "workClass": null,
+        "description": "Brooksville RV Resort - Office and Comfort Station",
+        "status": "Approved",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://www.wilcopermits.com/public/permits/details/6973ea6c82949df8b5b59eae"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Williamson County, TX",
+    "url": "https://www.wilcopermits.com/",
+    "type": "address",
+    "value": "2912 CR 175",
+    "time": "2026-10-10T18:10:23.792Z",
+    "elapsedMs": 760,
+    "count": 1,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "2026-0041",
+        "jurisdiction": "Williamson County, TX",
+        "databaseId": 0,
+        "address": "2912 CR 175",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Building",
+        "workClass": null,
+        "description": "2912 CR 175",
+        "status": "Approved",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://www.wilcopermits.com/public/permits/details/6973ebd782949df8b5b5ea3f"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Williamson County, TX",
+    "url": "https://www.wilcopermits.com/",
+    "type": "permit",
+    "value": "2026-0041",
+    "time": "2026-10-10T18:10:24.552Z",
+    "elapsedMs": 1008,
+    "count": 1,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "2026-0041",
+        "jurisdiction": "Williamson County, TX",
+        "databaseId": 0,
+        "address": "2912 CR 175",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Building",
+        "workClass": null,
+        "description": "2912 CR 175",
+        "status": "Approved",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://www.wilcopermits.com/public/permits/details/6973ebd782949df8b5b5ea3f"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Williamson County, TX",
+    "url": "https://www.wilcopermits.com/",
+    "type": "recent",
+    "value": "2026-10-03T18:10:25.560Z",
+    "time": "2026-10-10T18:10:25.560Z",
+    "elapsedMs": 0,
+    "count": 0,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": []
+  },
+  {
+    "jurisdiction": "Coconut Creek, FL",
+    "url": "https://www3.coconutcreek.gov/sd/permit/permit_status_01.asp",
+    "type": "address",
+    "value": "COPANS",
+    "time": "2026-10-10T18:10:25.561Z",
+    "elapsedMs": 289,
+    "count": 651,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "26002855",
+        "jurisdiction": "Coconut Creek, FL",
+        "databaseId": 0,
+        "address": "4800 W COPANS RD",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "COMMUNICATION ANTENNAS",
+        "workClass": null,
+        "description": null,
+        "status": "OPEN",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": "CITY OF COCONUT CREEK",
+        "sourceUrl": null
+      },
+      {
+        "permitNumber": "26001692",
+        "jurisdiction": "Coconut Creek, FL",
+        "databaseId": 0,
+        "address": "COPANS RD",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "CITY PROJECT",
+        "workClass": null,
+        "description": null,
+        "status": "OPEN",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": "PUBLIC LAND",
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Coconut Creek, FL",
+    "url": "https://www3.coconutcreek.gov/sd/permit/permit_status_01.asp",
+    "type": "address",
+    "value": "4800 W COPANS RD",
+    "time": "2026-10-10T18:10:25.851Z",
+    "elapsedMs": 865,
+    "count": 452,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "26002855",
+        "jurisdiction": "Coconut Creek, FL",
+        "databaseId": 0,
+        "address": "4800 W COPANS RD",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "COMMUNICATION ANTENNAS",
+        "workClass": null,
+        "description": null,
+        "status": "OPEN",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": "CITY OF COCONUT CREEK",
+        "sourceUrl": null
+      },
+      {
+        "permitNumber": "26001541",
+        "jurisdiction": "Coconut Creek, FL",
+        "databaseId": 0,
+        "address": "4800 W COPANS RD",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "INSTALL GAS PIPING",
+        "workClass": null,
+        "description": null,
+        "status": "CLOSED",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": "CITY OF COCONUT CREEK",
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Coconut Creek, FL",
+    "url": "https://www3.coconutcreek.gov/sd/permit/permit_status_01.asp",
+    "type": "permit",
+    "value": "26002855",
+    "time": "2026-10-10T18:10:26.716Z",
+    "elapsedMs": 893,
+    "count": 1,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "26002855",
+        "jurisdiction": "Coconut Creek, FL",
+        "databaseId": 0,
+        "address": "4800 W COPANS RD",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "COMMUNICATION ANTENNAS",
+        "workClass": null,
+        "description": null,
+        "status": "OPEN",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": "CITY OF COCONUT CREEK",
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Coconut Creek, FL",
+    "url": "https://www3.coconutcreek.gov/sd/permit/permit_status_01.asp",
+    "type": "recent",
+    "value": "2026-10-03T18:10:27.610Z",
+    "time": "2026-10-10T18:10:27.610Z",
+    "elapsedMs": 0,
+    "count": 0,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": []
+  },
+  {
+    "jurisdiction": "Eugene, OR",
+    "url": "https://pdd.eugene-or.gov/buildingpermits/permitsearch",
+    "type": "address",
+    "value": "1047 W 18TH PL",
+    "time": "2026-10-10T18:10:27.610Z",
+    "elapsedMs": 1983,
+    "count": 3,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "10-00576-01",
+        "jurisdiction": "Eugene, OR",
+        "databaseId": 0,
+        "address": "1047 W 18TH PL",
+        "parcel": "18040111-01700",
+        "lat": null,
+        "lng": null,
+        "permitType": null,
+        "workClass": "Woodstv/fp or pellet insert",
+        "description": null,
+        "status": null,
+        "issuedAt": null,
+        "appliedAt": "2010-02-08",
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://pdd.eugene-or.gov/BuildingPermits/PermitDetails?log=10-00576-01"
+      },
+      {
+        "permitNumber": "25-01320-01",
+        "jurisdiction": "Eugene, OR",
+        "databaseId": 0,
+        "address": "1047 W 18TH PL",
+        "parcel": "18040111-01700",
+        "lat": null,
+        "lng": null,
+        "permitType": null,
+        "workClass": "Specialty Permit",
+        "description": null,
+        "status": null,
+        "issuedAt": null,
+        "appliedAt": "2025-02-28",
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://pdd.eugene-or.gov/BuildingPermits/PermitDetails?log=25-01320-01"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Eugene, OR",
+    "url": "https://pdd.eugene-or.gov/buildingpermits/permitsearch",
+    "type": "address",
+    "value": "1047 W 18TH PL",
+    "time": "2026-10-10T18:10:29.593Z",
+    "elapsedMs": 2067,
+    "count": 3,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "10-00576-01",
+        "jurisdiction": "Eugene, OR",
+        "databaseId": 0,
+        "address": "1047 W 18TH PL",
+        "parcel": "18040111-01700",
+        "lat": null,
+        "lng": null,
+        "permitType": null,
+        "workClass": "Woodstv/fp or pellet insert",
+        "description": null,
+        "status": null,
+        "issuedAt": null,
+        "appliedAt": "2010-02-08",
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://pdd.eugene-or.gov/BuildingPermits/PermitDetails?log=10-00576-01"
+      },
+      {
+        "permitNumber": "25-01320-01",
+        "jurisdiction": "Eugene, OR",
+        "databaseId": 0,
+        "address": "1047 W 18TH PL",
+        "parcel": "18040111-01700",
+        "lat": null,
+        "lng": null,
+        "permitType": null,
+        "workClass": "Specialty Permit",
+        "description": null,
+        "status": null,
+        "issuedAt": null,
+        "appliedAt": "2025-02-28",
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://pdd.eugene-or.gov/BuildingPermits/PermitDetails?log=25-01320-01"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Eugene, OR",
+    "url": "https://pdd.eugene-or.gov/buildingpermits/permitsearch",
+    "type": "permit",
+    "value": "10-00576-01",
+    "time": "2026-10-10T18:10:31.660Z",
+    "elapsedMs": 3473,
+    "error": "Error: Eugene: missing search results table"
+  },
+  {
+    "jurisdiction": "Eugene, OR",
+    "url": "https://pdd.eugene-or.gov/buildingpermits/permitsearch",
+    "type": "company",
+    "value": "SMITH",
+    "time": "2026-10-10T18:10:35.133Z",
+    "elapsedMs": 2805,
+    "error": "Error: Eugene: unrecognized permit row"
+  },
+  {
+    "jurisdiction": "Eugene, OR",
+    "url": "https://pdd.eugene-or.gov/buildingpermits/permitsearch",
+    "type": "recent",
+    "value": "2026-10-03T18:10:37.939Z",
+    "time": "2026-10-10T18:10:37.939Z",
+    "elapsedMs": 2032,
+    "count": 139,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "26-06513-01",
+        "jurisdiction": "Eugene, OR",
+        "databaseId": 0,
+        "address": "1047 W 18TH PL",
+        "parcel": "18040111-01700",
+        "lat": null,
+        "lng": null,
+        "permitType": null,
+        "workClass": "Addition",
+        "description": null,
+        "status": null,
+        "issuedAt": null,
+        "appliedAt": "2026-10-05",
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://pdd.eugene-or.gov/BuildingPermits/PermitDetails?log=26-06513-01"
+      },
+      {
+        "permitNumber": "26-06723-01",
+        "jurisdiction": "Eugene, OR",
+        "databaseId": 0,
+        "address": "1161 W 24TH AVE",
+        "parcel": "18040114-06400",
+        "lat": null,
+        "lng": null,
+        "permitType": null,
+        "workClass": "Specialty Permit",
+        "description": null,
+        "status": null,
+        "issuedAt": null,
+        "appliedAt": "2026-10-05",
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://pdd.eugene-or.gov/BuildingPermits/PermitDetails?log=26-06723-01"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Garden Grove, CA",
+    "url": "https://ggcity.org/buildingpermit/start/index",
+    "type": "address",
+    "value": "10871 FORBES",
+    "time": "2026-10-10T18:10:39.972Z",
+    "elapsedMs": 2231,
+    "error": "Error: Garden Grove: invalid result link"
+  },
+  {
+    "jurisdiction": "Garden Grove, CA",
+    "url": "https://ggcity.org/buildingpermit/start/index",
+    "type": "address",
+    "value": "100 Main St",
+    "time": "2026-10-10T18:10:42.203Z",
+    "elapsedMs": 270,
+    "count": 0,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": true
+    },
+    "samples": []
+  },
+  {
+    "jurisdiction": "Garden Grove, CA",
+    "url": "https://ggcity.org/buildingpermit/start/index",
+    "type": "permit",
+    "value": "2026-0044",
+    "time": "2026-10-10T18:10:42.474Z",
+    "elapsedMs": 1480,
+    "error": "Error: Garden Grove: missing search results"
+  },
+  {
+    "jurisdiction": "Garden Grove, CA",
+    "url": "https://ggcity.org/buildingpermit/start/index",
+    "type": "recent",
+    "value": "2026-10-03T18:10:43.955Z",
+    "time": "2026-10-10T18:10:43.955Z",
+    "elapsedMs": 0,
+    "count": 0,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": true
+    },
+    "samples": []
+  },
+  {
+    "jurisdiction": "Eugene, OR",
+    "url": "https://pdd.eugene-or.gov/buildingpermits/permitsearch",
+    "type": "address",
+    "value": "1047 W 18TH PL",
+    "time": "2026-10-10T18:12:44.878Z",
+    "elapsedMs": 2018,
+    "count": 3,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "10-00576-01",
+        "jurisdiction": "Eugene, OR",
+        "databaseId": 0,
+        "address": "1047 W 18TH PL",
+        "parcel": "18040111-01700",
+        "lat": null,
+        "lng": null,
+        "permitType": null,
+        "workClass": "Woodstv/fp or pellet insert",
+        "description": null,
+        "status": null,
+        "issuedAt": null,
+        "appliedAt": "2010-02-08",
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://pdd.eugene-or.gov/BuildingPermits/PermitDetails?log=10-00576-01"
+      },
+      {
+        "permitNumber": "25-01320-01",
+        "jurisdiction": "Eugene, OR",
+        "databaseId": 0,
+        "address": "1047 W 18TH PL",
+        "parcel": "18040111-01700",
+        "lat": null,
+        "lng": null,
+        "permitType": null,
+        "workClass": "Specialty Permit",
+        "description": null,
+        "status": null,
+        "issuedAt": null,
+        "appliedAt": "2025-02-28",
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://pdd.eugene-or.gov/BuildingPermits/PermitDetails?log=25-01320-01"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Eugene, OR",
+    "url": "https://pdd.eugene-or.gov/buildingpermits/permitsearch",
+    "type": "address",
+    "value": "1047 W 18TH PL",
+    "time": "2026-10-10T18:12:46.896Z",
+    "elapsedMs": 2002,
+    "count": 3,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "10-00576-01",
+        "jurisdiction": "Eugene, OR",
+        "databaseId": 0,
+        "address": "1047 W 18TH PL",
+        "parcel": "18040111-01700",
+        "lat": null,
+        "lng": null,
+        "permitType": null,
+        "workClass": "Woodstv/fp or pellet insert",
+        "description": null,
+        "status": null,
+        "issuedAt": null,
+        "appliedAt": "2010-02-08",
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://pdd.eugene-or.gov/BuildingPermits/PermitDetails?log=10-00576-01"
+      },
+      {
+        "permitNumber": "25-01320-01",
+        "jurisdiction": "Eugene, OR",
+        "databaseId": 0,
+        "address": "1047 W 18TH PL",
+        "parcel": "18040111-01700",
+        "lat": null,
+        "lng": null,
+        "permitType": null,
+        "workClass": "Specialty Permit",
+        "description": null,
+        "status": null,
+        "issuedAt": null,
+        "appliedAt": "2025-02-28",
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://pdd.eugene-or.gov/BuildingPermits/PermitDetails?log=25-01320-01"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Eugene, OR",
+    "url": "https://pdd.eugene-or.gov/buildingpermits/permitsearch",
+    "type": "permit",
+    "value": "10-00576-01",
+    "time": "2026-10-10T18:12:48.899Z",
+    "elapsedMs": 6550,
+    "count": 1,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "10-00576-01",
+        "jurisdiction": "Eugene, OR",
+        "databaseId": 0,
+        "address": "1047 W 18TH PL",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Residential",
+        "workClass": "Woodstv/fp or pellet insert",
+        "description": "Install woodstove insert.",
+        "status": "Issued",
+        "issuedAt": null,
+        "appliedAt": "2010-02-08",
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://pdd.eugene-or.gov/BuildingPermits/PermitDetails?log=10-00576-01"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Eugene, OR",
+    "url": "https://pdd.eugene-or.gov/buildingpermits/permitsearch",
+    "type": "company",
+    "value": "SMITH",
+    "time": "2026-10-10T18:12:55.449Z",
+    "elapsedMs": 2998,
+    "count": 462,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "07-02489-01",
+        "jurisdiction": "Eugene, OR",
+        "databaseId": 0,
+        "address": "2150 SILVER LEA CT",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Electrical",
+        "workClass": "Specialty Permit",
+        "description": null,
+        "status": "Finished",
+        "issuedAt": "2007-05-21",
+        "appliedAt": "2007-05-21",
+        "expiresAt": "2007-11-27",
+        "valuation": null,
+        "contractorName": "B & C SMITH CONTRACTING LLC",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://pdd.eugene-or.gov/BuildingPermits/PermitDetails?log=07-02489-01"
+      },
+      {
+        "permitNumber": "26-01354-01",
+        "jurisdiction": "Eugene, OR",
+        "databaseId": 0,
+        "address": "2322 W 28TH AVE",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Building",
+        "workClass": "Accessory Dwelling Unit",
+        "description": null,
+        "status": "Active",
+        "issuedAt": "2026-09-17",
+        "appliedAt": "2026-05-04",
+        "expiresAt": "2027-09-12",
+        "valuation": null,
+        "contractorName": "BENJAMIN M SMITH CONSTRUCTION LLC",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://pdd.eugene-or.gov/BuildingPermits/PermitDetails?log=26-01354-01"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Eugene, OR",
+    "url": "https://pdd.eugene-or.gov/buildingpermits/permitsearch",
+    "type": "recent",
+    "value": "2026-10-03T18:12:58.448Z",
+    "time": "2026-10-10T18:12:58.448Z",
+    "elapsedMs": 2071,
+    "count": 139,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "26-06513-01",
+        "jurisdiction": "Eugene, OR",
+        "databaseId": 0,
+        "address": "1047 W 18TH PL",
+        "parcel": "18040111-01700",
+        "lat": null,
+        "lng": null,
+        "permitType": null,
+        "workClass": "Addition",
+        "description": null,
+        "status": null,
+        "issuedAt": null,
+        "appliedAt": "2026-10-05",
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://pdd.eugene-or.gov/BuildingPermits/PermitDetails?log=26-06513-01"
+      },
+      {
+        "permitNumber": "26-06723-01",
+        "jurisdiction": "Eugene, OR",
+        "databaseId": 0,
+        "address": "1161 W 24TH AVE",
+        "parcel": "18040114-06400",
+        "lat": null,
+        "lng": null,
+        "permitType": null,
+        "workClass": "Specialty Permit",
+        "description": null,
+        "status": null,
+        "issuedAt": null,
+        "appliedAt": "2026-10-05",
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://pdd.eugene-or.gov/BuildingPermits/PermitDetails?log=26-06723-01"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Garden Grove, CA",
+    "url": "https://ggcity.org/buildingpermit/start/index",
+    "type": "address",
+    "value": "10871 FORBES",
+    "time": "2026-10-10T18:13:29.055Z",
+    "elapsedMs": 2349,
+    "count": 27,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": true
+    },
+    "samples": [
+      {
+        "permitNumber": "13-1510",
+        "jurisdiction": "Garden Grove, CA",
+        "databaseId": 0,
+        "address": null,
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": null,
+        "workClass": null,
+        "description": "INSTALLATION OF PALLET RACK",
+        "status": "Inspections",
+        "issuedAt": "2013-07-16",
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://ggcity.org/buildingpermit/permits/search?permit_id=217185"
+      },
+      {
+        "permitNumber": "80952",
+        "jurisdiction": "Garden Grove, CA",
+        "databaseId": 0,
+        "address": null,
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": null,
+        "workClass": null,
+        "description": "TYPE: ELECTRIC. REPLACE DAMAGED MAIN WITH SAME.",
+        "status": "Finaled",
+        "issuedAt": "2005-08-11",
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://ggcity.org/buildingpermit/permits/search?permit_id=181734"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Garden Grove, CA",
+    "url": "https://ggcity.org/buildingpermit/start/index",
+    "type": "address",
+    "value": "100 Main St",
+    "time": "2026-10-10T18:13:31.405Z",
+    "elapsedMs": 315,
+    "count": 0,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": true
+    },
+    "samples": []
+  },
+  {
+    "jurisdiction": "Garden Grove, CA",
+    "url": "https://ggcity.org/buildingpermit/start/index",
+    "type": "permit",
+    "value": "13-1510",
+    "time": "2026-10-10T18:13:31.720Z",
+    "elapsedMs": 897,
+    "count": 1,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": true
+    },
+    "samples": [
+      {
+        "permitNumber": "13-1510",
+        "jurisdiction": "Garden Grove, CA",
+        "databaseId": 0,
+        "address": "10871 FORBES AVE",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": null,
+        "workClass": "Commercial Tenant Improvement",
+        "description": "INSTALLATION OF PALLET RACK",
+        "status": "Inspections",
+        "issuedAt": "2013-07-16",
+        "appliedAt": "2013-05-23",
+        "expiresAt": "2014-01-12",
+        "valuation": null,
+        "contractorName": "WAREHOUSE SOLUTIONS INC",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://ggcity.org/buildingpermit/permits/search?search=13-1510"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Garden Grove, CA",
+    "url": "https://ggcity.org/buildingpermit/start/index",
+    "type": "recent",
+    "value": "2026-10-03T18:13:32.617Z",
+    "time": "2026-10-10T18:13:32.617Z",
+    "elapsedMs": 0,
+    "count": 0,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": true
+    },
+    "samples": []
+  },
+  {
+    "jurisdiction": "Lyon County, NV",
+    "url": "https://comdev.lyon-county.org/CitizenPortal/DefaultLyon.aspx",
+    "type": "address",
+    "value": "MAIN",
+    "time": "2026-10-10T18:26:01.145Z",
+    "elapsedMs": 1340,
+    "count": 86,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "26-0668",
+        "jurisdiction": "Lyon County, NV",
+        "databaseId": 0,
+        "address": "1290 W MAIN ST",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Commercial / Wireless Communication Facility",
+        "workClass": null,
+        "description": null,
+        "status": "Issued",
+        "issuedAt": null,
+        "appliedAt": "2026-06-18",
+        "expiresAt": "2027-02-07",
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      },
+      {
+        "permitNumber": "26-0267",
+        "jurisdiction": "Lyon County, NV",
+        "databaseId": 0,
+        "address": "720 S MAIN ST",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Commercial / Re-Roof",
+        "workClass": null,
+        "description": null,
+        "status": "Disapproved",
+        "issuedAt": null,
+        "appliedAt": "2026-03-24",
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Lyon County, NV",
+    "url": "https://comdev.lyon-county.org/CitizenPortal/DefaultLyon.aspx",
+    "type": "address",
+    "value": "1290 W MAIN ST",
+    "time": "2026-10-10T18:26:02.486Z",
+    "elapsedMs": 1857,
+    "count": 16,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "26-0668",
+        "jurisdiction": "Lyon County, NV",
+        "databaseId": 0,
+        "address": "1290 W MAIN ST",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Commercial / Wireless Communication Facility",
+        "workClass": null,
+        "description": null,
+        "status": "Issued",
+        "issuedAt": null,
+        "appliedAt": "2026-06-18",
+        "expiresAt": "2027-02-07",
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      },
+      {
+        "permitNumber": "26-0136",
+        "jurisdiction": "Lyon County, NV",
+        "databaseId": 0,
+        "address": "1290 W MAIN ST",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Commercial / Eligible Facility Request",
+        "workClass": null,
+        "description": null,
+        "status": "Completed",
+        "issuedAt": null,
+        "appliedAt": "2026-02-11",
+        "expiresAt": "2026-11-25",
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Lyon County, NV",
+    "url": "https://comdev.lyon-county.org/CitizenPortal/DefaultLyon.aspx",
+    "type": "permit",
+    "value": "26-0668",
+    "time": "2026-10-10T18:26:04.348Z",
+    "elapsedMs": 2039,
+    "count": 1,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "26-0668",
+        "jurisdiction": "Lyon County, NV",
+        "databaseId": 0,
+        "address": "1290 W MAIN ST",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Commercial / Wireless Communication Facility",
+        "workClass": null,
+        "description": null,
+        "status": "Issued",
+        "issuedAt": null,
+        "appliedAt": "2026-06-18",
+        "expiresAt": "2027-02-07",
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Lyon County, NV",
+    "url": "https://comdev.lyon-county.org/CitizenPortal/DefaultLyon.aspx",
+    "type": "company",
+    "value": "SMITH",
+    "time": "2026-10-10T18:26:06.387Z",
+    "elapsedMs": 6800,
+    "count": 3,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "25-1140",
+        "jurisdiction": "Lyon County, NV",
+        "databaseId": 0,
+        "address": "94 INDUSTRIAL PKWY",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Commercial / Electrical",
+        "workClass": null,
+        "description": null,
+        "status": "Completed",
+        "issuedAt": null,
+        "appliedAt": "2025-11-18",
+        "expiresAt": "2026-10-10",
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      },
+      {
+        "permitNumber": "23-0711",
+        "jurisdiction": "Lyon County, NV",
+        "databaseId": 0,
+        "address": "600 LAKE AVE",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Commercial / Electrical",
+        "workClass": null,
+        "description": null,
+        "status": "Completed",
+        "issuedAt": null,
+        "appliedAt": "2023-07-20",
+        "expiresAt": "2024-07-24",
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Lyon County, NV",
+    "url": "https://comdev.lyon-county.org/CitizenPortal/DefaultLyon.aspx",
+    "type": "recent",
+    "value": "2026-10-03T18:26:13.188Z",
+    "time": "2026-10-10T18:26:13.188Z",
+    "elapsedMs": 1255,
+    "count": 25,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "26-1193",
+        "jurisdiction": "Lyon County, NV",
+        "databaseId": 0,
+        "address": "106 OAKMONT DR",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Residential / Pool/Spa",
+        "workClass": null,
+        "description": null,
+        "status": "Disapproved",
+        "issuedAt": null,
+        "appliedAt": "2026-10-09",
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      },
+      {
+        "permitNumber": "26-1192",
+        "jurisdiction": "Lyon County, NV",
+        "databaseId": 0,
+        "address": "704 ROBERTS CREEK DR",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Residential / Single Family Residence - Fire Repair",
+        "workClass": null,
+        "description": null,
+        "status": "In Process",
+        "issuedAt": null,
+        "appliedAt": "2026-10-08",
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Johnston County, NC",
+    "url": "https://www.johnstonnc.gov/content.cfm?id=1843",
+    "type": "address",
+    "value": "102 MAIN",
+    "time": "2026-10-10T18:26:35.149Z",
+    "elapsedMs": 1110,
+    "count": 3,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "174579",
+        "jurisdiction": "Johnston County, NC",
+        "databaseId": 0,
+        "address": "102 MAIN ST, PINE LEVEL",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "COMMERCIAL REMODEL",
+        "workClass": null,
+        "description": null,
+        "status": null,
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 132365,
+        "contractorName": "CAROLINA COMFORT AIR INC",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      },
+      {
+        "permitNumber": "189485",
+        "jurisdiction": "Johnston County, NC",
+        "databaseId": 0,
+        "address": "102 MAIN ST, PINE LEVEL",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "CHANGE OF TENANT",
+        "workClass": null,
+        "description": null,
+        "status": null,
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 60,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Johnston County, NC",
+    "url": "https://www.johnstonnc.gov/content.cfm?id=1843",
+    "type": "address",
+    "value": "102 MAIN ST, PINE LEVEL",
+    "time": "2026-10-10T18:26:36.260Z",
+    "elapsedMs": 209,
+    "count": 3,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "174579",
+        "jurisdiction": "Johnston County, NC",
+        "databaseId": 0,
+        "address": "102 MAIN ST, PINE LEVEL",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "COMMERCIAL REMODEL",
+        "workClass": null,
+        "description": null,
+        "status": null,
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 132365,
+        "contractorName": "CAROLINA COMFORT AIR INC",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      },
+      {
+        "permitNumber": "189485",
+        "jurisdiction": "Johnston County, NC",
+        "databaseId": 0,
+        "address": "102 MAIN ST, PINE LEVEL",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "CHANGE OF TENANT",
+        "workClass": null,
+        "description": null,
+        "status": null,
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 60,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Johnston County, NC",
+    "url": "https://www.johnstonnc.gov/content.cfm?id=1843",
+    "type": "permit",
+    "value": "174579",
+    "time": "2026-10-10T18:26:36.470Z",
+    "elapsedMs": 1638,
+    "count": 1,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "174579",
+        "jurisdiction": "Johnston County, NC",
+        "databaseId": 0,
+        "address": "102 MAIN ST, PINE LEVEL",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "COMMERCIAL REMODEL",
+        "workClass": null,
+        "description": null,
+        "status": null,
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 132365,
+        "contractorName": "CAROLINA COMFORT AIR INC",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Johnston County, NC",
+    "url": "https://www.johnstonnc.gov/content.cfm?id=1843",
+    "type": "recent",
+    "value": "2026-10-03T18:26:38.112Z",
+    "time": "2026-10-10T18:26:38.112Z",
+    "elapsedMs": 0,
+    "count": 0,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": []
+  },
+  {
+    "jurisdiction": "Palm Coast, FL",
+    "url": "https://www.palmcoast.gov/building/search",
+    "type": "address",
+    "value": "515 PALM COAST",
+    "time": "2026-10-10T18:27:40.260Z",
+    "elapsedMs": 1766,
+    "count": 91,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "2026100278",
+        "jurisdiction": "Palm Coast, FL",
+        "databaseId": 0,
+        "address": "515 PALM COAST PKWY SW UNIT 13",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "COMMERCIAL FIRE ALARM",
+        "workClass": null,
+        "description": null,
+        "status": "ISSUED",
+        "issuedAt": "2026-10-09",
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 3000,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": "GARY L SMITH",
+        "ownerName": "515 PALM COAST LLC",
+        "sourceUrl": "https://www.palmcoast.gov/building/details/2026100278"
+      },
+      {
+        "permitNumber": "2026090665",
+        "jurisdiction": "Palm Coast, FL",
+        "databaseId": 0,
+        "address": "515 PALM COAST PKWY SW UNIT 13",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "FIRE SPRINKLER WET COMMERCIAL",
+        "workClass": null,
+        "description": null,
+        "status": "ISSUED",
+        "issuedAt": "2026-09-25",
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 10000,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": "ANDY  JOHNSTON",
+        "ownerName": "515 PALM COAST LLC",
+        "sourceUrl": "https://www.palmcoast.gov/building/details/2026090665"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Palm Coast, FL",
+    "url": "https://www.palmcoast.gov/building/search",
+    "type": "address",
+    "value": "515 PALM COAST PKWY SW UNIT 13",
+    "time": "2026-10-10T18:27:42.027Z",
+    "elapsedMs": 1543,
+    "count": 91,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "2026100278",
+        "jurisdiction": "Palm Coast, FL",
+        "databaseId": 0,
+        "address": "515 PALM COAST PKWY SW UNIT 13",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "COMMERCIAL FIRE ALARM",
+        "workClass": null,
+        "description": null,
+        "status": "ISSUED",
+        "issuedAt": "2026-10-09",
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 3000,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": "GARY L SMITH",
+        "ownerName": "515 PALM COAST LLC",
+        "sourceUrl": "https://www.palmcoast.gov/building/details/2026100278"
+      },
+      {
+        "permitNumber": "2026090665",
+        "jurisdiction": "Palm Coast, FL",
+        "databaseId": 0,
+        "address": "515 PALM COAST PKWY SW UNIT 13",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "FIRE SPRINKLER WET COMMERCIAL",
+        "workClass": null,
+        "description": null,
+        "status": "ISSUED",
+        "issuedAt": "2026-09-25",
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 10000,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": "ANDY  JOHNSTON",
+        "ownerName": "515 PALM COAST LLC",
+        "sourceUrl": "https://www.palmcoast.gov/building/details/2026090665"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Palm Coast, FL",
+    "url": "https://www.palmcoast.gov/building/search",
+    "type": "permit",
+    "value": "2026100278",
+    "time": "2026-10-10T18:27:43.570Z",
+    "elapsedMs": 1879,
+    "error": "Error: Palm Coast: incomplete permit results"
+  },
+  {
+    "jurisdiction": "Palm Coast, FL",
+    "url": "https://www.palmcoast.gov/building/search",
+    "type": "company",
+    "value": "SMITH",
+    "time": "2026-10-10T18:27:45.450Z",
+    "elapsedMs": 2187,
+    "count": 237,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "2026050673",
+        "jurisdiction": "Palm Coast, FL",
+        "databaseId": 0,
+        "address": "72 AIRPORT COMMERCE CENTER WAY",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "COMMERCIAL ACCESSORY STRUCTURE",
+        "workClass": null,
+        "description": null,
+        "status": "FINAL",
+        "issuedAt": "2026-05-20",
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 5000,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": "TIMOTHY SCOT SMITH",
+        "ownerName": "CITY OF PALM COAST",
+        "sourceUrl": "https://www.palmcoast.gov/building/details/2026050673"
+      },
+      {
+        "permitNumber": "2026050672",
+        "jurisdiction": "Palm Coast, FL",
+        "databaseId": 0,
+        "address": "350 PALM COAST PKWY NE",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "COMMERCIAL ACCESSORY STRUCTURE",
+        "workClass": null,
+        "description": null,
+        "status": "FINAL",
+        "issuedAt": "2026-06-01",
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 5000,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": "TIMOTHY SCOT SMITH",
+        "ownerName": "CITY OF PALM COAST FLORIDA",
+        "sourceUrl": "https://www.palmcoast.gov/building/details/2026050672"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Palm Coast, FL",
+    "url": "https://www.palmcoast.gov/building/search",
+    "type": "recent",
+    "value": "2026-10-03T18:27:47.638Z",
+    "time": "2026-10-10T18:27:47.638Z",
+    "elapsedMs": 1891,
+    "count": 187,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "2026100338",
+        "jurisdiction": "Palm Coast, FL",
+        "databaseId": 0,
+        "address": "338 UNDERWOOD TRL",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "FENCE",
+        "workClass": null,
+        "description": null,
+        "status": "FINAL",
+        "issuedAt": "2026-10-09",
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": "CRISTINA CATANZARO-CRISANTI",
+        "ownerName": "ADAMS HOMES OF NORTHWEST FLORIDA INC",
+        "sourceUrl": "https://www.palmcoast.gov/building/details/2026100338"
+      },
+      {
+        "permitNumber": "2026100336",
+        "jurisdiction": "Palm Coast, FL",
+        "databaseId": 0,
+        "address": "19 PINTO LN",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "MECHANICAL",
+        "workClass": null,
+        "description": null,
+        "status": "ISSUED",
+        "issuedAt": "2026-10-09",
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 14000,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": "MARK DANIEL EIDMAN JR",
+        "ownerName": "FRIEND WILLEE R & CHARLENE ANN FRIEND AMC",
+        "sourceUrl": "https://www.palmcoast.gov/building/details/2026100336"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Palm Coast, FL",
+    "url": "https://www.palmcoast.gov/building/search",
+    "type": "address",
+    "value": "515 PALM COAST",
+    "time": "2026-10-10T18:28:19.494Z",
+    "elapsedMs": 1290,
+    "count": 91,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "2026100278",
+        "jurisdiction": "Palm Coast, FL",
+        "databaseId": 0,
+        "address": "515 PALM COAST PKWY SW UNIT 13",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "COMMERCIAL FIRE ALARM",
+        "workClass": null,
+        "description": null,
+        "status": "ISSUED",
+        "issuedAt": "2026-10-09",
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 3000,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": "GARY L SMITH",
+        "ownerName": "515 PALM COAST LLC",
+        "sourceUrl": "https://www.palmcoast.gov/building/details/2026100278"
+      },
+      {
+        "permitNumber": "2026090665",
+        "jurisdiction": "Palm Coast, FL",
+        "databaseId": 0,
+        "address": "515 PALM COAST PKWY SW UNIT 13",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "FIRE SPRINKLER WET COMMERCIAL",
+        "workClass": null,
+        "description": null,
+        "status": "ISSUED",
+        "issuedAt": "2026-09-25",
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 10000,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": "ANDY  JOHNSTON",
+        "ownerName": "515 PALM COAST LLC",
+        "sourceUrl": "https://www.palmcoast.gov/building/details/2026090665"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Palm Coast, FL",
+    "url": "https://www.palmcoast.gov/building/search",
+    "type": "address",
+    "value": "515 PALM COAST PKWY SW UNIT 13",
+    "time": "2026-10-10T18:28:20.786Z",
+    "elapsedMs": 1783,
+    "count": 91,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "2026100278",
+        "jurisdiction": "Palm Coast, FL",
+        "databaseId": 0,
+        "address": "515 PALM COAST PKWY SW UNIT 13",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "COMMERCIAL FIRE ALARM",
+        "workClass": null,
+        "description": null,
+        "status": "ISSUED",
+        "issuedAt": "2026-10-09",
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 3000,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": "GARY L SMITH",
+        "ownerName": "515 PALM COAST LLC",
+        "sourceUrl": "https://www.palmcoast.gov/building/details/2026100278"
+      },
+      {
+        "permitNumber": "2026090665",
+        "jurisdiction": "Palm Coast, FL",
+        "databaseId": 0,
+        "address": "515 PALM COAST PKWY SW UNIT 13",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "FIRE SPRINKLER WET COMMERCIAL",
+        "workClass": null,
+        "description": null,
+        "status": "ISSUED",
+        "issuedAt": "2026-09-25",
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 10000,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": "ANDY  JOHNSTON",
+        "ownerName": "515 PALM COAST LLC",
+        "sourceUrl": "https://www.palmcoast.gov/building/details/2026090665"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Palm Coast, FL",
+    "url": "https://www.palmcoast.gov/building/search",
+    "type": "permit",
+    "value": "2026100278",
+    "time": "2026-10-10T18:28:22.570Z",
+    "elapsedMs": 2116,
+    "count": 1,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "2026100278",
+        "jurisdiction": "Palm Coast, FL",
+        "databaseId": 0,
+        "address": "515 PALM COAST PKWY SW UNIT 13",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "COMMERCIAL FIRE ALARM",
+        "workClass": null,
+        "description": null,
+        "status": "ISSUED",
+        "issuedAt": "2026-10-09",
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 3000,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": "GARY L SMITH",
+        "ownerName": "515 PALM COAST LLC",
+        "sourceUrl": "https://www.palmcoast.gov/building/details/2026100278"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Palm Coast, FL",
+    "url": "https://www.palmcoast.gov/building/search",
+    "type": "company",
+    "value": "SMITH",
+    "time": "2026-10-10T18:28:24.687Z",
+    "elapsedMs": 2204,
+    "count": 237,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "2026050673",
+        "jurisdiction": "Palm Coast, FL",
+        "databaseId": 0,
+        "address": "72 AIRPORT COMMERCE CENTER WAY",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "COMMERCIAL ACCESSORY STRUCTURE",
+        "workClass": null,
+        "description": null,
+        "status": "FINAL",
+        "issuedAt": "2026-05-20",
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 5000,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": "TIMOTHY SCOT SMITH",
+        "ownerName": "CITY OF PALM COAST",
+        "sourceUrl": "https://www.palmcoast.gov/building/details/2026050673"
+      },
+      {
+        "permitNumber": "2026050672",
+        "jurisdiction": "Palm Coast, FL",
+        "databaseId": 0,
+        "address": "350 PALM COAST PKWY NE",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "COMMERCIAL ACCESSORY STRUCTURE",
+        "workClass": null,
+        "description": null,
+        "status": "FINAL",
+        "issuedAt": "2026-06-01",
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 5000,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": "TIMOTHY SCOT SMITH",
+        "ownerName": "CITY OF PALM COAST FLORIDA",
+        "sourceUrl": "https://www.palmcoast.gov/building/details/2026050672"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Palm Coast, FL",
+    "url": "https://www.palmcoast.gov/building/search",
+    "type": "recent",
+    "value": "2026-10-03T18:28:26.892Z",
+    "time": "2026-10-10T18:28:26.892Z",
+    "elapsedMs": 1695,
+    "count": 187,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "2026100338",
+        "jurisdiction": "Palm Coast, FL",
+        "databaseId": 0,
+        "address": "338 UNDERWOOD TRL",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "FENCE",
+        "workClass": null,
+        "description": null,
+        "status": "FINAL",
+        "issuedAt": "2026-10-09",
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": null,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": "CRISTINA CATANZARO-CRISANTI",
+        "ownerName": "ADAMS HOMES OF NORTHWEST FLORIDA INC",
+        "sourceUrl": "https://www.palmcoast.gov/building/details/2026100338"
+      },
+      {
+        "permitNumber": "2026100336",
+        "jurisdiction": "Palm Coast, FL",
+        "databaseId": 0,
+        "address": "19 PINTO LN",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "MECHANICAL",
+        "workClass": null,
+        "description": null,
+        "status": "ISSUED",
+        "issuedAt": "2026-10-09",
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 14000,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": "MARK DANIEL EIDMAN JR",
+        "ownerName": "FRIEND WILLEE R & CHARLENE ANN FRIEND AMC",
+        "sourceUrl": "https://www.palmcoast.gov/building/details/2026100336"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Independence, MO",
+    "url": "https://apps.indepmo.org/apps/BuildingPermits",
+    "type": "address",
+    "value": "523 E LINWOOD AVE",
+    "time": "2026-10-10T18:29:57.719Z",
+    "elapsedMs": 579,
+    "count": 1,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "2016-02063",
+        "jurisdiction": "Independence, MO",
+        "databaseId": 0,
+        "address": "523 E LINWOOD AVE",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Residential",
+        "workClass": null,
+        "description": "Detached Building",
+        "status": null,
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 3000,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Independence, MO",
+    "url": "https://apps.indepmo.org/apps/BuildingPermits",
+    "type": "address",
+    "value": "523 E LINWOOD AVE",
+    "time": "2026-10-10T18:29:58.300Z",
+    "elapsedMs": 617,
+    "count": 1,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "2016-02063",
+        "jurisdiction": "Independence, MO",
+        "databaseId": 0,
+        "address": "523 E LINWOOD AVE",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Residential",
+        "workClass": null,
+        "description": "Detached Building",
+        "status": null,
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 3000,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Independence, MO",
+    "url": "https://apps.indepmo.org/apps/BuildingPermits",
+    "type": "permit",
+    "value": "2016-02063",
+    "time": "2026-10-10T18:29:58.918Z",
+    "elapsedMs": 1007,
+    "count": 1,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "2016-02063",
+        "jurisdiction": "Independence, MO",
+        "databaseId": 0,
+        "address": "523 E LINWOOD AVE",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "Residential",
+        "workClass": null,
+        "description": "Detached Building",
+        "status": null,
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 3000,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Independence, MO",
+    "url": "https://apps.indepmo.org/apps/BuildingPermits",
+    "type": "recent",
+    "value": "2026-10-03T18:29:59.926Z",
+    "time": "2026-10-10T18:29:59.926Z",
+    "elapsedMs": 0,
+    "count": 0,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": []
+  },
+  {
+    "jurisdiction": "Ocean City, MD",
+    "url": "https://oceancitymd.gov/oc/departments/planning-community-development/online-permitting/",
+    "type": "address",
+    "value": "3505 COASTAL",
+    "time": "2026-10-10T18:31:54.958Z",
+    "elapsedMs": 334,
+    "count": 3,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "21-0004",
+        "jurisdiction": "Ocean City, MD",
+        "databaseId": 0,
+        "address": "3505 COASTAL HIGHWAY - UNIT 1",
+        "parcel": null,
+        "lat": 38.363929749199606,
+        "lng": -75.0728607178025,
+        "permitType": null,
+        "workClass": null,
+        "description": "Moving kitchen to back of restaurant",
+        "status": "Closed",
+        "issuedAt": null,
+        "appliedAt": "2021-01-07T05:00:00.000Z",
+        "expiresAt": null,
+        "valuation": 400000,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://oceancitymd.gov/GIS/Permits/21-0004/"
+      },
+      {
+        "permitNumber": "22-0522",
+        "jurisdiction": "Ocean City, MD",
+        "databaseId": 0,
+        "address": "3505 COASTAL HWY UNIT 1",
+        "parcel": null,
+        "lat": 38.363924228450244,
+        "lng": -75.07298303254507,
+        "permitType": "RFSD",
+        "workClass": null,
+        "description": "Installing chicken house metal on roof",
+        "status": "Closed",
+        "issuedAt": "2022-03-30T04:00:00.000Z",
+        "appliedAt": "2022-03-17T04:00:00.000Z",
+        "expiresAt": null,
+        "valuation": 4000,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://oceancitymd.gov/GIS/Permits/22-0522/"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Ocean City, MD",
+    "url": "https://oceancitymd.gov/oc/departments/planning-community-development/online-permitting/",
+    "type": "address",
+    "value": "3505 COASTAL HIGHWAY - UNIT 1",
+    "time": "2026-10-10T18:31:55.293Z",
+    "elapsedMs": 877,
+    "count": 1,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "21-0004",
+        "jurisdiction": "Ocean City, MD",
+        "databaseId": 0,
+        "address": "3505 COASTAL HIGHWAY - UNIT 1",
+        "parcel": null,
+        "lat": 38.363929749199606,
+        "lng": -75.0728607178025,
+        "permitType": null,
+        "workClass": null,
+        "description": "Moving kitchen to back of restaurant",
+        "status": "Closed",
+        "issuedAt": null,
+        "appliedAt": "2021-01-07T05:00:00.000Z",
+        "expiresAt": null,
+        "valuation": 400000,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://oceancitymd.gov/GIS/Permits/21-0004/"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Ocean City, MD",
+    "url": "https://oceancitymd.gov/oc/departments/planning-community-development/online-permitting/",
+    "type": "permit",
+    "value": "21-0004",
+    "time": "2026-10-10T18:31:56.170Z",
+    "elapsedMs": 957,
+    "count": 1,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "21-0004",
+        "jurisdiction": "Ocean City, MD",
+        "databaseId": 0,
+        "address": "3505 COASTAL HIGHWAY - UNIT 1",
+        "parcel": null,
+        "lat": 38.363929749199606,
+        "lng": -75.0728607178025,
+        "permitType": null,
+        "workClass": null,
+        "description": "Moving kitchen to back of restaurant",
+        "status": "Closed",
+        "issuedAt": null,
+        "appliedAt": "2021-01-07T05:00:00.000Z",
+        "expiresAt": null,
+        "valuation": 400000,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://oceancitymd.gov/GIS/Permits/21-0004/"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Ocean City, MD",
+    "url": "https://oceancitymd.gov/oc/departments/planning-community-development/online-permitting/",
+    "type": "recent",
+    "value": "2026-10-03T18:31:57.128Z",
+    "time": "2026-10-10T18:31:57.128Z",
+    "elapsedMs": 1022,
+    "count": 86,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit"
+      ],
+      "listRecent": true,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "25-2318",
+        "jurisdiction": "Ocean City, MD",
+        "databaseId": 0,
+        "address": "2007 HERRING WAY Unit A",
+        "parcel": null,
+        "lat": 38.35040315825512,
+        "lng": -75.07904803011778,
+        "permitType": "RALT",
+        "workClass": null,
+        "description": "Cased opening in wall",
+        "status": "Issued",
+        "issuedAt": "2026-10-05T16:30:20.000Z",
+        "appliedAt": "2025-12-02T05:00:00.000Z",
+        "expiresAt": null,
+        "valuation": 1000,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://oceancitymd.gov/GIS/Permits/25-2318/"
+      },
+      {
+        "permitNumber": "25-2387",
+        "jurisdiction": "Ocean City, MD",
+        "databaseId": 0,
+        "address": "709 KELLY RD UNIT A",
+        "parcel": null,
+        "lat": 38.4486838204201,
+        "lng": -75.06346005549047,
+        "permitType": "FNDC",
+        "workClass": null,
+        "description": "Crawlspace encapsulation",
+        "status": "Issued",
+        "issuedAt": "2026-10-05T17:17:28.000Z",
+        "appliedAt": "2025-12-10T05:00:00.000Z",
+        "expiresAt": null,
+        "valuation": 12019,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": "https://oceancitymd.gov/GIS/Permits/25-2387/"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Houston, TX",
+    "url": "https://www.houstonpermittingcenter.org/",
+    "type": "address",
+    "value": "1000 MAIN",
+    "time": "2026-10-10T18:36:43.410Z",
+    "elapsedMs": 4239,
+    "error": "Error: Houston: incomplete report data"
+  },
+  {
+    "jurisdiction": "Houston, TX",
+    "url": "https://www.houstonpermittingcenter.org/",
+    "type": "address",
+    "value": "100 Main St",
+    "time": "2026-10-10T18:36:47.650Z",
+    "elapsedMs": 5895,
+    "error": "Error: Houston: incomplete report data"
+  },
+  {
+    "jurisdiction": "Houston, TX",
+    "url": "https://www.houstonpermittingcenter.org/",
+    "type": "permit",
+    "value": "2026-0044",
+    "time": "2026-10-10T18:36:53.564Z",
+    "elapsedMs": 1731,
+    "error": "Error: Houston: missing report metadata"
+  },
+  {
+    "jurisdiction": "Houston, TX",
+    "url": "https://www.houstonpermittingcenter.org/",
+    "type": "company",
+    "value": "SMITH",
+    "time": "2026-10-10T18:36:55.295Z",
+    "elapsedMs": 4647,
+    "error": "Error: Houston: incomplete report data"
+  },
+  {
+    "jurisdiction": "Houston, TX",
+    "url": "https://www.houstonpermittingcenter.org/",
+    "type": "recent",
+    "value": "2026-10-03T18:36:59.942Z",
+    "time": "2026-10-10T18:36:59.942Z",
+    "elapsedMs": 0,
+    "count": 0,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "name",
+        "company"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": []
+  },
+  {
+    "jurisdiction": "Houston, TX",
+    "url": "https://www.houstonpermittingcenter.org/",
+    "type": "address",
+    "value": "1000 MAIN ST 116",
+    "time": "2026-10-10T18:37:34.416Z",
+    "elapsedMs": 4031,
+    "count": 2,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "name",
+        "company"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "49003840",
+        "jurisdiction": "Houston, TX",
+        "databaseId": 0,
+        "address": "1000 MAIN ST 116 77002",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "ELEV RENEWAL",
+        "workClass": "VB",
+        "description": "ELEVATOR SITE",
+        "status": null,
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 0,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": "*BBVA COMPASS BANK",
+        "sourceUrl": "https://cohtora.houstontx.gov/ibi_apps/WFServlet.ibfs?IBIF_webapp=%2Fibi_apps&IBIC_server=EDASERVE&IBIWF_msgviewer=OFF&IBIAPP_app=soldpermits&IBIF_ex=sold_permit_d&CLICKED_ON=&PN=49003840&PT=VB"
+      },
+      {
+        "permitNumber": "24040498",
+        "jurisdiction": "Houston, TX",
+        "databaseId": 0,
+        "address": "1000 MAIN ST 116 77002",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "COMM.ELEV.INST",
+        "workClass": "V1",
+        "description": "COMMERCIAL ELEVATOR PERMIT WS",
+        "status": null,
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 23145,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": "*BBVA COMPASS BANK",
+        "sourceUrl": "https://cohtora.houstontx.gov/ibi_apps/WFServlet.ibfs?IBIF_webapp=%2Fibi_apps&IBIC_server=EDASERVE&IBIWF_msgviewer=OFF&IBIAPP_app=soldpermits&IBIF_ex=sold_permit_d&CLICKED_ON=&PN=24040498&PT=V1"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Houston, TX",
+    "url": "https://www.houstonpermittingcenter.org/",
+    "type": "address",
+    "value": "1000 MAIN ST 116 77002",
+    "time": "2026-10-10T18:37:38.448Z",
+    "elapsedMs": 4207,
+    "count": 2,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "name",
+        "company"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "49003840",
+        "jurisdiction": "Houston, TX",
+        "databaseId": 0,
+        "address": "1000 MAIN ST 116 77002",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "ELEV RENEWAL",
+        "workClass": "VB",
+        "description": "ELEVATOR SITE",
+        "status": null,
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 0,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": "*BBVA COMPASS BANK",
+        "sourceUrl": "https://cohtora.houstontx.gov/ibi_apps/WFServlet.ibfs?IBIF_webapp=%2Fibi_apps&IBIC_server=EDASERVE&IBIWF_msgviewer=OFF&IBIAPP_app=soldpermits&IBIF_ex=sold_permit_d&CLICKED_ON=&PN=49003840&PT=VB"
+      },
+      {
+        "permitNumber": "24040498",
+        "jurisdiction": "Houston, TX",
+        "databaseId": 0,
+        "address": "1000 MAIN ST 116 77002",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "COMM.ELEV.INST",
+        "workClass": "V1",
+        "description": "COMMERCIAL ELEVATOR PERMIT WS",
+        "status": null,
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 23145,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": "*BBVA COMPASS BANK",
+        "sourceUrl": "https://cohtora.houstontx.gov/ibi_apps/WFServlet.ibfs?IBIF_webapp=%2Fibi_apps&IBIC_server=EDASERVE&IBIWF_msgviewer=OFF&IBIAPP_app=soldpermits&IBIF_ex=sold_permit_d&CLICKED_ON=&PN=24040498&PT=V1"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Houston, TX",
+    "url": "https://www.houstonpermittingcenter.org/",
+    "type": "permit",
+    "value": "49003840",
+    "time": "2026-10-10T18:37:42.656Z",
+    "elapsedMs": 4206,
+    "count": 1,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "name",
+        "company"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "49003840",
+        "jurisdiction": "Houston, TX",
+        "databaseId": 0,
+        "address": "1000 MAIN ST 116 77002",
+        "parcel": null,
+        "lat": null,
+        "lng": null,
+        "permitType": "ELEV RENEWAL",
+        "workClass": "VB",
+        "description": "ELEVATOR SITE",
+        "status": null,
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 0,
+        "contractorName": null,
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": "*BBVA COMPASS BANK",
+        "sourceUrl": "https://cohtora.houstontx.gov/ibi_apps/WFServlet.ibfs?IBIF_webapp=%2Fibi_apps&IBIC_server=EDASERVE&IBIWF_msgviewer=OFF&IBIAPP_app=soldpermits&IBIF_ex=sold_permit_d&CLICKED_ON=&PN=49003840&PT=VB"
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Houston, TX",
+    "url": "https://www.houstonpermittingcenter.org/",
+    "type": "company",
+    "value": "SMITH",
+    "time": "2026-10-10T18:37:46.863Z",
+    "elapsedMs": 4658,
+    "error": "Error: Houston: report cache contains only part of the result; narrow the search"
+  },
+  {
+    "jurisdiction": "Houston, TX",
+    "url": "https://www.houstonpermittingcenter.org/",
+    "type": "recent",
+    "value": "2026-10-03T18:37:51.522Z",
+    "time": "2026-10-10T18:37:51.522Z",
+    "elapsedMs": 0,
+    "count": 0,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "name",
+        "company"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": []
+  },
+  {
+    "jurisdiction": "Houston, TX",
+    "url": "https://www.houstonpermittingcenter.org/",
+    "type": "company",
+    "value": "BBVA COMPASS BANK",
+    "time": "2026-10-10T18:38:33.734Z",
+    "elapsedMs": 4324,
+    "error": "Error: Houston: missing report metadata"
+  },
+  {
+    "jurisdiction": "El Paso County, CO",
+    "url": "https://www.pprbd.org/Search/Permit",
+    "type": "address",
+    "value": "4364 LASHELLE AVE",
+    "time": "2026-10-10T18:43:07.778Z",
+    "elapsedMs": 7860,
+    "count": 10,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "B07983",
+        "jurisdiction": "El Paso County, CO",
+        "databaseId": 0,
+        "address": "4364 LASHELLE AVE A-B",
+        "parcel": null,
+        "lat": 38.767348583550195,
+        "lng": -104.7950083616884,
+        "permitType": "Building",
+        "workClass": "103",
+        "description": "DUPLEX",
+        "status": "Finaled",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 36000,
+        "contractorName": "THE RANGE COMPANY",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      },
+      {
+        "permitNumber": "F89972",
+        "jurisdiction": "El Paso County, CO",
+        "databaseId": 0,
+        "address": "4364 LASHELLE AVE",
+        "parcel": "3407001001",
+        "lat": 38.767348583550195,
+        "lng": -104.7950083616884,
+        "permitType": "Building",
+        "workClass": "434",
+        "description": "REROOF (CHG 1395 ENGLEBY RD 6-14-06 JN)",
+        "status": "Finaled",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 6000,
+        "contractorName": "A & I SKYLINE, LLC",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "El Paso County, CO",
+    "url": "https://www.pprbd.org/Search/Permit",
+    "type": "address",
+    "value": "4364 LASHELLE AVE A-B",
+    "time": "2026-10-10T18:43:15.639Z",
+    "elapsedMs": 8006,
+    "count": 1,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "B07983",
+        "jurisdiction": "El Paso County, CO",
+        "databaseId": 0,
+        "address": "4364 LASHELLE AVE A-B",
+        "parcel": null,
+        "lat": 38.767348583550195,
+        "lng": -104.7950083616884,
+        "permitType": "Building",
+        "workClass": "103",
+        "description": "DUPLEX",
+        "status": "Finaled",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 36000,
+        "contractorName": "THE RANGE COMPANY",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "El Paso County, CO",
+    "url": "https://www.pprbd.org/Search/Permit",
+    "type": "permit",
+    "value": "B07983",
+    "time": "2026-10-10T18:43:23.645Z",
+    "elapsedMs": 8021,
+    "count": 1,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "B07983",
+        "jurisdiction": "El Paso County, CO",
+        "databaseId": 0,
+        "address": "4364 LASHELLE AVE A-B",
+        "parcel": null,
+        "lat": 38.767348583550195,
+        "lng": -104.7950083616884,
+        "permitType": "Building",
+        "workClass": "103",
+        "description": "DUPLEX",
+        "status": "Finaled",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 36000,
+        "contractorName": "THE RANGE COMPANY",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "El Paso County, CO",
+    "url": "https://www.pprbd.org/Search/Permit",
+    "type": "company",
+    "value": "THE RANGE COMPANY",
+    "time": "2026-10-10T18:43:31.667Z",
+    "elapsedMs": 8325,
+    "count": 249,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "A27748",
+        "jurisdiction": "El Paso County, CO",
+        "databaseId": 0,
+        "address": "2055 BROMAN CT",
+        "parcel": "6504308043",
+        "lat": 38.76940725413685,
+        "lng": -104.78786951839747,
+        "permitType": "Building",
+        "workClass": "101",
+        "description": "RES",
+        "status": "Finaled",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 26000,
+        "contractorName": "THE RANGE COMPANY",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      },
+      {
+        "permitNumber": "A31032",
+        "jurisdiction": "El Paso County, CO",
+        "databaseId": 0,
+        "address": "4271 COLLEGE VIEW DR",
+        "parcel": "6504308039",
+        "lat": 38.76992541320861,
+        "lng": -104.78863071573494,
+        "permitType": "Building",
+        "workClass": "101",
+        "description": "RES",
+        "status": "Finaled",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 26000,
+        "contractorName": "THE RANGE COMPANY",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "El Paso County, CO",
+    "url": "https://www.pprbd.org/Search/Permit",
+    "type": "recent",
+    "value": "2026-10-03T18:43:39.992Z",
+    "time": "2026-10-10T18:43:39.992Z",
+    "elapsedMs": 0,
+    "count": 0,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": []
+  },
+  {
+    "jurisdiction": "Manitou Springs, CO",
+    "url": "https://www.pprbd.org/",
+    "type": "address",
+    "value": "306 CANON AVE",
+    "time": "2026-10-10T18:43:39.993Z",
+    "elapsedMs": 8014,
+    "count": 42,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "D09327",
+        "jurisdiction": "Manitou Springs, CO",
+        "databaseId": 0,
+        "address": "306 CANON AVE",
+        "parcel": "7405336022",
+        "lat": 38.85976676436868,
+        "lng": -104.91741203154801,
+        "permitType": "Building",
+        "workClass": "437",
+        "description": "SIDING AND SHEATHING REPAIR REISSUE OF C47822}",
+        "status": "Finaled",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 1000,
+        "contractorName": "MURPHY CONSTRUCTORS OF COLORADO SPRINGS, INC.",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      },
+      {
+        "permitNumber": "D10938",
+        "jurisdiction": "Manitou Springs, CO",
+        "databaseId": 0,
+        "address": "306 CANON AVE",
+        "parcel": "7405336022",
+        "lat": 38.85976676436868,
+        "lng": -104.91741203154801,
+        "permitType": "Building",
+        "workClass": "437",
+        "description": "INT NON-BEARING DEMO [ADD PLANS & PERMITS REQ]",
+        "status": "Finaled",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 6000,
+        "contractorName": "MURPHY CONSTRUCTORS OF COLORADO SPRINGS, INC.",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Manitou Springs, CO",
+    "url": "https://www.pprbd.org/",
+    "type": "address",
+    "value": "306 CANON AVE",
+    "time": "2026-10-10T18:43:48.008Z",
+    "elapsedMs": 7982,
+    "count": 42,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "D09327",
+        "jurisdiction": "Manitou Springs, CO",
+        "databaseId": 0,
+        "address": "306 CANON AVE",
+        "parcel": "7405336022",
+        "lat": 38.85976676436868,
+        "lng": -104.91741203154801,
+        "permitType": "Building",
+        "workClass": "437",
+        "description": "SIDING AND SHEATHING REPAIR REISSUE OF C47822}",
+        "status": "Finaled",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 1000,
+        "contractorName": "MURPHY CONSTRUCTORS OF COLORADO SPRINGS, INC.",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      },
+      {
+        "permitNumber": "D10938",
+        "jurisdiction": "Manitou Springs, CO",
+        "databaseId": 0,
+        "address": "306 CANON AVE",
+        "parcel": "7405336022",
+        "lat": 38.85976676436868,
+        "lng": -104.91741203154801,
+        "permitType": "Building",
+        "workClass": "437",
+        "description": "INT NON-BEARING DEMO [ADD PLANS & PERMITS REQ]",
+        "status": "Finaled",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 6000,
+        "contractorName": "MURPHY CONSTRUCTORS OF COLORADO SPRINGS, INC.",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Manitou Springs, CO",
+    "url": "https://www.pprbd.org/",
+    "type": "permit",
+    "value": "D09327",
+    "time": "2026-10-10T18:43:55.991Z",
+    "elapsedMs": 8006,
+    "count": 1,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "D09327",
+        "jurisdiction": "Manitou Springs, CO",
+        "databaseId": 0,
+        "address": "306 CANON AVE",
+        "parcel": "7405336022",
+        "lat": 38.85976676436868,
+        "lng": -104.91741203154801,
+        "permitType": "Building",
+        "workClass": "437",
+        "description": "SIDING AND SHEATHING REPAIR REISSUE OF C47822}",
+        "status": "Finaled",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 1000,
+        "contractorName": "MURPHY CONSTRUCTORS OF COLORADO SPRINGS, INC.",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Manitou Springs, CO",
+    "url": "https://www.pprbd.org/",
+    "type": "company",
+    "value": "MURPHY CONSTRUCTORS OF COLORADO SPRINGS, INC.",
+    "time": "2026-10-10T18:44:03.997Z",
+    "elapsedMs": 8018,
+    "count": 70,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "A89587",
+        "jurisdiction": "Manitou Springs, CO",
+        "databaseId": 0,
+        "address": "311 MANITOU AVE",
+        "parcel": "7404309003",
+        "lat": 38.856432846173234,
+        "lng": -104.89987512146975,
+        "permitType": "Building",
+        "workClass": "437",
+        "description": "REMOVE SHEETROCK-FIRE DAMAGE",
+        "status": "Finaled",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 2000,
+        "contractorName": "MURPHY CONSTRUCTORS OF COLORADO SPRINGS, INC.",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      },
+      {
+        "permitNumber": "A90814",
+        "jurisdiction": "Manitou Springs, CO",
+        "databaseId": 0,
+        "address": "307 MANITOU AVE (MANITOU)",
+        "parcel": null,
+        "lat": 38.8563898638423,
+        "lng": -104.89946264024411,
+        "permitType": "Building",
+        "workClass": "437",
+        "description": "INT REMODEL-MOTEL",
+        "status": "Finaled",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 60000,
+        "contractorName": "MURPHY CONSTRUCTORS OF COLORADO SPRINGS, INC.",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Manitou Springs, CO",
+    "url": "https://www.pprbd.org/",
+    "type": "recent",
+    "value": "2026-10-03T18:44:12.015Z",
+    "time": "2026-10-10T18:44:12.015Z",
+    "elapsedMs": 0,
+    "count": 0,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": []
+  },
+  {
+    "jurisdiction": "Monument, CO",
+    "url": "https://www.pprbd.org/",
+    "type": "address",
+    "value": "17563 LEISURE LAKE DR",
+    "time": "2026-10-10T18:44:12.016Z",
+    "elapsedMs": 8007,
+    "count": 4,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "J63739",
+        "jurisdiction": "Monument, CO",
+        "databaseId": 0,
+        "address": "17563 LEISURE LAKE DR",
+        "parcel": "7115419003",
+        "lat": 39.086939324530036,
+        "lng": -104.87382107128204,
+        "permitType": "Building",
+        "workClass": "101",
+        "description": "RESIDENCE",
+        "status": "Finaled",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 537649,
+        "contractorName": "CENTURY COMMUNITIES",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      },
+      {
+        "permitNumber": "O92051",
+        "jurisdiction": "Monument, CO",
+        "databaseId": 0,
+        "address": "17563 LEISURE LAKE DR",
+        "parcel": "7115419003",
+        "lat": 39.086939324530036,
+        "lng": -104.87382107128204,
+        "permitType": "Building",
+        "workClass": "434",
+        "description": "REROOF",
+        "status": "Finaled",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 16808,
+        "contractorName": "ABOVE THE REST LLC",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Monument, CO",
+    "url": "https://www.pprbd.org/",
+    "type": "address",
+    "value": "17563 LEISURE LAKE DR",
+    "time": "2026-10-10T18:44:20.024Z",
+    "elapsedMs": 7982,
+    "count": 4,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "J63739",
+        "jurisdiction": "Monument, CO",
+        "databaseId": 0,
+        "address": "17563 LEISURE LAKE DR",
+        "parcel": "7115419003",
+        "lat": 39.086939324530036,
+        "lng": -104.87382107128204,
+        "permitType": "Building",
+        "workClass": "101",
+        "description": "RESIDENCE",
+        "status": "Finaled",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 537649,
+        "contractorName": "CENTURY COMMUNITIES",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      },
+      {
+        "permitNumber": "O92051",
+        "jurisdiction": "Monument, CO",
+        "databaseId": 0,
+        "address": "17563 LEISURE LAKE DR",
+        "parcel": "7115419003",
+        "lat": 39.086939324530036,
+        "lng": -104.87382107128204,
+        "permitType": "Building",
+        "workClass": "434",
+        "description": "REROOF",
+        "status": "Finaled",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 16808,
+        "contractorName": "ABOVE THE REST LLC",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Monument, CO",
+    "url": "https://www.pprbd.org/",
+    "type": "permit",
+    "value": "J63739",
+    "time": "2026-10-10T18:44:28.006Z",
+    "elapsedMs": 8002,
+    "count": 1,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "J63739",
+        "jurisdiction": "Monument, CO",
+        "databaseId": 0,
+        "address": "17563 LEISURE LAKE DR",
+        "parcel": "7115419003",
+        "lat": 39.086939324530036,
+        "lng": -104.87382107128204,
+        "permitType": "Building",
+        "workClass": "101",
+        "description": "RESIDENCE",
+        "status": "Finaled",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 537649,
+        "contractorName": "CENTURY COMMUNITIES",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Monument, CO",
+    "url": "https://www.pprbd.org/",
+    "type": "company",
+    "value": "CENTURY COMMUNITIES",
+    "time": "2026-10-10T18:44:36.010Z",
+    "elapsedMs": 8006,
+    "count": 164,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "J59013",
+        "jurisdiction": "Monument, CO",
+        "databaseId": 0,
+        "address": "17592 LEISURE LAKE DR",
+        "parcel": "7115420053",
+        "lat": 39.08722729166591,
+        "lng": -104.87451702398042,
+        "permitType": "Building",
+        "workClass": "101",
+        "description": "RESIDENCE",
+        "status": "Finaled",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 584764,
+        "contractorName": "CENTURY COMMUNITIES",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      },
+      {
+        "permitNumber": "J59015",
+        "jurisdiction": "Monument, CO",
+        "databaseId": 0,
+        "address": "17578 LEISURE LAKE DR",
+        "parcel": "7115420052",
+        "lat": 39.087100295289645,
+        "lng": -104.87441241786053,
+        "permitType": "Building",
+        "workClass": "101",
+        "description": "RESIDENCE",
+        "status": "Finaled",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 513234,
+        "contractorName": "CENTURY COMMUNITIES",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Monument, CO",
+    "url": "https://www.pprbd.org/",
+    "type": "recent",
+    "value": "2026-10-03T18:44:44.017Z",
+    "time": "2026-10-10T18:44:44.017Z",
+    "elapsedMs": 0,
+    "count": 0,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": []
+  },
+  {
+    "jurisdiction": "Woodland Park, CO",
+    "url": "https://www.pprbd.org/",
+    "type": "address",
+    "value": "407 FOREST EDGE CIR",
+    "time": "2026-10-10T18:44:44.017Z",
+    "elapsedMs": 8020,
+    "count": 1,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "Q63388",
+        "jurisdiction": "Woodland Park, CO",
+        "databaseId": 0,
+        "address": "407 FOREST EDGE CIR",
+        "parcel": "R0023044",
+        "lat": 38.997713978466614,
+        "lng": -105.04372555400306,
+        "permitType": "Building",
+        "workClass": "434",
+        "description": "REROOF",
+        "status": "Open",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 20000,
+        "contractorName": "RELIABLE ROOFING SYSTEMS, INC",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Woodland Park, CO",
+    "url": "https://www.pprbd.org/",
+    "type": "address",
+    "value": "407 FOREST EDGE CIR",
+    "time": "2026-10-10T18:44:52.038Z",
+    "elapsedMs": 7984,
+    "count": 1,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "Q63388",
+        "jurisdiction": "Woodland Park, CO",
+        "databaseId": 0,
+        "address": "407 FOREST EDGE CIR",
+        "parcel": "R0023044",
+        "lat": 38.997713978466614,
+        "lng": -105.04372555400306,
+        "permitType": "Building",
+        "workClass": "434",
+        "description": "REROOF",
+        "status": "Open",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 20000,
+        "contractorName": "RELIABLE ROOFING SYSTEMS, INC",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Woodland Park, CO",
+    "url": "https://www.pprbd.org/",
+    "type": "permit",
+    "value": "Q63388",
+    "time": "2026-10-10T18:45:00.023Z",
+    "elapsedMs": 8002,
+    "count": 1,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "Q63388",
+        "jurisdiction": "Woodland Park, CO",
+        "databaseId": 0,
+        "address": "407 FOREST EDGE CIR",
+        "parcel": "R0023044",
+        "lat": 38.997713978466614,
+        "lng": -105.04372555400306,
+        "permitType": "Building",
+        "workClass": "434",
+        "description": "REROOF",
+        "status": "Open",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 20000,
+        "contractorName": "RELIABLE ROOFING SYSTEMS, INC",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Woodland Park, CO",
+    "url": "https://www.pprbd.org/",
+    "type": "company",
+    "value": "RELIABLE ROOFING SYSTEMS, INC",
+    "time": "2026-10-10T18:45:08.026Z",
+    "elapsedMs": 8063,
+    "count": 7,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": [
+      {
+        "permitNumber": "J84915",
+        "jurisdiction": "Woodland Park, CO",
+        "databaseId": 0,
+        "address": "307 E GUNNISON AVE",
+        "parcel": "6029.241100040",
+        "lat": 38.99873498949979,
+        "lng": -105.05045222149556,
+        "permitType": "Building",
+        "workClass": "434",
+        "description": "REROOF",
+        "status": "Finaled",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 7955,
+        "contractorName": "RELIABLE ROOFING SYSTEMS, INC",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      },
+      {
+        "permitNumber": "L69712",
+        "jurisdiction": "Woodland Park, CO",
+        "databaseId": 0,
+        "address": "1020 SPRUCE HAVEN DR",
+        "parcel": "6029.242770010",
+        "lat": 38.99513213310686,
+        "lng": -105.06565750035499,
+        "permitType": "Building",
+        "workClass": "434",
+        "description": "REROOF",
+        "status": "Finaled",
+        "issuedAt": null,
+        "appliedAt": null,
+        "expiresAt": null,
+        "valuation": 10453,
+        "contractorName": "RELIABLE ROOFING SYSTEMS, INC",
+        "contractorLicense": null,
+        "applicantName": null,
+        "ownerName": null,
+        "sourceUrl": null
+      }
+    ]
+  },
+  {
+    "jurisdiction": "Woodland Park, CO",
+    "url": "https://www.pprbd.org/",
+    "type": "recent",
+    "value": "2026-10-03T18:45:16.090Z",
+    "time": "2026-10-10T18:45:16.090Z",
+    "elapsedMs": 0,
+    "count": 0,
+    "capabilities": {
+      "search": [
+        "address",
+        "permit",
+        "company",
+        "name"
+      ],
+      "listRecent": false,
+      "detail": false
+    },
+    "samples": []
+  }
+]

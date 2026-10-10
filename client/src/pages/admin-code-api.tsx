@@ -10,9 +10,10 @@ import { GoogleSectionHeader } from "@/components/google";
  *
  * Every token writes only to its own branch (devapi/…) on GitHub; nothing
  * runs or deploys until the owner merges and deploys it. Issuing needs a
- * Google re-verification from the last 15 minutes (server/dev-api/routes.ts).
+ * Google re-verification from the last 15 minutes AND the admin's
+ * authenticator code (server/dev-api/routes.ts).
  */
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { AlertTriangle, CheckCircle2, Copy, ExternalLink, GitBranch, Loader2, ShieldCheck, ShieldOff } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -28,6 +29,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useDocumentTitle } from "@/components/feature-landing/primitives";
+import { VerificationCancelled } from "@/components/recent-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -41,7 +43,7 @@ type TokenItem = {
 };
 type Payload = {
   configured: boolean; apiUrl: string; baseBranch: string | null; hours: { min: number; max: number }; maxLive: number;
-  verification: { googleLinked: boolean; googleVerifiedUntil: string | null }; tokens: TokenItem[];
+  verification: { googleLinked: boolean; totpEnabled: boolean; googleVerifiedUntil: string | null }; tokens: TokenItem[];
 };
 type Issued = { token: string; apiUrl: string; item: TokenItem };
 type Activity = {
@@ -122,6 +124,114 @@ function TokenActivity({ id }: { id: string }) {
   );
 }
 
+/** Ready-to-save text of the recovery codes. */
+const recoveryText = (codes: string[]) =>
+  ["ConstructHUB recovery codes", "Each code signs you in once if you lose your phone. Keep them somewhere safe.", "", ...codes].join("\n");
+
+/**
+ * Step 2: the authenticator app, set up right here (the same /api/auth/2fa/setup + /verify
+ * that Settings → Security uses): QR code → first code → recovery codes to save → done.
+ */
+function TwoStepStep({ enabled }: { enabled: boolean }) {
+  const { toast } = useToast();
+  const [setup, setSetup] = useState<{ secret: string; qrCode: string } | null>(null);
+  const [code, setCode] = useState("");
+  const [codes, setCodes] = useState<string[] | null>(null);
+  const [saved, setSaved] = useState(false);
+  const start = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/api/auth/2fa/setup")).json() as Promise<{ secret: string; qrCode: string }>,
+    onSuccess: (d) => { setSetup({ secret: d.secret, qrCode: d.qrCode }); setCode(""); },
+    onError: (e) => { if (!(e instanceof VerificationCancelled)) toast({ title: "Couldn't start the setup", description: apiErrorMessage(e), variant: "destructive" }); },
+  });
+  const verify = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/api/auth/2fa/verify", { code })).json() as Promise<{ codes?: string[] }>,
+    onSuccess: (d) => {
+      setCodes(d.codes ?? []); setSetup(null); setCode("");
+      toast({ title: "Two-step sign-in is on" });
+      void queryClient.invalidateQueries({ queryKey: [KEY] });
+      void queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    },
+    onError: (e) => { setCode(""); toast({ title: "That code didn't work", description: apiErrorMessage(e, "Enter the code your app shows right now."), variant: "destructive" }); },
+  });
+
+  if (codes && !saved) {
+    return (
+      <div className="space-y-3" data-testid="twostep-recovery">
+        <p className="text-sm"><CheckCircle2 className="mr-1.5 inline h-4 w-4 text-emerald-600" />Two-step sign-in is on. <strong>Save these recovery codes now.</strong> Each one gets you in once if you lose your phone, and you won't see them again.</p>
+        <div className="grid grid-cols-2 gap-1 rounded bg-muted p-3 font-mono text-sm sm:grid-cols-5">{codes.map((c) => <span key={c}>{c}</span>)}</div>
+        <div className="flex flex-wrap gap-2">
+          <CopyButton value={recoveryText(codes)} label="Copy codes" testId="button-copy-recovery" />
+          <Button type="button" variant="outline" size="sm" data-testid="button-download-recovery" onClick={() => {
+            const url = URL.createObjectURL(new Blob([recoveryText(codes)], { type: "text/plain" }));
+            const a = document.createElement("a"); a.href = url; a.download = "constructhub-recovery-codes.txt"; a.click(); URL.revokeObjectURL(url);
+          }}>Download .txt</Button>
+          <Button type="button" size="sm" onClick={() => setSaved(true)} data-testid="button-recovery-saved">I saved them</Button>
+        </div>
+      </div>
+    );
+  }
+  if (enabled) {
+    return <p className="text-sm text-muted-foreground" data-testid="twostep-on">Your authenticator app is set up. You'll type its 6-digit code when you issue a token.</p>;
+  }
+  if (!setup) {
+    return (
+      <div className="space-y-2" data-testid="twostep-start">
+        <p className="text-sm">Issuing also needs the 6-digit code from an authenticator app on your phone, so a stolen Google login alone can't hand out access to the code. One-time setup, about a minute:</p>
+        <ol className="ml-5 list-decimal space-y-0.5 text-sm text-muted-foreground">
+          <li>Install <strong>Google Authenticator</strong> or <strong>Authy</strong> on your phone (free).</li>
+          <li>Click the button below and scan the QR code with it.</li>
+          <li>Type the 6-digit code it shows. Then save your recovery codes.</li>
+        </ol>
+        <Button size="sm" onClick={() => start.mutate()} disabled={start.isPending} data-testid="button-start-twostep">
+          {start.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Set up authenticator app
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-3" data-testid="twostep-scan">
+      <p className="text-sm font-medium">Scan this with your authenticator app</p>
+      <div className="flex flex-wrap items-start gap-4">
+        <img src={setup.qrCode} alt="QR code for your authenticator app" className="h-44 w-44 rounded border bg-white p-2" data-testid="img-twostep-qr" />
+        <div className="min-w-0 flex-1 space-y-2 text-sm">
+          <p className="text-muted-foreground">Can't scan? In the app choose "Enter a setup key" and type:</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <code className="break-all rounded bg-muted px-2 py-1 font-mono text-xs" data-testid="text-twostep-secret">{setup.secret}</code>
+            <CopyButton value={setup.secret} label="Copy key" testId="button-copy-twostep-secret" />
+          </div>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="twostep-code">Code from the app</Label>
+          <Input id="twostep-code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="123456" className="w-32 font-mono tracking-widest"
+            value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            onKeyDown={(e) => { if (e.key === "Enter" && code.length === 6) verify.mutate(); }} data-testid="input-twostep-code" />
+        </div>
+        <Button onClick={() => verify.mutate()} disabled={code.length !== 6 || verify.isPending} data-testid="button-verify-twostep">
+          {verify.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Turn on
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => setSetup(null)}>Cancel</Button>
+      </div>
+    </div>
+  );
+}
+
+/** One numbered step of the checklist: its state shows at a glance. */
+function Step({ n, title, done, children, testId }: { n: number; title: string; done: boolean; children: ReactNode; testId: string }) {
+  return (
+    <div className="flex gap-3 rounded-lg border p-3 sm:p-4" data-testid={testId}>
+      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${done ? "bg-emerald-600 text-white" : "bg-primary/10 text-primary"}`}>
+        {done ? <CheckCircle2 className="h-4 w-4" /> : n}
+      </span>
+      <div className="min-w-0 flex-1 space-y-2">
+        <p className="font-medium">{title}</p>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function TokenRow({ t, now, onRevoke }: { t: TokenItem; now: number; onRevoke: (t: TokenItem) => void }) {
   const [open, setOpen] = useState(false);
   return (
@@ -164,14 +274,15 @@ export default function AdminCodeApiPage() {
   const [hours, setHours] = useState(24);
   const [access, setAccess] = useState<"read" | "write">("write");
   const [issued, setIssued] = useState<Issued | null>(null);
+  const [totpCode, setTotpCode] = useState("");
   const [revoking, setRevoking] = useState<TokenItem | null>(null);
 
   const issue = useMutation({
     mutationFn: async () => (await apiRequest("POST", KEY, {
-      name: name.trim(), holderType: holder, hours, scopes: access === "write" ? ["read", "write"] : ["read"],
+      name: name.trim(), holderType: holder, hours, scopes: access === "write" ? ["read", "write"] : ["read"], totpCode,
     })).json() as Promise<Issued>,
-    onSuccess: (out) => { setIssued(out); setName(""); void queryClient.invalidateQueries({ queryKey: [KEY] }); },
-    onError: (e) => { toast({ title: "Token not issued", description: apiErrorMessage(e), variant: "destructive" }); void queryClient.invalidateQueries({ queryKey: [KEY] }); },
+    onSuccess: (out) => { setIssued(out); setName(""); setTotpCode(""); void queryClient.invalidateQueries({ queryKey: [KEY] }); },
+    onError: (e) => { setTotpCode(""); toast({ title: "Token not issued", description: apiErrorMessage(e), variant: "destructive" }); void queryClient.invalidateQueries({ queryKey: [KEY] }); },
   });
   const revoke = useMutation({
     mutationFn: async (t: TokenItem) => (await apiRequest("DELETE", `${KEY}/${t.id}`)).json(),
@@ -181,7 +292,18 @@ export default function AdminCodeApiPage() {
 
   const verifiedUntil = data?.verification.googleVerifiedUntil ? new Date(data.verification.googleVerifiedUntil).getTime() : 0;
   const verified = verifiedUntil > now;
-  const canIssue = !!data?.configured && !!data.verification.googleLinked && verified && !!name.trim() && !issue.isPending;
+  const canIssue = !!data?.configured && !!data.verification.googleLinked && !!data.verification.totpEnabled && verified
+    && !!name.trim() && /^\d{6}$/.test(totpCode) && !issue.isPending;
+  // What still stands between the admin and the Issue button, in words.
+  const issueBlocker = !data ? null
+    : !data.configured ? "The Code API isn't switched on on this server yet."
+    : !data.verification.googleLinked ? "Issuing needs an admin account that signs in with Google."
+    : !verified && !data.verification.totpEnabled ? "Finish steps 1 and 2 above first."
+    : !verified ? "Finish step 1 above (Continue with Google) first."
+    : !data.verification.totpEnabled ? "Finish step 2 above (set up the authenticator app) first."
+    : !name.trim() ? "Say who the token is for."
+    : !/^\d{6}$/.test(totpCode) ? "Type the 6-digit code your authenticator app shows now."
+    : null;
   const live = data?.tokens.filter((t) => t.status === "live") ?? [];
   const past = data?.tokens.filter((t) => t.status !== "live") ?? [];
 
@@ -222,19 +344,23 @@ export default function AdminCodeApiPage() {
           <CardHeader><CardTitle className="text-base">Issue a token</CardTitle>
             <CardDescription>Each token gets its own branch from {data.baseBranch ?? "main"}. Reads and commits only; nothing it writes runs or goes live until you merge and deploy.</CardDescription></CardHeader>
           <CardContent className="space-y-4">
-            <div className="rounded-lg border p-3" data-testid="google-status">
+            <Step n={1} title="Confirm it's you with Google" done={data.verification.googleLinked && verified} testId="google-status">
               {!data.verification.googleLinked ? (
                 <p className="text-sm"><ShieldOff className="mr-1.5 inline h-4 w-4 text-destructive" />This admin account doesn't sign in with Google. Issuing needs one that does.</p>
               ) : verified ? (
-                <p className="text-sm"><CheckCircle2 className="mr-1.5 inline h-4 w-4 text-emerald-600" />Verified with Google until {new Date(verifiedUntil).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}.</p>
+                <p className="text-sm text-muted-foreground">Verified until {new Date(verifiedUntil).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} (15 minutes at a time).</p>
               ) : (
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm"><ShieldCheck className="mr-1.5 inline h-4 w-4 text-primary" />Confirm it's you with Google first. It's good for 15 minutes.</p>
+                  <p className="text-sm text-muted-foreground">Sign in to Google again. It's good for 15 minutes.</p>
                   <Button size="sm" data-testid="button-verify-google"
                     onClick={() => window.location.assign(`/api/auth/google?reauth=1&next=${encodeURIComponent(PAGE)}`)}>Continue with Google</Button>
                 </div>
               )}
-            </div>
+            </Step>
+            <Step n={2} title="Authenticator app" done={data.verification.totpEnabled} testId="twostep-status">
+              <TwoStepStep enabled={data.verification.totpEnabled} />
+            </Step>
+            <p className="pt-1 font-medium">3. Issue the token</p>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5 sm:col-span-2">
                 <Label htmlFor="token-name">Who is it for?</Label>
@@ -263,9 +389,19 @@ export default function AdminCodeApiPage() {
                 </div>
               </div>
             </div>
-            <Button disabled={!canIssue} onClick={() => issue.mutate()} data-testid="button-issue">
-              {issue.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Issue token
-            </Button>
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="totp-code">Authenticator code</Label>
+                <Input id="totp-code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="123456" className="w-32 font-mono tracking-widest"
+                  disabled={!data.verification.totpEnabled}
+                  value={totpCode} onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  onKeyDown={(e) => { if (e.key === "Enter" && canIssue) issue.mutate(); }} data-testid="input-totp-code" />
+              </div>
+              <Button disabled={!canIssue} onClick={() => issue.mutate()} data-testid="button-issue">
+                {issue.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Issue token
+              </Button>
+            </div>
+            {issueBlocker && <p className="text-sm text-muted-foreground" data-testid="text-issue-blocker">{issueBlocker}</p>}
           </CardContent>
         </Card>
 

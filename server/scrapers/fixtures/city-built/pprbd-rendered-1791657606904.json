@@ -1,0 +1,1 @@
+{"error":{"code":400,"message":"Unable to generate token.","details":["'username' must be specified.","'password' must be specified.","'referer' must be specified."]}}

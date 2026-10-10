@@ -329,6 +329,18 @@ const entries: Draft[] = [
     howItWorks: "A schedule can only be made for a portal that has a verified link and supports live search. Other accounts see a message that administrator access is required.",
     needs: ["Administrator access."],
   },
+  {
+    key: "permit-alerts", group: "Permits & Databases", route: "/permit-alerts", title: "Permit Alerts",
+    whatItIs: "Watches that tell you when a new permit you care about is filed.",
+    whatItDoes: "Watch an address, a parcel, a contractor, or the trades you work in across the jurisdictions you pick. Watched portals are checked every hour and you get one digest per watch by email, text or Telegram.",
+    howToUse: [
+      "Sidebar → Permits & Databases → Permit Alerts.",
+      "Choose what to watch — an address, a parcel, a contractor, or the trades in an area — and pick the jurisdictions.",
+      "Pick how to hear about hits (email, text or Telegram) and save the watch.",
+    ],
+    howItWorks: "Alerts work on the portals that can list permits by date; the directory marks those Alerts supported. Each watched jurisdiction is polled hourly through the adapter registry, and only jurisdictions with an active watch are polled.",
+    needs: [moduleNeed("permitAlerts")],
+  },
 
   /* ══ Google Business ══════════════════════════════════════════════════════════════════════════ */
   {
@@ -567,11 +579,11 @@ const entries: Draft[] = [
     howToUse: [
       "Google Reviews → “GMB Profiles & Templates” → Add Profile, and paste your Google review link.",
       "Choose “New Review Request”, pick the profile, enter the client’s name and email, and send now or schedule it.",
-      "Watch the request’s tracking: opened, link clicked, feedback.",
+      "Under “Feedback routing”, set the score below which a client’s feedback comes to you privately first (default 8; “10” means only a perfect score skips the private form), then watch each request’s tracking: opened, link clicked, feedback, caught privately.",
       "On the Google Profile Reviews tab, filter reviews and publish replies to Google.",
       "For AI drafts, open “AI reply settings and drafts queue”, choose a location and a mode, then approve drafts in the queue.",
     ],
-    howItWorks: "Every client gets the same button to leave a Google review whatever score they give — Google prohibits asking only happy clients. Reminders stop when the client responds, unsubscribes or reaches the maximum you set. AI can get facts wrong, so check every reply.",
+    howItWorks: "Every client gets the same button to leave a Google review whatever score they give — Google prohibits asking only happy clients. A score below your feedback-routing threshold shows the private “What could we have done better?” form first and alerts you at once (bell, email and Telegram when linked) with the name, score, job and their words, then offers the Google review step like everyone else; a score at or above it goes straight to the Google step. The “Caught privately” tile and the “Private feedback” badge count those requests. Reminders stop when the client responds, unsubscribes or reaches the maximum you set. AI can get facts wrong, so check every reply.",
     needs: ["Any plan.", "Google Profile Reviews needs a connected Google account and a linked location."],
   },
 
@@ -633,7 +645,7 @@ const entries: Draft[] = [
     needs: ["Any plan; scans are counted against the plan’s monthly Site Scans."],
   },
   {
-    key: "seo", group: "Tools", route: "/seo", title: "SEO",
+    key: "seo", group: "Tools", route: "/seo", title: "SEO Suite",
     whatItIs: "A rank tracker and research tools: where your site ranks on Google for the keywords you choose, checked every week.",
     whatItDoes: "Five tabs. Rank tracker shows each keyword’s position on desktop and mobile with movement since the last check. Site explorer looks up any website’s search traffic, keywords, backlinks and competitors. Keywords returns up to 50 related searches with volume, cost per click and difficulty. Backlinks shows who links to your site. Competitors lists keywords a competitor ranks for and you do not.",
     howToUse: [

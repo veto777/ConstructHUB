@@ -9,7 +9,8 @@ create this in the admin portal." Changes go to a branch; the owner approves eve
 - **Tokens:** `chdev_…`, issued at **/admin/code-api** (sidebar → Admin → Code API). They last 24 or 48 hours,
   have read or read + write access, and are shown once. Up to 10 can be live at a time. Revoking one stops it at once.
 - **Who can issue:** platform admins (`server/admin.ts`). The account must sign in with Google, and the admin must
-  click **Continue with Google** in the 15 minutes before issuing. That has to be the admin's own sign-in;
+  click **Continue with Google** in the 15 minutes before issuing, **and** type the current 6-digit code from
+  their authenticator app (two-step sign-in must be on in Settings → Security; a code works once). That has to be the admin's own sign-in;
   an agency member acting for an admin's account can't issue.
 - **What a token can do:** read the repo (tree, files, search), commit to **its own branch `devapi/<id>`**
   (pushed to GitHub at once), see its diff and log, and `POST /submit` to tell the admin the branch is

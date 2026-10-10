@@ -1,0 +1,560 @@
+{
+  "displayFieldName": "OWNER_NAME",
+  "fieldAliases": {
+    "OBJECTID": "OBJECTID",
+    "PERMITNO": "PERMITNO",
+    "APPL_DATE": "APPL_DATE",
+    "ISSDATE": "ISSDATE",
+    "OCCDATE": "OCCDATE",
+    "CONTROL_NO": "CONTROL_NO",
+    "OWNER_NAME": "OWNER_NAME",
+    "OWNER_ADD": "OWNER_ADD",
+    "P_ADDRESS": "P_ADDRESS",
+    "P_ST_NAME": "P_ST_NAME",
+    "P_ST_NO": "P_ST_NO",
+    "P_SUBDIV": "P_SUBDIV",
+    "CONVEYANCE_ID": "CONVEYANCE_ID",
+    "P_DISTRICT": "P_DISTRICT",
+    "TRACT": "TRACT",
+    "IMPROV_COD": "IMPROV_COD",
+    "USE_CODE": "USE_CODE",
+    "DESC_WORK": "DESC_WORK",
+    "DESC_WORK2": "DESC_WORK2",
+    "PERMIT_TYPE": "PERMIT_TYPE",
+    "LANDUSE_TYPE": "LANDUSE_TYPE",
+    "DESCRIPTION_TYPE": "DESCRIPTION_TYPE",
+    "PRO_USE": "PRO_USE",
+    "EXT_USE": "EXT_USE",
+    "OWNERSHIP": "OWNERSHIP",
+    "RES_CAT": "RES_CAT",
+    "EST_COST": "EST_COST",
+    "TOTAL_UNIT": "TOTAL_UNIT",
+    "RES_NU_EFF": "RES_NU_EFF",
+    "RES_NU_1BR": "RES_NU_1BR",
+    "RES_NU_2BR": "RES_NU_2BR",
+    "RES_NU_3BR": "RES_NU_3BR",
+    "RES_TOTAL": "RES_TOTAL",
+    "RES_TOT_AP": "RES_TOT_AP",
+    "RES_1_FABR": "RES_1_FABR",
+    "FLOOR_AREA": "FLOOR_AREA",
+    "SIZE_WIDTH": "SIZE_WIDTH",
+    "SIZE_DEPTH": "SIZE_DEPTH",
+    "SIZE_HEIGHT": "SIZE_HEIGHT",
+    "SIZE_STORY": "SIZE_STORY",
+    "LOT_SIZE": "LOT_SIZE",
+    "ZONING": "ZONING",
+    "PROP_NO": "PROP_NO",
+    "FORM_OWNER": "FORM_OWNER",
+    "ZIP": "ZIP",
+    "PLAT": "PLAT",
+    "SECTION_": "SECTION_",
+    "BLOCK": "BLOCK",
+    "LOT": "LOT",
+    "BOOK": "BOOK",
+    "FOLIO": "FOLIO",
+    "MAP": "MAP",
+    "GRID": "GRID",
+    "PARCEL": "PARCEL",
+    "LANDAREA": "LANDAREA",
+    "LANDAREA2": "LANDAREA2",
+    "COMMENT_": "COMMENT_",
+    "STATUS": "STATUS",
+    "LOCATION_DISCREPANCY": "LOCATION_DISCREPANCY"
+  },
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": {
+    "wkid": 4326,
+    "latestWkid": 4326
+  },
+  "fields": [
+    {
+      "name": "OBJECTID",
+      "type": "esriFieldTypeOID",
+      "alias": "OBJECTID"
+    },
+    {
+      "name": "PERMITNO",
+      "type": "esriFieldTypeString",
+      "alias": "PERMITNO",
+      "length": 7
+    },
+    {
+      "name": "APPL_DATE",
+      "type": "esriFieldTypeDate",
+      "alias": "APPL_DATE",
+      "length": 8
+    },
+    {
+      "name": "ISSDATE",
+      "type": "esriFieldTypeString",
+      "alias": "ISSDATE",
+      "length": 8
+    },
+    {
+      "name": "OCCDATE",
+      "type": "esriFieldTypeString",
+      "alias": "OCCDATE",
+      "length": 8
+    },
+    {
+      "name": "CONTROL_NO",
+      "type": "esriFieldTypeString",
+      "alias": "CONTROL_NO",
+      "length": 10
+    },
+    {
+      "name": "OWNER_NAME",
+      "type": "esriFieldTypeString",
+      "alias": "OWNER_NAME",
+      "length": 50
+    },
+    {
+      "name": "OWNER_ADD",
+      "type": "esriFieldTypeString",
+      "alias": "OWNER_ADD",
+      "length": 50
+    },
+    {
+      "name": "P_ADDRESS",
+      "type": "esriFieldTypeString",
+      "alias": "P_ADDRESS",
+      "length": 52
+    },
+    {
+      "name": "P_ST_NAME",
+      "type": "esriFieldTypeString",
+      "alias": "P_ST_NAME",
+      "length": 44
+    },
+    {
+      "name": "P_ST_NO",
+      "type": "esriFieldTypeString",
+      "alias": "P_ST_NO",
+      "length": 8
+    },
+    {
+      "name": "P_SUBDIV",
+      "type": "esriFieldTypeString",
+      "alias": "P_SUBDIV",
+      "length": 44
+    },
+    {
+      "name": "CONVEYANCE_ID",
+      "type": "esriFieldTypeString",
+      "alias": "CONVEYANCE_ID",
+      "length": 10
+    },
+    {
+      "name": "P_DISTRICT",
+      "type": "esriFieldTypeString",
+      "alias": "P_DISTRICT",
+      "length": 2
+    },
+    {
+      "name": "TRACT",
+      "type": "esriFieldTypeString",
+      "alias": "TRACT",
+      "length": 10
+    },
+    {
+      "name": "IMPROV_COD",
+      "type": "esriFieldTypeString",
+      "alias": "IMPROV_COD",
+      "length": 1
+    },
+    {
+      "name": "USE_CODE",
+      "type": "esriFieldTypeString",
+      "alias": "USE_CODE",
+      "length": 2
+    },
+    {
+      "name": "DESC_WORK",
+      "type": "esriFieldTypeString",
+      "alias": "DESC_WORK",
+      "length": 255
+    },
+    {
+      "name": "DESC_WORK2",
+      "type": "esriFieldTypeString",
+      "alias": "DESC_WORK2",
+      "length": 32
+    },
+    {
+      "name": "PERMIT_TYPE",
+      "type": "esriFieldTypeString",
+      "alias": "PERMIT_TYPE",
+      "length": 19
+    },
+    {
+      "name": "LANDUSE_TYPE",
+      "type": "esriFieldTypeString",
+      "alias": "LANDUSE_TYPE",
+      "length": 50
+    },
+    {
+      "name": "DESCRIPTION_TYPE",
+      "type": "esriFieldTypeString",
+      "alias": "DESCRIPTION_TYPE",
+      "length": 25
+    },
+    {
+      "name": "PRO_USE",
+      "type": "esriFieldTypeString",
+      "alias": "PRO_USE",
+      "length": 47
+    },
+    {
+      "name": "EXT_USE",
+      "type": "esriFieldTypeString",
+      "alias": "EXT_USE",
+      "length": 47
+    },
+    {
+      "name": "OWNERSHIP",
+      "type": "esriFieldTypeString",
+      "alias": "OWNERSHIP",
+      "length": 1
+    },
+    {
+      "name": "RES_CAT",
+      "type": "esriFieldTypeString",
+      "alias": "RES_CAT",
+      "length": 1
+    },
+    {
+      "name": "EST_COST",
+      "type": "esriFieldTypeString",
+      "alias": "EST_COST",
+      "length": 10
+    },
+    {
+      "name": "TOTAL_UNIT",
+      "type": "esriFieldTypeDouble",
+      "alias": "TOTAL_UNIT"
+    },
+    {
+      "name": "RES_NU_EFF",
+      "type": "esriFieldTypeString",
+      "alias": "RES_NU_EFF",
+      "length": 2
+    },
+    {
+      "name": "RES_NU_1BR",
+      "type": "esriFieldTypeString",
+      "alias": "RES_NU_1BR",
+      "length": 2
+    },
+    {
+      "name": "RES_NU_2BR",
+      "type": "esriFieldTypeString",
+      "alias": "RES_NU_2BR",
+      "length": 2
+    },
+    {
+      "name": "RES_NU_3BR",
+      "type": "esriFieldTypeString",
+      "alias": "RES_NU_3BR",
+      "length": 2
+    },
+    {
+      "name": "RES_TOTAL",
+      "type": "esriFieldTypeString",
+      "alias": "RES_TOTAL",
+      "length": 4
+    },
+    {
+      "name": "RES_TOT_AP",
+      "type": "esriFieldTypeString",
+      "alias": "RES_TOT_AP",
+      "length": 3
+    },
+    {
+      "name": "RES_1_FABR",
+      "type": "esriFieldTypeString",
+      "alias": "RES_1_FABR",
+      "length": 2
+    },
+    {
+      "name": "FLOOR_AREA",
+      "type": "esriFieldTypeString",
+      "alias": "FLOOR_AREA",
+      "length": 12
+    },
+    {
+      "name": "SIZE_WIDTH",
+      "type": "esriFieldTypeString",
+      "alias": "SIZE_WIDTH",
+      "length": 6
+    },
+    {
+      "name": "SIZE_DEPTH",
+      "type": "esriFieldTypeString",
+      "alias": "SIZE_DEPTH",
+      "length": 6
+    },
+    {
+      "name": "SIZE_HEIGHT",
+      "type": "esriFieldTypeString",
+      "alias": "SIZE_HEIGHT",
+      "length": 5
+    },
+    {
+      "name": "SIZE_STORY",
+      "type": "esriFieldTypeString",
+      "alias": "SIZE_STORY",
+      "length": 6
+    },
+    {
+      "name": "LOT_SIZE",
+      "type": "esriFieldTypeString",
+      "alias": "LOT_SIZE",
+      "length": 17
+    },
+    {
+      "name": "ZONING",
+      "type": "esriFieldTypeString",
+      "alias": "ZONING",
+      "length": 8
+    },
+    {
+      "name": "PROP_NO",
+      "type": "esriFieldTypeString",
+      "alias": "PROP_NO",
+      "length": 10
+    },
+    {
+      "name": "FORM_OWNER",
+      "type": "esriFieldTypeString",
+      "alias": "FORM_OWNER",
+      "length": 34
+    },
+    {
+      "name": "ZIP",
+      "type": "esriFieldTypeString",
+      "alias": "ZIP",
+      "length": 5
+    },
+    {
+      "name": "PLAT",
+      "type": "esriFieldTypeString",
+      "alias": "PLAT",
+      "length": 6
+    },
+    {
+      "name": "SECTION_",
+      "type": "esriFieldTypeString",
+      "alias": "SECTION_",
+      "length": 3
+    },
+    {
+      "name": "BLOCK",
+      "type": "esriFieldTypeString",
+      "alias": "BLOCK",
+      "length": 5
+    },
+    {
+      "name": "LOT",
+      "type": "esriFieldTypeString",
+      "alias": "LOT",
+      "length": 5
+    },
+    {
+      "name": "BOOK",
+      "type": "esriFieldTypeString",
+      "alias": "BOOK",
+      "length": 4
+    },
+    {
+      "name": "FOLIO",
+      "type": "esriFieldTypeString",
+      "alias": "FOLIO",
+      "length": 4
+    },
+    {
+      "name": "MAP",
+      "type": "esriFieldTypeString",
+      "alias": "MAP",
+      "length": 5
+    },
+    {
+      "name": "GRID",
+      "type": "esriFieldTypeString",
+      "alias": "GRID",
+      "length": 5
+    },
+    {
+      "name": "PARCEL",
+      "type": "esriFieldTypeString",
+      "alias": "PARCEL",
+      "length": 5
+    },
+    {
+      "name": "LANDAREA",
+      "type": "esriFieldTypeString",
+      "alias": "LANDAREA",
+      "length": 8
+    },
+    {
+      "name": "LANDAREA2",
+      "type": "esriFieldTypeString",
+      "alias": "LANDAREA2",
+      "length": 11
+    },
+    {
+      "name": "COMMENT_",
+      "type": "esriFieldTypeString",
+      "alias": "COMMENT_",
+      "length": 74
+    },
+    {
+      "name": "STATUS",
+      "type": "esriFieldTypeString",
+      "alias": "STATUS",
+      "length": 10
+    },
+    {
+      "name": "LOCATION_DISCREPANCY",
+      "type": "esriFieldTypeString",
+      "alias": "LOCATION_DISCREPANCY",
+      "length": 50
+    }
+  ],
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 1,
+        "PERMITNO": "B318898",
+        "APPL_DATE": null,
+        "ISSDATE": "19980723",
+        "OCCDATE": null,
+        "CONTROL_NO": "RA",
+        "OWNER_NAME": "VALENZIANO, SALVATORE & ESTELA",
+        "OWNER_ADD": "SAME",
+        "P_ADDRESS": "1009 LESLIE AVE",
+        "P_ST_NAME": "LESLIE AVE",
+        "P_ST_NO": "1009",
+        "P_SUBDIV": "J H BUTLER PLAT",
+        "CONVEYANCE_ID": "010021",
+        "P_DISTRICT": "1",
+        "TRACT": "401505",
+        "IMPROV_COD": "5",
+        "USE_CODE": "01",
+        "DESC_WORK": "RAZE SFD-DEBRIS TO BE HAULED TO APPROVED       SANITARY LANDFILL IN ACCORDANCE W/APPLICABLE   CO SITE REGULATIONS/SEWER TO BE CAPPED/HOUSE   BUILT APPROX 1944/50X40X20=2,000SQ'/PERMIT     EXPIRES 90-DAYS FROM DATE OF ISSUE",
+        "DESC_WORK2": " ",
+        "PERMIT_TYPE": "RAZING",
+        "LANDUSE_TYPE": "SINGLE FAMILY DETACHED",
+        "DESCRIPTION_TYPE": null,
+        "PRO_USE": "VACANT LOT",
+        "EXT_USE": "SFD",
+        "OWNERSHIP": null,
+        "RES_CAT": null,
+        "EST_COST": "1,000.00",
+        "TOTAL_UNIT": 1,
+        "RES_NU_EFF": " ",
+        "RES_NU_1BR": " ",
+        "RES_NU_2BR": " ",
+        "RES_NU_3BR": " ",
+        "RES_TOTAL": " ",
+        "RES_TOT_AP": " ",
+        "RES_1_FABR": " ",
+        "FLOOR_AREA": "2,000",
+        "SIZE_WIDTH": null,
+        "SIZE_DEPTH": null,
+        "SIZE_HEIGHT": null,
+        "SIZE_STORY": null,
+        "LOT_SIZE": "0066.20 X 0000.00",
+        "ZONING": " ",
+        "PROP_NO": "0107001250",
+        "FORM_OWNER": "THOMAS GEORGE,JR",
+        "ZIP": "21228",
+        "PLAT": " ",
+        "SECTION_": " ",
+        "BLOCK": " ",
+        "LOT": "4",
+        "BOOK": "0014",
+        "FOLIO": "0078",
+        "MAP": "0094",
+        "GRID": "0024",
+        "PARCEL": "0098",
+        "LANDAREA": "00004950",
+        "LANDAREA2": "000",
+        "COMMENT_": " ",
+        "STATUS": null,
+        "LOCATION_DISCREPANCY": null
+      },
+      "geometry": {
+        "x": -76.75038875136813,
+        "y": 39.28471637816301
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 2,
+        "PERMITNO": "B327746",
+        "APPL_DATE": null,
+        "ISSDATE": "19980710",
+        "OCCDATE": null,
+        "CONTROL_NO": "RA",
+        "OWNER_NAME": "EPWORTH UNITED METHODIST CHURCH",
+        "OWNER_ADD": "600 WARREN RD  COCKEYSVILLE, MD 21030",
+        "P_ADDRESS": "600 WARREN RD",
+        "P_ST_NAME": "WARREN RD",
+        "P_ST_NO": "600",
+        "P_SUBDIV": "1000 SW SHERWOOD RD",
+        "CONVEYANCE_ID": "080247",
+        "P_DISTRICT": "8",
+        "TRACT": "408900",
+        "IMPROV_COD": "5",
+        "USE_CODE": "01",
+        "DESC_WORK": "RAZE EX. SFD TO BE BURNED DOWN BY FIRE DEPT.   DEBRIS TO BE HAULED TO SANITARY LANDFILL IN    ACCORDENCE W/ COUNTY SITE REGULATIONS. SFD     CONST. IN 1897. SEWER TO BE CAPPED.            30'X40'X25'=2,400SF. PERMIT EXPIRES 90 DAYS    FROM DATE OF IS",
+        "DESC_WORK2": "FINAL 7/10/98",
+        "PERMIT_TYPE": "RAZING",
+        "LANDUSE_TYPE": "INSTITUTIONAL",
+        "DESCRIPTION_TYPE": null,
+        "PRO_USE": "VACANT LOT",
+        "EXT_USE": "CHURCH + 2 SFDS",
+        "OWNERSHIP": null,
+        "RES_CAT": null,
+        "EST_COST": "2,500.00",
+        "TOTAL_UNIT": 1,
+        "RES_NU_EFF": " ",
+        "RES_NU_1BR": " ",
+        "RES_NU_2BR": " ",
+        "RES_NU_3BR": " ",
+        "RES_TOTAL": " ",
+        "RES_TOT_AP": " ",
+        "RES_1_FABR": " ",
+        "FLOOR_AREA": "2,400",
+        "SIZE_WIDTH": null,
+        "SIZE_DEPTH": null,
+        "SIZE_HEIGHT": null,
+        "SIZE_STORY": null,
+        "LOT_SIZE": "3.155AC",
+        "ZONING": " ",
+        "PROP_NO": "1700006251",
+        "FORM_OWNER": "ASSISTED LIVING OF AMERICA INC",
+        "ZIP": "21030",
+        "PLAT": " ",
+        "SECTION_": " ",
+        "BLOCK": " ",
+        "LOT": " ",
+        "BOOK": "0000",
+        "FOLIO": "0000",
+        "MAP": "0068",
+        "GRID": "0019",
+        "PARCEL": "0440",
+        "LANDAREA": "00047711",
+        "LANDAREA2": "000",
+        "COMMENT_": " ",
+        "STATUS": null,
+        "LOCATION_DISCREPANCY": null
+      },
+      "geometry": {
+        "x": -76.62040873452536,
+        "y": 39.474050724893004
+      }
+    }
+  ],
+  "exceededTransferLimit": true
+}

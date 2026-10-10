@@ -1,0 +1,65 @@
+[
+  {
+    "permitnum": "6066909-CN",
+    "permitclass": "Institutional",
+    "permitclassmapped": "Non-Residential",
+    "permittypemapped": "Building",
+    "permittypedesc": "Addition/Alteration",
+    "description": "Divide lab support room into two rooms & build out shelled office area.",
+    "housingunits": "0.0",
+    "housingunitsremoved": "0.0",
+    "housingunitsadded": "0.0",
+    "estprojectcost": "39700.0000",
+    "applieddate": "2005-07-27T00:00:00.000",
+    "issueddate": "2005-07-27T00:00:00.000",
+    "expiresdate": "2007-01-27T00:00:00.000",
+    "completeddate": "2005-09-15T00:00:00.000",
+    "statuscurrent": "Completed",
+    "originaladdress1": "1100 FAIRVIEW AVE N",
+    "originalcity": "SEATTLE",
+    "originalstate": "WA",
+    "originalzip": "98109",
+    "contractorcompanyname": "FRED HUTCHINSON CANCER RES CTR",
+    "link": {
+      "url": "https://services.seattle.gov/portal/customize/LinkToRecord.aspx?altId=6066909-CN"
+    },
+    "latitude": "47.62855693",
+    "longitude": "-122.33036774",
+    "location1": {
+      "latitude": "47.62855693",
+      "longitude": "-122.33036774"
+    },
+    "daysoutcorrections": "0",
+    "numberreviewcycles": "0",
+    "dependentbuilding": "0",
+    "housingcategory": "N/A"
+  },
+  {
+    "permitnum": "6066930-CN",
+    "permitclass": "Single Family/Duplex",
+    "permitclassmapped": "Residential",
+    "permittypemapped": "Building",
+    "permittypedesc": "Addition/Alteration",
+    "description": "Construct 10' (?) max high retaining wall and backfill near ditch at southwest property line of lot  adjacent to railroad  per plan.",
+    "housingunits": "0.0",
+    "estprojectcost": "5000.0000",
+    "statuscurrent": "Closed",
+    "originaladdress1": "4701 31ST AVE W",
+    "originalcity": "SEATTLE",
+    "originalstate": "WA",
+    "originalzip": "98199",
+    "link": {
+      "url": "https://services.seattle.gov/portal/customize/LinkToRecord.aspx?altId=6066930-CN"
+    },
+    "latitude": "47.66309964",
+    "longitude": "-122.39733825",
+    "location1": {
+      "latitude": "47.66309964",
+      "longitude": "-122.39733825"
+    },
+    "daysoutcorrections": "0",
+    "numberreviewcycles": "0",
+    "dependentbuilding": "0",
+    "housingcategory": "Single-Family Add/Alt"
+  }
+]

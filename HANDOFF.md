@@ -1,3 +1,27 @@
+## 🔔 2026-10-10 — Permit alerts (branch `permits/alerts`, NOT deployed)
+- **What:** owner's order ("track contractors or specific trades in your area, get alerts when a permit is issued for a
+  specific address"). A **watch** (`permit_watches`: address | parcel | contractor | trade_area, params + channels +
+  the `permit_databases` ids it follows) is polled **hourly per watched jurisdiction** by `server/permits/poller.ts`
+  (one tick every 5 min, `pg_try_advisory_lock(7193)`, ≤10 jurisdictions per tick one after another, 403/429/CAPTCHA
+  → 6 h back-off, failures to the issue desk, state in `permit_poll_state`). Nothing is polled without a watch. Permits
+  land normalized in `permits` (unique `database_id + permit_number`, content hash), matches in `permit_watch_hits`
+  (unique per watch × permit → a permit is announced once), one digest per watch per poll by email (`server/email.ts`),
+  text (`server/crm/sms.ts`, the owner's CRM texting allowance) or Telegram (the LSA bot's linked chat).
+  `server/permits/matching.ts`: address normalization / parcel equality, contractor name (LLC/Inc noise, word order) or
+  license, trade keyword sets (`shared/permit-alerts.ts` TRADES) within a radius (Google geocoding, `GOOGLE_PLACES_API_KEY`,
+  ≤40 geocodes per poll) or across the watch's jurisdictions when there are no coordinates.
+- **Adapter contract:** `server/scrapers/types.ts` (`PortalAdapter`: search / listRecent / detail + capabilities) and
+  `server/scrapers/registry.ts` (`getAdapter`, aliases). The 7 legacy `scraper.ts` adapters are wrapped with
+  `listRecent = []`, `capabilities.listRecent = false`; **alerts only work on a portal whose adapter really lists by
+  date** — 16 platform adapters (`server/scrapers/<platform>.ts`) were commissioned in parallel from commit
+  `9912d632`; each registers itself with `registerAdapter`. The directory and the watch show "Alerts supported" from
+  that flag (`GET /api/permits/alert-platforms`).
+- **API/UI:** `/api/permits/watches` (CRUD, `/:id/hits`, `/:id/check`, `/jurisdictions`) behind
+  `requireModule("permitAlerts")`; page `/permit-alerts` (sidebar → Permits & Databases → Permit Alerts; digests link
+  to `/permit-alerts?watch=<id>`). `permitAlerts` left `COMING_MODULES`. Tests: `server/permits/*.test.ts`.
+- **Owner decides:** the à-la-carte price (brief: $199 standalone / $129 add-on — the price book on `pricing/a-la-carte`
+  gates on the same module); the first-poll look-back (7 days); whether texts should also count outside a CRM org.
+
 ## 2026-10-10 — Alpine door intelligence and replay (ads/door-hardening; not deployed)
 
 Ported X4BNet datacenter/VPN IPv4+IPv6 feeds (startup / 12-hour refresh, keep the last good lists on failure),

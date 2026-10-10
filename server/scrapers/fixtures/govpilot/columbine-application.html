@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html >
+<head>
+<title></title>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1.0'/>
+<meta http-equiv='X-UA-Compatible' content='IE=edge' ><meta http-equiv='cache-control' content='max-age=0' />
+<meta http-equiv='cache-control' content='no-cache' />
+<meta http-equiv='expires' content='0' />
+<meta http-equiv='expires' content='Tue, 01 Jan 1980 1:00:00 GMT' />
+<meta http-equiv='pragma' content='no-cache' />
+<META NAME='ROBOTS' CONTENT='NONE'>
+<META NAME='GOOGLEBOT' CONTENT='NOARCHIVE'>
+<link rel='stylesheet' href='//kendo.cdn.telerik.com/2020.2.617/styles/kendo.common.min.css' />
+<link rel='stylesheet' href='//kendo.cdn.telerik.com/2020.2.617/styles/kendo.rtl.min.css' />
+<link rel='stylesheet' href='//kendo.cdn.telerik.com/2020.2.617/styles/kendo.blueopal.min.css' />
+<link rel='stylesheet' href='//kendo.cdn.telerik.com/2020.2.617/styles/kendo.dataviz.min.css' />
+<link rel='stylesheet' href='//kendo.cdn.telerik.com/2020.2.617/styles/kendo.dataviz.blueopal.min.css' />
+<link rel='stylesheet' href='//kendo.cdn.telerik.com/2020.2.617/styles/kendo.default.mobile.min.css' />
+<script src='//kendo.cdn.telerik.com/2020.2.617/js/jquery.min.js'></script>
+<script src='//kendo.cdn.telerik.com/2020.2.617/js/kendo.all.min.js'></script>
+<link type='text/css' href='https://ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/themes/south-street/jquery-ui.css' rel='stylesheet'>
+<script type='text/javascript' src='https://ajax.googleapis.com/ajax/libs/jqueryui/1.10.3/jquery-ui.min.js'></script>
+<!--[if IE]>
+<script src='js/excanvas.js'></script>
+<![endif]-->
+<script type='text/javascript' src='js/jquery.ui.touch-punch.min.js'></script>
+<link href='styles/jquery.signature.css' rel='stylesheet'>
+<script src='js/jquery.signature.js'></script>
+<script type='text/javascript' src='https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.10.6/moment.min.js'></script>
+<link href='js/global.css' rel='stylesheet'>
+<script src='js/global.js'></script>
+</head>
+<body >
+<div id='waiting' class='k-header' style='display:none;height:100%;width:100%;top:10px;left:10px;font-size:28px'>Transmitting Data,Please Wait...!</div>
+<div id='htoolbar'></div>
+<div id='main' style='position:relative;height: 100%;margin:0; border: 0;padding:0'>
+<form id='MAINFORM' onsubmit='return false;'>
+<img src='https://sandbox.govpilot.com/UUPLOADS/9360/pp/FINALLogoColumbine.jpg'  style='position: absolute; width:170px; height:52px; top: 35px; right: 0px; bottom: 0px; left: 15px' />
+<div class='k-block k-shadow' style='position: absolute;width: 1000px; height: 3650px;left: 0px; bottom: 0px; top: 120px; right: 0px;border: 1px solid #CCCCCC;background-color: #FFFFFF;'>
+</div>
+<button id='B3fef' style='position:absolute;font-family:Segoe UI; font-size: 14px;top:3720px;left:350px;font-weight: Bold; font-style:Normal;background-color: #23A0DA; color: #FFFFFF;height:30px; Width:300px;'>Submit</button>
+<div id='X_b724_dc2a8_0DIV' style='position:absolute;top:-515px;left:200px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px;'>
+<input id='X_b724_dc2a8_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:300px;' />
+</div>
+<input maxlength='500'  id='T_d168_2dae5_0'   onchange='Tchanged("2dae5",this.value)'  style='position:absolute;top:-485px;left:200px;bottom:auto;right:auto;padding:0px;
+ border-color:#000000; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:300px;' class='k-textbox' />
+<div id='M_3421_e9a9a_0DIV' style='position:absolute;top:-425px;left:200px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px;'>
+<input id='M_3421_e9a9a_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:300px;' />
+</div>
+<div id='M_f746_3c296_0DIV' style='position:absolute;top:-410px;left:535px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px;'>
+<input id='M_f746_3c296_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:300px;' />
+</div>
+<div id='M_e639_9002a_0DIV' style='position:absolute;top:-380px;left:535px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px;'>
+<input id='M_e639_9002a_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:300px;' />
+</div>
+<input id='SN_491d_495e5_0' tabstop='false' readonly=''  style='position:absolute;top:-350px;left:200px;bottom:auto;right:auto;padding:0px;
+ border-color:#838383; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:300px;' />
+<div id='M_3da9_ba51b_0DIV' style='position:absolute;top:-350px;left:535px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px;'>
+<input id='M_3da9_ba51b_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:300px;' />
+</div>
+<div id='M_4994_394e2_0DIV' style='position:absolute;top:-320px;left:535px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px;'>
+<input id='M_4994_394e2_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:300px;' />
+</div>
+<div id='Z_7a00_f6fad_0DIV' style='position:absolute;top:-290px;left:200px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px;'>
+<input id='Z_7a00_f6fad_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:300px;' />
+</div>
+<div id='M_79af_78b78_0DIV' style='position:absolute;top:-290px;left:535px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px;'>
+<input id='M_79af_78b78_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:300px;' />
+</div>
+<div id='M_6268_79f33_0DIV' style='position:absolute;top:-235px;left:530px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px;'>
+<input id='M_6268_79f33_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:300px;' />
+</div>
+<input maxlength='500'  id='T_901d_9c7a6_0'   onchange='Tchanged("9c7a6",this.value)'  style='position:absolute;top:320px;left:25px;bottom:auto;right:auto;padding:0px;
+ border-color:#838383; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:300px;' class='k-textbox' />
+<div id='L_0186_c4b13_0DIV' style='position:absolute;top:320px;left:350px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px;'>
+<select id='L_0186_c4b13_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:300px;' > <option>Brookhaven 1</option>
+<option>Burning Tree</option>
+<option>Columbine Valley Estates</option>
+<option>Columbine Villas</option>
+<option>Country Club</option>
+<option>Country Club Villas</option>
+<option>Polo Meadows</option>
+<option>The Village</option>
+<option>Villa Avignon</option>
+<option>Wild Plum</option>
+<option>Wilder Lane</option>
+<option>Willowcroft</option>
+</select>
+
+</div>
+<input maxlength='25'  id='T_d9b4_4d587_0'   onchange='Tchanged("4d587",this.value)'  style='position:absolute;top:320px;left:675px;bottom:auto;right:auto;padding:0px;
+ border-color:#838383; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:138px;' class='k-textbox' />
+<input maxlength='25'  id='T_487c_5f9ce_0'   onchange='Tchanged("5f9ce",this.value)'  style='position:absolute;top:320px;left:837px;bottom:auto;right:auto;padding:0px;
+ border-color:#838383; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:138px;' class='k-textbox' />
+<input maxlength='25'  id='T_42de_f8986_0'   onchange='Tchanged("f8986",this.value)'  style='position:absolute;top:480px;left:25px;bottom:auto;right:auto;padding:0px;
+ border-color:#838383; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:300px;' class='k-textbox' />
+<input maxlength='25'  id='T_b4c1_043c3_0'   onchange='Tchanged("043c3",this.value)'  style='position:absolute;top:480px;left:350px;bottom:auto;right:auto;padding:0px;
+ border-color:#838383; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:300px;' class='k-textbox' />
+<input maxlength='25'  id='T_c3c5_1c5de_0'   onchange='Tchanged("1c5de",this.value)'  style='position:absolute;top:480px;left:675px;bottom:auto;right:auto;padding:0px;
+ border-color:#838383; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:300px;' class='k-textbox' />
+<div id='MT_e295_7a77c_0DIV' style='position:absolute;top:560px;left:25px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px;'>
+<input  id='MT_e295_7a77c_0'    style='position:absolute;font-size:14px; font-family:Segoe UI; color:#000000;border-color:gray;width:100%;height:100%' />
+</div>
+
+<input  type='text' pattern='[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,3}$' title='email address, example: yourname@domain.com' id='T_b87b_8a58d_0'    style='position:absolute;top:560px;left:350px;bottom:auto;right:auto;padding:0px;
+ border-color:#838383; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:300px;' class='k-textbox' />
+<input maxlength='25'  id='T_2e46_15207_0'   onchange='Tchanged("15207",this.value)'  style='position:absolute;top:725px;left:25px;bottom:auto;right:auto;padding:0px;
+ border-color:#838383; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:300px;' class='k-textbox' />
+<input maxlength='25'  id='T_bf97_b8630_0'   onchange='Tchanged("b8630",this.value)'  style='position:absolute;top:725px;left:345px;bottom:auto;right:auto;padding:0px;
+ border-color:#838383; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:300px;' class='k-textbox' />
+<div id='P_00e2_40d73_0DIV' style='position:absolute;top:720px;left:668px;bottom:auto;right:auto;margin:5px;padding:0px;font-size:14px; font-family:Segoe UI; color:#000000;height:30px; width:148px;'>
+<input id='P_00e2_40d73_0' style='width:138px;' />
+ </div>
+<div id='MT_9ed8_d3d72_0DIV' style='position:absolute;top:725px;left:837px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:138px;'>
+<input  id='MT_9ed8_d3d72_0'    style='position:absolute;font-size:14px; font-family:Segoe UI; color:#000000;border-color:gray;width:100%;height:100%' />
+</div>
+
+<div id='MT_3cf4_7df90_0DIV' style='position:absolute;top:805px;left:25px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px;'>
+<input  id='MT_3cf4_7df90_0'    style='position:absolute;font-size:14px; font-family:Segoe UI; color:#000000;border-color:gray;width:100%;height:100%' />
+</div>
+
+<input  type='text' pattern='[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,3}$' title='email address, example: yourname@domain.com' id='T_15da_2b4d3_0'    style='position:absolute;top:805px;left:345px;bottom:auto;right:auto;padding:0px;
+ border-color:#838383; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:300px;' class='k-textbox' />
+<input maxlength='25'  id='T_85fa_0cb23_0'   onchange='Tchanged("0cb23",this.value)'  style='position:absolute;top:805px;left:675px;bottom:auto;right:auto;padding:0px;
+ border-color:#838383; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:300px;' class='k-textbox' />
+<div id='L_edb6_859de_0DIV' style='position:absolute;top:880px;left:505px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:138px;'>
+<select id='L_edb6_859de_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:138px;' > <option>No</option>
+<option>Yes</option>
+</select>
+
+</div>
+<textarea maxlength='500'  id='T_e9b3_7af3a_0'  onchange='Tchanged("7af3a",this.value)' style='position:absolute;top:1335px;left:25px;bottom:auto;right:auto;padding:0px;
+ border-color:#838383; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:75px; width:950px;'  class='k-textbox'></textarea>
+<div id='L_6489_f2594_0DIV' style='position:absolute;top:1580px;left:335px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:138px;'>
+<select id='L_6489_f2594_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:138px;' > <option>No</option>
+<option>Yes</option>
+</select>
+
+</div>
+<div id='L_528c_f2422_0DIV' style='position:absolute;top:1580px;left:837px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:138px;'>
+<select id='L_528c_f2422_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:138px;' > <option>No</option>
+<option>Yes</option>
+</select>
+
+</div>
+<div id='L_2c1a_cbc3a_0DIV' style='position:absolute;top:1630px;left:335px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:138px;'>
+<select id='L_2c1a_cbc3a_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:138px;' > <option>No</option>
+<option>Yes</option>
+</select>
+
+</div>
+<div id='L_bc43_06bfb_0DIV' style='position:absolute;top:1630px;left:837px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:138px;'>
+<select id='L_bc43_06bfb_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:138px;' > <option>No</option>
+<option>Yes</option>
+</select>
+
+</div>
+<div id='L_8e09_a5420_0DIV' style='position:absolute;top:1680px;left:335px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:138px;'>
+<select id='L_8e09_a5420_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:138px;' > <option>No</option>
+<option>Yes</option>
+</select>
+
+</div>
+<div id='L_3bd4_3eb2b_0DIV' style='position:absolute;top:1675px;left:837px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:138px;'>
+<select id='L_3bd4_3eb2b_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:138px;' > <option>No</option>
+<option>Yes</option>
+</select>
+
+</div>
+<div id='L_542d_b6a7a_0DIV' style='position:absolute;top:1750px;left:335px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:138px;'>
+<select id='L_542d_b6a7a_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:138px;' > <option>No</option>
+<option>Yes</option>
+</select>
+
+</div>
+<div id='L_1212_36648_0DIV' style='position:absolute;top:1725px;left:837px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:138px;'>
+<select id='L_1212_36648_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:138px;' > <option>No</option>
+<option>Yes</option>
+</select>
+
+</div>
+<div id='L_8ae2_b9024_0DIV' style='position:absolute;top:1800px;left:335px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:138px;'>
+<select id='L_8ae2_b9024_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:138px;' > <option>No</option>
+<option>Yes</option>
+</select>
+
+</div>
+<div id='L_f199_77d27_0DIV' style='position:absolute;top:1770px;left:837px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:138px;'>
+<select id='L_f199_77d27_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:138px;' > <option>No</option>
+<option>Yes</option>
+</select>
+
+</div>
+<div id='L_f110_a6d68_0DIV' style='position:absolute;top:1815px;left:837px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:138px;'>
+<select id='L_f110_a6d68_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:138px;' > <option>No</option>
+<option>Yes</option>
+</select>
+
+</div>
+<div class='k-block k-shadow' id='M_F_f842_7cb5c_0' style='position: absolute;width: 950px; height: 430px;left: 25px; bottom: 0px; top: 1880px; right: 0px;border: 1px solid #CCCCCC;background-color: #FFFFFF;z-index:0' >
+<div><input id='F_f842_7cb5c_0' name='files' type='file' /></div>
+</div><div id='L_462e_ba7d4_0DIV' style='position:absolute;top:2360px;left:25px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:138px;'>
+<select id='L_462e_ba7d4_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:138px;' > <option>No</option>
+<option>Yes</option>
+</select>
+
+</div>
+<div id='M_c485_94e43_0DIV' style='position:absolute;top:2530px;left:25px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px;'>
+<input id='M_c485_94e43_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:300px;' />
+</div>
+<div id='M_aed6_4b4df_0DIV' style='position:absolute;top:2530px;left:350px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px;'>
+<input id='M_aed6_4b4df_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:300px;' />
+</div>
+<div id='L_4cf5_7b9f7_0DIV' style='position:absolute;top:2655px;left:25px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:138px;'>
+<select id='L_4cf5_7b9f7_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:138px;' > <option>No</option>
+<option>Yes</option>
+</select>
+
+</div>
+<div id='L_7af1_088c4_0DIV' style='position:absolute;top:2855px;left:670px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:138px;'>
+<select id='L_7af1_088c4_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:138px;' > <option>No</option>
+<option>Yes</option>
+</select>
+
+</div>
+<div id='L_b22e_f406e_0DIV' style='position:absolute;top:2930px;left:670px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:138px;'>
+<select id='L_b22e_f406e_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:138px;' > <option>No</option>
+<option>Yes</option>
+</select>
+
+</div>
+<div id='L_0d3a_41a9d_0DIV' style='position:absolute;top:2990px;left:670px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:138px;'>
+<select id='L_0d3a_41a9d_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:138px;' > <option>No</option>
+<option>Yes</option>
+</select>
+
+</div>
+<div id='L_4ae5_24aba_0DIV' style='position:absolute;top:3040px;left:670px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:138px;'>
+<select id='L_4ae5_24aba_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:138px;' > <option>No</option>
+<option>Yes</option>
+</select>
+
+</div>
+<div id='L_ff24_54c97_0DIV' style='position:absolute;top:3095px;left:670px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:138px;'>
+<select id='L_ff24_54c97_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:138px;' > <option>No</option>
+<option>Yes</option>
+</select>
+
+</div>
+<div id='L_5174_da3a9_0DIV' style='position:absolute;top:3145px;left:670px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:138px;'>
+<select id='L_5174_da3a9_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:138px;' > <option>No</option>
+<option>Yes</option>
+</select>
+
+</div>
+
+<div  style='position: absolute;padding:3px;top:3400px;left:25px;height:250px; width:300px;border: 1px solid #a0a0a0;font-family:Segoe UI; font-size: 12px; color: #000000;font-weight: Normal; font-style:Normal;'>
+<div style='height:30px' >Type Full Name :<input id='7970c' style='width: 65%; left: 5px; bottom: auto; right: auto; padding: 0px; border-color: #FF0000; border-style: Solid; border-width: 1px; font-size: 12px; font-family: Segoe UI; color: #000000; background-color: #FFFFFF;' class='k-textbox' /></div>
+<div id='sign_a232e' style='height:35px' >Sign With Hand
+<input id='hsign_7970c' type='checkbox'   />
+<button id='csign_7970c' style='display:none; font-family:Segoe UI; font-size: 11px;color: #000000;Width:50px;'>Clear</button>  
+<button id='csign1_7970c' style='display:none; font-family:Segoe UI; font-size: 11px;color: #000000;Width:50px;'>Done</button>  
+</div>
+<div style='position:relative; height:auto '>
+<div id='ES_d08b_7970c_1' style='display:block; width:290px;height:170px;border: 1px solid #a0a0a0;  font-family: Segoe Script; font-size: 25px; color: #0066CC; font-weight: Normal; font-style: italic; text-align: center; text-decoration: underline; font-variant: normal; text-transform: capitalize;'></div>
+<div id='dsign_7970c' style='display:none;top:0; width:290px;height:170px'></div>
+</div>
+<div style='height: 15px;'>
+<div id='ES_d08b_7970c_2' style='width: 100%; font-family: Arial, Helvetica, sans-serif; font-size: 9px; color: #808080; font-weight: normal; text-align: center; vertical-align: top'></div>
+</div>
+</div>
+<div style='position: absolute;width: 1000px; height: 5px;left: 0px; bottom: 0px; top: 5px; right: 0px;border: 0px solid #000000;background-color: #000000;font-family:Segoe UI; font-size: 14px; color: #0EB8F1;font-weight: Normal; font-style:Normal;text-align:left;'></div>
+<div style='position: absolute;width: 485px; height: 30px;left: 30px; bottom: 0px; top: 2995px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>No on street parking without a permit between 3:00 am - 6:00 am. <span style="color:red;">*</span></div>
+<div style='position: absolute;width: 285px; height: 30px;left: 540px; bottom: 0px; top: 1635px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Plot Plan</div>
+<div style='position: absolute;width: 190px; height: 30px;left: -590px; bottom: 0px; top: -1075px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>$1 to $500</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 30px; bottom: 0px; top: 3375px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Signature <span style="color:red;">*</span></div>
+<div style='position: absolute;width: 950px; height: 30px;left: 30px; bottom: 0px; top: 940px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Enter subcontractor information in the grid below: </div>
+<div style='position: absolute;width: 430px; height: 90px;left: 290px; bottom: 0px; top: 25px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 28px; color: #000000;font-weight: Bold; font-style:Normal;text-align:center'>Building Permit Application With Plan Review</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 205px; bottom: 0px; top: -375px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Reference Number</div>
+<div style='position: absolute;width: 950px; height: 5px;left: 25px; bottom: 0px; top: 2430px; right: 0px;border: 0px solid #000000;background-color: #000000;font-family:Segoe UI; font-size: 14px; color: #0EB8F1;font-weight: Normal; font-style:Normal;text-align:left;'></div>
+<div style='position: absolute;width: 1000px; height: 5px;left: 0px; bottom: 0px; top: 3770px; right: 0px;border: 0px solid #000000;background-color: #000000;font-family:Segoe UI; font-size: 14px; color: #0EB8F1;font-weight: Normal; font-style:Normal;text-align:left;'></div>
+<div style='position: absolute;width: 190px; height: 30px;left: -590px; bottom: 0px; top: -850px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>$50,001 to $100,000</div>
+<div style='position: absolute;width: 950px; height: 5px;left: 25px; bottom: 0px; top: 1440px; right: 0px;border: 0px solid #000000;background-color: #000000;font-family:Segoe UI; font-size: 14px; color: #0EB8F1;font-weight: Normal; font-style:Normal;text-align:left;'></div>
+<div style='position: absolute;width: 300px; height: 30px;left: 30px; bottom: 0px; top: 2630px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Do you acknowledge this statement? <span style="color:red;">*</span></div>
+<div style='position: absolute;width: 950px; height: 40px;left: 30px; bottom: 0px; top: 640px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 24px; color: #00B0F0;font-weight: Normal; font-style:Normal;text-align:left;'>Contractor Information</div>
+<div style='position: absolute;width: 190px; height: 30px;left: -590px; bottom: 0px; top: -670px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>$1,000,001 and up</div>
+<div style='position: absolute;width: 285px; height: 30px;left: 540px; bottom: 0px; top: 1820px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Drainage or Grading Plan</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 350px; bottom: 0px; top: 700px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>City <span style="color:red;">*</span></div>
+<div style='position: absolute;width: 290px; height: 30px;left: 540px; bottom: 0px; top: 1680px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Elevation Plan</div>
+<div style='position: absolute;width: 138px; height: 30px;left: 680px; bottom: 0px; top: 295px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Lot </div>
+<div style='position: absolute;width: 190px; height: 30px;left: -590px; bottom: 0px; top: -1030px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>$501  to $ 2,000</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 30px; bottom: 0px; top: 1635px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Two sets of Blueprints or drawings <span style="color:red;">*</span></div>
+<div style='position: absolute;width: 300px; height: 30px;left: 30px; bottom: 0px; top: 535px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Phone #</div>
+<div style='position: absolute;width: 285px; height: 45px;left: 540px; bottom: 0px; top: 1580px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>HOA Approval (Required if exterior change)</div>
+<div style='position: absolute;width: 950px; height: 40px;left: 30px; bottom: 0px; top: 1460px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 24px; color: #00B0F0;font-weight: Normal; font-style:Normal;text-align:left;'>Attachments</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 30px; bottom: 0px; top: 295px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Project Address</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 30px; bottom: 0px; top: 455px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Name</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 355px; bottom: 0px; top: 535px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Email <span style="color:red;">*</span></div>
+<div style='position: absolute;width: 300px; height: 30px;left: 678px; bottom: 0px; top: 780px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>License Number</div>
+<div style='position: absolute;width: 465px; height: 123.983047485352px;left: 30px; bottom: 0px; top: 3140.00024414063px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>The applicant for the building permit has been informed that  there are private convenants that affect the use and improvement of the property. The applicant acknowledges that they have been informed as to the appropriate Home Owners Association and the HOA representative they may contact. <span style="color:red;">*</span></div>
+<div style='position: absolute;width: 950px; height: 40px;left: 30px; bottom: 0px; top: 2800px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Please note that your application will NOT be processed until you agree and select 'Yes' to all the terms and conditions below.</div>
+<div style='position: absolute;width: 310px; height: 65px;left: 685px; bottom: 0px; top: 25px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Normal; font-style:Normal;text-align:right'>2 Middlefield Road<br>Columbine Valley CO 80123<br>(303) 795-1434<br>www.columbinevalley.org</br></div>
+<div style='position: absolute;width: 940px; height: 55px;left: 30px; bottom: 0px; top: 1520px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Required are the Signed Contract with homeowner and two sets of Blueprints or drawings.  Please select any additional documents that are applicable to your project.</div>
+<div style='position: absolute;width: 640px; height: 50px;left: -375px; bottom: 0px; top: -675px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>$7600.00 for the first $1,000,000 plus $5.00 for each additional $1000.00 or fraction thereof   plus the inspection fees as determined by the trustees from time to time.</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 30px; bottom: 0px; top: 1755px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Certificate of Asbestos Removal</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 30px; bottom: 0px; top: 2505px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Select Total Valuation <span style="color:red;">*</span></div>
+<div style='position: absolute;width: 300px; height: 30px;left: 205px; bottom: 0px; top: -315px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Date Submitted</div>
+<div style='position: absolute;width: 475px; height: 30px;left: 30px; bottom: 0px; top: 3045px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Door to door solicitation prohibited  without a valid solicitors permit. <span style="color:red;">*</span></div>
+<div style='position: absolute;width: 300px; height: 50px;left: 30px; bottom: 0px; top: 1800px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Demo or excavation (include approved demo permit)</div>
+<div style='position: absolute;width: 640px; height: 50px;left: -375px; bottom: 0px; top: -735px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>$4350.00 for the first $500,000 plus $6.50 for each additional $1000.00 or fraction thereof  to and including $1,000,000.00 plus the inspection fees as determined by the trustees from time to time.</div>
+<div style='position: absolute;width: 555px; height: 30px;left: -375px; bottom: 0px; top: -1075px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>$33.00 plus the inspection fees as determined by the trustees from time to time.</div>
+<div style='position: absolute;width: 345px; height: 70px;left: 350px; bottom: 0px; top: 3780px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #0EB8F1;font-weight: Normal; font-style:Normal;text-align:left;'></div>
+<div style='position: absolute;width: 680px; height: 50px;left: -375px; bottom: 0px; top: -915px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>$542.50.00 for the first $25000 plus $13.50 for each additional $1000.00 or fraction thereof  to and including $50,000.00 plus the inspection fees as determined by the trustees from time to time.</div>
+<div style='position: absolute;width: 138px; height: 30px;left: 842px; bottom: 0px; top: 295px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Block</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 30px; bottom: 0px; top: 1585px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Signed contract with homeowner <span style="color:red;">*</span></div>
+<div style='position: absolute;width: 300px; height: 30px;left: 205px; bottom: 0px; top: -450px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Total Inspection Fee Main</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 30px; bottom: 0px; top: 1310px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Description of Project <span style="color:red;">*</span></div>
+<div style='position: absolute;width: 950px; height: 30px;left: 30px; bottom: 0px; top: 3340px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>I hereby certify that the above mentioned information is true to my knowledge.</div>
+<div style='position: absolute;width: 138px; height: 30px;left: 840px; bottom: 0px; top: 700px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>ZIP <span style="color:red;">*</span></div>
+<div style='position: absolute;width: 300px; height: 30px;left: 680px; bottom: 0px; top: 455px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>City, State, ZIP</div>
+<div style='position: absolute;width: 950px; height: 40px;left: 30px; bottom: 0px; top: 400px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 24px; color: #00B0F0;font-weight: Normal; font-style:Normal;text-align:left;'>Owner Information</div>
+<div style='position: absolute;width: 190px; height: 30px;left: -590px; bottom: 0px; top: -790px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>$100,001 to $500,000</div>
+<div style='position: absolute;width: 145px; height: 30px;left: -590px; bottom: 0px; top: -1110px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Total Valuation</div>
+<div style='position: absolute;width: 190px; height: 30px;left: -590px; bottom: 0px; top: -910px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>$25,001 to $50,000</div>
+<div style='position: absolute;width: 950px; height: 30px;left: 30px; bottom: 0px; top: 2335px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Please note that failure to submit required documents may delay your application, this is the responsibility of the applicant, select  yes/no.</div>
+<div style='position: absolute;width: 480px; height: 30px;left: 30px; bottom: 0px; top: 880px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Will you have any subcontractors associated with your project ? <span style="color:red;">*</span></div>
+<div style='position: absolute;width: 190px; height: 30px;left: -590px; bottom: 0px; top: -730px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>$500,001 to $1,000,000</div>
+<div style='position: absolute;width: 1000px; height: 5px;left: 0px; bottom: 0px; top: 3695px; right: 0px;border: 0px solid #000000;background-color: #000000;font-family:Segoe UI; font-size: 14px; color: #0EB8F1;font-weight: Normal; font-style:Normal;text-align:left;'></div>
+<div style='position: absolute;width: 1000px; height: 5px;left: 0px; bottom: 0px; top: 120px; right: 0px;border: 0px solid #000000;background-color: #000000;font-family:Segoe UI; font-size: 14px; color: #0EB8F1;font-weight: Normal; font-style:Normal;text-align:left;'></div>
+<div style='position: absolute;width: 665px; height: 30px;left: 30px; bottom: 0px; top: 195px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Search by typing property address and hit enter to select from a populated list: <span style="color:red;">*</span></div>
+<div style='position: absolute;width: 290px; height: 30px;left: 540px; bottom: 0px; top: 1775px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Soil report</div>
+<div style='position: absolute;width: 950px; height: 30px;left: 30px; bottom: 0px; top: 2585px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Note: This is an estimate of fees. Please verify with the Town of Columbine Valley before preparing your check.</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 355px; bottom: 0px; top: 295px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Neighborhood </div>
+<div style='position: absolute;width: 300px; height: 30px;left: 355px; bottom: 0px; top: 2505px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Total Due</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 350px; bottom: 0px; top: 780px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Email <span style="color:red;">*</span></div>
+<div style='position: absolute;width: 138px; height: 30px;left: 678px; bottom: 0px; top: 700px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>State <span style="color:red;">*</span></div>
+<div style='position: absolute;width: 410px; height: 30px;left: 30px; bottom: 0px; top: 3100px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Advertising signage is prohibited in Columbine Valley. <span style="color:red;">*</span></div>
+<div style='position: absolute;width: 950px; height: 40px;left: 30px; bottom: 0px; top: 3285px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 24px; color: #00B0F0;font-weight: Normal; font-style:Normal;text-align:left;'>Certification</div>
+<div style='position: absolute;width: 950px; height: 5px;left: 25px; bottom: 0px; top: 375px; right: 0px;border: 0px solid #000000;background-color: #000000;font-family:Segoe UI; font-size: 14px; color: #0EB8F1;font-weight: Normal; font-style:Normal;text-align:left;'></div>
+<div style='position: absolute;width: 190px; height: 30px;left: -590px; bottom: 0px; top: -970px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>$2001 to $25,000</div>
+<div style='position: absolute;width: 950px; height: 40px;left: 30px; bottom: 0px; top: 2740px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 24px; color: #00B0F0;font-weight: Normal; font-style:Normal;text-align:left;'>Disclaimer</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 30px; bottom: 0px; top: 780px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Phone # <span style="color:red;">*</span></div>
+<div style='position: absolute;width: 285px; height: 30px;left: 540px; bottom: 0px; top: 1730px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Evidence of payment for sewer or water</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 30px; bottom: 0px; top: 700px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>General Contractor Name <span style="color:red;">*</span></div>
+<div style='position: absolute;width: 530px; height: 60px;left: 30px; bottom: 0px; top: 2930px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>The Town of Columbine Valley requires digital copy (PDF) of blueprints if larger than 11x17 <span style="color:red;">*</span></div>
+<div style='position: absolute;width: 625px; height: 70px;left: 30px; bottom: 0px; top: 2845px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>All subcontractors MUST be registered with the Town of Columbine Valley PRIOR to commencement of work. All plumbers and electricians must be state licensed and provide proof of licensing at time of registration. <span style="color:red;">*</span></div>
+<div style='position: absolute;width: 950px; height: 40px;left: 30px; bottom: 0px; top: 2450px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 24px; color: #00B0F0;font-weight: Normal; font-style:Normal;text-align:left;'>Fee</div>
+<div style='position: absolute;width: 300px; height: 50px;left: 30px; bottom: 0px; top: 1685px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Two sets foundation drawings (Engineer approved/designed)</div>
+<div style='position: absolute;width: 650px; height: 50px;left: -375px; bottom: 0px; top: -795px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>$1350 for the first $100,000 plus $7.50 for each additional $1000.00 or fraction thereof  to and including $500,000.00 plus the inspection fees as determined by the trustees from time to time.</div>
+<div style='position: absolute;width: 950px; height: 40px;left: 30px; bottom: 0px; top: 1250px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 24px; color: #00B0F0;font-weight: Normal; font-style:Normal;text-align:left;'>Project Information</div>
+<div style='position: absolute;width: 145px; height: 30px;left: -375px; bottom: 0px; top: -1110px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Permit Fee</div>
+<div style='position: absolute;width: 950px; height: 40px;left: 30px; bottom: 0px; top: 140px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 24px; color: #00B0F0;font-weight: Normal; font-style:Normal;text-align:left;'>Property Information</div>
+<div style='position: absolute;width: 670px; height: 55px;left: -375px; bottom: 0px; top: -855px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>$875.00 for the first $50,000 plus $9.50 for each additional $1000.00 or fraction thereof  to and including $100,000.00 plus the inspection fees as determined by the trustees from time to time.</div>
+<div style='position: absolute;width: 950px; height: 5px;left: 25px; bottom: 0px; top: 1230px; right: 0px;border: 0px solid #000000;background-color: #000000;font-family:Segoe UI; font-size: 14px; color: #0EB8F1;font-weight: Normal; font-style:Normal;text-align:left;'></div>
+<div style='position: absolute;width: 950px; height: 5px;left: 25px; bottom: 0px; top: 620px; right: 0px;border: 0px solid #000000;background-color: #000000;font-family:Segoe UI; font-size: 14px; color: #0EB8F1;font-weight: Normal; font-style:Normal;text-align:left;'></div>
+<div style='position: absolute;width: 950px; height: 5px;left: 25px; bottom: 0px; top: 2720px; right: 0px;border: 0px solid #000000;background-color: #000000;font-family:Segoe UI; font-size: 14px; color: #0EB8F1;font-weight: Normal; font-style:Normal;text-align:left;'></div>
+<div style='position: absolute;width: 685px; height: 50px;left: -375px; bottom: 0px; top: -975px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>$105.50.00 for the first $2000 plus $19.00 for each additional $1000.00 or fraction thereof  to and including $25,000.00 plus the inspection fees as determined by the trustees from time to time.</div>
+<div style='position: absolute;width: 700px; height: 45px;left: -375px; bottom: 0px; top: -1035px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>$33.00 for the first $500 plus $4.50 for each additional $100.00 or fraction thereof  to and including $2000.00 plus the inspection fees as determined by the trustees from time to time.</div>
+<div style='position: absolute;width: 950px; height: 5px;left: 25px; bottom: 0px; top: 3265px; right: 0px;border: 0px solid #000000;background-color: #000000;font-family:Segoe UI; font-size: 14px; color: #0EB8F1;font-weight: Normal; font-style:Normal;text-align:left;'></div>
+<div style='position: absolute;width: 300px; height: 30px;left: 355px; bottom: 0px; top: 455px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Address</div>
+<div class='k-block k-shadow' style='position: absolute;padding:5px;width: 950px; height: 230px;left: 25px; bottom: 0px; top: 970px; right: 0px;border: 1px solid #CCCCCC;background-color: #FFFFFF;font-family:Segoe UI; font-size: 11px; color: #FFFFFF;font-weight: Normal; font-style:Normal;'>
+<div id='GR_5133' ></div>
+ </div>
+<div class='k-block k-shadow' style='position: absolute;padding: 5px;width: 950px; height: 46px;left: 25px; bottom: 0px; top: 225px; right: 0px;border: 1px solid #000000;background-color: #FFFFFF;'>
+<input id='addqs' style='width:930px;height:auto; font-family: Calibri; font-size: 14px;'/>
+</div>
+</form>
+</div>
+<div id='FORM_a3f350fd-ee51-4320-b3e7-dba9b86d110d' style='display:none;top:0;left:0;margin:0 auto;height:100%;border: 1px solid #D4D4D4;background-color: #F7F7F7;'>
+<p id='TI_a3f350fd-ee51-4320-b3e7-dba9b86d110d' style='font-size:16px;font-family:Segoe UI;color:#278EB8; margin:5px;top:0;left:0'></p>
+<div class='k-block k-shadow' style='position: absolute;width: 1000px; height: 330px;left: 10px; bottom: 0px; top: 50px; right: 0px;border: 1px solid #CCCCCC;background-color: #FFFFFF;'>
+</div>
+<input maxlength='25'  id='a3f350fd-ee51-4320-b3e7-dba9b86d110dT_ab16_a427a_0'   onchange='Tchanged("a427a",this.value)'  style='position:absolute;top:155px;left:35px;bottom:auto;right:auto;padding:0px;
+ border-color:#838383; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:300px;' class='k-textbox' />
+<input maxlength='25'  id='a3f350fd-ee51-4320-b3e7-dba9b86d110dT_bc19_2f9e2_0'   onchange='Tchanged("2f9e2",this.value)'  style='position:absolute;top:155px;left:360px;bottom:auto;right:auto;padding:0px;
+ border-color:#838383; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:300px;' class='k-textbox' />
+<div id='a3f350fd-ee51-4320-b3e7-dba9b86d110dMT_2ea0_c37bc_0DIV' style='position:absolute;top:235px;left:35px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px;'>
+<input  id='a3f350fd-ee51-4320-b3e7-dba9b86d110dMT_2ea0_c37bc_0'    style='position:absolute;font-size:14px; font-family:Segoe UI; color:#000000;border-color:gray;width:100%;height:100%' />
+</div>
+
+<input  type='text' pattern='[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,3}$' title='email address, example: yourname@domain.com' id='a3f350fd-ee51-4320-b3e7-dba9b86d110dT_0525_32242_0'    style='position:absolute;top:235px;left:360px;bottom:auto;right:auto;padding:0px;
+ border-color:#838383; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:300px;' class='k-textbox' />
+<input maxlength='25'  id='a3f350fd-ee51-4320-b3e7-dba9b86d110dT_0829_3998c_0'   onchange='Tchanged("3998c",this.value)'  style='position:absolute;top:315px;left:35px;bottom:auto;right:auto;padding:0px;
+ border-color:#838383; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:300px;' class='k-textbox' />
+<div id='a3f350fd-ee51-4320-b3e7-dba9b86d110dL_3e48_e6fab_0DIV' style='position:absolute;top:315px;left:360px;bottom:auto;right:0;padding:0px;margin:0px;height:30px; width:300px;'>
+<select id='a3f350fd-ee51-4320-b3e7-dba9b86d110dL_3e48_e6fab_0' style='font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF;height:30px; width:300px;' > <option>Electrician</option>
+<option>General Contractor</option>
+<option>Mechanical</option>
+<option>Plumbing</option>
+<option>Roofing</option>
+<option>Other</option>
+</select>
+
+</div>
+<input maxlength='25'  id='a3f350fd-ee51-4320-b3e7-dba9b86d110dT_3531_01f80_0'   onchange='Tchanged("01f80",this.value)'  style='position:absolute;top:315px;left:685px;bottom:auto;right:auto;padding:0px;
+ border-color:#838383; border-style:Solid; border-width:1px; font-size:14px; font-family:Segoe UI; color:#000000; background-color:#FFFFFF; height:30px; width:300px;' class='k-textbox' />
+<div style='position: absolute;width: 300px; height: 30px;left: 365px; bottom: 0px; top: 210px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Email </div>
+<div style='position: absolute;width: 300px; height: 30px;left: 365px; bottom: 0px; top: 290px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Area of Trade</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 365px; bottom: 0px; top: 130px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Last Name</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 690px; bottom: 0px; top: 290px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Area of Business if Other, please specify :</div>
+<div style='position: absolute;width: 950px; height: 40px;left: 40px; bottom: 0px; top: 70px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 24px; color: #00B0F0;font-weight: Normal; font-style:Normal;text-align:left;'>Subcontractor Details</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 40px; bottom: 0px; top: 130px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>First Name </div>
+<div style='position: absolute;width: 300px; height: 30px;left: 40px; bottom: 0px; top: 210px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Phone # </div>
+<div style='position: absolute;width: 300px; height: 30px;left: 40px; bottom: 0px; top: 290px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Business Name</div>
+<div style='position:absolute;margin:10px;top:400px;left:0;right:0;bottom:0'><button id='GLS_a3f350fd-ee51-4320-b3e7-dba9b86d110d' >Save</button>
+<button id='GLC_a3f350fd-ee51-4320-b3e7-dba9b86d110d' >Cancel</button>
+</div>
+
+</div>
+
+
+<div id='RESP' style='display:none;top:0;left:0;margin:0 auto;height: 375px;border: 1px solid #CCCCCC;background-color: #FFFFFF;'>
+<img src='https://sandbox.govpilot.com/UUPLOADS/9360/pp/FINALLogoColumbine.jpg'  style='position: absolute; width:170px; height:52px; top: 50px; right: 0px; bottom: 0px; left: 35px' />
+<div class='k-block k-shadow' id='RESP_485e_495e5_0' style='position: absolute;width: 300px; height: 30px;left: 445px; bottom: 0px; top: 170px; right: 0px;border: 1px solid #838383;background-color: #FFFFFF;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Normal; font-style:Normal;text-align:left;'></div>
+<div class='k-block k-shadow' id='RESP_7b0c_f6fad_0' style='position: absolute;width: 300px; height: 30px;left: 445px; bottom: 0px; top: 235px; right: 0px;border: 1px solid #838383;background-color: #FFFFFF;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Normal; font-style:Normal;text-align:left;'></div>
+<div class='k-block k-shadow' id='RESP_3c94_2b4d3_0' style='position: absolute;width: 300px; height: 30px;left: 445px; bottom: 0px; top: 300px; right: 0px;border: 1px solid #838383;background-color: #FFFFFF;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Normal; font-style:Normal;text-align:left;'></div>
+<div style='position: absolute;width: 300px; height: 30px;left: 40px; bottom: 0px; top: 170px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Reference Number:</div>
+<div style='position: absolute;width: 300px; height: 30px;left: 40px; bottom: 0px; top: 235px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Date Submitted:</div>
+<div style='position: absolute;width: 950px; height: 5px;left: 35px; bottom: 0px; top: 140px; right: 0px;border: 0px solid #000000;background-color: #000000;font-family:Segoe UI; font-size: 14px; color: #0EB8F1;font-weight: Normal; font-style:Normal;text-align:left;'></div>
+<div style='position: absolute;width: 300px; height: 30px;left: 40px; bottom: 0px; top: 300px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 14px; color: #000000;font-weight: Bold; font-style:Normal;text-align:left;'>Email confirmation has been sent to:</div>
+<div style='position: absolute;width: 615px; height: 50px;left: 235px; bottom: 0px; top: 65px; right: 0px;border: 0px hidden solid #000000;font-family:Segoe UI; font-size: 18px; color: #00B0F0;font-weight: Normal; font-style:Normal;text-align:left;'>Your application has been submitted successfully</div>
+
+</div>
+<script id='GNB_a3f350fd-ee51-4320-b3e7-dba9b86d110d' type='text/x-kendo-template'>
+<a class='k-button' href='\#' onclick='return toolbar_click("G_b32c2")'>Add New Record</a>
+</script><script>
+var CheckLists = new Dictionary(),FREC={},CA={},RS={},MA={},TABS={},LU={},BU={},PROCTID='',ADDSEL=false,APNSEL=false,ASTYPE='',control;
+$(document).ready(function () {
+$('#B3fef').kendoButton({ click: Save });
+$('#X_b724_dc2a8_0').kendoNumericTextBox({ID:'dc2a8',decimals:2,format:'c',spinners:false});
+var nx=$('#X_b724_dc2a8_0').data('kendoNumericTextBox');nx.enable(false);
+$('#M_3421_e9a9a_0').kendoNumericTextBox({format:'c',ID:'e9a9a',min:0,max:9999999,value:0, change: NFChanged});
+$('#M_3421_e9a9a_0').data('kendoNumericTextBox').enable(false);
+$('#M_f746_3c296_0').kendoNumericTextBox({format:'c',ID:'3c296',min:0,max:9999999,value:0, change: NFChanged});
+$('#M_e639_9002a_0').kendoNumericTextBox({format:'c',ID:'9002a',min:21.45,max:9999999,value:0, change: NFChanged});
+$('#M_3da9_ba51b_0').kendoNumericTextBox({format:'c',ID:'ba51b',min:0,max:9999999,value:0, change: NFChanged});
+$('#M_4994_394e2_0').kendoNumericTextBox({format:'c',ID:'394e2',min:0,max:9999999,value:0, change: NFChanged});
+$('#Z_7a00_f6fad_0').kendoDateTimePicker({ID:'f6fad',value:new Date(), change: DFChanged});$('#Z_7a00_f6fad_0').data('kendoDateTimePicker').readonly();$('#M_79af_78b78_0').kendoNumericTextBox({format:'c',ID:'78b78',min:0,max:9999999,value:0, change: NFChanged});
+$('#M_6268_79f33_0').kendoNumericTextBox({format:'c',ID:'79f33',min:0,max:9999999,value:0, change: NFChanged});
+$('#L_0186_c4b13_0').kendoDropDownList({ID:'c4b13', change: DFChanged,optionLabel: 'Select...'});$('#L_0186_c4b13_0').data('kendoDropDownList').select(-1);
+$('#MT_e295_7a77c_0').kendoMaskedTextBox({ mask: '(###) ###-####' });
+$('#P_00e2_40d73_0').kendoComboBox({ID:'40d73', 
+dataSource: [
+{ CODE:'AL', DESC:'AL'}, 
+{ CODE:'AK', DESC:'AK'}, 
+{ CODE:'AZ', DESC:'AZ'}, 
+{ CODE:'AR', DESC:'AR'}, 
+{ CODE:'CA', DESC:'CA'}, 
+{ CODE:'CO', DESC:'CO'}, 
+{ CODE:'CT', DESC:'CT'}, 
+{ CODE:'DE', DESC:'DE'}, 
+{ CODE:'DC', DESC:'DC'}, 
+{ CODE:'FL', DESC:'FL'}, 
+{ CODE:'GA', DESC:'GA'}, 
+{ CODE:'HI', DESC:'HI'}, 
+{ CODE:'ID', DESC:'ID'}, 
+{ CODE:'IL', DESC:'IL'}, 
+{ CODE:'IN', DESC:'IN'}, 
+{ CODE:'IA', DESC:'IA'}, 
+{ CODE:'KS', DESC:'KS'}, 
+{ CODE:'KY', DESC:'KY'}, 
+{ CODE:'LA', DESC:'LA'}, 
+{ CODE:'ME', DESC:'ME'}, 
+{ CODE:'MD', DESC:'MD'}, 
+{ CODE:'MA', DESC:'MA'}, 
+{ CODE:'MI', DESC:'MI'}, 
+{ CODE:'MN', DESC:'MN'}, 
+{ CODE:'MS', DESC:'MS'}, 
+{ CODE:'MO', DESC:'MO'}, 
+{ CODE:'MT', DESC:'MT'}, 
+{ CODE:'NE', DESC:'NE'}, 
+{ CODE:'NV', DESC:'NV'}, 
+{ CODE:'NH', DESC:'NH'}, 
+{ CODE:'NJ', DESC:'NJ'}, 
+{ CODE:'NM', DESC:'NM'}, 
+{ CODE:'NY', DESC:'NY'}, 
+{ CODE:'NC', DESC:'NC'}, 
+{ CODE:'ND', DESC:'ND'}, 
+{ CODE:'OH', DESC:'OH'}, 
+{ CODE:'OK', DESC:'OK'}, 
+{ CODE:'OR', DESC:'OR'}, 
+{ CODE:'PA', DESC:'PA'}, 
+{ CODE:'RI', DESC:'RI'}, 
+{ CODE:'SC', DESC:'SC'}, 
+{ CODE:'SD', DESC:'SD'}, 
+{ CODE:'TN', DESC:'TN'}, 
+{ CODE:'TX', DESC:'TX'}, 
+{ CODE:'UT', DESC:'UT'}, 
+{ CODE:'VT', DESC:'VT'}, 
+{ CODE:'VA', DESC:'VA'}, 
+{ CODE:'WA', DESC:'WA'}, 
+{ CODE:'WV', DESC:'WV'}, 
+{ CODE:'WI', DESC:'WI'}, 
+{ CODE:'WY', DESC:'WY'}, 
+{ CODE:'AS', DESC:'AS'}, 
+{ CODE:'GU', DESC:'GU'}, 
+{ CODE:'MP', DESC:'MP'}, 
+{ CODE:'PR', DESC:'PR'}, 
+{ CODE:'UM', DESC:'UM'}, 
+{ CODE:'VI', DESC:'VI'}, 
+{ CODE:'AA', DESC:'AA'}, 
+{ CODE:'AP', DESC:'AP'}, 
+{ CODE:'AE', DESC:'AE'}, 
+],
+dataTextField: 'CODE',
+dataValueField: 'DESC',
+filter: 'contains',
+change:function(e) { LIChanged(this);},
+ cascade: function (e) {  LIChanged(this); }});
+$('#MT_9ed8_d3d72_0').kendoMaskedTextBox({ mask: '#####' });
+$('#MT_3cf4_7df90_0').kendoMaskedTextBox({ mask: '(###) ###-####' });
+$('#L_edb6_859de_0').kendoDropDownList({ID:'859de', change: DFChanged,optionLabel: 'Select...'});$('#L_edb6_859de_0').data('kendoDropDownList').select(-1);
+$('#L_6489_f2594_0').kendoDropDownList({ID:'f2594', change: DFChanged,optionLabel: 'Select...'});$('#L_6489_f2594_0').data('kendoDropDownList').select(-1);
+$('#L_528c_f2422_0').kendoDropDownList({ID:'f2422', change: DFChanged,optionLabel: 'Select...'});$('#L_528c_f2422_0').data('kendoDropDownList').select(-1);
+$('#L_2c1a_cbc3a_0').kendoDropDownList({ID:'cbc3a', change: DFChanged,optionLabel: 'Select...'});$('#L_2c1a_cbc3a_0').data('kendoDropDownList').select(-1);
+$('#L_bc43_06bfb_0').kendoDropDownList({ID:'06bfb', change: DFChanged,optionLabel: 'Select...'});$('#L_bc43_06bfb_0').data('kendoDropDownList').select(-1);
+$('#L_8e09_a5420_0').kendoDropDownList({ID:'a5420', change: DFChanged,optionLabel: 'Select...'});$('#L_8e09_a5420_0').data('kendoDropDownList').select(-1);
+$('#L_3bd4_3eb2b_0').kendoDropDownList({ID:'3eb2b', change: DFChanged,optionLabel: 'Select...'});$('#L_3bd4_3eb2b_0').data('kendoDropDownList').select(-1);
+$('#L_542d_b6a7a_0').kendoDropDownList({ID:'b6a7a', change: DFChanged,optionLabel: 'Select...'});$('#L_542d_b6a7a_0').data('kendoDropDownList').select(-1);
+$('#L_1212_36648_0').kendoDropDownList({ID:'36648', change: DFChanged,optionLabel: 'Select...'});$('#L_1212_36648_0').data('kendoDropDownList').select(-1);
+$('#L_8ae2_b9024_0').kendoDropDownList({ID:'b9024', change: DFChanged,optionLabel: 'Select...'});$('#L_8ae2_b9024_0').data('kendoDropDownList').select(-1);
+$('#L_f199_77d27_0').kendoDropDownList({ID:'77d27', change: DFChanged,optionLabel: 'Select...'});$('#L_f199_77d27_0').data('kendoDropDownList').select(-1);
+$('#L_f110_a6d68_0').kendoDropDownList({ID:'a6d68', change: DFChanged,optionLabel: 'Select...'});$('#L_f110_a6d68_0').data('kendoDropDownList').select(-1);
+$('#F_f842_7cb5c_0').kendoUpload({async: {saveUrl: '/uuploads/uploadw.php',removeUrl: '/uuploads/uremove.php',autoUpload: true, removeField: 'fileNames[]'}, error: onuploadError, success: uploadSuccess, upload: OnUpload, remove: OnRemove });$('#L_462e_ba7d4_0').kendoDropDownList({ID:'ba7d4', change: DFChanged,optionLabel: 'Select...'});$('#L_462e_ba7d4_0').data('kendoDropDownList').select(-1);
+$('#M_c485_94e43_0').kendoNumericTextBox({format:'c',ID:'94e43',min:1,max:9999999,value:0, change: NFChanged});
+$('#M_aed6_4b4df_0').kendoNumericTextBox({format:'c',ID:'4b4df',min:0,max:9999999,value:0, change: NFChanged});
+$('#M_aed6_4b4df_0').data('kendoNumericTextBox').enable(false);
+$('#L_4cf5_7b9f7_0').kendoDropDownList({ID:'7b9f7', change: DFChanged,optionLabel: 'Select...'});$('#L_4cf5_7b9f7_0').data('kendoDropDownList').select(-1);
+$('#L_7af1_088c4_0').kendoDropDownList({ID:'088c4', change: DFChanged,optionLabel: 'Select...'});$('#L_7af1_088c4_0').data('kendoDropDownList').select(-1);
+$('#L_b22e_f406e_0').kendoDropDownList({ID:'f406e', change: DFChanged,optionLabel: 'Select...'});$('#L_b22e_f406e_0').data('kendoDropDownList').select(-1);
+$('#L_0d3a_41a9d_0').kendoDropDownList({ID:'41a9d', change: DFChanged,optionLabel: 'Select...'});$('#L_0d3a_41a9d_0').data('kendoDropDownList').select(-1);
+$('#L_4ae5_24aba_0').kendoDropDownList({ID:'24aba', change: DFChanged,optionLabel: 'Select...'});$('#L_4ae5_24aba_0').data('kendoDropDownList').select(-1);
+$('#L_ff24_54c97_0').kendoDropDownList({ID:'54c97', change: DFChanged,optionLabel: 'Select...'});$('#L_ff24_54c97_0').data('kendoDropDownList').select(-1);
+$('#L_5174_da3a9_0').kendoDropDownList({ID:'da3a9', change: DFChanged,optionLabel: 'Select...'});$('#L_5174_da3a9_0').data('kendoDropDownList').select(-1);
+
+ADDSEL=true;
+ASTYPE='ADDSEL0'
+sessionStorage.setItem('wnd', true);
+$('#a3f350fd-ee51-4320-b3e7-dba9b86d110dMT_2ea0_c37bc_0').kendoMaskedTextBox({ mask: '(###) ###-####' });
+$('#a3f350fd-ee51-4320-b3e7-dba9b86d110dL_3e48_e6fab_0').kendoDropDownList({ID:'e6fab', change: DFChanged,optionLabel: 'Select...'});$('#a3f350fd-ee51-4320-b3e7-dba9b86d110dL_3e48_e6fab_0').data('kendoDropDownList').select(-1);
+$('#GLS_a3f350fd-ee51-4320-b3e7-dba9b86d110d').kendoButton({ click: ActionButton });
+$('#GLC_a3f350fd-ee51-4320-b3e7-dba9b86d110d').kendoButton({ click: ActionButton });
+
+PROCTID='2393f';
+BU['B3fef']={type:'S',cid:'B3fef', bid:'df5efc15-c0f8-4ee7-9c4b-3d86623f1008'};
+CA['dc2a8']={type:'X',cid:'X_b724_dc2a8_0',F:'[94e43]/2',field:'Contract Price'};
+CA['2dae5']={type:'T',cid:'T_d168_2dae5_0', r:0,parentCont:'MAIN', t:'Valuation of the project with labor cost and materials',field:'Valuation of the project with labor cost and materials',TDV:'',USE:''};
+CA['e9a9a']={type:'M',cid:'M_3421_e9a9a_0', r:0,parentCont:'MAIN', field:'Total Inspection Fee Main',NDV:'0'};
+CA['3c296']={type:'M',cid:'M_f746_3c296_0', r:0,parentCont:'MAIN', field:'Permit Fee',NDV:'0'};
+CA['9002a']={type:'M',cid:'M_e639_9002a_0', r:0,parentCont:'MAIN', field:'Plan Review Fee',NDV:'0'};
+CA['495e5']={type:'SN',cid:'SN_491d_495e5_0',field:'Reference Number', r:0};
+CA['ba51b']={type:'M',cid:'M_3da9_ba51b_0', r:0,parentCont:'MAIN', field:'Open Space Tax',NDV:'0'};
+CA['394e2']={type:'M',cid:'M_4994_394e2_0', r:0,parentCont:'MAIN', field:'City Sales Tax',NDV:'0'};
+CA['f6fad']={type:'D',cid:'Z_7a00_f6fad_0',dv:'0,DAY',field:'Date Submitted', r:0,parentCont:'MAIN'};
+CA['78b78']={type:'M',cid:'M_79af_78b78_0', r:0,parentCont:'MAIN', field:'Impact Fee',NDV:'0'};
+CA['79f33']={type:'M',cid:'M_6268_79f33_0', r:0,parentCont:'MAIN', field:'Transportation Fee',NDV:'0'};
+CA['9c7a6']={type:'T',cid:'T_901d_9c7a6_0', r:0,parentCont:'MAIN', t:'Project Address',field:'Project Address',TDV:'╟FADDRESS',USE:''};
+CA['c4b13']={type:'L',cid:'L_0186_c4b13_0', r:0,parentCont:'MAIN', field:'Subdivision'};
+CA['4d587']={type:'T',cid:'T_d9b4_4d587_0', r:0,parentCont:'MAIN', t:'Lot',field:'Lot',TDV:'╟LOTNBR1',USE:''};
+CA['5f9ce']={type:'T',cid:'T_487c_5f9ce_0', r:0,parentCont:'MAIN', t:'Block',field:'Block',TDV:'╟BLKNBR1',USE:''};
+CA['f8986']={type:'T',cid:'T_42de_f8986_0', r:0,parentCont:'MAIN', t:'Owner Name',field:'Owner Name',TDV:'╟OWNER1',USE:''};
+CA['043c3']={type:'T',cid:'T_b4c1_043c3_0', r:0,parentCont:'MAIN', t:'Owner Address',field:'Owner Address',TDV:'╟OWNERMAILADDRESS',USE:''};
+CA['1c5de']={type:'T',cid:'T_c3c5_1c5de_0', r:0,parentCont:'MAIN', t:'Owner City State ZIP',field:'Owner City State ZIP',TDV:'╟OWNERCSZ',USE:''};
+CA['7a77c']={type:'MT',cid:'MT_e295_7a77c_0', r:0,parentCont:'MAIN', t:'Owner Phone',field:'Owner Phone',TDV:''};
+CA['8a58d']={type:'T',cid:'T_b87b_8a58d_0', r:1,parentCont:'MAIN', t:'Owner Email',em:1,field:'Owner Email',TDV:''};
+CA['15207']={type:'T',cid:'T_2e46_15207_0', r:1,parentCont:'MAIN', t:'General Contractor Name',field:'General Contractor Name',TDV:'',USE:''};
+CA['b8630']={type:'T',cid:'T_bf97_b8630_0', r:1,parentCont:'MAIN', t:'Contractor City',field:'Contractor City',TDV:'',USE:''};
+CA['40d73']={type:'P',cid:'P_00e2_40d73_0', r:1,parentCont:'MAIN', field:'Contractor State',LID:2598};
+CA['d3d72']={type:'MT',cid:'MT_9ed8_d3d72_0', r:1,parentCont:'MAIN', t:'Contractor Zip',field:'Contractor Zip',TDV:''};
+CA['7df90']={type:'MT',cid:'MT_3cf4_7df90_0', r:1,parentCont:'MAIN', t:'Contractor Phone',field:'Contractor Phone',TDV:''};
+CA['2b4d3']={type:'T',cid:'T_15da_2b4d3_0', r:1,parentCont:'MAIN', t:'Contractor Email',em:1,field:'Contractor Email',TDV:''};
+CA['0cb23']={type:'T',cid:'T_85fa_0cb23_0', r:0,parentCont:'MAIN', t:'Contractor License',field:'Contractor License',TDV:'',USE:''};
+CA['859de']={type:'L',cid:'L_edb6_859de_0', r:1,parentCont:'MAIN', field:'Will you have subcontractors associated with project'};
+CA['7af3a']={type:'T',cid:'T_e9b3_7af3a_0', r:0,parentCont:'MAIN', t:'Description of project',field:'Description of project',TDV:'',USE:''};
+CA['f2594']={type:'L',cid:'L_6489_f2594_0', r:1,parentCont:'MAIN', field:'Signed contract with homeowner'};
+CA['f2422']={type:'L',cid:'L_528c_f2422_0', r:0,parentCont:'MAIN', field:'HOA Approval'};
+CA['cbc3a']={type:'L',cid:'L_2c1a_cbc3a_0', r:1,parentCont:'MAIN', field:'Two sets of Blueprints or drawings'};
+CA['06bfb']={type:'L',cid:'L_bc43_06bfb_0', r:0,parentCont:'MAIN', field:'Plot Plan'};
+CA['a5420']={type:'L',cid:'L_8e09_a5420_0', r:0,parentCont:'MAIN', field:'Two sets foundation drawings'};
+CA['3eb2b']={type:'L',cid:'L_3bd4_3eb2b_0', r:0,parentCont:'MAIN', field:'Elevation Plan'};
+CA['b6a7a']={type:'L',cid:'L_542d_b6a7a_0', r:0,parentCont:'MAIN', field:'Certificate of Asbestos Removal'};
+CA['36648']={type:'L',cid:'L_1212_36648_0', r:0,parentCont:'MAIN', field:'Evidence of payment for sewer or water'};
+CA['b9024']={type:'L',cid:'L_8ae2_b9024_0', r:0,parentCont:'MAIN', field:'Demo or excavation'};
+CA['77d27']={type:'L',cid:'L_f199_77d27_0', r:0,parentCont:'MAIN', field:'Soil report'};
+CA['a6d68']={type:'L',cid:'L_f110_a6d68_0', r:0,parentCont:'MAIN', field:'Drainage or Grading Plan'};
+CA['7cb5c']={type:'F',cid:'F_f842_7cb5c_0', r:0,parentCont:'MAIN'};
+CA['ba7d4']={type:'L',cid:'L_462e_ba7d4_0', r:0,parentCont:'MAIN', field:'Failure to submit require documents'};
+CA['94e43']={type:'M',cid:'M_c485_94e43_0', r:1,parentCont:'MAIN', field:'Total valuation',NDV:'0'};
+CA['4b4df']={type:'M',cid:'M_aed6_4b4df_0', r:0,parentCont:'MAIN', field:'Total Due',NDV:'0'};
+CA['7b9f7']={type:'L',cid:'L_4cf5_7b9f7_0', r:1,parentCont:'MAIN', field:'Do you acknowledge this statement'};
+CA['088c4']={type:'L',cid:'L_7af1_088c4_0', r:1,parentCont:'MAIN', field:'Subcontractor registration must'};
+CA['f406e']={type:'L',cid:'L_b22e_f406e_0', r:1,parentCont:'MAIN', field:'Columbine Valley requires digital copy'};
+CA['41a9d']={type:'L',cid:'L_0d3a_41a9d_0', r:1,parentCont:'MAIN', field:'No on street parking'};
+CA['24aba']={type:'L',cid:'L_4ae5_24aba_0', r:1,parentCont:'MAIN', field:'Door to door solicitation prohibited'};
+CA['54c97']={type:'L',cid:'L_ff24_54c97_0', r:1,parentCont:'MAIN', field:'Advertising signage prohibited'};
+CA['da3a9']={type:'L',cid:'L_5174_da3a9_0', r:1,parentCont:'MAIN', field:'HOA representative contact'};
+CA['7970c']={type:'ES',cid:'7970c',t1:'ES_d08b_7970c_1',t2:'ES_d08b_7970c_2', r:1,parentCont:'MAIN', field:'Signature'};
+GR['GR_5133'] ={TID:'G_b32c2',PTID:'',h:230,editor:'FORM_a3f350fd-ee51-4320-b3e7-dba9b86d110d',button:'GNB_a3f350fd-ee51-4320-b3e7-dba9b86d110d', columns: [
+{ field: 'Id', editable:false,hidden:true, type: 'string' },{TF:'Subcontractor First Name', field: 'GFa427a', title: 'First Name', width: 195, type: 'string' },
+{TF:'Subcontractor Last Name', field: 'GF2f9e2', title: 'Last Name', width: 179, type: 'string' },
+{TF:'Subcontractor Phone Number', field: 'GFc37bc', title: 'Phone #', width: 80, type: 'string' },
+{ command: { name: 'LE_a3f350fd-ee51-4320-b3e7-dba9b86d110d', text: 'Edit', click: editsubrecord, title: '&nbsp;' } },
+{ command: ['destroy'], title: '&nbsp;' }]
+ };
+CA['a3f350fd-ee51-4320-b3e7-dba9b86d110da427a']={type:'T',cid:'a3f350fd-ee51-4320-b3e7-dba9b86d110dT_ab16_a427a_0', r:0,parentCont:'a3f350fd-ee51-4320-b3e7-dba9b86d110d', t:'Subcontractor First Name',field:'Subcontractor First Name',TDV:'',USE:''};
+CA['a3f350fd-ee51-4320-b3e7-dba9b86d110d2f9e2']={type:'T',cid:'a3f350fd-ee51-4320-b3e7-dba9b86d110dT_bc19_2f9e2_0', r:0,parentCont:'a3f350fd-ee51-4320-b3e7-dba9b86d110d', t:'Subcontractor Last Name',field:'Subcontractor Last Name',TDV:'',USE:''};
+CA['a3f350fd-ee51-4320-b3e7-dba9b86d110dc37bc']={type:'MT',cid:'a3f350fd-ee51-4320-b3e7-dba9b86d110dMT_2ea0_c37bc_0', r:0,parentCont:'a3f350fd-ee51-4320-b3e7-dba9b86d110d', t:'Subcontractor Phone Number',field:'Subcontractor Phone Number',TDV:''};
+CA['a3f350fd-ee51-4320-b3e7-dba9b86d110d32242']={type:'T',cid:'a3f350fd-ee51-4320-b3e7-dba9b86d110dT_0525_32242_0', r:0,parentCont:'a3f350fd-ee51-4320-b3e7-dba9b86d110d', t:'Subcontractor Email',em:1,field:'Subcontractor Email',TDV:''};
+CA['a3f350fd-ee51-4320-b3e7-dba9b86d110d3998c']={type:'T',cid:'a3f350fd-ee51-4320-b3e7-dba9b86d110dT_0829_3998c_0', r:0,parentCont:'a3f350fd-ee51-4320-b3e7-dba9b86d110d', t:'Subcontractor Business Name',field:'Subcontractor Business Name',TDV:'',USE:''};
+CA['a3f350fd-ee51-4320-b3e7-dba9b86d110de6fab']={type:'L',cid:'a3f350fd-ee51-4320-b3e7-dba9b86d110dL_3e48_e6fab_0', r:0,parentCont:'a3f350fd-ee51-4320-b3e7-dba9b86d110d', field:'Subcontractor Area of Trade'};
+CA['a3f350fd-ee51-4320-b3e7-dba9b86d110d01f80']={type:'T',cid:'a3f350fd-ee51-4320-b3e7-dba9b86d110dT_3531_01f80_0', r:0,parentCont:'a3f350fd-ee51-4320-b3e7-dba9b86d110d', t:'Subcontractor area of Business if Other',field:'Subcontractor area of Business if Other',TDV:'',USE:''};
+BU['GLS_a3f350fd-ee51-4320-b3e7-dba9b86d110d']={type:'GLS',tar:'FORM_a3f350fd-ee51-4320-b3e7-dba9b86d110d'};
+BU['GLC_a3f350fd-ee51-4320-b3e7-dba9b86d110d']={type:'GLC',tar:'FORM_a3f350fd-ee51-4320-b3e7-dba9b86d110d'};
+Logic={"Desc":null,"Events":[{"Actcode":"","Actions":[{"ActionOrder":0,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Permit Fee] To a formula result","EID":"27d6c","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"f8582","ModifyID":"3c296","ModifyTO":"1350+(ceiling(([94e43] - 100000) \/ 1000) * 7.50)","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":1,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Plan Review Fee] To a formula result","EID":"27d6c","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"2e866","ModifyID":"9002a","ModifyTO":"[3c296]*0.65","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":2,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [City Sales Tax] To a formula result","EID":"27d6c","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"a7638","ModifyID":"394e2","ModifyTO":"([94e43]\/2)*0.03","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":3,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Open Space Tax] To a formula result","EID":"27d6c","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"246af","ModifyID":"ba51b","ModifyTO":"([94e43]\/2)*0.0025","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":4,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Total Due] To a formula result","EID":"27d6c","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"f7da4","ModifyID":"4b4df","ModifyTO":"[3c296]+[9002a]+[394e2]+[ba51b]+[78b78]+[79f33]","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null}],
+"Desc":"Total valuation is >= 100001 to <= 500000","FieldCHTO":">=|100001.00|<=|500000.00","FieldID":"94e43","FieldOP":99,"ID":"27d6c","Mode":0,"RecordFilter":"","Usercode":"2"},
+{"Actcode":"","Actions":[{"ActionOrder":0,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Advertising signage prohibited] To []","EID":"8a8c8","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"edcf0","ModifyID":"54c97","ModifyTO":null,"NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":1,"ActionType":3,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Pop-Up Message Action","EID":"8a8c8","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"Please note that your application will NOT be submitted until you select 'Yes' for Advertising\/Company Signage prohibited in Columbine Valley.","ID":"3f596","ModifyID":"","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null}],
+"Desc":"Advertising\/company signage is prohibited = NO","FieldCHTO":"No","FieldID":"54c97","FieldOP":0,"ID":"8a8c8","Mode":0,"RecordFilter":"","Usercode":"2"},
+{"Actcode":"","Actions":[{"ActionOrder":0,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Door to door solicitation prohibited] To []","EID":"81ef5","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"68182","ModifyID":"24aba","ModifyTO":null,"NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":1,"ActionType":3,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Pop-Up Message Action","EID":"81ef5","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"Please note that your application will NOT be submitted until you select 'Yes' for Door to door solicitation prohibited without a valid solicitors permit.","ID":"c673a","ModifyID":"","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null}],
+"Desc":"Door to door solicitation prohibited = NO","FieldCHTO":"No","FieldID":"24aba","FieldOP":0,"ID":"81ef5","Mode":0,"RecordFilter":"","Usercode":"2"},
+{"Actcode":"","Actions":[{"ActionOrder":0,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [No on street parking] To []","EID":"89e35","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"20b19","ModifyID":"41a9d","ModifyTO":null,"NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":1,"ActionType":3,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Pop-Up Message Action","EID":"89e35","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"Please note that your application will NOT be submitted until you select 'Yes' for No on street parking without permit between 3 am and 6 am.","ID":"ca645","ModifyID":"","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null}],
+"Desc":"No on street parking = NO","FieldCHTO":"No","FieldID":"41a9d","FieldOP":0,"ID":"89e35","Mode":0,"RecordFilter":"","Usercode":"2"},
+{"Actcode":"","Actions":[{"ActionOrder":0,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Subcontractor registration must] To []","EID":"fc591","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"da3b5","ModifyID":"088c4","ModifyTO":null,"NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":1,"ActionType":3,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Pop-Up Message Action","EID":"fc591","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"Please note that your application will NOT be submitted until you select 'Yes' for All subcontractors MUST be registered with the Town of Columbine Valley PRIOR to commencement of work. All plumbers and electricians must be state licensed and provide proof of licensing at time of registration.","ID":"d670a","ModifyID":"","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null}],
+"Desc":"All subcontractors MUST be registered with the Town of Columbine Valley PRIOR to commencement of work. All plumbers and electricians must be state licensed and provide proof of licensing at time of registration. = NO","FieldCHTO":"No","FieldID":"088c4","FieldOP":0,"ID":"fc591","Mode":0,"RecordFilter":"","Usercode":"2"},
+{"Actcode":"","Actions":[{"ActionOrder":0,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Columbine Valley requires digital copy] To []","EID":"84b1f","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"14411","ModifyID":"f406e","ModifyTO":null,"NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":1,"ActionType":3,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Pop-Up Message Action","EID":"84b1f","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"Please note that your application will NOT be submitted until you select 'Yes' for The Town of Columbine Valley requires digital copy (PDF) of blueprints if larger than 11x17.","ID":"dda00","ModifyID":"","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null}],
+"Desc":"The Town of Columbine Valley requires digital copy (PDF) of blueprints if larger than 11x17 = NO","FieldCHTO":"No","FieldID":"f406e","FieldOP":0,"ID":"84b1f","Mode":0,"RecordFilter":"","Usercode":"2"},
+{"Actcode":"","Actions":[{"ActionOrder":0,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [HOA representative contact] To []","EID":"8c298","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"7565c","ModifyID":"da3a9","ModifyTO":null,"NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":1,"ActionType":3,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Pop-Up Message Action","EID":"8c298","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"Please note that your application will NOT be submitted until you select 'Yes' for The applicant for the building permit has been informed that  there are private convenants that affect the use and improvement of the property. The applicant acknowledges that they have been informed as to the appropriate Home Owners Association and the HOA representative they may contact.","ID":"5ed76","ModifyID":"","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null}],
+"Desc":"The applicant for the building permit has been informed that  there are private convenants that affect the use and improvement of the property. The applicant acknowledges that they have been informed as to the appropriate Home Owners Association and the HOA representative they may contact = NO","FieldCHTO":"No","FieldID":"da3a9","FieldOP":0,"ID":"8c298","Mode":0,"RecordFilter":"","Usercode":"2"},
+{"Actcode":"","Actions":[{"ActionOrder":0,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Signed contract with homeowner] To []","EID":"3a780","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"1b32d","ModifyID":"f2594","ModifyTO":null,"NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":1,"ActionType":3,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Pop-Up Message Action","EID":"3a780","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"Please note that your application will NOT be submitted until you select 'Yes' for Signed Contract with homeowner.","ID":"ae8d3","ModifyID":"","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null}],
+"Desc":"Signed contract with homeowner = NO","FieldCHTO":"No","FieldID":"f2594","FieldOP":0,"ID":"3a780","Mode":0,"RecordFilter":"","Usercode":"2"},
+{"Actcode":"","Actions":[{"ActionOrder":0,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Two sets of Blueprints or drawings] To []","EID":"cf3a8","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"ed7f9","ModifyID":"cbc3a","ModifyTO":null,"NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":1,"ActionType":3,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Pop-Up Message Action","EID":"cf3a8","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"Please note that your application will NOT be submitted until you select 'Yes' for Two sets of Blueprints or drawings.","ID":"e0760","ModifyID":"","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null}],
+"Desc":"Two sets of Blueprints or drawings","FieldCHTO":"No","FieldID":"cbc3a","FieldOP":0,"ID":"cf3a8","Mode":0,"RecordFilter":"","Usercode":"2"},
+{"Actcode":"","Actions":[{"ActionOrder":0,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Do you acknowledge this statement] To []","EID":"0e2f6","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"ccf20","ModifyID":"7b9f7","ModifyTO":null,"NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":1,"ActionType":3,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Pop-Up Message Action","EID":"0e2f6","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"Please note that your application will NOT be submitted until you select 'Yes' for Do you acknowledge this statement?","ID":"1a43b","ModifyID":"","ModifyTO":"","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null}],
+"Desc":"Do you acknowledge this statement = NO","FieldCHTO":"No","FieldID":"7b9f7","FieldOP":0,"ID":"0e2f6","Mode":0,"RecordFilter":"","Usercode":"2"},
+{"Actcode":"","Actions":[{"ActionOrder":0,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Permit Fee] To [33.00]","EID":"48077","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"16ae4","ModifyID":"3c296","ModifyTO":"33.00","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":1,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [City Sales Tax] To a formula result","EID":"48077","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"c4f98","ModifyID":"394e2","ModifyTO":"([94e43]\/2)*0.03","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":2,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Open Space Tax] To a formula result","EID":"48077","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"04e50","ModifyID":"ba51b","ModifyTO":"([94e43]\/2)*0.0025","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":3,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Plan Review Fee] To a formula result","EID":"48077","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"7d5fa","ModifyID":"9002a","ModifyTO":"33*0.65","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":4,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Total Due] To a formula result","EID":"48077","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"7c6f4","ModifyID":"4b4df","ModifyTO":"[3c296]+[9002a]+[394e2]+[ba51b]+[78b78]+[79f33]","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null}],
+"Desc":"Total valuation is >=$1 and <= $500","FieldCHTO":">=|1.00|<=|500.00","FieldID":"94e43","FieldOP":99,"ID":"48077","Mode":0,"RecordFilter":"","Usercode":"2"},
+{"Actcode":"","Actions":[{"ActionOrder":0,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Permit Fee] To a formula result","EID":"d6045","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"9d619","ModifyID":"3c296","ModifyTO":"33.00+(ceiling(([94e43] - 500)  \/ 100) * 4.50)","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":1,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Plan Review Fee] To a formula result","EID":"d6045","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"3d02d","ModifyID":"9002a","ModifyTO":"[3c296]*0.65","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":2,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Open Space Tax] To a formula result","EID":"d6045","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"16519","ModifyID":"ba51b","ModifyTO":"([94e43]\/2)*0.0025","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":3,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [City Sales Tax] To a formula result","EID":"d6045","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"0d8ae","ModifyID":"394e2","ModifyTO":"([94e43]\/2)*0.03","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":4,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Total Due] To a formula result","EID":"d6045","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"7f43f","ModifyID":"4b4df","ModifyTO":"[3c296]+[9002a]+[394e2]+[ba51b]+[78b78]+[79f33]\n","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null}],
+"Desc":"Total valuation is >=$501 and <= $2000","FieldCHTO":">=|501.00|<=|2000.00","FieldID":"94e43","FieldOP":99,"ID":"d6045","Mode":0,"RecordFilter":"","Usercode":"2"},
+{"Actcode":"","Actions":[{"ActionOrder":0,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Permit Fee] To a formula result","EID":"b6580","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"95fcf","ModifyID":"3c296","ModifyTO":"542.50+(ceiling(([94e43] - 25000) \/ 1000) * 13.50)","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":1,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Plan Review Fee] To a formula result","EID":"b6580","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"8bd20","ModifyID":"9002a","ModifyTO":"[3c296]*0.65","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":2,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [City Sales Tax] To a formula result","EID":"b6580","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"13cc3","ModifyID":"394e2","ModifyTO":"([94e43]\/2)*0.03","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":3,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Open Space Tax] To a formula result","EID":"b6580","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"42cd5","ModifyID":"ba51b","ModifyTO":"([94e43]\/2)*0.0025","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":4,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Total Due] To a formula result","EID":"b6580","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"cf046","ModifyID":"4b4df","ModifyTO":"[3c296]+[9002a]+[394e2]+[ba51b]+[78b78]+[79f33]","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null}],
+"Desc":"Total valuation is >=$25001 to <=$50000","FieldCHTO":">=|25001.00|<=|50000.00","FieldID":"94e43","FieldOP":99,"ID":"b6580","Mode":0,"RecordFilter":"","Usercode":"2"},
+{"Actcode":"","Actions":[{"ActionOrder":0,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Permit Fee] To a formula result","EID":"4a109","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"529ee","ModifyID":"3c296","ModifyTO":"875+(ceiling(([94e43] - 50000) \/ 1000) * 9.50)","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":1,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Plan Review Fee] To a formula result","EID":"4a109","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"5c5a8","ModifyID":"9002a","ModifyTO":"[3c296]*0.65","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":2,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [City Sales Tax] To a formula result","EID":"4a109","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"2d584","ModifyID":"394e2","ModifyTO":"([94e43]\/2)*0.03","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":3,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Open Space Tax] To a formula result","EID":"4a109","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"d12df","ModifyID":"ba51b","ModifyTO":"([94e43]\/2)*0.0025","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":4,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Total Due] To a formula result","EID":"4a109","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"eabef","ModifyID":"4b4df","ModifyTO":"[3c296]+[9002a]+[394e2]+[ba51b]+[78b78]+[79f33]","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null}],
+"Desc":"Total valuation is >= 50001 and <= 100000","FieldCHTO":">=|50001.00|<=|100000.00","FieldID":"94e43","FieldOP":99,"ID":"4a109","Mode":0,"RecordFilter":"","Usercode":"2"},
+{"Actcode":"","Actions":[{"ActionOrder":0,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Permit Fee] To a formula result","EID":"bd0e7","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"491fc","ModifyID":"3c296","ModifyTO":"4350+(ceiling(([94e43] - 500000) \/ 1000) * 6.50)","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":1,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Plan Review Fee] To a formula result","EID":"bd0e7","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"1a9de","ModifyID":"9002a","ModifyTO":"[3c296]*0.65","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":2,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [City Sales Tax] To a formula result","EID":"bd0e7","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"17292","ModifyID":"394e2","ModifyTO":"([94e43]\/2)*0.03","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":3,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Open Space Tax] To a formula result","EID":"bd0e7","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"24081","ModifyID":"ba51b","ModifyTO":"([94e43]\/2)*0.0025","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":4,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Total Due] To a formula result","EID":"bd0e7","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"191ab","ModifyID":"4b4df","ModifyTO":"[3c296]+[9002a]+[394e2]+[ba51b]+[78b78]+[79f33]","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null}],
+"Desc":"Total valuation is >= 500001 to <= 1000000","FieldCHTO":">=|500001.00|<=|1000000.00","FieldID":"94e43","FieldOP":99,"ID":"bd0e7","Mode":0,"RecordFilter":"","Usercode":"2"},
+{"Actcode":"","Actions":[{"ActionOrder":0,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Permit Fee] To a formula result","EID":"1d98c","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"fdcc6","ModifyID":"3c296","ModifyTO":"7600+(ceiling(([94e43] - 1000000) \/ 1000) * 5.00)","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":1,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Plan Review Fee] To a formula result","EID":"1d98c","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"baaa5","ModifyID":"9002a","ModifyTO":"[3c296]*0.65","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":2,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [City Sales Tax] To a formula result","EID":"1d98c","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"f88eb","ModifyID":"394e2","ModifyTO":"([94e43]\/2)*0.03","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":3,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Open Space Tax] To a formula result","EID":"1d98c","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"7baaf","ModifyID":"ba51b","ModifyTO":"([94e43]\/2)*0.0025","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":4,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Total Due] To a formula result","EID":"1d98c","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"f9e74","ModifyID":"4b4df","ModifyTO":"[3c296]+[9002a]+[394e2]+[ba51b]+[78b78]+[79f33]","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null}],
+"Desc":"Total valuation is 1000001 and up","FieldCHTO":"1000001.00","FieldID":"94e43","FieldOP":3,"ID":"1d98c","Mode":0,"RecordFilter":"","Usercode":"2"},
+{"Actcode":"","Actions":[{"ActionOrder":0,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Transportation Fee] To a formula result","EID":"21e20","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"58e5a","ModifyID":"79f33","ModifyTO":"[94e43]*.01","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":1,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Total Due] To a formula result","EID":"21e20","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"fd519","ModifyID":"4b4df","ModifyTO":"[3c296]+[9002a]+[394e2]+[ba51b]+[78b78]+[79f33]","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null}],
+"Desc":"Total Valuation >= 25,000","FieldCHTO":"25000.00","FieldID":"94e43","FieldOP":3,"ID":"21e20","Mode":0,"RecordFilter":"","Usercode":"2"},
+{"Actcode":"","Actions":[{"ActionOrder":0,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Permit Fee] To [0]","EID":"0e5a8","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"7ff88","ModifyID":"3c296","ModifyTO":"0","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null}],
+"Desc":"Total valuation is =$0","FieldCHTO":"0","FieldID":"94e43","FieldOP":0,"ID":"0e5a8","Mode":0,"RecordFilter":"","Usercode":"2"},
+{"Actcode":"","Actions":[{"ActionOrder":0,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Permit Fee] To a formula result","EID":"0c17a","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"adcbf","ModifyID":"3c296","ModifyTO":"105.50+(ceiling(([94e43] - 2000) \/ 1000) * 19.00)","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":1,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Plan Review Fee] To a formula result","EID":"0c17a","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"c0188","ModifyID":"9002a","ModifyTO":"[3c296]*0.65","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":2,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [City Sales Tax] To a formula result","EID":"0c17a","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"29d42","ModifyID":"394e2","ModifyTO":"([94e43]\/2)*0.03","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":3,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Open Space Tax] To a formula result","EID":"0c17a","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"88a90","ModifyID":"ba51b","ModifyTO":"([94e43]\/2)*0.0025","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":4,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Total Due] To a formula result","EID":"0c17a","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"00d02","ModifyID":"4b4df","ModifyTO":"[3c296]+[9002a]+[394e2]+[ba51b]+[78b78]+[79f33]","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null}],
+"Desc":"Total valuation is >= $2001 to $25000","FieldCHTO":">=|2001.00|<=|25000.00","FieldID":"94e43","FieldOP":99,"ID":"0c17a","Mode":0,"RecordFilter":"","Usercode":"2"},
+{"Actcode":"","Actions":[{"ActionOrder":1,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":1,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Total Due] To a formula result","EID":"cca80","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"902a7","ModifyID":"4b4df","ModifyTO":"[3c296]+[9002a]+[394e2]+[ba51b]+[78b78]+[79f33]","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null},
+{"ActionOrder":0,"ActionType":0,"CalBody":null,"CalDATEID":null,"CalEND":null,"CalList":null,"CalNum":0,"CalSTA":null,"CalSubject":null,"CalUnit":null,"Desc":"Modify [Transportation Fee] To [0]","EID":"cca80","EmailCC":null,"EmailFieldID":null,"EmailToList":"","Emailatt":null,"Emailmmg":null,"Emailsubject":"","ID":"d9ddb","ModifyID":"79f33","ModifyTO":"0","NotifyList":null,"Notifybody":null,"Notifysubject":null,"PrmList":null}],
+"Desc":"Total Valuation < 25,000","FieldCHTO":"25000.00","FieldID":"94e43","FieldOP":2,"ID":"cca80","Mode":0,"RecordFilter":"","Usercode":"2"}],
+"Name":"","Type":1};
+RS['495e5']={type:'SN',cid:'RESP_485e_495e5_0'};
+RS['f6fad']={type:'D',cid:'RESP_7b0c_f6fad_0'};
+RS['2b4d3']={type:'T',cid:'RESP_3c94_2b4d3_0'};
+
+ getData();
+ InitESN();});
+</script>
+</body>
+</html>

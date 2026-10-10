@@ -49,3 +49,6 @@ client/public/persona-samples/*.wav
 
 # Issue desk tower config (ISSUE_DESK_SECRET) — never commit
 ops/issue-desk/.env
+
+# US Census Gazetteer inputs for build-jurisdiction-coords (regenerable, large)
+scripts/data/gazetteer/

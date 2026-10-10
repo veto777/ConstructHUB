@@ -66,7 +66,7 @@ export function seoNav(chosen: { domain?: string | null } = {}): ToolShellConfig
   explorerGroups.push({ key: "monitor", label: "Monitored backlinks", items: [{ key: "monitor", label: "This site's links", path: HOME.backlinks, to: (c) => q(HOME.backlinks, { site: site(c) }) }, ...BACKLINK_SECTIONS.map(([section, label]) => ({ key: `monitor-${section}`, label, path: HOME.backlinks, to: (c: ToolNavCtx) => q(HOME.backlinks, { site: site(c), section }), params: { section } }))] });
   explorerGroups.push({ key: "more", label: "More", items: [{ key: "batch", label: "Batch analysis", path: HOME.batch, to: () => HOME.batch }] });
   return {
-    key: "seo", label: "SEO",
+    key: "seo", label: "SEO Suite",
     tools: [
       { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, path: HOME.dashboard, to: () => HOME.dashboard, groups: [
         { key: "main", items: [{ key: "all", label: "All sites", to: () => HOME.dashboard }, { key: "analysed", label: "Analysed sites", to: () => `${HOME.dashboard}?filter=analysed`, params: { filter: "analysed" } }, { key: "crawled", label: "Crawled sites", to: () => `${HOME.dashboard}?filter=crawled`, params: { filter: "crawled" } }] },

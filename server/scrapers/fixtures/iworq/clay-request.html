@@ -1,0 +1,2169 @@
+<noscript>
+    <div style="color: red; font-size: 20px; text-align: center;">
+        <p>JavaScript is required to use this website. Please enable JavaScript in your browser settings.</p>
+    </div>
+    <meta http-equiv="refresh" content="0; URL=https://portal.iworq.net/javascript-disabled">
+</noscript>
+
+<script>
+    let hasToken = 0;
+    document.addEventListener('DOMContentLoaded', (e) => {
+        if ("6Les_AYkAAAAACw9NzcxkcDVfvExxeyw2KS1cao_") {
+            // Show only the reCAPTCHA v3 first
+            $('#recaptcha-container').show();
+            $('#form-container').hide(); // Hide the form initially
+            
+            if(!hasToken) {
+                grecaptcha.ready(function() {
+                    grecaptcha.execute("6Les_AYkAAAAACw9NzcxkcDVfvExxeyw2KS1cao_", {action: 'submit'}).then(function(token) {
+                        hasToken = 1
+                        $.ajax({
+                            url: "https://portal.iworq.net/captchaverify",
+                            type: "post",
+                            data: {
+                                'g-recaptcha-response': token,
+                                'dsn': "CLAYCOUNTY",
+                                'fieldApplicationId': "700",
+                                'templateId': "3481",
+                                '_token':'[REDACTED]'
+                            },
+                            success: function (e){
+                                url = "https://portal.iworq.net/error"
+                                dsn = "CLAYCOUNTY"
+                                fieldApplicationId = "700"
+                                if (!e.isValid && e.showRecaptchaV2) {
+                                    // Trigger reCAPTCHA v2 dynamically if v3 fails
+                                    loadRecaptchaV2();
+                                } else if (e.isValid) {
+                                    // Hide reCAPTCHA and show the form upon success
+                                    $('#recaptcha-container').hide();
+                                    $('#form-container').show();
+                                } else if (!e.isValid) {
+                                    // Redirect to error page if other error
+                                    window.location.href = "https://portal.iworq.net/error";
+                                }
+                            }
+                        });
+                    });
+                });
+            }
+        }
+    });
+
+    function loadRecaptchaV2() {
+        // Check if the recaptcha-v2-container already exists and remove it
+        let existingRecaptchaContainer = document.getElementById('recaptcha-v2-container');
+        if (existingRecaptchaContainer) {
+            existingRecaptchaContainer.remove();
+        }
+
+        // Create a new empty container for the reCAPTCHA v2 widget
+        let recaptchaContainer = document.createElement('div');
+        recaptchaContainer.id = 'recaptcha-v2-container';
+        recaptchaContainer.style = 'width:fit-content;margin:auto;';
+        document.body.appendChild(recaptchaContainer);
+
+        // Render the v2 widget
+        grecaptcha.render(recaptchaContainer, {
+            'sitekey': "6LeprT4qAAAAACn2wFNhhNRRSLe-auOpmBANt1Io",
+            'callback': function (token) {
+                // Submit the v2 token to the backend
+                $.ajax({
+                    url: "https://portal.iworq.net/captchaverify",
+                    type: "post",
+                    data: {
+                        'g-recaptcha-response-v2': token,
+                        'dsn': "CLAYCOUNTY",
+                        'fieldApplicationId': "700",
+                        'templateId': "3481",
+                        '_token': '[REDACTED]'
+                    },
+                    success: function (e) {
+                        if (e.isValid) {
+                            // Hide reCAPTCHA and show the form upon successful v2 validation
+                            $('#recaptcha-v2-container').hide();
+                            $('#form-container').show();
+                        } else {
+                            window.location.href = "https://portal.iworq.net/error";
+                        }
+                    }
+                });
+            }
+        });
+    }
+</script>
+<!-- reCAPTCHA v3 Script-->
+<script src="https://www.google.com/recaptcha/api.js?render=6Les_AYkAAAAACw9NzcxkcDVfvExxeyw2KS1cao_"></script>
+<!-- reCAPTCHA v2 Script -->
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- CSRF Token -->
+    <meta name="csrf-token" content="[REDACTED]">
+
+    <link rel="shortcut icon" href="https://s3.amazonaws.com/iworq-upload/GUEST/600/5052752-iworqfav.png">
+    <title>    Service Requests
+ - Clay County</title>
+
+    <!-- Fonts -->
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css?family=Raleway:300,400,600" rel="stylesheet" type="text/css">
+
+    <!-- Styles -->
+    <link href="/css/app.css?id=c2805d3ac7312e864679" rel="stylesheet">
+    <script src="https://portal.iworq.net/fontawesome-pro-6/js/all.min.js" crossorigin="anonymous"></script>
+    <link href="/css/cc.css?id=111c0a3dbb82c9134a76?v=0.0.2" rel="stylesheet">
+
+    <script src='https://www.google.com/recaptcha/api.js' async defer></script>
+    <script>
+        function onCaptchaSubmit(token) {
+            const searchForm = document.getElementById('search-form-captcha');
+            if (searchForm.checkValidity()) {
+                searchForm.submit();
+            } else {
+                searchForm.reportValidity();
+            }
+        }
+    </script>
+    <script>
+        function onCaptchaRedirect(token) {
+            const btn = document.querySelector('button[data-callback="onCaptchaRedirect"]');
+            var url = '{https://portal.iworq.net}'; //disable HTML-encoding
+            if (btn && btn.dataset.href) {
+                url = btn.dataset.href;
+            }
+            if ((new RegExp('g-recaptcha-response')).test(url)) {
+                var splitArr = url.split("g-recaptcha-response", 2)[0].split("{", 2);
+                var redirectUrl = splitArr[1] + "g-recaptcha-response=" + token;
+
+                if (url.includes("page")) {
+                    redirectUrl = redirectUrl + '&page' + url.split('page')[1].split("}", 2)[0];
+                }
+                window.location.href = redirectUrl;
+            } else {
+                var splitArr = url.split("{", 2)[1].split("}", 2);
+                window.location.href = splitArr[0];
+            }
+        }
+    </script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/15.0.7/marked.min.js" integrity="sha512-rPuOZPx/WHMHNx2RoALKwiCDiDrCo4ekUctyTYKzBo8NGA79NcTW2gfrbcCL2RYL7RdjX2v9zR0fKyI4U4kPew==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    
+    
+</head>
+<body>
+<a class="skip-link screen-reader-text" href="#content">Skip to content</a>
+<div id="app">
+    <nav id="site-nav" class="navbar fixed-top bg-light mainnav box-shadow">
+        <section id="ccLogoSection" class="col-6 order-1 col-md-3">
+                            <img src="https://s3.amazonaws.com/iworq-upload/CLAYCOUNTY/5/11103664-ClayCounty%20Logo1.png" alt="City Logo">
+                    </section>
+        <section id="ccPageNameSection" class="col-12 order-3 order-md-2 col-md-6 text-center page-name">
+           <h1 title="Service Requests">Service Requests</h1>
+        </section>
+        <section id="ccHomeNavSection" class="col-6 order-2 order-md-3 col-md-3 right-nav">
+            <div class="row">
+                <div class="col d-flex justify-content-end">
+                        <a
+    href="/"
+    class="mr-2"
+    aria-label="Home"
+>
+    <span class="fa-solid fa-house-chimney fa-2x" aria-hidden="true"></span>
+</a>
+        <a href="https://portal.iworq.net/help/CLAYCOUNTY/700" class="mr-2" aria-label="Click to open help"><i class="fas fa-question-circle fa-2x"></i></a>
+                </div>
+            </div>
+        </section>
+    </nav>
+    <main id="content">
+            
+    <!-- Container for reCAPTCHA validation -->
+    <div id="recaptcha-container" class="text-center my-5">
+        <div id="recaptcha"></div>
+    </div>
+
+    <!-- Main form content hidden initially -->
+    <div id="form-container" style="display: none;">
+        <form method="post" enctype="multipart/form-data" onSubmit="document.getElementById('submit-webform').disabled = true;">
+            <input type="hidden" name="_token" value="[REDACTED]">            <input type="hidden" name="js_enabled" id="js_enabled" value="0">
+                                                                                            
+            <div class="container">
+                <div class="row justify-content-center mx-4">
+                    <div class="col-12 col-lg-6 card box-shadow border-radius pt-4 pb-5 px-5 mb-4 only-child flex-grow-1">
+                        <div class="row">
+                            <p> </p>
+                        </div>
+
+                        
+                                                    <div class="row">
+                                <div class="col">
+                                    <p class="text-danger">* Indicates required field</p>
+                                </div>
+                            </div>
+                        
+                        <div class="row mb-4">
+                            <div class="col">
+                                <div class="row">
+                                                                            <div
+                    class="col-sm-6 mb-3"
+                    >
+        <div class="row">
+            <div class="col "
+                            >
+                <label for="field125568">
+                    <span class="text-danger">*</span>
+                Date:
+    </label>
+                                <input
+    type="date"
+     class="form-control"      id="field125568"      name="field125568"                      required         >
+                    </div>
+        </div>
+    </div>
+                                                                            <div
+                    class="col-sm-6 mb-3"
+                    >
+        <div class="row">
+            <div class="col "
+                            >
+                <label for="field125575">
+                    <span class="text-danger">*</span>
+                Owner / Occupant:
+    </label>
+                                <input
+    type="text"
+     class="form-control"      id="field125575"      name="field125575"                      required         pattern=".*\S+.*"  >
+                            </div>
+        </div>
+    </div>
+                                                                            <div
+                    class="col-sm-6 mb-3"
+                    >
+        <div class="row">
+            <div class="col "
+                            >
+                <label for="field125577">
+                    <span class="text-danger">*</span>
+                Permit Type:
+    </label>
+                                <select
+     class="form-control selectpicker select-border"      id="field125577"      name="field125577"      data-live-search="true"      data-size="10"                  required         >
+    <option  value=""
+        ></option>
+                <option
+                            value="386917"
+                
+                    >
+                            Building - Commercial
+                    </option>    
+                        <option
+                            value="420476"
+                
+                    >
+                            Building - Commercial Addition
+                    </option>    
+                        <option
+                            value="386929"
+                
+                    >
+                            Building - Commercial Remodel
+                    </option>    
+                        <option
+                            value="386918"
+                
+                    >
+                            Building - Residential
+                    </option>    
+                        <option
+                            value="386919"
+                
+                    >
+                            Building - Residential Accessory
+                    </option>    
+                        <option
+                            value="420472"
+                
+                    >
+                            Building - Residential Addition
+                    </option>    
+                        <option
+                            value="386930"
+                
+                    >
+                            Building - Residential Remodel
+                    </option>    
+                        <option
+                            value="386920"
+                
+                    >
+                            Change of Use
+                    </option>    
+                        <option
+                            value="420469"
+                
+                    >
+                            Electrical - Low Voltage
+                    </option>    
+                        <option
+                            value="386928"
+                
+                    >
+                            Electrical - Photovotaic System
+                    </option>    
+                        <option
+                            value="386931"
+                
+                    >
+                            Electrical - Single Trade
+                    </option>    
+                        <option
+                            value="386932"
+                
+                    >
+                            Fuel Piping - Single Trade
+                    </option>    
+                        <option
+                            value="386921"
+                
+                    >
+                            Generator - Commercial
+                    </option>    
+                        <option
+                            value="386922"
+                
+                    >
+                            Generator - Residential
+                    </option>    
+                        <option
+                            value="420475"
+                
+                    >
+                            Mechanical - Change Out
+                    </option>    
+                        <option
+                            value="386933"
+                
+                    >
+                            Mechanical - Single Trade
+                    </option>    
+                        <option
+                            value="386923"
+                
+                    >
+                            Miscellaneous - Commercial
+                    </option>    
+                        <option
+                            value="386924"
+                
+                    >
+                            Miscellaneous - Residential
+                    </option>    
+                        <option
+                            value="386925"
+                
+                    >
+                            Moble Home - Double Wide
+                    </option>    
+                        <option
+                            value="386926"
+                
+                    >
+                            Moble Home - Park Model
+                    </option>    
+                        <option
+                            value="386927"
+                
+                    >
+                            Moble Home - Single Wide
+                    </option>    
+                        <option
+                            value="424225"
+                
+                    >
+                            Multi-Trade
+                    </option>    
+                        <option
+                            value="386934"
+                
+                    >
+                            Plumbing - Single Trade
+                    </option>    
+            </select>                    </div>
+        </div>
+    </div>
+                                                                            <div
+                    class="col-sm-6 mb-3"
+                    >
+        <div class="row">
+            <div class="col "
+                            >
+                <label for="field125570">
+                    <span class="text-danger">*</span>
+                Discription:
+    </label>
+                                <select
+     class="form-control selectpicker select-border"      id="field125570"      name="field125570"      data-live-search="true"      data-size="10"                  required         >
+    <option  value=""
+        ></option>
+                <option
+                            value="386935"
+                
+                    >
+                            Addition
+                    </option>    
+                        <option
+                            value="386936"
+                
+                    >
+                            Alteration
+                    </option>    
+                        <option
+                            value="386937"
+                
+                    >
+                            Change of Use
+                    </option>    
+                        <option
+                            value="386938"
+                
+                    >
+                            Demolition
+                    </option>    
+                        <option
+                            value="386939"
+                
+                    >
+                            Demolition / Move
+                    </option>    
+                        <option
+                            value="386940"
+                
+                    >
+                            Generator
+                    </option>    
+                        <option
+                            value="420465"
+                
+                    >
+                            Multi Trade
+                    </option>    
+                        <option
+                            value="386941"
+                
+                    >
+                            New Construction
+                    </option>    
+                        <option
+                            value="386942"
+                
+                    >
+                            New Construction - Deck
+                    </option>    
+                        <option
+                            value="386943"
+                
+                    >
+                            New Construction - Garage / Carport
+                    </option>    
+                        <option
+                            value="386944"
+                
+                    >
+                            New Construction - Garage Appartment
+                    </option>    
+                        <option
+                            value="386945"
+                
+                    >
+                            New Construction - Gazebo
+                    </option>    
+                        <option
+                            value="386946"
+                
+                    >
+                            New Construction - Reissue
+                    </option>    
+                        <option
+                            value="386947"
+                
+                    >
+                            New Construction - Retaining Wall
+                    </option>    
+                        <option
+                            value="386948"
+                
+                    >
+                            New Construction - Roof Over Deck
+                    </option>    
+                        <option
+                            value="386949"
+                
+                    >
+                            New Construction - Shell Only
+                    </option>    
+                        <option
+                            value="386950"
+                
+                    >
+                            New Construction - Storage Building
+                    </option>    
+                        <option
+                            value="386951"
+                
+                    >
+                            Porch
+                    </option>    
+                        <option
+                            value="386952"
+                
+                    >
+                            Porch Enclosure
+                    </option>    
+                        <option
+                            value="420466"
+                
+                    >
+                            PV System - Commercial
+                    </option>    
+                        <option
+                            value="420467"
+                
+                    >
+                            PV System - Residential
+                    </option>    
+                        <option
+                            value="386953"
+                
+                    >
+                            Remodel
+                    </option>    
+                        <option
+                            value="386954"
+                
+                    >
+                            Remodel &amp; Addition
+                    </option>    
+                        <option
+                            value="386955"
+                
+                    >
+                            Remodel (single trades only)
+                    </option>    
+                        <option
+                            value="386956"
+                
+                    >
+                            Repair Fire / Flood Damage
+                    </option>    
+                        <option
+                            value="386957"
+                
+                    >
+                            Repairs
+                    </option>    
+                        <option
+                            value="386958"
+                
+                    >
+                            Replacement
+                    </option>    
+                        <option
+                            value="386959"
+                
+                    >
+                            Residential PV System
+                    </option>    
+                        <option
+                            value="420468"
+                
+                    >
+                            RV Park / Manufactured Home Park
+                    </option>    
+                        <option
+                            value="386960"
+                
+                    >
+                            Single Trade - Electrical
+                    </option>    
+                        <option
+                            value="386961"
+                
+                    >
+                            Single Trade - Fuel Piping
+                    </option>    
+                        <option
+                            value="386962"
+                
+                    >
+                            Single Trade - Mechanical
+                    </option>    
+                        <option
+                            value="386963"
+                
+                    >
+                            Single Trade - Plumbing
+                    </option>    
+                        <option
+                            value="386964"
+                
+                    >
+                            Swimming Pool - Above Ground
+                    </option>    
+                        <option
+                            value="386965"
+                
+                    >
+                            Swimming pool - In Ground
+                    </option>    
+                        <option
+                            value="386966"
+                
+                    >
+                            Temporary Structure
+                    </option>    
+            </select>                    </div>
+        </div>
+    </div>
+                                                                            <div
+                    class="col-sm-6 mb-3"
+                    >
+        <div class="row">
+            <div class="col "
+                            >
+                <label for="field125585">
+                    <span class="text-danger">*</span>
+                Type of Construction:
+    </label>
+                                <select
+     class="form-control selectpicker select-border"      id="field125585"      name="field125585"      data-live-search="true"      data-size="10"                  required         >
+    <option  value=""
+        ></option>
+                <option
+                            value="386967"
+                
+                    >
+                            Block
+                    </option>    
+                        <option
+                            value="386968"
+                
+                    >
+                            Concrete
+                    </option>    
+                        <option
+                            value="386969"
+                
+                    >
+                            Log / Post and Beam
+                    </option>    
+                        <option
+                            value="420458"
+                
+                    >
+                            Low Voltage / Alarm System
+                    </option>    
+                        <option
+                            value="386970"
+                
+                    >
+                            Metal / Steel Framing
+                    </option>    
+                        <option
+                            value="386971"
+                
+                    >
+                            Moble Home
+                    </option>    
+                        <option
+                            value="386972"
+                
+                    >
+                            Modular Home
+                    </option>    
+                        <option
+                            value="386973"
+                
+                    >
+                            Other
+                    </option>    
+                        <option
+                            value="386974"
+                
+                    >
+                            Retaining Wall
+                    </option>    
+                        <option
+                            value="420459"
+                
+                    >
+                            RV / Well Service
+                    </option>    
+                        <option
+                            value="420460"
+                
+                    >
+                            Service Change - 100 Amp
+                    </option>    
+                        <option
+                            value="420461"
+                
+                    >
+                            Service Change - 200 Amp
+                    </option>    
+                        <option
+                            value="420462"
+                
+                    >
+                            Service Change - 400 Amp
+                    </option>    
+                        <option
+                            value="420463"
+                
+                    >
+                            Service Change - 600 Amp
+                    </option>    
+                        <option
+                            value="420464"
+                
+                    >
+                            Service Change - 800 Amp and greater
+                    </option>    
+                        <option
+                            value="386975"
+                
+                    >
+                            SIPS
+                    </option>    
+                        <option
+                            value="386976"
+                
+                    >
+                            Swimming Pool
+                    </option>    
+                        <option
+                            value="386977"
+                
+                    >
+                            Timber Frame
+                    </option>    
+                        <option
+                            value="386978"
+                
+                    >
+                            Wood Framing
+                    </option>    
+                        <option
+                            value="386979"
+                
+                    >
+                            Wood Framing / Block
+                    </option>    
+                        <option
+                            value="386980"
+                
+                    >
+                            Wood Framing / Concrete
+                    </option>    
+                        <option
+                            value="386981"
+                
+                    >
+                            Wood Framing / Steel
+                    </option>    
+            </select>                    </div>
+        </div>
+    </div>
+                                                                            <div
+                    class="col-sm-6 mb-3"
+                    >
+        <div class="row">
+            <div class="col "
+                            >
+                <label for="field125573">
+                    <span class="text-danger">*</span>
+                Number of Bedrooms:
+    </label>
+                                <select
+     class="form-control selectpicker select-border"      id="field125573"      name="field125573"      data-live-search="true"      data-size="10"                  required         >
+    <option  value=""
+        ></option>
+                <option
+                            value="388227"
+                
+                    >
+                            1
+                    </option>    
+                        <option
+                            value="388228"
+                
+                    >
+                            2
+                    </option>    
+                        <option
+                            value="388229"
+                
+                    >
+                            3
+                    </option>    
+                        <option
+                            value="388230"
+                
+                    >
+                            4
+                    </option>    
+                        <option
+                            value="388231"
+                
+                    >
+                            5
+                    </option>    
+                        <option
+                            value="388232"
+                
+                    >
+                            6
+                    </option>    
+                        <option
+                            value="388233"
+                
+                    >
+                            7
+                    </option>    
+                        <option
+                            value="388234"
+                
+                    >
+                            8
+                    </option>    
+                        <option
+                            value="388235"
+                
+                    >
+                            9
+                    </option>    
+                        <option
+                            value="388226"
+                
+                    >
+                            N/A
+                    </option>    
+            </select>                    </div>
+        </div>
+    </div>
+                                                                            <div
+                    class="col-sm-6 mb-3"
+                    >
+        <div class="row">
+            <div class="col "
+                            >
+                <label for="field125564">
+                Building Dimension:
+    </label>
+                                <input
+    type="text"
+     class="form-control"      id="field125564"      name="field125564"                             pattern=".*\S+.*"  >
+                            </div>
+        </div>
+    </div>
+                                                                            <div
+                    class="col-sm-6 mb-3"
+                    >
+        <div class="row">
+            <div class="col "
+                            >
+                <label for="field125579">
+                    <span class="text-danger">*</span>
+                Project Cost:
+    </label>
+                                <input
+    type="number"
+     class="form-control"      id="field125579"      name="field125579"                      required         step="any"  >
+                            </div>
+        </div>
+    </div>
+                                                                            <div
+                    class="col-sm-6 mb-3"
+                    >
+        <div class="row">
+            <div class="col "
+                            >
+                <label for="field125581">
+                Square Feet - Finished:
+    </label>
+                                <input
+    type="number"
+     class="form-control"      id="field125581"      name="field125581"                             step="any"  >
+                            </div>
+        </div>
+    </div>
+                                                                            <div
+                    class="col-sm-6 mb-3"
+                    >
+        <div class="row">
+            <div class="col "
+                            >
+                <label for="field125582">
+                Square Feet - Unfinished:
+    </label>
+                                <input
+    type="number"
+     class="form-control"      id="field125582"      name="field125582"                             step="any"  >
+                            </div>
+        </div>
+    </div>
+                                                                            <div
+                    class="col-sm-6 mb-3"
+                    >
+        <div class="row">
+            <div class="col "
+                            >
+                <label for="field125586">
+                    <span class="text-danger">*</span>
+                Type of Heating:
+    </label>
+                                <select
+     class="form-control selectpicker select-border"      id="field125586"      name="field125586"      data-live-search="true"      data-size="10"                  required         >
+    <option  value=""
+        ></option>
+                <option
+                            value="386982"
+                
+                    >
+                            Duel Fuel Heat Pump
+                    </option>    
+                        <option
+                            value="386983"
+                
+                    >
+                            Electric Baseboard
+                    </option>    
+                        <option
+                            value="386984"
+                
+                    >
+                            Electric Heat Pump
+                    </option>    
+                        <option
+                            value="386985"
+                
+                    >
+                            Forced Warm Air Furnace
+                    </option>    
+                        <option
+                            value="386986"
+                
+                    >
+                            Geo-thermal
+                    </option>    
+                        <option
+                            value="386987"
+                
+                    >
+                            Mini-Split
+                    </option>    
+                        <option
+                            value="387207"
+                
+                    >
+                            Not Applicable
+                    </option>    
+                        <option
+                            value="386988"
+                
+                    >
+                            Oil-Fired Furnace
+                    </option>    
+                        <option
+                            value="386989"
+                
+                    >
+                            Other
+                    </option>    
+                        <option
+                            value="386990"
+                
+                    >
+                            Radiant Floor Heat
+                    </option>    
+            </select>                    </div>
+        </div>
+    </div>
+                                                                            <div
+                    class="col-sm-6 mb-3"
+                    >
+        <div class="row">
+            <div class="col "
+                            >
+                <label for="field125566">
+                Commercial/Residential Group:
+    </label>
+                                <select
+     class="form-control selectpicker select-border"      id="field125566"      name="field125566"      data-live-search="true"      data-size="10"                         >
+    <option  value="0" ></option>
+                <option
+                            value="386991"
+                
+                    >
+                            Group A-1
+                    </option>    
+                        <option
+                            value="386992"
+                
+                    >
+                            Group A-2
+                    </option>    
+                        <option
+                            value="386993"
+                
+                    >
+                            Group A-3
+                    </option>    
+                        <option
+                            value="386994"
+                
+                    >
+                            Group A-4
+                    </option>    
+                        <option
+                            value="386995"
+                
+                    >
+                            Group A-5
+                    </option>    
+                        <option
+                            value="386996"
+                
+                    >
+                            Group B
+                    </option>    
+                        <option
+                            value="386997"
+                
+                    >
+                            Group E
+                    </option>    
+                        <option
+                            value="386998"
+                
+                    >
+                            Group F-1
+                    </option>    
+                        <option
+                            value="386999"
+                
+                    >
+                            Group F-2
+                    </option>    
+                        <option
+                            value="387000"
+                
+                    >
+                            Group H-1
+                    </option>    
+                        <option
+                            value="387001"
+                
+                    >
+                            Group H-2
+                    </option>    
+                        <option
+                            value="387002"
+                
+                    >
+                            Group H-3
+                    </option>    
+                        <option
+                            value="387003"
+                
+                    >
+                            Group H-4
+                    </option>    
+                        <option
+                            value="387004"
+                
+                    >
+                            Group I-1
+                    </option>    
+                        <option
+                            value="387005"
+                
+                    >
+                            Group I-2
+                    </option>    
+                        <option
+                            value="387006"
+                
+                    >
+                            Group I-3
+                    </option>    
+                        <option
+                            value="387007"
+                
+                    >
+                            Group I-4
+                    </option>    
+                        <option
+                            value="387008"
+                
+                    >
+                            Group M
+                    </option>    
+                        <option
+                            value="387009"
+                
+                    >
+                            Group R-1
+                    </option>    
+                        <option
+                            value="387010"
+                
+                    >
+                            Group R-2
+                    </option>    
+                        <option
+                            value="387011"
+                
+                    >
+                            Group R-3
+                    </option>    
+                        <option
+                            value="387012"
+                
+                    >
+                            Group R-4
+                    </option>    
+                        <option
+                            value="387013"
+                
+                    >
+                            Group S-1
+                    </option>    
+                        <option
+                            value="387014"
+                
+                    >
+                            Group S-2
+                    </option>    
+                        <option
+                            value="387015"
+                
+                    >
+                            Group U
+                    </option>    
+                        <option
+                            value="387016"
+                
+                    >
+                            Residential
+                    </option>    
+                        <option
+                            value="387017"
+                
+                    >
+                            Residential - Multi Family
+                    </option>    
+                        <option
+                            value="387018"
+                
+                    >
+                            Residential - Single Family
+                    </option>    
+            </select>                    </div>
+        </div>
+    </div>
+                                                                            <div
+                    class="col-sm-6 mb-3"
+                    >
+        <div class="row">
+            <div class="col "
+                            >
+                <label for="field125580">
+                    <span class="text-danger">*</span>
+                Site Address:
+    </label>
+                                <input
+    type="text"
+     class="form-control"      id="field125580"      name="field125580"                      required         pattern=".*\S+.*"  >
+                            </div>
+        </div>
+    </div>
+                                                                            <div
+                    class="col-sm-6 mb-3"
+                    >
+        <div class="row">
+            <div class="col "
+                            >
+                <label for="field125565">
+                    <span class="text-danger">*</span>
+                City/State/Zip:
+    </label>
+                                <input
+    type="text"
+     class="form-control"      id="field125565"      name="field125565"                      required         pattern=".*\S+.*"  >
+                            </div>
+        </div>
+    </div>
+                                                                            <div
+                    class="col-sm-6 mb-3"
+                    >
+        <div class="row">
+            <div class="col "
+                            >
+                <label for="field125584">
+                    <span class="text-danger">*</span>
+                Township:
+    </label>
+                                <select
+     class="form-control selectpicker select-border"      id="field125584"      name="field125584"      data-live-search="true"      data-size="10"                  required         >
+    <option  value=""
+        ></option>
+                <option
+                            value="386884"
+                
+                    >
+                            Brasstown
+                    </option>    
+                        <option
+                            value="386883"
+                
+                    >
+                            Hayesville
+                    </option>    
+                        <option
+                            value="386885"
+                
+                    >
+                            Hiawassee
+                    </option>    
+                        <option
+                            value="386882"
+                
+                    >
+                            Shooting Creek
+                    </option>    
+                        <option
+                            value="386886"
+                
+                    >
+                            Sweetwater
+                    </option>    
+                        <option
+                            value="386887"
+                
+                    >
+                            Tusquittee
+                    </option>    
+                        <option
+                            value="387019"
+                
+                    >
+                            Warne
+                    </option>    
+            </select>                    </div>
+        </div>
+    </div>
+                                                                            <div
+                    class="col-sm-6 mb-3"
+                    >
+        <div class="row">
+            <div class="col "
+                            >
+                <label for="field125583">
+                Subdivision:
+    </label>
+                                <select
+     class="form-control selectpicker select-border"      id="field125583"      name="field125583"      data-live-search="true"      data-size="10"                         >
+    <option  value="0" ></option>
+                <option
+                            value="387024"
+                
+                    >
+                            Angel Knob
+                    </option>    
+                        <option
+                            value="387025"
+                
+                    >
+                            Ashe Point
+                    </option>    
+                        <option
+                            value="387026"
+                
+                    >
+                            Bailey Acres
+                    </option>    
+                        <option
+                            value="387027"
+                
+                    >
+                            Barlow Fields
+                    </option>    
+                        <option
+                            value="387028"
+                
+                    >
+                            Bell Lake View
+                    </option>    
+                        <option
+                            value="387029"
+                
+                    >
+                            Black Bear Bottoms
+                    </option>    
+                        <option
+                            value="387030"
+                
+                    >
+                            Brasstown Acres
+                    </option>    
+                        <option
+                            value="387031"
+                
+                    >
+                            Bridgewater
+                    </option>    
+                        <option
+                            value="387032"
+                
+                    >
+                            Brookside Meadows
+                    </option>    
+                        <option
+                            value="387033"
+                
+                    >
+                            Cabin Cove
+                    </option>    
+                        <option
+                            value="387034"
+                
+                    >
+                            Chairmaker
+                    </option>    
+                        <option
+                            value="387035"
+                
+                    >
+                            Chatuge Hills
+                    </option>    
+                        <option
+                            value="387036"
+                
+                    >
+                            Chatuge Shores Overlook
+                    </option>    
+                        <option
+                            value="387037"
+                
+                    >
+                            Chatuge Village
+                    </option>    
+                        <option
+                            value="387038"
+                
+                    >
+                            Cold Branch Acres
+                    </option>    
+                        <option
+                            value="387039"
+                
+                    >
+                            Compass Creek
+                    </option>    
+                        <option
+                            value="387040"
+                
+                    >
+                            Compass Meadows
+                    </option>    
+                        <option
+                            value="387041"
+                
+                    >
+                            Crawford Heights
+                    </option>    
+                        <option
+                            value="387042"
+                
+                    >
+                            Cypress Point
+                    </option>    
+                        <option
+                            value="387043"
+                
+                    >
+                            Dan Knob
+                    </option>    
+                        <option
+                            value="387044"
+                
+                    >
+                            Deer Valley
+                    </option>    
+                        <option
+                            value="387045"
+                
+                    >
+                            Deerbrook
+                    </option>    
+                        <option
+                            value="387046"
+                
+                    >
+                            Downings Place
+                    </option>    
+                        <option
+                            value="387047"
+                
+                    >
+                            Drake Ridge
+                    </option>    
+                        <option
+                            value="387048"
+                
+                    >
+                            Eagle Fork
+                    </option>    
+                        <option
+                            value="387049"
+                
+                    >
+                            Eagle Fork Properties
+                    </option>    
+                        <option
+                            value="387050"
+                
+                    >
+                            Eagles View
+                    </option>    
+                        <option
+                            value="387051"
+                
+                    >
+                            Elf School
+                    </option>    
+                        <option
+                            value="387052"
+                
+                    >
+                            Fires Creek Cove
+                    </option>    
+                        <option
+                            value="387053"
+                
+                    >
+                            Fires Creek Road
+                    </option>    
+                        <option
+                            value="387054"
+                
+                    >
+                            Gabriel Ridge
+                    </option>    
+                        <option
+                            value="387055"
+                
+                    >
+                            Grouse Mountain
+                    </option>    
+                        <option
+                            value="387056"
+                
+                    >
+                            Hidden River
+                    </option>    
+                        <option
+                            value="387057"
+                
+                    >
+                            High Meadows
+                    </option>    
+                        <option
+                            value="387058"
+                
+                    >
+                            Hoby &amp; Naomi Garrett
+                    </option>    
+                        <option
+                            value="387059"
+                
+                    >
+                            Hole In One
+                    </option>    
+                        <option
+                            value="387060"
+                
+                    >
+                            Hyatt Mills Estates
+                    </option>    
+                        <option
+                            value="387061"
+                
+                    >
+                            Ivy Knob
+                    </option>    
+                        <option
+                            value="387062"
+                
+                    >
+                            J &amp; R Farms
+                    </option>    
+                        <option
+                            value="387063"
+                
+                    >
+                            Joe Jones Subdivision
+                    </option>    
+                        <option
+                            value="387064"
+                
+                    >
+                            Lakewood Hills
+                    </option>    
+                        <option
+                            value="387065"
+                
+                    >
+                            Laurel Mountain Estates
+                    </option>    
+                        <option
+                            value="387066"
+                
+                    >
+                            Longview
+                    </option>    
+                        <option
+                            value="387067"
+                
+                    >
+                            Low Gap Trailer Park
+                    </option>    
+                        <option
+                            value="387073"
+                
+                    >
+                            McClure Point
+                    </option>    
+                        <option
+                            value="387074"
+                
+                    >
+                            McCracken Point
+                    </option>    
+                        <option
+                            value="387075"
+                
+                    >
+                            McGlamery Farms
+                    </option>    
+                        <option
+                            value="387076"
+                
+                    >
+                            McIntosh Cove
+                    </option>    
+                        <option
+                            value="387077"
+                
+                    >
+                            Meadows at Chatuge
+                    </option>    
+                        <option
+                            value="387078"
+                
+                    >
+                            Mission Hill Estates
+                    </option>    
+                        <option
+                            value="387079"
+                
+                    >
+                            Mission Ridge
+                    </option>    
+                        <option
+                            value="387080"
+                
+                    >
+                            Mission Ridge - Phase I
+                    </option>    
+                        <option
+                            value="387081"
+                
+                    >
+                            Mission Ridge - Phase II
+                    </option>    
+                        <option
+                            value="387082"
+                
+                    >
+                            Mission Valley Overlook
+                    </option>    
+                        <option
+                            value="387083"
+                
+                    >
+                            Moore Acres
+                    </option>    
+                        <option
+                            value="387084"
+                
+                    >
+                            Moss Mountain
+                    </option>    
+                        <option
+                            value="387085"
+                
+                    >
+                            Mountain Harbour
+                    </option>    
+                        <option
+                            value="387086"
+                
+                    >
+                            Mountain View
+                    </option>    
+                        <option
+                            value="387087"
+                
+                    >
+                            North Ridge
+                    </option>    
+                        <option
+                            value="387088"
+                
+                    >
+                            North View
+                    </option>    
+                        <option
+                            value="387134"
+                
+                    >
+                            Not Applicable
+                    </option>    
+                        <option
+                            value="387208"
+                
+                    >
+                            Not Applicable
+                    </option>    
+                        <option
+                            value="387089"
+                
+                    >
+                            Oak Forest Hills
+                    </option>    
+                        <option
+                            value="387090"
+                
+                    >
+                            Pine Log Village
+                    </option>    
+                        <option
+                            value="387091"
+                
+                    >
+                            Possum Holler
+                    </option>    
+                        <option
+                            value="387092"
+                
+                    >
+                            Pounding Mill Creek Estates
+                    </option>    
+                        <option
+                            value="387093"
+                
+                    >
+                            Quail Cove
+                    </option>    
+                        <option
+                            value="387094"
+                
+                    >
+                            Rainbow Falls
+                    </option>    
+                        <option
+                            value="387095"
+                
+                    >
+                            Rebel Lane
+                    </option>    
+                        <option
+                            value="387096"
+                
+                    >
+                            Rhinehart
+                    </option>    
+                        <option
+                            value="387097"
+                
+                    >
+                            River Oaks
+                    </option>    
+                        <option
+                            value="387098"
+                
+                    >
+                            River Sound Village
+                    </option>    
+                        <option
+                            value="387099"
+                
+                    >
+                            Riverbend
+                    </option>    
+                        <option
+                            value="387100"
+                
+                    >
+                            Riverwalk
+                    </option>    
+                        <option
+                            value="387101"
+                
+                    >
+                            Shelton Springs
+                    </option>    
+                        <option
+                            value="387102"
+                
+                    >
+                            Shephard Farms
+                    </option>    
+                        <option
+                            value="387103"
+                
+                    >
+                            Shiloh Ridge
+                    </option>    
+                        <option
+                            value="387104"
+                
+                    >
+                            Shiloh Stables
+                    </option>    
+                        <option
+                            value="387105"
+                
+                    >
+                            Shooting Creek Orchard
+                    </option>    
+                        <option
+                            value="387106"
+                
+                    >
+                            Shooting Creek Trails
+                    </option>    
+                        <option
+                            value="387107"
+                
+                    >
+                            Smoke Rise
+                    </option>    
+                        <option
+                            value="387108"
+                
+                    >
+                            Staurolite Woods
+                    </option>    
+                        <option
+                            value="387109"
+                
+                    >
+                            Sweetwater Bend
+                    </option>    
+                        <option
+                            value="387110"
+                
+                    >
+                            Tanglewood Cottages
+                    </option>    
+                        <option
+                            value="387111"
+                
+                    >
+                            The Meadows at Chatuge
+                    </option>    
+                        <option
+                            value="387112"
+                
+                    >
+                            The Pines
+                    </option>    
+                        <option
+                            value="387113"
+                
+                    >
+                            The Ridges
+                    </option>    
+                        <option
+                            value="387114"
+                
+                    >
+                            The Springs
+                    </option>    
+                        <option
+                            value="387115"
+                
+                    >
+                            The Springs (ph II)
+                    </option>    
+                        <option
+                            value="387116"
+                
+                    >
+                            The Villages of Elf School
+                    </option>    
+                        <option
+                            value="387117"
+                
+                    >
+                            The Vinings
+                    </option>    
+                        <option
+                            value="387118"
+                
+                    >
+                            The Wilderness
+                    </option>    
+                        <option
+                            value="387119"
+                
+                    >
+                            Trillium Heights
+                    </option>    
+                        <option
+                            value="387120"
+                
+                    >
+                            Tusquittee Landing
+                    </option>    
+                        <option
+                            value="387121"
+                
+                    >
+                            Tusquittee Meadows
+                    </option>    
+                        <option
+                            value="387122"
+                
+                    >
+                            Walker Point
+                    </option>    
+                        <option
+                            value="387123"
+                
+                    >
+                            Walnut Point
+                    </option>    
+                        <option
+                            value="387124"
+                
+                    >
+                            Warne Estates
+                    </option>    
+                        <option
+                            value="387125"
+                
+                    >
+                            Warne Landing
+                    </option>    
+                        <option
+                            value="420457"
+                
+                    >
+                            Waters Edge
+                    </option>    
+                        <option
+                            value="387126"
+                
+                    >
+                            Weber Way
+                    </option>    
+                        <option
+                            value="387127"
+                
+                    >
+                            Wesley Meadows
+                    </option>    
+                        <option
+                            value="387128"
+                
+                    >
+                            White Oak
+                    </option>    
+                        <option
+                            value="387129"
+                
+                    >
+                            White Pine Ridge
+                    </option>    
+                        <option
+                            value="387130"
+                
+                    >
+                            Wilderness
+                    </option>    
+                        <option
+                            value="387131"
+                
+                    >
+                            Wilderness Log Cabin Resort
+                    </option>    
+                        <option
+                            value="387132"
+                
+                    >
+                            Winchester Cove
+                    </option>    
+                        <option
+                            value="387133"
+                
+                    >
+                            Woods of Hunter
+                    </option>    
+            </select>                    </div>
+        </div>
+    </div>
+                                                                            <div
+                    class="col-sm-6 mb-3"
+                    >
+        <div class="row">
+            <div class="col "
+                            >
+                <label for="field125576">
+                Parcel ID Number (PIN):
+    </label>
+                                <input
+    type="text"
+     class="form-control"      id="field125576"      name="field125576"                             pattern=".*\S+.*"  >
+                            </div>
+        </div>
+    </div>
+                                                                            <div
+                    class="col-sm-6 mb-3"
+                    >
+        <div class="row">
+            <div class="col "
+                            >
+                <label for="field125578">
+                    <span class="text-danger">*</span>
+                Phone:
+    </label>
+                                <input
+    type="text"
+     class="form-control"      id="field125578"      name="field125578"                      required         pattern=".*\S+.*"  >
+                            </div>
+        </div>
+    </div>
+                                                                            <div
+                    class="col-sm-6 mb-3"
+                    >
+        <div class="row">
+            <div class="col "
+                            >
+                <label for="field125571">
+                    <span class="text-danger">*</span>
+                E-Mail Address:
+    </label>
+                                <input
+    type="text"
+     class="form-control"      id="field125571"      name="field125571"                      required         pattern=".*\S+.*"  >
+                            </div>
+        </div>
+    </div>
+                                                                            <div
+                    class="col-sm-6 mb-3"
+                    >
+        <div class="row">
+            <div class="col "
+                            >
+                <label for="field125574">
+                    <span class="text-danger">*</span>
+                Other Restrictions:
+    </label>
+                                <select
+     class="form-control selectpicker select-border"      id="field125574"      name="field125574"      data-live-search="true"      data-size="10"                  required         >
+    <option  value=""
+        ></option>
+                <option
+                            value="387020"
+                
+                    >
+                            None Noted
+                    </option>    
+                        <option
+                            value="387021"
+                
+                    >
+                            Project is State or Federal
+                    </option>    
+                        <option
+                            value="387022"
+                
+                    >
+                            Project located in FEMA Flood Zone
+                    </option>    
+                        <option
+                            value="387023"
+                
+                    >
+                            Project located in Town Limits or ETJ
+                    </option>    
+            </select>                    </div>
+        </div>
+    </div>
+                                                                            <div
+                    class="col-sm-6 mb-3"
+                    >
+        <div class="row">
+            <div class="col "
+                            >
+                <label for="field125569">
+                    <span class="text-danger">*</span>
+                Directions to the Job Site:
+    </label>
+                                <input
+    type="text"
+     class="form-control"      id="field125569"      name="field125569"                      required         pattern=".*\S+.*"  >
+                            </div>
+        </div>
+    </div>
+                                                                            <div
+                    class="col-sm-6 mb-3"
+                    >
+        <div class="row">
+            <div class="col "
+                            >
+                <label for="field125567">
+                    <span class="text-danger">*</span>
+                Contractor Information:
+    </label>
+                                <input
+    type="text"
+     class="form-control"      id="field125567"      name="field125567"                      required         pattern=".*\S+.*"  >
+                            </div>
+        </div>
+    </div>
+                                                                            <div
+                    class="col-sm-6 mb-3"
+                    >
+        <div class="row">
+            <div class="col "
+                            >
+                <label for="field125572">
+                Lein Agent Information (projects over $30,000):
+    </label>
+                                <input
+    type="text"
+     class="form-control"      id="field125572"      name="field125572"                             pattern=".*\S+.*"  >
+                            </div>
+        </div>
+    </div>
+                                                                    </div>
+                            </div>
+                        </div>
+
+                        
+                                                
+                        
+                        
+                        <div class="row">
+                            <div class="col">
+                                <button
+                                    id="submit-webform"
+                                    type="submit"
+                                                                            class="btn btn-primary btn-change cc-button"
+                                                                    >Submit</button>
+                            </div>
+                        </div>
+                    </div>
+                                    </div>
+            </div>
+        </form>
+    </div>
+        <div id="modalWrapper" class="modal fade" role="dialog" style="z-index: 2000;">
+            <div class="modal-dialog" role="document">
+                <div id="commonModal" class="modal-content">
+                    <div class="modal-header">
+                        <h2 class="modal-title" id="modalTitle">Accessibility</h2>
+                        <button class="close" data-dismiss="modal">Dismiss</button>
+                    </div>
+                    <div class="modal-body" id="modalContent">
+                    </div>
+                    <div class="modal-footer" id="modalFooter">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+                                </main>
+    <br>
+    <footer id="accessibility" class="text-center">
+        <a id="accessibility-statement" href="">Accessibility</a>
+    </footer>
+    <br>
+</div>
+
+<!-- Scripts -->
+<script src="/js/client.js?id=87e1138ca0542ab0382a"></script>
+<script src="/js/cc-template.js?id=8df5847e28e112357293"></script>
+    <script>
+        $('body').on('click','#submit-webform', function (event) {
+            document.getElementById('js_enabled').value = "1";
+        });
+        let dsn = 'CLAYCOUNTY';
+        const fid = 700;
+    </script>
+
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-select@1.13.9/dist/css/bootstrap-select.min.css">
+<script src="https://cdn.jsdelivr.net/npm/bootstrap-select@1.13.9/dist/js/bootstrap-select.min.js"></script>
+
+
+<script>
+document.addEventListener("DOMContentLoaded", (event) => {
+  const body = document.querySelector('body');
+  const siteNav = document.querySelector('#site-nav');
+
+  const setMarginTop = (el, height) => {
+    const marginTop = height + 16;
+    el.style.marginTop = `${marginTop}px`;
+  };
+
+  setMarginTop(body, siteNav.offsetHeight);
+
+  window.onresize = e => {
+    setMarginTop(body, siteNav.offsetHeight);
+  };
+
+    document.querySelectorAll('.columns .row .col.has-toggle').forEach(function (col) {
+        const value = col.querySelector('.field-value');
+        const btn = col.querySelector('.field-toggle');
+        if (!value || !btn) return;
+
+        if (value.scrollHeight > value.clientHeight + 1) {
+            btn.classList.remove('d-none');
+        }
+
+        btn.addEventListener('click', function () {
+            const expanded = col.classList.toggle('is-expanded');
+            btn.textContent = expanded ? 'Show less' : 'Show more';
+            btn.setAttribute('aria-expanded', expanded);
+        });
+    });
+});
+</script>
+</body>
+</html>

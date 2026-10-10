@@ -333,6 +333,9 @@ export async function setupAuth(app: Express) {
             try { await logActivity(req, user.id, "security.reauthenticated", { method: "google" }); } catch { /* audit is best-effort here */ }
             return res.redirect(nextPath);
           }
+          // A two-step account: Google confirmed it (recorded above for the Code API page), but the
+          // session's step-up still needs the authenticator code, which the page asks for itself.
+          if (ok) return res.redirect(`${nextPath}${nextPath.includes("?") ? "&" : "?"}reauth=google-2fa`);
           return res.redirect(`${nextPath}${nextPath.includes("?") ? "&" : "?"}reauth=google-failed`);
         }
         if (err || !user) return res.redirect("/auth?error=google-failed");

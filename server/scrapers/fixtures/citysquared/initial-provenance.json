@@ -1,0 +1,249 @@
+[
+  {
+    "file": "bethel-recent.json",
+    "url": "https://services4.municity5.com/M5Services/M5Service.svc/Customer/BethelTownCT/FilteredSearch",
+    "method": "POST",
+    "status": 200,
+    "requestBody": {
+      "base": "Permit",
+      "fields": [
+        {
+          "Permit": "Permit_ID"
+        },
+        {
+          "Permit": "PermitNo"
+        },
+        {
+          "Permit": "PermitDate"
+        },
+        {
+          "Permit": "ApplicaNo"
+        },
+        {
+          "Permit": "ExperationDate"
+        },
+        {
+          "Permit": "CloseDate"
+        },
+        {
+          "Permit": "PermStatus"
+        },
+        {
+          "Permit": "ConstCost"
+        },
+        {
+          "Permit": "LegalAddress"
+        },
+        {
+          "Permit": "ConstructionType"
+        }
+      ],
+      "filters": [
+        {
+          "name": "PermitDate",
+          "operator": "greaterthanorequals",
+          "entity": "Permit",
+          "value": "2026-10-03"
+        }
+      ],
+      "limit": 100,
+      "order": "asc",
+      "includeDeleted": false,
+      "fieldsToSearchBy": "",
+      "defaultSort": "",
+      "relationships": {
+        "Parents": [],
+        "Children": [],
+        "Siblings": []
+      },
+      "sort": "Permit_ID",
+      "start": 0
+    }
+  },
+  {
+    "file": "bethel-recent-page1.json",
+    "url": "https://services4.municity5.com/M5Services/M5Service.svc/Customer/BethelTownCT/FilteredSearch",
+    "method": "POST",
+    "status": 200,
+    "requestBody": {
+      "base": "Permit",
+      "fields": [
+        {
+          "Permit": "Permit_ID"
+        },
+        {
+          "Permit": "PermitNo"
+        },
+        {
+          "Permit": "PermitDate"
+        },
+        {
+          "Permit": "ApplicaNo"
+        },
+        {
+          "Permit": "ExperationDate"
+        },
+        {
+          "Permit": "CloseDate"
+        },
+        {
+          "Permit": "PermStatus"
+        },
+        {
+          "Permit": "ConstCost"
+        },
+        {
+          "Permit": "LegalAddress"
+        },
+        {
+          "Permit": "ConstructionType"
+        }
+      ],
+      "filters": [
+        {
+          "name": "PermitDate",
+          "operator": "greaterthanorequals",
+          "entity": "Permit",
+          "value": "2026-10-03"
+        }
+      ],
+      "limit": 10,
+      "order": "asc",
+      "includeDeleted": false,
+      "fieldsToSearchBy": "",
+      "defaultSort": "",
+      "relationships": {
+        "Parents": [],
+        "Children": [],
+        "Siblings": []
+      },
+      "sort": "Permit.Permit_ID"
+    }
+  },
+  {
+    "file": "bethel-recent-page2.json",
+    "url": "https://services4.municity5.com/M5Services/M5Service.svc/Customer/BethelTownCT/FilteredSearch",
+    "method": "POST",
+    "status": 200,
+    "requestBody": {
+      "base": "Permit",
+      "fields": [
+        {
+          "Permit": "Permit_ID"
+        },
+        {
+          "Permit": "PermitNo"
+        },
+        {
+          "Permit": "PermitDate"
+        },
+        {
+          "Permit": "ApplicaNo"
+        },
+        {
+          "Permit": "ExperationDate"
+        },
+        {
+          "Permit": "CloseDate"
+        },
+        {
+          "Permit": "PermStatus"
+        },
+        {
+          "Permit": "ConstCost"
+        },
+        {
+          "Permit": "LegalAddress"
+        },
+        {
+          "Permit": "ConstructionType"
+        }
+      ],
+      "filters": [
+        {
+          "name": "PermitDate",
+          "operator": "greaterthanorequals",
+          "entity": "Permit",
+          "value": "2026-10-03"
+        },
+        {
+          "name": "Permit_ID",
+          "operator": "greaterthan",
+          "entity": "Permit",
+          "value": 58479
+        }
+      ],
+      "limit": 10,
+      "order": "asc",
+      "includeDeleted": false,
+      "fieldsToSearchBy": "",
+      "defaultSort": "",
+      "relationships": {
+        "Parents": [],
+        "Children": [],
+        "Siblings": []
+      },
+      "sort": "Permit.Permit_ID"
+    }
+  },
+  {
+    "file": "bethel-empty.json",
+    "url": "https://services4.municity5.com/M5Services/M5Service.svc/Customer/BethelTownCT/FilteredSearch",
+    "method": "POST",
+    "status": 200,
+    "requestBody": {
+      "base": "Permit",
+      "fields": [
+        {
+          "Permit": "Permit_ID"
+        },
+        {
+          "Permit": "PermitNo"
+        },
+        {
+          "Permit": "PermitDate"
+        },
+        {
+          "Permit": "ApplicaNo"
+        },
+        {
+          "Permit": "ExperationDate"
+        },
+        {
+          "Permit": "CloseDate"
+        },
+        {
+          "Permit": "PermStatus"
+        },
+        {
+          "Permit": "ConstCost"
+        },
+        {
+          "Permit": "LegalAddress"
+        },
+        {
+          "Permit": "ConstructionType"
+        }
+      ],
+      "filters": [
+        {
+          "name": "PermitNo",
+          "operator": "like",
+          "entity": "Permit",
+          "value": "ConstructHUB-no-such-permit-20261010"
+        }
+      ],
+      "limit": 100,
+      "order": "asc",
+      "includeDeleted": false,
+      "fieldsToSearchBy": "",
+      "defaultSort": "",
+      "relationships": {
+        "Parents": [],
+        "Children": [],
+        "Siblings": []
+      },
+      "sort": "Permit.Permit_ID"
+    }
+  }
+]

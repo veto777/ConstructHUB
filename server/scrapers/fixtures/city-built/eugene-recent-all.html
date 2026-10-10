@@ -1,0 +1,1175 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>City of Eugene - Planning and Development - Building Permit Search Results</title>
+    <link rel="shortcut icon" href="/Content/Images/favicon.ico" />
+    <script src="/Scripts/jquery-1.6.2.min.js"></script>
+
+    <link type="text/css" rel="stylesheet" media="all" href="/Content/Reset.css" />
+    <link type="text/css" rel="stylesheet" media="print" href="/Content/Print.css" />
+    <link type="text/css" rel="stylesheet" media="all" href="/Content/jquery-ui-1.8.20.custom.css" />
+    <link rel="stylesheet" href="/Content/Site.css" />
+    <script src="/Scripts/jquery-1.6.2.min.js"></script>
+    <script src="/Scripts/jquery-ui-1.8.20.custom.min.js"></script>
+    <script src="/Scripts/jquery.validate.min.js"></script>
+    <script src="/Scripts/modernizr.custom.min.js"></script>
+
+    <style type="text/css">
+        input[type="submit"].ui-state-default,
+        input[type="button"].ui-state-default,
+        .ui-button-text {
+            font-size: 12px;
+            font-weight: normal;
+        }
+
+        div.ui-datepicker {
+            font-size: 10px;
+        }
+
+
+
+        #debug-message {
+            color: Red;
+            font-weight: bold;
+            font-size: larger;
+            float: right;
+            margin: 1em;
+        }
+    </style>
+
+    <script type="text/javascript">
+        $(document).ready(function () {
+            $('input:submit, input:button, button').button();
+            $('input:text').focus(function () { this.select(); });
+            $.validator.addMethod('phone', function (phone, element) {
+                phone = phone.replace(/\s+/g, '');
+                return this.optional(element) || phone.length > 9 &&
+                    phone.match(/^[2-9]\d{2}-\d{3}-\d{4}$/);
+            }, 'Please enter a valid phone number');
+        });
+    </script>
+
+    
+    <link type="text/css" rel="stylesheet" href="/Content/jquery.datatables.css" />
+    <script type="text/javascript" src="/Scripts/jquery.datatables.min.js"></script>
+    <script type="text/javascript" src="/Scripts/jquery.datatables.tools.min.js"></script>
+        <script type="text/javascript">
+            $(document).ready(function () {
+                $('#search-results-table').dataTable({
+                    sScrollY: '210px',
+                    bPaginate: false,
+                    bJQueryUI: true,
+                    bSearchable: true,
+                    bSort: true,
+                    bScrollCollapse: true,
+                    sDom: '<"H"fr>t<"F"ipT>',
+                    oTableTools: {
+                        aButtons: [
+                            {
+                                sExtends: 'print',
+                                sButtonText: 'Print View',
+                                sToolTip: 'Show printer friendly view, press ESC to switch back',
+                                sInfo: '<h6>Print View</h6><p>Press <b>ESC</b> to switch back</p>'
+                            },
+                            {
+                                sExtends: 'text',
+                                sButtonText: 'Export',
+                                sToolTip: 'Export to CSV file',
+                                fnClick: function (button, config) {
+                                    config.sFieldBoundary = '';
+                                    config.sFieldSeperator = '|';
+                                    config.sNewLine = '||';
+                                    config.bHeader = true;
+
+                                    var data = this.fnGetTableData(config).replace(/"/, "'");
+                                    var encodedData = btoa(data);
+
+                                    var input = '<input type="hidden" name="data" value="' + encodedData + '" />';
+                               
+                                    $('<form action="SearchExport" method="POST">' + input +
+                                        '</form>').appendTo('body').submit().remove();
+                                }
+                            }]
+                    }
+                });
+            });
+        </script>
+    <script type="text/javascript">
+		function LoadMap()
+		{
+			var url = '/Maps/SearchResultsMap/30adf81c-330a-4e5b-8c30-9f14a9933920';
+
+			$('#search-map-frame').attr('src', url);
+			$('#search-map-container').css('display', 'block');
+			$('#search-map-button').css('display', 'none');
+		}
+    </script>
+    <style type="text/css">
+        #search-map-container {
+            display: none;
+        }
+
+        #search-map-button {
+            width: 100%;
+            text-align: center;
+        }
+
+        th.table-project-name {
+            width: 15em;
+        }
+    </style>
+
+
+    <script type="text/javascript">
+        $(document).ready(function () {
+            $('button').button();
+        });
+    </script>
+
+        <script type="text/javascript">
+            var _gaq = _gaq || [];
+            _gaq.push(['_setAccount', 'UA-34287918-3']);
+            _gaq.push(['_trackPageview']);
+
+            (function () {
+                var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+                ga.src = ('https:' === document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+                var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+            })();
+        </script>
+</head>
+<body>
+    <noscript><div>The City of Eugene's interactive <b>PDD Online Services Center</b> requires that Javascript be enabled in your browser.</div></noscript>
+    <div id="page">
+        <div id="header">
+            <div id="logo">
+                <a href="https://www.eugene-or.gov/"><img id="citylogo" src="/Content/Images/city-logo-90x90.jpg" alt="City of Eugene" /></a>
+            </div>
+            <div id="title">
+                <div class="custom_h1">Planning and Development Department</div>
+                <div id="menu">
+<a class="inactive" href="/">Home</a><a class="inactive" href="/Maps">Maps</a><a class="active" href="/BuildingPermits">Building Permits</a><a class="inactive" href="/CodeCompliance">Code Compliance</a><a class="inactive" href="/LandUse">Land Use</a><a class="inactive" href="/RentalHousing">Rental Housing</a><a class="inactive" href="/GreenBuilding">Waste Prevention</a>                </div>
+            </div>
+        </div>
+        <div id="main">
+            
+
+
+<h2>Building Permit Search Results</h2>
+<fieldset>
+    <button id="new-search-button-right" onclick="window.location.href='PermitSearch'">New Search</button>
+    <h3>Search by Date Received: October 3, 2026 - October 10, 2026</h3>
+        <table id="search-results-table" class="datatable">
+            <thead>
+                <tr>
+                    <th class="table-log-number">Log Number</th>
+                    <th class="table-date">Received</th>
+                    <th>Site Address</th>
+                    <th>Scope of Work</th>
+                        <th class="table-map-and-taxlot">Map &amp; Taxlot</th>
+                </tr>
+            </thead>
+            <tbody>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06513-01" target="_blank">26-06513-01</a></td>
+                        <td>10/5/2026</td>
+                        <td>1047 W 18TH PL</td>
+                        <td>Addition</td>
+                            <td>18040111-01700</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06723-01" target="_blank">26-06723-01</a></td>
+                        <td>10/5/2026</td>
+                        <td>1161 W 24TH AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>18040114-06400</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06729-01" target="_blank">26-06729-01</a></td>
+                        <td>10/5/2026</td>
+                        <td>140 E 37TH AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>18030741-12100</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06728-01" target="_blank">26-06728-01</a></td>
+                        <td>10/5/2026</td>
+                        <td>181 E ANCHOR AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>17040244-01006</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06726-01" target="_blank">26-06726-01</a></td>
+                        <td>10/5/2026</td>
+                        <td>2065 LAW LN</td>
+                        <td>Specialty Permit</td>
+                            <td>17032031-05500</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06736-01" target="_blank">26-06736-01</a></td>
+                        <td>10/5/2026</td>
+                        <td>2845 GREENTREE WAY</td>
+                        <td>Specialty Permit</td>
+                            <td>18040344-00362</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06718-01" target="_blank">26-06718-01</a></td>
+                        <td>10/5/2026</td>
+                        <td>3700 BABCOCK LN, UNIT 59</td>
+                        <td>Specialty Permit</td>
+                            <td>17032141-00302</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06669-01" target="_blank">26-06669-01</a></td>
+                        <td>10/5/2026</td>
+                        <td>3787 W 1ST AVE</td>
+                        <td>Fire System</td>
+                            <td>17042730-02308</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06380-01" target="_blank">26-06380-01</a></td>
+                        <td>10/5/2026</td>
+                        <td>3815 W 11TH AVE</td>
+                        <td>Addition</td>
+                            <td>17043414-00506</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06722-01" target="_blank">26-06722-01</a></td>
+                        <td>10/5/2026</td>
+                        <td>469 E 15TH AVE, UNIT 1</td>
+                        <td>Specialty Permit</td>
+                            <td>17033233-01900</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06678-01" target="_blank">26-06678-01</a></td>
+                        <td>10/5/2026</td>
+                        <td>475 PINTO WAY</td>
+                        <td>Reroof</td>
+                            <td>17032822-02700</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06633-01" target="_blank">26-06633-01</a></td>
+                        <td>10/5/2026</td>
+                        <td>500 VALLEY RIVER CENTER</td>
+                        <td>Sign</td>
+                            <td>17033020-01007</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06634-01" target="_blank">26-06634-01</a></td>
+                        <td>10/5/2026</td>
+                        <td>500 VALLEY RIVER CENTER</td>
+                        <td>Sign</td>
+                            <td>17033020-01007</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06635-01" target="_blank">26-06635-01</a></td>
+                        <td>10/5/2026</td>
+                        <td>500 VALLEY RIVER CENTER</td>
+                        <td>Sign</td>
+                            <td>17033020-01007</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06695-01" target="_blank">26-06695-01</a></td>
+                        <td>10/5/2026</td>
+                        <td>5797 BAINBRIDGE RD</td>
+                        <td>New Single Family Dwelling</td>
+                            <td>17042034-08800</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06730-01" target="_blank">26-06730-01</a></td>
+                        <td>10/5/2026</td>
+                        <td>6048 KISTLER LN</td>
+                        <td>Specialty Permit</td>
+                            <td>17042023-03600</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06675-01" target="_blank">26-06675-01</a></td>
+                        <td>10/5/2026</td>
+                        <td>967 PATTERSON ST</td>
+                        <td>Sign</td>
+                            <td>17033223-07100</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06774-01" target="_blank">26-06774-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>1069 RIO GLEN DR</td>
+                        <td>Addition</td>
+                            <td>17031931-00600</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06753-01" target="_blank">26-06753-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>1079 VALLEY RIVER WAY, UNIT A</td>
+                        <td>Specialty Permit</td>
+                            <td>17033020-00806</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06740-01" target="_blank">26-06740-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>135 E 30TH AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>18030711-13400</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06744-01" target="_blank">26-06744-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>1400 EXECUTIVE PKWY, UNIT 220</td>
+                        <td>Specialty Permit</td>
+                            <td>17042440-01602</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06720-01" target="_blank">26-06720-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>1409 MARTINGALE ST</td>
+                        <td>Foundation</td>
+                            <td>17032124-02603</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06733-01" target="_blank">26-06733-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>1572 WILSON CT</td>
+                        <td>Foundation</td>
+                            <td>17043544-01000</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06751-01" target="_blank">26-06751-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>1739 COPPING ST</td>
+                        <td>Specialty Permit</td>
+                            <td>17041331-00107</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06771-01" target="_blank">26-06771-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>1841 LAWRENCE ST</td>
+                        <td>Specialty Permit</td>
+                            <td>18030612-05800</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06756-01" target="_blank">26-06756-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>1875 SYLVAN ST</td>
+                        <td>Specialty Permit</td>
+                            <td>18030412-01502</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06747-01" target="_blank">26-06747-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>1895 CARMEL AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>17032022-06400</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06770-01" target="_blank">26-06770-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>1961 E 19TH AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>18030422-03100</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06782-01" target="_blank">26-06782-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>2063 STONE CREST DR</td>
+                        <td>Specialty Permit</td>
+                            <td>17031843-02800</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06745-01" target="_blank">26-06745-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>221 DIVISION AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>17041322-00103</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06734-01" target="_blank">26-06734-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>2495 TAYLOR ST</td>
+                        <td>Foundation</td>
+                            <td>18040142-02400</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06760-01" target="_blank">26-06760-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>305 TAYLOR ST</td>
+                        <td>Specialty Permit</td>
+                            <td>17042543-07200</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06759-01" target="_blank">26-06759-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>320 CAP CT, UNIT A</td>
+                        <td>Specialty Permit</td>
+                            <td>17042744-01000</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06522-01" target="_blank">26-06522-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>3327 W 25TH AVE</td>
+                        <td>Addition</td>
+                            <td>18040231-07100</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06749-01" target="_blank">26-06749-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>3328 ELMIRA RD</td>
+                        <td>Specialty Permit</td>
+                            <td>17042623-01602</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06761-01" target="_blank">26-06761-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>340 GREENFIELD AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>17041124-00300</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06755-01" target="_blank">26-06755-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>3445 STRATHMORE PL</td>
+                        <td>Specialty Permit</td>
+                            <td>18040222-00120</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06757-01" target="_blank">26-06757-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>350 E 46TH AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>18031814-07500</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06758-01" target="_blank">26-06758-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>350 E 46TH AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>18031814-07500</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06768-01" target="_blank">26-06768-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>353 GARTH LN</td>
+                        <td>Specialty Permit</td>
+                            <td>17042311-07700</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06735-01" target="_blank">26-06735-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>3623 WESTLEIGH ST</td>
+                        <td>Foundation</td>
+                            <td>18040222-01800</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06763-01" target="_blank">26-06763-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>3700 BABCOCK LN, UNIT 83</td>
+                        <td>Specialty Permit</td>
+                            <td>17032141-00300</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06532-01" target="_blank">26-06532-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>3760 ONYX ST</td>
+                        <td>Alter/Remodel</td>
+                            <td>18030842-01900</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06440-01" target="_blank">26-06440-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>5060 DONALD ST</td>
+                        <td>Alter/Remodel</td>
+                            <td>18031841-10300</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06762-01" target="_blank">26-06762-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>565 LONE OAK AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>17041240-00507</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06793-01" target="_blank">26-06793-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>570 POLK ST</td>
+                        <td>Waste Water</td>
+                            <td>17043612-08200</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06738-01" target="_blank">26-06738-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>734 LEIGH ST</td>
+                        <td>Specialty Permit</td>
+                            <td>17032134-10300</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06739-01" target="_blank">26-06739-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>738 LEIGH ST</td>
+                        <td>Specialty Permit</td>
+                            <td>17032134-10300</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06765-01" target="_blank">26-06765-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>780 W 6TH ALY, UNIT 4</td>
+                        <td>Specialty Permit</td>
+                            <td>17033122-06200</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06727-01" target="_blank">26-06727-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>832 LARIAT DR</td>
+                        <td>Specialty Permit</td>
+                            <td>17032043-02500</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06766-01" target="_blank">26-06766-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>897 W 36TH AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>18030732-00601</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06767-01" target="_blank">26-06767-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>897 W 36TH AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>18030732-00601</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06586-01" target="_blank">26-06586-01</a></td>
+                        <td>10/6/2026</td>
+                        <td>933 W 13TH AVE</td>
+                        <td>Foundation</td>
+                            <td>17033132-06902</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06775-01" target="_blank">26-06775-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>1145 WILLAGILLESPIE RD</td>
+                        <td>Specialty Permit</td>
+                            <td>17031930-02800</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06789-01" target="_blank">26-06789-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>1234 FRIGON AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>17042042-02000</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06812-01" target="_blank">26-06812-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>1310 W 24TH AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>18040141-13600</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06814-01" target="_blank">26-06814-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>1310 W 24TH AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>18040141-13600</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06817-01" target="_blank">26-06817-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>1490 E 22ND ALY</td>
+                        <td>Specialty Permit</td>
+                            <td>18030514-14700</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06833-01" target="_blank">26-06833-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>1603 ARDENDALE LN</td>
+                        <td>Specialty Permit</td>
+                            <td>18041212-00119</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06807-01" target="_blank">26-06807-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>1664 KINGS NORTH ST</td>
+                        <td>Specialty Permit</td>
+                            <td>17032121-00142</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06815-01" target="_blank">26-06815-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>172 OAKLEIGH LN, UNIT 612</td>
+                        <td>Specialty Permit</td>
+                            <td>17042413-70006</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06797-01" target="_blank">26-06797-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>175 N GRAND ST, UNIT 1</td>
+                        <td>Specialty Permit</td>
+                            <td>17042514-02000</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06790-01" target="_blank">26-06790-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>1950 MCLEAN BLVD</td>
+                        <td>Specialty Permit</td>
+                            <td>18041220-03400</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06830-01" target="_blank">26-06830-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>1975 TIGERTAIL RD</td>
+                        <td>Specialty Permit</td>
+                            <td>18041220-05727</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06783-01" target="_blank">26-06783-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>2065 LAW LN</td>
+                        <td>Specialty Permit</td>
+                            <td>17032031-05500</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06796-01" target="_blank">26-06796-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>211 GRIMES ST</td>
+                        <td>Specialty Permit</td>
+                            <td>17042743-02700</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06791-01" target="_blank">26-06791-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>2510 WILLAKENZIE RD</td>
+                        <td>Specialty Permit</td>
+                            <td>17032010-04422</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06708-01" target="_blank">26-06708-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>255 KNAPP LN</td>
+                        <td>Accessory Bldg</td>
+                            <td>17042433-07900</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06805-01" target="_blank">26-06805-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>3175 POTTER ST</td>
+                        <td>Specialty Permit</td>
+                            <td>18030812-05500</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06788-01" target="_blank">26-06788-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>3245 WHITTEN DR</td>
+                        <td>Specialty Permit</td>
+                            <td>18030723-02301</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06832-01" target="_blank">26-06832-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>3255 AGATE ST</td>
+                        <td>Specialty Permit</td>
+                            <td>18030814-00160</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06803-01" target="_blank">26-06803-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>3335 SAINT KITTS AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>17031612-03400</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06802-01" target="_blank">26-06802-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>35 W 35TH AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>18030742-00203</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-05625-01" target="_blank">26-05625-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>3545 POTTER ST</td>
+                        <td>Erosion Prevention</td>
+                            <td>18030842-04300</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06811-01" target="_blank">26-06811-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>38 W 30TH AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>18030712-06100</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06806-01" target="_blank">26-06806-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>4055 ROYAL AVE, UNIT 122</td>
+                        <td>Specialty Permit</td>
+                            <td>17042233-00100</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06799-01" target="_blank">26-06799-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>4575 W 11TH AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>17043310-04600</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06781-01" target="_blank">26-06781-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>4646 BARGER DR</td>
+                        <td>Change of Use</td>
+                            <td>17042100-00100</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06731-01" target="_blank">26-06731-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>4656 THUNDERBIRD ST</td>
+                        <td>Addition</td>
+                            <td>16043543-12500</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06792-01" target="_blank">26-06792-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>4789 SPRING MEADOW AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>16043543-14535</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06713-01" target="_blank">26-06713-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>5809 BAINBRIDGE RD</td>
+                        <td>New Single Family Dwelling</td>
+                            <td>17042034-08900</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06717-01" target="_blank">26-06717-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>5812 BAINBRIDGE RD</td>
+                        <td>New Single Family Dwelling</td>
+                            <td>17042034-06800</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06724-01" target="_blank">26-06724-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>5813 BAINBRIDGE RD</td>
+                        <td>New Single Family Dwelling</td>
+                            <td>17042034-09000</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06804-01" target="_blank">26-06804-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>711 SKIPPER AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>17041421-00106</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-05949-01" target="_blank">26-05949-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>744 BLACKFOOT AVE</td>
+                        <td>Alter/Remodel</td>
+                            <td>17041122-00402</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06798-01" target="_blank">26-06798-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>820 CHERRY AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>17042341-02100</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06820-01" target="_blank">26-06820-01</a></td>
+                        <td>10/7/2026</td>
+                        <td>990 VAN BUREN ST</td>
+                        <td>Specialty Permit</td>
+                            <td>17043614-07900</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06837-01" target="_blank">26-06837-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>111 W 7TH AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>17033112-08400</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06822-01" target="_blank">26-06822-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>1319 HAMMOCK ST</td>
+                        <td>Specialty Permit</td>
+                            <td>17031941-06000</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06834-01" target="_blank">26-06834-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>132 LYNNBROOK DR</td>
+                        <td>Specialty Permit</td>
+                            <td>17040223-05100</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06827-01" target="_blank">26-06827-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>1369 S BERTELSEN RD, UNIT E1</td>
+                        <td>Tenant Infill</td>
+                            <td>17043430-01100</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06858-01" target="_blank">26-06858-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>1394 FERRY ST</td>
+                        <td>Right of Way - PW</td>
+                            <td>17033232-14900</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06847-01" target="_blank">26-06847-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>1425 PARNELL DR</td>
+                        <td>Specialty Permit</td>
+                            <td>17041444-03900</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06835-01" target="_blank">26-06835-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>1505 MONTEREY AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>17031911-01000</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06850-01" target="_blank">26-06850-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>155 E 39TH AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>18030744-04500</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06732-01" target="_blank">26-06732-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>1732 W 23RD AVE</td>
+                        <td>Foundation</td>
+                            <td>18040124-02301</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06836-01" target="_blank">26-06836-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>1934 CEDAR BROOK DR</td>
+                        <td>Specialty Permit</td>
+                            <td>17042012-10100</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06853-01" target="_blank">26-06853-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>1960 ECHO HOLLOW RD</td>
+                        <td>Specialty Permit</td>
+                            <td>17042111-00200</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06265-01" target="_blank">26-06265-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>2080 RIDGEWAY DR</td>
+                        <td>Addition</td>
+                            <td>17031843-04200</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06856-01" target="_blank">26-06856-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>2082 AMIRANTE ST</td>
+                        <td>Specialty Permit</td>
+                            <td>17041744-00158</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06852-01" target="_blank">26-06852-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>2560 ONYX ST</td>
+                        <td>Specialty Permit</td>
+                            <td>18030542-03200</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06857-01" target="_blank">26-06857-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>2879 TIMBERLINE DR</td>
+                        <td>Specialty Permit</td>
+                            <td>18040233-00136</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06824-01" target="_blank">26-06824-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>2890 RIVERVIEW ST</td>
+                        <td>Specialty Permit</td>
+                            <td>18030444-00400</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06845-01" target="_blank">26-06845-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>3029 QUIET LN</td>
+                        <td>Specialty Permit</td>
+                            <td>17041113-02200</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06777-01" target="_blank">26-06777-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>3049 TIMBERLINE DR</td>
+                        <td>New Single Family Dwelling</td>
+                            <td>18041132-00600</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06821-01" target="_blank">26-06821-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>3169 TANNER PARK DR</td>
+                        <td>Specialty Permit</td>
+                            <td>18041124-06500</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06780-01" target="_blank">26-06780-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>3190 TANNER PARK DR</td>
+                        <td>New Single Family Dwelling</td>
+                            <td>18041132-01000</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06851-01" target="_blank">26-06851-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>3355 N DELTA HWY, UNIT 35</td>
+                        <td>Specialty Permit</td>
+                            <td>17030700-01203</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06843-01" target="_blank">26-06843-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>3370 SUMMIT SKY BLVD</td>
+                        <td>Specialty Permit</td>
+                            <td>18041041-02000</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06828-01" target="_blank">26-06828-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>350 NORMAN AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>17041331-00359</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06823-01" target="_blank">26-06823-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>3865 MIRROR POND WAY</td>
+                        <td>Specialty Permit</td>
+                            <td>17030823-02020</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06819-01" target="_blank">26-06819-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>515 HIGH ST</td>
+                        <td>Specialty Permit</td>
+                            <td>17033111-04600</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06829-01" target="_blank">26-06829-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>526 VALLEY RIVER CENTER</td>
+                        <td>Specialty Permit</td>
+                            <td>17033020-01007</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06813-01" target="_blank">26-06813-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>532 W 8TH AVE, UNIT 2</td>
+                        <td>Specialty Permit</td>
+                            <td>17033124-01200</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06741-01" target="_blank">26-06741-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>5786 DURST ST</td>
+                        <td>New Single Family Dwelling</td>
+                            <td>17042034-04300</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06826-01" target="_blank">26-06826-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>730 FAIR OAKS DR</td>
+                        <td>Specialty Permit</td>
+                            <td>17032921-00800</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06862-01" target="_blank">26-06862-01</a></td>
+                        <td>10/8/2026</td>
+                        <td>930 W 17TH AVE</td>
+                        <td>Driveway/Curb Cut</td>
+                            <td>17033133-01900</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06864-01" target="_blank">26-06864-01</a></td>
+                        <td>10/9/2026</td>
+                        <td>1059 TYLER ST</td>
+                        <td>Specialty Permit</td>
+                            <td>17043614-11800</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06860-01" target="_blank">26-06860-01</a></td>
+                        <td>10/9/2026</td>
+                        <td>1140 TRAIL AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>17042422-05303</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06842-01" target="_blank">26-06842-01</a></td>
+                        <td>10/9/2026</td>
+                        <td>1458 FERRY ST</td>
+                        <td>Repair Fire Damage</td>
+                            <td>17033233-01700</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06865-01" target="_blank">26-06865-01</a></td>
+                        <td>10/9/2026</td>
+                        <td>1557 N DANEBO AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>17042124-01500</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06889-01" target="_blank">26-06889-01</a></td>
+                        <td>10/9/2026</td>
+                        <td>1585 E 13TH AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>17033200-00100</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06881-01" target="_blank">26-06881-01</a></td>
+                        <td>10/9/2026</td>
+                        <td>195 E 25TH AVE</td>
+                        <td>Driveway/Curb Cut</td>
+                            <td>18030641-10100</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06874-01" target="_blank">26-06874-01</a></td>
+                        <td>10/9/2026</td>
+                        <td>1970 COLUMBIA ST</td>
+                        <td>Foundation</td>
+                            <td>18030511-05501</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06872-01" target="_blank">26-06872-01</a></td>
+                        <td>10/9/2026</td>
+                        <td>215 COACHMAN DR</td>
+                        <td>Specialty Permit</td>
+                            <td>18031841-04500</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06887-01" target="_blank">26-06887-01</a></td>
+                        <td>10/9/2026</td>
+                        <td>2309 PARK GROVE DR</td>
+                        <td>Specialty Permit</td>
+                            <td>17031712-06100</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06816-01" target="_blank">26-06816-01</a></td>
+                        <td>10/9/2026</td>
+                        <td>2677 WILLAKENZIE RD, UNIT 1</td>
+                        <td>Specialty Permit</td>
+                            <td>17032011-04900</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06871-01" target="_blank">26-06871-01</a></td>
+                        <td>10/9/2026</td>
+                        <td>2784 DAYNA LN</td>
+                        <td>Specialty Permit</td>
+                            <td>17031714-05400</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06877-01" target="_blank">26-06877-01</a></td>
+                        <td>10/9/2026</td>
+                        <td>2784 DAYNA LN</td>
+                        <td>Specialty Permit</td>
+                            <td>17031714-05400</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06880-01" target="_blank">26-06880-01</a></td>
+                        <td>10/9/2026</td>
+                        <td>3283 CORALY AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>17042623-01845</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06867-01" target="_blank">26-06867-01</a></td>
+                        <td>10/9/2026</td>
+                        <td>3460 WESTWARD HO AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>17032824-06700</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06879-01" target="_blank">26-06879-01</a></td>
+                        <td>10/9/2026</td>
+                        <td>3700 BABCOCK LN, UNIT 140</td>
+                        <td>Specialty Permit</td>
+                            <td>17032141-00400</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06882-01" target="_blank">26-06882-01</a></td>
+                        <td>10/9/2026</td>
+                        <td>3730 WESTLEIGH ST</td>
+                        <td>Specialty Permit</td>
+                            <td>18040222-06200</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06861-01" target="_blank">26-06861-01</a></td>
+                        <td>10/9/2026</td>
+                        <td>3875 PATTERSON CT</td>
+                        <td>Specialty Permit</td>
+                            <td>18030833-00800</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06873-01" target="_blank">26-06873-01</a></td>
+                        <td>10/9/2026</td>
+                        <td>533 ROPER RD</td>
+                        <td>Specialty Permit</td>
+                            <td>17042824-01200</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06863-01" target="_blank">26-06863-01</a></td>
+                        <td>10/9/2026</td>
+                        <td>59 CONSTANTINE PL</td>
+                        <td>Specialty Permit</td>
+                            <td>18031834-03800</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06883-01" target="_blank">26-06883-01</a></td>
+                        <td>10/9/2026</td>
+                        <td>779 NANTUCKET AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>17041434-08600</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06885-01" target="_blank">26-06885-01</a></td>
+                        <td>10/9/2026</td>
+                        <td>860 E 38TH AVE</td>
+                        <td>Specialty Permit</td>
+                            <td>18030834-00400</td>
+                    </tr>
+                    <tr>
+                        <td><a href="PermitDetails?log=26-06888-01" target="_blank">26-06888-01</a></td>
+                        <td>10/9/2026</td>
+                        <td>863 FAIRWAY VIEW DR</td>
+                        <td>Specialty Permit</td>
+                            <td>17032032-04500</td>
+                    </tr>
+            </tbody>
+        </table>
+        <div id="search-results-disclaimer">
+            <div class="disclaimer">
+    Note: This product is for informational purposes and may not have been prepared for,
+    or be suitable for legal, engineering, or surveying purposes. Users of this information
+    should review or consult the primary data and information sources to ascertain the
+    usability of this information.
+</div>
+
+        </div>
+        <div id="search-map-button">
+            <button onclick="LoadMap()">Map Search Results</button>
+        </div>
+        <div id="search-map-container">
+            <iframe id="search-map-frame" src="#"></iframe>
+        </div>
+</fieldset>
+        </div>
+        <div id="footer">
+            Copyright &copy;2026 City of Eugene. All rights reserved.
+        </div>
+    </div>
+
+    
+</body>
+</html>

@@ -1,0 +1,233 @@
+{
+  "displayFieldName": "ownername",
+  "fieldAliases": {
+    "OBJECTID": "FID",
+    "APPLICANT": "Applicant",
+    "CONTRACTOR": "Contractor",
+    "FACILITYID": "Facility Identifier",
+    "INTID": "Integer ID",
+    "ADDRESS": "Address",
+    "APN": "APN",
+    "WORKDESC": "Work Description",
+    "SUBDESC": "Sub Description",
+    "PERMITAPPROVAL": "Permit Approval",
+    "ISSUEDATE": "Issue Date",
+    "ISSUEDATEUTC": "Issue Date (UTC)",
+    "FINALDATE": "Final Date",
+    "FINALDATEUTC": "Final Date (UTC)",
+    "DWELLINGUNIT": "Dwelling Unit",
+    "PERMITVALUE": "Permit Value",
+    "SQUAREFOOT": "Square Foot",
+    "FOLDERNUM": "Folder Number",
+    "LASTUPDATE": "Last Update Date",
+    "LASTEDITOR": "Last Editor",
+    "NOTES": "Notes",
+    "ENTERPRISEID": "Enterprise ID",
+    "GlobalID": "GlobalID"
+  },
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": {
+    "wkid": 4326,
+    "latestWkid": 4326
+  },
+  "fields": [
+    {
+      "name": "OBJECTID",
+      "type": "esriFieldTypeOID",
+      "alias": "FID"
+    },
+    {
+      "name": "APPLICANT",
+      "type": "esriFieldTypeString",
+      "alias": "Applicant",
+      "length": 150
+    },
+    {
+      "name": "CONTRACTOR",
+      "type": "esriFieldTypeString",
+      "alias": "Contractor",
+      "length": 150
+    },
+    {
+      "name": "FACILITYID",
+      "type": "esriFieldTypeString",
+      "alias": "Facility Identifier",
+      "length": 20
+    },
+    {
+      "name": "INTID",
+      "type": "esriFieldTypeInteger",
+      "alias": "Integer ID"
+    },
+    {
+      "name": "ADDRESS",
+      "type": "esriFieldTypeString",
+      "alias": "Address",
+      "length": 150
+    },
+    {
+      "name": "APN",
+      "type": "esriFieldTypeString",
+      "alias": "APN",
+      "length": 20
+    },
+    {
+      "name": "WORKDESC",
+      "type": "esriFieldTypeString",
+      "alias": "Work Description",
+      "length": 50
+    },
+    {
+      "name": "SUBDESC",
+      "type": "esriFieldTypeString",
+      "alias": "Sub Description",
+      "length": 50
+    },
+    {
+      "name": "PERMITAPPROVAL",
+      "type": "esriFieldTypeString",
+      "alias": "Permit Approval",
+      "length": 150
+    },
+    {
+      "name": "ISSUEDATE",
+      "type": "esriFieldTypeDate",
+      "alias": "Issue Date",
+      "length": 8
+    },
+    {
+      "name": "ISSUEDATEUTC",
+      "type": "esriFieldTypeDate",
+      "alias": "Issue Date (UTC)",
+      "length": 8
+    },
+    {
+      "name": "FINALDATE",
+      "type": "esriFieldTypeDate",
+      "alias": "Final Date",
+      "length": 8
+    },
+    {
+      "name": "FINALDATEUTC",
+      "type": "esriFieldTypeDate",
+      "alias": "Final Date (UTC)",
+      "length": 8
+    },
+    {
+      "name": "DWELLINGUNIT",
+      "type": "esriFieldTypeInteger",
+      "alias": "Dwelling Unit"
+    },
+    {
+      "name": "PERMITVALUE",
+      "type": "esriFieldTypeInteger",
+      "alias": "Permit Value"
+    },
+    {
+      "name": "SQUAREFOOT",
+      "type": "esriFieldTypeInteger",
+      "alias": "Square Foot"
+    },
+    {
+      "name": "FOLDERNUM",
+      "type": "esriFieldTypeString",
+      "alias": "Folder Number",
+      "length": 20
+    },
+    {
+      "name": "LASTUPDATE",
+      "type": "esriFieldTypeDate",
+      "alias": "Last Update Date",
+      "length": 8
+    },
+    {
+      "name": "LASTEDITOR",
+      "type": "esriFieldTypeString",
+      "alias": "Last Editor",
+      "length": 40
+    },
+    {
+      "name": "NOTES",
+      "type": "esriFieldTypeString",
+      "alias": "Notes",
+      "length": 255
+    },
+    {
+      "name": "ENTERPRISEID",
+      "type": "esriFieldTypeString",
+      "alias": "Enterprise ID",
+      "length": 20
+    },
+    {
+      "name": "GlobalID",
+      "type": "esriFieldTypeGlobalID",
+      "alias": "GlobalID",
+      "length": 38
+    }
+  ],
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 167198,
+        "APPLICANT": "SEYED HOSSEINI   ",
+        "CONTRACTOR": "SEYED HOSSEINI   ",
+        "FACILITYID": "100543",
+        "INTID": 100543,
+        "ADDRESS": "372 S MONROE ST  , SAN JOSE CA 95128-5108",
+        "APN": "27735047",
+        "WORKDESC": "Additions/Alterations",
+        "SUBDESC": "Single-Family",
+        "PERMITAPPROVAL": "B-Complete, E-Complete, M-Complete, P-Complete",
+        "ISSUEDATE": 1789430400000,
+        "ISSUEDATEUTC": 1789455600000,
+        "FINALDATE": null,
+        "FINALDATEUTC": null,
+        "DWELLINGUNIT": 1,
+        "PERMITVALUE": 12033,
+        "SQUAREFOOT": 0,
+        "FOLDERNUM": "2026-129136-RS",
+        "LASTUPDATE": 1789550580000,
+        "LASTEDITOR": "FME",
+        "NOTES": null,
+        "ENTERPRISEID": "PLN-PBTH-0000100543",
+        "GlobalID": "{9132FF0C-D5D9-4244-B8F9-74A2D65A75FF}"
+      },
+      "geometry": {
+        "x": -121.94297099995731,
+        "y": 37.32186600008947
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 167499,
+        "APPLICANT": "ZF HEATING & COOLING LLC  ISABELLA LIU",
+        "CONTRACTOR": "ZF HEATING & COOLING LLC  ISABELLA LIU",
+        "FACILITYID": "100845",
+        "INTID": 100845,
+        "ADDRESS": "20  ATLAS AV  , SAN JOSE CA 95126-3101",
+        "APN": "09211030",
+        "WORKDESC": "Sub-Trades Only",
+        "SUBDESC": "Single-Family",
+        "PERMITAPPROVAL": "E-Complete, M-Complete",
+        "ISSUEDATE": 1788998400000,
+        "ISSUEDATEUTC": 1789023600000,
+        "FINALDATE": null,
+        "FINALDATEUTC": null,
+        "DWELLINGUNIT": 0,
+        "PERMITVALUE": 0,
+        "SQUAREFOOT": 0,
+        "FOLDERNUM": "2026-137137-RS",
+        "LASTUPDATE": 1789550580000,
+        "LASTEDITOR": "FME",
+        "NOTES": null,
+        "ENTERPRISEID": "PLN-PBTH-0000100845",
+        "GlobalID": "{3914CC35-A3D3-4458-B43A-A8F55A491437}"
+      },
+      "geometry": {
+        "x": -121.8740805000775,
+        "y": 37.4115060003165
+      }
+    }
+  ],
+  "exceededTransferLimit": true
+}

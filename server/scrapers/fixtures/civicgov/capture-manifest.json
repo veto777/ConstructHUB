@@ -1,0 +1,119 @@
+[
+  {
+    "file": "parkville-exact-home.html",
+    "url": "https://www.civicgov4.com/mo_parkville/portal/index.php",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:49:47.985Z",
+    "redactions": []
+  },
+  {
+    "file": "parkville-exact-index.html",
+    "url": "https://www.civicgov4.com/mo_parkville/portal/index.php?r=publicRecordsSearch/index",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:49:48.879Z",
+    "redactions": [
+      "csrf_token"
+    ]
+  },
+  {
+    "file": "parkville-exact-search.json",
+    "url": "https://www.civicgov4.com/mo_parkville/portal/index.php?r=publicRecordsSearch%2Fsearch&query=405+Main+St&page=1",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:49:49.870Z",
+    "redactions": []
+  },
+  {
+    "file": "parkville-exact-parcelDetails.html",
+    "url": "https://www.civicgov4.com/mo_parkville/portal/index.php?r=publicRecordsSearch%2FparcelDetails&parcel_number=20-7.0-35-100-028-003.001",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:49:50.876Z",
+    "redactions": [
+      "csrf_token"
+    ]
+  },
+  {
+    "file": "parkville-exact-getPermits.json",
+    "url": "https://www.civicgov4.com/mo_parkville/portal/index.php?r=publicRecordsSearch%2FgetPermits&parcel_number=20-7.0-35-100-028-003.001&page=1",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:49:51.868Z",
+    "redactions": []
+  },
+  {
+    "file": "jefferson-home.html",
+    "url": "https://www.civicgov4.com/mo_jeffersoncounty/portal/index.php",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:49:52.819Z",
+    "redactions": []
+  },
+  {
+    "file": "jefferson-index.html",
+    "url": "https://www.civicgov4.com/mo_jeffersoncounty/portal/index.php?r=publicRecordsSearch/index",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:49:53.821Z",
+    "redactions": [
+      "csrf_token"
+    ]
+  },
+  {
+    "file": "jefferson-search.json",
+    "url": "https://www.civicgov4.com/mo_jeffersoncounty/portal/index.php?r=publicRecordsSearch%2Fsearch&query=100+Main+St&page=1",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:49:54.960Z",
+    "redactions": []
+  },
+  {
+    "file": "jefferson-parcelDetails.html",
+    "url": "https://www.civicgov4.com/mo_jeffersoncounty/portal/index.php?r=publicRecordsSearch%2FparcelDetails&parcel_number=1040180300103101",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:49:55.826Z",
+    "redactions": [
+      "csrf_token"
+    ]
+  },
+  {
+    "file": "jefferson-getPermits.json",
+    "url": "https://www.civicgov4.com/mo_jeffersoncounty/portal/index.php?r=publicRecordsSearch%2FgetPermits&parcel_number=1040180300103101&page=1",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:49:56.818Z",
+    "redactions": []
+  },
+  {
+    "file": "south-portland-home.html",
+    "url": "https://www.civicgov4.com/me_southportland/portal/index.php",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:49:57.839Z",
+    "redactions": []
+  },
+  {
+    "file": "south-portland-index.html",
+    "url": "https://www.civicgov4.com/me_southportland/portal/index.php?r=publicRecordsSearch/index",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:49:58.883Z",
+    "redactions": [
+      "csrf_token"
+    ]
+  },
+  {
+    "file": "south-portland-search.json",
+    "url": "https://www.civicgov4.com/me_southportland/portal/index.php?r=publicRecordsSearch%2Fsearch&query=100+Main+St&page=1",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:49:59.890Z",
+    "redactions": []
+  },
+  {
+    "file": "south-portland-parcelDetails.html",
+    "url": "https://www.civicgov4.com/me_southportland/portal/index.php?r=publicRecordsSearch%2FparcelDetails&parcel_number=032*0000*035*",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:50:00.884Z",
+    "redactions": [
+      "csrf_token"
+    ]
+  },
+  {
+    "file": "south-portland-getPermits.json",
+    "url": "https://www.civicgov4.com/me_southportland/portal/index.php?r=publicRecordsSearch%2FgetPermits&parcel_number=032*0000*035*&page=1",
+    "status": 200,
+    "fetchedAt": "2026-10-10T17:50:01.878Z",
+    "redactions": []
+  }
+]

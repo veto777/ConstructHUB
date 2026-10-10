@@ -35,7 +35,7 @@ export class AdsClient implements AdsApi {
     await this.quota();
     let r: Response;
     try {
-      r = await this.http(`https://googleads.googleapis.com/${this.version}/customers/${cid}/${endpoint}`, {
+      r = await this.http(`https://googleads.googleapis.com/${this.version}/customers/${cid}${endpoint.startsWith(":") ? "" : "/"}${endpoint}`, {
         method: 'POST', redirect:'error', headers: {Authorization: `Bearer ${token}`, ...(process.env.GOOGLE_ADS_DEVELOPER_TOKEN ? {'developer-token': process.env.GOOGLE_ADS_DEVELOPER_TOKEN} : {}),
           'login-customer-id': login, 'Content-Type': 'application/json'}, body: JSON.stringify(body), signal: AbortSignal.timeout(20000),
       });
@@ -50,6 +50,10 @@ export class AdsClient implements AdsApi {
     const d = await this.request(cid, 'googleAds:search', {query, ...(pageToken ? {pageToken} : {})}, false);
     if ((d.results !== undefined && !Array.isArray(d.results)) || (d.nextPageToken !== undefined && typeof d.nextPageToken !== 'string')) throw new AdsError('Invalid Google search response', 502);
     return {results: d.results || [], nextPageToken: d.nextPageToken};
+  }
+  /** A read-only customer method (customers/{cid}:method): the Keyword Planner (server/seo/google-planner.ts). */
+  rpc(cid: string, method: 'generateKeywordIdeas' | 'generateKeywordHistoricalMetrics', body: unknown) {
+    return this.request(cid, `:${method}`, body, false);
   }
   mutate(cid: string, operations: any[], validateOnly = false) {
     return this.request(cid, 'googleAds:mutate', {mutateOperations: operations, partialFailure: false, validateOnly}, !validateOnly);

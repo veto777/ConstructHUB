@@ -233,6 +233,7 @@ const permitsGroup: NavGroup = {
     { title: "Property Records", url: "/property", icon: Building },
     { title: "Scrape Schedules", url: "/schedules", icon: Clock },
     { title: "Search History", url: "/history", icon: FileText },
+    { title: "Permit Alerts", url: "/permit-alerts", icon: Bell, badge: "new" as BadgeType },
   ],
 };
 
@@ -282,7 +283,7 @@ const standaloneItems: { title: string; url: string; icon: any; logo?: string; l
   { title: "Call Assistant", url: "/call-assistant", icon: Phone, logoComponent: CallAssistantIcon, badge: "new" },
   { title: "Social Media", url: "/social-media", icon: Megaphone, logoComponent: SocialMediaIcon },
   { title: "Site Scan", url: "/site-scan", icon: Search, logoComponent: SiteScanIcon },
-  { title: "SEO", url: "/seo", icon: TrendingUp, logoComponent: SeoIcon, badge: "new" },
+  { title: "SEO Suite", url: "/seo", icon: TrendingUp, logoComponent: SeoIcon, badge: "new" },
   { title: "Cloudflare", url: "/cloudflare", icon: Cloud, logoComponent: CloudflareIcon },
   { title: "Search Console", url: "/search-console", icon: Search, logoComponent: SearchConsoleIcon },
   { title: "IP Tracker", url: "/ip-tracker", icon: Fingerprint, logo: ipTrackerLogo, badge: "hot" },

@@ -16,13 +16,30 @@ it('property lookup API keeps office and phone but suppresses unverified URLs', 
   expect(office.portalUrl).toBe('https://dead.invalid');
 });
 
-it('does not route an unrelated jurisdiction to a hardcoded scraper',()=>{
- const row={platform:'eTRAKiT',portalUrl:'https://other-city.invalid/eTRAKiT/',searchUrl:null};
- expect(canScrapeGovernmentPortal(row)).toBe(false);
+it('treats the multi-tenant eTRAKiT adapter as searchable on any verified tenant URL',()=>{
+ // The eTRAKiT adapter is multi-tenant (etrakit.REPORT.md): it derives the app root from
+ // the target URL and verifies the portal, so it is searchable on any tenant, not just Bellingham.
+ const row={platform:'eTRAKiT',portalUrl:'https://hills-trk.aspgov.com/eTRAKiT/default.aspx',searchUrl:null};
+ expect(canScrapeGovernmentPortal(row)).toBe(true);
  expect(canScrapeGovernmentPortal({...row,portalUrl:'https://permits.cob.org/eTRAKiT/'})).toBe(true);
- expect(canScrapeGovernmentPortal({...row,platform:'Custom / GovPlatform'})).toBe(false);
- expect(canScrapeGovernmentPortal({...row,platform:null})).toBe(false);
- expect(canScrapeGovernmentPortal({...row,platform:'City Website'})).toBe(false);
+ expect(canScrapeGovernmentPortal({...row,portalUrl:'https://permits.shastacounty.gov/etrakit/Search/permit.aspx'})).toBe(true);
+ // A non-http(s) URL is still rejected.
+ expect(canScrapeGovernmentPortal({...row,portalUrl:'ftp://x.invalid/eTRAKiT/'})).toBe(false);
+});
+
+it('keeps the single-tenant Skagit/Custom adapter pinned to skagitcounty.net',()=>{
+ const row={platform:'Skagit County',portalUrl:'https://www.skagitcounty.net/permits',searchUrl:null};
+ expect(canScrapeGovernmentPortal(row)).toBe(true);
+ expect(canScrapeGovernmentPortal({...row,portalUrl:'https://other-county.invalid/permits'})).toBe(false);
+ expect(canScrapeGovernmentPortal({...row,platform:'Custom / GovPlatform'})).toBe(true);
+ expect(canScrapeGovernmentPortal({...row,platform:'Custom / GovPlatform',portalUrl:'https://other-county.invalid/permits'})).toBe(false);
+});
+
+it('never labels a blocked or non-adapter platform searchable',()=>{
+ const base={portalUrl:'https://portal.invalid/permits',searchUrl:null};
+ for (const platform of ['iWorQ','OpenGov','CitizenServe','MyGovernmentOnline','City Website',null]) {
+   expect(canScrapeGovernmentPortal({...base,platform})).toBe(false);
+ }
 });
 
 it('retains verified permit links while withholding unsourced legacy contact fields',()=>{

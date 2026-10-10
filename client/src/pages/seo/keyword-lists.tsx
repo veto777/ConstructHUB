@@ -7,6 +7,7 @@
  * grouping by topic is the `topic` parameter ("*" every group, a term one group, "other" the keywords in no group),
  * so a topic's header counts lead to the rows they count and the back button returns to the view before.
  */
+import { PlacePicker, placeBody, placeWords, type SeoPlace } from "./place";
 import { MarketPicker } from "./market";
 import { DEFAULT_MARKET, findMarket, marketLabel, type SeoMarket } from "@shared/seo-markets";
 import { useEffect, useMemo, useState } from "react";
@@ -151,7 +152,7 @@ function usePicked() {
 }
 
 /** Paste up to 200 keywords and get the numbers for all of them in one go. */
-export function BulkKeywords({ status, site, onTrack, initial = "", market, onMarket }: { status: SeoStatus | undefined; site: SeoSite | null; onTrack?: (rows: KwRow[]) => void; initial?: string; market?: SeoMarket; /** The country picker's pick; the page writes it to the address as well as the store. */ onMarket?: (m: SeoMarket) => void }) {
+export function BulkKeywords({ status, site, onTrack, initial = "", market, onMarket, place = null, onPlace }: { status: SeoStatus | undefined; site: SeoSite | null; onTrack?: (rows: KwRow[]) => void; initial?: string; market?: SeoMarket; /** The country picker's pick; the page writes it to the address as well as the store. */ onMarket?: (m: SeoMarket) => void; /** A US place: its own volumes and cost per click (difficulty and intent stay the country's). */ place?: SeoPlace | null; onPlace?: (p: SeoPlace | null) => void }) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [text, setText] = useState(initial);
@@ -159,7 +160,7 @@ export function BulkKeywords({ status, site, onTrack, initial = "", market, onMa
   const { picked, toggle, clear, set } = usePicked();
   const draft = useMemo(() => parseKeywords(text), [text]);
   const loc = market?.locationCode, lang = market?.languageCode;
-  const body = useMemo(() => ({ keywords: asked, ...(loc ? { locationCode: loc, languageCode: lang } : {}) }), [asked, loc, lang]);
+  const body = useMemo(() => ({ keywords: asked, ...(loc ? { locationCode: loc, languageCode: lang } : {}), ...placeBody(place) }), [asked, loc, lang, place]);
   const queryKey = ["/api/seo/keywords/bulk", body];
   const saved = useQuery<{ page: { rows: KwRow[]; notFound: string[]; fetchedAt: string } } | null>({
     queryKey, enabled: asked.length > 0, retry: false, staleTime: 5 * 60_000,
@@ -184,8 +185,9 @@ export function BulkKeywords({ status, site, onTrack, initial = "", market, onMa
         </label>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {market && onMarket && <MarketPicker value={market} onChange={(m) => { setAsked([]); clear(); onMarket(m); }} />}
+          {market && onPlace && <PlacePicker value={place} onChange={(p) => { setAsked([]); clear(); onPlace(p); }} market={market} />}
           <Button type="submit" disabled={!draft.length} data-testid="button-bulk-prepare">Analyse {draft.length ? `${Math.min(draft.length, MAX_BULK)} keyword${draft.length === 1 ? "" : "s"}` : "keywords"}</Button>
-          <span className="g-text-2 text-[13px]">{draft.length > MAX_BULK ? `Only the first ${MAX_BULK} of ${fmtNum(draft.length)} are analysed at once. ` : ""}{price != null && draft.length ? <>About <Link href={seoLinks.usage()} className={TEXT_LINK} title="Usage and credit: what lookups cost and what is left this month" data-testid="link-bulk-price">{money(bulkPrice(status, Math.min(draft.length, MAX_BULK)))}</Link> of your SEO data; reopening the same set within a day is free. {market?.label ?? "United States"}, Google.</> : `Volume, difficulty, cost per click and intent for each. ${market?.label ?? "United States"}, Google.`}</span>
+          <span className="g-text-2 text-[13px]">{draft.length > MAX_BULK ? `Only the first ${MAX_BULK} of ${fmtNum(draft.length)} are analysed at once. ` : ""}{price != null && draft.length ? <>About <Link href={seoLinks.usage()} className={TEXT_LINK} title="Usage and credit: what lookups cost and what is left this month" data-testid="link-bulk-price">{money(bulkPrice(status, Math.min(draft.length, MAX_BULK)))}</Link> of your SEO data; reopening the same set within a day is free. {placeWords(place, market?.label ?? "United States")}, Google.{place ? " Volume and cost per click are the place's; difficulty and intent are the country's." : ""}</> : `Volume, difficulty, cost per click and intent for each. ${placeWords(place, market?.label ?? "United States")}, Google.${place ? " Volume and cost per click are the place's; difficulty and intent are the country's." : ""}`}</span>
         </div>
       </form>
       <div className="mt-4">

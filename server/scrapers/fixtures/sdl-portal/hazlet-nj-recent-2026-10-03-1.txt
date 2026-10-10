@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="en" class="h-100"> <!-- h-100 for msticky footer -->
+  <head>
+    
+    <title>SDL Portal</title>
+    
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <!-- Le HTML5 shim, for IE6-8 support of HTML elements -->
+    <!--[if lt IE 9]>
+        <script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+
+    <!-- <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous"> -->
+    <script src="https://kit.fontawesome.com/1c8d835d57.js" crossorigin="anonymous"></script>
+
+    <!--[if gte IE 9]><!-->
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+    <script src="/static/lib/bs4/js/bootstrap.bundle.min.js"></script>
+    <!--<![endif]-->
+    <!--[if IE 9]>
+      <script src="https://cdn.jsdelivr.net/gh/coliff/bootstrap-ie8/js/bootstrap-ie9.min.js"></script>
+      <link href="https://cdn.jsdelivr.net/gh/coliff/bootstrap-ie8/css/bootstrap-ie9.min.css" rel="stylesheet">
+    <![endif]-->
+    <!--[if lte IE 8]>
+      <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
+      <script src="https://cdn.jsdelivr.net/gh/coliff/bootstrap-ie8/js/bootstrap-ie8.min.js"></script>
+      <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.js"></script>
+      <link href="https://cdn.jsdelivr.net/gh/coliff/bootstrap-ie8/css/bootstrap-ie8.min.css" rel="stylesheet">
+    <![endif]-->
+
+    <!-- BS flatly css -->
+    <link href="/static/lib/bs4/css/flatly_4.4.1.min.css" rel="stylesheet">
+    <!-- portal general css -->
+    <link href="/static/css/siteV4.css" rel="stylesheet">
+
+    <script>
+        var hostUrl = "https://www.sdlportal.com";
+        var pathUrl = "https://www.sdlportal.com/towns/nj/monmouth/hazlettwp/search2";
+        var muniUrl = "";
+        var isHomePage = false;
+        var gm_api_key = "AIzaSyDE-f53JsqsTSmBK7DPPfBoQLBjIvcK1wM";
+    </script>
+    
+
+
+    <!-- General Helper Libraries -->
+    <script src="/static/lib/modernizr/js/modernizr-latest.js"></script>
+    <script src="/static/lib/moment/moment.min.js"></script>
+    <script src="/static/js/sdl.util.v4.js?v=15"></script>
+
+    <!-- town search auto complete library -->
+    <script src="https://cdn.jsdelivr.net/autocomplete.js/0/autocomplete.jquery.min.js"></script>
+
+    
+    <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+    <script>
+        var county = "Monmouth";
+        var mid = "nj_monmouth_hazlettwp";
+        var muniUrl = "https://www.sdlportal.com/towns/nj/monmouth/hazlettwp";
+        var isSDLTown = true;
+    </script>
+
+
+    
+
+    
+        <style>
+            
+                a, a:hover, a:focus { color: #007780; } .navbar-inverse { background: #225b40; } .navbar-inverse .navbar-nav > li > a { color: #ffffff; } .navbar-inverse .navbar-nav > li > a:hover, .navbar-inverse .navbar-nav > li > a:focus { color: #fae48f; } .navbar-inverse .navbar-nav > .active > a, .navbar-inverse .navbar-nav > .active > a:hover, .navbar-inverse .navbar-nav > .active > a:focus { background-color: #77a083; color: #ffffff; } .panel-primary .panel-heading, .card-custom, .badge-custom { background-color: #274b70; border-color: #274b70; color: #ffffff; } .panel-primary .panel { border-color : #274b70; } .btn-info { background-color: #455987; border-color: #455987; color: #ffffff; } .card-info { background-color : #455987; } .btn-outline-info { color : #455987; border-color : #455987; } .btn-outline-info:hover, .btn-outline-info:focus, .btn-outline-info.focus, .btn-outline-info:active, .btn-outline-info.active,.open > .btn-outline-info.dropdown-toggle  { background-color : #455987; border-color : #455987; } .btn-info:hover, .btn-info:focus, .btn-info.focus, .btn-info:active:hover, .btn-info.active:hover, .open>.dropdown-toggle.btn-info:hover, .btn-info:active:focus, .btn-info.active:focus, .open>.dropdown-toggle.btn-info:focus,  .btn-info:active.focus, .btn-info.active.focus, .open>.dropdown-toggle.btn-info.focus, .btn-info:active, .btn-info.active, .open>.dropdown-toggle.btn-info { background-color: #128c8a; border-color: #128c8a; } .btn-info:disabled, .btn-info.disabled { background-color: #cee7f7; border-color: #cee7f7; } .btn-outline-info:disabled, .btn-outline-info.disabled { color : #cee7f7; border-color : #cee7f7; } .btn-primary { background-color: #cfbf87; border-color: #cfbf87; color: #000000; } .card-primary { background-color : #cfbf87; } .btn-outline-primary { color : #cfbf87; border-color : #cfbf87; } .btn-outline-primary:hover, .btn-outline-primary:focus, .btn-outline-primary.focus, .btn-outline-primary:active, .btn-outline-primary.active,.open > .btn-outline-primary.dropdown-toggle { background-color : #cfbf87; border-color : #cfbf87; } .btn-primary:hover, .btn-primary:focus, .btn-primary.focus, .btn-primary:active:hover, .btn-primary.active:hover, .open>.dropdown-toggle.btn-primary:hover, .btn-primary:active:focus, .btn-primary.active:focus, .open>.dropdown-toggle.btn-primary:focus,  .btn-primary:active.focus, .btn-primary.active.focus, .open>.dropdown-toggle.btn-primary.focus, .btn-primary:active, .btn-primary.active, .open>.dropdown-toggle.btn-primary { background-color: #7a7a7a; border-color: #7a7a7a; } .btn-primary:disabled, .btn-primary.disabled { background-color: #ecf0f4; border-color: #ecf0f4; } .btn-outline-primary:disabled, .btn-outline-primary.disabled { color : #ecf0f4; border-color : #ecf0f4; } .btn-success { background-color: #507c57; border-color: #507c57; color: #ffffff; } .card-success { background-color : #507c57; } .btn-outline-success { color : #507c57; border-color : #507c57; } .btn-outline-success:hover, .btn-outline-success:focus, .btn-outline-success.focus, .btn-outline-success:active, .btn-outline-success.active,.open > .btn-outline-success.dropdown-toggle { background-color : #507c57; border-color : #507c57; } .btn-success:hover, .btn-success:focus, .btn-success.focus, .btn-success:active:hover, .btn-success.active:hover, .open>.dropdown-toggle.btn-success:hover, .btn-success:active:focus, .btn-success.active:focus, .open>.dropdown-toggle.btn-success:focus,  .btn-success:active.focus, .btn-success.active.focus, .open>.dropdown-toggle.btn-success.focus, .btn-success:active, .btn-success.active, .open>.dropdown-toggle.btn-success { background-color: #0b414c; border-color: #0b414c; } .btn-success:disabled, .btn-success.disabled { background-color: #ecf5de; border-color: #ecf5de; } .btn-outline-success:disabled, .btn-outline-success.disabled { color : #ecf5de; border-color : #ecf5de; } 
+            
+        </style>
+    
+    
+    
+
+    
+
+    <script type="text/javascript">
+      (function(e,c){if(!c.__SV){var l,h;window.mixpanel=c;c._i=[];c.init=function(q,r,f){function t(d,a){var g=a.split(".");2==g.length&&(d=d[g[0]],a=g[1]);d[a]=function(){d.push([a].concat(Array.prototype.slice.call(arguments,0)))}}var b=c;"undefined"!==typeof f?b=c[f]=[]:f="mixpanel";b.people=b.people||[];b.toString=function(d){var a="mixpanel";"mixpanel"!==f&&(a+="."+f);d||(a+=" (stub)");return a};b.people.toString=function(){return b.toString(1)+".people (stub)"};l="disable time_event track track_pageview track_links track_forms track_with_groups add_group set_group remove_group register register_once alias unregister identify name_tag set_config reset opt_in_tracking opt_out_tracking has_opted_in_tracking has_opted_out_tracking clear_opt_in_out_tracking start_batch_senders start_session_recording stop_session_recording people.set people.set_once people.unset people.increment people.append people.union people.track_charge people.clear_charges people.delete_user people.remove".split(" ");for(h=0;h<l.length;h++)t(b,l[h]);var n="set set_once union unset remove delete".split(" ");b.get_group=function(){function d(p){a[p]=function(){b.push([g,[p].concat(Array.prototype.slice.call(arguments,0))])}}for(var a={},g=["get_group"].concat(Array.prototype.slice.call(arguments,0)),m=0;m<n.length;m++)d(n[m]);return a};c._i.push([q,r,f])};c.__SV=1.2;var k=e.createElement("script");k.type="text/javascript";k.async=!0;k.src="undefined"!==typeof MIXPANEL_CUSTOM_LIB_URL?MIXPANEL_CUSTOM_LIB_URL:"file:"===e.location.protocol&&"//cdn.mxpnl.com/libs/mixpanel-2-latest.min.js".match(/^\/\//)?"https://cdn.mxpnl.com/libs/mixpanel-2-latest.min.js":"//cdn.mxpnl.com/libs/mixpanel-2-latest.min.js";e=e.getElementsByTagName("script")[0];e.parentNode.insertBefore(k,e)}})(document,window.mixpanel||[]);
+      mixpanel.init('b6a7d0177e02ab659ea92993fdfa9c04', {
+        autocapture: true,
+        record_sessions_percent: 100,
+      });
+    </script>
+
+  </head>
+    <body class="d-flex flex-column h-100"> <!-- sticky footer -->
+        <header>
+            
+                
+  <nav class="navbar navbar-expand-md navbar-dark navbar-inverse navbar-skinny">
+      
+        <a class="navbar-brand mr-0 mr-lg-3" href="https://www.sdlportal.com/towns/nj/monmouth/hazlettwp"><img src="https://storage.googleapis.com/sdlportal2/files/nj/monmouth/hazlettwp/config/Hazlet Logo - 290x60 (1).png" class="logo-header" alt="Hazlet Township logo"/></a>
+      
+
+      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbar-main-collapse" aria-controls="navbar-main-collapse" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse" id="navbar-main-collapse">
+          <ul class="navbar-nav mr-auto">
+            
+              <li class="nav-item">
+                  <a class="nav-link" href="https://www.sdlportal.com/towns/nj/monmouth/hazlettwp/search" ><i class="fas fa-search"></i><span class="d-md-none d-lg-inline"> Search</span></a>
+              </li>
+              <!---->
+              <li class="nav-item">
+                  <a class="nav-link" href="https://www.sdlportal.com/towns/nj/monmouth/hazlettwp/requests"><i class="fas fa-pen"></i><span class="d-md-none d-lg-inline"> Requests</span></a>
+              </li>
+              <!---->
+              <li class="nav-item dropdown">
+                  <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                  <i class="fas fa-map"></i><span class="d-md-none d-lg-inline"> Maps</span>
+                  </a>
+                  <div class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
+                      <a class="dropdown-item" href="https://www.sdlportal.com/towns/nj/monmouth/hazlettwp/maps">Town Map</a>
+                      
+                        
+                      
+                      
+                        
+                      
+                      
+                  </div>
+              </li>
+              
+              
+              
+              <li class="nav-item">
+                  <a class="nav-link" href="https://www.hazlettwp.org/" ><i class="fas fa-university"></i><span class="d-md-none d-lg-inline">  Hazlet, NJ </span></a>
+              </li>
+              
+            
+          </ul>
+          
+              <div class="btn-group navbar-btn">
+                  <a class="btn btn-outline-light" href="/login">Sign In</a>
+                  <a class="btn btn-outline-light" href="/signup">Sign Up</a>
+              </div>
+          
+      </div>
+  </nav>
+
+            
+            
+
+        </header>
+        <main >
+            
+  
+  <div class='site-messages d-print-none'>
+      
+      
+  </div>
+  
+
+  
+  
+    
+  
+
+  <div class="container">
+      <div class="row">
+        
+          
+          <div class="col-12">
+            <div class="clearfix">
+              <h4 class="float-left mb-1"><span class="advanced-search-toggle collapse ">Advanced Search</span></h4>
+          
+              
+                <div class="btn-group btn-group-toggle btn-group-sm float-right my-1 " data-toggle="buttons">
+                  <label class="btn btn-outline-default ">
+                    <i class="fas fa-home"></i>
+                    <input type="radio" name="search-term" value="properties" autocomplete="off" > Properties
+                  </label>
+                  
+                  <label class="btn btn-outline-default active">
+                    <i class="fas fa-hard-hat"></i>
+                    <input type="radio" name="search-term" value="permits" autocomplete="off" checked> Permits
+                  </label>
+                  
+                  
+                </div>
+              
+            </div>
+
+            <div class="advanced-search-toggle collapse fade show">
+              <input type="hidden" id="simple-search-type" value="permits" />
+              <div class="form-group mb-1">
+                <div class="input-group">
+                  <input id="simple-search" type="text" class="clean-txt form-control" placeholder="Search for a street or street address or block and lot" aria-label="Search" >
+                  <span class="input-group-append">
+                      <button class="btn btn-primary rounded-right" type="button">Search</button>
+                  </span>
+
+                </div>
+              </div>
+            </div>
+
+            <div class="advanced-search-toggle collapse fade ">
+              <div class="search-types search-properties">
+                <ul class="nav nav-tabs nav-justified">
+                  <li class="nav-item">
+                    <a class="nav-link active px-1 px-md-3 clear-search" data-toggle="tab" data-target="#search-property-blq" data-search-type="propertyblocklot" aria-expanded="true" role="button" tabindex="0"><i class="fas fa-map mr-1"></i> <span class="d-none d-md-inline">Block and Lot</span><span class="d-md-none">Block/Lot</span></a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link px-1 px-md-3 clear-search" data-toggle="tab" data-target="#search-property-street" data-search-type="propertystreet" aria-expanded="false" role="button" tabindex="0"><i class="fas fa-road mr-1"></i>Street <span class="d-none d-md-inline">Name</span></a>
+                  </li>
+                  
+                </ul>
+
+                <div class="tab-content mt-2">
+                  <div id="search-property-blq" class="tab-pane fade active show">
+                    <form class="" action= "https://www.sdlportal.com/towns/nj/monmouth/hazlettwp/search2" method="GET">
+                      <input type="hidden" name="limit" value=100 />
+                      <input type="hidden" name="st" value="propertyblocklot" />
+                      <input type="hidden" name="as" value="1" />
+                      <div class="form-row">
+                        <div class="col-md-4">
+                            <div class="form-group ">
+                                <label class="control-label" for="block">Block</label>
+                                <input name="block"  id="block" type="text" class="form-control clean-txt form-control-sm" placeholder="Block" maxlength=16 value="">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group ">
+                                <label class="control-label" for="lot" >Lot</label>
+                                <input name="lot" id="lot" type="text" class="form-control clean-txt form-control-sm" placeholder="Lot" maxlength=16 value="">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group ">
+                                <label class="control-label" for="qual">Qualifier</label>
+                                <input name="qual" id="qual" type="text" class="form-control clean-txt form-control-sm" placeholder="Qualifier" maxlength=50 value="">
+                            </div>
+                        </div>
+                      </div>
+                      <button class="btn btn-primary btn-block" type="submit">Search for properties</button>
+                    </form>
+                  </div>
+
+                  <div id="search-property-street" class="tab-pane fade">
+                    <form class="" action= "https://www.sdlportal.com/towns/nj/monmouth/hazlettwp/search2" method="GET">
+                      <input type="hidden" name="limit" value=100 />
+                      <input type="hidden" name="st" value="propertystreet" />
+                      <input type="hidden" name="as" value="1" />
+                      <div class="form-group ">
+                          <label class="control-label" for="street-name">Street Name</label>
+                          <input name="q" id="street-name" type="text" class="form-control clean-txt form-control-sm" placeholder="Street Name" maxlength=150 value="">
+                      </div>
+                      <button class="btn btn-primary btn-block" type="submit">Search for properties</button>
+                    </form>
+                  </div>
+                  
+                </div>
+              </div>
+
+              <div class="search-types search-permits d-none">
+                <form class="" action= "https://www.sdlportal.com/towns/nj/monmouth/hazlettwp/search2" method="GET">
+                  <div class="form-row">
+                    <input type="hidden" name="st" value="permits"/>
+                    <input type="hidden" name="limit" value='100' />
+                    <input type="hidden" name="as" value="1"/>
+                    <div class="col-md-6">
+                        <div class="form-group mb-1">
+                            <label class="control-label" for="pc">Permit/Control Number</label>
+                            <input class="form-control clean-txt form-control-sm" name="pc" id="pc" type="text" placeholder="Permit or control number (full or partial)" value="">
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="form-group mb-1">
+                            <label class="control-label" for="loc">Location</label>
+                            <input class="form-control clean-txt form-control-sm" name="loc" id="loc" type="text" placeholder="Street address" value="">
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="form-group mb-1">
+                            <label class="control-label" for="kw">Keywords</label>
+                            <input class="form-control clean-txt form-control-sm" name="kw" id="kw" type="text" placeholder="Solar, pool, etc" value="">
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                      <div class="form-group mb-1">
+                        <label class="control-label" for="wt">Work Type</label>
+                        <select name="wt" id="wt" class="custom-select custom-select-sm">
+                            <option value="" selected></option>
+                            <option value="New">New</option>
+                            <option value="Addition">Addition</option>
+                            <option value="Alteration">Alteration</option>
+                            <option value="Demolition">Demolition</option>
+                        </select>
+                      </div>
+                    </div>
+
+                   <div class="col-md-3">
+                        <div class="form-group mb-1">
+                            <label class="control-label" for="stps">Permit Status</label>
+                            <select name="stps" id="stps" class="custom-select custom-select-sm">
+                                <option value="all" selected>Any Permit Status</option>
+                                <option value="active">Active Permits</option>
+                                <option value="complete">Closed Permits</option>
+                                <option value="inactive">Inactive Permits</option>
+                                <option value="covid">Non-Essential Covid Permits</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="col-md-3">
+                        <div class="form-group mb-1">
+                            <label class="control-label" for="ug">Proposed Use Group</label>
+                            <select name="ug" id="ug" class="custom-select custom-select-sm" >
+                                <option value="all" selected></option>
+                                
+                                  <option value="A-1">A-1 (Assembly)</option>
+                                
+                                  <option value="A-2">A-2 (Assembly)</option>
+                                
+                                  <option value="A-3">A-3 (Assembly)</option>
+                                
+                                  <option value="A-4">A-4 (Assembly)</option>
+                                
+                                  <option value="A-5">A-5 (Assembly)</option>
+                                
+                                  <option value="B">B (Business)</option>
+                                
+                                  <option value="E">E (Education)</option>
+                                
+                                  <option value="F-1">F-1 (Factory)</option>
+                                
+                                  <option value="F-2">F-2 (Factory)</option>
+                                
+                                  <option value="H-1">H-1 (Hazard)</option>
+                                
+                                  <option value="H-4">H-2 (Hazard)</option>
+                                
+                                  <option value="H-3">H-3 (Hazard)</option>
+                                
+                                  <option value="H-4">H-4 (Hazard)</option>
+                                
+                                  <option value="H-5">H-5 (Hazard)</option>
+                                
+                                  <option value="I-1">I-1 (Institution)</option>
+                                
+                                  <option value="I-2">I-2 (Institution)</option>
+                                
+                                  <option value="I-3">A-3 (Institution)</option>
+                                
+                                  <option value="I-4">I-4 (Institution)</option>
+                                
+                                  <option value="M">M (Mercantile)</option>
+                                
+                                  <option value="R-1">R-1 (Residential)</option>
+                                
+                                  <option value="R-2">R-2 (Residential)</option>
+                                
+                                  <option value="R-3">R-3 (Residential)</option>
+                                
+                                  <option value="R-4">R-4 (Residential)</option>
+                                
+                                  <option value="R-5">R-5 (Residential)</option>
+                                
+                                  <option value="S-1">S-1 (Storage)</option>
+                                
+                                  <option value="S-2">S-2 (Storage)</option>
+                                
+                                  <option value="U">U (Utility / Misc)</option>
+                                
+                                
+                                  <option value="A-1,A-2,A-3,A-4,A-5">Assembly</option>
+                                
+                                  <option value="B">Business</option>
+                                
+                                  <option value="E">Education</option>
+                                
+                                  <option value="F-1,F-2">Factory</option>
+                                
+                                  <option value="H-1,H-4,H-3,H-4,H-5">Hazard</option>
+                                
+                                  <option value="I-1,I-2,I-3,I-4">Institution</option>
+                                
+                                  <option value="M">Mercantile</option>
+                                
+                                  <option value="R-1,R-2,R-3,R-4,R-5">Residential</option>
+                                
+                                  <option value="S-1,S-2">Storage</option>
+                                
+                                  <option value="U">Misc</option>
+                                
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="form-group mb-1">
+                            <label class="control-label" for="stpd">Permit Issued Time Frame</label>
+                            <select name="stpd" id="stpd" class="custom-select custom-select-sm">
+                                <option value="all" selected></option>
+                                <option value="today">Today</option>
+                                <option value="yesterday">Yesterday</option>
+                                <option value="last7">Last 7 Days</option>
+                                <option value="last28">Last 4 Weeks</option>
+                                <option value="last90">Last 90 Days</option>
+                                <option value="last365">Last 52 Weeks</option>
+                                <option value="currentmonth">Current Month</option>
+                                <option value="currentquarter">Current Quarter</option>
+                                <option value="currentyear">Current Year</option>
+                                <option value="previousmonth">Previous Month</option>
+                                <option value="previousquarter">Previous Quarter</option>
+                                <option value="previousyear">Previous Year</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="form-group mb-1">
+                            <label class="control-label" for="psd">Permits Issued On or After</label>
+                            <input class="form-control date-pick form-control-sm" id="psd" />
+                        </div>
+                        <input class="form-control" name="psd" type="hidden" value=0 />
+                    </div>
+
+                    <div class="col-md-4">
+                        <div class="form-group mb-1">
+                            <label class="control-label" for="ped">Permits Issued On or Before</label>
+                            <input class="form-control date-pick form-control-sm" id="ped" />
+                        </div>
+                        <input class="form-control" name="ped" type="hidden" value=0 />
+                    </div>
+
+                  </div>
+                  <div class="form-check text-right">
+                    <input class="form-check-input" type="checkbox" name="ugi" id="ugi">
+                    <label class="form-check-label" for="ugi">
+                      Include Use Groups in Results
+                    </label>
+                  </div>
+                  <button class="btn btn-primary btn-block" type="submit">Search for permits</button>
+                </form>
+              </div>
+
+              <div class="search-types search-complaints d-none">
+                <div class="alert alert-light p-1 mb-1"><i class="fas fa-info-circle mr-1"></i>Advanced search is not available for complaints.</div>
+              </div>
+            </div>
+
+            <div class="clearfix small">
+              <span class="float-left"><button class="btn btn-link text-primary p-1" data-toggle='collapse' data-target='.search-help'><span class="search-help collapse show"><i class="fas fa-question-circle mr-1"></i>Help</span><span class="search-help collapse fade"><i class="fas fa-times-circle mr-1"></i>Close Help</span></button></span>
+              <span class="float-right">
+                <button class="btn btn-link text-primary advanced-search-toggle collapse show clear-search p-1" data-toggle='collapse' data-target='.advanced-search-toggle'><i class="fas fa-search-plus mr-1"></i>Advanced Search</button>
+                <button class="btn btn-link text-primary advanced-search-toggle collapse clear-search p-1 " data-toggle='collapse' data-target='.advanced-search-toggle'><i class="fas fa-search mr-1"></i>Simple Search</button>
+              </span>
+            </div>
+
+            <div class="search-help collapse fade">
+              <div class="advanced-search-toggle collapse fade show">
+                <div class="search-types search-properties">
+                  <h5>Property Simple Search</h5>
+                  <ul>
+                    <li>To find a specific property, search by the full address of the property including any street numbers.</li>
+                    <li>For the best results, include the street name but exclude the street type (i.e. search for "Main" and not "Main St" or "Main Street")</li>
+                    <li>Use the Advanced Search option when you do not have complete address information OR you are searching for several properties at once by searching by Block, Lot, owner, location name or street name.</li>
+                  </ul>
+                </div>
+
+                
+                <div class="search-types search-permits d-none">
+                  <h5>Permit Simple Search</h5>
+                  <ul>
+                    <li>To find a specific permit, search by the full or partial permit or control number or by a specific street address</li>
+                    <li>For permit or control numbers, be sure to include any non-alphanumeric characters in your query</li>
+                    <li>For the best results, include the street name but exclude the street type (i.e. search for "Main" and not "Main St" or "Main Street")</li>
+                    <li>The tips below are useful for keyword searches.
+                        <ul>
+                            <li><b>13-02748+A</b> - Exact Permit Or Control Number searches</li>
+                            <li><b>spring</b> or <b>springfield</b> - All permits on Springfield Dr.</li>
+                            <li><b>pn:13-0274</b> - Search Permit Numbers starting with '13-0274'</li>
+                            <li><b>cn:13-02</b> - Search Control Numbers starting with '13-02'</li>
+                        </ul>
+                    </li>
+                    <li>Use the Advanced Search option if you are searching for multiple permit based on keywords, permit issued dates, user groups, or street location</li>
+                    <li>Note: Not all permits may be available on the portal. Please contact your town official if you are unable to locate a permit.</li>
+                  </ul>
+                </div>
+                
+
+                
+              </div>
+
+              <div class="advanced-search-toggle collapse fade ">
+                <div class="search-types search-properties">
+                  <h5>Property Advanced Search</h5>
+                  <ul>
+                    <li>Include at least one value in the available search options.</li>
+                    <li>For the best results in street searches, you many need to exclude the street type (i.e. search for "Main" and not "Main St" or "Main Street").</li>
+                    <li>For the best results for property owner searches, use the "Last Name, First Name" format.</li>
+                  </ul>
+                </div>
+
+                
+                <div class="search-types search-permits d-none">
+                  <h5>Permits Advanced Search</h5>
+                  <ul>
+                    <li>Include at least one value in the available search options.</li>
+                    <li>For keyword search, up to three comma separated keywords can be included</li>
+                    <li>For the best results, include the street name but exclude the street type (i.e. search for "Main" and not "Main St" or "Main Street") for location related searches</li>
+                  </ul>
+                </div>
+                
+              </div>
+            </div>
+          </div>
+        
+
+        
+          <div class="col-12">
+            
+
+            <h4 class="mb-0">Search Results
+            
+              
+                <span>: 13 results</span></h4>
+              
+            
+            
+              <div class="text-dark small"><i class="fas fa-search mr-1"></i>You searched for permits with an issue date after 10/01/2026 and an issue date before 10/11/2026</div>
+            
+          </div>
+          <div class="col-12">
+            <div class="table-responsive">
+              <table class="table table-sm table-striped table-bordered table-paginate  table-download  " data-tp-perPage=25>
+                
+
+                
+                  <thead class="text-dark">
+                    <td style="min-width:115px;">Control #</td>
+                    <td style="min-width:115px;">Permit #</td>
+                    <td>Issue Date</td>
+                    <td style="min-width:165px;">Location</td>
+                    <!--  -->
+                    <td>Work Type</td>
+                    
+                    <td>Work Description</td>
+                    
+                    <td>Subcodes</td>
+                    
+                    <td>Status</td>
+                  </thead>
+                  <tbody>
+                  
+                    <tr>
+                      <td><a href="https://www.sdlportal.com/towns/nj/monmouth/hazlettwp/building/permits/C-26-00800">C-26-00800</a></td>
+                      <td>2026-0685</td>
+                      <td>10/05/2026</td>
+                      <td>17 CROMAN COURT</td>
+                      <!--  -->
+                      <td>Alteration</td>
+                      
+                      <td></td>
+                      
+                      <td>Electrical, Mechanical</td>
+                      
+                      <td>Open</td>
+                    </tr>
+                  
+                    <tr>
+                      <td><a href="https://www.sdlportal.com/towns/nj/monmouth/hazlettwp/building/permits/C-26-00798">C-26-00798</a></td>
+                      <td>2026-0683</td>
+                      <td>10/02/2026</td>
+                      <td>13 ROBIN ROAD</td>
+                      <!--  -->
+                      <td>Alteration</td>
+                      
+                      <td></td>
+                      
+                      <td>Electrical</td>
+                      
+                      <td>CA and Close Date Issued</td>
+                    </tr>
+                  
+                    <tr>
+                      <td><a href="https://www.sdlportal.com/towns/nj/monmouth/hazlettwp/building/permits/C-26-00782">C-26-00782</a></td>
+                      <td>2026-0688</td>
+                      <td>10/06/2026</td>
+                      <td>3057 HIGHWAY 35</td>
+                      <!--  -->
+                      <td>Alteration</td>
+                      
+                      <td></td>
+                      
+                      <td>Building</td>
+                      
+                      <td>Open</td>
+                    </tr>
+                  
+                    <tr>
+                      <td><a href="https://www.sdlportal.com/towns/nj/monmouth/hazlettwp/building/permits/C-26-00781">C-26-00781</a></td>
+                      <td>2026-0681</td>
+                      <td>10/02/2026</td>
+                      <td>14 MOLLY PITCHER DRIVE</td>
+                      <!--  -->
+                      <td>Alteration</td>
+                      
+                      <td></td>
+                      
+                      <td>Building, Electrical, Fire, Mechanical</td>
+                      
+                      <td>Open</td>
+                    </tr>
+                  
+                    <tr>
+                      <td><a href="https://www.sdlportal.com/towns/nj/monmouth/hazlettwp/building/permits/C-26-00780">C-26-00780</a></td>
+                      <td>2026-0687</td>
+                      <td>10/06/2026</td>
+                      <td>2931 HIGHWAY 35</td>
+                      <!--  -->
+                      <td>Alteration</td>
+                      
+                      <td></td>
+                      
+                      <td>Building, Electrical</td>
+                      
+                      <td>Open</td>
+                    </tr>
+                  
+                    <tr>
+                      <td><a href="https://www.sdlportal.com/towns/nj/monmouth/hazlettwp/building/permits/C-26-00761">C-26-00761</a></td>
+                      <td>2026-0474+A</td>
+                      <td>10/06/2026</td>
+                      <td>256 GOLDEN LANE</td>
+                      <!--  -->
+                      <td>Alteration</td>
+                      
+                      <td></td>
+                      
+                      <td>Building</td>
+                      
+                      <td>Open</td>
+                    </tr>
+                  
+                    <tr>
+                      <td><a href="https://www.sdlportal.com/towns/nj/monmouth/hazlettwp/building/permits/C-26-00760">C-26-00760</a></td>
+                      <td>2026-0611+A</td>
+                      <td>10/06/2026</td>
+                      <td>32 DOGWOOD LANE</td>
+                      <!--  -->
+                      <td>Alteration</td>
+                      
+                      <td></td>
+                      
+                      <td>Building</td>
+                      
+                      <td>Open</td>
+                    </tr>
+                  
+                    <tr>
+                      <td><a href="https://www.sdlportal.com/towns/nj/monmouth/hazlettwp/building/permits/C-26-00751">C-26-00751</a></td>
+                      <td>2025-0685+C</td>
+                      <td>10/05/2026</td>
+                      <td>13 TALL OAKS DRIVE</td>
+                      <!--  -->
+                      <td>Alteration</td>
+                      
+                      <td></td>
+                      
+                      <td>Electrical</td>
+                      
+                      <td>Open</td>
+                    </tr>
+                  
+                    <tr>
+                      <td><a href="https://www.sdlportal.com/towns/nj/monmouth/hazlettwp/building/permits/C-26-00748">C-26-00748</a></td>
+                      <td>2026-0686</td>
+                      <td>10/05/2026</td>
+                      <td>4 SKYLINE DRIVE</td>
+                      <!--  -->
+                      <td>Alteration</td>
+                      
+                      <td></td>
+                      
+                      <td>Building, Electrical</td>
+                      
+                      <td>Open</td>
+                    </tr>
+                  
+                    <tr>
+                      <td><a href="https://www.sdlportal.com/towns/nj/monmouth/hazlettwp/building/permits/C-26-00726">C-26-00726</a></td>
+                      <td>2026-0564+A</td>
+                      <td>10/06/2026</td>
+                      <td>6 ROBERT ROAD</td>
+                      <!--  -->
+                      <td>Alteration</td>
+                      
+                      <td></td>
+                      
+                      <td>Building, Electrical</td>
+                      
+                      <td>Open</td>
+                    </tr>
+                  
+                    <tr>
+                      <td><a href="https://www.sdlportal.com/towns/nj/monmouth/hazlettwp/building/permits/C-26-00618">C-26-00618</a></td>
+                      <td>2026-0682</td>
+                      <td>10/02/2026</td>
+                      <td>6 RAYMOND COURT</td>
+                      <!--  -->
+                      <td>Alteration</td>
+                      
+                      <td>REPLACE AC AND FURNACE </td>
+                      
+                      <td>Electrical, Mechanical</td>
+                      
+                      <td>Open</td>
+                    </tr>
+                  
+                    <tr>
+                      <td><a href="https://www.sdlportal.com/towns/nj/monmouth/hazlettwp/building/permits/C-26-00559">C-26-00559</a></td>
+                      <td>2026-0684</td>
+                      <td>10/05/2026</td>
+                      <td>34 ANGELA CIRCLE</td>
+                      <!--  -->
+                      <td>Alteration</td>
+                      
+                      <td>REPLACEMENT A/C UNIT </td>
+                      
+                      <td>Electrical, Mechanical</td>
+                      
+                      <td>Open</td>
+                    </tr>
+                  
+                    <tr>
+                      <td><a href="https://www.sdlportal.com/towns/nj/monmouth/hazlettwp/building/permits/C-26-00294">C-26-00294</a></td>
+                      <td>2026-0689</td>
+                      <td>10/09/2026</td>
+                      <td>130 HUDSON AVENUE</td>
+                      <!--  -->
+                      <td>Alteration</td>
+                      
+                      <td></td>
+                      
+                      <td>Electrical, Mechanical</td>
+                      
+                      <td>Open</td>
+                    </tr>
+                  
+                  </tbody>
+                
+
+                
+              </table>
+            </div>
+            <div class="alert alert-white text-dark small p-1">
+              <i class="fas fa-info-circle"></i> Every effort has been made to offer the most current and correct information possible. Original records may differ from the information on these pages. Verification of information on source documents is recommended.
+            </div>
+          </div>
+        
+      </div>
+    </div>
+
+
+
+            
+            
+        </main>
+        
+            
+            <footer class="footer mt-auto py-3 d-print-none">
+                <div class="container text-center">
+                    <ul class="list-inline">
+                        <li class="list-inline-item"><a class="text-dark" href="https://www.spatialdatalogic.com">Home</a></li>
+                        <li class="list-inline-item"><a class="text-dark" href="https://www.spatialdatalogic.com/terms">Terms of Service</a></li>
+                        <li class="list-inline-item"><a class="text-dark" href="https://www.spatialdatalogic.com/privacy">Privacy</a></li>
+                        <li class="list-inline-item"><a class="text-dark" href="https://spatialdatalogic.com/resources/sdl-news">News</a></li>
+                    </ul>
+                    <ul class="list-inline">
+                        <li class="list-inline-item"><a class="text-dark fab fa-twitter" href="https://twitter.com/SDLSales" aria-label="SDL on X" target="_blank" rel="noopener noreferrer"></a></li>
+                        <li class="list-inline-item"><a class="text-dark fab fa-facebook" href="https://www.facebook.com/pages/Spatial-Data-Logic/521682907926250" aria-label="SDL on Facebook" target="_blank" rel="noopener noreferrer"></a></li>
+                    </ul>
+                    <div class="text-dark">
+                        <p>&copy; 2026 SDL. All Rights Reserved</p>
+                    </div>
+                </div>
+            </footer>
+            
+        
+
+        
+        
+
+    
+    <!-- Switch Towns Modal -->
+    <div class="modal fade" id="switchTownsModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="exampleModalLabel">Switch Towns</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                  <p>Search by town name and select one from the list that appears below.</p>
+                  <div class="input-group w-100">
+                    <input type="text" class="form-control" id="town-search" placeholder="Find a Town" aria-label="Town search">
+                    <div class="input-group-append d-none d-md-flex">
+                      <div class="input-group-text"><i class="fas fa-search"></i></div>
+                    </div>
+                  </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Cancel</button>
+              </div>
+            </div>
+        </div>
+    </div>
+
+     <!-- Help Widget -->
+    
+        
+        <div id="sdl-help-trigger" style='display:none;' data-hlp-mid="nj_monmouth_hazlettwp">
+        <button type="button" class="btn btn-primary rounded-pill d-print-none"><i class="fas fa-question-circle fa-lg"></i><span class='d-none d-sm-inline'> Help</span></button>
+        </div>
+
+        <div id="sdl-help-modal" class="modal fade text-dark" tabindex="-1" role="dialog" data-backdrop=false >
+            <div class="modal-dialog  modal-dialog-scrollable" role="document">
+                <div class="modal-content">
+                    <div class="modal-header p-2 text-center bg-light">
+                        <h6 class="modal-title w-100">Help</h6>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body accordian" id="help-container">
+                        <div class='help-general'></div>
+                        <div class='help-account'></div>
+                        <div class='help-property'></div>
+                        <div class='help-permit'></div>
+                        <div class='help-inspection'></div>
+                        <div class='help-unordered'></div>
+                        <div  class='help-technical'>
+                            <div class="card mb-1">
+                                <div class="card-header p-2 clickable collapsed text-dark bg-white" data-toggle="collapse" href="#help-technical" data-parent="#help-container" aria-expanded="false">
+                                    <h6 class="m-0">I have a technical issue</h6>
+                                </div>
+                                <div class="p-2 small card-body collapse" id="help-technical">
+                                    <div>
+                                        <strong>PLEASE READ:</strong> The SDL Portal is a 3rd party company contracted by your town and can only assist with any technical issues and errors related to the portal or your account. If you have questions about your applications, town process, or need emergency assistance, please contact your town directly.
+                                    </div>
+                                    <a type="button" href="https://help.getsdl.com/kb-tickets/new" target="_blank" class="btn btn-primary btn-sm btn-block">Contact SDL for Technical Assistance</a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                            
+                                
+                                    <a role='button' class='btn btn-primary btn-sm btn-block help-all' href="/docs">Go to Help Center</a>
+                                
+                            
+                        
+                    </div>
+
+                    <div class='modal-footer'>
+                        <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Close</button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <script>$('#sdl-help-trigger').sdlHelp();</script>
+        
+    
+    
+
+    
+    <script>(function(d){var s = d.createElement("script");s.setAttribute("data-account", "NQWh9waQr3");s.setAttribute("src", "https://cdn.userway.org/widget.js");(d.body || d.head).appendChild(s);})(document)</script><noscript>Please ensure Javascript is enabled for purposes of <a href="https://userway.org">website accessibility</a></noscript>
+    
+    </body>
+    
+
+    
+     <script type='text/javascript'>
+          var _gaq = _gaq || [];
+          _gaq.push(['_setAccount', ' ']);
+          _gaq.push(['_trackPageview']);
+
+          (function() {
+            var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+            ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+            var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+          })();
+        </script>
+  
+
+    
+        
+    
+
+    
+<!-- flatpicker - date picker -->
+<link rel="stylesheet" href="/static/lib/flatpickr/css/flatpickr.min.css">
+<script src="/static/lib/flatpickr/js/flatpickr.min.js"></script>
+<!-- csv download parser -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/4.1.2/papaparse.min.js"></script>
+<script src="/static/js/search.js"></script>
+
+
+    
+    
+
+    
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-19533412-5', 'sdlportal.com');
+      ga('send', 'pageview');
+
+    </script>
+    
+    <script>$(".site-messages > .site-message").sdlMessage();</script>
+</html>

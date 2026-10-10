@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
+
+	<!-- bootstrap 3.0.2 -->
+	<link href="/va_culpeper/portal/themes/AdminLTE-2.1.1/bootstrap/css/bootstrap.min.css" rel="stylesheet" type="text/css" />
+    <!-- Font Awesome Icons -->
+    <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css" rel="stylesheet" type="text/css" />
+    <!-- Ionicons -->
+    <link href="https://code.ionicframework.com/ionicons/2.0.1/css/ionicons.min.css" rel="stylesheet" type="text/css" />
+	<!-- Theme style -->
+	<link href="/va_culpeper/portal/themes/AdminLTE-2.1.1/dist/css/AdminLTE.css" rel="stylesheet" type="text/css" />
+     <!-- AdminLTE Skins. Choose a skin from the css/skins
+         folder instead of downloading all of them to reduce the load. -->
+    <link href="/va_culpeper/portal/themes/AdminLTE-2.1.1/dist/css/skins/_all-skins.min.css" rel="stylesheet" type="text/css" />
+    <!-- Style custom -->
+    <link href="/va_culpeper/portal/themes/AdminLTE-2.1.1/dist/css/style.css" rel="stylesheet" type="text/css" />
+
+	<link rel="stylesheet" type="text/css" href="/va_culpeper/portal/css/foundation.css" />
+	<link rel="stylesheet" type="text/css" href="/va_culpeper/portal/css/custom.css" />
+
+	<script src="/va_culpeper/portal/js/vendor/modernizr.js"></script>
+	<script src="/va_culpeper/portal/js/vendor/jquery.js"></script>
+	<script src="/va_culpeper/portal/js/custom/tableManager.js"></script>
+	<script type="text/javascript">
+        // basic usage
+        $(document).ready(function() {			
+	        if ($('.tablemanager').length > 0) {
+                $('.tablemanager').tablemanager({
+                    firstSort: [[1, 0], [2, 0]],
+                    appendFilterby: true,
+                    dateFormat: [[4, "mm-dd-yyyy"]],
+                    debug: true,
+                    vocabulary: {
+                        voc_filter_by: 'Filter By',
+                        voc_type_here_filter: 'Enter search terms here...',
+                        voc_show_rows: 'Rows Per Page'
+                    },
+                    pagination: true,
+                    showrows: [50, 100, 200],
+                });
+            }
+			$.ajax({
+				url: '../automated/portalHtml',
+				type: 'GET',
+				dataType: 'html',
+				success: function(data) {
+					// if data is a string, extract the contents of the first textarea in data
+					if (typeof data === 'string' && $('.tablemanager').length == 0) {
+						var html_data = $.parseHTML(data);
+						var permit_table = $(html_data).filter("#permits").val();
+						var project_table = $(html_data).filter("#projects").val();
+						var license_table = $(html_data).filter("#licenses").val();
+						var complaints_table = $(html_data).filter("#complaints").val();
+						const tablemanager = $('.tablemanager');
+						
+						// if this page is for permits, append the permit table
+						if ($(".portal:contains(Search Permits and Apply Online)").length > 0 || $(".art-postheader:contains(Permit)").length > 0 || $(".box-title:contains(Permit)").length > 0) {
+							$(".portal:eq(0)").append(permit_table);		
+							if (tablemanager.length > 0) tablemanager.tablemanager({
+								firstSort: [[1, 0], [2, 0]],
+								appendFilterby: true,
+								dateFormat: [[4, "mm-dd-yyyy"]],
+								debug: true,
+								vocabulary: {
+									voc_filter_by: 'Filter By',
+									voc_type_here_filter: 'Enter search terms here...',
+									voc_show_rows: 'Rows Per Page'
+								},
+								pagination: true,
+								showrows: [50, 100, 200],
+							});
+						}
+
+						// if this page is for projects, append the project table
+						if ($(".portal:contains(Search Projects and Apply Online)").length > 0 || $(".art-postheader:contains(Project)").length > 0 || $(".box-title:contains(Planning)").length > 0) {
+							$(".portal:eq(0)").append(project_table);
+							if (tablemanager.length > 0) tablemanager.tablemanager({
+								firstSort: [[1, 0], [2, 0]],
+								appendFilterby: true,
+								dateFormat: [[4, "mm-dd-yyyy"]],
+								debug: true,
+								vocabulary: {
+									voc_filter_by: 'Filter By',
+									voc_type_here_filter: 'Enter search terms here...',
+									voc_show_rows: 'Rows Per Page'
+								},
+								pagination: true,
+								showrows: [50, 100, 200],
+							});
+						}
+
+						// if this page is for licenses, append the license table
+						if ($(".portal:contains(Search Licenses and Apply Online)").length > 0 || $(".art-postheader:contains(License)").length > 0 || $(".box-title:contains(License)").length > 0) {
+							$(".portal:eq(0)").append(license_table);
+                            if (tableManager.length > 0) {
+                                tableManager.tablemanager({
+                                    firstSort: [[1, 0], [2, 0]],
+                                    appendFilterby: true,
+                                    dateFormat: [[4, "mm-dd-yyyy"]],
+                                    debug: true,
+                                    vocabulary: {
+                                        voc_filter_by: 'Filter By',
+                                        voc_type_here_filter: 'Enter search terms here...',
+                                        voc_show_rows: 'Rows Per Page'
+                                    },
+                                    pagination: true,
+                                    showrows: [50, 100, 200],
+                                });
+                            }
+						}
+
+						// if this page is for complaints, append the complaints table
+						if ($(".portal:contains(Complaints & Violations)").length > 0 || $(".art-postheader:contains(Complaints & Violations)").length > 0 || $(".box-title:contains(Complaints & Violations)").length > 0) {
+							$(".portal:eq(0)").append(complaints_table);
+							if (tableManager.length > 0) tablemanager.tablemanager({
+								firstSort: [[1, 0], [2, 0]],
+								appendFilterby: true,
+								dateFormat: [[4, "mm-dd-yyyy"]],
+								debug: true,
+								vocabulary: {
+									voc_filter_by: 'Filter By',
+									voc_type_here_filter: 'Enter search terms here...',
+									voc_show_rows: 'Rows Per Page'
+								},
+								pagination: true,
+								showrows: [50, 100, 200],
+							});
+						}
+					}
+				}
+			});
+        });
+	</script>
+
+	<!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+	<!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+        <!--[if lt IE 9]>
+          <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+          <script src="https://oss.maxcdn.com/libs/respond.js/1.3.0/respond.min.js"></script>
+          <![endif]-->
+
+ 	<title>Citizen Portal - View PortalPosts</title>
+
+</head>
+
+<body class="skin-blue sidebar-mini layout-top-nav">
+
+    <!-- Site wrapper -->
+    <div class="wrapper">
+
+            			    <header class="main-header">
+				    <nav class="navbar navbar-static-top">
+					    <div class="container">
+						    <div class="navbar-header">
+							    <a href="./" class="navbar-brand">Citizen Portal</a>
+						    </div>
+
+						    <!-- Collect the nav links, forms, and other content for toggling -->
+						    <div class="collapse navbar-collapse pull-left" id="navbar-collapse">
+							    <ul class="nav navbar-nav">
+								    <li><a href="/va_culpeper/portal/index.php?r=site/login">Login</a></li>
+								    <li><a href="/va_culpeper/portal/index.php?r=users/create">Register</a></li>
+                                    							    </ul>
+						    </div>
+						    <!-- /.navbar-collapse -->
+					    </div>
+					    <!-- /.container-fluid -->
+				    </nav>
+			    </header>
+	            	    
+    <!-- Left side column. contains the logo and sidebar -->
+
+<!-- Right side column. Contains the navbar and content of the page -->
+    <div class="content-wrapper">
+
+        <!-- Content Header (Page header) -->
+        <section class="content-header">
+                            <!-- breadcrumbs -->
+            
+        </section>
+
+        <!-- Main content -->
+        <section class="content">
+            <div class="container">
+	<div class="box box-primary">
+		<div class="box-header with-border">
+			<h3 class="box-title">Community Development Citizen Portal</h3>
+		</div>
+		<div class="box-body">
+			<div class="portal" style="text-align: center; padding: 40px; background-color: #f5f7fa; border-radius: 15px; max-width: 1300px; margin: 0 auto;">
+<div class="portal-logo" style="display: block;"><img style="max-width: 100%; height: auto;" src="https://www.civicgov4.com/va_culpeper/images/uploads/main_header_landscape.png?timestamp=1759422783" alt="Culpeper County Logo" /></div>
+<div class="portal-menu" style="margin-top: 40px;">
+<ul style="list-style: none; padding: 0; display: flex; justify-content: center; gap: 30px;">
+<li style="display: inline-block;"><a style="display: inline-block; padding: 24px 36px; background-color: #005a3a; color: #ffffff; text-decoration: none; font-weight: bold; border-radius: 8px; text-transform: uppercase; letter-spacing: 1.5px; font-size: 20px; line-height: 1px;" href="https://www.civicgov4.com/va_culpeper/portal/index.php?r=portalPosts/view&amp;id=2" target="_blank">Permits</a></li>
+<li style="display: inline-block;"><a style="display: inline-block; padding: 24px 36px; background-color: #005a3a; color: #ffffff; text-decoration: none; font-weight: bold; border-radius: 8px; text-transform: uppercase; letter-spacing: 1.5px; font-size: 20px; line-height: 1px;" href="https://www.civicgov4.com/va_culpeper/portal/index.php?r=portalPosts/view&amp;id=20" target="_blank">Inspections</a></li>
+</ul>
+</div>
+<p>&nbsp;</p>
+<div class="container" style="text-align: left;">
+<h1 style="font-size: 2em;">&nbsp;</h1>
+</div>
+</div>		</div>
+	</div>
+</div>
+        </section><!-- /.content -->
+
+    </div><!-- /.right-side -->
+
+
+            <footer class="main-footer">
+                <div class="pull-right hidden-xs">
+                    <strong>Community Development 4.0 Citizen Portal</strong>
+                </div>
+	            <strong>Copyright &copy; 2026 <a href="http://www.civicgovcloud.com/" target="_civicgov">CivicPlus</a></strong>
+            </footer>
+
+
+          <div class='control-sidebar-bg'></div>
+
+    </div><!-- ./wrapper -->
+    <script>
+	    $(document).ready(function() {
+            $(".sidebar-toggle").click(function(e) {
+                e.preventDefault();
+                $("body").toggleClass('sidebar-collapse');
+                $("body").toggleClass('sidebar-open');
+            });
+	    });
+    </script>
+    <!-- Bootstrap 3.3.2 JS -->
+    <script src="/va_culpeper/portal/themes/AdminLTE-2.1.1/bootstrap/js/bootstrap.min.js" type="text/javascript"></script>
+    <!-- SlimScroll -->
+    <script src="/va_culpeper/portal/themes/AdminLTE-2.1.1/plugins/slimScroll/jquery.slimscroll.min.js" type="text/javascript"></script>
+    <!-- FastClick -->
+    <script src='/va_culpeper/portal/themes/AdminLTE-2.1.1/plugins/fastclick/fastclick.min.js'></script>
+    <!-- AdminLTE App -->
+    <script src="/va_culpeper/portal/themes/AdminLTE-2.1.1/dist/js/app.min.js" type="text/javascript"></script>
+    
+    <!-- AudioEye snippet -->
+    <script type="text/javascript">!function () {
+        var b = function () {
+            window.__AudioEyeSiteHash = "69257278ee3a58e381f2deba1979e0fe";
+            var a = document.createElement("script");
+            a.src = "https://wsmcdn.audioeye.com/aem.js";
+            a.type = "text/javascript";
+            a.setAttribute("async", "");
+            document.getElementsByTagName("body")[0].appendChild(a)
+        };
+        "complete" !== document.readyState ? window.addEventListener ? window.addEventListener("load", b) : window.attachEvent && window.attachEvent("onload", b) : b()
+    }();</script>
+    </body>
+</html>
