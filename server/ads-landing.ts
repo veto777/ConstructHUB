@@ -1,6 +1,6 @@
 /**
- * Google Ads landing doors — https://constructhub.us/googleads-features (= /features)
- * and /googleads-crm (= /features/crm). Owner order 2026-10-07: "the same system
+ * Google Ads landing doors — https://constructhub.us/googleads-features (= /features),
+ * /googleads-crm (= /features/crm) and /googleads-pricing (= /pricing, the 2026-10-09 campaign). Owner order 2026-10-07: "the same system
  * we created for the Alpine Google ads" (alpine wa-main server/ads-landing.ts),
  * for a NATIONWIDE campaign.
  *
@@ -48,9 +48,10 @@ import { isPortalHost, isClientHost, requestHost } from "./site-context";
 export const ADS_LANDINGS: Readonly<Record<string, string>> = {
   "/googleads-features": "/features",
   "/googleads-crm": "/features/crm",
+  "/googleads-pricing": "/pricing",
 };
 export const ADS_LANDING_PATHS: readonly string[] = Object.keys(ADS_LANDINGS);
-export const DEFAULT_ADS_LP_KEYS: readonly string[] = ["ch_feat_2026", "ch_crm_2026"];
+export const DEFAULT_ADS_LP_KEYS: readonly string[] = ["ch_feat_2026", "ch_crm_2026", "ch_price_2026"];
 
 const CLICK_ID_RE = /^[A-Za-z0-9_-]{16,}$/;
 const GOOGLE_UA_RE = /(AdsBot-Google|Googlebot|Google-InspectionTool|Mediapartners-Google|Google-Site-Verification|GoogleOther|Storebot-Google|APIs-Google|Google-AdWords|Google-Ads)/i;

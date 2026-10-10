@@ -31,7 +31,7 @@ export const APP_ROUTE_PATTERNS: readonly string[] = [
   // The CRM's paths (the portal's own host serves them; the main site hands them over).
   "/crm", "/crm/*",
   // Google Ads landing doors (server/ads-landing.ts).
-  "/googleads-features", "/googleads-crm",
+  "/googleads-features", "/googleads-crm", "/googleads-pricing",
 ];
 
 function matches(pattern: string, path: string): boolean {

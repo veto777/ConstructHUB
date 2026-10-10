@@ -11,7 +11,7 @@ const visitor = (over: Partial<AdsRequestFacts> = {}): AdsRequestFacts => ({
 
 describe("ad landing doors", () => {
   it("each door serves a real, prerendered marketing page", () => {
-    expect(ADS_LANDINGS).toEqual({ "/googleads-features": "/features", "/googleads-crm": "/features/crm" });
+    expect(ADS_LANDINGS).toEqual({ "/googleads-features": "/features", "/googleads-crm": "/features/crm", "/googleads-pricing": "/pricing" });
     for (const target of Object.values(ADS_LANDINGS)) expect(MARKETING_ROUTES).toContain(target);
   });
 
@@ -55,8 +55,8 @@ describe("ad landing doors", () => {
     expect(doorHtml(html)).toBe(html);
   });
 
-  it("ships two default keys, one per ad", () => {
-    expect(DEFAULT_ADS_LP_KEYS).toEqual(["ch_feat_2026", "ch_crm_2026"]);
+  it("ships three default keys, one per door", () => {
+    expect(DEFAULT_ADS_LP_KEYS).toEqual(["ch_feat_2026", "ch_crm_2026", "ch_price_2026"]);
   });
 });
 

@@ -1,3 +1,12 @@
+## 2026-10-10 — /googleads-pricing door; constructhub.us in Click Guard (ads/pricing-door)
+
+The 2026-10-09 Performance Max campaign (681-225-6576, under MCC 831-008-9188) now lands on the door
+`/googleads-pricing` (= `/pricing`) with key `ch_price_2026` in the final-URL suffix, so the Alpine rules apply:
+verified-Google crawler only, bots 403 + Click Guard block, click id + key required, non-US and hosting
+networks sent to the public page. Live .env: `ADS_LP_KEYS` (+ch_price_2026), `ADS_LP_DOMAIN=constructhub.us`,
+`ADS_LP_ALLOW_IPS` (office). Click Guard site `constructhub.us` (tracked_domains id 1, owner support@) is
+mapped to the ad account, so the Ads manager "IP exclusions" protection pushes door blocks to the campaign.
+
 # ConstructHUB — Handoff
 
 ## 2026-10-10 — One-click Google Ads link (ads/one-click-link)
