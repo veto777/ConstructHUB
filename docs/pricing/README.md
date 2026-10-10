@@ -55,6 +55,51 @@ There is **no per-location pricing and no extra-location add-on** (retired
 `extra_location` records stay in `shared/plans.ts` only so stored old
 subscriptions still read and bill as they did.
 
+## À la carte: every tool as its own subscription (`shared/alacarte.ts`)
+
+Owner order 2026-10-10: every tool can be bought on its own, monthly or
+annually, with or without a plan. The price book is **`shared/alacarte.ts`**
+only: fifteen items (`ALACARTE`), each with a **standalone** monthly price (no
+paid plan) and an **add-on** monthly price (an active paid Business Tools plan
+or CRM plan — `isAddonPrice` / `alacarteTierFor`). Annual is `ANNUAL_MONTHS`
+× monthly like everything else. Items that overlap a platform add-on (the two
+SEO suites, the protected website) name it in `existingAddon`: their add-on
+tier IS that add-on's price and grants, never a parallel product. JobCam is
+sold on top of an active CRM plan only (`requiresCrmPlan`) until a stand-alone
+CRM shell exists; permit alerts show as coming while `permitAlerts` sits in
+`COMING_MODULES`. The CRM and the Call Assistant are already stand-alone and
+are linked from the tab (`ALACARTE_LINKED`); the texting number stays an
+add-on only (`ALACARTE_ADDON_ONLY`).
+
+- **Change a price:** edit the item's `standaloneMonthlyCents` /
+  `addonMonthlyCents` (an `existingAddon` item's add-on price is the add-on's
+  own price in `shared/plans.ts`). Stripe Prices follow by lookup key
+  (`chub_v1_alacarte_<key>_<standalone|addon>_<interval>_<cents>`,
+  `server/billing/prices.ts alacartePriceSpec`): a new cents value makes a new
+  Price on the next checkout; existing subscriptions keep theirs until they
+  are repriced (below).
+- **Change what an item grants:** its `grants` (modules, count limits, the
+  automatic-reply switch). `server/entitlements.ts` lays active items over the
+  plan's allowances — or over `STANDALONE_BASE_LIMITS` with no plan — so the
+  gates work the same either way.
+- **Billing:** `POST /api/alacarte/checkout { key, interval, quantity? }`
+  (`server/billing/alacarte.ts`) opens Stripe Checkout for ONE item at the
+  account's tier; each item is its own Stripe subscription
+  (`metadata.product = "alacarte"`), stored in `alacarte_subscriptions`
+  (`server/billing/alacarte-store.ts`, one row per account and item). The
+  checkout refuses what the plan already covers (`alacarteAlreadyCovered`).
+  Cancel from the Stripe portal (Manage billing), as for the other products.
+- **Standalone ↔ add-on when a plan starts or ends:** the webhook calls
+  `reconcileAlacartePricing(userId)` after every platform and CRM subscription
+  write. Each live item on the other tier has its price swapped with Stripe's
+  `proration_behavior: "none"`: the cycle already paid is untouched and the
+  **next renewal** bills the new price — never a mid-cycle charge or credit.
+  The row's `tier` follows the subscription's price (the webhook reads it from
+  the price's metadata, never from the client).
+- **Tests:** `server/alacarte-pricebook.test.ts` (the price book),
+  `server/billing/alacarte.test.ts` (price specs, order parsing, the
+  repricing plan), `server/entitlements.test.ts` (the overlay).
+
 ## The comparison tables: `shared/plan-matrix.ts`
 
 `shared/plan-matrix.ts` is the ONE source behind the comparison tables on

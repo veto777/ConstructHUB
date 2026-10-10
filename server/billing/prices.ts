@@ -25,6 +25,7 @@ import {
   CRM_PLANS, CRM_ADDONS, CRM_EXTRA_SEAT_MONTHLY_CENTS, CRM_EXTRA_SEAT_ANNUAL_CENTS, crmPlanPriceCents, crmAddonPriceCents, isCrmPlanKey,
   type CrmPlanKey, type CrmAddonKey,
 } from "@shared/crm-plans";
+import { ALACARTE, alacartePriceCents, isAlacarteKey, isAlacarteTier, type AlacarteKey, type AlacarteTier } from "@shared/alacarte";
 
 const PREFIX = "chub_v1";
 
@@ -37,7 +38,9 @@ export type PriceRole =
   | { kind: "crm_plan"; key: CrmPlanKey; interval: BillingInterval }
   | { kind: "crm_seat"; interval: BillingInterval }
   // A yes/no add-on on the CRM subscription (shared/crm-plans.ts CRM_ADDONS).
-  | { kind: "crm_addon"; key: CrmAddonKey; interval: BillingInterval };
+  | { kind: "crm_addon"; key: CrmAddonKey; interval: BillingInterval }
+  // One tool sold à la carte, on its own subscription, at the standalone or the add-on tier (shared/alacarte.ts).
+  | { kind: "alacarte"; key: AlacarteKey; tier: AlacarteTier; interval: BillingInterval };
 
 export type PriceSpec = {
   lookupKey: string;
@@ -82,6 +85,7 @@ function roleMetadata(role: PriceRole): Record<string, string> {
     chub_kind: role.kind,
     chub_key: "key" in role ? role.key : "",
     chub_interval: "interval" in role ? role.interval : "once",
+    ...("tier" in role ? { chub_tier: role.tier } : {}),
   };
 }
 
@@ -182,6 +186,26 @@ export function crmAddonPriceSpec(addon: CrmAddonKey, interval: BillingInterval)
   };
 }
 
+/**
+ * One à la carte item at one tier (shared/alacarte.ts): `<prefix>_alacarte_<key>_<standalone|addon>_<interval>_<cents>`.
+ * The two tiers are two Prices on one Product name; a plan starting or ending moves a subscription between them at
+ * its next renewal (server/billing/alacarte.ts reconcileAlacartePricing). An item that overlaps a platform add-on
+ * prices its add-on tier from that add-on (alacartePriceCents), so the cents — and the key — agree with it.
+ */
+export function alacartePriceSpec(key: AlacarteKey, tier: AlacarteTier, interval: BillingInterval): PriceSpec {
+  const cents = alacartePriceCents(key, tier, interval);
+  return {
+    lookupKey: `${PREFIX}_alacarte_${key}_${tier}_${interval}_${cents}`,
+    role: { kind: "alacarte", key, tier, interval },
+    params: {
+      currency: "usd",
+      unit_amount: cents,
+      recurring: { interval },
+      product_data: { name: `ConstructHUB ${ALACARTE[key].name}${tier === "addon" ? " (add-on price)" : ""}` },
+    },
+  };
+}
+
 export function agencyLocationsPriceSpec(interval: BillingInterval): PriceSpec {
   const tiers = agencyLocationTiers(interval);
   const signature = tiers.map((t) => `${t.up_to}x${t.unit_amount}`).join("-");
@@ -255,6 +279,9 @@ export function roleOfPrice(price: Stripe.Price | null | undefined): PriceRole |
     case "crm_addon":
       return typeof meta.chub_key === "string" && meta.chub_key in CRM_ADDONS && isBillingInterval(interval)
         ? { kind: "crm_addon", key: meta.chub_key as CrmAddonKey, interval } : null;
+    case "alacarte":
+      return isAlacarteKey(meta.chub_key) && isAlacarteTier(meta.chub_tier) && isBillingInterval(interval)
+        ? { kind: "alacarte", key: meta.chub_key, tier: meta.chub_tier, interval } : null;
     default:
       return null;
   }
