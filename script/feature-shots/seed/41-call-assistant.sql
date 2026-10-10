@@ -73,7 +73,7 @@ from fs_org o, (select $J${
   "credibility": {
     "yearsInBusiness": 15,
     "foundedYear": 2011,
-    "licenses": ["Denver roofing contractor license (sample) SR-00000"],
+    "licenses": ["Licensed and insured in Colorado"],
     "insured": true,
     "bonded": true,
     "warranties": ["10-year workmanship warranty"],

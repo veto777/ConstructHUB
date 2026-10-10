@@ -323,20 +323,20 @@ VALUES
 -- Mail alerts: forwarded provider messages (sender addresses are the app's recognized provider senders)
 -- ===================================================================================================
 INSERT INTO mail_alert_messages (id, user_id, dedupe, source, category, severity, sender, subject, body, confirmation_code, confirmation_link, domain_id, location_id, read_at, received_at, expires_at)
-SELECT 910000 + n, 1, 'sample-gbp-mail-' || n, 'forwarding', cat, sev, sender, subj, body, NULL, NULL, dom, NULL,
+SELECT 910000 + n, 1, 'sample-gbp-mail-' || n, 'forwarding', cat, sev, sender, subj, body, NULL, NULL, dom, loc,
   CASE WHEN rd THEN now() - ago + interval '20 minutes' END, now() - ago, now() - ago + interval '30 days'
 FROM (VALUES
-  (1,  'gbp', 'critical', 'businessprofile-noreply@google.com', 'Someone suggested changes to Summit Roofing Co.', 'A user suggested an edit to your Business Profile: Website. Review the suggested change in your Business Profile.', NULL::bigint, interval '48 minutes', false),
-  (2,  'gbp', 'warning',  'businessprofile-noreply@google.com', 'Your Business Profile category was updated: Summit Roofing Co.', 'Google updated the primary category on your Business Profile based on information from users and other sources.', NULL, interval '3 hours', false),
-  (3,  'registrar', 'critical', 'support@namehost.example', 'Domain denverhailrepair.example expires in 26 days', 'Auto-renew is off for denverhailrepair.example. Renew before the expiry date to keep the site and email working.', 910004, interval '9 hours', false),
-  (4,  'gsc', 'warning', 'sc-noreply@google.com', 'New Page indexing issue detected for site summitroofing.example', 'Search Console has identified that some pages on your site are not being indexed due to the following new reason: Redirect error.', 910001, interval '1 day 2 hours', true),
-  (5,  'gbp', 'info',    'businessprofile-noreply@google.com', 'You have a new review on Summit Roofing Co.', 'Maria Delgado left a 5-star review. Reply to let customers know you value their feedback.', NULL, interval '2 days', true),
-  (6,  'ads', 'warning', 'ads-noreply@google.com', 'Your campaign "Denver Roof Repair - Search" is limited by budget', 'Your campaign could get more clicks with a higher daily budget. Review recommendations in your account.', NULL, interval '3 days', true),
-  (7,  'cloudflare', 'info', 'noreply@notify.cloudflare.com', 'SSL/TLS certificate renewed for summitroofing-aurora.example', 'The edge certificate for summitroofing-aurora.example was renewed successfully.', 910002, interval '4 days', true),
-  (8,  'gbp', 'warning', 'businessprofile-noreply@google.com', 'Action needed: verify Summit Roofing Co. Lakewood', 'To keep your Business Profile visible, confirm your business information. Sign in to review.', NULL, interval '6 days', true),
-  (9,  'registrar', 'warning', 'support@namehost.example', 'Domain aurorahailclaims.example expires in 12 days', 'Auto-renew is off. Renew to avoid losing this domain.', 910008, interval '8 days', false),
-  (10, 'gsc', 'info', 'sc-noreply@google.com', 'Monthly Search performance for summitroofing.example', 'Your site got 1,240 clicks from Google Search last month, up 18% from the month before.', 910001, interval '10 days', true),
-  (11, 'gbp', 'info', 'businessprofile-noreply@google.com', 'Your September performance report for Summit Roofing Co. Aurora', '2,310 people viewed your Business Profile in September. 312 people called or requested directions.', NULL, interval '11 days', true)
-) v(n, cat, sev, sender, subj, body, dom, ago, rd);
+  (1,  'gbp', 'critical', 'businessprofile-noreply@google.com', 'Someone suggested changes to Summit Roofing Co.', 'A user suggested an edit to your Business Profile: Website. Review the suggested change in your Business Profile.', NULL::bigint, 910001::bigint, interval '48 minutes', false),
+  (2,  'gbp', 'warning',  'businessprofile-noreply@google.com', 'Your Business Profile category was updated: Summit Roofing Co.', 'Google updated the primary category on your Business Profile based on information from users and other sources.', NULL, NULL, interval '3 hours', false),
+  (3,  'registrar', 'critical', 'support@namehost.example', 'Domain denverhailrepair.example expires in 26 days', 'Auto-renew is off for denverhailrepair.example. Renew before the expiry date to keep the site and email working.', 910004, NULL, interval '9 hours', false),
+  (4,  'gsc', 'warning', 'sc-noreply@google.com', 'New Page indexing issue detected for site summitroofing.example', 'Search Console has identified that some pages on your site are not being indexed due to the following new reason: Redirect error.', 910001, 910001, interval '1 day 2 hours', true),
+  (5,  'gbp', 'info',    'businessprofile-noreply@google.com', 'You have a new review on Summit Roofing Co.', 'Maria Delgado left a 5-star review. Reply to let customers know you value their feedback.', NULL, 910001, interval '2 days', true),
+  (6,  'ads', 'warning', 'ads-noreply@google.com', 'Your campaign "Denver Roof Repair - Search" is limited by budget', 'Your campaign could get more clicks with a higher daily budget. Review recommendations in your account.', NULL, NULL, interval '3 days', true),
+  (7,  'cloudflare', 'info', 'noreply@notify.cloudflare.com', 'SSL/TLS certificate renewed for summitroofing-aurora.example', 'The edge certificate for summitroofing-aurora.example was renewed successfully.', 910002, 910002, interval '4 days', true),
+  (8,  'gbp', 'warning', 'businessprofile-noreply@google.com', 'Action needed: verify Summit Roofing Co. Lakewood', 'To keep your Business Profile visible, confirm your business information. Sign in to review.', NULL, 910003, interval '6 days', true),
+  (9,  'registrar', 'warning', 'support@namehost.example', 'Domain aurorahailclaims.example expires in 12 days', 'Auto-renew is off. Renew to avoid losing this domain.', 910008, NULL, interval '8 days', false),
+  (10, 'gsc', 'info', 'sc-noreply@google.com', 'Monthly Search performance for summitroofing.example', 'Your site got 1,240 clicks from Google Search last month, up 18% from the month before.', 910001, 910001, interval '10 days', true),
+  (11, 'gbp', 'info', 'businessprofile-noreply@google.com', 'Your September performance report for Summit Roofing Co. Aurora', '2,310 people viewed your Business Profile in September. 312 people called or requested directions.', NULL, 910002, interval '11 days', true)
+) v(n, cat, sev, sender, subj, body, dom, loc, ago, rd);
 
 COMMIT;

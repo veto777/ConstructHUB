@@ -48,7 +48,7 @@ insert into crm_orgs (id, name, legal_entity_name, owner_user_id, email, phone, 
   timezone, license_number, license_state, industry, description, estimate_footer, invoice_footer, default_deposit_bps,
   onboarding_dismissed_at, custom_fields, created_at, updated_at)
 values ('40000000-0000-4000-8000-000000000001', 'Summit Roofing Co.', 'Summit Roofing Co. LLC', 1, 'office@summitroofing.example',
-  '(303) 555-0140', 'https://summitroofing.example', '100 Sample St', 'Denver', 'CO', '80202', 'US', 'America/Denver', 'SAMPLE-RC-0140', 'CO',
+  '(303) 555-0140', 'https://summitroofing.example', '100 Sample St', 'Denver', 'CO', '80202', 'US', 'America/Denver', NULL, 'CO',
   'Roofing & Gutters', 'Residential and light-commercial roofing, gutters and storm repair across the Denver metro.',
   'Thank you for considering Summit Roofing Co.', 'Thank you for your business.', 3000, now() - interval '200 days',
   '{"sms": {"mode": "dedicated", "fromNumber": "+13035550142"}, "smsEstimates": true, "smsAlerts": true, "voiceNudge": false, "themeColor": "orange"}',
@@ -105,7 +105,7 @@ select ('40000000-0003-4000-8000-0000000000' || lpad(n::text, 2, '0')), '4000000
   case when st in ('complete','invoiced','paid') then now() - (moved || ' days')::interval else null end,
   now() - (moved || ' days')::interval - interval '3 hours', now() - (age || ' days')::interval, now() - (moved || ' days')::interval, la, lo
 from (values
- ( 1, 1,'Hail damage roof replacement','in_progress','Denver','80205',array['roofing'],18450,-1,1,38,39.7480,-104.9590),
+ ( 1, 1,'Hail damage roof replacement','in_progress','Denver','80205',array['roofing'],18450,-1,1,38,39.748,-104.959),
  ( 2, 2,'Seamless gutters and guards','scheduled','Lakewood','80226',array['gutters'],4860,3,4,30,39.7050,-105.0810),
  ( 3, 3,'Full tear-off, architectural shingles','approved','Aurora','80012',array['roofing'],21300,null,2,26,39.6990,-104.8370),
  ( 4, 4,'Roof inspection and repair','lead','Littleton','80120',array['roofing'],950,null,3,3,null,null),
@@ -114,7 +114,7 @@ from (values
  ( 7, 7,'Storm damage insurance claim','estimating','Englewood','80110',array['roofing'],15900,null,6,12,null,null),
  ( 8, 8,'Seamless gutters, front and back','proposal_sent','Wheat Ridge','80033',array['gutters'],3620,null,7,16,null,null),
  ( 9, 9,'Standing-seam metal roof upgrade','lead','Thornton','80229',array['roofing'],28500,null,2,4,null,null),
- (10,10,'Roof replacement','punch_list','Centennial','80122',array['roofing'],19750,-9,1,52,39.5800,-104.8770),
+ (10,10,'Roof replacement','punch_list','Centennial','80122',array['roofing'],19750,-9,1,52,39.580,-104.877),
  (11,11,'Chimney flashing and cricket','complete','Golden','80401',array['roofing'],3180,-20,8,60,39.7550,-105.2210),
  (12,12,'Ice dam prevention and heat cable','invoiced','Broomfield','80020',array['roofing'],2450,-14,10,45,null,null),
  (13,13,'TPO flat roof section, Building 2','waiting_on_trades','Westminster','80031',array['roofing'],38200,-3,6,40,39.8370,-105.0370),
@@ -294,21 +294,21 @@ select '40000000-000d-4000-8000-0000000000' || n, '40000000-0000-4000-8000-00000
   'jobcam/40000000-0000-4000-8000-000000000001/40000000-000d-4000-8000-0000000000' || n || '/original.jpg',
   'jobcam/40000000-0000-4000-8000-000000000001/40000000-000d-4000-8000-0000000000' || n || '/display.jpg',
   'jobcam/40000000-0000-4000-8000-000000000001/40000000-000d-4000-8000-0000000000' || n || '/thumb.jpg',
-  1600, 1200, now() - (m || ' minutes')::interval, now() - (m || ' minutes')::interval + interval '1 minute', la, lo, 6,
+  1600, 1200, now() - (m || ' minutes')::interval, now() - (m || ' minutes')::interval + interval '1 minute', la, lo, 50,
   cap, 'user', array[tg], st, cv, now() - (m || ' minutes')::interval, now() - (m || ' minutes')::interval
 from (values
- ('01', 1,3,'Front slope before tear-off, missing tabs by the vent','Before',false,true, 6*1440+300, 39.7481,-104.9591),
- ('02', 1,3,'Hail hits marked on the north slope for the adjuster','Damage',true,false, 6*1440+280, 39.7480,-104.9589),
- ('03', 1,4,'Shingles and drip edge delivered, 34 bundles','Progress',false,false, 3*1440+90, 39.7479,-104.9590),
- ('04', 1,4,'Tear-off half done, decking looks solid','Progress',false,true, 2*1440+200, 39.7480,-104.9592),
- ('05', 1,5,'Synthetic underlayment and ice and water shield down','Progress',false,true, 1*1440+620, 39.7481,-104.9590),
- ('06', 1,4,'New Charcoal architectural shingles, ridge cap on','After',true,true, 140, 39.7480,-104.9591),
- ('07',10,5,'New 6-inch seamless gutter on the back side','After',false,true, 9*1440+60, 39.5801,-104.8771),
- ('08',11,4,'Step flashing and counter-flashing redone at the chimney','After',true,true, 20*1440+30, 39.7551,-105.2211),
- ('09',10,4,'Finished roof, front elevation','After',false,true, 9*1440+90, 39.5800,-104.8770),
+ ('01', 1,3,'Front slope before tear-off, missing tabs by the vent','Before',false,true, 6*1440+300, 39.748,-104.959),
+ ('02', 1,3,'Hail hits marked on the north slope for the adjuster','Damage',true,false, 6*1440+280, 39.748,-104.959),
+ ('03', 1,4,'Shingles and drip edge delivered, 34 bundles','Progress',false,false, 3*1440+90, 39.748,-104.959),
+ ('04', 1,4,'Tear-off half done, decking looks solid','Progress',false,true, 2*1440+200, 39.748,-104.959),
+ ('05', 1,5,'Synthetic underlayment and ice and water shield down','Progress',false,true, 1*1440+620, 39.748,-104.959),
+ ('06', 1,4,'New Charcoal architectural shingles, ridge cap on','After',true,true, 140, 39.748,-104.959),
+ ('07',10,5,'New 6-inch seamless gutter on the back side','After',false,true, 9*1440+60, 39.580,-104.877),
+ ('08',11,4,'Step flashing and counter-flashing redone at the chimney','After',true,true, 20*1440+30, 39.755,-105.221),
+ ('09',10,4,'Finished roof, front elevation','After',false,true, 9*1440+90, 39.580,-104.877),
  ('10', 7,3,'Hail bruising on the south slope, test square','Damage',false,false, 2*1440+30, null, null),
- ('11',13,4,'Existing membrane before the TPO section','Before',false,false, 4*1440+200, 39.8371,-105.0371),
- ('12', 2,3,'Old gutter pulling away at the corner','Before',false,false, 5*1440+45, 39.7051,-105.0811)
+ ('11',13,4,'Existing membrane before the TPO section','Before',false,false, 4*1440+200, 39.837,-105.037),
+ ('12', 2,3,'Old gutter pulling away at the corner','Before',false,false, 5*1440+45, 39.705,-105.081)
 ) as t(n, p, by, cap, tg, st, cv, m, la, lo);
 
 insert into jobcam_org_usage (org_id, bytes, media_count, photo_count, video_count, storage_tier_gb, updated_at)
