@@ -5,7 +5,7 @@ import { isConfigured as dataforseoConfigured, normalizeBusinessName } from "./s
 import { lookupPoint as lookupGridPoint, gridEstimateUsd } from "./seo/grid";
 import { withBudget, SeoBudgetError } from "./seo/budget";
 const gridRound6 = (n: number) => Math.round(n * 1e6) / 1e6;
-import { getEntitlements, requirePlan, requireModule, hasModule, usersWithModule, sendModuleRequired, sendPlanRequired, sendLimitReached, sendLocationLimit, raiseHint, cheapestPlanWhere, locationCount, plural, inUse, redeemTrialCode, endRevokedTrial, TOP_PLAN, TRIAL_CODE_PLAN } from "./entitlements";
+import { getEntitlements, requirePlan, requireModule, hasModule, usersWithModule, sendModuleRequired, sendPlanRequired, sendLimitReached, sendLocationLimit, raiseHint, cheapestPlanWhere, locationCount, plural, inUse, redeemTrialCode, endRevokedTrial, TOP_PLAN, TRIAL_CODE_PLAN, accessPlanName } from "./entitlements";
 import { PAYMENT_NEEDED_STATUSES, PLANS, fitsLimit } from "@shared/plans";
 import { isSalesOnly, sendTalkToSales, salesInquirySubject } from "./catalog";
 import { isReviewSuppressed, unsubscribeRecipient, resubscribeRecipient } from "./review-suppression";
@@ -229,7 +229,7 @@ export async function registerRoutes(
           const raise = raiseHint(ent, "locations", ["location"]);
           return void sendLimitReached(res, {
             feature: "guardedLocations", limit, used: r.n, upgradePlan: raise.upgradePlan, addon: raise.addon,
-            message: `Profile Guard is on for ${plural(r.n, "location")}, and your ${PLANS[ent.accessPlan!].name} plan covers ${plural(limit, "location")}. Turn Guard off on another location first. ${raise.text}`.trim(),
+            message: `Profile Guard is on for ${plural(r.n, "location")}, and your ${accessPlanName(ent)} plan covers ${plural(limit, "location")}. Turn Guard off on another location first. ${raise.text}`.trim(),
           });
         }
         next();
@@ -246,7 +246,7 @@ export async function registerRoutes(
         if (!ent) return;
         if (mode === "auto" && !ent.allowances!.autoPublishAiReplies) {
           return void sendPlanRequired(res, cheapestPlanWhere((l) => l.autoPublishAiReplies) ?? TOP_PLAN, "Publishing AI review replies automatically", {
-            message: `Your ${PLANS[ent.accessPlan!].name} plan drafts AI replies for you to approve. Publishing them automatically is included with the ${PLANS[cheapestPlanWhere((l) => l.autoPublishAiReplies) ?? TOP_PLAN].name} plan.`,
+            message: `Your ${accessPlanName(ent)} plan drafts AI replies for you to approve. Publishing them automatically is included with the ${PLANS[cheapestPlanWhere((l) => l.autoPublishAiReplies) ?? TOP_PLAN].name} plan.`,
           });
         }
         next();
@@ -266,6 +266,8 @@ export async function registerRoutes(
           planName: ent.accessPlan ? PLANS[ent.accessPlan].name : null,
           isPlatformAdmin: ent.isPlatformAdmin, grantEndsAt: ent.grantEndsAt,
           limits: ent.limits, allowances: ent.allowances, modules: ent.modules, addonModules: ent.addonModules, addonModulesPaused: ent.addonModulesPaused, addons: ent.addons,
+          // À la carte items (shared/alacarte.ts): in force (already in allowances/modules) and paused for a payment.
+          alacarte: ent.alacarte,
           // Pricing terms (server/billing/pricing-terms.ts): the SEO tools kept from before they were Agency-only, and a founding member's locked price.
           seoGrandfathered: ent.seoGrandfathered,
           foundingMember: ent.foundingMember ? { since: ent.foundingMember.since, prices: ent.foundingMember.prices } : null,
@@ -3756,7 +3758,7 @@ export async function registerRoutes(
         const raise = raiseHint(ent, "protectedSites", ["website"], "protected_site");
         return sendLimitReached(res, {
           feature: "protectedSites", limit, used: outcome.used, upgradePlan: raise.upgradePlan, addon: raise.addon,
-          message: `Your ${PLANS[ent.accessPlan!].name} plan protects ${plural(limit, "website")} with Click Guard, IP Tracker and VPN Shield, and ${inUse(outcome.used)}. ${raise.text}`.trim(),
+          message: `Your ${accessPlanName(ent)} plan protects ${plural(limit, "website")} with Click Guard, IP Tracker and VPN Shield, and ${inUse(outcome.used)}. ${raise.text}`.trim(),
         });
       }
       res.json(outcome.domain);
@@ -5318,7 +5320,7 @@ function main() {
         const raise = raiseHint(ent, "reviewTemplates", ["template"]);
         return sendLimitReached(res, {
           feature: "reviewTemplates", limit: max, used, upgradePlan: raise.upgradePlan, addon: null,
-          message: `Your ${PLANS[ent.accessPlan!].name} plan includes ${plural(max, "review request template")} and ${inUse(used)}. Delete one you no longer use. ${raise.text}`.trim(),
+          message: `Your ${accessPlanName(ent)} plan includes ${plural(max, "review request template")} and ${inUse(used)}. Delete one you no longer use. ${raise.text}`.trim(),
         });
       };
       // Early answer at the limit, before resolving the review link.

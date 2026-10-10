@@ -20,6 +20,7 @@ import {
   type CrmPlanKey, type CrmPlanLimits,
 } from "../../shared/crm-plans";
 import { isPlatformAdminEmail } from "../admin";
+import { alacarteSchemaReady } from "../billing/alacarte-store";
 
 /** Idempotent, additive. Run once per process before anything reads the table. */
 export const CRM_SUBSCRIPTION_DDL: readonly string[] = [
@@ -121,18 +122,20 @@ export async function getCrmEntitlements(userId: number | null | undefined, opts
 }
 
 async function loadCrmEntitlements(userId: number): Promise<CrmEntitlements> {
-  await crmBillingSchemaReady();
+  await Promise.all([crmBillingSchemaReady(), alacarteSchemaReady()]);
+  // JobCam bought à la carte (shared/alacarte.ts, its own subscription) counts like the JobCam add-on on this CRM plan.
   const { rows: [row] } = await pool.query(
-    `SELECT u.email, u.beta_at, s.plan, s.status, s.extra_seats, s.jobcam_addon, s.trial_end, s.current_period_end
+    `SELECT u.email, u.beta_at, s.plan, s.status, s.extra_seats, s.jobcam_addon, s.trial_end, s.current_period_end,
+            EXISTS (SELECT 1 FROM alacarte_subscriptions a WHERE a.user_id = u.id AND a.item_key = 'jobcam' AND a.status = ANY($2::text[])) AS jobcam_alacarte
        FROM users u LEFT JOIN crm_subscriptions s ON s.user_id = u.id
-      WHERE u.id = $1`, [userId]);
+      WHERE u.id = $1`, [userId, ACCESS_STATUSES]);
   if (!row) return NO_CRM;
   return crmEntitlementsFromRow(row, isPlatformAdminEmail(row.email));
 }
 
 /** The entitlements one users ⟕ crm_subscriptions row gives. Pure — crm-plans.test.ts checks it. */
 export function crmEntitlementsFromRow(
-  row: { beta_at?: Date | string | null; plan?: unknown; status?: string | null; extra_seats?: number | null; jobcam_addon?: boolean | null; trial_end?: Date | string | null; current_period_end?: Date | string | null },
+  row: { beta_at?: Date | string | null; plan?: unknown; status?: string | null; extra_seats?: number | null; jobcam_addon?: boolean | null; jobcam_alacarte?: boolean | null; trial_end?: Date | string | null; current_period_end?: Date | string | null },
   isAdmin: boolean,
 ): CrmEntitlements {
   // ConstructHUB staff and beta accounts use the CRM without a subscription.
@@ -150,8 +153,9 @@ export function crmEntitlementsFromRow(
   if (!plan) return { ...NO_CRM, status };
   const limits = CRM_PLANS[plan].limits;
   const extraSeats = Math.max(0, Number(row.extra_seats) || 0);
-  // The add-on only counts on a plan that sells it; a plan that includes JobCam needs none.
-  const jobcamAddon = row.jobcam_addon === true && crmAddonAvailableOn("jobcam", plan);
+  // The add-on only counts on a plan that sells it; a plan that includes JobCam needs none. Bought on the CRM
+  // subscription or à la carte (jobcam_alacarte), it is the same add-on to the gate.
+  const jobcamAddon = (row.jobcam_addon === true || row.jobcam_alacarte === true) && crmAddonAvailableOn("jobcam", plan);
   return {
     plan, limits, extraSeats, jobcamAddon, jobcam: crmPlanHasJobcam(plan, jobcamAddon), status, active: true, via: "plan",
     seats: limits.seats < 0 ? limits.seats : limits.seats + extraSeats,

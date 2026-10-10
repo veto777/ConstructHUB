@@ -39,7 +39,8 @@ export function tileAccess(def: DashboardTileDef, ent: TileAccessInput): TileAcc
     case "none":
       return { entitled: true };
     case "plan":
-      return ent.accessPlan ? { entitled: true } : { entitled: false, requiredPlan: PLAN_KEYS[0] };
+      // An account on à la carte items alone has allowances without a plan (shared/alacarte.ts).
+      return ent.accessPlan || ent.allowances ? { entitled: true } : { entitled: false, requiredPlan: PLAN_KEYS[0] };
     case "allowance": {
       const ok = !!ent.allowances && ent.allowances[gate.limit] !== 0;
       return ok ? { entitled: true } : { entitled: false, requiredPlan: cheapestPlanAllowing(gate.limit) };

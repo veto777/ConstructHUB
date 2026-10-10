@@ -181,10 +181,10 @@ export async function endAlacarteSubscription(sub: Stripe.Subscription): Promise
 }
 
 /** The plans that decide an account's tier: its own active platform plan, and a PAID CRM plan (never a beta or admin grant). */
-export async function alacarteAccountOf(userId: number): Promise<AlacarteAccount & { entitlements: Awaited<ReturnType<typeof getEntitlements>>; crmPlanActive: boolean }> {
+export async function alacarteAccountOf(userId: number): Promise<AlacarteAccount & { entitlements: Awaited<ReturnType<typeof getEntitlements>>; crmPlanActive: boolean; crmJobcam: boolean }> {
   const [ent, crm] = await Promise.all([getEntitlements(userId), getCrmEntitlements(userId, { fresh: true })]);
   const crmPlan = crm.via === "plan" ? crm.plan : null;
-  return { plan: ent.plan, crmPlan, entitlements: ent, crmPlanActive: !!crmPlan };
+  return { plan: ent.plan, crmPlan, entitlements: ent, crmPlanActive: !!crmPlan, crmJobcam: crm.jobcam };
 }
 
 /** The items in force (active or trialing) among an account's rows. */
@@ -335,6 +335,9 @@ export function registerAlacarteBillingRoutes(app: Express, deps: AlacarteBillin
           "crm_plan_required");
       }
       const have = { modules: ent.modules, allowances: ent.allowances, addons: ent.addons, alacarte: activeKeysOf(rows) };
+      if (it.grants.crmJobcam && account.crmJobcam && !have.alacarte.includes(order.key)) {
+        throw new BillingRequestError(409, `Your CRM plan already includes ${it.name} — there is nothing to add.`, "already_included");
+      }
       if (alacarteAlreadyCovered(order.key, have)) {
         throw new BillingRequestError(409, `Your account already has ${it.name}${have.alacarte.includes(order.key) ? "" : " through your plan"} — there is nothing to add.`, "already_included");
       }
