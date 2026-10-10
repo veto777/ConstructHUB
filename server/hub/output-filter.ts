@@ -16,6 +16,7 @@ import {
   PLANS, PLAN_KEYS, ADDONS, AGENCY_LOCATION_BANDS, ANNUAL_MONTHS, LEGACY_BAND_ANNUAL_MONTHS, GBP_REINSTATEMENT_CENTS, SALES_THRESHOLD_CENTS, TRIAL_DAYS,
   CALL_ASSISTANT_TIERS, CALL_ASSISTANT_ANNUAL_MONTHS, CALL_ASSISTANT_OVERAGE_CENTS_PER_MINUTE, type PlanKey,
 } from "@shared/plans";
+import { ALACARTE, ALACARTE_KEYS, ALACARTE_LINKED, ALACARTE_ADDON_ONLY, alacartePriceCents } from "@shared/alacarte";
 import { CRM_PLANS, CRM_PLAN_KEYS, CRM_TRIAL_DAYS, CRM_EXTRA_SEAT_MONTHLY_CENTS, CRM_EXTRA_SEAT_ANNUAL_CENTS } from "@shared/crm-plans";
 import { hubLinkFor } from "@shared/hub-links";
 import { DFY_CATALOG, COURSE_BUNDLE } from "../catalog";
@@ -145,13 +146,26 @@ export const NOT_SOLD: RegExp[] = [
   /\bzapier\b/i, /\baffiliate program\b/i, /\bpartner program\b/i, /\b(phone|live chat|24\/7) support\b/i,
   // SEO suite add-ons are sold; individual rank-tracking, keyword and backlink add-ons are not.
   // (\b does not see "à" as a word character, so the boundary is written out.)
-  /\b(rank[- ]?track\w*|keyword[- ]research|backlinks?) (add-?ons?|addon)\b/i, /(?:^|[^\p{L}])[àa][ -]la[ -]carte(?![\p{L}])/iu,
+  /\b(rank[- ]?track\w*|keyword[- ]research|backlinks?) (add-?ons?|addon)\b/i,
   /\b(add-?ons?|addon|upgrade) for (the |your )?(seo|rank[- ]?track\w*|keyword[- ]research|backlinks?)\b/i,
   // Owner, 2026-10-08: the AI Call Assistant is a separate service with its own subscription — never "an add-on to
   // the Pro plan", and no plan or CRM plan includes it.
   /\bcall assistant\b[^.]{0,40}\b(an? )?(add-?on|addon) (to|for|on|of) (the |a |any |your |every )?(?:[\w,]+[- ]){0,6}plans?\b/i,
   /\b(starter|pro|growth|agency|every|any|all|each|crm)( plan)?s? (include|includes|come with|comes with|gets?|has|have)\b[^.]{0,30}\bcall assistant\b/i,
 ];
+/**
+ * "À la carte" is a real offer since 2026-10-10 (shared/alacarte.ts): every tool on its own subscription. A sentence
+ * may say so when it names a real à la carte item, one of the other stand-alone products, or the tools as a whole;
+ * "rank tracking à la carte" (not an item) stays blocked. (\b does not see "à" as a word character, so the boundary
+ * is written out.)
+ */
+const ALACARTE_PHRASE = /(?:^|[^\p{L}])[àa][ -]la[ -]carte(?![\p{L}])/iu;
+const ALACARTE_ITEM_NAMES = new RegExp(
+  "\\b(" + [
+    ...ALACARTE_KEYS.map((k) => ALACARTE[k].name), ...ALACARTE_LINKED.map((l) => l.name), ...ALACARTE_ADDON_ONLY.map((a) => a.name),
+    "Profile Guard", "Click Guard", "IP Tracker", "VPN Shield", "Site Scan", "Site Scans", "SEO suite", "SEO suites", "the CRM", "JobCam",
+    "every tool", "any tool", "any single tool", "each tool", "single tool", "single tools", "the tools", "every single tool", "a tool", "one tool", "tools",
+  ].map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+")).join("|") + ")(?![\\p{L}])", "iu");
 /** A sentence about the SEO tools (for the amounts it may carry). */
 const SEO_TOPIC = /\b(seo|rank[- ]?track\w*|keyword[- ]research|backlinks?)\b/i;
 /** In a sentence about SEO, an amount may only be the price of a plan that includes the tools… */
@@ -167,6 +181,12 @@ const SEO_CREDIT_CENTS: ReadonlySet<number> = new Set([
 const SEO_CREDIT_CUE = /\b(credits?|prepaid|packs?|data|allowance)\b/i;
 /** SEO suite add-on prices only: an unrelated add-on's price cannot price SEO. */
 const SEO_ADDON_PRICE_CENTS: ReadonlySet<number> = new Set(Object.values(ADDONS).filter((a) => a.exclusiveGroup === "seo_addon").flatMap((a) => [a.monthlyCents, a.annualCents]));
+/** The SEO suites à la carte (shared/alacarte.ts seo_basic / seo_pro): both tiers, monthly and yearly — in a sentence that says so. */
+const SEO_ALACARTE_CENTS: ReadonlySet<number> = new Set(
+  ALACARTE_KEYS.filter((k) => ALACARTE[k].exclusiveGroup === "seo").flatMap((k) => (["standalone", "addon"] as const).flatMap((t) => [alacartePriceCents(k, t, "month"), alacartePriceCents(k, t, "year")])));
+/** The Master Class à la carte: both tiers, monthly and yearly (the modules and bundle stay sales-only, O11). */
+const MASTER_CLASS_ALACARTE_CENTS: ReadonlySet<number> = new Set((["standalone", "addon"] as const).flatMap((t) => [alacartePriceCents("master_class", t, "month"), alacartePriceCents("master_class", t, "year")]));
+const ALACARTE_CUE = /(?:^|[^\p{L}])[àa][ -]la[ -]carte(?![\p{L}])|\bon (its|their) own\b|\bstand-?alone\b|\bwith no plan\b/iu;
 const ADDON_PRICE_CENTS: ReadonlySet<number> = new Set(Object.values(ADDONS).flatMap((a) => [a.monthlyCents, a.annualCents, ...(a.setupCents ? [a.setupCents] : [])]));
 /** ADDON_CUE without the SEO data words, so "SEO data" alone never opens the add-on exemption. */
 const addonCueWithoutSeo = (s: string) => ADDON_CUE.test(s.replace(/\bseo data\b|\bdata credit\b/gi, " "));
@@ -759,6 +779,7 @@ function checkContent(linkless: string, opts: FilterOptions, book: KnowledgeBook
     const rest = s.replace(/\bGoogle Guarantee(d)?\b/gi, "");
     if (/guarante/i.test(rest) && !NEG.test(rest)) block("O10");
     if (NOT_SOLD.some((re) => re.test(s)) && !NEG.test(s)) block("O10");
+    if (ALACARTE_PHRASE.test(s) && !ALACARTE_ITEM_NAMES.test(s) && !NEG.test(s)) block("O10");
     for (const re of COMMERCIAL_UNLESS_NEGATED) {
       const m = s.match(re);
       if (m && !NEG.test(`${s.slice(0, m.index)} ${s.slice(m.index! + m[0].length)}`)) block("O10");
@@ -785,7 +806,7 @@ function checkContent(linkless: string, opts: FilterOptions, book: KnowledgeBook
       const agency = /\bAgency\b/.test(s), credit = SEO_CREDIT_CUE.test(s), addon = addonCueWithoutSeo(s);
       for (const m of s.matchAll(/\$\s?(\d[\d,]*(?:\.\d{1,2})?)/g)) {
         const cents = toCents(m[1]);
-        if (cents === SALES_THRESHOLD_CENTS || (agency && SEO_PLAN_CENTS.has(cents)) || (credit && SEO_CREDIT_CENTS.has(cents)) || (addon && SEO_ADDON_PRICE_CENTS.has(cents))) continue;
+        if (cents === SALES_THRESHOLD_CENTS || (agency && SEO_PLAN_CENTS.has(cents)) || (credit && SEO_CREDIT_CENTS.has(cents)) || (addon && SEO_ADDON_PRICE_CENTS.has(cents)) || (ALACARTE_CUE.test(s) && SEO_ALACARTE_CENTS.has(cents))) continue;
         block("O10");
       }
     }
@@ -793,10 +814,13 @@ function checkContent(linkless: string, opts: FilterOptions, book: KnowledgeBook
     if (statesCount(s) || FOUNDING_LIMITS.some((re) => re.test(s))) block("O10");
   }
 
-  // O11 — a sales-only item next to a price
+  // O11 — a sales-only item next to a price. The Master Class's modules and bundle are sales-only, but the
+  // Master Class à la carte (shared/alacarte.ts master_class) is a listed subscription: a sentence that says so
+  // ("on its own", "à la carte") and carries only its price-book amounts passes.
   for (const s of sentences) {
     if (!/\$\s?\d/.test(s)) continue;
     const lower = s.toLowerCase();
+    if (ALACARTE_CUE.test(s) && [...s.matchAll(/\$\s?(\d[\d,]*(?:\.\d{1,2})?)/g)].every((m) => MASTER_CLASS_ALACARTE_CENTS.has(toCents(m[1])))) continue;
     if (SALES_ONLY_NAMES.some((name) => lower.includes(name.toLowerCase()))) block("O11");
   }
 

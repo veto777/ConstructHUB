@@ -14,6 +14,7 @@ import {
   callAssistantOverageLine, callAssistantOverageRule, callAssistantOverageStatusLine, callAssistantTiersShortLine, callAssistantAvailabilityLine, formatCentsShort,
 } from "@shared/plan-copy";
 import { CALL_ASSISTANT_TIERS, CALL_ASSISTANT_FREE_SPAM_CALLS, CALL_ASSISTANT_OVERAGE_RATES, CALL_ASSISTANT_ANNUAL_MONTHS } from "@shared/plans";
+import { ALACARTE_KEYS, alacartePriceCents } from "@shared/alacarte";
 import { SPAM_STRIKES_TO_BLOCK } from "./voice/spam";
 import { COURSE_BUNDLE } from "./catalog";
 import { FORWARDING_ADVICE } from "./voice/numbers";
@@ -293,6 +294,8 @@ describe("AI assistant prompts use the price book", () => {
       ...CRM_PLAN_KEYS.map((k) => CRM_PLANS[k].annualCents),
       // The Unlimited plan's own feature line states the Master Class's listed price.
       COURSE_BUNDLE.priceCents,
+      // Every tool à la carte (shared/alacarte.ts): the yearly prices of both tiers are listed prices too.
+      ...ALACARTE_KEYS.flatMap((k) => [alacartePriceCents(k, "standalone", "year"), alacartePriceCents(k, "addon", "year")]),
       SALES_THRESHOLD_CENTS,
     ]);
     const text = HUB_TEXT;

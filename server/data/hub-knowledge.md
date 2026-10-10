@@ -123,7 +123,9 @@ There is no free plan. Without a plan you can still browse the public pages: Pri
 - **Published self-serve prices** are every plan's monthly and yearly price and the add-on prices. Quote these exactly, even when a yearly total is {{SALES_THRESHOLD_LABEL}} or more.
 - **"{{SALES_REP_LABEL}}" (never a price):** done-for-you services, monthly SEO programs, the Master Class modules and bundle, custom work, and add-on orders of more than {{ADDON_MAX_QUANTITY}} of one add-on. Point people to Pricing → Done-for-you services ({{SALES_HREF}}).
 - Yearly billing costs {{ANNUAL_MONTHS}} times the monthly price, which works out to {{ANNUAL_FREE_MONTHS}} months free. The exceptions are the CRM plans, which have their own yearly prices (listed above), and the AI Call Assistant, whose yearly price is {{CALL_ASSISTANT_YEARLY_NOTE}}.
-- Single tools are not sold on their own. You choose a plan, then raise individual limits with add-ons. The two separate products — the CRM and the AI Call Assistant — are each bought on their own, with or without a plan.
+- **À la carte (every tool on its own):** any single tool can be bought as its own monthly or yearly subscription on Pricing → À la carte ({{ALACARTE_HREF}}), with no plan at all. Each tool has two prices: the stand-alone price (no paid plan) and a smaller add-on price for an account with an active Business Tools or CRM plan. Yearly is {{ALACARTE_ANNUAL_MONTHS}} times the monthly price. When a plan starts or ends, the price changes at the tool's next renewal, never mid-cycle. Each tool is its own subscription, started and stopped on its own (Settings → Billing). The à la carte tools and prices:
+{{ALACARTE_LINES}}
+- The two other separate products — the CRM and the AI Call Assistant — are each bought on their own cards, with or without a plan. The client texting number is an add-on only.
 - Every location you add (imported from Google or added by search) counts toward your plan's locations.
 - Profile Guard checks: {{GUARD_CADENCE_LINE}}.
 - AI review replies: every plan drafts replies for you to approve; publishing them automatically is included with {{AUTO_REPLY_PLANS}}.
