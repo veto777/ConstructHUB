@@ -14,10 +14,10 @@ describe("adapter registry", () => {
     expect(getAdapter(null)).toBeNull();
   });
   it("marks the scraper.ts wrappers as legacy (no listRecent)", () => {
-    const a = getAdapter("SmartGov")!;
+    const a = getAdapter("Skagit County")!;
     expect(isLegacyAdapter(a)).toBe(true);
     expect(a.capabilities.listRecent).toBe(false);
-    expect(supportsAlerts("SmartGov")).toBe(false);
+    expect(supportsAlerts("Skagit County")).toBe(false);
   });
   it("prefers a jurisdiction-specific adapter over the platform adapter", () => {
     const fake: PortalAdapter = { platform: "Test open data", capabilities: { search: ["address"], listRecent: true, detail: false }, search: async () => [], listRecent: async () => [] };
