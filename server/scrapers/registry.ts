@@ -87,3 +87,8 @@ registerAdapter(legacy("eTRAKiT", [], ["permit", "name", "company"]));
 registerAdapter(legacy("Accela", ["Accela Citizen Access"], ["address", "permit", "name"]));
 registerAdapter(legacy("Click2Gov", [], ["address", "permit", "name"]));
 registerAdapter(legacy("FTG Portal", [], ["name", "company"]));
+
+import permitEyesAdapter from "./permiteyes";
+import sdlPortalAdapter from "./sdl-portal";
+registerAdapter(permitEyesAdapter);
+registerAdapter(sdlPortalAdapter);
