@@ -24,6 +24,16 @@ export function cityviewSearchUrl(root: string, value: string, page: number, cat
   return url.href;
 }
 
+function publicRecordUrl(input: string, root: string): string {
+  const url = new URL(input, root + "/");
+  const base = new URL(root);
+  const expected = base.pathname.replace(/\/$/, "").toLowerCase() + "/permit/";
+  if (url.origin !== base.origin || !url.pathname.toLowerCase().startsWith(expected) || !/\/(?:Status|StatusReference)$/i.test(url.pathname)) {
+    throw new Error("CityView returned a record link outside the tenant's public permit pages");
+  }
+  return url.href;
+}
+
 function checkPage(html: string, url: string): void {
   if (/captcha|cf-chl-|verify you are human|access denied/i.test(html)) throw new PortalBlockedError(url, 403, "CityView challenge/access denial");
   if (/type=["']password["']/i.test(html) || /\/Account\/Logon(?:\?|$)/i.test(url)) throw new PortalBlockedError(url, 401, "CityView requires sign-in");
@@ -34,6 +44,7 @@ export function parseCityviewResults(payload: unknown, ctx: Identity, root: stri
   if (!payload || typeof payload !== "object" || !("View" in payload)) throw new Error("Invalid CityView results response");
   const p = payload as { View: unknown; RedirectUrl?: unknown; LocationMarkers?: unknown };
   if (p.RedirectUrl) {
+    if (/captcha/i.test(String(p.RedirectUrl))) throw new PortalBlockedError(root, 403, "CityView redirected to CAPTCHA");
     if (/Logon/i.test(String(p.RedirectUrl))) throw new PortalBlockedError(root, 401, "CityView redirected to sign-in");
     throw new Error(`CityView redirected results: ${String(p.RedirectUrl)}`);
   }
@@ -52,8 +63,8 @@ export function parseCityviewResults(payload: unknown, ctx: Identity, root: stri
     const marker = markers.find(m => m.ReferenceNumber === permitNumber);
     const locations = r.find(".displayField").filter((_, e) => /^(Locations?|Address):?$/i.test($(e).find("label").first().text().trim())).find(".right1 .basicText").toArray().map(e => $(e).text().trim()).filter(Boolean);
     const href = r.find('a[href*="/Permit/Status?"]').first().attr("href");
-    const source = href ? new URL(href, root + "/").href : text(marker?.LinkUri);
-    if (source && new URL(source).origin !== new URL(root).origin) throw new Error("CityView returned an unexpected record host");
+    const link = href ?? text(marker?.LinkUri);
+    const source = link ? publicRecordUrl(link, root) : null;
     const point = marker?.MapPoint as Record<string, unknown> | undefined;
     const relation = marker?.MapRelationValue as Record<string, unknown> | undefined;
     const loc = (row as unknown as { sourceCodeLocation?: { startOffset: number; endOffset: number } }).sourceCodeLocation;
@@ -149,9 +160,7 @@ const adapter: PortalAdapter = {
       try { payload = JSON.parse(response.body); } catch { throw new Error("CityView returned non-JSON results"); }
       const redirect = (payload as { RedirectUrl?: unknown })?.RedirectUrl;
       if (typeof redirect === "string" && /\/Permit\/Status\?/i.test(redirect)) {
-        const target = new URL(redirect, s.root + "/");
-        if (target.origin !== new URL(s.root).origin || !target.pathname.toLowerCase().startsWith(new URL(s.root).pathname.toLowerCase().replace(/\/$/, "") + "/permit/")) throw new Error("CityView redirected outside the tenant");
-        const detail = await s.get(target.href);
+        const detail = await s.get(publicRecordUrl(redirect, s.root));
         return [parseCityviewDetail(detail.body, { databaseId: ctx.databaseId, jurisdiction: ctx.jurisdiction }, detail.url)];
       }
       const parsed = parseCityviewResults(payload, { databaseId: ctx.databaseId, jurisdiction: ctx.jurisdiction }, s.root);

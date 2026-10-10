@@ -1,0 +1,286 @@
+[
+  {
+    "slug": "govpilot",
+    "target": {
+      "jurisdiction": "Avalon, NJ",
+      "url": "https://main.govpilot.com/web/public/8cbc19df-997_Construction-Permit-Borough-of-Avalon?uid=6913&ust=NJ&pu=1&id=0",
+      "platform": "GovPilot (Construction Permit / Inspection Request)",
+      "sourceUrl": "https://avalonboro.net/government/department-of-administration/avalon-construction-2/",
+      "linkStatus": "verified"
+    },
+    "type": "address",
+    "value": "100 Dune",
+    "started": "2026-10-10T17:53:03.356Z",
+    "count": 22,
+    "elapsedMs": 887,
+    "requests": [
+      {
+        "url": "https://main.govpilot.com/web/public/8cbc19df-997_Construction-Permit-Borough-of-Avalon?uid=6913&ust=NJ&pu=1&id=0",
+        "method": "GET",
+        "status": 200,
+        "file": "avalon-address-0.html"
+      },
+      {
+        "url": "https://api-main.govpilot.com/api/v1/lookup/address/module-search",
+        "method": "POST",
+        "status": 200,
+        "file": "avalon-address-1.json"
+      }
+    ]
+  },
+  {
+    "slug": "govpilot",
+    "target": {
+      "jurisdiction": "Cranbury, NJ",
+      "url": "https://main.govpilot.com/web/public/23ab5fde-290_Construction-Permit-Township-of-Cranbury?uid=7199&ust=NJ&pu=1&id=0",
+      "platform": "GovPilot",
+      "sourceUrl": "https://www.cranburytownship.org/1352/Departments",
+      "linkStatus": "unconfirmed"
+    },
+    "type": "address",
+    "value": "23 NORTH MAIN",
+    "started": "2026-10-10T17:55:18.494Z",
+    "count": 72,
+    "elapsedMs": 786,
+    "requests": [
+      {
+        "url": "https://main.govpilot.com/web/public/23ab5fde-290_Construction-Permit-Township-of-Cranbury?uid=7199&ust=NJ&pu=1&id=0",
+        "method": "GET",
+        "status": 200,
+        "file": "cranbury-address-0.html"
+      },
+      {
+        "url": "https://api-main.govpilot.com/api/v1/lookup/address/module-search",
+        "method": "POST",
+        "status": 200,
+        "file": "cranbury-address-1.json"
+      }
+    ]
+  },
+  {
+    "slug": "govpilot",
+    "target": {
+      "jurisdiction": "Cranbury, NJ",
+      "url": "https://main.govpilot.com/web/public/23ab5fde-290_Construction-Permit-Township-of-Cranbury?uid=7199&ust=NJ&pu=1&id=0",
+      "platform": "GovPilot",
+      "sourceUrl": "https://www.cranburytownship.org/1352/Departments",
+      "linkStatus": "unconfirmed"
+    },
+    "type": "permit",
+    "value": "24-085",
+    "started": "2026-10-10T17:55:20.759Z",
+    "count": 7,
+    "elapsedMs": 812,
+    "requests": [
+      {
+        "url": "https://main.govpilot.com/web/public/23ab5fde-290_Construction-Permit-Township-of-Cranbury?uid=7199&ust=NJ&pu=1&id=0",
+        "method": "GET",
+        "status": 200,
+        "file": "cranbury-permit-0.html"
+      },
+      {
+        "url": "https://api-main.govpilot.com/api/v1/lookup/address/module-search",
+        "method": "POST",
+        "status": 200,
+        "file": "cranbury-permit-1.json"
+      }
+    ]
+  },
+  {
+    "slug": "govpilot",
+    "target": {
+      "jurisdiction": "Avalon, NJ",
+      "url": "https://main.govpilot.com/web/public/8cbc19df-997_Construction-Permit-Borough-of-Avalon?uid=6913&ust=NJ&pu=1&id=0",
+      "platform": "GovPilot (Construction Permit / Inspection Request)",
+      "sourceUrl": "https://avalonboro.net/government/department-of-administration/avalon-construction-2/",
+      "linkStatus": "verified"
+    },
+    "type": "permit",
+    "value": "20110420",
+    "started": "2026-10-10T17:55:28.669Z",
+    "count": 1,
+    "elapsedMs": 636,
+    "requests": [
+      {
+        "url": "https://main.govpilot.com/web/public/8cbc19df-997_Construction-Permit-Borough-of-Avalon?uid=6913&ust=NJ&pu=1&id=0",
+        "method": "GET",
+        "status": 200,
+        "file": "avalon-permit-0.html"
+      },
+      {
+        "url": "https://api-main.govpilot.com/api/v1/lookup/address/module-search",
+        "method": "POST",
+        "status": 200,
+        "file": "avalon-permit-1.json"
+      }
+    ]
+  },
+  {
+    "slug": "govpilot",
+    "target": {
+      "jurisdiction": "Cranbury, NJ",
+      "url": "https://main.govpilot.com/web/public/23ab5fde-290_Construction-Permit-Township-of-Cranbury?uid=7199&ust=NJ&pu=1&id=0",
+      "platform": "GovPilot",
+      "sourceUrl": "https://www.cranburytownship.org/1352/Departments",
+      "linkStatus": "unconfirmed"
+    },
+    "type": "recent",
+    "value": "2026-10-03T00:00:00Z",
+    "started": "2026-10-10T17:55:23.058Z",
+    "count": 0,
+    "elapsedMs": 1,
+    "requests": []
+  },
+  {
+    "slug": "govpilot",
+    "target": {
+      "jurisdiction": "Maplewood, NJ",
+      "url": "https://main.govpilot.com/web/public/129d48cb-7b2_Construction-Permit-Township-of-Maplewood?uid=7127&ust=NJ&pu=1&id=0",
+      "platform": "GovPilot (Construction Permit)",
+      "sourceUrl": "https://www.maplewoodnj.gov/government/community-development/construction-division/how-to-submit-a-construction-permit-application-obtain-inspections",
+      "linkStatus": "verified"
+    },
+    "type": "address",
+    "value": "123 Maplewood",
+    "started": "2026-10-10T17:52:43.198Z",
+    "count": 8,
+    "elapsedMs": 904,
+    "requests": [
+      {
+        "url": "https://main.govpilot.com/web/public/129d48cb-7b2_Construction-Permit-Township-of-Maplewood?uid=7127&ust=NJ&pu=1&id=0",
+        "method": "GET",
+        "status": 200,
+        "file": "maplewood-address-0.html"
+      },
+      {
+        "url": "https://api-main.govpilot.com/api/v1/lookup/address/module-search",
+        "method": "POST",
+        "status": 200,
+        "file": "maplewood-address-1.json"
+      }
+    ]
+  },
+  {
+    "slug": "govpilot",
+    "target": {
+      "jurisdiction": "Maplewood, NJ",
+      "url": "https://main.govpilot.com/web/public/129d48cb-7b2_Construction-Permit-Township-of-Maplewood?uid=7127&ust=NJ&pu=1&id=0",
+      "platform": "GovPilot (Construction Permit)",
+      "sourceUrl": "https://www.maplewoodnj.gov/government/community-development/construction-division/how-to-submit-a-construction-permit-application-obtain-inspections",
+      "linkStatus": "verified"
+    },
+    "type": "recent",
+    "value": "2026-10-03T00:00:00Z",
+    "started": "2026-10-10T17:55:27.189Z",
+    "count": 0,
+    "elapsedMs": 1,
+    "requests": []
+  },
+  {
+    "slug": "govpilot",
+    "target": {
+      "jurisdiction": "Cranbury, NJ",
+      "url": "https://main.govpilot.com/web/public/23ab5fde-290_Construction-Permit-Township-of-Cranbury?uid=7199&ust=NJ&pu=1&id=0",
+      "platform": "GovPilot",
+      "sourceUrl": "https://www.cranburytownship.org/1352/Departments",
+      "linkStatus": "unconfirmed"
+    },
+    "type": "permit",
+    "value": "CONSTRUCTHUB-NO-SUCH-PERMIT-20261010",
+    "started": "2026-10-10T17:56:17.222Z",
+    "count": 0,
+    "elapsedMs": 547,
+    "requests": [
+      {
+        "url": "https://main.govpilot.com/web/public/23ab5fde-290_Construction-Permit-Township-of-Cranbury?uid=7199&ust=NJ&pu=1&id=0",
+        "method": "GET",
+        "status": 200,
+        "file": "cranbury-empty-0.html"
+      },
+      {
+        "url": "https://api-main.govpilot.com/api/v1/lookup/address/module-search",
+        "method": "POST",
+        "status": 200,
+        "file": "cranbury-empty-1.json"
+      }
+    ]
+  },
+  {
+    "slug": "govpilot",
+    "target": {
+      "jurisdiction": "Avalon, NJ",
+      "url": "https://main.govpilot.com/web/public/8cbc19df-997_Construction-Permit-Borough-of-Avalon?uid=6913&ust=NJ&pu=1&id=0",
+      "platform": "GovPilot (Construction Permit / Inspection Request)",
+      "sourceUrl": "https://avalonboro.net/government/department-of-administration/avalon-construction-2/",
+      "linkStatus": "verified"
+    },
+    "type": "recent",
+    "value": "2026-10-03T00:00:00Z",
+    "started": "2026-10-10T17:55:30.786Z",
+    "count": 0,
+    "elapsedMs": 1,
+    "requests": []
+  },
+  {
+    "slug": "govpilot",
+    "target": {
+      "jurisdiction": "Maplewood, NJ",
+      "url": "https://main.govpilot.com/web/public/129d48cb-7b2_Construction-Permit-Township-of-Maplewood?uid=7127&ust=NJ&pu=1&id=0",
+      "platform": "GovPilot (Construction Permit)",
+      "sourceUrl": "https://www.maplewoodnj.gov/government/community-development/construction-division/how-to-submit-a-construction-permit-application-obtain-inspections",
+      "linkStatus": "verified"
+    },
+    "type": "permit",
+    "value": "2001-1079+A_1",
+    "started": "2026-10-10T17:55:24.565Z",
+    "count": 1,
+    "elapsedMs": 1076,
+    "requests": [
+      {
+        "url": "https://main.govpilot.com/web/public/129d48cb-7b2_Construction-Permit-Township-of-Maplewood?uid=7127&ust=NJ&pu=1&id=0",
+        "method": "GET",
+        "status": 200,
+        "file": "maplewood-permit-0.html"
+      },
+      {
+        "url": "https://api-main.govpilot.com/api/v1/lookup/address/module-search",
+        "method": "POST",
+        "status": 200,
+        "file": "maplewood-permit-1.json"
+      }
+    ]
+  },
+  {
+    "capture": "initial manual survey; exact timestamp not retained",
+    "date": "2026-10-10",
+    "requests": [
+      {
+        "file": "cranbury-main.json",
+        "url": "https://api-main.govpilot.com/api/v1/lookup/address/module-search",
+        "method": "POST",
+        "body": {
+          "uid": "7199",
+          "tid": "dcee8,1",
+          "q": "Main",
+          "take": 100,
+          "skip": 0,
+          "page": 1,
+          "pageSize": 100
+        },
+        "status": 200
+      },
+      {
+        "file": "cranbury-form.html",
+        "url": "https://main.govpilot.com/web/public/23ab5fde-290_Construction-Permit-Township-of-Cranbury?uid=7199&ust=NJ&pu=1&id=0",
+        "method": "GET",
+        "status": 200
+      },
+      {
+        "file": "columbine-application.html",
+        "url": "https://main.govpilot.com/web/public/7ae3f635-ff5_Building-Permit-Application-With-Plan-Review-COLUMBINE-VALLEY?uid=9360&ust=CO&pu=1&id=0",
+        "method": "GET",
+        "status": 200
+      }
+    ]
+  }
+]

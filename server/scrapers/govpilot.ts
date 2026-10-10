@@ -32,7 +32,7 @@ export function parseGovpilotResults(payload: unknown, ctx: Pick<AdapterCtx, "da
   if (!payload || typeof payload !== "object") throw new Error("Invalid GovPilot response");
   const p = payload as { success?: unknown; status?: unknown; error?: unknown; data?: unknown };
   if (p.success !== true || p.status !== "success" || p.error || !Array.isArray(p.data)) throw new Error("GovPilot lookup failed or returned an unexpected schema");
-  return p.data.flatMap((row: unknown): PermitRecord[] => {
+  const records = p.data.flatMap((row: unknown): PermitRecord[] => {
     if (!row || typeof row !== "object" || !("FADDRESS" in row) || typeof row.FADDRESS !== "string") throw new Error("GovPilot lookup row has no display address");
     // This is the public inspection lookup's labelled permit summary, not the property's ID.
     if (/^CTRL NO:/.test(row.FADDRESS) && !row.FADDRESS.includes("PRMT NO:")) return []; // Historical control-only row: no public permit number.
@@ -48,6 +48,8 @@ export function parseGovpilotResults(payload: unknown, ctx: Pick<AdapterCtx, "da
       sourceUrl: null, raw: row as Record<string, unknown>,
     }];
   });
+  if (p.data.length && !records.length) throw new Error("GovPilot returned only control-number rows, with no public permit numbers");
+  return records;
 }
 
 const adapter: PortalAdapter = {
@@ -66,7 +68,10 @@ const adapter: PortalAdapter = {
     const payload = await politeJson(req.url, req.init, opts);
     // The observed endpoint returns all matching rows, despite the Kendo pageSize hint;
     // the public form explicitly has serverPaging:false. Do not invent pagination.
-    return parseGovpilotResults(payload, { databaseId: ctx.databaseId, jurisdiction: ctx.jurisdiction });
+    const records = parseGovpilotResults(payload, { databaseId: ctx.databaseId, jurisdiction: ctx.jurisdiction });
+    const rows = (payload as { data: unknown[] }).data;
+    if (records.length !== rows.length) ctx.log(`GovPilot omitted ${rows.length - records.length} historical control-only rows without permit numbers`);
+    return records;
   },
   async listRecent(ctx) { govpilotUrl(ctx.searchUrl); ctx.log("GovPilot public lookup has no issued/applied date listing"); return []; },
 };
