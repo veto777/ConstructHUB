@@ -84,7 +84,7 @@
   "wait": "Clearpeak Exteriors",
   "actions": [
    {
-    "scroll": "text=Redstone Restoration"
+    "scroll": "text=Spruce Line Fence"
    }
   ],
   "alt": "Agency Ads and LSA manager client accounts table listing connected Google Ads accounts with customer ID, LSA status, currency and time zone, linked Click Guard site, last audit time and account status.",
@@ -98,6 +98,9 @@
   "actions": [
    {
     "scroll": "text=Review call tracking"
+   },
+   {
+    "evaluate": "document.querySelector('main').scrollTop += 52"
    }
   ],
   "alt": "Ads health audit findings for client accounts, such as campaigns not set to presence-only targeting, search terms with spend and no conversions, missing ad schedules and budget-limited campaigns, each with a fix button.",
@@ -180,7 +183,7 @@
     "wait": 1500
    },
    {
-    "scroll": "h3:has-text(\"Flagged IPs\")"
+    "scroll": "text=198.51.100.201"
    }
   ],
   "alt": "Cloudflare zone details showing IP addresses flagged by Click Guard with the reason for each and a button to add it to an edge blocking rule preview.",
@@ -235,7 +238,10 @@
     "wait": 1500
    },
    {
-    "scroll": "h3:has-text(\"Search analytics\")"
+    "scroll": "text=hail damage roof repair"
+   },
+   {
+    "evaluate": "document.querySelector('main').scrollTop += 34"
    }
   ],
   "alt": "Search analytics for a roofing website broken down by search query, showing clicks, impressions, click-through rate and average position per day.",

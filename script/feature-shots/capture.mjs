@@ -51,6 +51,7 @@ for (const s of shots.filter((x) => !x.skip)) {
       else if (a.press) await page.keyboard.press(a.press);
       else if (a.hover) await page.locator(a.hover).first().hover();
       else if (a.scroll) await page.locator(a.scroll).first().scrollIntoViewIfNeeded();
+      else if (a.evaluate) await page.evaluate(a.evaluate);
       else if (a.wait) await page.waitForTimeout(Number(a.wait));
       await page.waitForLoadState("networkidle").catch(() => {});
     }

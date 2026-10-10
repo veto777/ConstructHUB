@@ -58,6 +58,9 @@
    },
    {
     "wait": 800
+   },
+   {
+    "evaluate": "document.querySelectorAll('main,div').forEach(e => { if (e.scrollHeight > e.clientHeight) e.scrollTop += 95 })"
    }
   ],
   "alt": "GMB Edit Monitor with watched Google listings and the edit history of Summit Roofing Co., showing before and after values for website, category and phone changes.",
@@ -229,7 +232,10 @@
   "wait": "summitgutters",
   "actions": [
    {
-    "scroll": "text=denverhailrepair.example"
+    "scroll": "text=summitgutters.example"
+   },
+   {
+    "evaluate": "document.querySelector('main').scrollTop += 118"
    },
    {
     "wait": 400

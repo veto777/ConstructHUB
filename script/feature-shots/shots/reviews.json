@@ -70,6 +70,12 @@
    },
    {
     "wait": 1000
+   },
+   {
+    "evaluate": "document.querySelectorAll('main,div').forEach(e => { if (e.scrollHeight > e.clientHeight) e.scrollTop += 60 })"
+   },
+   {
+    "wait": 300
    }
   ],
   "alt": "One LSA account opened: totals for leads, charged leads, disputes and spend, filters, and lead cards with type, charge, contact and Good or Bad rating buttons.",
@@ -99,6 +105,9 @@
   "actions": [
    {
     "scroll": "text=Review highlight"
+   },
+   {
+    "evaluate": "document.querySelectorAll('main,div').forEach(e => { if (e.scrollHeight > e.clientHeight) e.scrollTop += 210 })"
    },
    {
     "wait": 300
@@ -222,6 +231,9 @@
    },
    {
     "scroll": "text=Apply to selected locations"
+   },
+   {
+    "evaluate": "document.querySelectorAll('main,div').forEach(e => { if (e.scrollHeight > e.clientHeight) e.scrollTop -= 170 })"
    },
    {
     "wait": 300

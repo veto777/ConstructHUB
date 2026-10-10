@@ -177,6 +177,9 @@
     "scroll": "[aria-label=\"Guide topics\"]"
    },
    {
+    "evaluate": "document.querySelector('main').scrollTop -= 80"
+   },
+   {
     "wait": 500
    }
   ],

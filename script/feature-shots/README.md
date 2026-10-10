@@ -36,3 +36,35 @@ Secure session cookie over HTTPS; Chromium treats `localhost` as a secure origin
 
 Look at every image before committing it. `server/feature-pages.test.ts` checks that every listed screen exists,
 belongs to a real page and has an alt text and a caption without prices or stats.
+
+## Killing the "Background processing is disabled" banner for captures
+
+The Cloudflare / Search Console pages show a yellow "Background processing is disabled…" notice whenever
+`GET /api/{cloudflare,gsc}/connections` reports `workerEnabled: false`, which comes from the
+`EDGE_SEARCH_WORKER_ENABLED` env var (`server/cloudflare/routes.ts`). The same env var starts the edge worker
+loop in-process (`server/cloudflare/worker.ts`), so you cannot just flip it on for a capture — the first tick
+(~1 s) would queue `discover` jobs for every seeded connection. It still could not reach a real provider (the
+seeded tokens are plaintext `sample-placeholder-not-a-token`, and `decryptToken` throws before any network
+call), but the queued/failed rows would pollute the Work-queue tab.
+
+The safe recipe used for the 2026-10-10 re-shoot (review item 3):
+
+1. Pre-flight: `SELECT state,count(*) FROM edge_jobs GROUP BY 1;` — expect only `done` rows (no queued/running).
+2. Insert two blocker rows so `scheduleEdgeDiscovery` (which skips a connection whose `discover` job ran in the
+   last hour) queues nothing:
+   `INSERT INTO edge_jobs(user_id,connection_id,kind,state,started_at,finished_at,available_at) VALUES
+   (1,930101,'discover','done',now(),now(),now()),(1,930102,'discover','done',now(),now(),now());`
+3. Add `EDGE_SEARCH_WORKER_ENABLED=true` to the lane `.env`, restart the lane
+   (`bash /tmp/chx_fs_start.sh`), verify `workerEnabled: true` on both connections endpoints.
+4. Capture `cloudflare` + `searchConsole` shots.
+5. Undo: remove the env line, delete the blocker rows
+   (`DELETE FROM edge_jobs WHERE connection_id IN (930101,930102) AND started_at > now() - interval '2 hours' AND finished_at = started_at;`),
+   restart the lane.
+
+## Shot-spec tips learned the hard way
+
+- The dashboard scrolls an inner container (`main` on most pages, sometimes a nested `div`); Playwright
+  `fullPage` does not grow the page and `clip` screenshots of tall sections time out. Use the `actions` list:
+  `scroll` a row into view, then an `evaluate` action
+  (`document.querySelectorAll('main,div').forEach(e => { if (e.scrollHeight > e.clientHeight) e.scrollTop += N })`)
+  for pixel-precise framing between sticky tab bars and cut-off rows. `capture.mjs` supports `evaluate`.
