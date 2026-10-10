@@ -12,7 +12,7 @@ import { notifyUser, logActivity } from '../account-events';
 import { AdsError, ADS_SCOPE, customerId, configured, oauthTokens, redirectUri } from './client';
 import { withAgencyLock, grant, enqueue, account } from './store';
 import { protectionInput, STARTER_NEGATIVES } from './protections';
-import { optimizationSteps } from './playbook';
+import { optimizationSteps, recommendationInputs, recommendationAction } from './playbook';
 import { requireModule } from '../entitlements';
 declare module 'express-session' {interface SessionData { adsOAuth?:{state:string;userId:number;manager:string;expires:number;redirect:string} }}
 const pageInput=z.object({q:z.string().trim().max(100).default(''),status:z.string().max(30).default(''),lsa:z.enum(['','true','false','unknown']).default(''),page:z.coerce.number().int().min(1).max(100000).default(1),limit:z.coerce.number().int().min(1).max(100).default(25)});
@@ -166,6 +166,41 @@ export function registerAdsRoutes(app:Express,auth:(req:any,res:any)=>any,option
     const batch=p.requestId;
     await withAgencyLock(user,async c=>{await c.query('BEGIN');try{for(const cid of ids) await enqueue(user,g.connection_id,p.kind,{action:p.action},cid,batch,`${batch}:${cid}`,c);await c.query('COMMIT');}catch(e){await c.query('ROLLBACK');throw e;}});
     await logActivity(req,user,'ads.bulk_queued',{kind:p.kind,batchId:batch,count:ids.length});res.status(202).json({batchId:batch,queued:ids.length});
+  });
+  // Selection counts include off-page clients and determine whether IP preview is available.
+  route('post','/recommendations/scope',async(req,res,user)=>{
+    const p=z.object({selection}).strict().parse(req.body);await grant(user);
+    const ids=await targets(user,p.selection);
+    const {rows:[r]}=await pool.query('SELECT count(*)::int mapped FROM ads_accounts WHERE user_id=$1 AND customer_id=ANY($2) AND domain_id IS NOT NULL',[user,ids]);
+    res.json({total:ids.length,mapped:r.mapped});
+  });
+  route('post','/recommendations/preview',async(req,res,user)=>{
+    const p=z.object({selection,stepIds:z.array(z.string()).min(1).max(6),inputs:recommendationInputs.default({}),requestId:z.string().uuid()}).strict().parse(req.body);
+    const steps=[...new Set(p.stepIds)].map(id=>{
+      const step=optimizationSteps.find(s=>s.id===id && s.recommendation!=='info');
+      if(!step) throw new AdsError('Choose an actionable recommendation.',400);
+      return {step,action:recommendationAction(step,p.inputs)};
+    });
+    const g=await grant(user),ids=await targets(user,p.selection);
+    const skipped:{customerId:string;stepId:string;reason:string}[]=[];
+    let queued=0;
+    await withAgencyLock(user,async c=>{
+      await c.query('BEGIN');
+      try {
+        const {rows}=await c.query('SELECT customer_id,domain_id FROM ads_accounts WHERE user_id=$1 AND customer_id=ANY($2)',[user,ids]);
+        const mapped=new Set(rows.filter(r=>r.domain_id).map(r=>r.customer_id));
+        const jobs=steps.flatMap(({step,action})=>ids.flatMap(cid=>{
+          if(step.needs==='domainMapping'&&!mapped.has(cid)) {skipped.push({customerId:cid,stepId:step.id,reason:'Map a Click Guard site first'});return [];}
+          return [{cid,step,action}];
+        }));
+        if(jobs.length) await reserve(user,jobs.length);
+        for(const {cid,step,action} of jobs) await enqueue(user,g.connection_id,'preview',{action,stepId:step.id,version:step.version,source:step.source},cid,p.requestId,`recommendations:${p.requestId}:${cid}:${step.id}`,c);
+        queued=jobs.length;
+        await c.query('COMMIT');
+      }catch(e){await c.query('ROLLBACK');throw e;}
+    });
+    await logActivity(req,user,'ads.bulk_queued',{kind:'preview',batchId:p.requestId,count:queued});
+    res.status(202).json({batchId:p.requestId,queued,skipped});
   });
   // Creates ads_invitations rows (deduped per requestId) and queues invite + invitation-
   // email jobs per client. "Confirm invitations and emails" — ads-manager.tsx.

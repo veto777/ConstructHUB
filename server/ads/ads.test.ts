@@ -276,6 +276,32 @@ describe('Owner-scoped routes, durable queue and agency scale',()=>{
     expect(state.campaign[0].geoTargetTypeSetting.positiveGeoTargetType).toBe('PRESENCE_OR_INTEREST');expect((await pool.query('SELECT status FROM ads_plans WHERE id=$1',[plan.id])).rows[0].status).toBe('reversed');
     expect((await pool.query("SELECT 1 FROM account_activity WHERE user_id=$1 AND kind='ads.write_applied'",[user])).rowCount).toBe(2);
   });
+  it('queues recommendations idempotently and never applies a suffix before confirmation',async()=>{
+    const body={selection:{ids:[cid,'2000000001']},stepIds:['ip','suffix'],inputs:{suffix:{suffix:'utm_source=google&dev={device}',mode:'set'}},requestId:randomUUID()};
+    const result=await call('/recommendations/preview',body);
+    expect(result.statusCode).toBe(202);expect(result.body.queued).toBe(3);
+    expect(result.body.skipped).toEqual([{customerId:'2000000001',stepId:'ip',reason:'Map a Click Guard site first'}]);
+    await call('/recommendations/preview',body);
+    expect((await pool.query('SELECT count(*)::int n FROM ads_jobs WHERE user_id=$1',[user])).rows[0].n).toBe(3);
+    await tick();await tick();await tick();
+    expect(api.mutate).not.toHaveBeenCalled();
+    const plan=(await pool.query("SELECT * FROM ads_plans WHERE user_id=$1 AND customer_id=$2 AND kind='suffix'",[user,cid])).rows[0];
+    expect(plan.status).toBe('preview');
+    expect((await call('/plans/confirm',{ids:[plan.id]})).statusCode).toBe(400);
+    await call('/plans/confirm',{ids:[plan.id],confirm:true});await tick();await tick();
+    expect(state.campaign[0].finalUrlSuffix).toBe(body.inputs.suffix.suffix);
+    await call('/plans/undo-preview',{ids:[plan.id]});await tick();
+    const undo=(await pool.query("SELECT id FROM ads_plans WHERE user_id=$1 AND kind='undo'",[user])).rows[0];
+    await call('/plans/confirm',{ids:[undo.id],confirm:true});await tick();
+    expect(state.campaign[0].finalUrlSuffix).toBe('');
+  });
+  it('stops a confirmed suffix plan when its observed suffix changes',async()=>{
+    await call('/recommendations/preview',{selection:{ids:[cid]},stepIds:['suffix'],inputs:{},requestId:randomUUID()});await tick();
+    const plan=(await pool.query('SELECT id FROM ads_plans WHERE user_id=$1',[user])).rows[0];
+    await call('/plans/confirm',{ids:[plan.id],confirm:true});state.campaign[0].finalUrlSuffix='outside=edit';await tick();
+    expect(api.mutate).not.toHaveBeenCalled();
+    expect((await pool.query('SELECT error FROM ads_plans WHERE id=$1',[plan.id])).rows[0].error).toMatch(/changed/);
+  });
   it('blocks stale, expired, and foreign-connection confirmations',async()=>{
     const plan=await planPresence();await call('/plans/confirm',{ids:[plan.id],confirm:true});state.campaign[0].name='Outside edit';await tick();expect(api.mutate).not.toHaveBeenCalled();expect((await pool.query('SELECT error FROM ads_plans WHERE id=$1',[plan.id])).rows[0].error).toMatch(/changed/);
     await pool.query("UPDATE ads_plans SET status='preview',expires_at=now()-interval '1 minute' WHERE id=$1",[plan.id]);expect((await call('/plans/confirm',{ids:[plan.id],confirm:true})).statusCode).toBe(409);

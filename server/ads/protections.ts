@@ -5,7 +5,7 @@ import { AdsError, type AdsApi, searchAll } from './client';
 const days = ['MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY','SUNDAY'] as const;
 const slot = z.object({dayOfWeek:z.enum(days), startHour:z.number().int().min(0).max(23), startMinute:z.enum(['ZERO','FIFTEEN','THIRTY','FORTY_FIVE']).default('ZERO'), endHour:z.number().int().min(0).max(24), endMinute:z.enum(['ZERO','FIFTEEN','THIRTY','FORTY_FIVE']).default('ZERO')}).strict();
 const minute = (m:string) => ['ZERO','FIFTEEN','THIRTY','FORTY_FIVE'].indexOf(m)*15;
-const schedule = z.array(slot).min(1).max(42).superRefine((slots,c)=> {
+export const scheduleInput = z.array(slot).min(1).max(42).superRefine((slots,c)=> {
   for(const day of days) {
     const s=slots.filter(s=>s.dayOfWeek===day).sort((a,b)=>a.startHour*60+minute(a.startMinute)-b.startHour*60-minute(b.startMinute));
     if(s.length>6 || s.some((s,i)=>s.endHour*60+minute(s.endMinute)<=s.startHour*60+minute(s.startMinute) || (s.endHour===24 && s.endMinute!=='ZERO') || (i>0 && s.startHour*60+minute(s.startMinute)<slotsEnd(s,i)))) c.addIssue({code:'custom',message:'Schedules need non-overlapping intervals, at most six per day; midnight ends at 24:00'});
@@ -13,17 +13,23 @@ const schedule = z.array(slot).min(1).max(42).superRefine((slots,c)=> {
   }
 });
 const common = {campaignIds:z.array(z.string().regex(/^\d+$/)).min(1).max(100).optional()};
+// Query pairs only; percent escapes and supported ValueTrack tokens are preserved verbatim.
+export const suffixInput = z.string().min(1).max(1000).refine(value => {
+  const plain=value.replace(/\{(?:device|network|loc_physical_ms|keyword|campaignid|adgroupid)\}/g,'token');
+  return plain.split('&').every(pair=>/^[A-Za-z0-9_.~-]+=(?:[A-Za-z0-9_.~!$'()*+,;:@/?=-]|%[0-9A-Fa-f]{2})*$/.test(pair));
+}, 'Use URL query pairs without a leading ?, spaces, fragments or unsupported tokens');
 export const protectionInput = z.discriminatedUnion('kind',[
   z.object({kind:z.literal('presence'),...common}).strict(),
-  z.object({kind:z.literal('schedule'),...common,slots:schedule}).strict(),
+  z.object({kind:z.literal('schedule'),...common,slots:scheduleInput}).strict(),
   z.object({kind:z.literal('ip'),...common}).strict(),
+  z.object({kind:z.literal('suffix'),...common,suffix:suffixInput,mode:z.enum(['set','append'])}).strict(),
   z.object({kind:z.literal('negative'),...common,name:z.string().trim().min(1).max(100),keywords:z.array(z.string().trim().min(1).max(80)).min(1).max(500),mode:z.enum(['add','replace']).default('add')}).strict(),
   z.object({kind:z.literal('placement'),urls:z.array(z.string().trim().min(3).max(250).regex(/^(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?:\/[a-zA-Z0-9._~%/-]*)?$/)).min(1).max(500)}).strict(),
 ]);
 export type ProtectionInput = z.infer<typeof protectionInput>;
 export const STARTER_NEGATIVES = ['jobs','careers','salary','training','DIY','tutorial','free','cheap'];
 export const STATE_QUERIES = {
-  campaign: `SELECT campaign.resource_name,campaign.id,campaign.name,campaign.status,campaign.advertising_channel_type,campaign.geo_target_type_setting.positive_geo_target_type FROM campaign WHERE campaign.status != 'REMOVED'`,
+  campaign: `SELECT campaign.resource_name,campaign.id,campaign.name,campaign.final_url_suffix,campaign.status,campaign.advertising_channel_type,campaign.geo_target_type_setting.positive_geo_target_type FROM campaign WHERE campaign.status != 'REMOVED'`,
   campaignCriterion: `SELECT campaign_criterion.resource_name,campaign_criterion.campaign,campaign_criterion.type,campaign_criterion.negative,campaign_criterion.ip_block.ip_address,campaign_criterion.ad_schedule.day_of_week,campaign_criterion.ad_schedule.start_hour,campaign_criterion.ad_schedule.start_minute,campaign_criterion.ad_schedule.end_hour,campaign_criterion.ad_schedule.end_minute,campaign_criterion.bid_modifier,campaign_criterion.location.geo_target_constant,campaign_criterion.local_service_id.service_id FROM campaign_criterion WHERE campaign_criterion.status != 'REMOVED' AND campaign_criterion.type IN ('IP_BLOCK','AD_SCHEDULE','LOCATION','LOCAL_SERVICE_ID')`,
   customerNegativeCriterion: `SELECT customer_negative_criterion.resource_name,customer_negative_criterion.placement.url FROM customer_negative_criterion WHERE customer_negative_criterion.type = 'PLACEMENT'`,
   sharedSet: `SELECT shared_set.resource_name,shared_set.name,shared_set.type FROM shared_set WHERE shared_set.status != 'REMOVED' AND shared_set.type = 'NEGATIVE_KEYWORDS'`,
@@ -35,7 +41,7 @@ export type State=Record<ResourceType, any[]>;
 export const emptyState=(): State => ({campaign:[],campaignCriterion:[],customerNegativeCriterion:[],sharedSet:[],sharedCriterion:[],campaignSharedSet:[]});
 export function normalize(type: ResourceType, r:any) {
   const pick=(keys:string[])=>Object.fromEntries(keys.filter(k=>r[k]!==undefined).map(k=>[k,r[k]]));
-  if(type==='campaign') return {...pick(['resourceName','id','name','status','advertisingChannelType']),geoTargetTypeSetting:{positiveGeoTargetType:r.geoTargetTypeSetting?.positiveGeoTargetType || 'UNSPECIFIED'}};
+  if(type==='campaign') return {...pick(['resourceName','id','name','status','advertisingChannelType']),finalUrlSuffix:r.finalUrlSuffix || '',geoTargetTypeSetting:{positiveGeoTargetType:r.geoTargetTypeSetting?.positiveGeoTargetType || 'UNSPECIFIED'}};
   if(type==='campaignCriterion') {
     const v:any={...pick(['resourceName','campaign','ipBlock','location','localServiceId']),negative:r.negative===true};
     if(r.adSchedule) v.adSchedule={dayOfWeek:r.adSchedule.dayOfWeek,startHour:r.adSchedule.startHour||0,startMinute:r.adSchedule.startMinute||'ZERO',endHour:r.adSchedule.endHour||0,endMinute:r.adSchedule.endMinute||'ZERO'};
@@ -62,7 +68,7 @@ export function buildPlan(cid:string,state:State,input:ProtectionInput,flagged:s
   let campaigns=state.campaign.filter(c=>!inputHasCampaigns(input)||input.campaignIds!.includes(c.id));
   if(inputHasCampaigns(input) && input.campaignIds!.some(id=>!campaigns.some(c=>c.id===id))) throw new AdsError('A selected campaign is missing. Refresh the account.',409);
   if(input.kind!=='placement') {
-    const supported=input.kind==='ip'?['SEARCH','DISPLAY']:input.kind==='negative'?['SEARCH','DISPLAY']:['SEARCH','DISPLAY','PERFORMANCE_MAX'];
+    const supported=input.kind==='suffix'?campaigns.map(c=>c.advertisingChannelType):input.kind==='ip'?['SEARCH','DISPLAY']:input.kind==='negative'?['SEARCH','DISPLAY']:['SEARCH','DISPLAY','PERFORMANCE_MAX'];
     const skipped=campaigns.filter(c=>!supported.includes(c.advertisingChannelType));
     if(skipped.length) p.warnings.push(`${skipped.length} unsupported campaigns skipped (${[...new Set(skipped.map(c=>c.advertisingChannelType))].join(', ')}).`);
     campaigns=campaigns.filter(c=>supported.includes(c.advertisingChannelType));
@@ -75,6 +81,15 @@ export function buildPlan(cid:string,state:State,input:ProtectionInput,flagged:s
     if(!['PRESENCE_OR_INTEREST','SEARCH_INTEREST'].includes(old)) throw new AdsError('Google did not provide a reversible location setting.',422);
     const update=(value:string)=>({update:{resourceName:c.resourceName,geoTargetTypeSetting:{positiveGeoTargetType:value}},updateMask:'geo_target_type_setting.positive_geo_target_type'});
     add('campaign',update('PRESENCE'),update(old));p.summary.push(`${c.name}: ${old} → PRESENCE`);
+  }
+  if(input.kind==='suffix') for(const c of campaigns) {
+    const old=c.finalUrlSuffix || '';
+    const next=input.mode==='append' && old ? old.replace(/&+$/, '')+'&'+input.suffix : input.suffix;
+    if(next.length>1000) throw new AdsError('Combined campaign suffix exceeds 1,000 characters.',422);
+    if(old===next) continue;
+    const update=(value:string)=>({update:{resourceName:c.resourceName,finalUrlSuffix:value},updateMask:'final_url_suffix'});
+    add('campaign',update(next),update(old));
+    p.summary.push(`${c.name}: ${old || '(empty)'} → ${next}`);
   }
   if(input.kind==='schedule') for(const c of campaigns) {
     const existing=state.campaignCriterion.filter(r=>r.campaign===c.resourceName && r.adSchedule);
