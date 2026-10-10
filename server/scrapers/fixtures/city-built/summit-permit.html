@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"> <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.1/dist/css/bootstrap.min.css" integrity="sha384-zCbKRCUGaJDkqS1kPbPd7TveP5iyJE0EjAuZQTgFLD2ylzuqKfdKlfG/eSrtxUkn" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.11.4/css/dataTables.bootstrap4.min.css" />
+    <link rel="stylesheet" href="https://js.arcgis.com/4.22/esri/themes/light/main.css">
+    <link rel="apple-touch-icon" sizes="57x57" href="/lib/images/apple-icon-57x57.png">
+    <link rel="apple-touch-icon" sizes="60x60" href="/lib/images/apple-icon-60x60.png">
+    <link rel="apple-touch-icon" sizes="72x72" href="/lib/images/apple-icon-72x72.png">
+    <link rel="apple-touch-icon" sizes="76x76" href="/lib/images/apple-icon-76x76.png">
+    <link rel="apple-touch-icon" sizes="114x114" href="/lib/images/apple-icon-114x114.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="/lib/images/apple-icon-120x120.png">
+    <link rel="apple-touch-icon" sizes="144x144" href="/lib/images/apple-icon-144x144.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/lib/images/apple-icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/lib/images/apple-icon-180x180.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/lib/images/android-icon-192x192.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/lib/images/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="96x96" href="/lib/images/favicon-96x96.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/lib/images/favicon-16x16.png">
+    <link rel="manifest" href="/lib/images/manifest.json">
+    <meta name="msapplication-TileColor" content="#ffffff">
+    <meta name="msapplication-TileImage" content="~/lib/images/ms-icon-144x144.png">
+    <meta name="theme-color" content="#ffffff">
+    <meta name="keywords"
+        content="permits, cityWorks, County of Summit, Summit County, Ohio, Building Standards, Sanitary Sewer Services, Barberton, Bath, Boston Heights, Boston Township, Clinton, Copley, Coventry Township, Cuyahoga Falls, Fairlawn, Green, Hudson, Lakemore, Macedonia, Mogadore, Munroe Falls, New Franklin, Northfield Center Township, Northfield Village, Norton, Peninsula, Reminderville, Richfield Township, Richfield Village, Silverlake, Springfield Township, Stow, Tallmadge, Twinsburg" />
+    <meta name="description" content="Permits - County of Summit, Summit County, Ohio: Permit Result" />
+    <meta name="twitter:title" content="Permits - County of Summit, Ohio:">
+    <meta property="og:title" content="Permits - County of Summit, Ohio:" />
+    <meta property="og:description" content="Permits - County of Summit, Ohio: Permit Result" />
+    <meta name="twitter:description" content="Permits - County of Summit, Ohio: Permit Result" />
+    <meta name="twitter:card" content="summary_large_image">
+    <meta property="og:url" content="/PermitResult" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Permits - County of Summit, Ohio" />
+    <link rel="image_src" href="/lib/images/cw_share.png" />
+    <meta property="og:image" content="~/lib/images/cw_share.png" />
+    <meta property="og:image:secure_url" content="~/lib/images/cw_share.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="474" />
+    <link rel="stylesheet" href="/css/site.css" />
+    <title>Summit County Permits - Summit County, Ohio - Permit Result</title>
+</head>
+
+<body>
+    <div class="sr-only sr-only-focusable">
+        <p>Call Sanitary Sewer: <a href="tel:330-926-2414">330-926-2414</a></p>
+        <p>Call Building Standards: <a href="tel:330-630-7280">330-630-7280</a></p>
+        <p><a href="https://co.summitoh.net/departments/Human-Resources.html">Employment opportunities</a></p>
+        <p><a class="nav-link" href="https://co.summitoh.net/">Visit the County of Summit, OH website</a></p>
+    </div><a class="sr-only sr-only-focusable" href="#content">Skip to main content</a> <!-- NAVIGATION -->
+    <nav class="navbar navbar-expand-lg navbar-blue"> <a class="nav-link" href="https://co.summitoh.net/"><img class="county-seal img-fluid" src="/lib/images/county_seal_white.png" alt="Summit County Seal" title="Summit County Seal"></a> <a class="navbar-brand" href="/">Summit County Permits</a> <button
+            class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarMenu"
+            aria-controls="navbarMenu" aria-expanded="false" aria-label="Toggle navigation"><span
+                class="navbar-toggler-icon"></span> </button>
+        <div class="collapse navbar-collapse" id="navbarMenu">
+            <ul class="navbar-nav ml-auto">
+                <li class="nav-item active"><a class="nav-link" href="/">Home</a></li>
+                <li class="nav-item"><a class="nav-link"
+                        href="https://co.summitoh.net/departments/Building-Standards.html"><span class="sr-only">Visit
+                            website for </span>Building Standards</a></li>
+                <li class="nav-item"><a class="nav-link"
+                       href="/DailyInspectionsResult">
+                        <span class="sr-only">
+                            Visit
+                            website for </span>Daily Inspections</a></li>
+                <li class="nav-item"><a class="nav-link"
+                        href="https://co.summitoh.net/departments/Sanitary-Sewer-Services.html"><span
+                            class="sr-only">Visit website for </span>Sanitary Sewer Services</a></li>
+                <li class="nav-item d-block d-lg-none"><a class="nav-link" href="tel:330-926-2414"><span
+                            class="sr-only">Call </span>Building Standards: 330-926-2414</a></li>
+                <li class="nav-item d-block d-lg-none"><a class="nav-link" href="tel:330-926-2414"><span
+                            class="sr-only">Call </span>Sanitary Sewer: 330-926-2414</a></li>
+                <li class="nav-item"><a class="nav-link" href="https://co.summitoh.net/"><span class="sr-only">Visit
+                            website for </span>County of Summit, OH</a></li>
+            </ul>
+        </div>
+    </nav><!-- /END NAVIGATION -->
+    <div class="container-fluid" id="content">
+        <!-- KEEP DIV ID #CONTENT FOR ACCESSIBILITY -->
+        <!-- CONTENT HERE -->
+        
+<div class="container py-5">
+    <div class="row">
+        <div class="col-12">
+            <a href="/" class="btn btn-outline-secondary mb-2">Back To Search</a>
+            <h1>Permit Result</h1>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-12 col-xl-12">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Permit Details</h5>
+                </div>
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="ml-2 mt-4 mb-2">
+                            <h6 class="card-title mb-0">Permit: CPR210041</h6>
+                            <div class="text-muted mb-0">Address: 445 S MAIN ST, AKRON 44311</div>
+                            <div class="text-muted mb-0">Parcel: <a href="/AddressResult?id=19738875"></a></div>
+                            <div class="text-muted mb-2">Owner: </div>
+                            <hr />
+                            <h6 class="card-title mb-0">Amount Due: $0.00</h6>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-12 col-xl-12">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Permit Information</h5>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mt-2 ml-2">
+                            <div class="text-muted mb-0">Number: CPR210041</div>
+                            <div class="text-muted mb-0">Type: Building</div>
+                            <div class="text-muted mb-0">Applied Date: </div>
+                            <div class="text-muted mb-2">Issue Date: </div>
+                            <div class="text-muted mb-0">Work Description: </div>
+                            <div class="text-muted mb-0">Stipulations: </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mt-2">
+                            <div class="text-muted mb-0">Category: Plan Review</div>
+                            <div class="text-muted mb-0">Status: CLOSED</div>
+                            <div class="text-muted mb-0">Expire Date: 01/19/2120</div>
+                            <div class="text-muted mb-2">Final Date: </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-12 col-xl-12">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 id="inspections" class="card-title mb-0">Inspections</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive pt-2 mb-2">
+                       <table id="permits" class="table" style="width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th>Inspection Type</th>
+                                    <th>Inspector</th>
+                                    <th>Status</th>
+                                    <th>Scheduled Date</th>
+                                    <th>Completed Date</th>
+                                    <th>Result</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <th></th>
+                                    <th>Inspection Type</th>
+                                    <th>Inspector</th>
+                                    <th>Status</th>
+                                    <th>Scheduled Date</th>
+                                    <th>Completed Date</th>
+                                    <th>Result</th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div id="payments" class="card mb-3">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Fees & Payments</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive pt-2 mb-2">
+                       <table id="fees" class="table" style="width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th>Date</th>
+                                    <th>Action Item</th>
+                                    <th>Qty</th>
+                                    <th>Description</th>
+                                    <th>Billed</th>
+                                    <th>Amount Paid</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                    <tr>
+                                        <td></td>
+                                        <td>01/19/2021</td>
+                                        <td>Invoice Item</td>
+                                        <td>71670.00</td>
+                                        <td>Commercial-Plan Review</td>
+                                        <td>$2,509.50</td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td></td>
+                                        <td>01/19/2021</td>
+                                        <td>Invoice Item</td>
+                                        <td></td>
+                                        <td>Trade Fees</td>
+                                        <td>$0.00</td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td></td>
+                                        <td>01/19/2021</td>
+                                        <td>Invoice Item</td>
+                                        <td></td>
+                                        <td>Single Trade Plan Review</td>
+                                        <td>$145.00</td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td></td>
+                                        <td>01/19/2021</td>
+                                        <td>Invoice Item</td>
+                                        <td></td>
+                                        <td>Sign Plan Review</td>
+                                        <td>$60.00</td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td></td>
+                                        <td>01/19/2021</td>
+                                        <td>Invoice Item</td>
+                                        <td></td>
+                                        <td>Commercial State Tax Fee</td>
+                                        <td>$0.00</td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td></td>
+                                        <td>01/19/2021</td>
+                                        <td>Invoice Item</td>
+                                        <td></td>
+                                        <td>Online Application Fee</td>
+                                        <td>$2.00</td>
+                                        <td></td>
+                                    </tr>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <th></th>
+                                    <th>Date</th>
+                                    <th>Action Item</th>
+                                    <th>Qty</th>
+                                    <th>Description</th>
+                                    <th>Billed</th>
+                                    <th>Result</th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Attachments</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive pt-2 mb-2">
+                       <table id="attachment" class="table" style="width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th>Date Created</th>
+                                    <th>Title</th>
+                                    <th>Record</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                    <tr>
+                                        <td>
+                                            <a href="https://cityworks.summitoh.net/cityworks/Services/PLL/CaseRelDocs/Download?data={%27CaRelDocsId%27:810}&amp;token=[REDACTED]"><i class="fa-solid fa-eye"></i>
+                                        </a>
+                                        </td>
+                                        <td>01/19/2021</td>
+                                        <td>PPR210045 &amp; CPR210041  Electronic Submittal 01.15.2021 dh.pdf</td>
+                                        <td>810</td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            <a href="https://cityworks.summitoh.net/cityworks/Services/PLL/CaseRelDocs/Download?data={%27CaRelDocsId%27:811}&amp;token=[REDACTED]"><i class="fa-solid fa-eye"></i>
+                                        </a>
+                                        </td>
+                                        <td>01/19/2021</td>
+                                        <td>PPR210045 &amp; CPR210041 Review APP.pdf</td>
+                                        <td>811</td>
+                                    </tr>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <th></th>
+                                    <th>Date Created</th>
+                                    <th>Title</th>
+                                    <th>Record</th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Contractor Information</h5>
+                </div>
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="mt-2 ml-2">
+                            <div class="text-muted mb-0">Name: </div>
+                            <div class="text-muted mb-0">Address: </div>
+                            <div class="text-muted mb-0">Phone: </div>
+                            <div class="text-muted mb-0">Mobile: </div>
+                            <div class="text-muted mb-0">Fax: </div>
+                            <div class="text-muted mb-2">Other: </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Applicant Information</h5>
+                </div>
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="mt-2 ml-2">
+                            <div class="text-muted mb-0">Name: Katie Veasey Gillette</div>
+                            <div class="text-muted mb-0">Address: 3200 Euclid Ave&#xD;&#xA;Cleveland OH, 44115</div>
+                            <div class="text-muted mb-0">Phone: </div>
+                            <div class="text-muted mb-0">Mobile: </div>
+                            <div class="text-muted mb-0">Fax: </div>
+                            <div class="text-muted mb-2">Other: 216.881.2444</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Owner Information</h5>
+                </div>
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="mt-2 ml-2">
+                            <div class="text-muted mb-0">Name: </div>
+                            <div class="text-muted mb-0">Address: </div>
+                            <div class="text-muted mb-0">Phone: </div>
+                            <div class="text-muted mb-0">Mobile: </div>
+                            <div class="text-muted mb-0">Fax: </div>
+                            <div class="text-muted mb-2">Other: </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Occupant Information</h5>
+                </div>
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="mt-2 ml-2">
+                            <div class="text-muted mb-0">Name: </div>
+                            <div class="text-muted mb-0">Address: </div>
+                            <div class="text-muted mb-0">Phone: </div>
+                            <div class="text-muted mb-0">Mobile: </div>
+                            <div class="text-muted mb-0">Fax: </div>
+                            <div class="text-muted mb-2">Other: </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+        <!-- /END CONTENT -->
+    </div><!-- FOOTER -->
+    <footer class="container-fluid">
+        <div class="container">
+            <div class="row the-footer justify-content-start align-items-center border-top py-3">
+                <div class="col-12 col-lg-2 text-center text-lg-right mb-2"><img class="county-seal img-fluid" style="max-width:80px;" src="/lib/images/county_seal.png" alt="The Summit County Seal" title="Summit County, Ohio"></div>
+                <div class="col-12 col-lg-5 text-center text-lg-left mb-2"><strong>COUNTY OF SUMMIT, OHIO</strong></div>
+                <div class="col-12 col-lg-5 text-center text-lg-right mb-2">Sanitary Sewer: <a
+                        href="tel:330-926-2414">330-926-2414</a><br />Building Standards: <a
+                        href="tel:330-630-7280">330-630-7280</a><br /><a
+                        href="https://co.summitoh.net/departments/Human-Resources.html">Employment</a></div>
+            </div>
+            <div class="row text-center disclaimer">
+                <div class="col-12 text-center">
+                    <p>DISCLAIMER: The County of Summit website might not have full functionality when used with certain
+                        web browsers. The site provides external links in which the information is not controlled by the
+                        County. The County is not responsible for the accuracy or legality of the content, leaving it up
+                        to the user to evaluate the information.</p>
+                </div>
+            </div>
+        </div>
+    </footer><!-- /END FOOTER -->
+    <!-- Optional JavaScript -->
+    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
+    <script src="https://code.jquery.com/ui/1.13.1/jquery-ui.min.js" integrity="sha256-eTyxS0rkjpLEo16uXTS0uVCS4815lc40K2iVpWDvdSY=" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js" integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.1/dist/js/bootstrap.min.js" integrity="sha384-VHvPCCyXqtD5DqJeNxl2dtTyhF78xXNXdkwX1CZeRusQfRKp+tA7hAShOK/B/fQ2" crossorigin="anonymous"></script>
+    <script src="https://cdn.datatables.net/1.11.4/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.4/js/dataTables.bootstrap4.min.js"></script>
+    <script src="https://js.arcgis.com/4.22/"></script>
+    <script src="/js/site.js?v=iiFrThiuxGtj_qdo2ka00-mz7FImNZ7DpzI8xRLfOak"></script>
+
+    
+    <script>
+        $(document).ready(function () {
+            $(".paymentExpand").click(function(){
+                $(this).toggleClass("open");
+                if($(this).hasClass("open")){
+                    $(this).html('<i class="fa-solid fa-minus"></i>');
+                    $(this).parent().parent().next().show();
+                }else{
+                    $(this).html('<i class="fa-solid fa-plus"></i>');
+                    $(this).parent().parent().next().hide();
+                }
+            })
+            var permitsTable = $('#permits').DataTable({
+                searching: true,
+                select: false,
+                "language": {
+                    "emptyTable":"No Permits Found"
+                }
+            });
+            var attachmentTable = $('#attachment').DataTable({
+                searching: true,
+                select: false,
+                "language": {
+                    "emptyTable":"No Attachments Found"
+                }
+            });
+        });
+    </script>
+
+</body>
+
+</html>

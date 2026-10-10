@@ -1,0 +1,1494 @@
+
+
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en-us">
+<head><title>
+	OC FastTrack - Search All Permit Type
+</title><meta id="MetaDescription" name="DESCRIPTION" content="FastTrack Permitting allows you to review permits, a plan status, schedule and review inspections, browse contractor information and field investigation reports" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta http-equiv="X-UA-Compatible" content="IE=edge,IE=8;FF=3;OtherUA=4" /><meta name="format-detection" content="telephone=no" /><link rel="stylesheet" type="text/css" href="bootstrap-3.2.0-dist/css/bootstrap.min.css" /><link rel="stylesheet" type="text/css" href="bootstrap-datepicker/css/datepicker3.css" /><link rel="stylesheet" type="text/css" href="js/DataTables-1.10.16/css/jquery.dataTables.min.css" /><link rel="stylesheet" type="text/css" href="css/R_Table.css?v=660" /><link rel="stylesheet" type="text/css" href="css/onlineservices_look.css?v=659" /><link rel="stylesheet" type="text/css" href="css/ft_tablewrap.css?v=659" /><link rel="stylesheet" type="text/css" href="css/ft_master_page.css?v=659" /><link rel="stylesheet" type="text/css" href="css/ft_refactor_styles.css?v=659" /><link rel="shortcut icon" type="image/ico" href="images/ft_icon.ico" /><link rel="shortcut icon" type="image/ico" href="https://fasttrack.ocfl.net/onlineservices/Images/ft_icon.ico" /><link rel="stylesheet" type="text/css" href="bootstrap-4.1/css/custom-dropdown.css" />
+
+    <script type="text/javascript" src="bootstrap-4.1/js/popper.js"></script>
+
+    <script type="text/javascript" src="js/jQuery-3.2.1/jquery-3.2.1.min.js"></script>
+    <script type="text/javascript" src="js/DataTables-1.10.16/js/jquery.dataTables.min.js"></script>
+     <script src="js/jquery.validate.js?v=661" type="text/javascript"></script>
+    <script src="js/additional-methods.min.js?v=661" type="text/javascript"></script>
+    <script src="bootstrap-3.2.0-dist/js/bootstrap.min.js" type="text/javascript"></script>
+
+    <script src="js/PassingFormVariables.js?v=664" type="text/javascript"></script>
+    <script src="js/UI_Features.js?v=659" type="text/javascript"></script>
+    <script src="js/FileFunctionality.js?v=670" type="text/javascript"></script>
+    <script src="js/creditcard.js?v=659" type="text/javascript"></script>
+    <script src="js/Calendar_Features.js?v=659" type="text/javascript"></script>
+    <script src="js/jquery.matchHeight.js?v=659" type="text/javascript"></script>
+    <script src="js/ShoppingCartActions.js?v=660" type="text/javascript"></script>
+    <script src="js/address_parcel_change.js?v=659" type="text/javascript"></script>
+    <script src="js/custom-dropdown.js?v=659" type="text/javascript"></script>
+
+    <script src="video-js-7.3.0/video.js"></script>
+
+    <script type="text/javascript">
+        $(document).ready(function () {
+            $("#siteLink").focus();
+            document.getElementById("pURL").value = window.location;
+            setLang();
+        });
+
+        var imageUrl = 'images/House.png';
+
+        /* bgn 08/31/21 discontinued to meet WCAG standards */
+        /* var imageUrl = new Array();
+
+        imageUrl[0] = 'images/BuildingConstruction.png';
+
+        imageUrl[1] = 'images/ConcreteBuilding.png';
+
+        imageUrl[2] = 'images/ConsBuilding.png';
+
+        imageUrl[3] = 'images/ConstructionVechile.png';
+
+        imageUrl[4] = 'images/House.png';
+
+        imageUrl[5] = 'images/HousingComplex.png';
+        imageUrl[6] = 'images/irrigation1.png';
+        imageUrl[7] = 'images/Night.png';
+        imageUrl[8] = 'images/pool.png';
+
+        imageUrl[9] = 'images/Roadway.png';
+        imageUrl[10] = 'images/School.png';
+        imageUrl[11] = 'images/Tools.png';
+        imageUrl[12] = 'images/Water.png';
+        imageUrl[13] = 'images/Welders.png';
+        imageUrl[14] = 'images/Woodhouse.png'; 
+
+        $(document).ready(function () {
+
+            $("#bannerImg").prop("src", imageUrl[Math.floor(Math.random() * 15)]);
+
+        });
+
+        */
+
+    </script>
+
+    <link href="video-js-7.3.0/video-js.min.css" rel="stylesheet" /><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" />
+     
+    <style>
+
+
+        /*Nuwan Dank: move thead styles below stop site css*/
+
+        .menu-li {
+            text-align: left;
+            border-bottom: 1px dotted #928f8f;
+        }
+
+        .menu-item:hover {
+            /*font-weight: bold;*/
+            color: yellow;
+        }
+
+        .footerCol {
+            float: left;
+            width: 20%;
+            margin: 0 0 10px 38px;
+            padding: 0;
+        }
+
+        #innerFooter {
+            padding: 40px 0 0 0;
+            width: 960px;
+            text-align: left;
+            margin: 0 auto;
+        }
+
+        #innerFooter, .footerCol li a {
+            font-size: 12px !important;
+            line-height: 13px !important;
+            color: #000 !important;
+        }
+
+        .menu-item:visited {
+            text-decoration-color: yellow;
+        }
+
+        .table-padded td {
+            padding: 0px;
+            margin: 1px;
+        }
+
+        .table-padded-7 {
+            padding: 7px;
+            margin: 2px;
+        }
+
+        .table-padded-4 {
+            padding: 4px;
+            border: 0px;
+        }
+
+        .pageBreadcrump {
+            background-color: #e9f3fb;
+            min-height: 10px;
+            vertical-align: middle;
+            height: auto;
+            border-bottom: 1px solid #65aae7;
+        }
+
+        @media (min-width: 920px) {
+            .logoImg {
+                display: none;
+            }
+        }
+
+        @media (max-width: 919px) {
+            .logoImg {
+                display: inline-block;
+            }
+        }
+
+        @media (min-width: 768px) {
+            .mobile-top-alert {
+                display: none;
+            }
+        }
+
+        @media (max-width: 767px) {
+            .mobile-top-alert {
+                display: inline-block;
+            }
+        }
+
+        @media (min-width: 768px) {
+            #divMobileSizeNotice {
+                display: none;
+            }
+        }
+
+        @media (max-width: 768px) {
+            #divMobileSizeNotice {
+                display: inline-block;
+            }
+        }
+
+        .nav-wrapper {
+  
+    
+   
+    
+}
+  .sl-nav {
+  display: inline;
+  
+}
+.sl-nav ul {
+  margin:0;
+  padding:0;
+  list-style: none;
+  position: relative;
+  display: inline-block;
+}
+.sl-nav li {
+  cursor: pointer;
+  padding-bottom:10px;
+}
+.sl-nav li ul {
+  display: none;
+}
+.sl-nav li:hover ul {
+  position: absolute;
+  top:29px;
+  right:-15px;
+  display: block;
+  background: #fff;
+  width: 120px;
+  padding-top: 0px;
+  z-index: 1;
+  border-radius:5px;
+  box-shadow: 0px 0px 20px rgba(0,0,0,0.2);
+}
+.sl-nav li:hover .triangle {
+  position: absolute;
+  top: 15px;
+  right: -10px;
+  z-index:10;
+  height: 14px;
+  overflow:hidden;
+  width: 30px;
+  background: transparent;
+}
+.sl-nav li:hover .triangle:after {
+  content: '';
+  display: block;
+  z-index: 20;
+  width: 15px;
+  transform: rotate(45deg) translateY(0px) translatex(10px);
+  height: 15px;
+  background: #fff;
+  border-radius:2px 0px 0px 0px;
+  box-shadow: 0px 0px 20px rgba(0,0,0,0.2);
+}
+.sl-nav li ul li {
+  position: relative;
+  text-align: left;
+  background: transparent;
+  padding: 15px 15px;
+  padding-bottom:0;
+  z-index: 2;
+  font-size: 15px;
+  color: #3c3c3c;
+}
+.sl-nav li ul li:last-of-type {
+  padding-bottom: 0px;
+}
+.sl-nav li ul li span {
+  padding-left: 5px;
+}
+.sl-nav li ul li span:hover, .sl-nav li ul li span.active {
+  color: #146c78;
+}
+.sl-flag {
+  display: inline-block;
+  box-shadow: 0px 0px 3px rgba(0,0,0,0.4);
+  width: 15px;
+  height: 15px;
+  background: #aaa;
+  border-radius: 50%;
+  position: relative;
+  top: 2px;
+  overflow: hidden;
+}
+.flag-de {
+background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAIAAAAC64paAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAZdEVYdFNvZnR3YXJlAHBhaW50Lm5ldCA0LjAuMTM0A1t6AAAAPUlEQVQ4T+3HMQ0AIBTE0NOHM8x9B7hgh71bIWGieUvze1m7kHGBr/AVvsJX+EpmP5dV5/gKX+ErfIUvVDYcX2NMxQC8PAAAAABJRU5ErkJggg==');
+  background-size: cover;
+  background-position: center center;
+}
+.flag-usa {
+  background-size: cover;
+  background-position: center center;
+  background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAIAAAAC64paAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAAZdEVYdFNvZnR3YXJlAHBhaW50Lm5ldCA0LjAuMTM0A1t6AAABhUlEQVQ4T2Ows82PjGixsc4LD2tysC/09Kjw8622tyuICG8u0w/cpGSCBzF4e1VmZkzw9anOzOj38a4KCW4IC22ECHYk1l9tn4gHMeTlTnZxLikvm+XiUpKW2hvgX+vnV5OVOQEoOGfOtv94AYOzU3Fd7XxHh6Lq6rlurqUx0W0J8Z1AnbW18yotonaYuOJBDBXls4A+bGpaBCTz86YEBtQCvVBSPAPIbY0oP1/aiAcxABU1Ny+2tclvbFjo5FgUF9uenNwNDLnmpkWEnV1TPRcY1O1tS4H6i4umA/0MDK2K8tlAwRqHpP1uoXgQKKraWpcClTY3LQZaCLQ5NaUX5OaWJY3++SeTC/AgBmA4AXUClUJs9ver8fKsAAYEUJCws4G21dXNB1oFdD/Qz8DQTk4C+bm2dn6DZ9bRiDQ8iAEYt8CoBpK5YBIYw0AEEZwSXX4oMB4PYoC6gCzAcDqrjGzEsMfen2xEmbMv1rSTjRi26dqRjShz9o2+6WQjBrSShQSkZAIADvW/HLrLY6cAAAAASUVORK5CYII=');
+}
+
+ 
+    </style>
+    <link rel="stylesheet" href="https://unpkg.com/boxicons@latest/css/boxicons.min.css" /><link rel="stylesheet" type="text/css" href="css/TopNavBar.css?v=708" /></head>
+
+<body id="Body" style="background-color: #0E3252;">
+    
+    <h1 style="display: none;">Search All Permit Type</h1>
+
+
+    <div class="container" style="background-color: white; padding-left: 0px; max-width: 960px; min-height: 500px; padding-right: 0px">
+        <div>
+            <nav id="topnav231" class="container no-print" style="max-width: 960px;">
+                <div class="navbar23">
+                    <i class='bx bx-menu'></i>
+                    
+                    <div class="nav-links">
+                        <div class="sidebar-logo">
+                            <span class="logo-name">
+                                <img class="img-responsive" alt="FT Logo" style="width: 70%; height: 70%; padding-left: 5px" src="Images/FastTrackLogo-nobg-white.png" />
+                            </span>
+                            <i class='bx bx-x'></i>
+                        </div>
+                        <ul class="links"> 
+                            <li><a href="default.aspx" aria-label="Default Page" ><i class='fa-solid fa-house-chimney' style="font-size: 1.5em"></i></a></li>
+                            <li style="display: block;"><a href="Login.aspx">Login</a></li>
+                            <li style="display: none;">
+                                <a href="#">My Services</a>
+                                <i class='bx bxs-chevron-down htmlcss-arrow arrow  '></i>
+                                <ul class="htmlCss-sub-menu sub-menu">
+                                    <li style="display: none;"><a href="MyDashboard.aspx">My Dashboard</a></li>
+
+
+                                    <li><a href="MyPermits.aspx">My Permits</a></li>
+                                    <li><a href="MyPermits.aspx?id=Search">My Permit Search</a></li>
+                                    
+                                    <li style="display: block"><a href="MyPermitVerification.aspx">My Permit Verification</a></li>
+                                    <li><a href="MyInspections.aspx">My Inspections</a></li>
+                                     <li  class="more">
+                                        <span>
+                                            <a href="#">My Accounts</a>
+                                            <i class='bx bxs-chevron-right arrow more-arrow'></i>
+                                        </span>
+                                        <ul class="more-sub-menu sub-menu">
+                                            <li><a href="FeesAndPayments.aspx">Pay Dues & Fees</a></li>                      
+                                            <li><a href="MyPaymentsSearch.aspx">View Payment History</a></li>
+                                            <li style="display: none;"><a href="MyLicenses.aspx">View License Information</a></li>                                                                                        
+                                            <li style="display: none;"><a href="MyEscrowAndLicenseFees.aspx">Deposit Escrow & Pay License Fees</a></li>  
+                                            <li style="display: none;"><a href="credit-reservation-account.aspx">View Credit & Reservation Accounts</a></li>
+                                        </ul>
+                                    </li>
+                                    <li class="more1">
+                                        <span>
+                                            <a href="#">My Profile</a>
+                                            <i class='bx bxs-chevron-right arrow more1-arrow'></i>
+                                        </span>
+                                        <ul class="more1-sub-menu sub-menu">
+                                            <li><a href="MyProfile.aspx">Edit Profile</a></li>
+                                            <li><a href="ChangePassword.aspx">Change Password</a></li>
+                                        </ul>
+                                    </li>
+                                   
+                                    <li><a href="AssignContractors.aspx">Assign Contractors</a></li>
+                                    <!-- NM-01/11/2018: New item -->
+                                    <li><a href="application-select-type.aspx">Apply for a Permit</a></li>
+                                    <!-- REM-01/04/2018: RES permits. New menu for permit application. -->
+
+                                </ul>
+                            </li>
+                            <li>
+                                <a href="#">Search Tools</a>
+                                <i class='bx bxs-chevron-down js-arrow arrow '></i>
+                                <ul class="js-sub-menu sub-menu">
+                                    <li><a href="DevelopmentCases.aspx">Development Cases</a></li>
+                                    <li><a href="FieldInvestigativeReports.aspx">Field Investigative Reports</a></li>
+                                    <li><a href="HearingsAndMeetings.aspx">Hearings &amp; Meetings</a></li>
+                                    <li><a href="Inspections.aspx?filter=Search">Inspections</a></li>
+                                    <li><a href="LicensedContractors.aspx">Licensed Contractors</a></li>
+                                    <li><a href="PermitsAllTypes.aspx">Permit Search (all types)</a></li>
+                                    <li><a href="Properties.aspx">Properties (Address or Parcel)</a></li>
+									<li style="display: block;"><a href="PaymentNoLogIn.aspx">Make a Payment</a></li>
+                                </ul>
+                            </li>
+                            <li>
+                                <a href="#">Resources</a>
+                                <i class='bx bxs-chevron-down js-arrow1 arrow '></i>
+                                <ul class="js-sub-menu1 sub-menu">
+                                    <li><a href="videos.aspx">FastTrack Training Hub</a></li>
+                                    <li><a href="ImpactFeesCalculator.aspx">Impact Fee Calculator</a></li>
+                                    <li><a href="http://www.ocfl.net/?tabid=368" target="_blank">Permits &amp; Licenses</a></li>
+                                    <li><a href="http://www.ocfl.net/?tabid=107" target="_blank">Planning &amp; Development</a></li>
+                                    <li><a href="https://www.ocfl.net/NeighborsHousing/CodeCompliance.aspx" target="_blank">Code Enforcement</a></li>
+                                    <li><a href="http://www.ocpafl.org/" target="_blank">Property Appraiser</a></li>
+                                    <li><a href="Resources.aspx">Forms, Fees &amp; Resources</a></li>
+                                    <li><a href="https://www.ocfl.net/Portals/0/resource%20library/Open%20Government/FeeDirectory.pdf" target="_blank">Orange County Fees</a></li>                                    
+                                    <li><a href="https://fasttrack.ocfl.net/OnlineServices/helpdocs/Unlicensed%20Contractor%20Info%20Sheet.pdf" target="_blank">Unlicensed Contractors Info</a></li>
+                                </ul>
+                            </li>
+                            <li><a href="http://www.ocfl.net/" target="_blank">OCFL.Net</a></li>
+                            <li><a href="https://www.surveymonkey.com/r/OCFT_2018" target="_blank">Survey</a></li>
+                            <li>
+                                <a href="#">Contact Us</a>
+                                <i class='bx bxs-chevron-down js-arrow2 arrow '></i>
+                                <ul class="js-sub-menu2 sub-menu">
+                                    <li><a href="Contacts.aspx">FastTrack Contacts</a></li>
+                                    <li><a href="StaffDirectory.aspx">Staff Directory</a></li>
+                                </ul>
+                            </li>
+
+                            
+                           
+                            <li style="display: none;"><a href="Logout.aspx" onclick="return confirm('Are you sure you want to logout?')">Logout</a></li>
+                        </ul>
+                    </div>
+
+                    <div translate="no" class="search-box">
+                        <a href="javascript:void(0)" id="enableRecite" title="Recite Me"><img src="Images/ReciteMe.png" style=" height:25px; margin-top:7px;" alt="Launch Recite Me assistive technology" /></a>
+                        
+                        <i class="bx bx-search" title="Quick Search" style="font-size:1.7em"></i>
+                        
+                        
+                        
+                        
+                        
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                        <a id="aShopCart" title="Shopping Cart" href="ShoppingCart.aspx"><i style="font-size:1.5em" class="fa-solid fa-cart-shopping " id="_shoppingCartItemCntNew" value="0"></i></a>
+                        
+
+                        <div class="input-group mb-3 input-box form-inline ">
+                           
+                            <select name="ddlFilter" title="Search Type" class="QuickSearchddl" id="ddlFilter">
+                                <option value="A">Address</option>
+                                <option value="F">File #</option>
+                                <option value="P">Parcel</option>
+
+                            </select>
+                         
+                            <input type="text" id="txtSearchAll" aria-label="Enter Value" placeholder="Enter Property Address" />
+
+                            
+                            <img id="imgLoadQS3" alt="Loading details..." style="display: none" class="f331" src="Images/Spinner-1s-40px.gif" />
+                            <a href="#" onclick="return fQSHelp()" title="Help" id="btnfind2"><i style="color: #071b2c; font-size: 12pt" class='fas fa-question-circle f32 '></i></a>
+                            <a href="#" title="Search" style="background-color: white; padding-left: 0px; width: 20px;" class="f33" id="btnfind"><i style="color: #071b2c;" class='bx bx-search f34'></i></a>
+
+                        </div>
+                    </div>
+                </div>
+            </nav>
+        </div>
+        <style>
+
+        </style>
+        <div style="padding-top: 51px">
+            
+
+            <span>
+                <img id="bannerImg1" height="134" width="960" alt="Orange County Fasttrack" class="img-responsive" src="Images/Oc-Fast-Track-Landing-Page-V3.jpg" />
+            </span>
+        </div>
+        <div style="background-color: white; height: 1px"></div>
+        <div style="border-bottom: 1px solid #bedbf4; height: 1px"></div>
+        <script>
+            function fQSHelp() {
+                $("#QSHelp").dialog({
+                     title: "Quick Search Help",
+                                    modal: true,
+                                    width: 265
+                });
+                return false;
+            }
+
+        </script>
+        <div id="QSHelp" style="display: none">
+            <table style="padding: 20px">
+                <tr>
+                    <td>
+                        <b>Address</b><br />
+                        Enter 3 characters minimum.<br />
+                        Examples ~ <br />
+                        7 N<br />
+                        450<br />
+                        John Young<br />
+                        3165 McCrory<br />
+                        2450 33rd Street<br />
+                        201 S Rosalind Ave<br />                        
+                        400 E South St, Orlando, FL 32801<br />
+                        <br />
+                    </td>
+                </tr>
+                 <tr>
+                    <td>
+                          <b>File #</b><br />
+                        Enter 3 characters minimum.<br />
+                        Examples ~ <br />
+                        23-<br />
+                        SE-<br />                                          
+                        CGC<br />
+                        ABA-<br />   
+                       <br />
+                    </td>
+                </tr>
+                 <tr>
+                    <td><b>Parcel</b><br />
+                        Enter parcel number.<br />
+                        Example ~<br />
+                        25-22-29-8380-11-000<br />
+                    
+                    </td>
+                </tr>
+            </table>
+
+        </div>
+        
+
+
+
+        <style>        
+
+            .cart:hover {
+                text-decoration: none;
+                color: #d60e96;
+            }
+
+            .cart .cart-basket {
+                font-size: .8rem;
+                position: relative;
+                top: -10px;
+                left: -8px;
+                width: 15px;
+                height: 15px;
+                color: #fff;
+                background-color: #418deb;
+                border-radius: 50%;
+            }
+
+            .badge2 {
+                padding-left: 9px;
+                padding-right: 9px;
+                -webkit-border-radius: 9px;
+                -moz-border-radius: 9px;
+                border-radius: 9px;
+                left: -8px;
+                top: -10px;
+            }
+
+            .label-warning[href],
+            .badge2-warning[href] {
+                background-color: #c67605;
+            }
+
+            #lblCartCount {
+                font-size: 12px;
+                background: #ff0000;
+                color: #fff;
+                padding: 0 5px;
+                vertical-align: top;
+                margin-left: -10px;
+            }
+
+            .badge1:after {
+                content: attr(value);
+                font-size: 11px;
+                background: deeppink;
+                border-radius: 50%;
+                padding: 0px 5px;
+                position: relative;
+                left: -9px;
+                top: -13px;
+                opacity: 0.9;
+                font-family: 'Poppins', sans-serif;
+            }
+
+            .content {
+                padding: 16px;
+            }
+
+            html.translated-ltr body nav.navbar.navbar-default.navbar-fixed-top {
+                padding-top: 39px;
+            }
+
+            /*The sticky class is added to the navbar with JS when it reaches its scroll position*/
+            .sticky {
+                position: fixed;
+                /*top: 0;*/
+                width: 960px;
+            }
+
+                /*Add some top padding to the page content to prevent sudden quick movement (as the navigation bar gets a new position at the top of the page (position:fixed and top:0)*/
+                .sticky + .content {
+                    padding-top: 0px;
+                }
+
+            /*.goog-te-banner-frame.skiptranslate {
+    display: none !important;
+    } 
+body {
+    top: 0px !important; 
+    }
+    */
+
+            html.translated-ltr .navbar-inner, html.translated-ltr .navbar-inner {
+                padding-top: 100px;
+            }
+        </style>
+        <input id="hdnvall" type="hidden" />
+        
+       
+
+        <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.js"></script>
+        <link rel="stylesheet" href="//code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css" />
+
+        <script id="rendered-js">
+            // search-box open close js code          
+
+            $("#ddlFilter").change(function () {
+                var val = this.value;
+
+
+                if (val == "P") { $("#txtSearchAll").attr("placeholder", "00-00-00-0000-00-000"); }
+                else if (val == "A") { $("#txtSearchAll").attr("placeholder", "Enter Property Address"); }
+                else if (val == "F") { $("#txtSearchAll").attr("placeholder", 'Enter Permit\\Case\\Report\\License #'); }
+
+            });
+
+            /*
+                        //$("#txtSearchAll").change(function () {
+                        $('#txtSearchAll').bind('input', function() {
+             
+                            var sInputVal = this.value;
+                            if (sInputVal.length > 2) {
+                                $.ajax
+                                    ({
+                                        type: "POST", url: "QuickSearch.aspx/LoadAutoCompleteData",
+                                        data: "{sMode : '" + $("#ddlFilter").val() + "', sVal : '" + sInputVal + "'}",
+                                        contentType: "application/json; charset=utf-8",
+                                        dataType: 'json',
+                                        success: function (data) {
+            
+                                            var objdata = $.parseJSON(data.d);
+            
+              
+                                            var finalDat2 = " ";
+                                            if ($("#ddlFilter").val() == "F") {
+                                                finalDat2 = $.map(objdata, function (item) {
+                                                    return {
+                                                        label: item.ADDRESS_FILENO,
+                                                        value: item.ADDRESS_FILENO,
+                                                    }
+                                                });
+            
+                                            }
+                                            else if ($("#ddlFilter").val() == "A") {
+                                                finalDat2 = $.map(objdata, function (item) {
+                                                    return {
+                                                        label: item.ADDRESS_FILENO,
+                                                        value: item.ADDRESS_FILENO,
+                                                    }
+                                                });
+            
+                                            }
+             
+             
+                                            $('#txtSearchAll').autocomplete({                                   
+                                                source: finalDat2,
+                                                minLength: 2,
+                                                autoFocus: true,
+                                                delay: 0,
+                                                disabled: false,
+                                          select: function(event, ui) {
+            
+                                                     var TABKEY = 9;
+                                                    this.value = ui.item.value;
+            
+                                                    if (event.keyCode == TABKEY) { 
+            
+                                                        event.preventDefault();
+                                                        this.value = this.value + " ";
+                                                        $('#txtSearchAll').focus();
+                                                    }
+            
+                                                    return false;
+                                                }                                  
+                                            });
+            
+                                        //  $('#txtSearchAll').autocomplete("enable");
+            
+                                           
+                                        },
+                                        error: function (xhr, status) {
+                                            alert('Error while loading autocomplete details.');
+                                            return false;
+                                        }
+                                    });
+                            }
+            
+                            return false;
+                        });
+            
+            */
+
+            function log(message) {
+                $("<div>").text(message).prependTo("#log");
+                $("#log").scrollTop(0);
+            }
+
+            $("#txtSearchAll").autocomplete({
+                source: function (request, response) {
+                    var sInputVal = $("#txtSearchAll").val();
+                    //alert(sInputVal);                 
+                    $.ajax({
+                        type: "POST", url: "QuickSearch.aspx/LoadAutoCompleteData",
+                        data: "{sMode : 'A', sVal : '" + sInputVal + "'}",
+                        contentType: "application/json; charset=utf-8",
+                        dataType: 'json',
+                        success: function (data) {
+
+                            var objdata = $.parseJSON(data.d);
+
+
+                            var finalDat2 = " ";
+                            finalDat2 = $.map(objdata, function (item) {
+                                return {
+                                    label: item.ADDRESS_FILENO,
+                                    value: item.ADDRESS_FILENO,
+                                }
+                            });
+
+                            // alert(finalDat2);
+                            response(finalDat2);
+                        }
+                    });
+                },
+                minLength: 3,
+                open: function () {
+                    $(this).removeClass("ui-corner-all").addClass("ui-corner-top");
+                },
+                close: function () {
+                    $(this).removeClass("ui-corner-top").addClass("ui-corner-all");
+                }
+            });
+            window.addEventListener("pageshow", () => {
+                document.getElementById("imgLoadQS3").style.display = "none";
+                  document.getElementById("btnfind2").style.display = "inline-block";
+                $('#txtSearchAll').val('');
+                $("#ddlFilter").val('A')
+
+            });
+
+            function GetFolderInfo() {
+
+                let sInputVal = $('#txtSearchAll').val();
+                let sddlVal = $("#ddlFilter").val();
+
+                if (sInputVal.trim().length < 3) {
+                    alert("Please type at least three characters to search the record(s).");
+                    document.getElementById("imgLoadQS3").style.display = "none";
+                    document.getElementById("btnfind2").style.display = "inline-block";
+                    return false;
+                }
+
+                document.getElementById("imgLoadQS3").style.display = "inline-block";
+                document.getElementById("btnfind2").style.display = "none";
+                
+
+                $.ajax
+                    ({
+                        type: "POST", url: "QuickSearch.aspx/GetFolderInfo",
+                        data: "{sMode : '" + $("#ddlFilter").val() + "', sVal : '" + sInputVal + "'}",
+                        contentType: "application/json; charset=utf-8",
+                        dataType: 'json',
+                        success: function (data) {
+
+                            var objdata = $.parseJSON(data.d);
+
+                            // alert(objdata.length);
+                            if (objdata.length == 1) {
+                                for (var i = 0; i < objdata.length; i++) {
+                                    // alert(objdata[i]["URL"]);                                    
+                                    $('#txtFolderRSN').val(objdata[0]["FOLDERRSN"]);
+                                    $('#txtReferenceFile').val(sInputVal);
+                                    document.getElementsByTagName('form')[0].action = objdata[0]["URL"];
+                                    document.getElementsByTagName('form')[0].submit();
+                                }
+                            }
+                            else if (objdata.length > 1) {
+                                let sMsg = "more than one permit or case found!";
+                                // alert(sMsg);
+
+                                //if ($("#ddlFilter").val() == "F") {
+                                //    window.location = "QuickSearch.aspx?Mode=" + sddlVal + "&Value=" + sInputVal + "";
+                                //}
+                                //else if ($("#ddlFilter").val() == "A") {
+                                //    window.location = "QuickSearch.aspx?Address=" + sInputVal + "";
+                                //}
+                                //else {
+                                //    window.location = "QuickSearch.aspx?Parcel=" + sInputVal + "";
+                                //}
+
+                                window.location = "QuickSearch.aspx?Mode=" + sddlVal + "&Value=" + sInputVal + "";
+
+
+                            }
+                            else {
+                                let sMsg = "No results found!\n\nYour search criteria does not match our records.\nPlease refine your search.";
+                                document.getElementById("imgLoadQS3").style.display = "none";
+                                document.getElementById("btnfind2").style.display = "inline-block";
+                                alert(sMsg);
+                                // window.location = "QuickSearch.aspx?Mode=" + sddlVal + "&Value=" + sInputVal + "";
+                                return false;
+                            }
+                        },
+                        error: function (xhr, status) {
+                            document.getElementById("imgLoadQS3").style.display = "none";
+                            document.getElementById("btnfind2").style.display = "inline-block";
+                            alert('Error while getting permit details.');
+                        }
+                    });
+
+                return false;
+
+            }
+
+            $('#txtSearchAll').on("keypress", function (e) {
+                if (e.keyCode == 13) {
+                    GetFolderInfo();
+                }
+            });
+
+            $("#btnfind").click(function () {
+                GetFolderInfo();
+            });
+
+            let navbar23 = document.querySelector(".navbar23");
+            let searchBox = document.querySelector(".search-box .bx-search");
+            let searchBoxCancel = document.querySelector(".search-box .bx-x");
+
+            searchBox.addEventListener("click", () => {
+                navbar23.classList.toggle("showInput");
+                if (navbar23.classList.contains("showInput")) {
+                    searchBox.classList.replace("bx-search", "bx-x");
+                } else {
+                    searchBox.classList.replace("bx-x", "bx-search");
+                }
+            });
+
+
+            // sidebar open close js code
+            let navLinks = document.querySelector(".nav-links");
+            let menuOpenBtn = document.querySelector(".navbar23 .bx-menu");
+            let menuCloseBtn = document.querySelector(".nav-links .bx-x");
+            menuOpenBtn.onclick = function () {
+                navLinks.style.left = "0";
+            };
+            menuCloseBtn.onclick = function () {
+                navLinks.style.left = "-100%";
+            };
+
+
+            // sidebar submenu open close js code
+            let htmlcssArrow = document.querySelector(".htmlcss-arrow");
+            htmlcssArrow.onclick = function () {
+                navLinks.classList.toggle("show1");
+            };
+            let moreArrow = document.querySelector(".more-arrow");
+            moreArrow.onclick = function () {
+                navLinks.classList.toggle("show2");
+            };
+            let jsArrow = document.querySelector(".js-arrow");
+            jsArrow.onclick = function () {
+                navLinks.classList.toggle("show3");
+            };
+            let js1Arrow = document.querySelector(".js-arrow1");
+            js1Arrow.onclick = function () {
+                navLinks.classList.toggle("show4");
+            };
+            let js2Arrow = document.querySelector(".js-arrow2");
+            js2Arrow.onclick = function () {
+                navLinks.classList.toggle("show5");
+            };
+            let more1Arrow = document.querySelector(".more1-arrow");
+            more1Arrow.onclick = function () {
+                navLinks.classList.toggle("show6");
+            };
+
+            //window.onscroll = function () { myFunction() };
+
+            //// Get the navbar
+            //var navbar = document.getElementById("topnav23");
+
+            //// Get the offset position of the navbar
+            //var sticky = navbar.offsetTop;
+
+            //// Add the sticky class to the navbar when you reach its scroll position. Remove "sticky" when you leave the scroll position
+            //function myFunction() {
+            //    if (window.pageYOffset >= sticky) {
+            //        navbar.classList.add("sticky")
+            //    } else {
+            //        navbar.classList.remove("sticky");
+            //    }
+            //}
+//# sourceURL=pen.js
+        </script>
+        <script>
+            function ChangeLang(fld) {
+                let sHostName = window.location.hostname;                 
+                
+                let text = document.getElementById("pURL").value; 
+
+                if (fld == "en") {
+                                    
+                    document.getElementById("pURL").value = text.replace(sHostName.toLowerCase(), "fasttrack.ocfl.net");
+                    
+                } 
+                else if (fld == "es") {
+                  
+                    document.getElementById("pURL").value = text.replace(sHostName.toLowerCase(), fld + "-fasttrack.ocfl.net");
+                    
+                } 
+                else if (fld == "cp") {
+                    
+                    document.getElementById("pURL").value = text.replace(sHostName.toLowerCase(), fld + "-fasttrack.ocfl.net");
+                    
+                } 
+
+                
+
+             //   alert(document.getElementById("pURL").value);
+
+                let strFinalURL = document.getElementById("pURL").value;
+
+                if (
+                    document.getElementById("pURL").value == "https://fasttrack.ocfl.net/OnlineServices/" ||
+                    document.getElementById("pURL").value == "https://es-fasttrack.ocfl.net/OnlineServices/" ||
+                    document.getElementById("pURL").value == "https://cp-fasttrack.ocfl.net/OnlineServices/"
+                )
+                {
+                    strFinalURL = document.getElementById("pURL").value + "default.aspx";
+                }
+                                
+                window.open(strFinalURL, "_self");
+                                               
+                return false;
+            }
+
+            function setLang() {
+                let sHostName = window.location.hostname;
+                let sHostName1 = document.getElementById("pURL").value.toLowerCase();
+
+              
+               // alert(sHostName1.includes("login"));
+                
+                if (sHostName1.includes("es-fasttrack") == true)
+                {
+                    document.getElementById("spnActive").innerHTML = "Español &nbsp;";
+                     $("#liES").hide();   
+                }
+                else  if (sHostName1.includes("cp-fasttrack") == true)
+                {
+                    document.getElementById("spnActive").innerHTML = "kreyòl &nbsp;";
+                     $("#liCP").hide();   
+                }
+                else 
+                {
+                    document.getElementById("spnActive").innerHTML = "English &nbsp;";
+                     $("#liEN").hide();   
+                }
+                
+                return false;
+
+            }
+        </script>
+        
+        <div id="idBreadCrump" class="row text-right no-print" style="max-width: 960px; margin: 0px">
+            <div class="col-sm-12  pageBreadcrump" >
+                <span id="SiteMapPath1" style="font-size:0.8em;"><a href="#SiteMapPath1_SkipLink"><img alt="Skip Navigation Links" src="/OnlineServices/WebResource.axd?d=KkwPkq3Hoi_AYbkPTBWmU77e2d1rdWraA8-tHcSqCz5X4QuYOpSZ3oDAy3WBRLYmMIFJCtLKWOvPmg04eGmT6moL5qfPLIJ4GXucMcpHX8U1&amp;t=639190689332169432" width="0" height="0" style="border-width:0px;" /></a><span><a title="Home" href="/OnlineServices/Default.aspx">Home</a></span><span> &gt; </span><span>Permits All Types</span><a id="SiteMapPath1_SkipLink"></a></span>
+            </div>
+
+        </div>
+        <div>
+                     
+        </div>
+
+        <div id="divEnvBanner" style="background-color: white; height: 0px; padding-top: 5px; font-size: 8pt; font-style: italic">
+            <table role="presentation" style="width:100%;"  >
+               
+                <tr>
+
+                    
+                    
+                    
+                    
+                    <td style="text-wrap: normal; text-align: -webkit-right" width="100%;">
+                        <div style="padding-right: 20px; width:100%; color: #a6a6a6; text-align: right; ">
+
+                            <div class="nav-wrapper">
+                                <input type="hidden" id="pURL" name="pURL" value="" />
+                                <span style="display: none;">Welcome  !! &nbsp;&nbsp;  Last Login :  <span class="cls987">
+                                    <br />
+                                </span></span>&nbsp; &nbsp; 
+                                  
+                            </div>
+                       </div>
+                    </td>
+                </tr>
+            </table>
+
+        </div>
+
+
+
+        
+        
+
+
+
+        <div class="row" style="display: none; padding-top: 15px;">
+            <div class=" col-sm-1 ">
+                &nbsp;
+            </div>
+            <div class=" col-sm-10  text-right">
+                <span id="btnShoppingCart1" style="display: none;">
+                    <span style="width: 20px;">&nbsp;</span>
+                    <button type="button" class="btn btn-primary" style="padding: 3px 7px;" onclick="window.location.href = 'ShoppingCart.aspx';">
+                        <span class="glyphicon glyphicon-shopping-cart" style="top: 3px;"></span>(<span id="shoppingCartItemCount">0</span>)
+                    </button>
+                </span>
+
+            </div>
+            <div class=" col-sm-1 ">
+                &nbsp;
+            </div>
+
+        </div>
+        <br />
+
+
+
+        <div class="row" style="padding-left: 5px; padding-right: 5px">
+            <div style="white-space: nowrap" class=" col-sm-1 "></div>
+            <div class=" col-sm-10 ">
+                <div id="content">
+                    
+
+    <div class="clearfix">
+        <div class="pull-left">
+            <div id="pageTitleNew">
+			    <!-- Put Title here -->
+			    Permits (All Types)
+            </div>
+        </div>
+    </div>
+    <form method="post" action="./PermitsAllTypes.aspx" id="ctl00" class="form-horizontal control-group">
+<div class="aspNetHidden">
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="/wEPDwUKLTcyNDgyODI5MA9kFgJmDw8WAh4LVHJhbnNsYXRpb25nZBYEAgIPZBYCZg8WAh4HVmlzaWJsZWhkAgQPZBYEAgMPFgIfAWhkAgUPFgIfAWhkZBpWqzb/0KUMRT+5XXNJRcnH6INXdbeaZyD1ESASWQEb" />
+</div>
+
+<script type="text/javascript">
+//<![CDATA[
+var theForm = document.forms['ctl00'];
+if (!theForm) {
+    theForm = document.ctl00;
+}
+function __doPostBack(eventTarget, eventArgument) {
+    if (!theForm.onsubmit || (theForm.onsubmit() != false)) {
+        theForm.__EVENTTARGET.value = eventTarget;
+        theForm.__EVENTARGUMENT.value = eventArgument;
+        theForm.submit();
+    }
+}
+//]]>
+</script>
+
+
+<script src="/OnlineServices/WebResource.axd?d=hXfH3GkhQw8c7lvtRrEQGHMvE7hgDOXbD_GGUcUrgojakfR2iYTk3R8TvjL3GKaTpa1t0vjc2EeQ12zQz3kFt8FHAC83BNohfT536vhNPpc1&amp;t=639190689332169432" type="text/javascript"></script>
+
+<div class="aspNetHidden">
+
+	<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="62A2FD8F" />
+	<input type="hidden" name="__SCROLLPOSITIONX" id="__SCROLLPOSITIONX" value="0" />
+	<input type="hidden" name="__SCROLLPOSITIONY" id="__SCROLLPOSITIONY" value="0" />
+	<input type="hidden" name="__EVENTTARGET" id="__EVENTTARGET" value="" />
+	<input type="hidden" name="__EVENTARGUMENT" id="__EVENTARGUMENT" value="" />
+	<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="/wEdAAPx1hjObwwme2BlZ91xnO06PtiRPZ3maGQWMpfeQvrFivRtNSYuJsrSqVMXINoyBZJ/mAdCGdN64BrQDJRmD8ruaAY1IW2Ou7fbEKfKbZxVMg==" />
+</div>
+        <input id="txtFolderRSN" name="FolderRSN" type="hidden" />
+        <input id="txtReferenceFile" name="ReferenceFile" type="hidden" />
+        <table class="table-responsive" style ="width:100%;" role="presentation">
+            <tr>
+                <td class="detailText">
+                    <br />
+                    If you need assistance or have questions about Orange County's Land Development Process, please refer to our <a href="Contacts.aspx" style="color: blue;" target="_blank" title="Opens new window">Contacts </a>page. </td>
+            </tr>
+            <tr>
+                <td>&nbsp;</td>
+            </tr>
+            <tr>
+                <td style="height:6px;" class="horizontalline"></td>
+            </tr>
+            <tr>
+                <td>&nbsp; </td>
+            </tr>
+        </table>
+        <table class="MenuTable" role="presentation">
+            <tr class="detailData">
+                <td style="width:40%;" class="menuDataLeftColumn"><a href="permit-building.aspx" class="alink">Building Permits</a> </td>
+                <td class="menuDataRightColumn">The Division of Building Safety is charged with the responsibility of reviewing plans, issuing permits and performing inspections for vertical construction to ensure compliance with the Florida Building Codes and local construction ordinances. The types of permit that we issue are building, electrical, gas, mechanical, plumbing, and roofing.
+                    <br />
+                </td>
+            </tr>
+            <tr class="detailData">
+                <td  class="menuDataLeftColumn"><a href="permit-environmental.aspx" class="alink">Environmental Permits</a></td>
+                <td class="menuDataRightColumn">The Environmental Permitting, Compliance, and Enforcement Section is charged with the responsibility of reviewing plans, issuing permits, performing inspections and pursuing enforcement for any activity that will cause a negative impact on the natural resources of Orange County, as protected by the County Comprehensive Policy Plan and specifically in Chapters 15 and 33 of Orange County Code. This includes the construction of boat docks, shoreline alterations (including seawall construction), lakeshore vegetation removal or enhancement, wetland and/or surface water impacts, and boat ramp construction. Some activities must be confirmed and/or approved by the Board of County Commissioners.
+                    <br />
+                </td>
+            </tr>
+            <tr class="detailData">
+                <td class="menuDataLeftColumn"><a href="permit-fire.aspx" class="alink">Fire Systems Permits</a></td>
+                <td class="menuDataRightColumn">The Office of the Fire Marshal is responsible for issuing Fire Systems permits. For questions regarding the Fire Systems permits process please call us at 407-836-0004.
+                    <br />
+                </td>
+            </tr>                    
+            <tr class="detailData">
+                <td class="menuDataLeftColumn"><a href="permit-floodplain.aspx" class="alink">Floodplain Permits</a></td>
+                <td class="menuDataRightColumn">The Stormwater Management Division is responsible for issuing floodplain permits. Floodplain permits are typically required for development occurring within the FEMA designated floodplain. Permits are issued to ensure compliance with local ordinance and Federal regulations. The applicant is required to provide an elevation certificate as part of the floodplain permit process. For questions regarding the floodplain permit process please call us at 407-836-5612.
+                    <br />
+                </td>
+            </tr>
+            <tr class="detailData">
+                <td class="menuDataLeftColumn"><a href="permit-sitework.aspx" class="alink">Site Work Permits</a></td>
+                <td class="menuDataRightColumn">The site work permitting process is the review and issuance of Right-of-Way/Underground Utilization permits and Excavation/Fill/Mass Grading permits.
+                    <br />
+                </td>
+            </tr>
+            <tr class="detailData">
+                <td class="menuDataLeftColumn"><a href="permit-zoning-review.aspx" class="alink">Zoning Review</a></td>
+                <td class="menuDataRightColumn">The Zoning Division reviews a variety of permit applications to ensure compliance with the zoning district and all development standards. Most applications require the submittal of a fully dimensioned site plan for our review. For questions regarding zoning districts or development standards please call us at 407-836-3111.
+                    <br />
+                </td>
+            </tr>
+        </table>
+               
+        
+
+<style>
+    .floatleft23 {
+	/*font: normal normal bold small sans-serif;*/
+	float: left;
+	/* margin-left:-3px; */
+	 
+}
+
+.floatright23 {
+	/*font: normal normal bold small sans-serif;*/
+	float: right;
+	/* margin-left:-3px; */
+	 
+}
+</style>
+<br />
+<br /><br />
+<br />
+<div class="padPlus hide-forData">    
+    <input name="ctl00$ContentPlaceHolder1$uc_printback$btnBack" type="button" id="ContentPlaceHolder1_uc_printback_btnBack" class="btn btn-primary   floatleft23" value="Back" onClick="window.history.go(-1);" />
+    <input name="ctl00$ContentPlaceHolder1$uc_printback$btnPrint" type="button" id="ContentPlaceHolder1_uc_printback_btnPrint" class="btn btn-primary  floatright23" value=" Print" onClick="window.print();" />
+</div>
+            
+    
+
+<script type="text/javascript">
+//<![CDATA[
+
+theForm.oldSubmit = theForm.submit;
+theForm.submit = WebForm_SaveScrollPositionSubmit;
+
+theForm.oldOnSubmit = theForm.onsubmit;
+theForm.onsubmit = WebForm_SaveScrollPositionOnSubmit;
+//]]>
+</script>
+<input type="hidden" name="as_ffc_field" value="AAAAAAXCkOs6qQmn_36e_eI5cTHvlANI8EBZey9W-sGg3PgH3YiBxIunqZyoiSQM4QmQVGsNHlz-Ou6TLwVNyyH-gnsLmH92vxaQzvz1THFNK8kQ3sMSYZfsgKvczaZtQOKMQpA6kQME7LR416NdRMSLxhwYGjTI2PhrqSo_zPIhmjdEkTxOFifGb8AynOQ8EkBiYnH69ztJTKbtMt7Tbf8dJMHK1ufbo-tt0uM0InVN86aqbwlZsola7FeZQqox_etdHamJQo5KxDHcmMNG2m-s40JJtO2M2lVpvjkRCGlLgrQtGwD9pogoq3XAMqs8BLhxUbvnoCR997QQowzrRomoqMNqMJnP7M17LPITI-g3IZwsC49pgPQOfCMJa5l9hQqtevBbfa8-Kh6A05L6R8_WH0Hspdt_kHAMQUZAPpzoDHH5cEC1A50VX-JSG964rUxw1y0VABeeh8ZIlTJD1udxa-Vc53IMC2GtMeWqqLsxy1xkpNUkoXD4CL5ac9EfVoGdHqVtxw35WLMuakESY0ESUNJvtOWxDdsiAaUciXqiPJC8sUhdtjOpu4J3AeWJYhOaLSlMsSpvcBZkKxvOvLByvqUaYMTVg5jWF5RlUlEVlaSnrPuYPqEynMmsjhQC6yhIv3vqJc8BPkAVLqHbsp4wEcchc3u2wE5x_vZmUSgNVM6HS_101hD3TRl8j1zJZZCetvV1GYH24dB7ddQ4P9P7N0vv2-nHoIisP1GStQCRjR4O2H5NFg6PlyIA9IxXPj9ab36DV310LfS27zWBq-b2i5MPzq_aS5ra-1lryZ1LdR21wVcoJ9-1CM2o8jbNSE5LLpl3qNrNQ4qfpc9WSvTRasUTjC8TdyZBnVkTh1mytvoVOT0byA8icI4opNUuPA4t6zKDt2BluJAePnKEHkMfaNeBfedhbFZFV2B1iyN6osCDKKHzBCnMsQI6Wr2pW9Fau-8C0FHHNx23P09s34BVC-vibe133e0mPTnqLAtIQO35orUVlxLnFNX67N9gzg4RZNoV1Eyi_YBpVYA-Z-AIxUv01iZR1sYJDVZjqHIG0LhSfg51clh2roMBQGRuoc5_CqW1oBxu0YowYZxfeaFtHwfBLqWGz0UVb6NurdHhoqCliSOoXMCT6q3wnly69dZPmKV40r3br3ze5BquKi9-W9qRc2QajPovcCvYaWc9tBYGy3QMXCvkaHnTQcVbVHeyWe7KgGLuOEqXv5g5fR2l_QUL" /><input type="hidden" name="as_sfid" value="AAAAAAVRAy9zl5YImBV0FC1lhfpj8lr0x63NRI3pE5cF9P1Vix1qTS7cR6WUaSzm7KywX17jZaty-arqxRJKiCL2pCHG_f2TQdasGhowl9URd1L2-b-fBoZ9I9f0HM9BQ5PMnDIRgFJarGaHGmu-SVjO7JxZ-jSsyiQByP1VLOJmb0n6-w==" /><input type="hidden" name="as_fid" value="4fb3a8791b1467ce21373392a59af56bdedf0a4d" /></form>
+
+                </div>
+            </div>
+            <div class=" col-sm-1 ">&nbsp;</div>
+
+        </div>
+        <br />
+        <br />
+
+        <br />
+        <br />
+        <div class="footerwrapNew no-print" style="background-color: lightgray;">
+            <div class="row" style="font-size: 12px">
+                <div class=" col-sm-3 ">
+                    <ul class="footerCol3">
+                        <li><a href='https://www.ocfl.net/BoardofCommissioners.aspx'>County Commission (BCC)</a></li>
+                        <li><a href='https://www.ocfl.net/OpenGovernment.aspx'>Open Government</a></li>
+                        <li><a href='https://newsroom.ocfl.net/press-box/' target="_blank" title="Orange County Newsroom website - Opens in a new window">Media Center</a></li>
+                        <li><a href='http://www.orangecountyanimalservicesfl.net' target="_blank" title="Animals and Pets website - Opens in a new window">Animals &amp; Pets</a></li>
+                        <li><a href='https://www.ocfl.net/ConventionCenter.aspx'>Convention Center</a></li>
+                    </ul>
+                </div>
+                <div class=" col-sm-3 ">
+                    <ul class="footerCol3">
+                        <li><a href='https://www.ocfl.net/CultureParks.aspx'>Culture &amp; Parks</a></li>
+                        <li><a href='https://www.ocfl.net/EconomicDevelopment.aspx'>Economic Development</a></li>
+                        <li><a href='https://www.ocfl.net/EmergencySafety.aspx'>Emergency &amp; Safety</a></li>
+                        <li><a href='https://www.ocfl.net/EmploymentVolunteerism.aspx'>Employment &amp; Volunteerism</a></li>
+                        <li><a href='https://www.ocfl.net/Environment.aspx'>Environment</a></li>
+                    </ul>
+                </div>
+                <div class=" col-sm-3">
+                    <ul class="footerCol3">
+                        <li><a href='https://www.ocfl.net/FamiliesHealthSocialSvcs.aspx'>Families, Health &amp; Social Svcs</a></li>
+                        <li><a href='https://www.ocfl.net/JailInmateServices.aspx'>Jail &amp; Inmate Services</a></li>
+                        <li><a href='https://www.ocfl.net/FamiliesHealthSocialSvcs/MedicalExaminer.aspx'>Medical Examiner</a></li>
+                        <li><a href='https://www.ocfl.net/NeighborsHousing.aspx'>Neighborhoods &amp; Housing</a></li>
+                        <li><a href='https://www.ocfl.net/PermitsLicenses.aspx'>Permits &amp; Licenses</a></li>
+                    </ul>
+                </div>
+                <div class=" col-sm-3 ">
+
+                    <ul class="footerCol3">
+                        <li><a href='https://www.ocfl.net/PlanningDevelopment.aspx'>Planning &amp; Development</a></li>
+                        <li><a href='https://www.ocfl.net/TrafficTransportation.aspx'>Traffic &amp; Transportation</a></li>
+                        <li><a href='https://www.ocfl.net/VendorServices.aspx'>Vendor Services</a></li>
+                        <li><a href='https://www.ocfl.net/WaterGarbageRecycling.aspx'>Water, Garbage &amp; Recycling</a></li>
+                        <li><a href="/PermitsLicenses/ZoningDivision.aspx">Zoning</a></li>
+                    </ul>
+                </div>
+
+
+
+            </div>
+
+            <br />
+            <div style="font-size: 12px;">
+                Orange County Government is committed to providing access to all individuals, 
+                with or without disabilities, seeking information on its website, <a class="alink" target="_blank" style="color: blue; padding: 0px; margin: 0px;" href="https://fasttrack.ocfl.net">fasttrack.ocfl.net</a>. 
+                To provide this information, the site is built to comply with <a class="alink" target="_blank" style="color: blue; padding: 0px; margin: 0px;" href="https://www.section508.gov/">Section 508</a> of the U.S. Rehabilitation Act (as amended), 
+                and <a class="alink" target="_blank" style="color: blue; padding: 0px; margin: 0px;" href="https://www.flrules.org/gateway/RuleNo.asp?ID=60-8.002">Florida Administrative Code (FAC) Rule: 60-8.002</a>. W3C Web Content Accessibility Guidelines (WCAG) were followed to ensure our information is accessible.
+                <p />
+                <p />
+                If you use assistive technology (such as a screen reader, eye tracking device, voice recognition software, etc.) 
+                and have difficulties accessing information on <a class="alink" target="_blank" style="color: blue; padding: 0px; margin: 0px;" href="https://fasttrack.ocfl.net">fasttrack.ocfl.net</a>, please contact us at (407) 836-8181 or <a class="alink" style="color: blue; padding: 0px; margin: 0px;" href="mailto:publicrecordrequest@ocfl.net">publicrecordrequest@ocfl.net</a>
+                and provide the URL (web address) of the material you tried to access, the problem you experienced, and your contact information.
+            </div>
+
+            <br />
+
+            <div class="row">
+                <div class=" col-sm-6   ">
+                    © 2026 Orange County Government, Florida. 
+                </div>
+                <div class=" col-sm-6   ">
+                    <a href="http://www.ocfl.net/Home/PrivacyPolicyTermsofUse.aspx" tabindex="0">Privacy Policy &amp; Terms of Use</a> | 
+					<a href="http://www.ocfl.net/Accessibility.aspx" tabindex="0">Accessibility</a> | &nbsp; Ver. <a href="releasenotes.aspx" tabindex="0">7.1.0.1</a>
+                </div>
+
+            </div>
+
+            <p />
+
+        </div>
+
+    </div>
+
+
+
+    <div style="max-width: 960px; display: none; background-color: white;">
+
+        
+        
+
+        
+
+        <br />
+        <!-- ------------------------------------------------------------------------------ -->
+        <!-- REM-04/30/2018: FastTrack Homepage Redesign Project - Dismissable notification -->
+        <!-- ------------------------------------------------------------------------------ -->
+        
+
+        
+
+        <div style="display: none" class="row">
+            <div class="col-sm-3">
+                
+                
+            </div>
+
+            <div id="prettyprint" class="container col-sm-9 padMinus">
+                
+                <div class="container-fluid breadcrumb breadcrumbText floatright" style="margin-left: 10px;">
+
+                    <!-- this is where the Shopping Cart button, icon, and count are displayed -->
+
+                </div>
+                <div class="container-fluid" style="float: left; display: none">
+                    
+                </div>
+                <div style="float: none; clear: left;"></div>
+                <div class="container-fluid">
+                </div>
+                <input name="ctl00$hdnLastStampDate" type="hidden" id="hdnLastStampDate" />
+            </div>
+        </div>
+        <!-- end of Row -->
+        
+        <input name="ctl00$lblRemoteHostIP" type="hidden" id="lblRemoteHostIP" />
+        
+ 
+
+        
+    </div>
+
+    <div style="position: relative; display: inline-block; height: 80px;">&nbsp;</div>
+
+
+    <!-- end of body Div -->
+
+    <!-- Javascript files related to grids loaded last because for some reason they are not loading first in the <head> section -->
+    <script src="js/customDtCol_sort.js?v=652" type="text/javascript"></script>
+    <script src="bootstrap-datepicker/js/bootstrap-datepicker.js?v=652" type="text/javascript"></script>
+    <script src="js/Grid_Features.js?v=655" type="text/javascript"></script>
+
+    <!-- Ticket #169932 - render the "Who's On Chat" feature if the current page pertains to one of the following permit types -->
+    <div style="display: none;">
+        <!-- these are the scripts that add the component for "Who's On Chat" -->
+        <script type='text/javascript' src='//ocgdbsgw.whoson.com/include.js?domain=fasttrack.ocfl.net'></script>
+        <script type='text/javascript'>
+            if (sWOTrackPage)
+                sWOTrackPage();
+        </script>
+    </div>
+    <!-- End Ticket #169932 -->
+    <input type="hidden" id="recaptchaToken" name="recaptchaToken" />
+
+   
+    <script>
+        var serviceUrl = "//api.reciteme.com/asset/js?key=";
+        var serviceKey = "24523eac4b56fc3be491c50ddcd1575f80f7b13f";
+        var options = {};  // Options can be added as needed
+
+        
+        
+        var autoLoad = false;
+        var enableFragment = "#reciteEnable";
+        var loaded = [], frag = !1; window.location.hash === enableFragment && (frag = !0); function loadScript(c, b) { var a = document.createElement("script"); a.type = "text/javascript"; a.readyState ? a.onreadystatechange = function () { if ("loaded" == a.readyState || "complete" == a.readyState) a.onreadystatechange = null, void 0 != b && b() } : void 0 != b && (a.onload = function () { b() }); a.src = c; document.getElementsByTagName("head")[0].appendChild(a) } function _rc(c) { c += "="; for (var b = document.cookie.split(";"), a = 0; a < b.length; a++) { for (var d = b[a]; " " == d.charAt(0);)d = d.substring(1, d.length); if (0 == d.indexOf(c)) return d.substring(c.length, d.length) } return null } function loadService(c) { for (var b = serviceUrl + serviceKey, a = 0; a < loaded.length; a++)if (loaded[a] == b) return; loaded.push(b); loadScript(serviceUrl + serviceKey, function () { "function" === typeof _reciteLoaded && _reciteLoaded(); "function" == typeof c && c(); Recite.load(options); Recite.Event.subscribe("Recite:load", function () { Recite.enable() }) }) } "true" == _rc("Recite.Persist") && loadService(); if (autoLoad && "false" != _rc("Recite.Persist") || frag) document.addEventListener ? document.addEventListener("DOMContentLoaded", function (c) { loadService() }) : loadService();
+
+        document.addEventListener("DOMContentLoaded", function (event) {
+
+            document.getElementById('enableRecite').addEventListener("click", function () {
+
+                loadService();
+
+            });
+
+        });
+    </script>
+
+</body>
+
+
+
+    <script src="https://www.google.com/recaptcha/enterprise.js?render=6Lfu1kwsAAAAAC8KzACcEjP87Tg3HWBJSBP0qZRx"></script>
+
+    <script>
+        grecaptcha.enterprise.ready(function () {
+            grecaptcha.enterprise.execute('6Lfu1kwsAAAAAC8KzACcEjP87Tg3HWBJSBP0qZRx', {
+                action: 'permit_building'
+            }).then(function (token) {
+                document.getElementById('recaptchaToken').value = token;
+            });
+        });
+    </script>
+
+	<script>
+        customHtml = `<iframe title="Polimorphic Chat" aria-label="Polimorphic Chat" frameborder="0" id="chatFrame" allow="geolocation" src="https://app.polimorphic.com/organizations/orange_county_fl/chat" style="
+position: fixed;
+bottom: 90px;
+left: 20px;
+z-index: 10000000;
+border-radius: 8px;
+box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+height: 0;
+width: 0;
+"></iframe>
+<div id="greetingText" style="color: #FFFFFF; font-family: Avenir; position: fixed; bottom: 90px; left: 20px;; z-index: 1000000; border-radius: 8px; box-shadow: rgba(0, 0, 0, 0.1) 0px 4px 24px; visibility: visible; background: #4392BC; border: 2px solid #FFFFFF; padding: 10px; cursor: pointer;" onclick="this.style.visibility='hidden';document.getElementById('chatButton').click()">Need Help?</div>
+<button onclick="const frame = document.getElementById('chatFrame');
+const chatButton = document.getElementById('chatButton');
+const chatIcon = document.getElementById('chatIcon');
+const closeIcon = document.getElementById('closeIcon');
+const greetingText = document.getElementById('greetingText');
+var isMobile = window.matchMedia('(max-width: 768px)').matches;
+if (chatButton.getAttribute('active') === 'false') {
+chatButton.setAttribute('active', 'true');
+frame.setAttribute('data-open', 'true');
+frame.contentWindow.postMessage({ type: 'poli-chat-open' }, '*');
+if (isMobile) {
+frame.style.height = '100vh';
+frame.style.width = '100vw';
+frame.style.top = '0';
+frame.style.bottom = '';
+frame.style.right = '0';
+frame.style.left = '0';
+frame.style.borderRadius = '0';
+frame.style.boxShadow = 'none';
+chatButton.style.display = 'none';
+} else {
+frame.style.height = 'min(-100px + 100vh, 780px)';
+frame.style.width = 'min(100vw - 40px, 581px)';
+chatIcon.style.display = 'none';
+closeIcon.style.display = 'flex';
+}
+frame.focus();
+if (greetingText) {
+greetingText.style.visibility = 'hidden';
+}
+} else {
+chatButton.setAttribute('active', 'false');
+frame.removeAttribute('data-open');
+frame.style.height = '0';
+frame.style.width = '0';
+frame.style.top = '';
+frame.style.bottom = '90px';
+frame.style.right = '';
+frame.style.left = '20px';
+frame.style.borderRadius = '8px';
+frame.style.boxShadow = '';
+chatIcon.style.display = 'flex';
+closeIcon.style.display = 'none';
+if (isMobile) {
+chatButton.style.display = 'flex';
+}
+}" id="chatButton" class="poli-chat-embed-element" active="false" style="position: fixed; bottom: 20px; left: 20px;; z-index: 2147483647; background-color: transparent; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.2s; transform: scale(1); pointer-events: auto; opacity: 1;" onmouseover="this.style.transform='scale(1.15)'" onmouseout="this.style.transform='scale(1)'" aria-label="Toggle chat">
+<div id="chatIcon" style="color: #FFFFFF;
+background: #4392BC;
+border: 2px solid #FFFFFF;
+min-width: 56px; width: 56px; height: 56px; min-height: 56px; border-radius: 50%;
+box-shadow: rgba(0, 0, 0, 0.1) 0px 2px 12px;
+display: flex; justify-content: center; align-items: center;
+"><svg style="width: 24px; height: 24px; fill: #FFFFFF; opacity: 1;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+<path fill="currentColor" d="M12 2C6.477 2 2 6.477 2 12c0 1.82.487 3.53 1.338 5L2 22l5-1.338C8.47 21.513 10.18 22 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18c-1.657 0-3.224-.393-4.615-1.088L4.5 19.5l.588-2.885C4.393 15.224 4 13.657 4 12c0-4.418 3.582-8 8-8s8 3.582 8 8-3.582 8-8 8z"></path>
+</svg></div>
+<div id="closeIcon" style="color: #FFFFFF;
+background: #4392BC;
+border: 2px solid #FFFFFF;
+min-width: 56px; width: 56px; height: 56px; min-height: 56px; border-radius: 50%;
+box-shadow: rgba(0, 0, 0, 0.1) 0px 2px 12px;
+display: flex; justify-content: center; align-items: center;
+border-color: #FFFFFF; display: none;">
+<svg style="width: 24px; height: 24px; fill: #FFFFFF; opacity: 1;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+<path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path>
+</svg>
+</div>
+</button>`
+        function addToBody(htmlContent) {
+            const temp = document.createElement('div');
+            temp.innerHTML = htmlContent;
+            while (temp.firstChild) {
+                document.body.appendChild(temp.firstChild);
+            }
+        }
+        addToBody(customHtml);
+        function applyMobileLayout(mobile) {
+            var btn = document.getElementById('chatButton');
+            var icn = document.getElementById('chatIcon');
+            var gt = document.getElementById('greetingText');
+            if (btn) btn.style.bottom = mobile ? '10px' : '20px';
+            if (icn) {
+                if (!icn.dataset.origW) { icn.dataset.origW = icn.style.width; icn.dataset.origH = icn.style.height; icn.dataset.origMinW = icn.style.minWidth; icn.dataset.origMinH = icn.style.minHeight; }
+                icn.style.minWidth = mobile ? '40px' : icn.dataset.origMinW;
+                icn.style.width = mobile ? '40px' : icn.dataset.origW;
+                icn.style.height = mobile ? '40px' : icn.dataset.origH;
+                icn.style.minHeight = mobile ? '40px' : icn.dataset.origMinH;
+                var svgs = icn.querySelectorAll('svg');
+                for (var i = 0; i < svgs.length; i++) {
+                    if (!svgs[i].style.width.includes('%')) {
+                        if (!svgs[i].dataset.origW) { svgs[i].dataset.origW = svgs[i].style.width; svgs[i].dataset.origH = svgs[i].style.height; }
+                        svgs[i].style.width = mobile ? '20px' : svgs[i].dataset.origW;
+                        svgs[i].style.height = mobile ? '20px' : svgs[i].dataset.origH;
+                    }
+                }
+            }
+            if (gt) gt.style.bottom = mobile ? '60px' : '';
+        }
+        var mql = window.matchMedia('(max-width: 768px)');
+        if (mql.matches) applyMobileLayout(true);
+        mql.addEventListener('change', function (e) {
+            applyMobileLayout(e.matches);
+            var frame = document.getElementById('chatFrame');
+            var chatBtn = document.getElementById('chatButton');
+            var chatIcn = document.getElementById('chatIcon');
+            var closeIcn = document.getElementById('closeIcon');
+            if (chatBtn && chatBtn.getAttribute('active') === 'true') {
+                if (e.matches) {
+                    frame.style.height = '100vh'; frame.style.width = '100vw';
+                    frame.style.top = '0'; frame.style.bottom = ''; frame.style.right = '0'; frame.style.left = '0';
+                    frame.style.borderRadius = '0'; frame.style.boxShadow = 'none';
+                    chatBtn.style.display = 'none';
+                    chatIcn.style.display = 'flex'; closeIcn.style.display = 'none';
+                } else {
+                    frame.style.height = 'min(-100px + 100vh, 780px)';
+                    frame.style.width = 'min(100vw - 40px, 581px)';
+                    frame.style.top = '';
+                    frame.style.bottom = '90px';
+                    frame.style.right = '';
+                    frame.style.left = '20px';
+                    frame.style.borderRadius = '8px';
+                    frame.style.boxShadow = '';
+                    chatBtn.style.display = 'flex';
+                    chatIcn.style.display = 'none'; closeIcn.style.display = 'flex';
+                }
+            }
+        });
+        window.addEventListener('message', function (event) {
+            if (event.data && event.data.type === 'poli-chat-close') {
+                var btn = document.getElementById('chatButton');
+                if (btn && btn.getAttribute('active') === 'true') {
+                    btn.click();
+                }
+            }
+        });
+    </script>
+   
+</html>

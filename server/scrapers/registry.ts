@@ -208,3 +208,12 @@ registerAdapter(enerGovAdapter);
 import opendataAdapter, { OPENDATA_JURISDICTIONS } from "./opendata";
 registerAdapter(opendataAdapter);
 for (const jurisdiction of OPENDATA_JURISDICTIONS) registerJurisdictionAdapter(jurisdiction, opendataAdapter);
+
+import cityBuiltAdapter, { watsAdapter, eugeneAdapter, lyonAdapter, palmAdapter, oceanAdapter, pprbdAdapter } from "./city-built";
+registerAdapter(cityBuiltAdapter);
+registerAdapter(watsAdapter);
+registerAdapter(eugeneAdapter);
+registerAdapter(lyonAdapter);
+registerAdapter(palmAdapter);
+registerAdapter(oceanAdapter);
+registerAdapter(pprbdAdapter);
