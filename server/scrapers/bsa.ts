@@ -8,6 +8,10 @@ export function bsaTenant(input: string): { origin: string; uid: string } {
     throw new Error(`Not a BS&A Online portal URL: ${input}`);
   }
   const ids = [...url.searchParams].filter(([key]) => key.toLowerCase() === "uid").map(([, value]) => value);
+  // Both assigned DirectUrl examples redirect to ApplyForPermitContractor?uid=<path id>.
+  const direct = url.pathname.match(/^\/DirectUrl\/Cd_PermitApplicationContractor\/([1-9]\d*)\/?$/i);
+  if (!ids.length && direct) ids.push(direct[1]);
+  if (direct && ids.some(id => id !== direct[1])) throw new Error("BS&A Online shortcut and query specify different municipalities");
   if (ids.length !== 1 || !/^[1-9]\d*$/.test(ids[0])) throw new Error("BS&A Online URL must contain one numeric municipality uid");
   return { origin: "https://bsaonline.com", uid: ids[0] };
 }
@@ -15,11 +19,15 @@ export function bsaTenant(input: string): { origin: string; uid: string } {
 const clean = (s: string) => s.replace(/\s+/g, " ").trim();
 
 export function assertBsaPage(html: string, url: string): void {
+  // Do not interpret a permit's work description as a portal-wide error message.
+  if (/^\s*\{/.test(html)) {
+    try { if (Array.isArray(JSON.parse(html).data)) return; } catch { /* HTML/error validation below. */ }
+  }
   const $ = load(html);
   $("script,style,noscript").remove();
   const text = clean($.text());
   // Normal pages include a global CAPTCHA script; only an actual challenge is a block.
-  if (/just a moment|verify (?:that )?you are human|unusual traffic|complete (?:the |this )?captcha|access denied|checking your browser/i.test(text) || $(".g-recaptcha, .h-captcha, #challenge-form").length) {
+  if (/just a moment|verify (?:that )?you are human|unusual traffic|complete (?:the |this )?captcha|access denied|checking your browser/i.test(text) || $(".g-recaptcha, .h-captcha, .cf-turnstile, #challenge-form").length) {
     throw new PortalBlockedError(url, 403, "BS&A Online CAPTCHA or access challenge; automation stopped");
   }
   if (/building department.{0,100}(?:not available|not enabled|not supported)|(?:not available|not enabled).{0,100}building department/i.test(text)) {
@@ -39,8 +47,11 @@ export class BsaSession {
   url(path: string, params: Record<string, string> = {}): string {
     const u = new URL(path, this.tenant.origin);
     if (!/^https:$/.test(u.protocol) || !/^(www\.)?bsaonline\.com$/i.test(u.hostname) || u.port || u.username || u.password) throw new Error("BS&A Online redirected outside its public portal");
-    const uid = u.searchParams.get("uid");
-    if (uid && uid !== this.tenant.uid) throw new Error("BS&A Online changed municipality unexpectedly");
+    for (const [key, value] of [...u.searchParams]) {
+      if (key.toLowerCase() !== "uid") continue;
+      if (value !== this.tenant.uid) throw new Error("BS&A Online changed municipality unexpectedly");
+      u.searchParams.delete(key);
+    }
     u.hostname = "bsaonline.com";
     u.searchParams.set("uid", this.tenant.uid);
     for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
@@ -50,7 +61,7 @@ export class BsaSession {
     let url = this.url(path, params);
     for (let redirects = 0; redirects < 8; redirects++) {
       const headers: Record<string, string> = { cookie: [...this.cookies].map(([k, v]) => `${k}=${v}`).join("; ") };
-      if (/Get.*PartialView|PropertyAndParcelDetails|SelectBinding|UpdateAdvancedRecordSearch/.test(new URL(url).pathname)) headers["x-requested-with"] = "XMLHttpRequest";
+      if (/Get.*PartialView|PropertyAndParcelDetails|CdPropertySelectModal|SelectBinding|UpdateAdvancedRecordSearch/.test(new URL(url).pathname)) headers["x-requested-with"] = "XMLHttpRequest";
       if (form) headers["content-type"] = "application/x-www-form-urlencoded";
       const res = await politeFetch(url, { method: form ? "POST" : "GET", body: form ? new URLSearchParams(form).toString() : undefined, headers, redirect: "manual" }, { minDelayMs: Math.max(1000, this.ctx.politeness.minDelayMs) });
       for (const cookie of res.headers.getSetCookie()) {
@@ -65,8 +76,11 @@ export class BsaSession {
         if ([301, 302, 303].includes(res.status)) form = undefined;
         continue;
       }
+      if ([401, 403, 429].includes(res.status)) throw new PortalBlockedError(url, res.status);
       if (!res.ok) throw new Error(`BS&A Online HTTP ${res.status} at ${url}`);
       assertBsaPage(html, url);
+      const activeUid = load(html)("#__ActiveUnitId").val();
+      if (typeof activeUid === "string" && activeUid !== this.tenant.uid) throw new Error("BS&A Online returned a different municipality");
       return { html, url };
     }
     throw new Error("BS&A Online redirect loop or expired search session");
@@ -121,14 +135,14 @@ export function bsaDate(value: unknown): string | null {
   const ms = value.match(/^\/Date\((-?\d+)(?:[+-]\d{4})?\)\/$/);
   if (ms) {
     const date = new Date(Number(ms[1]));
-    return Number.isFinite(date.getTime()) && date.getUTCFullYear() > 1900 ? date.toISOString().slice(0, 10) : null;
+    return Number.isFinite(date.getTime()) && date.getUTCFullYear() > 1 ? date.toISOString() : null;
   }
   const us = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s.*)?$/);
   const iso = value.match(/^(\d{4})-(\d{2})-(\d{2})(?:T.*)?$/);
   const parts = us ? [Number(us[3]), Number(us[1]), Number(us[2])] : iso ? [Number(iso[1]), Number(iso[2]), Number(iso[3])] : null;
   if (!parts) return null;
   const [y, m, d] = parts, date = new Date(Date.UTC(y, m - 1, d));
-  return y > 1900 && date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d ? date.toISOString().slice(0, 10) : null;
+  return y > 1 && date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d ? date.toISOString().slice(0, 10) : null;
 }
 
 export function bsaPermitGridUrl(html: string): string {
@@ -140,7 +154,8 @@ export function bsaPermitGridUrl(html: string): string {
 const nullableText = (value: unknown): string | null => typeof value === "string" && clean(value) ? clean(value) : null;
 export function parseBsaPermitGrid(payload: unknown, ctx: Pick<AdapterCtx, "databaseId" | "jurisdiction">, property: { address: string | null; parcel: string | null }, baseUrl: string): { records: PermitRecord[]; total: number } {
   if (!payload || typeof payload !== "object") throw new Error("BS&A Online invalid permit grid response");
-  const data = payload as { data?: unknown; total?: unknown; modelState?: unknown };
+  const data = payload as { data?: unknown; total?: unknown; modelState?: unknown; success?: boolean; error?: unknown };
+  if (data.success === false || data.error) throw new Error("BS&A Online permit grid reported a portal error");
   if (!Array.isArray(data.data) || !Number.isInteger(data.total) || Number(data.total) < 0) throw new Error("BS&A Online permit grid missing data/total");
   const records = data.data.map((value): PermitRecord => {
     if (!value || typeof value !== "object") throw new Error("BS&A Online invalid permit row");
@@ -169,11 +184,44 @@ export function parseBsaPermitGrid(payload: unknown, ctx: Pick<AdapterCtx, "data
   return { records, total: Number(data.total) };
 }
 
+export function parseAssociatedProperties(payload: unknown): { rows: { PropertyGuid: string; AddressDisplayString: string }[]; total: number } {
+  const p = payload as { data?: unknown; total?: unknown } | null;
+  if (!p || !Array.isArray(p.data) || !Number.isInteger(p.total) || Number(p.total) < 0) throw new Error("BS&A Online invalid associated property grid");
+  const rows = p.data.map(row => {
+    if (!row || typeof row.PropertyGuid !== "string" || typeof row.AddressDisplayString !== "string") throw new Error("BS&A Online invalid associated property row");
+    return { PropertyGuid: row.PropertyGuid, AddressDisplayString: row.AddressDisplayString };
+  });
+  return { rows, total: Number(p.total) };
+}
+
+async function selectAssociatedProperty(session: BsaSession, hit: BsaHit): Promise<string> {
+  const modal = await session.request("/CD_PropertySearchV3/CdPropertySelectModal", { parcelNumber: hit.referenceKey });
+  const match = modal.html.match(/"selectUrl":("[^"\r\n]*\/GridAssociatedPropertiesSelectBinding[^"\r\n]*")/);
+  if (!match) throw new Error("BS&A Online associated property selector is unavailable");
+  const rows: { PropertyGuid: string; AddressDisplayString: string }[] = [];
+  for (let page = 1; page <= 5; page++) {
+    const result = await session.request(JSON.parse(match[1]), {}, { page: String(page), size: "20" });
+    const parsed = parseAssociatedProperties(JSON.parse(result.html));
+    if (parsed.total > 100 || (!parsed.rows.length && parsed.total > rows.length)) throw new Error("BS&A Online associated property list is too large or incomplete");
+    rows.push(...parsed.rows);
+    if (rows.length === parsed.total) {
+      const byId = rows.filter(r => r.PropertyGuid.toLowerCase() === hit.recordKey.toLowerCase());
+      const title = clean(load(hit.html)("h3").text());
+      const matches = byId.length ? byId : rows.filter(r => clean(r.AddressDisplayString) === title);
+      if (matches.length !== 1) throw new Error("BS&A Online cannot unambiguously select the requested associated property");
+      return matches[0].PropertyGuid;
+    }
+  }
+  throw new Error("BS&A Online incomplete associated property pagination");
+}
+
 async function propertyPermits(session: BsaSession, ctx: AdapterCtx, detail: { html: string; url: string }, hit: BsaHit): Promise<PermitRecord[]> {
   const $ = load(detail.html);
-  const recordKey = $("#PropertyRecordKey").val(), token = $("#SubPageAuthToken").val(), reference = $("#SubPageAuthReferenceKey").val();
+  let recordKey = $("#PropertyRecordKey").val();
+  const token = $("#SubPageAuthToken").val(), reference = $("#SubPageAuthReferenceKey").val();
   if (typeof recordKey !== "string" || typeof token !== "string" || typeof reference !== "string") throw new Error("BS&A Online property detail is unavailable");
-  if (recordKey !== `7=${hit.recordKey}`) throw new Error("BS&A Online returned a different associated property; public property selection is required");
+  if (reference !== hit.referenceKey) throw new Error("BS&A Online returned a different parcel");
+  if (recordKey !== `7=${hit.recordKey}`) recordKey = await selectAssociatedProperty(session, hit);
   const property = await session.request("/CD_PropertySearchV3/PropertyAndParcelDetails", { recordKey, SubPageAuthToken: token, ReferenceKey: reference });
   const gridUrl = bsaPermitGridUrl(property.html), p = load(property.html);
   const address = nullableText(p("#Property_Address_DisplayAddress").val()) ?? nullableText($("#HiddenAddress").val());
