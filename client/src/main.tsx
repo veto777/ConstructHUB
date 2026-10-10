@@ -4,12 +4,14 @@ import { queryClient } from "./lib/queryClient";
 import { installClientErrorReporting } from "./lib/report-client-errors";
 import "./index.css";
 import { inNativeApp } from "./lib/app-shell";
+import { startAdsDoorRecorder } from "./lib/ads-door-recorder";
 
 // Inside the iPhone apps: mark <html class="in-app"> before the first render (lib/app-shell.ts).
 inNativeApp();
 
 // Uncaught errors and unhandled rejections reach the issue desk (/admin/issues).
 installClientErrorReporting();
+void startAdsDoorRecorder();
 
 const container = document.getElementById("root")!;
 const mount = () => createRoot(container).render(<App />);

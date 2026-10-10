@@ -2,7 +2,7 @@ import { AppPage, Section, Notice, appTable, appTableCards } from "@/components/
 import { GoogleSectionHeader, GooglePill } from "@/components/google";
 import { ToolTabs } from "@/components/tool";
 import { Search } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest, apiErrorMessage } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
@@ -13,12 +13,53 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { useUrlParam } from '@/hooks/use-url-param';
 import { PlanRequired, planRequiredFrom, pollUnlessPlanRequired } from '@/components/plan-required';
-type Tab='accounts'|'invitations'|'plans'|'jobs'|'findings';
-const labels:Record<Tab,string>={accounts:'Client accounts',invitations:'Access invitations',plans:'Protection previews',jobs:'Queue',findings:'Health audit'};
+type Tab='accounts'|'invitations'|'plans'|'jobs'|'findings'|'landing';
+const labels:Record<Tab,string>={accounts:'Client accounts',invitations:'Access invitations',plans:'Protection previews',jobs:'Queue',findings:'Health audit',landing:'Landing door'};
+
+function DoorReplay({sessionId}:{sessionId:string}) {
+  const target=useRef<HTMLDivElement>(null);
+  const [error,setError]=useState('');
+  useEffect(()=>{
+    let cancelled=false, player:{ $destroy:()=>void }|undefined;
+    setError('');
+    void Promise.all([
+      import('rrweb-player'), import('rrweb-player/dist/style.css'),
+      apiRequest('GET',`/api/ads-lp/rr/${encodeURIComponent(sessionId)}`).then(r=>r.json()),
+    ]).then(([{default:Player},_css,data])=>{
+      if(cancelled||!target.current)return;
+      // The bundled Svelte component exposes $destroy; its published types
+      // omit that inherited API when Svelte is not installed by the host app.
+      player=new Player({target:target.current,props:{events:data.events,width:Math.min(960,target.current.clientWidth||640),height:500,autoPlay:false}}) as unknown as {$destroy:()=>void};
+    }).catch(e=>{if(!cancelled)setError(apiErrorMessage(e));});
+    return ()=>{cancelled=true;player?.$destroy();};
+  },[sessionId]);
+  return <>{error&&<p role="alert">{error}</p>}<div ref={target} className="overflow-auto"/></>;
+}
+function LandingDoorTab() {
+  const [replay,setReplay]=useState<string|null>(null);
+  const hits=useQuery<any>({queryKey:['/api/ads-lp/hits'],refetchInterval:10000});
+  const columns=['Time','Door','Action','Reason','IP','Country','Campaign key','Device','Network','Recording'];
+  return <Section flush>
+    <CardHeader><CardTitle>Landing door</CardTitle></CardHeader>
+    <CardContent className="space-y-3">
+      {hits.error&&<p role="alert">{apiErrorMessage(hits.error)}</p>}
+      {hits.isLoading?<p>Loading…</p>:<div className="overflow-x-auto border rounded"><table className={appTable.table}>
+        <thead><tr className="border-b text-left">{columns.map(c=><th key={c} className="p-3">{c}</th>)}</tr></thead>
+        <tbody>{(hits.data?.items||[]).map((hit:any)=><tr key={hit.id} className="border-b">
+          {[new Date(hit.at).toLocaleString(),hit.door,hit.action,hit.reason,hit.ip,hit.country,hit.campaign_key,hit.device,hit.network].map((value,i)=><td key={i} className="p-3">{value||'—'}</td>)}
+          <td className="p-3">{hit.session_id?<Button variant="outline" size="sm" onClick={()=>setReplay(hit.session_id)}>Replay</Button>:'No recording'}</td>
+        </tr>)}</tbody>
+      </table></div>}
+      {!hits.isLoading&&!hits.error&&!hits.data?.items?.length&&<p>No door visits yet.</p>}
+      <Dialog open={!!replay} onOpenChange={open=>{if(!open)setReplay(null);}}><DialogContent className="max-w-5xl"><DialogHeader><DialogTitle>Door replay</DialogTitle></DialogHeader>{replay&&<DoorReplay sessionId={replay}/>}</DialogContent></Dialog>
+    </CardContent>
+  </Section>;
+}
 const defaults=['jobs','careers','salary','training','DIY','tutorial','free','cheap'];
 function Pager({page,total,setPage}:{page:number;total:number;setPage:(n:number)=>void}) {return <div className="flex flex-wrap items-center gap-3 text-sm"><Button variant="outline" disabled={page<=1} onClick={()=>setPage(page-1)}>Previous</Button><span>Page {page} · {total} results</span><Button variant="outline" disabled={page*25>=total} onClick={()=>setPage(page+1)}>Next</Button></div>;}
 export default function AdsManagerPage() {
   const qc=useQueryClient();
+  const me=useQuery<{isPlatformAdmin?:boolean}>({queryKey:['/api/auth/me']});
   // The section lives in the URL (?tab=jobs) so a reload or a shared link keeps it.
   const [tabParam,setTabParam]=useUrlParam('tab');
   const tab:Tab=(Object.keys(labels) as string[]).includes(tabParam??'')?tabParam as Tab:'accounts';
@@ -70,7 +111,7 @@ export default function AdsManagerPage() {
   const [domainQ,setDomainQ]=useState(''),[domainPage,setDomainPage]=useState(1),[campaignCustomer,setCampaignCustomer]=useState(''),[campaignQ,setCampaignQ]=useState(''),[campaignPage,setCampaignPage]=useState(1);
   const status=useQuery<any>({queryKey:['/api/ads/status'],refetchInterval:pollUnlessPlanRequired(10000)});
   const params=new URLSearchParams({page:String(page),q,status:filter,lsa});
-  const data=useQuery<any>({queryKey:['ads-list',tab,params.toString()],queryFn:async()=> (await apiRequest('GET',`/api/ads/${tab}?${params}`)).json(),refetchInterval:pollUnlessPlanRequired(5000)});
+  const data=useQuery<any>({queryKey:['ads-list',tab,params.toString()],enabled:tab!=='landing',queryFn:async()=> (await apiRequest('GET',`/api/ads/${tab}?${params}`)).json(),refetchInterval:pollUnlessPlanRequired(5000)});
   const detail=useQuery<any>({queryKey:['ads-preview',previewId,previewPage,operationQ],enabled:!!previewId,queryFn:async()=>(await apiRequest('GET',`/api/ads/plans/${previewId}?page=${previewPage}&limit=25&q=${encodeURIComponent(operationQ)}`)).json()});
   const domains=useQuery<any>({queryKey:['ads-domains',domainQ,domainPage],enabled:tab==='accounts',queryFn:async()=>(await apiRequest('GET',`/api/ads/domains?q=${encodeURIComponent(domainQ)}&page=${domainPage}`)).json()});
   const campaigns=useQuery<any>({queryKey:['ads-campaigns',campaignCustomer,campaignQ,campaignPage],enabled:!!campaignCustomer,queryFn:async()=>(await apiRequest('GET',`/api/ads/accounts/${campaignCustomer}/campaigns?q=${encodeURIComponent(campaignQ)}&page=${campaignPage}`)).json()});
@@ -94,7 +135,9 @@ export default function AdsManagerPage() {
   const planGate=[status.error,data.error].find(e=>planRequiredFrom(e));
   // Google's page format (owner, 2026-10-07): a quiet header, pill tabs and actions, hairline cards.
   const header=<GoogleSectionHeader as="h1" title="Agency Ads & LSA manager" description="Manage client access and review ad protections before applying them." flush actions={planGate ? null : status.data?.connected ? <GooglePill variant="solid" label="Discover clients" disabled={action.isPending} onClick={()=>run('/sync',{kind:'discover'})} /> : <GooglePill variant="solid" label="Connect MCC with Google" disabled={!status.data?.configured||action.isPending} onClick={()=>run('/connect',{managerId:manager||status.data?.defaultManagerId})} />} />;
-  if(planGate)return <AppPage className="[&_select]:max-w-full [&_select]:min-h-10 [&_button]:min-h-10 [&_h3]:text-base [&_p]:text-sm">{header}<PlanRequired module="adsManager" error={planGate} className="max-w-3xl"/></AppPage>;
+  const tabs=<ToolTabs as="group" label="Ads manager sections">{(Object.keys(labels) as Tab[]).filter(t=>t!=='landing'||me.data?.isPlatformAdmin).map(t=><GooglePill key={t} label={labels[t]} selected={tab===t} ariaPressed={tab===t} onClick={()=>switchTab(t)} />)}</ToolTabs>;
+  if(tab==='landing')return <AppPage>{header}{tabs}{me.isLoading?<p>Loading…</p>:me.data?.isPlatformAdmin?<LandingDoorTab/>:<p>Platform admin access required.</p>}</AppPage>;
+  if(planGate)return <AppPage className="[&_select]:max-w-full [&_select]:min-h-10 [&_button]:min-h-10 [&_h3]:text-base [&_p]:text-sm">{header}{me.data?.isPlatformAdmin&&tabs}<PlanRequired module="adsManager" error={planGate} className="max-w-3xl"/></AppPage>;
   return <AppPage className="[&_select]:max-w-full [&_select]:min-h-10 [&_button]:min-h-10 [&_h3]:text-base [&_p]:text-sm">
     {header}
     {message&&<p role="status" className="rounded border p-3">{message}</p>}
@@ -108,7 +151,7 @@ export default function AdsManagerPage() {
         {status.data?.connected&&<><Button variant="outline" disabled={action.isPending||!enabled} onClick={()=>run('/sync',{kind:'poll'})}>Poll invitations</Button><Button variant="outline" disabled={action.isPending} onClick={()=>{if(window.confirm('Remove local MCC credentials and cancel queued work? Revoke Google access separately in your Google Account.'))run('/disconnect',{confirm:true});}}>Disconnect MCC</Button></>}
       </div>
     </CardContent></Section>
-    <ToolTabs as="group" label="Ads manager sections">{(Object.keys(labels) as Tab[]).map(t=><GooglePill key={t} label={labels[t]} selected={tab===t} ariaPressed={tab===t} onClick={()=>switchTab(t)} />)}</ToolTabs>
+    {tabs}
     {tab==='accounts'&&<Card><CardHeader><CardTitle className="text-base">Add a Google Ads account</CardTitle></CardHeader><CardContent>
       <form className="flex flex-wrap gap-2" onSubmit={e=>{e.preventDefault();if(!linkAccount.isPending&&!linking)linkAccount.mutate();}}>
         <Input className="w-full sm:max-w-xs" aria-label="Client Google Ads customer ID" placeholder="000-000-0000" value={linkCustomer} onChange={e=>setLinkCustomer(e.target.value)} disabled={linkAccount.isPending||!!linking}/>
