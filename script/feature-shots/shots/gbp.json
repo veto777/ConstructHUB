@@ -51,7 +51,7 @@
   "key": "profileGuard",
   "n": 2,
   "route": "/gmb-monitor",
-  "wait": "Peakline Exteriors",
+  "wait": "Clearpeak Exteriors",
   "actions": [
    {
     "click": "[data-testid=button-history-910001]"

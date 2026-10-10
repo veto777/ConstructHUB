@@ -81,7 +81,7 @@
   "key": "adsManager",
   "n": 1,
   "route": "/ads-manager?tab=accounts",
-  "wait": "Peakline Exteriors",
+  "wait": "Clearpeak Exteriors",
   "actions": [
    {
     "scroll": "text=Redstone Restoration"

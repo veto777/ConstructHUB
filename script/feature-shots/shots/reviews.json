@@ -201,7 +201,7 @@
   "key": "agency",
   "n": 2,
   "route": "/agency?tab=clients",
-  "wait": "Peakline Exteriors",
+  "wait": "Clearpeak Exteriors",
   "alt": "Agency Clients tab with a new-client form and client workspaces showing contact email, folder, tags and notes.",
   "caption": "Client workspaces with folders, tags and notes"
  },

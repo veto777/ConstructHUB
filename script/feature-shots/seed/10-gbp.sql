@@ -160,7 +160,7 @@ OVERRIDING SYSTEM VALUE VALUES
  (910001, 1, 'sample-place-summit-denver',   'Summit Roofing Co.',          'Denver, CO 80202',   '(303) 555-0142', 'https://summitroofing.example',          'Roofing contractor', 'Mon–Fri 7 AM–6 PM, Sat 8 AM–5 PM', 148, '4.8', 186, true, now() - interval '3 hours', now() - interval '30 days'),
  (910002, 1, 'sample-place-summit-aurora',   'Summit Roofing Co. Aurora',   'Aurora, CO 80012',   '(720) 555-0167', 'https://summitroofing.example/aurora',   'Roofing contractor', 'Mon–Fri 7 AM–6 PM, Sat 8 AM–4 PM', 71, '4.7', 94, true, now() - interval '3 hours', now() - interval '31 days'),
  (910003, 1, 'sample-place-summit-lakewood', 'Summit Roofing Co. Lakewood', 'Lakewood, CO 80226', '(303) 555-0185', 'https://summitroofing.example/lakewood', 'Roofing contractor', 'Mon–Fri 7:30 AM–5:30 PM', 39, '4.9', 57, true, now() - interval '1 day', now() - interval '32 days'),
- (910004, 1, 'sample-place-peakline',        'Peakline Exteriors',          'Denver, CO 80216',   '(303) 555-0123', 'https://peaklineexteriors.example',      'Roofing contractor', 'Mon–Sat 7 AM–7 PM', 212, '4.6', 311, false, now() - interval '8 days', now() - interval '45 days');
+ (910004, 1, 'sample-place-clearpeak',        'Clearpeak Exteriors',          'Denver, CO 80216',   '(303) 555-0123', 'https://clearpeakexteriors.example',      'Roofing contractor', 'Mon–Sat 7 AM–7 PM', 212, '4.6', 311, false, now() - interval '8 days', now() - interval '45 days');
 
 INSERT INTO gmb_edit_history (id, listing_id, field_changed, old_value, new_value, detected_at)
 OVERRIDING SYSTEM VALUE VALUES
@@ -173,7 +173,7 @@ OVERRIDING SYSTEM VALUE VALUES
  (910007, 910001, 'rating',      '4.7', '4.8', now() - interval '22 days'),
  (910008, 910002, 'website',     'https://summitroofing.example/aurora', 'https://summitroofing.example', now() - interval '6 days'),
  (910009, 910002, 'reviewCount', '90', '94', now() - interval '3 hours'),
- (910010, 910004, 'businessName','Peakline Exteriors', 'Peakline Exteriors - Roofing & Hail Repair Denver', now() - interval '8 days');
+ (910010, 910004, 'businessName','Clearpeak Exteriors', 'Clearpeak Exteriors - Roofing & Hail Repair Denver', now() - interval '8 days');
 
 -- ===================================================================================================
 -- Posts & Photos (gbp_content_jobs, gbp_content_style)
@@ -231,9 +231,9 @@ OVERRIDING SYSTEM VALUE
 SELECT (scan_id - 910000) * 1000 + 910000000 + grid_row * 20 + grid_col, scan_id, grid_row, grid_col, round(lat::numeric, 6)::text, round(lon::numeric, 6)::text,
   rank, 20,
   jsonb_build_array(
-    jsonb_build_object('name', CASE WHEN rank = 1 THEN 'Summit Roofing Co.' ELSE (ARRAY['Peakline Exteriors','Cobalt Ridge Roofing','Larkspur Roof & Siding','Quarry Peak Exteriors'])[1 + (jitter % 4)] END, 'address', 'Denver, CO', 'rank', 1),
+    jsonb_build_object('name', CASE WHEN rank = 1 THEN 'Summit Roofing Co.' ELSE (ARRAY['Clearpeak Exteriors','Cobalt Ridge Roofing','Larkspur Roof & Siding','Quarry Peak Exteriors'])[1 + (jitter % 4)] END, 'address', 'Denver, CO', 'rank', 1),
     jsonb_build_object('name', (ARRAY['Front Range Gutters','Halcyon Roof Pros','Brightpine Roofing','Northgate Storm Restoration'])[1 + ((jitter + 1) % 4)], 'address', 'Denver, CO', 'rank', 2),
-    jsonb_build_object('name', CASE WHEN rank = 3 THEN 'Summit Roofing Co.' ELSE (ARRAY['Cobalt Ridge Roofing','Larkspur Roof & Siding','Peakline Exteriors','Halcyon Roof Pros'])[1 + ((jitter + 2) % 4)] END, 'address', 'Denver, CO', 'rank', 3)),
+    jsonb_build_object('name', CASE WHEN rank = 3 THEN 'Summit Roofing Co.' ELSE (ARRAY['Cobalt Ridge Roofing','Larkspur Roof & Siding','Clearpeak Exteriors','Halcyon Roof Pros'])[1 + ((jitter + 2) % 4)] END, 'address', 'Denver, CO', 'rank', 3)),
   (SELECT created_at FROM ranking_grid_scans WHERE id = scan_id) + interval '2 minutes'
 FROM ranked;
 
@@ -257,7 +257,7 @@ SELECT 910000 + n, scan, 1, 'sample-place-comp-' || n, name, addr, phone, site, 
     'genericReviews', CASE WHEN gen >= 6 THEN '[{"author":"R. Allen","text":"Great job."},{"author":"D. Moore","text":"Good company, would use again."}]'::jsonb ELSE '[]'::jsonb END),
   NULL, now() - interval '3 days', now() - (first_seen * interval '1 day')
 FROM (VALUES
-  (1,  910001, 'Peakline Exteriors',                       'Denver, CO 80216',      '(303) 555-0123', 'https://peaklineexteriors.example',    '4.6', 311, 'Roofing contractor', false, 20, 16, 2, 4, 9, 17, 1, '6 years',  120),
+  (1,  910001, 'Clearpeak Exteriors',                       'Denver, CO 80216',      '(303) 555-0123', 'https://clearpeakexteriors.example',    '4.6', 311, 'Roofing contractor', false, 20, 16, 2, 4, 9, 17, 1, '6 years',  120),
   (2,  910001, 'Cobalt Ridge Roofing',                     'Englewood, CO 80110',   '(303) 555-0131', 'https://cobaltridge.example',          '4.9', 142, 'Roofing contractor', false, 20, 19, 3, 5, 6, 18, 0, '4 years',  120),
   (3,  910001, 'Best Cheap Roofers Near Me Denver',        NULL,                    '(720) 555-0108', 'https://cheaproofersdenver.example',  '5.0', 87,  'Roofing contractor', true,  20, 20, 12, 14, 1, 9, 6, '5 months', 21),
   (4,  910001, 'Front Range Gutters',                      'Wheat Ridge, CO 80033', '(303) 555-0154', 'https://frontrangegutters.example',    '4.7', 203, 'Gutter cleaning service', false, 20, 17, 1, 5, 7, 18, 1, '8 years', 120),
@@ -273,7 +273,7 @@ FROM (VALUES
   (22, 910002, 'Clearflow Gutter Co.',                     'Aurora, CO 80012',      '(720) 555-0121', 'https://clearflowgutter.example',      '4.8', 89,  'Gutter service', false, 20, 19, 2, 6, 5, 17, 1, '6 years', 120),
   (23, 910002, 'Rainline Seamless Gutters',                'Centennial, CO 80015',  '(303) 555-0132', 'https://rainline.example',             '4.5', 54,  'Gutter service', false, 20, 16, 1, 7, 3, 16, 2, '4 years', 120),
   (24, 910002, 'Best Gutter Cleaning Near Me Aurora',      NULL,                    '(720) 555-0102', 'https://guttercleaningaurora.example', '5.0', 33,  'Gutter cleaning service', true, 20, 20, 10, 13, 0, 8, 6, '4 months', 16),
-  (25, 910002, 'Peakline Exteriors',                       'Aurora, CO 80011',      '(303) 555-0123', 'https://peaklineexteriors.example',    '4.6', 311, 'Roofing contractor', false, 20, 16, 2, 4, 9, 17, 1, '6 years', 120),
+  (25, 910002, 'Clearpeak Exteriors',                       'Aurora, CO 80011',      '(303) 555-0123', 'https://clearpeakexteriors.example',    '4.6', 311, 'Roofing contractor', false, 20, 16, 2, 4, 9, 17, 1, '6 years', 120),
   (26, 910002, 'Cherry Creek Gutter Guys',                 'Aurora, CO 80013',      '(720) 555-0158', 'https://ccgutterguys.example',         '4.4', 47,  'Gutter service', false, 20, 15, 1, 6, 4, 16, 2, '3 years', 120),
   (27, 910002, 'Summit Roofing Co. Aurora',                'Aurora, CO 80012',      '(720) 555-0167', 'https://summitroofing.example/aurora', '4.7', 94,  'Roofing contractor', false, 20, 18, 1, 4, 8, 19, 0, '8 years', 120),
   (28, 910002, 'Hailstone Gutter & Roof',                  'Parker, CO 80134',      '(303) 555-0119', 'https://hailstonegutter.example',      '4.6', 72,  'Gutter service', false, 20, 17, 2, 6, 5, 17, 1, '5 years', 120)

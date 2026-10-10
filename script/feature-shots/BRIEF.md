@@ -36,9 +36,13 @@ throwaway lane database seeded with SAMPLE data. The page will caption these ima
 - Do NOT edit app code (client/, server/, shared/) or feature-page files, and do not commit or push — the lead does that.
   Only add files under `script/feature-shots/seed/` and `script/feature-shots/shots/` (yours only) plus the images.
 - Sample data must be clearly fictional and never resemble a real company or person: business names like "Summit
-  Roofing Co.", "Peakline Exteriors", "Front Range Gutters"; people like "Maria Delgado", "Tom Becker"; emails at
+  Roofing Co.", "Clearpeak Exteriors", "Front Range Gutters"; people like "Maria Delgado", "Tom Becker"; emails at
   `*.example`; phones in 555-01xx; websites `*.example` (e.g. summitroofing.example). Sample IPs from documentation
   ranges only (192.0.2.x, 198.51.100.x, 203.0.113.x; IPv6 2001:db8::/32). No real brands as customers or competitors.
+  Before keeping a business name, google it first (in quotes) and drop any name that matches a real company —
+  the first pass shipped "Foothills Fence Co." (shown with a SUSPENDED ad account), "Foothills Fence & Deck",
+  "Copper Creek Concrete", "Mile High Concrete & Paving" and "Peakline Exteriors" (a real Calgary exteriors
+  company), all later renamed.
 - NEVER invent government data (permits, permit portals, appraiser/assessor offices, property records). If a screen
   needs it, use what is already real in the DB, or skip and say so.
 - Use Denver, Colorado as the sample service area (city names and real coordinates are fine; street addresses must be
