@@ -324,7 +324,8 @@ VALUES
 -- ===================================================================================================
 INSERT INTO mail_alert_messages (id, user_id, dedupe, source, category, severity, sender, subject, body, confirmation_code, confirmation_link, domain_id, location_id, read_at, received_at, expires_at)
 SELECT 910000 + n, 1, 'sample-gbp-mail-' || n, 'forwarding', cat, sev, sender, subj, body, NULL, NULL, dom, loc,
-  CASE WHEN rd THEN now() - ago + interval '20 minutes' END, now() - ago, now() - ago + interval '30 days'
+  CASE WHEN rd THEN now() - ago + ((n * 13 % 47) || ' seconds')::interval + interval '20 minutes' END,
+  now() - ago + ((n * 13 % 47) || ' seconds')::interval, now() - ago + interval '30 days'
 FROM (VALUES
   (1,  'gbp', 'critical', 'businessprofile-noreply@google.com', 'Someone suggested changes to Summit Roofing Co.', 'A user suggested an edit to your Business Profile: Website. Review the suggested change in your Business Profile.', NULL::bigint, 910001::bigint, interval '48 minutes', false),
   (2,  'gbp', 'warning',  'businessprofile-noreply@google.com', 'Your Business Profile category was updated: Summit Roofing Co.', 'Google updated the primary category on your Business Profile based on information from users and other sources.', NULL, NULL, interval '3 hours', false),

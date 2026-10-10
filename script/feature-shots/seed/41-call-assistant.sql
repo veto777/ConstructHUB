@@ -160,13 +160,13 @@ select 'fs-voice-num-1', org_id, '+17205550142', 'Main line', 'Denver, CO', 'CO'
 insert into voice_calls (id, org_id, number_id, call_sid, direction, from_number, to_number, engine, persona, profile_version,
   started_at, answered_at, ended_at, duration_seconds, billed_minutes, outcome, caller_name, caller_city, service_needed, summary, transcript, spam_confidence, spam_reason, created_at)
 select 'fs-voice-call-' || c.n, o.org_id, 'fs-voice-num-1', 'fs-voice-call-' || c.n, 'inbound', c.frm, '+17205550142', 'sample', 'janice', 3,
-  now() - c.ago, now() - c.ago, now() - c.ago + make_interval(secs => c.dur), c.dur, greatest(1, ceil(c.dur / 60.0))::int,
+  now() - c.ago + (((c.n * 29) % 43) || ' seconds')::interval, now() - c.ago + (((c.n * 29) % 43) || ' seconds')::interval, now() - c.ago + (((c.n * 29) % 43) || ' seconds')::interval + make_interval(secs => c.dur), c.dur, greatest(1, ceil(c.dur / 60.0))::int,
   c.outcome, c.name, c.city, c.need, c.summary,
   jsonb_build_array(
     jsonb_build_object('role','assistant','text','Thanks for calling Summit Roofing, this is Janice. Calls may be recorded. How can we help today?'),
     jsonb_build_object('role','caller','text', c.said),
     jsonb_build_object('role','assistant','text', c.reply)),
-  c.spam, case when c.outcome = 'spam' then 'Robocall: recorded sales pitch' end, now() - c.ago
+  c.spam, case when c.outcome = 'spam' then 'Robocall: recorded sales pitch' end, now() - c.ago + (((c.n * 29) % 43) || ' seconds')::interval
 from fs_org o, (values
   (1, '+13035550161', interval '3 hours',  212, 'lead_submitted', 'Maria Delgado', 'Lakewood',  'Hail damage inspection',  'Hail last week dented gutters and knocked granules off the shingles. Wants an inspection before calling insurance. Lead sent to the CRM.', 'We had that hail storm and I think the roof took a beating.', 'I can set that up. What is the address of the property?', null::numeric),
   (2, '+13035550162', interval '7 hours',  148, 'lead_submitted', 'Tom Becker',    'Aurora',    'Full roof replacement',    'Roof is 22 years old, asking about a full replacement and financing. Lead sent to the CRM.', 'Our roof is over twenty years old and we want a quote to replace it.', 'Happy to help. An estimator does a free inspection first. What is the address?', null),
