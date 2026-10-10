@@ -154,3 +154,8 @@ import myGovAdapter from "./mygov";
 registerAdapter(myGovAdapter);
 import mgoConnectAdapter from "./mgo-connect";
 registerAdapter(mgoConnectAdapter);
+
+import citizenserveAdapter from "./citizenserve";
+registerAdapter(citizenserveAdapter);
+import civicgovAdapter from "./civicgov";
+registerAdapter(civicgovAdapter);
