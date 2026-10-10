@@ -88,5 +88,11 @@ registerAdapter(legacy("Accela", ["Accela Citizen Access"], ["address", "permit"
 registerAdapter(legacy("Click2Gov", [], ["address", "permit", "name"]));
 registerAdapter(legacy("FTG Portal", [], ["name", "company"]));
 
-import cityBuiltAdapter from "./city-built";
+import cityBuiltAdapter, { watsAdapter, eugeneAdapter, lyonAdapter, palmAdapter, oceanAdapter, pprbdAdapter } from "./city-built";
 registerAdapter(cityBuiltAdapter);
+registerAdapter(watsAdapter);
+registerAdapter(eugeneAdapter);
+registerAdapter(lyonAdapter);
+registerAdapter(palmAdapter);
+registerAdapter(oceanAdapter);
+registerAdapter(pprbdAdapter);

@@ -1,0 +1,1116 @@
+
+
+<!DOCTYPE html>
+<!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>         <html class="no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>         <html class="no-js lt-ie9"> <![endif]-->
+<!--[if gt IE 8]><!-->
+<html class="no-js" lang="en">
+<!--<![endif]-->
+<head><meta charset="utf-8" /><meta name="description" /><title>
+	Search Permit Status - 
+</title><meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" /><link href="//fonts.googleapis.com/css?family=Open+Sans" rel="stylesheet" type="text/css" /><link href="//fonts.googleapis.com/css?family=Josefin+Sans" rel="stylesheet" type="text/css" /><link href="/ComDev/Content/master-styles?v=1Kj3goY1ZWLuVOJFewKp6NckuSX-ClRPU3XeWMm45aw1" rel="stylesheet"/>
+<script src="/ComDev/bundles/modernizr?v=inCVuEFe6J4Q07A0AcRsbJic_UE5MwpRMNGcOtk94TE1"></script>
+
+
+    <style type="text/css">
+                        
+                        #interior-header-bg {
+                            /* for older versions of ie that don't support multiple backgrounds or gradients, omit the tint layer */
+                            background: center 20%
+                                        url(https://www.independencemo.gov/sites/default/files/2023-08/homepage-hero.jpg);
+                            /* layered background (img + tint) */
+                            background:
+                                /* top background layer is the tint (must use gradient) */
+                                linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)),
+                                /* bottom background layer is the img (apply vertical offset, if present) */
+                                center 20%
+                                url(https://www.independencemo.gov/sites/default/files/2023-08/homepage-hero.jpg);
+                                background-size: cover;
+                        }
+
+                        #interior-header{
+                            height: 0em;
+                        }
+
+                        #interior-header div {
+                            font-size: 2em;
+                        }
+
+                        .brand-desktop-container {
+                            display: block;
+                            height: 0px;
+                            margin-top: 1em;
+                            margin-left: 1em;
+                        }
+
+                        .brand-desktop {
+                            background: url(/apps/content/images/independence-logo-white.png) no-repeat left center;
+                            height: 70px;
+                            display: block;
+                            margin: auto;
+                            background-size: contain;
+                            width: 50%;
+                        }
+
+                        .header-desktop {
+                            visibility: hidden;
+                            padding-top: 0px;
+                            padding-bottom: 0px;
+                            color: white;
+                            font-weight: bold;
+                            border-bottom: 4px solid transparent;
+                        }
+
+                        .brand-mobile {
+                            background: url(/Content/images/brand-logo.gif) no-repeat left center;
+                            visibility: visible;
+                            height: 60px;
+                            width: 180px;
+                        }
+
+                        .header-mobile {
+                            visibility: visible;
+                        }
+
+                        .navbar-default .navbar-toggle {
+                            border: 2px solid #5bb0e0;
+                        }
+
+                        .navbar-toggle {
+                            background-color: #003b5c;
+                        }
+
+                        .navbar-default .navbar-toggle:hover, .navbar-default .navbar-toggle:focus {
+                            background-color: #5bb0e0;
+                        }
+
+                        .navbar-default .navbar-toggle .icon-bar {
+                            background-color: white;
+                        }
+
+                        .navbar-default {
+                            background-color: transparent;
+                            border-color: transparent;
+                        }
+
+                        .navbar-default .navbar-collapse, .navbar-default .navbar-form {
+                            margin-top: 2px;
+                            border-top: 0.5em solid #5bb0e0;
+                            background-color: #003b5c;
+                        }
+
+                        .navbar-default .navbar-nav > li > a {
+                            color: white;
+                        }
+
+                        .navbar-default .navbar-nav > li > a:hover {
+                            color: white;
+                            background-color: #5bb0e0;
+                        }
+
+                        .navbar-default .navbar-nav .open .dropdown-menu > li > a:hover, .navbar-default .navbar-nav .open .dropdown-menu > li > a:focus {
+                            color: white;
+                            background-color: #5bb0e0;
+                        }
+
+                        .navbar-default .navbar-nav .open .dropdown-menu > li > a {
+                            color: white;
+                        }
+
+                        .navbar-default .navbar-nav .open .dropdown-menu > li > a:hover {
+                            color: white;
+                            background-color: #5bb0e0;
+                        }
+
+                        .navbar > .container .navbar-brand, .navbar > .container-fluid .navbar-brand {
+                            margin-left: 0px;
+                        }
+
+                        .nav .open > a, .nav .open > a:hover, .nav .open > a:focus {
+                            background-color: #5bb0e0;
+                            border-color: transparent;
+                        }
+
+                        .panel-body {
+                            display: block;
+                        }
+
+                        .panel-link-container {
+                            flex-direction: row;
+                            flex-wrap: wrap;
+                            gap: 2em;
+                            grid-column: 1;
+                            padding: 0em;
+                            align-content: flex-start;
+                            display: flex;
+                            justify-content: space-between;
+                            overflow: hidden;
+                            position: relative;
+                            width: 100%;
+                        }
+
+                        .modern-link-half {
+                            border-bottom: 2px solid rgba(0,0,0,0);
+                            color: #000;
+                            font-size: 1.25em;
+                            padding: .5em;
+                            z-index: 1;
+                            width: 100%;
+                        }
+
+                        .modern-link {
+                            border-bottom: 2px solid rgba(0,0,0,0);
+                            color: #000;
+                            font-size: 1.25em;
+                            padding: .5em;
+                            z-index: 1;
+                            width: 100%;
+                        }
+
+                        @media (min-width: 800px) {     
+                            #interior-header-bg {
+                                background: center 20%
+                                            url(https://www.independencemo.gov/sites/default/files/2023-08/homepage-hero.jpg);
+                                background:
+                                    linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)),
+                                    center 20%
+                                    url(https://www.independencemo.gov/sites/default/files/2023-08/homepage-hero.jpg);
+                                background-size: cover;
+                            }
+
+                            .navbar-brand {
+                                background-size: contain;
+                                float: none;
+                                width: 200px;
+                            }
+
+                            .navbar-toggle {
+                                float: left;
+                                margin-left: 1em;
+                                margin-right: 0px;
+                            }
+
+                            .navbar-default {
+                                padding-top: 12em;
+                                background: none;
+                                border: none;
+                                margin-bottom: 0px;
+                            }
+
+                            .brand-desktop-container {
+                                display: block;
+                                margin-top: 0em;
+                            }
+
+                            .brand-desktop {
+                                display: block;
+                                margin-top: 1em;
+                                margin-left: auto;
+                                height: 119px;
+                                visibility: visible;
+                            }
+
+                            .header-desktop {
+                                padding-top: 20px;
+                                padding-bottom: 20px;
+                                visibility: visible;
+                            }
+
+                            .brand-mobile {
+                                visibility: hidden;
+                            }
+
+                            .header-mobile {
+                                visibility: hidden;
+                            }
+
+                            .panel-body {
+                                display: flex;
+                            }
+
+                            .panel-link-container {
+                                padding: 3.125em;
+                            }
+
+                            .modern-link-half {
+                                width: calc(50% - 2em);
+                            }
+
+                            .modern-link {
+                                width: calc(33% - 2em);
+                            }
+                        }
+
+                        @media (min-width: 991px) {
+                            #interior-header-bg {
+                                height: 32em;
+                            }
+
+                            .brand-desktop-container {
+                                height: 178px;
+                            }
+
+                            .brand-desktop {
+                                margin-top: 4em;
+                                height: 178px;
+                                visibility: visible;
+                                margin-left: 5em;
+                            }
+
+                            .navbar-brand {
+                                width: 400px;
+                            }
+
+                            .navbar-default {
+                                padding-top: 8em;
+                            }
+
+                            .navbar-default .navbar-collapse, .navbar-default .navbar-form {
+                                border-color: transparent;
+                                background-color: transparent;
+                            }
+
+                            .navbar-default .navbar-nav > li > a {
+                                color: white;
+                            }
+
+                            .navbar-default .navbar-nav .open .dropdown-menu > li > a {
+                                color: white;
+                            }
+
+                            .navbar-nav {
+                                float: right;
+                            }
+
+                            .navbar-default .navbar-nav > li > a {
+                                color: white;
+                                font-weight: bold;
+                                border-bottom: 4px solid transparent;
+                            }
+
+                            .navbar-default .navbar-nav > li > a:active {
+                                color: white;
+                            }
+
+                            .navbar-default .navbar-nav > li > .modern-nav-link-type-1:hover {
+                                color: white;
+                                background: #4a7729;
+                                border-bottom: 4px solid #60ca81;
+                            }
+
+                            .navbar-default .navbar-nav > li > .modern-nav-link-type-2:hover {
+                                color: white;
+                                background: #003b5c;
+                                border-bottom: 4px solid #5bb0e0;
+                            }
+
+                            .navbar-default .navbar-nav > li > .modern-nav-link-type-3:hover {
+                                color: white;
+                                background: #855d00;
+                                border-bottom: 4px solid #f2a900;
+                            }
+
+                            .navbar-default .navbar-nav > li > .modern-nav-link-type-4:hover {
+                                color: white;
+                                background: #4f758b;
+                                border-bottom: 4px solid #5bb0e0;
+                            }
+
+                            .navbar-default .navbar-nav > li > .modern-nav-link-type-5:hover {
+                                color: white;
+                                background: #215732;
+                                border-bottom: 4px solid #60ca81;
+                            }
+                        }
+
+                        body{
+                            padding-top: 0px;
+                        }
+
+                        .navbar-brand {
+                            background-size: contain;
+                        }
+
+                        .container {
+                            width: 95%;
+                        }
+
+
+                        #nav-interior .nav > li > a:hover, #nav-interior .nav > li > a{
+                            color: black;
+                        }
+
+                        #nav-interior .nav-pills > li .nav-sub > li a:hover {
+                            color: black;
+                        }
+
+                        #nav-interior .nav > li > a:hover, #nav-interior .nav > li.active > a {
+                            background-color: #e5ebee;
+                            color: #003b5c;
+                            border-right: 4px solid #003b5c;
+                        }
+
+                        #nav-interior .nav .nav-sub > li > a:hover, #nav-interior .nav .nav-sub > li.active > a:hover {
+                            background-color: #e5ebee;
+                            color: #003b5c;
+                            border-right: 4px solid #003b5c;
+                        }
+
+                        #nav-interior .nav-pills > li.active > a:hover {
+                            background-color: transparent;
+                            color: #003b5c;
+                            border-right: 4px solid rgba(0,59,92,0.3)
+                        }
+
+                        #nav-interior .nav-pills .nav-sub > li.active a{
+                            border-right: 4px solid #003b5c;
+                        }
+
+                        #nav-interior .nav-pills .nav-sub > li a:hover{
+                            background-color: #e5ebee;
+                            color: #003b5c;
+                            border-right: 4px solid #003b5c;
+                        }
+
+                        #nav-interior .nav-pills .nav-sub > li.active a:hover{
+                            background-color: transparent;
+                            color: #003b5c;
+                            border-right: 4px solid rgba(0,59,92,0.3)
+                        }
+
+                        #nav-interior .nav-pills .nav-sub > li a,
+                        #interior-wrapper h1, #interior-wrapper h2, #interior-wrapper h3, #interior-wrapper h4, #interior-wrapper h5, #interior-wrapper h6,
+                        #interior-wrapper .h1, #interior-wrapper .h2, #interior-wrapper .h3, #interior-wrapper .h4, #interior-wrapper .h5, #interior-wrapper .h6 {
+                            color: #003b5c;
+                        }
+
+                        #interior-articles .media-list > li.media {
+                            border-color: #003b5c;
+                        }
+
+                        .primary-color {
+                            color: #003b5c;
+                        }
+
+                        .accent-color {
+                            color: #003b5c;
+                        }
+
+                        #nav-interior{
+                            margin-top: 2rem;
+                        }
+
+                        body{
+                            margin-bottom: 20rem;
+                        }
+
+                        #main-footer {
+                            border-top: 0.5em solid #5bb0e0;
+                            background-color: #003b5c;
+                            height: 14rem;
+                        }
+
+                        .panel{
+                            margin-bottom: 0px;
+                        }
+
+                        .panel-info > .panel-heading {
+                            color: white;
+                            background-color: #003b5c;
+                            border-color: transparent;
+                        }
+
+                        .panel-heading {
+                            padding: 10px 15px;
+                            border-bottom: 1px solid transparent;
+                            border-top-right-radius: 0px;
+                            border-top-left-radius: 0px;
+                        }
+
+                        .panel-info {
+                            border-color: transparent;
+                            background-color: rgba(0,59,92,0.1);
+                        }
+
+                        .modern-link:hover, .modern-link-half:hover{
+                            text-decoration: none;
+                            border-bottom: 2px solid #003b5c;
+                        }
+                    </style>
+
+    
+    <style type="text/css">
+        .radio input[type="radio"][id*=rblSearchBy] {
+            margin-left: 0;
+        }
+
+        .radio label[for*=rblSearchBy] {
+            margin-right: 10px;
+        }
+    </style>
+
+
+</head>
+<body>
+
+    <div id="site-container">
+
+        
+           <div id="site-header" class="hidden-print">
+                <div class="brand-desktop-container">
+                    <a class="navbar-brand brand-desktop" id="site-header-logo-desktop" href="https://independencemo.gov/"></a>
+                </div>
+                <nav class="navbar navbar-default" role="navigation">
+                    <div class="container-fluid">
+                        <div class="navbar-header">
+                            <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+                                <span class="sr-only">Toggle navigation</span>
+                                <span class="icon-bar"></span>
+                                <span class="icon-bar"></span>
+                                <span class="icon-bar"></span>
+                            </button>
+                        </div>
+                        <div class="navbar-collapse collapse">
+                            <ul class="nav navbar-nav" id="top-navigation-bar">
+                                <li><a class="modern-nav-link-type-1" href="https://independencemo.gov/residents">For Residents</a></li>
+                                <li><a class="modern-nav-link-type-2" href="https://independencemo.gov/businesses">For Business</a></li>
+                                <li><a class="modern-nav-link-type-3" href="https://independencemo.gov/visitors">For Visitors</a></li>
+                                <li><a class="modern-nav-link-type-4" href="https://independencemo.gov/government">Government</a></li>
+                                <li><a class="modern-nav-link-type-5" href="https://independencemo.gov/utilities-city-services">Utilities & City Services</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </nav>
+            </div>
+           
+    <div id="interior-header-bg"></div>
+    
+      
+
+    <div id="interior-wrapper">
+        <div class="container">
+            <div class="row">
+
+                <div class="col-md-3 visible-md visible-lg hidden-print">
+                    
+                    <nav id="nav-interior">
+                        <ol class="nav nav-pills nav-stacked">
+                            
+                                    <li class=''>
+                                        <a href='/Apps/OpenData/Home' target=''>
+                                            <span class="glyphicon glyphicon-cloud"></span>&nbsp;Open Data Center<span class='caret'></span>
+                                        </a>
+                                        <ul class="nav nav-pills nav-stacked nav-sub">
+                                            
+                                                    <li class=''>
+                                                        <a href='/Apps/OpenData/BuildingPermits' target=''>Building Permits<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/Apps/OpenData/businesslicense' target=''>Business Licenses<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/Apps/OpenData/contractorlicense' target=''>Contractor Licenses<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/Apps/OpenData/llc' target=''>LLC<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/Apps/OpenData/specialevents' target=''>Special Events<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/Apps/OpenData/rentals' target=''>Rentral Properties<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/Apps/OpenData/landlordlicense' target=''>Landlord Licenses<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/Apps/OpenData/codeviolations' target=''>Property Maintenance Violations<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/Apps/OpenData/rentalready' target=''>Rental Unit Inspections<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/Apps/OpenData/restaurantinspections' target=''>Restaurant Violations<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/Apps/OpenData/liquorlicense' target=''>Liquor Licenses<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                        </ul>
+                                    </li>
+                                
+                                    <li class=''>
+                                        <a href='/apps/' target=''>
+                                            <span class="glyphicon glyphicon-home"></span>&nbsp;Permit & Application Center
+                                        </a>
+                                        <ul class="nav nav-pills nav-stacked nav-sub">
+                                            
+                                        </ul>
+                                    </li>
+                                
+                                    <li class='active'>
+                                        <a href='/apps/BuildingPermits' target=''>
+                                            Building Permits<span class='caret'></span>
+                                        </a>
+                                        <ul class="nav nav-pills nav-stacked nav-sub">
+                                            
+                                                    <li class=''>
+                                                        <a href='/apps/communitydevelopment/trade' target=''>Apply for a Trade Permit<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/apps/communitydevelopment/energize' target=''>Apply for an Energize Permit<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/apps/payment?CaseType=COMDEVBP' target=''>Pay Trade Permit Fees<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/apps/print?CaseType=COMDEVBP' target=''>Print Trade Permits<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class='active'>
+                                                        <a href='/comdev/SearchPermitStatus' target=''>Search Permit Status<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/comdev/RequestInspectionCW' target=''>Request Inspection<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                        </ul>
+                                    </li>
+                                
+                                    <li class=''>
+                                        <a href='/apps/BusinessLicenses' target=''>
+                                            Business Licensing<span class='caret'></span>
+                                        </a>
+                                        <ul class="nav nav-pills nav-stacked nav-sub">
+                                            
+                                                    <li class=''>
+                                                        <a href='/apps/businesslicensing/businesslicense' target=''>Business License Application<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/apps/businesslicensing/EmployeePermit/TempBLIndex' target=''>Temporary Business License Application<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/apps/businesslicensing/businesslicense/renewalsearch' target=''>Business License Renewal<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/apps/businesslicensing/businesslicense/paybalancesearch' target=''>Pay Business License Fees<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/apps/print?CaseType=BUSLICENSE' target=''>Print Business License<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/apps/businesslicensing/licensesearch/searchgbl' target=''>Search General Licenses<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/apps/businesslicensing/licensesearch/searchtbl' target=''>Search Temporary Licenses<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                        </ul>
+                                    </li>
+                                
+                                    <li class=''>
+                                        <a href='/apps/ContractorLicenses' target=''>
+                                            Contractor Licensing<span class='caret'></span>
+                                        </a>
+                                        <ul class="nav nav-pills nav-stacked nav-sub">
+                                            
+                                                    <li class=''>
+                                                        <a href='/Apps/CommunityDevelopment/Contractor/Application' target=''>Contractor License Application<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/Apps/CommunityDevelopment/Contractor/renewalsearch' target=''>Contractor License Renewal<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/apps/payment?CaseType=CONTRACTOR' target=''>Pay Contractor License Fees<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/apps/print?CaseType=CONTRACTOR' target=''>Print Contractor License<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                        </ul>
+                                    </li>
+                                
+                                    <li class=''>
+                                        <a href='/apps/EmployeePermits' target=''>
+                                            Employee Permits<span class='caret'></span>
+                                        </a>
+                                        <ul class="nav nav-pills nav-stacked nav-sub">
+                                            
+                                                    <li class=''>
+                                                        <a href='/apps/businesslicensing/employeepermit/apply' target=''>Employee Permit Application<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/apps/print?CaseType=EMPPERMIT' target=''>Print Employee Permit<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/apps/businesslicensing/licensesearch/searchepl' target=''>Search Employee Permits<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                        </ul>
+                                    </li>
+                                
+                                    <li class=''>
+                                        <a href='/apps/LandlordLicenses' target=''>
+                                            Landlord Licenses<span class='caret'></span>
+                                        </a>
+                                        <ul class="nav nav-pills nav-stacked nav-sub">
+                                            
+                                                    <li class=''>
+                                                        <a href='/apps/businesslicensing/landlordlicense/landlordapplication' target=''>Landlord License Application<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/apps/businesslicensing/landlordlicense/renewalsearch' target=''>Landlord License Renewal<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/apps/businesslicensing/landlordlicense/paybalancesearch' target=''>Pay Landlord License Fees<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/apps/print?CaseType=LANDLORD' target=''>Print Landlord License<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/apps/businesslicensing/licensesearch/searchlbl' target=''>Search Landlord Licenses<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/apps/businesslicensing/rentalready' target=''>Rental Ready Landlord Search<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                        </ul>
+                                    </li>
+                                
+                                    <li class=''>
+                                        <a href='/apps/LiquorLicenses' target=''>
+                                            Liquor Licenses<span class='caret'></span>
+                                        </a>
+                                        <ul class="nav nav-pills nav-stacked nav-sub">
+                                            
+                                                    <li class=''>
+                                                        <a href='/apps/businesslicensing/liquorlicense/renewsearch' target=''>Liquor License Renewal<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/apps/businesslicensing/liquorlicense/paybalancesearch' target=''>Pay Liquor License Fees<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/apps/print?CaseType=LIQUOR' target=''>Print Liquor License<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/apps/businesslicensing/licensesearch/searchlqbl' target=''>Search Liquor Licenses<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                        </ul>
+                                    </li>
+                                
+                                    <li class=''>
+                                        <a href='/apps/HealthServices' target=''>
+                                            Health Services<span class='caret'></span>
+                                        </a>
+                                        <ul class="nav nav-pills nav-stacked nav-sub">
+                                            
+                                                    <li class=''>
+                                                        <a href='/apps/health/TempEventHealthPermit' target=''>Temporary Event Health Permit Application<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/apps/payment?CaseType=TEMPHEALTH' target=''>Pay Temp. Event Health Permit Fees<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                        </ul>
+                                    </li>
+                                
+                                    <li class=''>
+                                        <a href='/apps/RightOfWayPermits' target=''>
+                                            Right-of-Way Permit<span class='caret'></span>
+                                        </a>
+                                        <ul class="nav nav-pills nav-stacked nav-sub">
+                                            
+                                                    <li class=''>
+                                                        <a href='/apps/PublicWorks/RightofWay/' target=''>Apply for a ROW Permit<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/apps/payment?CaseType=PWROW' target=''>Pay Right-of-Way Permit Fees<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/apps/print?CaseType=PWROW' target=''>Print Right-of-Way Permits<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                                    <li class=''>
+                                                        <a href='/apps/search?CaseType=PWROW' target=''>Search Right-of-Way Permit Status<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                        </ul>
+                                    </li>
+                                
+                                    <li class=''>
+                                        <a href='/HR/JobOpportunities' target=''>
+                                            Job Opportunities<span class='caret'></span>
+                                        </a>
+                                        <ul class="nav nav-pills nav-stacked nav-sub">
+                                            
+                                                    <li class=''>
+                                                        <a href='/HR/ClosedJobStatus' target=''>Status of Closed Jobs<span class="glyphicon glyphicon-minus"></span></a>
+                                                    </li>
+                                                
+                                        </ul>
+                                    </li>
+                                
+                            
+                        </ol>
+                    </nav>
+
+                    
+                    
+
+                </div>
+
+                <div class="col-xxs-12 col-md-9">
+
+                    
+    <form method="post" action="./SearchPermitStatus" id="ctl00" role="form">
+<div class="aspNetHidden">
+<input type="hidden" name="__EVENTTARGET" id="__EVENTTARGET" value="" />
+<input type="hidden" name="__EVENTARGUMENT" id="__EVENTARGUMENT" value="" />
+<input type="hidden" name="__LASTFOCUS" id="__LASTFOCUS" value="" />
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="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" />
+</div>
+
+<script type="text/javascript">
+//<![CDATA[
+var theForm = document.forms['ctl00'];
+if (!theForm) {
+    theForm = document.ctl00;
+}
+function __doPostBack(eventTarget, eventArgument) {
+    if (!theForm.onsubmit || (theForm.onsubmit() != false)) {
+        theForm.__EVENTTARGET.value = eventTarget;
+        theForm.__EVENTARGUMENT.value = eventArgument;
+        theForm.submit();
+    }
+}
+//]]>
+</script>
+
+
+<script src="/ComDev/WebResource.axd?d=pynGkmcFUV13He1Qd6_TZJhf60M6f3bT5GEVClSOgCB0eAFxpdL0qFbv5S7SopjfCqdMkzRz97JyJ8bpBJQw0Q2&amp;t=639190653332169432" type="text/javascript"></script>
+
+
+<script src="/ComDev/ScriptResource.axd?d=D9drwtSJ4hBA6O8UhT6CQlafZ5gcKOoZEk9kjgqfProLEX7Yvz005l-PvbtQh1WU1A--z8v3Ygh8PaiH52dyq9cE1KIre3gfQYome06ZKHJoin3CTZIKyQo0KII49S74_uAUHSbgBscqlAkZgWd3uuV82e92BFOIKcFl1h-0DpY1&amp;t=ffffffffbec1863d" type="text/javascript"></script>
+<script type="text/javascript">
+//<![CDATA[
+if (typeof(Sys) === 'undefined') throw new Error('ASP.NET Ajax client-side framework failed to load.');
+//]]>
+</script>
+
+<script src="/ComDev/ScriptResource.axd?d=JnUc-DEDOM5KzzVKtsL1tfOxFgIVcsfUZkfKskkqz_OqZ-1lQPoXG_MBPMCs-0g-w61FYa946MzDDQEjO6agZhw-POBppaa2dQKykyVPKDnUNt00H5xpT9otD4r-f-osRODsfDikTWh6ZYVVaDLNlYjyrIOGUYcMwfogu9vLXUljtFZrmQe1V4IgvtztONTZ0&amp;t=ffffffffbec1863d" type="text/javascript"></script>
+<script src="/ComDev/ScriptResource.axd?d=pVdHczR8HTv0TYtXLibFoIfKZuVlIPYzQrINL0i-OGLKgDUo3iVV1t86Ijz3h9FYH2nAbzK9GSZXpUS9GEnmoH_bf3U2NevAnPvf8J8nHliXVVLI_DFMTi38BXaIDNx2FuPbnwF6mjYgr4zhzgYDAg2&amp;t=ffffffffb56adc1f" type="text/javascript"></script>
+<script src="/ComDev/ScriptResource.axd?d=-qISl4-OkT-7X02E4Fisr3mR2BbzyUSGulQxWjjZkt4siya7-ui7UdP8cf6R1HW-ueLwRO-3VReRspPgODYvkhANL1TwJXxoqOc2cLFnHVuG-GVC19ewXNsrQHSuB72b0&amp;t=ffffffffb56adc1f" type="text/javascript"></script>
+<script src="/ComDev/ScriptResource.axd?d=LpGQnoKUSgO3ODsBUs8GfUzZSJV9d0DjkZF-inQTi5jelL68_Mbrut7V6FvLkbxx4cHInzVwlLhIuucd1aVIZDJkaNGJX3r4k6mqZehRAWvo2SyaRdW3FGLdEg-1kWG_0&amp;t=ffffffffb56adc1f" type="text/javascript"></script>
+<script src="/ComDev/ScriptResource.axd?d=iC2sD0Al8A6ZX4AVmUco0ap0cxBTD2iv0y48oEC4mYWCeJOmDCZa45ERbhmR6IlCAr3BrqYqYSyVHeEJ-AJ07WsLn0zDZUgxhVCOycw9AXMt5Gdy1XtIPLc0Y4SRFf1A0&amp;t=ffffffffb56adc1f" type="text/javascript"></script>
+<script src="/ComDev/ScriptResource.axd?d=rFItVvyVSHru2mWi6oVDAUORC2uQBM_2olSJzdxSU_OEePOwZdK3GTTqxAG5j22Ogs1yj4_u6RSqkeNxrWWgbwSeXnnQcL8jefp-s7uKNfNQ1Y57jueoDaCXGNrIBMWv0&amp;t=ffffffffb56adc1f" type="text/javascript"></script>
+<script src="/ComDev/ScriptResource.axd?d=VXG5HWKmJ5VfT6XbkUxKRu1fUvMzoI-bTmXBOVReOGVA2ZzD4Y_a7gXjzoBDD7lxDsr-oc_YzE9DPC6jzd_Ozmili9f6SkDmO3rjUOEDoPe4VgeVab41Jc_Bs0BRZDf50&amp;t=ffffffffb56adc1f" type="text/javascript"></script>
+<script src="/ComDev/ScriptResource.axd?d=UOhNCrWepwbJqlILLLhLzeREI_0InaJv01LeEVzIRQ4Zs5Ra8V1FmH2azPPDI4AAAGAr5o_xY939nglugBFgRuHW2mLN8QBIAO-HIvlX93bn7Tnrmh3CkiQ8mQA9FrZU0&amp;t=ffffffffb56adc1f" type="text/javascript"></script>
+<script src="/ComDev/ScriptResource.axd?d=5Ptu7TR6eeUMpbV-tOSG6jO4YBda_duArmAUlsGa9dZC0Qbwyd5iA3_-Ykq9j4RWpC6Vt9sBDgSKy2PJpvQxqjq7mJ1y2yF_pb5DlYsMYM7JXtqauiGwls2uNnViH1Xn0&amp;t=ffffffffb56adc1f" type="text/javascript"></script>
+<script src="/ComDev/ScriptResource.axd?d=yq2dglGiX2GonGqAbqjStkHT4dQHGUfFTsyAomLVdPH6aoFfaWTlq9FHk83Ta5XLA-vEbEcdf5XfAtQfDHvOcnnEYs6tUyG066gUwdFeCyAes7WGm0nv9ReoIDOsroqg0&amp;t=ffffffffb56adc1f" type="text/javascript"></script>
+<script src="/ComDev/ScriptResource.axd?d=q85rlLsZEVu9loex9kzISNcAts0SSqG6K9HBWMhOMzz7H5f5gKI8gua_XJvQW1jU-4IGns_g7nJEjgrkTCpBfm6iyzEFO5SxHgUfo1xnkO8NjvR3BvJ_9g4FlfnpzbFG0&amp;t=ffffffffb56adc1f" type="text/javascript"></script>
+<script src="/ComDev/ScriptResource.axd?d=9fVK6SOzqud8-CG5DRcWdWYgCq4tBYlZYW_y8GXy05ZHdLxrXE20nyX_xWjLHkcSWLxPz2rqLYwCSTsgovqa8uXYOLxtC0qxQWRRfciRveQxfF4PGFjSDLonmNyJIylN0&amp;t=ffffffffb56adc1f" type="text/javascript"></script>
+<script src="/ComDev/ScriptResource.axd?d=FJYGXcD0D1IU18YZcc5S5Whvpb18DDj2S0N-vEKQTu0tgtVShiTqGvT9HXU9FrSjUCkf_KpCBgl3xqYrn1t-5FJXc3AKFrX4yhJqpAaY1lr7TDkgi_ykZ8ueiu1sQKVq0&amp;t=ffffffffb56adc1f" type="text/javascript"></script>
+<script src="/ComDev/ScriptResource.axd?d=qTnPOILsJCPbmGgsgyJ0e2mQjjC25GWs70Y-hfUgjkko65A1ITV1vVUaMtCLJVQxE9BhgkvGsbxCG9XKd-tL7V8V29XwyjiwZ86BIj8avMHBHUXo55AKx6CCtC_ITRHP0&amp;t=ffffffffb56adc1f" type="text/javascript"></script>
+<div class="aspNetHidden">
+
+	<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="623486E8" />
+	<input type="hidden" name="__VIEWSTATEENCRYPTED" id="__VIEWSTATEENCRYPTED" value="" />
+	<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="Zl0UW1NaI+rSR76xwOYlcicjkkT8pBn5gqq9gTZYMC3c6pc2PjS6it/CkF3mpklHTuV67aITXA67YumhS837mV2b0jAtrlO0xK/ivBImronaMx4u3fFwda4sg05hrzmDbm1kYitkHDk4lcwQquByhaGCNJF15+I3KJIUiUqHDE3IEhtR4/S/Nk1e3KdYGyAQ6lDpWN8o88sVMEazPKgepCt4PqvDH9C1/8gMtdAp+Wur1cBKMmGVv2VTQ7G7Shtnw88ruEOO2uRuiyXBKScIgyPaOheXA4j7Wc7gPrnTlgIv0UaObXZiM2QZjYyU72l0S629vBBClFdjT41UGMvzeEC7C/hyVUyq6L2K2sdxtKQ=" />
+</div>
+        
+        <script type="text/javascript">
+//<![CDATA[
+Sys.WebForms.PageRequestManager._initialize('ctl00$ctl00$cphBody$cphBody$ctl01', 'ctl00', ['tctl00$ctl00$cphBody$cphBody$ctl02','cphBody_cphBody_ctl02','tctl00$ctl00$cphBody$cphBody$ucPermitStatus$ctl00','cphBody_cphBody_ucPermitStatus_ctl00'], ['ctl00$ctl00$cphBody$cphBody$btnSearch','cphBody_cphBody_btnSearch'], [], 90, 'ctl00$ctl00');
+//]]>
+</script>
+
+        <div id="cphBody_cphBody_ctl02">
+	
+
+                <h1>Search Permit Status</h1>
+
+                <div id="cphBody_cphBody_pnlSearch" class="row">
+		
+                    <p>
+                        This form allows you to track the status of a permit application and/or obtain the results of inspections for projects underway. 
+                        Enter the Permit Number, OR the Address of the property.
+                    </p>
+                    <div class="alert alert-info">
+                        <strong>The fastest and most accurate results will be obtained by entering a Permit Number.</strong><br />
+                        Call Building Inspections at (816) 325-7401 if you are not able to find a permit or have any questions.
+                    </div>
+
+                    
+
+                    <div id="SearchBy" class="col-xs-6">
+                        <div class="form-group">
+                            <label for="ctl00_ctl00_cphBody_cphBody_rblSearchBy">Search By</label>
+                            <table id="ctl00_ctl00_cphBody_cphBody_rblSearchBy" class="radio">
+			<tr>
+				<td><input id="ctl00_ctl00_cphBody_cphBody_rblSearchBy_0" type="radio" name="ctl00$ctl00$cphBody$cphBody$rblSearchBy" value="Permit Number" checked="checked" /><label for="ctl00_ctl00_cphBody_cphBody_rblSearchBy_0">Permit Number</label></td><td><input id="ctl00_ctl00_cphBody_cphBody_rblSearchBy_1" type="radio" name="ctl00$ctl00$cphBody$cphBody$rblSearchBy" value="Address" onclick="javascript:setTimeout(&#39;__doPostBack(\&#39;ctl00$ctl00$cphBody$cphBody$rblSearchBy$1\&#39;,\&#39;\&#39;)&#39;, 0)" /><label for="ctl00_ctl00_cphBody_cphBody_rblSearchBy_1">Address</label></td>
+			</tr>
+		</table>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="cphBody_cphBody_txtPermitNum1">Permit Number</label>
+                            
+                            
+                            
+                            
+                            <div>
+                                <input name="ctl00$ctl00$cphBody$cphBody$txtPermitNum1" type="number" maxlength="2" id="cphBody_cphBody_txtPermitNum1" class="form-control" style="display: inline-block; width: 80px;" />
+                                -
+                                <input name="ctl00$ctl00$cphBody$cphBody$txtPermitNum2" type="number" maxlength="8" id="cphBody_cphBody_txtPermitNum2" class="form-control" style="display: inline-block; width: 150px;" />
+                            </div>
+                        </div>
+                        
+
+                        <div class="form-group">
+                            <label for="cphBody_cphBody_txtHouseNum">House Number:</label>
+                            
+                            
+                            <input name="ctl00$ctl00$cphBody$cphBody$txtHouseNum" type="number" maxlength="7" id="cphBody_cphBody_txtHouseNum" disabled="disabled" class="aspNetDisabled form-control" />
+                        </div>
+                        <div class="form-group">
+                            <label for="cphBody_cphBody_txtStreetName">Street Name:</label>
+                            
+                            <input name="ctl00$ctl00$cphBody$cphBody$txtStreetName" type="text" maxlength="25" id="cphBody_cphBody_txtStreetName" disabled="disabled" class="aspNetDisabled form-control" />
+                        </div>
+                        
+                        <div id="Submit" role="button">
+                            <input type="submit" name="ctl00$ctl00$cphBody$cphBody$btnSearch" value="Search" id="cphBody_cphBody_btnSearch" class="btn btn-primary" />
+                        </div>
+                        
+                    </div>
+                    <div  class="col-xs-6">
+                        <a href="/Apps/OpenData/BuildingPermits" class="btn btn-success">View All Building Permits</a>
+                        </div>
+                    
+
+                    
+                    
+                
+	</div>
+                
+
+                
+                
+
+                <div id="cphBody_cphBody_ucPermitStatus_ctl00">
+		
+        <div id="cphBody_cphBody_ucPermitStatus_pnlPopup" style="display: none;">
+			
+
+            <input type="hidden" name="ctl00$ctl00$cphBody$cphBody$ucPermitStatus$hdnPermitNumPrefix" id="cphBody_cphBody_ucPermitStatus_hdnPermitNumPrefix" />
+            <input type="hidden" name="ctl00$ctl00$cphBody$cphBody$ucPermitStatus$hdnPermitNumSuffix" id="cphBody_cphBody_ucPermitStatus_hdnPermitNumSuffix" />
+
+            <div id="permit-status-modal" class="modal" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <a id="cphBody_cphBody_ucPermitStatus_btnClose" class="close" href="javascript:__doPostBack(&#39;ctl00$ctl00$cphBody$cphBody$ucPermitStatus$btnClose&#39;,&#39;&#39;)">×</a>
+                            <h3 class="modal-title">Permit Information</h3>
+                        </div>
+                        <div class="modal-body">
+
+                            <p><strong>FOR INFORMATIONAL PURPOSES ONLY - NOT A VALID PERMIT</strong></p>
+                            <p>
+                                The requested permit could not be found. Please check your information and try again.
+                            </p>
+
+                            
+                            
+                            
+
+                        </div>
+                        <div class="modal-footer">
+                            <input type="submit" name="ctl00$ctl00$cphBody$cphBody$ucPermitStatus$btnCancel" value="Close" id="cphBody_cphBody_ucPermitStatus_btnCancel" class="btn btn-default" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        
+		</div>
+        
+        <span id="cphBody_cphBody_ucPermitStatus_lblPopupTarget" style="display: none;"></span>
+        
+    
+	</div>
+
+
+            
+</div>
+        <div id="cphBody_cphBody_modalProgress_updateProgress" style="display:none;">
+	
+        <div id="ModalProgressBackground"></div>
+        <div id="ModalProgressMessage">
+            <h5>Loading</h5>
+            <div class="progress h-margin">
+                <div class="progress-bar progress-bar-striped active" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" style="width: 100%">
+                    <span class="sr-only">Loading</span>
+                </div>
+            </div>
+        </div>
+    
+</div>
+
+    
+
+<script type="text/javascript">
+//<![CDATA[
+Sys.Application.add_init(function() {
+    $create(Sys.Extended.UI.ModalPopupBehavior, {"backgroundCssClass":"ModalBackground","dynamicServicePath":"/comdev/SearchPermitStatus","id":"cphBody_cphBody_ucPermitStatus_mpePopup","popupControlID":"cphBody_cphBody_ucPermitStatus_pnlPopup"}, null, null, $get("cphBody_cphBody_ucPermitStatus_lblPopupTarget"));
+});
+Sys.Application.add_init(function() {
+    $create(Sys.UI._UpdateProgress, {"associatedUpdatePanelId":null,"displayAfter":500,"dynamicLayout":true}, null, null, $get("cphBody_cphBody_modalProgress_updateProgress"));
+});
+//]]>
+</script>
+</form>
+
+                    
+
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+
+
+        <footer id="main-footer" class="container-fluid home-section hidden-print">
+            <div id="footer-bottom" class="row">
+                <div class="col-xxs-12 col-md-3">
+                </div>
+                <div class="col-xxs-12 col-md-6">
+                    <div id="privacy-copyright">
+                        <a href="#" data-toggle="modal" data-target="#privacy-policy-modal">Privacy Policy</a> | &copy; 2026 City of Independence, Missouri. All rights reserved.
+                    </div>
+                </div>
+            </div>
+        </footer>
+
+    </div>
+
+    <div id="sign-in-modal" class="modal fade" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content">
+                <form role="form" id="modal-sign-in" method="post" action="https://www.ci.independence.mo.us/UserMgmt/Login">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                        <h4 class="modal-title">Sign In</h4>
+                    </div>
+                    <div class="modal-body">
+
+                        <div class="form-group">
+                            <label for="username">Username</label>
+                            <input type="text" class="form-control" id="username" name="username" autofocus>
+                        </div>
+                        <div class="form-group">
+                            <label for="password">Password</label>
+                            <input type="password" class="form-control" id="password" name="password">
+                        </div>
+                        <div class="checkbox">
+                            <label>
+                                <input type="checkbox" name="remember_me" />
+                                Keep me logged in on this computer
+                            </label>
+                        </div>
+
+                        <ul class="list-unstyled">
+                            <li><a href="/UserMgmt/CreateUser">Not registered?</a></li>
+                            <li><a href="/UserMgmt/PasswordRecovery">Forgot username or password?</a></li>
+                        </ul>
+
+                    </div>
+                    <div class="modal-footer">
+                        <button type="submit" class="btn btn-primary" form="modal-sign-in">Sign in</button>
+                        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="privacy-policy-modal" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                    <h4 class="modal-title">Privacy Policy</h4>
+                </div>
+                <div class="modal-body">
+                    <p>
+                        When you visit the City of Independence, Missouri website, we use automated tools to log information about each visit. We process this information in the
+                        aggregate to determine site performance issues, such as popular pages, most frequently downloaded forms, and other site performance characteristics. This
+                        information does not identify you personally. We do not track or record information about individuals and their visits. To protect your privacy, the City
+                        of Independence has incorporated industry-standard secure server software (Secure Socket Layers) into sensitive sections of the web site.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/ComDev/bundles/master-scripts?v=yKGMn3QXZkARTOG70dNZy5hotciBLxAdJpvjFnDsCbc1"></script>
+
+
+    
+
+    <script src="/ComDev/bundles/master-interior-scripts?v=ovMLqTg9vzXaL585NS1RszcijDAXyvc4IeGTvqzEtxE1"></script>
+
+    
+    
+
+
+
+    <!-- Google Analytics -->
+    <script src="/ComDev/bundles/google-analytics"></script>
+
+    <!-- Emma CityScene Email Signup Form -->
+    
+
+</body>
+</html>

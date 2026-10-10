@@ -1,0 +1,402 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<title>Permit Inquiries</title><meta name="viewport" content="width=device-width">
+<link rel="stylesheet" type="text/css" href="/vision6noteswrapper5/bootstrap/css/bootstrap.min.css">
+<link rel="stylesheet" type="text/css" href="/vision6noteswrapper5/css/customLotusNotes.default.css">
+<script type="text/javascript" src="/vision6noteswrapper5/jquery/jquery.min.js"></script>
+<script type="text/javascript" src="/vision6noteswrapper5/bootstrap/js/bootstrap.min.js"></script>
+<script type="text/javascript" src="/public/permits/permitInquiry.nsf/sweetalert2.all.min.js"></script>
+<script src="https://www.google.com/recaptcha/api.js?render=6Lf3pdQjAAAAAH5h8Fczi_rKyJcBk40QFhkr45iK"></script>
+<script language="JavaScript" type="text/javascript">
+<!-- 
+function validatePermitValues(e) {	var message = '';	var fname = '';		e.preventDefault();	if ($('#appYear').val().trim() == '') {		message += 'Application Year<br>';		fname = fname == '' ? '#appYear' : fname;	}		var appNum = $('#applicationNumber').val().trim() || ''; 	if (appNum == '') {		message += 'Permit / Application Number<br>';		fname = fname == '' ? '#applicationNumber' : fname;	} else if (!isNumeric(appNum)) {		message += 'Permit / Application Number must be a number<br>';		fname = fname == '' ? '#applicationNumber' : fname;	}		var streetNum = $('#applicationStreetNumber').val().trim() || '';	if (streetNum == '') {		message += 'Street Number<br>';		fname = fname == '' ? '#applicationStreetNumber' : fname;			} else if (!isNumeric(streetNum)) {		message += 'Street Number must be a number<br>';		fname = fname == '' ? '#applicationStreetNumber' : fname;	}		if (message != '') {		$(fname).focus();		Swal.fire({			title: '<span style="font-size: 0.6em">Please enter the following field(s) and try again</span>',			html: '<div style="font-size: 0.8em">' + message + '</div>',			confirmButtonColor: '#337ab7',			confirmButtonText: 'OK',		});		return;	}	grecaptcha.ready(function() {		grecaptcha			.execute('6Lf3pdQjAAAAAH5h8Fczi_rKyJcBk40QFhkr45iK', {action: 'application'})			.then(function(token) {				$('#token').val(token);				$('#action').val("application");				$('#goPermitH').click();			});	});}function validatePinValues(e) {	var message = '';	var fname = '';		e.preventDefault();	var pin = $('#pinNumber').val().trim() || '';	if (pin == "") {		message += 'Permit PIN Number';		fname = fname == '' ? '#pinNumber' : fname;	} else if (!isNumeric(pin)) {		message += 'Permit PIN Number must be a number';		fname = fname == '' ? '#pinNumber' : fname;	} else if (pin.length > 9) {		message += 'Permit PIN Number should be a maximum of 9 digits';		fname = fname == '' ? '#pinNumber' : fname;	}	if (message != '') {		$(fname).focus();		Swal.fire({			title: '<span style="font-size: 0.6em">Please enter the following field(s) and try again</span>',			html: '<div style="font-size: 0.8em">' + message + '</div>',			confirmButtonColor: '#337ab7',			confirmButtonText: 'OK',		});		return;	}		grecaptcha.ready(function() {		grecaptcha			.execute('6Lf3pdQjAAAAAH5h8Fczi_rKyJcBk40QFhkr45iK', {action: 'pin'})			.then(function(token) {				$('#token').val(token);				$('#action').val("pin");						$('#goPinH').click();			});	});}function isNumeric(val) {	return !isNaN(parseFloat(val)) && isFinite(val);}function checkStandardAbbreviations(streetName) {	var abv = ['ACRD','AL','ARC','BLVD','BR','BRDG','BYP','CSWY','CTR','CIR','COM','CONN','CT','COVE','CRES',	'CRSG','DR','EXWY','EXT','FRWY','HWY','LN','LOOP','MALL','MTWY','OVAL','OVPS','PKWY','PASS','PATH','PIKE',	'PL','PLZ','PT','RAMP','RD','ROW','RUE','SERV','SQ','ST','TER','THWY','TFWY','TRL','TUN','TPKE','UNP',	'WALK','WY'];	return abv.includes(streetName.toUpperCase());}
+// -->
+</script>
+
+<script language="JavaScript" type="text/javascript">
+<!-- 
+document._domino_target = "_self";
+function _doClick(v, o, t, h) {
+  var form = document._DominoForm;
+  if (form.onsubmit) {
+     var retVal = form.onsubmit();
+     if (typeof retVal == "boolean" && retVal == false)
+       return false;
+  }
+  var target = document._domino_target;
+  if (o.href != null) {
+    if (o.target != null)
+       target = o.target;
+  } else {
+    if (t != null)
+      target = t;
+  }
+  form.target = target;
+  form.__Click.value = v;
+  if (h != null)
+    form.action += h;
+  form.submit();
+  return false;
+}
+// -->
+</script>
+</head>
+<body text="#000000" bgcolor="#FFFFFF">
+
+<form method="post" action="/public/permits/permitInquiry.nsf/index.html?OpenForm&amp;Seq=1" name="_DominoForm">
+<input type="hidden" name="__Click" value="0"><script type= "text/javascript">$(document.body).addClass("front_end_body site_standardsitetemplate");</script>
+<link rel="Shortcut Icon" href="/vision6noteswrapper5/favicon.ico">
+<style id="poshytip-css-tip-yellow" type="text/css">
+div.tip-yellow {
+visibility: hidden;
+position: absolute;
+top: 0;
+left: 0;
+}
+div.tip-yellow table, div.tip-yellow td {
+margin: 0;
+font-family: inherit;
+font-size: inherit;
+font-weight: inherit;
+font-style: inherit;
+font-variant: inherit;
+}
+div.tip-yellow td.tip-bg-image span {
+display: block;
+font: 1px/1px sans-serif;
+height: 10px;
+width: 10px;
+overflow: hidden;
+}
+div.tip-yellow td.tip-right {
+background-position: 100% 0;
+}
+div.tip-yellow td.tip-bottom {
+background-position: 100% 100%;
+}
+div.tip-yellow td.tip-left {
+background-position: 0 100%;
+}
+div.tip-yellow div.tip-inner {
+background-position: -10px -10px;
+}
+div.tip-yellow div.tip-arrow {
+visibility: hidden;
+position: absolute;
+overflow: hidden;
+font: 1px/1px sans-serif;
+}
+</style>
+<noscript>
+<div class="noscript_alert"><span>Please enable JavaScript in your browser for a better user experience.</span></div>
+</noscript>
+<div class="sitewrapper site_template mainSpan_wrapper">
+<div class="mainSpan" id="mainSpan_wrapper_Screen">
+<header id="siteheader" class="">
+<a id="home_link" href="http://www.cor.net">Home</a>
+<a href="javascript:void(0);" class="menu_trigger mobile_only">Menu</a>
+<div id="headercolumn" class="site_template_column  column sortable_col header_column">
+<div id="top_nav">
+<a href="https://www.cor.net/our-city/city-contacts">Contact Us</a>
+<a href="https://www.cor.net/departments/human-resources/job-openings">Employment</a>
+<a href="https://www.cor.net/government/transparency-initiative">Transparency</a>
+</div>
+</div>
+</header>
+<div class="standardlayout clearfix" id="sitebody">
+<div id="ColumnUserControl1" class="column  top_col  clearfix">
+<div class=" main_menu_widget">
+<link rel="stylesheet" type="text/css" href="/vision6noteswrapper5/css/dropdownmegamenu.css">
+<nav id="menuContainer_170_0_1" class="mainnav">
+<ul class="dropdownmenu clearfix">
+<li id="dropdownrootitem1" class='megamenu_first'><a class='dropdownrootitem1 active' href='https://www.cor.net/home'>Home</a></li>
+<li id="dropdownrootitem3" class='megamenu_first'><a class='dropdownrootitem3' href='https://www.cor.net/our-city'>Our City</a></li>
+<li id="dropdownrootitem4" class='megamenu_first'><a class='dropdownrootitem4' href='https://www.cor.net/departments-7'>Departments</a></li>
+<li id="dropdownrootitem5" class='megamenu_first'><a class='dropdownrootitem5' href='https://www.cor.net/government'>Government</a></li>
+<li id="dropdownrootitem6" class='megamenu_first'><a class='dropdownrootitem6' href='https://www.cor.net/businesses'>Businesses</a></li>
+<li id="dropdownrootitem2" class='megamenu_first'><a class='dropdownrootitem2' href='https://www.cor.net/services-6'>Services</a></li>
+<li id="dropdownrootitem7" class='megamenu_first'><a class='dropdownrootitem7' href='https://www.cor.net/i-want-to'>I Want To...</a></li>
+ </ul>
+</nav>
+</div>
+</div>
+<div id="ColumnUserControl2" class="column left_col">
+<nav class="nocontent sidenav mobile_list">
+<ul>
+<li class="sidenav_expanded sidenav_haschildren">
+<a href="http://www.cor.net/?navid=366">Permits Home</a>
+<ul>
+<li><a href="/public/permits/permitInquiry.nsf/index.html">Permits Search</a></li>
+<li class="sidenav_expanded sidenav_haschildren"><a>Apply Online</a></li>
+<ul>
+<li><a href="./index.html">For Permits</a></li>
+<li><a href="/public/permits/permitInquiry.nsf/inspectionIndex.html?openForm">For Inspections</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</div>
+<div id="ColumnUserControl3" class="column right_col">
+<a id="pagebody"></a>
+<header class="title_widget clearfix"></header>
+<div class="normal_content_area content_area clearfix"><script>
+function A7XMYNEK5E(fieldSuffix, fieldSuffix2, e) {
+	var message = '';
+	var fname = '';
+    e.preventDefault();
+	var fname1 = '#N9WXEBJ992nu'+fieldSuffix;
+	var fname2 = '#N9WXEBJ992nm'+fieldSuffix;
+	if ($(fname1).val().trim() == '') {
+		message += 'Street Number<br>';
+		fname = fname == '' ? fname1 : fname;
+	} else if (!isNumeric($(fname1).val().trim())) {
+		message += 'Street Number must be a number<br>';
+		fname = fname == '' ? fname1 : fname;
+	}
+	if ($(fname2).val().trim() == '') {
+		message += 'Street Name<br>';
+		fname = fname == '' ? fname2 : fname;
+	}
+    if (checkStandardAbbreviations($(fname2).val().trim())) {
+         message += 'Street abbreviations only are not allowed<br>';
+		fname = fname == '' ? fname2 : fname;
+    }
+
+	if (message != '') {
+		$(fname).focus();
+		Swal.fire({
+			title: '<span style="font-size: 0.6em">Please enter the following field(s) and try again</span>',
+			html: '<div style="font-size: 0.8em">' + message + '</div>',
+			confirmButtonColor: '#337ab7',
+			confirmButtonText: 'OK',
+		});
+		return;
+	}
+	setValues(fieldSuffix, fieldSuffix2);
+
+	grecaptcha.ready(function() {
+		grecaptcha
+			.execute('6Lf3pdQjAAAAAH5h8Fczi_rKyJcBk40QFhkr45iK', {action: 'address'})
+			.then(function(token) {
+				$('#token').val(token);
+				$('#action').val('address');
+				$('#goAddressH').click();
+			});
+	});
+}
+
+function setValues(fieldSuffix, fieldSuffix2) {
+	var newValue = fieldSuffix + '|' + fieldSuffix2 + '|' + $('#N9WXEBJ992nu' + fieldSuffix).val() + '|' + $('#N9WXEBJ992nm' + fieldSuffix).val() + '|' + $('#N9WXEBJ992dr' + fieldSuffix).val()
+	$('#street').val(newValue);
+}
+</script>
+<div>
+ <h1>Permit Search</h1> 
+<div class="content_area normal_content_area clearfix">
+<p>Select from one of the three search types to the right.</p>
+<p>To search by application number, choose the year of the application and then enter the application number and street number.  This should appear at the top of your printed permit.</p>
+<p>To search by location, enter as much as you know of the location address.  The search will try to find any matches that contain your search terms.  An entry of "1400" only will dipsplay up to 100 matches of properties that have "1400" in the  street number.  A search of both "1400" and "Park" will narrow down the search only to those addresses on "Park" that contain "1400" in the street number.</p>
+<p>If you have a PIN number (Phone Access Code), you may type it in in the third search to try to find a specific permit.</p>
+ 
+<div class="card mb-2">
+<div class="card-header">Property Search</div>
+<div class="card-body px-4">
+ 
+<p class="mx-1 my-2 p-3" style="background-color:#fcf8e3">Note: On your printed permit, the first two digits of your permit number represent the year, and those after the dash are the permit number. For example, if your permit/application number is "26-1234", select 2026 in the year drop down and enter 1234 for the permit/application number.</p>
+<div class="row mb-1">
+<label class="col-12 col-md-4 col-form-label text-start text-md-end fw-bold" for="appYear">Application Year:&#160;</label>
+<div class="col-12 col-md-3"> 
+<input name="%%Surrogate_appYear" type="hidden" value="1">
+<select name="appYear" id="appYear" class="form-select" style="width:100%">
+<option value="26">2026
+<option value="25">2025
+<option value="24">2024
+<option value="23">2023
+<option value="22">2022
+<option value="21">2021
+<option value="20">2020
+<option value="19">2019
+<option value="18">2018
+<option value="17">2017
+<option value="16">2016
+<option value="15">2015
+<option value="14">2014
+<option value="13">2013
+<option value="12">2012
+<option value="11">2011
+<option value="10">2010
+<option value="09">2009
+<option value="08">2008
+<option value="07">2007
+<option value="06">2006
+<option value="05">2005
+<option value="04">2004
+<option value="03">2003
+<option value="02">2002
+<option value="01">2001
+<option value="00">2000
+<option value="99">1999
+<option value="98">1998
+<option value="97">1997
+<option value="96">1996</select>
+ </div>
+</div>
+ 
+<div class="row mb-1 align-items-center">
+<label class="col-12 col-md-4 col-form-label text-start text-md-end fw-bold" for="applicationNumber">Permit / Application Number:&#160;</label>
+<div class="col-12 col-md-3"> 
+<input name="applicationNumber" value="" id="applicationNumber" class="form-control" style="width:100%"> </div>
+</div>
+ 
+<div class="row mb-1">
+<label class="col-12 col-md-4 col-form-label text-start text-md-end fw-bold" for="applicationStreetNumber">Street Number:&#160;</label>
+<div class="col-12 col-md-3"> 
+<input name="applicationStreetNumber" value="" id="applicationStreetNumber" class="form-control" style="width:100%"> </div>
+</div>
+ 
+<div class="text-center mt-2">
+<button  type=button" class="btn btn-primary" style="padding: 5px 20px" id="goPermit" onclick="validatePermitValues(event)">Go</button>
+<p>
+<input type="button" value="Go Hidden" id="goPermitH" style="display:none" onclick="return _doClick('8625866B0059D4C1.107c183543f6073e86258e5f004a750a/$Body/0.2B4A', this, null)">
+</div>
+ 
+<hr class="mb-2">
+ 
+<div class="text-center mb-1">OR</div>
+ 
+<div>
+<div class="row mb-1">
+<label class="col-12 col-md-4 col-form-label text-start text-md-end fw-bold" for="N9WXEBJ992nuP0H7">Street Number:&#160;</label>
+<div class="col-12 col-md-3"><input class="form-control" style="width:100%" name="N9WXEBJ992nuP0H7" id="N9WXEBJ992nuP0H7"> </div>
+</div>
+ 
+<div class="row mb-1">
+<label class="col-12 col-md-4 col-form-label text-start text-md-end fw-bold" for="N9WXEBJ992nmP0H7">Street Name:&#160;</label>
+<div class="col-12 col-md-8"><input class="form-control" style="width:100%" name="N9WXEBJ992nmP0H7" id="N9WXEBJ992nmP0H7"> </div>
+</div>
+ 
+<div class="row mb-1">
+<label class="col-12 col-md-4 col-form-label text-start text-md-end fw-bold" for="N9WXEBJ992drP0H7">Street Direction:&#160;</label>
+<div class="col-12 col-md-3">
+<select class="form-select" style="width:100%" name="N9WXEBJ992drP0H7" id="N9WXEBJ992drP0H7">
+<option value="X" selected>&lt;Direction&gt;</option>
+<option value="N">N</option>
+<option value="E">E</option>
+<option value="S">S</option>
+<option value="W">W</option>
+</select>
+</div>
+</div>
+
+<div class="text-center mt-2">
+<button class="btn btn-primary" type="button" id="JWNOHLAS">Go</button><br>
+
+<input type="button" value="Go Hidden" id="goAddressH" style="display:none" onclick="return _doClick('8625866B0059D4C1.107c183543f6073e86258e5f004a750a/$Body/0.371A', this, null)">
+</div>
+</div>
+ 
+<hr class="mb-2">
+ 
+<div class="text-center mb-1">OR</div>
+ 
+<div class="row mb-1">
+<label class="col-12 col-md-4 col-form-label text-start text-md-end fw-bold" for="pinNumber">Permit PIN Number:&#160;</label>
+<div class="col-12 col-md-3"> 
+<input name="pinNumber" value="" id="pinNumber" class="form-control" style="width:100%"> </div>
+</div>
+ 
+<div class="text-center mt-2">
+<button class="btn btn-primary g-recaptcha" type="button" id="goPin" onclick="validatePinValues(event)">Go</button><br>
+
+<input type="button" value="Go Hidden" id="goPinH" style="display:none" onclick="return _doClick('8625866B0059D4C1.107c183543f6073e86258e5f004a750a/$Body/0.3C24', this, null)">
+</div>
+</div>
+ 
+ </div>
+</div>
+</div>
+</div>
+
+<br>
+
+<input name="action" value="" id="action" style="display:none">
+<input name="token" value="" id="token" style="display:none">
+<input name="error" value="" id="error" style="display:none">
+<input name="returnurl" value="" id="returnurl" style="display:none">
+<input name="name" value="" style="display:none">
+<input name="street" value="" id="street" style="display:none">
+<input  name="unid" value="(GHpd2yI72Uv2T7456HvW)"  id="unid" style="display:none">
+<script>
+$(window).on('load', function () {
+  $('#JWNOHLAS').on('click', function() {
+    A7XMYNEK5E('P0H7','I98B', event); return false;
+  });
+});
+
+</script>
+
+<br>
+</div>
+</div>
+</div>
+
+<footer id="page_footer" class="">
+<div id="footercolumn" class="site_template_column  footer_column">
+<div class="footer_location">
+<div style="text-align: center;">
+2360 Campbell Creek Blvd. Suite 550<br>
+Richardson, TX 75082
+<p>&nbsp;</p>
+</div>
+</div>
+
+<div class="footer_phone">
+<div class="footerLH" style="text-align: center;">
+<a href="tel:972-744-4100">972-744-4100</a>
+<p style="line-height: 1.5em; margin-bottom: 0; padding-bottom: 0; font-size:100%">Mailing Address: P.O. Box 830309 Richardson, TX 75083-0309</p>
+<a href="https://www.cor.net/departments/capital-projects-engineering/public-project-input/capital-project-tracker-map" target="_blank" title="View Richardson Projects">View Richardson Projects</a>&nbsp;|&nbsp;<a href="https://www.cor.net/departments/community-services/code-enforcement/express-a-concern" target="_blank" title="Report an Issue">Report an Issue</a>
+</div>
+<style>
+    div.footerLH a{
+    min-width: 44px;
+    min-height: 44px;
+    }
+</style>
+</div>
+
+<div class="social_icons">
+<a href="https://www.cor.net/our-city/system-pages-do-not-delete/follow-us" target="_self" title="Facebook Icon"><img src="/vision6noteswrapper5/images/facebook.png" alt="Facebook Icon"></a>
+<a href="mailto:askrichardsonconcern@cor.net" target="_self" title="Email Icon"><img src="/vision6noteswrapper5/images/mail.png" alt="Email Icon"></a>
+</div>
+
+<p class="footer_copyright">
+<a href="https://granicus.com/government-website-design?utm_source=customer&amp;utm_medium=footer&amp;utm_campaign=govAccesswebsite">Website Design by Granicus</a>
+ - Connecting People and Government
+</p>
+
+<div class="footer_contact">
+<p class="linksHover" style="line-height:1.5em;">Accommodations for Persons with Disabilities call Lindsay Turman,
+<a href="tel:9727440908" style="text-decoration: underline;">972-744-0908</a> or <a href="mailto:ADACoordinator@cor.gov" style="text-decoration: underline;">ADACoordinator@cor.gov</a><br>
+Visit <a href="https://www.cor.net/services/ada-compliance-accommodations" target="_blank" rel="noopener" style="text-decoration: underline;">www.cor.net/ADA</a> for more information.</p>
+<style>
+    .linksHover a:hover, a:focus{
+    text-decoration: underline;
+    font-weight:800;
+    }
+</style>
+</div>
+
+</div>
+</footer>
+
+<div id="view-options">
+<a href="javascript:void(0);" id="view-full" onclick="viewfullsite()" class="mobile_only">View Full Site</a>
+</div>
+</div>
+</div>
+<p></form>
+</body>
+</html>

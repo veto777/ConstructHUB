@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+  
+<link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon/favicon-16x16.png">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+  <link rel="stylesheet" href="/css/bundle.css">
+  <title>MilamCountyPermits.com</title>
+  <script>window.STATUS_LABELS = {} || {};</script>
+  <script>window.JURISDICTION_LABELS = {"county":{"key":"county","field":"jurisdictionCounty","row":"County","short":"County","long":"County","highlight":false,"hasList":false},"countyPrecinct":{"key":"countyPrecinct","field":"jurisdictionCountyPrecinct","row":"County Precinct","short":"County Precinct","long":"County Precinct","highlight":false,"hasList":false},"esd":{"key":"esd","field":"jurisdictionESD","row":"ESD Jurisdiction","short":"ESD","long":"Emergency Services District","highlight":false,"hasList":true},"municipal":{"key":"municipal","field":"jurisdictionMunicipal","row":"Municipal Jurisdiction","short":"Municipal","long":"Municipal Jurisdiction","highlight":false,"hasList":true},"fireStation":{"key":"fireStation","field":"jurisdictionFireStation","row":"Fire Station","short":"Fire Station","long":"Fire Station","highlight":false,"hasList":false},"fireResponseArea":{"key":"fireResponseArea","field":"jurisdictionFireResponseArea","row":"Fire Response Area","short":"Fire Response Area","long":"Fire Response Area","highlight":false,"hasList":false},"waterUtility":{"key":"waterUtility","field":"jurisdictionWaterUtility","row":"Water Utility","short":"Water Utility","long":"Water Utility","highlight":false,"hasList":false},"other":{"key":"other","field":"jurisdictionOther","row":"Other Jurisdiction","short":"Other","long":"Other Jurisdiction","highlight":false,"hasList":false},"esdRow":"ESD Jurisdiction","esdShort":"ESD","esdLong":"Emergency Services District","esdHighlight":false,"anyConfigured":true} || {};</script>
+  <script>(function(){try{var t=localStorage.getItem('theme')||'light';if(t==='auto')t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.setAttribute('data-bs-theme',t)}catch(e){}})()</script></head>
+<body id="body" class="fi-ground">
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <svg xmlns="http://www.w3.org/2000/svg" class="d-none">
+    <symbol id="darkModeCheck" viewBox="0 0 16 16">
+      <path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/>
+    </symbol>
+    <symbol id="circle-half" viewBox="0 0 16 16">
+      <path d="M8 15A7 7 0 1 0 8 1v14zm0 1A8 8 0 1 1 8 0a8 8 0 0 1 0 16z"/>
+    </symbol>
+    <symbol id="moon-stars-fill" viewBox="0 0 16 16">
+      <path d="M6 .278a.768.768 0 0 1 .08.858 7.208 7.208 0 0 0-.878 3.46c0 4.021 3.278 7.277 7.318 7.277.527 0 1.04-.055 1.533-.16a.787.787 0 0 1 .81.316.733.733 0 0 1-.031.893A8.349 8.349 0 0 1 8.344 16C3.734 16 0 12.286 0 7.71 0 4.266 2.114 1.312 5.124.06A.752.752 0 0 1 6 .278z"/>
+      <path d="M10.794 3.148a.217.217 0 0 1 .412 0l.387 1.162c.173.518.579.924 1.097 1.097l1.162.387a.217.217 0 0 1 0 .412l-1.162.387a1.734 1.734 0 0 0-1.097 1.097l-.387 1.162a.217.217 0 0 1-.412 0l-.387-1.162A1.734 1.734 0 0 0 9.31 6.593l-1.162-.387a.217.217 0 0 1 0-.412l1.162-.387a1.734 1.734 0 0 0 1.097-1.097l.387-1.162zM13.863.099a.145.145 0 0 1 .274 0l.258.774c.115.346.386.617.732.732l.774.258a.145.145 0 0 1 0 .274l-.774.258a1.156 1.156 0 0 0-.732.732l-.258.774a.145.145 0 0 1-.274 0l-.258-.774a1.156 1.156 0 0 0-.732-.732l-.774-.258a.145.145 0 0 1 0-.274l.774-.258c.346-.115.617-.386.732-.732L13.863.1z"/>
+    </symbol>
+    <symbol id="sun-fill" viewBox="0 0 16 16">
+      <path d="M8 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM8 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 0zm0 13a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0v-2A.5.5 0 0 1 8 13zm8-5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2a.5.5 0 0 1 .5.5zM3 8a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1h2A.5.5 0 0 1 3 8zm10.657-5.657a.5.5 0 0 1 0 .707l-1.414 1.415a.5.5 0 1 1-.707-.708l1.414-1.414a.5.5 0 0 1 .707 0zm-9.193 9.193a.5.5 0 0 1 0 .707L3.05 13.657a.5.5 0 0 1-.707-.707l1.414-1.414a.5.5 0 0 1 .707 0zm9.193 2.121a.5.5 0 0 1-.707 0l-1.414-1.414a.5.5 0 0 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .707zM4.464 4.465a.5.5 0 0 1-.707 0L2.343 3.05a.5.5 0 1 1 .707-.707l1.414 1.414a.5.5 0 0 1 0 .708z"/>
+    </symbol>
+  </svg>
+  <nav aria-label="Primary" class="navbar navbar-dark hdr1 mb-3 px-2" id="header1" style="background-color: #00287f;">
+  <div class="container-fluid d-flex flex-nowrap p-0" style="max-width: 1800px;">
+      <a class="navbar-brand d-none d-lg-inline ms-1 ms-lg-2" href="/">MilamCountyPermits.com</a>
+    <ul class="navbar-nav me-auto">
+            <li class="nav-item d-none d-md-inline">
+              <span class="hdr1-burn" data-burn-chip><span class="hdr1-burn-dot" data-burn-dot aria-hidden="true"></span>Open Burning <span class="hdr1-burn-status" id="openBurningStatus" data-burn-badge-class="hdr1-burn-status"></span></span>
+            </li>
+    </ul>
+    
+    <div class="dropdown bd-mode-toggle me-2">
+      <button class="btn btn-secondary dropdown-toggle d-flex align-items-center navbar-button"
+              id="bd-theme"
+              type="button"
+              aria-expanded="false"
+              data-bs-toggle="dropdown"
+              aria-label="Toggle theme (auto)">
+        <svg class="bi my-1 theme-icon-active" width="1em" height="1em"><use href="#circle-half"></use></svg>
+        <span class="visually-hidden" id="bd-theme-text">Toggle theme</span>
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end shadow" aria-labelledby="bd-theme-text">
+        <li>
+          <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="light" aria-pressed="false">
+            <svg class="bi me-2 opacity-50" width="1em" height="1em"><use href="#sun-fill"></use></svg>
+            Light
+            <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#darkModeCheck"></use></svg>
+          </button>
+        </li>
+        <li>
+          <button type="button" class="dropdown-item d-flex align-items-center" data-bs-theme-value="dark" aria-pressed="false">
+            <svg class="bi me-2 opacity-50" width="1em" height="1em"><use href="#moon-stars-fill"></use></svg>
+            Dark
+            <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#darkModeCheck"></use></svg>
+          </button>
+        </li>
+        <li>
+          <button type="button" class="dropdown-item d-flex align-items-center active" data-bs-theme-value="auto" aria-pressed="true">
+            <svg class="bi me-2 opacity-50" width="1em" height="1em"><use href="#circle-half"></use></svg>
+            Auto
+            <svg class="bi ms-auto d-none" width="1em" height="1em"><use href="#darkModeCheck"></use></svg>
+          </button>
+        </li>
+      </ul>
+    </div>
+      <a href="https://www.fireinspection360.com/users/login?redirect=MilamTX" class="btn btn-primary me-2 navbar-button"><span><i class="fa-solid fa-user"></i></span><span class="ms-2">Login or Register</span></a>
+      <a href="/users/azure" class="btn btn-danger navbar-button"><span><i class="fa-brands fa-microsoft"></i></span><span class="ms-2">County Employee</span></a>
+  </div>
+</nav>
+
+<!-- Help Modal -->
+<div class="modal fade" id="helpModal" tabindex="-1" role="dialog" aria-labelledby="helpModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="helpModalLabel"><i class="fa-regular fa-comment-dots"></i> Have a comment or question?</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div>For assistance contact Joshua Todd, Milam County Fire Marshal at 254-482-2341 or <a href="/cdn-cgi/l/email-protection#ff99968d9a929e8d8c979e93bf9296939e929c908a918b86d1919a8b"><span class="__cf_email__" data-cfemail="f6909f84939b9784859e979ab69b9f9a979b95998398828fd8989382">[email&#160;protected]</span></a>.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+  <div class="container-fluid" id="bodyContainer" style="max-width: 1800px;margin: auto; height: 100%;">
+    <div class="row d-flex flex-nowrap m-0">
+      
+      
+      <div class="col p-0" style="width:70%">
+        <div id="browserMessage"></div>
+        <main id="main-content" tabindex="-1">
+          
+          
+          
+          <style>
+  /* The confirmation measure, as on the two anonymous inspection pages: a
+     single column of a dozen facts reads best under 820px. */
+  .ppd-wrap { max-width: 820px; margin-inline: auto; }
+  .ppd-head { display: flex; flex-wrap: wrap; gap: .5rem .75rem; align-items: center; justify-content: center; }
+  .ppd-head h1 { margin-bottom: 0; }
+  .ppd-sub { text-align: center; font-size: .875rem; margin-top: .4rem; color: var(--bs-secondary-color); }
+  .ppd-sub strong { color: var(--bs-body-color); }
+  /* Band headings and the record-reading field scale (design standard 4.5):
+     .66rem uppercase micro-labels over .95rem values. The jurisdiction partial
+     states the same scale for its own rows. */
+  .ppd-card h2 { font-size: .78rem; font-weight: 650; text-transform: uppercase; letter-spacing: .06em; margin-bottom: .7rem; }
+  .ppd-f { margin-bottom: .6rem; }
+  .ppd-l { display: block; font-size: .66rem; text-transform: uppercase; letter-spacing: .07em; font-weight: 650; color: var(--bs-secondary-color); line-height: 1.35; }
+  .ppd-v { font-size: .95rem; overflow-wrap: anywhere; }
+  .ppd-cols { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 16px; }
+  @media (max-width: 560px) { .ppd-cols { grid-template-columns: 1fr; } }
+  .ppd-empty { font-size: .95rem; font-style: italic; color: var(--bs-secondary-color); }
+  .ppd-num { font-variant-numeric: tabular-nums; }
+  /* RADIUS SCALE (design standard 4.5): 12px cards. */
+  .ppd-card { border-radius: 12px; }
+  /* Left rail as a clipped background at the page's rail thickness (--xp-rail,
+     from the accent partial): a thick border mitres around the corner arc.
+     background-COLOR, never the shorthand (it would erase the rail), and the
+     rail width is bought back in padding-left because a padding-box background
+     paints inside the padding. */
+  .ppd-attn { --ppd-tone: var(--bs-warning);
+    border: 1px solid var(--bs-border-color); border-radius: 12px;
+    background-color: var(--bs-warning-bg-subtle);
+    background-image: linear-gradient(var(--ppd-tone), var(--ppd-tone));
+    background-repeat: no-repeat; background-size: var(--xp-rail) 100%;
+    background-position: left top; background-origin: padding-box; background-clip: padding-box;
+    padding: .85rem 1rem; padding-left: calc(1rem + var(--xp-rail)); margin-bottom: 1rem; }
+  .ppd-attn-done { --ppd-tone: var(--bs-success); background-color: var(--bs-success-bg-subtle); }
+  .ppd-attn-title { font-weight: 650; font-size: 1rem; margin-bottom: .2rem; }
+  .ppd-attn-body { font-size: .95rem; }
+  /* One unpaid invoice per row: when, which invoice, how much. The amount
+     keeps the right edge; on a phone the row wraps and the amount drops to
+     its own line rather than squeezing the invoice number. */
+  .ppd-fees { list-style: none; margin: .6rem 0 0; padding: 0; font-size: .95rem; }
+  .ppd-fee { display: flex; flex-wrap: wrap; gap: .25rem .75rem; align-items: baseline;
+    padding: .35rem 0; border-top: 1px solid var(--bs-border-color-translucent); }
+  .ppd-fee-when { color: var(--bs-secondary-color); }
+  .ppd-fee-amt { margin-left: auto; font-weight: 600; }
+  .ppd-fee-total { display: flex; justify-content: space-between; gap: .75rem; padding-top: .45rem;
+    border-top: 2px solid var(--bs-border-color); font-weight: 650; font-size: 1rem; }
+  /* The project tree: a nested outline, indented one step per level, in the
+     record-reading scale so it sits with the rest of the page. */
+  .ppd-tree { font-size: .95rem; }
+  .ppd-tree-sub { margin-left: 1rem; }
+  .ppd-tree-row { margin-top: .25rem; }
+  .ppd-tree-here { font-weight: 650; }
+  .ppd-tree-note { font-size: .875rem; color: var(--bs-secondary-color); }
+  .ppd-tree .badge { font-size: .75em; vertical-align: baseline; }
+  /* The legend: a fold, so the page leads with the record and the reader
+     who wants the vocabulary opens it. */
+  .ppd-legend { font-size: .875rem; }
+  .ppd-legend summary { cursor: pointer; color: var(--bs-secondary-color); }
+  .ppd-legend-row { display: flex; gap: .5rem; align-items: baseline; margin-top: .4rem; }
+  .ppd-legend-row .badge { flex: 0 0 auto; }
+  .ppd-signin { font-size: .875rem; text-align: center; margin-top: 1rem; color: var(--bs-secondary-color); }
+</style>
+<style>
+  /* Every section card and every modal wears a coloured top rail naming its
+     category, the Status Frame treatment from the inspection details page.
+     ONE rail thickness for the whole page, and it is the SAME token that page
+     uses (--xp-rail is the THICKNESS, never a colour - do not overload it).
+
+     A card declares its accent ONCE, with an .xp-accent-* class. The rail and
+     the section icon both read that declaration, so the two cannot drift apart
+     the way a hand-paired border colour and icon colour do.
+
+     Two custom properties per accent, because they are not the same job:
+       --xp-accent      the rail. A 4px decorative bar; the heading beside it
+                        carries the meaning, so a bright hue is fine here, and
+                        the same hue works in both themes.
+       --xp-accent-ink  the icon. Text-sized, so it is measured - and it needs
+                        a DARK TWIN, because an ink chosen for white is
+                        unreadable on #212529 and vice versa. The bright rail
+                        hues are nowhere near the bar in light mode (teal
+                        2.13:1, cyan 1.96:1, amber 1.63:1), which is why an
+                        icon must never just inherit the rail colour.
+
+     Measured against the WORST surface the ink can land on in each theme -
+     the darkest light surface (--bs-tertiary-bg #f8f9fa) and the lightest
+     dark one (--bs-secondary-bg #343a40), not merely the card background:
+
+       accent   light ink   on #f8f9fa   dark ink   on #343a40
+       primary  #0a58ca     6.11         #6ea8fe    4.76
+       purple   #59359a     8.30         #c29ffa    5.28
+       teal     #097269     5.50         #7beacc    7.93
+       cyan     #087990     4.80         #6edff6    7.42
+       orange   #a5490b     5.60         #feb272    6.48
+       amber    #8a6803     4.90         #ffda6a    8.49
+       pink     #a52a68     6.36         #e685b5    4.59
+       indigo   #520dc2     9.07         #ccc0ff    6.88
+       green    #146c43     6.12         #75b798    4.92
+       danger   #b02a37     6.16         #ea868f    4.55
+       muted    #5c6268     5.86         #adb5bd    5.55
+
+     AND THEY ARE MEASURED AGAINST EACH OTHER, not only against the surface.
+     An ink that clears contrast can still be indistinguishable from the ink
+     on the next card, and the two failures are independent - every value in
+     the table above passed its contrast bar the whole time this was broken.
+     The floor is now deltaE 20.0 in BOTH themes (green+teal light, and
+     indigo+purple dark). It used to be 8.7 light / 12.5 dark:
+
+       teal   #0f6f54 -> #097269 (light), #79dfc1 -> #7beacc (dark)
+       indigo #c5b3fd -> #ccc0ff (dark only; light was already 37.8)
+
+     Teal moved rather than green because green is the anchored one - it has
+     to keep reading as Bootstrap success - and because `--bs-teal` #20c997
+     and `--bs-success` #198754 are only ~10deg apart in hue to begin with, so
+     darkening both for contrast is what compressed them. There is not much
+     room here: teal now sits 20.0 from green and 20.4 from cyan, between the
+     two, and a wider gap is not available without teal ceasing to be teal
+     (an unconstrained search returns near-black and neon). `scripts/
+     check-accent-collisions.js` holds the floor at 18, which is the 2 units
+     of slack that leaves - re-run it after touching any value here.
+
+     `danger` is for SEVERITY, and only severity - an open-findings card, a
+     card in an error state - never for decoration. Red on this system means
+     something is wrong, the same way it does on the inspection details page.
+
+     Amber's light ink is DARKER than Bootstrap's own
+     --bs-warning-text-emphasis, which measures 4.33:1 and does not clear the
+     bar; indigo's dark ink is LIGHTER than indigo-300 (#a370f7, 3.41:1).
+     Re-measure before changing any of them - BOTH ways: contrast against the
+     surface, and deltaE against every other ink.
+
+     This used to say "purple and indigo read alike in dark mode - keep them
+     off the same page", which was true and was the wrong remedy: it made a
+     palette defect into a rule every page author had to remember, and two
+     pages did not (users/details and announcements/manage carried the pair
+     for months). The same was true of green+teal, which was WORSE at 8.7 and
+     sat on eight pages - and nobody had noticed that one at all, because
+     green and teal are correct category choices for "fees/completed" and
+     "history", so every page was using them exactly as intended. A rule that
+     asks authors to avoid a pair is a rule that gets forgotten; separating
+     the values and checking them is not. */
+  :root { --xp-rail: 4px; }
+
+  /* THE RAIL IS THE CARD'S OWN BACKGROUND, and every other way of drawing it
+     has a specific failure:
+
+       border-top: 4px solid  - the browser MITRES the 4px accent into the 1px
+         side borders around the corner arc, so the colour bleeds diagonally
+         down each corner and reads as a rendering artifact.
+       an absolutely-positioned ::before - nothing clips it. Giving the bar
+         `border-radius: inherit` does not help: the box is only 4px tall, so
+         the browser scales a 12px radius down to 4px, and the bar's ends then
+         sit OUTSIDE the card's 12px curve and poke past the corners. That
+         shipped for one round and is exactly what it looks like.
+       ::before plus overflow: hidden - how the analytics pages clip theirs,
+         and correct there, but not portable: the ITM one-page form puts a
+         position-absolute street-suggestion dropdown INSIDE its Property card,
+         and hiding overflow would clip it.
+
+     A background gradient is clipped to the card's border-radius by the
+     browser, for free, with no pseudo-element and no overflow change - so the
+     ends follow the corner exactly and nothing can escape the card.
+
+     THE ONE THING TO WATCH: a rule that sets the `background` SHORTHAND on an
+     accented card resets background-image and silently erases the rail. Use
+     `background-color` on such rules (the ITM forms' .xp-card.xp-found is the
+     one in the fleet, and the gate checks for others).
+     Two consequences worth knowing: the card's border box is untouched, so
+     nothing shifts; and the include no longer has to come after the page's
+     own style block, because there is no border shorthand left to reset it.
+     If anyone ever reverts this to border-top, that ordering trap comes back.
+     (Written in prose deliberately - a literal style tag inside a stylesheet
+     comment is the sort of thing that gets read as markup by the next tool
+     along, and the house rule is to describe tags rather than write them.) */
+  .xp-accent-primary, .xp-accent-purple, .xp-accent-teal, .xp-accent-cyan,
+  .xp-accent-orange, .xp-accent-amber, .xp-accent-pink, .xp-accent-indigo,
+  .xp-accent-green, .xp-accent-danger, .xp-accent-muted, .xp-railed {
+    background-image: linear-gradient(var(--xp-accent), var(--xp-accent));
+    background-repeat: no-repeat;
+    background-size: 100% var(--xp-rail);
+    background-position: top left;
+    /* padding-box on both, so the bar sits just INSIDE the 1px border - the
+       same place the analytics pages' absolutely-positioned bar sits - rather
+       than under it, which would leave the border painting a grey line over
+       its top pixel. */
+    background-origin: padding-box;
+    background-clip: padding-box;
+  }
+  /* .xp-ink-* IS THE SAME INK WITHOUT THE RAIL. Every .xp-accent-* class is in
+     the selector list above, so it paints a 4px bar - which is right on a card
+     and wrong on an icon in a tab strip, a heading or a chip. The two families
+     therefore share ONE declaration per accent rather than sitting in separate
+     rules: the ink is measured against the worst surface in each theme, and a
+     second copy of a measured value is how the tab and the card it opens come
+     to disagree about what purple means. Nothing else changes - .xp-ink-* is
+     absent from the rail selector list by construction, so it cannot paint
+     one, and the classes are new, so no existing page is affected. */
+  .xp-accent-primary, .xp-ink-primary { --xp-accent: var(--bs-primary); --xp-accent-ink: #0a58ca; }
+  .xp-accent-purple, .xp-ink-purple  { --xp-accent: var(--bs-purple);  --xp-accent-ink: #59359a; }
+  .xp-accent-teal, .xp-ink-teal    { --xp-accent: var(--bs-teal);    --xp-accent-ink: #097269; }
+  .xp-accent-cyan, .xp-ink-cyan    { --xp-accent: var(--bs-cyan);    --xp-accent-ink: #087990; }
+  .xp-accent-orange, .xp-ink-orange  { --xp-accent: var(--bs-orange);  --xp-accent-ink: #a5490b; }
+  .xp-accent-amber, .xp-ink-amber   { --xp-accent: var(--bs-warning); --xp-accent-ink: #8a6803; }
+  .xp-accent-pink, .xp-ink-pink    { --xp-accent: var(--bs-pink);    --xp-accent-ink: #a52a68; }
+  .xp-accent-indigo, .xp-ink-indigo  { --xp-accent: var(--bs-indigo);  --xp-accent-ink: #520dc2; }
+  .xp-accent-green, .xp-ink-green   { --xp-accent: var(--bs-success); --xp-accent-ink: #146c43; }
+  .xp-accent-danger, .xp-ink-danger  { --xp-accent: var(--bs-danger);  --xp-accent-ink: #b02a37; }
+  .xp-accent-muted, .xp-ink-muted   { --xp-accent: #adb5bd;           --xp-accent-ink: #5c6268; }
+  /* Only the INK flips - the rail hue is decorative and reads in both themes.
+     Redefining just the one property keeps a single declaration per accent. */
+  [data-bs-theme="dark"] .xp-accent-primary, [data-bs-theme="dark"] .xp-ink-primary { --xp-accent-ink: #6ea8fe; }
+  [data-bs-theme="dark"] .xp-accent-purple, [data-bs-theme="dark"] .xp-ink-purple  { --xp-accent-ink: #c29ffa; }
+  [data-bs-theme="dark"] .xp-accent-teal, [data-bs-theme="dark"] .xp-ink-teal    { --xp-accent-ink: #7beacc; }
+  [data-bs-theme="dark"] .xp-accent-cyan, [data-bs-theme="dark"] .xp-ink-cyan    { --xp-accent-ink: #6edff6; }
+  [data-bs-theme="dark"] .xp-accent-orange, [data-bs-theme="dark"] .xp-ink-orange  { --xp-accent-ink: #feb272; }
+  [data-bs-theme="dark"] .xp-accent-amber, [data-bs-theme="dark"] .xp-ink-amber   { --xp-accent-ink: #ffda6a; }
+  [data-bs-theme="dark"] .xp-accent-pink, [data-bs-theme="dark"] .xp-ink-pink    { --xp-accent-ink: #e685b5; }
+  [data-bs-theme="dark"] .xp-accent-indigo, [data-bs-theme="dark"] .xp-ink-indigo  { --xp-accent-ink: #ccc0ff; }
+  [data-bs-theme="dark"] .xp-accent-green, [data-bs-theme="dark"] .xp-ink-green   { --xp-accent-ink: #75b798; }
+  [data-bs-theme="dark"] .xp-accent-danger, [data-bs-theme="dark"] .xp-ink-danger  { --xp-accent-ink: #ea868f; }
+  [data-bs-theme="dark"] .xp-accent-muted, [data-bs-theme="dark"] .xp-ink-muted   { --xp-accent-ink: #adb5bd; }
+  /* A modal needed a compound selector when the rail was a border, to beat
+     Bootstrap's own .modal-content border at equal specificity. The
+     pseudo-element competes with nothing, so that rule is gone - one less
+     thing to keep in step. .modal-content is already position: relative, and
+     it clips nothing, so its rail behaves like any card's. */
+  /* A LEFT rail - the same paint, the same token, rotated. Add .xp-lrail
+     beside an accent class (or set --xp-accent directly) on a panel whose
+     tone belongs on its leading edge: an attention band, a severity panel,
+     a callout.
+
+     A LEFT RAIL IS NEVER border-left, for the reason given above for
+     border-top: the browser MITRES the thick accent into the 1px top and
+     bottom borders around the corner arc, so the colour bleeds diagonally at
+     each corner and reads as a rendering artifact. It is the same defect,
+     rotated, and it is what this class exists to prevent.
+
+     ONE THICKNESS PER PAGE: --xp-rail governs both edges. A left rail at a
+     different width than the top rails on the same page reads as two
+     different systems.
+
+     THE CALLER MUST ADD THE RAIL BACK TO ITS OWN padding-left:
+       padding-left: calc(<the element's inset> + var(--xp-rail));
+     A border sits OUTSIDE the padding box and a padding-box background does
+     not, so converting one to the other silently eats that much of the
+     content's inset - no layout shift, nothing to see in the diff, the text
+     just creeps toward the rail. The bar for "is the spacing right" is the
+     element's OWN padding-right, never a number you pick.
+
+     The `background` SHORTHAND trap applies here exactly as it does to the
+     top rails: a tinted panel must set background-COLOR, or it erases its
+     own rail.
+
+     THE COLOUR TOKEN IS --xp-lrail, WHICH WAS ALREADY THE FLEET'S WORD FOR
+     IT - nine views (the incidents/users analytics setup banners, My Day's
+     inspection rows, the ITM config policy and system cards, the ITM form's
+     deficiency rows) each declared `--xp-lrail: <colour>` and then repeated
+     these six background declarations inline. This class is those six lines,
+     once; adopting it there is deleting them and keeping the declaration.
+     An accent-classed card that sets no --xp-lrail falls back to its
+     --xp-accent, so .xp-accent-danger + .xp-lrail needs no extra token. */
+  .xp-lrail {
+    background-image: linear-gradient(var(--xp-lrail, var(--xp-accent)), var(--xp-lrail, var(--xp-accent)));
+    background-repeat: no-repeat;
+    background-size: var(--xp-rail) 100%;
+    background-position: left top;
+    background-origin: padding-box;
+    background-clip: padding-box;
+  }
+
+  /* The section icon. Inherits its card's accent, so a card states its colour
+     in exactly one place. Outside an accented card it falls back to the
+     surrounding text colour rather than to a hue that would look deliberate. */
+  .xp-ico { color: var(--xp-accent-ink, inherit); }
+
+  /* The kit's own .fa rule sets line-height: 1, so an icon in a 1.5em line box
+     sits ~4px high next to its text. Two classes deep to beat .fa on
+     specificity rather than on source order, and inherit rather than a margin
+     nudge, which is a magic number tied to today's font size. */
+  .xp-card h2 i.fa-solid,
+  .xp-card h3 i.fa-solid,
+  .modal-title i.fa-solid,
+  .xp-wrap h1 i.fa-solid { line-height: inherit; }
+</style>
+<div class="ppd-wrap">
+
+  <div class="alert text-center d-none" id="paymentResultBanner" role="alert"></div>
+
+  <div class="card ppd-card mb-3 xp-railed" style="--xp-accent: #198754;">
+    <div class="card-body">
+      <div class="ppd-head">
+        <h1 class="h4">Building Permit</h1>
+        <span class="badge badge-md rounded-pill text-bg-success">Approved</span>
+      </div>
+      <div class="ppd-sub">
+        <strong class="ppd-num">#2026-0044</strong> &middot; Approved since 9/5/2026
+      </div>
+    </div>
+  </div>
+
+    <div class="ppd-attn ppd-attn-done" id="fees">
+      <div class="ppd-attn-title"><i class="fa-solid fa-circle-check me-2" aria-hidden="true"></i>No fees are outstanding</div>
+      <div class="ppd-attn-body">There is nothing to pay for this permit.</div>
+    </div>
+
+  <div class="card ppd-card mb-3 xp-accent-primary">
+    <div class="card-body">
+      <h2><i class="fa-solid fa-location-dot me-2 xp-ico" aria-hidden="true"></i>Location</h2>
+          <div class="ppd-f"><span class="ppd-l">Property</span><span class="ppd-v"><strong><span class="pt-chip me-2"><i class="fa-solid fa-building" aria-hidden="true"></i>Building</span> Rosebud Pump Station</strong></span></div>
+          <div class="ppd-f"><span class="ppd-l">Address</span><span class="ppd-v">9140 N US HIGHWAY 77<br>Burlington, TX 76519</span></div>
+          <style>
+            /* TWO COLUMNS WHEN THE CARD CAN TAKE IT, and the question is about the CARD,
+               not the window - which is what a container query answers and a media query
+               cannot. This block sits in the Location card, whose width depends on the
+               page grid: ~560px of content beside a sibling card on a wide screen, the
+               full measure when the grid collapses to one column, and narrower again on
+               a phone. A viewport breakpoint gets all three wrong at least once.
+          
+               The host element is the container rather than the card, so the whole
+               mechanism stays inside this file - nothing has to be declared on the pages
+               that include it. `container-type: inline-size` also applies
+               `contain: layout style`, which is inert here: these rows are ordinary flow
+               content with nothing positioned out of them.
+          
+               420px is two 200px columns plus the gap - below that the values (a name
+               like "West Travis County Public Utility Agency" is the long case) wrap
+               hard enough that one column reads better. */
+            .ijur-host { container-type: inline-size; }
+            .ijur { display: grid; grid-template-columns: 1fr; gap: 0 16px; }
+            @container (min-width: 420px) {
+              .ijur { grid-template-columns: 1fr 1fr; }
+            }
+            /* The record-reading field scale, matching .ipd-f/.ipd-l/.ipd-v and
+               .ipn-f/.ipn-l/.ipn-v - identical on both pages, so the partial states it
+               once rather than taking a class prefix as a parameter. */
+            .ijur-f { margin-bottom: .6rem; }
+            .ijur-l { display: block; font-size: .66rem; text-transform: uppercase; letter-spacing: .07em; font-weight: 650; color: var(--bs-secondary-color); line-height: 1.35; }
+            .ijur-v { font-size: .95rem; overflow-wrap: anywhere; }
+          </style>
+          <div class="ijur-host">
+            <div class="ijur">
+              
+              
+              <div class="ijur-f"><span class="ijur-l">Municipal Jurisdiction</span><span class="ijur-v">None</span></div>
+              <div class="ijur-f"><span class="ijur-l">ESD Jurisdiction</span><span class="ijur-v">Burlington Volunteer Fire Department</span></div>
+              
+              
+              
+            </div>
+          </div>    </div>
+  </div>
+
+  <div class="card ppd-card mb-3 xp-accent-purple">
+    <div class="card-body">
+      <h2><i class="fa-solid fa-file-signature me-2 xp-ico" aria-hidden="true"></i>Permit</h2>
+        <div class="ppd-f"><span class="ppd-l">Project</span><span class="ppd-v"><strong>Offsite Pump Station</strong></span></div>
+      <div class="ppd-f"><span class="ppd-l">Scope Of Work</span><span class="ppd-v">Chemical feed and shelter for pump station.</span></div>
+        <div class="ppd-f"><span class="ppd-l">Applicant</span><span class="ppd-v">Kimley-Horn</span></div>
+        <div class="ppd-f"><span class="ppd-l">Fire Code</span><span class="ppd-v">2024 IFC</span></div>
+      <div class="ppd-cols">
+        <div class="ppd-f"><span class="ppd-l">Submitted</span><span class="ppd-v">9/4/2026</span></div>
+        <div class="ppd-f"><span class="ppd-l">Approved</span><span class="ppd-v">9/5/2026</span></div>
+        <div class="ppd-f mb-0"><span class="ppd-l">Expires</span><span class="ppd-v">3/4/2027</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card ppd-card mb-3 xp-accent-pink">
+    <div class="card-body">
+      <h2><i class="fa-solid fa-sitemap me-2 xp-ico" aria-hidden="true"></i>Project</h2>
+      <div class="ppd-tree-note mb-2">The permits and inspections that belong to the same project. This permit is shown in bold.</div>
+      <div class="ppd-tree" id="projectDiv" role="status" aria-live="polite"><i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Loading the project&hellip;</div>
+    </div>
+  </div>
+
+  <details class="ppd-legend">
+    <summary>What the statuses mean</summary>
+      <div class="ppd-legend-row"><span class="badge badge-xs rounded-pill bg-orange">Processing</span><span>The application is waiting to be reviewed and accepted as a permit.</span></div>
+      <div class="ppd-legend-row"><span class="badge badge-xs rounded-pill text-bg-warning">Fee Required</span><span>A fee is due before the permit can move on.</span></div>
+      <div class="ppd-legend-row"><span class="badge badge-xs rounded-pill bg-yellow">On Hold</span><span>The permit is not in the review queue, usually because information is missing or another permit must be approved first.</span></div>
+      <div class="ppd-legend-row"><span class="badge badge-xs rounded-pill text-bg-primary">Under Review</span><span>The permit is in the review queue.</span></div>
+      <div class="ppd-legend-row"><span class="badge badge-xs rounded-pill text-bg-danger">Awaiting Response</span><span>The most recent submittal was reviewed but not approved. Plan review comments have been sent to the applicant.</span></div>
+      <div class="ppd-legend-row"><span class="badge badge-xs rounded-pill bg-maroon">Revision Required</span><span>The approval was revoked and a plan revision must be submitted for review.</span></div>
+      <div class="ppd-legend-row"><span class="badge badge-xs rounded-pill text-bg-secondary">Accepted - No review</span><span>The documents were accepted without a formal review.</span></div>
+      <div class="ppd-legend-row"><span class="badge badge-xs rounded-pill text-bg-success">Approved</span><span>The permit has been approved.</span></div>
+      <div class="ppd-legend-row"><span class="badge badge-xs rounded-pill text-bg-dark">Cancelled</span><span>The permit was cancelled before it was approved.</span></div>
+  </details>
+
+  <div class="ppd-signin">
+    Signed in as the applicant, this page also shows the plan review documents, the payment history, and what you can do next. <a href="/users/login">Sign in</a> to see them.
+  </div>
+
+</div>
+        </main>
+          <footer class="mt-3 text-center">
+            
+            <div><small>Part of the <a href="https://www.fireinspection360.com">FireInspection360.com</a> network | <span style="white-space:nowrap;"><i class="fa-regular fa-copyright"></i> Fire Safety Technical Services, LLC</span></small></div>
+            <div><small><a href="/terms">Terms of Service</a> | <a href="/privacypolicy">Privacy Policy</a></small></div>
+          </footer>
+      </div>
+    </div>
+  </div>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script type="text/javascript" src="/scripts/bundle.js"></script>
+  
+  
+
+  
+<script>
+  
+    // Stores where the PAYER wants their receipt, before they leave for the
+    // gateway. sendBeacon FIRST because most of these paths navigate away in the
+    // same tick and an ordinary fetch is cancelled with the page; keepalive
+    // fetch is the fallback. Fire-and-forget by design: the receipt is a
+    // courtesy and must never stand between the payer and paying.
+    function ipdSaveReceiptEmail() {
+      var input = document.getElementById('ipdReceiptEmail');
+      if (!input) return;
+      var value = (input.value || '').trim();
+      if (!value) return;
+      var url = '/api/v1/payments/receiptemail/permit/6a99f20adb22a3bb7944f394';
+      var body = JSON.stringify({ email: value });
+      try {
+        if (navigator.sendBeacon && navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }))) return;
+      } catch (e) {}
+      try {
+        fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body, keepalive: true }).catch(function () {});
+      } catch (e) {}
+    }
+  
+    // The two kinds with no JS of their own: a classic form POST (Tyler) and a
+    // plain link (QuickBooks). They navigate immediately, which is exactly what
+    // sendBeacon is for.
+    if (document.getElementById('ipdPayForm')) {
+      document.getElementById('ipdPayForm').addEventListener('submit', ipdSaveReceiptEmail);
+    }
+    if (document.getElementById('ipdPayLink')) {
+      document.getElementById('ipdPayLink').addEventListener('click', ipdSaveReceiptEmail);
+    }
+  
+    // Certified Payments hands back the field set for ITS form; we build a
+    // hidden form and POST the payer to the gateway.
+    if (document.getElementById('ipdPayButton')) {
+      document.getElementById('ipdPayButton').onclick = function () {
+        ipdSaveReceiptEmail();
+        document.getElementById('ipdPayButton').disabled = true;
+        document.getElementById('paymentErrorMessage').innerText = '';
+        $.get('/api/v1/certifiedpayments/request', { type: 'permit', id: '6a99f20adb22a3bb7944f394' }, function (result) {
+          if (result && result.success) {
+            var form = document.createElement('form');
+            document.body.appendChild(form);
+            form.method = 'post';
+            form.action = result.url;
+            for (var key in result.data) {
+              var input = document.createElement('input');
+              input.type = 'hidden';
+              input.name = key;
+              input.value = result.data[key];
+              form.appendChild(input);
+            }
+            // Mark this tab as the paying one so the outcome banner shows here
+            // and not to staff or another visitor looking at the same record.
+            try { sessionStorage.setItem('paymentAttempt', '6a99f20adb22a3bb7944f394'); } catch (e) {}
+            form.submit();
+          } else {
+            document.getElementById('ipdPayButton').disabled = false;
+            document.getElementById('paymentErrorMessage').innerText = (result && result.errorMessage) || 'There was an unknown error.';
+          }
+        }).fail(function () {
+          document.getElementById('ipdPayButton').disabled = false;
+          document.getElementById('paymentErrorMessage').innerText = 'There was an unknown error.';
+        });
+      };
+    }
+  
+  
+  
+    (async function () {
+      var banner = document.getElementById('paymentResultBanner');
+      if (!banner) return;
+      // The outcome is already recorded before the payer gets back here, so
+      // asking is a courtesy - and it is scoped to the tab that paid.
+      var attempted = false;
+      try { attempted = sessionStorage.getItem('paymentAttempt') === '6a99f20adb22a3bb7944f394'; } catch (e) {}
+      if (!attempted) return;
+      try { sessionStorage.removeItem('paymentAttempt'); } catch (e) {}
+      let response = null;
+      try {
+        response = await fetch('/api/v1/payments/status/permit/6a99f20adb22a3bb7944f394', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }
+        });
+      } catch (error) { console.log(error); }
+      let data = null;
+      if (response && response.ok) {
+        try { data = await response.json(); } catch (error) { console.log(error); }
+      }
+      banner.classList.remove('d-none');
+      if (data && data.paid) {
+        banner.classList.add('alert-success');
+        banner.innerText = 'Payment received. Thank you!';
+      } else if (data && data.failureMessage) {
+        banner.classList.add('alert-danger');
+        banner.innerText = data.failureMessage;
+      } else {
+        banner.classList.add('alert-warning');
+        banner.innerText = 'We have not received a completed payment for this fee. If you finished paying, refresh this page in a minute to confirm. If you cancelled or did not finish, you can use the pay button to try again.';
+      }
+    })();
+  
+
+  (function () {
+    var PROJECT_URL = '/api/v1/permits/project/6a99f20adb22a3bb7944f394/6a923bf8c78b024c05d7ae35';
+    var THIS_PERMIT = '6a99f20adb22a3bb7944f394';
+    var TIMEZONE = 'America/Chicago';
+
+    function esc(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function dateText(value) {
+      if (!value) return '';
+      var date = new Date(value);
+      if (isNaN(date.getTime())) return '';
+      try {
+        return new Intl.DateTimeFormat('en-US', { timeZone: TIMEZONE, year: 'numeric', month: 'numeric', day: 'numeric' }).format(date);
+      } catch (err) {
+        return new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'numeric', day: 'numeric' }).format(date);
+      }
+    }
+
+    // statusBadge is server-built markup from the endpoint; everything else
+    // is text and is escaped. An inspection links to ITS anonymous page, the
+    // report QR page, never the fee-notice page that shows an owner the full
+    // record.
+    function inspectionRow(inspection) {
+      var html = '';
+      var label = esc(inspection.type) + ' Inspection';
+      if (inspection.status) {
+        var scheduled = inspection.status === 'Scheduled';
+        var when = dateText(scheduled ? inspection.scheduledDate : inspection.statusDate);
+        var tail = ' ' + (inspection.statusBadge || '') + (when ? (scheduled ? ' for ' : ' on ') + when : '');
+        html += '<div class="ppd-tree-row"><a href="/public/inspections/details/' + esc(inspection._id) + '">' + label + '</a>' + tail + '</div>';
+      } else {
+        html += '<div class="ppd-tree-row">' + label + ' ' + (inspection.statusBadge || '') + '</div>';
+      }
+      if (inspection.partialCount > 0) {
+        html += '<div class="ppd-tree-sub ppd-tree-note">Partial inspections: ' + esc(inspection.partialCount) + '</div>';
+      }
+      return html;
+    }
+
+    function permitRow(permit) {
+      var isHere = permit._id && permit._id == THIS_PERMIT;
+      var label = esc(permit.type) + ' Permit';
+      var when = dateText(permit.statusDate);
+      var tail = ' ' + (permit.statusBadge || '') + (when ? ' on ' + when : '');
+      if (isHere) return '<div class="ppd-tree-row ppd-tree-here">' + label + tail + '</div>';
+      if (!permit.status) return '<div class="ppd-tree-row">' + label + ' ' + (permit.statusBadge || '') + '</div>';
+      var href = permit.isPermitSubmittal
+        ? '/permitsubmittals/submittal/details/' + esc(permit._id)
+        : '/public/permits/details/' + esc(permit._id);
+      return '<div class="ppd-tree-row"><a href="' + href + '">' + label + '</a>' + tail + '</div>';
+    }
+
+    function projectHtml(project) {
+      var html = '';
+      var permits = (project && project.permits) || [];
+      for (var i = 0; i < permits.length; i++) {
+        html += permitRow(permits[i]);
+        var inspections = permits[i].inspections || [];
+        if (!inspections.length) continue;
+        html += '<div class="ppd-tree-sub">';
+        for (var j = 0; j < inspections.length; j++) {
+          if (inspections[j].propertyAddress) {
+            html += '<div class="ppd-tree-row">' + esc(inspections[j].propertyAddress) + '</div><div class="ppd-tree-sub">';
+            var perProperty = inspections[j].inspections || [];
+            for (var k = 0; k < perProperty.length; k++) html += inspectionRow(perProperty[k]);
+            html += '</div>';
+          } else {
+            html += inspectionRow(inspections[j]);
+          }
+        }
+        html += '</div>';
+      }
+      return html;
+    }
+
+    async function buildProject() {
+      var host = document.getElementById('projectDiv');
+      if (!host || !PROJECT_URL) return;
+      let response = null;
+      try {
+        response = await fetch(PROJECT_URL, { headers: { 'Accept': 'application/json' } });
+      } catch (err) {
+        console.warn('project fetch failed', err);
+      }
+      if (!response || !response.ok) {
+        host.innerHTML = '<span class="ppd-empty">The project could not be loaded. Reload the page to try again.</span>';
+        return;
+      }
+      var project = null;
+      try { project = await response.json(); } catch (err) { project = null; }
+      var html = projectHtml(project);
+      host.innerHTML = html || '<span class="ppd-empty">No related permits or inspections were found.</span>';
+    }
+
+    if (PROJECT_URL) {
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', buildProject);
+      else buildProject();
+    }
+  })();
+</script>
+
+  
+  <noscript>
+    <div id="noscript-warning">JavaScript must be enabled for this site to function correctly.</div>
+  </noscript>
+
+  <script src="/scripts/tenant-layout.js"></script>
+  <script>
+
+        // Open burning status for Public users and users not logged in
+        fi360BurnStatus({ badge: 'badge badge-sm', deniedMessages: {"Denied: County burn ban":"Open burning denied due to a county burn ban.",
+            "Denied: Red Flag Warning":"Open burning denied due to a red flag warning.",
+            "Denied: High winds (>22 mph)":"Open burning denied due to high winds (>22 mph).",
+            "Denied: Low winds (<6 mph)":"Open burning denied due to low winds (< 6 mph)."} });
+
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a487885c9df8c61f',t:'MTc5MTY1NTMxMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4bc70e2c01a94c73b74392e4234840661791215815920" integrity="sha512-L0ha0OXavK/8okipN9F8BtP84dg9DUhPERbBXzwI6dgTA55d2+yweo3pn5CSFYs45/r8md2+xvUPtTdvTNRfjA==" data-cf-beacon='{"version":"2024.11.0","token":"1174b79baf404e5bb98fcd4a0c3ecf32","spa":2}' crossorigin="anonymous"></script>
+</body>
+</html>

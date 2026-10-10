@@ -1,0 +1,278 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>City of Eugene - Planning and Development - Building Permit Details</title>
+    <link rel="shortcut icon" href="/Content/Images/favicon.ico" />
+    <script src="/Scripts/jquery-1.6.2.min.js"></script>
+
+    <link type="text/css" rel="stylesheet" media="all" href="/Content/Reset.css" />
+    <link type="text/css" rel="stylesheet" media="print" href="/Content/Print.css" />
+    <link type="text/css" rel="stylesheet" media="all" href="/Content/jquery-ui-1.8.20.custom.css" />
+    <link rel="stylesheet" href="/Content/Site.css" />
+    <script src="/Scripts/jquery-1.6.2.min.js"></script>
+    <script src="/Scripts/jquery-ui-1.8.20.custom.min.js"></script>
+    <script src="/Scripts/jquery.validate.min.js"></script>
+    <script src="/Scripts/modernizr.custom.min.js"></script>
+
+    <style type="text/css">
+        input[type="submit"].ui-state-default,
+        input[type="button"].ui-state-default,
+        .ui-button-text {
+            font-size: 12px;
+            font-weight: normal;
+        }
+
+        div.ui-datepicker {
+            font-size: 10px;
+        }
+
+
+
+        #debug-message {
+            color: Red;
+            font-weight: bold;
+            font-size: larger;
+            float: right;
+            margin: 1em;
+        }
+    </style>
+
+    <script type="text/javascript">
+        $(document).ready(function () {
+            $('input:submit, input:button, button').button();
+            $('input:text').focus(function () { this.select(); });
+            $.validator.addMethod('phone', function (phone, element) {
+                phone = phone.replace(/\s+/g, '');
+                return this.optional(element) || phone.length > 9 &&
+                    phone.match(/^[2-9]\d{2}-\d{3}-\d{4}$/);
+            }, 'Please enter a valid phone number');
+        });
+    </script>
+
+    
+    <script type="text/javascript">
+		$(document).ready(function ()
+		{
+			$("#plan-review-letters").change(function (event)
+			{
+				OpenSelected('#plan-review-letters', 'Plan Review Letter');
+            });
+
+			$("#issued-permits").change(function (event)
+			{
+				OpenSelected('#issued-permits', 'Issued Permit');
+			});
+		});
+
+		var Dialog = null;
+		var WindowNumber = 0;
+
+		function NewWindow(url, title)
+		{
+			var win = window.open('', 'NewWindow' + WindowNumber++);
+
+            var s=[];
+            s.push('<html xmlns="http://www.w3.org/1999/xhtml"><head>');
+            s.push('<title>Print ');
+            s.push(title);
+            s.push('</');
+            s.push('title>');
+            s.push("<script type='text/javascript'>function AR(){ var f=document.getElementById('ifrm');var h=f.contentWindow.document.body.scrollHeight;f.height=h+'px';window.focus();}");
+            s.push("</");
+            s.push("script>");
+            s.push("</");
+            s.push("head>");
+            s.push('<body style="margin:0;padding:0;overflow:hidden;"><iframe id="ifrm" src="');
+            s.push(url);
+            s.push('" scrolling="no" style="width:100%;height:100%" onload="AR();">');
+            s.push('</');
+            s.push('iframe>');
+            s.push('</');
+            s.push('body>');
+            s.push('</');
+            s.push('html>');
+            s = s.join("");
+
+			win.focus();
+			win.document.write(s);
+		}
+
+		function PrintCertificate(docId )
+		{
+            NewWindow('PrintCertificate?docId=' + docId);
+        }
+
+        function PrintTemporaryCertificate(log) {
+            NewWindow('PrintTemporaryCertificate?log='+ log);
+        }
+
+        function PrintTemporaryCertificate() {
+            NewWindow('PrintTemporaryCertificate?log=26-06513-01');
+        }
+
+        function PrintOccupantLoadCertificate() {
+            NewWindow('PrintOccupantLoadCertificate?log=26-06513-01');
+        }
+
+		function PrintElectricalApplication()
+		{
+			NewWindow('ElectricalApplication?log=26-06513-01', 'Electrical Application');
+        }
+
+		function ShowInspectionMemos()
+		{
+			window.open('PermitInspectionMemos?log=26-06513-01', 'NewWindow' + WindowNumber++);
+        }
+
+		function ShowInspectors()
+		{
+			if (Dialog == null)
+			{
+				$.get('PermitInspectors?log=26-06513-01', function (response)
+				{
+					Dialog = $('<div></div>').html(response).dialog({ autoOpen: false,
+						title: 'Inspectors', modal: true, width: 'auto'
+					});
+
+					Dialog.dialog('open');
+				});
+			}
+			else
+			{
+				Dialog.dialog('open');
+			}
+		}
+
+		function LoadReport(summary) {
+		    var url = $('#details-report-frame').attr('src');
+
+			if (!summary)
+			{
+				url = url.replace(/expand=False/, 'expand=True');
+			}
+			else
+			{
+				url = url.replace(/expand=True/, 'expand=False');
+			}
+
+            var reportFrame = document.createElement("iframe");
+            reportFrame.setAttribute("id", "details-report-frame");
+            reportFrame.setAttribute("scrolling", "no");
+            reportFrame.setAttribute("src", url);
+            reportFrame.setAttribute("onload", "AutoResize();");
+
+			// Do it this way so the onload handler fires to set the iframe size.
+			$('#details-report-container').html(reportFrame);
+		}
+
+		function AutoResize()
+		{
+			var frame = document.getElementById('details-report-frame');
+			var height = frame.contentWindow.document.body.scrollHeight;
+
+			frame.height = height + 'px';
+		}
+
+		function OpenSelected(select, type)
+		{
+			var url = $(select + ' option:selected').val();
+
+			if (url != '0')
+			{
+				NewWindow(url, type);
+			}
+		}
+    </script>
+
+
+    <script type="text/javascript">
+        $(document).ready(function () {
+            $('button').button();
+        });
+    </script>
+
+        <script type="text/javascript">
+            var _gaq = _gaq || [];
+            _gaq.push(['_setAccount', 'UA-34287918-3']);
+            _gaq.push(['_trackPageview']);
+
+            (function () {
+                var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+                ga.src = ('https:' === document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+                var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+            })();
+        </script>
+</head>
+<body>
+    <noscript><div>The City of Eugene's interactive <b>PDD Online Services Center</b> requires that Javascript be enabled in your browser.</div></noscript>
+    <div id="page">
+        <div id="header">
+            <div id="logo">
+                <a href="https://www.eugene-or.gov/"><img id="citylogo" src="/Content/Images/city-logo-90x90.jpg" alt="City of Eugene" /></a>
+            </div>
+            <div id="title">
+                <div class="custom_h1">Planning and Development Department</div>
+                <div id="menu">
+<a class="inactive" href="/">Home</a><a class="inactive" href="/Maps">Maps</a><a class="active" href="/BuildingPermits">Building Permits</a><a class="inactive" href="/CodeCompliance">Code Compliance</a><a class="inactive" href="/LandUse">Land Use</a><a class="inactive" href="/RentalHousing">Rental Housing</a><a class="inactive" href="/GreenBuilding">Waste Prevention</a>                </div>
+            </div>
+        </div>
+        <div id="main">
+            
+
+
+<h2>Building Permit Details</h2>
+<fieldset>
+    <h3>Permit 26-06513-01</h3>
+    <table id="details-button-box">
+        <tr>
+            <td>
+                    <button disabled="disabled">Inspection Memos</button>
+            </td>
+
+                <td>
+                    <button disabled="disabled">Certificate</button>
+                </td>
+
+
+            <td>
+                    <button disabled="disabled">Occupant Load Certificate</button>
+            </td>
+            <td>
+                    <button id="print-electrical-application-button" onclick="PrintElectricalApplication()">Electrical Application</button>
+            </td>
+            <td>
+                <button id="inspector-list-button" onclick="ShowInspectors()">Show Inspectors</button>
+            </td>
+            <td>
+                <button id="new-search-button" onclick="window.location.href='PermitSearch'">New Search</button>
+            </td>
+        </tr>
+            <tr>
+                <td colspan="6" class="center">
+                    This permit application was submitted using our <span class="ebuild">eBuild</span> system.<br />
+                    All submittals must be made electronically.<br />
+                    Contact the primary contact or other contractor listed under <b>Contractor Data</b> for assistance.
+                </td>
+            </tr>
+    </table>
+    <div id="permit-report-toggle-container" class="clear">
+        <input name="permit-report-toggle" type="radio" value="false" onclick="LoadReport(true)" /> Summary</>
+        <input name="permit-report-toggle" type="radio"  checked="checked" value="true" onclick="LoadReport(false)" /> Details</>
+        <a class="pdf-icon" href="PermitReport?log=26-06513-01&amp;expand=True&amp;pdf=True" target="_blank"><img src="/Content/Images/pdf-icon-32x32.png" alt="PDF Copy" title="Download a PDF copy of the complete report" /></a>
+    </div>
+    <div id="details-report-container" class="clear">
+        <iframe id="details-report-frame" src="PermitReport?log=26-06513-01&amp;expand=True&amp;pdf=False" scrolling="no" onload="AutoResize();"></iframe>
+    </div>
+</fieldset>
+        </div>
+        <div id="footer">
+            Copyright &copy;2026 City of Eugene. All rights reserved.
+        </div>
+    </div>
+
+    
+</body>
+</html>
