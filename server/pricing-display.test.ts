@@ -106,7 +106,8 @@ describe("pricing display: comparison tables (shared/plan-matrix.ts)", () => {
   });
 
   it("marks coming modules and the not-yet-enforced history row", () => {
-    expect(byKey.permitAlerts.cells).toEqual({ starter: false, team: false, pro: false, growth: { coming: true }, agency: { coming: true } });
+    // Permit alerts are LIVE (server/permits) — a plain ✅ on the plans that carry the module, never Coming.
+    expect(byKey.permitAlerts.cells).toEqual({ starter: false, team: false, pro: false, growth: true, agency: true });
     expect(byKey.csvExport.cells.pro).toEqual({ coming: true });
     // Scheduled client email reports are LIVE (server/seo/site-report-send.ts, sent by server/seo/jobs.ts) — a plain ✅, never Coming.
     expect(byKey.scheduledReports.cells).toEqual({ starter: false, team: false, pro: false, growth: true, agency: true });

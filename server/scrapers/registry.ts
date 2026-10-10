@@ -21,9 +21,20 @@ export function registerAdapter(adapter: PortalAdapter): void {
   for (const alias of adapter.aliases ?? []) adapters.set(key(alias), adapter);
 }
 
+/**
+ * permit_databases.platform labels are not uniform ("Tyler EnerGov Citizen Self Service", "eTRAKiT (CentralSquare)",
+ * "Oregon ePermitting (Accela)"): an exact label or alias wins; otherwise the longest registered label contained in
+ * the stored one. A label that names no registered adapter answers null — never a guess at a different platform.
+ */
 export function getAdapter(platform: string | null | undefined): PortalAdapter | null {
   if (!platform) return null;
-  return adapters.get(key(platform)) ?? null;
+  const k = key(platform);
+  const exact = adapters.get(k);
+  if (exact) return exact;
+  const stripped = k.replace(/\s*\([^)]*\)/g, " ").replace(/\s+/g, " ").trim();
+  if (stripped !== k && adapters.has(stripped)) return adapters.get(stripped)!;
+  const candidates = Array.from(adapters.keys()).filter((label) => label.length >= 5 && k.includes(label)).sort((a, b) => b.length - a.length);
+  return candidates.length ? adapters.get(candidates[0])! : null;
 }
 
 /** Distinct adapters, for capability listings. */

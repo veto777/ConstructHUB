@@ -17,7 +17,13 @@ describe("coming-soon feature bullets", () => {
     // server/seo/jobs.ts; schedules are saved from the SEO Reports page
     // (server/seo/routes.ts saveSchedule) and shown in client/src/pages/seo/reports.tsx.
     expect(COMING_MODULES).not.toContain("scheduledReports");
-    expect(COMING_MODULES).toEqual(["csvExport", "permitAlerts"]);
+    expect(COMING_MODULES).toEqual(["csvExport"]);
+  });
+
+  it("permit alerts are live — not in COMING_MODULES", () => {
+    // Built and shipping: server/permits/poller.ts (hourly per watched jurisdiction, through
+    // server/scrapers/registry.ts), server/permits/routes.ts (/api/permits/watches), client/src/pages/permit-alerts.tsx.
+    expect(COMING_MODULES).not.toContain("permitAlerts");
   });
 
   it("every mapped bullet is a real bullet of a plan that grants the module", () => {
@@ -40,7 +46,7 @@ describe("coming-soon feature bullets", () => {
 
   it("isComingFeature badges only the bullets whose modules are still coming", () => {
     expect(isComingFeature("CSV export of every report")).toBe(true); // Pro — csvExport is coming
-    expect(isComingFeature("Permit alerts for new filings in your territory")).toBe(true); // Agency — permitAlerts is coming
+    expect(isComingFeature("Permit alerts for new filings in your territory")).toBe(false); // Agency — live, ships today
     expect(isComingFeature("Scheduled client email reports")).toBe(false); // Agency — live, ships today
     expect(isComingFeature("Everything in Team")).toBe(false);
     expect(isComingFeature("Priority email support")).toBe(false);

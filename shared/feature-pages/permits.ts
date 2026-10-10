@@ -16,6 +16,11 @@ import { allowanceLine } from "./pricing";
  *     "Find permit portal" web search): client/src/pages/databases.tsx, shared/government-links.ts,
  *     scripts/verify-links.ts, scripts/build-permit-portals.ts; it is public: client/src/App.tsx PublicRouter
  *   - history (saved with results, delete one or all): client/src/pages/history.tsx, server/routes.ts /api/search-queries
+ *   - permit alerts (watch kinds, hourly poll per watched jurisdiction through the adapter registry, one digest per
+ *     watch by email/text/Telegram, "Alerts supported" from each adapter's capabilities.listRecent, gated by the
+ *     permitAlerts module): shared/permit-alerts.ts, server/permits/poller.ts, server/permits/matching.ts,
+ *     server/permits/deliver.ts, server/permits/routes.ts, server/scrapers/types.ts, server/scrapers/registry.ts,
+ *     client/src/pages/permit-alerts.tsx
  */
 
 const SEARCHES: FeatureAllowance = { limit: "permitSearches", unit: "permit searches", period: "month" };
@@ -81,6 +86,11 @@ const page: FeaturePage = {
       title: "Search history",
       body: "Every search is saved with its results. Reopen a past search, or delete the ones you no longer need.",
     },
+    {
+      icon: "bell",
+      title: "Permit alerts",
+      body: "Watch an address, a parcel, a contractor, or the trades you care about in an area. Watched portals are checked every hour and you get one digest per watch by email, text or Telegram. Works on the portals that can list permits by date; the directory marks them Alerts supported.",
+    },
   ],
   spotlight: {
     kicker: "The Results",
@@ -135,7 +145,11 @@ const page: FeaturePage = {
     },
     {
       q: "Does it have every permit in the country?",
-      a: "No. It shows what each government portal publishes, and only for the portals it can search. It doesn't add permits from other sources, and it doesn't send you alerts about new permits.",
+      a: "No. It shows what each government portal publishes, and only for the portals it can search. It doesn't add permits from other sources.",
+    },
+    {
+      q: "How do permit alerts work, and which portals do they cover?",
+      a: "A watch names the jurisdictions to follow and what to look for: one address or parcel, a contractor's name or license, or a set of trades (roofing, HVAC, electrical, plumbing, solar, pool, remodel, new construction and more) in an area. Every hour each watched portal is asked for the permits it listed since the last check; new matches go out as one digest per watch by email, text or Telegram, and every match is kept on the Permit Alerts page. Only a portal that can list permits by date can be watched, so coverage varies by jurisdiction: the directory and the watch itself say Alerts supported where it is, and a watch on a portal that isn't supported yet starts working the day its portal is. Alerts are a separate module on the plans that include it.",
     },
   ],
   // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"):
@@ -194,7 +208,15 @@ const page: FeaturePage = {
     "client/src/pages/search.tsx",
     "client/src/pages/databases.tsx",
     "client/src/pages/history.tsx",
+    "client/src/pages/permit-alerts.tsx",
     "client/src/App.tsx",
+    "shared/permit-alerts.ts",
+    "server/permits/poller.ts",
+    "server/permits/matching.ts",
+    "server/permits/deliver.ts",
+    "server/permits/routes.ts",
+    "server/scrapers/types.ts",
+    "server/scrapers/registry.ts",
     "server/routes.ts",
     "server/scraper.ts",
     "server/growth-quotas.ts",
