@@ -9,6 +9,8 @@ import { Ticket,
   KanbanSquare, ArrowRight, Bell, Lock, Phone, LayoutGrid, Store, KeyRound, Bug, PlayCircle, PenLine,
 } from "lucide-react";
 import { PLANS, planForModule, type ModuleKey } from "@shared/plans";
+import { lockedLanding, toolAccess, type ToolAccessContext } from "@/lib/tool-access";
+import type { EntitlementsInfo } from "@/lib/pricing-display";
 import permitsLogo from "@assets/Permits_1772157993497.png";
 import masterclassLogo from "@assets/Masterclass_1772158106209.png";
 import priceLogo from "@assets/Price_1772158106209.png";
@@ -151,8 +153,8 @@ function GoogleAdsIcon({ className }: { className?: string }) {
 }
 
 type BadgeType = "new" | "hot" | "best";
-/** testId overrides the title-derived test id when two items share a title. */
-type NavChild = { title: string; url: string; icon: any; badge?: BadgeType; subChildren?: NavChild[]; testId?: string };
+/** testId overrides the title-derived test id when two items share a title. `locked`: a tool the account lacks, linked to its landing page. */
+type NavChild = { title: string; url: string; icon: any; badge?: BadgeType; subChildren?: NavChild[]; testId?: string; locked?: boolean };
 
 /** Pages of the modules only some plans include; the page itself shows the plan_required card. */
 const MODULE_BY_URL: Record<string, ModuleKey> = {
@@ -289,6 +291,9 @@ const standaloneItems: { title: string; url: string; icon: any; logo?: string; l
   { title: "Master Class", url: "/master-class", icon: GraduationCap, logo: masterclassLogo, landingUrl: "/features/master-class" },
 ];
 
+/** The CRM gateway (member → portal, else plans): the Workspace link, and the locked "More tools" entry without a CRM plan. */
+const CRM_URL = "/crm-app";
+
 const pricingGroup: NavGroup = {
   label: "Pricing & Plans",
   icon: CreditCard,
@@ -348,6 +353,7 @@ function CollapsibleNavGroup({ group, planBadgeFor = () => null }: { group: NavG
                   <item.icon className="h-3.5 w-3.5 shrink-0" />
                   <span className="truncate">{item.title}</span>
                   {(() => {
+                    if (item.locked) return <LockedBadge label={item.title} />;
                     const plan = planBadgeFor(item.url);
                     if (plan) return <PlanBadge plan={plan} label={item.title} />;
                     return item.badge ? <FeatureBadge type={item.badge} label={item.title} /> : null;
@@ -379,6 +385,27 @@ function CollapsibleNavGroup({ group, planBadgeFor = () => null }: { group: NavG
 /** The same lists, for the tool shell's "All tools" drawer (components/seo-tool/layout.tsx) — the sidebar itself is unchanged. */
 export const APP_NAV = { permitsGroup, googleGroups, googleReviewsItem, standaloneItems, pricingGroup, shownHere };
 
+/** A tool the account lacks (owner, 2026-10-10): a lock, and the entry opens the tool's landing page, not the tool. */
+function LockedBadge({ label }: { label: string }) {
+  return (
+    <span
+      className="ml-auto shrink-0 inline-flex items-center p-0.5 text-sidebar-foreground/60"
+      title={inNativeApp() ? "Not on this account" : "Not on your account — see how it works"}
+      data-testid={`badge-locked-${label.toLowerCase().replace(/\s+/g, "-")}`}
+    >
+      <Lock className="h-3 w-3" aria-hidden="true" />
+      <span className="sr-only">{inNativeApp() ? "Not on this account" : "Not on your account"}</span>
+    </span>
+  );
+}
+
+/** A locked tool as a "More tools" entry: its landing page (the tool itself in the iPhone apps, where nothing is sold). */
+const lockedEntry = (item: NavChild): NavChild => ({
+  title: item.title, icon: item.icon, locked: true,
+  url: inNativeApp() ? item.url : lockedLanding(item.url),
+  testId: `link-nav-more-${item.title.toLowerCase().replace(/\s+/g, "-")}`,
+});
+
 export function AppSidebar() {
   const [location] = useLocation();
   const queryClient = useQueryClient();
@@ -402,16 +429,43 @@ export function AppSidebar() {
     queryKey: ["/api/auth/me"],
   });
 
-  // Which plan-gated modules this account can open. Agency workspace follows the
-  // workspace owner's plan (members need none of their own), so it reads /api/agency/me.
-  const { data: entitlements } = useQuery<{ modules?: Partial<Record<ModuleKey, boolean>> } | null>({
+  // Which tools this account has (lib/tool-access.ts): the plan's allowances and modules with the à la carte items
+  // laid over them (/api/entitlements), the agency workspace (which follows the workspace owner's plan, so it reads
+  // /api/agency/me), and the account's own CRM plan. Everything the account lacks moves to "More tools", locked.
+  const { data: entitlements } = useQuery<EntitlementsInfo | null>({
     queryKey: ["/api/entitlements"],
     enabled: !!user,
   });
-  const { data: agencyMe } = useQuery<{ entitled?: boolean; teamEntitled?: boolean } | null>({
+  const { data: agencyMe } = useQuery<{ owner?: number; actor?: number; entitled?: boolean; teamEntitled?: boolean } | null>({
     queryKey: ["/api/agency/me"],
     enabled: !!user,
   });
+  const { data: crmSub } = useQuery<{ access?: { active?: boolean } } | null>({
+    queryKey: ["/api/crm/billing/subscription"],
+    enabled: !!user,
+  });
+  const accessCtx: ToolAccessContext = {
+    entitlements: user ? entitlements : undefined,
+    agencyMember: !!agencyMe && typeof agencyMe.owner === "number" && typeof agencyMe.actor === "number" && agencyMe.owner !== agencyMe.actor,
+    agencyWorkspace: agencyMe ? agencyMe.teamEntitled === true : undefined,
+    crmActive: crmSub ? crmSub.access?.active === true : undefined,
+  };
+  const locked = (url: string) => !!user && toolAccess(url, accessCtx) === "locked";
+  const lockedTools: NavChild[] = [];
+  /** The group with only the tools the account has; null when it has none of them (they are all in "More tools"). */
+  const kept = (group: NavGroup): NavGroup | null => {
+    const children = group.children.filter(shownHere).filter((c) => { if (locked(c.url)) { lockedTools.push(c); return false; } return true; });
+    return children.length ? { ...group, children } : null;
+  };
+  const keptPermits = kept(permitsGroup);
+  const keptGoogle = googleGroups.map(kept).filter((g): g is NavGroup => !!g);
+  const reviewsLocked = SHOW_GOOGLE_REVIEWS && locked(googleReviewsItem.url);
+  if (reviewsLocked) lockedTools.push(googleReviewsItem);
+  const reviewsShown = SHOW_GOOGLE_REVIEWS && !reviewsLocked;
+  const keptStandalone = standaloneItems.filter(shownHere).filter((item) => { if (locked(item.url)) { lockedTools.push(item); return false; } return true; });
+  const crmShown = !locked(CRM_URL);
+  if (!crmShown) lockedTools.push({ title: "CRM", url: CRM_URL, icon: KanbanSquare });
+  const moreTools: NavGroup = { label: "More tools", icon: Lock, children: lockedTools.map(lockedEntry) };
   // The issue desk's badge: issues nobody has looked at yet (403 until the admin sign-in passes — then no count).
   const { data: issueSummary } = useQuery<{ new: number; fixReady: number }>({
     queryKey: ["/api/admin/issues/summary"],
@@ -458,8 +512,9 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         {/* ConstructHub CRM — a separate product with its own plans, on its own portal.
-            Prominent pathway in through the /crm-app gateway (member → portal, else plans). */}
-        <SidebarGroup>
+            Prominent pathway in through the /crm-app gateway (member → portal, else plans). Without a CRM plan of
+            its own the account finds it under "More tools", locked, leading to its landing page. */}
+        {crmShown && <SidebarGroup>
           <div className="px-2 pb-2 text-xs font-medium text-muted-foreground">Workspace</div>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -476,28 +531,28 @@ export function AppSidebar() {
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
-        </SidebarGroup>
+        </SidebarGroup>}
 
-        <SidebarSeparator />
+        {crmShown && <SidebarSeparator />}
 
-        <SidebarGroup>
+        {keptPermits && <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              <CollapsibleNavGroup group={permitsGroup} />
+              <CollapsibleNavGroup group={keptPermits} />
             </SidebarMenu>
           </SidebarGroupContent>
-        </SidebarGroup>
+        </SidebarGroup>}
 
-        <SidebarSeparator />
+        {keptPermits && <SidebarSeparator />}
 
-        <SidebarGroup>
+        {(keptGoogle.length > 0 || reviewsShown) && <SidebarGroup>
           <SidebarGroupContent>
             <div className="px-2 pb-2 text-xs font-medium text-muted-foreground">Growth</div>
             <SidebarMenu>
-              {googleGroups.map(group => (
+              {keptGoogle.map(group => (
                 <CollapsibleNavGroup key={group.label} group={group} planBadgeFor={planBadgeFor} />
               ))}
-              {SHOW_GOOGLE_REVIEWS && (
+              {reviewsShown && (
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     asChild
@@ -513,15 +568,15 @@ export function AppSidebar() {
               )}
             </SidebarMenu>
           </SidebarGroupContent>
-        </SidebarGroup>
+        </SidebarGroup>}
 
-        <SidebarSeparator />
+        {(keptGoogle.length > 0 || reviewsShown) && <SidebarSeparator />}
 
         <SidebarGroup>
           <SidebarGroupContent>
             <div className="px-2 pb-2 text-xs font-medium text-muted-foreground">Tools</div>
             <SidebarMenu>
-              {standaloneItems.filter(shownHere).map(item => (
+              {keptStandalone.map(item => (
                 <SidebarMenuItem key={item.url}>
                   <div className="flex items-center">
                     <SidebarMenuButton
@@ -566,6 +621,15 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        {/* Every tool the account lacks, collapsed and locked (owner, 2026-10-10): each entry opens the tool's landing
+            page — the case for adding it on or moving up — never the tool. Platform admins never see this group. */}
+        {moreTools.children.length > 0 && <SidebarGroup data-testid="group-more-tools">
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <CollapsibleNavGroup group={moreTools} />
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>}
         {user?.isPlatformAdmin === true && <SidebarGroup>
           {/* Open by default: the owner uses these daily (Access grants, Issues, Feature pages); folding it stays possible. */}
           <details open>
