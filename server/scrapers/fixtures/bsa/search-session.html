@@ -1,0 +1,397 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" >
+<head id="Head1"><title>
+	
+        Detailed Record Search
+        |
+        City of Rochester Hills
+        |
+        BS&amp;A Online
+</title><link type="text/css" href="/Content/2011.3.1115/telerik.common.min.css" rel="stylesheet"/>
+<link type="text/css" href="/Content/telerik.bsanewsite.css" rel="stylesheet"/>
+
+    <!--Note: Bsa.css is created by a pre-build step.-->
+    <link href="/Content/Bsa.css?v=S5UZmEobis5z9YA88zuqpj-OXR9UohmJcI6_Yttfn1I1" rel="stylesheet" type="text/css" />
+    
+
+    <!--Should we serve these ourselves rather than via cdn?-->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" /><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&amp;display=swap" /><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@200..900" />
+
+    <link href="/Content/Mdb/mdb.min.css?v=c3whRo_Tb-NqUwy7xLxS1F_-NIcSqO7Id4-mZDurG5k1" rel="stylesheet" type="text/css" />
+    <link href="/Content/Mdb/Plugins/calendar.min.css?v=HnBFlzRF6TpnmrLn1oToPaEXEpAOeYNSmT4AEB8is_U1" rel="stylesheet" type="text/css" />
+    <link href="/Content/Bsa/Refresh/Bsa.Mdb.css?v=lrfkBmh4peIVfTxCE0vF_SzrIL7uu_mjjGpxGzMsi7A1" rel="stylesheet" type="text/css" />
+    <link href="/Content/Bsa/Refresh/Bsa.NewSiteVersion.css?v=-clGHnAyIQh0B1K3ZTh3DvOxKKZ0btjnSHuub4Mqi9I1" rel="stylesheet" type="text/css" />
+    <!-- Pay Now split-button (.mdb-split-button-*) styles live in Bsa.SplitButton.css. The split-button renders across PaymentDetail pages and MyAccount Bills cards, so load it globally here rather than per-surface. -->
+    <link href="/Content/Bsa/Refresh/Bsa.SplitButton.css?v=aOZkV074ZIP1lAm7j0klKQAkDAGtX8I8cMkQGX22td01" rel="stylesheet" type="text/css" />
+    <!-- Mini-cart (.mini-cart-*) styles live in Bsa.Cart.css. The navbar mini-cart renders on every page, so load it globally here, not just on the /Cart/ page (Views/Cart/Index.aspx). -->
+    <link href="/Content/Bsa/Bsa.Cart.css?v=76JkfeE3Pj-i0hsqiehT644NZLIyF_vD0nZeaWUwN9U1" rel="stylesheet" type="text/css" />
+    <link href="/Content/Bsa/Bsa.Print.css?v=rtGrBZ9qkNpx_HC1qShSlGI9sjy31AUVaumw98vY4OY1" rel="stylesheet" type="text/css" media="print" />
+    <link href="/Content/Bsa/Bsa.Mobile.css?v=kTNYNPJbxmL3qicVIziahuST6-sQtX_Z4legBygNFBA1" rel="stylesheet" type="text/css" media="handheld" />
+    <link href="/Content/inettuts.css?v=-GMN1Yar2rFzr5NbPuQANFCFc1vaJvkS3_RspevRqOs1" rel="stylesheet" type="text/css" />
+    <link href="/Content/nivo-slider.css?v=Unp-ergcfZJHx8SWhHTQjK14CRt6rNu6y9FR2fiOt201" rel="stylesheet" type="text/css" />
+    <link href="/Content/themes/jquery-ui-1.8.15.custom.css?v=hg6r5nxLZV0uQCqNG8aIh7TbD7uGlByFDNpCDTJ6TaI1" rel="stylesheet" type="text/css" />
+    <link href="/Content/nivo-slider/themes/default/default.css?v=NCDKtuLUPDXoF8b6Ra4wvt5uIKdWc5IhgZ7tiKw4prE1" rel="stylesheet" type="text/css"
+        media="screen" />
+    
+
+    <script src="/Scripts/jquery-1.6.2.js?v=JPUMm-xJytd2GCaMtFZSvjrD5c4Fs3XPfdcxq_O6TBo1" type="text/javascript"></script>
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" /><meta property="og:url" content="https://bsaonline.com" /><meta property="og:title" content="BS&amp;A Online" /><meta property="og:description" content="Your online source for municipal data" /><meta property="og:image" content="https://bsaonline.com/Content/Images/BsaLogo.png" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="https://bsaonline.com/Content/Images/BsaLogo.png" /><meta property="twitter:url" content="https://bsaonline.com" /><meta property="twitter:title" content="BS&amp;A Online" /><meta property="twitter:description" content="Your online source for municipal data" /><meta property="twitter:image" content="https://bsaonline.com/Content/Images/BsaLogo.png" /><meta name="viewport" content="width=device-width, initial-scale=1" /><link rel="icon" href="/icon-192.png" type="image/png" sizes="192x192" /><link rel="icon" href="/icon-512.png" type="image/png" sizes="512x512" /><link rel="apple-touch-icon" href="/apple-touch-icon.png" /><!-- 180×180 -->
+    <link rel="icon" href="/icon-32.ico" sizes="32x32" />
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-MZ4278722E"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+
+        gtag('config', 'G-MZ4278722E');
+    </script>
+</head>
+<body >
+    
+    <input name="__RequestVerificationToken" type="hidden" value="REDACTED" />
+    
+    <input type="hidden" id="__ActiveUnitId" value="385" />
+    <div class="toast fade terms-of-use-toast" role="alert" data-mdb-color="info" data-mdb-toast-init="" data-mdb-autohide="false" data-mdb-position="bottom-left" id="bsa-204868e1-6fe3-4ea0-aff7-0b7dc02c3955_DYNAMICKEY_" name="bsa-204868e1-6fe3-4ea0-aff7-0b7dc02c3955_DYNAMICKEY_"><div class="toast-header"><i class='fas fa-info-circle' role="img" aria-label="Information"></i><h2 class="me-auto toast-header-text">Terms of Use</h2><button class="btn btn-bsa-secondary" id="bsa-51e439e5-2893-4c37-be28-c612eea6e38d_DYNAMICKEY_" name="bsa-51e439e5-2893-4c37-be28-c612eea6e38d_DYNAMICKEY_" type="Button" data-mdb-dismiss="toast" onclick="onTermsOfUseDismissed()" onkeydown="if(event.keyCode == 90){ onTermsOfUseDismissed() }" aria-label="Close notification"><span class="btn-image fas fa-x"></span></button></div><div class="toast-body"><div>By continuing to use this website you agree to the <a target="_blank" class="bsa-action-link" href="/TermsOfUse/BsaoTermsOfUse">BS&A Online Terms of Use</a>.</div></div></div>
+    
+    <div id="global-progress-window">
+    </div>
+    <div id="global-progress-window-overlay">
+    </div>
+    <div id="global-progress-window-with-percentage">
+    </div>
+    <div id="global-progress-window-with-percentage-overlay">
+    </div>
+    <div class='site-toolbar-item-highlighter'>
+    </div>
+
+    <div id="login-modal" class="modal fade" tabindex="-1" data-mdb-backdrop="static" data-mdb-keyboard="false"><div class="modal-dialog modal-dialog-centered"><div class="modal-content" style="" role="dialog" aria-modal="true" aria-labelledby="login-modal-content"><div class="modal-body" style=""></div></div></div></div>
+    <div id="registration-modal" class="modal fade" tabindex="-1" data-mdb-backdrop="static" data-mdb-keyboard="false"><div class="modal-dialog modal-dialog-centered"><div class="modal-content" style="" role="dialog" aria-modal="true" aria-labelledby="registration-modal-content"><div class="modal-body" style=""></div></div></div></div>
+    <div id="generic-image-modal" class="modal fade" tabindex="-1" data-mdb-backdrop="static" data-mdb-keyboard="false"><div class="modal-dialog modal-dialog-centered" style="justify-content: center;"><div class="modal-content" style="display: flex; overflow: auto;" role="dialog" aria-modal="true" aria-labelledby="generic-image-modal-content"><div class="modal-header"><h2 class="modal-title" id="generic-image-modal-content">Placeholder</h2><button class="btn btn-modal-close" id="bsa-53b7d22b-779e-48d9-9354-47b7bf971ffe_DYNAMICKEY_" name="bsa-53b7d22b-779e-48d9-9354-47b7bf971ffe_DYNAMICKEY_" type="Button" data-mdb-dismiss="modal" aria-label="Close"></button></div><button type="button" data-mdb-target="#generic-image-modal" data-mdb-slide="prev" class="modal-control-prev" onclick="javascript: ChangeImageInModal('prev')" onkeydown="if(event.keyCode == 90){ javascript: ChangeImageInModal('prev') }" aria-label="Previous image"><span class="fas fa-arrow-left"></span></button><button type="button" data-mdb-target="#generic-image-modal" data-mdb-slide="next" class="modal-control-next" onclick="javascript: ChangeImageInModal('next')" onkeydown="if(event.keyCode == 90){ javascript: ChangeImageInModal('next') }" aria-label="Next image"><span class="fas fa-arrow-right"></span></button><div class="modal-body" style="display: flex; overflow: auto;"><div class="image-container">Placeholder</div></div><div class="modal-footer"><button class="btn property-details-image-modal-print-button no-print btn-bsa-secondary" id="bsa-9f1b72a0-5eb8-459d-82a8-18de3b2b332b_DYNAMICKEY_" name="bsa-9f1b72a0-5eb8-459d-82a8-18de3b2b332b_DYNAMICKEY_" type="Button" onclick="javascript:PrintImageFromModal()" onkeydown="if(event.keyCode == 90){ javascript:PrintImageFromModal() }"><span class="btn-image fas fa-print image-margin-right"></span>Print Image</button><button class="btn property-details-image-modal-print-button no-print btn-bsa-secondary" id="bsa-1c7ecc9d-9420-4920-a645-fe8a0f2b4e7b_DYNAMICKEY_" name="bsa-1c7ecc9d-9420-4920-a645-fe8a0f2b4e7b_DYNAMICKEY_" type="Button" onclick="javascript:DownloadPdfOrTiff()" onkeydown="if(event.keyCode == 90){ javascript:DownloadPdfOrTiff() }"><span class="btn-image fas fa-download image-margin-right"></span>Download</button></div></div></div></div>
+    <div id="generic-sitewide-modal" class="modal fade" tabindex="-1" data-mdb-backdrop="static" data-mdb-keyboard="false"><div class="modal-dialog modal-dialog-centered"><div class="modal-content" style="" role="dialog" aria-modal="true" aria-labelledby="generic-sitewide-modal-content"><div class="modal-header"><h2 class="modal-title" id="generic-sitewide-modal-content">Placeholder</h2><button class="btn btn-modal-close" id="bsa-1a2f85fc-9051-4c1b-92da-d8cdf10e3d65_DYNAMICKEY_" name="bsa-1a2f85fc-9051-4c1b-92da-d8cdf10e3d65_DYNAMICKEY_" type="Button" data-mdb-dismiss="modal" aria-label="Close"></button></div><div class="modal-body" style="">Placeholder</div></div></div></div>
+    <div id="generic-report-modal" class="modal fade" tabindex="-1" data-mdb-backdrop="static" data-mdb-keyboard="false"><div class="modal-dialog modal-dialog-centered"><div class="modal-content" style="" role="dialog" aria-modal="true" aria-labelledby="generic-report-modal-content"><div class="modal-header"><h2 class="modal-title" id="generic-report-modal-content">Placeholder</h2><button class="btn btn-modal-close" id="bsa-471ad506-4d92-43b2-9f27-b644e559ed1e_DYNAMICKEY_" name="bsa-471ad506-4d92-43b2-9f27-b644e559ed1e_DYNAMICKEY_" type="Button" data-mdb-dismiss="modal" aria-label="Close"></button></div><div class="modal-body" style="">Placeholder</div></div></div></div>
+    <div id="generic-yes-no-modal" class="modal fade" tabindex="-1" data-mdb-backdrop="static" data-mdb-keyboard="false"><div class="modal-dialog modal-dialog-centered"><div class="modal-content" style="" role="dialog" aria-modal="true" aria-labelledby="generic-yes-no-modal-content"><div class="modal-header"><h2 class="modal-title" id="generic-yes-no-modal-content">Question</h2></div><div class="modal-body" style="">Placeholder</div><div class="modal-footer"><button class="btn btn-bsa-primary" id="bsa-0c15fbb9-237d-44eb-b1f9-10c54b7aac21_DYNAMICKEY_" name="Yes" type="Button" data-mdb-dismiss="modal">Yes</button><button class="btn btn-bsa-secondary" id="bsa-5d9b30f4-991e-43dc-a3c0-62b20bb19679_DYNAMICKEY_" name="No" type="Button" data-mdb-dismiss="modal">No</button></div></div></div></div>
+    <div id="generic-message-modal" class="modal fade" tabindex="-1" data-mdb-backdrop="static" data-mdb-keyboard="false"><div class="modal-dialog modal-dialog-centered"><div class="modal-content" style="" role="dialog" aria-modal="true" aria-labelledby="generic-message-modal-content"><div class="modal-header"><h2 class="modal-title" id="generic-message-modal-content">Title</h2></div><div class="modal-body" style="">Placeholder</div><div class="modal-footer"><button class="btn btn-bsa-primary" id="bsa-6f4b60cf-0f98-467a-88cc-a51a221038f1_DYNAMICKEY_" name="Close" type="Button" data-mdb-dismiss="modal">Close</button></div></div></div></div>
+    <div id="generic-loading-modal" class="modal fade" tabindex="-1" data-mdb-backdrop="static" data-mdb-keyboard="false"><div class="modal-dialog modal-dialog-centered"><div class="modal-content" style="" role="dialog" aria-modal="true" aria-labelledby="generic-loading-modal-content"><div class="modal-body" style=""><div class="d-flex align-items-center"><div class="spinner-border"><span class="visually-hidden">Loading...</span></div><div class="flex-grow-1 text-center"><h6 class="loading-header mb-2">Processing Your Request...</h6><div class="loading-details">Please Wait</div></div></div></div></div></div></div>    
+    <div id="select-municipality-modal" class="modal fade" tabindex="-1" data-mdb-backdrop="static" data-mdb-keyboard="false"><div class="modal-dialog modal-dialog-centered"><div class="modal-content" style="" role="dialog" aria-modal="true" aria-labelledby="select-municipality-modal-content"><div class="modal-header"><h2 class="modal-title" id="select-municipality-modal-content">Select Municipality</h2></div><div class="modal-body" style=""><div class="municipality-search-container"><label class="visually-hidden" for="ModalMunicipalitySearch">Enter Municipality, results will appear automatically as you type</label><div id="search-input-container" class="input-group search-control"><div class="search-input-wrapper"><div data-mdb-input-init="" class="form-outline"><input id="ModalMunicipalitySearch" placeholder="Enter Municipality" class="placeholder-active search-input form-control" type="search"></input></div><button type="button" class="search-clear-button" tabindex="-1" aria-label="Clear search" aria-hidden="true">&times;</button></div><button class="btn search-button btn-bsa-primary" id="search-button" name="bsa-a6f062a9-f553-4c12-a162-f2502040b58b_DYNAMICKEY_" type="File" data-mdb-ripple-init="" aria-label="Search"><span class="btn-image fa fa-search"></span></button></div></div></div><div class="modal-footer"><a class="bsa-action-link" href="/MunicipalDirectory">Go to Municipal Directory</a><button class="btn btn-bsa-secondary" id="bsa-c7d5b959-8354-44be-b543-4c09deece50b_DYNAMICKEY_" name="bsa-c7d5b959-8354-44be-b543-4c09deece50b_DYNAMICKEY_" type="Button" data-mdb-dismiss="modal">Cancel</button></div></div></div></div>
+    <div class="toast fade" role="alert" data-mdb-color="success" data-mdb-toast-init="" data-mdb-autohide="false" data-mdb-position="top-right" id="generic-success-toast" name="bsa-041d4d99-65b0-4016-b68f-f5cd968f36c2_DYNAMICKEY_"><div class="toast-header"><i class='fas fa-check' role="img" aria-label="Success"></i><h2 class="me-auto toast-header-text">Placeholder</h2><button class="btn btn-bsa-secondary" id="bsa-e569c525-cfae-4e0e-94f3-0c6d25175eee_DYNAMICKEY_" name="bsa-e569c525-cfae-4e0e-94f3-0c6d25175eee_DYNAMICKEY_" type="Button" data-mdb-dismiss="toast" aria-label="Close notification"><span class="btn-image fas fa-x"></span></button></div><div class="toast-body">Placeholder</div></div>
+
+    <!-- Remove below once switched over to new modals !-->
+    <div class="t-widget t-window" id="generic-sitewide-window" style="display:none"><div class="t-window-titlebar t-header">&nbsp;<span class="t-window-title">&amp;nbsp;</span><div class="t-window-actions t-header"><a class="t-link" href="#"><span class="t-icon t-close">Close</span></a></div></div><div class="t-window-content t-content" style="overflow:auto;width:100px">&nbsp;</div></div>
+    <div class="t-widget t-window" id="generic-sitewide-window-report" style="display:none"><div class="t-window-titlebar t-header">&nbsp;<span class="t-window-title">&amp;nbsp;</span><div class="t-window-actions t-header"><a class="t-link" href="#"><span class="t-icon t-close">Close</span></a></div></div><div class="t-window-content t-content" style="overflow:auto;width:100px">&nbsp;</div></div>
+    <div class="t-widget t-window" id="bErrorWindow" style="display:none"><div class="t-window-titlebar t-header">&nbsp;<span class="t-window-title">Error</span><div class="t-window-actions t-header"><a class="t-link" href="#"><span class="t-icon t-close">Close</span></a></div></div><div class="t-window-content t-content" style="overflow:auto;width:400px"><div class='message-window-contents-hidden'>
+<input type='hidden' name='b0fa1f1c-57a5-423f-b4b2-13558bccc43b' id='b0fa1f1c-57a5-423f-b4b2-13558bccc43b' value='Error' /><input type='hidden' name='baddedac-79a5-44b8-ae22-0672b683552e' id='baddedac-79a5-44b8-ae22-0672b683552e' value='400' /></div>
+<div class='message-window'><div class='message-window-contents' ><table cellspacing=0 cellpadding=0 width=100%><tr><td style='vertical-align:top'><div class='message-window-contents-image'><img src='/Content/Images/109_AllAnnotations_Error_32x32_72.png' alt=''/></div></td><td><div class='message-window-contents-title'>Error</div><div class='message-window-contents-message'>error message</div><div class='message-window-sub-contents'></div></td></tr></table></div><div class='message-window-buttons'><input class='t-button t-state-default bsa-button' type='submit' value='Ok' onclick="CloseMessageWindowFromGuid('53ae5807-3254-4286-ac16-721c9af87036');"/>
+<input type='hidden' name='53ae5807-3254-4286-ac16-721c9af87036' id='53ae5807-3254-4286-ac16-721c9af87036' />
+</div></div></div></div>
+    <div class="t-widget t-window" id="bInformationWindow" style="display:none"><div class="t-window-titlebar t-header">&nbsp;<span class="t-window-title">Information</span><div class="t-window-actions t-header"><a class="t-link" href="#"><span class="t-icon t-close">Close</span></a></div></div><div class="t-window-content t-content" style="overflow:auto;width:400px"><div class='message-window-contents-hidden'>
+<input type='hidden' name='c1429b2f-0f7d-4b47-b97a-9fcafd8157a5' id='c1429b2f-0f7d-4b47-b97a-9fcafd8157a5' value='Information' /><input type='hidden' name='f371687f-f228-4519-91dd-037240e1dd07' id='f371687f-f228-4519-91dd-037240e1dd07' value='400' /></div>
+<div class='message-window'><div class='message-window-contents' ><table cellspacing=0 cellpadding=0 width=100%><tr><td style='vertical-align:top'><div class='message-window-contents-image'><img src='/Content/Images/109_AllAnnotations_Info_32x32_72.png' alt=''/></div></td><td><div class='message-window-contents-title'>Success</div><div class='message-window-contents-message'>success message</div><div class='message-window-sub-contents'></div></td></tr></table></div><div class='message-window-buttons'><input class='t-button t-state-default bsa-button' type='submit' value='Ok' onclick="CloseMessageWindowFromGuid('4941d110-0d4e-4bfa-8018-606bce15e21b');"/>
+<input type='hidden' name='4941d110-0d4e-4bfa-8018-606bce15e21b' id='4941d110-0d4e-4bfa-8018-606bce15e21b' />
+</div></div></div></div>
+    <div class="t-widget t-window" id="bDefaultYesNoWindow" style="display:none"><div class="t-window-titlebar t-header">&nbsp;<span class="t-window-title">Question</span><div class="t-window-actions t-header"><a class="t-link" href="#"><span class="t-icon t-close">Close</span></a></div></div><div class="t-window-content t-content" style="overflow:auto;width:410px"><div class='message-window-contents-hidden'>
+<input type='hidden' name='bbe08419-bab1-400b-aa8f-6ff341cdd2b5' id='bbe08419-bab1-400b-aa8f-6ff341cdd2b5' value='Question' /><input type='hidden' name='0bf71cfe-194c-4437-aae4-088bbf47f295' id='0bf71cfe-194c-4437-aae4-088bbf47f295' value='410' /></div>
+<div class='message-window'><div class='message-window-contents' ><table cellspacing=0 cellpadding=0 width=100%><tr><td style='vertical-align:top'><div class='message-window-contents-image'><img src='/Content/Images/109_AllAnnotations_Help_32x32_72.png' alt=''/></div></td><td><div class='message-window-contents-title'>MessageTitle</div><div class='message-window-contents-message'>Message</div><div class='message-window-sub-contents'></div></td></tr></table></div><div class='message-window-buttons'><input class='t-button t-state-default bsa-button' type='submit' value='Yes' onclick=";"/>
+&nbsp;&nbsp;<input class='t-button t-state-default bsa-button' type='submit' value='No' onclick=";"/>
+</div></div></div></div>
+    <div class="new-master-container">
+        
+        <header role="banner">
+            <nav id="MdbNavigationBar" aria-label="Site navigation" class="navbar fixed-top navbar-expand-md"><div class="container-fluid d-flex flex-row flex-md-nowrap flex-wrap"><a class="skip-to-main-content" href="#main-content">Skip to main content</a><button class="navbar-toggler" data-mdb-collapse-init="" data-mdb-target="#MdbNavigationBarCollapsibleItems"><i class='fa fa-bars'></i></button><a><img alt="BS&A" loading="lazy" height="34.287px" width="79.939px" src="/Content/Images/BSALogo2.png"></img></a><div id="MdbNavigationBarCollapsibleItems" class="collapse navbar-collapse"><div class="left-items-container"><div class="navigation-item-container"><a href="/Home/Index">Home</a></div><div class="navigation-item-container"><li class="dropdown"><a data-mdb-dropdown-init="" class="dropdown-toggle" href="#">Services</a><ul class="dropdown-menu"><li><h2 class="dropdown-header">Assessing</h2></li><li><a class="dropdown-item" href="/SiteSearch/AssessingRecordSearch">Assessing Search</a></li><li><a class="dropdown-item" href="/ASSG_AdvancedSearch/AdvancedSearch">Property Sale Search</a></li><li><h2 class="dropdown-header">Building Department</h2></li><li><a class="dropdown-item" href="/CD_PermitApplication/ApplyForPermit">Apply for a Permit</a></li><li><a class="dropdown-item" href="/CD_PzeProcessApplication/ApplyForPzeProcess">Apply for a Planning, Zoning or Engineering Process</a></li><li><a class="dropdown-item" href="/SiteSearch/BuildingDepartmentRecordSearch">Building Department Record Search</a></li><li><a class="dropdown-item" href="/BsaPayment/TakeBuildingDepartmentPayment">Pay a Building Department Fee</a></li><li><a class="dropdown-item" href="/CD_InspectionRequest/RequestInspection">Schedule an Inspection</a></li><li><h2 class="dropdown-header">Custom</h2></li><li><a class="dropdown-item" href="https://bsaonline.com/OnlinePayment/OnlinePaymentSearch?PaymentApplicationType=13&uid=385" target="_blank">Invoice and Parking Violation Search</a></li><li><h2 class="dropdown-header">Global</h2></li><li><a class="dropdown-item" href="/SiteSearch/AdvancedRecordSearch">Detailed Record Search</a></li><li><a class="dropdown-item" href="/BsaPayment/PayBill">Pay a Bill</a></li><li><h2 class="dropdown-header">Miscellaneous Receivables</h2></li><li><a class="dropdown-item" href="/SiteSearch/MiscellaneousReceivablesRecordSearch">Miscellaneous Receivables Record Search</a></li><li><a class="dropdown-item" href="/BsaPayment/TakeMiscellaneousReceivablesPayment">Pay a Miscellaneous Invoice</a></li><li><h2 class="dropdown-header">Special Assessment</h2></li><li><a class="dropdown-item" href="/BsaPayment/TakeSpecialAssessmentPayment">Pay for a Special Assessment</a></li><li><a class="dropdown-item" href="/SiteSearch/SpecialAssessmentRecordSearch">Special Assessment Search</a></li><li><h2 class="dropdown-header">Tax</h2></li><li><a class="dropdown-item" href="/SiteSearch/TaxRecordSearch">Current Tax Search</a></li><li><a class="dropdown-item" href="/BsaPayment/TakeTaxPayment">Pay Current Taxes</a></li></ul></li></div><div class="navigation-item-container"><a data-acsb-custom-trigger="true" href="#"><i class="fas fa-universal-access navigation-item-icon"></i> Accessibility Settings</a></div></div><div class="right-items-container"><div class="select-municipality-container navigation-item-container"><li class="dropdown"><a data-mdb-dropdown-init="" class="dropdown-toggle" href="#">City of Rochester Hills</a><ul class="dropdown-menu"><li><a class="dropdown-item" href="javascript:bsaModal.showSelectMunicipalityModal()">Change Municipality</a></li></ul></li></div><div class="navigation-item-container"><li class="dropdown"><a data-mdb-dropdown-init="" class="dropdown-toggle" href="#">Currently Not Signed In</a><ul class="dropdown-menu" id="bsa-0ad1e1cc-84e6-42e4-9e21-9a0c41e701d1_DYNAMICKEY_" name="bsa-0ad1e1cc-84e6-42e4-9e21-9a0c41e701d1_DYNAMICKEY_"><li><button class="dropdown-item" id="bsa-72c37bbb-e6ac-4c8a-bab4-b5a708d02ba2_DYNAMICKEY_" name="bsa-72c37bbb-e6ac-4c8a-bab4-b5a708d02ba2_DYNAMICKEY_" type="button" onclick="login()" onkeydown="if(event.keyCode == 90){ login() }">Sign In</button></li><li><button class="dropdown-item" id="bsa-d9c0afbc-9f93-49ce-893a-373fdaaa9b59_DYNAMICKEY_" name="bsa-d9c0afbc-9f93-49ce-893a-373fdaaa9b59_DYNAMICKEY_" type="button" onclick="register()" onkeydown="if(event.keyCode == 90){ register() }">Register</button></li></ul></li></div></div></div></div></nav>
+
+        </header>
+        
+
+        <!-- New Site Search Goes !-->
+        
+
+        <noscript>
+            <div class="alert mb-0 alert-danger" role="alert" aria-live="assertive" aria-atomic="true" data-mdb-color="danger" data-mdb-alert-init="" id="bsa-faf6749b-7c88-4f61-a486-2fd8a5a2295f_DYNAMICKEY_" name="bsa-faf6749b-7c88-4f61-a486-2fd8a5a2295f_DYNAMICKEY_"><div class="alert-inner"><div class="alert-image"><i class='fas fa-exclamation-circle' role="img" aria-label="Error"></i></div><div class="alert-content"><h3 class="alert-heading">JavaScript is currently not supported or disabled by this browser.</h3><div class="alert-message">Please enable it for full functionality.</div></div></div></div>
+        </noscript>
+        <main id="main-content" tabindex="-1" class="new-master-wrapper">
+            <div class="municipal-hero-section"><h1 class="municipal-hero-title">City of Rochester Hills</h1></div>
+            <div class="mdb-wizard-container"><div class="ajax-wizard"><div id="WizardStepListContainer" class="wizard-navigation-header"><ul id="WizardStepList"></ul></div><ul id="WizardErrorList" class="validation-summary-errors" role="alert" tabindex="-1"></ul><div id="CurrentStepPartialView"></div><div id="CurrentStepAdditionalContentPartialView"></div></div></div><input id="AdvancedRecordSearchSessionGuid" name="AdvancedRecordSearchSessionGuid" type="hidden" value="REDACTED" />
+        </main>
+        
+        <footer class="footer-container">            
+            <div class="footer-copyright">                
+                <span>Copyright © 2026 <a href="http://www.bsasoftware.com" class="text-decoration-underline">BS&A Software</a>, Inc.</span>                
+
+                
+
+                <div class="vr"></div>
+                <span><a href="https://status.bsaonline.com" target="_blank" class="text-decoration-underline">Status</a></span>
+
+                <div class="vr"></div>
+                <span><a href="/Home/AccessibilityStatement" class="text-decoration-underline">Statement on Accessibility</a></span>
+
+                
+            </div>
+
+            <div class="footer-disclaimer">
+                <p>
+                    <strong>**Disclaimer:</strong> BS&A Software provides BS&A Online as a way for municipalities
+                to display information online and is not responsible for the content or accuracy
+                of the data herein. This data is provided for reference only and WITHOUT WARRANTY
+                of any kind, expressed or inferred. Please contact your local municipality if you
+                believe there are errors in the data.
+                </p>
+            </div>
+        </footer>
+            
+    </div>
+
+    <script type="text/javascript" src="/Scripts/2011.3.1115/telerik.common.min.js"></script>
+<script type="text/javascript" src="/Scripts/2011.3.1115/telerik.grid.min.js"></script>
+<script type="text/javascript" src="/Scripts/2011.3.1115/telerik.grid.editing.min.js"></script>
+<script type="text/javascript" src="/Scripts/2011.3.1115/telerik.calendar.min.js"></script>
+<script type="text/javascript" src="/Scripts/2011.3.1115/telerik.datepicker.min.js"></script>
+<script type="text/javascript" src="/Scripts/2011.3.1115/telerik.grid.filtering.min.js"></script>
+<script type="text/javascript" src="/Scripts/2011.3.1115/telerik.window.min.js"></script>
+<script type="text/javascript" src="/Scripts/2011.3.1115/telerik.datetimepicker.min.js"></script>
+<script type="text/javascript" src="/Scripts/09-jquery.validate.js"></script>
+<script type="text/javascript" src="/Scripts/22-amplify.js"></script>
+<script type="text/javascript" src="/Scripts/knockout-3.0.0.min.js"></script>
+<script type="text/javascript" src="/Scripts/knockout.mapping-latest.js"></script>
+<script type="text/javascript" src="/Scripts/26-ko.telerik.js"></script>
+<script type="text/javascript" src="/Scripts/Bsa/22-Bsa.LinkDropDown.js"></script>
+<script type="text/javascript" src="/Scripts/2011.3.1115/telerik.draganddrop.min.js"></script>
+<script type="text/javascript">
+//<![CDATA[
+jQuery(document).ready(function(){
+jQuery('#generic-sitewide-window').tWindow({onClose:OnGenericSiteWideWindowClose, modal:true, draggable:false, resizable:false});
+jQuery('#generic-sitewide-window-report').tWindow({onClose:OnGenericSiteWideWindowClose, modal:true, draggable:false, resizable:false});
+jQuery('#bErrorWindow').tWindow({onClose:onTelerikWindowClose, modal:true, draggable:false, resizable:false});
+jQuery('#bInformationWindow').tWindow({onClose:onTelerikWindowClose, modal:true, draggable:false, resizable:false});
+jQuery('#bDefaultYesNoWindow').tWindow({onClose:onTelerikWindowClose, modal:true, draggable:false, resizable:false});});
+//]]>
+</script><div id='initializedTelerikControls' style='height: 0px; visibility: hidden; display: none;'><label For='asdfasdfasdfas12345df'>a</label><div class="t-widget t-numerictextbox"><input class="t-input" id="asdfasdfasdfas12345df" name="asdfasdfasdfas12345df" type="text" value="0" /><a class="t-link t-icon t-arrow-up" href="#" tabindex="-1" title="Increase value">Increment</a><a class="t-link t-icon t-arrow-down" href="#" tabindex="-1" title="Decrease value">Decrement</a></div><label For='asdfasdfqw23fq123rzas'>a</label><div class="t-widget t-datepicker"><div class="t-picker-wrap"><input class="t-input" id="asdfasdfqw23fq123rzas" name="asdfasdfqw23fq123rzas" type="text" value="10/10/2026" /><span class="t-select"><span class="t-icon t-icon-calendar" title="Open the calendar">Open the calendar</span></span></div></div><label For='alskfhasdkfjMOOOOblah'>a</label><label For='alskfhasdkfjMOOOOblah-input'>a</label><div class="t-widget t-combobox t-header" style="width: 200px; float: left; margin-bottom: 280px;"><div class="t-dropdown-wrap t-state-default"><input class="t-input" id="alskfhasdkfjMOOOOblah-input" name="alskfhasdkfjMOOOOblah-input" type="text" /><span class="t-select t-header"><span class="t-icon t-arrow-down">select</span></span></div><input id="alskfhasdkfjMOOOOblah" name="alskfhasdkfjMOOOOblah" style="display:none" type="text" /></div></div>
+
+    <!--Add Before Custom Scripts-->
+    <script src="/Scripts/Mdb/mdb.umd.min.js?v=IY6Ro83nf7iVVTTQGOH6QE51bG-xn1vKZ_aub4dHmKY1" type="text/javascript"></script>
+    <script src="/Scripts/Mdb/Plugins/inputmask.min.js?v=t7Y0ipdqglLi7oC73qMYyCr-AiIeqslLHo2FNaa9NaQ1" type="text/javascript"></script>
+    <script src="/Scripts/Mdb/Plugins/calendar.min.js?v=T7WxIgudv9vsnKadalJc3YmctnhpGFv_A88goMyEgfY1" type="text/javascript"></script>
+    <script src="/Scripts/Bsa/Refresh/Bsa.Reporting.js?v=aBJ73OWc5wddEWaLhxI87pBviek_PcOSChSC_iRn7GA1" type="text/javascript"></script>
+    <script src="/Scripts/Bsa/Refresh/Bsa.Modal.js?v=7Oz7Cjw_jClXymT-wNZEuohlloW_qRivFez9ZsLXulk1" type="text/javascript"></script>
+    <script src="/Scripts/Bsa/Refresh/Bsa.Mdb.js?v=_lC_60QfSJfzeevBFo3suYrbRcv5RSHGhZSomy0MSOk1" type="text/javascript"></script>
+
+    
+    <script src="/Scripts/Bsa.jquery.js?v=uyYzSjz8jkRSM4X0uSuDjjYB5XMLQOUwT6soQXHLl-w1" type="text/javascript"></script>
+    <script src="/Scripts/Bsa.js?v=pfmdBvE-jcej_43RnxTAbA-M1gkyhNDxSBU-RiuqzPw1" type="text/javascript"></script>
+    
+    <script type="text/javascript">
+
+        $.validator.methods.number = function (value, element) {
+            if (value.length <= 0 || value == '.')
+                return true;
+
+            return !isNaN(parseFloat(value)) && isFinite(value);
+        }
+
+        $.validator.methods.range = function (value, element, param) {
+            if (value.length <= 0 || value == '.')
+                return true;
+
+            return value >= param[0] && value <= param[1];
+        }
+    </script>
+    <script type="text/javascript">
+        //Store the client timezone in a cookie, so we can grab it on the server
+        setTimezoneCookie();
+    </script>
+    <script src="/Scripts/Bsa/CustomTextProvider.js?v=ULcKJRa4Wi600LcCXabr2Wz6fDaa8fBOtTmQSp7uV341" type="text/javascript"></script>
+    <script src="/Scripts/Tools/Bsa.Global.JQueryExtensions.js?v=8fk40NY5-5QQDoGlHABPESQ4kT8ZurkxYnGlB0ZqtFA1"></script>
+    
+    <script src="/Scripts/Bsa/Bsa.Global.Captcha.js?v=HMkdh3u0U_aT8Awt4Wnq49hvsNB4-1Kw6Ta6U_cdyaw1" type="text/javascript"></script>
+    <script src="/Scripts/Payment/Bsa.Global.StripeAppearance.js?v=145-7GBwkb7GfjmMZOKF23533EiIV36wKcW9nbbDihU1" type="text/javascript"></script>
+    
+    <script src="/Scripts/Cart/Bsa.Global.Cart.js?v=pU-Kbelo7arPW0TEhZPtktG7JmsBHJqQXXThoXFgLIQ1" type="text/javascript"></script>
+    
+    <script src="/Scripts/Cart/Bsa.Global.CartPinPrompt.js?v=eyadEjINgKWGjOYAQsUk5QbgTihATlX-pwd19hsHME41" type="text/javascript"></script>
+    <script src="https://status.bsaonline.com/embed/script.js"></script>
+     
+     <script> (function () { var s = document.createElement('script'); var h = document.querySelector('head') || document.body; s.src = 'https://acsbapp.com/apps/app/dist/js/app.js'; s.async = true; s.onload = function () { acsbJS.init(); }; h.appendChild(s); })(); </script>
+     
+    <script type="text/javascript">
+        customHtml = `<iframe title="Polimorphic Chat" aria-label="Polimorphic Chat" frameborder="0" id="chatFrame" data-poli-chat allow="geolocation" src="https://app.polimorphic.com/organizations/usa.bsa_online/chat" style="
+    position: fixed;
+    bottom: 90px;
+    right: 20px;
+    z-index: 10000000;
+    border-radius: 23px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+    height: 0;
+    width: 0;
+"></iframe>
+<div id="greetingText" data-poli-chat style="color: #FFFFFF; font-family: Open Sans; position: fixed; bottom: 90px; right: 20px;; z-index: 1000000; border-radius: 23px; box-shadow: rgba(0, 0, 0, 0.1) 0px 4px 24px; visibility: visible; background: #203143; border: 2px solid #FFFFFF; padding: 10px; cursor: pointer;" onclick="this.style.visibility='hidden';document.getElementById('chatButton').click()">How can I help you today?</div>
+<button onclick="const frame = document.getElementById('chatFrame');
+const chatButton = document.getElementById('chatButton');
+const chatIcon = document.getElementById('chatIcon');
+const closeIcon = document.getElementById('closeIcon');
+const greetingText = document.getElementById('greetingText');
+var isMobile = window.matchMedia('(max-width: 768px)').matches;
+if (chatButton.getAttribute('active') === 'false') {
+  chatButton.setAttribute('active', 'true');
+  frame.setAttribute('data-open', 'true');
+  frame.contentWindow.postMessage({ type: 'poli-chat-open' }, '*');
+  if (isMobile) {
+    frame.style.height = '100vh';
+    frame.style.width = '100vw';
+    frame.style.top = '0';
+    frame.style.bottom = '';
+    frame.style.right = '0';
+    frame.style.left = '0';
+    frame.style.borderRadius = '0';
+    frame.style.boxShadow = 'none';
+    chatButton.style.display = 'none';
+  } else {
+    frame.style.height = 'min(-100px + 100vh, 390px)';
+    frame.style.width = 'min(100vw - 40px, 480px)';
+    chatIcon.style.display = 'none';
+    closeIcon.style.display = 'flex';
+  }
+  frame.focus();
+  if (greetingText) {
+    greetingText.style.visibility = 'hidden';
+  }
+} else {
+  chatButton.setAttribute('active', 'false');
+  frame.removeAttribute('data-open');
+  frame.style.height = '0';
+  frame.style.width = '0';
+  frame.style.top = '';
+  frame.style.bottom = '90px';
+  frame.style.right = '20px';
+  frame.style.left = '';
+  frame.style.borderRadius = '23px';
+  frame.style.boxShadow = '';
+  chatIcon.style.display = 'flex';
+  closeIcon.style.display = 'none';
+  if (isMobile) {
+    chatButton.style.display = 'flex';
+  }
+}" id="chatButton" data-poli-chat class="poli-chat-embed-element" active="false" style="position: fixed; bottom: 20px; right: 20px;; z-index: 2147483647; background-color: transparent; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.2s; transform: scale(1); pointer-events: auto; opacity: 1;" onmouseover="this.style.transform='scale(1.15)'" onmouseout="this.style.transform='scale(1)'" aria-label="Toggle chat">
+    <div  id="chatIcon"  style="color: #FFFFFF;
+  background: #203143;
+  border: 2px solid #FFFFFF;
+  min-width: 56px; width: 56px; height: 56px; min-height: 56px; border-radius: 50%;
+  box-shadow: rgba(0, 0, 0, 0.1) 0px 2px 12px;
+  display: flex; justify-content: center; align-items: center;
+  "><svg style="width: 24px; height: 24px; fill: #FFFFFF; opacity: 1;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M12 2C6.477 2 2 6.477 2 12c0 1.82.487 3.53 1.338 5L2 22l5-1.338C8.47 21.513 10.18 22 12 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18c-1.657 0-3.224-.393-4.615-1.088L4.5 19.5l.588-2.885C4.393 15.224 4 13.657 4 12c0-4.418 3.582-8 8-8s8 3.582 8 8-3.582 8-8 8z"></path>
+      </svg></div>
+      <div id="closeIcon" style="color: #FFFFFF;
+  background: #203143;
+  border: 2px solid #FFFFFF;
+  min-width: 56px; width: 56px; height: 56px; min-height: 56px; border-radius: 50%;
+  box-shadow: rgba(0, 0, 0, 0.1) 0px 2px 12px;
+  display: flex; justify-content: center; align-items: center;
+   border-color: #FFFFFF; display: none;">
+      <svg style="width: 24px; height: 24px; fill: #FFFFFF;  opacity: 1;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+        <path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path>
+      </svg>
+      </div>
+    </button>`
+        function addToBody(htmlContent) {
+            const temp = document.createElement('div');
+            temp.innerHTML = htmlContent;
+            while (temp.firstChild) {
+                document.body.appendChild(temp.firstChild);
+            }
+        }
+        addToBody(customHtml);
+        function applyMobileLayout(mobile) {
+            var btn = document.getElementById('chatButton');
+            var icn = document.getElementById('chatIcon');
+            var gt = document.getElementById('greetingText');
+            if (btn) btn.style.bottom = mobile ? '10px' : '20px';
+            if (icn) {
+                if (!icn.dataset.origW) { icn.dataset.origW = icn.style.width; icn.dataset.origH = icn.style.height; icn.dataset.origMinW = icn.style.minWidth; icn.dataset.origMinH = icn.style.minHeight; }
+                icn.style.minWidth = mobile ? '40px' : icn.dataset.origMinW;
+                icn.style.width = mobile ? '40px' : icn.dataset.origW;
+                icn.style.height = mobile ? '40px' : icn.dataset.origH;
+                icn.style.minHeight = mobile ? '40px' : icn.dataset.origMinH;
+                var svgs = icn.querySelectorAll('svg');
+                for (var i = 0; i < svgs.length; i++) {
+                    if (!svgs[i].style.width.includes('%')) {
+                        if (!svgs[i].dataset.origW) { svgs[i].dataset.origW = svgs[i].style.width; svgs[i].dataset.origH = svgs[i].style.height; }
+                        svgs[i].style.width = mobile ? '20px' : svgs[i].dataset.origW;
+                        svgs[i].style.height = mobile ? '20px' : svgs[i].dataset.origH;
+                    }
+                }
+            }
+            if (gt) gt.style.bottom = mobile ? '60px' : '';
+        }
+        var mql = window.matchMedia('(max-width: 768px)');
+        if (mql.matches) applyMobileLayout(true);
+        mql.addEventListener('change', function (e) {
+            applyMobileLayout(e.matches);
+            var frame = document.getElementById('chatFrame');
+            var chatBtn = document.getElementById('chatButton');
+            var chatIcn = document.getElementById('chatIcon');
+            var closeIcn = document.getElementById('closeIcon');
+            if (chatBtn && chatBtn.getAttribute('active') === 'true') {
+                if (e.matches) {
+                    frame.style.height = '100vh'; frame.style.width = '100vw';
+                    frame.style.top = '0'; frame.style.bottom = ''; frame.style.right = '0'; frame.style.left = '0';
+                    frame.style.borderRadius = '0'; frame.style.boxShadow = 'none';
+                    chatBtn.style.display = 'none';
+                    chatIcn.style.display = 'flex'; closeIcn.style.display = 'none';
+                } else {
+                    frame.style.height = 'min(-100px + 100vh, 390px)';
+                    frame.style.width = 'min(100vw - 40px, 480px)';
+                    frame.style.top = '';
+                    frame.style.bottom = '90px';
+                    frame.style.right = '20px';
+                    frame.style.left = '';
+                    frame.style.borderRadius = '23px';
+                    frame.style.boxShadow = '';
+                    chatBtn.style.display = 'flex';
+                    chatIcn.style.display = 'none'; closeIcn.style.display = 'flex';
+                }
+            }
+        });
+        window.addEventListener('message', function (event) {
+            if (event.data && event.data.type === 'poli-chat-close') {
+                var btn = document.getElementById('chatButton');
+                if (btn && btn.getAttribute('active') === 'true') {
+                    btn.click();
+                }
+            }
+        });
+        // Close the chat when the host page is clicked outside of it.
+        document.addEventListener('click', function (event) {
+            var btn = document.getElementById('chatButton');
+            // Nothing to close: the launcher's 'active' attribute is the open/closed flag.
+            if (!btn || btn.getAttribute('active') !== 'true') return;
+            // On mobile the chat is fullscreen and the launcher is hidden, so there is no outside.
+            if (window.matchMedia('(max-width: 768px)').matches) return;
+            // Skip anything the widget owns: the launcher and the greeting bubble open the chat
+            // themselves, and their click keeps bubbling here, so closing too would undo them.
+            // Clicks inside the iframe never reach this document; the iframe only matches on its edge.
+            if (event.target.closest('[data-poli-chat]')) return;
+            // Reuse the launcher's own toggle so closing behaves exactly like the launcher X.
+            btn.click();
+        });
+    </script>
+      
+    <script src="/Scripts/Wizard/Bsa.AjaxWizard.js?v=VSgX7MQQS8x48hGtQ1lInDxAI6VxOgP8TGaeevTywy81"></script>
+    <script src="/Scripts/Bsa/Bsa.Global.js?v=BmwlNF5qBijQCBpic0e4_z2b4HfWn6TyEL-ZRZb49041" type="text/javascript"></script>
+
+    <script src="/Scripts/Search/AdvancedRecordSearch/Bsa.Global.AdvancedRecordSearchWizard.js?v=S2_PQs6Xyq2WtmFCMdyVKjuTzidkuc31vl5tjhQG0Jc1" type="text/javascript"></script>
+    <script src="/Scripts/Search/AdvancedRecordSearch/Steps/Bsa.Global.AdvancedRecordSearchMunicipalitySelectionStep.js?v=NYHcmIA3iGqeMhrvcDjMilnrzq2C-u_Uqr-WBbtilDQ1" type="text/javascript"></script>
+    <script src="/Scripts/Search/AdvancedRecordSearch/Steps/Bsa.Global.AdvancedRecordSearchSelectRecordTypeStep.js?v=lucVY3gbiAvoDMSYtlTmhxeobCwwEnUe8NsazKlTcGk1" type="text/javascript"></script>
+    <script src="/Scripts/Search/AdvancedRecordSearch/Steps/Bsa.Global.AdvancedRecordSearchFindRecordStep.js?v=HJjFNqr5gt4cAB846tRQ9ksN3vQQQjS5cl_qmk3EjNw1" type="text/javascript"></script>
+
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4bc70e2c01a94c73b74392e4234840661791215815920" integrity="sha512-L0ha0OXavK/8okipN9F8BtP84dg9DUhPERbBXzwI6dgTA55d2+yweo3pn5CSFYs45/r8md2+xvUPtTdvTNRfjA==" data-cf-beacon='{"version":"2024.11.0","token":"b9fd8c213f014b888446b628d9b8b808","spa":2}' crossorigin="anonymous"></script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a48776f688afcedc',t:'MTc5MTY1NDU5OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

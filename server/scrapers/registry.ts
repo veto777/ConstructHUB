@@ -180,3 +180,6 @@ import permitEyesAdapter from "./permiteyes";
 import sdlPortalAdapter from "./sdl-portal";
 registerAdapter(permitEyesAdapter);
 registerAdapter(sdlPortalAdapter);
+
+import bsaAdapter from "./bsa";
+registerAdapter(bsaAdapter);
