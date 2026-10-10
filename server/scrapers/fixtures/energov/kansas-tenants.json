@@ -1,0 +1,33 @@
+{
+  "Result": [
+    {
+      "TenantID": 7,
+      "TenantName": "KansasCityMOProd",
+      "FriendlyTenantName": "CompassKC - City of Kansas City, MO",
+      "IsGoogleTranslateEnabled": false,
+      "TenantUrl": "KansasCityMOProd",
+      "CountryTypeId": 1,
+      "Cultures": [
+        {
+          "TenantCultureId": 2,
+          "TenantId": 7,
+          "CultureId": 1,
+          "TenantName": "KansasCityMOProd",
+          "CultureName": "en-US",
+          "LanguageCountry": "English (United States)",
+          "IsDefault": true,
+          "IsActive": false,
+          "HeaderHtml": null,
+          "BodyHtml": null,
+          "FooterHtml": null
+        }
+      ]
+    }
+  ],
+  "Success": true,
+  "ErrorMessage": "",
+  "ValidationErrorMessage": "",
+  "ConcurrencyErrorMessage": "",
+  "StatusCode": 200,
+  "BrokenRules": []
+}

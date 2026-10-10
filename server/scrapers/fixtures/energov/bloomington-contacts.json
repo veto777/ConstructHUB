@@ -1,0 +1,28 @@
+{
+  "PageCount": 1,
+  "TotalFound": 1,
+  "CacheKey": "",
+  "Result": [
+    {
+      "ModuleId": 1,
+      "EntityId": "d4cd98c1-2bb9-4c79-93ef-48883771183b",
+      "ContactTypeId": "D6DCD76F-6CCF-45D5-B776-71DBB114B144",
+      "ContactTypeName": "Applicant",
+      "GlobalEntityName": "Granite Student Living",
+      "FirstName": "",
+      "LastName": "",
+      "IsBilling": true,
+      "IsBillingDisplayText": "Yes",
+      "Title": "",
+      "ContactStatus": "N/A",
+      "ContactId": "f57f524a-897e-4ba0-a9e4-8ec3b363883a",
+      "GlobalEntityId": "5D7E8046-03D0-41D2-A7A0-0329D863237B"
+    }
+  ],
+  "Success": true,
+  "ErrorMessage": "",
+  "ValidationErrorMessage": "",
+  "ConcurrencyErrorMessage": "",
+  "StatusCode": 200,
+  "BrokenRules": []
+}

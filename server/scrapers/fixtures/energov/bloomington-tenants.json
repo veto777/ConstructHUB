@@ -1,0 +1,33 @@
+{
+  "Result": [
+    {
+      "TenantID": 1,
+      "TenantName": "BloomingtonINProd",
+      "FriendlyTenantName": "City of Bloomington, Indiana",
+      "IsGoogleTranslateEnabled": false,
+      "TenantUrl": "BloomingtonINProd",
+      "CountryTypeId": 1,
+      "Cultures": [
+        {
+          "TenantCultureId": 1,
+          "TenantId": 1,
+          "CultureId": 1,
+          "TenantName": "BloomingtonINProd",
+          "CultureName": "en-US",
+          "LanguageCountry": "English (United States)",
+          "IsDefault": true,
+          "IsActive": false,
+          "HeaderHtml": null,
+          "BodyHtml": null,
+          "FooterHtml": null
+        }
+      ]
+    }
+  ],
+  "Success": true,
+  "ErrorMessage": "",
+  "ValidationErrorMessage": "",
+  "ConcurrencyErrorMessage": "",
+  "StatusCode": 200,
+  "BrokenRules": []
+}
