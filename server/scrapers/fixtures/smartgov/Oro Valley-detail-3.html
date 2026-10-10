@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+
+
+
+<html lang="en">
+    <head><meta charset="utf-8" /><meta name="description" content="SmartGov Public Portal by Granicus" /><meta name="author" content="Granicus" /><title>
+	Town of Oro Valley, AZ Public Portal
+</title><link href="/Styles/redmond/jquery-ui-1.9.0.custom.min.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Scripts/bootstrap/css/bootstrap.min.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/font-awesome/css/font-awesome.min.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/toastr.min.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/jquery.Jcrop.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/notifications/main.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/chosen.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/ils-daterangepicker.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/site.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/ils-custom.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/sgc-business.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/payment-vendors.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/landing-page.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/dropzone/dropzonecustom.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/StandardStyles.css?v=v2026.17" rel="stylesheet" type="text/css" />
+
+<link rel="icon" type="image/x-icon" href="/img/favicon.ico">
+<script type='text/javascript' src='/Scripts/jquery/jquery.min.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/jqueryui/jquery-ui.min.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/jquery.ba-throttle-debounce.min.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/jquery.tablesorter.min.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/FormSupport.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/ajaxupload.min.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/jquery.Jcrop.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/bootstrap/js/bootstrap.bundle.min.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/toastr.min.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/portal-scripts.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/ils.infieldlabel.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/ils-daterangepicker.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/notifications/notification.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Dialog.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/PortalAttachmentSupport.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/parcel.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/location-entry-map.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/dropzone/dropzone.min.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/landingPage.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/sgcBusinessLicense.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/ApplicationSearchHelper.js?v=v2026.17'></script>
+
+<script type='text/javascript' src='/Scripts/Shared/StringUtil.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/ErrorSupport.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/ListSupport.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/portal-map-support.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Maps/esri-map.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/AttachmentSupport.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/inputMask/jquery.inputmask.bundle.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/ils-list.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/ils-overlay.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/ils-autocomplete.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/ils-datepicker.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/Controls.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/StencilSupport.js?v=v2026.17'></script>
+
+
+<script>
+  FormSupport.applicationRoot = "";
+  FormSupport._rootImagePath = "~/img/";
+</script>
+
+<script type="text/javascript">
+    function googleTranslateElementInit() {
+        new google.translate.TranslateElement({ pageLanguage: 'en', layout: google.translate.TranslateElement.InlineLayout.HORIZONTAL }, 'google_translate_element');
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const script = document.createElement('script');
+        script.src = '//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
+        script.async = true;
+        document.head.appendChild(script);
+    });
+</script>
+
+<script type="text/javascript">
+    FormSupport.applicationRoot = "";
+    document.addEventListener(
+        "btnclick",
+        function (event) { SgSupport.handleBrButtonClick(event) },
+        false
+    );
+    document.addEventListener(
+        "datePickerChanged",
+        function (event) { SgSupport.handleDatePickerChange(event) },
+        false
+    );
+</script>
+
+<!-- Initialize the smartgov stencil components -->
+<script type='module' src='/Scripts/sgcomps/www/build/sgcomps.esm.js?v=v2026.17'></script>
+
+<script nomodule='' src='/Scripts/sgcomps/www/build/sgcomps.js?v=v2026.17'></script>
+
+
+        <script type="text/javascript" src="/Scripts/Shared/PendoHelper.js"></script>
+        
+        
+  
+<script type="text/javascript">
+  window.PortalMapDefaults = { center: [-110.966532, 32.3909], zoom: 15 };
+</script>
+<script type="importmap">
+{ "imports": { "@arcgis/core/": "https://js.arcgis.com/4.29/@arcgis/core/" } }
+</script>
+<link rel="stylesheet" href="https://js.arcgis.com/4.29/esri/themes/light/main.css" />
+<link rel="stylesheet" href="https://js.arcgis.com/calcite-components/2.8.0/calcite.css" />
+<script type="text/javascript">
+  (function () {
+    var base = "https://js.arcgis.com/4.29/";
+    window.$arcgis = {
+      import: function (paths) {
+        return Promise.all(paths.map(function (p) {
+          return import((p.indexOf("http") === 0 ? p : base + p)).then(function (m) { return (m && m.default) ? m.default : m; });
+        }));
+      }
+    };
+  })();
+</script>
+
+
+
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+    (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+          
+    ga('create', 'UA-41213900-2', 'smartgovcommunity.com');
+    ga('send', 'pageview');
+</script></head>
+    
+    <body class="site-mode st-box-unset" data-bs-spy="scroll" data-bs-target="#scroll-target" data-offset="65">
+        <div class="site-content-container">
+             
+             
+            
+
+<!-- top bar with logo -->
+<section id="top-bar-section">
+  <div class="top-bar-container new-permit-wizard st-box-unset">
+    <div class="sgc-container"> 
+      <span>
+        <a href="/Public/Home"><img src="/Public/BannerImage" alt="Permitting Home"></a>
+      </span>
+    
+        <span class="login-nav float-end">
+          
+          <a href="/Register/RegisterUser">Sign Up</a> or <a href="/Public/Account/LogIn">Log In</a>
+          
+            <div id="google_translate_element"></div>      
+                
+        </span>
+    </div> 
+  </div> 
+</section> <!-- /top-bar section -->  
+
+          
+            <section id="main-content">
+                <div class="main-content-container">
+                  <div class="sgc-container">
+                    <div class="row">
+                      <div class="col-lg-12">
+                        
+  
+
+                        <div class="site-mode-content-box new-permit-wizard">
+                          
+                              <div class="row">    
+                                  <div class="col-lg-11 min-template-controls-container">
+                                      <div class="row">
+                                          <div class="col-lg-12">
+                                              <div class="row">
+                                                  <div class="offset-lg-1 col-lg-10">              
+                                                                  
+                                                  </div>
+                                              </div>
+                                          </div>        
+                                      </div>
+                                      <div class="row">
+                                          <div class="offset-lg-1 st-w-90 m-l-xxxl">  
+                                              
+    <style>
+        div.min-template-controls-container {
+            background-color: white;
+        }
+
+        div.site-mode-content-box {
+            background-color: white !important;
+        }
+    </style>
+  <form id="_form_25578" method="post" action="/PermittingPublic/PermitLandingPagePublic">
+<input type="hidden" name="_conv" value="1" />
+      <input type="hidden" id="Id" name="Id" value="5681d2f2-2532-4fd7-91c8-b35b015525e2"/>
+      <input type="hidden" id="Applicant.Business.Id" name="Applicant.Business.Id"/>
+      <input type="hidden" id="ExpandedSections" name="ExpandedSections"/>
+      <input type="hidden" id="UpdatedSection" name="UpdatedSection"/>
+      <input type="hidden" id="ShowConfirm" name="ShowConfirm"/>
+   
+    <!-- Header section -->
+    <div class='landing-page-top-section-div'><div class='business-detail-header'></div><table data-initial-focus='true' tabindex='0' role='table' class='header-table-no-outline businessDetail business-license-left'><tr><td class='case-header-title p-b' tabindex='0' colspan='4'>Right-of-Way Construction (utility cuts, curb cuts, road widening, etc.)</td></tr><tr><td class='business-detail-primary-value' rowspan='3' style='width: 70px;'><i class='fas fa-hammer fa-2x landing-page-image-circle' style='color: #cccccc;'></i></td><td class='case-header-field-label' tabindex='0' colspan='2' style='padding-bottom: 5px'>Engineering Permits (Grading, Right-of-Way, Floodplain)</td></tr><tr><td class='case-header-field-label'>Reference Number</td><td tabindex='0' aria-label='Reference number' class='case-header-field-value'><span class=' m-r-sm'>REFERENCE-25-1900</span></td></tr><tr><td class='case-header-field-label'>Record Number</td><td class='case-header-field-value' tabindex='0' aria-label='Record number' ><span class=' m-r-sm'>2501935</span><div tabindex='0' class='case-header-status-badge end-state'>Expired: 3/23/2026</div></td></tr></table><table class='businessDetail business-license-right'><tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td tabindex='0' class='landing-page-header-fee-info'><span>Current Fees</span><br/><div class='landing-page-payment-container '><span class='unit'>$</span><span class='dollars'>0</span><span class='cents'>.00</span></div><div>Additional fees may be required</div></td></tr><tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr></table></div><div tabindex='0' class='landing-page-header-bottom-section-div'><table class='table-help'><tr><td class='info-text'>&nbsp;</tr></table></div>
+    <br />
+    <!-- Project info section -->
+    <section class='landing-page-case-child-section' id='projectsection-section' tabindex='-1'>
+<div class='section-collapsible active m-b-none' id='section_ProjectSection'
+                          role='button'
+                          aria-expanded='true'
+                          aria-controls='section_ProjectSection_panel'
+                          tabindex='0' 
+                          onkeydown='Controls.collapsibleDivOnKeyDownHandler(event, this);'
+                          onclick='Controls.collapsibleDivClickHandler(event, this); LandingPage.showNoteLinks("ProjectSection"); return false;'>
+                    <div id='section_ProjectSection_info'                              
+                         class='section-collapsible-info ' 
+                         tabindex='-1' 
+                         onkeydown='Controls.collapsibleDivOnKeyDownHandler(event, this);' 
+                         onclick='Controls.collapsibleDivClickHandler(event, this); LandingPage.showNoteLinks("ProjectSection"); return false;'>
+                      <i class='fa fa-caret-up' aria-hidden='true' ></i>
+                      <i class='fa fa-caret-down' aria-hidden='true' style='display: none;'></i>
+                      Project Information <span class='float-end section-done'>&nbsp;</span>
+                    </div>
+                 </div>
+<div id='section_ProjectSection_panel' style='display: block'>
+<div class='landing-page-section-div'>
+<p class='m-b-md'></p><div class='alerts-container landing-page-section-alert' class='hide'></div>
+<table class='case-main-section-table-left' tabindex='0' role='table'>
+                            <tr>
+                                <td class='project-section-field-label'><span class='float-start'>Location</span></td>
+                                <td class='project-section-field-label'>&nbsp;</td>
+                            </tr>
+<tr>
+                                <td class='project-section-field-value'><span class='float-start'>La Canada Drive</span></td>
+                                <td class='project-section-field-value'><span class='float-start' >Parcel</span></td>
+                            </tr>
+<tr>
+                                <td class='project-section-field-value'><span class='float-start'>Oro Valley, AZ </span></td>
+                                <td class='project-section-field-value'><span class='float-start'>
+&nbsp;
+</span></td></tr>
+<tr><td colspan='2'>
+&nbsp;
+</td></tr>
+<tr><td class='project-section-field-value' colspan='2'>
+&nbsp;</td></tr>
+</table>
+<table class='case-main-section-table-right' tabindex='0' role='table'>
+                           <tr><td colspan='2'>&nbsp;</td></tr>
+                           <tr>
+                               <td class='project-section-field-label float-start'>Created</td>
+                               <td class='project-section-field-value'>9/17/2025</td>
+                           </tr>
+<tr>
+                        <td class='project-section-field-label float-start'>Submitted</td>
+                        <td class='project-section-field-value'>9/18/2025</td>
+                    </tr>
+<tr>
+                                <td class='project-section-field-label'>Approved</td>
+                                <td class='project-section-field-value'>9/19/2025</td>
+                            </tr>
+                           <tr>
+                               <td class='project-section-field-label float-start'>Issued</td>
+                               <td class='project-section-field-value'>9/24/2025</td>
+                           </tr>
+                           <tr>
+                               <td class='project-section-field-label float-start'>Closed</td>
+                               <td class='project-section-field-value'> - -</td>
+                           </tr>
+                           <tr>
+                               <td class='project-section-field-label'>Application Expires</td>
+                               <td class='project-section-field-value'><strong>3/23/2026</strong></td></tr></table>
+</div>
+</div>
+</section>
+
+      
+    <!-- permit public notice details -->
+    
+
+    <!-- permit notes -->
+    
+
+
+    <!-- permit child requirements -->  
+    
+      
+    
+      
+    <!-- permit contacts and owners -->
+    
+
+    <!-- permit contractors -->
+    
+      
+    <!-- permit details -->
+    
+      
+    <!-- permit fixtures -->
+    
+      
+    <!-- permit valuations -->
+    
+      
+    <!-- permit submittal details -->
+    
+
+    <!-- permit parcels details -->
+    
+
+    <!-- permit conditions details -->
+    
+      
+     <!-- permit bonds details -->
+     
+      
+      <!-- permit structures details -->
+      
+
+    <!-- fee details -->
+    
+
+    <!-- inspections detail -->
+    
+   
+    <!-- permit approval steps step details  --> 
+    
+      
+     <!-- permit cycles details  --> 
+     
+      
+      <!-- permit associations steps step details  --> 
+      
+      
+  </form>
+ 
+    <script>
+        FormSupport.initalize = function () {
+            
+            LandingPage.setFocusElement('ProjectSection');
+
+        };
+
+        FormSupport.ready(function () {
+            
+            LandingPage.init('ProjectSection');
+
+            // Add onclick event handler to all page elements (except the Options menu button and menu items), so 
+            // if the options menu is displayed and user clicks anywhere else on the page,
+            // the toggleOptionsMenu function will to called to hide the menu.
+            var $btnOptions = $("#permitOptions");
+            var $ul = $btnOptions.siblings("ul").first();
+            $("body").on("click", $("*").not($ul).not($btnOptions).not("A"),
+                function (event) {
+                    if (event.target.nodeName.toUpperCase() === "A") {
+                        return;
+                    }
+
+                    if ($btnOptions.siblings().first().is(":visible") ) {
+                        LandingPage.toggleOptionsMenu(event, "permitOptions");
+                    }
+                }
+            );
+        });
+
+    </script>
+
+                                          </div> <!-- /col-lg-10 -->     
+                                      </div>  <!-- /row -->
+                                  </div> <!-- /col-lg-12 -->   
+                              </div> <!-- /row -->
+                              
+  
+<script type="text/javascript">
+(function () {
+  if (!document.querySelector("#ProjectMapV4View")) return;
+  var portalItemId = "e691172598f04ea8881cd2a4adaa45ba";
+  var portalUrl = "";
+  var applicationId = "";
+  var basemaps = [{"name":"Topographic Map","urls":["https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer"]},{"name":"Ortho 2023 Tile Cache","urls":["https://gisimage.orovalleyaz.gov/gisimage/rest/services/Imagery/2023_Ortho_Photo_Tile_Cache/ImageServer"]},{"name":"Ortho 2021","urls":["https://gisimage.orovalleyaz.gov/gisimage/rest/services/Imagery/2021_Ortho_Photo/ImageServer"]}];
+  var defaultBasemaps = [{"id":"topo-vector","name":"Topographic"},{"id":"streets-vector","name":"Streets"},{"id":"streets-navigation-vector","name":"Navigation"},{"id":"satellite","name":"Imagery"},{"id":"hybrid","name":"Imagery with Labels"},{"id":"gray-vector","name":"Light Gray"},{"id":"dark-gray-vector","name":"Dark Gray"},{"id":"terrain","name":"Terrain"},{"id":"oceans","name":"Oceans"},{"id":"national-geographic","name":"National Geographic","portalItemId":"f33a34de3a294590ab48f246e99958c9"},{"id":"osm","name":"OpenStreetMap"}];
+  var mapLayers = [{"url":"https://gismap.orovalleyaz.gov/gismap/rest/services/Landbase/SmartGOV_Parcels/MapServer","parcels":"0","parcelNumber":"PARCEL","initiallyChecked":"Y","mapLayerType":0,"id":"layer-0"}];
+  var useMapLayersOnly = false;
+  var mapProxyRules = [];
+  var esriConfig = {
+    EsriPortalItemId: portalItemId,
+    EsriPortalUrl: portalUrl || null,
+    ApplicationId: applicationId || null,
+    basemaps: basemaps,
+    defaultBasemaps: defaultBasemaps,
+    mapLayers: mapLayers,
+    useMapLayersOnly: useMapLayersOnly,
+    portalSuppressCredentials: true,
+    mapProxyRules: mapProxyRules, CenterLat: 32.3909, CenterLong: -110.966532, zoom: 15, geometryServiceUrl: "https://pimamaps.pima.gov/arcgis/rest/services/Locators/Composite_ParStr_Locator/GeocodeServer", collapseLegendOnOpen: true
+  };
+  window.ProjectMapV4Config = { esriConfig: esriConfig, containerDivSelector: "#ProjectMapV4View", showSearch: false };
+  function reinitProjectMapV4(singlePointArg) {
+    var singlePoint = (singlePointArg != null) ? singlePointArg : ((typeof window.ProjectMapV4Point !== "undefined" && window.ProjectMapV4Point) ? window.ProjectMapV4Point : null);
+    if (!document.querySelector("#ProjectMapV4View")) return;
+    if (window.projectEsriMap && typeof window.projectEsriMap.destroy === "function") {
+      window.projectEsriMap.destroy();
+      window.projectEsriMap = null;
+    }
+    var cfg = window.ProjectMapV4Config;
+    if (!cfg) return;
+    window.projectEsriMap = new EsriMap({ esriConfig: cfg.esriConfig, containerDivSelector: cfg.containerDivSelector, showSearch: cfg.showSearch, singlePoint: singlePoint });
+    window.projectEsriMap.initialize().catch(function (e) { console.error("[Portal Map V4] init failed:", e); });
+  }
+  window.reinitProjectMapV4 = reinitProjectMapV4;
+  reinitProjectMapV4();
+})();
+</script>
+
+
+                          
+                        </div>
+                      </div> <!-- /span12 -->
+                    </div> <!-- /row -->
+                  </div> <!-- /container -->          
+                </div> <!-- /main-content-container -->
+            </section>
+            
+                <footer>
+                    <div class="footer-container-rf">
+                        <div class="sgc-container">
+                            <div class="row">
+                                
+    <div class='landing-page-footer-container'><div class='row'><table class='sgc-container m-t'><tr><td class='landing-page-footer-link'><a href='/ApplicationPublic/ApplicationHome'>
+                                  <i class='fas fa-arrow-left'></i>&nbsp;<span>Return</span>
+                                  </a></td><td class='landing-page-footer-public-message'>
+<i class='fas fa-exclamation-triangle'></i>&nbsp;<span class='m-l-sm'>Public Information</span>
+</td>
+<td class='landing-page-footer-submit-button'>&nbsp;</td>
+</tr></table></div>
+
+
+                            </div> <!-- /row -->
+                        </div>
+                    </div>
+                </footer>
+            
+        </div> <!-- /site-content-container -->
+        <script type="text/javascript"> 
+        // if we are using pendo, initialize it
+        $(document).ready
+        (
+            function () {
+                  PendoHelper.init("1ecfdd71-f46c-451b-7f50-e31729715fd2", "",
+                    "", "", "", "", "SGP");
+            }
+        );
+        </script>
+    </body>
+</html>

@@ -1,6 +1,6 @@
 import * as cheerio from 'cheerio';
 import { assertPublicResponse, formValues, isoDate, portalSession } from './smartgov';
-import { parsePermitTables, publicRecordUrl } from './etrakit';
+import { parsePermitTables } from './etrakit';
 import type { AdapterCtx, PermitRecord, PermitSearchType, PortalAdapter } from './types';
 
 export function click2govUrl(input:string):string {
@@ -38,18 +38,23 @@ export function parseClick2GovDetail(html:string,ctx:AdapterCtx,url:string):Perm
   const displayedNumber=pairs['application #']||pairs['permit #'];if(!displayedNumber)return null;
   const parts=displayedNumber.match(/^(\d{2})\s*-\s*(\d+)$/);
   const number=parts?`${parts[1]}-${parts[2].padStart(8,'0')}`:displayedNumber;
+  // Public selection URLs encode the displayed record identity; the POST URL alone does not.
+  const source=new URL('selectpermit.html',url);
+  source.searchParams.set('permit.appYearAndNumber',number);source.searchParams.set('validatePermitView','true');
   const get=(k:string)=>pairs[k]||null;const money=get('valuation')?.replace(/[$,\s]/g,'');
   return {permitNumber:number,databaseId:ctx.databaseId,jurisdiction:ctx.jurisdiction,address:get('address'),parcel:get('parcel id'),
     permitType:get('application type'),description:get('work description')||get('description'),status:get('application status')||get('status'),
     issuedAt:isoDate(get('issue date')),appliedAt:isoDate(get('application date')),expiresAt:isoDate(get('expiration date')),
     ownerName:get('owner'),contractorName:get('general contractor')||get('contractor'),valuation:money&&/^\d+(\.\d+)?$/.test(money)?Number(money):null,
-    sourceUrl:publicRecordUrl(url,url),raw:{html},};
+    sourceUrl:source.href,raw:{html},};
 }
 export function parseClick2GovResults(html:string,ctx:AdapterCtx,url:string):PermitRecord[]{
   assertPublicResponse(html,url);const detail=parseClick2GovDetail(html,ctx,url);if(detail)return [detail];
-  const rows=parsePermitTables(html,ctx,url,'table');if(rows.length)return rows;
+  const rows=parsePermitTables(html,ctx,url,'table');
+  for(const row of rows)if(row.sourceUrl){const source=new URL(row.sourceUrl);source.searchParams.delete('OWASP_CSRFTOKEN');row.sourceUrl=source.href;}
+  if(rows.length)return rows;
   const $=cheerio.load(html);$('script,style').remove();
-  if(/no matching records|no records (to display|found)|search returned no results|no data available in table|no permits found/i.test($.text()))return [];
+  if(/no matching records|no records (to display|found)|search returned no results|no data available in table|no permits found|no results returned/i.test($.text()))return [];
   throw new Error('Unrecognized Click2Gov results or validation failure');
 }
 async function run(ctx:AdapterCtx,q:{type:PermitSearchType;value:string},wantDetail=false):Promise<PermitRecord[]>{
@@ -59,14 +64,15 @@ async function run(ctx:AdapterCtx,q:{type:PermitSearchType;value:string},wantDet
   const form=click2govSearchForm(page.html,q.type,q.value);const action=new URL(form.action,page.url);
   if(action.origin!==new URL(page.url).origin)throw new Error('Click2Gov search form left the tenant');
   page=await request(action.href,form.body);const records=parseClick2GovResults(page.html,ctx,page.url);
-  $=cheerio.load(page.html);
   if(/serverSide\s*:\s*true|bServerSide\s*:\s*true/i.test(page.html))throw new Error('Click2Gov server-side pagination not supported; refusing incomplete results');
   if(wantDetail && records.length){
-    const exact=records.find(r=>r.permitNumber===q.value);if(!exact)return [];
+    const parts=q.value.match(/^(\d{2})-(\d+)$/)!;
+    const number=`${parts[1]}-${parts[2].padStart(8,'0')}`;
+    const exact=records.find(r=>r.permitNumber===number);if(!exact)throw new Error('Click2Gov returned a different permit');
     if(!exact.sourceUrl)throw new Error('Click2Gov detail link unavailable');
     if(!parseClick2GovDetail(page.html,ctx,page.url)){
       page=await request(exact.sourceUrl);const detail=parseClick2GovDetail(page.html,ctx,page.url);
-      if(!detail||detail.permitNumber!==q.value)throw new Error('Click2Gov detail page did not match requested permit');return [detail];
+      if(!detail||detail.permitNumber!==number)throw new Error('Click2Gov detail page did not match requested permit');return [detail];
     }
   }
   return records;

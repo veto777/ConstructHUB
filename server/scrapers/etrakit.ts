@@ -46,7 +46,13 @@ export function parsePermitTables(html: string, ctx: AdapterCtx, url: string, se
       });
     });
   });
-  return [...new Map(out.map(r=>[r.permitNumber,r])).values()];
+  const unique=new Map<string,PermitRecord>();
+  for(const row of out){
+    const prior=unique.get(row.permitNumber);
+    if(!prior)unique.set(row.permitNumber,row);
+    else prior.raw={...prior.raw,additionalRows:[...((prior.raw?.additionalRows as unknown[])??[]),row.raw]};
+  }
+  return [...unique.values()];
 }
 export function parseETRAKiTResults(html: string, ctx: AdapterCtx, url: string): PermitRecord[] {
   const rows = parsePermitTables(html,ctx,url,"table[id*='rgSearchRslts'],table[id*='SearchResults'],table[id*='dgResults']");

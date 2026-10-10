@@ -10,7 +10,7 @@ export function assertPublicResponse(html: string, url: string): void {
   if (/verify (you are|that you are) human|access denied|just a moment|captcha|request (has been )?blocked|incapsula incident/i.test(text)) {
     throw new PortalBlockedError(url, 403, `Public portal challenge at ${url}`);
   }
-  if (/runtime error|server error in|an error (has )?occurred|service unavailable/i.test(text)) throw new Error(`Portal error at ${url}`);
+  if (/runtime error|server error in|an error (has )?occurred|error occurred|encountered an error|service unavailable/i.test(text)) throw new Error(`Portal error at ${url}`);
 }
 
 /** Isolated cookie session, manual redirects retain cookies and rate-limit each hop. */
@@ -90,7 +90,7 @@ export function parseSmartGovResults(html: string, ctx: AdapterCtx, url: string)
     records.push({ permitNumber, jurisdiction: ctx.jurisdiction, databaseId: ctx.databaseId,
       address, permitType: type, status, description: null,
       // The displayed date belongs to the current status, not necessarily issuance.
-      issuedAt: status && /\bissued\b/i.test(status) && !/not issued/i.test(status) ? isoDate(statusDate) : null,
+      issuedAt: status && /^(?:Step\s+\d+\s+of\s+\d+:\s*)?issued\b/i.test(status) ? isoDate(statusDate) : null,
       appliedAt: null, contractorName: null, applicantName: null,
       sourceUrl: action ? new URL(`${form}/${action}`,url).href : null,
       raw: { html: $.html(e) },
@@ -98,6 +98,29 @@ export function parseSmartGovResults(html: string, ctx: AdapterCtx, url: string)
   });
   if (!records.length && !/No results found/i.test($('.alert-info').text())) throw new Error('Unrecognized SmartGov result page');
   return records;
+}
+
+export function parseSmartGovDetail(html: string, ctx: AdapterCtx, url: string): PermitRecord {
+  assertPublicResponse(html,url);
+  const $=cheerio.load(html);
+  const header=$('[aria-label="Record number"]');
+  const permitNumber=header.children('span').first().text().trim();
+  if(!permitNumber)throw new Error('Unrecognized SmartGov permit detail');
+  const fields:Record<string,string>={};
+  $('.case-main-section-table-right tr').each((_i,e)=>{const cells=$(e).children('td');if(cells.length===2)fields[cells.eq(0).text().trim()]=cells.eq(1).text().trim()});
+  const contacts:Record<string,string>={};
+  $('.contacts-section-row').each((_i,e)=>{const row=$(e);const name=row.find('.contact-name').text().trim();const role=row.find('.contact-role').text().trim();if(name&&role)contacts[role]=name});
+  const contact=(pattern:RegExp)=>Object.entries(contacts).find(([role])=>pattern.test(role))?.[1]??null;
+  const address=$('.case-main-section-table-left tr').slice(1,3).map((_i,e)=>$(e).children('td').first().text().trim()).get().filter(Boolean).join(', ')||null;
+  const badge=header.find('.case-header-status-badge').text().trim();
+  return {permitNumber,databaseId:ctx.databaseId,jurisdiction:ctx.jurisdiction,address,
+    parcel:$('.case-main-section-table-left a[aria-label^="parcel "]').first().text().trim()||null,
+    permitType:$('.case-header-title').first().text().trim()||null,
+    status:badge.replace(/:\s*\d{1,2}\/\d{1,2}\/\d{4}$/, '')||null,
+    issuedAt:isoDate(fields.Issued),appliedAt:isoDate(fields.Submitted),expiresAt:isoDate(fields['Application Expires']),
+    contractorName:contact(/^(primary |general )?contractor$/i),applicantName:contact(/^(applicant|submitter of the application)$/i),ownerName:contact(/^owner( of record)?$/i),
+    sourceUrl:url,raw:{html},
+  };
 }
 
 export function smartgovSearchBody(html: string, fields: Record<string,string>): URLSearchParams {
@@ -117,6 +140,8 @@ async function run(ctx: AdapterCtx, fields: Record<string,string>, advanced: boo
   const endpoint = new URL(`${action}/Search`,base).href;
   const body = smartgovSearchBody(page.html,fields);
   page = await request(endpoint,body);
+  const totalText=cheerio.load(page.html)('#search-results .muted').first().text();
+  const expected=Number(totalText.match(/([\d,]+)\s+results/i)?.[1]?.replace(/,/g,'')??0);
   const out: PermitRecord[] = []; const seen = new Set<string>();
   for (let index = 0; index < 1000; index++) {
     const records = parseSmartGovResults(page.html,ctx,endpoint);
@@ -124,7 +149,10 @@ async function run(ctx: AdapterCtx, fields: Record<string,string>, advanced: boo
     for (const r of records) if (!seen.has(r.permitNumber)) {seen.add(r.permitNumber);out.push(r);}
     const dom = cheerio.load(page.html);
     const pages = dom('[onclick*="gotoPage"]').map((_i,e) => Number(dom(e).attr('onclick')?.match(/gotoPage\(\s*(\d+)/)?.[1])).get();
-    if (!pages.some(n => n > index)) return out;
+    if (!pages.some(n => n > index)) {
+      if(expected && out.length<expected)throw new Error('SmartGov pagination ended before the reported result count');
+      return out;
+    }
     const next = new URLSearchParams(body); next.set('_applicationSearchPage',String(index+1));
     page = await request(new URL(`${action}/SearchPage`,base).href,next);
   }
@@ -134,16 +162,22 @@ async function run(ctx: AdapterCtx, fields: Record<string,string>, advanced: boo
 const adapter: PortalAdapter = {
   platform: 'SmartGov',
   aliases: ["SmartGov (Granicus)", "SmartGov (Planning & Development portal)", "SmartGov (via city redirect)", "SmartGov Citizen Portal", "SmartGov Community Portal", "SmartGov Community portal", "SmartGov Online Permit Center", "SmartGov Online Permit Portal", "SmartGov Online Permitting", "SmartGov Online Permitting and Inspection Portal", "SmartGov Online Portal", "SmartGov Permit & Development Portal", "SmartGov Permit Center", "SmartGov Permit Management & Tracking", "SmartGov Permit Portal", "SmartGov Permitting & Licensing Portal", "SmartGov Public Permit Portal", "SmartGov Public Portal", "SmartGov Public Portal (Granicus)", "SmartGov Public Portal (via county permitting link)", "SmartGov building permits online", "SmartGov citizen portal", "SmartGov community portal", "SmartGov customer portal", "SmartGov electronic permit/application system", "SmartGov permit portal", "SmartGov portal", "SmartGov public portal"],
-  capabilities: { search: ['address','permit','name','company','keyword'], listRecent: true, detail: false },
+  capabilities: { search: ['address','permit','name','company'], listRecent: true, detail: true },
   async search(ctx,q) {
     if (!q.value?.trim()) throw new Error('Search value is required');
     const fields: Record<string,string> = { address: 'SiteAddress.Street1', permit:'CaseNumber', name:'PrimaryContact.Contact.DisplayName', company:'PrimaryContractor.Contact.DisplayName' };
-    if (q.type === 'keyword') {
-      if (q.value.trim().length < 2) throw new Error('SmartGov requires at least two characters');
-      return run(ctx,{query:q.value},false);
-    }
     if (!fields[q.type]) throw new Error(`Unsupported SmartGov search: ${q.type}`);
     return run(ctx,{Module:'Permitting',[fields[q.type]]:q.value},true);
+  },
+  async detail(ctx,permitNumber) {
+    const rows=await run(ctx,{Module:'Permitting',CaseNumber:permitNumber},true);
+    const match=rows.find(r=>r.permitNumber.toLowerCase()===permitNumber.toLowerCase());
+    if(!match)return null;
+    if(!match.sourceUrl)throw new Error('SmartGov detail link unavailable');
+    const page=await portalSession(ctx)(match.sourceUrl);
+    const detail=parseSmartGovDetail(page.html,ctx,page.url);
+    if(detail.permitNumber.toLowerCase()!==permitNumber.toLowerCase())throw new Error('SmartGov detail did not match requested permit');
+    return detail;
   },
   async listRecent(ctx,since) { return run(ctx,{Module:'Permitting',IssuedOn:`${usDate(since)} To ${usDate(new Date().toISOString())}`},true); },
 };
