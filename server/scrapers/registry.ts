@@ -162,3 +162,6 @@ registerAdapter(civicgovAdapter);
 
 import iworqAdapter from "./iworq";
 registerAdapter(iworqAdapter);
+
+import opengov from "./opengov";
+registerAdapter(opengov);
