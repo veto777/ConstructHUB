@@ -1,0 +1,2019 @@
+<!DOCTYPE html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<html lang="en">
+   <head>
+      <title>City of Tamarac Building Permits</title>
+      
+
+
+
+<meta charset="utf-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="format-detection" content="telephone=no"/>
+<meta name="author" content="Citizen Engagement Portal, CentralSquare" />
+<meta name="copyright" content="1999 - 2017 Citizen Engagement Portal, CentralSquare" />
+<link rel="shortcut icon" href="user_files/favicon.ico?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y" />
+
+
+<link rel="stylesheet" media="all" href="style/jquery/jquery-ui.min.css?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y" />
+<link rel="stylesheet" media="all" href="style/jquery/jquery.alerts.css?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y" />
+<link rel="stylesheet" media="all" href="style/bootstrap/glyphicons.css?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y" />
+<link rel="stylesheet" media="all" href="style/bootstrap/glyphicons-social.css?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y" />
+
+<link rel="stylesheet" media="all" href="style/bootstrap.min.css?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y" />
+<link rel="stylesheet" media="all" href="style/datatables.min.css?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y" />
+<link rel="stylesheet" media="all" href="style/pikaday.css?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y" />
+
+<link rel="stylesheet" media="all" href="style/egov.css?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y" />
+<link rel="stylesheet" media="all" href="style/egov.theme.css?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y" />
+
+<link rel="stylesheet" media="all" href="style/app.css?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y" />
+<link rel="stylesheet" media="all" href="user_files/style-user.theme.css?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y" />
+<link rel="stylesheet" media="all" href="user_files/style-userV3.css?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y" />
+<link rel="stylesheet" media="print" href="style/printV2.css?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y" />
+<link rel="stylesheet" media="print" href="user_files/style-user-printV3.css?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y" />
+
+
+
+<!--[if lt IE 9]>
+   <link rel="stylesheet" media="all" href="style/ie.css" />
+<![endif]-->
+<noscript>
+   <meta http-equiv="Refresh" content="0;url=environmentWarning.jsp" />
+</noscript>
+<!--[if lt IE 9]>
+   <script type="text/javascript" src="/Click2GovBP/scripts/html5shiv.min.js"></script>
+   <script type="text/javascript" src="/Click2GovBP/scripts/respond.min.js"></script>
+<![endif]-->
+
+<script src="https://apis.google.com/js/platform.js?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y" async defer></script>
+<meta name="google-signin-client_id" content=".apps.googleusercontent.com">
+
+   </head>
+   <body>
+      
+
+
+
+
+
+
+<script type="text/javascript" src="scripts/jquery/jquery.min.js?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y"></script>
+<script type="text/javascript">
+   var jq = jQuery.noConflict();
+</script>
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+	
+
+  <div id="editPage"></div>
+  <div id="page" class="container">
+    <a id="skipNav" class="skip-main noowasp" href="#menu?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y">
+      
+
+
+
+
+
+
+
+
+
+   
+   
+      
+      
+      <!-- only in edit mode if there is no body replacement text -->
+      
+   
+
+
+<span id="" class=" "  >Skip to main navigation</span>
+    </a>
+    <a id="skipCon" class="skip-main noowasp" href="#content?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y">
+      
+
+
+
+
+
+
+
+
+
+   
+   
+      
+      
+      <!-- only in edit mode if there is no body replacement text -->
+      
+   
+
+
+<span id="" class=" "  >Skip to main content</span>
+    </a>
+    <div class="row" role="banner">
+      <div class="navbar fixed-top navbar-dark d-flex d-md-none">
+   <button class="navbar-toggler" type="button" data-toggle="offcanvas">
+      <span class="sr-only">Toggle application navigation</span>
+      <span class="navbar-toggler-icon"></span>
+   </button>
+   <span class="navbar-brand">
+      Building Permits
+   </span>
+</div>
+<div id="banner" class="col-12 d-none d-md-block">
+   <a href="https://tamarac.gov?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y" target="_blank" class="c2gHotspot"></a>
+
+   <div id="accessibility-header" class="is-hidden banner-link">
+      
+
+
+
+
+
+
+
+
+
+   
+   
+      
+      
+      <!-- only in edit mode if there is no body replacement text -->
+      
+   
+
+
+<span id="" class=" "  >Building Permits</span>
+   </div>
+   
+      <div id="c2g-navbar" class="banner-link d-none d-md-block">
+         <!-- TODOQPSF - add active class when on associated page -->
+
+
+   
+      
+      
+      
+   
+   
+          
+   
+      
+
+
+
+
+
+
+
+
+
+
+
+
+
+   
+
+
+
+
+
+   
+      
+   
+   
+
+
+      <a style='width:auto;' class='noanimate' href="index.html?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y"><i class="glyphicons glyphicons-home"></i>&nbsp;
+
+
+
+
+
+
+
+
+
+   
+   
+      
+      
+      <!-- only in edit mode if there is no body replacement text -->
+      
+   
+
+
+<span id="" class=" "  >Home</span></a>
+   
+
+   
+   
+   
+          
+   
+      
+
+
+
+
+
+
+
+
+
+
+
+
+
+   
+
+
+
+
+
+   
+      
+   
+   
+
+
+      <a style='width:auto;' class='noanimate' href="accessibility.html?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y"><i class="glyphicons glyphicons-person-wheelchair"></i>&nbsp;
+
+
+
+
+
+
+
+
+
+   
+   
+      
+      
+      <!-- only in edit mode if there is no body replacement text -->
+      
+   
+
+
+<span id="" class=" "  >Accessibility</span></a>
+   
+   
+      <a style='width:auto;' class='noanimate' href="https://www.tamarac.gov/Contact?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y"><i class="glyphicons glyphicons-envelope"></i>&nbsp;
+
+
+
+
+
+
+
+
+
+   
+   
+      
+      
+      <!-- only in edit mode if there is no body replacement text -->
+      
+   
+
+
+<span id="" class=" "  >Contact Us</span></a>
+   
+   
+   
+      
+         
+	         
+
+
+
+
+
+
+
+
+
+
+
+
+
+   
+
+
+
+   
+
+   
+      
+      
+   
+
+   
+
+   
+
+
+
+   
+      
+   
+   
+
+
+	         <a style='width:auto;' class='noanimate' href="newuser.html?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y&viewNewUser=true" title="Create New User"><i class="glyphicons glyphicons-user"></i>&nbsp;
+
+
+
+
+
+
+
+
+
+   
+   
+      
+      
+      <!-- only in edit mode if there is no body replacement text -->
+      
+   
+
+
+<span id="" class=" "  ></span></a>
+	         
+
+
+
+
+
+
+
+
+
+
+
+
+
+   
+
+
+
+
+
+   
+      
+   
+   
+
+
+	         <a style='width:auto;' class='noanimate' href="logonuser.html?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y"><i class="glyphicons glyphicons-log-in"></i>&nbsp;
+
+
+
+
+
+
+
+
+
+   
+   
+      
+      
+      <!-- only in edit mode if there is no body replacement text -->
+      
+   
+
+
+<span id="" class=" "  ></span></a>
+         
+      
+      
+   
+
+      </div>
+   
+</div>
+    </div>
+    
+      
+   
+
+
+<script type="text/javascript">
+   var specialCharsAllowed       = "special characters";  //List of special chars will be in first element
+   
+//<![CDATA[
+   //validator
+   var errMessage                = 'The following issues must be addressed before this form can be submitted:';
+   var errMessageAccess          = 'Please correct the below errors on this page:';
+   var errMsgNotEmpty            = 'Must not be empty.';
+   var errRadioNotEmpty          = 'Radio must be selected.';
+   var errCheckboxNotEmpty       = 'The checkbox is required.';
+   var errMsgAlphaOnly           = 'Must contain only alphabetic characters.';
+   var errMsgAlphaSpace          = 'Must contain only alphabetic characters.';
+   var errMsgAlphaNumOnly        = 'Must contain only alphanumeric characters.';
+   var errMsgNumericOnly         = 'Must contain only numeric characters.';
+   var errMsgFloatOnly           = 'Must contain a valid monetary amount.';
+   var errMsgValidCCNum          = 'Contains an invalid credit card number.';
+   var errMsgValidRoutingNum     = 'Contains an invalid routing number.';
+   var errMsgValidEmail          = 'Contains an invalid eMail address.';
+   var errMsgValidUrl            = 'Contains an invalid URL.';
+   var errMsgMaxLength           = 'Must contain more than {0} characters.';
+   var errMsgMinLength           = 'Must contain at least {0} characters.';
+   var errMsgMaxValue            = 'Must be less than or equal to {0}.';
+   var errMsgMinValue            = 'Must be greater than or equal to {0}.';
+   var errMsgNumBetween          = 'Must contain a numeric value between {0} and {1}.';
+   var errMsgMatch               = 'Values must match.';
+   var errMsgValidZip            = 'Contains an invalid Zip Code.';
+   var errMsgAlphaPlus           = 'Must contain only letters and these characters (comma, space, period, single quotes, dash).';
+   var errMsgAlphaNumericPlus    = 'Must contain only letters, numbers and these characters (comma, space, period, single quotes, dash).';
+   var errMsgCCExpired           = 'Contains an invalid date.';
+   var errMsgCCInvalid           = 'Contains an invalid card number.';
+   var errMsgCurrency            = 'Must contain a valid currency amount.';
+   var errMsgNoNumber            = 'Must contain a number.';
+   var errMsgNoLetter            = 'Must contain a letter.';
+   var errMsgNoLowercase         = 'Must contain a lowercase letter.';
+   var errMsgNoUppercase         = 'Must contain an uppercase letter.';
+   var errMsgNoSpecialChar       = 'Must contain one from: special characters';
+   var errMsgPasswordInvalid     = 'May only contain letters, numbers, or special characters';
+   var errMsgEmailInvalid        = 'Invalid Email';
+   var errMsgDateInvalid         = 'Contains an invalid date.';
+   var errMsgTimeInvalid         = 'Contains an invalid time.';
+   var errMsgMaxDecimalLength    = 'Must not contain more than {0} decimal places.';
+   var errCancelNoItems          = 'You have not selected an item to cancel.';
+   var errCancelConfirm          = 'Are you sure you wish to cancel the selected item(s)?';
+   var errNoCheckboxes           = 'A checkbox must be selected.';
+   var errNoRadios               = 'A radio must be selected.';
+   
+   //additional messages
+   var errMsgFees                = 'You must select at least one fee to pay!';
+   var errDeleteConfirm          = 'Are you sure you wish to delete the selected item(s)?';
+   var errDeleteNoItems          = 'You have not selected an item to delete.';
+   var errDeleteAutoPay          = 'Unable to delete. An account selected has Autopay enabled, please remove Autopay before deleting.';
+   var errRemoveNoItems          = 'You have not selected any twitter account to remove.';
+   var errRemoveConfirm          = 'Are you sure you wish to remove the selected twitter account(s)?';
+   var errDateRangeInValid       = 'The {0} is in future compared to {1}.';
+   var errTimeRangeInValid       = 'The {0} is in future compared to {1}.';
+   
+   var errMsgLogonReq            = 'You must logon before proceeding.';
+   var errMsgCheckBoxNotSelected = 'You must select agree to continue';
+   var errMsgNotContractor       = 'There are no contractors associated with this account.';
+   
+   //Error message console
+   
+   var errMsgGrooup1             = 'Please select at least one field from Group One ( Employee number/ SSN/ SSN last four/ Hire date)';
+   var errMsgGrooup2             = 'Please select at least one field from Group Two ( Employee name/ Gross pay/ Last check date/ Last check number/ Net pay)';
+   var errMsgGrooupSSN           = 'Among SSN last four and SSN, only one has to be selected';
+   var errMsgEmpSSN              = 'Employee no must have to be selected for Including SSN last four';
+   
+   //Accessibility
+   var jsAccessOff              = '???userauth.menu_btns.accessibility_off???';
+   var jsAccessOn               = '???userauth.menu_btns.accessibility_on???';
+   var jsAccessButton           = 'Continue (opens new tab)';
+   
+   //Misc text
+   var jsDeleteConfirmTitle     = 'Confirm Delete';
+   var jsDeleteConfirmText      = 'Are you sure you wish to delete the item(s) selected.';
+//]]>
+   
+</script>
+
+
+<script src="https://apis.google.com/js/platform.js?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y"></script>
+
+<script type="text/javascript">
+	var showRowCnt = true;
+		
+</script>
+
+<script type='text/javascript' src="scripts/bootstrap.bundle.min.js?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y"></script>
+<script type="text/javascript" src="scripts/moment.min.js?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y"></script>
+<script type="text/javascript" src="scripts/pikaday.js?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y"></script>
+<script type="text/javascript" src="scripts/pikaday.jquery.js?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y"></script>
+
+<script type="text/javascript" src="scripts/jquery/jquery-ui.min.js?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y"></script>
+<script type="text/javascript" src="scripts/jquery/jquery.alerts.js?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y"></script>
+
+<script type='text/javascript' src="scripts/datatables.min.js?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y"></script>
+
+<script type="text/javascript" src="scripts/jquery/jquery.maskedinput-1.4.1.min.js?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y"></script>
+<script type='text/javascript' src="scripts/validator.js?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y"></script>
+
+<script type='text/javascript' src="scripts/validator.extend.js?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y"></script>
+<script type="text/javascript" src="scripts/util.js?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y"></script>
+<script type="text/javascript" src="scripts/jqueryUtils.js?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y"></script>
+<script type="text/javascript" src="scripts/cookieUtils.js?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y"></script>
+<script type="text/javascript" src="scripts/Chart.min.js?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y"></script>
+
+
+
+
+
+
+<script type="text/javascript">
+
+jq(function()
+{
+   //if cookie exists, toggle on.  if not, toggle off.
+   //toggleAccessibility(GetCookie('c2gAccessibility'));
+});
+
+function toggleAccessibility(pToggle)
+{
+   //test to turn on or off, look for hide in skip link
+   if (pToggle || false)
+   {
+      //turn on accessibility skip links
+      jq("#skipNav,#skipCon").removeClass("is-hidden");
+      if(jq("#application_content").length > 0)
+      {
+         //remove application skip link for this page
+         jq("#skipApp").removeClass("is-hidden");
+      }
+   }  
+   else
+   {
+      //add focus to first form element 
+      setFirstFocus();
+   }
+};
+
+
+//sets focus onto first input found. can put nofocus attribute on the form to prevent focus
+//being set on any input.
+function setFirstFocus()
+{
+   if((document.forms != null) && !jPopupShown) 
+   {
+      var lFocusSet = false;
+      
+      for(var i = 0;i < document.forms.length; i++)
+      {
+         if(document.forms[i].attributes.nofocus == null && document.forms[i].elements != null)
+         {
+            for(var j = 0;j < document.forms[i].elements.length; j++)
+            {
+               var lFormField = document.forms[i].elements[j];
+
+               if((lFormField.type != null) && !lFormField.disabled && 
+                  (lFormField.style.visibility != "hidden") &&
+                  (typeof(lFormField.focus) != "undefined") &&
+                  ((lFormField.type == "text") || (lFormField.type.indexOf("select") >= 0) ||
+                  (lFormField.type == "textarea") || (lFormField.type == "password") || 
+                  (lFormField.type == "radio") || (lFormField.type == "checkbox") || 
+                  (lFormField.type == "file") || (lFormField.type == "email")))
+               {
+                  lFormField.focus();
+                  lFocusSet = true;
+                  break;
+               }
+            }
+         }
+         if(lFocusSet)
+         {
+            break;
+         }
+      }
+   }
+};
+
+</script>
+
+
+<script type="text/javascript">
+
+
+
+</script>
+
+
+
+
+
+
+
+
+
+
+
+   <script>
+      var b = "-----BEGIN PUBLIC KEY-----MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAr9kJwcCm7zRDyUyAtHNrFj+9X8CoARRQc0GD6FEMCBYXzKiYa3kR+e11TwVzCtiA+yAR1fsXoVKEAPyy3ZBne7Gs+8Ju3aIS+iXM75ELYlOvd9sUqsMHLdNbBxL/JcVlZIoDVQy50PmfcjfN2+aUDZGKStyqLdX8+4r0PktShzviZ6SPAFHmsMY0isLLnJ+XxcdtY9rPAYD1WmyX+BMpFSgycABmxVS0s2rbm5m1JQnIcZ9d+XuMYB72ndyNX9n/WQK+xyUAklz7ETkdnoDl1mbhBIQ24JJa5Og06gyEMkqhu/wJYEc/UbU0efCeJnwJnvolmB7zj2s8mWpxvxTl8wIDAQAB-----END PUBLIC KEY-----";
+      var c = "RSA-OAEP";
+   </script>
+   <script type="text/javascript" src="scripts/util2.js?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y"></script>
+
+
+<script>
+   //In case the browser doesn't support includes on arrays
+   if(!Array.prototype.includes)
+   {
+      Array.prototype.includes = function(pSearch)
+      {
+         var lFound = false;            
+         for(var i = 0;i < this.length; i++)
+         {
+            if(this[i].indexOf(pSearch) >= 0)
+            {
+               lFound = true;
+               break;
+            }               
+         }            
+         return lFound;
+      }
+   }      
+
+	//Copied from validator script file. Call function with jquery input field object(s) that is
+	//associated with inline validation and it will clear the errors.
+	function clearErrors($el)
+	{
+	   var $group = $el.closest('.validator-group')
+	   var $block = $group.find('.help-block.with-errors')
+	   var $feedback = $group.find('.form-control-feedback')
+	
+      $el.data("bs.validator.errors","");
+	   $block.html($block.data('bs.validator.originalContent'))
+	   $group.removeClass('has-error')
+	   if (!$block.hasClass('is-hidden'))
+	   {
+	      $block.addClass('is-hidden')
+	   }
+	
+	   $feedback.length
+	     && $feedback.removeClass('glyphicon-remove')
+	     && $feedback.addClass('glyphicon-ok')
+	     && $group.addClass('has-success')
+	}           
+	      
+   function automaticLogin()
+   {
+      
+   }
+    	
+</script>
+
+<!-- Scripts to support facebook -->
+
+
+<!-- Scripts to support google -->
+
+
+
+
+
+
+    
+    
+      
+        <div class="row">
+          
+          <div id="menu" class="col-6 col-md-3 navbar-default">
+   <div id="menuWrapper" class="nav nav-pills list-group">
+      <a id="mobileMenuLogo" class="list-group-item visible-xs-block"></a>
+      
+      
+      
+      
+
+
+
+
+
+
+
+
+
+
+
+
+
+   
+
+
+
+
+
+   
+      
+   
+   
+
+
+      
+         
+            
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   
+      
+
+
+
+   
+
+
+
+   
+      
+      
+      <!-- only in edit mode if there is a key -->
+      
+   
+   
+
+<a  href="index.html?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y" class="list-group-item active "  title=""   aria-current="page" >Home</a>
+
+         
+         
+      
+      
+      
+      
+         
+
+
+
+
+
+
+
+
+
+
+
+
+
+   
+
+
+
+   
+
+   
+      
+      
+   
+
+   
+
+   
+
+
+
+   
+      
+   
+   
+
+
+         
+            
+            
+               
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   
+      
+
+
+
+
+
+   
+      
+      
+      <!-- only in edit mode if there is a key -->
+      
+   
+   
+
+<a  href="selectpermit.html?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y&initialSearchView=true" class="list-group-item "  title=""   >Search For Permits</a>
+
+            
+         
+      
+      
+      
+         
+
+
+
+
+
+
+
+
+
+
+
+
+
+   
+
+
+
+   
+
+   
+      
+      
+   
+
+   
+
+   
+
+
+
+   
+      
+   
+   
+
+
+         
+            
+            
+               
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   
+   
+      
+      
+
+
+
+
+
+   
+      
+      
+      <!-- only in edit mode if there is a key -->
+      
+   
+   
+
+<a  href="permitinfo.html?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y&schdInspView=true" class="list-group-item "  title="Schedule/Cancel Insp." aria-label="Schedule/Cancel Insp."  >Schedule/Cancel Insp.</a>
+
+            
+         
+      
+ 
+      
+      
+         
+
+
+
+
+
+
+
+
+
+
+
+
+
+   
+
+
+
+
+
+   
+      
+   
+   
+
+
+         
+            
+            
+               
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   
+      
+
+
+
+
+
+   
+      
+      
+      <!-- only in edit mode if there is a key -->
+      
+   
+   
+
+<a  href="submit-app-flow.html?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y" class="list-group-item "  title=""   >Submit Application</a>
+
+            
+         
+      
+      
+      <!-- TODOQPSF - add active class when on associated page -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   
+
+
+
+   
+
+   
+      
+      
+   
+
+   
+
+   
+      
+      
+   
+
+   
+
+   
+
+
+
+   
+      
+   
+   
+
+
+
+
+
+<!-- Responsive Menu -->
+<span class="d-block d-md-none">
+  
+
+  
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+   
+
+
+
+
+
+   
+      
+   
+   
+
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   
+   
+      
+      
+
+
+
+
+
+   
+      
+      
+      <!-- only in edit mode if there is a key -->
+      
+   
+   
+
+<a  href="accessibility.html?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y" class="list-group-item "  title="Accessibility" aria-label="Accessibility"  >Accessibility</a>
+
+  
+
+  
+    
+      
+	      
+
+
+
+
+
+
+
+
+
+
+
+
+
+   
+
+
+
+   
+
+   
+      
+      
+   
+
+   
+
+   
+
+
+
+   
+      
+   
+   
+
+
+	      	 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   
+   
+      
+      
+
+
+
+
+
+   
+      
+      
+      <!-- only in edit mode if there is a key -->
+      
+   
+   
+
+<a  href="newuser.html?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y&viewNewUser=true" class="list-group-item "  title="Create New User" aria-label="Create New User"  ></a>
+
+	         
+
+
+
+
+
+
+
+
+
+
+
+
+
+   
+
+
+
+
+
+   
+      
+   
+   
+
+
+	         
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   
+   
+      
+      
+
+
+
+
+
+   
+      
+      
+      <!-- only in edit mode if there is a key -->
+      
+   
+   
+
+<a  href="logonuser.html?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y" class="list-group-item "  title="Login" aria-label="Login"  ></a>
+
+      
+      
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   
+   
+      
+      
+
+
+
+
+
+   
+      
+      
+      <!-- only in edit mode if there is a key -->
+      
+   
+   
+
+<a  href="https://www.tamarac.gov/Contact?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y" class="list-group-item "  title="Contact Us" aria-label="Contact Us"  >Contact Us</a>
+
+      
+    
+    
+  
+
+  
+</span>
+      
+         
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   
+      
+
+
+
+
+
+   
+      
+      
+      <!-- only in edit mode if there is a key -->
+      
+   
+   
+
+<a  href="https://tamarac.gov/ContractorRegistration?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y" class="list-group-item "  title=""   target="_blank" >Contractor Registrations</a>
+
+      
+      
+   </div>
+</div>
+
+          <div id="content" class="col-md-9" role="main" tabindex="-1">
+            
+            <div class="hiddenLbl"></div><!-- placeholder as some screen readers say part of content before main landmark -->
+            
+         
+
+<div style="width: 70%;">
+   
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script type="text/javascript">
+// for accessibility, change page title to state that there's an error or notice on this page
+if('' == 'true')
+{
+   if(document.title.indexOf('Error or Notice on page') < 0)
+   {
+      document.title = 'Error or Notice on page '+document.title;
+   }
+}
+</script>
+</div>
+
+
+  
+    <img role="presentation" class="sideImage hidden-xs" src="img/SideIcons_258x584.png" height="584" width="258" />
+<div class="landingPageText">
+City of Tamarac | Building Permits & Inspections Portal
+
+<hr style="border: none; border-top: 2px solid #2369af; margin: 0;">
+<br />
+
+
+
+<div class="epermits-info" style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; line-height: 1.6; font-size: 12px; color: #333;">
+
+
+
+  <h2 style="font-size: 16px; margin-bottom: 8px;"><B>&#128295; Online Building Permits & Contractor Services</B></h2>
+
+  <p>
+
+    Our ePermits portal makes it easy for citizens and contractors to complete the most common steps in the building permit process online. This includes:
+
+  </p>
+
+  <ul style="margin-top: 0;">
+
+    <li>Submitting applications</li>
+
+    <li>Paying permit fees</li>
+
+    <li>Scheduling inspections</li>
+
+    <li>Viewing inspection results</li>
+
+    <li>Searching permit history</li>
+
+  </ul>
+
+  <p>
+
+    &#128216; For detailed instructions, please consult the 
+
+    <a href="https://Tamarac.gov/DocumentCenter/View/1511?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y" target="_blank"><strong>ePermits Applicant Guide</strong></a>.
+
+  </p>
+
+
+
+  <hr>
+
+
+
+  <br />
+
+
+
+  <h2 style="font-size: 16px; margin-bottom: 8px;"><B>&#128736;&#65039; Contractor Registration & Updates</B></h2>
+
+  <p>
+
+    <strong>All contractors must be registered with the City of Tamarac before they can be selected for a permit application.</strong><br><br>
+
+    There is no fee to register.
+
+  </p>
+
+
+
+  <h3 style="font-size: 15px; margin-top: 16px;">&nbsp;&nbsp;&#10148; New Contractor Registration</h3>
+
+  <p>
+
+    New contractors must complete the full registration process by submitting all required information and documentation via the online form:
+
+    <br>
+
+    &#128279; <a href="https://Tamarac.gov/ContractorRegistration?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y" target="_blank"><strong>Register as a Contractor</strong></a>
+
+  </p>
+
+  <p>
+
+    The Building Department will review your submission and notify you once your registration is approved.
+
+  </p>
+
+
+
+  <h3 style="font-size: 15px; margin-top: 16px;">&nbsp;&nbsp;&#128257; Already Registered? Submit Updates by Email</h3>
+
+  <p>
+
+    <strong>If you are an existing registered contractor</strong>, please <span style="text-decoration: underline;">do not</span> use the full registration form to submit updates.
+
+    <br><br>
+
+    For updates such as <em>renewed licenses or insurance documents</em>, simply email the new documents to:
+
+    <br>
+
+    &#128231; <a href="mailto:Contractor@Tamarac.gov?subject=Contractor Registration Update">Contractor@Tamarac.gov</a>
+
+  </p>
+
+  <p style="background-color: #fff3cd; padding: 10px; border-left: 5px solid #ffc107;">
+
+    <strong>Note:</strong> Please <u>only send updated or expiring documents</u> - do not resend the entire registration packet.
+
+  </p>
+
+
+
+</div>
+
+</div>
+  
+  
+
+
+<script>
+   automaticLogin();
+</script>
+
+<div class="g-signin2 is-invisible" data-onsuccess="onGoogleAutoSignIn"></div>
+
+      
+          </div>
+        </div>
+      
+      
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+   
+
+
+
+
+
+   
+      
+   
+   
+
+
+    <form id="c2gLogoff" action="logoffuser.html" method="get">
+       <input type="hidden" name="viewLogoffUser" value="true"/>
+    <INPUT type=hidden name=OWASP_CSRFTOKEN value=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y></form>          
+          
+    <div id="footer" role="contentinfo">
+      <!-- =========================================================
+     CITY OF TAMARAC - BUILDING PERMITS FOOTER
+     Building Department Contact Information
+     ========================================================= -->
+
+<style>
+/* ---------------------------------------------------------
+   Building Department Contact Footer
+   Styles are intentionally scoped to avoid affecting
+   Click2Gov application styling.
+   --------------------------------------------------------- */
+
+#tamarac-building-footer {
+    box-sizing: border-box;
+    width: 100%;
+    font-family: Arial, Helvetica, sans-serif;
+    color: #333333;
+    background: #ffffff;
+    border-top: 3px solid #1767b1;
+}
+
+#tamarac-building-footer *,
+#tamarac-building-footer *::before,
+#tamarac-building-footer *::after {
+    box-sizing: border-box;
+}
+
+#tamarac-building-footer .tb-footer-inner {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 14px 18px 10px;
+}
+
+
+/* ---------------------------------------------------------
+   Heading
+   --------------------------------------------------------- */
+
+#tamarac-building-footer .tb-footer-heading {
+    text-align: center;
+    margin-bottom: 11px;
+}
+
+#tamarac-building-footer .tb-footer-title {
+    margin: 0 0 3px;
+    color: #1767b1;
+    font-size: 16px;
+    font-weight: bold;
+    line-height: 1.3;
+}
+
+#tamarac-building-footer .tb-footer-subtitle {
+    margin: 0;
+    color: #555555;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+
+/* ---------------------------------------------------------
+   Contact Methods
+   --------------------------------------------------------- */
+
+#tamarac-building-footer .tb-contact-row {
+    display: flex;
+    justify-content: center;
+    align-items: stretch;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0 auto 12px;
+}
+
+#tamarac-building-footer .tb-contact-item {
+    display: flex;
+    align-items: center;
+    min-width: 190px;
+    padding: 8px 12px;
+    background: #f5f8fb;
+    border: 1px solid #d5e0e9;
+    border-radius: 4px;
+    text-decoration: none;
+    color: #333333;
+    transition:
+        background-color 0.15s ease,
+        border-color 0.15s ease,
+        box-shadow 0.15s ease;
+}
+
+#tamarac-building-footer a.tb-contact-item:hover,
+#tamarac-building-footer a.tb-contact-item:focus {
+    background: #eef5fb;
+    border-color: #8db9dd;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    text-decoration: none;
+    outline: none;
+}
+
+#tamarac-building-footer a.tb-contact-item:focus {
+    box-shadow: 0 0 0 2px rgba(23, 103, 177, 0.25);
+}
+
+
+/* ---------------------------------------------------------
+   Contact Icons
+   --------------------------------------------------------- */
+
+#tamarac-building-footer .tb-contact-icon {
+    width: 31px;
+    height: 31px;
+    min-width: 31px;
+    margin-right: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #1767b1;
+    background: #ffffff;
+    border: 1px solid #cbdce9;
+    border-radius: 50%;
+}
+
+#tamarac-building-footer .tb-contact-icon svg {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+}
+
+#tamarac-building-footer .tb-contact-text {
+    min-width: 0;
+    line-height: 1.25;
+}
+
+#tamarac-building-footer .tb-contact-label {
+    display: block;
+    margin-bottom: 1px;
+    color: #555555;
+    font-size: 10px;
+    font-weight: normal;
+    text-transform: uppercase;
+    letter-spacing: 0.35px;
+}
+
+#tamarac-building-footer .tb-contact-value {
+    display: block;
+    color: #075ca8;
+    font-size: 12px;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+
+/* ---------------------------------------------------------
+   Bottom Security / Browser Link
+   --------------------------------------------------------- */
+
+#tamarac-building-footer .tb-footer-bottom {
+    padding-top: 8px;
+    border-top: 1px solid #e2e2e2;
+    text-align: center;
+    font-size: 11px;
+    line-height: 1.4;
+}
+
+#tamarac-building-footer .tb-footer-bottom a {
+    color: #006dcc;
+    text-decoration: underline;
+}
+
+#tamarac-building-footer .tb-footer-bottom a:hover,
+#tamarac-building-footer .tb-footer-bottom a:focus {
+    color: #004f91;
+}
+
+
+/* ---------------------------------------------------------
+   Responsive Layout
+   --------------------------------------------------------- */
+
+@media (max-width: 760px) {
+
+    #tamarac-building-footer .tb-footer-inner {
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+
+    #tamarac-building-footer .tb-contact-row {
+        display: block;
+    }
+
+    #tamarac-building-footer .tb-contact-item {
+        width: 100%;
+        max-width: 360px;
+        margin: 0 auto 7px;
+    }
+
+    #tamarac-building-footer .tb-contact-value {
+        white-space: normal;
+        word-break: break-word;
+    }
+}
+
+
+/* ---------------------------------------------------------
+   Amazon Connect Communications Widget
+   Existing positioning retained.
+   --------------------------------------------------------- */
+
+#root {
+    position: fixed !important;
+    right: 24px !important;
+    bottom: 24px !important;
+    left: auto !important;
+    transform: none !important;
+    z-index: 999999 !important;
+}
+</style>
+
+
+<!-- =========================================================
+     BUILDING DEPARTMENT CONTACT FOOTER
+     ========================================================= -->
+
+<div id="tamarac-building-footer">
+    <div class="tb-footer-inner">
+
+        <div class="tb-footer-heading">
+
+            <div class="tb-footer-title">
+                Need Help With Building Permits or Inspections?
+            </div>
+
+            <p class="tb-footer-subtitle">
+                City of Tamarac Building Department is available to assist with permits, inspections, and contractor services.
+            </p>
+
+        </div>
+
+
+        <div class="tb-contact-row">
+
+            <!-- PHONE -->
+            <a
+                class="tb-contact-item"
+                href="tel:+19545973420?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y"
+                aria-label="Call City of Tamarac Building Department at 954-597-3420"
+            >
+
+                <span class="tb-contact-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" focusable="false">
+                        <path d="M6.62 10.79a15.46 15.46 0 006.59 6.59l2.2-2.2a1 1 0 011.02-.24c1.12.37 2.33.57 3.57.57a1 1 0 011 1V20a1 1 0 01-1 1C10.61 21 3 13.39 3 4a1 1 0 011-1h3.5a1 1 0 011 1c0 1.25.2 2.45.57 3.57a1 1 0 01-.25 1.02l-2.2 2.2z"/>
+                    </svg>
+                </span>
+
+                <span class="tb-contact-text">
+                    <span class="tb-contact-label">Phone</span>
+                    <span class="tb-contact-value">(954) 597-3420</span>
+                </span>
+
+            </a>
+
+
+            <!-- WHATSAPP -->
+            <a
+                class="tb-contact-item"
+                href="https://wa.me/19545973420?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Contact City of Tamarac Building Department using WhatsApp at 954-597-3420"
+            >
+
+                <span class="tb-contact-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" focusable="false">
+                        <path d="M16.75 13.96c-.25-.12-1.47-.72-1.7-.81-.23-.08-.39-.12-.56.13-.16.25-.64.81-.78.97-.14.17-.29.19-.54.06-.25-.12-1.05-.39-2-1.24-.74-.66-1.24-1.47-1.38-1.72-.15-.25-.02-.38.11-.5.11-.11.25-.29.37-.43.13-.15.17-.25.25-.42.08-.16.04-.31-.02-.43-.06-.13-.56-1.35-.77-1.85-.2-.49-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31-.23.25-.88.86-.88 2.1s.9 2.43 1.03 2.6c.12.17 1.77 2.7 4.29 3.79.6.26 1.07.41 1.43.53.6.19 1.15.16 1.58.1.48-.07 1.47-.6 1.68-1.18.21-.58.21-1.08.15-1.18-.06-.1-.23-.16-.48-.28z"/>
+                        <path d="M12.04 2A9.84 9.84 0 003.6 16.91L2 22l5.24-1.55A9.84 9.84 0 1012.04 2zm0 17.88a8 8 0 01-4.08-1.12l-.29-.17-3.11.92.94-3.03-.19-.31a8.01 8.01 0 116.73 3.71z"/>
+                    </svg>
+                </span>
+
+                <span class="tb-contact-text">
+                    <span class="tb-contact-label">WhatsApp</span>
+                    <span class="tb-contact-value">(954) 597-3420</span>
+                </span>
+
+            </a>
+
+
+            <!-- EMAIL -->
+            <a
+                class="tb-contact-item"
+                href="mailto:Permit@Tamarac.gov"
+                aria-label="Email City of Tamarac Building Department at Permit@Tamarac.gov"
+            >
+
+                <span class="tb-contact-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" focusable="false">
+                        <path d="M20 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V6a2 2 0 00-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+                    </svg>
+                </span>
+
+                <span class="tb-contact-text">
+                    <span class="tb-contact-label">Email</span>
+                    <span class="tb-contact-value">Permit@Tamarac.gov</span>
+                </span>
+
+            </a>
+
+        </div>
+
+
+        <div class="tb-footer-bottom">
+
+            <a
+                href="https://tamarac.gov/1027/Supported-Web-Browsers?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y"
+                target="_blank"
+                rel="noopener noreferrer"
+            >
+                Credit Card Payment Security and Supported Web Browsers
+            </a>
+
+        </div>
+
+    </div>
+</div>
+
+
+<!-- =========================================================
+     AMAZON CONNECT COMMUNICATIONS WIDGET
+     Existing functionality retained
+     ========================================================= -->
+
+<script src="https://d1kcdaokbysnkp.cloudfront.net/amazon-connect-chat-interface.js?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y"></script>
+<script src="https://d1kcdaokbysnkp.cloudfront.net/ACChat.js?OWASP_CSRFTOKEN=USDY-YD8C-04KU-3ABR-G02Q-O1N1-RA9Q-R23Y"></script>
+
+<div id="root"></div>
+
+
+<script>
+function getCivicPlusUser() {
+
+    try {
+
+        const userMenu = document.querySelector("#userMenu");
+
+        if (!userMenu) {
+            return {
+                isLoggedIn: "false",
+                name: "",
+                firstName: "",
+                email: ""
+            };
+        }
+
+        const name =
+            userMenu.querySelector("strong")
+            ?.textContent
+            ?.trim() || "";
+
+        const email =
+            userMenu.querySelector(".email")
+            ?.textContent
+            ?.trim() || "";
+
+        return {
+            isLoggedIn: (name || email) ? "true" : "false",
+            name: name,
+            firstName: name.split(" ")[0] || "",
+            email: email
+        };
+
+    } catch (e) {
+
+        console.log("CivicPlus user detection failed:", e);
+
+        return {
+            isLoggedIn: "false",
+            name: "",
+            firstName: "",
+            email: ""
+        };
+    }
+}
+
+const civicPlusUser = getCivicPlusUser();
+</script>
+
+
+<script>
+AmazonCustomChatWidget.ChatInterface.init({
+
+    containerId: 'root', // ID of the container element where the widget will be placed
+
+    initiationIcon: 'icon', // 'icon' or 'button'
+
+    region: 'us-east-1',
+
+    name: 'Customer', // Customer name or reference to form field: 'refer|inputFields|Name'
+
+    username: 'Guest', // Username or reference to form field: 'refer|inputFields|UserName'
+
+    apiGateway: 'https://e6h6p3gwi8.execute-api.us-east-1.amazonaws.com/Prod',
+
+    chatContactFlowId: '2d80346e-6c65-4a71-a006-42027b4ffbfd',
+
+    instanceId: '52ea6c96-48d9-4aff-a1db-89fb10a0b414',
+
+    contactAttr: {
+
+        // CivicPlus Attributes
+        CivicPlusLoggedIn: civicPlusUser.isLoggedIn,
+        CivicPlusName: civicPlusUser.name,
+        CivicPlusFirstName: civicPlusUser.firstName,
+        CivicPlusEmail: civicPlusUser.email,
+
+        // Web Browser Attributes
+        pageUrl: window.location.href,
+        pagePath: window.location.pathname,
+        pageTitle: document.title,
+        referrer: document.referrer || "",
+        browserLanguage: navigator.language,
+        screenSize: `x`,
+        timestamp: new Date().toISOString(),
+
+        // Custom / Manual Attributes
+        chatSource: "Click2GovBP"
+    }
+
+});
+</script>
+
+    </div>
+  </div>
+  
+   </body>
+</html>

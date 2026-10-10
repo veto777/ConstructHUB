@@ -1,0 +1,130 @@
+
+
+    <div class="clearfix">
+        <div class="float-end muted st-mr-md">Page 2 of 14 results</div>    
+    </div>
+     
+            <div class="search-result-item">
+                <div class="search-result-title">
+                    <a href="javascript:void(0);" onclick="FormSupport.submitAction( 'Detail/11c3ce19-8b76-48df-8a73-aeca01032f41' );">
+                        2201690
+                    </a>
+                </div>
+                <div class="row">
+                    <div class="col-lg-3">
+    
+                            <div class="">Solar (Electric, Water, Pool Heater, etc.)</div>  
+                            <div class="">Closed / COO, 10/20/2022</div>
+    
+                    </div>
+    
+                        <div class="col-lg-3">
+                            <div>2495 E SPRING PIONEER LN</div>
+                            <div>TUCSON, AZ </div>
+                        </div>
+    
+                        <div class="col-lg-3">
+    
+                        </div>
+                </div>
+            </div>
+     
+            <div class="search-result-item">
+                <div class="search-result-title">
+                    <a href="javascript:void(0);" onclick="FormSupport.submitAction( 'Detail/d2fea50d-039d-44ab-b1de-aeeb0128202e' );">
+                        2202027
+                    </a>
+                </div>
+                <div class="row">
+                    <div class="col-lg-3">
+    
+                            <div class="">Solar (Electric, Water, Pool Heater, etc.)</div>  
+                            <div class="">Permit Issued, 10/17/2022</div>
+    
+                    </div>
+    
+                        <div class="col-lg-3">
+                            <div>10697 N PYRENEES AV</div>
+                            <div>TUCSON, AZ </div>
+                        </div>
+    
+                        <div class="col-lg-3">
+    
+                        </div>
+                </div>
+            </div>
+     
+            <div class="search-result-item">
+                <div class="search-result-title">
+                    <a href="javascript:void(0);" onclick="FormSupport.submitAction( 'Detail/09e26eaa-a551-47b5-bfc1-aee6010e025a' );">
+                        2201964
+                    </a>
+                </div>
+                <div class="row">
+                    <div class="col-lg-3">
+    
+                            <div class="">Solar (Electric, Water, Pool Heater, etc.)</div>  
+                            <div class="">Closed / COO, 10/7/2022</div>
+    
+                    </div>
+    
+                        <div class="col-lg-3">
+                            <div>12633 N RED EAGLE DR</div>
+                            <div>TUCSON, AZ </div>
+                        </div>
+    
+                        <div class="col-lg-3">
+    
+                        </div>
+                </div>
+            </div>
+     
+            <div class="search-result-item">
+                <div class="search-result-title">
+                    <a href="javascript:void(0);" onclick="FormSupport.submitAction( 'Detail/61a1b26d-7ebc-4208-95ba-aebb01127287' );">
+                        2201500
+                    </a>
+                </div>
+                <div class="row">
+                    <div class="col-lg-3">
+    
+                            <div class="">Solar (Electric, Water, Pool Heater, etc.)</div>  
+                            <div class="">Closed / COO, 9/21/2022</div>
+    
+                    </div>
+    
+                        <div class="col-lg-3">
+                            <div>360 W SACATON CANYON DR</div>
+                            <div>TUCSON, AZ </div>
+                        </div>
+    
+                        <div class="col-lg-3">
+    
+                        </div>
+                </div>
+            </div>
+                
+    <input type="hidden" id="_applicationSearchPage" name="_applicationSearchPage" value="1" />
+    <div class="search-results-paging">
+        <ul>
+            
+            <li><a href="#" onclick="ApplicationSearchAdvancedResults.gotoPage(0)"><span class="search-results-page"><i class="fas fa-chevron-left"></i></span></a></li>
+            
+            <li><a href="#" onclick="ApplicationSearchAdvancedResults.gotoPage(0)"><span class="search-results-page">1</span></a></li>
+            
+            <li><span class="search-results-page search-results-page-active">2</span></li>
+            
+        </ul>
+    </div>
+    
+
+<script>
+    var ApplicationSearchAdvancedResults = {
+        gotoPage: function( pageNumber ) 
+        {
+            $( '#_applicationSearchPage' ).val( pageNumber );
+            FormSupport.contentAction( '~/ApplicationPublic/ApplicationSearchAdvanced/SearchPage', $( '#search-results' ) ); 
+            window.scrollTo( 0 );
+        }
+    };
+</script>

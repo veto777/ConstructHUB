@@ -9,6 +9,11 @@
 import { scrapeByPlatform, type ScrapeResult } from "../scraper";
 import type { AdapterCtx, PermitRecord, PermitSearchType, PortalAdapter } from "./types";
 
+import smartgov from "./smartgov";
+import etrakit from "./etrakit";
+import click2gov from "./click2gov";
+import ftg from "./ftg";
+
 const adapters = new Map<string, PortalAdapter>();
 
 function key(platform: string): string {
@@ -80,10 +85,10 @@ function legacy(platform: string, aliases: string[], search: PermitSearchType[])
 }
 
 // The 7 adapters in server/scraper.ts. Labels and aliases mirror scrapeByPlatform's switch.
-registerAdapter(legacy("SmartGov", [], ["address", "permit"]));
+registerAdapter(smartgov);
 registerAdapter(legacy("Skagit County", ["Custom / GovPlatform"], ["address", "permit", "name"]));
 registerAdapter(legacy("Tyler EnerGov", ["Tyler Technologies", "Tyler EnerGov Self Service"], ["address", "permit", "name"]));
-registerAdapter(legacy("eTRAKiT", [], ["permit", "name", "company"]));
+registerAdapter(etrakit);
 registerAdapter(legacy("Accela", ["Accela Citizen Access"], ["address", "permit", "name"]));
-registerAdapter(legacy("Click2Gov", [], ["address", "permit", "name"]));
-registerAdapter(legacy("FTG Portal", [], ["name", "company"]));
+registerAdapter(click2gov);
+registerAdapter(ftg);

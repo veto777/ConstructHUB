@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+
+
+
+<html lang="en">
+  <head><meta charset="utf-8" /><meta name="description" content="SmartGov Public Portal by Granicus" /><meta name="author" content="Granicus" /><title>
+	Coconino County Public Portal
+</title><link href="/Styles/redmond/jquery-ui-1.9.0.custom.min.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Scripts/bootstrap/css/bootstrap.min.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/font-awesome/css/font-awesome.min.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/toastr.min.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/jquery.Jcrop.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/notifications/main.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/chosen.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/ils-daterangepicker.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/site.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/ils-custom.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/sgc-business.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/payment-vendors.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/landing-page.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/dropzone/dropzonecustom.css?v=v2026.17" rel="stylesheet" type="text/css" />
+<link href="/Styles/StandardStyles.css?v=v2026.17" rel="stylesheet" type="text/css" />
+
+<link rel="icon" type="image/x-icon" href="/img/favicon.ico">
+<script type='text/javascript' src='/Scripts/jquery/jquery.min.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/jqueryui/jquery-ui.min.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/jquery.ba-throttle-debounce.min.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/jquery.tablesorter.min.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/FormSupport.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/ajaxupload.min.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/jquery.Jcrop.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/bootstrap/js/bootstrap.bundle.min.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/toastr.min.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/portal-scripts.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/ils.infieldlabel.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/ils-daterangepicker.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/notifications/notification.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Dialog.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/PortalAttachmentSupport.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/parcel.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/location-entry-map.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/dropzone/dropzone.min.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/landingPage.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/sgcBusinessLicense.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/ApplicationSearchHelper.js?v=v2026.17'></script>
+
+<script type='text/javascript' src='/Scripts/Shared/StringUtil.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/ErrorSupport.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/ListSupport.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/portal-map-support.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Maps/esri-map.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/AttachmentSupport.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/inputMask/jquery.inputmask.bundle.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/ils-list.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/ils-overlay.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/ils-autocomplete.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/ils-datepicker.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/Controls.js?v=v2026.17'></script>
+<script type='text/javascript' src='/Scripts/Shared/StencilSupport.js?v=v2026.17'></script>
+
+
+<script>
+  FormSupport.applicationRoot = "";
+  FormSupport._rootImagePath = "~/img/";
+</script>
+
+<script type="text/javascript">
+    function googleTranslateElementInit() {
+        new google.translate.TranslateElement({ pageLanguage: 'en', layout: google.translate.TranslateElement.InlineLayout.HORIZONTAL }, 'google_translate_element');
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const script = document.createElement('script');
+        script.src = '//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
+        script.async = true;
+        document.head.appendChild(script);
+    });
+</script>
+
+<script type="text/javascript">
+    FormSupport.applicationRoot = "";
+    document.addEventListener(
+        "btnclick",
+        function (event) { SgSupport.handleBrButtonClick(event) },
+        false
+    );
+    document.addEventListener(
+        "datePickerChanged",
+        function (event) { SgSupport.handleDatePickerChange(event) },
+        false
+    );
+</script>
+
+<!-- Initialize the smartgov stencil components -->
+<script type='module' src='/Scripts/sgcomps/www/build/sgcomps.esm.js?v=v2026.17'></script>
+
+<script nomodule='' src='/Scripts/sgcomps/www/build/sgcomps.js?v=v2026.17'></script>
+
+
+    <script type="text/javascript" src="/Scripts/Shared/PendoHelper.js"></script>
+    <script type="text/javascript" src="/Scripts/Shared/GXAHelper.js"></script>
+    
+          
+
+
+<script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+    (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+          
+    ga('create', 'UA-41213900-2', 'smartgovcommunity.com');
+    ga('send', 'pageview');
+</script></head>
+    
+  <body class="site-mode" data-bs-spy="scroll" data-bs-target="#scroll-target" data-offset="65">
+    <div class="site-content-container">
+       
+       
+      
+
+<!-- top bar with logo -->
+<section id="top-bar-section">
+  <div class="top-bar-container">
+    <div class="sgc-container"> 
+          <span>
+            <a href="/Public/Home"><img src="/Public/BannerImage" alt="Permitting Home"></a>
+          </span>
+        
+        <span class="login-nav float-end">
+          
+          <a href="/Register/RegisterUser">Sign Up</a> or <a href="/Public/Account/LogIn">Log In</a>
+              
+        </span>
+    </div> 
+  </div> 
+</section> <!-- /top-bar section -->  
+
+      
+      <section id="main-content">
+        <div class="main-content-container">
+          <div class="sgc-container">
+            <div class="row">
+              <div class="col-lg-12">
+                <div class="site-mode-content-box">
+                  
+    <div class="row row-centered">    
+        <div class="col-lg-12 min-template-controls-container">
+            <div class="row row-centered">
+                <div class="col-lg-12">
+                    <div class="row row-centered">
+                        <div class="col-lg-10">              
+                                        
+                        </div>
+                    </div>
+                </div>        
+            </div>
+            <div class="row row-centered">
+                <div class="col-lg-10">  
+                    
+    <form id="_form_24944" method="post" action="/ApplicationPublic/ApplicationSearch" onsubmit="return false;">
+<input type="hidden" name="_conv" value="1" />
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="search-options float-end">
+                    <a href="javascript:void(0);" onclick="FormSupport.submitAction( 'AdvancedSearch' );"><i class="fa fa-search"></i> <small>Advanced Search</small></a>
+                </div>
+            </div>
+        </div>
+        <div class="search-container" tabindex="0" aria-label="Enter at least 2 characters.">
+            <div class="row">
+                <div class="col-lg-12">
+                    <div class="search-input">
+                        <label for="query" data-margin-left="80px" data-margin-top="10px" class="infield-label">Enter a permit or license number, address, or name</label>
+                        <i class="sprite-search"></i>
+                        <input type="text" id="query" name="query" class="search-input-control st-w-80" onkeydown="ApplicationSearch.searchKeyHandler(event);"/>
+                        <button  type="button" id="Search" name="Search" style="margin-top:5px" class="sgc-square-button-primary ils-button-location-both" onclick="ApplicationSearch.initiateSearch();; return false;">Search</button>
+                        
+                        
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-lg-12 st-text-center m-t-md">
+                    <span class="help-block">Enter at least 2 characters</span>
+                </div>
+            </div>
+        </div>
+        <br>
+        <div id="search-results" class="search-results">
+            
+            <div data-initial-focus="true" class="alert alert-info" tabindex="0">No results found</div>
+    
+
+<script>
+    var ApplicationSearchResults = {
+        gotoPage: function( pageNumber ) 
+        {
+            $( '#_applicationSearchPage').val(pageNumber);
+            FormSupport.contentAction('SearchPage', $('#search-results'));
+            window.scrollTo(0);
+        }
+    };
+</script>
+        </div>
+    </form>
+
+
+                </div> <!-- /col-lg-10 -->     
+            </div>  <!-- /row -->
+        </div> <!-- /col-lg-12 -->   
+    </div> <!-- /row -->
+    
+    <script>
+        var ApplicationSearch =
+        {
+            initiateSearch: function () {
+                var value = $('#query').val();
+
+                value = ApplicationSearchHelper.sanitizeSearchText(value);
+
+                // TO DO: Move this check into helper js file
+                if (value.length >= 2) {
+                    $('#query').val(value);
+                    $('#Search').prop('disabled', true);
+                    FormSupport.submitAction('Search');
+                }
+            },
+
+            searchKeyHandler(event) {
+                if (event.key === 'Enter') {
+                    event.stopPropagation();
+                    event.preventDefault();
+                    var searchButton = document.getElementById('Search');
+                    if (searchButton) {
+                        searchButton.click();
+                    }
+                }
+            }
+        };
+    </script>
+
+            
+                </div>
+              </div> <!-- /span12 -->
+            </div> <!-- /row -->
+          </div> <!-- /container -->          
+        </div> <!-- /main-content-container -->
+      </section>
+
+      
+
+<footer>
+  <div class="footer-container">
+    <div class="container">
+      <div class="row">
+        <div class="offset-lg-3 col-lg-2">
+          <a href="http://www.coconino.az.gov" target="_blank">Coconino County</a>
+        </div>
+        <div class="col-lg-2">
+           <a href="/Public/PrivacyPolicy">Privacy Policy</a>
+        </div>
+        <div class="col-lg-2">
+          <a href="/Public/RefundPolicy">Refund Policy</a>
+        </div>
+      </div> <!-- /row -->
+         
+      <div class='footer-custom-links'>
+<div class='row'>
+<div class='offset-lg-5 col-lg-2'>
+<a href='http://coconino.az.gov/FormCenter/Community-Development-18/Community-Development-Customer-Satisfact-122'>Customer Satisfaction Survey</a>
+</div>
+</div>
+</div>
+
+
+      <div class="row">
+        <div class="col-lg-12">
+          <div class="powered-by-container">
+              Powered by SmartGov, &copy; 2011 - 2026 <a target="_blank"  href="https://granicus.com/">Granicus</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+    <script type="text/javascript">
+        FormSupport.ready(function () {
+            // Dynamic padding to prevent footer overlap.
+            var mainContainer = $("div.main-content-container");
+            var footerHeight = $("div.footer-container").outerHeight();
+            var isSiteMode = $("body").hasClass("site-mode");
+
+            if (isSiteMode && mainContainer.outerHeight() && footerHeight) {
+                mainContainer.css("padding-bottom", `${footerHeight + 70}px`);
+            }
+        });
+    </script>
+</footer>
+                              
+    </div> <!-- /site-content-container -->
+    <script type="text/javascript"> 
+        // if we are using pendo, initialize it
+        $(document).ready
+        (
+            function () {
+                  PendoHelper.init("1ecfdd71-f46c-451b-7f50-e31729715fd2", "",
+                    "", "", "", "", "SGP");
+            }
+        );
+    </script>
+    
+  </body>
+</html>

@@ -1,0 +1,115 @@
+
+
+    <div class="clearfix">
+        <div class="float-end muted st-mr-md">Page 4 of 33 results</div>    
+    </div>
+     
+            <div class="search-result-item">
+                <div class="search-result-title">
+                    <a href="javascript:void(0);" onclick="FormSupport.submitAction( 'Detail/40adfdf3-6601-4183-872a-b4da012b1511' );">
+                        M-26-0185
+                    </a>
+                </div>
+                <div class="row">
+                    <div class="col-lg-3">
+    
+                            <div class="">Mechanical Permit</div>  
+                            <div class="">Issued, 10/5/2026</div>
+    
+                    </div>
+    
+                        <div class="col-lg-3">
+                            <div>4247 CEMETERY RD</div>
+                            <div>SPRINGDALE, WA </div>
+                        </div>
+    
+                        <div class="col-lg-3">
+    
+                        </div>
+                </div>
+            </div>
+     
+            <div class="search-result-item">
+                <div class="search-result-title">
+                    <a href="javascript:void(0);" onclick="FormSupport.submitAction( 'Detail/71f97e6b-7b34-41d6-b2eb-b4da012c3bfc' );">
+                        W-26-0195
+                    </a>
+                </div>
+                <div class="row">
+                    <div class="col-lg-3">
+    
+                            <div class="">Weatherization Permit</div>  
+                            <div class="">Issued, 10/5/2026</div>
+    
+                    </div>
+    
+                        <div class="col-lg-3">
+                            <div>437 MEADOW CT</div>
+                            <div>COLVILLE, WA </div>
+                        </div>
+    
+                        <div class="col-lg-3">
+    
+                                <div class="">Lynch, John</div>  
+                                <div class="">JOHN LYNCH CONSTRUCTION LLC</div>
+    
+                        </div>
+                </div>
+            </div>
+     
+            <div class="search-result-item">
+                <div class="search-result-title">
+                    <a href="javascript:void(0);" onclick="FormSupport.submitAction( 'Detail/6bbff875-e485-49ea-abef-b4da01322f09' );">
+                        W-26-0196
+                    </a>
+                </div>
+                <div class="row">
+                    <div class="col-lg-3">
+    
+                            <div class="">Weatherization Permit</div>  
+                            <div class="">Issued, 10/5/2026</div>
+    
+                    </div>
+    
+                        <div class="col-lg-3">
+                            <div>1346 OLD KETTLE RD</div>
+                            <div>KETTLE FALLS, WA </div>
+                        </div>
+    
+                        <div class="col-lg-3">
+    
+                                <div class="">Lynch, John</div>  
+                                <div class="">JOHN LYNCH CONSTRUCTION LLC</div>
+    
+                        </div>
+                </div>
+            </div>
+                
+    <input type="hidden" id="_applicationSearchPage" name="_applicationSearchPage" value="3" />
+    <div class="search-results-paging">
+        <ul>
+            
+            <li><a href="#" onclick="ApplicationSearchAdvancedResults.gotoPage(2)"><span class="search-results-page"><i class="fas fa-chevron-left"></i></span></a></li>
+            
+            <li><a href="#" onclick="ApplicationSearchAdvancedResults.gotoPage(0)"><span class="search-results-page">1</span></a></li>
+            
+            <li><a href="#" onclick="ApplicationSearchAdvancedResults.gotoPage(1)"><span class="search-results-page">2</span></a></li>
+            
+            <li><a href="#" onclick="ApplicationSearchAdvancedResults.gotoPage(2)"><span class="search-results-page">3</span></a></li>
+            
+            <li><span class="search-results-page search-results-page-active">4</span></li>
+            
+        </ul>
+    </div>
+    
+
+<script>
+    var ApplicationSearchAdvancedResults = {
+        gotoPage: function( pageNumber ) 
+        {
+            $( '#_applicationSearchPage' ).val( pageNumber );
+            FormSupport.contentAction( '~/ApplicationPublic/ApplicationSearchAdvanced/SearchPage', $( '#search-results' ) ); 
+            window.scrollTo( 0 );
+        }
+    };
+</script>
