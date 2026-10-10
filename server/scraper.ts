@@ -9,6 +9,8 @@ function log(message: string, source = "scraper") {
   console.log(`${new Date().toLocaleTimeString("en-US")} [${source}] ${message}`);
 }
 import { liveSearchOutcome, scrapeFailureReason } from "./live-search-outcome";
+import type { AdapterCtx, PermitRecord, PermitSearchType, PortalAdapter } from "./scrapers/types";
+import { USER_AGENT as ADAPTER_USER_AGENT } from "./scrapers/polite-fetch";
 
 // CHROMIUM_PATH wins. The Replit-era Nix build is used only where it exists;
 // anywhere else playwright-core launches its own managed headless build (the
@@ -259,7 +261,8 @@ export async function startLiveSearch(
         db.id,
         db.name,
         queryId,
-        jobId
+        jobId,
+        db.jurisdiction
       );
 
       // Every adapter catches its own failure (browser launch, timeout, portal
@@ -2458,8 +2461,31 @@ export async function scrapePermitDetail(
   platform: string,
   searchUrl: string,
   permitNumber: string,
-  rawData: Record<string, any> | null
+  rawData: Record<string, any> | null,
+  jurisdiction?: string | null
 ): Promise<PermitDetail | null> {
+  const registry = await import("./scrapers/registry");
+  const adapter = registry.getAdapterFor({ platform, jurisdiction: jurisdiction ?? null });
+  if (adapter && !registry.isLegacyAdapter(adapter)) {
+    if (!adapter.detail || !adapter.capabilities.detail) {
+      log(`${adapter.platform} adapter has no detail lookup`, "adapter");
+      return null;
+    }
+    const ctx = buildAdapterCtx({ databaseId: 0, databaseName: jurisdiction ?? platform, jurisdiction: jurisdiction ?? "", searchUrl, portalUrl: searchUrl });
+    try {
+      const record = await adapter.detail(ctx, permitNumber);
+      if (!record) return null;
+      const { raw: _raw, ...fields } = record;
+      const detail: PermitDetail = {};
+      for (const [k, v] of Object.entries(fields)) detail[k] = v == null ? null : String(v);
+      return detail;
+    } catch (err: any) {
+      log(`${adapter.platform} detail failed for ${permitNumber}: ${err?.message || err}`, "adapter");
+      return null;
+    } finally {
+      await ctx.closeAll();
+    }
+  }
   switch (platform) {
     case "Accela":
       return scrapeAccelaDetail(searchUrl, permitNumber);
@@ -2475,6 +2501,78 @@ export async function scrapePermitDetail(
 
 export type ScraperPlatform = "SmartGov" | "Skagit County" | "Tyler EnerGov" | "eTRAKiT" | "Accela" | "Click2Gov" | "FTG Portal" | string;
 
+// ---- Registry adapters (server/scrapers/<platform>.ts) --------------------------------------------
+// Every platform adapter built after the seven above implements PortalAdapter and registers itself in
+// server/scrapers/registry.ts. scrapeByPlatform / scrapePermitDetail consult the registry first; only
+// the legacy wrappers (isLegacyAdapter) fall through to the switch statements below. The registry is
+// imported lazily because it wraps those legacy functions, which live in this file.
+
+function toScrapeResult(r: PermitRecord, platform: string): ScrapeResult {
+  const { raw, ...record } = r;
+  const result = makeResult({
+    permitNumber: r.permitNumber,
+    permitType: r.permitType ?? null,
+    status: r.status ?? null,
+    address: r.address ?? null,
+    applicantName: r.applicantName ?? null,
+    contractorName: r.contractorName ?? null,
+    description: r.description ?? null,
+    issuedDate: r.issuedAt ?? null,
+    parcelNumber: r.parcel ?? null,
+    expirationDate: r.expiresAt ?? null,
+  });
+  (result as any).rawData = { ...(r.sourceUrl ? { detailUrl: r.sourceUrl } : {}), adapter: platform, record, raw: raw ?? null };
+  return result;
+}
+
+function buildAdapterCtx(args: { databaseId: number; databaseName: string; jurisdiction: string; searchUrl: string; portalUrl: string | null }): AdapterCtx & { closeAll: () => Promise<void> } {
+  const contexts: BrowserContext[] = [];
+  return {
+    ...args,
+    browser: async () => {
+      const browser = await getBrowser();
+      const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, userAgent: ADAPTER_USER_AGENT });
+      context.setDefaultTimeout(60000);
+      context.setDefaultNavigationTimeout(60000);
+      contexts.push(context);
+      return context;
+    },
+    log: (m) => log(`${args.databaseName}: ${m}`, "adapter"),
+    politeness: { minDelayMs: 1000 },
+    closeAll: async () => {
+      for (const c of contexts.splice(0)) await c.close().catch(() => {});
+    },
+  };
+}
+
+async function scrapeWithAdapter(
+  adapter: PortalAdapter,
+  a: { searchUrl: string; searchTerm: string; searchType: string; databaseId: number; databaseName: string; queryId: number; jobId: string; jurisdiction: string }
+): Promise<ScrapeResult[]> {
+  const progress = initProgress(a.databaseId, a.databaseName, a.searchTerm, a.jobId);
+  const ctx = buildAdapterCtx({ databaseId: a.databaseId, databaseName: a.databaseName, jurisdiction: a.jurisdiction, searchUrl: a.searchUrl, portalUrl: a.searchUrl });
+  try {
+    const supported = adapter.capabilities.search as string[];
+    if (!supported.includes(a.searchType)) {
+      throw new Error(`${adapter.platform} supports ${supported.join(", ") || "no"} search, not ${a.searchType}`);
+    }
+    const records = await adapter.search(ctx, { type: a.searchType as PermitSearchType, value: a.searchTerm });
+    const results = records.map(r => toScrapeResult(r, adapter.platform));
+    progress.resultsFound = results.length;
+    scrapeJobs.set(a.jobId, { ...progress });
+    await saveResults(results, a.databaseId, a.databaseName, a.queryId, a.jobId, progress);
+    return results;
+  } catch (err: any) {
+    progress.status = "error";
+    progress.message = err?.message || String(err);
+    scrapeJobs.set(a.jobId, { ...progress });
+    log(`${adapter.platform} adapter failed on ${a.databaseName}: ${progress.message}`, "adapter");
+    return [];
+  } finally {
+    await ctx.closeAll();
+  }
+}
+
 export async function scrapeByPlatform(
   platform: ScraperPlatform,
   searchUrl: string,
@@ -2483,10 +2581,16 @@ export async function scrapeByPlatform(
   databaseId: number,
   databaseName: string,
   queryId: number,
-  jobId: string
+  jobId: string,
+  jurisdiction?: string | null
 ): Promise<ScrapeResult[]> {
-  if (!canScrapeGovernmentPortal({ platform, searchUrl, portalUrl: null })) {
+  if (!canScrapeGovernmentPortal({ platform, searchUrl, portalUrl: null, jurisdiction: jurisdiction ?? null })) {
     throw new Error("No verified adapter for this portal jurisdiction");
+  }
+  const registry = await import("./scrapers/registry");
+  const adapter = registry.getAdapterFor({ platform, jurisdiction: jurisdiction ?? null });
+  if (adapter && !registry.isLegacyAdapter(adapter)) {
+    return scrapeWithAdapter(adapter, { searchUrl, searchTerm, searchType, databaseId, databaseName, queryId, jobId, jurisdiction: jurisdiction ?? databaseName });
   }
   switch (platform) {
     case "SmartGov":

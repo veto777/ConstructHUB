@@ -757,7 +757,7 @@ export async function registerRoutes(
       const url = db.searchUrl || db.portalUrl!;
       const platform = db.platform!;
 
-      scrapeByPlatform(platform, url, searchTerm, searchType || "address", db.id, db.name, query.id, jobId)
+      scrapeByPlatform(platform, url, searchTerm, searchType || "address", db.id, db.name, query.id, jobId, db.jurisdiction)
         .catch((err) => console.error("Scrape error:", err));
 
       res.json({ jobId, queryId: query.id, message: "Scrape started" });
@@ -823,7 +823,8 @@ export async function registerRoutes(
         db.platform,
         db.searchUrl,
         result.permitNumber || "",
-        rawData
+        rawData,
+        db.jurisdiction
       );
 
       if (details) {
@@ -983,7 +984,7 @@ export async function registerRoutes(
         const query = await storage.createSearchQuery({ userId: null, searchType: schedule.searchType, searchValue: schedule.searchValue, countyId: portal.countyId });
         const jobId = `schedule-${schedule.id}-${Date.now()}`;
         const found = await scrapeByPlatform(portal.platform!, (portal.searchUrl || portal.portalUrl)!, schedule.searchValue,
-          portal.platform === "SmartGov" ? "address" : schedule.searchType, portal.id, portal.name, query.id, jobId);
+          portal.platform === "SmartGov" ? "address" : schedule.searchType, portal.id, portal.name, query.id, jobId, portal.jurisdiction);
         // A failed attempt is not a run: "Last run" only moves when the portal search completed. Adapters catch
         // their own errors and return what they had, so the job's recorded outcome decides.
         const outcome = liveSearchOutcome(found.length, getScrapeProgress(jobId));
