@@ -204,3 +204,6 @@ import permitlink from './permitlink';
 registerAdapter(permitlink);
 
 registerAdapter(enerGovAdapter);
+
+import opendataAdapter from "./opendata";
+registerAdapter(opendataAdapter);

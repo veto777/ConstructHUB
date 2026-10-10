@@ -1,0 +1,248 @@
+{
+  "objectIdFieldName": "ObjectId",
+  "uniqueIdField": {
+    "name": "ObjectId",
+    "isSystemMaintained": true
+  },
+  "globalIdFieldName": "",
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": {
+    "wkid": 4326,
+    "latestWkid": 4326
+  },
+  "fields": [
+    {
+      "name": "PERMIT_NUMBER",
+      "type": "esriFieldTypeString",
+      "alias": "PERMIT_NUMBER",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "PERMIT_TYPE",
+      "type": "esriFieldTypeString",
+      "alias": "PERMIT_TYPE",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "PERMIT_STATUS",
+      "type": "esriFieldTypeString",
+      "alias": "PERMIT_STATUS",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "CONTRACTOR",
+      "type": "esriFieldTypeString",
+      "alias": "CONTRACTOR",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "CATEGORY_NAME",
+      "type": "esriFieldTypeString",
+      "alias": "CATEGORY_NAME",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "WORK_TYPE",
+      "type": "esriFieldTypeString",
+      "alias": "WORK_TYPE",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ZONING",
+      "type": "esriFieldTypeString",
+      "alias": "ZONING",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SQFT",
+      "type": "esriFieldTypeDouble",
+      "alias": "SQFT",
+      "sqlType": "sqlTypeFloat",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "PERMIT_FEE",
+      "type": "esriFieldTypeDouble",
+      "alias": "PERMIT_FEE",
+      "sqlType": "sqlTypeFloat",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "PROJECT_COSTS",
+      "type": "esriFieldTypeDouble",
+      "alias": "PROJECT_COSTS",
+      "sqlType": "sqlTypeFloat",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ADDRESS",
+      "type": "esriFieldTypeString",
+      "alias": "ADDRESS",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "CITY",
+      "type": "esriFieldTypeString",
+      "alias": "CITY",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "STATE",
+      "type": "esriFieldTypeString",
+      "alias": "STATE",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ZIPCODE",
+      "type": "esriFieldTypeString",
+      "alias": "ZIPCODE",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "LATITUDE",
+      "type": "esriFieldTypeDouble",
+      "alias": "LATITUDE",
+      "sqlType": "sqlTypeFloat",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "LONGITUDE",
+      "type": "esriFieldTypeDouble",
+      "alias": "LONGITUDE",
+      "sqlType": "sqlTypeFloat",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "DISTRICT",
+      "type": "esriFieldTypeString",
+      "alias": "DISTRICT",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "NEIGHBORHOOD",
+      "type": "esriFieldTypeString",
+      "alias": "NEIGHBORHOOD",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ISSUE_DATE",
+      "type": "esriFieldTypeDate",
+      "alias": "ISSUE_DATE",
+      "sqlType": "sqlTypeTimestamp2",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ObjectId",
+      "type": "esriFieldTypeOID",
+      "alias": "ObjectId",
+      "sqlType": "sqlTypeInteger",
+      "domain": null,
+      "defaultValue": null
+    }
+  ],
+  "exceededTransferLimit": true,
+  "features": [
+    {
+      "attributes": {
+        "PERMIT_NUMBER": "14BL1477",
+        "PERMIT_TYPE": "Residential New",
+        "PERMIT_STATUS": "Issued",
+        "CONTRACTOR": "HOWELL CONSTRUCTION",
+        "CATEGORY_NAME": null,
+        "WORK_TYPE": null,
+        "ZONING": "R5",
+        "SQFT": 574,
+        "PERMIT_FEE": 63.14,
+        "PROJECT_COSTS": 13000,
+        "ADDRESS": "2517 GARDINER LN",
+        "CITY": "LOUISVILLE",
+        "STATE": "KY",
+        "ZIPCODE": "40205-0000",
+        "LATITUDE": 38.21578881,
+        "LONGITUDE": -85.66514333,
+        "DISTRICT": "26",
+        "NEIGHBORHOOD": "HAWTHORNE",
+        "ISSUE_DATE": 1393218000000,
+        "ObjectId": 1
+      },
+      "geometry": {
+        "x": -85.66514333,
+        "y": 38.21578881000001
+      }
+    },
+    {
+      "attributes": {
+        "PERMIT_NUMBER": "14BL1478",
+        "PERMIT_TYPE": "Residential Alteration",
+        "PERMIT_STATUS": "Issued",
+        "CONTRACTOR": " ",
+        "CATEGORY_NAME": null,
+        "WORK_TYPE": null,
+        "ZONING": "R4",
+        "SQFT": 1134,
+        "PERMIT_FEE": 85.05,
+        "PROJECT_COSTS": 5000,
+        "ADDRESS": "6315 LABOR LN",
+        "CITY": "LOUISVILLE",
+        "STATE": "KY",
+        "ZIPCODE": "40291-0000",
+        "LATITUDE": 38.15439619,
+        "LONGITUDE": -85.60772374,
+        "DISTRICT": "23",
+        "NEIGHBORHOOD": null,
+        "ISSUE_DATE": 1393218000000,
+        "ObjectId": 2
+      },
+      "geometry": {
+        "x": -85.60772374,
+        "y": 38.15439618999999
+      }
+    }
+  ]
+}

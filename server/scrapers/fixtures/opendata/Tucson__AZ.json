@@ -1,0 +1,296 @@
+{
+  "displayFieldName": "PROJECTNAME",
+  "fieldAliases": {
+    "OBJECTID": "OBJECTID",
+    "ID": "ID",
+    "MODULE": "MODULE",
+    "NUMBER": "NUMBER",
+    "ADDRESS": "ADDRESS",
+    "UNITORSUITE": "UNITORSUITE",
+    "PARCEL": "PARCEL",
+    "STATUS": "STATUS",
+    "TYPE": "TYPE",
+    "PREFIX": "PREFIX",
+    "WORKCLASS": "WORKCLASS",
+    "CensusCode": "CensusCode",
+    "StructureType": "StructureType",
+    "APPLYDATE": "APPLYDATE",
+    "ISSUEDATE": "ISSUEDATE",
+    "EXPIREDATE": "EXPIREDATE",
+    "COMPLETEDATE": "COMPLETEDATE",
+    "VALUE": "VALUE",
+    "SQUAREFEET": "SQUAREFEET",
+    "PROJECTNAME": "PROJECTNAME",
+    "LAT": "LAT",
+    "LON": "LON",
+    "WARD": "WARD",
+    "DESCRIPTION": "DESCRIPTION",
+    "CSS_URL": "CSS_URL",
+    "ENGOV_URL": "ENGOV_URL",
+    "PRO_URL": "PRO_URL",
+    "SOURCE": "SOURCE",
+    "DATASOURCE": "DATASOURCE",
+    "ACTIVE": "ACTIVE"
+  },
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": {
+    "wkid": 4326,
+    "latestWkid": 4326
+  },
+  "fields": [
+    {
+      "name": "OBJECTID",
+      "type": "esriFieldTypeOID",
+      "alias": "OBJECTID"
+    },
+    {
+      "name": "ID",
+      "type": "esriFieldTypeString",
+      "alias": "ID",
+      "length": 50
+    },
+    {
+      "name": "MODULE",
+      "type": "esriFieldTypeString",
+      "alias": "MODULE",
+      "length": 50
+    },
+    {
+      "name": "NUMBER",
+      "type": "esriFieldTypeString",
+      "alias": "NUMBER",
+      "length": 50
+    },
+    {
+      "name": "ADDRESS",
+      "type": "esriFieldTypeString",
+      "alias": "ADDRESS",
+      "length": 1500
+    },
+    {
+      "name": "UNITORSUITE",
+      "type": "esriFieldTypeString",
+      "alias": "UNITORSUITE",
+      "length": 50
+    },
+    {
+      "name": "PARCEL",
+      "type": "esriFieldTypeString",
+      "alias": "PARCEL",
+      "length": 50
+    },
+    {
+      "name": "STATUS",
+      "type": "esriFieldTypeString",
+      "alias": "STATUS",
+      "length": 50
+    },
+    {
+      "name": "TYPE",
+      "type": "esriFieldTypeString",
+      "alias": "TYPE",
+      "length": 50
+    },
+    {
+      "name": "PREFIX",
+      "type": "esriFieldTypeString",
+      "alias": "PREFIX",
+      "length": 20
+    },
+    {
+      "name": "WORKCLASS",
+      "type": "esriFieldTypeString",
+      "alias": "WORKCLASS",
+      "length": 50
+    },
+    {
+      "name": "CensusCode",
+      "type": "esriFieldTypeString",
+      "alias": "CensusCode",
+      "length": 50
+    },
+    {
+      "name": "StructureType",
+      "type": "esriFieldTypeString",
+      "alias": "StructureType",
+      "length": 150
+    },
+    {
+      "name": "APPLYDATE",
+      "type": "esriFieldTypeDate",
+      "alias": "APPLYDATE",
+      "length": 8
+    },
+    {
+      "name": "ISSUEDATE",
+      "type": "esriFieldTypeDate",
+      "alias": "ISSUEDATE",
+      "length": 8
+    },
+    {
+      "name": "EXPIREDATE",
+      "type": "esriFieldTypeDate",
+      "alias": "EXPIREDATE",
+      "length": 8
+    },
+    {
+      "name": "COMPLETEDATE",
+      "type": "esriFieldTypeDate",
+      "alias": "COMPLETEDATE",
+      "length": 8
+    },
+    {
+      "name": "VALUE",
+      "type": "esriFieldTypeDouble",
+      "alias": "VALUE"
+    },
+    {
+      "name": "SQUAREFEET",
+      "type": "esriFieldTypeDouble",
+      "alias": "SQUAREFEET"
+    },
+    {
+      "name": "PROJECTNAME",
+      "type": "esriFieldTypeString",
+      "alias": "PROJECTNAME",
+      "length": 100
+    },
+    {
+      "name": "LAT",
+      "type": "esriFieldTypeDouble",
+      "alias": "LAT"
+    },
+    {
+      "name": "LON",
+      "type": "esriFieldTypeDouble",
+      "alias": "LON"
+    },
+    {
+      "name": "WARD",
+      "type": "esriFieldTypeString",
+      "alias": "WARD",
+      "length": 50
+    },
+    {
+      "name": "DESCRIPTION",
+      "type": "esriFieldTypeString",
+      "alias": "DESCRIPTION",
+      "length": 4000
+    },
+    {
+      "name": "CSS_URL",
+      "type": "esriFieldTypeString",
+      "alias": "CSS_URL",
+      "length": 150
+    },
+    {
+      "name": "ENGOV_URL",
+      "type": "esriFieldTypeString",
+      "alias": "ENGOV_URL",
+      "length": 150
+    },
+    {
+      "name": "PRO_URL",
+      "type": "esriFieldTypeString",
+      "alias": "PRO_URL",
+      "length": 150
+    },
+    {
+      "name": "SOURCE",
+      "type": "esriFieldTypeString",
+      "alias": "SOURCE",
+      "length": 50
+    },
+    {
+      "name": "DATASOURCE",
+      "type": "esriFieldTypeString",
+      "alias": "DATASOURCE",
+      "length": 29
+    },
+    {
+      "name": "ACTIVE",
+      "type": "esriFieldTypeString",
+      "alias": "ACTIVE",
+      "length": 50
+    }
+  ],
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 1,
+        "ID": "00009bb9-bf06-4de3-a508-a3c9de5f787f",
+        "MODULE": "PERMIT",
+        "NUMBER": "TC-RES-0826-04700",
+        "ADDRESS": "2128 N 3RD AV",
+        "UNITORSUITE": "",
+        "PARCEL": "115011060",
+        "STATUS": "In Review",
+        "TYPE": "Residential Building - One or Two Family",
+        "PREFIX": "TC-RES",
+        "WORKCLASS": "Residential Fence/Wall Permit",
+        "CensusCode": "9999 Census Code N/A",
+        "StructureType": "",
+        "APPLYDATE": 1787574521000,
+        "ISSUEDATE": null,
+        "EXPIREDATE": null,
+        "COMPLETEDATE": null,
+        "VALUE": 0,
+        "SQUAREFEET": 0,
+        "PROJECTNAME": "",
+        "LAT": 32.24781859,
+        "LON": -110.96390146,
+        "WARD": "Ward 3",
+        "DESCRIPTION": "Code compliance case CE-VIO0226-00691. Six existing see-through steel fence panels, each approximately 6 ft wide (36 ft total), were removed from between preexisting masonry columns and replaced with solid CMU infill panels for sound reduction, privacy, and safety. The existing low masonry base, pedestrian gate, driveway gate, and columns predate this work. Proposed correction and finish: reduce any permanent CMU portion exceeding 6 ft; apply stucco to the altered panels after required City inspection/authorization; and permanently mortar up to approximately 1 ft of masonry brick/cap build-up to each existing column only as needed to align the tops, with every finished panel and column no more than 6 ft above adjacent finished grade. No change to gates, driveway, sidewalk, curb, street, or utilities. Owner-occupied single-family residence. After-the-fact permit to resolve CE-VIO0226-00691.",
+        "CSS_URL": "https://cityoftucsonaz-energovweb.tylerhost.net/apps/selfservice#/permit/00009bb9-bf06-4de3-a508-a3c9de5f787f",
+        "ENGOV_URL": "https://cityoftucsonaz-energov.tylerhost.net/apps/managepermit/#/permit/00009bb9-bf06-4de3-a508-a3c9de5f787f/summary",
+        "PRO_URL": "https://pro.tucsonaz.gov/activity_search/TC-RES-0826-04700",
+        "SOURCE": "ENGV",
+        "DATASOURCE": "PDSD_RESIDENTIALBLDG",
+        "ACTIVE": "Yes"
+      },
+      "geometry": {
+        "x": -110.96390146045239,
+        "y": 32.2478185899394
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 2,
+        "ID": "0000B47A-8464-435B-85C5-2432D2B090CF",
+        "MODULE": "PERMIT",
+        "NUMBER": "T22CM07055",
+        "ADDRESS": "5329 S SIERRA PRIETA TR",
+        "UNITORSUITE": "",
+        "PARCEL": "141025150",
+        "STATUS": "Issued",
+        "TYPE": "Residential Building - One or Two Family",
+        "PREFIX": "TC-RES",
+        "WORKCLASS": "New Dwelling Permit",
+        "CensusCode": "101 - Single Family Residence",
+        "StructureType": "",
+        "APPLYDATE": 1663113600000,
+        "ISSUEDATE": 1663286400000,
+        "EXPIREDATE": 1700566770000,
+        "COMPLETEDATE": null,
+        "VALUE": 291993.38,
+        "SQUAREFEET": 2957,
+        "PROJECTNAME": "",
+        "LAT": 32.15479848,
+        "LON": -110.7846506,
+        "WARD": "Ward 4",
+        "DESCRIPTION": "SFR F50A22 T22-M0021",
+        "CSS_URL": "https://cityoftucsonaz-energovweb.tylerhost.net/apps/selfservice#/permit/0000B47A-8464-435B-85C5-2432D2B090CF",
+        "ENGOV_URL": "https://cityoftucsonaz-energov.tylerhost.net/apps/managepermit/#/permit/0000B47A-8464-435B-85C5-2432D2B090CF/summary",
+        "PRO_URL": "https://pro.tucsonaz.gov/activity_search/T22CM07055",
+        "SOURCE": "ENGV",
+        "DATASOURCE": "PDSD_RESIDENTIALBLDG",
+        "ACTIVE": "Yes"
+      },
+      "geometry": {
+        "x": -110.78465059991157,
+        "y": 32.15479847976762
+      }
+    }
+  ],
+  "exceededTransferLimit": true
+}

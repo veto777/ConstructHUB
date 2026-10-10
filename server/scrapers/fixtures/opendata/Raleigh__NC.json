@@ -1,0 +1,931 @@
+{
+  "objectIdFieldName": "OBJECTID",
+  "uniqueIdField": {
+    "name": "OBJECTID",
+    "isSystemMaintained": true
+  },
+  "globalIdFieldName": "GlobalID",
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": {
+    "wkid": 4326,
+    "latestWkid": 4326
+  },
+  "fields": [
+    {
+      "name": "OBJECTID",
+      "type": "esriFieldTypeOID",
+      "alias": "OBJECTID",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "permittypemapped",
+      "type": "esriFieldTypeString",
+      "alias": "Permit Type Mapped",
+      "sqlType": "sqlTypeOther",
+      "length": 30,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "workclass",
+      "type": "esriFieldTypeString",
+      "alias": "Work Class",
+      "sqlType": "sqlTypeOther",
+      "length": 100,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "permitclass",
+      "type": "esriFieldTypeString",
+      "alias": "Permit Class",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "proposedworkdescription",
+      "type": "esriFieldTypeString",
+      "alias": "Proposed Work Description",
+      "sqlType": "sqlTypeOther",
+      "length": 100,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "permitclassmapped",
+      "type": "esriFieldTypeString",
+      "alias": "Permit Class Mapped",
+      "sqlType": "sqlTypeOther",
+      "length": 40,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "applieddate",
+      "type": "esriFieldTypeDate",
+      "alias": "Applied Date",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "issueddate",
+      "type": "esriFieldTypeDate",
+      "alias": "Issued Date",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "estprojectcost",
+      "type": "esriFieldTypeDouble",
+      "alias": "Estimated Project Cost",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "constcompletedofficial",
+      "type": "esriFieldTypeString",
+      "alias": "Construction Officially Completed",
+      "sqlType": "sqlTypeOther",
+      "length": 10,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "censuslanduse",
+      "type": "esriFieldTypeString",
+      "alias": "Census Landuse",
+      "sqlType": "sqlTypeOther",
+      "length": 100,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "censuslandusecode",
+      "type": "esriFieldTypeInteger",
+      "alias": "Census Landuse Code",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "devplanid",
+      "type": "esriFieldTypeInteger",
+      "alias": "Development Plan ID",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "corlotid",
+      "type": "esriFieldTypeString",
+      "alias": "City Lot ID",
+      "sqlType": "sqlTypeOther",
+      "length": 10,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "cntyacctnum",
+      "type": "esriFieldTypeString",
+      "alias": "County Account Number",
+      "sqlType": "sqlTypeOther",
+      "length": 10,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "coissueddate",
+      "type": "esriFieldTypeDate",
+      "alias": "CO Issued Date",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "cocissueddate",
+      "type": "esriFieldTypeDate",
+      "alias": "COC Issued Date",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "cocnbr",
+      "type": "esriFieldTypeInteger",
+      "alias": "COC Number",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "contractorcompanyname",
+      "type": "esriFieldTypeString",
+      "alias": "Contractor Company Name",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "contractordba",
+      "type": "esriFieldTypeString",
+      "alias": "Contractor Doing Business As",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "contractoraddress1",
+      "type": "esriFieldTypeString",
+      "alias": "Contractor Address 1",
+      "sqlType": "sqlTypeOther",
+      "length": 100,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "contractoraddress2",
+      "type": "esriFieldTypeString",
+      "alias": "Contractor Address 2",
+      "sqlType": "sqlTypeOther",
+      "length": 100,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "contractorcity",
+      "type": "esriFieldTypeString",
+      "alias": "Contractor City",
+      "sqlType": "sqlTypeOther",
+      "length": 30,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "contractorstate",
+      "type": "esriFieldTypeString",
+      "alias": "Contractor State",
+      "sqlType": "sqlTypeOther",
+      "length": 10,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "contractoremail",
+      "type": "esriFieldTypeString",
+      "alias": "Contractor Email",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "contractorlicnum",
+      "type": "esriFieldTypeString",
+      "alias": "Contractor License Number",
+      "sqlType": "sqlTypeOther",
+      "length": 20,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "contractorphone",
+      "type": "esriFieldTypeString",
+      "alias": "Contractor Phone",
+      "sqlType": "sqlTypeOther",
+      "length": 20,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "contractorzip",
+      "type": "esriFieldTypeString",
+      "alias": "Contractor Zip",
+      "sqlType": "sqlTypeOther",
+      "length": 10,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "countylocation",
+      "type": "esriFieldTypeString",
+      "alias": "County",
+      "sqlType": "sqlTypeOther",
+      "length": 20,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "description",
+      "type": "esriFieldTypeString",
+      "alias": "description",
+      "sqlType": "sqlTypeOther",
+      "length": 100,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "expirednewpermnum",
+      "type": "esriFieldTypeString",
+      "alias": "New Expired Permit Number",
+      "sqlType": "sqlTypeOther",
+      "length": 10,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "expiresdate",
+      "type": "esriFieldTypeDate",
+      "alias": "Expiration Date",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "fee",
+      "type": "esriFieldTypeInteger",
+      "alias": "fee",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "fiscalyear",
+      "type": "esriFieldTypeString",
+      "alias": "Fiscal Year",
+      "sqlType": "sqlTypeOther",
+      "length": 10,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "govtownedprop",
+      "type": "esriFieldTypeInteger",
+      "alias": "Government Owned Property",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "grouptenantname",
+      "type": "esriFieldTypeString",
+      "alias": "Group Tenant Name",
+      "sqlType": "sqlTypeOther",
+      "length": 100,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "housingunitstotal",
+      "type": "esriFieldTypeInteger",
+      "alias": "Total Housing Units",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "housingunitsexist",
+      "type": "esriFieldTypeInteger",
+      "alias": "Existing Housing Units",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "issueddate_mth",
+      "type": "esriFieldTypeInteger",
+      "alias": "Month Issued",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "issueddate_yr",
+      "type": "esriFieldTypeInteger",
+      "alias": "Year Issued",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "jurisdiction",
+      "type": "esriFieldTypeString",
+      "alias": "jurisdiction",
+      "sqlType": "sqlTypeOther",
+      "length": 30,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "jurisdiction_atissue",
+      "type": "esriFieldTypeString",
+      "alias": "Jurisdiction At Issue",
+      "sqlType": "sqlTypeOther",
+      "length": 30,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "jurisdiction_inout_ral",
+      "type": "esriFieldTypeString",
+      "alias": "Jurisdiction In Raleigh",
+      "sqlType": "sqlTypeOther",
+      "length": 40,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "landusedescription",
+      "type": "esriFieldTypeString",
+      "alias": "Landuse Description",
+      "sqlType": "sqlTypeOther",
+      "length": 100,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "landusenewuse",
+      "type": "esriFieldTypeString",
+      "alias": "Landuse Code",
+      "sqlType": "sqlTypeOther",
+      "length": 10,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "latitude_perm",
+      "type": "esriFieldTypeDouble",
+      "alias": "Latitude",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "longitude_perm",
+      "type": "esriFieldTypeDouble",
+      "alias": "Longitude",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "mapsheet",
+      "type": "esriFieldTypeString",
+      "alias": "Map Sheet",
+      "sqlType": "sqlTypeOther",
+      "length": 10,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "numberstories",
+      "type": "esriFieldTypeInteger",
+      "alias": "Stories",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "originaladdress1",
+      "type": "esriFieldTypeString",
+      "alias": "Original Address 1",
+      "sqlType": "sqlTypeOther",
+      "length": 100,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "originaladdress2",
+      "type": "esriFieldTypeString",
+      "alias": "Original Address 2",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "originalcity",
+      "type": "esriFieldTypeString",
+      "alias": "Original City",
+      "sqlType": "sqlTypeOther",
+      "length": 30,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "originalstate",
+      "type": "esriFieldTypeString",
+      "alias": "Original State",
+      "sqlType": "sqlTypeOther",
+      "length": 10,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "originalzip",
+      "type": "esriFieldTypeString",
+      "alias": "Original Zip",
+      "sqlType": "sqlTypeOther",
+      "length": 10,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "parc_open_space_zone_fee",
+      "type": "esriFieldTypeInteger",
+      "alias": "Open Space Zone Fee",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "parcelownername",
+      "type": "esriFieldTypeString",
+      "alias": "Parcel Owner Name",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "parcelowneraddress1",
+      "type": "esriFieldTypeString",
+      "alias": "Parcel Owner Address 1",
+      "sqlType": "sqlTypeOther",
+      "length": 100,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "parcelowneraddress2",
+      "type": "esriFieldTypeString",
+      "alias": "Parcel Owner Address 2",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "perm_comments",
+      "type": "esriFieldTypeString",
+      "alias": "Permit Comments",
+      "sqlType": "sqlTypeOther",
+      "length": 500,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "permittype",
+      "type": "esriFieldTypeString",
+      "alias": "Permit Type",
+      "sqlType": "sqlTypeOther",
+      "length": 30,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "pin",
+      "type": "esriFieldTypeString",
+      "alias": "PIN #",
+      "sqlType": "sqlTypeOther",
+      "length": 20,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "projectname",
+      "type": "esriFieldTypeString",
+      "alias": "Project Name",
+      "sqlType": "sqlTypeOther",
+      "length": 100,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "proposeduse",
+      "type": "esriFieldTypeString",
+      "alias": "Proposed Use",
+      "sqlType": "sqlTypeOther",
+      "length": 200,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "publisher",
+      "type": "esriFieldTypeString",
+      "alias": "publisher",
+      "sqlType": "sqlTypeOther",
+      "length": 30,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "recordupdatedate",
+      "type": "esriFieldTypeDate",
+      "alias": "Record Updated",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "reviewercomments",
+      "type": "esriFieldTypeString",
+      "alias": "Reviewer Comments",
+      "sqlType": "sqlTypeOther",
+      "length": 500,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "statelicnum",
+      "type": "esriFieldTypeString",
+      "alias": "State License Number",
+      "sqlType": "sqlTypeOther",
+      "length": 10,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "statuscurrent",
+      "type": "esriFieldTypeString",
+      "alias": "Current Status",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "statuscurrentmapped",
+      "type": "esriFieldTypeString",
+      "alias": "Current Status Mapped",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "streetnum",
+      "type": "esriFieldTypeString",
+      "alias": "Street Number",
+      "sqlType": "sqlTypeOther",
+      "length": 20,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "streetdirectionprefix",
+      "type": "esriFieldTypeString",
+      "alias": "Street Direction Prefix",
+      "sqlType": "sqlTypeOther",
+      "length": 10,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "streetname",
+      "type": "esriFieldTypeString",
+      "alias": "Street Name",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "streetdirectionsuffix",
+      "type": "esriFieldTypeString",
+      "alias": "streetdirectionsuffix",
+      "sqlType": "sqlTypeOther",
+      "length": 10,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "streettype",
+      "type": "esriFieldTypeString",
+      "alias": "streettype",
+      "sqlType": "sqlTypeOther",
+      "length": 10,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "totalsqft",
+      "type": "esriFieldTypeInteger",
+      "alias": "Total Square Footage",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "voiddate",
+      "type": "esriFieldTypeDate",
+      "alias": "Void Date",
+      "sqlType": "sqlTypeOther",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "workclassmapped",
+      "type": "esriFieldTypeString",
+      "alias": "Work Class Mapped",
+      "sqlType": "sqlTypeOther",
+      "length": 20,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "GlobalID",
+      "type": "esriFieldTypeGlobalID",
+      "alias": "GlobalID",
+      "sqlType": "sqlTypeOther",
+      "length": 38,
+      "domain": null,
+      "defaultValue": "NEWID() WITH VALUES"
+    },
+    {
+      "name": "const_type",
+      "type": "esriFieldTypeString",
+      "alias": "Construction Type",
+      "sqlType": "sqlTypeOther",
+      "length": 20,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "occupancyclass",
+      "type": "esriFieldTypeString",
+      "alias": "Occupancy Class",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "permitnum",
+      "type": "esriFieldTypeString",
+      "alias": "Permit Number",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "adu_type",
+      "type": "esriFieldTypeString",
+      "alias": "ADU Type",
+      "sqlType": "sqlTypeOther",
+      "length": 20,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "missing_middle",
+      "type": "esriFieldTypeString",
+      "alias": "missing_middle",
+      "sqlType": "sqlTypeOther",
+      "length": 10,
+      "domain": null,
+      "defaultValue": null
+    }
+  ],
+  "exceededTransferLimit": true,
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 47521,
+        "permittypemapped": "Building",
+        "workclass": "New Building",
+        "permitclass": "324",
+        "proposedworkdescription": null,
+        "permitclassmapped": "Residential",
+        "applieddate": 955379156000,
+        "issueddate": 956762178000,
+        "estprojectcost": 236800,
+        "constcompletedofficial": "Yes",
+        "censuslanduse": "OFFICE, BANK, AND PROFESSIONAL BUILDING",
+        "censuslandusecode": 324,
+        "devplanid": 0,
+        "corlotid": "1218",
+        "cntyacctnum": "0252764",
+        "coissueddate": 1005055252000,
+        "cocissueddate": null,
+        "cocnbr": null,
+        "contractorcompanyname": "DJB (BEERS/DAVIDSON AND JONES",
+        "contractordba": null,
+        "contractoraddress1": "T/A BEERS CONSTRUCTION GROUP, INC.",
+        "contractoraddress2": "3101 INDUSTRIAL DRIVE STE. 100",
+        "contractorcity": "RALEIGH",
+        "contractorstate": "NC",
+        "contractoremail": "djb no longer exists",
+        "contractorlicnum": "2050",
+        "contractorphone": "9198286260",
+        "contractorzip": "27609",
+        "countylocation": "WAKE",
+        "description": "CONST. BLD",
+        "expirednewpermnum": null,
+        "expiresdate": null,
+        "fee": 445,
+        "fiscalyear": "FY 99/00",
+        "govtownedprop": 0,
+        "grouptenantname": null,
+        "housingunitstotal": null,
+        "housingunitsexist": null,
+        "issueddate_mth": 4,
+        "issueddate_yr": 2000,
+        "jurisdiction": "16000US3755000",
+        "jurisdiction_atissue": null,
+        "jurisdiction_inout_ral": "Inside City Limits",
+        "landusedescription": "MEMB - CLUBS COUNTRY/TENNIS/GOLF",
+        "landusenewuse": "190",
+        "latitude_perm": null,
+        "longitude_perm": null,
+        "mapsheet": "076803",
+        "numberstories": 2,
+        "originaladdress1": "10601 LUMLEY RD",
+        "originaladdress2": null,
+        "originalcity": "RALEIGH",
+        "originalstate": null,
+        "originalzip": null,
+        "parc_open_space_zone_fee": 1,
+        "parcelownername": "BRIER CREEK COUNTRY CLUB LLC",
+        "parcelowneraddress1": "1215 JONES FRANKLIN RD STE 203",
+        "parcelowneraddress2": "RALEIGH NC  27606-3351",
+        "perm_comments": null,
+        "permittype": "BUILDING",
+        "pin": "0768055077",
+        "projectname": "CONVERSION DEVELOPMENT PLAN",
+        "proposeduse": "OFFICE, BANK, AND PROFESSIONAL BUILDING",
+        "publisher": "City of Raleigh",
+        "recordupdatedate": 1018381849000,
+        "reviewercomments": null,
+        "statelicnum": "34493",
+        "statuscurrent": "INACTIVE (INSPECTIONS COMPLETED)",
+        "statuscurrentmapped": "Occupancy",
+        "streetnum": "10601",
+        "streetdirectionprefix": "  ",
+        "streetname": "LUMLEY",
+        "streetdirectionsuffix": "  ",
+        "streettype": "RD",
+        "totalsqft": 4736,
+        "voiddate": null,
+        "workclassmapped": "New",
+        "GlobalID": "675f6d3e-358a-4b6d-b001-b21d4353035f",
+        "const_type": "V  U",
+        "occupancyclass": "ASSEMBLY SMALL",
+        "permitnum": "000571",
+        "adu_type": null,
+        "missing_middle": null
+      },
+      "geometry": {
+        "x": -78.79496132840086,
+        "y": 35.90338690037903
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 47522,
+        "permittypemapped": "Building",
+        "workclass": "Alterations/repairs",
+        "permitclass": "318",
+        "proposedworkdescription": "GRILL",
+        "permitclassmapped": "Non-Residential",
+        "applieddate": 959016910000,
+        "issueddate": 962632760000,
+        "estprojectcost": 35000,
+        "constcompletedofficial": "Yes",
+        "censuslanduse": "AMUSEMENT & RECREATIONAL BUILDING",
+        "censuslandusecode": 318,
+        "devplanid": 0,
+        "corlotid": "0881",
+        "cntyacctnum": "0058278",
+        "coissueddate": 1042466933000,
+        "cocissueddate": null,
+        "cocnbr": null,
+        "contractorcompanyname": "CENTURION CONSTRUCTION COMPANY",
+        "contractordba": null,
+        "contractoraddress1": "3301 GLEN ROYAL RD ",
+        "contractoraddress2": null,
+        "contractorcity": "RALEIGH",
+        "contractorstate": "NC",
+        "contractoremail": "vherring@centurionconstruction.com",
+        "contractorlicnum": "113",
+        "contractorphone": "9197870924",
+        "contractorzip": "27617",
+        "countylocation": "WAKE",
+        "description": "GRILL/SNACK BAR FIT UP",
+        "expirednewpermnum": null,
+        "expiresdate": null,
+        "fee": 50,
+        "fiscalyear": "FY 00/01",
+        "govtownedprop": 0,
+        "grouptenantname": null,
+        "housingunitstotal": 0,
+        "housingunitsexist": null,
+        "issueddate_mth": 7,
+        "issueddate_yr": 2000,
+        "jurisdiction": "16000US3755000",
+        "jurisdiction_atissue": null,
+        "jurisdiction_inout_ral": "Inside City Limits",
+        "landusedescription": "MEMB - CLUBS COUNTRY/TENNIS/GOLF",
+        "landusenewuse": "798",
+        "latitude_perm": null,
+        "longitude_perm": null,
+        "mapsheet": null,
+        "numberstories": 1,
+        "originaladdress1": "400 S PEARTREE LN",
+        "originaladdress2": null,
+        "originalcity": "RALEIGH",
+        "originalstate": null,
+        "originalzip": null,
+        "parc_open_space_zone_fee": 4,
+        "parcelownername": "RALEIGH COUNTRY CLUB INC",
+        "parcelowneraddress1": "400 S PEARTREE LN",
+        "parcelowneraddress2": "RALEIGH NC  27610-2814",
+        "perm_comments": null,
+        "permittype": "BUILDING",
+        "pin": "1713981008",
+        "projectname": "CONVERSION DEVELOPMENT PLAN",
+        "proposeduse": "AMUSEMENT & RECREATIONAL BUILDING",
+        "publisher": "City of Raleigh",
+        "recordupdatedate": 962632755000,
+        "reviewercomments": null,
+        "statelicnum": "12332",
+        "statuscurrent": "INACTIVE (INSPECTIONS COMPLETED)",
+        "statuscurrentmapped": "Occupancy",
+        "streetnum": "400",
+        "streetdirectionprefix": "S",
+        "streetname": "PEARTREE",
+        "streetdirectionsuffix": "  ",
+        "streettype": "LN",
+        "totalsqft": 0,
+        "voiddate": null,
+        "workclassmapped": "Existing",
+        "GlobalID": "0b192fb0-3879-4bbc-b4f9-e91b7c7419de",
+        "const_type": "VI U",
+        "occupancyclass": "BUSINESS",
+        "permitnum": "001769",
+        "adu_type": null,
+        "missing_middle": null
+      },
+      "geometry": {
+        "x": -78.59238939602945,
+        "y": 35.78676491813382
+      }
+    }
+  ]
+}

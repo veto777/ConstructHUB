@@ -1,0 +1,439 @@
+{
+  "objectIdFieldName": "ObjectId",
+  "uniqueIdField": {
+    "name": "ObjectId",
+    "isSystemMaintained": true
+  },
+  "globalIdFieldName": "",
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": {
+    "wkid": 4326,
+    "latestWkid": 4326
+  },
+  "fields": [
+    {
+      "name": "record_id",
+      "type": "esriFieldTypeString",
+      "alias": "Record ID",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"Unique identifier used to track this permit within BSEED's Accela database.\", \"fieldValueType\": \"uniqueIdentifier\"}"
+    },
+    {
+      "name": "address",
+      "type": "esriFieldTypeString",
+      "alias": "Address",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"Property address of the structure that the building permit was issued for.\", \"fieldValueType\": \"locationOrPlaceName\"}"
+    },
+    {
+      "name": "submitted_date",
+      "type": "esriFieldTypeDateOnly",
+      "alias": "Submitted Date",
+      "sqlType": "sqlTypeDate",
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"Date the application was received. Applications are submitted to BSEED by property owners or licensed professionals.\", \"fieldValueType\": \"dateAndTime\"}"
+    },
+    {
+      "name": "issued_date",
+      "type": "esriFieldTypeDateOnly",
+      "alias": "Issued Date",
+      "sqlType": "sqlTypeDate",
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"Date the permit was issued. The permit is issued when the permit application is approved. Permits are issued by BSEED staff.\", \"fieldValueType\": \"dateAndTime\"}"
+    },
+    {
+      "name": "work_description",
+      "type": "esriFieldTypeString",
+      "alias": "Description of Work",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 1368,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"Notes and further specifications about the building permit. They may contain details about the location information, related grants, or related building permits.\", \"fieldValueType\": \"description\"}"
+    },
+    {
+      "name": "permit_type",
+      "type": "esriFieldTypeString",
+      "alias": "Permit Type",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"The category of building permit that was issued.\", \"fieldValueType\": \"typeOrCategory\"}"
+    },
+    {
+      "name": "construction_type",
+      "type": "esriFieldTypeString",
+      "alias": "Construction Type",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"\", \"fieldValueType\": \"typeOrCategory\"}"
+    },
+    {
+      "name": "current_use_type",
+      "type": "esriFieldTypeString",
+      "alias": "Current Building Use Type",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"The building's current Type of Use. It is defined by the Michigan Building Code in conjunction with the City of Detroit Zoning Ordinance.\", \"fieldValueType\": \"typeOrCategory\"}"
+    },
+    {
+      "name": "proposed_use_type",
+      "type": "esriFieldTypeString",
+      "alias": "Proposed Use Type",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"The Type of Use that the permit applicant proposed for the relevant building space after the permitted work is completed.\", \"fieldValueType\": \"typeOrCategory\"}"
+    },
+    {
+      "name": "use_group",
+      "type": "esriFieldTypeString",
+      "alias": "Use Group",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"\", \"fieldValueType\": \"typeOrCategory\"}"
+    },
+    {
+      "name": "zoning_designation",
+      "type": "esriFieldTypeString",
+      "alias": "Zoning Designation",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"The type of zoning district where the building is located. The City of Detroit Zoning Ordinance is written by the City Planning Commission and approved by City Council.\", \"fieldValueType\": \"typeOrCategory\"}"
+    },
+    {
+      "name": "num_stories",
+      "type": "esriFieldTypeDouble",
+      "alias": "Number of Stories",
+      "sqlType": "sqlTypeFloat",
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"Stories is the total number of floors in the building. Permits may be issued for individual floors or groups of floors.\", \"fieldValueType\": \"countOrAmount\"}"
+    },
+    {
+      "name": "num_units",
+      "type": "esriFieldTypeDouble",
+      "alias": "Number of Units",
+      "sqlType": "sqlTypeFloat",
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"\", \"fieldValueType\": \"countOrAmount\"}"
+    },
+    {
+      "name": "amt_permit_cost",
+      "type": "esriFieldTypeDouble",
+      "alias": "amt_permit_cost",
+      "sqlType": "sqlTypeFloat",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "amt_estimated_contractor_cost",
+      "type": "esriFieldTypeDouble",
+      "alias": "Contractor Estimated Cost",
+      "sqlType": "sqlTypeFloat",
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"Cost estimated by contractor, when included in permit application.\"}"
+    },
+    {
+      "name": "amt_estimated_department_cost",
+      "type": "esriFieldTypeDouble",
+      "alias": "Department Estimated Cost",
+      "sqlType": "sqlTypeFloat",
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"Cost estimate calculated by BSEED using the Michigan Bureau of Construction Codes (BCC) Square Footage Cost Table. Department Estimated Cost is used to determine permit fees when Contractor Estimated Cost is less than the cost estimate that is based on the BCC Square Footage Cost Table.\"}"
+    },
+    {
+      "name": "pmr_id",
+      "type": "esriFieldTypeString",
+      "alias": "pmr_id",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "is_open_to_elements",
+      "type": "esriFieldTypeString",
+      "alias": "Open to Elements?",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"At the time of building permit application, has the structure been open to the elements for more than one month in the last 3 years?\", \"fieldValueType\": \"binary\"}"
+    },
+    {
+      "name": "is_missing_portions_of_building",
+      "type": "esriFieldTypeString",
+      "alias": "Missing Structural Elements?",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"At the time of building permit application, is the structure(s) missing windows, doors, or any portion of the roof?\", \"fieldValueType\": \"binary\"}"
+    },
+    {
+      "name": "is_purchased_from_dlba",
+      "type": "esriFieldTypeString",
+      "alias": "Purchased from DLBA?",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"Was the property purchased from the Detroit Land Bank Authority?\", \"fieldValueType\": \"binary\"}"
+    },
+    {
+      "name": "is_in_dlba_compliance",
+      "type": "esriFieldTypeString",
+      "alias": "In DLBA Compliance Program?",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"At the time of building permit application, is the property in the Detroit Land Bank Authority (DLBA) compliance process?\", \"fieldValueType\": \"binary\"}"
+    },
+    {
+      "name": "has_change_in_units",
+      "type": "esriFieldTypeString",
+      "alias": "Change in Units?",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"Will this permit change the number of residential units?\", \"fieldValueType\": \"binary\"}"
+    },
+    {
+      "name": "is_vacant",
+      "type": "esriFieldTypeString",
+      "alias": "Is Building Vacant?",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"At the time of building permit application, is the building vacant?\", \"fieldValueType\": \"binary\"}"
+    },
+    {
+      "name": "neighborhood",
+      "type": "esriFieldTypeString",
+      "alias": "Neighborhood",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"Neighborhood where the address of property is located.\", \"fieldValueType\": \"locationOrPlaceName\"}"
+    },
+    {
+      "name": "council_district",
+      "type": "esriFieldTypeString",
+      "alias": "Council District",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 2147483647,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"Council district where the address of property is located.\", \"fieldValueType\": \"locationOrPlaceName\"}"
+    },
+    {
+      "name": "zip_code",
+      "type": "esriFieldTypeString",
+      "alias": "ZIP Code",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 2147483647,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"Zip code where the address of property is located.\", \"fieldValueType\": \"locationOrPlaceName\"}"
+    },
+    {
+      "name": "street_number",
+      "type": "esriFieldTypeDouble",
+      "alias": "Street Number",
+      "sqlType": "sqlTypeFloat",
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"Street number of the property address where the permit was issued.\", \"fieldValueType\": \"description\"}"
+    },
+    {
+      "name": "street_prefix",
+      "type": "esriFieldTypeString",
+      "alias": "Street Prefix",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"Street prefix / directional of the property address where the permit was issued.\", \"fieldValueType\": \"description\"}"
+    },
+    {
+      "name": "street_name",
+      "type": "esriFieldTypeString",
+      "alias": "Street Name",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"Street name of the property address where the permit was issued.\", \"fieldValueType\": \"locationOrPlaceName\"}"
+    },
+    {
+      "name": "street_type",
+      "type": "esriFieldTypeString",
+      "alias": "Street Type",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"Street type for the property address where the permit was issued.\", \"fieldValueType\": \"typeOrCategory\"}"
+    },
+    {
+      "name": "parcel_id",
+      "type": "esriFieldTypeString",
+      "alias": "Parcel ID",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"Unique number used to track the parcel of land the property is located on. Parcel IDs are assigned by the Office of the Assessor.\", \"fieldValueType\": \"uniqueIdentifier\"}"
+    },
+    {
+      "name": "address_id",
+      "type": "esriFieldTypeDouble",
+      "alias": "Address ID",
+      "sqlType": "sqlTypeFloat",
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"Unique number used to identify the physical address of the location for which a building permit was issued. Address IDs are assigned when an address is geocoded using Detroit's Base Units.\", \"fieldValueType\": \"uniqueIdentifier\"}"
+    },
+    {
+      "name": "longitude",
+      "type": "esriFieldTypeDouble",
+      "alias": "Longitude",
+      "sqlType": "sqlTypeFloat",
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"Longitudinal geographic coordinate of the address of the structure for which the building permit was issued.\", \"fieldValueType\": \"coordinate\"}"
+    },
+    {
+      "name": "latitude",
+      "type": "esriFieldTypeDouble",
+      "alias": "Latitude",
+      "sqlType": "sqlTypeFloat",
+      "domain": null,
+      "defaultValue": null,
+      "description": "{\"value\": \"Latitudinal geographic coordinate of the address of the structure for which the building permit was issued.\", \"fieldValueType\": \"coordinate\"}"
+    },
+    {
+      "name": "ObjectId",
+      "type": "esriFieldTypeOID",
+      "alias": "ObjectId",
+      "sqlType": "sqlTypeInteger",
+      "domain": null,
+      "defaultValue": null
+    }
+  ],
+  "exceededTransferLimit": true,
+  "features": [
+    {
+      "attributes": {
+        "record_id": "RES2026-01961",
+        "address": "12805 La Salle Blvd",
+        "submitted_date": "2026-06-11",
+        "issued_date": "2026-06-22",
+        "work_description": "Exterior alterations (windows) per documents. \r\n(Subject to Field Approval.)",
+        "permit_type": "Alteration",
+        "construction_type": "5B - COMBUSTIBLE (FP 000)",
+        "current_use_type": "Two Family",
+        "proposed_use_type": "Two Family",
+        "use_group": "R-3 310.5",
+        "zoning_designation": "Other",
+        "num_stories": 3,
+        "num_units": 1,
+        "amt_permit_cost": 475.97,
+        "amt_estimated_contractor_cost": 7300,
+        "amt_estimated_department_cost": null,
+        "pmr_id": null,
+        "is_open_to_elements": "No",
+        "is_missing_portions_of_building": "No",
+        "is_purchased_from_dlba": "No",
+        "is_in_dlba_compliance": "No",
+        "has_change_in_units": "No",
+        "is_vacant": "No",
+        "neighborhood": "Dexter-Linwood",
+        "council_district": "5",
+        "zip_code": "48238",
+        "street_number": 12805,
+        "street_prefix": null,
+        "street_name": "La Salle",
+        "street_type": "Blvd",
+        "parcel_id": "10008816-8",
+        "address_id": 40121,
+        "longitude": -83.117555464,
+        "latitude": 42.391290852,
+        "ObjectId": 1
+      },
+      "geometry": {
+        "x": -83.117555464,
+        "y": 42.39129085199998
+      }
+    },
+    {
+      "attributes": {
+        "record_id": "RES2025-00921",
+        "address": "19966 Meyers Rd",
+        "submitted_date": "2025-03-25",
+        "issued_date": "2025-04-14",
+        "work_description": "Exterior renovations per provided documents. (Subject to field approval.)",
+        "permit_type": "Alteration",
+        "construction_type": "5B - COMBUSTIBLE (FP 000)",
+        "current_use_type": "One Family",
+        "proposed_use_type": "One Family",
+        "use_group": "R-3 310.5",
+        "zoning_designation": "R2-Two Family Residential",
+        "num_stories": 1,
+        "num_units": 1,
+        "amt_permit_cost": 441.88,
+        "amt_estimated_contractor_cost": 6960,
+        "amt_estimated_department_cost": null,
+        "pmr_id": null,
+        "is_open_to_elements": "No",
+        "is_missing_portions_of_building": "No",
+        "is_purchased_from_dlba": "No",
+        "is_in_dlba_compliance": "No",
+        "has_change_in_units": "No",
+        "is_vacant": "No",
+        "neighborhood": "McDowell",
+        "council_district": "2",
+        "zip_code": "48235",
+        "street_number": 19966,
+        "street_prefix": null,
+        "street_name": "Meyers",
+        "street_type": "Rd",
+        "parcel_id": "16046312-4",
+        "address_id": 25286,
+        "longitude": -83.17071,
+        "latitude": 42.439518,
+        "ObjectId": 2
+      },
+      "geometry": {
+        "x": -83.17071000000001,
+        "y": 42.43951799999999
+      }
+    }
+  ]
+}

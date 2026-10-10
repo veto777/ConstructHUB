@@ -1,0 +1,431 @@
+{
+  "objectIdFieldName": "ObjectId",
+  "uniqueIdField": {
+    "name": "ObjectId",
+    "isSystemMaintained": true
+  },
+  "globalIdFieldName": "",
+  "fields": [
+    {
+      "name": "APNO",
+      "type": "esriFieldTypeString",
+      "alias": "APNO",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "APBLDGKEY",
+      "type": "esriFieldTypeDouble",
+      "alias": "APBLDGKEY",
+      "sqlType": "sqlTypeFloat",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "APTYPE",
+      "type": "esriFieldTypeString",
+      "alias": "APTYPE",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "WORKTYPE",
+      "type": "esriFieldTypeString",
+      "alias": "WORKTYPE",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "APPLICANT",
+      "type": "esriFieldTypeString",
+      "alias": "APPLICANT",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "APL_ADDRESS",
+      "type": "esriFieldTypeString",
+      "alias": "APL_ADDRESS",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "BLDGAPPLSTATUS",
+      "type": "esriFieldTypeString",
+      "alias": "BLDGAPPLSTATUS",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ISSDTTM",
+      "type": "esriFieldTypeDate",
+      "alias": "ISSDTTM",
+      "sqlType": "sqlTypeTimestamp2",
+      "length": 8,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "DECLVLTN",
+      "type": "esriFieldTypeDouble",
+      "alias": "DECLVLTN",
+      "sqlType": "sqlTypeFloat",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "CALCVLTN",
+      "type": "esriFieldTypeDouble",
+      "alias": "CALCVLTN",
+      "sqlType": "sqlTypeFloat",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "STNO",
+      "type": "esriFieldTypeDouble",
+      "alias": "STNO",
+      "sqlType": "sqlTypeFloat",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "PREDIR",
+      "type": "esriFieldTypeString",
+      "alias": "PREDIR",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "STNAME",
+      "type": "esriFieldTypeString",
+      "alias": "STNAME",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SUFFIX",
+      "type": "esriFieldTypeString",
+      "alias": "SUFFIX",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "POSTDIR",
+      "type": "esriFieldTypeString",
+      "alias": "POSTDIR",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "STSUB",
+      "type": "esriFieldTypeString",
+      "alias": "STSUB",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SUBDIVCODEADR",
+      "type": "esriFieldTypeDouble",
+      "alias": "SUBDIVCODEADR",
+      "sqlType": "sqlTypeFloat",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "PRCLID",
+      "type": "esriFieldTypeBigInteger",
+      "alias": "PRCLID",
+      "sqlType": "sqlTypeBigInt",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SUBDIV",
+      "type": "esriFieldTypeString",
+      "alias": "SUBDIV",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "PRCLTYPE",
+      "type": "esriFieldTypeString",
+      "alias": "PRCLTYPE",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "SUBDIVCODEPRCL",
+      "type": "esriFieldTypeDouble",
+      "alias": "SUBDIVCODEPRCL",
+      "sqlType": "sqlTypeFloat",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "BLOCK",
+      "type": "esriFieldTypeString",
+      "alias": "BLOCK",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "LOT",
+      "type": "esriFieldTypeString",
+      "alias": "LOT",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 256,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "LEGALOWNER",
+      "type": "esriFieldTypeString",
+      "alias": "LEGALOWNER",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "NAME",
+      "type": "esriFieldTypeString",
+      "alias": "NAME",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ADDR1",
+      "type": "esriFieldTypeString",
+      "alias": "ADDR1",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "CITY",
+      "type": "esriFieldTypeString",
+      "alias": "CITY",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "STATE",
+      "type": "esriFieldTypeString",
+      "alias": "STATE",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ZIP",
+      "type": "esriFieldTypeString",
+      "alias": "ZIP",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "CONTACTINFO",
+      "type": "esriFieldTypeString",
+      "alias": "CONTACTINFO",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "GALLONS",
+      "type": "esriFieldTypeString",
+      "alias": "GALLONS",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "PUBLICDROPLIST",
+      "type": "esriFieldTypeString",
+      "alias": "PUBLICDROPLIST",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "COMM",
+      "type": "esriFieldTypeString",
+      "alias": "COMM",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "RES",
+      "type": "esriFieldTypeString",
+      "alias": "RES",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "MISC_FEES",
+      "type": "esriFieldTypeString",
+      "alias": "MISC_FEES",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "CODE_ANALYSIS",
+      "type": "esriFieldTypeString",
+      "alias": "CODE_ANALYSIS",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "NSCB",
+      "type": "esriFieldTypeString",
+      "alias": "NSCB",
+      "sqlType": "sqlTypeNVarchar",
+      "length": 4000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "ObjectId",
+      "type": "esriFieldTypeOID",
+      "alias": "ObjectId",
+      "sqlType": "sqlTypeInteger",
+      "domain": null,
+      "defaultValue": null
+    }
+  ],
+  "exceededTransferLimit": true,
+  "features": [
+    {
+      "attributes": {
+        "APNO": "C-189527",
+        "APBLDGKEY": 678654,
+        "APTYPE": "Com",
+        "WORKTYPE": "Building",
+        "APPLICANT": "CORE CONSTRUCTION",
+        "APL_ADDRESS": "7150 CASCADE VALLEY CT LAS VEGAS",
+        "BLDGAPPLSTATUS": "Closed",
+        "ISSDTTM": 1309305600000,
+        "DECLVLTN": 189500,
+        "CALCVLTN": 0,
+        "STNO": 10101,
+        "PREDIR": null,
+        "STNAME": "BANBURRY CROSS",
+        "SUFFIX": "DR",
+        "POSTDIR": null,
+        "STSUB": null,
+        "SUBDIVCODEADR": 58084,
+        "PRCLID": null,
+        "SUBDIV": "CROSSING AT SUMMERLIN VILLAGE 8 PLAT BOOK 58 PAGE 84 LOT 1 ",
+        "PRCLTYPE": null,
+        "SUBDIVCODEPRCL": 58084,
+        "BLOCK": null,
+        "LOT": "1",
+        "LEGALOWNER": "CITY OF LAS VEGAS 495 S MAIN ST 5TH FLR LAS VEGAS NV 89101 ",
+        "NAME": "CITY OF LAS VEGAS",
+        "ADDR1": "495 S MAIN ST",
+        "CITY": "LAS VEGAS",
+        "STATE": "NV",
+        "ZIP": "89101",
+        "CONTACTINFO": "CITY OF LAS VEGAS",
+        "GALLONS": null,
+        "PUBLICDROPLIST": null,
+        "COMM": "Y",
+        "RES": "N",
+        "MISC_FEES": "BLDGANALYSIS | DESCRIPTION 3D_082 | PHOTOVOLTAIC SYSTEM PER KW 3E_010 | CARPORT CUSTOM AND COMMERCI (SQ FT)",
+        "CODE_ANALYSIS": "OCCDESC Utility Structure (without MPEs)",
+        "NSCB": "LICENSE # | TYPE 0077142 | A 0006144A | B",
+        "ObjectId": 11225699
+      }
+    },
+    {
+      "attributes": {
+        "APNO": "C-189528",
+        "APBLDGKEY": 678655,
+        "APTYPE": "Com",
+        "WORKTYPE": "Building",
+        "APPLICANT": "CORE CONSTRUCTION",
+        "APL_ADDRESS": "7150 CASCADE VALLEY CT LAS VEGAS",
+        "BLDGAPPLSTATUS": "Closed",
+        "ISSDTTM": 1308182400000,
+        "DECLVLTN": 321550,
+        "CALCVLTN": 0,
+        "STNO": 805,
+        "PREDIR": "N",
+        "STNAME": "MOJAVE",
+        "SUFFIX": "RD",
+        "POSTDIR": null,
+        "STSUB": null,
+        "SUBDIVCODEADR": 99016,
+        "PRCLID": null,
+        "SUBDIV": "PARCEL MAP FILE 99 PAGE 16 LOT 2 ",
+        "PRCLTYPE": null,
+        "SUBDIVCODEPRCL": 99016,
+        "BLOCK": null,
+        "LOT": "2",
+        "LEGALOWNER": "CITY OF LAS VEGAS 495 S MAIN ST 5TH FLR LAS VEGAS NV 89101 ",
+        "NAME": "CITY OF LAS VEGAS",
+        "ADDR1": "495 S MAIN ST",
+        "CITY": "LAS VEGAS",
+        "STATE": "NV",
+        "ZIP": "89101",
+        "CONTACTINFO": "CITY OF LAS VEGAS",
+        "GALLONS": null,
+        "PUBLICDROPLIST": null,
+        "COMM": "Y",
+        "RES": "N",
+        "MISC_FEES": "BLDGANALYSIS | DESCRIPTION 3D_082 | PHOTOVOLTAIC SYSTEM PER KW 3E_010 | CARPORT CUSTOM AND COMMERCI (SQ FT)",
+        "CODE_ANALYSIS": "OCCDESC Utility Structure (without MPEs)",
+        "NSCB": "LICENSE # | TYPE 0077142 | A 0006144A | B",
+        "ObjectId": 11225700
+      }
+    }
+  ]
+}

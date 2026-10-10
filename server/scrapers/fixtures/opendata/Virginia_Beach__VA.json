@@ -1,0 +1,227 @@
+{
+  "objectIdFieldName": "OBJECTID",
+  "uniqueIdField": {
+    "name": "OBJECTID",
+    "isSystemMaintained": true
+  },
+  "globalIdFieldName": "",
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": {
+    "wkid": 4326,
+    "latestWkid": 4326
+  },
+  "fields": [
+    {
+      "name": "OBJECTID",
+      "type": "esriFieldTypeOID",
+      "alias": "OBJECTID",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Parcels_FeatureToPoint_PROP_ADD",
+      "type": "esriFieldTypeString",
+      "alias": "Property Address",
+      "sqlType": "sqlTypeOther",
+      "length": 50,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Building_Permits_PermitNumber",
+      "type": "esriFieldTypeString",
+      "alias": "Permit Number",
+      "sqlType": "sqlTypeOther",
+      "length": 8000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Building_Permits_CreatedBy",
+      "type": "esriFieldTypeString",
+      "alias": "Created By",
+      "sqlType": "sqlTypeOther",
+      "length": 8000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Building_Permits_PermitType",
+      "type": "esriFieldTypeString",
+      "alias": "Permit Type",
+      "sqlType": "sqlTypeOther",
+      "length": 8000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Building_Permits_ConstructionTy",
+      "type": "esriFieldTypeString",
+      "alias": "Construction Type",
+      "sqlType": "sqlTypeOther",
+      "length": 8000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Building_Permits_WorkType",
+      "type": "esriFieldTypeString",
+      "alias": "Work Type",
+      "sqlType": "sqlTypeOther",
+      "length": 8000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Building_Permits_ApplicationDat",
+      "type": "esriFieldTypeDateOnly",
+      "alias": "Application Date",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Building_Permits_IssueDate",
+      "type": "esriFieldTypeDateOnly",
+      "alias": "Issue Date",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Building_Permits_FinalDate",
+      "type": "esriFieldTypeDateOnly",
+      "alias": "Final Date",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Building_Permits_Status",
+      "type": "esriFieldTypeString",
+      "alias": "Status",
+      "sqlType": "sqlTypeOther",
+      "length": 8000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Building_Permits_WorkDesc",
+      "type": "esriFieldTypeString",
+      "alias": "Work Description",
+      "sqlType": "sqlTypeOther",
+      "length": 8000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Building_Permits_StreetAddress",
+      "type": "esriFieldTypeString",
+      "alias": "Street Address",
+      "sqlType": "sqlTypeOther",
+      "length": 8000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Building_Permits_AddressUnit",
+      "type": "esriFieldTypeString",
+      "alias": "Address Unit",
+      "sqlType": "sqlTypeOther",
+      "length": 8000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Building_Permits_City",
+      "type": "esriFieldTypeString",
+      "alias": "City",
+      "sqlType": "sqlTypeOther",
+      "length": 8000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Building_Permits_State",
+      "type": "esriFieldTypeString",
+      "alias": "State",
+      "sqlType": "sqlTypeOther",
+      "length": 8000,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Building_Permits_Zip",
+      "type": "esriFieldTypeInteger",
+      "alias": "Zip",
+      "sqlType": "sqlTypeOther",
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Building_Permits_GPIN_Text",
+      "type": "esriFieldTypeString",
+      "alias": "GPIN_Text",
+      "sqlType": "sqlTypeOther",
+      "length": 255,
+      "domain": null,
+      "defaultValue": null
+    }
+  ],
+  "exceededTransferLimit": true,
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 4088559,
+        "Parcels_FeatureToPoint_PROP_ADD": "310 EDWIN DR",
+        "Building_Permits_PermitNumber": "2019-UTIL-00001",
+        "Building_Permits_CreatedBy": "PUBLICUSER4512",
+        "Building_Permits_PermitType": "Utility",
+        "Building_Permits_ConstructionTy": null,
+        "Building_Permits_WorkType": null,
+        "Building_Permits_ApplicationDat": "2019-01-01",
+        "Building_Permits_IssueDate": "2019-01-02",
+        "Building_Permits_FinalDate": null,
+        "Building_Permits_Status": "Closed",
+        "Building_Permits_WorkDesc": "INSIDE OF MT TRASHMORE PARK ON SOUTH BLVD. PLACING CRANE ON SOUTH BLVD TO PLACE BARGES IN LAKE WINDSOR. 1/3-1/4 2019TRAFFIC CONTROL APPROVAL 042-9-3WILL BE CLOSING 1-EAST BOUND LANE FOR TRACTOR TRAILERS W/BARGES LOADED ON THEM. THE BAGES WILL BE LIFTED OFF OF THE TRACTORS & TRAILERS AND PLACED IN LAKE WINDSOR FOR SOIL DREDGING & SAMPLING. UPON COMPLETION OF DREDING SAMPLES BEING TAKEN, THE CRANE WIL LBE LIFTING BARGES BACK OUT OF LAKE WINDSOR & PLACING BACK ON TRACTOR TRAILERS",
+        "Building_Permits_StreetAddress": "310 EDWIN DR",
+        "Building_Permits_AddressUnit": null,
+        "Building_Permits_City": "Virginia Beach",
+        "Building_Permits_State": "VA",
+        "Building_Permits_Zip": 23452,
+        "Building_Permits_GPIN_Text": "14768000000000"
+      },
+      "geometry": {
+        "x": -76.12572987288895,
+        "y": 36.82832688231723
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 4088560,
+        "Parcels_FeatureToPoint_PROP_ADD": "2324 SEA SHELL RD",
+        "Building_Permits_PermitNumber": "2019-BDRA-00004",
+        "Building_Permits_CreatedBy": "PUBLICUSER18800",
+        "Building_Permits_PermitType": "Building",
+        "Building_Permits_ConstructionTy": "Residential",
+        "Building_Permits_WorkType": "Addition and or Alteration",
+        "Building_Permits_ApplicationDat": "2019-01-02",
+        "Building_Permits_IssueDate": "2019-04-23",
+        "Building_Permits_FinalDate": "2019-07-23",
+        "Building_Permits_Status": "Closed",
+        "Building_Permits_WorkDesc": "Building new Front Porch and Roof Overhang Extension 12' from face of home, demolition of current porch and roof extension that is 7'",
+        "Building_Permits_StreetAddress": "2324 SEA SHELL RD",
+        "Building_Permits_AddressUnit": null,
+        "Building_Permits_City": "Virginia Beach",
+        "Building_Permits_State": "VA",
+        "Building_Permits_Zip": 23451,
+        "Building_Permits_GPIN_Text": "15901100000000"
+      },
+      "geometry": {
+        "x": -76.07501183200888,
+        "y": 36.91180520787185
+      }
+    }
+  ]
+}

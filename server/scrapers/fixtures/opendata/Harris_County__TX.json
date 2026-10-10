@@ -1,0 +1,85 @@
+{
+  "objectIdFieldName": "OBJECTID",
+  "globalIdFieldName": "",
+  "geometryType": "esriGeometryPoint",
+  "spatialReference": {
+    "wkid": 4326,
+    "latestWkid": 4326
+  },
+  "fields": [
+    {
+      "name": "OBJECTID",
+      "alias": "OBJECTID",
+      "type": "esriFieldTypeOID"
+    },
+    {
+      "name": "PROJECTNAME",
+      "alias": "PROJECTNAME",
+      "type": "esriFieldTypeString",
+      "length": 1000
+    },
+    {
+      "name": "FULLADDRESS",
+      "alias": "FULLADDRESS",
+      "type": "esriFieldTypeString",
+      "length": 200
+    },
+    {
+      "name": "PERMITNUMBER",
+      "alias": "PERMITNUMBER",
+      "type": "esriFieldTypeString",
+      "length": 20
+    },
+    {
+      "name": "PERMITNAME",
+      "alias": "PERMITNAME",
+      "type": "esriFieldTypeString",
+      "length": 1000
+    },
+    {
+      "name": "STATUS",
+      "alias": "STATUS",
+      "type": "esriFieldTypeString",
+      "length": 100
+    },
+    {
+      "name": "ISSUEDDATE",
+      "alias": "ISSUEDDATE",
+      "type": "esriFieldTypeDate",
+      "length": 8
+    }
+  ],
+  "features": [
+    {
+      "attributes": {
+        "OBJECTID": 1,
+        "PROJECTNAME": "Residential Construction",
+        "FULLADDRESS": "7418 Evelyn Grove Dr Spring TX 77379",
+        "PERMITNUMBER": "1905100027-RDW-001",
+        "PERMITNAME": "Curb and Gutter Driveway",
+        "STATUS": "Issued",
+        "ISSUEDDATE": 1557723600000
+      },
+      "geometry": {
+        "x": -95.54010306558834,
+        "y": 30.067726185770592
+      }
+    },
+    {
+      "attributes": {
+        "OBJECTID": 2,
+        "PROJECTNAME": "Residential Construction",
+        "FULLADDRESS": "7418 Evelyn Grove Dr Spring TX 77379",
+        "PERMITNUMBER": "1905100027-RSW-001",
+        "PERMITNAME": "Sidewalk Inspection",
+        "STATUS": "Issued",
+        "ISSUEDDATE": 1557723600000
+      },
+      "geometry": {
+        "x": -95.54010306558834,
+        "y": 30.067726185770592
+      }
+    }
+  ],
+  "exceededTransferLimit": true
+}
