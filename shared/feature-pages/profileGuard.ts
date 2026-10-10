@@ -1,5 +1,6 @@
 import type { FeatureAllowance, FeaturePage } from "./types";
 import { allowanceLine } from "./pricing";
+import { GBP_COMPARE } from "./gbp";
 import { PLANS, PLAN_KEYS } from "../plans";
 import { joinNames, planNamesWhere } from "../plan-copy";
 
@@ -197,6 +198,8 @@ const page: FeaturePage = {
         "If a plan lapses, your Guard settings stay and checks start again when a plan is back.",
     ],
   },
+  // Profile Guard is sold with the Google Business Profile item (shared/alacarte.ts gbp): the same comparison.
+  compare: GBP_COMPARE,
   related: ["gbp", "reinstatement", "reviews"],
   app: { href: "/locations", surface: "app", label: "Open Locations" },
   headings: {

@@ -64,6 +64,7 @@ import LsaGuidePage from "@/pages/lsa-guide";
 import LsaLeadsPage from "@/pages/lsa-leads";
 import CallAssistantLandingPage from "@/pages/call-assistant-landing";
 import { FeaturesCataloguePage, FeaturePageRoute, FeatureAdLanding, LegacyLanding } from "@/pages/features";
+import { ToolRouteGate } from "@/components/tool-route-gate";
 import { DfyCataloguePage, DfyPageRoute } from "@/pages/done-for-you";
 import SettingsPage from "@/pages/settings";
 import DevelopersPage from "@/pages/developers";
@@ -854,7 +855,7 @@ function AppContent() {
       <SidebarProvider style={sidebarStyle as React.CSSProperties} defaultOpen={sidebarDefaultOpen()}>
         <div className="md:hidden"><AppSidebar /></div>
         <SeoToolLayout actions={controls} banner={<PaymentNeededBanner />} footer={footer}>
-          <DashboardRouter />
+          <ToolRouteGate location={location}><DashboardRouter /></ToolRouteGate>
         </SeoToolLayout>
         <AppTabBar />
         <HubWidget surface="growth" signedIn />
@@ -880,7 +881,8 @@ function AppContent() {
           {/* Phones: bottom padding keeps content clear of the tab bar (AppTabBar); desktop is unchanged. */}
           <main className="flex-1 min-h-0 overflow-auto flex flex-col pb-[calc(60px+env(safe-area-inset-bottom))] md:pb-0">
             <div className="flex-1">
-              <DashboardRouter />
+              {/* A tool the account lacks renders its landing page here instead (components/tool-route-gate.tsx). */}
+              <ToolRouteGate location={location}><DashboardRouter /></ToolRouteGate>
             </div>
             {footer}
           </main>

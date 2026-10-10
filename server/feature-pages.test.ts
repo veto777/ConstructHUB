@@ -69,7 +69,7 @@ describe("feature page registry", () => {
   });
 
   it("gives every feature its own content file, and every content file is registered", () => {
-    const files = fs.readdirSync(dir).filter((f) => f.endsWith(".ts") && !["index.ts", "types.ts", "pricing.ts"].includes(f));
+    const files = fs.readdirSync(dir).filter((f) => f.endsWith(".ts") && !["index.ts", "types.ts", "pricing.ts", "compare.ts"].includes(f));
     expect(files.map((f) => f.replace(/\.ts$/, "")).sort()).toEqual(FEATURE_PAGES.map((p) => p.key).sort());
     const index = read("shared/feature-pages/index.ts");
     for (const page of FEATURE_PAGES) expect(index).toContain(`import ${page.key} from "./${page.key}";`);

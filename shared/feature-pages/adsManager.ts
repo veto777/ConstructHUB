@@ -175,6 +175,25 @@ const page: FeaturePage = {
         "write ads or change bids and budgets.",
     ],
   },
+  // Prices read on 2026-10-10 from: leadup-marketing.com/pricing (~/codex-audits/a-la-carte-competitors.md → ads_manager);
+  // Olly Olly's LSA Manager is quote only; Adalysis's price is a third-party listing (Capterra), labelled "reported".
+  compare: {
+    alacarte: ["ads_manager"],
+    checkedOn: "2026-10-10",
+    competitors: [
+      { name: "LeadUp", plan: "Platform", price: { kind: "monthly", cents: 4999 }, note: "plus usage fees for LSA call analysis and conversations", source: "https://leadup-marketing.com/pricing" },
+      { name: "Olly Olly", plan: "LSA Manager", price: { kind: "quote" } },
+      { name: "Adalysis", price: { kind: "monthly", cents: 12600 }, reported: true, source: "https://adalysis.com/pricing" },
+    ],
+    onlyUs: [
+      "Access requests for up to 1,000 client accounts at a time.",
+      "A health audit with Local Services checks, where an unanswered check shows as unavailable — never as a pass.",
+      "Click Guard IPs pushed into your clients' Google Ads exclusions, up to Google's 500 per campaign.",
+      "Every change previewed first, re-checked before it is written, and reversible through its own preview.",
+    ],
+    theyNotUs: "Building campaigns, bids and budgets, Microsoft Ads, and automatic call grading.",
+    noContractorAlternative: true,
+  },
   related: ["clickGuard", "lsaLeads", "agency"],
   app: { href: "/ads-manager", surface: "app" },
   headings: {

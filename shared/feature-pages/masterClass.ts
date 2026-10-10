@@ -171,6 +171,25 @@ const page: FeaturePage = {
         "change, so confirm the current requirements with the agency itself before you file, apply or pay.",
     ],
   },
+  // Prices read on 2026-10-10 from: classes.mycontractoruniversity.com, thesoe.com/enroll.html, thecontractorfight.com,
+  // btacademy.com (~/codex-audits/a-la-carte-competitors.md → master_class).
+  compare: {
+    alacarte: ["master_class"],
+    checkedOn: "2026-10-10",
+    competitors: [
+      { name: "Contractor University", price: { kind: "monthly", cents: 36500 }, source: "https://classes.mycontractoruniversity.com/" },
+      { name: "Contractor Nation", plan: "School of Entrepreneurship", price: { kind: "monthly", cents: 50000 }, note: "a lower first month", source: "https://www.thesoe.com/enroll.html" },
+      { name: "The Contractor Fight", price: { kind: "one_time", cents: 240000 }, note: "a 90-day program; monthly coaching sold separately", source: "https://thecontractorfight.com/" },
+      { name: "Breakthrough Academy", price: { kind: "one_time", cents: 570000 }, note: "plus monthly coaching", source: "https://btacademy.com/" },
+    ],
+    onlyUs: [
+      "A guide for all 50 states — Secretary of State, licensing board, workers' comp, tax, bonds — with agency links that are checked and dated.",
+      "A free state comparison table before you buy anything.",
+      "Website, SEO, Google Business Profile and Google Ads in one course.",
+    ],
+    theyNotUs: "Live coaching and a community.",
+    oneOfAKind: "As a 50-state licensing and marketing course, we found nothing else like it.",
+  },
   related: ["guides", "gbp", "siteScan"],
   app: { href: "/master-class", surface: "app", label: "Open the Master Class" },
   tryIt: { label: "Read the free course overview", href: "/master-class" },

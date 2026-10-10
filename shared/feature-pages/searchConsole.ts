@@ -1,6 +1,7 @@
 import type { FeaturePage } from "./types";
 import { PLANS, planForModule } from "../plans";
 import { plansWhere } from "../plan-copy";
+import { WEBSITE_TOOLS_COMPARE } from "./cloudflare";
 
 /**
  * Search Console — half of the Agency-only "Cloudflare + Search Console" module.
@@ -164,6 +165,8 @@ const page: FeaturePage = {
         "indexing, or decide what Google indexes. Viewing works with restricted access.",
     ],
   },
+  // Sold as Website Tools, one item with Cloudflare (shared/alacarte.ts website_tools): the same comparison.
+  compare: WEBSITE_TOOLS_COMPARE,
   related: ["siteScan", "cloudflare", "gbp"],
   app: { href: "/search-console", surface: "app" },
   headings: {

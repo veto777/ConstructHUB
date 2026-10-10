@@ -196,6 +196,24 @@ const page: FeaturePage = {
         "unless you allow them. You can apply your reply settings to new reviews only, or to older unanswered ones too.",
     ],
   },
+  // Prices read on 2026-10-10 from: get.nicejob.com/pricing, gatherup.com/pricing/, grade.us/home/plans/
+  // (~/codex-audits/a-la-carte-competitors.md → reviews). Birdeye and Podium publish no price.
+  compare: {
+    alacarte: ["reviews"],
+    checkedOn: "2026-10-10",
+    competitors: [
+      { name: "NiceJob", plan: "Starter", price: { kind: "monthly", cents: 7500 }, note: "Pro is more", source: "https://get.nicejob.com/pricing" },
+      { name: "GatherUp", plan: "Small Business", price: { kind: "monthly", cents: 9900 }, per: "1 location", source: "https://gatherup.com/pricing/" },
+      { name: "Grade.us", plan: "Small Business", price: { kind: "monthly", cents: 9900 }, source: "https://www.grade.us/home/plans/" },
+      { name: "Birdeye / Podium", price: { kind: "quote" } },
+    ],
+    onlyUs: [
+      "No review gating, by design: Google is offered to everyone, and a low rating also gets a private form for feedback.",
+      "AI reply drafts written only from the client's own words, with per-star rules — one- and two-star replies stay drafts unless you allow them.",
+      "Requests with your job photos and a personal note, sent now or scheduled, with follow-up reminders on your schedule.",
+    ],
+    theyNotUs: "Review requests by text (ours go by email), monitoring of other review sites, and website widgets.",
+  },
   related: ["gbp", "profileGuard", "crm"],
   app: { href: "/google-reviews", surface: "app" },
   headings: {

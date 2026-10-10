@@ -183,6 +183,25 @@ const page: FeaturePage = {
       "Google PageSpeed's mobile and desktop lab scores when Google returns them, a missing mobile viewport and oversized images",
     ],
   },
+  // Prices read on 2026-10-10 from: screamingfrog.co.uk/seo-spider/pricing/, seranking.com/subscription.html,
+  // brightlocal.com/pricing/ (~/codex-audits/a-la-carte-competitors.md → site_scan).
+  compare: {
+    alacarte: ["site_scan"],
+    checkedOn: "2026-10-10",
+    competitors: [
+      { name: "Screaming Frog", plan: "SEO Spider", price: { kind: "annual", cents: 27900 }, note: "a desktop crawler", source: "https://www.screamingfrog.co.uk/seo-spider/pricing/" },
+      { name: "SE Ranking", plan: "Core", price: { kind: "monthly", cents: 12900 }, note: "less on an annual plan", source: "https://seranking.com/subscription.html" },
+      { name: "BrightLocal", plan: "Track", price: { kind: "monthly", cents: 4100 }, source: "https://www.brightlocal.com/pricing/" },
+    ],
+    onlyUs: [
+      "Checks your website against your linked Google profile: name, address, phone, service pages and service areas.",
+      "Fix steps written for the site builder you use.",
+      "An AI Readiness score: whether GPTBot and ClaudeBot may read your site, structured data, FAQ content and llms.txt.",
+      "Rescans mark every fix fixed, still present or new, and the report carries your brand.",
+    ],
+    theyNotUs: "Much deeper technical crawls of large sites.",
+    noContractorAlternative: true,
+  },
   related: ["gbp", "rankingGrid", "searchConsole"],
   app: { href: "/site-scan", surface: "app" },
   tryIt: { label: "Free 60-second website scan", href: "/free-site-scan" },

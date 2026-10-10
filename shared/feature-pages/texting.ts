@@ -163,6 +163,26 @@ const page: FeaturePage = {
         "never texted. Other replies don't appear in the CRM, so client conversations stay in their portal and email.",
     ],
   },
+  // Prices read on 2026-10-10 from: quo.com/pricing, getjobber.com/pricing, broadly.com/pricing
+  // (~/codex-audits/a-la-carte-competitors.md → texting_number). Podium and Hatch are quote only. The texting
+  // number is an add-on only (shared/alacarte.ts ALACARTE_ADDON_ONLY), so this compares without a Buy button.
+  compare: {
+    alacarte: [],
+    checkedOn: "2026-10-10",
+    competitors: [
+      { name: "Quo (OpenPhone)", plan: "Starter", price: { kind: "monthly", cents: 1900 }, per: "per user", note: "a one-time registration fee and a small monthly fee for business texting on top", source: "https://www.quo.com/pricing" },
+      { name: "Jobber", plan: "Grow", price: { kind: "monthly", cents: 19900 }, note: "less on an annual plan", source: "https://www.getjobber.com/pricing/" },
+      { name: "Broadly", plan: "Pro", price: { kind: "monthly", cents: 69900 }, note: "plus an onboarding fee", source: "https://broadly.com/pricing/" },
+      { name: "Podium / Hatch", price: { kind: "quote" } },
+    ],
+    onlyUs: [
+      "A text to your team when a bid is approved or declined, a payment lands or a client re-opens an estimate.",
+      "Estimate links and reminders texted straight from the CRM.",
+      "STOP, START and HELP answered and honoured for you.",
+      "Segments counted the way carriers count them, refunded when the carrier refuses, and a hard monthly allowance — never an overage.",
+    ],
+    theyNotUs: "A two-way inbox: a client's replies do not show in our CRM.",
+  },
   related: ["crm", "crmLeads", "callAssistant"],
   app: { href: "/crm/settings", surface: "portal", label: "Open text settings" },
   headings: {

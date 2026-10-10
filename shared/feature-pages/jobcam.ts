@@ -195,6 +195,25 @@ const page: FeaturePage = {
         "already stored is removed.",
     ],
   },
+  // Prices read on 2026-10-10 from: companycam.com/pricing, fieldwire.com/pricing, contractorforeman.com/pricing
+  // (~/codex-audits/a-la-carte-competitors.md → jobcam). Raken is quote only.
+  compare: {
+    alacarte: ["jobcam"],
+    checkedOn: "2026-10-10",
+    competitors: [
+      { name: "CompanyCam", plan: "Core", price: { kind: "monthly", cents: 7900 }, note: "less on an annual plan; extra users cost more", source: "https://companycam.com/pricing" },
+      { name: "Fieldwire", plan: "Pro", price: { kind: "monthly", cents: 3900, billed: "annually" }, per: "per user", source: "https://www.fieldwire.com/pricing/" },
+      { name: "Contractor Foreman", plan: "Basic", price: { kind: "monthly", cents: 4900, billed: "annually" }, source: "https://contractorforeman.com/pricing/" },
+      { name: "Raken", price: { kind: "quote" } },
+    ],
+    onlyUs: [
+      "Built into the CRM: every shot filed to the project and the client, with a company feed.",
+      "A \"Show to client\" switch on every shot, so the client portal lists only what you chose.",
+      "Share links with a password, an expiry, a revoke and a view count, sent by email or text.",
+      "The camera opens on the nearest job, uploads resume after a lost connection, and phone video plays in any browser.",
+    ],
+    theyNotUs: "Drawing on photos, photo reports, checklists, AI or voice notes, offline capture and integrations.",
+  },
   related: ["crm", "crmSchedule", "texting"],
   app: { href: "/crm/jobcam", surface: "portal", label: "Open JobCam" },
   headings: {

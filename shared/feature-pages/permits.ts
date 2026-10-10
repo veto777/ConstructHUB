@@ -176,6 +176,23 @@ const page: FeaturePage = {
       "A permit number",
     ],
   },
+  // Prices read on 2026-10-10 from: shovels.ai/pricing, shop.constructionmonitor.com, propstream.com/pricing
+  // (~/codex-audits/a-la-carte-competitors.md → permits).
+  compare: {
+    alacarte: ["permits"],
+    checkedOn: "2026-10-10",
+    competitors: [
+      { name: "Shovels.ai", plan: "Basic", price: { kind: "monthly", cents: 59900 }, note: "nationwide permits with contacts, alerts and an API; Pro is more", source: "https://www.shovels.ai/pricing" },
+      { name: "Construction Monitor", price: { kind: "monthly_range", fromCents: 3100, toCents: 75000 }, per: "per region", note: "permit leads and alerts", source: "https://shop.constructionmonitor.com/" },
+      { name: "PropStream", price: { kind: "monthly", cents: 9900 }, note: "property data, not permits", source: "https://www.propstream.com/pricing" },
+    ],
+    onlyUs: [
+      "A live search of the real government portals by address, permit number, name, company or license — not a copy of their data.",
+      "Every search shows each portal's status: searched, or skipped and why.",
+      "A national directory of permit offices with checked links — free to browse — and one click to property records.",
+    ],
+    theyNotUs: "Nationwide permit databases with owner contacts and an API; alerts by address, trade and contractor are being built here.",
+  },
   related: ["property", "competitors", "crm"],
   app: { href: "/search", surface: "app" },
   tryIt: { label: "Browse the Database Directory", href: "/databases" },

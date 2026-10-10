@@ -1,6 +1,7 @@
 import type { FeaturePage } from "./types";
 import { PLANS, planForModule } from "../plans";
 import { plansWhere } from "../plan-copy";
+import { WEBSITE_TOOLS_COMPARE } from "./cloudflare";
 
 /**
  * Domains — half of the Agency-only "Domains + Gmail alerts" module.
@@ -180,6 +181,8 @@ const page: FeaturePage = {
         "Registrar keys are stored encrypted, and a saved key can be removed at any time.",
     ],
   },
+  // Sold as Website Tools, one item with Cloudflare (shared/alacarte.ts website_tools): the same comparison.
+  compare: WEBSITE_TOOLS_COMPARE,
   related: ["mailAlerts", "cloudflare", "agency"],
   app: { href: "/domains", surface: "app" },
   headings: {

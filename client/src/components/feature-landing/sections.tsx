@@ -15,8 +15,9 @@
 import type { ReactNode } from "react";
 import { Link } from "wouter";
 import { ArrowRight, CheckCircle2, ChevronDown, Minus } from "lucide-react";
-import type { FeatureHeading, LandingContent } from "@shared/feature-pages/types";
+import type { FeatureCompare, FeatureHeading, LandingContent } from "@shared/feature-pages/types";
 import type { FeaturePriceSummary } from "@shared/feature-pages/pricing";
+import { competitorPriceLabel, comparePricesNote } from "@shared/feature-pages/compare";
 import { SALES_REP_LABEL } from "@shared/plan-copy";
 import { GabeAvatar, StandingGator } from "@/components/mascot";
 import { FEATURE_ICON_COMPONENTS } from "./icons";
@@ -388,6 +389,74 @@ export function PricingSection({
         </div>
       </div>
       <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">{ctas}</div>
+    </Band>
+  );
+}
+
+// ── Compare (owner, 2026-10-10) ──────────────────────────────────────────────
+
+/**
+ * Named competitors at their own list prices, what we do that they don't (the
+ * page's own claims), what they do that we don't, and "one of a kind" where
+ * the research found nothing comparable. `offer` is the à la carte Buy /
+ * Included block (feature-landing/alacarte-offer.tsx) rendered under it.
+ */
+export function CompareSection({ page, compare, n, tone, offer }: { page: LandingContent; compare: FeatureCompare; n: string; tone: Tone; offer: ReactNode }) {
+  const heading: FeatureHeading = { title: `${page.ctaTitle ?? page.title} `, em: "Compared" };
+  return (
+    <Band id="compare" n={n} kicker="Compare" heading={heading} tone={tone} testId="section-feature-compare" center>
+      {compare.oneOfAKind && (
+        <p className="mt-6 inline-flex items-center rounded-full border border-mkt-orange px-4 py-1.5 text-[13px] font-semibold text-mkt-orange-ink" data-testid="text-feature-one-of-a-kind">
+          {compare.oneOfAKind}
+        </p>
+      )}
+      <div className="mt-10 bg-mkt-card border border-mkt-rule rounded-2xl overflow-hidden text-left">
+        <table className="w-full text-[14.5px]" data-testid="table-feature-compare">
+          <thead>
+            <tr className="border-b border-mkt-rule">
+              <th scope="col" className="text-left p-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-mkt-muted">Product</th>
+              <th scope="col" className="text-right p-4 whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.16em] text-mkt-muted">List price</th>
+            </tr>
+          </thead>
+          <tbody>
+            {compare.competitors.map((c, i) => (
+              <tr key={`${c.name}-${i}`} className="border-b border-dotted border-mkt-rule last:border-0" data-testid={`row-feature-compare-${i}`}>
+                <td className="px-4 py-3.5 align-top">
+                  <div className="font-display font-semibold text-[1.05rem] text-mkt-ink">{c.name}{c.plan ? <span className="font-sans text-[13px] font-medium text-mkt-muted ml-2">{c.plan}</span> : null}</div>
+                  {(c.note || c.reported) && (
+                    <p className="text-[13px] text-mkt-ink-soft mt-0.5">{c.note}{c.note && c.reported ? " · " : ""}{c.reported ? "reported by a third-party listing, not the vendor's page" : ""}</p>
+                  )}
+                </td>
+                <td className="px-4 py-3.5 align-top text-right whitespace-nowrap">
+                  <span className="font-semibold text-mkt-ink">{competitorPriceLabel(c.price)}</span>
+                  {c.per && <span className="block text-[12px] text-mkt-muted">{c.per}</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-3 text-[12.5px] text-mkt-muted text-left" data-testid="text-feature-compare-note">{comparePricesNote(compare.checkedOn)}</p>
+      <div className="mt-10 grid gap-5 md:grid-cols-12 text-left">
+        <div className="md:col-span-7 bg-mkt-card border border-mkt-rule rounded-2xl p-6 lg:p-7">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mkt-muted">What we do that they don't</p>
+          <ul className="mt-4 space-y-3 text-[15px] text-mkt-ink" data-testid="list-feature-only-us">
+            {compare.onlyUs.map((line) => (
+              <li key={line} className="flex gap-3"><CheckCircle2 className="h-[18px] w-[18px] mt-0.5 text-mkt-orange-ink shrink-0" aria-hidden /> {line}</li>
+            ))}
+          </ul>
+        </div>
+        <div className="md:col-span-5 bg-mkt-paper-2 border border-mkt-rule rounded-2xl p-6 lg:p-7">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mkt-muted">What they do that we don't</p>
+          <p className="mt-4 text-[15px] text-mkt-ink-soft leading-relaxed" data-testid="text-feature-they-not-us">{compare.theyNotUs}</p>
+          {compare.noContractorAlternative && (
+            <p className="mt-4 text-[14px] text-mkt-ink leading-relaxed" data-testid="text-feature-no-contractor-alternative">
+              Built for contractors: we found no trade-specific alternative — the products above are general tools.
+            </p>
+          )}
+        </div>
+      </div>
+      {offer}
     </Band>
   );
 }

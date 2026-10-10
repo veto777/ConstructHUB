@@ -1,4 +1,4 @@
-import type { FeaturePage } from "./types";
+import type { FeatureCompare, FeaturePage } from "./types";
 import { ADDONS, PLANS, PLAN_KEYS } from "../plans";
 
 /**
@@ -17,6 +17,24 @@ import { ADDONS, PLANS, PLAN_KEYS } from "../plans";
  */
 
 const INCLUDED_PLAN = PLANS[PLAN_KEYS.find((k) => PLANS[k].limits.seoKeywords !== 0) ?? "agency"].name;
+
+export const SEO_COMPARE: FeatureCompare = {
+  // Prices read on 2026-10-10 from: semrush.com/prices, ahrefs.com/pricing, seranking.com/subscription.html
+  // (~/codex-audits/a-la-carte-competitors.md → seo_basic / seo_pro). Third-party-reported prices (Mangools, Moz) are not quoted.
+  alacarte: ["seo_basic", "seo_pro"],
+  checkedOn: "2026-10-10",
+  competitors: [
+    { name: "Semrush", plan: "SEO", price: { kind: "monthly", cents: 13900 }, note: "500 keywords checked daily, 5 sites", source: "https://www.semrush.com/prices/" },
+    { name: "Ahrefs", plan: "Lite", price: { kind: "monthly", cents: 12900 }, note: "750 keywords", source: "https://ahrefs.com/pricing" },
+    { name: "SE Ranking", plan: "Core", price: { kind: "monthly", cents: 12900 }, note: "2,000 keywords checked daily", source: "https://seranking.com/subscription.html" },
+  ],
+  onlyUs: [
+    "1,000 tracked keywords at the entry tier.",
+    "Your Search Console clicks and impressions broken down beside the rankings you track.",
+    "The same suite that holds Site Scan and GridRank, on one account.",
+  ],
+  theyNotUs: "Daily rank checks (ours are weekly by default), far larger keyword databases, content tools and an API.",
+};
 
 const page: FeaturePage = {
   key: "seo",
@@ -65,6 +83,7 @@ const page: FeaturePage = {
     note: `Below the ${INCLUDED_PLAN} plan, the suite is the ${ADDONS.seo_basic.name} or ${ADDONS.seo_pro.name} add-on, or an à la carte subscription with no plan at all.`,
   },
   faqs: [],
+  compare: SEO_COMPARE,
   related: ["siteScan", "rankingGrid", "searchConsole"],
   app: { href: "/seo", surface: "app", label: "Open SEO" },
   seo: {

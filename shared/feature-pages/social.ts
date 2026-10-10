@@ -169,6 +169,24 @@ const page: FeaturePage = {
         "ConstructHUB doesn't bill for posting or count your posts; Blotato bills you under your own subscription.",
     ],
   },
+  // Prices read on 2026-10-10 from: blotato.com/pricing, socialpilot.co, mymarky.ai, vistasocial.com/pricing, buffer.com/pricing
+  // (~/codex-audits/a-la-carte-competitors.md → social).
+  compare: {
+    alacarte: ["social"],
+    checkedOn: "2026-10-10",
+    competitors: [
+      { name: "Blotato", price: { kind: "monthly", cents: 2900 }, note: "20 accounts; the posting service ours uses today", source: "https://www.blotato.com/pricing" },
+      { name: "Marky", price: { kind: "monthly", cents: 3900 }, note: "contractor-specific: job photos to posts, posts to Google Business Profile", source: "https://www.mymarky.ai/" },
+      { name: "SocialPilot", price: { kind: "monthly", cents: 3000 }, source: "https://www.socialpilot.co/" },
+      { name: "Buffer", price: { kind: "monthly_from", cents: 500 }, per: "per channel", source: "https://buffer.com/pricing" },
+    ],
+    onlyUs: [
+      "Auto mode writes only from real material — your offers, Google updates and reviews — and reports what's missing instead of inventing it.",
+      "A daily AI budget and quiet hours, with drafts that wait for your approval unless you choose fully automatic.",
+      "Bulk posting across every business you manage, with placeholders per business.",
+    ],
+    theyNotUs: "Today ours posts through a Blotato subscription of your own, and it does not post to your Google profile from here (that is AI Google posts); Marky does.",
+  },
   related: ["gbpContent", "media", "gbp"],
   app: { href: "/social-media", surface: "app" },
   headings: {

@@ -1,6 +1,7 @@
 import type { FeaturePage } from "./types";
 import { PLANS, planForModule } from "../plans";
 import { plansWhere } from "../plan-copy";
+import { WEBSITE_TOOLS_COMPARE } from "./cloudflare";
 
 /**
  * Mail alerts — half of the Agency-only "Domains + Gmail alerts" module.
@@ -173,6 +174,8 @@ const page: FeaturePage = {
         "alerts stores, labels and matches; it doesn't reply, appeal or fix anything for you.",
     ],
   },
+  // Sold as Website Tools, one item with Cloudflare (shared/alacarte.ts website_tools): the same comparison.
+  compare: WEBSITE_TOOLS_COMPARE,
   related: ["domains", "profileGuard", "agency"],
   app: { href: "/mail-alerts", surface: "app" },
   headings: {

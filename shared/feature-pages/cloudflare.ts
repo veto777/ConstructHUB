@@ -1,4 +1,4 @@
-import type { FeaturePage } from "./types";
+import type { FeatureCompare, FeaturePage } from "./types";
 import { PLANS, planForModule } from "../plans";
 import { plansWhere } from "../plan-copy";
 
@@ -23,6 +23,26 @@ import { plansWhere } from "../plan-copy";
 
 const MODULE_PLAN = PLANS[planForModule("cloudflareSearchConsole")].name;
 const ONLY_PLAN = plansWhere((plan) => plan.modules.cloudflareSearchConsole).length === 1;
+
+export const WEBSITE_TOOLS_COMPARE: FeatureCompare = {
+  // No product bundles Cloudflare rules, Search Console, registrar DNS and provider alert mail. Partial overlaps,
+  // prices read on 2026-10-10 from: uptimerobot.com/pricing, agencyanalytics.com/pricing
+  // (~/codex-audits/a-la-carte-competitors.md → website_tools).
+  alacarte: ["website_tools"],
+  checkedOn: "2026-10-10",
+  competitors: [
+    { name: "UptimeRobot", plan: "Solo", price: { kind: "monthly", cents: 1300 }, note: "uptime, SSL and DNS monitoring only", source: "https://uptimerobot.com/pricing/" },
+    { name: "AgencyAnalytics", plan: "Core", price: { kind: "monthly", cents: 2000, billed: "annually" }, per: "per client", note: "Search Console reporting only", source: "https://agencyanalytics.com/pricing" },
+  ],
+  onlyUs: [
+    "Cloudflare rule packs, the ads door included — every one previewed, confirmed and undoable; your Global API key is used once and never stored.",
+    "Click Guard's flagged IPs become a Cloudflare block rule.",
+    "DNS edits at Porkbun or Name.com with a preview, an email-safety check, verification and rollback.",
+    "URL inspection beside Site Scan, and provider alert emails sorted by severity and matched to the client.",
+  ],
+  theyNotUs: "UptimeRobot watches uptime from many regions; AgencyAnalytics builds client-facing dashboards.",
+  oneOfAKind: "No other tool does all of this in one place.",
+};
 
 const page: FeaturePage = {
   key: "cloudflare",
@@ -181,6 +201,7 @@ const page: FeaturePage = {
         "remove them.",
     ],
   },
+  compare: WEBSITE_TOOLS_COMPARE,
   related: ["searchConsole", "domains", "clickGuard"],
   app: { href: "/cloudflare", surface: "app" },
   headings: {

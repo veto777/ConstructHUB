@@ -173,6 +173,26 @@ const page: FeaturePage = {
         "time. The grid itself changes nothing on Google.",
     ],
   },
+  // Prices read on 2026-10-10 from: localfalcon.com/pricing, whitespark.ca/pricing/, brightlocal.com/pricing/,
+  // gmbbriefcase.com/pricing (~/codex-audits/a-la-carte-competitors.md → gridrank).
+  compare: {
+    alacarte: ["gridrank"],
+    checkedOn: "2026-10-10",
+    competitors: [
+      { name: "Local Falcon", plan: "Starter", price: { kind: "monthly", cents: 2499 }, note: "credits; a 7×7 grid is 49 credits", source: "https://www.localfalcon.com/pricing" },
+      { name: "Whitespark", plan: "Local Ranking Grids", price: { kind: "monthly_from", cents: 1000 }, source: "https://whitespark.ca/pricing/" },
+      { name: "BrightLocal", plan: "Track", price: { kind: "monthly", cents: 4100 }, note: "a 5-keyword grid", source: "https://www.brightlocal.com/pricing/" },
+      { name: "GMB Briefcase", plan: "Business", price: { kind: "monthly", cents: 9900 }, source: "https://gmbbriefcase.com/pricing" },
+    ],
+    onlyUs: [
+      "Find your business by name or paste your Google Maps link — no Google account connection needed.",
+      "One credit per 25 grid points, and a failed grid refunds its credits.",
+      "Who comes up instead of you at every point on the map.",
+      "Print any grid or save it as a PDF.",
+    ],
+    theyNotUs: "Bigger grids (up to 21×21) and AI write-ups of the results.",
+    noContractorAlternative: true,
+  },
   related: ["gbp", "competitors", "siteScan"],
   app: { href: "/ranking-grid", surface: "app" },
   headings: {
