@@ -165,3 +165,8 @@ registerAdapter(iworqAdapter);
 
 import opengov from "./opengov";
 registerAdapter(opengov);
+
+import cityviewAdapter from "./cityview";
+registerAdapter(cityviewAdapter);
+import govpilotAdapter from "./govpilot";
+registerAdapter(govpilotAdapter);
