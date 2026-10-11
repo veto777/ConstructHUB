@@ -280,24 +280,26 @@ export function EscalationRow({ e, callId, onOpenCall }: { e: VoiceEscalation; c
     },
     onError: (err) => toast({ title: "Couldn't close it", description: apiErrorMessage(err), variant: "destructive" }),
   });
-  const tone: "neutral" | "warning" | "success" = e.state === "closed" ? "neutral" : e.state === "waiting" ? "warning" : "success";
+  const uncertain = !!e.lastError?.includes("Delivery uncertain;") || (e.sentCount > 0 && !e.lastSentAt);
+  const deliveryLabel = uncertain ? "Delivery uncertain — verify before resending" : e.lastError || (e.sentCount ? `sent ${e.sentCount}×` : "Not sent");
+  const tone: "neutral" | "warning" | "success" = e.lastError || uncertain ? "warning" : e.state === "closed" ? "neutral" : e.state === "waiting" ? "warning" : "success";
   const stateLabels: Record<VoiceEscalation["state"], string> = {
     waiting: `waiting on ${e.recipientName || e.recipient}`,
     confirmed: "confirmed",
     followed_up: "follow-up sent",
     closed: `closed${e.closeReason ? ` — ${e.closeReason}` : ""}`,
   };
-  const stateLabel = stateLabels[e.state] ?? e.state;
+  const stateLabel = uncertain ? "Delivery uncertain" : e.lastError ? "Needs attention" : stateLabels[e.state] ?? e.state;
   return (
-    <li className="rounded-md border p-3" data-testid={`row-escalation-${e.id}`}>
+    <li className="min-w-0 break-words rounded-md border p-3" data-testid={`row-escalation-${e.id}`}>
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="secondary">{e.kindLabel}</Badge>
-        <span className="font-medium">{e.recipientName || e.recipient}</span>
-        <span className="text-xs text-muted-foreground">via {e.channel}{e.sentCount ? ` · sent ${e.sentCount}×` : " · not sent"}</span>
+        <span className="min-w-0 break-all font-medium">{e.recipientName || e.recipient}</span>
+        <span className="min-w-0 max-w-full break-words text-xs text-muted-foreground">via {e.channel} · {deliveryLabel}</span>
         <StatusPill tone={tone} className="ml-auto max-w-full whitespace-normal" data-testid={`pill-escalation-state-${e.id}`}>{stateLabel}</StatusPill>
       </div>
       {e.replyText && <div className="mt-1 text-xs text-muted-foreground">Reply: “{e.replyText}”</div>}
-      {e.lastError && <div className="mt-1 text-xs text-red-600 dark:text-red-400">Last send failed: {e.lastError}</div>}
+      {uncertain && <div className="mt-1 text-xs text-amber-700 dark:text-amber-400">Automatic sends are paused. Check with the recipient or carrier before sending again.</div>}
       {(e.state !== "closed" || onOpenCall) && (
         <div className="mt-2 flex flex-wrap gap-1">
           {e.state !== "closed" && (
