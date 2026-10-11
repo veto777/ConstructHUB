@@ -29,6 +29,9 @@ export async function ensureGbpContentSchema() {
     google_name text, google_status text, error text, attempts integer NOT NULL DEFAULT 0,
     started_at timestamptz, created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(user_id,request_key,item_index));
     ALTER TABLE gbp_content_jobs ADD COLUMN IF NOT EXISTS schedule jsonb NOT NULL DEFAULT '{}'::jsonb;
+    -- source (public API posts) used to be added only by server/account/schema.ts, which runs before this table
+    -- exists on a fresh database (ALTER TABLE IF EXISTS → no-op), so a new database never got the column.
+    ALTER TABLE gbp_content_jobs ADD COLUMN IF NOT EXISTS source text;
     CREATE INDEX IF NOT EXISTS gbp_content_due ON gbp_content_jobs(due_at) WHERE status='queued';
     CREATE TABLE IF NOT EXISTS gbp_content_style (
       user_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
