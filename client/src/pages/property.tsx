@@ -1,7 +1,7 @@
 import { PlanRequired, planRequiredFrom } from "@/components/plan-required";
 import { planNamesWhere } from "@shared/plan-copy";
-import { propertyOfficeForDisplay, resolvePropertyScope } from "./property-display";
-import { governmentLinkNotice, governmentLinksAvailable, isChallengeUrl } from "@shared/government-links";
+import { propertyCheckedNotice, propertyJurisdictionLabel, propertyOfficeForDisplay, resolvePropertyScope } from "./property-display";
+import { governmentLinksAvailable, isChallengeUrl } from "@shared/government-links";
 import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { readQueryInt, readQueryParam, replaceQueryParams } from "@/lib/url-query";
@@ -177,7 +177,7 @@ export default function PropertyPage() {
         as="h1"
         titleTestId="text-property-title"
         title="Property records"
-        description={`County appraiser portals for ownership, values, construction history and tax records. Included with ${planNamesWhere(p => p.modules.propertyRecords)}.`}
+        description={`Find assessor and appraiser offices. Their own sites hold ownership, values, construction history and tax records where published. Included with ${planNamesWhere(p => p.modules.propertyRecords)}.`}
         flush
       />
 
@@ -205,14 +205,14 @@ export default function PropertyPage() {
               </SelectContent>
             </Select></div>
             {stateFilter !== "all" && (
-              <div><label htmlFor="property-county" className="text-sm">County</label><Select value={countyFilter} onValueChange={handleCountyChange}>
+              <div><label htmlFor="property-county" className="text-sm">{stateFilter === "AK" ? "Borough / census area" : "County / jurisdiction"}</label><Select value={countyFilter} onValueChange={handleCountyChange}>
                 <SelectTrigger className="h-10 w-full sm:w-[180px]" id="property-county" data-testid="select-county-filter">
-                  <SelectValue placeholder="All counties" />
+                  <SelectValue placeholder="All jurisdictions" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All counties</SelectItem>
+                  <SelectItem value="all">All jurisdictions</SelectItem>
                   {counties.map(c => (
-                    <SelectItem key={c.id} value={String(c.id)}>{c.name} County</SelectItem>
+                    <SelectItem key={c.id} value={String(c.id)}>{propertyJurisdictionLabel(c)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select></div>
@@ -251,8 +251,7 @@ export default function PropertyPage() {
               const searchChallenge = isChallengeUrl(appraiser.searchUrl);
               const challenge = portalChallenge || searchChallenge;
               const linksOk = governmentLinksAvailable(appraiser);
-              const checkedAt = appraiser.lastVerifiedAt ? new Date(appraiser.lastVerifiedAt) : null;
-              const notice = challenge ? "The recorded link leads to a bot challenge. Find the official office below." : linksOk ? governmentLinkNotice(appraiser) ?? (checkedAt && !Number.isNaN(checkedAt.getTime()) ? 'Last checked ' + checkedAt.toLocaleDateString() + ' · links can change' : 'Check date unavailable · confirm with the office') : null;
+              const notice = challenge ? "The recorded link leads to a bot challenge. Find the official office below." : linksOk ? propertyCheckedNotice(appraiser) : null;
               // No usable official link on record: an honest web search, never a fabricated portal.
               const fallback = appraiser.linkStatus === "unconfirmed" || !linksOk || (!appraiser.portalUrl && !appraiser.searchUrl);
               return (
@@ -261,7 +260,7 @@ export default function PropertyPage() {
                   testId={`card-appraiser-${appraiser.id}`}
                   title={appraiser.name}
                   meta={[
-                    appraiser.county ? `${appraiser.county.name} County, ${appraiser.county.state}` : null,
+                    appraiser.county ? `${propertyJurisdictionLabel(appraiser.county)}, ${appraiser.county.state}` : null,
                     appraiser.address,
                   ]}
                   line={notice || appraiser.notes ? (
@@ -285,7 +284,7 @@ export default function PropertyPage() {
                         label="Find property records"
                         external
                         testId={`link-appraiser-fallback-${appraiser.id}`}
-                        title="Find the official county office through a web search"
+                        title="Find the official property records office through a web search"
                         href={`https://www.google.com/search?q=${encodeURIComponent(`${appraiser.county?.name || appraiser.name} ${appraiser.county?.stateCode || ""} assessor property records`)}`}
                       />
                     )}
@@ -293,15 +292,7 @@ export default function PropertyPage() {
                       <GooglePill icon={Phone} label="Call" href={`tel:${appraiser.phone.replace(/[^\d+]/g, "")}`} title={appraiser.phone} testId={`link-phone-${appraiser.id}`} />
                     )}
                   </>}
-                >
-                  {appraiser.searchableFields && appraiser.searchableFields.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {appraiser.searchableFields.map((field) => (
-                        <span key={field} className="g-chip g-chip--sm">{field}</span>
-                      ))}
-                    </div>
-                  )}
-                </GoogleListRow>
+                />
               );
             })}
           </GoogleList>

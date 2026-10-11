@@ -371,6 +371,22 @@ test.describe("settings api keys", () => {
     expect(calls.create).toHaveLength(2);
   });
 
+  test("cancelling identity verification explains that no key was created", async ({ page }) => {
+    const calls = await mockAccount(page, { createStatus: [403] });
+    await gotoCrm(page, API_URL);
+    await page.getByTestId("button-generate-key").click();
+    await page.getByTestId("input-key-name").fill("Cancelled key");
+    await page.getByTestId("button-generate-submit").click();
+    const reauth = page.getByRole("dialog", { name: "Verify your identity" });
+    await expect(reauth).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(reauth).toBeHidden();
+    await expect(page.getByTestId("text-key-generation-status")).toContainText("No API key was created");
+    await expect(page.getByTestId("input-key-name")).toHaveValue("Cancelled key");
+    await expect(page.getByTestId("dialog-new-key")).toBeHidden();
+    expect(calls.create).toHaveLength(1);
+  });
+
   test("menu: rename, set monthly limit, revoke with confirmation", async ({ page }) => {
     const calls = await mockAccount(page);
     await gotoCrm(page, API_URL);
@@ -508,6 +524,25 @@ test.describe("developers page", () => {
 });
 
 // ── 390px ───────────────────────────────────────────────────────────────────
+
+for (const width of [1024, 390]) {
+  test(`API keys expose all details and actions at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await mockAccount(page);
+    await gotoCrm(page, API_URL);
+    const card = page.getByTestId("card-api-key-key_a1");
+    await expect(card).toBeVisible();
+    await expect(page.getByTestId("table-api-keys")).toBeHidden();
+    for (const label of ["Units used", "Limit", "Added", "Last used", "Expires"]) {
+      await expect(card.getByText(label, { exact: true })).toBeVisible();
+    }
+    await expectNoSideScroll(page, "card-api-keys");
+    await page.getByTestId("button-key-menu-m-key_a1").focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByTestId("menu-key-revoke")).toBeVisible();
+    await page.screenshot({ path: test.info().outputPath(`api-keys-${width}.png`), fullPage: true });
+  });
+}
 
 test.describe("mobile 390", () => {
   test.use({ viewport: { width: 390, height: 844 } });

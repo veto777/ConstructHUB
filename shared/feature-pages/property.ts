@@ -9,7 +9,7 @@ import type { FeaturePage } from "./types";
  *     scripts/scrape-netronline.ts → server/data/appraisers.json, seeded by server/seed-all-appraisers.ts
  *   - link checks (verified / unconfirmed with "Last checked" / dead → hidden and replaced by a web search):
  *     scripts/verify-links.ts, shared/government-links.ts, client/src/pages/property.tsx
- *   - Visit + a separate Search button, tap-to-call phone, state / county / text filters kept in the address bar:
+ *   - Open portal + Call when available; Search records only for a distinct search URL; filters kept in the address bar:
  *     client/src/pages/property.tsx
  *   - the Property lookup link on every permit result (/property?countyId=…): client/src/pages/search.tsx
  *   - propertyRecords module required: server/routes.ts GET /api/property-appraisers,
@@ -35,7 +35,7 @@ const page: FeaturePage = {
     },
     {
       title: "Open the official site",
-      body: "Visit opens the office's own records site, and Search goes straight to its search page when it has a separate one.",
+      body: "Open portal opens the office's own records site. Call appears when a phone number is listed. Search records appears only when a separate search link is on record.",
     },
     {
       title: "Look the property up there",
@@ -55,7 +55,7 @@ const page: FeaturePage = {
     {
       icon: "link",
       title: "Links to the official site",
-      body: "A Visit button to each office's records site, plus a direct Search button when the office has a separate search page.",
+      body: "Open portal takes you to the office's records site. A link we couldn't confirm is labeled Open unconfirmed site. Search records appears only for a distinct search link.",
     },
     {
       icon: "check",
@@ -130,7 +130,7 @@ const page: FeaturePage = {
       "The office list is built from NETR Online's public records directory. For each county it keeps the offices that " +
         "handle property assessment, such as an assessor, property appraiser, auditor or tax commissioner, and leaves out " +
         "recorders, clerks and mapping offices. It lists the source's office name, phone and " +
-        "online link. When the office name is unavailable, the directory labels it County records (office name unavailable). Other missing values stay blank.",
+        "online link. When the office name is unavailable, the directory uses the place name followed by Assessor as a display label. Other missing values stay blank. Alaska place names are shown without adding County.",
       "Every published link is checked by loading the page. A link that opens a records page for that county is marked " +
         "verified. A source-listed link the check couldn't confirm, because the site blocked the check or the answer was " +
         "unclear, stays visible marked not auto-verified, with the date it was last checked. A dead link, one that " +

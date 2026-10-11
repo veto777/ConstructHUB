@@ -1,6 +1,18 @@
-import { isChallengeUrl } from '@shared/government-links';
+import { governmentLinkNotice, isChallengeUrl } from '@shared/government-links';
+
+/** Preserve the source's Alaska place name; never guess borough/census-area status. */
+export function propertyJurisdictionLabel(place: { name: string; stateCode: string }): string {
+  if (place.stateCode === 'AK' || /\b(county|parish|borough|census area|municipality)$/i.test(place.name)) return place.name;
+  return `${place.name} ${place.stateCode === 'LA' ? 'Parish' : 'County'}`;
+}
+
+export function propertyCheckedNotice(row: { linkStatus?: string | null; lastVerifiedAt?: string | Date | null }): string {
+  const notice = governmentLinkNotice({ ...row, linkStatus: 'unconfirmed' })!;
+  if (row.linkStatus === 'unconfirmed') return notice;
+  return notice.replace('Official site · not auto-verified · ', '') + ' · links can change';
+}
 /** Display-only safeguards; source corrections belong to the government-link pipeline. */
-export function propertyOfficeForDisplay<T extends { name: string; portalUrl: string | null; searchUrl: string | null; linkStatus: string | null }>(row: T): T {
+export function propertyOfficeForDisplay<T extends { name: string; county?: { name: string; stateCode: string }; portalUrl: string | null; searchUrl: string | null; linkStatus: string | null }>(row: T): T {
   const safe = (value: string | null) => {
     if (!value) return null;
     try { const u = new URL(value); return ['http:', 'https:'].includes(u.protocol) ? value : null; } catch { return null; }
@@ -8,7 +20,8 @@ export function propertyOfficeForDisplay<T extends { name: string; portalUrl: st
   const portalUrl = safe(row.portalUrl), searchUrl = safe(row.searchUrl);
   const challenge = isChallengeUrl(portalUrl) || isChallengeUrl(searchUrl);
   return { ...row, portalUrl, searchUrl,
-    name: / property records$/i.test(row.name) ? 'County records (office name unavailable)' : row.name,
+    name: !row.name.trim() || /^assessor$/i.test(row.name.trim()) || / property records$/i.test(row.name)
+      ? `${row.county?.name || row.name.replace(/ property records$/i, '').trim() || 'Local'} Assessor` : row.name,
     linkStatus: challenge ? 'unconfirmed' : row.linkStatus };
 }
 

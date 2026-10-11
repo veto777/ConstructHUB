@@ -29,6 +29,7 @@ import { API_NO_AI_NOTICE } from "@/pages/settings/api/api-keys-panel";
 import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
 import { BTN_PRIMARY, Kicker } from "@/components/feature-landing/primitives";
 import { copyToClipboard } from "@/pages/settings/billing/format";
+import { SITE_ORIGIN } from "@shared/seo";
 
 // ── The slice of OpenAPI 3 this page reads ──────────────────────────────────
 type Schema = {
@@ -274,7 +275,7 @@ export default function DevelopersPage() {
     for (const e of endpoints) if (!groups.has(tagKey(e.tag))) groups.set(tagKey(e.tag), prettyTag(e.tag));
     return Array.from(groups.values());
   }, [doc, endpoints]);
-  const origin = typeof window !== "undefined" ? window.location.origin : "https://constructhub.us";
+  const origin = SITE_ORIGIN;
   const base = `${origin}/api/v1`;
   const units = planUnits();
   const [search, setSearch] = useState("");
@@ -428,7 +429,7 @@ export default function DevelopersPage() {
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search endpoints: reviews, post, /locations/{id}…"
                   aria-label="Search endpoints"
-                  className="pl-9"
+                  className="!pl-10"
                   data-testid="input-developers-search"
                 />
               </div>

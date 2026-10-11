@@ -6,6 +6,7 @@ import { governmentLinksForDisplay, isChallengeUrl } from '../shared/government-
 const state = vi.hoisted(() => ({ query: {} as any }));
 vi.mock('@tanstack/react-query', async original => ({ ...await original<any>(), useQuery: () => state.query }));
 import PropertyPage from '../client/src/pages/property';
+import { propertyCheckedNotice, propertyJurisdictionLabel, propertyOfficeForDisplay } from '../client/src/pages/property-display';
 const office = { id: 1, countyId: 12, name: 'Test office', isActive: true, portalUrl: 'https://validate.perfdrive.com/', searchUrl: 'https://county.gov/records', linkStatus: 'verified', county: { name: 'Test', state: 'Test', stateCode: 'TS' } };
 beforeEach(() => {
   state.query = { data: [office], isLoading: false, refetch: vi.fn() };
@@ -39,4 +40,36 @@ it('recovers Roseau only from the archived challenge URL and leaves verification
   expect(new URL(roseau.portalUrl!).hostname).toBe('www.co.roseau.mn.us');
   expect(isChallengeUrl(roseau.portalUrl)).toBe(false);
   expect(governmentLinksForDisplay({ ...roseau, isActive: true, searchUrl: null }).linkStatus).toBe('unconfirmed');
+});
+
+it('omits seed-default search capabilities and describes records as held on office sites', () => {
+  state.query.data = [{ ...office, searchableFields: ['Address', 'Owner', 'Parcel'] }];
+  const html = renderToStaticMarkup(createElement(PropertyPage));
+  expect(html).not.toContain('g-chip');
+  expect(html).toContain('Their own sites hold ownership');
+});
+
+it('uses the same last-check calendar date for both link statuses', () => {
+  const lastVerifiedAt = new Date(2026, 8, 28, 12);
+  for (const linkStatus of ['verified', 'unconfirmed']) {
+    expect(propertyCheckedNotice({ linkStatus, lastVerifiedAt })).toContain('Last checked 2026-09-28');
+    expect(propertyCheckedNotice({ linkStatus, lastVerifiedAt: 'invalid' })).toContain('Check date unavailable');
+    expect(propertyCheckedNotice({ linkStatus, lastVerifiedAt: null })).not.toContain('Last checked');
+  }
+});
+
+it('preserves Alaska jurisdiction names and gives unnamed offices place-qualified labels', () => {
+  for (const name of ['Anchorage', 'Aleutians East Borough', 'Bethel Census Area']) {
+    const county = { name, stateCode: 'AK', state: 'Alaska' };
+    expect(propertyJurisdictionLabel(county)).toBe(name);
+    for (const officeName of ['', 'Assessor', `${name} property records`]) {
+      const row = propertyOfficeForDisplay({ ...office, name: officeName, county });
+      expect(row.name).toBe(`${name} Assessor`);
+      state.query.data = [row];
+      const html = renderToStaticMarkup(createElement(PropertyPage));
+      expect(html).toContain(`${name}, Alaska`);
+      expect(html).not.toContain(`${name} County`);
+    }
+  }
+  expect(propertyJurisdictionLabel({ name: 'Orange', stateCode: 'FL' })).toBe('Orange County');
 });

@@ -78,6 +78,7 @@ export function ApiKeysPanel({ onUpgrade, docsHref = "/developers" }: ApiKeysPan
   const upgrade = onUpgrade ?? (() => navigate("/pricing"));
 
   const [generateOpen, setGenerateOpen] = useState(false);
+  const [generateMessage, setGenerateMessage] = useState<string | null>(null);
   // Bumped after each successful create so the next Generate starts from a blank form
   // (Radix doesn't call onOpenChange when the dialog is closed from code).
   const [generateSession, setGenerateSession] = useState(0);
@@ -94,7 +95,14 @@ export function ApiKeysPanel({ onUpgrade, docsHref = "/developers" }: ApiKeysPan
   const createMutation = useMutation({
     mutationFn: async (body: CreateApiKeyBody) => (await apiRequest("POST", "/api/account/api-keys", body)).json() as Promise<CreateApiKeyResponse>,
     onSuccess: (res) => { setGenerateOpen(false); setGenerateSession((n) => n + 1); setNewKey(res); refreshKeys(); },
-    onError: fail("Couldn't create the key"),
+    onMutate: () => setGenerateMessage(null),
+    onError: (err) => {
+      if (err instanceof VerificationCancelled) {
+        setGenerateMessage("Identity check cancelled. No API key was created. You can try again when you're ready.");
+        return;
+      }
+      fail("Couldn't create the key")(err);
+    },
   });
   // Once the reveal is dismissed the secret leaves React state and the mutation cache alike.
   const dismissNewKey = () => { setNewKey(null); createMutation.reset(); };
@@ -127,7 +135,7 @@ export function ApiKeysPanel({ onUpgrade, docsHref = "/developers" }: ApiKeysPan
         <AlertDescription>
           <span data-testid="text-api-no-ai">{API_NO_AI_NOTICE}</span>{" "}
           Read your data, schedule posts and update records with your own scripts or your own AI; anything you send through the API is
-          stored exactly as sent. TruthCoder never generates content for an API call.{" "}
+          stored exactly as sent. AI features never run for an API call.{" "}
           <a href={docsHref} className="underline underline-offset-4" data-testid="link-api-docs">API reference</a>
         </AlertDescription>
       </Alert>
@@ -163,7 +171,7 @@ export function ApiKeysPanel({ onUpgrade, docsHref = "/developers" }: ApiKeysPan
                 <CardTitle className="text-base">API keys</CardTitle>
                 <CardDescription>Each key is shown in full once, when it's created. Revoke a key you no longer use.</CardDescription>
               </div>
-              <Button size="sm" onClick={() => setGenerateOpen(true)} disabled={!apiEnabled} data-testid="button-generate-key">
+              <Button size="sm" onClick={() => { setGenerateMessage(null); setGenerateOpen(true); }} disabled={!apiEnabled} data-testid="button-generate-key">
                 <KeyRound className="h-4 w-4 mr-1.5" aria-hidden="true" />Generate API key
               </Button>
             </CardHeader>
@@ -174,7 +182,7 @@ export function ApiKeysPanel({ onUpgrade, docsHref = "/developers" }: ApiKeysPan
                 </p>
               ) : (
                 <>
-                  <div className="hidden lg:block">
+                  <div className="hidden min-[1180px]:block">
                     {/* Compact cells (the shadcn default p-4 alone is 288px across nine columns) so the table fits the settings shell at 1440px. */}
                     <Table className="[&_th]:px-2 [&_td]:px-2 [&_td]:whitespace-nowrap" data-testid="table-api-keys">
                       <TableHeader>
@@ -212,7 +220,7 @@ export function ApiKeysPanel({ onUpgrade, docsHref = "/developers" }: ApiKeysPan
                       </TableBody>
                     </Table>
                   </div>
-                  <ul className="lg:hidden space-y-3" data-testid="list-api-keys">
+                  <ul className="min-[1180px]:hidden space-y-3" data-testid="list-api-keys">
                     {keys.map((k) => (
                       <li key={k.id} className="rounded-lg border p-3 space-y-2" data-testid={`card-api-key-${k.id}`}>
                         <div className="flex items-start justify-between gap-3">
@@ -246,6 +254,7 @@ export function ApiKeysPanel({ onUpgrade, docsHref = "/developers" }: ApiKeysPan
         onOpenChange={setGenerateOpen}
         planUnits={plan?.unitsPerMonth ?? 0}
         pending={createMutation.isPending}
+        message={generateMessage}
         onSubmit={(body) => createMutation.mutate(body)}
       />
       <NewKeyDialog result={newKey} onClose={dismissNewKey} />
@@ -339,8 +348,8 @@ function KeyMenu({ item, idSuffix, onRename, onLimit, onRevoke }: {
   );
 }
 
-function GenerateKeyDialog({ open, onOpenChange, planUnits, pending, onSubmit }: {
-  open: boolean; onOpenChange: (open: boolean) => void; planUnits: number; pending: boolean; onSubmit: (body: CreateApiKeyBody) => void;
+function GenerateKeyDialog({ open, onOpenChange, planUnits, pending, message, onSubmit }: {
+  open: boolean; onOpenChange: (open: boolean) => void; planUnits: number; pending: boolean; message: string | null; onSubmit: (body: CreateApiKeyBody) => void;
 }) {
   const [name, setName] = useState("");
   const [scopes, setScopes] = useState<ApiScope[]>(["read"]);
@@ -369,6 +378,7 @@ function GenerateKeyDialog({ open, onOpenChange, planUnits, pending, onSubmit }:
           <DialogDescription>{API_NO_AI_NOTICE} You'll see the key once; store it somewhere safe.</DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); submit(); }}>
+          {message && <p role="status" className="text-sm text-muted-foreground" data-testid="text-key-generation-status">{message}</p>}
           <div className="space-y-1.5">
             <Label htmlFor="api-key-name">Title</Label>
             <Input id="api-key-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} placeholder="e.g. Zapier, my reporting script" autoFocus data-testid="input-key-name" />
