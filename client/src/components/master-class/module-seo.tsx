@@ -30,7 +30,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const SEO_LESSONS: LessonMeta[] = [
   { id: "search-console", title: "Google Search Console (GSC)", icon: FileSearch },
   { id: "tracking", title: "Tracking & Analytics", icon: BarChart3 },
-  { id: "content", title: "Content Strategy That Actually Ranks", icon: PenTool },
+  { id: "content", title: "Content Strategy for Local Search", icon: PenTool },
   { id: "backlinks", title: "Backlinks & Link Building", icon: Link2 },
   { id: "citations", title: "Citations and directories", icon: ListChecks },
   { id: "social", title: "Social Media & Reputation Building", icon: Share2 },

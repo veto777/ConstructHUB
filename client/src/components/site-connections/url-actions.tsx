@@ -107,7 +107,7 @@ export function UrlActions({
       {rows.map((r, i) => (
         <div
           key={i}
-          className="grid min-w-0 gap-2 rounded-lg border p-3 sm:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center"
+          className="grid min-w-0 gap-2 rounded-lg border p-3 min-[1100px]:grid-cols-[auto_minmax(0,1fr)_minmax(0,2fr)_auto] min-[1100px]:items-center"
         >
           <input
             type="checkbox"
@@ -115,7 +115,7 @@ export function UrlActions({
             checked={r.selected}
             onChange={(e) => change(i, { selected: e.target.checked })}
           />
-          <label className="text-sm">
+          <label className="min-w-0 text-sm">
             Property
             <select
               className="block h-10 w-full min-w-0 rounded border bg-background px-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
@@ -130,9 +130,8 @@ export function UrlActions({
                 </option>
               ))}
             </select>
-            <span className="block break-all text-xs text-muted-foreground">{assets.find(a => String(a.id) === r.assetId)?.name}</span>
           </label>
-          <label className="text-sm">
+          <label className="min-w-0 text-sm">
             URL
             <Input
               value={r.url}

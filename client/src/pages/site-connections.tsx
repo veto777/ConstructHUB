@@ -1,3 +1,4 @@
+import { formatNumber } from "@/components/site-connections/format";
 import {
   LoadingReport,
   ReportError,
@@ -184,7 +185,7 @@ export function DataList({
       <GoogleSectionHeader
         as="h3"
         title={title}
-        count={data.data?.total}
+        count={data.data?.total == null ? null : formatNumber(data.data.total)}
         flush
       />
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
@@ -235,10 +236,10 @@ export function DataList({
               retry={() => void data.refetch()}
             />
           )}
-          <p className="text-sm g-text-2">{data.data?.total ?? 0} results</p>
+          <p className="text-sm g-text-2">{formatNumber(data.data?.total)} results</p>
           {data.data?.pendingJobs > 0 && (
             <Notice tone="warning">
-              Importing history or awaiting recovery: {data.data.pendingJobs}{" "}
+              Importing history or awaiting recovery: {formatNumber(data.data.pendingJobs)}{" "}
               unfinished analytics jobs. Check Work queue for failures.
             </Notice>
           )}
@@ -287,7 +288,7 @@ export function DataList({
               label="Previous"
             />
             <span className="text-sm tabular-nums g-text-2">
-              Page {page}
+              Page {formatNumber(page)}
               {lastPage ? ` of ${lastPage}` : ""}
             </span>
             <GooglePill
@@ -386,12 +387,10 @@ function MetricRows({ asset }: { asset: any }) {
               {r.date} {r.key}
             </p>
             <p className="text-muted-foreground">
-              Clicks: {r.clicks} · Impressions: {r.impressions} · CTR:{" "}
-              {r.ctr === null ? "Unavailable" : `${(r.ctr * 100).toFixed(2)}%`}{" "}
+              Clicks: {formatNumber(r.clicks)} · Impressions: {formatNumber(r.impressions)} · CTR:{" "}
+              {percent(r.ctr) ?? "Unavailable"}{" "}
               · Position:{" "}
-              {r.position === null
-                ? "Unavailable"
-                : Number(r.position).toFixed(1)}
+              {position(r.position) ?? "Unavailable"}
             </p>
           </div>
         )}
@@ -408,7 +407,7 @@ function MetricRows({ asset }: { asset: any }) {
         render={(r) => (
           <p className="text-sm text-muted-foreground">
             {r.path} · Submitted: {r.lastSubmitted ?? "Unknown"} · Errors:{" "}
-            {r.errors ?? "Unknown"}
+            {formatNumber(r.errors, "Unknown")}
           </p>
         )}
       />
@@ -464,7 +463,7 @@ export function LocationSearchSummary({ locationId }: { locationId: number }) {
         </p>
         <p className="text-sm text-muted-foreground">
           {s
-            ? `${s.clicks} clicks · ${s.impressions} impressions`
+            ? `${formatNumber(s.clicks)} clicks · ${formatNumber(s.impressions)} impressions`
             : "Search Console data unavailable. Connect an account and sync its property."}
         </p>
         {s?.external_id && (
@@ -587,7 +586,7 @@ export default function SiteConnections({
         description:
           r?.message ??
           (r?.queued !== undefined
-            ? `${r.queued} queued. Watch Work queue for completion.`
+            ? `${formatNumber(r.queued)} queued. Watch Work queue for completion.`
             : undefined),
       });
       return r;
@@ -763,7 +762,7 @@ export default function SiteConnections({
                 {zones && (
                   <section className="space-y-3 rounded-lg border p-4">
                     <p className="text-sm g-text-2">
-                      {zones.total} zones · page {zonePage}
+                      {formatNumber(zones.total)} zones · page {formatNumber(zonePage)}
                     </p>
                     {zones.accounts.map((a: any) => (
                       <p key={a.id} className="text-sm">
@@ -777,7 +776,7 @@ export default function SiteConnections({
                         onClick={() => discover(zonePage, accountPage - 1)}
                       />
                       <span className="text-sm">
-                        Accounts page {accountPage}
+                        Accounts page {formatNumber(accountPage)}
                       </span>
                       <GooglePill
                         label="Next accounts"
@@ -1160,7 +1159,7 @@ export default function SiteConnections({
                       }),
                     )
                   }
-                  label={`Sync selected (${selected.length})`}
+                  label={`Sync selected (${formatNumber(selected.length)})`}
                 />
                 <GooglePill
                   disabled={busy || !assets.data?.total}
@@ -1198,7 +1197,7 @@ export default function SiteConnections({
                     />
                   )}
                   <p className="text-sm g-text-2">
-                    {assets.data?.total ?? 0} sites
+                    {formatNumber(assets.data?.total)} sites
                   </p>
                   <label className="flex gap-2 text-sm g-text-2">
                     <input
@@ -1245,7 +1244,7 @@ export default function SiteConnections({
                           }
                           meta={[
                             cf ? a.status : accessLabel(a.status),
-                            `${a.locations} linked locations`,
+                            `${formatNumber(a.locations)} linked locations`,
                             a.synced_at
                               ? `${cf ? "Analytics" : "Sitemaps"} updated ${new Date(a.synced_at).toLocaleString()}`
                               : "Not synced",
@@ -1312,7 +1311,7 @@ export default function SiteConnections({
                       label="Previous sites"
                     />
                     <span className="text-sm tabular-nums g-text-2">
-                      Page {page}
+                      Page {formatNumber(page)}
                     </span>
                     <GooglePill
                       size="sm"
@@ -1567,9 +1566,9 @@ export default function SiteConnections({
                 </time>
               </p>
               <p className="text-muted-foreground">
-                {sampledBlocks(a.preview.before) ?? "Unknown number of"} blocked
+                {formatNumber(sampledBlocks(a.preview.before), "Unknown number of")} blocked
                 requests sampled before the change;{" "}
-                {sampledBlocks(a.after) ?? "unknown number of"} in the latest
+                {formatNumber(sampledBlocks(a.after), "unknown number of")} in the latest
                 snapshot. Latest snapshot: {relativeTime(a.after?.until)}. Sync
                 after applying. Samples do not prove the change caused a
                 difference.
@@ -1763,7 +1762,7 @@ function InspectionCoverage({ id }: { id: number }) {
         Inspected URL coverage:{" "}
         {data?.coverage?.length
           ? data.coverage
-              .map((c: any) => `${c.verdict ?? "Unknown"}: ${c.count}`)
+              .map((c: any) => `${c.verdict ?? "Unknown"}: ${formatNumber(c.count)}`)
               .join(" · ")
           : "Unavailable"}
       </p>
@@ -1878,7 +1877,7 @@ export function DatasetStatus({
                 : null;
           const state =
             analytics && d?.analytics?.pending > 0
-              ? `Importing history · ${d.analytics.pending} jobs pending`
+              ? `Importing history · ${formatNumber(d.analytics.pending)} jobs pending`
               : (j?.state ?? (updated ? "Imported" : "Not yet recorded"));
           return (
             <div key={n.kind} className="rounded-lg border p-3 text-sm">
@@ -1906,8 +1905,8 @@ export function DatasetStatus({
           rows={d.datasets}
           columns={[
             { label: "Dataset", value: (r) => r.dimension },
-            { label: "Importing", value: (r) => r.pending },
-            { label: "Failed / uncertain", value: (r) => r.failed },
+            { label: "Importing", value: (r) => r.pending, numeric: true },
+            { label: "Failed / uncertain", value: (r) => r.failed, numeric: true },
             {
               label: "Last completed",
               value: (r) =>
