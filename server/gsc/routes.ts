@@ -139,7 +139,7 @@ export function registerGscRoutes(
     const p = listInput
       .extend({
         dimension: z.enum(dimensions).default("date"),
-        group: z.enum(["day", "week", "month"]).default("day"),
+        group: z.enum(["total", "day", "week", "month"]).optional(),
         start: z
           .string()
           .date()
@@ -153,8 +153,9 @@ export function registerGscRoutes(
         dir: z.enum(["asc", "desc"]).default("asc"),
       })
       .parse(req.query);
-    const v = [a.id, p.dimension, p.start, p.end, p.group, `%${p.q}%`];
-    const sql = `SELECT to_char(date_trunc($5,date),'YYYY-MM-DD') date,key,sum(clicks) clicks,sum(impressions) impressions,
+    const group = p.group ?? (p.dimension === "date" ? "day" : "total");
+    const v = [a.id, p.dimension, p.start, p.end, group, `%${p.q}%`];
+    const sql = `SELECT CASE WHEN $5 = 'total' THEN NULL ELSE to_char(date_trunc(NULLIF($5,'total'),date),'YYYY-MM-DD') END date,key,sum(clicks) clicks,sum(impressions) impressions,
       sum(clicks)/NULLIF(sum(impressions),0) ctr,sum(position*impressions)/NULLIF(sum(impressions),0) position
       FROM gsc_analytics WHERE asset_id=$1 AND dimension=$2 AND date BETWEEN $3 AND $4 AND key ILIKE $6 GROUP BY 1,2`;
     const order = p.sort

@@ -12,7 +12,7 @@ vi.mock("../account-events", () => ({
   notifyUser: vi.fn(),
 }));
 vi.mock("../account-security", () => ({ requireRecentAuth: () => true }));
-vi.mock("../cloudflare/service", () => ({}));
+vi.mock("../cloudflare/service", () => ({ rulePack: vi.fn(() => []) }));
 vi.mock("../cloudflare/hooks", () => ({}));
 vi.mock("./service", () => ({
   dimensions: ["date", "query", "page", "country", "device"],
@@ -246,7 +246,7 @@ it("rejects unknown analytics sort columns instead of interpolating them", async
   expect(query).not.toHaveBeenCalled();
 });
 // Cloudflare cache datasets sort in SQL before pagination (same contract as GSC analytics).
-async function cfRequest(path: string, params: Record<string, string> = {}) {
+async function cfRequest(path: string, params: Record<string, string> = {}, body?: unknown) {
   const app = express();
   registerCloudflareRoutes(app, () => ({ id: 7 }));
   const handler = (app as any).router.stack.find(
@@ -264,7 +264,7 @@ async function cfRequest(path: string, params: Record<string, string> = {}) {
       return this;
     },
   };
-  await handler({ params: { id: "12" }, query: params }, res);
+  await handler({ params: { id: "12" }, query: params, body }, res);
   return res;
 }
 it("sorts a Cloudflare cache dataset in SQL before pagination", async () => {
@@ -324,4 +324,29 @@ it.each(["ctr", "position"])("puts missing %s values last when sorting ascending
   const result = await request("/api/gsc/assets/:id/analytics", { sort, dir: "asc" });
   expect(result.code).toBe(200);
   expect(query.mock.calls[0][0]).toContain(`ORDER BY ${sort} asc NULLS LAST`);
+});
+
+it.each(["query", "page"])("defaults %s breakdown to range totals with weighted metrics", async dimension => {
+  query.mockResolvedValue({ rows: [{ total: 1, pending: 0 }] } as any);
+  const result = await request("/api/gsc/assets/:id/analytics", { dimension });
+  expect(result.code).toBe(200);
+  expect(query.mock.calls[0][1]?.[4]).toBe("total");
+  const sql = String(query.mock.calls[0][0]);
+  expect(sql).toContain("CASE WHEN $5 = 'total' THEN NULL");
+  expect(sql).toContain("GROUP BY 1,2");
+  expect(sql).toContain("sum(position*impressions)/NULLIF(sum(impressions),0)");
+  expect(sql).toContain("sum(clicks)/NULLIF(sum(impressions),0)");
+  await request("/api/gsc/assets/:id/analytics", { dimension, group: "day" });
+  expect(query.mock.calls[3][1]?.[4]).toBe("day");
+});
+
+it.each(["ips", "bad-ua", "ads-door"])("preview warning applies to the %s pack only", async kind => {
+  query.mockResolvedValue({ rows: [{ id: "preview-id" }] } as any);
+  const result = await cfRequest("/api/cloudflare/preview", {}, { ids: [12], kind, ips: ["192.0.2.1"] });
+  expect(result.code).toBe(200);
+  const warning = result.body.items[0].warning;
+  expect(warning).toContain("real visitors");
+  expect(warning.includes("Ads rate limiting")).toBe(kind === "ads-door");
+  expect(warning.includes("High security")).toBe(kind === "ads-door");
+  expect(warning.includes("Site-wide rate limiting")).toBe(kind === "bad-ua");
 });

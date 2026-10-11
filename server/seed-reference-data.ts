@@ -116,77 +116,7 @@ export async function seedReferenceData() {
     console.error("State guide link sync failed (will retry on next boot):", err?.message || err);
   }
 
-  const stepCount = await db.execute(sql`SELECT COUNT(*) as count FROM state_guide_steps`);
-  const totalSteps = Number(stepCount.rows[0].count);
-
-  if (totalSteps === 0 && totalGuides > 0) {
-    console.log("Seeding state guide steps...");
-    const stepsData = loadJson("state-guide-steps.json");
-
-    const allGuides = await db.select({ id: stateGuides.id, stateCode: stateGuides.stateCode }).from(stateGuides);
-    const guideIdByOldId: Map<number, number> = new Map();
-
-    const oldGuideIds = [...new Set(stepsData.map((s: any) => s.state_guide_id))].sort((a: any, b: any) => a - b) as number[];
-    const guidesOrderedByCode = allGuides.sort((a, b) => a.stateCode.localeCompare(b.stateCode));
-
-    const oldIdToStateCode: Record<number, string> = {};
-    const stateCodesInOrder = guidesOrderedByCode.map(g => g.stateCode);
-    
-    for (const step of stepsData) {
-      const matchingGuide = allGuides.find(g => g.id === step.state_guide_id);
-      if (matchingGuide) {
-        guideIdByOldId.set(step.state_guide_id, matchingGuide.id);
-      }
-    }
-
-    if (guideIdByOldId.size === 0) {
-      const uniqueOldIds = [...new Set(stepsData.map((s: any) => s.state_guide_id))] as number[];
-      for (const oldId of uniqueOldIds) {
-        const match = allGuides.find(g => g.id === oldId);
-        if (match) guideIdByOldId.set(oldId, match.id);
-      }
-    }
-
-    for (const step of stepsData) {
-      const guideId = guideIdByOldId.get(step.state_guide_id) || step.state_guide_id;
-      await db.insert(stateGuideSteps).values({
-        stateGuideId: guideId,
-        stepNumber: step.step_number,
-        title: step.title,
-        description: step.description,
-        url: step.url,
-        urlLabel: step.url_label,
-        category: step.category,
-        isRequired: step.is_required,
-        tips: step.tips,
-      });
-    }
-    console.log(`Seeded ${stepsData.length} state guide steps.`);
-  } else {
-    console.log(`Already have ${totalSteps} state guide steps.`);
-  }
-
-  const moduleCount = await db.execute(sql`SELECT COUNT(*) as count FROM master_class_modules`);
-  const totalModules = Number(moduleCount.rows[0].count);
-
-  if (totalModules === 0) {
-    console.log("Seeding master class modules...");
-    const modulesData = loadJson("master-class-modules.json");
-    for (const m of modulesData) {
-      await db.insert(masterClassModules).values({
-        title: m.title,
-        description: m.description,
-        price: m.price,
-        category: m.category,
-        sortOrder: m.sort_order,
-        isActive: m.is_active,
-        features: m.features,
-      });
-    }
-    console.log(`Seeded ${modulesData.length} master class modules.`);
-  } else {
-    console.log(`Already have ${totalModules} master class modules.`);
-  }
+  await seedCourseReferenceData();
 
   const trialCodes = [
     { code: "TRIAL-C9D6AC01", trialDays: 0 },
@@ -214,4 +144,84 @@ export async function seedReferenceData() {
       console.log(`Seeded trial code: ${tc.code} (${tc.trialDays === 0 ? "unlimited" : tc.trialDays + " days"})`);
     }
   }
+}
+
+/** Seed empty catalogs, then bring only editorial copy up to date on every pass. */
+export async function seedCourseReferenceData(
+  database = db,
+  modulesData: typeof import("./data/master-class-modules.json") = loadJson("master-class-modules.json"),
+  stepsData: typeof import("./data/state-guide-steps.json") = loadJson("state-guide-steps.json"),
+) {
+  return database.transaction(async (db) => {
+    const stepCount = await db.execute(sql`SELECT COUNT(*) as count FROM state_guide_steps`);
+    const totalSteps = Number(stepCount.rows[0].count);
+
+    if (totalSteps === 0) {
+      console.log("Seeding state guide steps...");
+
+      const allGuides = await db.select({ id: stateGuides.id, stateCode: stateGuides.stateCode }).from(stateGuides);
+      const guideIdByCode = new Map(allGuides.map(g => [g.stateCode, g.id]));
+      // Exported IDs are not portable across databases. Resolve every step by state.
+      for (const step of stepsData) {
+        if (!guideIdByCode.has(step.state_code)) {
+          throw new Error(`Missing state guide for ${step.state_code}`);
+        }
+      }
+      for (const step of stepsData) {
+        const guideId = guideIdByCode.get(step.state_code)!;
+        await db.insert(stateGuideSteps).values({
+          stateGuideId: guideId,
+          stepNumber: step.step_number,
+          title: step.title,
+          description: step.description,
+          url: step.url,
+          urlLabel: step.url_label,
+          category: step.category,
+          isRequired: step.is_required,
+          tips: step.tips,
+        });
+      }
+      console.log(`Seeded ${stepsData.length} state guide steps.`);
+    } else {
+      console.log(`Already have ${totalSteps} state guide steps.`);
+    }
+
+    const moduleCount = await db.execute(sql`SELECT COUNT(*) as count FROM master_class_modules`);
+    const totalModules = Number(moduleCount.rows[0].count);
+
+    if (totalModules === 0) {
+      console.log("Seeding master class modules...");
+      for (const m of modulesData) {
+        await db.insert(masterClassModules).values({
+          title: m.title,
+          description: m.description,
+          price: m.price,
+          category: m.category,
+          sortOrder: m.sort_order,
+          isActive: m.is_active,
+          features: m.features,
+        });
+      }
+      console.log(`Seeded ${modulesData.length} master class modules.`);
+    } else {
+      console.log(`Already have ${totalModules} master class modules.`);
+    }
+
+    const modules = await db.execute(sql`UPDATE master_class_modules m
+      SET description = j.description, features = j.features
+      FROM jsonb_to_recordset(${JSON.stringify(modulesData)}::jsonb)
+        AS j(title text, description text, features text[])
+      WHERE m.title = j.title AND (m.description IS DISTINCT FROM j.description
+        OR m.features IS DISTINCT FROM j.features)`);
+    const steps = await db.execute(sql`UPDATE state_guide_steps s
+      SET description = j.description, tips = j.tips
+      FROM jsonb_to_recordset(${JSON.stringify(stepsData)}::jsonb)
+        AS j(state_code text, step_number integer, description text, tips text), state_guides g
+      WHERE g.state_code = j.state_code AND s.state_guide_id = g.id
+        AND s.step_number = j.step_number
+        AND (s.description IS DISTINCT FROM j.description OR s.tips IS DISTINCT FROM j.tips)`);
+    const counts = { modules: modules.rowCount ?? 0, steps: steps.rowCount ?? 0 };
+    console.log(`Updated reference copy: ${counts.modules} module(s), ${counts.steps} state guide step(s).`);
+    return counts;
+  });
 }

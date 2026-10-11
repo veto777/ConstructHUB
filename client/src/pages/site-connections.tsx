@@ -12,6 +12,7 @@ import {
   percent,
   position,
   relativeTime,
+  accessLabel,
   type Column,
 } from "@/components/site-connections/report";
 import {
@@ -22,7 +23,7 @@ import {
   previewFingerprint,
 } from "@/components/site-connections/context";
 import { UrlActions } from "@/components/site-connections/url-actions";
-import { Fragment, useState, useRef, type ReactNode } from "react";
+import { Fragment, useEffect, useState, useRef, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
@@ -303,7 +304,7 @@ export function DataList({
 }
 function MetricRows({ asset }: { asset: any }) {
   const [dimension, D] = useReportParam("dimension", "date"),
-    [group, G] = useReportParam("group", "day"),
+    [group, G] = useReportParam("group", dimension === "date" ? "day" : "total"),
     [start, S] = useReportParam(
       "reportStart",
       new Date(Date.now() - 31 * 86400000).toISOString().slice(0, 10),
@@ -323,7 +324,7 @@ function MetricRows({ asset }: { asset: any }) {
   const columns =
     dimension === "date"
       ? analyticsColumns.filter((c) => c.label !== "Breakdown")
-      : analyticsColumns;
+      : group === "total" ? analyticsColumns.filter(c => c.sortKey !== "date") : analyticsColumns;
   return (
     <div className="space-y-4">
       <p className="flex items-center gap-1.5 text-sm g-text-2">
@@ -339,7 +340,7 @@ function MetricRows({ asset }: { asset: any }) {
             aria-label="Breakdown"
             className={`${selectClass} block`}
             value={dimension}
-            onChange={(e) => rescope(D)(e.target.value)}
+            onChange={(e) => { rescope(D)(e.target.value); G(e.target.value === "date" ? "day" : "total"); }}
           >
             {["date", "query", "page", "device", "country"].map((d) => (
               <option key={d}>{d}</option>
@@ -354,7 +355,7 @@ function MetricRows({ asset }: { asset: any }) {
             value={group}
             onChange={(e) => rescope(G)(e.target.value)}
           >
-            {["day", "week", "month"].map((d) => (
+            {(dimension === "date" ? ["day", "week", "month"] : ["total", "day", "week", "month"]).map((d) => (
               <option key={d}>{d}</option>
             ))}
           </select>
@@ -537,6 +538,18 @@ export default function SiteConnections({
   const [queuedIds, setQueuedIds] = useState<number[]>([]);
   const [actionError, setActionError] = useState<unknown>(null);
   const [previewKey, setPreviewKey] = useState("");
+  const [focusPreview, setFocusPreview] = useState(false);
+  const previewHeading = useRef<HTMLSpanElement>(null);
+  const selectedSiteTabs = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!focusPreview || detailTab !== "Protection" || !previewHeading.current) return;
+    previewHeading.current.focus({ preventScroll: true });
+    previewHeading.current.scrollIntoView({ block: "start" });
+    if (selectedSiteTabs.current && selectedSiteTabs.current.getBoundingClientRect().top < 80) {
+      selectedSiteTabs.current.scrollIntoView({ block: "start" });
+    }
+    setFocusPreview(false);
+  }, [focusPreview, detailTab]);
   const previewIds = asset ? [asset.id] : selected;
   const fingerprint = previewFingerprint(
     previewIds,
@@ -561,7 +574,7 @@ export default function SiteConnections({
   const planGate = [config.error, assets.error, actionError].find((e) =>
     planRequiredFrom(e),
   );
-  async function act(fn: () => Promise<any>, title = "Request saved") {
+  async function act(fn: () => Promise<any>, title = "Request saved", notifySuccess = true) {
     B(true);
     setActionError(null);
     try {
@@ -569,7 +582,7 @@ export default function SiteConnections({
       await queryClient.invalidateQueries({
         predicate: (q) => String(q.queryKey[0]).startsWith(base),
       });
-      toast({
+      if (notifySuccess) toast({
         title,
         description:
           r?.message ??
@@ -1010,7 +1023,7 @@ export default function SiteConnections({
                 }
               />
               {cf && (
-                <ToolTabs as="group" label="Selected site views">
+                <div ref={selectedSiteTabs} className="scroll-mt-24"><ToolTabs as="group" label="Selected site views">
                   {["Overview", "Protection", "Activity"].map((t) => (
                     <GooglePill
                       key={t}
@@ -1023,7 +1036,7 @@ export default function SiteConnections({
                       }}
                     />
                   ))}
-                </ToolTabs>
+                </ToolTabs></div>
               )}
               <DatasetStatus
                 provider={provider}
@@ -1049,6 +1062,7 @@ export default function SiteConnections({
                       Pack("ips");
                       Select([asset.id]);
                       setDetailTab("Protection");
+                      setFocusPreview(true);
                     }}
                   />
                 )
@@ -1120,10 +1134,11 @@ export default function SiteConnections({
                           "siteOwner",
                           "siteFullUser",
                           "siteRestrictedUser",
+                          "siteUnverifiedUser",
                           "access_removed",
                         ]
                     ).map((s) => (
-                      <option key={s}>{s}</option>
+                      <option key={s} value={s}>{cf ? s : accessLabel(s)}</option>
                     ))}
                   </select>
                 }
@@ -1229,7 +1244,7 @@ export default function SiteConnections({
                             </span>
                           }
                           meta={[
-                            a.status,
+                            cf ? a.status : accessLabel(a.status),
                             `${a.locations} linked locations`,
                             a.synced_at
                               ? `${cf ? "Analytics" : "Sitemaps"} updated ${new Date(a.synced_at).toLocaleString()}`
@@ -1314,7 +1329,7 @@ export default function SiteConnections({
             ? (!assetId || (asset && detailTab === "Protection")) && (
                 <section>
                   <GoogleSectionHeader
-                    title="Preview edge protection for selected zones"
+                    title={<span ref={previewHeading} tabIndex={-1} className="block scroll-mt-40 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">Preview edge protection for selected zones</span>}
                     titleAfter={<HelpButton k="cloudflare.protection" />}
                     description="Review Click Guard / VPN Shield findings before adding IPs. Rules affect visitors."
                   />
@@ -1329,11 +1344,11 @@ export default function SiteConnections({
                       <option value="bad-ua">Site-wide bad user agents</option>
                       <option value="ips">Flagged IPs</option>
                     </select>
-                    <Field
+                    {pack === "ads-door" && <Field
                       label="Ads path"
                       value={path}
                       onChange={(e) => Path(e.target.value)}
-                    />
+                    />}
                     <Field
                       label="Flagged IP addresses (comma separated)"
                       value={ips}
@@ -1367,6 +1382,7 @@ export default function SiteConnections({
                                 .filter(Boolean),
                             }),
                           "Preview ready",
+                          false, // The review box announces success without an overlay.
                         );
                         if (d && currentFingerprint.current === fingerprint) {
                           Preview(d.items);
@@ -1382,6 +1398,7 @@ export default function SiteConnections({
                     )}
                     {preview.length > 0 && previewValid && (
                       <div className="space-y-3 rounded-lg border p-4">
+                        <p role="status" className="text-sm text-muted-foreground">Preview ready</p>
                         <h3 className="g-card__title g-card__title--md">
                           Review before applying
                         </h3>

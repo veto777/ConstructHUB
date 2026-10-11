@@ -1,15 +1,15 @@
 [
   {
     "title": "Business Formation & Licensing",
-    "description": "The step-by-step legal roadmap to get your construction business fully licensed, bonded, insured, and operational in any of the 50 states. Built by owners who've done it.",
+    "description": "Learn about business entity options, state licensing agencies, bonding, insurance, tax registration, and payroll requirements. Includes state filing links and checklists to review with your advisers.",
     "price": 150000,
     "category": "licensing",
     "sort_order": 1,
     "is_active": true,
     "features": [
       "Complete business entity formation guide — all 50 states",
-      "Licensing, bonding & insurance requirements decoded",
-      "Tax registration & payroll compliance made simple",
+      "Licensing, bonding & insurance topics",
+      "Tax registration & payroll requirements",
       "Secretary of State filing links & checklists",
       "Workers comp setup for every state",
       "Print-and-follow action plans for each step"
@@ -17,7 +17,7 @@
   },
   {
     "title": "GMB Setup & Optimization",
-    "description": "The proven system for building a Google Business Profile that dominates local search, generates leads on autopilot, and survives competitor attacks. From owners who rank #1.",
+    "description": "Learn how to set up and maintain a Google Business Profile, prepare for verification, manage reviews, publish photos and posts, and respond to suspensions.",
     "price": 200000,
     "category": "gmb",
     "sort_order": 2,
@@ -25,31 +25,31 @@
     "features": [
       "Full GMB setup, verification & optimization system",
       "Review management & response strategy",
-      "Fake review defense & competitor attack playbook",
-      "Photo strategy that boosts rankings",
+      "Review policy violations and reporting procedures",
+      "Planning and publishing business photos",
       "Posting schedules & content calendar",
-      "Suspension prevention & recovery procedures"
+      "Profile policies & suspension appeals"
     ]
   },
   {
     "title": "Website & Online Presence",
-    "description": "Build a contractor website that actually converts visitors into booked jobs. The same framework used by companies generating 7 figures from organic traffic alone.",
+    "description": "Learn how to plan a contractor website, organize service and location pages, present project portfolios, build contact forms, and review mobile usability and hosting options.",
     "price": 150000,
     "category": "website",
     "sort_order": 3,
     "is_active": true,
     "features": [
-      "High-converting contractor website blueprint",
-      "Service & location page strategy that ranks",
+      "Contractor website planning",
+      "Service & location page structure",
       "Lead capture & conversion optimization",
       "Page speed & mobile-first best practices",
-      "Portfolio showcases that close deals",
+      "Project portfolio presentation",
       "CMS selection & hosting guidance"
     ]
   },
   {
-    "title": "SEO & Directory Domination",
-    "description": "Get found everywhere your customers are searching. The complete local SEO, citation, content, and advertising playbook used by top-performing contractors nationwide.",
+    "title": "SEO & Business Directories",
+    "description": "Learn local SEO fundamentals, business directory maintenance, content planning, advertising setup, and how to read search performance reports.",
     "price": 150000,
     "category": "seo",
     "sort_order": 4,
@@ -57,7 +57,7 @@
     "features": [
       "Local SEO strategy built for contractors",
       "Citation building across top directories",
-      "Content & link building that moves the needle",
+      "Content planning & evaluating links",
       "Google Ads & Local Service Ads setup",
       "Tracking, analytics & reporting essentials",
       "Monthly SEO maintenance checklist"

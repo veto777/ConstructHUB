@@ -116,7 +116,10 @@ export type Column = {
   sortValue?: (row: any) => any;
   /** Server-side sort key (a whitelisted SQL column); only set for reports whose endpoint sorts before pagination. */
   sortKey?: string;
+  numeric?: boolean;
 };
+export const initialSortDirection = (column?: Column) => column?.numeric ? "desc" as const : "asc" as const;
+export const accessLabel = (status: string) => ({ siteOwner: "Owner", siteFullUser: "Full", siteRestrictedUser: "Restricted", siteUnverifiedUser: "Unverified", access_removed: "Access removed" }[status] ?? status);
 export type SortState = { key: string; dir: "asc" | "desc" };
 export function ReportTable({
   rows,
@@ -200,7 +203,7 @@ export function ReportTable({
               onChange={(e) => {
                 onSort!(
                     e.target.value,
-                    sort?.dir === "desc" ? "desc" : "asc",
+                    initialSortDirection(columns.find(c => c.sortKey === e.target.value)!),
                   );
               }}
             >
@@ -276,15 +279,15 @@ export function ReportTable({
                           if (!c.sortKey) return;
                           onSort!(
                             c.sortKey,
-                            sort?.key === c.sortKey && sort.dir === "asc"
-                              ? "desc"
-                              : "asc",
+                            sort?.key === c.sortKey
+                              ? sort.dir === "asc" ? "desc" : "asc"
+                              : initialSortDirection(c),
                           );
                         } else {
                           setLocalSort({
                             index,
                             desc:
-                              localSort?.index === index ? !localSort.desc : false,
+                              localSort?.index === index ? !localSort.desc : !!c.numeric,
                           });
                         }
                       }}
@@ -340,7 +343,7 @@ export function MetricTiles({
         <div key={m.label} className="rounded-xl border p-4">
           <dt className="text-sm text-muted-foreground">{m.label}</dt>
           <dd className="mt-2 text-2xl font-semibold tabular-nums">
-            {m.value ?? "Unavailable"}
+            {typeof m.value === "number" ? (Number.isFinite(m.value) ? m.value.toLocaleString("en-US") : "Unavailable") : m.value ?? "Unavailable"}
           </dd>
         </div>
       ))}
@@ -447,6 +450,16 @@ export function ReportTrend({
   const setSelected = (index: number) => setSelection({ signature, index });
   const listRef = useRef<HTMLDivElement>(null);
   const sel = Math.min(selected, periods.length - 1);
+  useEffect(() => {
+    const list = listRef.current;
+    const bar = list?.querySelectorAll<HTMLButtonElement>("button[data-trend-index]")[sel];
+    if (!list || !bar) return;
+    // Scroll only the chart, never the surrounding page on load/refetch.
+    const bounds = list.getBoundingClientRect(), target = bar.getBoundingClientRect();
+    if (target.left < bounds.left || target.right > bounds.right) {
+      list.scrollLeft += target.left - bounds.left - (list.clientWidth - target.width) / 2;
+    }
+  }, [signature, sel]);
   const focusBar = (i: number) =>
     listRef.current
       ?.querySelectorAll<HTMLButtonElement>("button[data-trend-index]")
@@ -569,14 +582,15 @@ export function relativeTime(
 export const analyticsColumns: Column[] = [
   { label: "Period", value: (r) => r.date, sortKey: "date" },
   { label: "Breakdown", value: (r) => r.key, sortKey: "key" },
-  { label: "Clicks", value: (r) => r.clicks, sortKey: "clicks" },
-  { label: "Impressions", value: (r) => r.impressions, sortKey: "impressions" },
-  { label: "CTR", value: (r) => percent(r.ctr), sortValue: (r) => r.ctr, sortKey: "ctr" },
+  { label: "Clicks", value: (r) => r.clicks, sortKey: "clicks", numeric: true },
+  { label: "Impressions", value: (r) => r.impressions, sortKey: "impressions", numeric: true },
+  { label: "CTR", value: (r) => percent(r.ctr), sortValue: (r) => r.ctr, sortKey: "ctr", numeric: true },
   {
     label: "Position",
     value: (r) => position(r.position),
     sortValue: (r) => r.position,
     sortKey: "position",
+    numeric: true,
   },
 ];
 export const cloudflareColumns: Record<string, Column[]> = {

@@ -38,7 +38,7 @@ export function useChecklist(key: string, options: ProgressOptions = DEFAULT_OPT
   const note = auth.isError ? "Account unavailable — progress is paused."
     : auth.isPending ? "Checking your account before saving progress…"
     : userId === null ? "Saved for this visit only — sign in to keep account-specific progress."
-    : snapshot.persistent ? "Progress is saved for your account in this browser only."
+    : snapshot.persistent ? "Progress is saved in this browser for your account only."
     : "Saved for this visit only — browser storage is unavailable.";
   return { done, isDone: (id) => done.has(id), toggle, reset, count: done.size, note, ready: auth.isSuccess,
     accountError: auth.isError, checkingAccount: auth.isFetching, checkAccount: () => { void auth.refetch(); } };

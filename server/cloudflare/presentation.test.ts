@@ -12,6 +12,9 @@ import {
   cloudflareColumns,
   sumKnown,
   percent,
+  accessLabel,
+  initialSortDirection,
+  analyticsColumns,
 } from "../../client/src/components/site-connections/report";
 import {
   syncRange,
@@ -679,4 +682,22 @@ it("preserves missing dates as unknown, distinguishes observed zero and labels p
   expect(html).toContain("No imported data");
   expect(html).toContain("min-w-[24px]");
   expect(html).toContain("overflow-x-auto");
+});
+
+it("formats overview counts like the trend while retaining unknowns", () => {
+  const html = renderToStaticMarkup(h(MetricTiles, { metrics: [
+    { label: "Requests", value: 22010 }, { label: "Unknown", value: null },
+    { label: "Invalid", value: NaN }, { label: "Zero", value: 0 },
+  ] }));
+  expect(html).toContain("22,010");
+  expect(html.match(/Unavailable/g)).toHaveLength(2);
+  expect(html).toContain(">0</dd>");
+});
+
+it("uses plain access labels and chooses descending only for numeric analytics columns", () => {
+  expect(["siteOwner", "siteFullUser", "siteRestrictedUser", "siteUnverifiedUser"].map(accessLabel)).toEqual(["Owner", "Full", "Restricted", "Unverified"]);
+  for (const column of analyticsColumns) {
+    expect(initialSortDirection(column)).toBe(["clicks", "impressions", "ctr", "position"].includes(column.sortKey!) ? "desc" : "asc");
+  }
+  expect(initialSortDirection()).toBe("asc");
 });

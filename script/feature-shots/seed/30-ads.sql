@@ -1980,4 +1980,15 @@ INSERT INTO account_api_usage (key_id, user_id, day, units, requests) VALUES
  ('key_sample930304', 1, '2026-08-16', 65, 30),
  ('key_sample930304', 1, '2026-08-15', 76, 22),
  ('key_sample930304', 1, '2026-08-14', 87, 29);
+-- Use the app's same-owner, exact normalized-host linking rule (cloudflare/common.ts).
+-- Scope both sides to this seed's sample rows; reruns cannot add duplicate links.
+INSERT INTO edge_location_links (asset_id, user_id, location_id)
+SELECT a.id, a.user_id, l.id
+FROM edge_assets a
+JOIN business_locations l ON l.user_id = a.user_id
+ AND lower(regexp_replace(split_part(regexp_replace(l.website, '^https?://', '', 'i'), '/', 1), '^www\.', '', 'i')) = a.domain
+WHERE a.id IN (930111, 930121) AND a.user_id = 1
+ AND a.domain = 'summitroofing.example'
+ AND l.id IN (910001, 910002, 910003)
+ON CONFLICT DO NOTHING;
 COMMIT;

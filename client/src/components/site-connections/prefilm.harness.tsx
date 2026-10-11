@@ -7,7 +7,8 @@ import { CartProvider } from "@/contexts/cart-context";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import MasterClassPage from "@/pages/master-class";
 import { SpamView } from "@/pages/crm-call-assistant/calls";
-import { CloudflareDetails, DataList } from "@/pages/site-connections";
+import SiteConnections, { CloudflareDetails, DataList } from "@/pages/site-connections";
+import { Toaster } from "@/components/ui/toaster";
 import { ReportTrend, SavedDataSummary, analyticsColumns } from "./report";
 import "@/index.css";
 queryClient.setDefaultOptions({ queries: { ...queryClient.getDefaultOptions().queries, retry: false, staleTime: Infinity } });
@@ -31,5 +32,6 @@ function Reports() {
 }
 const fixture = new URLSearchParams(location.search).get("fixture");
 createRoot(document.getElementById("root")!).render(<QueryClientProvider client={queryClient}><CartProvider><TooltipProvider>
-  {fixture === "course" ? <MasterClassPage /> : fixture === "spam" ? <main className="p-4"><SpamView canManage={false} onOpen={() => {}} /></main> : fixture === "cloudflare" ? <main className="p-4"><SavedDataSummary><CloudflareDetails id={1} onFlag={() => {}} /></SavedDataSummary></main> : <Reports />}
+  {fixture === "sites-cf" ? <SiteConnections provider="cloudflare" /> : fixture === "sites-gsc" ? <SiteConnections provider="gsc" /> : fixture === "course" ? <MasterClassPage /> : fixture === "spam" ? <main className="p-4"><SpamView canManage={false} onOpen={() => {}} /></main> : fixture === "cloudflare" ? <main className="p-4"><SavedDataSummary><CloudflareDetails id={1} onFlag={() => {}} /></SavedDataSummary></main> : <Reports />}
+  <Toaster />
 </TooltipProvider></CartProvider></QueryClientProvider>);
