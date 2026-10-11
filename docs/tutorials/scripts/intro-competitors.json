@@ -1,0 +1,121 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "intro-competitors",
+  "title": "Competitor Intel",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/competitors",
+      "caption": "Competitor Intel",
+      "chapter": "Pick a trade and area",
+      "narration": "This is Competitor Intel. It looks up the businesses Google lists for your trade around your town."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"select-industry\"]",
+      "caption": "Your trade",
+      "narration": "Choose your trade from the list, from roofing and siding to HVAC and plumbing."
+    },
+    {
+      "action": "press",
+      "value": "Escape",
+      "caption": "City or address",
+      "narration": "Then enter a city or an address for the area you want to see."
+    },
+    {
+      "action": "click",
+      "selector": "summary:has-text(\"Advanced\")",
+      "caption": "Search radius",
+      "narration": "Under Advanced, set the radius: 10, 25, 50 or 100 miles."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-start-scan\"]",
+      "caption": "Scan market",
+      "narration": "Scan market reads Google's public listings. Each scan uses one from your monthly allowance."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-scan-910001\"]",
+      "caption": "Saved scans",
+      "chapter": "Open a saved scan",
+      "narration": "Every scan is saved to your account. This one found twelve roofing contractors within 25 miles of Denver."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-expand-scan-910001\"]",
+      "caption": "Open the scan",
+      "narration": "Open it to see the market."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[text()=\"Total Competitors\"]/ancestor::div[contains(@class,\"grid\")][1]",
+      "caption": "Businesses by signal band",
+      "narration": "The top row counts the businesses, and how many show few, some or more review signals."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-scan-overview-910001\"]",
+      "caption": "The overview",
+      "narration": "The overview names the best-rated listings, with their rating and review count."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-competitor-910003\"]",
+      "caption": "Every listing",
+      "chapter": "The BS Meter",
+      "narration": "Each business shows its rating, review count and category, and how many sampled reviews repeat common phrases."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-competitor-910003\"] .max-w-xs",
+      "caption": "BS Meter, with its reasons",
+      "narration": "The BS Meter scores signals worth a closer look, from 0 to 100, and lists every reason, like a keyword-stuffed name."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-review-analysis-910003\"]",
+      "caption": "Review analysis",
+      "narration": "Review analysis breaks down the sample of reviews Google returns for that listing."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//p[contains(.,\"reviews sampled)\")]/following-sibling::div[1]",
+      "caption": "Signals, not proof",
+      "narration": "Good and bad reviews, common phrases and generic wording. They're signals to look at, not proof."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-competitor-intel\"]",
+      "caption": "Menu: Competitor Intel",
+      "narration": "You'll find Competitor Intel in the menu on the left, under Tools."
+    }
+  ],
+  "youtube": {
+    "title": "Competitor Intel in about a minute | ConstructHUB",
+    "description": "A one-minute tour of Competitor Intel in ConstructHUB: pick your trade and area, then read a saved scan of the businesses Google lists around you, with ratings, review counts, the BS Meter and a review-sample breakdown.",
+    "tags": [
+      "ConstructHUB",
+      "competitor analysis",
+      "local competitors",
+      "contractor marketing",
+      "Google listings",
+      "roofing marketing",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Size Up Your Market",
+    "accent": "Market",
+    "kicker": "Competitor Intel",
+    "step": 10
+  }
+}
