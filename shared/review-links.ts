@@ -16,6 +16,7 @@ export const REVIEW_PLATFORMS = [
   { key: "houzz", label: "Houzz", hint: "houzz.com/pro/..." },
   { key: "angi", label: "Angi", hint: "angi.com/companylist/..." },
   { key: "homeadvisor", label: "HomeAdvisor", hint: "homeadvisor.com/rated..." },
+  { key: "guildquality", label: "GuildQuality", hint: "guildquality.com/..." },
   { key: "facebook", label: "Facebook", hint: "facebook.com/.../reviews" },
   { key: "nextdoor", label: "Nextdoor", hint: "nextdoor.com/pages/..." },
   { key: "thumbtack", label: "Thumbtack", hint: "thumbtack.com/..." },
@@ -77,4 +78,45 @@ export function normalizeOtherReviewLinks(value: unknown): { links: OtherReviewL
     links.push(label === undefined ? { platform: row.platform, url } : { platform: row.platform, label, url });
   }
   return { links, error: null };
+}
+
+/** The label Google carries as a routing destination. */
+export const GOOGLE_DESTINATION_LABEL = "Google";
+
+/** A place the client can be routed to: Google, or one of the owner's pasted other sites. */
+export type ReviewDestination = { platform: ReviewPlatformKey | "google"; label?: string; url: string };
+
+/** Google first when it has a link, then the profile's/request's other sites, in order. */
+export function reviewDestinations(googleUrl: string | null | undefined, otherLinks: unknown): ReviewDestination[] {
+  const dests: ReviewDestination[] = [];
+  const g = typeof googleUrl === "string" ? googleUrl.trim() : "";
+  if (g) dests.push({ platform: "google", url: g });
+  for (const l of normalizeOtherReviewLinks(otherLinks).links) dests.push(l);
+  return dests;
+}
+
+/** "Google", "Yelp", … or the owner's own name for an "other" destination. */
+export function destinationLabel(d: ReviewDestination): string {
+  if (d.platform === "google") return GOOGLE_DESTINATION_LABEL;
+  return reviewLinkLabel({ platform: d.platform, label: d.label });
+}
+
+/** The primary destination's URL: `preferred` when it is one of `dests`, else the first (Google when present). */
+export function resolvePrimaryUrl(dests: ReviewDestination[], preferred: unknown): string {
+  const want = typeof preferred === "string" ? preferred.trim() : "";
+  if (want && dests.some((d) => d.url === want)) return want;
+  return dests[0]?.url ?? "";
+}
+
+/**
+ * The primary URL to STORE on a profile or request: "" (Google, the default) when `preferred` is empty, the
+ * Google link, or not one of the other sites; otherwise the matching other-site URL. Empty is read back as Google.
+ */
+export function normalizePrimaryReviewUrl(preferred: unknown, googleUrl: string | null | undefined, otherLinks: unknown): string {
+  const want = typeof preferred === "string" ? preferred.trim() : "";
+  if (!want) return "";
+  const g = typeof googleUrl === "string" ? googleUrl.trim() : "";
+  if (g && want === g) return "";
+  const other = normalizeOtherReviewLinks(otherLinks).links.find((l) => l.url === want);
+  return other ? other.url : "";
 }

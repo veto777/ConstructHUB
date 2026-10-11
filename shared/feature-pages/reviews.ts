@@ -119,7 +119,7 @@ const page: FeaturePage = {
     {
       icon: "link",
       title: "Your other review sites",
-      body: "Paste your review page on Yelp, BBB, Houzz, Angi, HomeAdvisor, Facebook, Nextdoor, Thumbtack or any other site. Clients see them after the Google step, whatever their score.",
+      body: "Paste your review page on Yelp, BBB, Angi, Houzz, HomeAdvisor and more. Pick a primary destination (usually Google) and which to include per request; clients are routed there, whatever their score.",
     },
   ],
   spotlight: {

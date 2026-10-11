@@ -137,7 +137,7 @@ describe("routing branch", () => {
     expect(route).not.toMatch(/showReview:\s*(rating|privateFirst|!)/);
     // The client page: the always-link sits outside every step branch and is never hidden by the score.
     const page = src("client/src/pages/review-feedback.tsx");
-    expect(page).toMatch(/\{reviewData\.googleProfileUrl && \(\s*<div[^>]*>\s*<Button asChild[^>]*>\s*<a href=\{reviewData\.googleProfileUrl\}[^>]*data-testid="link-google-review-always"/);
+    expect(page).toMatch(/\{primaryUrl && \(\s*<div[^>]*>\s*<Button asChild[^>]*>\s*<a href=\{primaryUrl\}[^>]*data-testid="link-google-review-always"/);
     expect(page).not.toMatch(/link-google-review-always[\s\S]{0,400}(rating|escalationThreshold|isHighRating)\s*[<>]/);
   });
 });

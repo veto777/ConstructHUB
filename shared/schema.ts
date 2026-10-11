@@ -674,6 +674,8 @@ export const reviewRequests = pgTable("review_requests", {
   // The profile's other review sites at send time (shared/review-links.ts) and the labels the client opened.
   otherReviewLinks: jsonb("other_review_links").notNull().default([]),
   otherLinksOpened: jsonb("other_links_opened").notNull().default([]),
+  // Which destination this request routes to first: "" / null = Google, else an other-site URL (shared/review-links.ts).
+  primaryReviewUrl: text("primary_review_url"),
   projectDescription: text("project_description"),
   personalMessage: text("personal_message"),
   photos: jsonb("photos").notNull().default([]),
@@ -736,6 +738,8 @@ export const reviewTemplates = pgTable("review_templates", {
   googleProfileUrl: text("google_profile_url").notNull(),
   // Other review sites (shared/review-links.ts): [{ platform, label?, url }], copied onto each request when it is sent.
   otherReviewLinks: jsonb("other_review_links").notNull().default([]),
+  // The profile's default primary destination: "" / null = Google, else one of the other sites' URLs (shared/review-links.ts).
+  primaryReviewUrl: text("primary_review_url"),
   projectDescription: text("project_description"),
   isDefault: boolean("is_default").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),

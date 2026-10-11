@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useRoute } from "wouter";
 import { isPrivateFirstScore, normalizeReviewEscalationThreshold, routeAfterRating } from "@shared/review-flow";
-import { normalizeOtherReviewLinks, reviewLinkLabel } from "@shared/review-links";
+import { destinationLabel, resolvePrimaryUrl, reviewDestinations } from "@shared/review-links";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -148,8 +148,14 @@ export default function ReviewFeedbackPage({ initialStep, initialRating }: { ini
   const preview = reviewData?.preview === true;
   // The owner's score threshold: below it the private form comes first (routing only, never the Google link).
   const escalationThreshold = normalizeReviewEscalationThreshold(reviewData?.escalationThreshold);
-  // The owner's other review sites (shared/review-links.ts): the one-more-thing step after Google, for every client.
-  const otherReviewLinks = normalizeOtherReviewLinks(reviewData?.otherReviewLinks).links;
+  // Routing (shared/review-links.ts): Google plus the owner's other sites, with one primary destination (default
+  // Google). The primary drives the main CTA for everyone; secondaries are also offered. The threshold only decides
+  // whether the private form comes first — no destination is ever hidden by the score.
+  const allDestinations = reviewDestinations(reviewData?.googleProfileUrl, reviewData?.otherReviewLinks);
+  const primaryUrl = resolvePrimaryUrl(allDestinations, reviewData?.primaryReviewUrl);
+  const primaryDest = allDestinations.find((d) => d.url === primaryUrl);
+  const primaryLabel = primaryDest ? destinationLabel(primaryDest) : "Google";
+  const secondaryDestinations = allDestinations.filter((d) => d.url !== primaryUrl);
   const isHighRating = rating > 0 && !isPrivateFirstScore(rating, escalationThreshold);
   /** Customer-progress beacons; never sent from the owner's preview. */
   const track = (path: string, body?: unknown, keepalive = false) => {
@@ -268,8 +274,8 @@ export default function ReviewFeedbackPage({ initialStep, initialRating }: { ini
       return res.json();
     },
     onSuccess: () => {
-      // The other review sites are offered to everyone who has some to see, whatever the score.
-      if (otherReviewLinks.length > 0) {
+      // Every secondary destination is offered to everyone who has one, whatever the score.
+      if (secondaryDestinations.length > 0) {
         setStep("bonus_reviews");
       } else {
         setStep("done");
@@ -277,7 +283,12 @@ export default function ReviewFeedbackPage({ initialStep, initialRating }: { ini
     },
   });
 
-  const trackGoogleOpen = () => track("google-link-opened", undefined, true);
+  // Record an open against the destination that was opened; Google keeps its own stat.
+  const trackDestOpen = (dest?: { platform: string; url: string } | null) => {
+    if (!dest || dest.platform === "google") track("google-link-opened", undefined, true);
+    else track("other-link-opened", { url: dest.url }, true);
+  };
+  const trackGoogleOpen = () => trackDestOpen(primaryDest);
 
   // Only a completed clipboard write counts as copied (it can be blocked by permissions, an
   // insecure page or an in-app browser). "Copied" then lasts until the text changes.
@@ -317,7 +328,7 @@ export default function ReviewFeedbackPage({ initialStep, initialRating }: { ini
       setShowCopyWarning(true);
       return;
     }
-    window.open(reviewData.googleProfileUrl, "_blank", "noopener,noreferrer");
+    window.open(primaryUrl, "_blank", "noopener,noreferrer");
     trackGoogleOpen();
     completeFlowMutation.mutate();
   };
@@ -328,7 +339,7 @@ export default function ReviewFeedbackPage({ initialStep, initialRating }: { ini
     // A failed copy stays on the page with the manual-copy instructions instead of opening Google empty-handed.
     if (!ok) return;
     setTimeout(() => {
-      window.open(reviewData.googleProfileUrl, "_blank", "noopener,noreferrer");
+      window.open(primaryUrl, "_blank", "noopener,noreferrer");
     trackGoogleOpen();
       completeFlowMutation.mutate();
     }, 300);
@@ -336,7 +347,7 @@ export default function ReviewFeedbackPage({ initialStep, initialRating }: { ini
 
   const handleSkipAndGo = () => {
     setShowCopyWarning(false);
-    window.open(reviewData.googleProfileUrl, "_blank", "noopener,noreferrer");
+    window.open(primaryUrl, "_blank", "noopener,noreferrer");
     trackGoogleOpen();
     completeFlowMutation.mutate();
   };
@@ -428,11 +439,11 @@ export default function ReviewFeedbackPage({ initialStep, initialRating }: { ini
           </div>
         </div>
 
-        {reviewData.googleProfileUrl && (
+        {primaryUrl && (
           <div className="mb-6 space-y-2 text-center">
             <Button asChild className="w-full h-12">
-              <a href={reviewData.googleProfileUrl} target="_blank" rel="noopener noreferrer" onClick={trackGoogleOpen} data-testid="link-google-review-always">
-                <ExternalLink className="w-4 h-4 mr-2" /> Leave a Google Review
+              <a href={primaryUrl} target="_blank" rel="noopener noreferrer" onClick={trackGoogleOpen} data-testid="link-google-review-always">
+                <ExternalLink className="w-4 h-4 mr-2" /> Leave a {primaryLabel} Review
               </a>
             </Button>
             <p className="text-xs text-muted-foreground">Everyone is welcome to review. No private feedback or referral participation is required, and no reward is offered for a review.</p>
@@ -596,22 +607,22 @@ export default function ReviewFeedbackPage({ initialStep, initialRating }: { ini
                 Your feedback is completely confidential
               </p>
 
-              {reviewData?.googleProfileUrl && (
+              {primaryUrl && (
                 <div className="pt-2 border-t space-y-3 text-center" data-testid="section-improvement-google-review">
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    You're also welcome to share your experience publicly on Google. Every review helps other homeowners — and helps us improve.
+                    You're also welcome to share your experience publicly on {primaryLabel}. Every review helps other homeowners — and helps us improve.
                   </p>
                   <Button
                     variant="outline"
                     className="w-full h-12 text-base font-bold border-2"
                     onClick={() => {
-                      window.open(reviewData.googleProfileUrl, "_blank", "noopener,noreferrer");
+                      window.open(primaryUrl, "_blank", "noopener,noreferrer");
     trackGoogleOpen();
                       completeFlowMutation.mutate();
                     }}
                     data-testid="button-improvement-google-review"
                   >
-                    <ExternalLink className="w-5 h-5 mr-2" /> Leave a Google Review
+                    <ExternalLink className="w-5 h-5 mr-2" /> Leave a {primaryLabel} Review
                   </Button>
                 </div>
               )}
@@ -808,7 +819,7 @@ export default function ReviewFeedbackPage({ initialStep, initialRating }: { ini
                   <div>
                     <p className="text-sm font-semibold mb-1">Enhance Your Review with AI</p>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Not a wordsmith? No problem. Just describe what work was done in a sentence or two, and we'll generate a detailed, professional Google review you can edit before posting. You stay in control — we just help you say it better.
+                      Not a wordsmith? No problem. Just describe what work was done in a sentence or two, and we'll generate a detailed, professional {primaryLabel} review you can edit before posting. You stay in control — we just help you say it better.
                     </p>
                   </div>
                 </div>
@@ -867,10 +878,10 @@ export default function ReviewFeedbackPage({ initialStep, initialRating }: { ini
                   <Sparkles className="w-8 h-8 text-gray-500" />
                 </div>
                 <h2 className="text-xl sm:text-2xl font-bold" data-testid="text-review-heading">
-                  Leave Your Google Review
+                  Leave Your {primaryLabel} Review
                 </h2>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Review the text below, edit it however you'd like, then copy and paste it into Google.
+                  Review the text below, edit it however you'd like, then copy and paste it into {primaryLabel}.
                 </p>
               </div>
 
@@ -1074,7 +1085,7 @@ export default function ReviewFeedbackPage({ initialStep, initialRating }: { ini
                     </div>
                     {copyError && (
                       <p role="alert" className="mb-3 text-xs text-destructive" data-testid="text-copy-review-error">
-                        Your browser blocked automatic copying. Select the review text above and copy it yourself (Ctrl+C, ⌘C on Mac, or long-press and choose Copy), then open Google and paste it.
+                        Your browser blocked automatic copying. Select the review text above and copy it yourself (Ctrl+C, ⌘C on Mac, or long-press and choose Copy), then open {primaryLabel} and paste it.
                       </p>
                     )}
 
@@ -1123,10 +1134,10 @@ export default function ReviewFeedbackPage({ initialStep, initialRating }: { ini
                       </div>
                       <div>
                         <p className={`font-semibold text-sm ${!copied && !copyError ? "text-muted-foreground" : ""}`}>
-                          Open Google & Paste Your Review
+                          Open {primaryLabel} & Paste Your Review
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {copied ? "You're ready! Click below to open Google." : copyError ? "Copy the review text yourself, then click below to open Google." : "Copy the review first to unlock this step."}
+                          {copied ? `You're ready! Click below to open ${primaryLabel}.` : copyError ? `Copy the review text yourself, then click below to open ${primaryLabel}.` : "Copy the review first to unlock this step."}
                         </p>
                       </div>
                     </div>
@@ -1142,7 +1153,7 @@ export default function ReviewFeedbackPage({ initialStep, initialRating }: { ini
                       ) : (
                         <ExternalLink className="w-5 h-5 mr-2" />
                       )}
-                      Open Google & Leave Review
+                      Open {primaryLabel} & Leave Review
                     </Button>
                   </div>
                 </div>
@@ -1167,15 +1178,15 @@ export default function ReviewFeedbackPage({ initialStep, initialRating }: { ini
               </div>
 
               <div className="space-y-3" data-testid="list-other-review-links">
-                {otherReviewLinks.map((link) => {
-                  const label = reviewLinkLabel(link);
+                {secondaryDestinations.map((link) => {
+                  const label = destinationLabel(link);
                   return (
                     <a
                       key={link.url}
                       href={link.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      onClick={() => track("other-link-opened", { url: link.url }, true)}
+                      onClick={() => trackDestOpen(link)}
                       className="flex items-center gap-4 p-4 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 group"
                       data-testid={`link-other-review-${link.platform}`}
                     >

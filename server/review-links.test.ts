@@ -7,7 +7,8 @@ import { describe, expect, it } from "vitest";
 import fs from "fs";
 import path from "path";
 import {
-  MAX_OTHER_REVIEW_LINKS, REVIEW_PLATFORMS, normalizeOtherReviewLinks, normalizeReviewUrl, reviewLinkLabel,
+  MAX_OTHER_REVIEW_LINKS, REVIEW_PLATFORMS, destinationLabel, normalizeOtherReviewLinks, normalizePrimaryReviewUrl,
+  normalizeReviewUrl, resolvePrimaryUrl, reviewDestinations, reviewLinkLabel,
 } from "@shared/review-links";
 
 const root = path.resolve(import.meta.dirname, "..");
@@ -66,6 +67,43 @@ describe("a profile's other review sites", () => {
   });
 });
 
+describe("the primary destination and the destinations list", () => {
+  it("lists Google first, then the other sites in order", () => {
+    const dests = reviewDestinations("https://g.page/r/x/review", [
+      { platform: "yelp", url: "yelp.com/biz/x" }, { platform: "bbb", url: "https://bbb.org/x" },
+    ]);
+    expect(dests.map((d) => d.platform)).toEqual(["google", "yelp", "bbb"]);
+    expect(dests[0].url).toBe("https://g.page/r/x/review");
+    expect(reviewDestinations("", [{ platform: "yelp", url: "yelp.com/x" }]).map((d) => d.platform)).toEqual(["yelp"]);
+    expect(reviewDestinations(null, null)).toEqual([]);
+  });
+
+  it("labels Google as Google and the rest by site, and GuildQuality is offered", () => {
+    expect(destinationLabel({ platform: "google", url: "x" })).toBe("Google");
+    expect(destinationLabel({ platform: "yelp", url: "x" })).toBe("Yelp");
+    expect(destinationLabel({ platform: "other", label: "Porch", url: "x" })).toBe("Porch");
+    expect(REVIEW_PLATFORMS.map((p) => p.key)).toContain("guildquality");
+  });
+
+  it("resolves the primary to the preferred destination, else Google/first", () => {
+    const dests = reviewDestinations("https://g/review", [{ platform: "yelp", url: "https://yelp.com/x" }]);
+    expect(resolvePrimaryUrl(dests, "https://yelp.com/x")).toBe("https://yelp.com/x");
+    expect(resolvePrimaryUrl(dests, "")).toBe("https://g/review");
+    expect(resolvePrimaryUrl(dests, "https://unknown.com")).toBe("https://g/review");
+    expect(resolvePrimaryUrl([], "x")).toBe("");
+  });
+
+  it("stores a primary URL only when it is one of the other sites (empty = Google)", () => {
+    const google = "https://g.page/r/x/review";
+    const others = [{ platform: "yelp", url: "yelp.com/x" }];
+    expect(normalizePrimaryReviewUrl("", google, others)).toBe("");
+    expect(normalizePrimaryReviewUrl(google, google, others)).toBe("");
+    expect(normalizePrimaryReviewUrl("https://yelp.com/x", google, others)).toBe("https://yelp.com/x");
+    expect(normalizePrimaryReviewUrl("yelp.com/x", google, others)).toBe("");
+    expect(normalizePrimaryReviewUrl("https://other.com", google, others)).toBe("");
+  });
+});
+
 describe("the links travel with the request and reach the client page (source guards)", () => {
   const routes = src("server/routes.ts");
   const page = src("client/src/pages/review-feedback.tsx");
@@ -77,20 +115,32 @@ describe("the links travel with the request and reach the client page (source gu
     expect(routes).toMatch(/app\.post\("\/api\/reviews\/create"[\s\S]*?otherReviewLinks = normalizeOtherReviewLinks\(template\.otherReviewLinks\)\.links/);
     expect(routes).toMatch(/app\.get\("\/api\/review\/:token"[\s\S]*?otherReviewLinks: normalizeOtherReviewLinks\(request\.otherReviewLinks\)\.links/);
     expect(routes).toContain('app.post("/api/review/:token/other-link-opened"');
+    expect(routes).toMatch(/app\.post\("\/api\/reviews\/create"[\s\S]*?primaryReviewUrl = normalizePrimaryReviewUrl/);
+    expect(routes).toMatch(/app\.get\("\/api\/review\/:token"[\s\S]*?primaryReviewUrl: request\.primaryReviewUrl/);
   });
 
   it("the client page lists the owner's links on the one-more-thing step with no site hard-coded, for every score", () => {
     expect(page).not.toContain("https://www.bbb.org/");
-    expect(page).toMatch(/otherReviewLinks\.map\(/);
+    expect(page).toMatch(/secondaryDestinations\.map\(/);
     // The step is reached by every client who has links to see, not only by a 10.
-    expect(page).toMatch(/otherReviewLinks\.length > 0[\s\S]{0,80}setStep\("bonus_reviews"\)/);
+    expect(page).toMatch(/secondaryDestinations\.length > 0[\s\S]{0,80}setStep\("bonus_reviews"\)/);
     expect(page).not.toMatch(/rating === 10[\s\S]{0,80}setStep\("bonus_reviews"\)/);
+    // The client routes to the primary destination, not a hard-coded Google link.
+    expect(page).toContain("reviewDestinations(reviewData?.googleProfileUrl");
+    expect(page).toContain("resolvePrimaryUrl(allDestinations");
+    expect(page).toMatch(/Leave a \{primaryLabel\} Review/);
+    expect(page).not.toContain('window.open(reviewData.googleProfileUrl');
   });
 
   it("the owner's profile dialog edits the links and the list shows them", () => {
     expect(owner).toContain("otherReviewLinks: templateOtherLinks");
     expect(owner).toContain('data-testid="button-add-other-link"');
     expect(owner).toMatch(/REVIEW_PLATFORMS\.map\(/);
+    // Per-send include/primary and the per-profile default primary.
+    expect(owner).toContain('data-testid="section-send-destinations"');
+    expect(owner).toContain('data-testid="select-template-primary"');
+    expect(owner).toContain("primaryReviewUrl: templatePrimaryUrl");
+    expect(owner).toContain("primaryReviewUrl: sendPrimaryUrl");
   });
 
   it("the schema and the additive migration carry the columns", () => {

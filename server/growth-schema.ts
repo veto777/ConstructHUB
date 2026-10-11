@@ -15,6 +15,8 @@ export async function ensureGrowthSchema() {
     ALTER TABLE review_templates ADD COLUMN IF NOT EXISTS other_review_links jsonb NOT NULL DEFAULT '[]'::jsonb;
     ALTER TABLE review_requests ADD COLUMN IF NOT EXISTS other_review_links jsonb NOT NULL DEFAULT '[]'::jsonb;
     ALTER TABLE review_requests ADD COLUMN IF NOT EXISTS other_links_opened jsonb NOT NULL DEFAULT '[]'::jsonb;
+    ALTER TABLE review_templates ADD COLUMN IF NOT EXISTS primary_review_url text;
+    ALTER TABLE review_requests ADD COLUMN IF NOT EXISTS primary_review_url text;
     CREATE TABLE IF NOT EXISTS review_recipient_preferences (
       user_id integer NOT NULL, email text NOT NULL, unsubscribed boolean NOT NULL DEFAULT true,
       updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(user_id,email)
