@@ -1,0 +1,130 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "intro-reinstatement",
+  "title": "Reinstatement",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/reinstatement",
+      "caption": "Profile reinstatement",
+      "chapter": "A suspended profile",
+      "narration": "This is Reinstatement. When Google suspends your Business Profile, you send this request, and our team reviews the case before taking it on."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"reinstatement-facts\"] .g-stat:has-text(\"Initial review\")",
+      "caption": "Initial review: 1–2 business days",
+      "narration": "The first review takes one to two business days."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-reinstate-name\"]",
+      "value": "Jordan Hale",
+      "caption": "Your name",
+      "chapter": "The request form",
+      "narration": "The form asks for your name, and the email where we can reach you."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-reinstate-email\"]",
+      "value": "jordan.hale@example.com",
+      "caption": "Your email",
+      "narration": "Our answer comes to this address."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-reinstate-business\"]",
+      "value": "Summit Roofing Co.",
+      "caption": "Business name; website is optional",
+      "narration": "Then the business name as it appears on Google. The website is optional."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-reinstate-address\"]",
+      "value": "1200 Demo Ave, Denver, CO 80202",
+      "caption": "The address, even if hidden",
+      "narration": "Enter the business address, even if it's hidden on the profile."
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid=\"select-business-type\"]",
+      "value": "Service area business (no storefront)",
+      "caption": "Storefront, service area, or hybrid",
+      "narration": "Choose what best describes the business: a storefront, a service area business, or a hybrid of both."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"radio-multi-yes\"]",
+      "caption": "More than one location?",
+      "narration": "Tick Yes if the business has more than one location."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"textarea-problem-description\"]",
+      "value": "Suspended two weeks ago, a day after we edited the business name.",
+      "caption": "Describe what happened",
+      "narration": "Describe the problem: when it happened, what Google said, and what you've already tried."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-submit-reinstatement\"]",
+      "caption": "Submit sends it to the team",
+      "chapter": "What happens next",
+      "narration": "Choose Submit and the request goes to our team. No account and no payment is needed to send it."
+    },
+    {
+      "action": "click",
+      "selector": "summary:has-text(\"How reinstatement works\")",
+      "caption": "How reinstatement works",
+      "narration": "How reinstatement works lists what happens next."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"process-step-1\"]",
+      "caption": "1. We review, and say if we can help",
+      "narration": "We review your case and tell you honestly whether we think we can help."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"process-step-4\"]",
+      "caption": "4. The appeal, and updates until Google decides",
+      "narration": "If we take it, we fix the cause and bring the profile in line with Google's guidelines. Then we submit the appeal, and keep you updated until Google decides."
+    },
+    {
+      "action": "highlight",
+      "selector": "a[href=\"/reinstatement\"]",
+      "caption": "Menu: Google Business, Reinstatement",
+      "narration": "You'll find Reinstatement in the menu on the left, under Google Business."
+    }
+  ],
+  "youtube": {
+    "title": "Suspended Google profile? Reinstatement in a minute | ConstructHUB",
+    "description": "A one-minute look at Reinstatement in ConstructHUB: the request form for a suspended Google Business Profile, what it asks for, and what happens after you send it: a review of your case, a guideline-first fix, and an appeal written and submitted for you.",
+    "tags": [
+      "ConstructHUB",
+      "Google Business Profile",
+      "suspended Google Business Profile",
+      "GBP reinstatement",
+      "profile suspension",
+      "Google Maps listing",
+      "contractor marketing"
+    ],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Suspended Profile Help",
+    "accent": "Suspended",
+    "kicker": "Reinstatement",
+    "step": 9
+  },
+  "hideSelectors": [
+    "[data-testid=\"card-reinstatement-pricing\"]"
+  ]
+}

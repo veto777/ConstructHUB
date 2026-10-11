@@ -1,0 +1,110 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "intro-lsa-leads",
+  "title": "LSA Leads",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/lsa-leads",
+      "caption": "LSA Leads",
+      "chapter": "Every lead in one list",
+      "narration": "This is LSA Leads. It pulls the leads from your Google Local Services Ads accounts into one list, and shows which ones you were charged for."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-last-sync\"]",
+      "caption": "Syncs on its own schedule",
+      "narration": "Leads sync in the background on their own schedule. The connection shows when the last sync ran."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"section-lsa-accounts\"]",
+      "caption": "Every account your sign-in can reach",
+      "narration": "Every Google Ads account your sign-in can reach is listed here, with how many leads it has and how many you were charged for."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"card-account-8015550101\"] button",
+      "caption": "Open an account",
+      "chapter": "An account's leads",
+      "narration": "Open an account to see its leads."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[@data-testid=\"stat-spend\"]/ancestor::div[.//*[@data-testid=\"stat-leads\"]][1]",
+      "caption": "Leads, charged, disputed, spend",
+      "narration": "The top row counts total leads, charged leads, how many you've disputed, and the total spend."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"row-lead-fs-b-1000000001\"]",
+      "caption": "Each lead: contact, service, type, charge",
+      "narration": "Each lead shows the contact, the service, whether it came as a call, message or booking, and whether Google charged you for it."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-expand-fs-b-1000000001\"]",
+      "caption": "More details",
+      "narration": "Choose More details for the lead status, the credit state, and the Google lead ID."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-bad-fs-b-1000000001\"]",
+      "caption": "Good or Bad",
+      "chapter": "Rate every lead",
+      "narration": "Under each lead you mark it Good, or report it as Bad."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"select-single-reason-fs-b-1000000001\"]",
+      "caption": "You pick the reason",
+      "narration": "You pick the reason: a service you don't offer, a sales call, a duplicate, outside your area, or a customer who wasn't ready to book."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-confirm-bad-fs-b-1000000001\"]",
+      "caption": "Report sends it to Google",
+      "narration": "Report sends the reason to Google. Google decides on any credit, and nothing is ever reported on its own."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-filter-disputed\"]",
+      "caption": "Disputed leads",
+      "narration": "The Disputed filter shows the leads you've reported. A reported lead can't be reported twice."
+    },
+    {
+      "action": "highlight",
+      "selector": "a[href=\"/lsa-leads\"]",
+      "caption": "Menu: Google Ads, LSA Leads",
+      "narration": "You'll find LSA Leads in the menu on the left, under Google Ads."
+    }
+  ],
+  "youtube": {
+    "title": "LSA Leads in about a minute | ConstructHUB",
+    "description": "A one-minute tour of LSA Leads in ConstructHUB: every Google Local Services Ads account in one list, each account's leads with the charged ones marked, and a Good or Bad rating on every lead with a reason you choose that goes to Google.",
+    "tags": [
+      "ConstructHUB",
+      "Local Services Ads",
+      "LSA leads",
+      "Google LSA",
+      "bad lead dispute",
+      "lead credit",
+      "roofing leads",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Rate Every Lead",
+    "accent": "Every",
+    "kicker": "LSA Leads",
+    "step": 5
+  }
+}

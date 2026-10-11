@@ -1,0 +1,25 @@
+{
+  "helpKey": "intro-lsa-leads",
+  "durationSec": 81,
+  "video": {
+    "key": "tutorials/intro-lsa-leads.17b6ca24.mp4",
+    "bytes": 5867286,
+    "sha256": "17b6ca24d65ae771e783ed976adb8771f54ad5babab6f267ed5f73d92f7118bf"
+  },
+  "captions": {
+    "key": "tutorials/intro-lsa-leads.0d7829a4.vtt",
+    "bytes": 1869,
+    "sha256": "0d7829a438e1eb931fe5402f27717b17dc4b5b7740bf10b30de8fd38e868545c"
+  },
+  "poster": {
+    "key": "tutorials/intro-lsa-leads.7418e0c3.jpg",
+    "bytes": 78534,
+    "sha256": "7418e0c35deb687eb09c8f5f0cf677d1a656acaf641ff24f59bd0415566a50d3"
+  },
+  "uploaded": {
+    "at": "2026-10-11T06:52:34.303Z",
+    "video": "3bcad114d584300ccfcc4934d3182914",
+    "captions": "a94e9a1a55a5f97f07f2ab550a346e62",
+    "poster": "0706718fda72cd73c9135c1f9b6e6d09"
+  }
+}
