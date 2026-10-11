@@ -60,7 +60,9 @@ export function registerMailAlertRoutes(
     });
   });
   // The Mail Alerts provider inbox: the retained alerts (30 days) with search and category/severity/client
-  // filters, read state, and the total used by the pager.
+  // filters. `unread=1` keeps only unread alerts; `mapped=mapped|unmapped` keeps alerts with (or without) an
+  // assigned client; `locationId` filters to one client. Rows carry the matched client's business name (never
+  // a bare location id), and the response carries the page-wide counts the triage chips lead with.
   route("get", "", async (req, res, id) => {
     const p = pageInput
       .extend({
@@ -77,6 +79,8 @@ export function registerMailAlertRoutes(
           ])
           .default(""),
         severity: z.enum(["", "critical", "warning", "info"]).default(""),
+        unread: z.enum(["", "1"]).default(""),
+        mapped: z.enum(["", "mapped", "unmapped"]).default(""),
       })
       .parse(req.query);
     const params = [
@@ -85,20 +89,31 @@ export function registerMailAlertRoutes(
       p.category,
       p.severity,
       p.locationId || null,
+      p.unread,
+      p.mapped,
     ];
     const filter =
-      "user_id=$1 AND expires_at>now() AND (subject ILIKE $2 OR sender ILIKE $2) AND ($3='' OR category=$3) AND ($4='' OR severity=$4) AND ($5::int IS NULL OR location_id=$5)";
+      "m.user_id=$1 AND m.expires_at>now() AND (m.subject ILIKE $2 OR m.sender ILIKE $2) AND ($3='' OR m.category=$3) AND ($4='' OR m.severity=$4) AND ($5::int IS NULL OR m.location_id=$5) AND ($6='' OR m.read_at IS NULL) AND ($7='' OR ($7='mapped' AND m.location_id IS NOT NULL) OR ($7='unmapped' AND m.location_id IS NULL))";
     const { rows } = await pool.query(
-      `SELECT id,category,severity,sender,subject,body,confirmation_code,confirmation_link,domain_id,location_id,read_at,received_at FROM mail_alert_messages WHERE ${filter} ORDER BY received_at DESC,id DESC LIMIT $6 OFFSET $7`,
+      `SELECT m.id,m.category,m.severity,m.sender,m.subject,m.body,m.confirmation_code,m.confirmation_link,m.domain_id,m.location_id,bl.business_name AS location_name,m.read_at,m.received_at FROM mail_alert_messages m LEFT JOIN business_locations bl ON bl.id=m.location_id AND bl.user_id=m.user_id WHERE ${filter} ORDER BY m.received_at DESC,m.id DESC LIMIT $8 OFFSET $9`,
       [...params, p.limit, (p.page - 1) * p.limit],
     );
     const {
       rows: [n],
     } = await pool.query(
-      `SELECT count(*)::int total FROM mail_alert_messages WHERE ${filter}`,
+      `SELECT count(*)::int total FROM mail_alert_messages m WHERE ${filter}`,
       params,
     );
-    res.json({ items: rows, total: n.total });
+    const {
+      rows: [counts],
+    } = await pool.query(
+      `SELECT count(*) FILTER (WHERE read_at IS NULL)::int unread,
+              count(*) FILTER (WHERE severity='critical')::int critical,
+              count(*) FILTER (WHERE location_id IS NULL)::int unmapped
+       FROM mail_alert_messages WHERE user_id=$1 AND expires_at>now()`,
+      [id],
+    );
+    res.json({ items: rows, total: n.total, counts });
   });
   route("post", "/read", async (req, res, id) => {
     const b = z

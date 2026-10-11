@@ -136,8 +136,11 @@ beforeAll(async () => {
   const app: any = { use: () => {} };
   for (const method of ["get", "post"])
     app[method] = (path: string, fn: any) => handlers.set(method + path, fn);
-  registerDomainRoutes(app, (req, res) =>
-    req.user?.id ? req.user : (res.status(401).json({}), null),
+  registerDomainRoutes(
+    app,
+    (req, res) => (req.user?.id ? req.user : (res.status(401).json({}), null)),
+    undefined,
+    { adapter: () => a },
   );
 });
 afterAll(async () => {
@@ -390,10 +393,11 @@ it("persists rollback intent before an ambiguous write and never replays it afte
       );
     }),
   };
-  await runDomainWorker({ adapter: () => failing });
+  // onlyUser: on a shared lane database another owner's open jobs must not be picked first.
+  await runDomainWorker({ adapter: () => failing, onlyUser: user });
   expect((await job(id)).status).toBe("uncertain");
   expect((await job(id)).result.inverse.nameservers).toEqual(state.nameservers);
-  await runDomainWorker({ adapter: () => failing });
+  await runDomainWorker({ adapter: () => failing, onlyUser: user });
   expect(failing.setNameservers).toHaveBeenCalledTimes(1);
   const [rollback] = await rollbackPreview(user, id);
   expect((await job(rollback)).status).toBe("previewing");
@@ -499,4 +503,101 @@ it("removes a saved registrar key behind step-up, keeps the domains and job hist
   await expect(
     preview(user, [kept], { kind: "nameservers", nameservers: ["x.example.test", "y.example.test"] }),
   ).rejects.toThrow("Manual domains");
+});
+
+it("serves live records for the picker, syncs every saved connection, filters by attention, and persists health", async () => {
+  // Record picker: the registrar adapter's live records for the domain.
+  const records = await call(
+    "get",
+    "/api/domains/records",
+    {},
+    { domainId: String(domain) },
+  );
+  expect(records.code).toBe(200);
+  expect(records.data.domain).toBe(state.domain);
+  expect(records.data.records).toEqual(state.records);
+  // A domain without a connected registrar cannot be read (409), and other owners get 404.
+  const {
+    rows: [manual],
+  } = await pool.query(
+    "SELECT id FROM managed_domains WHERE user_id=$1 AND connection_id IS NULL LIMIT 1",
+    [user],
+  );
+  expect(
+    (await call("get", "/api/domains/records", {}, { domainId: String(manual.id) })).code,
+  ).toBe(409);
+  expect(
+    (
+      await call(
+        "get",
+        "/api/domains/records",
+        {},
+        { domainId: String(manual.id) },
+        other,
+      )
+    ).code,
+  ).toBe(404);
+  // Full sync: without ids, every saved connection gets a discover job (one fixture key remains).
+  const syncAll = await call("post", "/api/domains/sync", {});
+  expect(syncAll.code).toBe(202);
+  expect(syncAll.data.synced).toBe(1);
+  expect(syncAll.data.jobs).toHaveLength(1);
+  // The monitor persists its health observation on the domain.
+  const health = {
+    up: true,
+    sslExpires: new Date(Date.now() + 120 * 86400000).toISOString(),
+  };
+  await monitor(
+    {
+      id: domain,
+      user_id: user,
+      domain: state.domain,
+      state: {
+        ...state,
+        expires: new Date(Date.now() + 400 * 86400000).toISOString(),
+        autoRenew: true,
+      },
+      observed: {},
+    },
+    {
+      http: async () => new Response('{"Status":0,"Answer":[]}'),
+      health: async () => health,
+    },
+  );
+  const {
+    rows: [md],
+  } = await pool.query("SELECT health FROM managed_domains WHERE id=$1", [domain]);
+  expect(md.health.up).toBe(true);
+  expect(md.health.sslExpires).toBe(health.sslExpires);
+  expect(typeof md.health.checkedAt).toBe("string");
+  // Healthy and expiring far out: not in the attention list. HTTPS down: flagged, with health returned.
+  let attention = await call("get", "/api/domains", {}, { attention: "1" });
+  expect(
+    attention.data.items.some((d: any) => Number(d.id) === Number(domain)),
+  ).toBe(false);
+  await pool.query("UPDATE managed_domains SET health=$2 WHERE id=$1", [
+    domain,
+    { ...health, up: false },
+  ]);
+  attention = await call("get", "/api/domains", {}, { attention: "1" });
+  const flagged = attention.data.items.find(
+    (d: any) => Number(d.id) === Number(domain),
+  );
+  expect(flagged).toBeTruthy();
+  expect(flagged.health.up).toBe(false);
+  // Expiry within 60 days flags the domain too.
+  await pool.query("UPDATE managed_domains SET health=$2 WHERE id=$1", [domain, health]);
+  await pool.query(
+    "UPDATE managed_domains SET state=state||$2::jsonb WHERE id=$1",
+    [
+      domain,
+      JSON.stringify({
+        expires: new Date(Date.now() + 10 * 86400000).toISOString(),
+      }),
+    ],
+  );
+  attention = await call("get", "/api/domains", {}, { attention: "1" });
+  expect(
+    attention.data.items.some((d: any) => Number(d.id) === Number(domain)),
+  ).toBe(true);
 });

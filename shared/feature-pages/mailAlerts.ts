@@ -15,7 +15,10 @@ import { WEBSITE_TOOLS_COMPARE } from "./cloudflare";
  *     suspension; forwarding confirmation code + link: server/mail-alerts/classify.ts
  *   - matching to a domain's location or a business name, 30-day retention, notification per new alert, kept for
  *     30 days when the plan lacks the module: server/mail-alerts/service.ts storeMatched, ingest, HELD_ALERT_NOTE
- *   - filters (category, severity, client), search, manual mapping, mark read: server/mail-alerts/routes.ts
+ *   - filters (category, severity, client — all, one named client, or unmapped), an unread-only view, search,
+ *     manual mapping, mark read (in bulk, per alert, or by opening the message): server/mail-alerts/routes.ts;
+ *     rows carry the matched client's business name (never a bare location id) and the list carries the
+ *     page-wide Critical/Unread/Unmapped counts the inbox triage leads with
  *   - optional read-only Gmail connection (only when enabled), last 30 days of known senders:
  *     server/mail-alerts/gmail.ts GMAIL_SCOPE, classify.ts GMAIL_QUERY
  *   - Agency-only gate: requireMailModule() in routes.ts (requireModule("domainsMailAlerts") in gmail.ts)

@@ -11,12 +11,15 @@ import { WEBSITE_TOOLS_COMPARE } from "./cloudflare";
  *     server/domains/routes.ts POST /connections, server/domains/service.ts saveConnection, server/domains/adapters/*
  *   - manual domains from any registrar: routes.ts POST /manual; auto-mapping to locations + manual mapping:
  *     service.ts autoMapDomains, routes.ts POST /mapping
- *   - daily monitor (DNS snapshot changed outside ConstructHUB, nameservers changed, expiry within 60/30/7 days,
+ *   - daily monitor (DNS snapshot changed outside ConstructHUB, nameserver changed, expiry within 60/30/7 days,
  *     auto-renew off, HTTPS check failed, SSL certificate within 30 days) with notifications: service.ts monitor,
- *     server/domains/health.ts websiteHealth, server/domains/dns.ts dnsSnapshot
+ *     server/domains/health.ts websiteHealth, server/domains/dns.ts dnsSnapshot; the latest HTTPS/SSL observation
+ *     is persisted on the domain (managed_domains.health) and shown as row badges with a "Needs attention" filter
  *   - DNS edits (A, AAAA, CNAME, TXT, MX, CAA; create/update/delete) and nameserver changes, preview →
  *     confirm (email-interruption acknowledgement for MX/TXT/CNAME/nameservers, recent sign-in) → apply →
- *     DNS verification → rollback preview: server/domains/types.ts, service.ts preview/confirm/processJob/rollbackPreview
+ *     DNS verification → rollback preview: server/domains/types.ts, service.ts preview/confirm/processJob/rollbackPreview;
+ *     update/delete start from the domain's current records (GET /records, the record picker), carrying the
+ *     provider record id through preview and confirmation
  *   - records hosted on Cloudflare are not edited: types.ts desired()
  *   - point nameservers at the Cloudflare zone's pair: routes.ts /cloudflare-preview, server/domains/cloudflare-link.ts
  *   - registrar guides: server/domains/guides.ts
@@ -80,12 +83,12 @@ const page: FeaturePage = {
     {
       icon: "settings",
       title: "DNS record edits",
-      body: "Create, update or delete A, AAAA, CNAME, TXT, MX and CAA records, or change nameservers, on connected registrars.",
+      body: "Create, update or delete A, AAAA, CNAME, TXT, MX and CAA records, or change nameservers, on connected registrars. Updates and deletes start from the domain's current record list, so the provider's record id is carried through the preview.",
     },
     {
       icon: "history",
       title: "Preview, verify, roll back",
-      body: "Each change shows the before and after. Once applied, DNS is checked until it matches, and a rollback preview lets you put the old values back.",
+      body: "Each change shows a readable before/after diff of the records and nameservers, with added, changed and removed rows labelled. Once applied, DNS is checked until it matches, and a rollback preview lets you put the old values back.",
     },
     {
       icon: "mail",
@@ -169,7 +172,8 @@ const page: FeaturePage = {
         "puts the padlock in the browser) and warns when it expires within 30 days. Each alert is sent once for the " +
         "state that caused it, not every day.",
       "On a connected registrar you can also change DNS: create, update or delete A, AAAA, CNAME, TXT, MX and CAA " +
-        "records, or switch nameservers. Every change starts as a preview of the before and after. Changes that can " +
+        "records, or switch nameservers. Every change starts as a preview of the before and after, shown as a " +
+        "readable diff with the added, changed and removed records labelled. Changes that can " +
         "interrupt email, like MX, TXT and CNAME records or nameservers, need an extra acknowledgement, and confirming " +
         "asks for a recent sign-in. If the domain changed after the preview, or the preview is more than 15 minutes old, " +
         "you're asked for a new one. Once a change is applied, public DNS is checked every 5 minutes until the new " +

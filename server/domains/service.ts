@@ -189,6 +189,15 @@ export async function ownedDomains(userId: number, ids: number[]) {
     throw new DomainError("Domain not found", 404);
   return rows;
 }
+/** Live DNS records of a domain from its registrar connection (the client-side record picker). */
+export async function readDomainRecords(
+  connection: any,
+  domain: string,
+  deps: Dependencies = {},
+) {
+  const state = await adapter(connection, deps).read(domain);
+  return { domain, records: state.records };
+}
 export async function preview(userId: number, ids: number[], change: Change) {
   const rows = await ownedDomains(userId, ids);
   if (rows.some((d) => !d.connection_id))
@@ -336,8 +345,16 @@ export async function monitor(d: any, deps: Dependencies) {
       "Website SSL certificate expires within 30 days",
     );
   await pool.query(
-    "UPDATE managed_domains SET observed=$2,checked_at=now(),next_check=now()+interval '1 day' WHERE id=$1",
-    [d.id, observed],
+    "UPDATE managed_domains SET observed=$2,checked_at=now(),next_check=now()+interval '1 day',health=$3 WHERE id=$1",
+    [
+      d.id,
+      observed,
+      {
+        up: health.up,
+        sslExpires: health.sslExpires,
+        checkedAt: new Date().toISOString(),
+      },
+    ],
   );
   return { health, questions: Object.keys(observed).length };
 }

@@ -15,6 +15,8 @@ import {
   ownedDomains,
   enqueue,
   autoMapDomains,
+  readDomainRecords,
+  type Dependencies,
 } from "./service";
 import { cloudflareZoneLink, type CloudflareZoneLink } from "./cloudflare-link";
 import { registrarGuides } from "./guides";
@@ -30,6 +32,7 @@ export function registerDomainRoutes(
   app: Express,
   auth: (req: any, res: any) => any,
   cf: (userId: number) => CloudflareZoneLink = () => cloudflareZoneLink,
+  deps: Dependencies = {},
 ) {
   app.use("/api/domains", (_req, res, next) => {
     res.setHeader("Cache-Control", "no-store");
@@ -87,14 +90,30 @@ export function registerDomainRoutes(
     }),
   );
   // Domain inventory: managed_domains of this user (?q domain, ?registrar, ?locationId,
-  // 25/page) with joined client name and DNS/expiry state. Inventory table — domains.tsx.
+  // ?attention=1 for "needs attention" — expiry within 60 days, auto-renew off, HTTPS down
+  // or SSL expiring within 30 days, 25/page) with joined client name, registrar state and the
+  // latest website-health observation. Inventory table — domains.tsx.
   route("get", "", async (req, res, id) => {
-    const p = pageInput.parse(req.query),
-      values = [id, `%${p.q}%`, p.registrar, p.locationId || null];
+    const p = pageInput
+      .extend({ attention: z.enum(["", "1"]).default("") })
+      .parse(req.query),
+      values = [
+        id,
+        `%${p.q}%`,
+        p.registrar,
+        p.locationId || null,
+        p.attention,
+      ];
+    const attention = `($5='' OR (
+       (m.state->>'expires' ~ '^\\d{4}-\\d{2}-\\d{2}' AND (m.state->>'expires')::timestamptz <= now()+interval '60 days')
+       OR m.state->>'autoRenew' = 'false'
+       OR m.health->>'up' = 'false'
+       OR (m.health->>'sslExpires' ~ '^\\d{4}-\\d{2}-\\d{2}' AND (m.health->>'sslExpires')::timestamptz <= now()+interval '30 days')))`;
     const filter =
-      "m.user_id=$1 AND m.domain ILIKE $2 AND ($3='' OR m.registrar=$3) AND ($4::int IS NULL OR m.location_id=$4)";
+      "m.user_id=$1 AND m.domain ILIKE $2 AND ($3='' OR m.registrar=$3) AND ($4::int IS NULL OR m.location_id=$4) AND " +
+      attention;
     const { rows } = await pool.query(
-      `SELECT m.id,m.domain,m.registrar,m.location_id,bl.business_name AS location_name,m.state - 'records' AS state,m.checked_at FROM managed_domains m LEFT JOIN business_locations bl ON bl.id=m.location_id AND bl.user_id=m.user_id WHERE ${filter} ORDER BY m.domain,m.id LIMIT $5 OFFSET $6`,
+      `SELECT m.id,m.domain,m.registrar,m.location_id,bl.business_name AS location_name,m.state - 'records' AS state,m.health,m.checked_at FROM managed_domains m LEFT JOIN business_locations bl ON bl.id=m.location_id AND bl.user_id=m.user_id WHERE ${filter} ORDER BY m.domain,m.id LIMIT $6 OFFSET $7`,
       [...values, p.limit, (p.page - 1) * p.limit],
     );
     const {
@@ -104,6 +123,27 @@ export function registerDomainRoutes(
       values,
     );
     res.json({ items: rows, total: n.total, page: p.page });
+  });
+  // The current DNS records of one managed domain, read live from its registrar — the record
+  // picker behind the DNS record change form (only for a connected, non-Cloudflare-hosted domain).
+  route("get", "/records", async (req, res, id) => {
+    const { domainId } = z
+      .object({ domainId: z.coerce.number().int().positive() })
+      .parse(req.query);
+    const [d] = await ownedDomains(id, [domainId]);
+    if (!d.connection_id)
+      throw new DomainError(
+        "This domain has no connected registrar. Change its records at the registrar.",
+        409,
+      );
+    const {
+      rows: [connection],
+    } = await pool.query(
+      "SELECT * FROM domain_connections WHERE id=$1 AND user_id=$2",
+      [d.connection_id, id],
+    );
+    if (!connection) throw new DomainError("Connection not found", 404);
+    res.json(await readDomainRecords(connection, d.domain, deps));
   });
   // Client-location search for the mapping dropdown: business_locations of this user
   // (?q name/website, 25/page). "Find client location" — domains.tsx.
@@ -190,19 +230,29 @@ export function registerDomainRoutes(
     res.status(201).json({ id: connectionId });
   });
   // Re-imports the domain inventory from the chosen registrar keys (discover job per
-  // connection into domain_jobs). "Sync connections" — domains.tsx.
+  // connection into domain_jobs). Without connectionIds it re-imports from every saved
+  // key — the page's "Sync all connections" syncs the whole inventory, not one page.
+  // "Sync connections" — domains.tsx.
   route("post", "/sync", async (req, res, id) => {
-    const b = z.object({ connectionIds: idsInput }).strict().parse(req.body);
-    const { rows } = await pool.query(
-      "SELECT id FROM domain_connections WHERE user_id=$1 AND id=ANY($2::bigint[])",
-      [id, b.connectionIds],
-    );
-    if (rows.length !== new Set(b.connectionIds).size)
+    const b = z
+      .object({ connectionIds: idsInput.optional() })
+      .strict()
+      .parse(req.body);
+    const { rows } = b.connectionIds
+      ? await pool.query(
+          "SELECT id FROM domain_connections WHERE user_id=$1 AND id=ANY($2::bigint[])",
+          [id, b.connectionIds],
+        )
+      : await pool.query(
+          "SELECT id FROM domain_connections WHERE user_id=$1 ORDER BY id",
+          [id],
+        );
+    if (b.connectionIds && rows.length !== new Set(b.connectionIds).size)
       throw new DomainError("Connection not found", 404);
     const jobs = [];
     for (const c of rows)
       jobs.push(await enqueue(id, "discover", {}, undefined, c.id));
-    res.status(202).json({ jobs });
+    res.status(202).json({ jobs, synced: rows.length });
   });
   // Adds manually tracked domains: INSERT managed_domains (registrar 'manual', on-conflict
   // skip), then auto-links a location whose website matches. "Add domains" — domains.tsx.

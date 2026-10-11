@@ -251,8 +251,108 @@ it("paginates 1000 alerts and client locations, filters on the server and isolat
   expect((await call("/api/mail-alerts", {}, 0)).status).toBe(401);
 });
 
-it("uses the trusted envelope recipient when Gmail preserves the original To header", async () => {
-  await ingest(
+it("triages by read state and client, attributes clients by name, and counts the inbox", async () => {
+  const { registerMailAlertRoutes } = await import("./routes");
+  const handlers = new Map<string, any>();
+  const app: any = { use: () => {} };
+  for (const method of ["get", "post"])
+    app[method] = (path: string, fn: any) => handlers.set(method + path, fn);
+  registerMailAlertRoutes(app, (req: any, res: any) =>
+    req.user?.id ? req.user : (res.status(401).json({}), null),
+  );
+  const call = async (path: string, query: any = {}, who = user) => {
+    let status = 200,
+      data: any;
+    const res: any = {
+      status: (s: number) => {
+        status = s;
+        return res;
+      },
+      json: (v: any) => {
+        data = v;
+        return res;
+      },
+    };
+    await handlers.get("get" + path)({ query, user: { id: who } }, res);
+    return { status, data };
+  };
+  // Three of the scale fixtures: one mapped+read, one critical, one read.
+  const subjects = [
+    "Scale indexing fixture 1",
+    "Scale indexing fixture 2",
+    "Scale indexing fixture 3",
+  ];
+  const {
+    rows: [mapped, critical, read],
+  } = await pool.query(
+    "SELECT id FROM mail_alert_messages WHERE user_id=$1 AND subject=ANY($2) ORDER BY subject",
+    [user, subjects],
+  );
+  await pool.query(
+    "UPDATE mail_alert_messages SET location_id=$2, read_at=now() WHERE id=$1",
+    [mapped.id, location],
+  );
+  await pool.query(
+    "UPDATE mail_alert_messages SET severity='critical' WHERE id=$1",
+    [critical.id],
+  );
+  await pool.query(
+    "UPDATE mail_alert_messages SET read_at=now() WHERE id=$1",
+    [read.id],
+  );
+  // Client attribution returns the business name, never a bare location id.
+  const named = await call("/api/mail-alerts", {
+    q: "Scale indexing fixture",
+    locationId: String(location),
+  });
+  expect(named.status).toBe(200);
+  expect(named.data.total).toBe(1);
+  expect(named.data.items[0]).toMatchObject({
+    location_id: location,
+    location_name: "Fixture Agency Client",
+  });
+  // The unmapped filter and the named-client filter are independent.
+  const unmapped = await call("/api/mail-alerts", {
+    q: "Scale indexing fixture",
+    mapped: "unmapped",
+  });
+  const mappedOnly = await call("/api/mail-alerts", {
+    q: "Scale indexing fixture",
+    mapped: "mapped",
+  });
+  expect(unmapped.data.total).toBe(999);
+  expect(mappedOnly.data.total).toBe(1);
+  expect(
+    mappedOnly.data.items.every((m: any) => m.location_id !== null),
+  ).toBe(true);
+  // The unread view matches the unread count exactly.
+  const unread = await call("/api/mail-alerts", {
+    q: "Scale indexing fixture",
+    unread: "1",
+  });
+  expect(unread.data.total).toBe(998);
+  const {
+    rows: [direct],
+  } = await pool.query(
+    `SELECT count(*) FILTER (WHERE read_at IS NULL)::int unread,
+            count(*) FILTER (WHERE severity='critical')::int critical,
+            count(*) FILTER (WHERE location_id IS NULL)::int unmapped
+     FROM mail_alert_messages WHERE user_id=$1 AND expires_at>now()`,
+    [user],
+  );
+  // The triage chips' counts are the same page-wide numbers.
+  expect(unread.data.counts).toEqual(direct);
+  // Other owners see neither the rows nor the counts.
+  const foreign = await call("/api/mail-alerts", {}, other);
+  expect(foreign.data.total).toBe(0);
+  expect(foreign.data.counts).toEqual({
+    unread: 0,
+    critical: 0,
+    unmapped: 0,
+  });
+});
+
+it("uses the trusted envelope recipient when Gmail preserves the original To header", async () => {  await ingest(
     "From: sc-noreply@google.com\r\nTo: original@gmail.com\r\nSubject: Coverage issue envelope fixture\r\n\r\nclient.example.test",
     address,
   );
