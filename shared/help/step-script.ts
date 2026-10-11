@@ -184,6 +184,12 @@ export const tutorialScriptSchema = z.object({
    * never a way to hide what a feature really shows. Plain CSS selectors.
    */
   hideSelectors: z.array(z.string().min(1).max(200).refine((v) => !/text=|>>|:has-text|:text\(|xpath=|[{}<]/.test(v), "a plain CSS selector")).max(12).optional(),
+  /**
+   * Like hideSelectors, but the element is taken out of the layout (display:none) so the page closes up — for a
+   * price tile or an environment notice a tutorial must not show, where a hidden element would leave a blank gap.
+   * Same limits: presentation only, never a way to hide what a feature really does. Plain CSS selectors.
+   */
+  removeSelectors: z.array(z.string().min(1).max(200).refine((v) => !/text=|>>|:has-text|:text\(|xpath=|[{}<]/.test(v), "a plain CSS selector")).max(12).optional(),
   /** What the YouTube upload says (youtube.json is generated from this and the measured timings). */
   youtube: z.object({
     /** Task first: "How to create and send an estimate | ConstructHUB CRM". */
