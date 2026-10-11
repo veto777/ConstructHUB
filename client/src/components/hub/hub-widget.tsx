@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useLocation, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { X, Send, RotateCcw, ChevronDown, ChevronUp, Lock } from "lucide-react";
 import HubMascot, { type HubMascotState } from "./hub-mascot";
 import { HubMarkdown } from "./hub-markdown";
@@ -60,6 +60,8 @@ type Msg = {
   index?: number;
   sig?: string;
   tone?: "error" | "note";
+  failed?: boolean;
+  presetId?: string;
 };
 
 const BUSY_TEXT = "My radio's crackling, so that took too long. Please try again in a minute. The quick questions below still work.";
@@ -117,12 +119,21 @@ const writeFlag = (key: string, value: string) => { try { window.localStorage.se
 const FOCUSABLE = 'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 export default function HubWidget({ surface, signedIn }: { surface: HubSurface; signedIn: boolean }) {
+  const { data: user } = useQuery<{ id: number } | null>({ queryKey: ["/api/auth/me"], enabled: signedIn });
+  const userId = signedIn ? user?.id : null;
+  // Remount all conversation state when the authenticated person changes, including A -> B.
+  if (signedIn && userId == null) return null;
+  return <HubConversation key={userId ?? "guest"} surface={surface} userId={userId ?? null} />;
+}
+
+function HubConversation({ surface, userId }: { surface: HubSurface; userId: number | null }) {
+  const queryClient = useQueryClient();
   const [location] = useLocation();
   const visible = hubVisible(location, surface);
-  const { data: meta, isError: metaFailed, refetch } = useQuery<HubMeta>({
-    queryKey: ["/api/hub/presets", signedIn ? "in" : "out"],
-    queryFn: async () => {
-      const res = await fetch("/api/hub/presets", { credentials: "include" });
+  const { data: meta, isError: metaFailed, isFetching: metaFetching, dataUpdatedAt, refetch } = useQuery<HubMeta>({
+    queryKey: ["/api/hub/presets", userId],
+    queryFn: async ({ signal }) => {
+      const res = await fetch("/api/hub/presets", { credentials: "include", signal, cache: "no-store" });
       if (!res.ok) throw new Error(String(res.status));
       // A server without the Hub routes answers with the SPA's index.html (the catch-all): not meta.
       if (!/\bapplication\/json\b/i.test(res.headers.get("content-type") ?? "")) throw new Error("not json");
@@ -163,7 +174,7 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
   // No typed questions this month: the plan has none (0), or they are all used.
   const noPlanQuestions = !!allowance && allowance.monthly === 0;
   const spent = !!limitBody || (!!allowance && allowance.monthly > 0 && allowance.remaining === 0);
-  const canChat = !!meta?.chat && !spent && !noPlanQuestions;
+  const canChat = !metaFailed && !!meta?.chat && !spent && !noPlanQuestions;
   const pageKey = pageKeyForPath(location, surface === "portal" || isPortal());
   const mascotState: HubMascotState = busy ? "thinking" : talking ? "talking" : "idle";
   const welcomeKey = welcomeFlagKey(meta?.userId);
@@ -178,13 +189,36 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
     setMessages([]);
   }, []);
 
-  // Sign-in or sign-out starts over: no transcript survives a change of person, and no reply
-  // from the previous person's question can land in the new one's chat.
-  useEffect(() => { startOver(); setInput(""); setLimitBody(null); }, [signedIn, startOver]);
-  // Unmount: nothing in flight may touch state afterwards.
+  // Identity changes remount this component: abort requests and reject late replies.
   useEffect(() => () => { generation.current += 1; inFlight.current?.abort(); }, []);
   // A fresh meta decides the quota state; the last plan answer only bridges until it arrives.
-  useEffect(() => { if (meta) setLimitBody(null); }, [meta]);
+  useEffect(() => { if (meta && !metaFailed) setLimitBody(null); }, [dataUpdatedAt, meta, metaFailed]);
+
+  useEffect(() => { if (open) void refetch(); }, [open, refetch]);
+  useEffect(() => queryClient.getQueryCache().subscribe((event) => {
+    if (visible && userId !== null && event.type === "updated" &&
+        event.query.queryKey[0] === "/api/entitlements" &&
+        (event.action.type === "success" || event.action.type === "invalidate")) void refetch();
+  }), [queryClient, refetch, userId, visible]);
+
+  // Refresh at monthly reset and UTC midnight (daily allowance), even while closed.
+  // Cap long timers to avoid the browser's signed 32-bit timeout overflow.
+  useEffect(() => {
+    if (!visible || userId === null || !meta) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const now = Date.now();
+    const month = Date.parse(meta.allowance?.resetsAt ?? "");
+    const midnight = new Date(now);
+    midnight.setUTCHours(24, 0, 0, 0);
+    const boundary = Number.isFinite(month) && month > now ? Math.min(month, +midnight) : +midnight;
+    const schedule = () => {
+      const remaining = boundary - Date.now();
+      if (remaining <= 0) { void refetch(); return; }
+      timer = setTimeout(schedule, Math.min(remaining, 2_147_483_647));
+    };
+    schedule();
+    return () => clearTimeout(timer);
+  }, [meta, dataUpdatedAt, visible, userId, refetch]);
 
   // "Activated when someone signs up": the first time a signed-in ACCOUNT lands here, the
   // launcher carries a dot and (on wider screens, for 15 s) a welcome bubble. Neither is modal,
@@ -248,7 +282,7 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
     return () => window.removeEventListener("constructhub:hub-open", onOpen);
   }, []);
 
-  /** Keep keyboard focus inside the dialog: the text box when chat is on, else the first quick question. */
+  /** Return focus after resetting: the text box when chat is on, else the first quick question. */
   const focusComposer = () => {
     window.setTimeout(() => {
       const target = (canChat ? inputRef.current : null) ?? panelRef.current?.querySelector<HTMLElement>("[data-hub-chip]") ?? panelRef.current?.querySelector<HTMLElement>(FOCUSABLE);
@@ -279,9 +313,16 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
     return { controller, live: () => gen === generation.current && inFlight.current === controller };
   };
 
-  const askPreset = async (presetId: string, label: string) => {
+  const markFailed = (id: number, failed: boolean) => setMessages((prev) => prev.map((m) => m.id === id ? { ...m, failed } : m));
+  const retryTurn = (id: number) => setMessages((prev) => {
+    const turn = prev.find((m) => m.id === id);
+    return turn ? [...prev.filter((m) => m.id !== id), { ...turn, failed: false }] : prev;
+  });
+
+  const askPreset = async (presetId: string, label: string, retryId?: number) => {
     if (busy) return;
-    push({ role: "user", content: label });
+    const userMsgId = retryId ?? push({ role: "user", content: label, presetId });
+    if (retryId) retryTurn(retryId);
     setBusy(true);
     const { controller, live } = begin();
     try {
@@ -297,10 +338,11 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
         push({ role: "assistant", content: data.reply });
         setTalking(true);
       } else {
+        markFailed(userMsgId, true);
         push({ role: "assistant", content: typeof data.reply === "string" ? data.reply : BUSY_TEXT, tone: "error" });
       }
     } catch {
-      if (live()) push({ role: "assistant", content: BUSY_TEXT, tone: "error" });
+      if (live()) { markFailed(userMsgId, true); push({ role: "assistant", content: BUSY_TEXT, tone: "error" }); }
     } finally {
       if (live()) { inFlight.current = null; setBusy(false); }
     }
@@ -312,8 +354,8 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
     setMessages((prev) => prev.map((m) => ({ ...m, inHistory: false })));
   };
 
-  const sendChat = async () => {
-    const text = input.trim();
+  const sendChat = async (retry?: Msg) => {
+    const text = (retry?.content ?? input).trim();
     if (!text || busy || !canChat) return;
     const max = meta?.maxChars ?? 500;
     if (text.length > max) return;
@@ -322,8 +364,9 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
     while (history.length > HISTORY_MAX_MESSAGES || history.reduce((n, m) => n + m.content.length, 0) + text.length > HISTORY_MAX_CHARS) {
       history = history.slice(2);
     }
-    const userMsgId = push({ role: "user", content: text });
-    setInput("");
+    const userMsgId = retry?.id ?? push({ role: "user", content: text });
+    if (retry) retryTurn(retry.id);
+    else setInput("");
     setBusy(true);
     // The Send button goes inactive while Gabe answers; never leave focus on it.
     if (document.activeElement !== inputRef.current) inputRef.current?.focus();
@@ -345,13 +388,14 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
       const data = await res.json().catch(() => ({}));
       // The chat was reset or the person changed while this was in flight: the reply is not for this conversation.
       if (!live()) return;
+      markFailed(userMsgId, !(res.ok && typeof data.reply === "string" && typeof data.sig === "string"));
       if (res.ok && typeof data.reply === "string" && typeof data.sig === "string") {
         setConversationId(data.conversationId);
         setMessages((prev) => prev.map((m) => (m.id === userMsgId ? { ...m, inHistory: true } : m)));
         push({ role: "assistant", content: data.reply, inHistory: true, index: data.index, sig: data.sig, tone: data.kind === "answer" ? undefined : "note" });
         setTalking(true);
         // An answered question is one off the month: refresh the header's count.
-        if (data.kind === "answer" && allowance && allowance.monthly > 0) void refetch();
+        if (data.kind === "answer") void refetch();
       } else if (res.status === 401 || (res.status === 403 && data.presetsOnly)) {
         push({ role: "assistant", content: data.reply ?? "Sign up or log in to ask your own questions.", tone: "note" });
         void refetch();
@@ -375,21 +419,10 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
         push({ role: "assistant", content: typeof data.reply === "string" ? data.reply : BUSY_TEXT, tone: "error" });
       }
     } catch {
-      if (live()) push({ role: "assistant", content: BUSY_TEXT, tone: "error" });
+      if (live()) { markFailed(userMsgId, true); push({ role: "assistant", content: BUSY_TEXT, tone: "error" }); }
     } finally {
       if (live()) { inFlight.current = null; setBusy(false); }
     }
-  };
-
-  // Tab stays inside the panel (focus trap). Escape is handled at document level above.
-  const onPanelKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key !== "Tab" || !panelRef.current) return;
-    const items = Array.from(panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((el) => el.offsetParent !== null || el === document.activeElement);
-    if (!items.length) return;
-    const first = items[0];
-    const last = items[items.length - 1];
-    if (e.shiftKey && (document.activeElement === first || !panelRef.current.contains(document.activeElement))) { e.preventDefault(); last.focus(); }
-    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   };
 
   const chips = useMemo(() => {
@@ -408,7 +441,7 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
   // Nothing until the server has answered; when it can't (a server without /api/hub, or down), the
   // launcher still shows and the panel says so, rather than Gabe silently not existing.
   if (!visible || (!meta && !metaFailed)) return null;
-  const offline = !meta;
+  const offline = !meta || metaFailed;
 
   // On phones the CRM ribbon and the platform tab bar (AppTabBar) sit at the bottom: the launcher and panel rise above them.
   const portalMobile = surface === "portal" || surface === "growth";
@@ -421,7 +454,7 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
         : "Hi, I'm Gabe! I know ConstructHUB inside out: plans, features and how to set things up. Tap a question below.";
 
   // The header's second line: the month's standing for a signed-in account, in the words the pricing page uses.
-  const headerLine = busy
+  const headerLine = metaFailed ? "Allowance unavailable — please try again" : busy
     ? "Thinking it over…"
     : !builder
       ? "Quick answers about ConstructHUB"
@@ -430,7 +463,7 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
           ? "Unlimited questions (fair use)"
           : allowance.monthly === 0
             ? "Quick questions only on this account"
-            : `${Math.max(0, allowance.remaining ?? 0).toLocaleString("en-US")} of ${allowance.monthly.toLocaleString("en-US")} questions left this month`
+            : allowance.remaining === null ? "Monthly allowance unavailable" : `${Math.max(0, allowance.remaining).toLocaleString("en-US")} of ${allowance.monthly.toLocaleString("en-US")} questions left this month`
         : "Ask about any feature or setup step";
 
   const resetOn = resetLabel(limitBody?.resetsAt ?? allowance?.resetsAt);
@@ -486,12 +519,10 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
           ref={panelRef}
           id={panelId}
           role="dialog"
-          aria-modal="true"
           aria-labelledby={titleId}
           aria-describedby={descId}
-          onKeyDown={onPanelKeyDown}
           className={cn(
-            "fixed z-[60] flex flex-col overflow-hidden rounded-2xl border bg-card text-card-foreground shadow-2xl",
+            "fixed z-[60] flex flex-col overflow-hidden rounded-2xl border bg-card text-card-foreground shadow-2xl [&_button:focus-visible]:outline [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-offset-2 [&_a:focus-visible]:outline [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-offset-2",
             "inset-x-2 sm:inset-x-auto sm:right-5 sm:w-[380px]",
             portalMobile
               ? "bottom-[calc(62px+env(safe-area-inset-bottom))] h-[min(620px,calc(100dvh-70px-env(safe-area-inset-bottom)))] md:bottom-5 md:h-[min(620px,calc(100dvh-2.5rem))]"
@@ -508,6 +539,7 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
               <p id={descId} className="text-xs text-white/85" data-testid="hub-allowance">
                 {headerLine}
               </p>
+              {!metaFailed && allowance && <p className="text-xs text-white/85" data-testid="hub-daily">Today: {allowance.daily.used.toLocaleString("en-US")} of {allowance.daily.limit.toLocaleString("en-US")} questions used</p>}
             </div>
             {builder && messages.length > 0 && (
               <button type="button" onClick={() => { startOver(); focusComposer(); }}
@@ -539,6 +571,10 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
                   data-tone={m.tone ?? "answer"}
                 >
                   {m.role === "user" ? m.content : <HubMarkdown text={m.content} onNavigate={() => setOpen(false)} />}
+                  {m.failed && <div className="mt-2 flex gap-3 text-xs">
+                    <button type="button" className="rounded underline disabled:opacity-50" disabled={busy || (!m.presetId && !canChat)} onClick={() => m.presetId ? void askPreset(m.presetId, m.content, m.id) : void sendChat(m)}>Retry</button>
+                    {userId !== null && <button type="button" className="rounded underline" onClick={() => { setInput(m.content); window.setTimeout(() => inputRef.current?.focus(), 0); }}>Edit</button>}
+                  </div>}
                 </div>
               </div>
             ))}
@@ -586,9 +622,9 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
             )}
           </div>
 
-          {!offline && (
-          <div className="border-t bg-background/60 p-3">
-            {canChat ? (
+          {(!offline || input.length > 0) && (
+          <div className="space-y-3 border-t bg-background/60 p-3">
+            {(canChat || input.length > 0) && (
               <form onSubmit={(e) => { e.preventDefault(); void sendChat(); }} className="flex items-end gap-2">
                 <label htmlFor={`${panelId}-input`} className="sr-only">Ask Gabe a question</label>
                 <textarea
@@ -603,15 +639,17 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
                   className="max-h-28 min-h-[40px] flex-1 resize-none rounded-xl border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60"
                   data-testid="hub-input"
                 />
-                <button type="submit" disabled={busy || !input.trim()} aria-label="Send"
+                <button type="submit" disabled={!canChat || busy || !input.trim()} aria-label="Send"
                   className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50"
                   data-testid="hub-send">
                   <Send className="h-4 w-4" />
                 </button>
               </form>
-            ) : builder && (spent || noPlanQuestions) ? (
+            )}
+            {!offline && !canChat && (builder && (spent || noPlanQuestions) ? (
               // The plan's monthly questions: a plan-gate card in the panel (the quick questions above still work).
               <div className="rounded-xl border bg-muted/40 p-3 text-xs" role="status" data-testid="hub-quota" data-reason={noPlanQuestions && !limitBody ? "no_plan" : "spent"}>
+                <button type="button" onClick={() => void refetch()} disabled={metaFetching} className="mb-2 rounded-full border bg-background px-3 py-1.5 font-medium disabled:opacity-50" data-testid="hub-check-allowance">{metaFetching ? "Checking allowance…" : "Check allowance"}</button>
                 <p className="flex items-center gap-1.5 font-semibold text-foreground">
                   <Lock className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
                   {noPlanQuestions && !limitBody ? "Typed questions need a plan" : "This month's questions are used up"}
@@ -656,7 +694,7 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
                   Create account
                 </Link>
               </div>
-            )}
+            ))}
             {canChat && meta && input.length > (meta.maxChars - 100) && (
               <p className="mt-1 text-right text-[11px] text-muted-foreground" aria-live="polite">{input.length}/{meta.maxChars}</p>
             )}
