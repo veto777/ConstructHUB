@@ -172,6 +172,11 @@ export const tutorialScriptSchema = z.object({
    */
   showLinkAddress: z.boolean().optional(),
   /**
+   * Keep Gabe's launcher and chat panel on screen. Every other video hides them (they are not the feature being
+   * taught); only the video about Gabe himself (intro-gabe) asks for them.
+   */
+  showAssistant: z.boolean().optional(),
+  /**
    * Fixture helpers run BEFORE the camera starts (recording slots only): the state a video begins in
    * when the demo workspace cannot be seeded that way for everyone — `auth.unfinishedSetup` for the
    * setup checklist. Never a way to stage a result: what the video then shows is done on camera.

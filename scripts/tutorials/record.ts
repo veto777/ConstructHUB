@@ -74,8 +74,9 @@ function overlay() {
     #__tut .card{position:absolute;inset:0;display:none}
     #__tut.carding .card{display:block}
     #__tut.carding .cur,#__tut.carding .ring,#__tut.carding .url{display:none}
-    /* The assistant launcher and its welcome bubble are not part of any feature being taught. */
-    [data-testid="hub-launcher"],[data-testid="hub-welcome-bubble"],[data-testid="hub-panel"]{display:none!important}
+    /* The assistant launcher and its welcome bubble are not part of any feature being taught — except in the one video
+       about the assistant itself (\`showAssistant\`), which keeps the launcher and the panel (never the welcome bubble). */
+    ${w.__tutAssistant ? "" : '[data-testid="hub-launcher"],[data-testid="hub-panel"],'}[data-testid="hub-welcome-bubble"]{display:none!important}
     /* …nor is the unread count on the CRM's bell. */
     [data-testid="badge-notifications-unread"]{display:none!important}
     #__tut.shot .cur{display:none}
@@ -784,6 +785,7 @@ async function main() {
     // tsx compiles with esbuild's keepNames, which wraps functions in a __name() helper the page does not have.
     await context.addInitScript("globalThis.__name = globalThis.__name || ((f) => f);");
     await context.addInitScript((on) => { (window as any).__tutLinkAddress = on; }, !!script.showLinkAddress);
+    await context.addInitScript((on) => { (window as any).__tutAssistant = on; }, !!script.showAssistant);
     await context.addInitScript(overlay);
     // Secrets that appear by themselves are blurred by a stylesheet that is there before the page draws anything.
     if (script.redactSelectors?.length || script.hideSelectors?.length || script.removeSelectors?.length)
