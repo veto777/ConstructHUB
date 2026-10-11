@@ -103,4 +103,5 @@ export { default as v_crm_team_crew_view } from "./crm-team-crew-view.json";
 export { default as v_crm_team_profile } from "./crm-team-profile.json";
 export { default as v_crm_team_roles } from "./crm-team-roles.json";
 export { default as v_database_directory } from "./database-directory.json";
+export { default as v_intro_reviews } from "./intro-reviews.json";
 export { default as v_jobcam } from "./jobcam.json";

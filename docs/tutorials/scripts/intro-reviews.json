@@ -1,0 +1,107 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "intro-reviews",
+  "title": "Google Reviews",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/google-reviews",
+      "caption": "Google Reviews",
+      "chapter": "Ask every client",
+      "narration": "This is Google Reviews. It asks every client for a Google review after the job, and keeps the answers in one place."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[text()=\"Total sent\"]/ancestor::div[.//*[contains(text(),\"Awaiting\")]][1]",
+      "caption": "Sent, opened, rated, waiting",
+      "narration": "The top row counts what you've sent, how many opened the Google link, the positive feedback, and who hasn't answered yet."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"card-review-request-\"]",
+      "caption": "Each request and where it stands",
+      "narration": "Below it, each request shows the client, the job, and where it stands: scheduled, pending, or Google link opened, with their private rating."
+    },
+    {
+      "action": "click",
+      "selector": "text=New review request",
+      "caption": "Send a request",
+      "chapter": "Send a request",
+      "narration": "To ask someone, choose New review request."
+    },
+    {
+      "action": "highlight",
+      "selector": "[role=\"dialog\"]",
+      "caption": "Name, email, a note, photos, send or schedule",
+      "narration": "Enter the client's name and email, add a personal note or job photos, and send it now or schedule it for later."
+    },
+    {
+      "action": "press",
+      "value": "Escape",
+      "caption": "Back to the list",
+      "narration": "Reminders follow on your schedule until the client answers."
+    },
+    {
+      "action": "goto",
+      "url": "/review/fs-b-sample-review-92006",
+      "caption": "What your client sees",
+      "chapter": "What the client sees",
+      "narration": "Your client gets a short page. They rate the job privately, from one to ten."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-rating-9\"]",
+      "caption": "A private rating",
+      "narration": "Whatever the score, the Google review option is right there at the top. No gating, no rewards."
+    },
+    {
+      "action": "goto",
+      "url": "/google-reviews?tab=profile-reviews",
+      "caption": "Your profile's reviews",
+      "chapter": "Reply with AI drafts",
+      "narration": "Back on your side, reviews from your linked Google listing sync in under Google profile reviews."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-profile-review-92001\"]",
+      "caption": "Synced reviews with AI reply drafts",
+      "narration": "Each one comes with an AI reply draft in your tone. You approve it, edit it, or let the plans that include it publish automatically."
+    },
+    {
+      "action": "highlight",
+      "selector": "a[href=\"/google-reviews\"]",
+      "caption": "Menu: Google Reviews",
+      "narration": "You'll find Google Reviews in the menu on the left, under Growth."
+    }
+  ],
+  "youtube": {
+    "title": "Google Reviews in about a minute | ConstructHUB",
+    "description": "A one-minute tour of Google Reviews in ConstructHUB: send review requests after each job, see what each client did, show every client the Google review option, and reply to synced Google reviews with AI drafts you approve.",
+    "tags": [
+      "ConstructHUB",
+      "Google reviews",
+      "contractor reviews",
+      "review requests",
+      "review management",
+      "roofing marketing",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Ask Every Client",
+    "accent": "Every",
+    "kicker": "Google Reviews",
+    "step": 2
+  },
+  "hideSelectors": [
+    "[data-testid=\"banner-review-preview\"]"
+  ]
+}

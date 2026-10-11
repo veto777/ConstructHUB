@@ -92,6 +92,9 @@ export async function startApp(o: { slot: number; database: string; bootTimeoutM
     DEV_AUTH_BYPASS_USER1: "true",
     SEO_JOBS_DISABLED: "true",
     EMAIL_FORCE_SINK: "1",
+    // Placeholder provider settings (never reachable): the Google Ads / LSA screens only render when these exist,
+    // and the sample rows carry placeholder tokens, so nothing can call Google. No worker flag is set, so no job runs.
+    GOOGLE_ADS_CLIENT_ID: "sample-client-id.apps.example", GOOGLE_ADS_CLIENT_SECRET: "sample-secret", GOOGLE_ADS_DEVELOPER_TOKEN: "sample-developer-token",
     SMS_OUTBOX_PATH: path.join(dir, "sms-outbox.jsonl"),
     VITE_CACHE_DIR: path.join(ROOT, ".cache", `vite-tut-slot${o.slot}`),
     TUTORIALS_LOCAL_DIR: path.join(ROOT, "tmp", "tutorials"),
