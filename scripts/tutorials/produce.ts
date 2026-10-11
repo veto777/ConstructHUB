@@ -56,12 +56,13 @@ async function main() {
   const scriptFile = path.join(ROOT, "docs/tutorials/scripts", `${helpKey}.json`);
   if (!fs.existsSync(scriptFile)) throw new Error(`${path.relative(ROOT, scriptFile)} does not exist — write the step script first`);
   const { script } = loadScript(scriptFile);
-  const entry = helpEntry(helpKey)!;
+  // A help entry, or a feature page's intro film (shared/feature-pages/intro-video.ts), which has none: its first goto says where it starts.
+  const route = helpEntry(helpKey)?.route ?? script.steps.find((s) => s.action === "goto")?.url ?? "/";
   const out = path.join(ROOT, "analysis", "video-out", helpKey);
   fs.mkdirSync(out, { recursive: true });
   const database = `constructhub_tut_slot${slot}`, port = SLOT_PORT(slot);
   // The CRM renders only on its own host name; record.ts points that name at this machine for its browser.
-  const base = isCrmRoute(entry.route) ? `http://portal.constructhub.us:${port}` : `http://127.0.0.1:${port}`;
+  const base = isCrmRoute(route) ? `http://portal.constructhub.us:${port}` : `http://127.0.0.1:${port}`;
   // This box serves production and its disk has run out once (2026-10-08): a recording needs about a
   // gigabyte of scratch, so nothing starts with less than 8 GB free.
   {

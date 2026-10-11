@@ -73,12 +73,15 @@ const VIDEO_TYPES: Record<string, string> = { mp4: "video/mp4", webm: "video/web
  * The HTML5 player: controls, no autoplay, nothing stored. When the video has captions they are its
  * default text track — shown from the first frame (a walkthrough is often watched with the sound
  * off) and switchable from the player's own captions button.
+ *
+ * `autoPlay` is for a player mounted BY a press on its own poster (feature-landing/intro-video.tsx):
+ * the person has just asked for the film, so it starts — still never a video that plays on its own.
  */
-export function HelpVideoPlayer({ video, title, className, testId }: { video: HelpVideo; title: string; className?: string; testId?: string }) {
+export function HelpVideoPlayer({ video, title, className, testId, autoPlay = false }: { video: HelpVideo; title: string; className?: string; testId?: string; autoPlay?: boolean }) {
   return (
     <video
       className={cn("aspect-video w-full rounded-lg bg-black", className)}
-      controls playsInline preload="metadata" poster={video.poster}
+      controls playsInline preload="metadata" poster={video.poster} autoPlay={autoPlay}
       aria-label={`Walkthrough video: ${title}`} data-testid={testId}
       // Some browsers load a default track but leave it hidden: turn the captions on once it is there.
       onLoadedMetadata={(e) => { const track = e.currentTarget.textTracks[0]; if (video.captions && track && track.mode === "disabled") track.mode = "showing"; }}

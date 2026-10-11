@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { GabeAvatar } from "@/components/mascot";
 import { ScreensSection } from "@/components/feature-landing/sections";
+import { FeatureIntroVideo } from "@/components/feature-landing/intro-video";
 import { FEATURE_SCREENS } from "@shared/feature-pages/screens";
 import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
 import { TalkToSalesDialog } from "@/components/talk-to-sales";
@@ -282,6 +283,9 @@ export default function CallAssistantLandingPage() {
           </div>
           <div className="mkt-ruler" aria-hidden />
         </section>
+
+        {/* The intro film, directly under the hero as on every feature page (owner, 2026-10-11); nothing until its manifest is uploaded. */}
+        <FeatureIntroVideo featureKey="callAssistant" title="AI Call Assistant" />
 
         {/* Spam: the owner's lead promise (2026-10-02). Only what the code does: CALL_ASSISTANT_SPAM in shared/plan-copy.ts. */}
         <section id="spam" className="py-16 lg:py-20 px-4 sm:px-6 lg:px-8 scroll-mt-16" data-testid="section-ca-spam">

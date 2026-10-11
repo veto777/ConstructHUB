@@ -15,6 +15,8 @@ import {
 import { allowanceLine, allowanceValue, featurePlanGap, featurePriceSummary, singularUnit } from "@shared/feature-pages/pricing";
 import { FEATURE_ICONS } from "@shared/feature-pages/types";
 import { FEATURE_SCREENS } from "@shared/feature-pages/screens";
+import { INTRO_VIDEO_PREFIX, featureIntroVideo, introVideoKey } from "@shared/feature-pages/intro-video";
+import { VIDEO_MANIFEST, helpVideoFor } from "@shared/help/videos";
 import { DASHBOARD_TILES } from "@shared/dashboard";
 import { ADDONS, CALL_ASSISTANT_TIERS, PLANS, PLAN_KEYS } from "@shared/plans";
 import { CRM_ADDONS, CRM_PLANS, CRM_PLAN_KEYS } from "@shared/crm-plans";
@@ -73,7 +75,7 @@ describe("feature page registry", () => {
   });
 
   it("gives every feature its own content file, and every content file is registered", () => {
-    const files = fs.readdirSync(dir).filter((f) => f.endsWith(".ts") && !["index.ts", "types.ts", "pricing.ts", "compare.ts", "screens.ts"].includes(f));
+    const files = fs.readdirSync(dir).filter((f) => f.endsWith(".ts") && !["index.ts", "types.ts", "pricing.ts", "compare.ts", "screens.ts", "intro-video.ts"].includes(f));
     expect(files.map((f) => f.replace(/\.ts$/, "")).sort()).toEqual(FEATURE_PAGES.map((p) => p.key).sort());
     const index = read("shared/feature-pages/index.ts");
     for (const page of FEATURE_PAGES) expect(index).toContain(`import ${page.key} from "./${page.key}";`);
@@ -117,6 +119,30 @@ describe("feature page registry", () => {
     const shotsDir = path.join(root, "client/public/feature-shots");
     const orphans = fs.readdirSync(shotsDir).filter((f) => f.endsWith(".webp") && !referenced.has(`/feature-shots/${f}`));
     expect(orphans).toEqual([]);
+  });
+
+  it("an intro film exists only through its uploaded manifest, under the page's intro-<slug> key", () => {
+    // Owner, 2026-10-11: every feature page carries its intro video near the top. The key is the page's
+    // slug (kebab case — a tutorial media key takes no capitals), and the Call Assistant's follows suit.
+    expect(introVideoKey("reviews")).toBe("intro-reviews");
+    expect(introVideoKey("rankingGrid")).toBe("intro-ranking-grid");
+    expect(introVideoKey("callAssistant")).toBe("intro-call-assistant");
+    for (const page of FEATURE_PAGES) expect(introVideoKey(page.key)).toBe(`${INTRO_VIDEO_PREFIX}${page.slug}`);
+    // The page's video is the manifest's, or nothing — never a stand-in.
+    for (const entry of FEATURE_CATALOGUE) {
+      const video = featureIntroVideo(entry.key);
+      expect(video, entry.key).toEqual(helpVideoFor(introVideoKey(entry.key)));
+      if (video) expect(VIDEO_MANIFEST[introVideoKey(entry.key)], entry.key).toBeTruthy();
+    }
+    expect(featureIntroVideo("no-such-feature")).toBeNull();
+    // The template and the hand-built Call Assistant page both mount the band; the landing page mounts the frame.
+    expect(read("client/src/components/feature-landing/feature-landing.tsx")).toContain("<FeatureIntroVideo featureKey={page.key}");
+    expect(read("client/src/pages/call-assistant-landing.tsx")).toContain('<FeatureIntroVideo featureKey="callAssistant"');
+    expect(read("client/src/pages/landing.tsx")).toContain("<IntroVideoFrame video={film.video}");
+    // No player without a video: both gate on it.
+    const component = read("client/src/components/feature-landing/intro-video.tsx");
+    expect(component).toMatch(/const video = featureIntroVideo\(featureKey\);\s*if \(!video\) return null;/);
+    expect(read("client/src/pages/landing.tsx")).toMatch(/\{film\?\.video \? \(/);
   });
 
   it("covers every dashboard tile, in the dashboard's groups", () => {

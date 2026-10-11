@@ -10,6 +10,8 @@ import { HELP_GROUPS as GROUPS } from "@shared/help/types";
 import { isKnownPath } from "@shared/app-routes";
 import { PLANS, PLAN_KEYS, planForModule } from "@shared/plans";
 import { VOICE_PERSONAS, VOICE_PERSONA_IDS } from "@shared/voice-personas";
+import { FEATURE_CATALOGUE } from "@shared/feature-pages";
+import { introVideoKey } from "@shared/feature-pages/intro-video";
 
 /**
  * Static integrity checks for the help registry (shared/help/registry.ts) — no server needed.
@@ -29,6 +31,15 @@ function* walk(dir: string): Generator<string> {
     else if (/\.(tsx?|jsx?)$/.test(name)) yield p;
   }
 }
+
+/**
+ * The feature pages' intro films (shared/feature-pages/intro-video.ts): `intro-<slug>` for a page of the feature
+ * catalogue. Not help entries — no "i" panel, no card on /tutorials — but a video all the same, so a manifest
+ * or a step script under one of these keys is held to the same proof as an entry's.
+ */
+const INTRO_KEYS = new Set(FEATURE_CATALOGUE.map((e) => introVideoKey(e.key)));
+/** The key names a help entry or a feature page's intro film. */
+const knownVideoKey = (key: string) => !!helpEntry(key) || INTRO_KEYS.has(key);
 
 /** Every help key mounted in the client: <HelpButton k="…" /> and the `helpKey: "…"` rows of a tab list. */
 function mountedKeys(): { key: string; where: string }[] {
@@ -149,37 +160,30 @@ describe("help registry", () => {
     const onDisk = fs.readdirSync(dir).filter((f) => f.endsWith(".json")).map((f) => f.slice(0, -5)).sort();
     expect(listed.slice().sort(), "shared/help/videos/index.ts is stale — npx tsx scripts/tutorials/gen-index.ts").toEqual(onDisk);
     for (const key of onDisk) expect(JSON.parse(fs.readFileSync(path.join(dir, `${key}.json`), "utf8")).helpKey, `${key}.json helpKey`).toBe(key);
-    for (const key of listed) expect(helpEntry(key), `videos/${key}.json exists, but ${key} is not a help entry`).toBeTruthy();
-    for (const e of HELP_ENTRIES) {
-      const m = VIDEO_MANIFEST[e.key];
-      if (e.video === null) {
-        expect(m, `${e.key} has a manifest but no video`).toBeUndefined();
-        // With no recording, the text must not point at one.
-        const text = [e.title, e.whatItIs, e.whatItDoes, e.howItWorks, ...e.howToUse, ...(e.needs ?? [])].join(" ");
-        expect(text, `${e.key} mentions a video it does not have`).not.toMatch(/walkthrough|tutorial video|watch the video/i);
-        continue;
-      }
-      // A real recording: listed in the manifest, in our own storage under tutorials/, never a stand-in.
-      expect(m, `${e.key} has a video with no manifest file`).toBeTruthy();
+    for (const key of listed) expect(knownVideoKey(key), `videos/${key}.json exists, but ${key} is neither a help entry nor a feature page's intro film`).toBe(true);
+    /** A real recording under `key`: in our own storage under tutorials/, really uploaded, with its step script — never a stand-in. */
+    const expectRealRecording = (key: string, video: NonNullable<ReturnType<typeof helpVideoFor>>) => {
+      const m = VIDEO_MANIFEST[key];
+      expect(m, `${key} has a video with no manifest file`).toBeTruthy();
       // Really uploaded: upload.ts writes the manifest only after R2 answered a HEAD for each object,
       // and records when, and the ETag R2 gave (the object's MD5 for a single-part put).
-      expect(Number.isFinite(Date.parse(m.uploaded?.at)), `${e.key} has no upload proof — run scripts/tutorials/upload.ts`).toBe(true);
-      for (const part of ["video", "captions", "poster"] as const) expect(m.uploaded[part], `${e.key} ${part} ETag`).toMatch(/^[0-9a-f]{32}(-\d+)?$/);
-      expect(e.video).toEqual(helpVideoFor(e.key));
-      expect(e.video.url, `${e.key} video url`).toMatch(/^(https:\/\/[^\s]+|\/)[^\s]*tutorials\/[^\s]+\.(mp4|webm)$/);
-      expect(e.video.url).not.toMatch(/example|placeholder|sample|lorem|youtube|vimeo/i);
-      expect(Number.isInteger(m.durationSec) && m.durationSec > 0 && m.durationSec < 1800, `${e.key} duration`).toBe(true);
-      expect(e.video.durationSec).toBe(m.durationSec);
-      expect(e.video.url).toBe(tutorialMediaUrl(m.video.key));
-      expect(e.video.poster).toBe(tutorialMediaUrl(m.poster.key));
-      expect(e.video.captions).toBe(tutorialMediaUrl(m.captions.key));
+      expect(Number.isFinite(Date.parse(m.uploaded?.at)), `${key} has no upload proof — run scripts/tutorials/upload.ts`).toBe(true);
+      for (const part of ["video", "captions", "poster"] as const) expect(m.uploaded[part], `${key} ${part} ETag`).toMatch(/^[0-9a-f]{32}(-\d+)?$/);
+      expect(video).toEqual(helpVideoFor(key));
+      expect(video.url, `${key} video url`).toMatch(/^(https:\/\/[^\s]+|\/)[^\s]*tutorials\/[^\s]+\.(mp4|webm)$/);
+      expect(video.url).not.toMatch(/example|placeholder|sample|lorem|youtube|vimeo/i);
+      expect(Number.isInteger(m.durationSec) && m.durationSec > 0 && m.durationSec < 1800, `${key} duration`).toBe(true);
+      expect(video.durationSec).toBe(m.durationSec);
+      expect(video.url).toBe(tutorialMediaUrl(m.video.key));
+      expect(video.poster).toBe(tutorialMediaUrl(m.poster.key));
+      expect(video.captions).toBe(tutorialMediaUrl(m.captions.key));
       for (const [part, ext, minBytes] of [["video", "mp4", 100_000], ["captions", "vtt", 50], ["poster", "jpg", 2_000]] as const) {
         const f = m[part];
         // tutorials/<helpKey>.<first 8 of its sha256>.<ext>: content-addressed, so a re-record is a new key.
-        expect(f.sha256, `${e.key} ${part} sha256`).toMatch(/^[0-9a-f]{64}$/);
-        expect(f.key, `${e.key} ${part} key`).toBe(`tutorials/${e.key}.${f.sha256.slice(0, 8)}.${ext}`);
+        expect(f.sha256, `${key} ${part} sha256`).toMatch(/^[0-9a-f]{64}$/);
+        expect(f.key, `${key} ${part} key`).toBe(`tutorials/${key}.${f.sha256.slice(0, 8)}.${ext}`);
         expect(f.key.slice("tutorials/".length)).toMatch(TUTORIAL_FILE);
-        expect(Number.isInteger(f.bytes) && f.bytes >= minBytes, `${e.key} ${part} bytes`).toBe(true);
+        expect(Number.isInteger(f.bytes) && f.bytes >= minBytes, `${key} ${part} bytes`).toBe(true);
         // Where the file is at hand (the box that recorded it), it is the file the manifest describes.
         const local = path.join(ROOT, "tmp/tutorials", f.key.slice("tutorials/".length));
         if (fs.existsSync(local)) {
@@ -190,8 +194,26 @@ describe("help registry", () => {
         }
       }
       // A walkthrough has a step script: the video is a recording of it, not a file from somewhere else.
-      expect(fs.existsSync(path.join(ROOT, "docs/tutorials/scripts", `${e.key}.json`)), `${e.key} step script`).toBe(true);
+      expect(fs.existsSync(path.join(ROOT, "docs/tutorials/scripts", `${key}.json`)), `${key} step script`).toBe(true);
+    };
+    for (const e of HELP_ENTRIES) {
+      if (e.video === null) {
+        expect(VIDEO_MANIFEST[e.key], `${e.key} has a manifest but no video`).toBeUndefined();
+        // With no recording, the text must not point at one.
+        const text = [e.title, e.whatItIs, e.whatItDoes, e.howItWorks, ...e.howToUse, ...(e.needs ?? [])].join(" ");
+        expect(text, `${e.key} mentions a video it does not have`).not.toMatch(/walkthrough|tutorial video|watch the video/i);
+        continue;
+      }
+      expectRealRecording(e.key, e.video);
     }
+    // The feature pages' intro films: the same proof, under their own keys (none of them is a help entry).
+    for (const key of listed.filter((k) => INTRO_KEYS.has(k))) {
+      expect(helpEntry(key), `${key} is an intro film, not a help entry`).toBeUndefined();
+      expectRealRecording(key, helpVideoFor(key)!);
+    }
+    // The intro frame never shows a play control without a video either.
+    const intro = read("client/src/components/feature-landing/intro-video.tsx");
+    expect(intro).toMatch(/const video = featureIntroVideo\(featureKey\);\s*if \(!video\) return null;/);
     // The UI never shows a play control for a null video: both are gated on `entry.video`.
     const button = read("client/src/components/help-button.tsx");
     expect(button).toMatch(/\{entry\.video && \(\s*<>\s*<button[^>]*aria-label=\{`Watch the walkthrough/);
@@ -298,7 +320,7 @@ describe("tutorial step scripts", () => {
       const { $schema: _schema, ...json } = JSON.parse(fs.readFileSync(path.join(dir, f), "utf8"));
       const script = parseTutorialScript(json);
       expect(f).toBe(`${script.helpKey}.json`);
-      expect(helpEntry(script.helpKey), script.helpKey).toBeTruthy();
+      expect(knownVideoKey(script.helpKey), `${script.helpKey} is neither a help entry nor a feature page's intro film`).toBe(true);
       expect(VOICE_PERSONA_IDS).toContain(script.narrator);
       // A script never carries a real credential, and the rule is about the VALUE being typed — not about what the
       // field's selector happens to be called (a key's NAME, a client's example.com address and a search are fine):

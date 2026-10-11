@@ -34,6 +34,16 @@ import { FEATURES_PATH, featureIntroPath } from "@shared/feature-pages";
 import { FooterGuides } from "@/components/public-page-chrome";
 import { SocialLinks } from "@/components/social-links";
 import { DFY_PATH, dfyPageByKey, dfyPagePath } from "@shared/dfy-pages";
+import { helpEntry } from "@shared/help/registry";
+import { IntroVideoFrame } from "@/components/feature-landing/intro-video";
+
+/**
+ * The overview film on the home page (owner, 2026-10-11: "We also need one for constructhub on the
+ * main landing page"): the "What is ConstructHUB?" entry of the help registry, whose video exists
+ * only through its uploaded manifest (shared/help/videos/brand-what-is-constructhub.json). Without
+ * the manifest the band below falls back to its text-and-buttons form.
+ */
+const BRAND_FILM_KEY = "brand-what-is-constructhub";
 
 
 /** Button recipes — anchors styled as buttons (no <button> nested in <a>). */
@@ -232,6 +242,7 @@ export default function LandingPage() {
   });
   const { data: counts } = usePermitDirectoryCounts();
   const hasVerified = typeof counts?.verifiedPortals === "number";
+  const film = helpEntry(BRAND_FILM_KEY);
   // Only jurisdictions with a real permit portal behind them are counted (audit lane 6, owner 2026-10-04: the old
   // "Jurisdictions Listed" headline counted all 32,853 directory rows although only ~2% have a portal).
   const stats: { value: number | undefined; suffix?: string; label: string }[] = [
@@ -541,25 +552,49 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* See it in action — the walkthrough videos and the social accounts; a slim band, so the sign-up call below stays in reach. */}
-      <section className="py-10 sm:py-12 px-4 sm:px-6 lg:px-8" data-testid="section-see-it-in-action" aria-labelledby="see-it-in-action-title">
-        <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center md:justify-between gap-6 text-center md:text-left">
-          <div className="min-w-0">
-            <h2 id="see-it-in-action-title" className="font-display font-semibold text-[1.6rem] sm:text-[1.9rem] leading-[1.1] tracking-[-0.02em]">
-              See it <em className="text-mkt-orange">in action</em>
-            </h2>
-            <p className="mt-2 text-[15px] text-mkt-ink-soft leading-relaxed max-w-md">
-              Short, narrated walkthroughs of the tools — here and on our channels.
-            </p>
+      {/* See it in action — the overview film with the walkthrough link and the social accounts beside it.
+          Without the film's manifest it is the slim text-and-buttons band, so the sign-up call below stays in reach. */}
+      {film?.video ? (
+        <section className="py-16 lg:py-24 px-4 sm:px-6 lg:px-8 bg-mkt-paper-2 border-y border-mkt-rule" data-testid="section-see-it-in-action" aria-labelledby="see-it-in-action-title">
+          <div className="max-w-6xl mx-auto grid md:grid-cols-12 gap-8 lg:gap-12 items-center">
+            <div className="md:col-span-5 text-center md:text-left">
+              <Kicker className="justify-center md:justify-start" n="">Watch</Kicker>
+              <h2 id="see-it-in-action-title" className="font-display font-semibold text-[2.1rem] sm:text-[2.6rem] lg:text-[3rem] leading-[1.05] tracking-[-0.02em] mt-5 [text-wrap:balance]">
+                See it <em className="text-mkt-orange">in action</em>
+              </h2>
+              <p className="mt-5 text-[17px] text-mkt-ink-soft leading-relaxed max-w-md mx-auto md:mx-0" data-testid="text-see-it-in-action-film">
+                Start with “{film.title}”, the short film about what ConstructHUB is. Then watch the narrated walkthroughs of the tools — here and on our channels.
+              </p>
+              <div className="mt-8 flex flex-col sm:flex-row items-center md:items-center justify-center md:justify-start gap-x-5 gap-y-3">
+                <Link href="/tutorials" data-testid="link-strip-tutorials" className={`${BTN_OUTLINE} ${BTN_LG} w-full sm:w-auto`}>
+                  <CirclePlay className="h-5 w-5" aria-hidden="true" /> Watch tutorials
+                </Link>
+                <SocialLinks tone="paper" label="Follow us" testId="social-landing-strip" />
+              </div>
+            </div>
+            <IntroVideoFrame video={film.video} title={film.title} testId="video-landing-film" className="md:col-span-7" />
           </div>
-          <div className="flex flex-col sm:flex-row items-center gap-x-5 gap-y-3 shrink-0">
-            <Link href="/tutorials" data-testid="link-strip-tutorials" className={`${BTN_OUTLINE} ${BTN_LG} w-full sm:w-auto`}>
-              <CirclePlay className="h-5 w-5" aria-hidden="true" /> Watch tutorials
-            </Link>
-            <SocialLinks tone="paper" label="Follow us" testId="social-landing-strip" />
+        </section>
+      ) : (
+        <section className="py-10 sm:py-12 px-4 sm:px-6 lg:px-8" data-testid="section-see-it-in-action" aria-labelledby="see-it-in-action-title">
+          <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center md:justify-between gap-6 text-center md:text-left">
+            <div className="min-w-0">
+              <h2 id="see-it-in-action-title" className="font-display font-semibold text-[1.6rem] sm:text-[1.9rem] leading-[1.1] tracking-[-0.02em]">
+                See it <em className="text-mkt-orange">in action</em>
+              </h2>
+              <p className="mt-2 text-[15px] text-mkt-ink-soft leading-relaxed max-w-md">
+                Short, narrated walkthroughs of the tools — here and on our channels.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row items-center gap-x-5 gap-y-3 shrink-0">
+              <Link href="/tutorials" data-testid="link-strip-tutorials" className={`${BTN_OUTLINE} ${BTN_LG} w-full sm:w-auto`}>
+                <CirclePlay className="h-5 w-5" aria-hidden="true" /> Watch tutorials
+              </Link>
+              <SocialLinks tone="paper" label="Follow us" testId="social-landing-strip" />
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Final CTA */}
       <section className="relative bg-mkt-navy text-mkt-navy-ink py-24 lg:py-32 px-4 sm:px-6 lg:px-8 overflow-hidden">

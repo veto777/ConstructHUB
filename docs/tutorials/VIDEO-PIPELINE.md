@@ -294,6 +294,16 @@ R2 is the app's object store in production (env `R2_ENDPOINT`, `R2_ACCESS_KEY_ID
 - **Registry:** nothing to type. `shared/help/registry.ts` builds `video` (url, measured
   `durationSec`, poster, captions) from the manifest; the play button, "Watch the walkthrough" and
   the Tutorials player appear for that key.
+- **A feature page's intro film** (owner, 2026-10-11) is the same pipeline under the key
+  `intro-<slug>` — the page's slug in `shared/feature-pages/<key>.ts` (`intro-reviews`,
+  `intro-ranking-grid`, `intro-site-scan`; the Call Assistant page: `intro-call-assistant`). It is
+  not a help entry: no "i" panel and no card on /tutorials. Once its manifest is committed the
+  player appears directly under that page's hero (`client/src/components/feature-landing/intro-video.tsx`;
+  `shared/feature-pages/intro-video.ts` resolves the key). The test holds an intro manifest and its
+  step script to the same proof as an entry's. The poster is the first thing a visitor sees on the
+  page, framed 16:9 at up to about 1000 px wide with an orange play button over its centre and the
+  title and length over its bottom edge: keep the centre and the bottom quarter free of small text.
+  The same frame plays `brand-what-is-constructhub` in the home page's "See it in action" band.
 - Upload, then build, `rsync` and restart as in `HANDOFF.md`. Check `/tutorials` and the feature's
   "i" panel on a desktop and on an iPhone (not yet done for the first video — see below).
 

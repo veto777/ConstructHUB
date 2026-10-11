@@ -31,6 +31,7 @@ import {
   ScreensSection, SpotlightSection, StepsSection, type Tone,
 } from "./sections";
 import { AlacarteOffer } from "./alacarte-offer";
+import { FeatureIntroVideo } from "./intro-video";
 
 const FLAGS: Record<NonNullable<FeaturePage["flag"]>, boolean> = { SHOW_COMPETITOR_INTEL, SHOW_GOOGLE_REVIEWS };
 
@@ -124,6 +125,8 @@ export function FeatureLanding({ page }: { page: FeaturePage }) {
           salesCta={salesCta(BTN_OUTLINE, "hero")}
           tryIt={tryIt}
         />
+        {/* The feature's intro film, directly under the hero (owner, 2026-10-11); nothing until its manifest is uploaded. */}
+        <FeatureIntroVideo featureKey={page.key} title={page.ctaTitle ?? page.title} />
         <ScreensSection page={page} screens={screens} n={nScreens} tone={tone("screens")} />
         <StepsSection page={page} n={nSteps} tone={tone("steps")} />
         <CardsSection page={page} n={nCards} tone={tone("cards")} />
