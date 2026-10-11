@@ -17,10 +17,11 @@
       "narration": "This is Site Scan. It reads your website the way a search engine does, and ends in a fix list."
     },
     {
-      "action": "highlight",
-      "selector": "xpath=//span[text()=\"Linked GBP location\"]/ancestor::div[contains(@class,\"grid\")][1]",
-      "caption": "Location, website, pages",
-      "narration": "Pick a Google Business Profile location and it uses that profile's website, and checks the site against it."
+      "action": "select",
+      "selector": "xpath=//span[text()=\"Linked GBP location\"]/following-sibling::select",
+      "value": "Summit Roofing Co.",
+      "caption": "Pick a location",
+      "narration": "Pick one of your Google Business Profile locations. Site Scan fills in its website and checks the site against it."
     },
     {
       "action": "highlight",
@@ -30,9 +31,9 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"list-scan-schedules\"]",
+      "selector": "[data-testid=\"toggle-monthly-rescan\"]",
       "caption": "Monthly rescans",
-      "narration": "Turn on a monthly rescan and it runs on its own. These two sites are rescanned every month."
+      "narration": "Monthly rescan is on for this site, so it scans again on its own every month."
     },
     {
       "action": "highlight",

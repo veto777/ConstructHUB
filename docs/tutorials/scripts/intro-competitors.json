@@ -70,7 +70,7 @@
       "selector": "[data-testid=\"card-competitor-910003\"]",
       "caption": "Every listing",
       "chapter": "The BS Meter",
-      "narration": "Each business shows its rating, review count and category, with links to call it or open its website."
+      "narration": "Each business shows its rating, review count and category, and how many sampled reviews repeat common phrases."
     },
     {
       "action": "highlight",
