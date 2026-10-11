@@ -6,14 +6,21 @@ import { Skeleton } from "@/components/ui/skeleton";
  * state; zooming in separates the dots and labels them by jurisdiction.
  * Data: GET /api/permits/map (same searchable predicate as the headline count);
  * centroids are public US Census Gazetteer (server/data/jurisdiction-coords.json).
+ *
+ * Two safety rules, after the Oct 2026 white screen (a Puerto Rico label whose
+ * centroid geoAlbersUsa cannot place — see permit-map-geo.ts):
+ *  - every <Marker> coordinate passes placeable() first, so the projection never
+ *    hands Marker a null to destructure;
+ *  - the exported PermitMap wraps the drawing in an error boundary, so whatever
+ *    goes wrong inside the map, the Search page itself stays up.
  */
-import { useMemo, useState, Fragment } from "react";
+import { Component, useMemo, useState, Fragment, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from "react-simple-maps";
-import { geoCentroid } from "d3-geo";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ExternalLink, Search as SearchIcon, Plus, Minus, RotateCcw, X, MapPin } from "lucide-react";
+import { FIPS_USPS, placeable, stateLabelPoint } from "./permit-map-geo";
 
 export interface MapPortal {
   databaseId: number;
@@ -35,16 +42,6 @@ interface MapData {
   portals: MapPortal[];
 }
 
-// State FIPS (us-atlas geography id) -> USPS code, to join the topojson to /api/permits/map.
-const FIPS_USPS: Record<string, string> = {
-  "01":"AL","02":"AK","04":"AZ","05":"AR","06":"CA","08":"CO","09":"CT","10":"DE","11":"DC","12":"FL",
-  "13":"GA","15":"HI","16":"ID","17":"IL","18":"IN","19":"IA","20":"KS","21":"KY","22":"LA","23":"ME",
-  "24":"MD","25":"MA","26":"MI","27":"MN","28":"MS","29":"MO","30":"MT","31":"NE","32":"NV","33":"NH",
-  "34":"NJ","35":"NM","36":"NY","37":"NC","38":"ND","39":"OH","40":"OK","41":"OR","42":"PA","44":"RI",
-  "45":"SC","46":"SD","47":"TN","48":"TX","49":"UT","50":"VT","51":"VA","53":"WA","54":"WV","55":"WI",
-  "56":"WY","72":"PR",
-};
-
 const MAX_ZOOM = 32;
 
 type Cell = { key: string; lat: number; lng: number; portals: MapPortal[]; hasCounty: boolean };
@@ -58,7 +55,58 @@ function gridStep(zoom: number): number {
   return 1.2;
 }
 
-export function PermitMap({ onPick }: { onPick: (p: MapPortal) => void }) {
+/** The card frame shared by the map and its failure fallback, so the page layout never jumps. */
+function MapFrame({ children }: { children: ReactNode }) {
+  return (
+    <div className="permit-map rounded-xl border g-card overflow-hidden">
+      <style>{`
+        .permit-map { --map-land: hsl(var(--muted)); --map-land-stroke: hsl(var(--background));
+          --map-blue: hsl(var(--primary) / 0.32); --map-blue-stroke: hsl(var(--primary) / 0.6);
+          --map-dot: #f97316; --map-dot-stroke: #ffffff; --map-state: hsl(var(--foreground) / 0.55);
+          --map-name: hsl(var(--foreground) / 0.85); --map-name-bg: hsl(var(--background) / 0.78); }
+        .dark .permit-map { --map-blue: hsl(var(--primary) / 0.45); --map-dot: #fb923c; --map-dot-stroke: hsl(var(--background)); }
+        .permit-map .rsm-geography { outline: none; }
+      `}</style>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Catches a render error anywhere inside the map and shows a same-sized card
+ * with a retry, so the Search page (search form, results, watches) keeps
+ * working. React still reports the error to the console.
+ */
+export class PermitMapBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(error: unknown) {
+    console.error("Permit map failed to draw", error);
+  }
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <MapFrame>
+        <div className="flex h-[300px] flex-col items-center justify-center gap-3 px-4 text-center text-sm g-text-2" role="alert" data-testid="permit-map-fallback">
+          <span>The coverage map could not be drawn. Searching below still works.</span>
+          <Button type="button" variant="outline" onClick={() => this.setState({ failed: false })}>Try again</Button>
+        </div>
+      </MapFrame>
+    );
+  }
+}
+
+export function PermitMap(props: { onPick: (p: MapPortal) => void }) {
+  return (
+    <PermitMapBoundary>
+      <PermitMapInner {...props} />
+    </PermitMapBoundary>
+  );
+}
+
+function PermitMapInner({ onPick }: { onPick: (p: MapPortal) => void }) {
   const { data, isLoading, isError, refetch } = useQuery<MapData>({ queryKey: ["/api/permits/map"] });
   const [zoom, setZoom] = useState(1);
   const [center, setCenter] = useState<[number, number]>([-97, 38]);
@@ -70,7 +118,8 @@ export function PermitMap({ onPick }: { onPick: (p: MapPortal) => void }) {
     return s;
   }, [data]);
 
-  const located = useMemo(() => (data?.portals ?? []).filter((p) => p.lat != null && p.lng != null), [data]);
+  // Only portals the projection can place become dots (a Puerto Rico portal would otherwise crash Marker).
+  const located = useMemo(() => (data?.portals ?? []).filter((p) => placeable([p.lng, p.lat])), [data]);
 
   // Group portals into dots; merge nearby ones at low zoom so ~1,800 points stay smooth.
   const cells = useMemo<Cell[]>(() => {
@@ -89,7 +138,8 @@ export function PermitMap({ onPick }: { onPick: (p: MapPortal) => void }) {
       c.lat = c.portals.reduce((s, p) => s + (p.lat as number), 0) / c.portals.length;
       c.lng = c.portals.reduce((s, p) => s + (p.lng as number), 0) / c.portals.length;
     }
-    return Array.from(by.values());
+    // A merged centre of placeable points is placeable in practice; check anyway — never a null into Marker.
+    return Array.from(by.values()).filter((c) => placeable([c.lng, c.lat]));
   }, [located, zoom]);
 
   const clamp = (z: number) => Math.max(1, Math.min(MAX_ZOOM, z));
@@ -99,16 +149,7 @@ export function PermitMap({ onPick }: { onPick: (p: MapPortal) => void }) {
   const stateLabelSize = Math.max(2.6, 9 / Math.sqrt(zoom));
 
   return (
-    <div className="permit-map rounded-xl border g-card overflow-hidden">
-      <style>{`
-        .permit-map { --map-land: hsl(var(--muted)); --map-land-stroke: hsl(var(--background));
-          --map-blue: hsl(var(--primary) / 0.32); --map-blue-stroke: hsl(var(--primary) / 0.6);
-          --map-dot: #f97316; --map-dot-stroke: #ffffff; --map-state: hsl(var(--foreground) / 0.55);
-          --map-name: hsl(var(--foreground) / 0.85); --map-name-bg: hsl(var(--background) / 0.78); }
-        .dark .permit-map { --map-blue: hsl(var(--primary) / 0.45); --map-dot: #fb923c; --map-dot-stroke: hsl(var(--background)); }
-        .permit-map .rsm-geography { outline: none; }
-      `}</style>
-
+    <MapFrame>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-2 text-xs g-text-2 border-b">
         <span className="inline-flex items-center gap-1.5"><span className="inline-block h-3 w-4 rounded-sm" style={{ background: "var(--map-blue)", border: "1px solid var(--map-blue-stroke)" }} />County permits searchable</span>
         <span className="inline-flex items-center gap-1.5"><span className="inline-block h-3 w-4 rounded-sm" style={{ background: "var(--map-land)" }} />No county portal yet</span>
@@ -132,16 +173,16 @@ export function PermitMap({ onPick }: { onPick: (p: MapPortal) => void }) {
                   {({ geographies }: any) => geographies.map((geo: any) => {
                     const usps = FIPS_USPS[geo.id as string];
                     const blue = usps ? blueStates.has(usps) : false;
-                    const centroid = geoCentroid(geo) as [number, number];
-                    const validCentroid = Number.isFinite(centroid?.[0]) && Number.isFinite(centroid?.[1]);
+                    // Null for anything geoAlbersUsa cannot place (territories): drawn, never labelled.
+                    const labelAt = usps ? stateLabelPoint(geo) : null;
                     return (
                       <Fragment key={geo.rsmKey}>
                         <Geography geography={geo}
                           fill={blue ? "var(--map-blue)" : "var(--map-land)"}
                           stroke="var(--map-land-stroke)" strokeWidth={0.5}
                           style={{ default: { outline: "none" }, hover: { outline: "none", fill: blue ? "var(--map-blue-stroke)" : "var(--map-land)" }, pressed: { outline: "none" } }} />
-                        {usps && validCentroid && (
-                          <Marker coordinates={centroid}>
+                        {usps && labelAt && (
+                          <Marker coordinates={labelAt}>
                             <text textAnchor="middle" dy="0.32em" fontSize={stateLabelSize} fill="var(--map-state)"
                               style={{ pointerEvents: "none", fontWeight: 700, letterSpacing: "0.02em" }}>{usps}</text>
                           </Marker>
@@ -204,6 +245,6 @@ export function PermitMap({ onPick }: { onPick: (p: MapPortal) => void }) {
           </div>
         )}
       </div>
-    </div>
+    </MapFrame>
   );
 }

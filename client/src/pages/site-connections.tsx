@@ -19,7 +19,7 @@ import {
   previewFingerprint,
 } from "@/components/site-connections/context";
 import { UrlActions } from "@/components/site-connections/url-actions";
-import { useState, useRef, type ReactNode } from "react";
+import { Fragment, useState, useRef, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
@@ -131,9 +131,9 @@ export function DataList({
     [page, P] = useReportPage(`page.${title}`),
     [status, S] = useReportParam(`status.${title}`);
   const path = `${url}${url.includes("?") ? "&" : "?"}q=${encodeURIComponent(q)}&page=${page}&limit=25&status=${encodeURIComponent(status)}`;
-  const data = useQuery({
+  // Standard lifecycle: the default queryFn fetches the key (the request path).
+  const data = useQuery<any>({
     queryKey: [path],
-    queryFn: () => read(path),
     refetchInterval: pollUnlessPlanRequired(15000),
   });
   return (
@@ -931,17 +931,20 @@ export default function SiteConnections({
                   />
                 )
               ) : (
-                <MetricRows key={asset.id} asset={asset} />
-              )}
-              {!cf && (
-                <UrlActions
-                  key={asset.id}
-                  assets={[asset]}
-                  busy={busy}
-                  submit={(body) =>
-                    act(() => post("/urls", body), "URL work queued")
-                  }
-                />
+                // One keyed mount per property. MetricRows and UrlActions were
+                // siblings keyed by the same asset id; React's keyed reconciliation
+                // collided and left a dead duplicate MetricRows (permanent
+                // skeletons) on every cold load of a property.
+                <Fragment key={`property-${asset.id}`}>
+                  <MetricRows asset={asset} />
+                  <UrlActions
+                    assets={[asset]}
+                    busy={busy}
+                    submit={(body) =>
+                      act(() => post("/urls", body), "URL work queued")
+                    }
+                  />
+                </Fragment>
               )}
               {cf && detailTab === "Activity" && (
                 <DataList
