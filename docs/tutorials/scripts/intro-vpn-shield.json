@@ -30,9 +30,9 @@
     },
     {
       "action": "highlight",
-      "selector": "xpath=//*[text()=\"Detections, last 30 days\"]/ancestor::*[.//*[starts-with(@data-testid,\"bar-vpn-\")]][1]",
-      "caption": "The last thirty days",
-      "narration": "A chart shows the detections of the last thirty days."
+      "selector": "xpath=(//*[normalize-space(text())=\"Top VPN providers\"])[1]/ancestor::*[contains(normalize-space(.),\"Top countries\")=false() and .//*[contains(text(),\"Data-center\")]][last()]",
+      "caption": "Where the traffic came from",
+      "narration": "Top VPN providers shows the kind of network behind the flagged visits."
     },
     {
       "action": "click",
@@ -43,13 +43,13 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid^=\"card-vpn-visit-\"]:has-text(\"198.51.100.65\"):has-text(\"Datacenter IP range\")",
+      "selector": "[data-testid^=\"card-vpn-visit-\"]:has-text(\"198.51.100.215\"):has-text(\"Datacenter IP range\")",
       "caption": "A data center address",
       "narration": "This visit came from a data center address, so the visitor saw the blocking overlay."
     },
     {
       "action": "click",
-      "selector": "[data-testid^=\"button-expand-vpn-visit-\"]:has-text(\"198.51.100.65\"):has-text(\"Datacenter IP range\")",
+      "selector": "[data-testid^=\"button-expand-vpn-visit-\"]:has-text(\"198.51.100.215\"):has-text(\"Datacenter IP range\")",
       "caption": "The visit's details",
       "narration": "Open one for the full record."
     },

@@ -1,25 +1,25 @@
 {
   "helpKey": "intro-ip-tracker",
-  "durationSec": 84,
+  "durationSec": 81,
   "video": {
-    "key": "tutorials/intro-ip-tracker.b7c79a1f.mp4",
-    "bytes": 6479638,
-    "sha256": "b7c79a1fd6ec3cd1dd481d79c93def05194b00da47a74dc10afe0a880a590cc1"
+    "key": "tutorials/intro-ip-tracker.016c2dfb.mp4",
+    "bytes": 6584644,
+    "sha256": "016c2dfbb7bd793984be627f070e3b1ad29917d52ef80f1d84eef0ad0c41c8f3"
   },
   "captions": {
-    "key": "tutorials/intro-ip-tracker.2829bf33.vtt",
-    "bytes": 1907,
-    "sha256": "2829bf33d622cde7bb9394eed18d8c162da137f74438a77274ba6ec57b2ddc73"
+    "key": "tutorials/intro-ip-tracker.b4d32c39.vtt",
+    "bytes": 1875,
+    "sha256": "b4d32c39624f225b84817b748b09dd534e9b05fb0bc1fb0bd17fa716752d0476"
   },
   "poster": {
-    "key": "tutorials/intro-ip-tracker.950c0e0c.jpg",
-    "bytes": 77531,
-    "sha256": "950c0e0cafc23dcdd5d11675f0d5d70d1f9edea785ba3a65b6edcd6d9238c37f"
+    "key": "tutorials/intro-ip-tracker.16b95bc3.jpg",
+    "bytes": 75088,
+    "sha256": "16b95bc355f55a4bfb933b8480a04e3524a39ec40f2e8c2a596556f4c06048e7"
   },
   "uploaded": {
-    "at": "2026-10-11T15:13:50.763Z",
-    "video": "8a04a4248cb35e6d288af9440410315d",
-    "captions": "0d25d24e81448c55225d36a6f61ef555",
-    "poster": "b345a4cd348417156b24b6d9af9a1e14"
+    "at": "2026-10-11T15:56:40.911Z",
+    "video": "f0964743e3762408a50ad5a98c307fa3",
+    "captions": "d199d87cab6bd75306cdff392762575b",
+    "poster": "74fd52ea1d0f797d860ab7a2e7a81543"
   }
 }
