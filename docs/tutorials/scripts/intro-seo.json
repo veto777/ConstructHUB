@@ -1,0 +1,177 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "intro-seo",
+  "title": "SEO Suite",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/seo",
+      "caption": "SEO Suite",
+      "chapter": "Your sites at a glance",
+      "narration": "This is the SEO Suite: where your site ranks, who links to it, and what to fix on it."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"seo-portfolio\"]",
+      "caption": "Every site you track",
+      "narration": "The dashboard sums up every site you track. This roofing company has three, with fifty-four tracked keywords."
+    },
+    {
+      "action": "goto",
+      "url": "/seo/rank-tracker?site=910001",
+      "selector": "[data-testid=\"rank-overview\"]",
+      "offset": 8,
+      "caption": "Rank tracker",
+      "chapter": "Rank tracker",
+      "narration": "Rank tracker checks where the site ranks in Google, every week by default."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"tool-tab-rank\"]",
+      "caption": "The open tool, at the top",
+      "narration": "The tool you're in shows at the top; the rest are on the left."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"tile-visibility\"]",
+      "caption": "Visibility: estimated share of clicks",
+      "narration": "Visibility estimates the share of clicks the site wins from its positions: 23.1 percent."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"chart-positions\"] .recharts-responsive-container",
+      "caption": "Keywords in each band, at each check",
+      "narration": "The bars count the keywords in each band at every check, eleven in the top three now."
+    },
+    {
+      "action": "goto",
+      "url": "/seo/local-grid?site=910001&scan=910001",
+      "selector": "[data-testid=\"grid-result\"]",
+      "offset": 8,
+      "caption": "Local grid",
+      "chapter": "Local grid",
+      "narration": "Local grid shows where the business ranks in Google's local results across its area. A saved scan opens on its result."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"grid-summary\"]",
+      "caption": "A finished 7 × 7 scan",
+      "narration": "In this seven by seven scan, for roofing contractor denver, it's in the first three at sixteen of forty-nine points."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"grid-cells\"]",
+      "caption": "Your position at each point",
+      "narration": "Each circle is one point, with its position there."
+    },
+    {
+      "action": "highlight",
+      "selector": "tr:has([data-testid=\"link-grid-rival-you\"])",
+      "caption": "Your row, marked You",
+      "narration": "Below, every business the scan found is counted. Yours is marked: sixteen points in the first three, against twenty-five for the leaders."
+    },
+    {
+      "action": "goto",
+      "url": "/seo/explorer?domain=summitroofing.example",
+      "selector": "[data-testid=\"explorer-report\"]",
+      "offset": 8,
+      "caption": "Site explorer",
+      "chapter": "Site explorer",
+      "narration": "Site explorer looks up any domain, yours or a competitor's."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"panel-backlinks\"]",
+      "caption": "Authority, backlinks, referring domains",
+      "narration": "Here's the site's authority, its backlinks, and the domains that link to it."
+    },
+    {
+      "action": "goto",
+      "url": "/seo/audit?site=910001",
+      "selector": "[data-testid=\"audit-overview\"]",
+      "offset": 8,
+      "caption": "Site audit",
+      "chapter": "Audit and action plan",
+      "narration": "Site audit crawls the site and lists what's broken. The health score is the share of pages with no errors."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-severity-warning\"]",
+      "caption": "Issues by severity",
+      "narration": "This crawl found no errors, two warnings and three notices."
+    },
+    {
+      "action": "goto",
+      "url": "/seo/plan",
+      "selector": "[data-testid=\"plan-summary\"]",
+      "offset": 20,
+      "caption": "Action plan",
+      "narration": "The Action plan turns findings into tasks, each with a status, a due date and an owner."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"plan-summary\"]",
+      "caption": "Open, in progress, done",
+      "narration": "The tiles count what's to do, in progress, and done."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"task-910005\"]",
+      "caption": "A task from Site audit",
+      "narration": "This one came from Site audit, and links straight back to the issue."
+    },
+    {
+      "action": "goto",
+      "url": "/",
+      "caption": "Back to ConstructHUB",
+      "narration": "Back on the home page, the SEO Suite is in the menu on the left."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-seo-suite\"]",
+      "caption": "Menu: SEO Suite",
+      "narration": "You'll find it under Tools, as SEO Suite."
+    }
+  ],
+  "youtube": {
+    "title": "SEO Suite in under two minutes | ConstructHUB",
+    "description": "A short tour of the SEO Suite in ConstructHUB: a dashboard of every site you track, the rank tracker with visibility and positions over time, a finished local grid scan and who shows up in it, the Site explorer, the site audit and the action plan.",
+    "tags": [
+      "ConstructHUB",
+      "SEO Suite",
+      "rank tracker",
+      "local SEO",
+      "contractor SEO",
+      "site audit",
+      "backlinks",
+      "local grid",
+      "roofing marketing",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "See Where You Rank",
+    "accent": "Rank",
+    "kicker": "SEO Suite",
+    "step": 8
+  },
+  "removeSelectors": [
+    "[data-testid=\"seo-usage-line\"]",
+    "[data-testid=\"button-add-credit\"]",
+    "[data-testid=\"seo-not-ready\"]",
+    "[data-testid=\"button-run-rank-check\"]",
+    "[data-testid=\"text-grid-cost\"]",
+    "[data-testid=\"button-grid-scan\"]",
+    "[data-testid=\"text-explorer-cost\"]",
+    "[data-testid=\"button-explorer-refresh\"]",
+    "[data-testid^=\"button-analyse-\"]"
+  ]
+}

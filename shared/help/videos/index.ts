@@ -114,4 +114,5 @@ export { default as v_intro_profile_guard } from "./intro-profile-guard.json";
 export { default as v_intro_ranking_grid } from "./intro-ranking-grid.json";
 export { default as v_intro_reinstatement } from "./intro-reinstatement.json";
 export { default as v_intro_reviews } from "./intro-reviews.json";
+export { default as v_intro_seo } from "./intro-seo.json";
 export { default as v_jobcam } from "./jobcam.json";
