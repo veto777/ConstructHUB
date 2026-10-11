@@ -50,8 +50,8 @@
     {
       "action": "wait",
       "holdMs": 1500,
-      "caption": "The scan details and the grid",
-      "narration": "The report opens with the business, the keyword and the grid size, and the points on the right."
+      "caption": "The scan details and the map",
+      "narration": "The report opens with the business, the keyword and the grid size, and the points on a map of the area."
     },
     {
       "action": "highlight",
@@ -100,7 +100,7 @@
   ],
   "youtube": {
     "title": "GMB Ranking Grid in about a minute | ConstructHUB",
-    "description": "A one-minute tour of the GMB Ranking Grid in ConstructHUB: find your business, enter the phrase a customer searches, size the grid, then read a finished scan: your rank at every point, the summary, the distribution and the businesses found most often across the grid.",
+    "description": "A one-minute tour of the GMB Ranking Grid in ConstructHUB: find your business, enter the phrase a customer searches, size the grid, then read a finished scan: your rank at every point on the map, the summary, the distribution and the businesses found most often across the grid.",
     "tags": [
       "ConstructHUB",
       "ranking grid",
@@ -119,8 +119,5 @@
     "accent": "Rank",
     "kicker": "GMB Ranking Grid",
     "step": 7
-  },
-  "hideSelectors": [
-    "[data-testid=\"img-ranking-map\"]"
-  ]
+  }
 }

@@ -71,19 +71,25 @@
       "url": "/media-library",
       "caption": "Media Library",
       "chapter": "Media Library",
-      "narration": "The Media Library keeps a folder per job, with the job address and GPS on it."
+      "narration": "The Media Library keeps a folder for each job, with the job's address."
     },
     {
       "action": "highlight",
       "selector": "[data-testid=\"folder-card-92001\"]",
       "caption": "A folder with its address and GPS",
-      "narration": "This one is a job site in Highland, Denver, with its coordinates attached."
+      "narration": "This one is a job site in Highland, Denver, with its coordinates on file."
     },
     {
       "action": "click",
       "selector": "[data-testid=\"folder-name-92001\"]",
       "caption": "Open a folder",
       "narration": "Open a folder to see its photos."
+    },
+    {
+      "action": "highlight",
+      "selector": ".g-chip:has-text(\"GPS on file\")",
+      "caption": "GPS on file",
+      "narration": "Photos you process in the Photo Optimizer get these coordinates written into them."
     },
     {
       "action": "highlight",
@@ -100,7 +106,7 @@
   ],
   "youtube": {
     "title": "Photo Optimizer in about a minute | ConstructHUB",
-    "description": "A one-minute tour of the Photo Optimizer in ConstructHUB: fill in your business details, pick service areas and keywords, drop in a batch of job photos, watermark them, and keep the named, geotagged results in Media Library folders by job.",
+    "description": "A one-minute tour of the Photo Optimizer in ConstructHUB: fill in your business details, pick service areas and keywords, drop in a batch of job photos, watermark them, and keep the named results in Media Library folders by job, with GPS written into processed photos.",
     "tags": [
       "ConstructHUB",
       "photo optimizer",
@@ -118,6 +124,6 @@
     "headline": "Job Photos Named",
     "accent": "Named",
     "kicker": "Photo Optimizer",
-    "step": 12
+    "step": 13
   }
 }

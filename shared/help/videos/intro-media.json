@@ -1,25 +1,25 @@
 {
   "helpKey": "intro-media",
-  "durationSec": 80,
+  "durationSec": 85,
   "video": {
-    "key": "tutorials/intro-media.93ed0264.mp4",
-    "bytes": 6428588,
-    "sha256": "93ed026417a80615cb5643de7e03fcfa18b3c94302a788f7ed085d360895a8fd"
+    "key": "tutorials/intro-media.91980c26.mp4",
+    "bytes": 6754236,
+    "sha256": "91980c264eaf7b7c4f2ef2a49fca8c664c0662538368b4709ed3ce8395214b39"
   },
   "captions": {
-    "key": "tutorials/intro-media.d03675b5.vtt",
-    "bytes": 1782,
-    "sha256": "d03675b5be58d877ce431914c9e6b9ff80e3f32f4cbc730f1c9bd919ea337ce5"
+    "key": "tutorials/intro-media.7131549a.vtt",
+    "bytes": 1891,
+    "sha256": "7131549a662adbadb15a0f803c74eb4b006785eb1be97b43460701101286262d"
   },
   "poster": {
-    "key": "tutorials/intro-media.e2bca3c6.jpg",
-    "bytes": 68498,
-    "sha256": "e2bca3c6038bc39a6c122f49f7bc04a54bd91a3e36ac46ab56a9883b4cb188df"
+    "key": "tutorials/intro-media.758f8a0e.jpg",
+    "bytes": 68703,
+    "sha256": "758f8a0eb02fec534992366c6be8594dbecbc2dba4e8ae1811294bfacce38040"
   },
   "uploaded": {
-    "at": "2026-10-11T06:41:32.939Z",
-    "video": "28653b4b1eb9364d426659609382f385",
-    "captions": "c7777702fb1eec6ae87fc52b9e12e3ee",
-    "poster": "511d24f29e68a469b7f8cbefaf996afd"
+    "at": "2026-10-11T14:06:07.753Z",
+    "video": "43d9a96921c8968f2846fd71c4e9d0d3",
+    "captions": "91cca415b6c25e8c2e476160c04f40c2",
+    "poster": "acfb2eea2915d223c5d8d099e0741df8"
   }
 }
