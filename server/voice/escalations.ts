@@ -246,7 +246,7 @@ async function notifyOwners(ctx: OrgVoiceContext, call: VoiceCallRow, kind: stri
       .where(and(eq(voiceEscalations.callId, call.id), eq(voiceEscalations.kind, kind)));
   } catch (error) {
     const message = `Owner alert: ${error instanceof Error ? error.message : String(error)}`;
-    await db.update(voiceEscalations).set({ lastError: sql`concat_ws('; ', nullif(rtrim(split_part(coalesce(${voiceEscalations.lastError}, ''), 'Owner alert:', 1), '; '), ''), ${message})` })
+    await db.update(voiceEscalations).set({ lastError: sql`concat_ws('; ', nullif(rtrim(split_part(coalesce(${voiceEscalations.lastError}, ''), 'Owner alert:', 1), '; '), ''), ${message}::text)` })
       .where(and(eq(voiceEscalations.callId, call.id), eq(voiceEscalations.kind, kind)));
     throw error;
   }
