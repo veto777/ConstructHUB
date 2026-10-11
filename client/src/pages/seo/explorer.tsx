@@ -337,17 +337,17 @@ export default function SeoExplorerPage() {
     <SeoShell title="Site explorer" description="Any website's estimated search traffic, keywords, backlinks and competitors — yours or a competitor's." site={site} onSite={onSite} sites={sites} status={status} picker={false} spends="lookups">
       {/* The domain box is this tool's global input: it lives in the tool bar's second row (components/tool/shell.tsx). */}
       <ToolBarSlot>
-      <form className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center" onSubmit={(e) => { e.preventDefault(); submit(false); }} data-testid="form-explorer">
+      <form className="seo-explorer-form mb-3 flex flex-col gap-2 sm:flex-row sm:items-center" onSubmit={(e) => { e.preventDefault(); submit(false); }} data-testid="form-explorer">
         <label className="relative min-w-0 flex-1 sm:max-w-xl">
           <span className="sr-only">Domain</span>
           <Search className="g-text-2 pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" aria-hidden />
           <input className="g-input w-full pl-9" placeholder="example.com" value={input} onChange={(e) => setInput(e.target.value)} data-testid="input-explorer-domain" autoComplete="off" spellCheck={false} />
         </label>
-        <MarketPicker value={market} onChange={changeMarket} disabled={analyse.isPending} />
         <Button type="submit" disabled={busy || !input.trim() || !configured} data-testid="button-explorer-analyse" title={!configured ? "Being switched on for your account" : undefined}>
           {analyse.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Analysing…</> : "Analyse"}
         </Button>
-        {site && site.domain !== input.trim() && <button type="button" className="g-pill min-h-[44px]" onClick={() => { setInput(site.domain); open(site.domain); }} data-testid="button-explorer-my-site">My site: {site.domain}</button>}
+        {site && <button type="button" className="g-pill min-h-[44px]" onClick={() => { setInput(site.domain); open(site.domain); }} data-testid="button-explorer-my-site" title={`Open saved report for ${site.domain}`}>My site</button>}
+        <MarketPicker value={market} onChange={changeMarket} disabled={analyse.isPending} />
       </form>
       </ToolBarSlot>
       <p className="g-text-2 mb-4 text-[13px]" data-testid="text-explorer-cost">

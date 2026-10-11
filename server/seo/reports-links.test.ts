@@ -124,7 +124,16 @@ describe("the screens: every figure a link, honest chips, 44 px targets", () => 
       expect(s, name).not.toMatch(/className="g-link"/);
       expect(s, name).not.toMatch(/href="\/(seo|settings|site-scan|search-console|pricing)/);
       expect(s, name).not.toMatch(/href=\{`\/seo/);
-      expect(s, name).not.toContain("<details");
+      // The filming fix deliberately folds the new-scan controls away when opening a saved scan.
+      // Report figures still must not be hidden inside that disclosure (or any other one).
+      const report = name === "grid" ? s.replace(/<details\b[\s\S]*?<\/details>/g, (form) => {
+        expect(form).toContain('data-testid="grid-new-scan"');
+        expect(form).toContain('data-testid="form-grid"');
+        expect(form).not.toContain('data-testid="grid-result"');
+        expect(form).not.toContain('data-testid="grid-history"');
+        return "";
+      }) : s;
+      expect(report, name).not.toContain("<details");
     }
   });
 

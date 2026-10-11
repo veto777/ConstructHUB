@@ -124,13 +124,19 @@ export function RankHistoryPanel({ site }: { site: SeoSite }) {
           <div className="rounded-xl border p-3 sm:p-4" style={CARD} data-testid="chart-positions">
             <PanelTitle>Positions <span className="g-text-2 font-normal">· <Link href={to({ checked: true })} className={LINK} title="The keywords with a saved check" data-testid="link-positions-checked">{last.checked} keyword{last.checked === 1 ? "" : "s"}</Link> checked <Link href={check(last.date)} className={LINK} title="The newest check in the numbers below" data-testid="link-positions-date">{fmtDate(last.date)}</Link></span></PanelTitle>
             <p className="g-text-2 mb-2 text-[12px]">How many of your keywords sat in each band of Google's results at each check. A band below opens those keywords from the newest check; a bar of an older check, or its date above, opens that check in the numbers.</p>
-            <div className="h-48 sm:h-56" aria-hidden>
+            <div className="h-72 sm:h-80" aria-hidden>
               <ResponsiveContainer>
-                <BarChart data={h.days} margin={{ top: 6, right: 4, bottom: 0, left: 0 }}>
+                <BarChart data={h.days} margin={{ top: 96, right: 4, bottom: 0, left: 0 }}>
                   <CartesianGrid stroke="var(--g-divider)" strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="date" tickFormatter={(v) => fmtDate(String(v))} tick={tick} axisLine={false} tickLine={false} minTickGap={24} />
                   <YAxis allowDecimals={false} tick={tick} axisLine={false} tickLine={false} width={30} />
-                  <Tooltip labelFormatter={(v) => fmtDate(String(v))} contentStyle={TOOLTIP} cursor={{ fill: "var(--g-hover)" }} />
+                  <Tooltip position={{ x: 0, y: 0 }} wrapperStyle={{ width: "100%", pointerEvents: "none" }} cursor={{ fill: "var(--g-hover)" }}
+                    content={({ active, label, payload }) => active && payload?.length ? (
+                      <div className="rounded border p-2 text-[11px] leading-4" style={CARD} data-testid="rank-positions-tooltip">
+                        <div className="mb-1 font-medium">{fmtDate(String(label))}</div>
+                        <div className="flex flex-wrap gap-x-3 gap-y-1">{payload.map((item) => <span key={String(item.dataKey)}>{item.name}: <b className="tabular-nums">{item.value}</b></span>)}</div>
+                      </div>
+                    ) : null} />
                   {BANDS.map((b) => <Bar key={b.key} dataKey={b.key} name={b.label} stackId="p" fill={b.color} stroke="var(--g-surface)" strokeWidth={1} isAnimationActive={false} className="cursor-pointer" onClick={(d: { payload?: { date?: string }; date?: string }) => onBar(b.key, d?.payload?.date ?? d?.date)} />)}
                 </BarChart>
               </ResponsiveContainer>
