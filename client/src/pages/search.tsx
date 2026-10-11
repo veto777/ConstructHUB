@@ -1,4 +1,4 @@
-import { readSearchUpdate } from "./permit-search-poll";
+import { readSearchUpdate, SEARCH_PAGE_SIZE } from "./permit-search-poll";
 import { planRequiredFrom } from "@/components/plan-required";
 import { Skeleton } from "@/components/ui/skeleton";
 import { governmentLinksAvailable, canScrapeGovernmentPortal } from "@shared/government-links";
@@ -99,13 +99,25 @@ interface LiveDatabase {
   resultsFound: number;
 }
 
-interface LiveSearchStatus {
+/** One page of stored matches in the search's area (server/search-page.ts): newest first, 50 at a time. */
+interface ResultPage {
+  results: any[];
+  /** Every stored match in scope, not only this page. */
+  totalResults: number;
+  /** `before` for the next (older) page; null on the last page. */
+  nextCursor: number | null;
+}
+interface LiveSearchStatus extends ResultPage {
   status: "running" | "completed";
   databases: LiveDatabase[];
-  results: any[];
-  totalResults: number;
   totalResultsScraped: number;
   elapsedMs: number;
+}
+/** The county a scope location (`county-N` / `city-N`) stands for; null for a state or nationwide. */
+function countyIdForLocation(loc: string, databases: Array<{ id: number; countyId: number }> | undefined) {
+  if (loc.startsWith("county-")) return parseInt(loc.replace("county-", ""));
+  if (loc.startsWith("city-")) return databases?.find(d => d.id === parseInt(loc.replace("city-", "")))?.countyId ?? null;
+  return null;
 }
 
 function parseDate(dateStr: string | null | undefined): Date | null {
@@ -147,7 +159,11 @@ export default function SearchPage() {
   // inputs, so a reload never pairs an old search's results with a query or area typed since.
   const [submitted, setSubmitted] = useState(() => ({ state: scopeState, loc: scopeLocation, type: searchType, q: searchValue.trim() }));
   const [liveStatus, setLiveStatus] = useState<LiveSearchStatus | null>(null);
-  const [initialResults, setInitialResults] = useState<any[] | null>(null);
+  const [initialResults, setInitialResults] = useState<ResultPage | null>(null);
+  // Older pages of stored matches (GET /api/search/results), each read from the previous page's cursor.
+  const [olderPages, setOlderPages] = useState<(ResultPage & { before: number })[]>([]);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState<Error | null>(null);
   // Set when nothing in the chosen area can be searched live: nothing ran, so there is no search to poll.
   const [noPortalsMessage, setNoPortalsMessage] = useState<string | null>(null);
   const [pollError, setPollError] = useState<Error | null>(null);
@@ -273,17 +289,7 @@ export default function SearchPage() {
     return { counties: allMatchedCounties, databases: matchedDbs };
   }, [stateCounties, searchableDbs, locationSearch]);
 
-  const scopeCountyId = useMemo(() => {
-    if (scopeLocation === "all") return null;
-    if (scopeLocation.startsWith("state-")) return null;
-    if (scopeLocation.startsWith("county-")) return parseInt(scopeLocation.replace("county-", ""));
-    if (scopeLocation.startsWith("city-")) {
-      const dbId = parseInt(scopeLocation.replace("city-", ""));
-      const db = databases?.find(d => d.id === dbId);
-      return db?.countyId ?? null;
-    }
-    return null;
-  }, [scopeLocation, databases]);
+  const scopeCountyId = useMemo(() => countyIdForLocation(scopeLocation, databases), [scopeLocation, databases]);
 
   const scopeLabel = useMemo(() => {
     if (scopeLocation === "all") return null;
@@ -317,11 +323,12 @@ export default function SearchPage() {
 
   const searchMutation = useMutation({
     mutationFn: async (payload: { searchType: string; searchValue: string; scopeCountyId: number | null; scopeState?: string }) => {
-      const res = await apiRequest("POST", "/api/search", payload);
+      const res = await apiRequest("POST", "/api/search", { ...payload, limit: SEARCH_PAGE_SIZE });
       return res.json();
     },
     onSuccess: (data) => {
       setLiveStatus(null);
+      setOlderPages([]);
       if (data.noSearchablePortals) {
         setInitialResults(null);
         setNoPortalsMessage(data.message || "No permit portal in this area supports live search yet.");
@@ -329,7 +336,7 @@ export default function SearchPage() {
       }
       queryClient.invalidateQueries({ queryKey: ["/api/search-queries"] });
       setNoPortalsMessage(null);
-      setInitialResults(data.results);
+      setInitialResults({ results: data.results ?? [], totalResults: data.totalResults ?? (data.results?.length ?? 0), nextCursor: data.nextCursor ?? null });
       setSearchId(data.searchId);
     },
     onError: (err: Error) => {
@@ -370,6 +377,7 @@ export default function SearchPage() {
     setSearchId(null);
     setLiveStatus(null);
     setInitialResults(null);
+    setOlderPages([]); setLoadMoreError(null);
     setNoPortalsMessage(null);
     searchMutation.mutate({
       searchType,
@@ -379,7 +387,46 @@ export default function SearchPage() {
     });
   };
 
-  const rawResults = liveStatus?.results ?? initialResults ?? [];
+  // The newest page: the poll's while a search is open (it refreshes as portals answer), else the
+  // first answer. Older pages hang off its cursor; if that cursor moves (newer matches arrived after
+  // older pages were read) the older pages no longer join up and are dropped to be read again.
+  const firstPage: ResultPage | null = liveStatus ?? initialResults;
+  const firstCursor = firstPage?.nextCursor ?? null;
+  useEffect(() => {
+    if (olderPages.length && olderPages[0].before !== firstCursor) setOlderPages([]);
+  }, [firstCursor]);
+  const rawResults = useMemo(() => {
+    const seen = new Set<number>();
+    const rows: any[] = [];
+    for (const r of [...(firstPage?.results ?? []), ...olderPages.flatMap(p => p.results)]) {
+      if (r?.id == null || !seen.has(r.id)) { if (r?.id != null) seen.add(r.id); rows.push(r); }
+    }
+    return rows;
+  }, [firstPage, olderPages]);
+  // null until the server has answered; never shown as 0 before then.
+  const totalResults: number | null = firstPage ? firstPage.totalResults : null;
+  const nextCursor = olderPages.length ? olderPages[olderPages.length - 1].nextCursor : firstCursor;
+  const olderCount = totalResults == null ? 0 : Math.max(0, totalResults - rawResults.length);
+  const hasOlder = nextCursor !== null && olderCount > 0;
+
+  // The next 50 older matches, in the area the search ran with (submitted, not the live form).
+  const loadMore = async () => {
+    if (nextCursor === null || loadingMore) return;
+    setLoadingMore(true); setLoadMoreError(null);
+    const before = nextCursor;
+    const scopeCounty = countyIdForLocation(submitted.loc, databases);
+    const params = new URLSearchParams({ searchType: submitted.type, searchValue: submitted.q, limit: String(SEARCH_PAGE_SIZE), before: String(before) });
+    if (scopeCounty) params.set("scopeCountyId", String(scopeCounty));
+    if (submitted.state !== "all") params.set("scopeState", submitted.state);
+    try {
+      const data: ResultPage = await (await apiRequest("GET", `/api/search/results?${params}`)).json();
+      setOlderPages(pages => [...pages, { results: data.results ?? [], totalResults: data.totalResults, nextCursor: data.nextCursor ?? null, before }]);
+      // Land on the page the new rows start (exact without client-side filters; clamped otherwise).
+      setResultPage(Math.floor(rawResults.length / SEARCH_PAGE_SIZE) + 1);
+    } catch (e) {
+      setLoadMoreError(e instanceof Error ? e : new Error("Could not load more results"));
+    } finally { setLoadingMore(false); }
+  };
 
   const availableStatuses = useMemo(() => {
     const counts = new Map<string, number>();
@@ -873,9 +920,11 @@ export default function SearchPage() {
                 title="Results"
                 actions={(
                   <span className="g-text-2 text-sm tabular-nums" data-testid="text-result-count">
-                    {filteredResults.length === rawResults.length
-                      ? `${rawResults.length} result${rawResults.length !== 1 ? "s" : ""}`
-                      : `${filteredResults.length} of ${rawResults.length}`}
+                    {filteredResults.length !== rawResults.length
+                      ? `${filteredResults.length} of ${rawResults.length} loaded`
+                      : totalResults != null && totalResults > rawResults.length
+                        ? `${rawResults.length} of ${totalResults.toLocaleString()} results loaded`
+                        : `${rawResults.length} result${rawResults.length !== 1 ? "s" : ""}`}
                   </span>
                 )}
               />
@@ -1067,10 +1116,19 @@ export default function SearchPage() {
                 )}
               </GoogleList>
               {resultPages > 1 && <div className="flex flex-wrap items-center justify-center gap-3 py-4"><Button variant="outline" disabled={visiblePage === 1} onClick={() => setResultPage(visiblePage - 1)}>Previous results</Button><span aria-live="polite">Page {visiblePage} of {resultPages} · {filteredResults.length} results</span><Button variant="outline" disabled={visiblePage === resultPages} onClick={() => setResultPage(visiblePage + 1)}>Next results</Button></div>}
+              {hasOlder && (
+                <div className="flex flex-col items-center gap-2 py-2 text-center text-sm g-text-2" data-testid="load-more-results">
+                  <span aria-live="polite">{rawResults.length.toLocaleString()} of {totalResults!.toLocaleString()} stored matches in this area loaded, newest first.</span>
+                  {isSearching
+                    ? <span>Older matches can be loaded once the live search finishes.</span>
+                    : <Button variant="outline" disabled={loadingMore} onClick={() => void loadMore()} data-testid="button-load-more-results">{loadingMore ? "Loading…" : `Load ${Math.min(SEARCH_PAGE_SIZE, olderCount)} older matches`}</Button>}
+                </div>
+              )}
+              {loadMoreError && <Notice tone="danger">{apiErrorMessage(loadMoreError, "Could not load more results")} <Button variant="outline" onClick={() => void loadMore()}>Retry</Button></Notice>}
             </div>
           )}
 
-          {isComplete && <Notice tone="info">The search service returns up to 1,000 stored matches before applying the area filter. Narrow the search to find older matches; this may not be the complete history.</Notice>}
+          {isComplete && hasOlder && <Notice tone="info">{totalResults!.toLocaleString()} stored matches in this area; the newest {rawResults.length.toLocaleString()} are shown. Load older matches above, or narrow the search.</Notice>}
           {isComplete && rawResults.length === 0 && (
             <div data-testid="empty-search-results">
               {searchedDbs === 0 ? (

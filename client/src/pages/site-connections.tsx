@@ -15,6 +15,7 @@ import {
 import {
   useReportParam,
   useReportPage,
+  useClampPage,
   syncRange,
   previewFingerprint,
 } from "@/components/site-connections/context";
@@ -55,6 +56,31 @@ const sampledBlocks = (snapshot: any) =>
     ? snapshot.events.filter((e: any) => e.action === "block").length
     : null;
 const read = async (url: string) => (await apiRequest("GET", url)).json();
+/** Human names for edge_jobs kinds (server/cloudflare + server/gsc workers); an unknown kind shows as itself. */
+const JOB_KIND_LABELS: Record<string, string> = {
+  discover: "Find sites",
+  sync: "Import data",
+  analytics: "Import search analytics",
+  sitemap: "Submit sitemap",
+  inspect: "Inspect URL",
+  apply: "Apply edge protection",
+  undo: "Undo edge protection",
+  invite: "Send invitation",
+  zone: "Check zone",
+  ips: "Update allowed IPs",
+  memberships: "Check account access",
+};
+const JOB_STATE_LABELS: Record<string, string> = {
+  queued: "Queued",
+  running: "Running",
+  done: "Done",
+  failed: "Failed",
+  uncertain: "Outcome unknown",
+};
+const jobLabel = (kind: unknown) =>
+  JOB_KIND_LABELS[String(kind)] ?? String(kind ?? "Job");
+const jobState = (state: unknown) =>
+  JOB_STATE_LABELS[String(state)] ?? String(state ?? "Unknown");
 function Field({
   label,
   ...props
@@ -136,6 +162,9 @@ export function DataList({
     queryKey: [path],
     refetchInterval: pollUnlessPlanRequired(15000),
   });
+  // A page past the end (a stale ?page after the scope changed, or rows removed) snaps to the last page.
+  const total: number | undefined = data.error ? undefined : data.data?.total;
+  const lastPage = useClampPage(page, total, 25, P);
   return (
     <section className="space-y-3">
       <GoogleSectionHeader
@@ -202,6 +231,7 @@ export function DataList({
               rows={data.data?.items ?? []}
               columns={columns}
               caption={title}
+              total={total}
             />
           ) : (
             <GoogleList>
@@ -225,10 +255,13 @@ export function DataList({
               onClick={() => P(page - 1)}
               label="Previous"
             />
-            <span className="text-sm tabular-nums g-text-2">Page {page}</span>
+            <span className="text-sm tabular-nums g-text-2">
+              Page {page}
+              {lastPage ? ` of ${lastPage}` : ""}
+            </span>
             <GooglePill
               size="sm"
-              disabled={page * 25 >= (data.data?.total ?? 0)}
+              disabled={page * 25 >= (total ?? 0)}
               onClick={() => P(page + 1)}
               label="Next"
             />
@@ -249,6 +282,18 @@ function MetricRows({ asset }: { asset: any }) {
       "reportEnd",
       new Date().toISOString().slice(0, 10),
     );
+  // The analytics DataList remounts on a scope change (its key below) but reads its page from the URL,
+  // so page 7 of "query" would otherwise become page 7 of "device". Every scope control resets it.
+  const [, setAnalyticsPage] = useReportPage("page.Search analytics");
+  const rescope = (set: (v: string) => void) => (v: string) => {
+    set(v);
+    setAnalyticsPage(1);
+  };
+  // The Breakdown column is the dimension key; for the date dimension it is always empty.
+  const columns =
+    dimension === "date"
+      ? analyticsColumns.filter((c) => c.label !== "Breakdown")
+      : analyticsColumns;
   return (
     <div className="space-y-4">
       <p className="flex items-center gap-1.5 text-sm g-text-2">
@@ -264,7 +309,7 @@ function MetricRows({ asset }: { asset: any }) {
             aria-label="Breakdown"
             className={`${selectClass} block`}
             value={dimension}
-            onChange={(e) => D(e.target.value)}
+            onChange={(e) => rescope(D)(e.target.value)}
           >
             {["date", "query", "page", "device", "country"].map((d) => (
               <option key={d}>{d}</option>
@@ -277,7 +322,7 @@ function MetricRows({ asset }: { asset: any }) {
             aria-label="Group"
             className={`${selectClass} block`}
             value={group}
-            onChange={(e) => G(e.target.value)}
+            onChange={(e) => rescope(G)(e.target.value)}
           >
             {["day", "week", "month"].map((d) => (
               <option key={d}>{d}</option>
@@ -288,18 +333,18 @@ function MetricRows({ asset }: { asset: any }) {
           label="From"
           type="date"
           value={start}
-          onChange={(e) => S(e.target.value)}
+          onChange={(e) => rescope(S)(e.target.value)}
         />
         <Field
           label="To"
           type="date"
           value={end}
-          onChange={(e) => E(e.target.value)}
+          onChange={(e) => rescope(E)(e.target.value)}
         />
       </div>
       <SearchOverview id={asset.id} start={start} end={end} />
       <DataList
-        columns={analyticsColumns}
+        columns={columns}
         key={`${dimension}:${group}:${start}:${end}`}
         title="Search analytics"
         url={`/api/gsc/assets/${asset.id}/analytics?dimension=${dimension}&group=${group}&start=${start}&end=${end}`}
@@ -359,9 +404,14 @@ function MetricRows({ asset }: { asset: any }) {
   );
 }
 export function LocationSearchSummary({ locationId }: { locationId: number }) {
-  const { data, error, isLoading, refetch } = useQuery({
-    queryKey: [`/api/gsc/locations/${locationId}/summary`],
-  });
+  // The server picks the location's linked property; linking a different one or a new sync changes
+  // the answer, so the card never serves a cached result on mount and keeps polling while shown.
+  const { data, error, isLoading, isFetching, refetch, dataUpdatedAt } =
+    useQuery({
+      queryKey: [`/api/gsc/locations/${locationId}/summary`],
+      refetchOnMount: "always",
+      refetchInterval: pollUnlessPlanRequired(60_000),
+    });
   const s = (data as any)?.search;
   // The containing location page remains useful without this optional module.
   if (planRequiredFrom(error)) return null;
@@ -369,7 +419,7 @@ export function LocationSearchSummary({ locationId }: { locationId: number }) {
   if (error) return <ReportError error={error} retry={() => void refetch()} />;
   return (
     <Card>
-      <CardContent className="p-4">
+      <CardContent className="space-y-1 p-4">
         <p className="font-medium">
           Google Search Console · property totals · last 30 days
         </p>
@@ -378,9 +428,25 @@ export function LocationSearchSummary({ locationId }: { locationId: number }) {
             ? `${s.clicks} clicks · ${s.impressions} impressions`
             : "Search Console data unavailable. Connect an account and sync its property."}
         </p>
-        <Link href="/search-console" className="text-primary underline">
-          Open Search Console
-        </Link>
+        {s?.external_id && (
+          <p className="text-sm text-muted-foreground">
+            Property: {String(s.external_id)}
+          </p>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Updated {dataUpdatedAt ? relativeTime(new Date(dataUpdatedAt).toISOString()) : "Not available"}
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <GooglePill
+            size="sm"
+            label={isFetching ? "Refreshing…" : "Refresh"}
+            disabled={isFetching}
+            onClick={() => void refetch()}
+          />
+          <Link href="/search-console" className="text-primary underline">
+            Open Search Console
+          </Link>
+        </div>
       </CardContent>
     </Card>
   );
@@ -953,7 +1019,7 @@ export default function SiteConnections({
                   render={(j) => (
                     <div className="text-sm">
                       <b>
-                        {j.kind} · {j.state}
+                        {jobLabel(j.kind)} · {jobState(j.state)}
                       </b>
                       <p>
                         {j.finished_at
@@ -1384,9 +1450,22 @@ export default function SiteConnections({
           url={`${base}/jobs`}
           filters={["queued", "running", "done", "failed", "uncertain"]}
           render={(j) => (
-            <p className="text-sm text-muted-foreground">
-              #{j.id} · {j.kind} · {j.state} {j.error && `— ${j.error}`}
-            </p>
+            <div className="space-y-1 text-sm">
+              <p className="font-medium">
+                {jobLabel(j.kind)}{" "}
+                <span className="g-chip g-chip--sm">{jobState(j.state)}</span>
+              </p>
+              <p className="text-muted-foreground">
+                {j.finished_at
+                  ? `Finished ${relativeTime(j.finished_at)}`
+                  : j.started_at
+                    ? `Started ${relativeTime(j.started_at)}`
+                    : "Waiting to start"}
+              </p>
+              {j.error && (
+                <p className="text-destructive break-words">{j.error}</p>
+              )}
+            </div>
           )}
         />
       )}

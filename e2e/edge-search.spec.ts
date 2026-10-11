@@ -143,7 +143,9 @@ test("Cloudflare 1,000-site list → bulk preview → confirmation → durable q
     )
     .toBe(25);
   await page.getByRole("button", { name: "Work queue", exact: true }).click();
-  await expect(page.getByText(/apply · queued/).first()).toBeVisible();
+  await expect(
+    page.getByText(/Apply edge protection\s*Queued/).first(),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Guide", exact: true }).click();
   await expect(
     page.getByText("Put a client site behind Cloudflare", { exact: true }),
