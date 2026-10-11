@@ -17,7 +17,7 @@ import { CALL_ASSISTANT_SEPARATE_LINE, COMPETITOR_INTEL_PLANS, PROTECTED_SITE_PL
 import type { HelpDraft, HelpEntry, HelpGroup } from "./types";
 import * as moreEntries from "./entries/index";
 import { helpVideoFor } from "./videos";
-import { FEATURE_PAGES } from "../feature-pages";
+import { EXTERNAL_FEATURE_PAGES, FEATURE_PAGES } from "../feature-pages";
 import { INTRO_VIDEO_PREFIX, introVideoKey } from "../feature-pages/intro-video";
 
 export { HELP_GROUPS } from "./types";
@@ -906,7 +906,7 @@ const BY_KEY = new Map(HELP_ENTRIES.map((e) => [e.key, e]));
 const INTRO_GROUPS: Record<string, HelpGroup> = {
   reviews: "Reviews", adsManager: "Google Ads", clickGuard: "Google Ads", lsaLeads: "Google Ads",
   permits: "Permits & Databases", property: "Permits & Databases",
-  crm: "CRM", crmLeads: "CRM", crmSchedule: "CRM", jobcam: "CRM", texting: "CRM",
+  crm: "CRM", crmLeads: "CRM", crmSchedule: "CRM", jobcam: "CRM", texting: "CRM", callAssistant: "CRM",
   gbp: "Google Business", profileGuard: "Google Business", gbpContent: "Google Business", media: "Google Business",
   rankingGrid: "Google Business", agency: "Google Business", reinstatement: "Google Business", domains: "Google Business",
   mailAlerts: "Google Business", competitors: "Google Business",
@@ -914,7 +914,13 @@ const INTRO_GROUPS: Record<string, HelpGroup> = {
 export const introHelpEntry = (key: string): HelpEntry | undefined => {
   if (!key.startsWith(INTRO_VIDEO_PREFIX)) return undefined;
   const page = FEATURE_PAGES.find((p) => introVideoKey(p.key) === key);
-  if (!page) return undefined;
+  if (!page) {
+    // A feature with its own hand-built page (the AI Call Assistant): title and lede are all it declares.
+    const ext = EXTERNAL_FEATURE_PAGES.find((p) => introVideoKey(p.key) === key);
+    if (!ext) return undefined;
+    return { key, title: ext.title, route: ext.app.href, group: INTRO_GROUPS[ext.key] ?? "Tools", unlisted: true,
+      whatItIs: ext.lede, whatItDoes: ext.lede, howToUse: [], howItWorks: ext.lede, video: helpVideoFor(key) };
+  }
   return {
     key, title: page.title, route: page.app.href, group: INTRO_GROUPS[page.key] ?? "Tools", unlisted: true,
     whatItIs: page.lede,
