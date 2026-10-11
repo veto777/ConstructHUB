@@ -17,6 +17,7 @@
 import { z } from "zod";
 import { request, assertOk, taskItems, safeHttpUrl, safeDomain, normalizeDomain, type Deadline, type DfsTask } from "./dataforseo";
 import { BACKLINKS_REQUEST_USD, BACKLINKS_ROW_USD } from "./pricing";
+import { SEO_SAVED_DAYS } from "@shared/seo-constants";
 import { sameUrlKey } from "./audit-pages";
 
 /** Websites listed in one lookup (one page per website). */
@@ -25,8 +26,8 @@ export const MENTIONS_SEARCH_USD = 0.03, MENTIONS_LINKS_USD = BACKLINKS_REQUEST_
 /** What is set aside for one check — also the most it can cost. The second try buys only the link check. */
 export const MENTIONS_ESTIMATE_USD = Math.round((MENTIONS_SEARCH_USD + MENTIONS_LINKS_USD) * 1e6) / 1e6;
 export const MENTIONS_RETRY_USD = Math.round(MENTIONS_LINKS_USD * 1e6) / 1e6;
-/** A saved check is shown for a week; "Check again" buys a new one. */
-export const MENTIONS_CACHE_HOURS = 24 * 7;
+/** A saved check is shown for the one saved-copy window (shared/seo-constants.ts); "Check again" buys a new one. */
+export const MENTIONS_CACHE_HOURS = 24 * SEO_SAVED_DAYS;
 export const MAX_PLACES = 8;
 export const mentionsDeps = { request };
 

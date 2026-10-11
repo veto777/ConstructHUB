@@ -213,7 +213,7 @@ describe("round 3 (Kimi round 2): the remaining figures, the address, honest wor
     expect(planner).toContain("your rankings didn't load this time, so no cell can be sorted here");
     expect(planner).toContain("the search volumes didn't load this time, so no cell can be called a gap");
     expect(planner).toMatch(/\{show && <ActiveFilter onClear=\{\(\) => setParam\("show", null\)\} clearLabel="Every cell">\{showWords\(show\)\}/);
-    expect(planner).toMatch(/const areaAt = \(p: \{ show\?: Show; service\?: string; town\?: string \}\) => seoLinks\.keywords\("", \{ view: "area", \.\.\.p \}\)/);
+    expect(planner).toMatch(/const areaAt = \(p: \{ show\?: Show; service\?: string; town\?: string \}\) => seoLinks\.keywords\("", \{ tab: "area", \.\.\.p \}\)/);
     expect(planner).toContain('address.get("service")');
     expect(planner).toContain('address.get("town")');
     expect(planner).toContain('setParam("service", null)');
@@ -223,7 +223,7 @@ describe("round 3 (Kimi round 2): the remaining figures, the address, honest wor
     expect(planner).toMatch(/const PHONE = "\(max-width: 639px\)"/);
     expect(planner).toMatch(/\{!phone \? \(/);
     expect(planner).toContain('data-testid="planner-cards"');
-    expect(seoLinks.keywords("", { view: "area", service: "roof repair", town: "lynden" })).toBe("/seo/keywords?view=area&service=roof+repair&town=lynden");
+    expect(seoLinks.keywords("", { tab: "area", service: "roof repair", town: "lynden" })).toBe("/seo/keywords?tab=area&service=roof+repair&town=lynden");
   });
   it("content: the visits figure's title says when it opens the whole site", () => {
     expect(content).toContain('opens ${pagePath(r) ? "this page" : `${r.domain}\'s pages (the page\'s address could not be read as one of its pages)`} in Site explorer');
@@ -244,8 +244,9 @@ describe("round 3 (Kimi round 2): the remaining figures, the address, honest wor
     expect(opps).toMatch(/data-testid=\{`tab-opp-\$\{t\}`\}><span className="underline decoration-dotted decoration-1 underline-offset-4">\{label\}<\/span>/);
     expect(opps).toMatch(/<Link key=\{t\} href=\{here\(t\)\} className="[^"]*focus-visible:outline[^"]*"/);
   });
-  it("backlinks: a Domain rank with no site named still links; 'lost' is named only when the list is drawn", () => {
-    const at = backlinks.indexOf('data-label="Domain rank"');
+  it("backlinks: an Authority with no site named still links; 'lost' is named only when the list is drawn", () => {
+    // The linking pages' Authority cell (the lost-links table has one of its own, earlier in the file).
+    const at = backlinks.indexOf('data-label="Authority"', backlinks.indexOf('data-testid="table-backlinks"'));
     const cell = backlinks.slice(at, backlinks.indexOf("</td>", at));
     expect(cell.match(/data-testid="link-page-authority"/g)).toHaveLength(2);
     expect(cell).toContain('href={view("referringDomains")}');

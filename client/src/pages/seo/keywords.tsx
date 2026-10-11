@@ -4,10 +4,11 @@
  * for it today and how strong those sites are; then the ideas around it —
  * matching terms, related terms and questions — filterable, sortable, paged,
  * exportable, and trackable on one of your sites.
- * The overview is one lookup (free to reopen for a week); each page of an idea
- * list is one lookup (free to reopen for a day). See server/seo/reports.ts.
+ * The overview is one lookup, and each page of an idea list is one lookup; each
+ * reopens free for the one saved-copy window (shared/seo-constants.ts). See server/seo/reports.ts.
  *
- * The address is the state (links.ts): `keyword`, `view`, `table`, `locationCode` + `languageCode`, `section`,
+ * The address is the state (links.ts): `keyword`, `tab` (one | bulk | area | lists — the `tab=` convention the audit
+ * and mentions use; the older `view=` spelling is still read), `table`, `locationCode` + `languageCode`, `section`,
  * `month`, `intent`, `list`, `topic`, `show`, `service` and `town` are read from it (the ideas table also reads its
  * `sort`, `offset` and `limit`), every tab and figure is a link that writes it, and
  * what narrowed the view is shown in a chip (data-testid="active-filter") with a clear control. The ideas tables
@@ -32,7 +33,7 @@ import { PlacePicker, placeBody, placeWords, usePlace, type SeoPlace } from "./p
 import { DEFAULT_MARKET, findMarket, marketKey, SEO_MARKETS, type SeoMarket } from "@shared/seo-markets";
 import { GradientSpark, MetricColumn, monthLabel, PALETTE } from "./viz";
 import { BarFigure, BLOCK_LINK, Card, FeatureTag, FIG_LINK, Heading, KdBadge, LINK_CUE, MetricRow, MonthlyBars, TEXT_LINK } from "./viz-keywords";
-import { seoLinks, setParam } from "./links";
+import { seoLinks, setParam, setParams } from "./links";
 import { marketParams, useTrackedKeywords } from "./keyword-links";
 
 type Overview = {
@@ -65,7 +66,7 @@ const SECTIONS: readonly Section[] = ["volume", "serp", "features", "ideas", "cp
 /** Which part of the overview a section lands on (the element ids below). */
 const SECTION_ID: Record<Section, string> = { volume: "keyword-trend", serp: "keyword-serp", features: "keyword-features", ideas: "keyword-ideas", cpc: "keyword-serp", results: "keyword-serp" };
 /** Every parameter the page honours, as read from the address. */
-type Address = { keyword: string; view?: Mode; table?: string; locationCode?: number; languageCode?: string; place?: number; section?: Section; month?: string; intent?: string; list?: number; topic?: string; show?: "gaps" | "weak" | "strong" | "unknown" };
+type Address = { keyword: string; tab?: Mode; table?: string; locationCode?: number; languageCode?: string; place?: number; section?: Section; month?: string; intent?: string; list?: number; topic?: string; show?: "gaps" | "weak" | "strong" | "unknown" };
 const SHOWS = ["gaps", "weak", "strong", "unknown"] as const;
 /** A pill-sized link or button that is 44 px tall on a phone. */
 const PILL = "g-pill g-pill--sm !min-h-11";
@@ -81,10 +82,11 @@ export default function SeoKeywordsPage() {
   const search = useSearch();
   const address = useMemo((): Address => {
     const p = new URLSearchParams(search);
-    const view = p.get("view"), table = p.get("table"), section = p.get("section"), month = p.get("month"), intent = p.get("intent"), topic = p.get("topic"), show = p.get("show");
+    // `tab` is the spelling written (links.ts); `view` is the older one, still honoured so saved links keep working.
+    const tab = p.get("tab") ?? p.get("view"), table = p.get("table"), section = p.get("section"), month = p.get("month"), intent = p.get("intent"), topic = p.get("topic"), show = p.get("show");
     return {
       keyword: p.get("keyword") ?? "",
-      view: view === "bulk" || view === "lists" || view === "area" ? view : undefined,
+      tab: tab === "bulk" || tab === "lists" || tab === "area" ? tab : undefined,
       table: table === "relatedTerms" || table === "questions" ? table : table === "matchingTerms" ? table : undefined,
       locationCode: Number(p.get("locationCode")) || undefined, languageCode: p.get("languageCode") || undefined,
       place: Number(p.get("place")) || undefined,
@@ -93,7 +95,10 @@ export default function SeoKeywordsPage() {
       topic: topic?.trim() || undefined, show: SHOWS.find((s) => s === show),
     };
   }, [search]);
-  const mode: Mode = address.view ?? "one";
+  const mode: Mode = address.tab ?? "one";
+  // A saved link with the older `view=` spelling is rewritten in place to `tab=`, so the shell's sub-navigation and crumb
+  // (components/seo-tool/nav.ts, which match `tab`) say the same view the page shows.
+  useEffect(() => { const p = new URLSearchParams(search); const v = p.get("view"); if (v !== null && p.get("tab") === null) setParams({ tab: v || null, view: null }, true); }, [search]);
   const ideas: TableKey = (address.table as TableKey | undefined) ?? "matchingTerms";
   /** The address with some parameters changed: what a link on this page points at. */
   const addr = (patch: Partial<Address>) => { const { keyword: k, ...rest } = { ...address, ...patch }; return seoLinks.keywords(k, rest); };
@@ -253,9 +258,9 @@ export default function SeoKeywordsPage() {
   }
 
   return (
-    <SeoShell title="Keywords explorer" description="How often people search for something, how hard it is to rank for, who ranked for it when it was last looked up, and the keywords around it." site={site} onSite={onSite} sites={sites} status={status}>
+    <SeoShell title="Keywords explorer" description="How often people search for something, how hard it is to rank for, who ranked for it when it was last looked up, and the keywords around it." site={site} onSite={onSite} sites={sites} status={status} spends="lookups">
       <nav className="g-tabs" aria-label="Keywords explorer views">
-        {([["one", "One keyword"], ["bulk", "Many keywords"], ["area", "Service × town"], ["lists", "My lists"]] as const).map(([m, label]) => <Link key={m} href={seoLinks.keywords(keyword ?? "", { view: m === "one" ? undefined : m })} aria-current={mode === m ? "page" : undefined} data-testid={`tab-keywords-${m}`}>{label}</Link>)}
+        {([["one", "One keyword"], ["bulk", "Many keywords"], ["area", "Service × town"], ["lists", "My lists"]] as const).map(([m, label]) => <Link key={m} href={seoLinks.keywords(keyword ?? "", { tab: m === "one" ? undefined : m })} aria-current={mode === m ? "page" : undefined} data-testid={`tab-keywords-${m}`}>{label}</Link>)}
       </nav>
       {mode === "bulk" && <BulkKeywords key={bulkSeed} market={market} onMarket={pickMarket} place={place} onPlace={pickPlace} initial={bulkSeed} status={status.data} site={site} onTrack={site ? (rows) => track.mutate({ rows, from: market }) : undefined} />}
       {mode === "area" && <ServicePlanner site={site} status={status.data} onTrack={site ? (rows) => track.mutate({ rows, from: findMarket(site.locationCode, site.languageCode) ?? market }) : undefined} />}

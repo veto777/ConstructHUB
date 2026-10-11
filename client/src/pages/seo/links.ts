@@ -101,7 +101,8 @@ export const seoLinks = {
     `/seo/audit${qs({ site: siteId, ...p })}`,
 
   /**
-   * Keywords explorer for one keyword; `view` one | bulk | lists | area; `table` matchingTerms | relatedTerms | questions.
+   * Keywords explorer for one keyword; `tab` one | bulk | lists | area — the `tab=` convention the audit and mentions
+   * use (the page still reads the older `view=` spelling); `table` matchingTerms | relatedTerms | questions.
    * Appended 2026-10-09 (keywords): `languageCode` with `locationCode` names the country exactly ("United States
    * (Spanish)" is 2840 + es); `section` scrolls to one part of the overview — volume (the monthly chart) | serp (Who
    * ranks) | features (On the results page) | ideas (the ideas tables) | cpc | results (the last two land on Who ranks,
@@ -116,7 +117,7 @@ export const seoLinks = {
    * town grid to one service's row and one town's column (the words as the grid shows them) — a row or column heading
    * writes them.
    */
-  keywords: (keyword: string, p: { view?: "one" | "bulk" | "lists" | "area"; table?: string; locationCode?: number; languageCode?: string; /** A US place (its code from the place picker): the numbers and results for there. */ place?: number; section?: "volume" | "serp" | "features" | "ideas" | "cpc" | "results"; month?: string; intent?: string; list?: number; topic?: string; show?: "gaps" | "weak" | "strong" | "unknown"; sort?: string; offset?: number; limit?: number; service?: string; town?: string } = {}) =>
+  keywords: (keyword: string, p: { tab?: "one" | "bulk" | "lists" | "area"; table?: string; locationCode?: number; languageCode?: string; /** A US place (its code from the place picker): the numbers and results for there. */ place?: number; section?: "volume" | "serp" | "features" | "ideas" | "cpc" | "results"; month?: string; intent?: string; list?: number; topic?: string; show?: "gaps" | "weak" | "strong" | "unknown"; sort?: string; offset?: number; limit?: number; service?: string; town?: string } = {}) =>
     `/seo/keywords${qs({ keyword, ...p })}`,
 
   /**
@@ -217,7 +218,7 @@ export const seoLinks = {
    * Appended (round 3, usage): Keywords explorer's Service × town planner for one site — the page a "Service-area
    * planner" lookup was made on (the planner opens that site's saved services and towns; nothing is bought on arrival).
    */
-  servicePlanner: (siteId: number) => `/seo/keywords${qs({ view: "area", site: siteId })}`,
+  servicePlanner: (siteId: number) => `/seo/keywords${qs({ tab: "area", site: siteId })}`,
 } as const;
 
 /** Read one parameter of the current address (the pages honour the names above). */

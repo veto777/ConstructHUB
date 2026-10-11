@@ -26,7 +26,7 @@ import { Download, Loader2, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { ActiveFilter, api, Empty, fmtDate, fmtNum, isNotRunYet, kd, money, useAddress, type SeoStatus } from "./shell";
+import { ActiveFilter, api, Empty, fmtDate, fmtNum, isNotRunYet, kd, money, SAVED_FOR, useAddress, type SeoStatus } from "./shell";
 import { AddToList } from "./keyword-lists";
 import { BLOCK_LINK, FIG_LINK, LINK_CUE, TEXT_LINK, TileLink } from "./viz-keywords";
 import { type SeoMarket } from "@shared/seo-markets";
@@ -153,7 +153,7 @@ export function OpportunitiesView({ domain, status, market, onTrack, planSiteId 
         <Empty testId="opportunities-not-run">
           <h3>What should {domain} work on next?</h3>
           <p>One lookup of the searches this site already ranks on pages one and two for (up to 500, the most searched) — sorted into what is within reach, what is slipping, which page is returned for what, and what leads to the home page.</p>
-          <p className="mt-1">{max != null ? <>Costs up to about <Link href={seoLinks.usage()} className={TEXT_LINK} title="Usage and credit: what lookups cost and what is left this month" data-testid="link-opp-price">{money(max)}</Link> of your SEO data</> : "The price depends on how many keywords the site has"}{small != null ? ` — about ${money(small)} for a site with a hundred keywords` : ""}; you pay for what comes back. Kept for a day and free to reopen.{!canPay && " You don't have enough SEO data left — add credit above."}</p>
+          <p className="mt-1">{max != null ? <>Costs up to about <Link href={seoLinks.usage()} className={TEXT_LINK} title="Usage and credit: what lookups cost and what is left this month" data-testid="link-opp-price">{money(max)}</Link> of your SEO data</> : "The price depends on how many keywords the site has"}{small != null ? ` — about ${money(small)} for a site with a hundred keywords` : ""}; you pay for what comes back. Kept for {SAVED_FOR} and free to reopen.{!canPay && " You don't have enough SEO data left — add credit above."}</p>
           <Button className="mt-3" disabled={run.isPending || !status?.configured || !canPay} onClick={() => run.mutate({ body, key: queryKey, again: false })} data-testid="button-opportunities-run">
             {run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Looking…</> : <><Play className="mr-1 h-4 w-4" /> Find opportunities{max != null ? ` — up to ${money(max)}` : ""}</>}
           </Button>

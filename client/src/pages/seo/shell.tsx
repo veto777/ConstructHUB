@@ -3,7 +3,9 @@
  * /seo/backlinks, /seo/competitors): Google surface with the brand accent,
  * the tab strip, the site picker, this account's plan units (tracked keywords,
  * keyword searches, backlink refreshes), a quiet "being switched on" notice
- * while the server reports configured:false, and the plan gate.
+ * while the server reports configured:false — only on a page that spends the
+ * data source's data (`spends`); Site audit, Reports, Usage and the Action plan
+ * spend nothing and say nothing — and the plan gate.
  *
  * White-label: nothing here names the data vendor or a price. Platform admins
  * see the "Data source" card on /admin (Platform admin), fed by `status.admin`; the SEO pages themselves are vendor-free.
@@ -21,6 +23,7 @@ import { planRequiredFrom } from "@/components/plan-required";
 import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { PLANS } from "@shared/plans";
+import { SEO_SAVED_DAYS, savedForWords } from "@shared/seo-constants";
 import { inNativeApp } from "@/lib/app-shell";
 import { seoLinks, setParam } from "./links";
 
@@ -93,8 +96,10 @@ export const holdNote = (status: SeoStatus | undefined, key: keyof SeoPrices) =>
   return hold != null && price != null && hold > price ? ` Up to ${money(hold)} is set aside while it runs; what isn't used comes straight back.` : "";
 };
 
-/** A saved-copy check that answered 404: not run yet — as opposed to a check that failed. */
+/** A saved-copy check that answered 404: not run yet, or run and expired (saved.ts `lastRunAt`) — as opposed to a check that failed. */
 export const isNotRunYet = (e: unknown) => /^404:/.test(String((e as { message?: unknown } | null)?.message ?? ""));
+/** How long a bought lookup reopens free, in the pages' words ("a week") — one window everywhere (shared/seo-constants.ts). */
+export const SAVED_FOR = savedForWords(SEO_SAVED_DAYS);
 
 export const useSeoStatus = () => useQuery<SeoStatus>({ queryKey: ["/api/seo/status"] });
 export const useSeoSites = () => useQuery<SeoSite[]>({ queryKey: ["/api/seo/sites"] });
@@ -208,10 +213,16 @@ const PHONE_SIZES = [
   "max-sm:[&_input[type=checkbox]:focus-visible]:[outline-offset:-10px] max-sm:[&_input[type=checkbox]:disabled]:cursor-default max-sm:[&_input[type=checkbox]:disabled]:opacity-50",
 ].join(" ");
 
-export function SeoShell({ title, description, actions, children, site, onSite, sites, status, picker = true }: {
+export function SeoShell({ title, description, actions, children, site, onSite, sites, status, picker = true, spends }: {
   title: string; description: string; actions?: ReactNode; children: ReactNode;
   /** false on pages that are not about one tracked site (Site explorer takes any domain). */
   picker?: boolean;
+  /**
+   * What this page spends the data source's data on — "tracking" (the rank tracker's checks) or "lookups" (anything
+   * bought with a button). While the source reports configured:false the page says so; a page that spends nothing
+   * (Site audit, Reports, Usage, the Action plan) leaves this out and shows no notice.
+   */
+  spends?: "tracking" | "lookups";
   site: SeoSite | null; onSite: (id: number) => void; sites: ReturnType<typeof useSeoSites>; status: ReturnType<typeof useSeoStatus>;
 }) {
   const gate = planRequiredFrom(status.error) ?? planRequiredFrom(sites.error);
@@ -235,7 +246,7 @@ export function SeoShell({ title, description, actions, children, site, onSite, 
         ) : (
           <>
             {picker && sites.isError && <div className="g-callout mb-4" role="alert" data-testid="seo-sites-error"><h3>Couldn't load your sites</h3><p>{apiErrorMessage(sites.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void sites.refetch()}>Try again</button></div>}
-            {status.data && !status.data.configured && <NotReadyNotice />}
+            {status.data && !status.data.configured && spends && <NotReadyNotice spends={spends} />}
             {children}
             <details className="tool-about"><summary>How dates are counted</summary><p data-testid="seo-dates-note">Dates of checks, crawls and reports are UTC days — the day each is filed under; in the US evening that is already the next day.</p></details>
           </>
@@ -328,11 +339,16 @@ function UsageLine({ status }: { status: ReturnType<typeof useSeoStatus> }) {
   );
 }
 
-/** Shown while the server reports configured:false. Sites and keywords still save; checks run once the source is live. */
-export function NotReadyNotice() {
+/**
+ * Shown while the server reports configured:false, on the pages that spend its data. The rank tracker: sites and
+ * keywords still save; checks run once the source is live. A lookup page: what is saved still opens; a new lookup waits.
+ */
+export function NotReadyNotice({ spends }: { spends: "tracking" | "lookups" }) {
   return (
     <p className="g-text-2 mb-4 text-[13px]" role="status" data-testid="seo-not-ready">
-      Rank tracking is being switched on for your account — check back shortly. You can add sites and keywords now; the first check runs as soon as it's on.
+      {spends === "tracking"
+        ? "Rank tracking is being switched on for your account — check back shortly. You can add sites and keywords now; the first check runs as soon as it's on."
+        : "Lookups are being switched on for your account — check back shortly. Saved results open as usual; a new lookup waits until it's on."}
     </p>
   );
 }

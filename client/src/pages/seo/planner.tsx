@@ -19,7 +19,8 @@ import { Download, Loader2, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { ActiveFilter, api, Empty, fmtDate, fmtNum, isNotRunYet, money, useAddress, type SeoSite, type SeoStatus } from "./shell";
+import { ActiveFilter, api, Empty, fmtDate, fmtNum, isNotRunYet, money, SAVED_FOR, useAddress, type SeoSite, type SeoStatus } from "./shell";
+import { lastRunAt } from "./saved";
 import { AddToList, type KwRow } from "./keyword-lists";
 import { AddToPlan, type PlanTask } from "./plan-button";
 import { DEFAULT_MARKET, findMarket } from "@shared/seo-markets";
@@ -30,9 +31,9 @@ type Show = "gaps" | "weak" | "strong" | "unknown";
 const SHOWS: readonly Show[] = ["gaps", "weak", "strong", "unknown"];
 /** The tiles' words, and the address that narrows the grid to the cells each counts. */
 const SHOW_WORDS: Record<Show, string> = { gaps: "Gaps: searched, and no ranking found for you", weak: "Beyond the first three", strong: "In the first three", unknown: "Nothing known: too few searches to measure, or a part that didn't load" };
-const showAt = (show: Show | undefined) => seoLinks.keywords("", { view: "area", show });
+const showAt = (show: Show | undefined) => seoLinks.keywords("", { tab: "area", show });
 /** The grid narrowed to one service's row and / or one town's column, with a tile's narrowing kept (links.ts `service`, `town`). */
-const areaAt = (p: { show?: Show; service?: string; town?: string }) => seoLinks.keywords("", { view: "area", ...p });
+const areaAt = (p: { show?: Show; service?: string; town?: string }) => seoLinks.keywords("", { tab: "area", ...p });
 /** A phone, where a table becomes cards (google.css: under 640 px): the grid is drawn one card per town. */
 const PHONE = "(max-width: 639px)";
 function usePhone(): boolean {
@@ -95,9 +96,11 @@ export function ServicePlanner({ site, status, onTrack }: { site: SeoSite | null
   const quote = useQuery<{ quoteCents: number | null }>({ queryKey: [base, "quote", cells], queryFn: () => api("GET", `${base}?cells=${cells}`), enabled: !!site && cells > 0 && !tooMany, staleTime: 60 * 60_000 });
   const body = useMemo(() => (asked ? { services: asked.services, towns: asked.towns } : null), [asked]);
   const queryKey = [base, marketId, body];
-  const saved = useQuery<{ page: Data } | null>({
+  // No fresh copy: `lastAt` is when the last one was made, when the server still knows (it expired) — so the page can say
+  // "last checked <date>" rather than claim nothing was ever run while the usage ledger lists it.
+  const saved = useQuery<{ page: Data | null; saved?: boolean; lastAt?: string | null } | null>({
     queryKey, enabled: !!site && !!body, retry: false, staleTime: 5 * 60_000,
-    queryFn: async () => { try { return await api("POST", base, { ...body, peek: true }); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
+    queryFn: async () => { try { return await api("POST", base, { ...body, peek: true }); } catch (e) { if (isNotRunYet(e)) return { page: null, lastAt: lastRunAt(e) }; throw e; } },
   });
   const run = useMutation({
     mutationFn: (v: { url: string; body: Record<string, unknown>; key: readonly unknown[]; again: boolean }) => api("POST", v.url, v.again ? { ...v.body, refresh: true } : v.body),
@@ -113,7 +116,7 @@ export function ServicePlanner({ site, status, onTrack }: { site: SeoSite | null
   // No price on screen, no purchase: the buttons wait for the quote, and say so when it cannot be had.
   const priced = price != null;
   const canPay = priced && (!status?.credits || status.credits.availableCents === -1 || status.credits.availableCents >= price);
-  const d = saved.data?.page ?? null;
+  const d = saved.data?.page ?? null, lastAt = saved.data?.lastAt ?? null;
   useEffect(() => { setPicked(new Set()); }, [d?.fetchedAt]);
   const rankingsKnown = !d?.missing.includes("rankings"), volumesKnown = !d?.missing.includes("volumes");
   // A table for another country than the site's present one is not shown as this country's.
@@ -193,7 +196,7 @@ export function ServicePlanner({ site, status, onTrack }: { site: SeoSite | null
           <span className="g-text-2 text-[13px]" data-testid="text-planner-cost">
             {tooMany ? <span style={{ color: "var(--g-red)" }}>Up to {MAX_SERVICES} services, {MAX_TOWNS} towns and {MAX_CELLS} searches in one table — shorten a list.</span>
               : tooLong ? <span style={{ color: "var(--g-red)" }}>"{tooLong}" is too long to look up (up to {MAX_CHARS} characters and {MAX_WORDS} words) — shorten that service or town.</span>
-              : cells && quote.data?.quoteCents != null ? <>Up to <Link href={seoLinks.usage()} className={TEXT_LINK} title="Usage and credit: what lookups cost and what is left this month" data-testid="link-planner-price">{money(quote.data.quoteCents)}</Link> of your SEO data for {site.domain} (you pay for what comes back); reopening the same table within a day is free.</> : `Every service is paired with every town for ${site.domain}.`}
+              : cells && quote.data?.quoteCents != null ? <>Up to <Link href={seoLinks.usage()} className={TEXT_LINK} title="Usage and credit: what lookups cost and what is left this month" data-testid="link-planner-price">{money(quote.data.quoteCents)}</Link> of your SEO data for {site.domain} (you pay for what comes back); reopening the same table within {SAVED_FOR} is free.</> : `Every service is paired with every town for ${site.domain}.`}
           </span>
         </div>
       </form>
@@ -205,9 +208,11 @@ export function ServicePlanner({ site, status, onTrack }: { site: SeoSite | null
       {asked && saved.isSuccess && !d && (
         <Empty testId="planner-not-run">
           <h3>{askedCells} search{askedCells === 1 ? "" : "es"} ready to check</h3>
-          <p>{askedQuote.isLoading ? "Getting the price…" : !priced ? <>Couldn't get the price for this table, so it can't be bought yet. <button type="button" className="g-link" onClick={() => void askedQuote.refetch()}>Try again</button></> : !canPay ? "You don't have enough SEO data left — add credit above." : "Nothing has been charged yet."}</p>
+          {/* "Nothing is charged until…" is true whatever came before; a table that was run and expired is said as such (data-testid planner-expired). */}
+          {lastAt && <p data-testid="planner-expired">Last checked <Link href={seoLinks.usage({ month: lastAt.slice(0, 7) })} className={TEXT_LINK} title="That month's lookups on the Usage page">{fmtDate(lastAt)}</Link>; a saved table is kept for {SAVED_FOR}, so this one is bought again.</p>}
+          <p>{askedQuote.isLoading ? "Getting the price…" : !priced ? <>Couldn't get the price for this table, so it can't be bought yet. <button type="button" className="g-link" onClick={() => void askedQuote.refetch()}>Try again</button></> : !canPay ? "You don't have enough SEO data left — add credit above." : "Nothing is charged until you press the button."}</p>
           <Button className="mt-2" disabled={run.isPending || !status?.configured || !canPay || !body} onClick={() => body && run.mutate({ url: base, body, key: queryKey, again: false })} data-testid="button-planner-run">
-            {run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Checking…</> : <><Play className="mr-1 h-4 w-4" /> Get the numbers{price != null ? ` — up to ${money(price)}` : ""}</>}
+            {run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Checking…</> : <><Play className="mr-1 h-4 w-4" /> {lastAt ? "Check again" : "Get the numbers"}{price != null ? ` — up to ${money(price)}` : ""}</>}
           </Button>
         </Empty>
       )}

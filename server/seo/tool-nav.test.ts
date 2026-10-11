@@ -133,6 +133,8 @@ describe("addresses and the current item", () => {
     const labels = (address: string) => shownGroups(tool("keywords"), at(address)).map((g) => g.key);
     expect(labels("/seo/keywords")).toEqual(["main"]);
     expect(labels("/seo/keywords?keyword=roof+repair")).toEqual(["main", "sections"]);
+    expect(labels("/seo/keywords?keyword=roof+repair&tab=bulk")).toEqual(["main"]);
+    // The older spelling of the tab is still read (saved links).
     expect(labels("/seo/keywords?keyword=roof+repair&view=bulk")).toEqual(["main"]);
   });
 });

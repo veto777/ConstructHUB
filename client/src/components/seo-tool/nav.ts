@@ -39,7 +39,7 @@ export const EXPLORER_VIEWS: { key: string; label?: string; items: [string, stri
 ];
 export const AUDIT_TABS: [string, string][] = [["issues", "Issues"], ["pages", "Pages"], ["links", "Internal links"], ["outgoing", "Outgoing links"], ["rendering", "Rendering"]];
 export const AUDIT_PAGE_SHOWS: [string, string][] = [["errors", "Pages with errors"], ["redirected", "Redirected"], ["notIndexable", "Not indexable"], ["canonical", "Canonical elsewhere"], ["orphans", "Orphan pages"], ["deep", "Deep pages"], ["thin", "Thin pages"], ["noTitle", "No title"], ["noDescription", "No description"]];
-export const RANK_PANELS: [string, string][] = [["keywords", "Keywords"], ["history", "History"], ["tags", "Tags"], ["competitors", "Competitors"], ["groups", "Results groups"], ["gsc", "Search Console"], ["competing", "Competing pages"]];
+export const RANK_PANELS: [string, string][] = [["keywords", "Keywords"], ["history", "History"], ["tags", "Tags"], ["competitors", "Competitors on your keywords"], ["groups", "Results groups"], ["gsc", "Search Console"], ["competing", "Competing pages"]];
 export const ALERT_KINDS: [string, string][] = [["rank_drop", "Rankings fell"], ["rank_gain", "Rankings improved"], ["links_lost", "Links lost"], ["links_gained", "Links gained"], ["grid_down", "Local grid worse"], ["grid_up", "Local grid better"], ["kw_new", "Searches newly seen"], ["kw_lost", "Searches no longer seen"], ["mention_new", "New mentions"]];
 export const MENTION_TABS: [string, string][] = [["prospects", "Likely you, no link"], ["yours", "Likely you"], ["unsure", "Name only"], ["linked", "Links to you"], ["notMine", "Marked not you"], ["all", "All"]];
 export const PLAN_KINDS: [string, string][] = [["keyword", "Keywords"], ["page", "New pages"], ["link_reclaim", "Win back a link"], ["link_prospect", "Ask for a link"], ["audit", "Site fixes"], ["other", "Other"]];
@@ -60,7 +60,8 @@ export function seoNav(chosen: { domain?: string | null } = {}): ToolShellConfig
   const rank = (p: Record<string, string | undefined> = {}) => (c: ToolNavCtx) => q(HOME.rank, { site: site(c), ...p });
   const keyword = (c: ToolNavCtx) => (c.path === HOME.keywords ? c.params.get("keyword") : null);
   const market = (c: ToolNavCtx) => (c.path === HOME.keywords ? { locationCode: c.params.get("locationCode"), languageCode: c.params.get("languageCode") } : {});
-  const hasKeyword = (c: ToolNavCtx) => !!keyword(c) && !c.params.get("view");
+  // The keywords explorer's tabs are `tab=` (pages/seo/links.ts); the older `view=` spelling is still read, as the page reads it.
+  const hasKeyword = (c: ToolNavCtx) => !!keyword(c) && !(c.params.get("tab") ?? c.params.get("view"));
   const explorerGroups: ToolSubGroup[] = EXPLORER_VIEWS.map((g) => ({ key: g.key, label: g.label, items: g.items.map(([view, label]) => ({ key: view, label, to: explorer(view), params: view === "overview" ? undefined : { view } })) }));
   // The tracked site's own backlink monitor and the batch tool are routes of their own; they belong with the explorer.
   explorerGroups.push({ key: "monitor", label: "Monitored backlinks", items: [{ key: "monitor", label: "This site's links", path: HOME.backlinks, to: (c) => q(HOME.backlinks, { site: site(c) }) }, ...BACKLINK_SECTIONS.map(([section, label]) => ({ key: `monitor-${section}`, label, path: HOME.backlinks, to: (c: ToolNavCtx) => q(HOME.backlinks, { site: site(c), section }), params: { section } }))] });
@@ -74,7 +75,7 @@ export function seoNav(chosen: { domain?: string | null } = {}): ToolShellConfig
       ] },
       { key: "explorer", label: "Site explorer", rail: "Site explorer", icon: Globe, path: HOME.explorer, paths: [HOME.backlinks, HOME.batch], to: explorer(), groups: explorerGroups },
       { key: "keywords", label: "Keywords explorer", rail: "Keywords", icon: KeyRound, path: HOME.keywords, to: () => HOME.keywords, groups: [
-        { key: "main", items: [{ key: "one", label: "One keyword", to: (c) => q(HOME.keywords, { keyword: keyword(c), ...market(c) }) }, ...KEYWORD_VIEWS.map(([view, label]) => ({ key: view, label, to: (c: ToolNavCtx) => q(HOME.keywords, { keyword: keyword(c), view }), params: { view } }))] },
+        { key: "main", items: [{ key: "one", label: "One keyword", to: (c) => q(HOME.keywords, { keyword: keyword(c), ...market(c) }) }, ...KEYWORD_VIEWS.map(([tab, label]) => ({ key: tab, label, to: (c: ToolNavCtx) => q(HOME.keywords, { keyword: keyword(c), tab }), params: { tab } }))] },
         { key: "sections", label: "This keyword", when: hasKeyword, items: KEYWORD_SECTIONS.map(([section, label]) => ({ key: `section-${section}`, label, to: (c: ToolNavCtx) => q(HOME.keywords, { keyword: keyword(c), ...market(c), section }), params: { section } })) },
       ] },
       { key: "content", label: "Content explorer", rail: "Content", icon: BookOpenText, path: HOME.content, to: () => HOME.content, groups: [] },
@@ -82,7 +83,7 @@ export function seoNav(chosen: { domain?: string | null } = {}): ToolShellConfig
         { key: "main", items: [{ key: "overview", label: "Overview", to: rank() }, ...RANK_PANELS.map(([panel, label]) => ({ key: panel, label, to: rank({ panel }), params: { panel } }))] },
         { key: "positions", label: "Positions", items: [{ key: "band-top3", label: "In the top 3", to: rank({ band: "top3" }), params: { band: "top3" } }, { key: "band-top10", label: "In the top 10", to: rank({ band: "top10" }), params: { band: "top10" } }, { key: "band-notFound", label: "Not found", to: rank({ band: "notFound" }), params: { band: "notFound" } }] },
         { key: "moves", label: "Since the last check", items: [{ key: "move-up", label: "Moved up", to: rank({ move: "up" }), params: { move: "up" } }, { key: "move-down", label: "Moved down", to: rank({ move: "down" }), params: { move: "down" } }, { key: "move-new", label: "Newly found", to: rank({ move: "new" }), params: { move: "new" } }, { key: "move-lost", label: "No longer found", to: rank({ move: "lost" }), params: { move: "lost" } }] },
-        { key: "rivals", label: "Competitors", items: [{ key: "competitors-page", label: "Compare a competitor", path: HOME.competitors, to: (c) => q(HOME.competitors, { site: site(c) }) }] },
+        { key: "rivals", label: "Competitor gap", items: [{ key: "competitors-page", label: "Compare a competitor", path: HOME.competitors, to: (c) => q(HOME.competitors, { site: site(c) }) }] },
       ] },
       { key: "grid", label: "Local grid", icon: Grid3X3, path: HOME.grid, to: (c) => q(HOME.grid, { site: site(c) }), groups: [] },
       { key: "audit", label: "Site audit", icon: Stethoscope, path: HOME.audit, to: audit(), groups: [

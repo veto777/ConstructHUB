@@ -334,7 +334,7 @@ export default function SeoExplorerPage() {
   const linksFrom = (d: string) => (trackedSite ? seoLinks.backlinks(trackedSite.id, { domain: d }) : to("backlinks", { source: d }));
 
   return (
-    <SeoShell title="Site explorer" description="Any website's estimated search traffic, keywords, backlinks and competitors — yours or a competitor's." site={site} onSite={onSite} sites={sites} status={status} picker={false}>
+    <SeoShell title="Site explorer" description="Any website's estimated search traffic, keywords, backlinks and competitors — yours or a competitor's." site={site} onSite={onSite} sites={sites} status={status} picker={false} spends="lookups">
       {/* The domain box is this tool's global input: it lives in the tool bar's second row (components/tool/shell.tsx). */}
       <ToolBarSlot>
       <form className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center" onSubmit={(e) => { e.preventDefault(); submit(false); }} data-testid="form-explorer">

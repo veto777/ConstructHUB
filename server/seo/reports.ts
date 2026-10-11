@@ -25,14 +25,16 @@ import type { SeoPlace } from "./place";
 import type { PlannerMetrics } from "./google-planner";
 import { withGoogleNumbers } from "./free-keywords";
 import { createHash } from "node:crypto";
+import { SEO_SAVED_DAYS } from "@shared/seo-constants";
 import { z } from "zod";
 import { pool } from "../db";
 import { request, assertOk, taskItems, type DfsTask } from "./dataforseo";
 import { safeDomain, safeHttpUrl } from "./dataforseo";
 import { parseExplorerKeyword, parseExplorerPage, parseCompetitors, parseReferringDomain, parseAnchor, INTENTS, type Intent } from "./explorer";
 
-export const CACHE_HOURS = 24;
-export const KEYWORD_OVERVIEW_TTL_DAYS = 7;
+/** One window for every saved copy (shared/seo-constants.ts): a bought page reopens free for SEO_SAVED_DAYS days. */
+export const CACHE_HOURS = SEO_SAVED_DAYS * 24;
+export const KEYWORD_OVERVIEW_TTL_DAYS = SEO_SAVED_DAYS;
 /** Wholesale estimates reserved before a call (settled to the real cost after). */
 export const REPORT_ESTIMATE_USD = 0.03;
 export const REPORT_TYPICAL_USD = 0.025;
@@ -564,6 +566,15 @@ export async function cached<T>(userId: number, key: string, maxAgeHours: number
   const { rows: [row] } = await pool.query(
     `SELECT data FROM seo_report_cache WHERE user_id=$1 AND key=$2 AND created_at > now() - ($3::float8 * interval '1 hour')`, [userId, key, maxAgeHours]);
   return row ? (row.data as T) : null;
+}
+/**
+ * When the saved copy under `key` was made, however old (null when none is kept) — so a `peek` that finds nothing fresh
+ * can say "last run <date>; a saved copy is kept N days" instead of "not run yet" when the usage ledger holds the lookup.
+ * Copies older than 30 days are dropped by saveCached below, so beyond that nothing is known here.
+ */
+export async function lastSavedAt(userId: number, key: string): Promise<string | null> {
+  const { rows: [row] } = await pool.query(`SELECT created_at FROM seo_report_cache WHERE user_id=$1 AND key=$2`, [userId, key]);
+  return row ? new Date(row.created_at).toISOString() : null;
 }
 /** `db`: a caller's own transaction, so the save can commit together with its other writes. */
 export async function saveCached(userId: number, key: string, kind: string, data: unknown, costUsd: number, db: { query: typeof pool.query } = pool): Promise<void> {

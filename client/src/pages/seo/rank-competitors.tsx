@@ -1,5 +1,6 @@
 /**
- * Rank tracker → Competitors: how visible you are on your tracked keywords next
+ * Rank tracker → Competitors on your keywords (named apart from the Competitor gap page, /seo/competitors, which
+ * buys a keyword-gap comparison): how visible you are on your tracked keywords next
  * to the competitors you follow, the other sites Google shows most on those
  * keywords, and who leads the map pack. Read from the result pages the weekly
  * check already saved (GET /api/seo/sites/:id/voice) — free. The device and tag
@@ -81,7 +82,7 @@ export function CompetitorPanel({ site }: { site: SeoSite }) {
   return (
     <section className="mb-5 scroll-mt-16" data-testid="rank-competitors">
       <div className="mb-2 flex flex-wrap items-baseline gap-2">
-        <SectionTitle>Competitors</SectionTitle>
+        <SectionTitle>Competitors on your keywords</SectionTitle>
         {(v.tags?.length ?? 0) > 0 && (
           <label className="flex items-center gap-1 text-[12px]"><span className="g-text-2">Keywords</span>
             <select className="g-select min-w-0 max-w-[14rem]" value={noTag ? NO_TAG : v.tags!.includes(tag) ? tag : ""} onChange={(e) => setParam("tag", e.target.value)} aria-describedby={q.isPlaceholderData ? `voice-loading-${site.id}` : undefined} data-testid="select-voice-tag">

@@ -34,7 +34,7 @@ export default function SeoMentionsPage() {
   // Another site has its own checks and tabs.
   const changeSite = (id: number) => { clearParams(["check", "tab"]); onSite(id); };
   return (
-    <SeoShell title="Mentions" description="Pages on other websites that use your business's name, and whether they link to you." site={site} onSite={changeSite} sites={sites} status={status}>
+    <SeoShell title="Mentions" description="Pages on other websites that use your business's name, and whether they link to you." site={site} onSite={changeSite} sites={sites} status={status} spends="lookups">
       {chip && site && <ActiveFilter onClear={() => clearParams(["check", "tab"], false)} clearLabel={`Newest check · ${TAB_LABEL.prospects}`}>Showing {chip}</ActiveFilter>}
       {sites.isLoading ? <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading your sites…</p>
         : sites.isError ? <div className="g-callout" role="alert"><h3>Couldn't load your sites</h3><p>{apiErrorMessage(sites.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void sites.refetch()}>Try again</button></div>

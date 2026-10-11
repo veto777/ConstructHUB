@@ -3,7 +3,10 @@
  * See who writes about what you sell, how strong their site is and when they
  * published — for content ideas, and for sites worth asking for a link or a
  * mention. Each new page of results shows its price first; a search you have
- * already run reopens free for a day.
+ * already run reopens free for the saved-copy window (shared/seo-constants.ts).
+ * "Leave out <site>" is not part of the address, and a search is saved under
+ * one setting of it — so a saved-copy check looks up both settings and shows
+ * the one that is saved, saying which (findings 2026-10-11 #9).
  * The address is the state (links.ts): `q`, the filters (`sort`, `since`, `authority`, `kind`) and the page of
  * results (`offset`) are read from it and written by the controls, each active filter is a chip with a clear, and
  * every figure on a result links to the Site explorer view that holds it. Arriving by link never buys: the saved page
@@ -20,7 +23,8 @@ import { Download, Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { ActiveFilter, api, Empty, fmtDate, fmtNum, isNotRunYet, money, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { ActiveFilter, api, Empty, fmtDate, fmtNum, isNotRunYet, money, SAVED_FOR, SeoShell, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { lastRunAt } from "./saved";
 import { PALETTE } from "./viz";
 
 type Row = { url: string; domain: string; title: string; snippet: string | null; authority: number | null; published: string | null; quality: number | null; author: string | null };
@@ -70,10 +74,20 @@ export default function SeoContentPage() {
   /** How the pages on screen are ordered once their numbers are in (the search's own order until then). */
   const [by, setBy] = useState<"search" | "links" | "traffic">("search");
   const body = useMemo(() => ({ query: query ?? "", sort: f.sort, ...(f.sinceDays ? { sinceDays: f.sinceDays } : {}), ...(f.minAuthority ? { minAuthority: f.minAuthority } : {}), ...(f.kind ? { kind: f.kind } : {}), ...(f.excludeOwn && site ? { exclude: site.domain } : {}), limit, offset }), [query, f, site, offset]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** The same search with "Leave out <site>" the other way round: the only other copy that can be saved of it. */
+  const otherBody = useMemo(() => { const { exclude, ...rest } = body as typeof body & { exclude?: string }; return exclude || !site ? rest : { ...rest, exclude: site.domain }; }, [body, site]);
   const queryKey = ["/api/seo/content", body];
-  const saved = useQuery<{ page: Page; saved?: boolean } | null>({
+  type Saved = { page: Page | null; saved?: boolean; /** The copy shown is the search saved with "Leave out <site>" the other way round — the only one saved. */ other?: boolean; /** No copy: when the last one was made, when the server still knows (it expired). */ lastAt?: string | null };
+  const saved = useQuery<Saved | null>({
     queryKey, enabled: !!query, retry: false, staleTime: 5 * 60_000,
-    queryFn: async () => { try { return await api("POST", "/api/seo/content", { ...body, peek: true }); } catch (e) { if (isNotRunYet(e)) return null; throw e; } },
+    queryFn: async (): Promise<Saved> => {
+      try { return await api("POST", "/api/seo/content", { ...body, peek: true }); } catch (e) {
+        if (!isNotRunYet(e)) throw e;
+        // Not saved as set: the same search saved the other way round on "Leave out <site>" is shown instead, and says so — ticking that box must not hide a search already bought.
+        if (site) { try { const alt: Saved = await api("POST", "/api/seo/content", { ...otherBody, peek: true }); return { ...alt, other: true }; } catch (e2) { if (!isNotRunYet(e2)) throw e2; } }
+        return { page: null, lastAt: lastRunAt(e) };
+      }
+    },
   });
   const run = useMutation({
     mutationFn: (v: { body: unknown; key: readonly unknown[] }) => api("POST", "/api/seo/content", v.body),
@@ -82,7 +96,7 @@ export default function SeoContentPage() {
   });
   const price = status.data?.prices?.contentSearch ?? null, hold = status.data?.holds?.contentSearch ?? price;
   const canPay = hold == null || !status.data?.credits || status.data.credits.availableCents === -1 || status.data.credits.availableCents >= hold;
-  const page = saved.data?.page ?? null;
+  const page = saved.data?.page ?? null, lastAt = saved.data?.lastAt ?? null;
   const submit = () => { const q = input.trim(); if (q.length >= 2) navigate(addr({}, q)); };
   const exportCsv = () => {
     if (!page) return;
@@ -145,7 +159,7 @@ export default function SeoContentPage() {
   const noNext = !page || page.sourceRows < limit || (page.total != null && page.offset + page.sourceRows >= page.total) || offset + limit > MAX_OFFSET;
 
   return (
-    <SeoShell title="Content explorer" description="Search the web for pages about a topic — who is writing about what you sell, how strong their site is, and when." site={site} onSite={onSite} sites={sites} status={status} picker={false}>
+    <SeoShell title="Content explorer" description="Search the web for pages about a topic — who is writing about what you sell, how strong their site is, and when." site={site} onSite={onSite} sites={sites} status={status} picker={false} spends="lookups">
       <form className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center" onSubmit={(e) => { e.preventDefault(); submit(); }} data-testid="form-content">
         <label className="relative min-w-0 flex-1 sm:max-w-xl"><span className="sr-only">Topic</span>
           <Search className="g-text-2 pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" aria-hidden />
@@ -161,7 +175,7 @@ export default function SeoContentPage() {
         {site && <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={f.excludeOwn} onChange={(e) => set({ excludeOwn: e.target.checked })} /> <span className="g-text">Leave out {site.domain}</span></label>}
       </div>
       {chips.length > 0 && <div data-testid="content-active-filters">{chips.map((c) => <ActiveFilter key={c.key} onClear={() => navigate(c.href)}>{c.words}</ActiveFilter>)}</div>}
-      <p className="g-text-2 mb-4 text-[13px]" data-testid="text-content-cost">Each new page of results costs about {price != null ? <Link href={seoLinks.usage()} className={TEXT_LINK} title="Usage and credit: what lookups cost and what is left this month" data-testid="link-content-price">{money(price)}</Link> : "—"} of your SEO data; a search you have run reopens free for a day. English-language pages.</p>
+      <p className="g-text-2 mb-4 text-[13px]" data-testid="text-content-cost">Each new page of results costs about {price != null ? <Link href={seoLinks.usage()} className={TEXT_LINK} title="Usage and credit: what lookups cost and what is left this month" data-testid="link-content-price">{money(price)}</Link> : "—"} of your SEO data; a search you have run reopens free for {SAVED_FOR}. English-language pages.</p>
 
       {!query && <Empty testId="content-intro"><h3>Find who writes about your trade</h3><p>Search a topic your customers care about — "roof replacement cost", "james hardie vs vinyl siding" — to see the pages already written about it. Use it to plan a better page of your own, and to find blogs, local news and directories worth asking for a mention. Sort by <b>Strongest sites first</b> to see the best-known sites first — authority is one sign of a link worth having, alongside how relevant and local the site is.</p></Empty>}
       {query && saved.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Checking for a saved search…</p>}
@@ -169,7 +183,7 @@ export default function SeoContentPage() {
       {query && saved.isSuccess && !page && (
         <Empty testId="content-not-run">
           <h3>Pages about "{query}"</h3>
-          <p>{offset ? "This page of results hasn't been opened yet." : "Not searched yet with these settings."}{!canPay && " You don't have enough SEO data left — add credit above."}</p>
+          <p>{lastAt ? <>Searched <Link href={seoLinks.usage({ month: lastAt.slice(0, 7) })} className={TEXT_LINK} title="That month's lookups on the Usage page" data-testid="link-content-last-run">{fmtDate(lastAt)}</Link>; a saved search is kept for {SAVED_FOR}, so this one is run again.</> : offset ? "This page of results hasn't been opened yet." : "Not searched yet with these settings."}{!canPay && " You don't have enough SEO data left — add credit above."}</p>
           {offset > 0 && <Link href={prevHref} className="g-pill mr-2 mt-2 !min-h-11" data-testid="button-content-back">← Back to the previous results</Link>}
           <Button className="mt-2" disabled={run.isPending || !status.data?.configured || !canPay} onClick={() => run.mutate({ body, key: queryKey })} data-testid="button-content-run">{run.isPending ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Searching…</> : `${offset ? "Load these results" : "Run the search"}${price != null ? ` — about ${money(price)}` : ""}`}</Button>
         </Empty>
@@ -184,6 +198,12 @@ export default function SeoContentPage() {
             </span>
             <button type="button" className="g-pill g-pill--sm !min-h-11 ml-auto" disabled={!page.rows.length} onClick={exportCsv} data-testid="button-content-export"><Download /> Export</button>
           </div>
+          {saved.data?.other && site && (
+            <p className="mb-2 text-[13px]" role="status" data-testid="content-other-variant">
+              {f.excludeOwn ? <>This search was saved with pages from {site.domain} included — that copy is shown.</> : <>This search was saved with {site.domain} left out — that copy is shown.</>}{" "}
+              <button type="button" className="g-link" disabled={run.isPending || !status.data?.configured || !canPay} onClick={() => run.mutate({ body, key: queryKey })} data-testid="button-content-run-variant">{run.isPending ? "Searching…" : `${f.excludeOwn ? `Run it leaving ${site.domain} out` : `Run it with ${site.domain} included`}${price != null ? ` — about ${money(price)}` : ""}`}</button>
+            </p>
+          )}
           {saved.data?.saved === false && <p className="mb-2 text-[13px]" style={{ color: "var(--g-red)" }} role="alert" data-testid="content-unsaved">These results could not be kept, so opening this search again will not be free. Export them now if you need them.</p>}
           {page.rows.length > 0 && (
             <div className="mb-3 flex flex-wrap items-center gap-2 text-[13px]" data-testid="content-metrics-bar">

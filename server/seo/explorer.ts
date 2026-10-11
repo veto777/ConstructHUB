@@ -21,8 +21,10 @@
  */
 import { pool } from "../db";
 import { request, assertOk, taskItems, type DfsTask } from "./dataforseo";
+import { SEO_SAVED_DAYS } from "@shared/seo-constants";
 
-export const REPORT_TTL_DAYS = 7;
+/** The one saved-copy window (shared/seo-constants.ts). */
+export const REPORT_TTL_DAYS = SEO_SAVED_DAYS;
 /** What one fresh report is reserved at before it runs (settled to the real cost after). */
 /** Raised 2026-10-08 with the history going from 6 to 24 months: measured $0.1272 for 6 months and $0.192 for 60, i.e. about $0.0012 a month. */
 export const EXPLORER_ESTIMATE_USD = 0.36;
