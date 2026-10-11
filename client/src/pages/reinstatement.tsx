@@ -1,5 +1,5 @@
 import { AppPage } from "@/components/app-ui";
-import { GoogleSurface, GoogleSectionHeader, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
+import { GoogleSurface, GoogleSectionHeader, GooglePill, GoogleStat } from "@/components/google";
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
@@ -67,7 +67,7 @@ export default function ReinstatementPage() {
     websiteUrl: "",
     businessAddress: "",
     businessType: "",
-    multipleLocations: "no",
+    multipleLocations: "",
     problemDescription: "",
   });
 
@@ -78,7 +78,7 @@ export default function ReinstatementPage() {
     },
     onSuccess: () => {
       toast({ title: "Request submitted", description: "We'll review your case and get back to you within 1-2 business days." });
-      setFormData({ name: "", email: "", businessName: "", websiteUrl: "", businessAddress: "", businessType: "", multipleLocations: "no", problemDescription: "" });
+      setFormData({ name: "", email: "", businessName: "", websiteUrl: "", businessAddress: "", businessType: "", multipleLocations: "", problemDescription: "" });
     },
     onError: (err: Error) => {
       toast({ title: "Submission failed", description: apiErrorMessage(err), variant: "destructive" });
@@ -101,7 +101,7 @@ export default function ReinstatementPage() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const canSubmit = [formData.name, formData.email, formData.businessName, formData.businessAddress, formData.businessType, formData.problemDescription]
+  const canSubmit = [formData.name, formData.email, formData.businessName, formData.businessAddress, formData.businessType, formData.multipleLocations, formData.problemDescription]
     .every((v) => v.trim() !== "");
 
   const requestForm = (                <form className="space-y-4" onSubmit={handleSubmit} data-testid="form-reinstatement">
@@ -146,7 +146,7 @@ export default function ReinstatementPage() {
                   </div>
                   <div>
                     <Label className={user ? "text-sm font-medium" : FIELD_LABEL}>Does this business have multiple locations? <span className={user ? "text-muted-foreground font-normal" : REQUIRED}>(required)</span></Label>
-                    <RadioGroup value={formData.multipleLocations} onValueChange={v => updateField("multipleLocations", v)} className="flex gap-4 mt-2">
+                    <RadioGroup required aria-label="Does this business have multiple locations?" value={formData.multipleLocations} onValueChange={v => updateField("multipleLocations", v)} className="flex gap-4 mt-2">
                       <div className="flex items-center gap-2">
                         <RadioGroupItem value="no" id="multi-no" data-testid="radio-multi-no" />
                         <Label htmlFor="multi-no" className="text-sm">No</Label>
@@ -191,8 +191,8 @@ export default function ReinstatementPage() {
                 </form>);
   // Google's format (owner, 2026-10-07): quiet title, number tiles, a hairline section for the form.
   if (user) return <GoogleSurface page><AppPage width="narrow" testId="page-reinstatement">
-    <GoogleSectionHeader as="h1" titleTestId="text-reinstatement-title" title="Profile reinstatement" description="Request help with a suspended Google Business Profile." flush actions={<GooglePill variant="solid" label="Review request form" href="#request" testId="button-get-reinstated"/>}/>
-    <div data-testid="reinstatement-facts"><GoogleStatGrid cols={2}><GoogleStat label="Flat project rate" value={formatUsd(GBP_REINSTATEMENT_CENTS)} testId="card-reinstatement-pricing"/><GoogleStat label="Initial review" value="1–2 days" hint="Business days"/></GoogleStatGrid></div>
+    <GoogleSectionHeader as="h1" titleTestId="text-reinstatement-title" title="Profile reinstatement" description="Request help with a suspended Google Business Profile." flush/>
+    <div data-testid="reinstatement-facts"><div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] gap-3"><GoogleStat label="Flat project rate" value={formatUsd(GBP_REINSTATEMENT_CENTS)} testId="card-reinstatement-pricing"/><GoogleStat label="Initial review" value="1–2 days" hint="Business days"/></div></div>
     <section id="request" data-testid="card-reinstatement-form">
       <GoogleSectionHeader titleTestId="text-form-title" title="Tell us about your suspension" description="We’ll review your case before taking it on."/>
       {requestForm}

@@ -1,0 +1,24 @@
+import { describe, expect, it } from 'vitest';
+import { auditTitle, protectionDescription } from './presentation';
+
+describe('protection preview descriptions', () => {
+  it('counts distinct IPs across campaigns and discloses removals', () => {
+    const operations = ['one', 'two'].flatMap(campaign => ['192.0.2.1', '192.0.2.2'].map(ipAddress => ({campaignCriterionOperation: {create: {campaign, ipBlock: {ipAddress}}}})));
+    expect(protectionDescription('ip', {operations})).toBe('Block 2 IPs on 2 campaigns');
+    expect(protectionDescription('ip', {operations: [...operations, {campaignCriterionOperation: {remove: 'old'}}]})).toBe('Block 2 IPs on 2 campaigns; remove 1 old exclusion');
+  });
+  it('does not turn missing documents into zero changes or describe reversals as additions', () => {
+    expect(protectionDescription('ip')).toBe('Update blocked IP addresses');
+    expect(protectionDescription('ip', {operations: []})).toBe('Already configured — no changes needed');
+    expect(protectionDescription('ip', {operations: []}, 'original')).toBe('Reverse protection changes: update blocked IP addresses');
+  });
+  it('describes other protection types without internal kind names', () => {
+    expect(protectionDescription('negative')).toBe('Update negative keywords');
+    expect(protectionDescription('presence', {operations: [{campaignOperation: {update: {resourceName: 'campaign'}}}]})).toBe('Target people in your locations on 1 campaign');
+  });
+});
+
+it('translates saved unavailable audit titles without changing successful findings', () => {
+  expect(auditTitle('terms', 'terms: unavailable')).toBe('Search terms could not be checked');
+  expect(auditTitle('terms', 'Review search terms')).toBe('Review search terms');
+});
