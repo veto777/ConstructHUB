@@ -380,7 +380,7 @@ function AccountsOverview({ onOpen }: { onOpen: (a: LsaAccount) => void }) {
     return () => clearTimeout(t);
   }, [q]);
 
-  const { data, isLoading } = useQuery<{ accounts: LsaAccount[]; total: number }>({
+  const { data, isLoading, error } = useQuery<{ accounts: LsaAccount[]; total: number }>({
     queryKey: ["/api/lsa/accounts", debouncedQ, page],
     queryFn: () => getJson(`/api/lsa/accounts?q=${encodeURIComponent(debouncedQ)}&page=${page}&pageSize=${pageSize}`),
     refetchInterval: 60000,
@@ -388,6 +388,8 @@ function AccountsOverview({ onOpen }: { onOpen: (a: LsaAccount) => void }) {
   const accounts = data?.accounts || [];
   const total = data?.total || 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  if (error) return <Notice tone="warning">Accounts could not be loaded. Please try again.</Notice>;
 
   return (
     <section data-testid="section-lsa-accounts">
@@ -418,6 +420,7 @@ function AccountsOverview({ onOpen }: { onOpen: (a: LsaAccount) => void }) {
                   size="md"
                   testId={`card-account-${a.customerId}`}
                   title={a.descriptiveName || `Account ${a.customerId}`}
+                  className="relative cursor-pointer focus-within:ring-2 focus-within:ring-ring focus-within:rounded-md [&_h3_button]:after:absolute [&_h3_button]:after:inset-0"
                   onOpen={() => onOpen(a)}
                   badges={<>
                     {a.lsaEnrolled === true && <span className="g-chip g-chip--sm g-open">LSA</span>}
@@ -456,7 +459,7 @@ function AccountDetail({ account, onBack }: { account: LsaAccount; onBack: () =>
   const [page, setPage] = useState(1);
   const pageSize = 50;
 
-  const { data, isLoading } = useQuery<{ leads: LsaLead[]; total: number }>({
+  const { data, isLoading, error } = useQuery<{ leads: LsaLead[]; total: number }>({
     queryKey: ["/api/lsa/leads", account.customerId, filter, page],
     queryFn: () => getJson(`/api/lsa/leads?customerId=${account.customerId}&filter=${filter}&page=${page}&pageSize=${pageSize}`),
     // Poll fast while any dispute is in flight so the live stickers update.
@@ -548,6 +551,8 @@ function AccountDetail({ account, onBack }: { account: LsaAccount; onBack: () =>
     batchSchedule.mutate(items);
   };
 
+  if (error) return <Notice tone="warning">Leads could not be loaded. <Button variant="outline" onClick={onBack}>Back to accounts</Button></Notice>;
+
   const totalSpend = account.costTotal != null ? Number(account.costTotal) : 0;
 
   return (
@@ -588,7 +593,7 @@ function AccountDetail({ account, onBack }: { account: LsaAccount; onBack: () =>
                   <Clock className="w-4 h-4" /> Schedule for later
                 </Button>
                 <Button variant="outline" size="sm" onClick={submitBatch} disabled={selected.size === 0 || batchDispute.isPending} className="flex items-center gap-1" data-testid="button-report-now">
-                  <ThumbsDown className="w-4 h-4" /> {batchDispute.isPending ? "Queuing…" : `Report ${selected.size || ""} now`}
+                  <ThumbsDown className="w-4 h-4" /> {batchDispute.isPending ? "Queuing…" : selected.size ? `Report ${selected.size} now` : "Report now"}
                 </Button>
                 {selected.size > 0 && <Button size="sm" variant="ghost" onClick={clearSelection} data-testid="button-clear-selection">Clear</Button>}
               </div>

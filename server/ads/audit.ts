@@ -1,3 +1,4 @@
+import { auditTitle } from './presentation';
 import { type AdsApi, searchAll } from './client';
 import type { State } from './protections';
 export interface Finding {kind:string;severity:'info'|'warning'|'unknown';title:string;detail:string;fix?:{action?:unknown;url?:string;label:string}}
@@ -13,7 +14,7 @@ export async function auditAccount(api:AdsApi,cid:string,state:State) {
   const google={url:'https://ads.google.com/',label:'Review in Google Ads'};
   const read=async(kind:keyof typeof AUDIT_QUERIES)=>{
     try{return await searchAll(api,cid,AUDIT_QUERIES[kind]);}
-    catch{findings.push({kind,severity:'unknown',title:`${kind}: unavailable`,detail:'Google did not return this check. This is not a passing result.',fix:google});return null;}
+    catch{findings.push({kind,severity:'unknown',title:auditTitle(kind,`${kind}: unavailable`),detail:'Google did not return this check. This is not a passing result.',fix:google});return null;}
   };
   const conversions=await read('conversions');
   if(conversions) {

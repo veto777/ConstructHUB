@@ -1,3 +1,4 @@
+import { protectionDescription, auditTitle } from './presentation';
 import { appConnectUrl, finishAppConnection } from "../app-connections";
 import { fromNativeApp } from "../app-shell";
 import { oauthBaseUrl } from "../site-context";
@@ -246,17 +247,19 @@ export function registerAdsRoutes(app:Express,auth:(req:any,res:any)=>any,option
     const where=`user_id=$1 AND ($2='' OR ${search} ILIKE '%'||$2||'%') AND ($3='' OR status=$3) ${table!=='ads_invitations'?'AND ($4::uuid IS NULL OR batch_id=$4)':''}`;
     const args:unknown[]=[user,p.q,p.status];if(table!=='ads_invitations')args.push(batch||null);
     const {rows:[n]}=await pool.query(`SELECT count(*)::int total FROM ${table} WHERE ${where}`,args);
-    res.json({items:(await pool.query(`SELECT ${columns} FROM ${table} WHERE ${where} ORDER BY created_at DESC,id LIMIT $${args.length+1} OFFSET $${args.length+2}`,[...args,p.limit,(p.page-1)*p.limit])).rows,total:n.total});
+    const extra=table==='ads_plans'?", document, (SELECT name FROM ads_accounts a WHERE a.user_id=ads_plans.user_id AND a.customer_id=ads_plans.customer_id) AS account_name":'';
+    const {rows}=await pool.query(`SELECT ${columns}${extra} FROM ${table} WHERE ${where} ORDER BY created_at DESC,id LIMIT $${args.length+1} OFFSET $${args.length+2}`,[...args,p.limit,(p.page-1)*p.limit]);
+    res.json({items:table==='ads_plans'?rows.map(({document,...plan})=>({...plan,description:protectionDescription(plan.kind,document,plan.undo_of)})):rows,total:n.total});
   });
   // One preview's change document from ads_plans: summary/warnings plus the operation
   // list (?q filters, 25/page) for the read-only review dialog — ads-manager.tsx.
   route('get','/plans/:id',async(req,res,user)=>{
     const id=z.string().uuid().parse(req.params.id),p=pageInput.parse(req.query);
-    const {rows:[plan]}=await pool.query('SELECT id,customer_id,kind,status,expires_at,error,document FROM ads_plans WHERE user_id=$1 AND id=$2',[user,id]);
+    const {rows:[plan]}=await pool.query('SELECT id,customer_id,kind,status,expires_at,error,document,undo_of,(SELECT name FROM ads_accounts a WHERE a.user_id=ads_plans.user_id AND a.customer_id=ads_plans.customer_id) AS account_name FROM ads_plans WHERE user_id=$1 AND id=$2',[user,id]);
     if(!plan)throw new AdsError('Preview not found.',404);
     const d=plan.document;delete plan.document;
     const operations=d.operations.filter((operation:any)=>(!p.q||JSON.stringify(operation).toLowerCase().includes(p.q.toLowerCase()))&&(!p.status||Object.values(operation).some((v:any)=>Object.hasOwn(v,p.status))));
-    res.json({...plan,summary:d.summary,warnings:d.warnings,operations:operations.slice((p.page-1)*p.limit,p.page*p.limit).map((operation:any)=>{const type=Object.keys(operation)[0].replace(/Operation$/,'');const op:any=Object.values(operation)[0];return {operation,before:op.remove||op.update?d.before[type]?.find((r:any)=>r.resourceName===(op.remove||op.update.resourceName))||null:null};}),total:operations.length});
+    res.json({...plan,description:protectionDescription(plan.kind,d,plan.undo_of),summary:d.summary,warnings:d.warnings,operations:operations.slice((p.page-1)*p.limit,p.page*p.limit).map((operation:any)=>{const type=Object.keys(operation)[0].replace(/Operation$/,'');const op:any=Object.values(operation)[0];return {operation,before:op.remove||op.update?d.before[type]?.find((r:any)=>r.resourceName===(op.remove||op.update.resourceName))||null:null};}),total:operations.length});
   });
   // Owner-approved apply: marks unexpired 'preview' plans queued and enqueues an apply job
   // per plan (the worker writes to Google). "Confirm selected previews" — ads-manager.tsx.
@@ -286,6 +289,6 @@ export function registerAdsRoutes(app:Express,auth:(req:any,res:any)=>any,option
     const p=pageInput.parse(req.query),cid=req.query.customerId?customerId.parse(req.query.customerId):'';
     const where=`user_id=$1 AND ($2='' OR customer_id=$2) AND ($3='' OR title ILIKE '%'||$3||'%') AND ($4='' OR severity=$4)`;
     const args=[user,cid,p.q,p.status];const {rows:[n]}=await pool.query(`SELECT count(*)::int total FROM ads_findings WHERE ${where}`,args);
-    res.json({items:(await pool.query(`SELECT * FROM ads_findings WHERE ${where} ORDER BY id DESC LIMIT $5 OFFSET $6`,[...args,p.limit,(p.page-1)*p.limit])).rows,total:n.total});
+    res.json({items:(await pool.query(`SELECT * FROM ads_findings WHERE ${where} ORDER BY id DESC LIMIT $5 OFFSET $6`,[...args,p.limit,(p.page-1)*p.limit])).rows.map(row=>({...row,title:auditTitle(row.kind,row.title)})),total:n.total});
   });
 }
