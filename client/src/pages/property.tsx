@@ -1,3 +1,5 @@
+import { PlanRequired, planRequiredFrom } from "@/components/plan-required";
+import { propertyOfficeForDisplay, resolvePropertyScope } from "./property-display";
 import { governmentLinkNotice, governmentLinksAvailable } from "@shared/government-links";
 import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -10,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AppPage, Toolbar, EmptyState } from "@/components/app-ui";
+import { AppPage, Toolbar, EmptyState, Notice } from "@/components/app-ui";
 import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
 import {
   Building,
@@ -40,14 +42,16 @@ interface PropertyAppraiser {
 }
 
 export default function PropertyPage() {
-  const { data: appraisers, isLoading } = useQuery<PropertyAppraiser[]>({
+  const { data: rawAppraisers, isLoading, error, refetch } = useQuery<PropertyAppraiser[]>({
     queryKey: ["/api/property-appraisers"],
   });
 
+  const appraisers = useMemo(() => rawAppraisers?.map(propertyOfficeForDisplay), [rawAppraisers]);
+  const [scopeNotice, setScopeNotice] = useState("");
   // Filters live in the address bar (?state=WA&countyId=12&q=…&page=2); ?countyId= is
   // also the deep link the Search page's "Property lookup" uses.
   const [stateFilter, setStateFilter] = useState<string>(() => readQueryParam("state")?.toUpperCase() || "all");
-  const [countyFilter, setCountyFilter] = useState<string>(() => String(readQueryInt("countyId") ?? "all"));
+  const [countyFilter, setCountyFilter] = useState<string>(() => readQueryParam("countyId") || "all");
   const [searchQuery, setSearchQuery] = useState(() => readQueryParam("q") ?? "");
   const [page, setPage] = useState(() => readQueryInt("page") ?? 1);
 
@@ -55,13 +59,9 @@ export default function PropertyPage() {
   // clearable); an id with no office on record, or an unknown state, falls back to all.
   useEffect(() => {
     if (!appraisers) return;
-    if (countyFilter !== "all") {
-      const county = appraisers.find(a => String(a.countyId) === countyFilter)?.county;
-      if (!county) setCountyFilter("all");
-      else if (county.stateCode !== stateFilter) setStateFilter(county.stateCode);
-    } else if (stateFilter !== "all" && !appraisers.some(a => a.county?.stateCode === stateFilter)) {
-      setStateFilter("all");
-    }
+    const scope = resolvePropertyScope(appraisers, stateFilter, countyFilter);
+    setStateFilter(scope.state); setCountyFilter(scope.county);
+    if (scope.notice) setScopeNotice(scope.notice);
   }, [appraisers]);
 
   const states = useMemo(() => {
@@ -139,6 +139,7 @@ export default function PropertyPage() {
   };
 
   const clearFilters = () => {
+    setScopeNotice("");
     setStateFilter("all");
     setCountyFilter("all");
     setSearchQuery("");
@@ -161,6 +162,12 @@ export default function PropertyPage() {
   const hasFilters = stateFilter !== "all" || countyFilter !== "all" || searchQuery.trim() !== "";
   const activeFilters = (stateFilter !== "all" ? 1 : 0) + (countyFilter !== "all" ? 1 : 0);
 
+  if (error) return <AppPage width="narrow" testId="page-property">
+    <GoogleSectionHeader as="h1" title="Property records" flush />
+    {planRequiredFrom(error) ? <PlanRequired module="propertyRecords" error={error} /> : /^401:/.test(error.message) ?
+      <Notice tone="info">Sign in to access Property Records with an eligible plan. <Button asChild variant="outline"><a href="/auth">Sign in</a></Button></Notice> :
+      <Notice tone="danger">Couldn't load property offices. <Button variant="outline" onClick={() => void refetch()}>Retry</Button></Notice>}
+  </AppPage>;
   return (
     <AppPage width="narrow" testId="page-property">
       {/* Google's local-pack format (owner, 2026-10-07): a quiet header, hairline rows, pill actions. */}
@@ -172,6 +179,8 @@ export default function PropertyPage() {
         flush
       />
 
+      {page > totalPages && totalPages > 0 && <Notice tone="info">That page is no longer available. Showing the last available page.</Notice>}
+      {scopeNotice && <Notice tone="info">{scopeNotice}</Notice>}
       <Toolbar
         search={{ value: searchQuery, onChange: handleSearchChange, placeholder: "Search by office, county, or state…", testId: "input-property-search" }}
         activeFilters={activeFilters}
@@ -182,8 +191,8 @@ export default function PropertyPage() {
         ) : undefined}
         filters={(
           <>
-            <Select value={stateFilter} onValueChange={handleStateChange}>
-              <SelectTrigger className="h-10 w-full sm:w-[180px]" data-testid="select-state-filter">
+            <div><label htmlFor="property-state" className="text-sm">State</label><Select value={stateFilter} onValueChange={handleStateChange}>
+              <SelectTrigger className="h-10 w-full sm:w-[180px]" id="property-state" data-testid="select-state-filter">
                 <SelectValue placeholder="All states" />
               </SelectTrigger>
               <SelectContent>
@@ -192,10 +201,10 @@ export default function PropertyPage() {
                   <SelectItem key={s.code} value={s.code}>{s.name}</SelectItem>
                 ))}
               </SelectContent>
-            </Select>
+            </Select></div>
             {stateFilter !== "all" && (
-              <Select value={countyFilter} onValueChange={handleCountyChange}>
-                <SelectTrigger className="h-10 w-full sm:w-[180px]" data-testid="select-county-filter">
+              <div><label htmlFor="property-county" className="text-sm">County</label><Select value={countyFilter} onValueChange={handleCountyChange}>
+                <SelectTrigger className="h-10 w-full sm:w-[180px]" id="property-county" data-testid="select-county-filter">
                   <SelectValue placeholder="All counties" />
                 </SelectTrigger>
                 <SelectContent>
@@ -204,7 +213,7 @@ export default function PropertyPage() {
                     <SelectItem key={c.id} value={String(c.id)}>{c.name} County</SelectItem>
                   ))}
                 </SelectContent>
-              </Select>
+              </Select></div>
             )}
           </>
         )}
@@ -229,7 +238,7 @@ export default function PropertyPage() {
         />
       ) : (
         <>
-          <p className="g-text-2 text-sm tabular-nums" data-testid="text-result-count">
+          <p className="g-text-2 text-sm tabular-nums" aria-live="polite" data-testid="text-result-count">
             {filtered.length > perPage
               ? `Showing ${(currentPage - 1) * perPage + 1}–${Math.min(currentPage * perPage, filtered.length)} of ${filtered.length.toLocaleString()} offices`
               : `${filtered.length} office${filtered.length !== 1 ? "s" : ""}`}
@@ -237,9 +246,10 @@ export default function PropertyPage() {
           <GoogleList testId="list-appraisers">
             {paginated.map((appraiser) => {
               const linksOk = governmentLinksAvailable(appraiser);
-              const notice = linksOk ? governmentLinkNotice(appraiser) : null;
+              const checkedAt = appraiser.lastVerifiedAt ? new Date(appraiser.lastVerifiedAt) : null;
+              const notice = linksOk ? governmentLinkNotice(appraiser) ?? (checkedAt && !Number.isNaN(checkedAt.getTime()) ? 'Last checked ' + checkedAt.toLocaleDateString() + ' · links can change' : 'Check date unavailable · confirm with the office') : null;
               // No usable official link on record: an honest web search, never a fabricated portal.
-              const fallback = !linksOk || (!appraiser.portalUrl && !appraiser.searchUrl);
+              const fallback = appraiser.linkStatus === "unconfirmed" || !linksOk || (!appraiser.portalUrl && !appraiser.searchUrl);
               return (
                 <GoogleListRow
                   key={appraiser.id}
@@ -258,10 +268,10 @@ export default function PropertyPage() {
                   ) : undefined}
                   actions={<>
                     {linksOk && appraiser.portalUrl && (
-                      <GooglePill icon={ExternalLink} label="Open portal" href={appraiser.portalUrl} external testId={`button-visit-appraiser-${appraiser.id}`} />
+                      <GooglePill icon={ExternalLink} label={appraiser.linkStatus === "unconfirmed" ? "Open unconfirmed site" : "Open portal"} href={appraiser.portalUrl} external testId={`button-visit-appraiser-${appraiser.id}`} />
                     )}
                     {linksOk && appraiser.searchUrl && appraiser.searchUrl !== appraiser.portalUrl && (
-                      <GooglePill icon={Search} label="Search records" href={appraiser.searchUrl} external testId={`button-search-appraiser-${appraiser.id}`} />
+                      <GooglePill icon={Search} label={appraiser.linkStatus === "unconfirmed" ? "Search unconfirmed site" : "Search records"} href={appraiser.searchUrl} external testId={`button-search-appraiser-${appraiser.id}`} />
                     )}
                     {fallback && (
                       <GooglePill

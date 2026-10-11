@@ -205,7 +205,7 @@ const page: FeaturePage = {
       "Every search shows each portal's status: searched, or skipped and why.",
       "A national directory of permit offices with checked links — free to browse — and one click to property records.",
     ],
-    theyNotUs: "Nationwide permit databases with owner contacts and an API; alerts by address, trade and contractor are being built here.",
+    theyNotUs: "Nationwide permit databases with owner contacts and an API.",
   },
   related: ["property", "competitors", "crm"],
   app: { href: "/search", surface: "app" },

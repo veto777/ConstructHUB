@@ -1,3 +1,4 @@
+import { PLANS, planForModule } from "../plans";
 import type { FeaturePage } from "./types";
 
 /**
@@ -11,8 +12,8 @@ import type { FeaturePage } from "./types";
  *   - Visit + a separate Search button, tap-to-call phone, state / county / text filters kept in the address bar:
  *     client/src/pages/property.tsx
  *   - the Property lookup link on every permit result (/property?countyId=…): client/src/pages/search.tsx
- *   - no plan check, public without signing in: server/routes.ts GET /api/property-appraisers,
- *     client/src/App.tsx PublicRouter, shared/dashboard.ts (gate "none")
+ *   - propertyRecords module required: server/routes.ts GET /api/property-appraisers,
+ *     shared/plans.ts propertyRecords
  */
 
 const page: FeaturePage = {
@@ -92,8 +93,8 @@ const page: FeaturePage = {
     },
   ],
   pricing: {
-    kind: "account",
-    note: "The directory also opens without signing in.",
+    kind: "module",
+    module: "propertyRecords",
   },
   faqs: [
     {
@@ -102,7 +103,7 @@ const page: FeaturePage = {
     },
     {
       q: "Do I need a plan to use it?",
-      a: "No. Property Records is free: any ConstructHUB account can use it, the directory opens without signing in, and it isn't counted against a plan.",
+      a: `Yes. Sign in with the ${PLANS[planForModule("propertyRecords")!].name} plan or above to browse Property Records.`,
     },
     {
       q: "Where does the office list come from?",
@@ -128,8 +129,8 @@ const page: FeaturePage = {
         "phone number.",
       "The office list is built from NETR Online's public records directory. For each county it keeps the offices that " +
         "handle property assessment, such as an assessor, property appraiser, auditor or tax commissioner, and leaves out " +
-        "recorders, clerks and mapping offices. It stores only what the source lists: the office name, its phone and its " +
-        "online link. A value the source doesn't list stays blank; nothing is filled in by guesswork.",
+        "recorders, clerks and mapping offices. It lists the source's office name, phone and " +
+        "online link. When the office name is unavailable, the directory labels it County records (office name unavailable). Other missing values stay blank.",
       "Every published link is checked by loading the page. A link that opens a records page for that county is marked " +
         "verified. A source-listed link the check couldn't confirm, because the site blocked the check or the answer was " +
         "unclear, stays visible marked not auto-verified, with the date it was last checked. A dead link, one that " +
@@ -151,7 +152,7 @@ const page: FeaturePage = {
   seo: {
     title: "County Assessor & Property Records Lookup | ConstructHUB",
     description:
-      "Find the county assessor or property appraiser office for US counties, with checked links to its official records site and its phone number. Free.",
+      "Find US county assessor offices, checked records-site links and available phone numbers. Sign in with an eligible plan.",
   },
   sources: [
     "client/src/pages/property.tsx",

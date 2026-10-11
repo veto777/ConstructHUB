@@ -6,7 +6,8 @@
  */
 import type { Express, NextFunction, Request, Response } from "express";
 import { z } from "zod";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { hitPageInput, hitPage } from "./hit-pagination";
+import { and, desc, eq, lt, inArray, sql } from "drizzle-orm";
 import { db } from "../db";
 import { permitDatabases, permitWatches, permitWatchHits, permits, permitPollState, type PermitWatch } from "@shared/schema";
 import {
@@ -211,6 +212,7 @@ export function registerPermitAlertRoutes(app: Express, getDevUser: GetUser): vo
       kind: existing.kind, name: existing.name, params: existing.params, channels: existing.channels, databaseIds: existing.databaseIds, active: existing.active,
       ...(req.body ?? {}),
     });
+    if (merged.kind !== existing.kind) throw new WatchError(400, "Create a new watch to change its type");
     const jurisdictions = await loadJurisdictions(merged.databaseIds);
     // A changed address/center is re-geocoded; an unchanged one keeps its point.
     const sameAddress = (merged.params.address ?? null) === ((existing.params as WatchParams).address ?? null);
@@ -231,14 +233,16 @@ export function registerPermitAlertRoutes(app: Express, getDevUser: GetUser): vo
 
   route("get", "/:id/hits", async (req, res, userId) => {
     const existing = await owned(req.params.id as string, userId);
-    const limit = Math.min(200, Math.max(1, parseInt(String(req.query.limit ?? "50"), 10) || 50));
+    const { limit, before } = hitPageInput.parse(req.query);
+    const [{ total }] = await db.select({ total: sql<number>`count(*)::int` }).from(permitWatchHits).innerJoin(permits, eq(permits.id, permitWatchHits.permitId)).where(eq(permitWatchHits.watchId, existing.id));
     const rows = await db.select({ hit: permitWatchHits, permit: permits }).from(permitWatchHits)
       .innerJoin(permits, eq(permits.id, permitWatchHits.permitId))
-      .where(eq(permitWatchHits.watchId, existing.id)).orderBy(desc(permitWatchHits.matchedAt)).limit(limit);
-    res.json({ hits: rows.map(({ hit, permit }) => ({
+      .where(and(eq(permitWatchHits.watchId, existing.id), before ? lt(permitWatchHits.id, before) : undefined)).orderBy(desc(permitWatchHits.id)).limit(limit + 1);
+    const page = hitPage(rows.map(({ hit, permit }) => ({
       id: hit.id, reason: hit.reason, matchedAt: hit.matchedAt, notifiedAt: hit.notifiedAt, channelResults: hit.channelResults,
       permit: { ...permit, raw: undefined },
-    })) });
+    })), limit);
+    res.json({ ...page, total });
   });
 
   // "Check now": the watch's jurisdictions are polled on the next scheduler tick (within five minutes).

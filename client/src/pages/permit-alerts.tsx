@@ -1,6 +1,11 @@
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Bell, Check, History, Pause, Play, Plus, RefreshCw, Trash2, X } from "lucide-react";
+import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
+import { Bell, Check, Pencil, History, Pause, Play, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { apiRequest, queryClient, apiErrorMessage } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -13,24 +18,27 @@ import { WATCH_KINDS, WATCH_KIND_LABELS, MAX_RADIUS_MILES, type PermitWatchDto, 
 type Jurisdiction = { id: number; name: string; jurisdiction: string; jurisdictionType: string; platform: string | null; alertsSupported: boolean };
 type Hit = { id: number; reason: string | null; matchedAt: string; notifiedAt: string | null; channelResults: Record<string, { ok: boolean; detail?: string | null }> | null; permit: Record<string, any> };
 
-const selectClass = "h-10 w-full rounded-full border bg-background px-4 text-sm sm:w-auto";
+const selectClass = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring h-10 w-full rounded-full border bg-background px-4 text-sm sm:w-auto";
 const when = (iso: string | null | undefined) => (iso ? relativeTime(new Date(iso)) : "never");
 
 export default function PermitAlertsPage() {
-  const [error, setError] = useState(""), [busy, setBusy] = useState(false), [showForm, setShowForm] = useState(false);
+  const { toast } = useToast();
+  const [editing, setEditing] = useState<PermitWatchDto | null>(null);
+  const [deleting, setDeleting] = useState<PermitWatchDto | null>(null);
+  const [error, setError] = useState<Error | null>(null), [busy, setBusy] = useState(false), [showForm, setShowForm] = useState(false);
   const [openHits, setOpenHits] = useState<number | null>(() => {
     const n = Number(new URLSearchParams(window.location.search).get("watch"));
     return Number.isInteger(n) && n > 0 ? n : null;
   });
-  const { data, error: listError, isLoading } = useQuery<{ watches: PermitWatchDto[]; geocoder: boolean; platforms: string[] }>({
+  const { data, error: listError, isLoading, refetch } = useQuery<{ watches: PermitWatchDto[]; geocoder: boolean; platforms: string[] }>({
     queryKey: ["/api/permits/watches"],
     refetchInterval: pollUnlessPlanRequired(30_000),
   });
   const refresh = () => queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith("/api/permits/watches") });
   const act = async (method: string, path: string, body?: unknown) => {
-    setBusy(true); setError("");
-    try { await apiRequest(method, path, body); await refresh(); return true; }
-    catch (e) { setError(apiErrorMessage(e, "That didn't work")); return false; }
+    setBusy(true); setError(null);
+    try { await apiRequest(method, path, body); await refresh(); toast({ title: path.endsWith("/check") ? "Check requested" : method === "DELETE" ? "Watch deleted" : "Watch saved", description: path.endsWith("/check") ? "The portal will be checked on the next scheduler tick, within five minutes." : undefined }); return true; }
+    catch (e) { setError(e instanceof Error ? e : new Error("That didn't work")); return false; }
     finally { setBusy(false); }
   };
 
@@ -40,16 +48,17 @@ export default function PermitAlertsPage() {
       title="Permit alerts"
       description="Watch an address, a contractor, or the trades you care about in an area. We check each jurisdiction's permit portal every hour and send you what's new."
       flush
-      actions={<GooglePill icon={Plus} label="New watch" variant="solid" onClick={() => setShowForm(true)} testId="button-new-watch" />}
+      actions={<GooglePill icon={Plus} label="New watch" variant="solid" onClick={() => { setEditing(null); setShowForm(true); }} disabled={busy || isLoading || !!listError} testId="button-new-watch" />}
     />
   );
-  const planGate = planRequiredFrom(listError);
+  const gateError = planRequiredFrom(error) ? error : listError;
+  const planGate = planRequiredFrom(gateError);
   if (planGate) {
     return (
       <GoogleSurface page>
         <AppPage testId="page-permit-alerts">
           {header}
-          <PlanRequired module="permitAlerts" error={listError} className="max-w-3xl" />
+          <PlanRequired module="permitAlerts" error={gateError} className="max-w-3xl" />
         </AppPage>
       </GoogleSurface>
     );
@@ -61,23 +70,30 @@ export default function PermitAlertsPage() {
     <GoogleSurface page>
       <AppPage testId="page-permit-alerts">
         {header}
-        {error && <Notice tone="danger" testId="notice-permit-alerts-error">{error}</Notice>}
-        {listError && !planGate && <Notice tone="danger">{apiErrorMessage(listError, "Could not load your watches")}</Notice>}
+        {error && <Notice tone="danger" testId="notice-permit-alerts-error">{apiErrorMessage(error)}</Notice>}
+        {listError && !planGate && <Notice tone="danger">{apiErrorMessage(listError, "Could not load your watches")} <Button onClick={() => void refetch()}>Retry</Button></Notice>}
         <Notice tone="info" testId="notice-permit-alerts-coverage">
           Alerts need a portal that can list permits by date. Each jurisdiction on a watch says whether its portal supports that today; one that doesn't is kept on the watch and starts working the day its portal is supported.
           {data && !data.geocoder ? " Distance matching is off on this server, so an area watch covers its whole jurisdictions." : ""}
         </Notice>
-        {showForm && (
-          <WatchForm
+        <Dialog open={showForm} onOpenChange={open => { if (!busy) setShowForm(open); }}>
+          <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
+            <DialogTitle className="sr-only">{editing ? "Edit watch" : "New watch"}</DialogTitle>
+            <DialogDescription className="sr-only">Choose permit criteria, jurisdictions and delivery channels.</DialogDescription>
+          {error && <Notice tone="danger">{apiErrorMessage(error)}</Notice>}
+          {showForm && <WatchForm
+            key={editing?.id ?? "new"}
+            initial={editing}
             busy={busy}
             geocoder={data?.geocoder ?? false}
             onCancel={() => setShowForm(false)}
-            onSave={async (body) => { if (await act("POST", "/api/permits/watches", body)) setShowForm(false); }}
-          />
-        )}
+            onSave={async (body) => { if (await act(editing ? "PATCH" : "POST", editing ? `/api/permits/watches/${editing.id}` : "/api/permits/watches", body)) setShowForm(false); }}
+          />}
+          </DialogContent>
+        </Dialog>
         <section>
-          <GoogleSectionHeader title="Your watches" count={watches.length} description={unsupported.length ? `${unsupported.length} jurisdiction${unsupported.length === 1 ? "" : "s"} on your watches can't be polled yet.` : undefined} />
-          {isLoading ? <p className="text-sm g-text-2">Loading…</p> : !watches.length ? (
+          <GoogleSectionHeader title="Your watches" count={listError || isLoading ? undefined : watches.length} description={unsupported.length ? `${unsupported.length} jurisdiction${unsupported.length === 1 ? "" : "s"} on your watches can't be polled yet.` : undefined} />
+          {isLoading ? <Skeleton className="h-32 w-full" /> : listError ? null : !watches.length ? (
             <p className="text-sm g-text-2" data-testid="text-no-watches">No watches yet. Add one to start getting alerts.</p>
           ) : (
             <GoogleList testId="list-permit-watches">
@@ -88,21 +104,23 @@ export default function PermitAlertsPage() {
                   busy={busy}
                   hitsOpen={openHits === w.id}
                   onToggleHits={() => setOpenHits(openHits === w.id ? null : w.id)}
+                  onEdit={() => { setEditing(w); setShowForm(true); }}
                   onPause={() => act("PATCH", `/api/permits/watches/${w.id}`, { active: !w.active })}
                   onCheck={() => act("POST", `/api/permits/watches/${w.id}/check`)}
-                  onDelete={() => { if (window.confirm(`Delete the watch "${w.name}"?`)) void act("DELETE", `/api/permits/watches/${w.id}`); }}
+                  onDelete={() => setDeleting(w)}
                 />
               ))}
             </GoogleList>
           )}
         </section>
+        <AlertDialog open={!!deleting} onOpenChange={open => { if (!open) setDeleting(null); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete {deleting?.name}?</AlertDialogTitle><AlertDialogDescription>This removes the watch and its match history.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction disabled={busy} onClick={async () => { if (deleting && await act("DELETE", `/api/permits/watches/${deleting.id}`)) setDeleting(null); }}>Delete watch</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
       </AppPage>
     </GoogleSurface>
   );
 }
 
-function WatchRow({ watch: w, busy, hitsOpen, onToggleHits, onPause, onCheck, onDelete }: {
-  watch: PermitWatchDto; busy: boolean; hitsOpen: boolean; onToggleHits: () => void; onPause: () => void; onCheck: () => void; onDelete: () => void;
+function WatchRow({ watch: w, busy, hitsOpen, onToggleHits, onPause, onCheck, onDelete, onEdit }: {
+  watch: PermitWatchDto; busy: boolean; hitsOpen: boolean; onToggleHits: () => void; onPause: () => void; onCheck: () => void; onDelete: () => void; onEdit: () => void;
 }) {
   const channels = [w.channels.email && "email", w.channels.sms && "text", w.channels.telegram && "Telegram"].filter(Boolean).join(", ");
   const supported = w.jurisdictions.filter((j) => j.alertsSupported);
@@ -136,23 +154,36 @@ function WatchRow({ watch: w, busy, hitsOpen, onToggleHits, onPause, onCheck, on
         ))}
       </>}
       actions={<>
+        <GooglePill icon={Pencil} label="Edit watch" onClick={onEdit} disabled={busy} />
         <GooglePill icon={History} label={hitsOpen ? "Hide matches" : "Matches"} onClick={onToggleHits} selected={hitsOpen} testId={`button-watch-hits-${w.id}`} />
         <GooglePill icon={RefreshCw} label="Check now" onClick={onCheck} disabled={busy || !w.active} testId={`button-watch-check-${w.id}`} />
         <GooglePill icon={w.active ? Pause : Play} label={w.active ? "Pause" : "Resume"} onClick={onPause} disabled={busy} testId={`button-watch-pause-${w.id}`} />
         <GooglePill icon={Trash2} label="Delete" variant="quiet" onClick={onDelete} disabled={busy} testId={`button-watch-delete-${w.id}`} />
       </>}
     >
-      {hitsOpen && <HitList watchId={w.id} />}
+      {hitsOpen && <HitList watchId={w.id} unavailable={!supported.length || !lastChecked || failing.length === w.jurisdictions.length} />}
     </GoogleListRow>
   );
 }
 
-function HitList({ watchId }: { watchId: number }) {
-  const { data, isLoading } = useQuery<{ hits: Hit[] }>({ queryKey: [`/api/permits/watches/${watchId}/hits`] });
-  if (isLoading) return <p className="pt-3 text-sm g-text-2">Loading matches…</p>;
-  const hits = data?.hits ?? [];
-  if (!hits.length) return <p className="pt-3 text-sm g-text-2" data-testid={`text-no-hits-${watchId}`}>No permits have matched this watch yet.</p>;
+export function HitList({ watchId, unavailable = false }: { watchId: number; unavailable?: boolean }) {
+  const { data, isLoading, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+    queryKey: [`/api/permits/watches/${watchId}/hits`],
+    initialPageParam: null as number | null,
+    queryFn: async ({ pageParam }) => (await apiRequest("GET", `/api/permits/watches/${watchId}/hits?limit=50${pageParam ? '&before=' + pageParam : ''}`)).json() as Promise<{ hits: Hit[]; nextCursor: number | null; total: number }>,
+    getNextPageParam: page => page.nextCursor ?? undefined,
+  });
+  if (isLoading) return <Skeleton className="h-24 w-full mt-3" />;
+  if (planRequiredFrom(error)) return <PlanRequired module="permitAlerts" error={error} />;
+  const hits = data?.pages.flatMap(page => page.hits) ?? [];
+  const failure = error ? <Notice tone="danger">Could not load matches. <Button onClick={() => void (data ? fetchNextPage() : refetch())}>Retry</Button></Notice> : null;
+  if (error && !hits.length) return failure;
+  if (!hits.length) return <p className="pt-3 text-sm g-text-2" data-testid={`text-no-hits-${watchId}`}>{unavailable ? "No matches are stored yet. Portal data is unavailable or has not been checked; this does not mean there are no permits." : "No permits have matched this watch yet."}</p>;
   return (
+    <>
+    {failure}
+    <Button variant="outline" className="mt-3" onClick={() => void refetch()}>Refresh matches</Button>
+    <p className="mt-3 text-sm" aria-live="polite">Showing {hits.length} of {data?.pages.at(-1)?.total ?? hits.length} retained matches</p>
     <ul className="mt-3 space-y-3 border-t pt-3" data-testid={`list-hits-${watchId}`}>
       {hits.map((h) => {
         const p = h.permit;
@@ -175,20 +206,22 @@ function HitList({ watchId }: { watchId: number }) {
         );
       })}
     </ul>
+    {hasNextPage && <Button className="mt-3" variant="outline" disabled={isFetchingNextPage} onClick={() => void fetchNextPage()}>{isFetchingNextPage ? "Loading…" : "Load more matches"}</Button>}
+    </>
   );
 }
 
-function WatchForm({ busy, geocoder, onCancel, onSave }: { busy: boolean; geocoder: boolean; onCancel: () => void; onSave: (body: unknown) => Promise<void> }) {
-  const [kind, setKind] = useState<WatchKind>("trade_area");
-  const [name, setName] = useState(""), [address, setAddress] = useState(""), [parcel, setParcel] = useState("");
-  const [contractorName, setContractorName] = useState(""), [contractorLicense, setContractorLicense] = useState("");
-  const [radius, setRadius] = useState(""), [trades, setTrades] = useState<string[]>([]), [keywords, setKeywords] = useState("");
-  const [email, setEmail] = useState(true), [sms, setSms] = useState(false), [smsTo, setSmsTo] = useState(""), [telegram, setTelegram] = useState(false);
-  const [q, setQ] = useState(""), [state, setState] = useState(""), [picked, setPicked] = useState<Jurisdiction[]>([]);
+export function WatchForm({ busy, geocoder, onCancel, onSave, initial }: { initial?: PermitWatchDto | null; busy: boolean; geocoder: boolean; onCancel: () => void; onSave: (body: unknown) => Promise<void> }) {
+  const [kind, setKind] = useState<WatchKind>(initial?.kind ?? "trade_area");
+  const [name, setName] = useState(initial?.name ?? ""), [address, setAddress] = useState(initial?.params.address ?? ""), [parcel, setParcel] = useState(initial?.params.parcel ?? "");
+  const [contractorName, setContractorName] = useState(initial?.params.contractorName ?? ""), [contractorLicense, setContractorLicense] = useState(initial?.params.contractorLicense ?? "");
+  const [radius, setRadius] = useState(initial?.params.radiusMiles?.toString() ?? ""), [trades, setTrades] = useState<string[]>(initial?.params.trades ?? []), [keywords, setKeywords] = useState(initial?.params.keywords?.join(", ") ?? "");
+  const [email, setEmail] = useState(initial?.channels.email ?? true), [sms, setSms] = useState(initial?.channels.sms ?? false), [smsTo, setSmsTo] = useState(initial?.channels.smsTo ?? ""), [telegram, setTelegram] = useState(initial?.channels.telegram ?? false);
+  const [q, setQ] = useState(""), [state, setState] = useState(""), [picked, setPicked] = useState<Jurisdiction[]>(initial?.jurisdictions.map(j => ({ ...j, id: j.databaseId, jurisdictionType: "" })) ?? []);
   const [debouncedQ, setDebouncedQ] = useState("");
   useEffect(() => { const t = setTimeout(() => setDebouncedQ(q), 250); return () => clearTimeout(t); }, [q]);
-  const { data: tradeList } = useQuery<{ trades: { key: string; label: string }[] }>({ queryKey: ["/api/permits/trades"], staleTime: Infinity });
-  const { data: found } = useQuery<{ jurisdictions: Jurisdiction[] }>({
+  const { data: tradeList, error: tradesError, isLoading: tradesLoading, refetch: retryTrades } = useQuery<{ trades: { key: string; label: string }[] }>({ queryKey: ["/api/permits/trades"], staleTime: Infinity });
+  const { data: found, error: foundError, isFetching: finding, refetch: retryFound } = useQuery<{ jurisdictions: Jurisdiction[] }>({
     queryKey: [`/api/permits/watches/jurisdictions?${new URLSearchParams({ q: debouncedQ, stateCode: state.toUpperCase() })}`],
     enabled: debouncedQ.length >= 2 || state.length === 2,
   });
@@ -197,7 +230,7 @@ function WatchForm({ busy, geocoder, onCancel, onSave }: { busy: boolean; geocod
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const params: Record<string, unknown> = {};
+    const params: Record<string, unknown> = { lat: initial?.params.lat ?? null, lng: initial?.params.lng ?? null };
     if (kind === "address") { params.address = address || null; params.parcel = parcel || null; }
     if (kind === "parcel") params.parcel = parcel || null;
     if (kind === "contractor") { params.contractorName = contractorName || null; params.contractorLicense = contractorLicense || null; }
@@ -212,11 +245,11 @@ function WatchForm({ busy, geocoder, onCancel, onSave }: { busy: boolean; geocod
 
   return (
     <form onSubmit={submit} className="g-card space-y-4" data-testid="form-new-watch">
-      <GoogleSectionHeader as="h2" title="New watch" flush />
+      <GoogleSectionHeader as="h2" title={initial ? "Edit watch" : "New watch"} flush />
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block space-y-1.5 text-sm">
           <span className="g-text-2">What to watch</span>
-          <select className={selectClass} value={kind} onChange={(e) => setKind(e.target.value as WatchKind)} data-testid="select-watch-kind">
+          <select className={selectClass} disabled={!!initial} value={kind} onChange={(e) => setKind(e.target.value as WatchKind)} data-testid="select-watch-kind">
             {WATCH_KINDS.map((k) => <option key={k} value={k}>{WATCH_KIND_LABELS[k]}</option>)}
           </select>
         </label>
@@ -254,6 +287,8 @@ function WatchForm({ busy, geocoder, onCancel, onSave }: { busy: boolean; geocod
         <>
           <div className="space-y-1.5 text-sm">
             <span className="g-text-2">Trades (none = every permit)</span>
+            {tradesError && <Notice tone="danger">Could not load trades. <Button type="button" onClick={() => void retryTrades()}>Retry</Button></Notice>}
+            {tradesLoading && <Skeleton className="h-10 w-full" />}
             <div className="flex flex-wrap gap-2" data-testid="picker-trades">
               {(tradeList?.trades ?? []).map((t) => (
                 <GooglePill key={t.key} icon={trades.includes(t.key) ? Check : Plus} label={t.label} selected={trades.includes(t.key)} onClick={() => toggleTrade(t.key)} size="sm" testId={`trade-${t.key}`} />
@@ -286,11 +321,13 @@ function WatchForm({ busy, geocoder, onCancel, onSave }: { busy: boolean; geocod
             ))}
           </div>
         )}
-        {found?.jurisdictions && (
+        {foundError && <Notice tone="danger">Could not load jurisdictions. <Button type="button" onClick={() => void retryFound()}>Retry</Button></Notice>}
+        {finding && <Skeleton className="h-20 w-full" />}
+        {!foundError && !finding && found?.jurisdictions && (
           <ul className="max-h-56 space-y-1 overflow-auto rounded-lg border p-2" data-testid="list-jurisdiction-results">
             {found.jurisdictions.filter((j) => !pickedIds.has(j.id)).map((j) => (
               <li key={j.id}>
-                <button type="button" className="flex w-full items-center justify-between gap-2 rounded px-2 py-1 text-left hover:bg-muted" onClick={() => setPicked([...picked, j])} data-testid={`pick-${j.id}`}>
+                <button type="button" className="flex w-full items-center justify-between gap-2 rounded px-2 py-1 text-left hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" onClick={() => setPicked([...picked, j])} data-testid={`pick-${j.id}`}>
                   <span>{j.name} <span className="g-text-2">· {j.jurisdiction}{j.platform ? ` · ${j.platform}` : ""}</span></span>
                   <span className={j.alertsSupported ? "g-open text-xs" : "g-text-2 text-xs"}>{j.alertsSupported ? "Alerts supported" : "Not supported yet"}</span>
                 </button>
@@ -305,14 +342,16 @@ function WatchForm({ busy, geocoder, onCancel, onSave }: { busy: boolean; geocod
         <span className="g-text-2">Notify me by</span>
         <div className="flex flex-wrap items-center gap-4">
           <Label className="flex items-center gap-2"><Checkbox checked={email} onCheckedChange={(v) => setEmail(v === true)} data-testid="check-channel-email" /> Email</Label>
-          <Label className="flex items-center gap-2"><Checkbox checked={sms} onCheckedChange={(v) => setSms(v === true)} data-testid="check-channel-sms" /> Text (uses your CRM texting allowance)</Label>
+          <Label className="flex items-center gap-2"><Checkbox checked={sms} onCheckedChange={(v) => setSms(v === true)} data-testid="check-channel-sms" /> Text</Label>
           <Label className="flex items-center gap-2"><Checkbox checked={telegram} onCheckedChange={(v) => setTelegram(v === true)} data-testid="check-channel-telegram" /> Telegram (linked on LSA Leads)</Label>
         </div>
+        <p className="g-text-2">Text alerts use your CRM texting allowance. Delivery requires a configured channel.</p>
         {sms && <Input value={smsTo} onChange={(e) => setSmsTo(e.target.value)} placeholder="Phone to text (blank = your CRM profile's)" className="sm:w-80" data-testid="input-channel-sms-to" />}
       </div>
 
+      <Notice tone="info">{initial ? "Changes apply to future matches; existing history is kept. " : "Review your watch: "}{WATCH_KIND_LABELS[kind]} · {[address, parcel, contractorName, contractorLicense, kind === "trade_area" && (trades.join(", ") || "all trades"), keywords, radius && `${radius} miles`].filter(Boolean).join(" · ")} · {picked.map(j => j.jurisdiction).join(", ") || "no jurisdictions selected"} · {[email && "email", sms && "text", telegram && "Telegram"].filter(Boolean).join(", ") || "no delivery channels"}.</Notice>
       <div className="flex flex-wrap gap-2">
-        <GooglePill icon={Bell} label="Save watch" variant="solid" type="submit" disabled={busy || !picked.length} testId="button-save-watch" />
+        <GooglePill icon={Bell} label="Save watch" variant="solid" type="submit" disabled={busy || !picked.length || (kind === "trade_area" && (!!tradesError || tradesLoading))} testId="button-save-watch" />
         <GooglePill icon={X} label="Cancel" onClick={onCancel} disabled={busy} testId="button-cancel-watch" />
       </div>
     </form>

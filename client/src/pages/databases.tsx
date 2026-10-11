@@ -32,7 +32,7 @@ import {
   ChevronRight,
   Building,
 } from "lucide-react";
-import { AppPage, Toolbar, EmptyState } from "@/components/app-ui";
+import { AppPage, Toolbar, EmptyState, Notice } from "@/components/app-ui";
 import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
 import { apiRequest } from "@/lib/queryClient";
 import { readQueryInt, readQueryParam, replaceQueryParams } from "@/lib/url-query";
@@ -94,11 +94,11 @@ export default function DatabasesPage() {
     });
   }, [selectedState, selectedCountyId, jurisdictionFilter, searchQuery, currentPage]);
 
-  const { data: counties } = useQuery<County[]>({
+  const { data: counties, error: countiesError, refetch: retryCounties } = useQuery<County[]>({
     queryKey: ["/api/counties"],
   });
 
-  const { data: counts } = useQuery<DbCounts>({
+  const { data: counts, error: countsError, refetch: retryCounts } = useQuery<DbCounts>({
     queryKey: ["/api/databases/counts"],
   });
 
@@ -140,7 +140,7 @@ export default function DatabasesPage() {
     return p.toString();
   }, [currentPage, jurisdictionFilter, selectedCountyId, selectedState, searchQuery]);
 
-  const { data: result, isLoading, isFetching, isPlaceholderData } = useQuery<FilteredResult>({
+  const { data: result, isLoading, isFetching, isPlaceholderData, error, refetch } = useQuery<FilteredResult>({
     queryKey: ["/api/databases", queryParams],
     queryFn: async () => {
       const res = await fetch(`/api/databases?${queryParams}`);
@@ -195,7 +195,7 @@ export default function DatabasesPage() {
         flush
       />
 
-      {counts && (
+      {counts && !countsError && (
         <GoogleStatGrid cols={3}>
           <GoogleStat
             label="Jurisdictions"
@@ -210,6 +210,8 @@ export default function DatabasesPage() {
         </GoogleStatGrid>
       )}
 
+      {countiesError && <Notice tone="danger">County filters are unavailable. <Button onClick={() => void retryCounties()}>Retry</Button></Notice>}
+      {countsError && <Notice tone="danger">Directory counts are unavailable. <Button onClick={() => void retryCounts()}>Retry</Button></Notice>}
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Jurisdiction type" data-testid="filter-jurisdiction-type">
           {([
@@ -223,7 +225,7 @@ export default function DatabasesPage() {
               ariaPressed={jurisdictionFilter === key}
               selected={jurisdictionFilter === key}
               onClick={() => handleFilterChange(setJurisdictionFilter)(key)}
-              label={<>{label}{count != null && <span className="ml-1.5 text-xs font-normal tabular-nums g-text-2">{count.toLocaleString()}</span>}</>}
+              label={<>{label}{!countsError && count != null && <span className="ml-1.5 text-xs font-normal tabular-nums g-text-2">{count.toLocaleString()}</span>}</>}
               testId={`button-filter-${key}`}
             />
           ))}
@@ -285,6 +287,8 @@ export default function DatabasesPage() {
             <Skeleton key={i} className="h-28 rounded-xl" />
           ))}
         </div>
+      ) : error ? (
+        <EmptyState icon={Database} title="Could not load the permit directory" description="Directory data is unavailable. Try again." action={<Button onClick={() => void refetch()}>Retry</Button>} />
       ) : databases.length === 0 ? (
         <EmptyState
           icon={Database}
@@ -489,7 +493,7 @@ function DatabaseCard({ database, countyName }: { database: PermitDatabase; coun
           {database.phone && (
             <GooglePill icon={Phone} label="Call" href={`tel:${database.phone.replace(/[^\d+]/g, "")}`} title={database.phone} testId={`link-phone-${database.id}`} />
           )}
-          <GooglePill icon={Building} label="Property lookup" href={`/property?countyId=${database.countyId}`} testId={`link-property-lookup-${database.id}`} />
+          <GooglePill icon={Building} label="Property records" title="Sign in with an eligible plan to browse property offices" href={`/property?countyId=${database.countyId}`} testId={`link-property-lookup-${database.id}`} />
           {canScrape && (
             <GooglePill icon={Download} label="Scrape" onClick={() => setScrapeOpen(true)} testId={`button-scrape-${database.id}`} />
           )}
