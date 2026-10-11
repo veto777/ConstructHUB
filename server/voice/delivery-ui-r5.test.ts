@@ -63,3 +63,20 @@ it("renders separate channel outcomes and explains that a disabled worker holds 
   expect(html).toContain("Carrier refused");
   expect(html).toContain("Queued retries will run when it is enabled");
 });
+
+it("keeps CRM success distinct from unknown notifications and excludes unknown-only retry", () => {
+  const client = new QueryClient();
+  const html = renderToStaticMarkup(createElement(QueryClientProvider, { client }, createElement(DeliverySection, { callId: "call", delivery: {
+    state: "failed", worker: { running: true, intervalSeconds: 60, lastRunAt: null, lastOk: null },
+    tasks: [
+      { id: 1, key: "lead", kind: "lead", label: "Client and project in your CRM", state: "done", attempts: 1, lastError: null, nextAttemptAt: null, giveUpAt: null, doneAt: null },
+      { id: 2, key: "notification:sms:two", kind: "notification", label: "SMS — recipient two", state: "failed", attempts: 1, lastError: "Delivery outcome unknown: response lost", nextAttemptAt: null, giveUpAt: null, doneAt: null },
+    ],
+  } })));
+  expect(html).toContain("CRM saved");
+  expect(html).toContain("Notifications need attention");
+  expect(html).toContain("Outcome unknown");
+  expect(html).toContain("Check with the recipient");
+  expect(html).not.toContain('data-testid="button-call-delivery-retry"');
+  expect(html).not.toContain("Fix the cause, then Retry now");
+});

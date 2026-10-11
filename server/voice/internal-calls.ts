@@ -31,7 +31,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { CALL_OUTCOMES, ESCALATION_KINDS, type CallOutcome } from "@shared/voice-profile";
 import { requireVoiceInternal, VOICE_INTERNAL_PATH } from "./internal-auth";
 import { loadOrgVoiceContext, findVoiceNumber } from "./org-profile";
-import { deliverLead, notifyCallSummary } from "./leads";
+import { deliverLead, callSummaryTaskSpecs } from "./leads";
 import { raiseEscalation } from "./escalations";
 import {
   insertCallTasks, leadTaskSpec, escalationTaskSpec, runCallTasksFor, listCallTasks, deliveryStateOf, startVoiceCallTaskWorker,
@@ -341,10 +341,7 @@ async function processFinishedCall(callId: string, report: EndReport, opts: Fini
     const quiet = (outcome === "hangup" || outcome === "voicemail") && durationSeconds < QUIET_CALL_SECONDS;
     if (!leadTask && !alertKinds.size && !quiet) {
       if (profile.leadDelivery.notifyOnEveryCall) {
-        await notifyCallSummary(ctx, { ...row, outcome }).catch((e: any) => {
-          console.error("[voice] summary notify failed:", e?.message || e);
-          void recordFailure("call_assistant", "Call Assistant call-summary notification", e, { callId: row.id, orgId: ctx.org.id });
-        });
+        tasks.push(...await callSummaryTaskSpecs(ctx, { ...row, outcome }));
       }
       recordActivity({ orgId: ctx.org.id, actorLabel: actor, action: "call.answered", entityType: "voice_call", entityId: row.id, customerId: row.customerId ?? null, meta: { outcome, durationSeconds, summary: row.summary, recording: !!row.recordingKey } });
     }
