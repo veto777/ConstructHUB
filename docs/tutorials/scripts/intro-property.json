@@ -1,0 +1,127 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "intro-property",
+  "title": "Property Records",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/property",
+      "caption": "Property Records",
+      "chapter": "A directory of county offices",
+      "narration": "This is Property Records, a directory of US county assessor and property appraiser offices."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-result-count\"]",
+      "caption": "Over 3,000 offices",
+      "narration": "It lists more than three thousand offices, from NETR Online's public records directory."
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid=\"select-state-filter\"]",
+      "value": "Florida",
+      "caption": "Pick a state",
+      "chapter": "Find the county's office",
+      "narration": "Pick a state, and the list keeps only that state's offices."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"select-county-filter\"]",
+      "caption": "Or pick a county",
+      "narration": "A County list appears next to it, or you can type the county's name."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-property-search\"]",
+      "value": "Sarasota",
+      "caption": "Search by office, county or state",
+      "narration": "Type Sarasota, and the list comes down to that county's office."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"card-appraiser-\"]",
+      "caption": "The office and its link check",
+      "chapter": "Open the office's own site",
+      "narration": "The card shows the office, its county, and when its link was last checked."
+    },
+    {
+      "action": "hover",
+      "selector": "[data-testid^=\"button-visit-appraiser-\"]",
+      "caption": "Open portal: the county's own site",
+      "narration": "Open portal takes you to the county's own records site. You look the property up there."
+    },
+    {
+      "action": "hover",
+      "selector": "[data-testid^=\"link-phone-\"]",
+      "caption": "Call the office",
+      "narration": "Call dials the office's number, where the directory lists one."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-property-search\"]",
+      "value": "Alachua",
+      "caption": "Another county: Alachua",
+      "narration": "Now type Alachua, a county whose link the check couldn't confirm."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"card-appraiser-\"]",
+      "caption": "Not auto-verified, with its last check",
+      "narration": "Its card says not auto-verified, with the date of the last check, so you know to double-check it."
+    },
+    {
+      "action": "hover",
+      "selector": "[data-testid^=\"link-appraiser-fallback-\"]",
+      "caption": "Find property records: a web search",
+      "narration": "Find property records runs a web search for the county's office, instead of guessing an address."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"page-property\"] p:has-text(\"Included with\")",
+      "caption": "Records stay on the county's site",
+      "chapter": "Where to find it",
+      "narration": "Owners and values stay on the county's site. ConstructHUB doesn't pull them in."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"page-property\"] p:has-text(\"Included with\")",
+      "caption": "Included with Pro, Agency and Unlimited",
+      "narration": "Property Records is included with the Pro, Agency and Unlimited plans."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-property-records\"]",
+      "caption": "Menu: Property Records",
+      "narration": "You'll find Property Records in the menu, under Permits & Databases."
+    }
+  ],
+  "youtube": {
+    "title": "Property Records in about a minute | ConstructHUB",
+    "description": "A one-minute tour of Property Records in ConstructHUB: a directory of US county assessor and property appraiser offices, filtered by state and county, with a checked link to each office's own records site and its phone number. You look the property up on the county's site.",
+    "tags": [
+      "ConstructHUB",
+      "property records",
+      "county assessor",
+      "property appraiser",
+      "public records",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Find the County Records Office",
+    "accent": "Records",
+    "kicker": "Property Records",
+    "step": 5
+  },
+  "removeSelectors": [
+    "[data-testid^=\"card-appraiser-\"] .g-chip"
+  ]
+}
