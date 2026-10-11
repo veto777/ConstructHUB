@@ -13,7 +13,7 @@ import {
   Star, Loader2, Copy, ExternalLink, CheckCircle2,
   ThumbsUp, ThumbsDown, MessageSquare, DollarSign, Camera, Download,
   AlertCircle, Heart, Sparkles, ArrowRight, ShieldCheck, X,
-  Clock, Lock, Award, Zap, PenLine,
+  Clock, Lock, Award, Zap, PenLine, ArrowLeft,
 } from "lucide-react";
 
 function FloatingParticles({ color = "#d4d4d8" }: { color?: string }) {
@@ -543,6 +543,18 @@ export default function ReviewFeedbackPage({ initialStep, initialRating }: { ini
         {step === "improvement" && (
           <Card className="border shadow-lg overflow-hidden">
             <CardContent className="p-6 sm:p-8 space-y-6">
+              <div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-foreground -ml-2"
+                  onClick={() => setStep("rating")}
+                  data-testid="button-improvement-back"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-1" />
+                  Back
+                </Button>
+              </div>
               <div className="text-center space-y-3">
                 <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto">
                   <MessageSquare className="w-8 h-8 text-gray-500" />
