@@ -646,9 +646,18 @@ export default function SiteConnections({
   return (
     <AppPage testId={`page-site-connections-${provider}`}>
       {header}
-      {config.error && (
-        <ReportError error={config.error} retry={() => void config.refetch()} />
-      )}
+      {config.error &&
+        (config.data ? (
+          <SavedDataStrip
+            updatedAt={config.dataUpdatedAt}
+            retry={() => void config.refetch()}
+          />
+        ) : (
+          <ReportError
+            error={config.error}
+            retry={() => void config.refetch()}
+          />
+        ))}
       {config.isLoading && <LoadingReport />}
       {config.data?.workerEnabled === false && (
         <Notice tone="warning">
@@ -1638,6 +1647,7 @@ function CloudflareDetails({
                   title={field[0].toUpperCase() + field.slice(1)}
                   url={`/api/cloudflare/assets/${id}/cache?field=${field}`}
                   columns={cloudflareColumns[field]}
+                  sortable
                   render={() => null}
                 />
               )}
@@ -1786,6 +1796,8 @@ function SearchOverview({
         label="Daily clicks"
         date={(r) => r.date}
         value={(r) => r.clicks}
+        start={start}
+        end={end}
       />
     </section>
   );

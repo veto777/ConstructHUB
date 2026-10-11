@@ -24,13 +24,17 @@ export function ReviewDialog({
   busy,
   submit,
   close,
+  onSubmitted,
 }: {
   review: "inspect" | "sitemap";
   picked: UrlRow[];
   assets: any[];
   busy: boolean;
   submit: (body: any) => Promise<any>;
+  /** Any close without a submission (Esc, X, overlay): must never clear the picked rows. */
   close: () => void;
+  /** Only a successful submit clears the picked rows (the caller closes here too). */
+  onSubmitted: () => void;
 }) {
   return (
     <Dialog open onOpenChange={(open) => !open && close()}>
@@ -63,7 +67,7 @@ export function ReviewDialog({
                 url: r.url,
               })),
             });
-            if (result) close();
+            if (result) onSubmitted();
           }}
           data-testid="button-confirm-queue"
         >
@@ -185,9 +189,10 @@ export function UrlActions({
           assets={assets}
           busy={busy}
           submit={submit}
-          close={() => {
+          close={() => setReview(null)}
+          onSubmitted={() => {
             setReview(null);
-            setRows(rows.filter((r) => !r.selected));
+            setRows((rows) => rows.filter((r) => !r.selected));
           }}
         />
       )}

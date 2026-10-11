@@ -468,7 +468,40 @@ export function registerCloudflareRoutes(
       throw new ProviderError("HTTPS is required for credentials", 400);
   };
   // Raw analytics lists behind the details panel ("Flagged IPs / traffic / events / paths /
-  // bots / countries"): expands edge_assets.data->field (?q, 25/page). site-connections.tsx.
+  // bots / countries"): expands edge_assets.data->field (?q, 25/page). ?sort&dir order the
+  // WHOLE dataset in SQL before pagination, whitelisted per dataset (typed numeric casts
+  // for counters, text order for names/dates) — same contract as the GSC analytics route.
+  // "Traffic"/"Events"/"Paths"/"Bots"/"Countries" DataLists — site-connections.tsx.
+  const cacheSorts: Record<string, Record<string, string>> = {
+    traffic: {
+      date: "value->'dimensions'->>'date'",
+      requests: "NULLIF(value->'sum'->>'requests','')::numeric",
+      pageViews: "NULLIF(value->'sum'->>'pageViews','')::numeric",
+      threats: "NULLIF(value->'sum'->>'threats','')::numeric",
+      uniques: "NULLIF(value->'uniq'->>'uniques','')::numeric",
+    },
+    events: {
+      datetime: "value->>'datetime'",
+      action: "value->>'action'",
+      clientIP: "value->>'clientIP'",
+      clientCountryName: "value->>'clientCountryName'",
+      clientRequestPath: "value->>'clientRequestPath'",
+      source: "value->>'source'",
+    },
+    paths: {
+      clientRequestPath: "value->'dimensions'->>'clientRequestPath'",
+      count: "NULLIF(value->>'count','')::numeric",
+    },
+    bots: {
+      botScore: "NULLIF(value->'dimensions'->>'botScore','')::numeric",
+      count: "NULLIF(value->>'count','')::numeric",
+    },
+    countries: {
+      country: "value->>'country'",
+      requests: "NULLIF(value->>'requests','')::numeric",
+      threats: "NULLIF(value->>'threats','')::numeric",
+    },
+  };
   route("get", "/api/cloudflare/assets/:id/cache", async (req, res, user) => {
     const a = await ownedAsset(
       user,
@@ -478,13 +511,23 @@ export function registerCloudflareRoutes(
     const p = listInput
       .extend({
         field: z.enum(["traffic", "events", "paths", "bots", "countries"]),
+        sort: z.string().max(40).optional(),
+        dir: z.enum(["asc", "desc"]).default("asc"),
       })
       .parse(req.query);
+    // Only whitelisted, per-dataset keys reach the ORDER BY; anything else is a 400,
+    // never an interpolation.
+    const orderColumn = p.sort ? cacheSorts[p.field]?.[p.sort] : undefined;
+    if (p.sort && !orderColumn)
+      throw new ProviderError("Unsupported sort field", 400);
     const values = [a.id, user, p.field, `%${p.q}%`];
     const from =
       "FROM edge_assets a,jsonb_array_elements(COALESCE(NULLIF(a.data->$3,'null'::jsonb),'[]')) value WHERE a.id=$1 AND a.user_id=$2 AND value::text ILIKE $4";
+    const order = orderColumn
+      ? `${orderColumn} ${p.dir} NULLS LAST, value::text`
+      : "value::text";
     const { rows } = await pool.query(
-      `SELECT value ${from} ORDER BY value::text LIMIT $5 OFFSET $6`,
+      `SELECT value ${from} ORDER BY ${order} LIMIT $5 OFFSET $6`,
       [...values, p.limit, (p.page - 1) * p.limit],
     );
     const {

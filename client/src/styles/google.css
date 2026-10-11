@@ -552,6 +552,11 @@ a.g-stat:hover { background: var(--g-surface-2); }
   .g-table td:first-child { display: block; font-weight: 500; }
   .g-table td:first-child::before { content: none; }
   .g-table .num { text-align: right; }
+  /* Site-connection reports (Search Console / Cloudflare) opt in with g-table--report:
+     every metric keeps its column label on phones, including the first column, so a
+     bare date or number is never left unidentifiable. */
+  .g-table--report td:first-child { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .g-table--report td:first-child::before { content: attr(data-label); color: var(--g-text-2); font-size: 12px; line-height: 16px; font-weight: 400; flex: none; }
 }
 /* Movement arrows: glyph + number, never colour alone. */
 .g-move { display: inline-flex; align-items: center; gap: 2px; font-variant-numeric: tabular-nums; font-size: 12px; line-height: 16px; }

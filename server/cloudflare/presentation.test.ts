@@ -23,12 +23,20 @@ import {
   ReviewDialog,
 } from "../../client/src/components/site-connections/url-actions";
 // Radix portals don't render on the server: stub the dialog primitives so the
-// review dialog's markup can be asserted as static HTML.
+// review dialog's markup can be asserted as static HTML. Handlers are captured
+// so tests can drive Esc (onOpenChange) and the confirm click.
+const captured = vi.hoisted(() => ({
+  openChanges: [] as Array<(open: boolean) => void>,
+  confirmClicks: [] as Array<() => Promise<void> | void>,
+}));
 const dialogStubs = vi.hoisted(async () => {
   const { createElement: h } = await import("react");
   const Div = ({ children, className }: any) => h("div", { className }, children);
   return {
-    Dialog: ({ children, open }: any) => (open ? h("div", null, children) : null),
+    Dialog: ({ children, open, onOpenChange }: any) => {
+      if (open) captured.openChanges.push(onOpenChange);
+      return open ? h("div", null, children) : null;
+    },
     DialogContent: Div,
     DialogHeader: Div,
     DialogTitle: Div,
@@ -36,6 +44,15 @@ const dialogStubs = vi.hoisted(async () => {
   };
 });
 vi.mock("../../client/src/components/ui/dialog", () => dialogStubs);
+vi.mock("../../client/src/components/ui/button", async () => {
+  const { createElement: h } = await import("react");
+  return {
+    Button: ({ children, onClick, ...rest }: any) => {
+      if (onClick) captured.confirmClicks.push(onClick);
+      return h("button", { ...rest, onClick }, children);
+    },
+  };
+});
 it("preserves independently picked sync bounds, including an end-only range", () => {
   expect(syncRange("2026-08-01", "2026-09-01")).toEqual({
     start: "2026-08-01",
@@ -327,6 +344,7 @@ it("the review dialog confirms with a real styled button, not a pill missing its
       busy: false,
       submit: async () => ({}),
       close: () => {},
+      onSubmitted: () => {},
     }),
   );
   // The portal re-supplies the surface tokens (the domains fix)…
@@ -335,6 +353,75 @@ it("the review dialog confirms with a real styled button, not a pill missing its
   expect(html).toContain("button-confirm-queue");
   expect(html).toContain("Confirm and queue");
   expect(html).not.toContain("g-pill");
+});
+// The r5 regression: ANY dialog close (Esc, X, overlay → Radix onOpenChange(false)) must
+// run the plain close — clearing the picked rows belongs to the submit-success path only.
+it("cancelling the review dialog closes without touching the submit-success path", () => {
+  const close = vi.fn();
+  const onSubmitted = vi.fn();
+  const submit = vi.fn(async () => ({ queued: 1 }));
+  captured.openChanges.length = 0;
+  renderToStaticMarkup(
+    h(ReviewDialog, {
+      review: "inspect",
+      picked: [{ assetId: "12", url: "https://fixture.example/a", selected: true }],
+      assets: [
+        { id: 12, name: "Fixture site", external_id: "sc-domain:fixture.example" },
+      ],
+      busy: false,
+      submit,
+      close,
+      onSubmitted,
+    }),
+  );
+  expect(captured.openChanges.length).toBe(1);
+  // Esc / X / overlay all reduce to onOpenChange(false):
+  captured.openChanges[0](false);
+  expect(close).toHaveBeenCalledTimes(1);
+  expect(onSubmitted).not.toHaveBeenCalled();
+  expect(submit).not.toHaveBeenCalled();
+});
+it("only a successful submit fires onSubmitted — a failed submit keeps everything", async () => {
+  const close = vi.fn();
+  const onSubmitted = vi.fn();
+  captured.confirmClicks.length = 0;
+  renderToStaticMarkup(
+    h(ReviewDialog, {
+      review: "sitemap",
+      picked: [{ assetId: "12", url: "https://fixture.example/sitemap.xml", selected: true }],
+      assets: [
+        { id: 12, name: "Fixture site", external_id: "sc-domain:fixture.example" },
+      ],
+      busy: false,
+      submit: async () => ({ queued: 1 }),
+      close,
+      onSubmitted,
+    }),
+  );
+  expect(captured.confirmClicks.length).toBe(1);
+  await captured.confirmClicks[0]();
+  expect(onSubmitted).toHaveBeenCalledTimes(1);
+  expect(close).not.toHaveBeenCalled();
+  // A rejected or empty result: nothing fires — the dialog stays open with rows intact.
+  const close2 = vi.fn();
+  const onSubmitted2 = vi.fn();
+  captured.confirmClicks.length = 0;
+  renderToStaticMarkup(
+    h(ReviewDialog, {
+      review: "inspect",
+      picked: [{ assetId: "12", url: "https://fixture.example/a", selected: true }],
+      assets: [
+        { id: 12, name: "Fixture site", external_id: "sc-domain:fixture.example" },
+      ],
+      busy: false,
+      submit: async () => null,
+      close: close2,
+      onSubmitted: onSubmitted2,
+    }),
+  );
+  await captured.confirmClicks[0]();
+  expect(onSubmitted2).not.toHaveBeenCalled();
+  expect(close2).not.toHaveBeenCalled();
 });
 it("trend bars are focusable controls with exact values and a labelled maximum", () => {
   const rows = [
@@ -401,4 +488,179 @@ it("page-local tables keep the honest within-this-page disclosure", () => {
   // No onSort: the button itself warns before the user clicks.
   expect(html).toContain("Sorts the rows on this page only");
   expect(html).not.toContain("across all");
+});
+import { toTrendPeriods } from "../../client/src/components/site-connections/report";
+it("mobile report tables label every cell and associate it with its column header", () => {
+  const html = renderToStaticMarkup(
+    h(ReportTable, {
+      caption: "Traffic",
+      rows: [{ dimensions: { date: "2026-10-01" }, sum: { requests: 7 } }],
+      columns: cloudflareColumns.traffic,
+    }),
+  );
+  // Every cell carries its metric label; every td names the header that describes it
+  // (the thead is visually hidden below 640px, so labels must live on the cells).
+  expect(html).toContain('data-label="Date (UTC)"');
+  expect(html).toContain('data-label="Requests"');
+  expect(html).toContain('data-label="Unique visitors"');
+  const cells = html.match(/<td[\s>]/g)!.length;
+  expect(html.match(/headers="[^"]+"/g)!.length).toBe(cells);
+  expect(html.match(/data-label=/g)!.length).toBe(cells);
+  // The report tables opt into first-column labels for the phone card layout.
+  expect(html).toContain("g-table--report");
+});
+it("server-sorted tables expose a phone-visible Sort by and Direction control", () => {
+  const html = renderToStaticMarkup(
+    h(ReportTable, {
+      caption: "Traffic",
+      total: 60,
+      rows: [],
+      columns: cloudflareColumns.traffic,
+      sort: { key: "requests", dir: "desc" },
+      onSort: () => {},
+    }),
+  );
+  // Visible below 640px only, and it reflects the server/URL sort state.
+  expect(html).toContain("sm:hidden");
+  expect(html).toContain("Sort by");
+  expect(html).toContain("Direction");
+  expect(html).toContain('aria-label="Sort Traffic by"');
+  expect(html).toContain('aria-label="Sort direction for Traffic"');
+  expect(html).toMatch(/selected[^>]*>Requests<\/option>/);
+  expect(html).toMatch(/selected[^>]*>Descending<\/option>/);
+  // Whole-report disclosure stays visible where the hidden thead can't be.
+  expect(html).toContain("Sorted by Requests descending, across all 60 rows.");
+  // Local-only tables get no server-sort control.
+  const local = renderToStaticMarkup(
+    h(ReportTable, {
+      caption: "Events",
+      rows: [{ n: 1 }],
+      columns: [{ label: "N", value: (r: any) => r.n }],
+    }),
+  );
+  expect(local).not.toContain("Sort by");
+});
+it("trend ranges over 90 days aggregate to weeks with a persistent date-value readout", () => {
+  // 120 consecutive days from 2026-06-01 — far past the ~90-day threshold.
+  const rows = Array.from({ length: 120 }, (_, i) => {
+    const d = new Date(Date.UTC(2026, 5, 1 + i));
+    return { date: d.toISOString().slice(0, 10), clicks: i + 1 };
+  });
+  const { periods, weekly } = toTrendPeriods(rows, (r: any) => r.clicks, (r: any) => r.date);
+  expect(weekly).toBe(true);
+  expect(periods.length).toBeLessThan(25);
+  for (const p of periods) expect(p.date).toMatch(/^Week of \d{4}-\d{2}-\d{2}$/);
+  // The SELECTED range drives the decision too: 58 actual days inside a 132-day
+  // selection still render weekly — widening the range asks for the long view.
+  const shortData = rows.slice(0, 58);
+  const byDataAlone = toTrendPeriods(shortData, (r: any) => r.clicks, (r: any) => r.date);
+  expect(byDataAlone.weekly).toBe(false);
+  const bySelectedRange = toTrendPeriods(
+    shortData,
+    (r: any) => r.clicks,
+    (r: any) => r.date,
+    "2026-06-01",
+    "2026-10-11",
+  );
+  expect(bySelectedRange.weekly).toBe(true);
+  expect(bySelectedRange.periods.length).toBeLessThan(20);
+  const html = renderToStaticMarkup(
+    h(ReportTrend, {
+      rows,
+      label: "Daily clicks",
+      date: (r: any) => r.date,
+      value: (r: any) => r.clicks,
+    }),
+  );
+  expect(html).toContain("weekly periods");
+  expect(html).toContain("Range over 90 days: each bar totals one week");
+  // One bar per week, not 120 daily bars.
+  expect(html.match(/<button/g)!.length).toBe(periods.length);
+  // The readout is pinned to the max period without any hover, date and value both shown.
+  expect(html).toContain("text-trend-selection");
+  const maxPeriod = periods.reduce((a, b) => (b.value > a.value ? b : a));
+  expect(html).toContain(`${maxPeriod.date}: ${maxPeriod.value.toLocaleString("en-US")}`);
+  expect(html).toContain('aria-pressed="true"');
+});
+it("the trend chart is a single Tab stop with arrow-key roving selection", () => {
+  const rows = [
+    { date: "2026-09-01", clicks: 12 },
+    { date: "2026-09-02", clicks: 40 },
+    { date: "2026-09-03", clicks: 8 },
+  ];
+  const html = renderToStaticMarkup(
+    h(ReportTrend, {
+      rows,
+      label: "Daily clicks",
+      date: (r: any) => r.date,
+      value: (r: any) => r.clicks,
+    }),
+  );
+  // Exactly one bar is in the tab order; the rest are reached with arrow keys.
+  expect(html.match(/tabindex="0"/g)!.length).toBe(1);
+  expect(html.match(/tabindex="-1"/g)!.length).toBe(2);
+  // Daily range stays daily, and the default selection is the maximum bar.
+  expect(html).toContain("daily periods");
+  expect(html).toContain("2026-09-02: 40");
+});
+import SiteConnections from "../../client/src/pages/site-connections";
+it("a failed config refetch keeps the saved data under a strip, never a bare alert", () => {
+  // Render-time window reads (URL params / deep-link notice) need a minimal browser shim.
+  const original = (globalThis as any).window;
+  (globalThis as any).window = {
+    location: { search: "", href: "http://localhost/search-console" },
+    history: { replaceState: () => {} },
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  };
+  try {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const key = ["/api/gsc/connections?limit=1"];
+    client.setQueryData(key, { total: 1, items: [{ id: 3, email: "fixture@example.invalid" }] });
+    client
+      .getQueryCache()
+      .find({ queryKey: key })!
+      .setState({ status: "error", error: new Error("500: config unavailable") });
+    const html = renderToStaticMarkup(
+      h(
+        QueryClientProvider,
+        { client },
+        h(Router, { ssrPath: "/search-console" }, h(SiteConnections, { provider: "gsc" })),
+      ),
+    );
+    // Saved data survives under the strip — the page keeps rendering its content.
+    expect(html).toContain("strip-saved-data");
+    expect(html).toContain("Refresh failed — showing saved data from");
+    expect(html).not.toContain('role="alert"');
+    // Never-loaded config still falls back to the bare error panel.
+    const fresh = new QueryClient({
+      defaultOptions: { queries: { retry: false, retryOnMount: false } },
+    });
+    const key2 = ["/api/cloudflare/connections?limit=1"];
+    fresh.setQueryData(key2, { total: 0, items: [] });
+    fresh
+      .getQueryCache()
+      .find({ queryKey: key2 })!
+      .setState({
+        status: "error",
+        error: new Error("500: config unavailable"),
+        data: undefined,
+        dataUpdatedAt: 0,
+      });
+    const html2 = renderToStaticMarkup(
+      h(
+        QueryClientProvider,
+        { client: fresh },
+        h(Router, { ssrPath: "/search-console" }, h(SiteConnections, { provider: "cloudflare" })),
+      ),
+    );
+    expect(html2).toContain('role="alert"');
+    expect(html2).not.toContain("strip-saved-data");
+    client.clear();
+    fresh.clear();
+  } finally {
+    (globalThis as any).window = original;
+  }
 });

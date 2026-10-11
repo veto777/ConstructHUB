@@ -245,3 +245,72 @@ it("rejects unknown analytics sort columns instead of interpolating them", async
   expect(r.code).toBe(400);
   expect(query).not.toHaveBeenCalled();
 });
+// Cloudflare cache datasets sort in SQL before pagination (same contract as GSC analytics).
+async function cfRequest(path: string, params: Record<string, string> = {}) {
+  const app = express();
+  registerCloudflareRoutes(app, () => ({ id: 7 }));
+  const handler = (app as any).router.stack.find(
+    (l: any) => l.route?.path === path,
+  ).route.stack[0].handle;
+  const res: any = {
+    code: 200,
+    body: null,
+    status(n: number) {
+      this.code = n;
+      return this;
+    },
+    json(body: any) {
+      this.body = body;
+      return this;
+    },
+  };
+  await handler({ params: { id: "12" }, query: params }, res);
+  return res;
+}
+it("sorts a Cloudflare cache dataset in SQL before pagination", async () => {
+  query
+    .mockResolvedValueOnce({ rows: [] } as any)
+    .mockResolvedValueOnce({ rows: [{ total: 30 }] } as any);
+  const r = await cfRequest("/api/cloudflare/assets/:id/cache", {
+    field: "traffic",
+    sort: "requests",
+    dir: "desc",
+  });
+  expect(r.code).toBe(200);
+  const sql = query.mock.calls[0][0] as string;
+  // Typed numeric cast on the counter, direction honored, order lands before LIMIT.
+  expect(sql).toContain(
+    "ORDER BY NULLIF(value->'sum'->>'requests','')::numeric desc NULLS LAST, value::text",
+  );
+  expect(sql.indexOf("ORDER BY")).toBeLessThan(sql.indexOf("LIMIT"));
+  expect(query.mock.calls[0][1]).toEqual([12, 7, "traffic", "%%", 25, 0]);
+});
+it("sorts text Cloudflare fields lexically and keeps the default order otherwise", async () => {
+  query
+    .mockResolvedValueOnce({ rows: [] } as any)
+    .mockResolvedValueOnce({ rows: [{ total: 4 }] } as any);
+  await cfRequest("/api/cloudflare/assets/:id/cache", {
+    field: "events",
+    sort: "datetime",
+  });
+  expect(query.mock.calls[0][0]).toContain("ORDER BY value->>'datetime' asc");
+  query.mockReset();
+  query.mockResolvedValue({ rows: [] } as any);
+  await cfRequest("/api/cloudflare/assets/:id/cache", { field: "events" });
+  expect(query.mock.calls[0][0]).toContain("ORDER BY value::text LIMIT");
+});
+it("rejects cache sorts outside the dataset whitelist instead of interpolating them", async () => {
+  // Unknown key entirely:
+  let r = await cfRequest("/api/cloudflare/assets/:id/cache", {
+    field: "traffic",
+    sort: "value;DROP TABLE",
+  });
+  expect(r.code).toBe(400);
+  // A real key from a DIFFERENT dataset must not leak across the whitelist:
+  r = await cfRequest("/api/cloudflare/assets/:id/cache", {
+    field: "countries",
+    sort: "datetime",
+  });
+  expect(r.code).toBe(400);
+  expect(query).not.toHaveBeenCalled();
+});

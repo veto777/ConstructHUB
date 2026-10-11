@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Notice } from "@/components/app-ui";
@@ -101,6 +101,9 @@ export function ReportTable({
     desc: boolean;
   } | null>(null);
   const server = !!onSort;
+  // Programmatic th↔td association: on phones the thead is visually hidden, so cells
+  // carry both a visible data-label and a headers reference to their column header.
+  const tableId = useId();
   // Server mode: the endpoint sorted before LIMIT/OFFSET, so the note always spans the report.
   // Local mode: the server paged the report (date, then clicks) and the client only has this
   // page, so a sort reorders these rows. Say so where the user can see it rather than only in
@@ -144,7 +147,53 @@ export function ReportTable({
           {sortNote}
         </p>
       )}
-      <table className="g-table w-full text-sm">
+      {server && (
+        // Below 640px the thead (and its sort buttons) is visually hidden, so the
+        // server sort needs a phone-visible control driving the same URL state.
+        <div className="mb-2 flex flex-wrap items-center gap-2 sm:hidden">
+          <label className="flex items-center gap-2 text-sm g-text-2">
+            Sort by
+            <select
+              aria-label={`Sort ${caption} by`}
+              className="h-9 rounded-full border bg-background px-3 text-sm text-foreground"
+              value={sort?.key ?? ""}
+              onChange={(e) => {
+                if (e.target.value)
+                  onSort!(
+                    e.target.value,
+                    sort?.dir === "desc" ? "desc" : "asc",
+                  );
+              }}
+            >
+              <option value="">Default order</option>
+              {columns
+                .filter((c) => c.sortKey)
+                .map((c) => (
+                  <option key={c.sortKey} value={c.sortKey}>
+                    {c.label}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-sm g-text-2">
+            Direction
+            <select
+              aria-label={`Sort direction for ${caption}`}
+              className="h-9 rounded-full border bg-background px-3 text-sm text-foreground disabled:opacity-50"
+              value={sort?.dir ?? "asc"}
+              disabled={!sort}
+              onChange={(e) =>
+                sort &&
+                onSort!(sort.key, e.target.value === "desc" ? "desc" : "asc")
+              }
+            >
+              <option value="asc">Ascending</option>
+              <option value="desc">Descending</option>
+            </select>
+          </label>
+        </div>
+      )}
+      <table className="g-table g-table--report w-full text-sm">
         <caption className="sr-only">
           {caption};{" "}
           {server
@@ -169,7 +218,12 @@ export function ReportTable({
                   : "none";
               const sortable = server ? !!c.sortKey : true;
               return (
-                <th key={c.label} scope="col" aria-sort={ariaSort}>
+                <th
+                  key={c.label}
+                  scope="col"
+                  id={`${tableId}-h${index}`}
+                  aria-sort={ariaSort}
+                >
                   {sortable ? (
                     <button
                       className="rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
@@ -214,8 +268,13 @@ export function ReportTable({
         <tbody>
           {ordered.map((row, i) => (
             <tr key={i}>
-              {columns.map((c) => (
-                <td key={c.label} className="max-w-md break-words">
+              {columns.map((c, ci) => (
+                <td
+                  key={c.label}
+                  headers={`${tableId}-h${ci}`}
+                  data-label={c.label}
+                  className="max-w-md break-words"
+                >
                   {c.value(row) ?? "Unavailable"}
                 </td>
               ))}
@@ -249,68 +308,203 @@ export function MetricTiles({
     </dl>
   );
 }
+type TrendPeriod = { date: string; value: number };
+/** Monday of the ISO week containing the YYYY-MM-DD date (UTC arithmetic). */
+function weekStart(iso: string) {
+  const d = new Date(`${iso}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return iso;
+  const dow = (d.getUTCDay() + 6) % 7;
+  d.setUTCDate(d.getUTCDate() - dow);
+  return d.toISOString().slice(0, 10);
+}
+/**
+ * Valid points sorted by date. Ranges longer than ~90 days would be hundreds of daily
+ * bars (and hundreds of Tab stops), so they aggregate to week buckets (starting Monday)
+ * whose value is the sum of the daily values; each bucket is labelled "Week of …".
+ * The span is judged against the SELECTED range (rangeStart/rangeEnd, when provided),
+ * not only the days that happen to have data: widening the range asks for the long view
+ * even where imported data covers fewer days.
+ */
+export function toTrendPeriods(
+  rows: any[],
+  value: (r: any) => any,
+  date: (r: any) => string,
+  rangeStart?: string,
+  rangeEnd?: string,
+): {
+  periods: TrendPeriod[];
+  weekly: boolean;
+  firstDate: string;
+  lastDate: string;
+} {
+  const valid = rows
+    .filter((r) => value(r) != null && Number.isFinite(Number(value(r))))
+    .slice()
+    .sort((a, b) => String(date(a)).localeCompare(String(date(b))));
+  const firstDate = valid.length ? String(date(valid[0])) : "",
+    lastDate = valid.length ? String(date(valid[valid.length - 1])) : "";
+  const first = valid.length ? Date.parse(`${firstDate}T00:00:00Z`) : NaN,
+    last = valid.length ? Date.parse(`${lastDate}T00:00:00Z`) : NaN;
+  const start = rangeStart ? Date.parse(`${rangeStart}T00:00:00Z`) : NaN,
+    end = rangeEnd ? Date.parse(`${rangeEnd}T00:00:00Z`) : NaN;
+  const spanFirst = Number.isFinite(start) ? Math.min(first, start) : first,
+    spanLast = Number.isFinite(end) ? Math.max(last, end) : last;
+  const weekly =
+    valid.length > 1 &&
+    Number.isFinite(spanFirst) &&
+    Number.isFinite(spanLast) &&
+    spanLast - spanFirst > 90 * 86400000;
+  if (!weekly)
+    return {
+      periods: valid.map((r) => ({
+        date: String(date(r)),
+        value: Number(value(r)),
+      })),
+      weekly,
+      firstDate,
+      lastDate,
+    };
+  const byWeek = new Map<string, number>();
+  for (const r of valid) {
+    const w = weekStart(String(date(r)));
+    byWeek.set(w, (byWeek.get(w) ?? 0) + Number(value(r)));
+  }
+  return {
+    periods: [...byWeek.entries()].map(([date, value]) => ({
+      date: `Week of ${date}`,
+      value,
+    })),
+    weekly,
+    firstDate,
+    lastDate,
+  };
+}
 export function ReportTrend({
   rows,
   label,
   value,
   date,
+  start,
+  end,
 }: {
   rows: any[];
   label: string;
   value: (r: any) => any;
   date: (r: any) => string;
+  /** Selected range edges (YYYY-MM-DD): ranges over ~90 days render as weekly buckets. */
+  start?: string;
+  end?: string;
 }) {
-  const valid = rows
-    .filter((r) => value(r) != null && Number.isFinite(Number(value(r))))
-    .slice()
-    .sort((a, b) => String(date(a)).localeCompare(String(date(b))));
-  const max = Math.max(1, ...valid.map((r) => Number(value(r))));
-  if (!valid.length) return null;
+  const { periods, weekly, firstDate, lastDate } = toTrendPeriods(
+    rows ?? [],
+    value,
+    date,
+    start,
+    end,
+  );
+  const max = Math.max(1, ...periods.map((p) => p.value));
   const fmt = (n: number) => n.toLocaleString("en-US");
+  // One Tab stop for the whole chart: only the selected bar sits in the tab order,
+  // arrow keys move the selection (roving tabindex).
+  const [selected, setSelected] = useState(() =>
+    periods.reduce((best, p, i) => (p.value > periods[best].value ? i : best), 0),
+  );
+  const listRef = useRef<HTMLDivElement>(null);
+  const sel = Math.min(selected, periods.length - 1);
+  const focusBar = (i: number) =>
+    listRef.current
+      ?.querySelectorAll<HTMLButtonElement>("button[data-trend-index]")
+      [i]?.focus();
+  const move = (e: { key: string; preventDefault: () => void }, from: number) => {
+    const step =
+      e.key === "ArrowRight" || e.key === "ArrowDown"
+        ? 1
+        : e.key === "ArrowLeft" || e.key === "ArrowUp"
+          ? -1
+          : 0;
+    const next =
+      e.key === "Home"
+        ? 0
+        : e.key === "End"
+          ? periods.length - 1
+          : step
+            ? Math.min(periods.length - 1, Math.max(0, from + step))
+            : null;
+    if (next == null) return;
+    e.preventDefault();
+    setSelected(next);
+    focusBar(next);
+  };
+  if (!periods.length) return null;
   return (
     <figure className="rounded-xl border p-4">
       <figcaption className="mb-3 flex flex-wrap items-baseline justify-between gap-2 text-sm">
-        <span>{label} · displayed periods</span>
-        {/* The labelled scale maximum: bar heights are shares of this number. */}
-        <span
-          className="text-xs tabular-nums text-muted-foreground"
-          data-testid="text-trend-max"
-        >
-          Max {fmt(max)}
+        <span>
+          {label} · {weekly ? "weekly" : "daily"} periods
+        </span>
+        <span className="flex items-baseline gap-3">
+          {/* Selected period stays visible without hover — tap/click or arrow to it. */}
+          <span
+            className="text-xs tabular-nums text-muted-foreground"
+            data-testid="text-trend-selection"
+            aria-live="polite"
+          >
+            {periods[sel].date}: {fmt(periods[sel].value)}
+          </span>
+          {/* The labelled scale maximum: bar heights are shares of this number. */}
+          <span
+            className="text-xs tabular-nums text-muted-foreground"
+            data-testid="text-trend-max"
+          >
+            Max {fmt(max)}
+          </span>
         </span>
       </figcaption>
-      <div className="flex h-28 items-stretch gap-1" role="list" aria-label={label}>
-        {valid.map((r, i) => {
-          const v = Number(value(r));
-          return (
-            // The whole column is the control: the exact value is announced by the button's
-            // label and shown as a chip on hover or keyboard focus (bars stay exact shares).
-            <div key={i} role="listitem" className="relative min-w-0 flex-1">
-              <button
-                type="button"
-                aria-label={`${date(r)}: ${fmt(v)}`}
-                title={`${date(r)}: ${fmt(v)}`}
-                className="group absolute inset-0 w-full cursor-default rounded-sm hover:bg-primary/10 focus-visible:bg-primary/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
+      <div
+        ref={listRef}
+        className="flex h-28 items-stretch gap-1"
+        role="list"
+        aria-label={label}
+      >
+        {periods.map((p, i) => (
+          // The whole column is the control: it selects on tap/click, announces its
+          // exact date and value, and shows the value chip while selected or hovered.
+          <div key={i} role="listitem" className="relative min-w-0 flex-1">
+            <button
+              type="button"
+              data-trend-index={i}
+              tabIndex={i === sel ? 0 : -1}
+              aria-pressed={i === sel}
+              aria-label={`${p.date}: ${fmt(p.value)}`}
+              title={`${p.date}: ${fmt(p.value)}`}
+              onClick={() => setSelected(i)}
+              onKeyDown={(e) => move(e, i)}
+              className={`group absolute inset-0 w-full cursor-pointer rounded-sm hover:bg-primary/10 focus-visible:bg-primary/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary ${
+                i === sel ? "bg-primary/15" : ""
+              }`}
+            >
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-0 bottom-0 rounded-t-sm bg-primary/70"
+                style={{ height: `${Math.max(1, (p.value / max) * 100)}%` }}
+              />
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute left-1/2 top-0 z-10 -translate-x-1/2 whitespace-nowrap rounded border bg-background px-1 text-[10px] tabular-nums text-foreground opacity-0 shadow-sm transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
               >
-                <span
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-x-0 bottom-0 rounded-t-sm bg-primary/70"
-                  style={{ height: `${Math.max(1, (v / max) * 100)}%` }}
-                />
-                <span
-                  aria-hidden="true"
-                  className="pointer-events-none absolute left-1/2 top-0 z-10 -translate-x-1/2 whitespace-nowrap rounded border bg-background px-1 text-[10px] tabular-nums text-foreground opacity-0 shadow-sm transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-                >
-                  {fmt(v)}
-                </span>
-              </button>
-            </div>
-          );
-        })}
+                {fmt(p.value)}
+              </span>
+            </button>
+          </div>
+        ))}
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
-        {date(valid[0])} – {date(valid[valid.length - 1])}. Each bar shows its
-        exact value on hover or keyboard focus; exact values also in the table.
+        {firstDate} – {lastDate}.{" "}
+        {weekly
+          ? "Range over 90 days: each bar totals one week (starting Monday). "
+          : ""}
+        Tap or arrow to a bar to pin its date and value; exact values also in the
+        table.
       </p>
     </figure>
   );
@@ -351,7 +545,11 @@ export const analyticsColumns: Column[] = [
 ];
 export const cloudflareColumns: Record<string, Column[]> = {
   traffic: [
-    { label: "Date (UTC)", value: (r) => r.dimensions?.date },
+    {
+      label: "Date (UTC)",
+      value: (r) => r.dimensions?.date,
+      sortKey: "date",
+    },
     ...["requests", "pageViews", "threats"].map((k) => ({
       label:
         k === "pageViews"
@@ -360,8 +558,13 @@ export const cloudflareColumns: Record<string, Column[]> = {
             ? "Requests"
             : "Threats",
       value: (r: any) => r.sum?.[k],
+      sortKey: k,
     })),
-    { label: "Unique visitors", value: (r) => r.uniq?.uniques },
+    {
+      label: "Unique visitors",
+      value: (r) => r.uniq?.uniques,
+      sortKey: "uniques",
+    },
   ],
   events: [
     ["Time", "datetime"],
@@ -370,19 +573,27 @@ export const cloudflareColumns: Record<string, Column[]> = {
     ["Country", "clientCountryName"],
     ["Path", "clientRequestPath"],
     ["Source", "source"],
-  ].map(([label, key]) => ({ label, value: (r) => r[key] })),
+  ].map(([label, key]) => ({ label, value: (r) => r[key], sortKey: key })),
   paths: [
-    { label: "Path", value: (r) => r.dimensions?.clientRequestPath },
-    { label: "Requests (sampled)", value: (r) => r.count },
+    {
+      label: "Path",
+      value: (r) => r.dimensions?.clientRequestPath,
+      sortKey: "clientRequestPath",
+    },
+    { label: "Requests (sampled)", value: (r) => r.count, sortKey: "count" },
   ],
   bots: [
-    { label: "Bot score", value: (r) => r.dimensions?.botScore },
-    { label: "Requests (sampled)", value: (r) => r.count },
+    {
+      label: "Bot score",
+      value: (r) => r.dimensions?.botScore,
+      sortKey: "botScore",
+    },
+    { label: "Requests (sampled)", value: (r) => r.count, sortKey: "count" },
   ],
   countries: [
-    { label: "Country", value: (r) => r.country },
-    { label: "Requests", value: (r) => r.requests },
-    { label: "Threats", value: (r) => r.threats },
+    { label: "Country", value: (r) => r.country, sortKey: "country" },
+    { label: "Requests", value: (r) => r.requests, sortKey: "requests" },
+    { label: "Threats", value: (r) => r.threats, sortKey: "threats" },
   ],
 };
 export function sumKnown(rows: any[] | null | undefined, key: string) {
