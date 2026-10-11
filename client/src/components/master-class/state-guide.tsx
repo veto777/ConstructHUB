@@ -1,3 +1,4 @@
+import { ProgressNote } from "./progress-note";
 /**
  * Module 1 — Business Formation & Licensing (/master-class?tab=state-guide&state=WA): one state's guide and the
  * lessons on running the business.
@@ -111,7 +112,7 @@ const CATEGORY_CONFIG: Record<string, { label: string; icon: LucideIcon }> = {
 
 export const BUSINESS_LESSONS: LessonMeta[] = [
   { id: "subcontractors", title: "Working with Subcontractors (1099)", icon: Handshake },
-  { id: "sales", title: "Sales — The Most Important Role", icon: CircleDollarSign },
+  { id: "sales", title: "Sales and sustainable operations", icon: CircleDollarSign },
   { id: "reputation", title: "Reputation & Review Management", icon: Star },
   { id: "hiring", title: "Hiring & Staffing Strategy", icon: Users },
   { id: "branding", title: "Branding & Professional Image", icon: Award },
@@ -180,7 +181,7 @@ function StepList({ code, stateName, steps, written }: { code: string; stateName
   return (
     <Section id="lesson-state-steps" className="scroll-mt-24" icon={Briefcase}
       title={written ? `Step-by-step walkthrough for ${stateName}` : `Checklist for ${stateName}`}
-      description={<>{list.ready && <>{progressLabel(done, steps.length)} · </>}{list.note}</>}
+      description={<>{list.ready && <>{progressLabel(done, steps.length)} · </>}<ProgressNote list={list} /></>}
       actions={done > 0 ? <Button variant="ghost" size="sm" onClick={list.reset} data-testid="button-state-steps-reset">Reset</Button> : undefined}
       testId="section-state-steps">
       {written ? (

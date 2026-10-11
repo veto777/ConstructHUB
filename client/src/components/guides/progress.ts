@@ -17,6 +17,9 @@ export type Checklist = {
   count: number;
   note: string;
   ready: boolean;
+  accountError: boolean;
+  checkingAccount: boolean;
+  checkAccount: () => void;
 };
 
 /** Keep stable IDs for unchanged items; give changed tasks new IDs. Explicit migrations retain only current IDs. */
@@ -37,7 +40,8 @@ export function useChecklist(key: string, options: ProgressOptions = DEFAULT_OPT
     : userId === null ? "Saved for this visit only — sign in to keep account-specific progress."
     : snapshot.persistent ? "Progress is saved for your account in this browser only."
     : "Saved for this visit only — browser storage is unavailable.";
-  return { done, isDone: (id) => done.has(id), toggle, reset, count: done.size, note, ready: auth.isSuccess };
+  return { done, isDone: (id) => done.has(id), toggle, reset, count: done.size, note, ready: auth.isSuccess,
+    accountError: auth.isError, checkingAccount: auth.isFetching, checkAccount: () => { void auth.refetch(); } };
 }
 
 export const progressLabel = (done: number, total: number) => `${done} of ${total} done`;

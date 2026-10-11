@@ -1,3 +1,4 @@
+import { ProgressNote } from "./progress-note";
 /**
  * The lesson bodies of a Master Class module, fetched from the server and rendered from blocks.
  *
@@ -12,9 +13,9 @@
  * page of the platform. "{connectionsPlan}" is replaced by the plan that includes Cloudflare + Search Console, read
  * from shared/plans.ts — no plan name is typed in the lesson copy.
  */
-import { useQuery, type UseQueryResult } from "@tanstack/react-query";
+import { useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { AlertTriangle, Ban, CheckCircle2, ExternalLink, Lightbulb, ShieldAlert, Wrench, X, type LucideIcon } from "lucide-react";
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useEffect, type ReactNode } from "react";
 import { Link } from "wouter";
 import { Notice, Section } from "@/components/app-ui";
 import { Badge } from "@/components/ui/badge";
@@ -129,7 +130,7 @@ function ChecklistBlock({ block }: { block: Extract<LessonBlock, { type: "checkl
   return (
     <div className="space-y-2" data-testid={`checklist-${base}`}>
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-        <span role="status">{list.ready && <>{progressLabel(list.count, block.items.length)}{block.unit ? ` ${block.unit}` : ""} · </>}{list.note}</span>
+        <span role="status">{list.ready && <>{progressLabel(list.count, block.items.length)}{block.unit ? ` ${block.unit}` : ""} · </>}<ProgressNote list={list} /></span>
         {list.count > 0 && <Button variant="ghost" size="sm" className="!min-h-8" onClick={list.reset} data-testid={`button-${base}-reset`}>{block.resetLabel ?? "Reset"}</Button>}
       </div>
       <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2" data-testid={`list-${base}`}>
@@ -226,11 +227,11 @@ export function LessonBlockView({ block }: { block: LessonBlock }) {
     case "stats": return (
       <div className="rounded-lg border border-border bg-muted p-3">
         {block.title && <h4 className="mb-2 text-sm font-semibold">{block.title}</h4>}
-        <div className={cn("grid gap-3 text-center", block.items.length >= 3 ? "grid-cols-3" : "grid-cols-2")}>
+        <div className={cn("grid grid-cols-1 gap-3 text-center", block.items.length >= 3 ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
           {block.items.map((s) => (
             <div key={s.label} className="rounded border border-border p-2">
               <p className="text-lg font-semibold text-muted-foreground [overflow-wrap:anywhere]">{s.value}</p>
-              <p className="text-[10px] text-muted-foreground">{s.label}</p>
+              <p className="text-xs text-muted-foreground">{s.label}</p>
             </div>
           ))}
         </div>
@@ -292,7 +293,16 @@ export function ModuleLessons({ module, lessons, storageKey, open, renderLesson,
   children?: ReactNode;
 }) {
   const q = useLessonBodies(module, open);
-  useScrollToHash(open && q.isSuccess);
+  const queryClient = useQueryClient();
+  const accessRevoked = q.isError && /^(401|403)\b/.test(q.error.message);
+  useEffect(() => {
+    if (!accessRevoked) return;
+    // Remove protected text while retaining the denial/error state. A later network
+    // failure or remount must not resurrect content from before access was revoked.
+    queryClient.getQueryCache().find({ queryKey: ["/api/master-class/lessons", module], exact: true })
+      ?.setState({ data: undefined, dataUpdatedAt: 0 });
+  }, [accessRevoked, module, queryClient]);
+  useScrollToHash(open && !!q.data && !accessRevoked);
   if (!open) return null;
   if (q.isPending) {
     return (
@@ -302,7 +312,7 @@ export function ModuleLessons({ module, lessons, storageKey, open, renderLesson,
       </Section>
     );
   }
-  if (q.isError) {
+  if (q.isError && (!q.data || accessRevoked)) {
     return (
       <Notice tone="danger" title="Couldn't load the lessons" testId="lessons-error"
         action={<Button variant="outline" size="sm" onClick={() => void q.refetch()} data-testid="button-lessons-retry">Try again</Button>}>
@@ -319,6 +329,10 @@ export function ModuleLessons({ module, lessons, storageKey, open, renderLesson,
   ));
   return (
     <>
+      {q.isError && <Notice tone="danger" title="Refresh failed — showing previously loaded lessons" testId="lessons-stale"
+        action={<Button variant="outline" size="sm" disabled={q.isFetching} onClick={() => void q.refetch()} data-testid="button-lessons-retry">{q.isFetching ? "Retrying…" : "Try again"}</Button>}>
+        {apiErrorMessage(q.error)} These lessons may be out of date.
+      </Notice>}
       {[...lessons, ...extras].map((meta, i) => <Fragment key={meta.id}>{render(meta, byId.get(meta.id), i)}</Fragment>)}
       {q.data.footer.length > 0 && <div data-testid="lessons-footer"><LessonBlocks blocks={q.data.footer} /></div>}
       {children}

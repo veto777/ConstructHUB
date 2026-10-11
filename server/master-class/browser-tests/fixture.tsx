@@ -9,11 +9,17 @@ import { LESSON_MODULES } from "../lessons";
 import "@/index.css";
 
 let failLessons = false;
+let lessonError = "503: Test lesson request failed";
+let failAccount = false;
 const client = new QueryClient({ defaultOptions: { queries: {
   retry: false, staleTime: Infinity,
   queryFn: async ({ queryKey }) => {
-    if (queryKey[0] === "/api/auth/me") return { id: 101 };
-    if (failLessons) throw new Error("Test lesson request failed");
+    if (queryKey[0] === "/api/auth/me") {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      if (failAccount) throw new Error("503: Test account unavailable");
+      return { id: 101 };
+    }
+    if (failLessons) throw new Error(lessonError);
     const module = queryKey[1] as LessonModuleKey;
     return { module, ...LESSON_MODULES[module], footer: LESSON_MODULES[module].footer ?? [] };
   },
@@ -54,11 +60,15 @@ function Fixture() {
       <button onClick={() => client.setQueryData<{ id: number } | null>(["/api/auth/me"], { id: 202 })}>Learner B</button>
       <button onClick={() => client.setQueryData<{ id: number } | null>(["/api/auth/me"], null)}>Sign out</button>
       <button onClick={() => client.getQueryCache().find({ queryKey: ["/api/auth/me"] })?.setState({ status: "error", error: new Error("Test account unavailable") })}>Fail account</button>
+      <button onClick={() => { failAccount = true; void client.refetchQueries({ queryKey: ["/api/auth/me"] }); }}>Break account network</button>
+      <button onClick={() => { failAccount = false; }}>Restore account network</button>
+      <button onClick={() => { failLessons = true; lessonError = "503: Test lesson refresh failed"; void client.refetchQueries({ queryKey: ["/api/master-class/lessons", module] }); }}>Fail refresh</button>
+      <button onClick={() => { failLessons = true; lessonError = "403: Access revoked"; void client.refetchQueries({ queryKey: ["/api/master-class/lessons", module] }); }}>Revoke access</button>
       <button onClick={() => { failLessons = true; void client.resetQueries({ queryKey: ["/api/master-class/lessons", module] }); }}>Fail lessons</button>
       <button onClick={() => { failLessons = false; }}>Restore lessons</button>
       <button onClick={() => setMounted(!mounted)}>Remount</button>
       <button onClick={() => { window.location.hash = "lesson-late-test"; setLate(true); }}>Late anchor</button>
-      {(["gmb", "licensing", "vetting", "seo"] as const).map((key) => <button key={key} onClick={() => setModule(key)}>{key}</button>)}
+      {(["gmb", "licensing", "vetting", "seo", "website"] as const).map((key) => <button key={key} onClick={() => setModule(key)}>{key}</button>)}
     </nav>
     {mounted && <>
       <LessonOutline lessons={lessons} storageKey={`mc:${module}`} />

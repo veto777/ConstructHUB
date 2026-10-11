@@ -29,18 +29,18 @@ export const WEBSITE: ModuleLessons = {
       id: "location-pages",
       title: "Location Pages & Slug Pages",
       blocks: [
-        { type: "p", text: "Your homepage matters, but your location pages and slug pages (service pages, city pages) are just as important — sometimes more. These are the pages that actually rank for local and service-specific searches. Every city and service you cover should have its own dedicated landing page with unique content." },
-        { type: "tip", text: "Each landing page must have unique content. Do not duplicate content across pages or copy from competitors. Use AI tools minimally — if you lean on AI too heavily, your content will read the same as everyone else's. Google grades your content on uniqueness. If it detects duplicate or thin content, your pages will not rank and can actually hurt your entire site." },
-        { type: "in-app", text: "Each city page should match a location in [Locations](/locations) and the Google profile that links to it; the [GMB Ranking Grid](/ranking-grid) shows which towns the pages still have to win." },
+        { type: "p", text: "Service and location pages can answer specific customer questions. Create them where you have distinct, useful information and real work or service coverage to describe; avoid near-duplicate pages for every keyword or town." },
+        { type: "tip", text: "Give each landing page a useful purpose and verify its claims, including any AI-assisted text. Avoid copied or scaled content created mainly to manipulate search rankings. See [Google’s spam policies](https://developers.google.com/search/docs/essentials/spam-policies)." },
+        { type: "in-app", text: "A city page can describe an area you serve without implying a staffed office or separate Google profile there. [GMB Ranking Grid](/ranking-grid) helps measure visibility across your service area." },
       ],
     },
     {
       id: "page-speed",
       title: "Page Speed & Performance",
       blocks: [
-        { type: "p", text: "Page speed is a direct ranking factor. Google rolled out a Core Web Vitals update and sites that load slowly will lose position. This is not optional — it directly affects where you show up in search results." },
+        { type: "p", text: "Speed and Core Web Vitals contribute to page experience, one of many ranking considerations. Strong scores do not guarantee higher rankings, and relevant content may rank despite weaker page experience. See [Google’s page-experience guidance](https://developers.google.com/search/docs/appearance/page-experience)." },
         { type: "cards", items: [
-          { title: "Google PageSpeed Insights", text: "Check your speed score, SEO issues, and Core Web Vitals. This is the tool Google uses to grade your site.", href: "https://pagespeed.web.dev/" },
+          { title: "Google PageSpeed Insights", text: "Inspect performance diagnostics and available Core Web Vitals field data. The PageSpeed score is not a Google ranking score.", href: "https://pagespeed.web.dev/" },
           { title: "NitroPack", text: "A performance optimization tool that handles caching, image compression, and code minification automatically to boost page speed scores." },
         ] },
         { type: "in-app", text: "[Site Scan](/site-scan) runs PageSpeed on the pages you choose, mobile and desktop, and keeps the history so you can see a regression." },
@@ -50,43 +50,43 @@ export const WEBSITE: ModuleLessons = {
       id: "mobile",
       title: "Mobile-First Design & User Experience",
       blocks: [
-        { type: "p", text: "Over 70% of contractor website traffic comes from mobile devices. Google uses mobile-first indexing, meaning it ranks your site based on the mobile version. If your site doesn't work well on phones, you're losing both rankings and customers." },
+        { type: "p", text: "Check your own analytics to understand mobile traffic. Make the phone experience usable: customers should be able to read the scope, inspect projects and contact you without struggling with the layout." },
         { type: "panels", items: [
           { title: "Mobile Must-Haves", items: [
             "Click-to-call button visible on every page",
-            "Fast load time — under 3 seconds on mobile networks",
-            "Large tap targets — buttons at least 48px tall",
-            "Readable text without zooming — 16px minimum font size",
+            "Test loading and responsiveness on real phones and slower connections",
+            "Use comfortably sized, spaced tap targets and test them on a phone",
+            "Use readable text that remains usable when zoomed",
             "Sticky header or floating CTA button for easy contact",
           ] },
           { title: "Conversion Optimization", tone: "plain", items: [
             "Contact form above the fold on every service page",
             "Social proof near CTAs — review count, star rating, years in business",
-            "Simple forms — name, phone, zip code, service needed (4 fields max)",
+            "Ask only for the information needed to respond to the inquiry",
             "Use availability or offer deadlines only when they are real and can be honored",
             "Display credentials and organization logos only when current, accurate and authorized",
           ] },
         ] },
-        { type: "in-app", text: "[Site Scan](/site-scan) runs PageSpeed's mobile check on the pages you choose; the mobile score is the one Google ranks by." },
+        { type: "in-app", text: "[Site Scan](/site-scan) runs mobile performance checks; use the findings to improve usability, not as a prediction of ranking." },
       ],
     },
     {
       id: "portfolio",
       title: "Portfolio showcases that close jobs",
       blocks: [
-        { type: "p", text: "Homeowners hire what they can see. A projects page with a dozen real jobs, photographed properly, closes more estimates than any paragraph about quality. It is also the page most often faked by new companies (see Vetting, tips 15 and 17), so yours has to be unmistakably yours." },
+        { type: "p", text: "Show real projects with clear captions and permission from the homeowner. A portfolio helps customers assess relevant work; it does not guarantee more accepted estimates." },
         { type: "panels", items: [
           { title: "What to show", items: [
             "Before and after of the same angle, taken in daylight after the clean-up",
-            "The city and the service in every caption — that is what the page ranks for",
+            "Describe the actual city and service in captions without promising rankings",
             "A line on what the job involved, the materials and how long it took",
-            "Your crew and your trucks in some of the photos: proof the work is yours",
+            "Show your crew and equipment accurately; photos alone do not verify who performed a project",
           ] },
           { title: "Rules that keep it honest and fast", items: [
             "Only your own projects — never stock photos or a supplier's gallery presented as your work",
             "Ask the homeowner before you publish photos of their house",
-            "Compress every image before upload; a gallery of full-size phone photos is the slowest page on most contractor sites",
-            "Add new work every quarter and retire the weakest — a dated portfolio reads as a closed business",
+            "Compress images and test gallery performance on mobile",
+            "Keep the portfolio current so customers can assess recent work",
           ] },
         ] },
         { type: "in-app", text: "Keep the photos you reuse on the site and on your Google profile in the [Media Library](/media-library), and publish the best ones to the profile from [Posts & Photos](/gbp-content)." },
@@ -96,25 +96,25 @@ export const WEBSITE: ModuleLessons = {
       id: "schema",
       title: "Schema Markup & Structured Data",
       blocks: [
-        { type: "p", text: "Schema markup is code you add to your website that tells Google exactly what your business is, what services you offer, and where you're located. It's how you get rich results in search — star ratings, service lists, business hours, and more showing up directly in Google." },
+        { type: "p", text: "Structured data describes page content in a machine-readable form. Supported markup may make a page eligible for certain search features, but display is not guaranteed. Follow [Google’s structured-data policies](https://developers.google.com/search/docs/appearance/structured-data/sd-policies)." },
         { type: "cards", cols: 3, items: [
-          { title: "LocalBusiness Schema", text: "Business name, address, phone, hours, service area, and geo coordinates. This is the foundation — every contractor site needs it." },
-          { title: "Service Schema", text: "Define each service with descriptions, price ranges, and service areas. Helps Google match your pages to specific service queries." },
-          { title: "Review & FAQ Schema", text: "Embed review data and FAQ answers directly in search results. This takes up more space in Google and increases click-through rates." },
+          { title: "LocalBusiness Schema", text: "Describe real business details that match visible page content and the applicable structured-data requirements." },
+          { title: "Service Schema", text: "Describe services accurately; a schema type alone does not establish eligibility for a Google rich result." },
+          { title: "Review & FAQ Schema", text: "Check eligibility before adding review or FAQ markup. Do not promise contractor review stars or FAQ rich results from markup alone." },
         ] },
-        { type: "tip", text: "Use Google's **Rich Results Test** tool to validate your schema markup. If your schema has errors, Google will ignore it entirely. Most WordPress SEO plugins like Yoast or RankMath can generate basic schema automatically, but you'll want to customize it for contractor-specific services." },
+        { type: "tip", text: "Use Google’s Rich Results Test to inspect supported markup and resolve reported issues. Passing validation does not guarantee a rich result." },
       ],
     },
     {
       id: "cms-hosting",
       title: "CMS, hosting and owning your site",
       blocks: [
-        { type: "p", text: "The platform matters less than who holds the keys. Contractors lose their sites to a web designer who disappears, a hosting bill nobody paid or a domain registered in an agency's name far more often than to a bad CMS. Pick a mainstream platform you or your staff can edit, then make sure every account is yours." },
+        { type: "p", text: "Choose a platform your team can maintain and make sure your business controls the domain, hosting and site accounts. Document access, renewals, backups and an exit plan." },
         { type: "panels", items: [
           { title: "Choosing a platform", items: [
-            "WordPress gives the most control and the most to maintain; hosted builders (Squarespace, Wix, Webflow) trade control for upkeep done for you",
+            "Compare editing, backup, export and maintenance capabilities before choosing a self-managed CMS or hosted builder",
             "Whatever you pick, you must be able to add a service page or a project yourself in an afternoon",
-            "Managed hosting with automatic backups, HTTPS and updates beats the cheapest shared plan",
+            "Compare hosting options for backups, HTTPS, updates, support and the needs of your site",
           ] },
           { title: "Ownership checklist", items: [
             "The domain is registered to your company, in an account you control, with auto-renew on",
@@ -129,11 +129,11 @@ export const WEBSITE: ModuleLessons = {
       id: "email",
       title: "Email Marketing & Follow-Up Systems",
       blocks: [
-        { type: "p", text: "Most contractors completely ignore email marketing, which means it's a huge opportunity. Not every lead is ready to buy today — a follow-up system keeps you top of mind when they're ready. This is especially powerful for seasonal services." },
+        { type: "p", text: "Follow-up email can help interested customers stay informed. Agree on appropriate contact preferences and test the usefulness of your messages." },
         { type: "cards", cols: 3, items: [
-          { title: "Lead Follow-Up Sequence", text: "Set up automated emails after someone fills out your contact form. Day 1: confirmation. Day 3: case study. Day 7: special offer. Day 14: check-in." },
-          { title: "Seasonal Campaigns", text: "Send seasonal reminders: spring gutter cleaning, fall roof inspections, winter prep, etc. These are high-conversion emails because they're timely and relevant." },
-          { title: "Past Customer Nurture", text: "Stay in touch with completed customers. They're your best source of referrals and repeat business. Quarterly newsletters with maintenance tips work great." },
+          { title: "Lead Follow-Up Sequence", text: "Example sequence to adapt to customer preferences: confirmation, relevant case study, then a polite check-in." },
+          { title: "Seasonal Campaigns", text: "Send relevant seasonal reminders and measure responses before expanding the campaign." },
+          { title: "Past Customer Nurture", text: "With appropriate contact preferences, send past customers useful maintenance information and measure whether it helps them." },
         ] },
         { type: "in-app", text: "Review requests and reminders after a job go out from [Google Reviews](/google-reviews); the longer follow-up and seasonal emails are your email tool's job." },
       ],
