@@ -1,6 +1,9 @@
 import { it, expect, describe } from "vitest";
 import {
+  canConfirmJob,
+  canRollbackJob,
   changeImplications,
+  changeNeedsEmailWarning,
   diffNameservers,
   diffRecords,
 } from "./dns-diff";
@@ -50,6 +53,139 @@ describe("diffRecords", () => {
     );
     expect(rows).toHaveLength(1);
     expect(rows[0].status).toBe("changed");
+  });
+  it("scopes same name/type records by provider id, not by name and type", () => {
+    // Two TXT records on the same name are common (SPF, verification, DKIM).
+    const multi = [
+      { id: "101", type: "TXT", name: "@", content: "v=spf1 -all", ttl: 600, priority: 0 },
+      { id: "102", type: "TXT", name: "@", content: "google-site-verification=abc", ttl: 600, priority: 0 },
+    ];
+    const after = [
+      multi[0],
+      { ...multi[1], content: "google-site-verification=xyz" },
+    ];
+    const rows = diffRecords(multi, after);
+    expect(rows).toHaveLength(2);
+    const changed = rows.find((r) => r.status === "changed");
+    expect(changed?.before?.id).toBe("102");
+    expect(changed?.after?.id).toBe("102");
+    expect(rows.find((r) => r.status === "unchanged")?.before?.id).toBe("101");
+  });
+  it("keeps records distinct when an edit makes the content identical", () => {
+    // After the edit, both records read "a". A name/type match could pair the
+    // wrong rows (removed + added, or two unchanged); the ids cannot.
+    const multi = [
+      { id: "101", type: "TXT", name: "@", content: "a", ttl: 600, priority: 0 },
+      { id: "102", type: "TXT", name: "@", content: "b", ttl: 600, priority: 0 },
+    ];
+    const rows = diffRecords(multi, [
+      multi[0],
+      { ...multi[1], content: "a" },
+    ]);
+    expect(rows).toHaveLength(2);
+    expect(rows.find((r) => r.status === "changed")?.before?.id).toBe("102");
+    expect(rows.find((r) => r.status === "unchanged")?.before?.id).toBe("101");
+  });
+  it("reports a second same name/type record as added without touching the first", () => {
+    const rows = diffRecords(
+      [{ id: "201", type: "MX", name: "@", content: "mx1.example.test", ttl: 600, priority: 10 }],
+      [
+        { id: "201", type: "MX", name: "@", content: "mx1.example.test", ttl: 600, priority: 10 },
+        { type: "MX", name: "@", content: "mx2.example.test", ttl: 600, priority: 20 },
+      ],
+    );
+    expect(rows).toHaveLength(2);
+    expect(rows.find((r) => r.status === "unchanged")?.before?.id).toBe("201");
+    const added = rows.find((r) => r.status === "added");
+    expect(added?.after?.content).toBe("mx2.example.test");
+  });
+  it("sorts duplicate name/type rows deterministically", () => {
+    const before = [
+      { id: "3", type: "TXT", name: "@", content: "c" },
+      { id: "1", type: "TXT", name: "@", content: "a" },
+      { id: "2", type: "TXT", name: "@", content: "b" },
+    ];
+    const after = before.map((r) => ({ ...r }));
+    const again = diffRecords(before, after.map((r) => ({ ...r })));
+    expect(again.map((r) => (r.before ?? r.after)?.id)).toEqual(
+      diffRecords(before, after).map((r) => (r.before ?? r.after)?.id),
+    );
+  });
+});
+
+describe("job eligibility helpers", () => {
+  it("only ready, unexpired change jobs can be confirmed", () => {
+    expect(
+      canConfirmJob({ kind: "change", status: "ready", expires_at: null }),
+    ).toBe(true);
+    expect(
+      canConfirmJob({
+        kind: "change",
+        status: "ready",
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      }),
+    ).toBe(true);
+    expect(
+      canConfirmJob({
+        kind: "change",
+        status: "ready",
+        expires_at: new Date(Date.now() - 60_000).toISOString(),
+      }),
+    ).toBe(false);
+    expect(canConfirmJob({ kind: "change", status: "verifying" })).toBe(false);
+    expect(canConfirmJob({ kind: "discover", status: "ready" })).toBe(false);
+    expect(canConfirmJob({ kind: "monitor", status: "ready" })).toBe(false);
+  });
+  it("applied changes can be rolled back regardless of verification state", () => {
+    for (const status of [
+      "verified",
+      "verifying",
+      "verification_failed",
+      "uncertain",
+    ])
+      expect(canRollbackJob({ kind: "change", status })).toBe(true);
+    expect(canRollbackJob({ kind: "change", status: "ready" })).toBe(false);
+    expect(canRollbackJob({ kind: "discover", status: "complete" })).toBe(
+      false,
+    );
+  });
+  it("requires the acknowledgement exactly when the server does", () => {
+    expect(
+      changeNeedsEmailWarning({
+        status: "ready",
+        payload: { change: { kind: "nameservers", nameservers: ["a.example.test", "b.example.test"] } },
+      }),
+    ).toBe(true);
+    expect(
+      changeNeedsEmailWarning({
+        status: "ready",
+        payload: { change: { kind: "update", record: { id: "9", type: "A", name: "@", content: "192.0.2.1" } } },
+      }),
+    ).toBe(false);
+    // MX -> A still counts: the record being replaced is an MX record.
+    expect(
+      changeNeedsEmailWarning({
+        status: "ready",
+        payload: { change: { kind: "update", record: { id: "9", type: "A", name: "@", content: "192.0.2.1" } } },
+        before_state: { records: [{ id: "9", type: "MX", name: "@", content: "mail.example.test" }] },
+      }),
+    ).toBe(true);
+    expect(changeNeedsEmailWarning({ status: "ready", payload: {} })).toBe(false);
+  });
+  it("reads seed-shaped payloads that store the change directly", () => {
+    // Seeded history rows keep the change as the payload itself, not payload.change.
+    expect(
+      changeNeedsEmailWarning({
+        status: "ready",
+        payload: { kind: "create", record: { type: "TXT", name: "@", content: "x" } },
+      }),
+    ).toBe(true);
+    expect(
+      changeNeedsEmailWarning({
+        status: "ready",
+        payload: { kind: "update", record: { type: "A", name: "@", content: "192.0.2.1" } },
+      }),
+    ).toBe(false);
   });
 });
 

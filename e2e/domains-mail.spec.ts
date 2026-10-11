@@ -203,6 +203,12 @@ test("DNS preview requires confirmation and the shared step-up dialog before app
                 domain: "preview.example.test",
                 kind: "change",
                 status: applied ? "verifying" : "ready",
+                payload: {
+                  change: {
+                    kind: "nameservers",
+                    nameservers: after.nameservers,
+                  },
+                },
                 before_state: before,
                 after_state: after,
               },
@@ -270,8 +276,17 @@ test("DNS preview requires confirmation and the shared step-up dialog before app
   ).toBeVisible();
   expect(applied).toBe(false);
   await page.getByLabel(`Select job ${jobId}`).check();
-  await page.getByLabel("I reviewed the changes", { exact: false }).check();
-  await page.getByRole("button", { name: "Confirm selected previews" }).click();
+  // Confirmation is a focused review: the dialog lists the selected change and
+  // its diff, and the acknowledgement binds to exactly that selection.
+  await page
+    .getByRole("button", { name: "Review and confirm selected previews" })
+    .click();
+  const review = page.getByTestId("dialog-confirm-previews");
+  await expect(review.getByText("preview.example.test")).toBeVisible();
+  await review
+    .getByLabel("I reviewed these changes", { exact: false })
+    .check();
+  await review.getByRole("button", { name: "Confirm 1 change" }).click();
   await expect(
     page.getByRole("heading", { name: "Verify your identity" }),
   ).toBeVisible();

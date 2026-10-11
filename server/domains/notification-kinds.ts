@@ -5,6 +5,16 @@ export const DOMAIN_MAIL_NOTIFICATION_KINDS = {
     email: true,
     security: true,
   },
+  "domains.verified": {
+    label: "Domain DNS change verified",
+    inApp: true,
+    email: false,
+  },
+  "domains.verification_failed": {
+    label: "Domain DNS change could not be verified",
+    inApp: true,
+    email: true,
+  },
   "domains.disconnected": {
     label: "A registrar API key was removed",
     inApp: true,

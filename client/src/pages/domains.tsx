@@ -27,6 +27,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { AppPage, Toolbar, Notice } from "@/components/app-ui";
 import {
   GoogleSurface,
@@ -41,12 +49,21 @@ import {
   pollUnlessPlanRequired,
 } from "@/components/plan-required";
 import {
+  BackgroundJobStatus,
   DnsStateDiff,
   JobStatusStepper,
+  canConfirmJob,
+  canRollbackJob,
+  changeNeedsEmailWarning,
+  jobChange,
   type DnsRecordLike,
   type JobLike,
 } from "@/components/domains/dns-diff";
 import { RecordPicker } from "@/components/domains/record-picker";
+import {
+  buildRecordChange,
+  scopedRecordId,
+} from "@/components/domains/record-change";
 import {
   badgeClass,
   domainBadges,
@@ -93,11 +110,16 @@ export default function DomainsPage() {
     [content, setContent] = useState(""),
     [ttl, setTtl] = useState(600),
     [priority, setPriority] = useState(0),
-    // The provider record id when Update/Delete started from the record picker.
-    [recordId, setRecordId] = useState<string>("");
+    // The provider record id when Update/Delete started from the record picker. The
+    // id is the immutable identity of the picked record: it survives value edits and
+    // is only dropped when the operation no longer targets that record (a create, or
+    // the selection moving away from recordDomainId's domain).
+    [recordId, setRecordId] = useState<string>(""),
+    [recordDomainId, setRecordDomainId] = useState<number | null>(null);
   const [jobPage, setJobPage] = useState(1),
     [jobSelection, setJobSelection] = useState<string[]>([]),
-    [warning, setWarning] = useState(false),
+    [reviewing, setReviewing] = useState(false),
+    [reviewAck, setReviewAck] = useState(false),
     [locationQuery, setLocationQuery] = useState(""),
     [location, setLocation] = useState(""),
     [locationPage, setLocationPage] = useState(1),
@@ -161,14 +183,30 @@ export default function DomainsPage() {
       setBusy(false);
     }
   };
-  const toggle = (id: number) =>
-    setSelected((s) =>
-      s.includes(id) ? s.filter((x) => x !== id) : [...s, id],
-    );
+  const clearPickedRecord = () => {
+    setRecordId("");
+    setRecordDomainId(null);
+  };
+  const toggle = (id: number) => {
+    const next = selected.includes(id)
+      ? selected.filter((x) => x !== id)
+      : [...selected, id];
+    // The picked record id belongs to one domain only; a selection that is no
+    // longer exactly that domain must not keep forwarding the identity.
+    if (recordId && (next.length !== 1 || next[0] !== recordDomainId))
+      clearPickedRecord();
+    setSelected(next);
+  };
   const pickedDomain =
     selected.length === 1
       ? (domains?.items || []).find((d: any) => Number(d.id) === selected[0])
       : undefined;
+  // Every selected job is on the current jobs page: paging and searching clear the selection.
+  const selectedJobs = (jobs?.items || []).filter((j: any) =>
+    jobSelection.includes(j.id),
+  );
+  const confirmableJobs = selectedJobs.filter(canConfirmJob),
+    rollbackableJobs = selectedJobs.filter(canRollbackJob);
   // Google's format (owner, 2026-10-07): a quiet page title, section headings with a hairline, pill actions.
   const header = (
     <GoogleSectionHeader
@@ -424,6 +462,7 @@ export default function DomainsPage() {
                 setJobSelection([]);
                 setPage(1);
                 setSelected([]);
+                clearPickedRecord();
               },
               placeholder: "Search domains",
             }}
@@ -438,6 +477,7 @@ export default function DomainsPage() {
                     setRegistrar(e.target.value);
                     setPage(1);
                     setSelected([]);
+                    clearPickedRecord();
                   }}
                 >
                   <option value="">All registrars</option>
@@ -460,6 +500,7 @@ export default function DomainsPage() {
                     setAttention(e.target.value);
                     setPage(1);
                     setSelected([]);
+                    clearPickedRecord();
                   }}
                 >
                   <option value="">All domains</option>
@@ -479,13 +520,17 @@ export default function DomainsPage() {
                     selected.includes(Number(d.id)),
                   )
                 }
-                onChange={(e) =>
-                  setSelected(
-                    e.target.checked
-                      ? domains.items.map((d: any) => Number(d.id))
-                      : [],
+                onChange={(e) => {
+                  const next = e.target.checked
+                    ? domains.items.map((d: any) => Number(d.id))
+                    : [];
+                  if (
+                    recordId &&
+                    (next.length !== 1 || next[0] !== recordDomainId)
                   )
-                }
+                    clearPickedRecord();
+                  setSelected(next);
+                }}
               />
               Select page
             </label>
@@ -645,6 +690,7 @@ export default function DomainsPage() {
                   onClick={() => {
                     setPage((p) => p - 1);
                     setSelected([]);
+                    clearPickedRecord();
                   }}
                   label="Previous domains"
                 />
@@ -657,6 +703,7 @@ export default function DomainsPage() {
                   onClick={() => {
                     setPage((p) => p + 1);
                     setSelected([]);
+                    clearPickedRecord();
                   }}
                   label="Next domains"
                 />
@@ -723,7 +770,8 @@ export default function DomainsPage() {
             <p className="text-sm g-text-2">
               Applies to every selected domain. With one domain selected, pick
               the current record below — the provider's record id is carried
-              through the preview. Cloudflare-hosted zones are managed in
+              through the preview, so the exact record changes even when others
+              share its name and type. Cloudflare-hosted zones are managed in
               Cloudflare.
             </p>
             <div className="flex flex-col gap-2 sm:flex-row">
@@ -732,8 +780,10 @@ export default function DomainsPage() {
                 aria-label="DNS operation"
                 value={kind}
                 onChange={(e) => {
-                  setKind(e.target.value);
-                  setRecordId("");
+                  const next = e.target.value;
+                  setKind(next);
+                  // A create makes a new record; update/delete keep the picked id.
+                  if (next === "create") clearPickedRecord();
                 }}
               >
                 {["create", "update", "delete"].map((v) => (
@@ -744,10 +794,7 @@ export default function DomainsPage() {
                 className={selectClass}
                 aria-label="Record type"
                 value={type}
-                onChange={(e) => {
-                  setType(e.target.value);
-                  setRecordId("");
-                }}
+                onChange={(e) => setType(e.target.value)}
               >
                 {["A", "AAAA", "CNAME", "TXT", "MX", "CAA"].map((v) => (
                   <option key={v}>{v}</option>
@@ -756,10 +803,7 @@ export default function DomainsPage() {
               <Input
                 aria-label="Record name"
                 value={recordName}
-                onChange={(e) => {
-                  setRecordName(e.target.value);
-                  setRecordId("");
-                }}
+                onChange={(e) => setRecordName(e.target.value)}
                 placeholder="@ or www"
               />
             </div>
@@ -767,10 +811,7 @@ export default function DomainsPage() {
               aria-label="Record value"
               placeholder="DNS record value (current value for delete)"
               value={content}
-              onChange={(e) => {
-                setContent(e.target.value);
-                setRecordId("");
-              }}
+              onChange={(e) => setContent(e.target.value)}
             />
             <div className="flex gap-2">
               <label className="flex-1 space-y-1.5 text-sm sm:flex-none">
@@ -779,10 +820,7 @@ export default function DomainsPage() {
                   aria-label="Record TTL"
                   type="number"
                   value={ttl}
-                  onChange={(e) => {
-                    setTtl(Number(e.target.value));
-                    setRecordId("");
-                  }}
+                  onChange={(e) => setTtl(Number(e.target.value))}
                 />
               </label>
               <label className="flex-1 space-y-1.5 text-sm sm:flex-none">
@@ -791,30 +829,46 @@ export default function DomainsPage() {
                   aria-label="MX priority"
                   type="number"
                   value={priority}
-                  onChange={(e) => {
-                    setPriority(Number(e.target.value));
-                    setRecordId("");
-                  }}
+                  onChange={(e) => setPriority(Number(e.target.value))}
                 />
               </label>
             </div>
+            {recordId && (
+              <p className="flex flex-wrap items-center gap-2 text-xs g-open">
+                <span>
+                  Record #{recordId} from{" "}
+                  {recordDomainId
+                    ? ((domains?.items || []).find(
+                        (d: any) => Number(d.id) === recordDomainId,
+                      )?.domain ?? "the picked domain")
+                    : "the picked domain"}{" "}
+                  is the target — the provider's id is sent with your edited
+                  values.
+                </span>
+                <GooglePill
+                  variant="quiet"
+                  size="sm"
+                  className="min-h-0 px-1.5"
+                  onClick={clearPickedRecord}
+                  label="Clear"
+                />
+              </p>
+            )}
             <GooglePill
               icon={Eye}
               disabled={!selected.length || busy}
               onClick={async () => {
                 const d = await act("/preview", {
                   ids: selected,
-                  change: {
-                    kind,
-                    record: {
-                      ...(recordId ? { id: recordId } : {}),
-                      type,
-                      name: recordName,
-                      content,
-                      ttl,
-                      priority,
-                    },
-                  },
+                  change: buildRecordChange(
+                    { kind, type, name: recordName, content, ttl, priority },
+                    scopedRecordId({
+                      recordId,
+                      recordDomainId,
+                      selected,
+                      kind,
+                    }),
+                  ),
                 });
                 if (d?.jobs?.length)
                   toast({
@@ -836,6 +890,7 @@ export default function DomainsPage() {
                   setTtl(r.ttl ?? 600);
                   setPriority(r.priority ?? 0);
                   setRecordId(r.id || "");
+                  setRecordDomainId(r.id ? Number(pickedDomain.id) : null);
                 }}
               />
             ) : (
@@ -875,23 +930,40 @@ export default function DomainsPage() {
                       className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180"
                       aria-hidden="true"
                     />
-                    <input
-                      aria-label={`Select job ${j.id}`}
-                      type="checkbox"
-                      checked={jobSelection.includes(j.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) =>
-                        setJobSelection((s) =>
-                          e.target.checked
-                            ? [...s, j.id]
-                            : s.filter((x) => x !== j.id),
-                        )
-                      }
-                      className="mr-1"
-                    />
-                    <span className="g-text">{j.domain || "Registrar inventory"}</span>
-                    <span className="g-text-2"> · {j.kind} · </span>
-                    <JobStatusStepper status={j.status} />
+                    {(canConfirmJob(j) || canRollbackJob(j)) && (
+                      <input
+                        aria-label={`Select job ${j.id}`}
+                        type="checkbox"
+                        checked={jobSelection.includes(j.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) =>
+                          setJobSelection((s) =>
+                            e.target.checked
+                              ? [...s, j.id]
+                              : s.filter((x) => x !== j.id),
+                          )
+                        }
+                        className="mr-1"
+                      />
+                    )}
+                    <span className="g-text">
+                      {j.domain || "Registrar inventory"}
+                    </span>
+                    <span className="g-text-2">
+                      {" "}
+                      ·{" "}
+                      {j.kind === "change"
+                        ? `DNS ${jobChange(j)?.kind ?? "change"}`
+                        : j.kind === "discover"
+                          ? "registrar import"
+                          : "DNS check"}{" "}
+                      ·{" "}
+                    </span>
+                    {j.kind === "change" ? (
+                      <JobStatusStepper status={j.status} />
+                    ) : (
+                      <BackgroundJobStatus kind={j.kind} status={j.status} />
+                    )}
                   </summary>
                   {j.error && (
                     <p role="alert" className="mt-2 text-sm g-closed">
@@ -942,52 +1014,45 @@ export default function DomainsPage() {
               No previews yet. Select domains above and preview a change.
             </p>
           )}
-          <label className="flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={warning}
-              onChange={(e) => setWarning(e.target.checked)}
-            />
-            I reviewed the changes and understand that MX, TXT, CNAME or
-            nameserver changes can break email and website access.
-          </label>
           <div className="flex flex-wrap items-center gap-2">
             <GooglePill
               icon={ShieldCheck}
               disabled={!jobSelection.length || busy || !!jobsError}
-              onClick={async () => {
-                const n = jobSelection.length;
-                const d = await act("/confirm", {
-                  jobIds: jobSelection,
-                  confirmed: true,
-                  emailWarningAccepted: warning,
-                });
-                if (d) {
-                  toast({
-                    title: `${n} change${n === 1 ? "" : "s"} queued`,
-                    description:
-                      "Applying at the registrar now. We check public DNS every 5 minutes until the change shows, and you get a notification with the result.",
-                  });
-                  setJobSelection([]);
-                  setWarning(false);
-                }
+              onClick={() => {
+                setReviewAck(false);
+                setReviewing(true);
               }}
-              label="Confirm selected previews"
+              label="Review and confirm selected previews"
             />
             <GooglePill
               icon={Undo2}
               variant="quiet"
               disabled={!jobSelection.length || busy}
               onClick={async () => {
+                if (!rollbackableJobs.length) {
+                  toast({
+                    variant: "destructive",
+                    title: "Nothing to roll back",
+                    description:
+                      "Select applied changes — verified, verifying, uncertain or failed verification — to preview a rollback.",
+                  });
+                  return;
+                }
                 const d = await act("/rollback-preview", {
-                  jobIds: jobSelection,
+                  jobIds: rollbackableJobs.map((j: any) => j.id),
                 });
-                if (d?.jobs?.length)
+                if (d?.jobs?.length) {
+                  const skipped = selectedJobs.length - rollbackableJobs.length;
                   toast({
                     title: "Rollback preview queued",
-                    description:
-                      "Review the restored before-values below, then confirm like any other change.",
+                    description: `Review the restored before-values below, then confirm like any other change.${
+                      skipped
+                        ? ` ${skipped} selected job${skipped === 1 ? "" : "s"} ${skipped === 1 ? "was" : "were"} not applied changes and ${skipped === 1 ? "was" : "were"} left out.`
+                        : ""
+                    }`,
                   });
+                  setJobSelection([]);
+                }
               }}
               label="Preview rollback of selected changes"
             />
@@ -1016,6 +1081,98 @@ export default function DomainsPage() {
           </div>
         </div>
       </section>
+      <Dialog open={reviewing} onOpenChange={setReviewing}>
+        <DialogContent className="max-w-2xl" data-testid="dialog-confirm-previews">
+          <DialogHeader>
+            <DialogTitle>
+              Confirm {confirmableJobs.length} change
+              {confirmableJobs.length === 1 ? "" : "s"}
+            </DialogTitle>
+            <DialogDescription>
+              Nothing changes at the registrar until you confirm. Each change
+              applies exactly as previewed below.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[50vh] space-y-3 overflow-y-auto">
+            {confirmableJobs.map((j: any) => {
+              const c = jobChange(j);
+              return (
+                <div key={j.id} className="rounded-xl border p-3">
+                  <p className="text-sm font-medium">{j.domain}</p>
+                  <p className="text-xs g-text-2">
+                    {c?.kind === "nameservers"
+                      ? `Nameservers → ${(c.nameservers || []).join(", ")}`
+                      : c?.record
+                        ? `${c.kind} ${c.record.type} ${c.record.name}`
+                        : "DNS change"}
+                  </p>
+                  <DnsStateDiff job={j as JobLike} />
+                </div>
+              );
+            })}
+            {selectedJobs.length - confirmableJobs.length > 0 && (
+              <p className="text-xs g-text-2">
+                {selectedJobs.length - confirmableJobs.length} selected job
+                {selectedJobs.length - confirmableJobs.length === 1 ? "" : "s"}{" "}
+                can't be confirmed right now — still building, already applied,
+                or expired — and are left out.
+              </p>
+            )}
+            {!confirmableJobs.length && (
+              <p className="text-sm g-text-2">
+                None of the selected jobs is waiting for confirmation. Previews
+                must finish building before they can be confirmed.
+              </p>
+            )}
+          </div>
+          {confirmableJobs.length > 0 &&
+            confirmableJobs.some(changeNeedsEmailWarning) && (
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={reviewAck}
+                  onChange={(e) => setReviewAck(e.target.checked)}
+                />
+                I reviewed these changes and understand that MX, TXT, CNAME or
+                nameserver changes can break email and website access.
+              </label>
+            )}
+          <DialogFooter>
+            <GooglePill
+              variant="quiet"
+              onClick={() => setReviewing(false)}
+              label="Cancel"
+            />
+            <GooglePill
+              variant="solid"
+              icon={ShieldCheck}
+              disabled={
+                !confirmableJobs.length ||
+                busy ||
+                (confirmableJobs.some(changeNeedsEmailWarning) && !reviewAck)
+              }
+              onClick={async () => {
+                const n = confirmableJobs.length;
+                const d = await act("/confirm", {
+                  jobIds: confirmableJobs.map((j: any) => j.id),
+                  confirmed: true,
+                  emailWarningAccepted: reviewAck,
+                });
+                if (d) {
+                  toast({
+                    title: `${n} change${n === 1 ? "" : "s"} queued`,
+                    description:
+                      "Applying at the registrar now. We check public DNS every 5 minutes until the change shows, and you get a notification with the result.",
+                  });
+                  setJobSelection([]);
+                  setReviewing(false);
+                }
+              }}
+              label={`Confirm ${confirmableJobs.length} change${confirmableJobs.length === 1 ? "" : "s"}`}
+            />
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <section>
         <GoogleSectionHeader title="Registrar walkthroughs" flush />
         <div className="space-y-3">

@@ -18,8 +18,9 @@ export function porkbun(
       )
     )
       throw new DomainError("Operation not allowed");
+    let r: Response;
     try {
-      const r = await http(`https://api.porkbun.com/api/json/v3${path}`, {
+      r = await http(`https://api.porkbun.com/api/json/v3${path}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -30,15 +31,28 @@ export function porkbun(
         signal: AbortSignal.timeout(15000),
         redirect: "error",
       });
-      const d = await r.json();
-      if (!r.ok || d.status !== "SUCCESS") throw new Error();
-      return d;
     } catch {
+      // Network drop, DNS failure or timeout — the registrar was never reached.
+      throw new DomainError(
+        "Could not reach Porkbun — the request timed out or the network dropped it. Try again in a moment.",
+        502,
+      );
+    }
+    let d: any;
+    try {
+      d = await r.json();
+    } catch {
+      throw new DomainError(
+        "Porkbun returned an unreadable response. Try again in a moment.",
+        502,
+      );
+    }
+    if (!r.ok || d.status !== "SUCCESS")
       throw new DomainError(
         "Porkbun request failed. Check API access and credentials.",
         502,
       );
-    }
+    return d;
   };
   const info = (d: any, nameservers: string[] = []) => ({
     domain: domainName.parse(d.domain),

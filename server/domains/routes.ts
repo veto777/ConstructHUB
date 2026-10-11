@@ -343,7 +343,7 @@ export function registerDomainRoutes(
   });
   // Applies confirmed previews: requires recent sign-in, the email-interruption warning
   // for email-affecting changes, and unexpired 'ready' jobs, then queues them for the
-  // worker. "Confirm selected previews" — domains.tsx.
+  // worker. "Review and confirm selected previews" — domains.tsx.
   route("post", "/confirm", async (req, res, id) => {
     const b = z
       .object({

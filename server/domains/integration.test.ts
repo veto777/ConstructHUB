@@ -601,3 +601,177 @@ it("serves live records for the picker, syncs every saved connection, filters by
     attention.data.items.some((d: any) => Number(d.id) === Number(domain)),
   ).toBe(true);
 });
+
+it("rejects a picked record id in bulk previews and updates one of two same-name/type records by id", async () => {
+  // Two TXT records on the same name — the fixture registrar's zone.
+  state.records = [
+    { id: "501", name: "@", type: "TXT", content: "v=spf1 -all", ttl: 300, priority: 0 },
+    { id: "502", name: "@", type: "TXT", content: "google-site-verification=abc", ttl: 300, priority: 0 },
+  ];
+  const secondConnection = Number(
+    await saveConnection(user, "porkbun", "Bulk guard key", "k2", "s2"),
+  );
+  try {
+    const second = Number(
+      (
+        await pool.query(
+          "UPDATE managed_domains SET connection_id=$2,registrar='porkbun' WHERE user_id=$1 AND domain='fixture-0003.example.test' RETURNING id",
+          [user, secondConnection],
+        )
+      ).rows[0].id,
+    );
+    // A picked provider id belongs to one domain: a bulk preview carrying it is
+    // refused before any job exists, so the id can never scope another domain.
+    const bulk = await call("post", "/api/domains/preview", {
+      ids: [domain, second],
+      change: {
+        kind: "update",
+        record: {
+          id: "501",
+          type: "TXT",
+          name: "@",
+          content: "v=spf1 ~all",
+          ttl: 300,
+          priority: 0,
+        },
+      },
+    });
+    expect(bulk.code).toBe(409);
+    expect(bulk.data.message).toContain("belongs to one domain");
+    // With the domain alone, the id scopes the exact record: editing one of two
+    // same-name/type records touches that record and leaves its sibling alone.
+    const [id] = await preview(user, [domain], {
+      kind: "update",
+      record: {
+        id: "502",
+        type: "TXT",
+        name: "@",
+        content: "google-site-verification=xyz",
+        ttl: 300,
+        priority: 0,
+      },
+    });
+    await processJob(await job(id), { adapter: () => a });
+    const ready = await job(id);
+    expect(ready.status).toBe("ready");
+    expect(ready.before_state.records).toHaveLength(2);
+    const changed = ready.after_state.records.find((r: any) => r.id === "502");
+    expect(changed.content).toBe("google-site-verification=xyz");
+    expect(
+      ready.after_state.records.find((r: any) => r.id === "501")?.content,
+    ).toBe("v=spf1 -all");
+    // Without the id, the same name/type set is ambiguous and stays rejected.
+    const [ambiguous] = await preview(user, [domain], {
+      kind: "update",
+      record: {
+        type: "TXT",
+        name: "@",
+        content: "v=spf1 ~all",
+        ttl: 300,
+        priority: 0,
+      },
+    });
+    await expect(
+      processJob(await job(ambiguous), { adapter: () => a }),
+    ).rejects.toThrow("exactly one matching record");
+    await pool.query(
+      "UPDATE domain_jobs SET status='failed',error='fixture' WHERE id=$1",
+      [ambiguous],
+    );
+    await pool.query("UPDATE domain_jobs SET status='complete' WHERE id=$1", [id]);
+  } finally {
+    // Removing the fixture key cascades its queued discover job.
+    await pool.query("DELETE FROM domain_connections WHERE id=$1", [
+      secondConnection,
+    ]);
+  }
+});
+
+it("notifies when DNS verification reaches a result", async () => {
+  state.records = [
+    { id: "601", name: "@", type: "A", content: "192.0.2.1", ttl: 300, priority: 0 },
+  ];
+  const [okJob] = await preview(user, [domain], {
+    kind: "update",
+    record: { id: "601", name: "@", type: "A", content: "192.0.2.2", ttl: 300, priority: 0 },
+  });
+  await processJob(await job(okJob), { adapter: () => a });
+  await confirm(user, [okJob], true);
+  await processJob(await job(okJob), { adapter: () => a });
+  expect((await job(okJob)).status).toBe("verifying");
+  const callsBefore = (notifyUser as any).mock.calls.length;
+  await processJob(await job(okJob), {
+    adapter: () => a,
+    http: async () =>
+      new Response(
+        JSON.stringify({ Status: 0, Answer: [{ type: 1, data: "192.0.2.2" }] }),
+      ),
+  });
+  expect((await job(okJob)).status).toBe("verified");
+  // The confirmation promised a notification with the result — exactly one.
+  expect((notifyUser as any).mock.calls.length).toBe(callsBefore + 1);
+  expect(notifyUser).toHaveBeenCalledWith(
+    user,
+    "domains.verified",
+    expect.objectContaining({
+      title: "Domain change verified",
+      body: expect.stringContaining(state.domain),
+    }),
+  );
+  expect(logActivity).toHaveBeenCalledWith(
+    null,
+    user,
+    "domains.verify",
+    expect.objectContaining({ jobId: okJob, result: "verified" }),
+  );
+  // A mismatch on the final allowed attempt is reported too.
+  const [badJob] = await preview(user, [domain], {
+    kind: "update",
+    record: { id: "601", name: "@", type: "A", content: "192.0.2.3", ttl: 300, priority: 0 },
+  });
+  await processJob(await job(badJob), { adapter: () => a });
+  await confirm(user, [badJob], true);
+  await processJob(await job(badJob), { adapter: () => a });
+  await pool.query("UPDATE domain_jobs SET attempts=288 WHERE id=$1", [badJob]);
+  await processJob(await job(badJob), {
+    adapter: () => a,
+    http: async () =>
+      new Response(
+        JSON.stringify({ Status: 0, Answer: [{ type: 1, data: "192.0.2.1" }] }),
+      ),
+  });
+  expect((await job(badJob)).status).toBe("verification_failed");
+  expect(notifyUser).toHaveBeenCalledWith(
+    user,
+    "domains.verification_failed",
+    expect.objectContaining({ title: "Domain change could not be verified" }),
+  );
+});
+
+it("confirms seeded-shape history rows whose payload is the change itself", async () => {
+  // Seeded rows store the change directly as payload (app-enqueued jobs wrap it
+  // as payload.change). Confirmation must still apply the warning rule and queue.
+  const seeded = crypto.randomUUID();
+  await pool.query(
+    `INSERT INTO domain_jobs(id,user_id,domain_id,connection_id,kind,status,payload,before_state,after_state,expires_at)
+     VALUES($1,$2,$3,$4,'change','ready',$5::jsonb,$6::jsonb,$7::jsonb,now()+interval '15 minutes')`,
+    [
+      seeded,
+      user,
+      domain,
+      connection,
+      JSON.stringify({
+        kind: "create",
+        record: { type: "TXT", name: "@", content: "fixture-seed-shape", ttl: 300 },
+      }),
+      JSON.stringify({ records: [], nameservers: state.nameservers }),
+      JSON.stringify({
+        records: [{ type: "TXT", name: "@", content: "fixture-seed-shape", ttl: 300 }],
+        nameservers: state.nameservers,
+      }),
+    ],
+  );
+  await expect(confirm(user, [seeded], false)).rejects.toThrow("Acknowledge");
+  await confirm(user, [seeded], true);
+  expect((await job(seeded)).status).toBe("queued");
+});
