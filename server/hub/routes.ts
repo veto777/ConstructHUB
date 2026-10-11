@@ -54,7 +54,29 @@ export type HubDeps = {
    */
   quota?: {
     take: (userId: number) => Promise<{ ok: true; refund: () => Promise<void> } | { ok: false; status: number; body: Record<string, unknown> }>;
+    /**
+     * The month's standing for the widget header (GET /presets): the plan's monthly limit
+     * (-1 unlimited, 0 none), what is used, and when it resets. Null when the account has no
+     * allowance to show. Read-only; never reserves.
+     */
+    usage?: (userId: number) => Promise<{ limit: number; used: number; resetsAt: string } | null>;
   };
+};
+
+/** Why chat is off for a signed-in account right now; the widget shows the matching state instead of a toast. */
+export type HubChatOff = "provider" | "capped";
+
+/** What GET /api/hub/presets tells a signed-in account about its Gabe questions. */
+export type HubAllowance = {
+  /** The plan's questions a month: -1 unlimited, 0 none (no plan). */
+  monthly: number;
+  used: number;
+  /** Questions left this month; null when unlimited. */
+  remaining: number | null;
+  /** First instant of next month (UTC), ISO. */
+  resetsAt: string;
+  /** Today's pace: the per-account daily cap and what today has used. */
+  daily: { limit: number; used: number };
 };
 
 const MAX_USER_CHARS = 500;
@@ -95,6 +117,40 @@ export function createHub(deps: HubDeps) {
   };
 
   const tierOf = (req: Request): HubTier => (deps.isBuilder(req) ? "builder" : "browse");
+
+  /**
+   * Whose allowance a signed-in request spends: the workspace owner for an agency member acting in
+   * the owner's workspace (the same membership/plan checks as the other workspace tools), else the user.
+   */
+  async function allowanceOwner(req: Request, userId: number): Promise<number> {
+    if (req.session?.agencyOwner && req.session.agencyOwner !== userId) {
+      const { requestAccess } = await import("../agency/routes");
+      return (await requestAccess(req)).owner;
+    }
+    return userId;
+  }
+
+  /** The month's standing for the widget header, or null when there is no meter or it can't be read. */
+  async function allowanceFor(req: Request): Promise<HubAllowance | null> {
+    if (!deps.quota?.usage || !req.user) return null;
+    try {
+      const userId = Number((req.user as { id: number }).id);
+      const ownerId = await allowanceOwner(req, userId);
+      const u = await deps.quota.usage(ownerId);
+      if (!u) return null;
+      const daily = hubDailyLimits(u.limit === 0 ? null : u.limit);
+      const dailyUsed = await deps.budget.used(keys.userDaily(userId), HUB_LIMITS.userDaily.windowMs);
+      return {
+        monthly: u.limit, used: u.used,
+        remaining: u.limit === -1 ? null : Math.max(0, u.limit - u.used),
+        resetsAt: u.resetsAt,
+        daily: { limit: daily.userDaily, used: dailyUsed },
+      };
+    } catch (err) {
+      logError("allowance", err);
+      return null;
+    }
+  }
   const note = (tier: HubTier, outcome: HubOutcome, reason: string, started: number) => {
     try { deps.stats.record(tier, outcome, reason); } catch { /* stats never break a reply */ }
     logLine(outcome, reason, now() - started);
@@ -229,7 +285,13 @@ export function createHub(deps: HubDeps) {
 
   router.get("/api/hub/presets", async (req, res) => {
     const builder = deps.isBuilder(req);
-    const chat = builder && deps.providerOk() && !(await capped());
+    // Why a signed-in account can't chat right now, named, so the widget shows a clear state
+    // (not a toast): the model provider isn't configured / pinned, or today's token cap is reached.
+    const chatOff: HubChatOff | null = !builder ? null : !deps.providerOk() ? "provider" : (await capped()) ? "capped" : null;
+    const chat = builder && chatOff === null;
+    const allowance = builder ? await allowanceFor(req) : null;
+    // Lets the widget keep its one-time welcome per account rather than per browser.
+    const userId = builder && req.user ? Number((req.user as { id: number }).id) : null;
     // The iPhone apps sell nothing (App Store 3.1.3(f)): the chip list there drops the
     // questions whose answer is plans/pricing/buying ("How much does it cost?", "talk to
     // sales"…). Tapping one still gets the fixed line (POST /preset), so old app builds
@@ -242,6 +304,9 @@ export function createHub(deps: HubDeps) {
         welcome: WELCOME_PRESETS.filter((id) => !APP_SALES_PRESETS.has(id)),
         tier: builder ? "builder" : "browse",
         chat,
+        chatOff,
+        allowance,
+        userId,
         maxChars: MAX_USER_CHARS,
       });
     }
@@ -251,6 +316,9 @@ export function createHub(deps: HubDeps) {
       welcome: WELCOME_PRESETS,
       tier: builder ? "builder" : "browse",
       chat,
+      chatOff,
+      allowance,
+      userId,
       maxChars: MAX_USER_CHARS,
     });
   });
@@ -363,11 +431,7 @@ export function createHub(deps: HubDeps) {
       try {
         // Resolve delegated access through the same membership/plan checks as other
         // workspace tools. Daily counters remain per actor; the allowance is the owner's.
-        let ownerId = userId;
-        if (req.session?.agencyOwner && req.session.agencyOwner !== userId) {
-          const { requestAccess } = await import("../agency/routes");
-          ownerId = (await requestAccess(req)).owner;
-        }
+        const ownerId = await allowanceOwner(req, userId);
         // Production always supplies quota; isolated Hub instances without a
         // plan meter retain the default guards and need no entitlement database.
         let monthlyGabeQuestions: number | null = null;

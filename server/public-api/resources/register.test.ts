@@ -50,6 +50,18 @@ describe("resource assembly", () => {
     expect(codes).toEqual([...API_ERROR_CODES, ...API_EXTRA_ERROR_CODES]);
     expect(codes).toEqual(expect.arrayContaining(["unauthorized", "invalid_api_key", "insufficient_scope", "validation_error", "not_found", "rate_limited", "quota_exceeded", "plan_required", "internal_error"]));
     expect(doc.components.schemas.ApiError ?? doc.components.schemas.Error).toEqual(doc.components.schemas.Error);
+    // Every operation says its scope and its cost, so the Developers page can show both on every row:
+    // reads (GET) are "read" and metered per rows, writes are "write" and a flat 5 units (quota.ts).
+    for (const [p, item] of Object.entries(doc.paths as Record<string, Record<string, any>>)) {
+      for (const [method, op] of Object.entries(item)) {
+        const write = method !== "get" && method !== "head";
+        expect(op["x-scope"], `${method} ${p}`).toBe(write ? "write" : "read");
+        expect(op["x-units"], `${method} ${p}`).toBe(write ? 5 : "1 + 1 per 100 rows");
+        expect(op.security, `${method} ${p}`).toEqual([{ apiKey: [write ? "write" : "read"] }]);
+      }
+    }
+    expect(doc.paths["/me"].get["x-scope"]).toBe("read");
+    expect(doc["x-limits"].units.read).toBe("1 + 1 per 100 rows");
     // Every response schema reference resolves to a schema the document carries.
     const refs = JSON.stringify(doc).match(/#\/components\/schemas\/[A-Za-z0-9_]+/g) ?? [];
     for (const ref of new Set(refs)) expect(doc.components.schemas[ref.split("/").pop()!], ref).toBeDefined();

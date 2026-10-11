@@ -1,5 +1,6 @@
-import type { FeaturePage } from "./types";
+import type { FeatureAllowance, FeaturePage } from "./types";
 import { HUB_PRESETS } from "../hub-presets";
+import { allowanceLine } from "./pricing";
 
 /**
  * Gabe, the Hub assistant — the AI helper in the corner of the app and the public pages.
@@ -10,17 +11,24 @@ import { HUB_PRESETS } from "../hub-presets";
  *   - the preset questions and the welcome set for a brand-new account: shared/hub-presets.ts
  *   - free-text chat needs a signed-in account with a verified email (401/403 otherwise), 500 characters a message:
  *     server/hub/routes.ts, server/hub/access.ts (isBuilder)
- *   - 40 questions a day per account, 20 questions per chat, and the quick questions keep working after the limit:
- *     server/hub/limits.ts (HUB_LIMITS.userDaily), server/hub/turns.ts (MAX_USER_TURNS), server/hub/replies.ts (R_LIMIT)
+ *   - every typed question takes one of the plan's monthly Gabe questions (shared/plans.ts limits.gabeQuestions,
+ *     -1 unlimited; 0 for an account with no plan), refunded when no answer comes back; a spent month gets the
+ *     plan-limit answer: server/hub/index.ts (quota), server/hub/routes.ts (step 10), server/growth-quotas.ts
+ *   - on top of that a daily pace per account that grows with the plan (never below the floor, a fair-use cap on
+ *     Unlimited), 20 questions per chat, and the quick questions keep working after any limit:
+ *     server/hub/limits.ts (hubDailyLimits), server/hub/turns.ts (MAX_USER_TURNS), server/hub/replies.ts (R_LIMIT)
  *   - no tools, no account data, no prices for sales-rep work, ConstructHUB topics only, English only, links only to
  *     ConstructHUB pages, answers from the knowledge pack + price book, the page the visitor is on:
  *     server/hub/prompt.ts (hardRulesText, systemPrompt, buildMessages), server/hub/knowledge.ts, server/hub/replies.ts
  *   - emails, phones, addresses and ID-like numbers are redacted before the model sees a message: server/hub/prefilter.ts (redact, forModel)
  *   - the only stored data: daily outcome counts (no text, no people) and cached preset answers: server/hub/store.ts, server/hub/index.ts
- *   - no plan check anywhere in the Hub: server/hub/routes.ts
+ *   - the quick questions have no plan check at all (anyone, signed in or not): server/hub/routes.ts POST /preset
+ * Numbers that live in the price book are read from it (allowanceLine), never typed.
  */
 
 const QUICK_QUESTIONS = Object.keys(HUB_PRESETS).length;
+/** The monthly question allowance per plan (the meter server/hub/index.ts reserves on). */
+const QUESTIONS: FeatureAllowance = { limit: "gabeQuestions", unit: "questions", period: "month" };
 
 const page: FeaturePage = {
   key: "gabe",
@@ -41,7 +49,7 @@ const page: FeaturePage = {
     },
     {
       title: "Sign in to ask your own",
-      body: "With a verified email, type your own question about how ConstructHUB works or how to set something up.",
+      body: "Signed in with a verified email, type your own question about how ConstructHUB works or how to set something up. Each one uses a question from your plan's monthly allowance.",
     },
     {
       title: "Get a short answer with a link",
@@ -118,8 +126,9 @@ const page: FeaturePage = {
     },
   ],
   pricing: {
-    kind: "account",
-    note: "Quick questions work without an account; typing your own questions needs a signed-in account with a verified email.",
+    kind: "allowance",
+    allowance: QUESTIONS,
+    note: "The quick questions are free for anyone, with or without an account. Typing your own questions needs a signed-in account with a verified email and uses the plan's monthly questions; a question that gets no answer isn't counted.",
   },
   faqs: [
     {
@@ -128,11 +137,11 @@ const page: FeaturePage = {
     },
     {
       q: "What do I need to chat with him?",
-      a: "Quick questions work for anyone on ConstructHUB's public pages. To type your own questions, sign in with a verified email. It isn't counted against any plan.",
+      a: `Quick questions work for anyone on ConstructHUB's public pages, and they're never counted. To type your own questions, sign in with a verified email on a plan. Each plan includes a monthly allowance — ${allowanceLine(QUESTIONS)} — and the widget shows how many are left this month.`,
     },
     {
       q: "Are there limits?",
-      a: "A question can be up to 500 characters, a chat runs for up to 20 questions before you start a new one, and each account can ask up to 40 questions a day. The quick questions keep working after that.",
+      a: "A question can be up to 500 characters and a chat runs for up to 20 questions before you start a new one. Your plan sets the questions per month, and a daily pace that grows with the plan keeps a month's allowance from going in one afternoon; when a limit is reached Gabe says so, and the quick questions keep working.",
     },
     {
       q: "What won't he do?",
@@ -169,8 +178,9 @@ const page: FeaturePage = {
         "and the pricing page.",
       "Your own words are cleaned before they go to the AI model. Email addresses, phone numbers, street addresses " +
         "and ID-like numbers are swapped for placeholders, so a question pasted with a customer's email, phone number " +
-        "or address doesn't carry them along. Typing your own questions needs a signed-in account with a verified email, and a message " +
-        "can be up to 500 characters.",
+        "or address doesn't carry them along. Typing your own questions needs a signed-in account with a verified email and " +
+        "uses one of your plan's monthly questions; a message can be up to 500 characters, and the quick questions are " +
+        "always free.",
       "Gabe explains; he doesn't act. He can't look anything up in your account, change a setting, or send, book or " +
         "create anything, and he will tell you so. He is an AI helper, so before you rely on an answer for something " +
         "that matters, check it on the page it links to.",
@@ -191,6 +201,8 @@ const page: FeaturePage = {
   },
   sources: [
     "client/src/components/hub/hub-widget.tsx",
+    "server/growth-quotas.ts",
+    "shared/plans.ts",
     "shared/hub-presets.ts",
     "server/hub/routes.ts",
     "server/hub/access.ts",

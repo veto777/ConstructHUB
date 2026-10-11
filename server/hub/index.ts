@@ -6,8 +6,10 @@
  * module enforces are in its header comment.
  */
 import type { Express } from "express";
+import { pool } from "../db";
 import { ipKey } from "../growth-limits";
-import { refundReservation, reserveQuotaFor } from "../growth-quotas";
+import { monthlyLimit, quotaKey, refundReservation, reserveQuotaFor, resetsAt } from "../growth-quotas";
+import { getEntitlements, ownsAllowances } from "../entitlements";
 import { requirePlatformAdmin } from "../crm/admin";
 import { createHub } from "./routes";
 import { hubAiClient, hubModel, hubProviderInfo, hubTimeoutMs, logProvider, providerOk } from "./ai";
@@ -40,6 +42,14 @@ export function registerHubRoutes(app: Express): void {
         const r = await reserveQuotaFor(userId, "gabeQuestions", 1);
         if (!r.ok) return { ok: false as const, status: r.status, body: r.body };
         return { ok: true as const, refund: () => refundReservation(r.reservation, 1) };
+      },
+      // The widget header's "questions left this month": the same meter reserveQuotaFor
+      // writes (growth_budgets, period '0' — counted on unlimited plans too), read, never taken.
+      usage: async (userId: number) => {
+        const ent = await getEntitlements(userId);
+        const limit = ownsAllowances(ent) ? monthlyLimit(ent, "gabeQuestions") : 0;
+        const { rows: [row] } = await pool.query("SELECT used FROM growth_budgets WHERE key=$1 AND period='0'", [quotaKey(userId, "gabeQuestions")]);
+        return { limit, used: Number(row?.used ?? 0), resetsAt: resetsAt() };
       },
     },
   });

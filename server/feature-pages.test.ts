@@ -302,6 +302,58 @@ describe("feature page prices", () => {
   });
 });
 
+describe("marketing truth: a page's plan claims match the gate the code enforces (reviewers, 2026-10-11)", () => {
+  it("Social Media is sold as the socialPublishing module (Pro and up, or the à la carte item), never 'every plan'", () => {
+    const page = featurePageByKey("social")!;
+    expect(page.pricing).toMatchObject({ kind: "module", module: "socialPublishing" });
+    const s = featurePriceSummary(page.pricing);
+    const first = PLAN_KEYS.find((k) => PLANS[k].modules.socialPublishing)!;
+    expect(s.headline).toBe(`Included from the ${PLANS[first].name} plan`);
+    expect(s.plans).toEqual(PLAN_KEYS.filter((k) => PLANS[k].modules.socialPublishing));
+    const text = JSON.stringify(page);
+    expect(text).not.toMatch(/every plan/i);
+    const faq = page.faqs.find((f) => /which plans/i.test(f.q))!;
+    for (const k of PLAN_KEYS) if (PLANS[k].modules.socialPublishing) expect(faq.a).toContain(PLANS[k].name);
+    expect(faq.a).toContain("Social media publishing");
+    // A Solo account is told to move up, not that it already has it.
+    expect(featurePlanGap(page.pricing, { accessPlan: "starter", allowances: PLANS.starter.limits, modules: PLANS.starter.modules }))
+      .toEqual({ label: `Upgrade to ${PLANS[first].name}`, href: "/pricing", note: `Not in your ${PLANS.starter.name} plan.` });
+  });
+
+  it("Gabe is priced from the monthly question allowance the Hub reserves, plan by plan, with no typed daily number", () => {
+    const page = featurePageByKey("gabe")!;
+    expect(page.pricing).toMatchObject({ kind: "allowance", allowance: { limit: "gabeQuestions", period: "month" } });
+    const s = featurePriceSummary(page.pricing);
+    expect(s.rows.map((r) => r.label)).toEqual(PLAN_KEYS.map((k) => PLANS[k].name));
+    expect(s.rows.find((r) => r.label === PLANS.starter.name)!.value).toBe(`${PLANS.starter.limits.gabeQuestions} questions a month`);
+    expect(s.rows.find((r) => r.label === PLANS.agency.name)!.value).toBe("Unlimited (fair use)");
+    const text = JSON.stringify(page);
+    expect(text).not.toMatch(/isn't counted against any plan|no plan check|40 questions a day/i);
+    expect(page.faqs.map((f) => f.a).join(" ")).toContain(allowanceLine({ limit: "gabeQuestions", unit: "questions", period: "month" }));
+    // The quick questions stay free: the note says so, in those words.
+    expect(page.pricing.note).toMatch(/quick questions are free/i);
+  });
+
+  it("Site Scan names the white-label plan wherever it promises a branded PDF", () => {
+    const page = featurePageByKey("siteScan")!;
+    const plan = PLANS[PLAN_KEYS.find((k) => PLANS[k].modules.whiteLabel)!].name;
+    const branded = page.cards.find((c) => /company name and logo/i.test(c.body))!;
+    expect(branded.body).toContain(`${plan} plan`);
+    expect(page.pricing.note).toContain(plan);
+    for (const line of [...page.compare!.onlyUs, ...page.audience.map((a) => a.body)]) {
+      if (/brand/i.test(line)) expect(line, line).toContain(plan);
+    }
+  });
+
+  it("the Customer API's rate line carries every plan's own per-minute rate", () => {
+    const page = featurePageByKey("customerApi")!;
+    const line = page.spotlight!.points.find((p) => /requests a minute/.test(p))!;
+    const rates = new Set(PLAN_KEYS.filter((k) => PLANS[k].limits.apiUnitsPerMonth !== 0).map((k) => PLANS[k].limits.apiRatePerMinute));
+    for (const rate of rates) expect(line).toContain(String(rate));
+    if (rates.size > 1) expect(line).toContain(PLANS.agency.name);
+  });
+});
+
 describe("the CRM is a separate product on every feature page (owner, 2026-10-07)", () => {
   it("CRM pages are priced from the cheapest CRM plan, never 'Included in every plan'", () => {
     const cheapest = Math.min(...CRM_PLAN_KEYS.map((k) => CRM_PLANS[k].monthlyCents));

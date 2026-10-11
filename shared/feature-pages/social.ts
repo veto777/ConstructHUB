@@ -1,4 +1,6 @@
 import type { FeaturePage } from "./types";
+import { ALACARTE } from "../alacarte";
+import { planNamesWhere } from "../plan-copy";
 
 /**
  * Social Media — every claim is backed by the code in `sources`:
@@ -21,9 +23,16 @@ import type { FeaturePage } from "./types";
  *     guides.tsx ("Agency social workflows"), server/social/agency.ts
  *   - the "How it works" guides tab: social-media.tsx → GuidesContent (client/src/pages/guides.tsx)
  *   - notices: server/notification-kinds.ts social.post_published / social.post_failed
- *   - pricing: the social routes have no plan check, but a business must exist in Locations, and adding one needs
- *     a plan (server/routes.ts POST /api/locations, requirePlan) — so it is sold as part of every plan.
+ *   - pricing: every /api/social route is behind requireModule("socialPublishing") (server/social/routes.ts), a
+ *     module of the Pro plan and up (shared/plans.ts PLANS[*].modules.socialPublishing), or of the à la carte
+ *     "Social media publishing" item (shared/alacarte.ts) — never "every plan". The plan names below are read
+ *     from the price book, never typed.
  */
+
+/** The plans whose modules include social publishing, cheapest first ("Pro, Agency and Unlimited"). */
+const SOCIAL_PLANS = planNamesWhere((plan) => plan.modules.socialPublishing);
+/** The plans without it ("Solo and Team"), which can add the à la carte item instead. */
+const PLANS_WITHOUT = planNamesWhere((plan) => !plan.modules.socialPublishing);
 
 const page: FeaturePage = {
   key: "social",
@@ -112,8 +121,9 @@ const page: FeaturePage = {
     },
   ],
   pricing: {
-    kind: "plan",
-    note: "Posting runs through your own Blotato subscription, which Blotato bills separately. ConstructHUB doesn't charge for it or count your posts.",
+    kind: "module",
+    module: "socialPublishing",
+    note: `Also sold on its own as the ${ALACARTE.social.name} item, for an account without one of these plans. Posting runs through your own Blotato subscription, which Blotato bills separately; ConstructHUB doesn't count your posts.`,
   },
   faqs: [
     {
@@ -122,7 +132,7 @@ const page: FeaturePage = {
     },
     {
       q: "Which plans include it?",
-      a: "Every plan. ConstructHUB doesn't count your posts; Blotato bills for posting under your own subscription.",
+      a: `The ${SOCIAL_PLANS} plans. On ${PLANS_WITHOUT}, or with no plan, you can add the ${ALACARTE.social.name} item on its own from the pricing page. ConstructHUB doesn't count your posts; Blotato bills for posting under your own subscription.`,
     },
     {
       q: "Will it post without me?",

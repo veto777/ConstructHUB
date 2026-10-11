@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { X, Send, RotateCcw, ChevronDown, ChevronUp } from "lucide-react";
+import { X, Send, RotateCcw, ChevronDown, ChevronUp, Lock } from "lucide-react";
 import HubMascot, { type HubMascotState } from "./hub-mascot";
 import { HubMarkdown } from "./hub-markdown";
 import { pageKeyForPath } from "@shared/hub-links";
@@ -21,18 +21,35 @@ import { cn } from "@/lib/utils";
  * the page is the route -> pageKey mapping. The transcript and the server's
  * turn signatures live in React state only (gone on reload or sign-out);
  * localStorage holds only UI flags.
+ *
+ * Every state the server can put chat in has its own, clear panel state and
+ * never a toast: the provider not configured / today's cap reached (chatOff),
+ * the plan's monthly questions used up or a plan without any (allowance), a
+ * request refused by the same-origin guard. A reply that arrives after the
+ * chat was reset, or after the person signed out, is dropped (a conversation
+ * generation guards every in-flight request).
  */
 
 export type HubSurface = "marketing" | "growth" | "portal";
 
+/** GET /api/hub/presets (server/hub/routes.ts). `chatOff`, `allowance` and `userId` arrive for a signed-in account. */
 type HubMeta = {
   presets: { id: string; label: string }[];
   primary: string[];
   welcome: string[];
   tier: "browse" | "builder";
   chat: boolean;
+  /** Why chat is off for a signed-in account: the model provider isn't configured, or today's token cap is reached. */
+  chatOff?: "provider" | "capped" | null;
+  /** The plan's monthly Gabe questions: -1 unlimited, 0 none; `remaining` null when unlimited. */
+  allowance?: { monthly: number; used: number; remaining: number | null; resetsAt: string; daily: { limit: number; used: number } } | null;
+  /** The signed-in account, for the per-account welcome flag. */
+  userId?: number | null;
   maxChars: number;
 };
+
+/** The server's plan answer on POST /chat (server/growth-quotas.ts): a spent month or a plan without questions. */
+type LimitBody = { code: "plan_required" | "limit_reached"; message?: string; reply?: string; resetsAt?: string; limit?: number; requiredPlan?: string };
 
 type Msg = {
   id: number;
@@ -46,6 +63,7 @@ type Msg = {
 };
 
 const BUSY_TEXT = "My radio's crackling, so that took too long. Please try again in a minute. The quick questions below still work.";
+const FORBIDDEN_TEXT = "That didn't go through from this page. Reload the page and ask again; the quick questions below still work.";
 const WELCOME_FLAG = "hub.welcomeSeen";
 const HISTORY_MAX_MESSAGES = 10;
 const HISTORY_MAX_CHARS = 3800;
@@ -74,6 +92,23 @@ export function hubVisible(location: string, surface: HubSurface): boolean {
     return MARKETING.some((p) => location === p || (p !== "/" && location.startsWith(`${p}/`))) || /^\/[\w-]+-landing$/.test(location);
   }
   return true;
+}
+
+/**
+ * The one-time welcome is per ACCOUNT, not per browser: a second new account on the same
+ * machine still gets its introduction. Older servers that send no userId fall back to the
+ * browser-wide flag.
+ */
+export function welcomeFlagKey(userId: number | null | undefined): string {
+  return typeof userId === "number" && Number.isFinite(userId) ? `${WELCOME_FLAG}:${userId}` : WELCOME_FLAG;
+}
+
+/** "Oct 1" — when the month's questions come back (the server's resetsAt is the 1st, UTC). */
+function resetLabel(iso: string | undefined): string | null {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return null;
+  return new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 }
 
 const readFlag = (key: string) => { try { return window.localStorage.getItem(key); } catch { return null; } };
@@ -107,7 +142,14 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
   const [welcome, setWelcome] = useState(false);
   const [bubble, setBubble] = useState(false);
   const [welcomePending, setWelcomePending] = useState(false);
+  // The server's plan answer to the last typed question (a spent month, a plan without questions),
+  // shown as its own card until the meta says otherwise.
+  const [limitBody, setLimitBody] = useState<LimitBody | null>(null);
   const nextId = useRef(1);
+  // Conversation generation: bumped on every reset (new chat, sign-in/out, unmount). A request
+  // started under an older generation is aborted and its reply, if it still arrives, is dropped.
+  const generation = useRef(0);
+  const inFlight = useRef<AbortController | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const launcherRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -117,19 +159,39 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
   const panelId = useId();
 
   const builder = meta?.tier === "builder";
-  const canChat = !!meta?.chat;
+  const allowance = meta?.allowance ?? null;
+  // No typed questions this month: the plan has none (0), or they are all used.
+  const noPlanQuestions = !!allowance && allowance.monthly === 0;
+  const spent = !!limitBody || (!!allowance && allowance.monthly > 0 && allowance.remaining === 0);
+  const canChat = !!meta?.chat && !spent && !noPlanQuestions;
   const pageKey = pageKeyForPath(location, surface === "portal" || isPortal());
   const mascotState: HubMascotState = busy ? "thinking" : talking ? "talking" : "idle";
+  const welcomeKey = welcomeFlagKey(meta?.userId);
 
-  // Sign-in or sign-out starts over: no transcript survives a change of person.
-  useEffect(() => { setMessages([]); setConversationId(null); setInput(""); }, [signedIn]);
+  /** Drop every in-flight request and start a fresh conversation (no transcript, no signatures). */
+  const startOver = useCallback(() => {
+    generation.current += 1;
+    inFlight.current?.abort();
+    inFlight.current = null;
+    setBusy(false);
+    setConversationId(null);
+    setMessages([]);
+  }, []);
 
-  // "Activated when someone signs up": the first time a signed-in account lands here, the
+  // Sign-in or sign-out starts over: no transcript survives a change of person, and no reply
+  // from the previous person's question can land in the new one's chat.
+  useEffect(() => { startOver(); setInput(""); setLimitBody(null); }, [signedIn, startOver]);
+  // Unmount: nothing in flight may touch state afterwards.
+  useEffect(() => () => { generation.current += 1; inFlight.current?.abort(); }, []);
+  // A fresh meta decides the quota state; the last plan answer only bridges until it arrives.
+  useEffect(() => { if (meta) setLimitBody(null); }, [meta]);
+
+  // "Activated when someone signs up": the first time a signed-in ACCOUNT lands here, the
   // launcher carries a dot and (on wider screens, for 15 s) a welcome bubble. Neither is modal,
   // and the bubble never shows on phones, where it would sit on top of the page.
   useEffect(() => {
-    if (visible && builder && !readFlag(WELCOME_FLAG)) { setWelcomePending(true); setBubble(true); }
-  }, [visible, builder]);
+    if (visible && builder && !readFlag(welcomeKey)) { setWelcomePending(true); setBubble(true); }
+  }, [visible, builder, welcomeKey]);
   useEffect(() => {
     if (!bubble) return;
     const t = window.setTimeout(() => setBubble(false), 15_000);
@@ -198,10 +260,10 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
     setOpen(true);
     setBubble(false);
     setWelcomePending(false);
-    if (builder) writeFlag(WELCOME_FLAG, "1");
+    if (builder) writeFlag(welcomeKey, "1");
     setWelcome(asWelcome);
   };
-  const dismissWelcome = () => { setBubble(false); setWelcomePending(false); writeFlag(WELCOME_FLAG, "1"); };
+  const dismissWelcome = () => { setBubble(false); setWelcomePending(false); writeFlag(welcomeKey, "1"); };
 
   const push = (msg: Omit<Msg, "id">) => {
     const id = nextId.current++;
@@ -209,17 +271,28 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
     return id;
   };
 
+  /** One request under the current generation: the controller to send, and whether its reply still belongs here. */
+  const begin = () => {
+    const gen = generation.current;
+    const controller = new AbortController();
+    inFlight.current = controller;
+    return { controller, live: () => gen === generation.current && inFlight.current === controller };
+  };
+
   const askPreset = async (presetId: string, label: string) => {
     if (busy) return;
     push({ role: "user", content: label });
     setBusy(true);
+    const { controller, live } = begin();
     try {
       const res = await fetch("/api/hub/preset", {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ presetId }),
+        signal: controller.signal,
       });
       const data = await res.json().catch(() => ({}));
+      if (!live()) return;
       if (res.ok && typeof data.reply === "string") {
         push({ role: "assistant", content: data.reply });
         setTalking(true);
@@ -227,13 +300,14 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
         push({ role: "assistant", content: typeof data.reply === "string" ? data.reply : BUSY_TEXT, tone: "error" });
       }
     } catch {
-      push({ role: "assistant", content: BUSY_TEXT, tone: "error" });
+      if (live()) push({ role: "assistant", content: BUSY_TEXT, tone: "error" });
     } finally {
-      setBusy(false);
+      if (live()) { inFlight.current = null; setBusy(false); }
     }
   };
 
-  const resetChat = () => {
+  /** The server asked for a fresh conversation: keep the transcript on screen, drop the signatures. */
+  const resetConversation = () => {
     setConversationId(null);
     setMessages((prev) => prev.map((m) => ({ ...m, inHistory: false })));
   };
@@ -253,6 +327,7 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
     setBusy(true);
     // The Send button goes inactive while Gabe answers; never leave focus on it.
     if (document.activeElement !== inputRef.current) inputRef.current?.focus();
+    const { controller, live } = begin();
     try {
       const res = await fetch("/api/hub/chat", {
         method: "POST", credentials: "include",
@@ -265,26 +340,44 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
           ],
           ...(pageKey ? { pageKey } : {}),
         }),
+        signal: controller.signal,
       });
       const data = await res.json().catch(() => ({}));
+      // The chat was reset or the person changed while this was in flight: the reply is not for this conversation.
+      if (!live()) return;
       if (res.ok && typeof data.reply === "string" && typeof data.sig === "string") {
         setConversationId(data.conversationId);
         setMessages((prev) => prev.map((m) => (m.id === userMsgId ? { ...m, inHistory: true } : m)));
         push({ role: "assistant", content: data.reply, inHistory: true, index: data.index, sig: data.sig, tone: data.kind === "answer" ? undefined : "note" });
         setTalking(true);
+        // An answered question is one off the month: refresh the header's count.
+        if (data.kind === "answer" && allowance && allowance.monthly > 0) void refetch();
       } else if (res.status === 401 || (res.status === 403 && data.presetsOnly)) {
         push({ role: "assistant", content: data.reply ?? "Sign up or log in to ask your own questions.", tone: "note" });
         void refetch();
+      } else if (data.code === "plan_required" || data.code === "limit_reached") {
+        // The plan's monthly questions: its own card below, never a toast; the meta confirms it.
+        setLimitBody(data as LimitBody);
+        push({ role: "assistant", content: typeof data.reply === "string" ? data.reply : typeof data.message === "string" ? data.message : "You've used this month's questions. The quick questions below still work.", tone: "note" });
+        void refetch();
       } else if (data.code === "tampered" || data.reset) {
         push({ role: "assistant", content: data.reply ?? "Let's start a fresh chat. Ask me again!", tone: "note" });
-        resetChat();
+        resetConversation();
+      } else if (data.code === "offline") {
+        // The provider went off (or today's cap was reached) since the panel opened: the composer
+        // turns into the clear chat-off state once the meta is refreshed.
+        push({ role: "assistant", content: typeof data.reply === "string" ? data.reply : "Gabe is off site right now. The quick questions below still work.", tone: "note" });
+        void refetch();
+      } else if (res.status === 403) {
+        // The same-origin guard refused the request (a stale tab, a proxy that dropped Origin): say so plainly.
+        push({ role: "assistant", content: FORBIDDEN_TEXT, tone: "note" });
       } else {
         push({ role: "assistant", content: typeof data.reply === "string" ? data.reply : BUSY_TEXT, tone: "error" });
       }
     } catch {
-      push({ role: "assistant", content: BUSY_TEXT, tone: "error" });
+      if (live()) push({ role: "assistant", content: BUSY_TEXT, tone: "error" });
     } finally {
-      setBusy(false);
+      if (live()) { inFlight.current = null; setBusy(false); }
     }
   };
 
@@ -327,6 +420,21 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
         ? "Hi, I'm Gabe! Ask me how any ConstructHUB feature works or how to set it up. I can't see your account or anyone's data, so I'll point you to the right page."
         : "Hi, I'm Gabe! I know ConstructHUB inside out: plans, features and how to set things up. Tap a question below.";
 
+  // The header's second line: the month's standing for a signed-in account, in the words the pricing page uses.
+  const headerLine = busy
+    ? "Thinking it over…"
+    : !builder
+      ? "Quick answers about ConstructHUB"
+      : allowance
+        ? allowance.monthly === -1
+          ? "Unlimited questions (fair use)"
+          : allowance.monthly === 0
+            ? "Quick questions only on this account"
+            : `${Math.max(0, allowance.remaining ?? 0).toLocaleString("en-US")} of ${allowance.monthly.toLocaleString("en-US")} questions left this month`
+        : "Ask about any feature or setup step";
+
+  const resetOn = resetLabel(limitBody?.resetsAt ?? allowance?.resetsAt);
+
   return (
     <>
       {!open && bubble && (
@@ -357,7 +465,7 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
           onClick={() => openPanel(welcomePending)}
           aria-label="Ask Gabe, your ConstructHUB guide"
           aria-haspopup="dialog"
-          aria-expanded={false}
+          aria-expanded={open}
           aria-controls={panelId}
           title="Ask Gabe"
           className={cn(
@@ -397,12 +505,12 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
             </div>
             <div className="min-w-0 flex-1">
               <h2 id={titleId} className="text-[15px] font-bold leading-tight">Gabe — your ConstructHUB guide</h2>
-              <p id={descId} className="text-xs text-white/85">
-                {busy ? "Thinking it over…" : builder ? "Ask about any feature or setup step" : "Quick answers about ConstructHUB"}
+              <p id={descId} className="text-xs text-white/85" data-testid="hub-allowance">
+                {headerLine}
               </p>
             </div>
             {builder && messages.length > 0 && (
-              <button type="button" onClick={() => { setMessages([]); setConversationId(null); focusComposer(); }}
+              <button type="button" onClick={() => { startOver(); focusComposer(); }}
                 className="rounded-md p-1.5 text-white/85 hover:bg-white/10 hover:text-white" aria-label="Start a new chat" data-testid="hub-new-chat">
                 <RotateCcw className="h-4 w-4" />
               </button>
@@ -501,8 +609,44 @@ export default function HubWidget({ surface, signedIn }: { surface: HubSurface; 
                   <Send className="h-4 w-4" />
                 </button>
               </form>
+            ) : builder && (spent || noPlanQuestions) ? (
+              // The plan's monthly questions: a plan-gate card in the panel (the quick questions above still work).
+              <div className="rounded-xl border bg-muted/40 p-3 text-xs" role="status" data-testid="hub-quota" data-reason={noPlanQuestions && !limitBody ? "no_plan" : "spent"}>
+                <p className="flex items-center gap-1.5 font-semibold text-foreground">
+                  <Lock className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                  {noPlanQuestions && !limitBody ? "Typed questions need a plan" : "This month's questions are used up"}
+                </p>
+                <p className="mt-1 text-muted-foreground" data-testid="hub-quota-message">
+                  {limitBody?.message
+                    ? limitBody.message
+                    : noPlanQuestions
+                      ? "Every ConstructHUB plan includes a monthly allowance of Gabe questions; this account has none. The quick questions above still work."
+                      : `You've used all ${allowance?.monthly.toLocaleString("en-US") ?? ""} questions your plan includes this month${resetOn ? `; they come back on ${resetOn} (UTC)` : ""}. The quick questions above still work.`}
+                </p>
+                {!inNativeApp() && (
+                  <Link href="/pricing" onClick={() => setOpen(false)}
+                    className="mt-2 inline-flex rounded-full bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-600"
+                    data-testid="hub-quota-plans">
+                    See plans
+                  </Link>
+                )}
+              </div>
             ) : builder ? (
-              <p className="text-xs text-muted-foreground" data-testid="hub-chat-off">Chat with Gabe is off right now. The quick questions still work.</p>
+              // Chat is off on the server: say why, and never through a toast. The quick questions above still work.
+              <div className="flex items-start justify-between gap-3 text-xs text-muted-foreground" role="status" data-testid="hub-chat-off" data-reason={meta?.chatOff ?? "off"}>
+                <p>
+                  {meta?.chatOff === "provider"
+                    ? "Typed questions aren't set up on this server yet, so I can only answer the quick questions above."
+                    : meta?.chatOff === "capped"
+                      ? "I've answered all the typed questions I can today. The quick questions above still work, and chat is back tomorrow."
+                      : "Chat with Gabe is off right now. The quick questions above still work."}
+                </p>
+                <button type="button" onClick={() => void refetch()}
+                  className="shrink-0 rounded-full border bg-background px-3 py-1.5 text-xs font-medium hover:border-orange-500 hover:bg-orange-50 dark:hover:bg-orange-950/40"
+                  data-testid="hub-chat-off-retry">
+                  Check again
+                </button>
+              </div>
             ) : (
               <div className="flex items-center justify-between gap-3" data-testid="hub-signup-cta">
                 <p className="text-xs text-muted-foreground">Create a free account to ask Gabe anything.</p>

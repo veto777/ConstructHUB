@@ -105,7 +105,7 @@ export async function discoverPages(
 export async function changePost(
   userId: number,
   id: string,
-  action: "approve" | "cancel",
+  action: "approve" | "cancel" | "save",
   text?: string,
   businessId: number | null = null,
 ) {
@@ -117,11 +117,14 @@ export async function changePost(
       [id, userId, businessId],
     );
     if (!p) throw new SocialError("Post not found", 404);
+    // "save" keeps an edited draft a draft (the text is persisted, nothing is queued); only a
+    // draft can be saved or approved, and only a draft or a queued post can be cancelled.
     if (
       !["draft", "queued"].includes(p.state) ||
-      (action === "approve" && p.state !== "draft")
+      (action !== "cancel" && p.state !== "draft")
     )
       throw new SocialError("Post already submitted or finalized", 409);
+    if (action === "save" && text === undefined) throw new SocialError("Enter the draft text");
     if (text !== undefined) {
       const platform = p.payload.post.content.platform;
       const d = {
@@ -136,16 +139,12 @@ export async function changePost(
       }
       p.payload.post.content.text = text;
     }
+    const nextState = action === "approve" ? "queued" : action === "cancel" ? "cancelled" : "draft";
     const {
       rows: [r],
     } = await pool.query(
       "UPDATE social_posts SET state=$3,payload=$4,approved_at=CASE WHEN $3='queued' THEN now() ELSE approved_at END,updated_at=now() WHERE id=$1 AND user_id=$2 RETURNING *",
-      [
-        id,
-        userId,
-        action === "approve" ? "queued" : "cancelled",
-        JSON.stringify(p.payload),
-      ],
+      [id, userId, nextState, JSON.stringify(p.payload)],
     );
     return r;
   });

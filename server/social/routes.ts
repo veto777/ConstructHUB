@@ -39,6 +39,18 @@ const fieldMessages: Record<string, string> = {
   kind: "Choose a source type.",
   businessIds: "Choose between 1 and 1,000 different businesses.",
 };
+/**
+ * POST /posts/:id/action — approve a draft (optionally with edited text), save an edited draft
+ * without queueing it, or cancel a draft / queued post. "save" always carries the text.
+ */
+export const postActionBody = z
+  .object({
+    action: z.enum(["approve", "cancel", "save"]),
+    text: z.string().trim().min(1).max(63206).optional(),
+  })
+  .strict()
+  .refine((b) => b.action !== "save" || b.text !== undefined, { path: ["text"], message: "Enter the draft text to save it." });
+
 export function socialInputMessage(e: z.ZodError): string {
   const issue = e.issues[0];
   if (!issue) return "Invalid Social Media input";
@@ -196,14 +208,9 @@ export function registerSocialRoutes(
     }
     res.json({results});
   });
+  // The queue's per-post buttons: "Save edit" (draft stays a draft), "Approve & queue", "Cancel post".
   route("post", "/posts/:id/action", async (req, res, id, businessId) => {
-    const body = z
-      .object({
-        action: z.enum(["approve", "cancel"]),
-        text: z.string().trim().min(1).max(63206).optional(),
-      })
-      .strict()
-      .parse(req.body);
+    const body = postActionBody.parse(req.body);
     res.json(
       publicPost(await changePost(
         id,
