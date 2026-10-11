@@ -24,35 +24,44 @@ DELETE FROM blocked_ips  WHERE domain_id BETWEEN 930001 AND 930003;
 DELETE FROM vpn_visits   WHERE domain_id BETWEEN 930001 AND 930003;
 DELETE FROM tracked_domains WHERE id BETWEEN 930001 AND 930003;
 
+-- Two whitelists live in settings: whitelistIps is Click Guard's (server/click-guard-exclusions.ts) and
+-- vpnWhitelistedIps is VPN Shield's (server/routes.ts POST /api/vpn-shield/track, vpn-shield.tsx Settings).
 INSERT INTO tracked_domains (id, user_id, domain, tracking_id, name, is_active, settings, created_at) OVERRIDING SYSTEM VALUE VALUES
  (930001, 1, 'summitroofing.example', 'a0f5e2c1-93a0-4b1d-8c11-sample930001', 'Summit Roofing Co.', true,
-  '{"clickThreshold":3,"blockDays":90,"exclusionListRate":500,"countryMode":"allow","vpnBlockMode":"block","whitelistIps":"203.0.113.5"}', now() - interval '74 days'),
+  '{"clickThreshold":3,"blockDays":90,"exclusionListRate":500,"countryMode":"allow","vpnBlockMode":"block","whitelistIps":"203.0.113.5","vpnWhitelistedIps":"203.0.113.5"}', now() - interval '74 days'),
  (930002, 1, 'storm.summitroofing.example', 'b7c3d9e4-11f2-4a6e-9d22-sample930002', 'Storm Repair Landing Page', true,
   '{"clickThreshold":2,"blockDays":60,"vpnBlockMode":"log"}', now() - interval '140 days'),
  (930003, 1, 'gutters.summitroofing.example', 'c2e8a6f0-5b7d-4c3a-8e33-sample930003', 'Front Range Gutters (sister brand)', true,
   '{"clickThreshold":3,"blockDays":90,"vpnBlockMode":"block"}', now() - interval '210 days');
 
 -- Ordinary visitors: ~30 days, weekday-shaped, Denver metro, Google Ads / organic / social / direct.
+-- p is the visitor (one IP each): the IP, city and fingerprint all come from p, so an IP always has one city.
+-- The device profile's user agent matches its browser, OS and device type.
 WITH days AS (
   SELECT d, CASE WHEN extract(dow FROM now() - d * interval '1 day') IN (0,6) THEN 16 ELSE 26 END + (d * 37 % 9) AS n
   FROM generate_series(0, 29) d
 ), rows AS (
-  SELECT d, k, (d * 131 + k * 17) AS h FROM days, generate_series(1, n) k
+  SELECT d, k, h, CASE WHEN h % 23 = 0 THEN 1000 + h % 200 ELSE h % 290 END AS p
+  FROM days, generate_series(1, n) k, LATERAL (SELECT d * 131 + k * 17 AS h) hh
+), prof(id, ua, dev, br, os) AS (VALUES
+  (1, 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1', 'mobile', 'Safari', 'iOS'),
+  (2, 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/141.0.7390.41 Mobile/15E148 Safari/604.1', 'mobile', 'Chrome', 'iOS'),
+  (3, 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36', 'mobile', 'Chrome', 'Android'),
+  (4, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36', 'desktop', 'Chrome', 'Windows'),
+  (5, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 Edg/141.0.0.0', 'desktop', 'Edge', 'Windows'),
+  (6, 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:143.0) Gecko/20100101 Firefox/143.0', 'desktop', 'Firefox', 'macOS'),
+  (7, 'Mozilla/5.0 (iPad; CPU OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1', 'tablet', 'Safari', 'iOS')
 )
 INSERT INTO click_visits (domain_id, ip_address, user_agent, device_type, browser, os, screen_resolution, language, timezone,
                           referrer, landing_page, country, city, is_suspicious, suspicion_reasons, fingerprint, visited_at)
 SELECT 930001,
-  CASE WHEN h % 23 = 0 THEN '2001:db8:4a1::' || to_hex(10 + (h % 200))
-       WHEN (h % 290) < 120 THEN '203.0.113.' || (10 + (h % 290))
-       WHEN (h % 290) < 240 THEN '198.51.100.' || (10 + (h % 290) - 120)
-       ELSE '192.0.2.' || (10 + (h % 290) - 240) END,
-  CASE WHEN h % 10 < 6 THEN 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1'
-       WHEN h % 10 < 9 THEN 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36'
-       ELSE 'Mozilla/5.0 (iPad; CPU OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1' END,
-  CASE WHEN h % 10 < 6 THEN 'mobile' WHEN h % 10 < 9 THEN 'desktop' ELSE 'tablet' END,
-  CASE WHEN h % 10 < 3 THEN 'Safari' WHEN h % 10 < 6 THEN 'Chrome' WHEN h % 10 < 8 THEN 'Chrome' WHEN h % 10 = 8 THEN 'Edge' ELSE 'Safari' END,
-  CASE WHEN h % 10 < 4 THEN 'iOS' WHEN h % 10 < 6 THEN 'Android' WHEN h % 10 < 8 THEN 'Windows' WHEN h % 10 = 8 THEN 'macOS' ELSE 'iOS' END,
-  CASE WHEN h % 10 < 6 THEN (ARRAY['390x844','393x852','412x915','430x932'])[1 + h % 4] WHEN h % 10 < 9 THEN (ARRAY['1920x1080','1536x864','2560x1440'])[1 + h % 3] ELSE '820x1180' END,
+  CASE WHEN p >= 1000 THEN '2001:db8:4a1::' || to_hex(10 + p - 1000)
+       WHEN p < 120 THEN '203.0.113.' || (10 + p)
+       WHEN p < 240 THEN '198.51.100.' || (10 + p - 120)
+       ELSE '192.0.2.' || (10 + p - 240) END,
+  prof.ua, prof.dev, prof.br, prof.os,
+  CASE prof.dev WHEN 'mobile' THEN (ARRAY['390x844','393x852','412x915','430x932'])[1 + h % 4]
+                WHEN 'desktop' THEN (ARRAY['1920x1080','1536x864','2560x1440'])[1 + h % 3] ELSE '820x1180' END,
   CASE WHEN h % 13 = 0 THEN 'es-US' ELSE 'en-US' END,
   'America/Denver',
   CASE WHEN h % 20 < 11 THEN 'https://www.google.com/'
@@ -64,24 +73,30 @@ SELECT 930001,
   'https://summitroofing.example' ||
   CASE WHEN h % 20 < 7 THEN (ARRAY['/roof-replacement','/storm-damage','/free-inspection'])[1 + h % 3]
        ELSE (ARRAY['/','/','/roof-repair','/gutters','/financing','/about','/contact','/reviews','/hail-damage-denver'])[1 + h % 9] END,
-  CASE WHEN h % 41 = 0 THEN 'CA' ELSE 'US' END,
-  CASE WHEN h % 41 = 0 THEN 'Calgary' ELSE (ARRAY['Denver','Denver','Denver','Aurora','Lakewood','Littleton','Englewood','Arvada','Centennial','Westminster','Highlands Ranch','Boulder'])[1 + h % 12] END,
+  CASE WHEN p % 41 = 0 THEN 'CA' ELSE 'US' END,
+  CASE WHEN p % 41 = 0 THEN 'Calgary' ELSE (ARRAY['Denver','Denver','Denver','Aurora','Lakewood','Littleton','Englewood','Arvada','Centennial','Westminster','Highlands Ranch','Boulder'])[1 + p % 12] END,
   false, NULL,
-  substr(md5('fp' || (h % 290)), 1, 16),
+  substr(md5('fp' || p), 1, 16),
   now() - d * interval '1 day' - ((k * 53 + d * 7) % 780) * interval '1 minute' - interval '25 minutes'
-FROM rows;
+FROM rows
+JOIN prof ON prof.id = CASE WHEN h % 10 < 3 THEN 1 WHEN h % 10 = 3 THEN 2 WHEN h % 10 < 6 THEN 3 WHEN h % 10 < 8 THEN 4
+                            WHEN h % 20 = 8 THEN 5 WHEN h % 20 = 18 THEN 6 ELSE 7 END;
 
--- A handful of visitors browsing right now (IP Tracker "online" = last 20 minutes).
+-- A handful of visitors browsing right now (IP Tracker "online" = last 20 minutes). Each city is the one the
+-- generator above gives the same IP, and each user agent matches its browser, OS and device.
 INSERT INTO click_visits (domain_id, ip_address, user_agent, device_type, browser, os, screen_resolution, language, timezone,
                           referrer, landing_page, country, city, is_suspicious, fingerprint, visited_at)
-SELECT 930001, ip, 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1',
-       dev, br, os, res, 'en-US', 'America/Denver', ref, lp, 'US', city, false, substr(md5('live' || ip), 1, 16), now() - m * interval '1 minute'
+SELECT 930001, ip, ua, dev, br, os, res, 'en-US', 'America/Denver', ref, lp, 'US', city, false, substr(md5('live' || ip), 1, 16), now() - m * interval '1 minute'
 FROM (VALUES
-  ('203.0.113.61','mobile','Safari','iOS','393x852','https://www.google.com/','https://summitroofing.example/free-inspection','Denver',3),
-  ('198.51.100.88','desktop','Chrome','Windows','1920x1080','https://www.google.com/','https://summitroofing.example/roof-replacement','Littleton',6),
-  ('203.0.113.97','mobile','Chrome','Android','412x915',NULL,'https://summitroofing.example/contact','Aurora',9),
-  ('192.0.2.54','tablet','Safari','iOS','820x1180','https://www.bing.com/','https://summitroofing.example/financing','Lakewood',14)
-) v(ip, dev, br, os, res, ref, lp, city, m);
+  ('203.0.113.61','Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1',
+   'mobile','Safari','iOS','393x852','https://www.google.com/','https://summitroofing.example/free-inspection','Aurora',3),
+  ('198.51.100.88','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36',
+   'desktop','Chrome','Windows','1920x1080','https://www.google.com/','https://summitroofing.example/roof-replacement','Englewood',6),
+  ('203.0.113.97','Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36',
+   'mobile','Chrome','Android','412x915',NULL,'https://summitroofing.example/contact','Aurora',9),
+  ('192.0.2.54','Mozilla/5.0 (iPad; CPU OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1',
+   'tablet','Safari','iOS','820x1180','https://www.bing.com/','https://summitroofing.example/financing','Centennial',14)
+) v(ip, ua, dev, br, os, res, ref, lp, city, m);
 
 -- Repeat clickers and bots that Click Guard flagged (the "telling" rows).
 INSERT INTO click_visits (domain_id, ip_address, user_agent, device_type, browser, os, screen_resolution, language, timezone,
@@ -118,37 +133,53 @@ INSERT INTO blocked_ips (domain_id, ip_address, reason, blocked_at, is_active, s
  (930001, '203.0.113.0/28', 'Competitor office range (manual review)', now() - interval '18 days', true, 'manual'),
  (930001, '198.51.100.150', 'Manually blocked', now() - interval '25 days', true, 'manual');
 
--- Second and third sites: lighter traffic so the site switcher has real numbers.
+-- Second and third sites: lighter traffic so the site switcher has real numbers. n is the visitor: its IP
+-- (192.0.2.100-159, unused by the main site), device and city all come from n.
 INSERT INTO click_visits (domain_id, ip_address, user_agent, device_type, browser, os, screen_resolution, language, timezone,
                           referrer, landing_page, country, city, is_suspicious, fingerprint, visited_at)
-SELECT dom, '198.51.100.' || (130 + (i * 7) % 60), 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1',
-       CASE WHEN i % 3 = 0 THEN 'desktop' ELSE 'mobile' END, CASE WHEN i % 3 = 0 THEN 'Chrome' ELSE 'Safari' END, CASE WHEN i % 3 = 0 THEN 'Windows' ELSE 'iOS' END,
-       '390x844', 'en-US', 'America/Denver', CASE WHEN i % 2 = 0 THEN 'https://www.google.com/' END,
+SELECT dom, '192.0.2.' || (100 + n),
+       CASE WHEN n % 3 = 0 THEN 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36'
+            ELSE 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1' END,
+       CASE WHEN n % 3 = 0 THEN 'desktop' ELSE 'mobile' END, CASE WHEN n % 3 = 0 THEN 'Chrome' ELSE 'Safari' END, CASE WHEN n % 3 = 0 THEN 'Windows' ELSE 'iOS' END,
+       CASE WHEN n % 3 = 0 THEN '1920x1080' ELSE '390x844' END, 'en-US', 'America/Denver', CASE WHEN i % 2 = 0 THEN 'https://www.google.com/' END,
        'https://' || CASE dom WHEN 930002 THEN 'storm.summitroofing.example/' ELSE 'gutters.summitroofing.example/' END,
-       'US', (ARRAY['Denver','Aurora','Arvada','Golden'])[1 + i % 4], false, substr(md5('s' || i), 1, 16),
+       'US', (ARRAY['Denver','Aurora','Arvada','Golden'])[1 + n % 4], false, substr(md5('s' || n), 1, 16),
        now() - (i % 20) * interval '1 day' - (i * 41 % 600) * interval '1 minute'
-FROM (VALUES (930002, 140), (930003, 70)) s(dom, n), LATERAL generate_series(1, n) i;
+FROM (VALUES (930002, 140), (930003, 70)) s(dom, cnt), LATERAL generate_series(1, cnt) i, LATERAL (SELECT (i * 7) % 60 AS n) nn;
 
--- VPN Shield detections on the main site (detector stores "Unknown VPN/Proxy" when no named provider matches).
+-- VPN Shield detections on the main site. n is the visitor: its IP (ranges the click rows above don't use),
+-- provider label and location all come from n, so one IP has one city. Provider labels are generic, never real
+-- company names. Each user agent matches its browser, OS and device.
 INSERT INTO vpn_visits (domain_id, ip_address, user_agent, fingerprint, browser, os, device_type, country, city, referrer, landing_page,
                         vpn_provider, detection_method, action, visited_at)
 SELECT 930001,
-  CASE WHEN i % 9 = 0 THEN '2001:db8:7f::' || to_hex(20 + i) WHEN i % 2 = 0 THEN '203.0.113.' || (140 + (i * 3) % 50) ELSE '198.51.100.' || (60 + (i * 5) % 40) END,
+  CASE WHEN n >= 1000 THEN '2001:db8:7f::' || to_hex(n - 1000) WHEN n < 100 THEN '203.0.113.' || (140 + n) ELSE '198.51.100.' || (210 + n - 100) END,
   CASE WHEN i % 3 = 0 THEN 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36'
-       ELSE 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1' END,
+       WHEN i % 3 = 1 THEN 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1'
+       ELSE 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:143.0) Gecko/20100101 Firefox/143.0' END,
   substr(md5('vpn' || (i % 23)), 1, 20),
   CASE WHEN i % 3 = 0 THEN 'Chrome' WHEN i % 3 = 1 THEN 'Safari' ELSE 'Firefox' END,
   CASE WHEN i % 3 = 0 THEN 'Windows' WHEN i % 3 = 1 THEN 'iOS' ELSE 'macOS' END,
   CASE WHEN i % 3 = 1 THEN 'mobile' ELSE 'desktop' END,
-  (ARRAY['US','US','US','US','NL','DE','CA','GB','SG','US'])[1 + i % 10],
-  (ARRAY['Denver','Chicago','Dallas','Ashburn','Amsterdam','Frankfurt','Toronto','London','Singapore','Seattle'])[1 + i % 10],
+  (ARRAY['US','US','US','US','NL','DE','CA','GB','SG','US'])[1 + n % 10],
+  (ARRAY['Denver','Chicago','Dallas','Ashburn','Amsterdam','Frankfurt','Toronto','London','Singapore','Seattle'])[1 + n % 10],
   CASE WHEN i % 4 = 0 THEN NULL ELSE 'https://www.google.com/' END,
   'https://summitroofing.example' || (ARRAY['/roof-replacement','/storm-damage','/free-inspection','/'])[1 + i % 4],
-  'Unknown VPN/Proxy',
+  (ARRAY['Data-center network','Commercial VPN','Proxy','Data-center network','Unknown VPN/Proxy'])[1 + n % 5],
   (ARRAY['Datacenter IP range','Datacenter IP range','WebRTC IP leak detected','VPN browser extension detected','Datacenter IP range; WebRTC IP leak detected'])[1 + i % 5],
   CASE WHEN i % 5 = 3 THEN 'log' ELSE 'block' END,
   now() - ((i * i) % 29) * interval '1 day' - (i * 67 % 700) * interval '1 minute' - interval '10 minutes'
-FROM generate_series(1, 64) i;
+FROM generate_series(1, 64) i,
+LATERAL (SELECT CASE WHEN i % 9 = 0 THEN 1000 + 20 + i WHEN i % 2 = 0 THEN (i * 3) % 50 ELSE 100 + (i * 5) % 40 END AS n) nn;
+
+-- Guard: every sample IP sits in one city, across IP Tracker and VPN Shield.
+DO $$ DECLARE bad text; BEGIN
+  SELECT ip_address INTO bad FROM (
+    SELECT ip_address, city FROM click_visits WHERE domain_id BETWEEN 930001 AND 930003
+    UNION SELECT ip_address, city FROM vpn_visits WHERE domain_id BETWEEN 930001 AND 930003
+  ) t GROUP BY ip_address HAVING count(DISTINCT coalesce(city, '')) > 1 LIMIT 1;
+  IF bad IS NOT NULL THEN RAISE EXCEPTION 'sample IP % is in more than one city', bad; END IF;
+END $$;
 
 
 -- ===================================================================================================
