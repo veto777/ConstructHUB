@@ -13,8 +13,11 @@ import { planNamesWhere } from "../plan-copy";
  *   - state guides live in the Master Class (State Guide tab, unlocked by module 1 / the bundle; the license lists
  *     and the comparison table are on the free overview): client/src/pages/master-class.tsx, server/data/state-guides.json,
  *     server/state-guides-schema.ts
- *   - the setup walkthroughs (Social Media → Guides tab; /guides redirects there), each with an "Open …" link:
- *     client/src/pages/guides.tsx, client/src/pages/social-media.tsx
+ *   - the Guides page (/guides) is its own page: a search, topic chips, the library of every destination below marked
+ *     Free / with an account / Master Class / plan, and the setup walkthroughs with a checkbox per step whose
+ *     progress stays in the browser; Social Media embeds the same content in its Guides tab:
+ *     client/src/pages/guides.tsx, client/src/components/guides/library.ts, client/src/components/guides/progress.ts,
+ *     client/src/pages/social-media.tsx
  *   - the site-connection guide (Cloudflare: domain, DNS, nameservers per registrar, the limited key that is never
  *     saved, permissions, disconnect; Search Console: connection, client add-user, sync, up to 16 months, sitemaps):
  *     client/src/pages/site-connection-guide.tsx
@@ -39,7 +42,7 @@ const page: FeaturePage = {
   steps: [
     {
       title: "Open the guide you need",
-      body: "The setup walkthroughs open from Guides; the Ads Guide, LSA Guide and Ad Fraud page sit with the Google Ads tools in the sidebar.",
+      body: "Guides lists every guide in one place: the Ads and LSA playbooks, the Ad Fraud page, the state licensing guides, the site connection guide and the setup walkthroughs, with a search and topic filters. Each is marked free, with an account, or Master Class.",
     },
     {
       title: "Pick the job in front of you",
@@ -47,7 +50,7 @@ const page: FeaturePage = {
     },
     {
       title: "Do it alongside",
-      body: "Each walkthrough links to the page it describes, so you can make the change while you read the step.",
+      body: "Each walkthrough links to the page it describes, so you can make the change while you read the step, and tick the step off as you go. Progress stays in your browser.",
     },
     {
       title: "Go deeper on ads",
@@ -83,7 +86,7 @@ const page: FeaturePage = {
     {
       icon: "list",
       title: "Setup walkthroughs",
-      body: "Profile Guard, AI review replies, Posts & Photos scheduling, social posting and auto mode, account security and Site Scan, button by button.",
+      body: "Profile Guard, AI review replies, Posts & Photos scheduling, social posting and auto mode, account security and Site Scan, button by button, with a checkbox per step and a search across every step.",
     },
   ],
   spotlight: {
@@ -137,6 +140,10 @@ const page: FeaturePage = {
       a: `Your own Cloudflare account and access to your domain registrar, or a Google account with access to the site's Search Console property. Connecting them inside ConstructHUB is part of the ${CONNECTIONS_PLAN} plan; the walkthrough itself is free to read.`,
     },
     {
+      q: "Does it remember where I was?",
+      a: "Each walkthrough has a checkbox per step and shows how many are done. That progress is saved in the browser you tick it in, not on your account, so another device or a cleared browser starts the list fresh.",
+    },
+    {
       q: "What don't the guides do?",
       a: "They don't change anything for you: you make each change in ConstructHUB, Google Ads, Cloudflare or your registrar. They are our recommendations, not a promise of results, and not legal or tax advice. Provider screens change; when they differ, the walkthroughs point you to the provider's current help.",
     },
@@ -153,7 +160,8 @@ const page: FeaturePage = {
       "Guides is where ConstructHUB keeps its how-to material for contractors who run their own marketing. The " +
         "playbooks are opinionated on purpose: they say what we would do in your account and why, so you can decide " +
         "for yourself. The setup walkthroughs are the opposite, plain instructions that use the same button names you " +
-        "see on screen.",
+        "see on screen, each step with a checkbox so a long setup can be picked up where it was left. The page lists " +
+        "every guide, free or paid, and says which is which before you open it.",
       "The Google Ads guide for contractors is built around one idea: pay only for clicks from people who could " +
         "hire you. It recommends switching off Search Partners, choosing the location option that targets people in " +
         "or regularly in your service area instead of the broader default, using specific keywords rather than broad " +
@@ -191,6 +199,8 @@ const page: FeaturePage = {
   },
   sources: [
     "client/src/pages/guides.tsx",
+    "client/src/components/guides/library.ts",
+    "client/src/components/guides/progress.ts",
     "client/src/pages/social-media.tsx",
     "client/src/pages/google-ads-guide.tsx",
     "client/src/pages/google-ads-guide-section.tsx",

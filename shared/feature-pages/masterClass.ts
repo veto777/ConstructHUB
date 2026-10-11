@@ -1,22 +1,35 @@
 import type { FeaturePage } from "./types";
+import { planNamesWhere } from "../plan-copy";
 
 /**
  * Master Class — the contractor business course.
  *
  * Every claim below is backed by the code in `sources`:
- *   - the tabs (Overview, State Guide, Website & SEO, Vetting, Pricing), what the free overview shows
- *     (states that require a license, the quick state comparison) and what stays locked:
- *     client/src/pages/master-class.tsx (MASTER_CLASS_TABS, isTabUnlocked, PaywallOverlay, AgencyTile)
- *   - the four modules and their titles: server/data/master-class-modules.json (seeded by server/seed-reference-data.ts)
+ *   - the tabs — Overview, the four module homes (State guide, Google Business, Website, SEO & ads), Vetting,
+ *     Enroll — what the free overview shows (states that require a license, the state comparison) and what stays
+ *     locked: client/src/pages/master-class.tsx, client/src/components/master-class/access.ts (tabUnlocked)
+ *   - the four modules and their titles: server/data/master-class-modules.json (seeded by server/seed-reference-data.ts);
+ *     a purchase opens the module whose category it bought: server/state-guides.ts (courseUnlocks)
+ *   - the paid guide is served only to an entitled account (401/403 otherwise); the list route carries the free
+ *     comparison facts only: server/routes.ts (/api/state-guides*), server/state-guides.ts (publicStateGuide)
  *   - 50 state guides with agency links and link-check status (verified / unconfirmed / dead → web search):
  *     server/data/state-guides.json, server/state-guides-schema.ts, scripts/verify-state-guides.ts
+ *   - the written walkthroughs on file (Washington, Florida): server/data/state-guide-steps.json; every other state's
+ *     ordered checklist is built from its agency record alone: server/state-guides.ts (agencyChecklist)
+ *   - lessons with an outline, durable #lesson anchors and "Mark done" kept in the browser:
+ *     client/src/components/master-class/lesson.tsx, client/src/components/guides/progress.ts
  *   - any course purchase unlocks the Google Ads guide sections (server-enforced 403 otherwise): server/routes.ts
  *     (/api/google-ads-guide/:slug), client/src/pages/google-ads-guide.tsx
- *   - every module and the bundle are at or above the sales threshold → "Talk to a sales rep", no online checkout:
- *     server/catalog.ts (COURSE_BUNDLE, isSalesOnly), server/stripe.ts (create-course-checkout), shared/plans.ts (showsPrice)
+ *   - every module and the bundle are at or above the sales threshold → "Talk to a sales rep", no online checkout;
+ *     the page reads the bundle's price from the server catalog: server/catalog.ts (COURSE_BUNDLE, isSalesOnly),
+ *     server/routes.ts (/api/course-catalog), server/stripe.ts (create-course-checkout), shared/plans.ts (showsPrice)
+ *   - the plan that includes the course: shared/plans.ts (PlanModules.masterClass), read through planNamesWhere
  *   - purchases belong to the signed-in account (course_purchases.user_id): shared/schema.ts; the dashboard tile's
  *     "Modules unlocked": server/dashboard/tiles/learn.ts
  */
+
+/** The plans whose modules include the Master Class — read from the price book, never typed. */
+const INCLUDED_PLAN = planNamesWhere((p) => p.modules.masterClass);
 
 const page: FeaturePage = {
   key: "masterClass",
@@ -37,27 +50,27 @@ const page: FeaturePage = {
     },
     {
       title: "Choose your modules",
-      body: "Pick the modules you need, or the complete bundle of all four. A sales rep quotes them for your business.",
+      body: `Pick the modules you need, or the complete bundle of all four. A sales rep quotes them for your business; the ${INCLUDED_PLAN} plan includes the whole course.`,
     },
     {
       title: "Unlock the course",
-      body: "Your purchase is recorded on your ConstructHUB account and opens the course sections it covers. Any purchase also opens the full Google Ads guide.",
+      body: "Your purchase is recorded on your ConstructHUB account and opens the module it covers, lesson by lesson, with an outline and a Mark done on each. Any purchase also opens the full Google Ads guide.",
     },
     {
       title: "Work through your state",
-      body: "Pick your state for its guide: the agencies to form, license, insure and register your business, with links that are checked.",
+      body: "Pick your state for its guide: the agencies to form, license, insure and register your business, with links that are checked, in an ordered checklist you tick off.",
     },
   ],
   cards: [
     {
       icon: "graduation",
       title: "Four modules",
-      body: "Business Formation & Licensing, GMB Setup & Optimization, Website & Online Presence, and SEO & Directory Domination. Buy one at a time or all four as the complete bundle.",
+      body: "Business Formation & Licensing, GMB Setup & Optimization, Website & Online Presence, and SEO & Directory Domination — each its own home of ordered lessons. Buy one at a time or all four as the complete bundle.",
     },
     {
       icon: "map",
       title: "A guide for all 50 states",
-      body: "Each state's Secretary of State, workers' comp agency and tax agency, plus its licensing board where the state licenses contractors, with notes on licensing, bonds, insurance and payroll.",
+      body: "Each state's Secretary of State, workers' comp agency and tax agency, plus its licensing board where the state licenses contractors, with notes on licensing, bonds, insurance and payroll — ordered into a checklist built from that record. Washington and Florida also have a written step-by-step walkthrough.",
     },
     {
       icon: "link",
@@ -65,14 +78,19 @@ const page: FeaturePage = {
       body: "Links are checked and show when they were last checked. One the check couldn't confirm is marked unconfirmed; one that failed becomes a web search, never a guess.",
     },
     {
+      icon: "map-pin",
+      title: "Google Business Profile",
+      body: "Claim and verify the profile, keep its details consistent, a photo habit, reviews asked for and answered the compliant way, fake-review defence, posting cadence, suspension prevention and recovery, and measuring your map rank.",
+    },
+    {
       icon: "globe",
-      title: "Website & SEO",
-      body: "A site that ranks, location pages, Search Console, page speed, tracking, backlinks, content, structured data, mobile design, reputation and email follow-up.",
+      title: "Website, SEO and ads",
+      body: "The pages a contractor site needs, location pages, speed, mobile, portfolio, schema and ownership; then Search Console, tracking, content, backlinks, citations, social, Google Ads and LSA, and a monthly maintenance checklist.",
     },
     {
       icon: "users",
       title: "Vetting contractors",
-      body: "The checks homeowners use before they hire, a homeowner's checklist, and how to build a credible brand the honest way.",
+      body: "The checks homeowners use before they hire, a homeowner's checklist you tick off, and how to build a credible brand the honest way. Included with any module.",
     },
     {
       icon: "megaphone",
@@ -87,16 +105,16 @@ const page: FeaturePage = {
       "Pick a state to see whether it requires a state contractor license, a bond, or sales tax on labor.",
       "The comparison table puts every state's license, workers' comp, sales tax and B&O tax side by side, free to read.",
       "Unlocked, each agency tile opens the agency's own site, and a link our check couldn't confirm says so.",
-      "A few states also have a detailed step-by-step walkthrough; every state links straight to its agencies.",
+      "Every state's agencies are ordered into a checklist you tick off; Washington and Florida also have a written step-by-step walkthrough, and the page says which one you are reading.",
     ],
     panel: {
       label: "State guide",
       title: "What each state guide covers",
       items: [
         "State overview", "Secretary of State", "Licensing board (where one exists)", "Workers' comp agency", "Tax agency", "Entity types",
-        "Workers' comp type", "Sales tax on labor", "Contractor bond", "Licensing details", "Insurance notes", "Payroll notes",
+        "Workers' comp type", "Sales tax on labor", "Contractor bond", "Licensing details", "Insurance notes", "Payroll notes", "Ordered checklist",
       ],
-      note: "The full state guide unlocks with the Business Formation & Licensing module or the bundle.",
+      note: `The full state guide unlocks with the Business Formation & Licensing module or the bundle, and is included with the ${INCLUDED_PLAN} plan.`,
     },
   },
   audience: [
@@ -116,16 +134,16 @@ const page: FeaturePage = {
   pricing: {
     kind: "sales",
     topic: "The Master Class",
-    note: "It is not part of any plan: buy the modules you want, or the complete bundle of all four.",
+    note: `The ${INCLUDED_PLAN} plan includes it. On any other plan, buy the modules you want, or the complete bundle of all four.`,
   },
   faqs: [
     {
       q: "What can I read before I buy?",
-      a: "The course overview: the curriculum, the states that require a state contractor license, and a comparison table of every state. Pick a state to see whether it needs a license or a bond. Each state's full guide, its agency links and the course sections stay locked until you buy.",
+      a: "The course overview: the curriculum, each module's lesson outline, the states that require a state contractor license, and a comparison table of every state. Pick a state to see whether it needs a license or a bond. Each state's full guide, its agency links and the lessons stay locked until you buy.",
     },
     {
       q: "How is it sold? Is it in my plan?",
-      a: "No plan includes it. The four modules are sold one at a time or as the complete bundle, and a sales rep quotes them. The course unlocks on your ConstructHUB account, and any Master Class purchase also unlocks the full Google Ads guide.",
+      a: `The ${INCLUDED_PLAN} plan includes the whole course. On any other plan the four modules are sold one at a time or as the complete bundle, and a sales rep quotes them. The course unlocks on your ConstructHUB account, and any Master Class purchase also unlocks the full Google Ads guide.`,
     },
     {
       q: "How current are the state guides?",
@@ -156,7 +174,10 @@ const page: FeaturePage = {
         "required, whether a contractor bond is required and the general contractor bond amount on file, how workers' comp is bought " +
         "there (private insurers, a state fund, or either), whether sales tax applies to labor, whether the state " +
         "charges a business and occupation (B&O) tax, and the business entity types you can form. Where there is no " +
-        "statewide license, the licensing notes point to the trade licenses and city or county rules that may still apply.",
+        "statewide license, the licensing notes point to the trade licenses and city or county rules that may still apply. " +
+        "Those records are ordered into a checklist for every state (form, license, bond, insure, taxes, payroll) that " +
+        "says nothing the record doesn't; Washington and Florida also have a walkthrough written step by step, and the " +
+        "page says which of the two you are reading.",
       "Agency websites move, so every agency link goes through a link check. A link counts as verified only when the " +
         "page loads, names the state and is about that agency's work: business filings, licensing, workers' comp or " +
         "taxes. When a government site blocks the check or the result is unclear, the link stays and is labelled " +
@@ -165,8 +186,11 @@ const page: FeaturePage = {
         "its link was last checked.",
       "Before you buy, the free overview shows which states require a state contractor license and a side-by-side " +
         "table of every state's license, workers' comp, sales tax on labor, B&O tax, bond and filing office. The " +
-        "modules and the complete bundle are quoted by a sales rep rather than checked out online, and a purchase is " +
-        "recorded on your ConstructHUB account, so the sections it unlocks open wherever you sign in.",
+        "modules and the complete bundle are quoted by a sales rep rather than checked out online, the " +
+        `${INCLUDED_PLAN} plan includes the course, and a purchase is ` +
+        "recorded on your ConstructHUB account, so the module it unlocks opens wherever you sign in. Each module is a " +
+        "home of ordered lessons with an outline; a lesson's link survives a reload, and Mark done keeps your place in " +
+        "the browser you read it in.",
       "The course is education, not legal, tax or licensing advice, and nothing is filed for you. Rules and fees " +
         "change, so confirm the current requirements with the agency itself before you file, apply or pay.",
     ],
@@ -206,9 +230,14 @@ const page: FeaturePage = {
   legacyPath: "/master-class-landing",
   sources: [
     "client/src/pages/master-class.tsx",
+    "client/src/components/master-class/access.ts",
+    "client/src/components/master-class/lesson.tsx",
+    "client/src/components/guides/progress.ts",
     "client/src/pages/google-ads-guide.tsx",
     "server/data/master-class-modules.json",
     "server/data/state-guides.json",
+    "server/data/state-guide-steps.json",
+    "server/state-guides.ts",
     "server/state-guides-schema.ts",
     "scripts/verify-state-guides.ts",
     "server/routes.ts",
