@@ -24,6 +24,7 @@ import { openRecording, parseRange } from "./recordings";
 import { listSpamLedger, presentSpamRow, unblockNumber, blockNumber, spamNumber } from "./spam";
 import { getVoiceUsageRow, summarizeVoiceUsage, voiceMonthKey } from "./billing-usage";
 import { closeEscalation, listEscalations, confirmEscalationByToken, startVoiceEscalationWorker, voiceEscalationWorkerStatus, kindLabel } from "./escalations";
+import { listCallTasks, presentCallTask, deliveryStateOf, rearmCallTasks, runCallTasksFor, callTaskWorkerStatus, type DeliveryState } from "./call-tasks";
 import { logActivity } from "../crm/activity";
 
 export const SPAM_OUTCOMES = ["spam", "blocked"] as const;
@@ -49,19 +50,42 @@ const listColumns = {
   customerId: voiceCalls.customerId, projectId: voiceCalls.projectId, leadDeliveredAt: voiceCalls.leadDeliveredAt,
   spamConfidence: voiceCalls.spamConfidence, spamReason: voiceCalls.spamReason,
   recordingPending: sql<boolean>`coalesce((${voiceCalls.flags}->>'recordingPending')::boolean, false)`,
+  recordingStatus: sql<StoredRecordingStatus | null>`${voiceCalls.flags}->'recording'`,
+  /** The call's post-call CRM work in one word (call-tasks.ts deliveryStateOf, in SQL): failed > pending > done; null = none. */
+  deliveryState: sql<DeliveryState | null>`(select case when count(*) = 0 then null
+      when bool_or(t.state = 'failed') then 'failed' when bool_or(t.state = 'pending') then 'pending' else 'done' end
+      from voice_call_tasks t where t.call_id = "voice_calls"."id")`,
 };
 
-/** The engine retries an upload for 3 days (voice/outbox.py max_age_s); past that (plus slack) "pending" is "failed". */
+/** The engine retries an upload for 3 days (voice/outbox.py max_age_s); with no word from it past that (plus slack),
+ *  "pending" is "failed". Only a backstop now: the engine reports failed/missing explicitly (POST /calls/:sid/artifacts). */
 export const RECORDING_PENDING_MAX_MS = (3 * 24 + 1) * 60 * 60 * 1000;
 export type RecordingState = "available" | "pending" | "failed" | "none";
+/** voice_calls.flags.recording — written by the end report (pending), the upload (available) and the engine's status. */
+export type StoredRecordingStatus = { state: "pending" | "failed" | "missing" | "available"; reason?: string | null; seq?: number; attempts?: number | null; at?: string };
+type RecordingInput = { recordingKey: string | null; recordingPending?: boolean | null; recordingStatus?: StoredRecordingStatus | null; flags?: unknown; endedAt: Date | null };
 
-/** Where a call's recording stands: stored, on its way from the engine, never arrived, or there is none. */
-export function recordingStateOf(call: { recordingKey: string | null; recordingPending?: boolean | null; flags?: unknown; endedAt: Date | null }, now = new Date()): RecordingState {
-  if (call.recordingKey) return "available";
-  const pending = call.recordingPending ?? (call.flags as Record<string, unknown> | null | undefined)?.recordingPending === true;
-  if (!pending) return "none";
-  const ended = call.endedAt?.getTime() ?? now.getTime();
-  return now.getTime() - ended > RECORDING_PENDING_MAX_MS ? "failed" : "pending";
+const storedStatus = (call: RecordingInput): StoredRecordingStatus | null =>
+  call.recordingStatus ?? ((call.flags as Record<string, unknown> | null | undefined)?.recording as StoredRecordingStatus | undefined) ?? null;
+
+/** Where a call's recording stands: stored, on its way from the engine, never arriving, or there is none. */
+export function recordingStateOf(call: RecordingInput, now = new Date()): RecordingState {
+  return recordingInfoOf(call, now).state;
+}
+
+/** The state plus the words the console shows for it (null when there is nothing to explain). */
+export function recordingInfoOf(call: RecordingInput, now = new Date()): { state: RecordingState; reason: string | null } {
+  if (call.recordingKey) return { state: "available", reason: null };
+  const st = storedStatus(call);
+  if (st?.state === "failed") return { state: "failed", reason: `The phone system's upload was refused${st.reason ? ` (${st.reason})` : ""}. It keeps the audio and can send it again once this is fixed.` };
+  if (st?.state === "missing") return { state: "failed", reason: `The recording file was lost on the phone system before it could be uploaded${st.reason ? ` (${st.reason})` : ""}.` };
+  const pending = st?.state === "pending" || (call.recordingPending ?? (call.flags as Record<string, unknown> | null | undefined)?.recordingPending === true);
+  if (!pending) return { state: "none", reason: null };
+  const since = st?.at ? new Date(st.at).getTime() : (call.endedAt?.getTime() ?? now.getTime());
+  if (now.getTime() - (Number.isFinite(since) ? since : now.getTime()) > RECORDING_PENDING_MAX_MS) {
+    return { state: "failed", reason: "No word from the phone system about this recording in over three days." };
+  }
+  return { state: "pending", reason: st?.attempts ? `Upload attempt ${st.attempts} is still being retried by the phone system.` : null };
 }
 
 /**
@@ -184,7 +208,13 @@ export function registerVoiceCallRoutes(app: Express, getDevUser: GetUser): void
     const [{ n: total }] = await db.select({ n: sql<number>`count(*)::int` }).from(voiceCalls).where(cond);
     const calls = await db.select(listColumns).from(voiceCalls).where(cond)
       .orderBy(desc(voiceCalls.startedAt)).limit(q.limit).offset((q.page - 1) * q.limit);
-    sendUnlogged(res, { calls: calls.map(({ recordingPending, ...c }) => ({ ...c, spamConfidence: c.spamConfidence == null ? null : Number(c.spamConfidence), hasRecording: !!c.recordingKey, recordingState: recordingStateOf({ ...c, recordingPending }) })), total, page: q.page, limit: q.limit });
+    sendUnlogged(res, {
+      calls: calls.map(({ recordingPending, recordingStatus, ...c }) => {
+        const rec = recordingInfoOf({ ...c, recordingPending, recordingStatus });
+        return { ...c, spamConfidence: c.spamConfidence == null ? null : Number(c.spamConfidence), hasRecording: !!c.recordingKey, recordingState: rec.state, recordingReason: rec.reason };
+      }),
+      total, page: q.page, limit: q.limit,
+    });
   });
 
   /**
@@ -226,14 +256,37 @@ export function registerVoiceCallRoutes(app: Express, getDevUser: GetUser): void
         .where(and(eq(voiceNumbers.orgId, v.ctx.org.id), eq(voiceNumbers.id, call.numberId))).limit(1)
       : [];
     const escalations = (await listEscalations(v.ctx.org.id, { callId: call.id })).map(presentEscalation);
+    const tasks = await listCallTasks(call.id);
+    const rec = recordingInfoOf(call);
     sendUnlogged(res, {
       ...call,
       spamConfidence: call.spamConfidence == null ? null : Number(call.spamConfidence),
       hasRecording: !!call.recordingKey,
-      recordingState: recordingStateOf(call),
+      recordingState: rec.state,
+      recordingReason: rec.reason,
+      deliveryState: deliveryStateOf(tasks),
+      delivery: { state: deliveryStateOf(tasks), tasks: tasks.map(presentCallTask), worker: callTaskWorkerStatus() },
       recordingUrl: call.recordingKey ? `/api/crm/voice/calls/${call.id}/recording` : null,
       customer: customer ?? null, project: project ?? null, number: number ?? null, escalations,
     });
+  });
+
+  /**
+   * POST → run this call's unfinished CRM work now ("Retry now" in the call drawer): failed and waiting tasks become
+   * due (a failed one gets another day before it gives up again), then run. Safe to press twice — every task is
+   * idempotent (call-tasks.ts). Any member may (like closing an escalation). → { delivery }
+   */
+  app.post("/api/crm/voice/calls/:id/delivery/retry", async (req: any, res) => {
+    const v = await voiceContext(req, res, getDevUser);
+    if (!v) return;
+    const [call] = await db.select({ id: voiceCalls.id }).from(voiceCalls)
+      .where(and(eq(voiceCalls.orgId, v.ctx.org.id), eq(voiceCalls.id, String(req.params.id)))).limit(1);
+    if (!call) return res.status(404).json({ message: "Call not found" });
+    const rearmed = await rearmCallTasks(v.ctx.org.id, call.id);
+    if (!rearmed) return res.status(409).json({ message: "Nothing left to deliver for this call." });
+    const tasks = await runCallTasksFor(call.id);
+    logActivity(v.ctx, "call.delivery_retried", { entityType: "voice_call", entityId: call.id, meta: { tasks: rearmed } });
+    sendUnlogged(res, { delivery: { state: deliveryStateOf(tasks), tasks: tasks.map(presentCallTask), worker: callTaskWorkerStatus() } });
   });
 
   /** GET → audio/wav streamed from R2 (recording_key); 404 when none. */

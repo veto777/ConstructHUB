@@ -33,9 +33,45 @@ export type VoiceCallListRow = {
   spamConfidence: number | null;
   spamReason: string | null;
   hasRecording: boolean;
-  /** available = stored; pending = the engine is still uploading it; failed = it never arrived (absent on an older server). */
+  /** available = stored; pending = the engine is still uploading it; failed = refused, lost or never arrived (absent on an older server). */
   recordingState?: "available" | "pending" | "failed" | "none";
+  /** Why, in words, when the state needs explaining (the engine's explicit status: server/voice/calls.ts recordingInfoOf). */
+  recordingReason?: string | null;
+  /** The call's post-call CRM work in one word (server/voice/call-tasks.ts): null = it had none. */
+  deliveryState?: CallDeliveryState | null;
 };
+
+export type CallDeliveryState = "pending" | "failed" | "done";
+
+/** One piece of a call's CRM work (the lead, an escalation) — GET /api/crm/voice/calls/:id → delivery.tasks. */
+export type CallTaskView = {
+  id: number;
+  key: string;
+  kind: "lead" | "escalation";
+  label: string;
+  /** retrying = pending after at least one failed attempt. */
+  state: "pending" | "retrying" | "failed" | "done";
+  attempts: number;
+  lastError: string | null;
+  nextAttemptAt: string | null;
+  giveUpAt: string | null;
+  doneAt: string | null;
+};
+export type CallDelivery = {
+  state: CallDeliveryState | null;
+  tasks: CallTaskView[];
+  worker: { running: boolean; intervalSeconds: number; lastRunAt: string | null; lastOk: boolean | null };
+};
+
+/** Whether an open call can still change by itself: not finished yet, its recording or its CRM work still on the way. */
+export function callStillChanging(c: Pick<VoiceCallListRow, "endedAt" | "outcome" | "recordingState" | "deliveryState">): boolean {
+  return !c.endedAt || !c.outcome || c.recordingState === "pending" || c.deliveryState === "pending";
+}
+
+/** What the list row says about a call that its open drawer must agree with (a change → refetch the drawer). */
+export function callFingerprint(c: Pick<VoiceCallListRow, "endedAt" | "outcome" | "recordingState" | "deliveryState" | "hasRecording" | "customerId">): string {
+  return [c.endedAt ?? "", c.outcome ?? "", c.recordingState ?? "", c.deliveryState ?? "", c.hasRecording ? 1 : 0, c.customerId ?? ""].join("|");
+}
 
 export type VoiceCallList = { calls: VoiceCallListRow[]; total: number; page: number; limit: number };
 
@@ -91,6 +127,8 @@ export type VoiceCallDetail = VoiceCallListRow & {
   number: { id: string; label: string | null; phoneNumber: string; location: string | null } | null;
   escalations: VoiceEscalation[];
   flags?: { ingest?: VoiceIngestInfo } & Record<string, unknown> | null;
+  /** Absent on an older server. */
+  delivery?: CallDelivery;
 };
 
 /** A call another receptionist pushed into this log (server/voice/ingest.ts) — e.g. Alpine's Janice. */

@@ -13,7 +13,7 @@
 import { randomBytes } from "crypto";
 import { db } from "../db";
 import {
-  crmActivityLog, crmCustomers, crmLeadSources, crmMembers, crmOrgs, crmProjects, crmNotificationChannel,
+  crmActivityLog, crmCustomers, crmLeadSources, crmMembers, crmOrgs, crmProjects, crmNotificationChannel, voiceCalls,
   type VoiceCallRow,
 } from "@shared/schema";
 import { and, eq, isNull, sql } from "drizzle-orm";
@@ -193,42 +193,54 @@ export async function deliverLead(args: {
     const existingTags = customer.tags ?? [];
     const addTags = tags.filter((t) => !existingTags.includes(t));
     if (addTags.length) patch.tags = [...existingTags, ...addTags];
-    // The note is appended once per call (the call sid marks it).
-    if (!call.leadDeliveredAt) patch.notes = [customer.notes?.trim(), `${note}\n[call ${call.callSid}]`].filter(Boolean).join("\n\n");
+    // The note is appended once per call (the call sid marks it — a retried delivery finds its own mark).
+    const mark = `[call ${call.callSid}]`;
+    if (!call.leadDeliveredAt && !(customer.notes ?? "").includes(mark)) patch.notes = [customer.notes?.trim(), `${note}\n${mark}`].filter(Boolean).join("\n\n");
     await db.update(crmCustomers).set(patch).where(eq(crmCustomers.id, customer.id));
     customer = { ...customer, ...patch } as typeof customer;
   } else {
     const owner = await orgOwnerMember(org);
     const leadSourceId = await callAssistantLeadSourceId(org.id);
-    const [row] = await db.insert(crmCustomers).values({
-      orgId: org.id,
-      displayName: facts.name || `Caller ${prettyPhone(facts.phone)}`,
-      firstName: facts.name,
-      phone: facts.phone,
-      email: facts.email,
-      addressLine1: facts.address,
-      city: facts.city,
-      state,
-      leadSourceId,
-      ownerMemberId: owner?.id ?? null,
-      tags,
-      notes: `${note}\n[call ${call.callSid}]`,
-      portalToken: randomBytes(24).toString("hex"),
-    }).returning();
-    customer = row;
+    // The client and the call's link to it commit together: a retry after any later failure (the project, a
+    // crash) finds the client through call.customerId and never files a second one — even without a phone number.
+    customer = await db.transaction(async (tx) => {
+      const [row] = await tx.insert(crmCustomers).values({
+        orgId: org.id,
+        displayName: facts.name || `Caller ${prettyPhone(facts.phone)}`,
+        firstName: facts.name,
+        phone: facts.phone,
+        email: facts.email,
+        addressLine1: facts.address,
+        city: facts.city,
+        state,
+        leadSourceId,
+        ownerMemberId: owner?.id ?? null,
+        tags,
+        notes: `${note}\n[call ${call.callSid}]`,
+        portalToken: randomBytes(24).toString("hex"),
+      }).returning();
+      await tx.update(voiceCalls).set({ customerId: row.id }).where(eq(voiceCalls.id, call.id));
+      return row;
+    });
     created = true;
   }
+  call.customerId = customer.id;
 
-  // 2. Project (pipeline stage "lead") — once per call.
+  // 2. Project (pipeline stage "lead") — once per call; committed together with the call's link to it (as above).
   let projectId: string | null = call.projectId ?? null;
   const projectName = [facts.need || "Phone lead", facts.city].filter(Boolean).join(" — ").slice(0, 200);
   if (!projectId && profile.leadDelivery.crm.createProject) {
-    const [project] = await db.insert(crmProjects).values({
-      orgId: org.id, customerId: customer.id, name: projectName, status: "lead",
-      addressLine1: facts.address, city: facts.city, state,
-      description: call.summary ?? null,
-    }).returning({ id: crmProjects.id });
-    projectId = project.id;
+    const customerId = customer.id;
+    projectId = await db.transaction(async (tx) => {
+      const [project] = await tx.insert(crmProjects).values({
+        orgId: org.id, customerId, name: projectName, status: "lead",
+        addressLine1: facts.address, city: facts.city, state,
+        description: call.summary ?? null,
+      }).returning({ id: crmProjects.id });
+      await tx.update(voiceCalls).set({ projectId: project.id }).where(eq(voiceCalls.id, call.id));
+      return project.id;
+    });
+    call.projectId = projectId;
   }
 
   const alreadyDelivered = !!call.leadDeliveredAt;
@@ -275,8 +287,11 @@ export async function deliverLead(args: {
     const cf = org.customFields;
     const anyChannel = ["inApp", "email", "sms"].some((c) => crmNotificationChannel(cf, "leadReceived", c as any));
     if (anyChannel) {
-      await notifyMembers({ org, pref: "leadReceived", type: "call.lead", title, body: bodyLine, link });
-      notified.bell = crmNotificationChannel(cf, "leadReceived", "inApp");
+      // Best-effort like the email and texts below: the client and project are filed; a notification hiccup
+      // must not send the delivery task round again.
+      await notifyMembers({ org, pref: "leadReceived", type: "call.lead", title, body: bodyLine, link })
+        .then(() => { notified.bell = crmNotificationChannel(cf, "leadReceived", "inApp"); })
+        .catch((e: any) => console.error("[voice] lead notification failed:", e?.message || e));
     }
     if (profile.leadDelivery.email.enabled) {
       const recipients = new Set<string>();
