@@ -127,6 +127,7 @@ describe("monthly text allowance seam (real test DB)", () => {
 
   beforeEach(async () => {
     clearSmsLimitWarnings();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ sid: "SM-meter-test" }), { status: 201 })));
     await pool.query("delete from growth_budgets where key = $1", [keyOf(proOwner)]);
   });
 
@@ -135,9 +136,9 @@ describe("monthly text allowance seam (real test DB)", () => {
   });
 
   it("charges each send by segment, and a send the carrier refuses charges nothing", async () => {
-    await withSwEnv({}, async () => {
+    await withSwEnv(SW_ENV, async () => {
       const one = await sendSms(phone, "hi", undefined, proOrg.id);
-      expect(one).toMatchObject({ ok: true, provider: "log", segments: 1 });
+      expect(one).toMatchObject({ ok: true, provider: "signalwire", segments: 1 });
       expect(await usedOf(proOwner)).toBe(1);
       const two = await sendSms(phone, "a".repeat(161), undefined, proOrg.id);
       expect(two.segments).toBe(2);
@@ -155,7 +156,7 @@ describe("monthly text allowance seam (real test DB)", () => {
   it("parallel sends never overshoot the cap", async () => {
     const left = 5;
     await fill(proOwner, PRO_LIMIT - left);
-    const results = await withSwEnv({}, () => Promise.all(Array.from({ length: 20 }, () => sendSms(phone, "hi", undefined, proOrg.id))));
+    const results = await withSwEnv(SW_ENV, () => Promise.all(Array.from({ length: 20 }, () => sendSms(phone, "hi", undefined, proOrg.id))));
     expect(results.filter((r: any) => r.ok)).toHaveLength(left);
     const refused = results.filter((r: any) => !r.ok);
     expect(refused).toHaveLength(20 - left);
@@ -167,7 +168,7 @@ describe("monthly text allowance seam (real test DB)", () => {
     await fill(proOwner, PRO_LIMIT);
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
-      const skipped = await withSwEnv({}, () => sendSms(phone, "hi", undefined, proOrg.id));
+      const skipped = await withSwEnv(SW_ENV, () => sendSms(phone, "hi", undefined, proOrg.id));
       expect(skipped.ok).toBe(false);
       expect(skipped.limit).toMatchObject({ code: "limit_reached", feature: "texts", limit: PRO_LIMIT, used: PRO_LIMIT, upgradePlan: "growth", addon: null, message: spentMessage("pro") });
       expect(skipped.error).toBe(spentMessage("pro"));
@@ -191,12 +192,12 @@ describe("monthly text allowance seam (real test DB)", () => {
 
   it("an opted-out number costs nothing, and an owner with no plan is still refused 402-style", async () => {
     await recordSmsOptout(proOrg.id, optedOut, "STOP");
-    const stop = await withSwEnv({}, () => sendSms(optedOut, "hi", undefined, proOrg.id));
+    const stop = await withSwEnv(SW_ENV, () => sendSms(optedOut, "hi", undefined, proOrg.id));
     expect(stop.ok).toBe(false);
     expect(stop.error).toContain("STOP");
     expect(await usedOf(proOwner)).toBe(0);
 
-    const refused = await withSwEnv({}, () => sendSms(phone, "hi", undefined, noPlanOrgId));
+    const refused = await withSwEnv(SW_ENV, () => sendSms(phone, "hi", undefined, noPlanOrgId));
     expect(refused).toMatchObject({ ok: false, error: SMS_NEEDS_PLAN });
     expect(refused.limit).toBeUndefined();
     expect(await usedOf(noPlanOwner)).toBe(0);

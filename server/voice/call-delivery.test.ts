@@ -7,11 +7,11 @@
  * Failures are injected for real, not mocked:
  *   - the CRM: a BEFORE INSERT trigger on crm_projects (and voice_escalations) raises for THIS test's org while a
  *     switch row exists (vitest_call_faults) — the client insert before it commits, the project insert fails;
- *   - the carrier: SignalWire env pointed at a closed port, so the escalation text really fails to send;
+ *   - the carrier: mocked definite rejection followed by acceptance with an identifier;
  *   - the process: a task leased by a "dead" runner, and a crash right after the acknowledgement (afterAck).
- * Sends never leave the box (EMAIL_FORCE_SINK=1; texts go to a per-run log outbox once the carrier is unset).
+ * Sends never leave the box (EMAIL_FORCE_SINK=1; the carrier mock writes accepted texts to a per-run outbox).
  */
-import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
 import pg from "pg";
 import fs from "node:fs";
 import path from "node:path";
@@ -37,14 +37,19 @@ const leadTech = fakePhone();
 const MIN = 60_000;
 const later = (ms: number) => () => new Date(Date.now() + ms);
 
-/** The carrier is down: every text fails (a real fetch to a closed port). */
+/** The carrier mock definitively refuses every text until recovery. */
 function carrierDown() {
   process.env.SIGNALWIRE_SPACE_URL = "127.0.0.1:9";
   process.env.SIGNALWIRE_PROJECT_ID = "vitest-project";
   process.env.SIGNALWIRE_API_TOKEN = "vitest-token";
   process.env.SIGNALWIRE_FROM_NUMBER = "+15550100999";
 }
-function carrierBack() { for (const k of CARRIER) delete process.env[k]; }
+function carrierBack() {
+  process.env.SIGNALWIRE_SPACE_URL = "carrier.example.invalid";
+  process.env.SIGNALWIRE_PROJECT_ID = "vitest-project";
+  process.env.SIGNALWIRE_API_TOKEN = "vitest-token";
+  process.env.SIGNALWIRE_FROM_NUMBER = "+15550100999";
+}
 async function crmFault(table: "crm_projects" | "voice_escalations", on: boolean) {
   if (on) await pool.query("insert into vitest_call_faults(key) values ($1) on conflict do nothing", [`${table}:${a.orgId}`]);
   else await pool.query("delete from vitest_call_faults where key = $1", [`${table}:${a.orgId}`]);
@@ -92,6 +97,17 @@ beforeAll(async () => {
     await pool.query(`drop trigger if exists vitest_call_fault_trg on ${t}`);
     await pool.query(`create trigger vitest_call_fault_trg before insert on ${t} for each row execute function vitest_call_fault()`);
   }
+  // Recovery must simulate carrier acceptance, never reinterpret a log-only send as success.
+  vi.stubGlobal("fetch", vi.fn(async (_url: unknown, init: RequestInit) => {
+    if (process.env.SIGNALWIRE_SPACE_URL === "127.0.0.1:9") {
+      return new Response(JSON.stringify({ message: "Carrier rejected" }), { status: 429 });
+    }
+    const body = new URLSearchParams(String(init.body));
+    fs.mkdirSync(path.dirname(SMS_OUTBOX), { recursive: true });
+    fs.appendFileSync(SMS_OUTBOX, JSON.stringify({ to: body.get("To"), body: body.get("Body") }) + "\n");
+    return new Response(JSON.stringify({ sid: "SM-" + randomUUID() }), { status: 201 });
+  }));
+  carrierBack();
   ic = await import("./internal-calls");
   tasks = await import("./call-tasks");
   a = await makeAccount(pool, bag, { orgName: "Delivery Test Roofing" });
@@ -114,6 +130,8 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
+  vi.unstubAllGlobals();
+  for (const k of CARRIER) delete process.env[k];
   for (const t of ["crm_projects", "voice_escalations"]) await pool.query(`drop trigger if exists vitest_call_fault_trg on ${t}`).catch(() => {});
   await pool.query("drop function if exists vitest_call_fault()").catch(() => {});
   await pool.query("drop table if exists vitest_call_faults").catch(() => {});

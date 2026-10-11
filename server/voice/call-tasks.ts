@@ -67,6 +67,7 @@ export function nextDelayMs(attempts: number): number {
 
 /** A task that can never succeed (its call or org is gone): failed at once, not retried. */
 export class PermanentTaskError extends Error {}
+export class UncertainDeliveryError extends PermanentTaskError {}
 
 type Queryable = { query: (text: string, values?: unknown[]) => Promise<{ rows: any[] }> };
 
@@ -119,9 +120,10 @@ async function failAttempt(task: CallTask, token: string, err: unknown, now: Dat
   const giveUp = err instanceof PermanentTaskError || (task.giveUpAt != null && now.getTime() >= task.giveUpAt.getTime());
   const state: CallTaskState = giveUp ? "failed" : "pending";
   await pool.query(
-    `UPDATE voice_call_tasks SET state = $3, last_error = $4, result = NULL, next_attempt_at = $5, leased_until = NULL, lease_token = NULL, updated_at = $6
+    `UPDATE voice_call_tasks SET state = $3, last_error = $4, result = $7::jsonb, next_attempt_at = $5, leased_until = NULL, lease_token = NULL, updated_at = $6
       WHERE id = $1 AND lease_token = $2`,
-    [task.id, token, state, message, new Date(now.getTime() + nextDelayMs(task.attempts)), now]);
+    [task.id, token, state, message, new Date(now.getTime() + nextDelayMs(task.attempts)), now,
+      err instanceof UncertainDeliveryError ? JSON.stringify({ uncertain: true }) : null]);
   return state;
 }
 
@@ -136,12 +138,12 @@ async function perform(task: CallTask, deps: CallTaskDeps, now: Date): Promise<R
   const ctx = await loadOrgVoiceContext(call.orgId);
   if (!ctx) throw new PermanentTaskError("the CRM organization no longer exists");
   if (task.kind === "notification") {
-    try { await deliverLeadNotification(ctx, call.id, task.payload); }
+    try { return { ...await deliverLeadNotification(ctx, call.id, task.payload), channel: task.payload.channel, recipient: task.payload.recipient }; }
     catch (e: any) {
-      if (e?.ambiguous) throw new PermanentTaskError(`Delivery outcome unknown: ${e.message}. Check with the recipient before retrying.`);
+      if (e?.ambiguous) throw new UncertainDeliveryError(`Delivery outcome unknown: ${e.message}. Check with the recipient; automatic and bulk retries are blocked.`);
+      if (e?.notConfigured) throw new PermanentTaskError(e.message);
       throw e;
     }
-    return { channel: task.payload.channel, recipient: task.payload.recipient };
   }
   if (task.kind === "lead") {
     const number = call.numberId ? await findVoiceNumber({ numberId: call.numberId }) : null;
@@ -163,7 +165,7 @@ export async function runCallTask(id: number, opts: CallTaskOpts = {}): Promise<
   const { task, token } = claimed;
   try {
     if (task.kind === "notification" && task.payload.channel !== "inApp") {
-      if (task.result?.sending) throw new PermanentTaskError("Delivery outcome unknown after interrupted send; check with the recipient before retrying.");
+      if (task.result?.sending || task.result?.uncertain) throw new UncertainDeliveryError("Delivery outcome unknown after interrupted send; check with the recipient. Automatic and bulk retries are blocked.");
       // This marker survives a crash and a lease expiry, including retries that already have lastError.
       // Never automatically resend an external message whose acceptance could not be recorded.
       const marked = await pool.query("UPDATE voice_call_tasks SET result = '{\"sending\":true}'::jsonb WHERE id = $1 AND lease_token = $2 RETURNING id", [task.id, token]);
@@ -172,7 +174,7 @@ export async function runCallTask(id: number, opts: CallTaskOpts = {}): Promise<
     const result = await perform(task, deps, now());
     try { await completeTask(task.id, token, result, now()); }
     catch (e) {
-      if (task.kind === "notification") throw new PermanentTaskError("Message sent but confirmation could not be saved. Check with recipient before retrying.");
+      if (task.kind === "notification") throw new UncertainDeliveryError("Delivery outcome unknown: message sent but confirmation could not be saved. Check with the recipient. Automatic and bulk retries are blocked.");
       throw e;
     }
     return "done";
@@ -222,7 +224,13 @@ export async function rearmCallTasks(orgId: string, callId: string, now = new Da
     `UPDATE voice_call_tasks
         SET state = 'pending', next_attempt_at = $3, updated_at = $3,
             give_up_at = CASE WHEN state = 'failed' OR give_up_at IS NULL OR give_up_at < $4 THEN $4 ELSE give_up_at END
-      WHERE org_id = $1 AND call_id = $2 AND state IN ('pending', 'failed') RETURNING id`,
+      WHERE org_id = $1 AND call_id = $2 AND state IN ('pending', 'failed')
+        AND coalesce(result->>'uncertain', 'false') <> 'true'
+        AND coalesce(result->>'sending', 'false') <> 'true'
+        AND (leased_until IS NULL OR leased_until < $3)
+        AND coalesce(last_error, '') NOT ILIKE '%outcome unknown%'
+        AND coalesce(last_error, '') NOT ILIKE '%confirmation could not be saved%'
+      RETURNING id`,
     [orgId, callId, now, new Date(now.getTime() + TASK_MANUAL_RETRY_MS)]);
   return rows.length;
 }
@@ -231,6 +239,7 @@ export async function rearmCallTasks(orgId: string, callId: string, now = new Da
 
 export type DeliveryState = "pending" | "failed" | "done";
 export type CallTaskView = {
+  uncertain: boolean;
   id: number; key: string; kind: CallTaskKind; label: string;
   /** retrying = pending after at least one failed attempt. */
   state: "pending" | "retrying" | "failed" | "done";
@@ -242,6 +251,7 @@ export function presentCallTask(t: CallTask): CallTaskView {
   const state = t.state === "pending" && t.attempts > 0 && t.lastError ? "retrying" : t.state;
   return {
     id: t.id, key: t.key, kind: t.kind, label, state, attempts: t.attempts, lastError: t.lastError,
+    uncertain: !!t.result?.uncertain || !!t.result?.sending || /outcome unknown|confirmation could not be saved/i.test(t.lastError ?? ""),
     nextAttemptAt: t.state === "pending" ? t.nextAttemptAt.toISOString() : null,
     giveUpAt: t.giveUpAt ? t.giveUpAt.toISOString() : null, doneAt: t.doneAt ? t.doneAt.toISOString() : null,
   };

@@ -193,8 +193,10 @@ export function CallDetailSheet({ callId, onClose }: { callId: string | null; on
 }
 
 const TASK_TONE: Record<CallTaskView["state"], "success" | "warning" | "danger" | "neutral"> = { done: "success", pending: "neutral", retrying: "warning", failed: "danger" };
+const isUncertain = (t: CallTaskView & { uncertain?: boolean }) => !!t.uncertain || /outcome unknown|confirmation could not be saved/i.test(t.lastError ?? "");
 function taskStateLabel(t: CallTaskView): string {
-  if (t.state === "done") return "Done";
+  if (isUncertain(t)) return "Outcome unknown";
+  if (t.state === "done") return t.kind === "notification" && !t.label.startsWith("In-app") ? "Accepted" : "Done";
   if (t.state === "failed") return "Failed";
   if (t.state === "retrying") return `Retrying · attempt ${t.attempts}`;
   return "Waiting";
@@ -208,7 +210,9 @@ function taskStateLabel(t: CallTaskView): string {
 export function DeliverySection({ callId, delivery }: { callId: string; delivery: CallDelivery }) {
   const qc = useQueryClient();
   const { toast } = useToast();
-  const unfinished = delivery.tasks.some((t) => t.state !== "done");
+  const unfinished = delivery.tasks.some((t) => t.state !== "done" && !isUncertain(t));
+  const crmTasks = delivery.tasks.filter(t => t.kind === "lead");
+  const notifications = delivery.tasks.filter(t => t.kind === "notification");
   const retry = useMutation({
     mutationFn: async () => (await apiRequest("POST", `/api/crm/voice/calls/${callId}/delivery/retry`, {})).json() as Promise<{ delivery: CallDelivery }>,
     onSuccess: (r) => {
@@ -218,9 +222,9 @@ export function DeliverySection({ callId, delivery }: { callId: string; delivery
     },
     onError: (err) => toast({ title: "Couldn't retry", description: apiErrorMessage(err), variant: "destructive" }),
   });
-  const headline = delivery.state === "failed" ? "Some of this call didn't reach your CRM"
-    : delivery.state === "pending" ? "Still being delivered to your CRM"
-    : "Delivered to your CRM";
+  const headline = crmTasks.length === 0 ? "Call delivery"
+    : crmTasks.every(t => t.state === "done") ? "CRM saved"
+    : crmTasks.some(t => t.state === "failed") ? "CRM needs attention" : "Saving to your CRM";
   return (
     <section className={`rounded-md border p-3 ${delivery.state === "failed" ? "border-destructive/40" : delivery.state === "pending" ? "border-amber-500/40" : ""}`} data-testid="section-call-delivery">
       <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -232,18 +236,22 @@ export function DeliverySection({ callId, delivery }: { callId: string; delivery
           </Button>
         )}
       </div>
+      {notifications.length > 0 && <p className="mb-3 text-muted-foreground" data-testid="text-notification-status">
+        {notifications.some(t => t.state !== "done") ? "Notifications need attention" : "Notifications accepted"}. Each channel's outcome is shown below; carrier acceptance does not confirm receipt.
+      </p>}
       <ul className="space-y-2" data-testid="list-call-delivery">
         {delivery.tasks.map((t) => (
           <li key={t.id} className="flex flex-wrap items-start gap-x-2 gap-y-1" data-testid={`row-call-task-${t.key}`}>
-            <span className="min-w-0 flex-1">{t.label}</span>
+            <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{t.label}</span>
             <StatusPill tone={TASK_TONE[t.state]} data-testid={`pill-call-task-${t.key}`}>{taskStateLabel(t)}</StatusPill>
             {t.state !== "done" && t.lastError && (
-              <span className="basis-full text-xs text-red-600 dark:text-red-400" data-testid={`text-call-task-error-${t.key}`}>Last try failed: {t.lastError}</span>
+              <span className="basis-full text-xs text-red-600 dark:text-red-400" data-testid={`text-call-task-error-${t.key}`}>{isUncertain(t) ? "Unconfirmed: " : "Last try failed: "}{t.lastError}</span>
             )}
-            {(t.state === "retrying" || t.state === "pending") && t.nextAttemptAt && delivery.worker.running && (
+            {!isUncertain(t) && (t.state === "retrying" || t.state === "pending") && t.nextAttemptAt && delivery.worker.running && (
               <span className="basis-full text-xs text-muted-foreground">Next automatic try {fmtWhen(t.nextAttemptAt)}</span>
             )}
-            {t.state === "failed" && (
+            {isUncertain(t) && <span className="basis-full text-xs text-muted-foreground">Check with the recipient before arranging another message. Retry now excludes this message to avoid duplicates.</span>}
+            {t.state === "failed" && !isUncertain(t) && (
               <span className="basis-full text-xs text-muted-foreground">Automatic retries stopped{t.giveUpAt ? ` ${fmtWhen(t.giveUpAt)}` : ""}. Fix the cause, then Retry now.</span>
             )}
           </li>

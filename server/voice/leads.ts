@@ -18,7 +18,7 @@ import {
 } from "@shared/schema";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { normalizePhone, sendSms } from "../crm/sms";
-import { notifyMembers } from "../crm/notify";
+import type { CallTaskSpec } from "./call-tasks";
 import { recordActivity } from "../crm/activity";
 import { sendWithFallback } from "../email";
 import { appForLink, pushSoon } from "../apns";
@@ -332,27 +332,39 @@ async function deliverLeadLocked(args: Parameters<typeof deliverLead>[0]): Promi
 }
 
 /** notifyOnEveryCall: a one-line summary for non-lead outcomes (info, declined, out_of_area). */
-export async function notifyCallSummary(ctx: OrgVoiceContext, call: VoiceCallRow): Promise<void> {
-  const claimed = await db.execute(sql`UPDATE voice_calls SET flags = coalesce(flags, '{}'::jsonb) || '{"summaryNotified":true}'::jsonb
-    WHERE id = ${call.id} AND coalesce(flags->>'summaryNotified', 'false') <> 'true' RETURNING id`);
-  if (!claimed.rows.length) return;
+export async function callSummaryTaskSpecs(ctx: OrgVoiceContext, call: VoiceCallRow): Promise<CallTaskSpec[]> {
+  const members = await db.select().from(crmMembers).where(and(eq(crmMembers.orgId, ctx.org.id), eq(crmMembers.status, "active")));
+  const owners = members.filter(m => m.role === "owner");
+  const recipients = new Map<string, { channel: string; recipient: string; userId?: number | null }>();
+  if (crmNotificationChannel(ctx.org.customFields, "leadReceived", "inApp")) {
+    for (const m of owners) recipients.set(`inApp:${m.id}`, { channel: "inApp", recipient: m.id, userId: m.userId });
+  }
+  if (crmNotificationChannel(ctx.org.customFields, "leadReceived", "sms")) {
+    const phones = owners.map(m => normalizePhone(m.phone)).filter(Boolean);
+    for (const phone of phones.length ? phones : [normalizePhone(ctx.org.phone)]) {
+      if (phone) recipients.set(`sms:${phone}`, { channel: "sms", recipient: phone });
+    }
+  }
   const title = `Call ${String(call.outcome ?? "ended").replace(/_/g, " ")} — ${call.callerName || prettyPhone(call.fromNumber)}`;
-  await notifyMembers({
-    org: ctx.org, pref: "leadReceived", type: "call.summary", title,
-    body: call.summary ?? null, link: `/call-assistant?tab=calls&call=${call.id}`,
-  });
+  return [...recipients].map(([key, recipient]) => ({ key: `summary:${key}`, kind: "notification", payload: {
+    ...recipient, type: "call.summary", title, body: call.summary ?? "", link: `/call-assistant?tab=calls&call=${call.id}`,
+  } }));
 }
 
 /** A single durable recipient/channel effect. Throws so the task records the reason and retries. */
-export async function deliverLeadNotification(ctx: OrgVoiceContext, callId: string, payload: Record<string, unknown>): Promise<void> {
+export async function deliverLeadNotification(ctx: OrgVoiceContext, callId: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
   const { channel, recipient, title, body, link } = payload;
   if (channel === "email") {
     await sendWithFallback({ to: String(recipient), subject: String(title), html: `<p>${esc(String(body))}</p>` }, false, { failover: "definite" });
   } else if (channel === "sms") {
     const result = await sendSms(String(recipient), `${ctx.org.name}: ${title} — ${body}`.slice(0, 320), ctx.org.customFields, ctx.org.id);
-    if (!result.ok) throw new Error(result.error || "SMS delivery failed");
+    if (result.provider === "log") throw Object.assign(new Error("Not sent: texting isn't set up."), { notConfigured: true });
+    if (!result.ok) throw Object.assign(new Error(result.error || "SMS delivery failed"), { ambiguous: result.ambiguous });
+    if (result.provider !== "signalwire" || !result.sid) throw Object.assign(new Error("Carrier acceptance could not be confirmed."), { ambiguous: true });
+    return { provider: result.provider, sid: result.sid, accepted: true };
   } else if (channel === "inApp") {
-    const inserted = await db.insert(crmNotifications).values({ id: `voice:${callId}:${recipient}`, orgId: ctx.org.id, memberId: String(recipient), type: "call.lead", title: String(title).slice(0, 300), body: String(body).slice(0, 1000), link: String(link) }).onConflictDoNothing().returning({ id: crmNotifications.id });
+    const inserted = await db.insert(crmNotifications).values({ id: `voice:${callId}:${recipient}`, orgId: ctx.org.id, memberId: String(recipient), type: payload.type === "call.summary" ? "call.summary" : "call.lead", title: String(title).slice(0, 300), body: String(body).slice(0, 1000), link: String(link) }).onConflictDoNothing().returning({ id: crmNotifications.id });
     if (inserted.length && typeof payload.userId === "number") pushSoon(payload.userId, appForLink(String(link)), { title: `${ctx.org.name}: ${title}`, body: String(body), link: String(link) });
   } else throw new Error("Unknown lead notification channel");
+  return { accepted: true };
 }

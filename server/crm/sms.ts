@@ -357,8 +357,10 @@ export type SmsResult = {
   ok: boolean;
   provider: "signalwire" | "log";
   sid?: string | null;
+  /** Acceptance may have happened; callers must not automatically resend. */
+  ambiguous?: boolean;
   error?: string | null;
-  /** Segments charged to the org's monthly allowance (a refused or failed send charges none). */
+  /** Segments charged to the org allowance. Unknown acceptance retains its reservation. */
   segments?: number;
   /** Set when the month's allowance refused the text: the 403 limit_reached body a manual route answers with. */
   limit?: LimitReachedBody;
@@ -378,7 +380,7 @@ function logProviderSend(to: string, body: string): SmsResult {
     fs.appendFileSync(LOG_PATH(), JSON.stringify(entry) + "\n");
   } catch { /* a full disk must not break a bid reminder */ }
   console.log(`[SMS LOG] no carrier configured — recorded instead of sending (to: ${to})`);
-  return { ok: true, provider: "log", sid: null };
+  return { ok: false, provider: "log", sid: null, error: "Not sent: texting isn't set up." };
 }
 
 /** SignalWire Compatibility API — Twilio-shaped: POST {space}/api/laml/2010-04-01/
@@ -401,12 +403,13 @@ async function signalwireSend(to: string, body: string, sender: SmsSender): Prom
     if (!resp.ok) {
       const msg = String(payload?.message ?? `SignalWire HTTP ${resp.status}`).slice(0, 300);
       console.error("[sms] SignalWire send failed:", msg);
-      return { ok: false, provider: "signalwire", error: msg };
+      return { ok: false, provider: "signalwire", error: msg, ambiguous: resp.status >= 500 || resp.status === 408 };
     }
-    return { ok: true, provider: "signalwire", sid: payload?.sid ?? null };
+    if (!payload?.sid) return { ok: false, provider: "signalwire", ambiguous: true, error: "Carrier acceptance could not be confirmed." };
+    return { ok: true, provider: "signalwire", sid: payload.sid };
   } catch (e: any) {
     console.error("[sms] SignalWire send failed:", e?.message || e);
-    return { ok: false, provider: "signalwire", error: String(e?.message || e).slice(0, 300) };
+    return { ok: false, provider: "signalwire", ambiguous: true, error: String(e?.message || e).slice(0, 300) };
   }
 }
 
@@ -434,6 +437,7 @@ export async function sendSms(
   orgId?: string,
 ): Promise<SmsResult> {
   const sender = resolveSmsSender(orgCustomFields);
+  if (!sender) return logProviderSend(to, body);
   if (sender?.mode === "dedicated" && !await dedicatedSmsAllowed(orgId, sender.from)) {
     // Do not silently reroute a client-facing text onto the shared number.
     return { ok: false, provider: "signalwire", sid: null, error: "Dedicated texting number is outside your current allowance. Update Text messaging settings." };
@@ -467,8 +471,8 @@ export async function sendSms(
   }
   const result = sender ? await signalwireSend(to, body, sender) : logProviderSend(to, body);
   if (!result.ok) {
-    // The text never went out: give its segments back.
-    if (metered?.ok) await refundReservation(metered.reservation ?? undefined, metered.segments)
+    // Refund only definite rejection. A lost response may still represent a charged text.
+    if (!result.ambiguous && metered?.ok) await refundReservation(metered.reservation ?? undefined, metered.segments)
       .catch((e: any) => console.error("[sms] allowance refund failed:", e?.message || e));
     return result;
   }
