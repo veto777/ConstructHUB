@@ -1,5 +1,5 @@
 import { BusinessSelector, MappingEditor, Pager, refreshSocial } from "@/components/social-agency";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
@@ -65,7 +65,21 @@ type Account = {
 
 export default function SocialMediaPage() {
   const [business, setBusiness] = useUrlParam("business");
-  const [tab, setTab] = useUrlParam("tab");
+  const [tab] = useUrlParam("tab");
+  // Edited draft text keyed by post id, hoisted above the workbench: a row's textarea state used to
+  // die with the row (filter/tab round trip, paging, switching businesses), silently discarding the
+  // edit. Keyed here it survives every unmount and remount until it is saved, discarded or approved.
+  const [draftEdits, setDraftEdits] = useState<Record<string, string>>({});
+  const editDraft = (id: string, value: string | undefined) =>
+    setDraftEdits((old) => {
+      if (value === undefined) {
+        if (!(id in old)) return old;
+        const next = { ...old };
+        delete next[id];
+        return next;
+      }
+      return { ...old, [id]: value };
+    });
   const valid = business === "all" || (!!business && /^[1-9]\d*$/.test(business) && Number.isSafeInteger(Number(business)));
   // The same query (same key, same fetch) BusinessSelector starts with, so this costs no extra request:
   // it tells the page whether the account has the tool at all (every /api/social route is the
@@ -84,7 +98,7 @@ export default function SocialMediaPage() {
         title="Social Media"
         description="Compose once, then review, schedule and track every account."
         flush
-        actions={<GooglePill onClick={() => setTab("guides")} label="How it works" />}
+        actions={<GooglePill href="/guides?topic=social" label="How it works" testId="link-how-it-works" />}
       />
       {planRequired ? (
         // The plan doesn't include social publishing: the standard plan card, in the page, instead of
@@ -95,7 +109,7 @@ export default function SocialMediaPage() {
         </>
       ) : (
         <>
-          <BusinessSelector value={business} onChange={v => setBusiness(v, true)} />
+          <BusinessSelector value={business} onChange={v => setBusiness(v, true)} accountTotal={businesses.data ? (businesses.data.total ?? 0) : null} />
           {noBusinesses && !business && (
             <Notice
               tone="info"
@@ -106,7 +120,7 @@ export default function SocialMediaPage() {
               Social Media posts for a business from Locations. Add or import one there, then come back to connect its accounts.
             </Notice>
           )}
-          {business && valid ? <SocialWorkbench key={business} businessId={business === "all" ? null : Number(business)} all={business === "all"} /> : <>
+          {business && valid ? <SocialWorkbench key={business} businessId={business === "all" ? null : Number(business)} all={business === "all"} draftEdits={draftEdits} onEditDraft={editDraft} /> : <>
             {/* The guides don't depend on a business: /guides lands here. */}
             {tab === "guides" && <GuidesContent />}
             {!business && !noBusinesses && <p className="text-sm g-text-2">Choose a business above. Add or import businesses in <a className="g-link" href="/locations">Locations</a>.</p>}
@@ -120,10 +134,13 @@ export default function SocialMediaPage() {
   );
 }
 
-function SocialWorkbench({ businessId, all }: { businessId: number | null; all: boolean }) {
+function SocialWorkbench({ businessId, all, draftEdits, onEditDraft }: { businessId: number | null; all: boolean; draftEdits: Record<string, string>; onEditDraft: (id: string, value: string | undefined) => void }) {
   const { toast } = useToast();
-  const [selectedPosts, setSelectedPosts] = useState<string[]>([]);
+  // Selected post ids keyed to their business names (for the bulk-cancel dialog), so the names
+  // survive paging and refetches even when the selected row is not on the current page.
+  const [selected, setSelected] = useState<Record<string, string>>({});
   const [bulkErrors, setBulkErrors] = useState<string[]>([]);
+  const [confirmBulkCancel, setConfirmBulkCancel] = useState(false);
   const [offset, setOffset] = useState(0), [postSearch, setPostSearch] = useState(""), [postState, setPostState] = useState(""), [postPlatform, setPostPlatform] = useState("");
   const [calendarDate, setCalendarDate] = useState(""), [connectionScope, setConnectionScope] = useState("business");
   const [sourceOffset, setSourceOffset] = useState(0), [sourceSearch, setSourceSearch] = useState("");
@@ -137,10 +154,15 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
   const sourcesQuery = useQuery<any[]>({ queryKey: ["/api/social", "sources", businessId, sourceOffset, sourceSearch], enabled: !all, queryFn: async () => (await apiRequest("GET", `/api/social/sources?${scope}&offset=${sourceOffset}&search=${encodeURIComponent(sourceSearch)}`)).json() });
   const media: any[] = mediaQuery.data ?? [];
   const sources: any[] = sourcesQuery.data ?? [];
-  // Drafts in the queue whose text was edited but not saved (PostRow reports them): bulk approval
-  // would publish the saved version, so it waits until they are saved or discarded.
-  const [dirtyDrafts, setDirtyDrafts] = useState<string[]>([]);
-  const markDirty = (id: string, dirty: boolean) => setDirtyDrafts((old) => (dirty ? (old.includes(id) ? old : [...old, id]) : old.filter((x) => x !== id)));
+  // Drafts with an edit still not saved or discarded, keyed by post id at the page level: bulk
+  // approval would publish the saved version, so it waits until they are saved or discarded. An edit
+  // made on another page/filter still counts — the map outlives the row.
+  const selectedPosts = Object.keys(selected);
+  const selectedDirty = selectedPosts.filter((id) => draftEdits[id] !== undefined).length;
+  // For the bulk-cancel confirmation: how many posts per business, names included.
+  const businessCounts = new Map<string, number>();
+  for (const name of Object.values(selected)) businessCounts.set(name, (businessCounts.get(name) ?? 0) + 1);
+  const businessSummary = [...businessCounts.entries()].map(([name, n]) => `${name} (${n})`).join(", ");
   const [tabParam, setTabParam] = useUrlParam("tab");
   const tab = all ? "queue" : tabParam || "compose", setTab = (v: string) => setTabParam(v === "compose" ? null : v);
   const [apiKey, setKey] = useState(""),
@@ -176,7 +198,7 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
       let title = vars.success ?? "Saved";
       if (result.results) {
         const failed = result.results.filter((r: any) => !r.ok);
-        setBulkErrors(failed.map((r: any) => r.error)); setSelectedPosts([]);
+        setBulkErrors(failed.map((r: any) => r.error)); setSelected({}); setConfirmBulkCancel(false);
         if (failed.length) title = `${result.results.length - failed.length} of ${result.results.length} posts updated`;
       }
       refreshSocial();
@@ -213,7 +235,6 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
         : uploading
           ? "Wait for the upload to finish."
           : mediaProblem;
-  const selectedDirty = selectedPosts.filter((id) => dirtyDrafts.includes(id)).length;
   function choose(a: Account, checked: boolean) {
     setDestinations((ds) =>
       checked
@@ -717,8 +738,9 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
             )}
             <p className="text-sm text-muted-foreground">{data?.total || 0} matching posts</p>
             <div className="flex flex-wrap gap-2">
-              <GooglePill size="sm" onClick={() => setSelectedPosts((data?.posts || []).filter((p: any) => ["draft", "queued"].includes(p.state)).map((p: any) => p.id))} label="Select this page of posts" />
-              {["approve", "cancel"].map(action => <GooglePill key={action} size="sm" disabled={!selectedPosts.length || selectedPosts.length > 100 || mutation.isPending || (action === "approve" && selectedDirty > 0)} onClick={() => mutation.mutate({ path: "/posts/bulk-action", body: { ids: selectedPosts, action }, success: action === "approve" ? "Selected drafts approved" : "Selected posts cancelled" })} label={action === "approve" ? "Approve selected drafts" : "Cancel selected posts"} />)}
+              <GooglePill size="sm" onClick={() => setSelected((old) => ({ ...old, ...Object.fromEntries((data?.posts || []).filter((p: any) => ["draft", "queued"].includes(p.state)).map((p: any) => [p.id, p.business_name || "Legacy / unassigned"])) }))} label="Select this page of posts" />
+              <GooglePill size="sm" disabled={!selectedPosts.length || selectedPosts.length > 100 || mutation.isPending || selectedDirty > 0} onClick={() => mutation.mutate({ path: "/posts/bulk-action", body: { ids: selectedPosts, action: "approve" }, success: "Selected drafts approved" })} label="Approve selected drafts" />
+              <GooglePill size="sm" disabled={!selectedPosts.length || selectedPosts.length > 100 || mutation.isPending} onClick={() => setConfirmBulkCancel(true)} label="Cancel selected posts" />
             </div>
             <p className="text-xs text-muted-foreground">{selectedPosts.length} selected (up to 100 per action). Approve publishes each saved draft as written.</p>
             {selectedDirty > 0 && (
@@ -735,9 +757,10 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
                   key={p.id}
                   post={p}
                   selected={selectedPosts.includes(p.id)}
-                  onSelect={checked => setSelectedPosts(old => checked ? [...old, p.id] : old.filter(id => id !== p.id))}
+                  onSelect={checked => setSelected((old) => { const next = { ...old }; if (checked) next[p.id] = p.business_name || "Legacy / unassigned"; else delete next[p.id]; return next; })}
                   pending={mutation.isPending}
-                  onDirtyChange={(dirty) => markDirty(p.id, dirty)}
+                  draft={draftEdits[p.id]}
+                  onEdit={(value) => onEditDraft(p.id, value)}
                   action={(action, text) =>
                     mutation.mutate({
                       path: `/posts/${p.id}/action${p.business_id ? `?businessId=${p.business_id}` : "?"}`,
@@ -748,6 +771,21 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
                 />
               ))}
             </GoogleList>}
+            <AlertDialog open={confirmBulkCancel} onOpenChange={setConfirmBulkCancel}>
+              <AlertDialogContent data-testid="dialog-bulk-cancel-posts">
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Cancel {selectedPosts.length} selected posts?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This cancels drafts and queued posts across {businessCounts.size} {businessCounts.size === 1 ? "business" : "businesses"}: {businessSummary}.
+                    Queued posts won&rsquo;t be published and drafts leave the queue. Anything already submitted to a platform can&rsquo;t be cancelled and stays as it is, with its error shown below. This can&rsquo;t be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Keep them</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => mutation.mutate({ path: "/posts/bulk-action", body: { ids: selectedPosts, action: "cancel" }, success: "Selected posts cancelled" })} data-testid="button-bulk-cancel-confirm">Cancel posts</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </section>
       )}
@@ -1128,29 +1166,28 @@ function PostRow({
   onSelect,
   pending,
   action,
-  onDirtyChange,
+  draft,
+  onEdit,
 }: {
   post: any;
   selected: boolean;
   onSelect: (checked: boolean) => void;
   pending: boolean;
   action: (a: "approve" | "cancel" | "save", text?: string) => void;
-  /** The draft's text differs from what is saved on the server (bulk approval waits for it). */
-  onDirtyChange?: (dirty: boolean) => void;
+  /** The draft's text edited but not saved yet, hoisted above the row so it survives unmounting. */
+  draft?: string;
+  onEdit: (value: string | undefined) => void;
 }) {
   const saved: string = p.payload.post.content.text;
-  const [text, setText] = useState(saved);
-  // A save (or another device's save) changes the saved text: follow it unless an edit is in progress here.
-  const lastSaved = useRef(saved);
-  useEffect(() => {
-    if (lastSaved.current !== saved) {
-      setText((t) => (t === lastSaved.current ? saved : t));
-      lastSaved.current = saved;
-    }
-  }, [saved]);
+  // Derived, not local state: with no local edit the textarea follows the saved text (including a
+  // save's refetch, from this device or another); a local edit wins until it is saved or discarded.
+  const text = draft ?? saved;
   const dirty = p.state === "draft" && text !== saved;
-  useEffect(() => { onDirtyChange?.(dirty); }, [dirty]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => () => onDirtyChange?.(false), []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Release the hoisted edit once it is moot: the post left draft (approved/cancelled) or the saved
+  // text caught up with the edit (the save landed, here or elsewhere). A failed save keeps the edit.
+  useEffect(() => {
+    if (draft !== undefined && (p.state !== "draft" || draft === saved)) onEdit(undefined);
+  }, [draft, saved, p.state, onEdit]);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const when = new Date(p.scheduled_at || p.created_at || p.due_at);
   return (
@@ -1174,7 +1211,7 @@ function PostRow({
         <Textarea
           aria-label="Edit draft"
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => onEdit(e.target.value)}
         />
       ) : (
         <p className="whitespace-pre-wrap text-sm">{p.payload.post.content.text}</p>
@@ -1207,7 +1244,7 @@ function PostRow({
               <GooglePill
                 variant="quiet"
                 disabled={pending}
-                onClick={() => setText(saved)}
+                onClick={() => onEdit(undefined)}
                 label="Discard edit"
                 testId={`button-post-discard-${p.id}`}
               />

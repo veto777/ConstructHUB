@@ -24,7 +24,7 @@ export function Pager({ offset, setOffset, more, label }: { offset: number; setO
   );
 }
 
-export function BusinessSelector({ value, onChange }: { value: string | null; onChange: (v: string) => void }) {
+export function BusinessSelector({ value, onChange, accountTotal }: { value: string | null; onChange: (v: string) => void; /** Businesses in the whole account (unfiltered), so the empty state can tell "account is empty" apart from "this search matched nothing". */ accountTotal?: number | null }) {
   const [expanded, setExpanded] = useState(false);
   const choose = (next: string) => { onChange(next); setExpanded(false); };
   const [search, setSearch] = useState(""), [offset, setOffset] = useState(0), [linked, setLinked] = useState("all");
@@ -68,7 +68,11 @@ export function BusinessSelector({ value, onChange }: { value: string | null; on
           }
         />
         {error && <p role="alert" className="text-sm text-destructive">Could not load businesses.</p>}
-        {!error && data && (data.items || []).length === 0 && (data.total ?? 0) === 0 && (
+        {/* The account-total call decides which empty state applies: an empty account says so (and
+            points at Locations) even mid-search; a live search/filter with businesses in the account
+            says nothing matched. The page result's own total can't tell those apart — it is already
+            filtered, so a zero-match search reports total 0. */}
+        {!error && data && (data.items || []).length === 0 && accountTotal === 0 && (
           <div className="rounded-xl border bg-card py-12 text-center" data-testid="empty-social-businesses">
             <p className="text-sm font-medium">No businesses yet</p>
             <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
@@ -77,7 +81,7 @@ export function BusinessSelector({ value, onChange }: { value: string | null; on
             <GooglePill className="mt-4" href="/locations" label="Add a location" testId="link-add-location" />
           </div>
         )}
-        {!error && data && (data.items || []).length === 0 && (data.total ?? 0) > 0 && (
+        {!error && data && (data.items || []).length === 0 && accountTotal != null && accountTotal > 0 && (
           <p className="text-sm text-muted-foreground" data-testid="text-no-business-match">No businesses match your search or filter.</p>
         )}
         {(data?.items || []).length > 0 && (
