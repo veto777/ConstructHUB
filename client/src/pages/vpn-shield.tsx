@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, type UseQueryResult } from "@tanstack/react-query";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import {
   AppPage,
@@ -15,8 +15,8 @@ import {
 } from "@/components/app-ui";
 import { GoogleSectionHeader, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
 import { ToolTabs } from "@/components/tool";
+import { countryName } from "@/components/ip-tracker/country-names";
 import {
-  AlertTriangle,
   ChevronRight, Copy, Monitor, Smartphone, Tablet,
   MapPin, Fingerprint, Clock, Shield,
   Search,
@@ -93,20 +93,75 @@ function useUrlState() {
 const ACTION_LABELS: Record<string, string> = { block: "Blocked", redirect: "Redirected", log: "Logged only" };
 const actionLabel = (action: string) => ACTION_LABELS[action] ?? action;
 
-function NoSiteCard() {
+// Activity panels re-check on this cadence while the page is open (queries otherwise
+// never refresh on their own), so "last detection" and the overview stay current.
+const VPN_REFETCH_MS = 15000;
+
+/** What the server's block mode falls back to when a site has no saved choice. */
+export const VPN_DEFAULT_MODE = "log";
+
+function SetupCard({ onCreated }: { onCreated: (id: number) => void }) {
+  const { toast } = useToast();
+  const [domain, setDomain] = useState("");
+  const [name, setName] = useState("");
+  const addMutation = useMutation({
+    // The one shared tracked-site list behind Click Guard, IP Tracker and VPN Shield.
+    mutationFn: async () => (await apiRequest("POST", "/api/click-guard/domains", { domain: domain.trim(), name: name.trim() || undefined })).json(),
+    onSuccess: async (created: any) => {
+      // Log-first: the site this setup adds starts in Log only. This is the explicit
+      // setup choice (nobody is blocked until Settings says so) and it preserves any
+      // choice saved later. Sites added outside this flow keep whatever they have.
+      if (created?.id) {
+        try {
+          await apiRequest("POST", `/api/vpn-shield/domains/${created.id}/settings`, { vpnBlockMode: "log", vpnRedirectUrl: "", vpnWhitelistedIps: "" });
+        } catch {
+          toast({ title: "Site added", description: "Pick a block mode in Settings — until then the platform default applies.", variant: "destructive" });
+        }
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/click-guard/domains"], exact: true });
+      queryClient.invalidateQueries({ queryKey: ["/api/vpn-shield/domains"], exact: true });
+      toast({ title: "Site added", description: "It starts in Log only. Now install the VPN Shield script on it." });
+      if (created?.id) onCreated(created.id);
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not add site", description: apiErrorMessage(err, "Failed to add site"), variant: "destructive" });
+    },
+  });
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border bg-card py-14 text-center" data-testid="card-vpn-no-site">
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
-        <AlertTriangle className="h-5 w-5" strokeWidth={1.6} />
+    <div className="rounded-xl border bg-card text-card-foreground" data-testid="card-vpn-setup">
+      <div className="space-y-3 p-4 sm:p-5">
+        <h2 className="g-card__title g-card__title--md">Set up your first site</h2>
+        <p className="text-sm text-muted-foreground" data-testid="text-vpn-setup-steps">
+          Step 1 of 3 — add the website. Then you'll install one script and verify the first detection. New sites start in <b>Log only</b>: detections are recorded but nobody is blocked until you turn blocking on.
+        </p>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Input
+            placeholder="example.com"
+            value={domain}
+            onChange={(e) => setDomain(e.target.value)}
+            data-testid="input-vpn-setup-domain"
+          />
+          <Input
+            placeholder="Display name (optional)"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            data-testid="input-vpn-setup-name"
+          />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <GooglePill
+            variant="solid"
+            label={addMutation.isPending ? "Adding…" : "Add site"}
+            onClick={() => addMutation.mutate()}
+            disabled={!domain.trim() || addMutation.isPending}
+            testId="button-vpn-setup-add"
+          />
+          <span className="self-center text-xs text-muted-foreground">
+            Sites you add here also appear in{" "}
+            <Link href="/ip-tracker" className="text-primary underline underline-offset-2" data-testid="link-vpn-setup-ip-tracker">IP Tracker</Link>.
+          </span>
+        </div>
       </div>
-      <div className="mt-3 g-card__title g-card__title--md">No site yet</div>
-      <p className="mt-1 max-w-sm text-sm text-muted-foreground" data-testid="text-no-domain-selected">
-        VPN Shield uses the sites you track. Add one in{" "}
-        <Link href="/ip-tracker" className="text-primary underline underline-offset-2" data-testid="link-vpn-add-site-ip-tracker">IP Tracker</Link>
-        {" "}or{" "}
-        <Link href="/google-ads" className="text-primary underline underline-offset-2" data-testid="link-vpn-add-site-click-guard">Google Click Guard</Link>
-        , then come back here to install VPN Shield and choose its settings.
-      </p>
     </div>
   );
 }
@@ -135,13 +190,39 @@ function DeviceIcon({ type }: { type: string | null }) {
   return <Monitor className="h-3.5 w-3.5" />;
 }
 
-function OverviewTab({ domainId, stats }: { domainId: number | null; stats: VpnStats | undefined }) {
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const localDayKey = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
+/** The last 30 local days, oldest first, each with its detection count. */
+function sparklineDays(visits: VpnVisit[] | undefined) {
+  const days: { key: string; label: string; count: number }[] = [];
+  const now = new Date();
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+    days.push({ key: localDayKey(d), label: `${d.getMonth() + 1}/${d.getDate()}`, count: 0 });
+  }
+  for (const v of visits || []) {
+    const key = localDayKey(new Date(v.visitedAt));
+    const bucket = days.find(d => d.key === key);
+    if (bucket) bucket.count++;
+  }
+  return days;
+}
+
+function OverviewTab({ domainId, statsQuery }: { domainId: number | null; statsQuery: UseQueryResult<VpnStats, Error> }) {
+  const stats = statsQuery.data;
   // The stats endpoint counts every detection; split them by the action that was taken.
-  const { data: visits } = useQuery<VpnVisit[]>({
+  const visitsQuery = useQuery<VpnVisit[]>({
     queryKey: ["/api/vpn-shield/domains", domainId, "blocked-visits"],
     enabled: !!domainId,
+    refetchInterval: VPN_REFETCH_MS,
   });
+  const visits = visitsQuery.data;
   const blockedCount = visits ? visits.filter(v => v.action === "block").length : null;
+
+  const days = sparklineDays(visits);
+  const maxDay = Math.max(...days.map(d => d.count), 1);
+  const recentTotal = days.reduce((s, d) => s + d.count, 0);
 
   return (
     <div className="space-y-4 sm:space-y-5">
@@ -153,19 +234,69 @@ function OverviewTab({ domainId, stats }: { domainId: number | null; stats: VpnS
         </span>
       </Notice>
 
+      {statsQuery.isError && !stats && (
+        <Notice tone="danger" title="Couldn't load protection statistics" testId="notice-vpn-stats-error"
+          action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void statsQuery.refetch()} data-testid="button-retry-vpn-stats">Retry</Button>}>
+          {apiErrorMessage(statsQuery.error, "The statistics could not be loaded.")} Zeroes below would mean "no data", not "no detections" — the real answer is unavailable.
+        </Notice>
+      )}
+      {visitsQuery.isError && !visits && (
+        <Notice tone="danger" title="Couldn't load flagged visits" testId="notice-vpn-visits-error"
+          action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void visitsQuery.refetch()} data-testid="button-retry-vpn-visits">Retry</Button>}>
+          {apiErrorMessage(visitsQuery.error, "The flagged-visit list could not be loaded.")}
+        </Notice>
+      )}
+
       <GoogleStatGrid cols={4}>
         <GoogleStat label="Detections" testId="card-stat-detections"
-          value={stats?.total ?? 0}
+          value={stats ? stats.total : "…"}
           hint="All time, any action" />
         <GoogleStat label="Detections today" testId="card-stat-detections-today"
-          value={stats?.today ?? 0} />
+          value={stats ? stats.today : "…"} />
         <GoogleStat label="Blocked" testId="card-stat-blocked"
-          value={domainId ? (blockedCount ?? "…") : 0}
+          value={domainId ? (visitsQuery.isError && !visits ? "Unavailable" : (blockedCount ?? "…")) : 0}
           hint="Overlay shown" />
         <GoogleStat label="Unique VPN IPs" testId="card-stat-unique-vpn-ips"
-          value={stats?.uniqueIps ?? 0}
+          value={stats ? stats.uniqueIps : "…"}
           hint="All time" />
       </GoogleStatGrid>
+
+      {visitsQuery.isLoading && (
+        <div className="flex justify-center py-8">
+          <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
+        </div>
+      )}
+
+      {visits && recentTotal > 0 && (
+        <Section title="Detections, last 30 days">
+          {/* Each bar hangs from a column with its own height: a percentage height
+              inside a content-sized column collapses to the minimum and draws every
+              bar the same. h-full + an absolute bar keeps the percentage meaningful. */}
+          <div className="flex items-stretch gap-1 h-28">
+            {days.map(day => (
+              <div key={day.key} className="flex-1 flex h-full flex-col items-center gap-1">
+                <div className="relative w-full flex-1">
+                  <div
+                    className="absolute bottom-0 left-0 right-0 rounded-t bg-primary/80 hover:bg-primary transition-colors"
+                    style={{ height: `${(day.count / maxDay) * 100}%` }}
+                    title={`${day.label}: ${day.count} detection${day.count === 1 ? "" : "s"}`}
+                    data-testid={`bar-vpn-${day.key}`}
+                  />
+                </div>
+                {Number(day.key.slice(8, 10)) % 5 === 1 && (
+                  <span className="text-[8px] text-muted-foreground truncate w-full text-center">{day.label}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {visits && recentTotal === 0 && (
+        <p className="text-sm text-muted-foreground" data-testid="text-vpn-no-recent-detections">
+          No detections in the last 30 days. If you installed the script recently, visit your own site through a VPN or proxy to test it — the first detection lands here within a minute.
+        </p>
+      )}
 
       {stats && stats.topProviders.length > 0 && (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 sm:gap-5">
@@ -184,7 +315,7 @@ function OverviewTab({ domainId, stats }: { domainId: number | null; stats: VpnS
             <div className="space-y-2">
               {stats.topCountries.slice(0, 8).map(c => (
                 <div key={c.name} className="flex items-center justify-between gap-2 text-sm">
-                  <span className="truncate">{c.name}</span>
+                  <span className="truncate">{countryName(c.name)}</span>
                   <span className="tabular-nums text-muted-foreground">{c.count}</span>
                 </div>
               ))}
@@ -202,14 +333,19 @@ function BlockedVisitorsTab({ domainId }: { domainId: number | null }) {
   const [page, setPage] = useState(1);
   const perPage = 20;
 
-  const { data: visits = [], isLoading } = useQuery<VpnVisit[]>({
+  const visitsQuery = useQuery<VpnVisit[]>({
     queryKey: ["/api/vpn-shield/domains", domainId, "blocked-visits"],
     enabled: !!domainId,
+    refetchInterval: VPN_REFETCH_MS,
   });
+  const visits = visitsQuery.data;
+  const visitsError = visitsQuery.isError && !visits;
 
-  const filtered = ipSearch ? visits.filter(v => v.ipAddress.includes(ipSearch)) : visits;
+  const filtered = (visits || []).filter(v => v.ipAddress.includes(ipSearch));
   const totalPages = Math.ceil(filtered.length / perPage);
-  const paginated = filtered.slice((page - 1) * perPage, page * perPage);
+  // Results can shrink below the current page: stay on a real one.
+  const safePage = Math.min(page, Math.max(totalPages, 1));
+  const paginated = filtered.slice((safePage - 1) * perPage, safePage * perPage);
 
   return (
     <div className="space-y-4">
@@ -231,10 +367,15 @@ function BlockedVisitorsTab({ domainId }: { domainId: number | null }) {
         </span>
       </div>
 
-      {isLoading ? (
+      {visitsQuery.isLoading ? (
         <div className="flex justify-center py-12">
           <div className="animate-spin h-6 w-6 border-2 border-foreground border-t-transparent rounded-full" />
         </div>
+      ) : visitsError ? (
+        <Notice tone="danger" title="Couldn't load flagged visits" testId="notice-flagged-error"
+          action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void visitsQuery.refetch()} data-testid="button-retry-flagged">Retry</Button>}>
+          {apiErrorMessage(visitsQuery.error, "The flagged-visit list could not be loaded.")} This is a failed request, not a quiet site.
+        </Notice>
       ) : paginated.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border bg-card py-14 text-center">
           <Shield className="h-5 w-5 text-muted-foreground" strokeWidth={1.6} />
@@ -248,15 +389,19 @@ function BlockedVisitorsTab({ domainId }: { domainId: number | null }) {
               className={`rounded-xl border bg-card transition-all ${expandedId === v.id ? "ring-1 ring-border" : ""}`}
               data-testid={`card-vpn-visit-${v.id}`}
             >
-              <div
-                className="cursor-pointer p-4 hover:bg-muted/30 transition-colors"
+              <button
+                type="button"
+                className="w-full cursor-pointer p-4 text-left hover:bg-muted/30 transition-colors"
                 onClick={() => setExpandedId(expandedId === v.id ? null : v.id)}
+                aria-expanded={expandedId === v.id}
+                aria-controls={`vpn-visit-detail-${v.id}`}
+                data-testid={`button-expand-vpn-visit-${v.id}`}
               >
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-sm font-medium" data-testid={`text-vpn-ip-${v.id}`}>
+                        <span className="font-mono text-sm font-medium break-all" data-testid={`text-vpn-ip-${v.id}`}>
                           {v.ipAddress}
                         </span>
                         {v.vpnProvider && (
@@ -286,7 +431,7 @@ function BlockedVisitorsTab({ domainId }: { domainId: number | null }) {
                         )}
                         {(v.city || v.country) && (
                           <span className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3" /> {[v.city, v.country].filter(Boolean).join(", ")}
+                            <MapPin className="h-3 w-3" /> {[v.city, countryName(v.country)].filter(Boolean).join(", ")}
                           </span>
                         )}
                         <span className="flex items-center gap-1">
@@ -301,10 +446,10 @@ function BlockedVisitorsTab({ domainId }: { domainId: number | null }) {
                   </div>
                   <ChevronRight className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform ${expandedId === v.id ? "rotate-90" : ""}`} />
                 </div>
-              </div>
+              </button>
 
               {expandedId === v.id && (
-                <div className="border-t bg-muted/20 p-4">
+                <div className="border-t bg-muted/20 p-4" id={`vpn-visit-detail-${v.id}`}>
                   <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <div className="space-y-2 text-sm">
                       <h4 className="mb-3 text-xs font-semibold text-muted-foreground">Detection details</h4>
@@ -320,7 +465,7 @@ function BlockedVisitorsTab({ domainId }: { domainId: number | null }) {
                       <div className="flex justify-between gap-4"><span className="text-muted-foreground">Browser</span><span className="font-medium">{v.browser || "Unknown"}</span></div>
                       <div className="flex justify-between gap-4"><span className="text-muted-foreground">OS</span><span className="font-medium">{v.os || "Unknown"}</span></div>
                       <div className="flex justify-between gap-4"><span className="text-muted-foreground">Device</span><span className="font-medium">{v.deviceType || "Unknown"}</span></div>
-                      <div className="flex justify-between gap-4"><span className="text-muted-foreground">Country</span><span className="font-medium">{v.country || "Unknown"}</span></div>
+                      <div className="flex justify-between gap-4"><span className="text-muted-foreground">Country</span><span className="font-medium">{countryName(v.country) || "Unknown"}</span></div>
                       <div className="flex justify-between gap-4"><span className="text-muted-foreground">City</span><span className="font-medium">{v.city || "Unknown"}</span></div>
                       <div className="flex justify-between gap-4"><span className="text-muted-foreground">Landing page</span><span className="max-w-[200px] truncate">{v.landingPage || "Unknown"}</span></div>
                       <div className="flex justify-between gap-4"><span className="text-muted-foreground">Referrer</span><span className="max-w-[200px] truncate">{v.referrer || "Direct"}</span></div>
@@ -344,12 +489,12 @@ function BlockedVisitorsTab({ domainId }: { domainId: number | null }) {
       {totalPages > 1 && (
         <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
           <span className="text-xs text-muted-foreground">
-            Showing {(page - 1) * perPage + 1}-{Math.min(page * perPage, filtered.length)} of {filtered.length}
+            Showing {(safePage - 1) * perPage + 1}-{Math.min(safePage * perPage, filtered.length)} of {filtered.length}
           </span>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)} data-testid="button-vpn-prev-page">Prev</Button>
-            <span className="text-sm tabular-nums text-muted-foreground">Page {page} / {totalPages}</span>
-            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} data-testid="button-vpn-next-page">Next</Button>
+            <Button variant="outline" size="sm" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)} data-testid="button-vpn-prev-page">Prev</Button>
+            <span className="text-sm tabular-nums text-muted-foreground">Page {safePage} / {totalPages}</span>
+            <Button variant="outline" size="sm" disabled={safePage >= totalPages} onClick={() => setPage(safePage + 1)} data-testid="button-vpn-next-page">Next</Button>
           </div>
         </div>
       )}
@@ -357,10 +502,12 @@ function BlockedVisitorsTab({ domainId }: { domainId: number | null }) {
   );
 }
 
-function InstallScriptTab({ domains, selectedDomainId, setSelectedDomainId }: {
+function InstallScriptTab({ domains, selectedDomainId, setSelectedDomainId, detections, statsError }: {
   domains: VpnDomain[];
   selectedDomainId: number | null;
   setSelectedDomainId: (id: number) => void;
+  detections: number | undefined;
+  statsError: boolean;
 }) {
   const appOrigin = useAppOrigin();
   const { toast } = useToast();
@@ -412,11 +559,25 @@ function InstallScriptTab({ domains, selectedDomainId, setSelectedDomainId }: {
                 variant="ghost"
                 className="!absolute top-2 right-2"
                 onClick={copyScript}
+                aria-label="Copy VPN Shield script"
                 data-testid="button-copy-vpn-script"
               >
                 <Copy className="h-4 w-4" />
               </Button>
             </div>
+            {/* Installation verification: the stats poll picks up the first detection, so this
+                line flips on its own once the script runs somewhere. */}
+            {!statsError && detections === 0 && (
+              <p className="flex items-start gap-1.5 text-xs text-muted-foreground" data-testid="text-vpn-awaiting-first-detection">
+                <Clock className="h-3 w-3 mt-0.5 shrink-0" />
+                Waiting for the first detection. After adding the script, visit your site through a VPN or proxy — the detection appears on the Overview within a minute.
+              </p>
+            )}
+            {!statsError && detections !== undefined && detections > 0 && (
+              <p className="text-xs text-emerald-700 dark:text-emerald-400" data-testid="text-vpn-script-active">
+                Script is running — {detections} detection{detections === 1 ? "" : "s"} recorded so far.
+              </p>
+            )}
           </div>
         </Section>
       )}
@@ -459,7 +620,7 @@ function SettingsTab({ domainId, domains }: { domainId: number | null; domains: 
   const domain = domains.find(d => d.id === domainId);
   const settings = (domain as any)?.settings || {};
 
-  const [blockMode, setBlockMode] = useState(settings.vpnBlockMode || "block");
+  const [blockMode, setBlockMode] = useState(settings.vpnBlockMode || VPN_DEFAULT_MODE);
   const [redirectUrl, setRedirectUrl] = useState(settings.vpnRedirectUrl || "");
   const [whitelistedIps, setWhitelistedIps] = useState(settings.vpnWhitelistedIps || "");
   // Same checks the server makes, shown before saving.
@@ -490,12 +651,12 @@ function SettingsTab({ domainId, domains }: { domainId: number | null; domains: 
     <div className="max-w-2xl space-y-4 sm:space-y-5">
       <Section
         title="Block mode"
-        description="Choose how the browser script responds to possible proxy signals after page load."
+        description="Choose how the browser script responds to possible proxy signals after page load. New sites start in Log only — review a sample of detections first, then turn on blocking explicitly."
       >
         <div className="space-y-2">
           {[
-            { value: "block", label: "Block", desc: "Show an overlay to flagged browsers" },
             { value: "log", label: "Log only", desc: "Record VPN visits but don't block them" },
+            { value: "block", label: "Block", desc: "Show an overlay to flagged browsers" },
             { value: "redirect", label: "Redirect", desc: "Redirect VPN visitors to a custom URL" },
           ].map(opt => (
             <label
@@ -521,6 +682,17 @@ function SettingsTab({ domainId, domains }: { domainId: number | null; domains: 
           ))}
         </div>
       </Section>
+
+      {blockMode !== "log" && (
+        <Notice tone="warning" testId="notice-blocking-active">
+          <span data-testid="text-blocking-state">
+            <span className="font-semibold">Blocking is ON after you save.</span>{" "}
+            {blockMode === "block"
+              ? "Flagged visitors will see an overlay instead of your page. Browser overlays can be bypassed and may affect legitimate visitors."
+              : "Flagged visitors will be sent to the redirect link instead of your page."}
+          </span>
+        </Notice>
+      )}
 
       {blockMode === "redirect" && (
         <Section title="Redirect URL">
@@ -583,6 +755,7 @@ function SettingsTab({ domainId, domains }: { domainId: number | null; domains: 
 }
 
 export default function VpnShieldPage() {
+  const { toast } = useToast();
   const { params, set: setUrlParam } = useUrlState();
   const tabParam = params.get("tab");
   const activeTab: TabId = tabs.some(t => t.id === tabParam) ? (tabParam as TabId) : "overview";
@@ -590,17 +763,30 @@ export default function VpnShieldPage() {
   const selectedDomainId = Number(params.get("site")) || null;
   const setSelectedDomainId = (id: number | null) => setUrlParam("site", id ? String(id) : null);
 
-  const { data: domains = [], isLoading: domainsLoading } = useQuery<VpnDomain[]>({
+  const domainsQuery = useQuery<VpnDomain[]>({
     queryKey: ["/api/vpn-shield/domains"],
+    refetchInterval: VPN_REFETCH_MS,
   });
+  const domains = domainsQuery.data;
+  const domainsLoading = domainsQuery.isLoading;
+  const domainsError = domainsQuery.isError && !domains;
 
-  const selectedDomain = domains.find(d => d.id === selectedDomainId) || domains[0];
+  const selectedDomain = (domains ?? []).find(d => d.id === selectedDomainId) || domains?.[0];
   const domainId = selectedDomain?.id ?? null;
 
-  const { data: stats } = useQuery<VpnStats>({
+  const statsQuery = useQuery<VpnStats>({
     queryKey: ["/api/vpn-shield/domains", domainId, "stats"],
     enabled: !!domainId,
+    refetchInterval: VPN_REFETCH_MS,
   });
+
+  const lastDetectionQuery = useQuery<VpnVisit[]>({
+    queryKey: ["/api/vpn-shield/domains", domainId, "blocked-visits"],
+    enabled: !!domainId,
+    refetchInterval: VPN_REFETCH_MS,
+  });
+  const lastDetection = lastDetectionQuery.data?.[0]?.visitedAt ?? null;
+  const savedMode = (selectedDomain as any)?.settings?.vpnBlockMode as string | undefined;
 
   return (
     <AppPage testId="page-vpn-shield">
@@ -615,7 +801,7 @@ export default function VpnShieldPage() {
         </>}
         flush
         actions={
-          domains.length > 0 ? (
+          (domains?.length ?? 0) > 0 ? (
             <label className="block min-w-0 flex-1 space-y-1.5 text-sm sm:w-56 sm:flex-none">
               <span className="text-muted-foreground sm:hidden">Site</span>
               <select
@@ -625,7 +811,7 @@ export default function VpnShieldPage() {
                 aria-label="Site"
                 data-testid="select-vpn-shield-domain"
               >
-                {domains.map(d => (
+                {(domains ?? []).map(d => (
                   <option key={d.id} value={d.id}>{d.name || d.domain}</option>
                 ))}
               </select>
@@ -633,6 +819,56 @@ export default function VpnShieldPage() {
           ) : undefined
         }
       />
+
+      {domainId && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border bg-card px-4 py-3" data-testid="strip-vpn-status">
+          <span className="inline-flex items-center gap-1.5 text-sm">
+            <span className={`h-2 w-2 rounded-full ${savedMode && savedMode !== "log" ? "bg-amber-500" : "bg-emerald-500"}`} />
+            <span data-testid="text-vpn-mode" className="font-medium">
+              {savedMode === "block" ? "Blocking: flagged visitors see an overlay"
+                : savedMode === "redirect" ? "Blocking: flagged visitors are redirected"
+                : savedMode === "log" ? "Log only: nothing is blocked"
+                : "No mode saved yet"}
+            </span>
+          </span>
+          <span className="text-xs text-muted-foreground" data-testid="text-vpn-last-detection">
+            Last detection: {lastDetection ? formatTimeAgo(lastDetection) : "none yet"}
+          </span>
+          <span className="text-xs text-muted-foreground" data-testid="text-vpn-updated">
+            {statsQuery.dataUpdatedAt ? `Updated ${formatTimeAgo(new Date(statsQuery.dataUpdatedAt).toISOString())}` : "Loading…"}
+          </span>
+          <span className="ml-auto flex items-center gap-2">
+            {!savedMode && (
+              <GooglePill
+                size="sm"
+                variant="solid"
+                label="Start in Log only"
+                onClick={() => apiRequest("POST", `/api/vpn-shield/domains/${domainId}/settings`, {
+                  vpnBlockMode: "log",
+                  vpnRedirectUrl: (selectedDomain as any)?.settings?.vpnRedirectUrl || "",
+                  vpnWhitelistedIps: (selectedDomain as any)?.settings?.vpnWhitelistedIps || "",
+                }).then(() => {
+                  queryClient.invalidateQueries({ queryKey: ["/api/vpn-shield/domains"] });
+                  toast({ title: "Log only enabled", description: "Detections are recorded without blocking. Change the mode any time in Settings." });
+                }).catch((err: any) => {
+                  toast({ title: "Could not save settings", description: apiErrorMessage(err, "Failed to save settings."), variant: "destructive" });
+                })}
+                testId="button-vpn-start-log-only"
+              />
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs"
+              disabled={statsQuery.isFetching || lastDetectionQuery.isFetching}
+              onClick={() => { void statsQuery.refetch(); void lastDetectionQuery.refetch(); }}
+              data-testid="button-refresh-vpn"
+            >
+              Refresh
+            </Button>
+          </span>
+        </div>
+      )}
 
       <ToolTabs as="tablist" label="VPN Shield sections">
         {tabs.map(tab => (
@@ -653,29 +889,41 @@ export default function VpnShieldPage() {
         <div className="flex items-center justify-center py-20">
           <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
         </div>
+      ) : domainsError ? (
+        <Notice tone="danger" title="Couldn't load your sites" testId="notice-vpn-domains-error"
+          action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void domainsQuery.refetch()} data-testid="button-retry-vpn-domains">Retry</Button>}>
+          {apiErrorMessage(domainsQuery.error, "The site list could not be loaded.")} This is a failed request, not an empty account.
+        </Notice>
       ) : (
         <>
-          {domains.length === 0 && <NoSiteCard />}
+          {(domains?.length ?? 0) === 0 && (
+            <SetupCard onCreated={(id) => {
+              setSelectedDomainId(id);
+              setActiveTab("install");
+            }} />
+          )}
 
           {activeTab === "overview" && (
-            <OverviewTab domainId={domainId} stats={stats} />
+            <OverviewTab domainId={domainId} statsQuery={statsQuery} />
           )}
 
           {activeTab === "blocked" && (
-            <BlockedVisitorsTab domainId={domainId} />
+            <BlockedVisitorsTab key={domainId ?? "none"} domainId={domainId} />
           )}
 
           {activeTab === "install" && (
             <InstallScriptTab
-              domains={domains}
+              domains={domains ?? []}
               selectedDomainId={domainId}
               setSelectedDomainId={setSelectedDomainId}
+              detections={statsQuery.data?.total}
+              statsError={statsQuery.isError && !statsQuery.data}
             />
           )}
 
           {activeTab === "settings" && (
             // Keyed by site: the form seeds its state once, so each site needs a fresh form.
-            <SettingsTab key={domainId ?? "none"} domainId={domainId} domains={domains} />
+            <SettingsTab key={domainId ?? "none"} domainId={domainId} domains={domains ?? []} />
           )}
         </>
       )}

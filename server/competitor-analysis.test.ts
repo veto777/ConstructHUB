@@ -22,4 +22,16 @@ describe("review sample heuristics", () => {
     expect(result.reviewAnalysis.reviewVelocityFlag).toBe(false);
     expect(result.bsReasons.join(" ")).not.toMatch(/hired|fake/);
   });
+  it("computes the NEW badge from firstSeenAt instead of the stored always-false flag", () => {
+    const recent = presentListing({ businessName: "Fixture", address: "Fixture street", isNew: false,
+      firstSeenAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString() });
+    expect(recent.isNew).toBe(true);
+    const old = presentListing({ businessName: "Fixture", address: "Fixture street", isNew: false,
+      firstSeenAt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString() });
+    expect(old.isNew).toBe(false);
+  });
+  it("keeps the stored flag when there is no firstSeenAt to judge from", () => {
+    expect(presentListing({ businessName: "Fixture", address: "Fixture street", isNew: true }).isNew).toBe(true);
+    expect(presentListing({ businessName: "Fixture", address: "Fixture street", isNew: false }).isNew).toBe(false);
+  });
 });

@@ -250,6 +250,9 @@ export function analyzeBsScore(place: any, reviewAnalysis?: any): { score: numbe
 }
 
 
+/** Listings first indexed within this window wear the NEW badge. */
+export const LISTING_NEW_WINDOW_DAYS = 30;
+
 export function presentListing(listing: any) {
   const analysis = listing.reviewAnalysis ? { ...listing.reviewAnalysis,
     reviewVelocityFlag: false,
@@ -258,5 +261,13 @@ export function presentListing(listing: any) {
   } : null;
   const score = analyzeBsScore({ name: listing.businessName, rating: Number(listing.rating),
     user_ratings_total: listing.reviewCount, formatted_address: listing.address }, analysis);
-  return { ...listing, reviewAnalysis: analysis, bsScore: score.score, bsReasons: score.reasons };
+  // The stored flag is written once at insert time (always false today); a listing is
+  // "new" when this scan first indexed it, so compute the badge from firstSeenAt and
+  // keep the stored value only when there is no timestamp to judge from.
+  let isNew = Boolean(listing.isNew);
+  if (listing.firstSeenAt) {
+    const ageMs = Date.now() - new Date(listing.firstSeenAt).getTime();
+    isNew = ageMs >= 0 && ageMs <= LISTING_NEW_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  }
+  return { ...listing, isNew, reviewAnalysis: analysis, bsScore: score.score, bsReasons: score.reasons };
 }

@@ -1,6 +1,5 @@
-import { AppPage, PageHeader, Section, StatGrid, Stat, AppTabsList, Toolbar, Notice, appTable, appTableCards } from "@/components/app-ui";
-import { useState } from "react";
-import { SHOW_AD_ACTIVITY } from "@/lib/features";
+import { AppPage, PageHeader, Section, StatGrid, Stat, AppTabsList, Toolbar, Notice } from "@/components/app-ui";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,16 +17,17 @@ import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Search, Loader2, Trash2, AlertTriangle, Shield, TrendingUp,
   Star, MapPin, Globe, Phone, ChevronDown, ChevronUp, Lock,
-  Eye, BarChart3, ExternalLink, RefreshCw, Users, Bot,
+  Eye, BarChart3, RefreshCw, Users, Bot,
   ThumbsUp, ThumbsDown, Camera, UserCheck, UserX, Clock,
-  MessageSquare, Ban, CheckCircle2, XCircle, Megaphone,
-  Plus, Smartphone, Monitor, Flag, Crosshair
+  MessageSquare, Ban, CheckCircle2, XCircle,
 } from "lucide-react";
 import { PLANS, PLAN_KEYS, type PlanKey } from "@shared/plans";
 import { COMPETITOR_INTEL_PLANS } from "@shared/plan-copy";
 import { AppLocked } from "@/components/app-locked";
 import { inNativeApp } from "@/lib/app-shell";
 import { GoogleSurface, GoogleLocalCard, GooglePill, GoogleMoreButton, GoogleAiOverview, AiEntity } from "@/components/google";
+import { usageLine, type EntitlementsInfo } from "@/lib/pricing-display";
+import { topRatedPicks } from "@/components/competitors/top-rated";
 
 /**
  * The server decides who may use Competitor Intel (server/entitlements.ts):
@@ -36,10 +36,6 @@ import { GoogleSurface, GoogleLocalCard, GooglePill, GoogleMoreButton, GoogleAiO
  */
 function planRequiredFrom(err: unknown): { requiredPlan: PlanKey | null; message: string } | null {
   const raw = err instanceof Error ? err.message : String(err ?? "");
-  // Before the server moves this gate to entitlements it answers a plain 403
-  // whose message names retired plans: treat it as "not on your plan", but
-  // show our own wording instead of the server's.
-  if (/^403:/.test(raw)) return { requiredPlan: null, message: "" };
   const match = /^402:\s*(.*)$/s.exec(raw);
   if (!match) return null;
   try {
@@ -111,11 +107,21 @@ export default function CompetitorsPage() {
 
   // No client-side plan check: the scans list answers 402 plan_required when
   // the account's plan does not include Competitor Intel.
-  const { data: scans, isLoading: scansLoading, error: scansError } = useQuery<any[]>({
+  const scansQuery = useQuery<any[]>({
     queryKey: ["/api/competitors/scans"],
     refetchInterval: query => query.state.data?.some(scan => scan.status === "running") ? 1500 : false,
   });
+  const scans = scansQuery.data;
+  const scansLoading = scansQuery.isLoading;
+  const scansError = scansQuery.error;
   const planRequired = planRequiredFrom(scansError);
+  // This month's scans, as the server counts them (same line the Ranking Grid shows under its form).
+  const { data: entitlements } = useQuery<EntitlementsInfo>({ queryKey: ["/api/entitlements"] });
+  const scansUsage = usageLine(entitlements?.usage?.competitorScans, entitlements?.isPlatformAdmin === true);
+
+  // After a scan card is deleted its disclosure button is gone with it: land focus on the page
+  // title so keyboard users are not dropped on the document body.
+  const titleRef = useRef<HTMLSpanElement | null>(null);
 
   const scanMutation = useMutation({
     mutationFn: async (params: { industry: string; location: string; radius: number }) => {
@@ -139,6 +145,7 @@ export default function CompetitorsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/competitors/scans"] });
       toast({ title: "Scan deleted" });
+      titleRef.current?.focus({ preventScroll: true });
     },
     onError: (err: Error) => {
       toast({ title: "Could not delete scan", description: apiErrorMessage(err), variant: "destructive" });
@@ -199,19 +206,13 @@ export default function CompetitorsPage() {
   // Google look (owner, 2026-10-06): the page sits on a GoogleSurface; scan results are a local pack.
   return (
     <GoogleSurface page><AppPage className="before:hidden">
-      <PageHeader title={<span data-testid="text-competitors-title">Competitor intelligence</span>} description="Find competitors and compare their rankings and reviews." />
+      <PageHeader title={<span ref={titleRef} tabIndex={-1} data-testid="text-competitors-title">Competitor intelligence</span>} description="Find competitors and compare their rankings and reviews." />
         <Tabs defaultValue="market-scan" className="space-y-6">
           <AppTabsList>
             <TabsTrigger value="market-scan" className="flex items-center gap-1.5" data-testid="tab-market-scan">
               <Search className="w-4 h-4" />
               Market scan
             </TabsTrigger>
-            {SHOW_AD_ACTIVITY && (
-              <TabsTrigger value="ad-spy" className="flex items-center gap-1.5" data-testid="tab-ad-spy">
-                <Megaphone className="w-4 h-4" />
-                Ad activity
-              </TabsTrigger>
-            )}
           </AppTabsList>
 
           <TabsContent value="market-scan" className="space-y-6">
@@ -268,12 +269,26 @@ export default function CompetitorsPage() {
                     </Button>
                   </div>
                 </div>
+                {scansUsage && (
+                  <p className="text-xs text-muted-foreground" data-testid="text-scan-usage">
+                    {scansUsage} this month
+                  </p>
+                )}
             </Section>
 
             {scansLoading && (
               <div className="flex justify-center py-12">
                 <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
               </div>
+            )}
+
+            {/* A failed list request is not an empty account: say so and retry, keeping any
+                previously loaded scans on screen (react-query keeps the last good data). */}
+            {!planRequired && scansError && !scansLoading && (
+              <Notice tone="danger" title="Couldn't load your scans" testId="notice-scans-error"
+                action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void scansQuery.refetch()} data-testid="button-retry-scans">Retry</Button>}>
+                {apiErrorMessage(scansError, "The scan list could not be loaded.")}
+              </Notice>
             )}
 
             {scans && scans.length === 0 && !scansLoading && (
@@ -296,345 +311,8 @@ export default function CompetitorsPage() {
               />
             ))}
           </TabsContent>
-
-          {SHOW_AD_ACTIVITY && (
-            <TabsContent value="ad-spy" className="space-y-6">
-              <AdSpyTab />
-            </TabsContent>
-          )}
         </Tabs>
     </AppPage></GoogleSurface>
-  );
-}
-
-function AdSpyTab() {
-  const { toast } = useToast();
-  const [newKeyword, setNewKeyword] = useState("");
-  const [newLocation, setNewLocation] = useState("");
-  const [newDevice, setNewDevice] = useState("mobile");
-  const [expandedKeyword, setExpandedKeyword] = useState<number | null>(null);
-
-  const { data: keywords, isLoading } = useQuery<any[]>({
-    queryKey: ["/api/ad-spy/keywords"],
-  });
-
-  const addMutation = useMutation({
-    mutationFn: async (params: { keyword: string; location: string; device: string }) => {
-      const res = await apiRequest("POST", "/api/ad-spy/keywords", params);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/ad-spy/keywords"] });
-      setNewKeyword("");
-      setNewLocation("");
-      toast({ title: "Keyword added", description: "Scanning for advertisers now..." });
-    },
-    onError: (err: Error) => {
-      toast({ title: "Failed to add keyword", description: err.message, variant: "destructive" });
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await apiRequest("DELETE", `/api/ad-spy/keywords/${id}`, {});
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/ad-spy/keywords"] });
-      toast({ title: "Keyword removed" });
-    },
-  });
-
-  const refreshMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await apiRequest("POST", `/api/ad-spy/keywords/${id}/refresh`, {});
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/ad-spy/keywords"] });
-      toast({ title: "Scan refreshed", description: "Advertiser data updated." });
-    },
-  });
-
-  const handleAdd = () => {
-    if (!newKeyword.trim()) { toast({ title: "Enter a keyword", variant: "destructive" }); return; }
-    if (!newLocation.trim()) { toast({ title: "Enter a location", variant: "destructive" }); return; }
-    addMutation.mutate({ keyword: newKeyword, location: newLocation, device: newDevice });
-  };
-
-  const keywordCount = keywords?.length || 0;
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-base font-semibold flex items-center gap-2">
-            <Megaphone className="w-5 h-5 text-orange-500" />
-            Public ad activity
-          </h2>
-          <p className="text-sm text-muted-foreground">Track who's advertising on Google for your target keywords.</p>
-        </div>
-        <Badge variant="outline" className="text-xs" data-testid="text-keyword-count">
-          {keywordCount}/10 keywords used
-        </Badge>
-      </div>
-
-      <Section flush testId="card-add-keyword">
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <div className="md:col-span-2 space-y-1.5">
-              <Label htmlFor="spy-keyword">Keyword</Label>
-              <Input
-                id="spy-keyword"
-                placeholder="e.g. roofers, siding, plumber"
-                value={newKeyword}
-                onChange={e => setNewKeyword(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && handleAdd()}
-                data-testid="input-spy-keyword"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="spy-location">Location</Label>
-              <Input
-                id="spy-location"
-                placeholder="e.g. Bellingham"
-                value={newLocation}
-                onChange={e => setNewLocation(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && handleAdd()}
-                data-testid="input-spy-location"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="spy-device">Device</Label>
-              <Select value={newDevice} onValueChange={setNewDevice}>
-                <SelectTrigger id="spy-device" data-testid="select-spy-device">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="mobile">Mobile</SelectItem>
-                  <SelectItem value="desktop">Desktop</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-end">
-              <Button
-                className="w-full font-semibold"
-                onClick={handleAdd}
-                disabled={addMutation.isPending || keywordCount >= 10}
-                data-testid="button-add-keyword"
-              >
-                {addMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-                Add keyword
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Section>
-
-      {isLoading && (
-        <div className="flex justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-        </div>
-      )}
-
-      {keywords && keywords.length === 0 && !isLoading && (
-        <div className="text-center py-12 text-muted-foreground">
-          <Megaphone className="w-12 h-12 mx-auto mb-3 opacity-40" />
-          <p>No keywords tracked yet. Add a keyword above to see who's advertising for it.</p>
-        </div>
-      )}
-
-      {keywords && keywords.length > 0 && (
-        <Section flush>
-          <CardContent className="pt-6 p-0">
-            <div className="overflow-x-auto">
-              <table className={appTable.table}>
-                <thead className={appTableCards.thead}>
-                  <tr className={appTableCards.tr + " border-b"}>
-                    <th className="text-left py-3 px-4 font-semibold text-muted-foreground">KEYWORD</th>
-                    <th className="text-left py-3 px-4 font-semibold text-muted-foreground">LOCATION</th>
-                    <th className="text-center py-3 px-4 font-semibold text-muted-foreground">DEVICE</th>
-                    <th className="text-center py-3 px-4 font-semibold text-muted-foreground">
-                      <span className="flex items-center justify-center gap-1">1 DAY</span>
-                    </th>
-                    <th className="text-center py-3 px-4 font-semibold text-muted-foreground">
-                      <span className="flex items-center justify-center gap-1">7 DAY</span>
-                    </th>
-                    <th className="text-center py-3 px-4 font-semibold text-muted-foreground">
-                      <span className="flex items-center justify-center gap-1">30 DAY</span>
-                    </th>
-                    <th className="text-center py-3 px-4 font-semibold text-muted-foreground">30 DAY ADVERTISERS</th>
-                    <th className="text-right py-3 px-4 font-semibold text-muted-foreground">ACTIONS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {keywords.map((kw: any) => (
-                    <AdSpyKeywordRow
-                      key={kw.id}
-                      keyword={kw}
-                      expanded={expandedKeyword === kw.id}
-                      onToggle={() => setExpandedKeyword(expandedKeyword === kw.id ? null : kw.id)}
-                      onDelete={() => deleteMutation.mutate(kw.id)}
-                      onRefresh={() => refreshMutation.mutate(kw.id)}
-                      deleting={deleteMutation.isPending}
-                      refreshing={refreshMutation.isPending}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Section>
-      )}
-    </div>
-  );
-}
-
-function AdSpyKeywordRow({ keyword, expanded, onToggle, onDelete, onRefresh, deleting, refreshing }: {
-  keyword: any;
-  expanded: boolean;
-  onToggle: () => void;
-  onDelete: () => void;
-  onRefresh: () => void;
-  deleting: boolean;
-  refreshing: boolean;
-}) {
-  const { data: advertisers, isLoading } = useQuery<any[]>({
-    queryKey: ["/api/ad-spy/keywords", keyword.id, "advertisers"],
-    enabled: expanded,
-  });
-
-  return (
-    <>
-      <tr className={appTableCards.tr + " border-b hover:bg-muted/30 transition-colors"} data-testid={`row-keyword-${keyword.id}`}>
-        <td className={appTableCards.td + " min-w-0 break-words"}>{keyword.keyword}</td>
-        <td className={appTableCards.td + " min-w-0 break-words"}>
-          <span className="flex items-center gap-1.5">
-            <Flag className="w-3 h-3 text-muted-foreground" />
-            {keyword.location}
-          </span>
-        </td>
-        <td className={appTableCards.td + " min-w-0 break-words"}>
-          <span className="flex items-center justify-center gap-1 text-muted-foreground">
-            {keyword.device === "mobile" ? <Smartphone className="w-3.5 h-3.5" /> : <Monitor className="w-3.5 h-3.5" />}
-            {keyword.device === "mobile" ? "Mobile" : "Desktop"}
-          </span>
-        </td>
-        <td className={appTableCards.td + " min-w-0 break-words"}>{keyword.advertisers1Day || "—"}</td>
-        <td className={appTableCards.td + " min-w-0 break-words"}>{keyword.advertisers7Day || "—"}</td>
-        <td className={appTableCards.td + " min-w-0 break-words"}>{keyword.advertisers30Day || "—"}</td>
-        <td className={appTableCards.td + " min-w-0 break-words"}>
-          <span className="font-bold text-orange-500">{keyword.totalAdvertisers || 0}</span>
-        </td>
-        <td className={appTableCards.td + " min-w-0 break-words"}>
-          <div className="flex items-center justify-end gap-1">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs border-orange-500/30 text-orange-500"
-              onClick={onToggle}
-              data-testid={`button-detailed-view-${keyword.id}`}
-            >
-              {expanded ? "Hide" : "Detailed View"}
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={onRefresh}
-              disabled={refreshing}
-              data-testid={`button-refresh-keyword-${keyword.id}`}
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-red-500 hover:text-red-600"
-              onClick={onDelete}
-              disabled={deleting}
-              data-testid={`button-delete-keyword-${keyword.id}`}
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </Button>
-          </div>
-        </td>
-      </tr>
-      {expanded && (
-        <tr>
-          <td colSpan={8} className={appTableCards.td + " min-w-0 break-words"}>
-            <div className="bg-muted/20 border-b p-4 space-y-3">
-              {isLoading && (
-                <div className="flex justify-center py-6">
-                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                </div>
-              )}
-              {advertisers && advertisers.length === 0 && !isLoading && (
-                <p className="text-sm text-muted-foreground text-center py-4">No advertisers found for this keyword yet.</p>
-              )}
-              {advertisers && advertisers.length > 0 && (
-                <div className="space-y-3">
-                  <p className="text-xs font-semibold text-muted-foreground ">
-                    {advertisers.length} Advertisers Found
-                  </p>
-                  <div className="grid gap-2">
-                    {advertisers.map((adv: any, idx: number) => (
-                      <div key={idx} className="flex items-start justify-between gap-4 p-3 rounded-lg border border-border/50 bg-background" data-testid={`card-advertiser-${idx}`}>
-                        <div className="flex-1 min-w-0 space-y-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-semibold text-sm">{adv.advertiserName}</p>
-                            {adv.advertiserDomain && (
-                              <Badge variant="outline" className="text-[10px] px-1.5">
-                                <Globe className="w-2.5 h-2.5 mr-0.5" />
-                                {adv.advertiserDomain}
-                              </Badge>
-                            )}
-                          </div>
-                          {adv.ads && adv.ads.length > 0 && (
-                            <div className="space-y-1.5 mt-2">
-                              {adv.ads.slice(0, 2).map((ad: any, ai: number) => (
-                                <div key={ai} className="pl-3 border-l-2 border-orange-500/30 text-xs space-y-0.5">
-                                  {ad.headline && <p className="text-muted-foreground font-medium">{ad.headline}</p>}
-                                  {ad.displayUrl && (
-                                    <p className="text-green-600 dark:text-green-400 text-[11px]">{ad.displayUrl}</p>
-                                  )}
-                                  {ad.description && <p className="text-muted-foreground">{ad.description}</p>}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <div className="text-right shrink-0 space-y-1">
-                          <p className="text-xs text-muted-foreground">
-                            Seen <span className="font-semibold text-foreground">{adv.totalAppearances}x</span>
-                          </p>
-                          <p className="text-[10px] text-muted-foreground">
-                            First: {new Date(adv.firstSeen).toLocaleDateString()}
-                          </p>
-                          <p className="text-[10px] text-muted-foreground">
-                            Last: {new Date(adv.lastSeen).toLocaleDateString()}
-                          </p>
-                          {adv.advertiserDomain && (
-                            <a
-                              href={`https://${adv.advertiserDomain}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:underline mt-1"
-                            >
-                              <ExternalLink className="w-2.5 h-2.5" /> Visit
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </td>
-        </tr>
-      )}
-    </>
   );
 }
 
@@ -775,28 +453,39 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retry
   // Google's local pack shows a few entries and a "More businesses" button; each press reveals the next batch.
   const PACK_SIZE = 5;
   const [shown, setShown] = useState(PACK_SIZE);
-  const { data, isLoading } = useQuery<{ scan: any; listings: any[] }>({
+  const isRunning = scan.status === "running";
+  const detailQuery = useQuery<{ scan: any; listings: any[] }>({
     queryKey: ["/api/competitors/scans", scan.id],
     enabled: expanded,
+    // While the scan runs, keep the expanded findings in step with it; the final poll
+    // lands after completion, so results never freeze at a stale partial set.
+    refetchInterval: isRunning ? 1500 : false,
   });
+  const { data, isLoading } = detailQuery;
 
   const listings = data?.listings || [];
-  const isRunning = scan.status === "running";
+  const detailError = detailQuery.isError && !data;
 
   const highRisk = listings.filter((l: any) => (l.bsScore || 0) >= 60).length;
   const moderate = listings.filter((l: any) => (l.bsScore || 0) >= 30 && (l.bsScore || 0) < 60).length;
   const organic = listings.filter((l: any) => (l.bsScore || 0) < 30).length;
-  // The overview names the best-rated listings that have a rating — a sentence built only from the scan's own numbers.
-  const topRated = listings
-    .filter((l: any) => Number(l.rating) > 0)
-    .sort((a: any, b: any) => Number(b.rating) - Number(a.rating) || (b.reviewCount || 0) - (a.reviewCount || 0))
-    .slice(0, 3);
+  // The overview names the best-rated listings whose review profile carries no "More signals"
+  // band — rating alone would crown keyword-stuffed listings the top picks.
+  const topRated = topRatedPicks(listings);
+  const ratedExcluded = listings.filter((l: any) => Number(l.rating) > 0 && (l.bsScore || 0) >= 60).length;
 
   return (
     <Section flush testId={`card-scan-${scan.id}`}>
-      <CardHeader className="pb-2 cursor-pointer" onClick={onToggle}>
+      <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-3 min-w-0">
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={expanded}
+            aria-controls={`scan-detail-${scan.id}`}
+            className="flex min-w-0 flex-1 items-center gap-3 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            data-testid={`button-expand-scan-${scan.id}`}
+          >
             <div className="w-10 h-10 rounded-lg bg-muted hidden sm:flex items-center justify-center shrink-0">
               <BarChart3 className="w-5 h-5 text-muted-foreground" />
             </div>
@@ -806,7 +495,7 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retry
                 {scan.radius} mile radius • {new Date(scan.createdAt).toLocaleDateString()} • {scan.totalFound || 0} competitors found
               </CardDescription>
             </div>
-          </div>
+          </button>
           <div className="flex items-center gap-2 shrink-0">
             {isRunning && (
               <Badge variant="outline" className="bg-muted text-muted-foreground border-border">
@@ -824,10 +513,10 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retry
                 Failed
               </Badge>
             )}
-            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }} disabled={deleting} aria-label="Delete scan" data-testid={`button-delete-scan-${scan.id}`}>
+            <Button variant="ghost" size="icon" onClick={() => setConfirmDelete(true)} disabled={deleting} aria-label="Delete scan" data-testid={`button-delete-scan-${scan.id}`}>
               <Trash2 className="w-4 h-4" />
             </Button>
-            {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            {expanded ? <ChevronUp className="w-4 h-4" aria-hidden="true" /> : <ChevronDown className="w-4 h-4" aria-hidden="true" />}
           </div>
         </div>
         {/* Full-width row under the title so a long provider error stays readable on phones. */}
@@ -838,7 +527,7 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retry
               variant="outline"
               size="sm"
               className="h-7 text-xs"
-              onClick={(e) => { e.stopPropagation(); onRetry(); }}
+              onClick={onRetry}
               disabled={retrying}
               data-testid={`button-retry-scan-${scan.id}`}
             >
@@ -875,11 +564,18 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retry
       </AlertDialog>
 
       {expanded && (
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4" id={`scan-detail-${scan.id}`}>
           {isLoading && (
             <div className="flex justify-center py-8">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             </div>
+          )}
+
+          {detailError && (
+            <Notice tone="danger" title="Couldn't load this scan's findings" testId={`notice-scan-detail-error-${scan.id}`}
+              action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void detailQuery.refetch()} data-testid={`button-retry-scan-detail-${scan.id}`}>Retry</Button>}>
+              {apiErrorMessage(detailQuery.error, "The findings could not be loaded.")} Any findings shown above are from the last successful load.
+            </Notice>
           )}
 
           {isRunning && (
@@ -890,6 +586,12 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retry
                 <div className="h-full w-full rounded-full bg-primary/60 animate-pulse" />
               </div>
             </div>
+          )}
+
+          {isRunning && listings.length > 0 && (
+            <p className="text-xs text-muted-foreground" data-testid={`text-scan-partial-${scan.id}`}>
+              Partial results — {listings.length} indexed so far. The scan is still running; the list updates as more come in.
+            </p>
           )}
 
           {listings.length > 0 && (
@@ -915,7 +617,7 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retry
 
               {topRated.length > 0 && (
                 <GoogleAiOverview label="Overview" testId={`text-scan-overview-${scan.id}`}
-                  footnote={`Built from the ${listings.length} listings this scan indexed on ${new Date(scan.createdAt).toLocaleDateString()} — ratings and counts as Google showed them then.`}>
+                  footnote={`Built from the ${listings.length} listings this scan indexed on ${new Date(scan.createdAt).toLocaleDateString()} — ratings and counts as Google showed them then.${ratedExcluded > 0 ? ` Highly rated listings showing more review signals are not named as top picks.` : ""}`}>
                   <p>
                     Top-rated {scan.industry.toLowerCase()} options near {scan.location} include{" "}
                     {topRated.map((l: any, i: number) => (

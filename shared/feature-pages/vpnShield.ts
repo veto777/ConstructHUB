@@ -128,7 +128,8 @@ const page: FeaturePage = {
   // Access Restricted overlay, the redirect); the checks are POST /api/vpn-shield/track (CRAWLER_PATTERNS,
   // identifyVpnProvider/VPN_PROVIDERS, isDatacenterIp/DATACENTER_CIDRS, the IPv4 WebRTC comparison, vpnExtension,
   // the "block" default, createVpnVisit fields); settings and the 500-address exact-IP whitelist are POST …/settings;
-  // the default shown in the app is client/src/pages/vpn-shield.tsx (useState(settings.vpnBlockMode || "block")).
+  // the default shown in the app is client/src/pages/vpn-shield.tsx (VPN_DEFAULT_MODE, "log";
+  // the setup flow saves Log only for each new site it adds).
   inDepth: {
     heading: { title: "VPN and Proxy Detection for Your Website, ", em: "Explained" },
     paragraphs: [
@@ -146,8 +147,9 @@ const page: FeaturePage = {
       "You choose the response for each website. Block replaces the page with an Access Restricted screen for flagged " +
         "browsers. Log only records the visit and lets it through. Redirect sends the visitor to a full http or https " +
         "link you set. A whitelist of up to 500 IP addresses, one per line, is never checked, which is where your " +
-        "office and crew belong. Until you pick, the response is Block, so switch to Log only first if you would " +
-        "rather watch before anything is blocked.",
+        "office and crew belong. Sites you add in VPN Shield start in Log only, so nothing is blocked while the first " +
+        "detections come in; for any site that was never configured, pick a response explicitly — Log only first if " +
+        "you would rather watch before anything is blocked.",
       "VPN Shield works in the visitor's browser once the page has started loading. Someone who blocks scripts still " +
         "sees your site and requests to your server aren't stopped, so it is not a firewall. The provider and data " +
         "center list is a limited built-in set that can be incomplete or out of date, and proxies that use home " +
