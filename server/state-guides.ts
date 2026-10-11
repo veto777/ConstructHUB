@@ -14,6 +14,10 @@
  *                       facts the marketing calls free (shared/feature-pages/
  *                       masterClass.ts). Agency links, notes, the overview and
  *                       the steps are the paid guide and never leave here.
+ *   The lesson bodies of every module (text, not state data) are served by
+ *   server/master-class/routes.ts under the same courseUnlocks() answer, resolved
+ *   per module by server/master-class/lessons.ts lessonModuleOpen().
+ *
  *   agencyChecklist()   the ordered checklist for a state that has no written
  *                       walkthrough yet, built ONLY from that state's own agency
  *                       records (server/data/state-guides.json: names, checked

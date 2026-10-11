@@ -18,6 +18,9 @@ import { planNamesWhere } from "../plan-copy";
  *     ordered checklist is built from its agency record alone: server/state-guides.ts (agencyChecklist)
  *   - lessons with an outline, durable #lesson anchors and "Mark done" kept in the browser:
  *     client/src/components/master-class/lesson.tsx, client/src/components/guides/progress.ts
+ *   - the lesson bodies are served only to an entitled account (401 signed out / 403 without the module, the bundle
+ *     or an included course) and ship in no client bundle: server/master-class/routes.ts, server/master-class/lessons.ts,
+ *     server/master-class/content/*; the client renders them from blocks: client/src/components/master-class/lesson-body.tsx
  *   - any course purchase unlocks the Google Ads guide sections (server-enforced 403 otherwise): server/routes.ts
  *     (/api/google-ads-guide/:slug), client/src/pages/google-ads-guide.tsx
  *   - every module and the bundle are at or above the sales threshold → "Talk to a sales rep", no online checkout;
@@ -54,7 +57,7 @@ const page: FeaturePage = {
     },
     {
       title: "Unlock the course",
-      body: "Your purchase is recorded on your ConstructHUB account and opens the module it covers, lesson by lesson, with an outline and a Mark done on each. Any purchase also opens the full Google Ads guide.",
+      body: "Your purchase is recorded on your ConstructHUB account and opens the module it covers, lesson by lesson, with an outline and a Mark done on each. The lesson text is sent to your account only once it is unlocked. Any purchase also opens the full Google Ads guide.",
     },
     {
       title: "Work through your state",
@@ -232,12 +235,15 @@ const page: FeaturePage = {
     "client/src/pages/master-class.tsx",
     "client/src/components/master-class/access.ts",
     "client/src/components/master-class/lesson.tsx",
+    "client/src/components/master-class/lesson-body.tsx",
     "client/src/components/guides/progress.ts",
     "client/src/pages/google-ads-guide.tsx",
     "server/data/master-class-modules.json",
     "server/data/state-guides.json",
     "server/data/state-guide-steps.json",
     "server/state-guides.ts",
+    "server/master-class/routes.ts",
+    "server/master-class/lessons.ts",
     "server/state-guides-schema.ts",
     "scripts/verify-state-guides.ts",
     "server/routes.ts",

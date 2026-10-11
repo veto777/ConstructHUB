@@ -6,7 +6,9 @@
  * Directory Domination) — the Vetting bonus lessons, and Enroll. Each module home lives in
  * components/master-class/* and decides what it shows from ONE access answer (/api/course-access, resolved per
  * module category on the server) that is first checked, then trusted: a loading or failed check shows as such,
- * never as "not bought". The catalog (/api/course-catalog) prices everything; the page types no price.
+ * never as "not bought". The catalog (/api/course-catalog) prices everything; the page types no price. The lesson
+ * bodies are not in this bundle: an open module fetches them from /api/master-class/lessons/:module
+ * (server/master-class/routes.ts), which answers only an entitled account.
  *
  * The open tab, the chosen state and the lesson (#lesson-…) live in the address, so a reload or a shared link
  * returns to the same material.
@@ -122,7 +124,7 @@ export default function MasterClassPage() {
                 ) : catalog ? (
                   bundlePriceShown
                     ? <Stat label="Complete bundle" value={formatUsd(catalog.bundle.priceCents)} hint={modulesTotalCents !== null ? <><span className="line-through">{formatUsd(modulesTotalCents)}</span> separately</> : "all four modules"} href="/master-class?tab=pricing" testId="text-overview-bundle-price" />
-                    : <Stat label="Complete bundle" value={<Link href={SALES_HREF} className="text-base font-semibold leading-tight hover:underline sm:text-lg" data-testid="link-overview-bundle-sales">{SALES_REP_LABEL}</Link>} hint="all four modules, quoted for your business" testId="text-bundle-reference" />
+                    : <Stat label="Complete bundle" value={<Link href={SALES_HREF} className="block whitespace-normal text-base font-semibold leading-tight hover:underline sm:text-lg" data-testid="link-overview-bundle-sales">{SALES_REP_LABEL}</Link>} hint="all four modules, quoted for your business" testId="text-bundle-reference" />
                 ) : (
                   <Stat label="Complete bundle" value={catalogQ.isError ? "—" : <Skeleton className="h-7 w-16" />} hint={catalogQ.isError ? "catalog didn't load" : "loading the catalog"} />
                 )}

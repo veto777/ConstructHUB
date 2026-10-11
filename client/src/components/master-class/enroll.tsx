@@ -124,7 +124,7 @@ export function EnrollTab(p: EnrollTabProps) {
             {/* "Best value" only when the page can show the saving that backs it. */}
             {savingsCents !== null && !everything && (
               <div className="absolute right-3 top-3">
-                <Badge className="bg-muted px-2 py-0.5 text-xs text-foreground hover:bg-muted" data-testid="badge-bundle-best-value">Best value</Badge>
+                <Badge className="no-default-hover-elevate bg-muted px-2 py-0.5 text-xs text-foreground hover:bg-muted" data-testid="badge-bundle-best-value">Best value</Badge>
               </div>
             )}
             <div className="text-center">
@@ -181,13 +181,17 @@ export function EnrollTab(p: EnrollTabProps) {
               const priceShown = showsPrice(mod.price);
               return (
                 <Section key={mod.id} flush className={`overflow-hidden ${open ? "ring-2 ring-border" : ""}`} testId={`card-module-${mod.category}`}>
-                  <div className="relative p-4 sm:p-6">
-                    {open && (
-                      <Badge className="absolute right-3 top-3 gap-1 bg-muted text-foreground hover:bg-muted" data-testid={`badge-purchased-${mod.category}`}>
-                        <CheckCircle2 className="h-3 w-3" aria-hidden="true" /> {why}
-                      </Badge>
-                    )}
-                    <ModIcon className="mb-3 h-8 w-8 opacity-80" aria-hidden="true" />
+                  <div className="p-4 sm:p-6">
+                    {/* The icon and the unlock badge share one row: a badge stamped over the icon (absolute + the Badge's
+                        own hover-elevate positioning) was the Enroll tab's first-round defect (re-score, 2026-10-11). */}
+                    <div className="mb-3 flex items-start justify-between gap-2">
+                      <ModIcon className="h-8 w-8 shrink-0 opacity-80" aria-hidden="true" />
+                      {open && (
+                        <Badge className="no-default-hover-elevate gap-1 bg-muted text-foreground hover:bg-muted" data-testid={`badge-purchased-${mod.category}`}>
+                          <CheckCircle2 className="h-3 w-3" aria-hidden="true" /> {why}
+                        </Badge>
+                      )}
+                    </div>
                     <h3 className="text-base font-semibold [overflow-wrap:anywhere]">{mod.title}</h3>
                     {/* One statement per card: what you own, or what it costs / who quotes it — never both. */}
                     {open ? (
