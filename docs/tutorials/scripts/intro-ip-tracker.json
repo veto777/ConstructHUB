@@ -1,0 +1,124 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "intro-ip-tracker",
+  "title": "IP Tracker",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/ip-tracker",
+      "caption": "IP Tracker",
+      "chapter": "Your website's visits",
+      "narration": "This is IP Tracker. It lists every visit your tracking code records on your website."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"select-domain\"]",
+      "caption": "Pick the website",
+      "narration": "Pick the website. This roofing company tracks three, the same list Click Guard uses."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-install-tracking\"]",
+      "caption": "One tracking code",
+      "narration": "One script tag on the site feeds it. It's the same code as Click Guard, so one install covers both."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[@data-testid=\"card-stat-online-now\"]/..",
+      "caption": "Online now, today, this week",
+      "narration": "The Dashboard counts who's online now, from the last twenty minutes, then today, yesterday, the last seven days and this month."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[text()=\"Daily visits\"]/ancestor::*[.//*[starts-with(@data-testid,\"bar-\")]][1]",
+      "caption": "Fourteen days of visits",
+      "narration": "Below, Daily visits charts each of the last fourteen days."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tab-visitors\"]",
+      "caption": "Every visitor by IP",
+      "chapter": "Open any visitor",
+      "narration": "Visitors groups the visits by IP address, with the visit count, location, browser and when each was last seen."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[@data-testid=\"input-ip-search\"]/..",
+      "caption": "Search by IP",
+      "narration": "Search by IP address to find one."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-expand-visitor-203.0.113.61\"]",
+      "caption": "Browser, device, screen, time zone",
+      "narration": "Open a visitor to see the browser, system, device, screen size, language and time zone."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"activity-\"]",
+      "caption": "Where each visit came from",
+      "narration": "Recent activity lists each visit: the site that sent them, and the page they landed on."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tab-traffic\"]",
+      "caption": "Traffic sources",
+      "chapter": "Sources, pages and places",
+      "narration": "Traffic lists the websites that sent your visitors, by domain, with page loads and visitors for each."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tab-pages\"]",
+      "caption": "Top pages",
+      "narration": "Pages shows the hits and unique visitors of each landing page."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tab-geo\"]",
+      "caption": "Countries and cities",
+      "narration": "Geo counts visits by country and by city, when a location is available."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tab-platforms\"]",
+      "caption": "Browsers and devices",
+      "narration": "And Platforms breaks them down by browser, operating system, device and screen size."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-ip-tracker\"]",
+      "caption": "Menu: IP Tracker",
+      "narration": "You'll find IP Tracker in the menu on the left, under Tools."
+    }
+  ],
+  "youtube": {
+    "title": "IP Tracker in about a minute | ConstructHUB",
+    "description": "A one-minute tour of IP Tracker in ConstructHUB: every visit your tracking code records, grouped by IP address, with each visitor's device, browser, landing pages and referrers, plus traffic sources, top pages, countries and cities, and platforms.",
+    "tags": [
+      "ConstructHUB",
+      "IP Tracker",
+      "website visitor tracking",
+      "visitor IP address",
+      "traffic sources",
+      "contractor website",
+      "roofing marketing"
+    ],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "See Every Visitor",
+    "accent": "Every",
+    "kicker": "IP Tracker",
+    "step": 8
+  },
+  "hideSelectors": [
+    "[data-testid=\"button-open-chat\"]"
+  ]
+}
