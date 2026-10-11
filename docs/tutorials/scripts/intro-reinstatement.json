@@ -124,7 +124,7 @@
     "kicker": "Reinstatement",
     "step": 9
   },
-  "hideSelectors": [
+  "removeSelectors": [
     "[data-testid=\"card-reinstatement-pricing\"]"
   ]
 }

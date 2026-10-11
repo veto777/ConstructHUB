@@ -132,7 +132,7 @@
     "kicker": "Posts & Photos",
     "step": 12
   },
-  "hideSelectors": [
+  "removeSelectors": [
     "div[role=\"alert\"].rounded-xl"
   ]
 }
