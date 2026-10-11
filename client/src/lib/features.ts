@@ -18,11 +18,10 @@ export const SHOW_COMPETITOR_INTEL = true;
 // the customer-facing /review/:token feedback form, the
 // /review/:token/unsubscribe page, and the "Google Reviews" sidebar nav item.
 //
-// Restored 2026-09-28 after the review-gating funnel was removed: every client,
-// whatever their rating, is offered the Google review option, and no reward is
-// tied to leaving a review. Keep it that way — Google prohibits review gating
-// and incentivized reviews, and the FTC's consumer-review rule (16 CFR 465)
-// prohibits buying positive reviews.
+// Restored 2026-09-28 after the review-funnel experiment was removed. The customer page asks every
+// client for a private 1–10 rating and routes scores below the owner's escalation threshold to private
+// feedback only — the Google review step is offered only at or above the threshold — and no reward is
+// tied to leaving a review: the FTC's consumer-review rule (16 CFR 465) prohibits buying positive reviews.
 export const SHOW_GOOGLE_REVIEWS = true;
 
 // ---------------------------------------------------------------------------
