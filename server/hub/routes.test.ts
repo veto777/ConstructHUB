@@ -131,6 +131,32 @@ describe("tiers and request guards", () => {
     expect(signedIn).toMatchObject({ tier: "builder", chat: true });
   });
 
+  it("GET /api/hub/presets names why chat is off (provider) and carries the plan's monthly standing for the header", async () => {
+    await env.close();
+    env = setup({ quota: { take: async () => ({ ok: true, refund: async () => {} }), usage: async () => ({ limit: 300, used: 12, resetsAt: "2026-10-01T00:00:00.000Z" }) } });
+    const out = await (await fetch(`${env.base}/api/hub/presets`, { headers: { "x-test-user": "42" } })).json();
+    expect(out).toMatchObject({ tier: "builder", chat: true, chatOff: null, userId: 42 });
+    expect(out.allowance).toEqual({ monthly: 300, used: 12, remaining: 288, resetsAt: "2026-10-01T00:00:00.000Z", daily: { limit: 40, used: 0 } });
+    // Unlimited: no remaining count, the fair-use daily cap.
+    await env.close();
+    env = setup({ quota: { take: async () => ({ ok: true, refund: async () => {} }), usage: async () => ({ limit: -1, used: 7, resetsAt: "2026-10-01T00:00:00.000Z" }) } });
+    const unlimited = await (await fetch(`${env.base}/api/hub/presets`, { headers: { "x-test-user": "42" } })).json();
+    expect(unlimited.allowance).toMatchObject({ monthly: -1, remaining: null, daily: { limit: 200 } });
+    // The provider pin failing: chat off, with the reason, never a 403 — presets stay.
+    env.setProvider(false);
+    const off = await (await fetch(`${env.base}/api/hub/presets`, { headers: { "x-test-user": "42" } })).json();
+    expect(off).toMatchObject({ tier: "builder", chat: false, chatOff: "provider" });
+    // Signed out: no allowance, no reason, no user.
+    const anon = await (await fetch(`${env.base}/api/hub/presets`)).json();
+    expect(anon).toMatchObject({ tier: "browse", chat: false, chatOff: null, allowance: null, userId: null });
+    // A meter that can't be read is a null allowance, not a failed request.
+    await env.close();
+    env = setup({ quota: { take: async () => ({ ok: true, refund: async () => {} }), usage: async () => { throw new Error("db down"); } } });
+    const broken = await fetch(`${env.base}/api/hub/presets`, { headers: { "x-test-user": "42" } });
+    expect(broken.status).toBe(200);
+    expect((await broken.json()).allowance).toBeNull();
+  });
+
   it("RT01: signed-out chat is 401 presetsOnly with the R_SIGNIN text — no model call, no budget", async () => {
     const r = await env.post("/api/hub/chat", { messages: [{ role: "user", content: "What does Pro cost?" }] });
     expect(r.status).toBe(401);

@@ -336,6 +336,24 @@ describe("real Postgres, mocked Blotato publishing", () => {
     await expect(createPosts(userId, request({ destinations: [destination, destination] }))).rejects.toThrow("once");
     await changePost(userId, p.id, "cancel");
   });
+  it("saves an edited draft without queueing it, validates the edit, and refuses to save a queued post", async () => {
+    const [p] = await createPosts(userId, request({ draft: true }));
+    const saved = await changePost(userId, p.id, "save", "Saved edit, still a draft");
+    expect(saved.state).toBe("draft");
+    expect(saved.approved_at).toBeNull();
+    expect(saved.payload.post.content.text).toBe("Saved edit, still a draft");
+    await expect(changePost(userId, p.id, "save")).rejects.toMatchObject({ status: 400 });
+    await expect(changePost(userId, p.id, "save", "x".repeat(281))).rejects.toMatchObject({ status: 400, message: "twitter: text exceeds 280 characters" });
+    http.mockClear();
+    await workerUser(userId, make);
+    expect(http).not.toHaveBeenCalled();
+    // Approval without a text publishes the saved edit, as the queue says it does.
+    const queued = await changePost(userId, p.id, "approve");
+    expect(queued.state).toBe("queued");
+    expect(queued.payload.post.content.text).toBe("Saved edit, still a draft");
+    await expect(changePost(userId, p.id, "save", "Too late")).rejects.toMatchObject({ status: 409 });
+    await changePost(userId, p.id, "cancel");
+  });
   it("keeps scheduled posts and drafts local until due or approved; rejects other owner actions", async () => {
     const [p] = await createPosts(userId, request({ draft: true }));
     http.mockClear();

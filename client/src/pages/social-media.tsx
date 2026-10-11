@@ -1,10 +1,16 @@
 import { BusinessSelector, MappingEditor, Pager, refreshSocial } from "@/components/social-agency";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { AppPage, Notice, Toolbar } from "@/components/app-ui";
+import { PlanRequired, planRequiredFrom } from "@/components/plan-required";
 import { ToolTabs } from "@/components/tool";
 import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
 import { ExternalLink, Search } from "lucide-react";
@@ -61,6 +67,15 @@ export default function SocialMediaPage() {
   const [business, setBusiness] = useUrlParam("business");
   const [tab, setTab] = useUrlParam("tab");
   const valid = business === "all" || (!!business && /^[1-9]\d*$/.test(business) && Number.isSafeInteger(Number(business)));
+  // The same query (same key, same fetch) BusinessSelector starts with, so this costs no extra request:
+  // it tells the page whether the account has the tool at all (every /api/social route is the
+  // socialPublishing module — a 402 here means the plan lacks it) and whether there is any business yet.
+  const businesses = useQuery<any>({
+    queryKey: ["/api/social", "businesses", "", 0, "all"],
+    queryFn: async () => (await apiRequest("GET", `/api/social/businesses?${new URLSearchParams({ search: "", offset: "0", linked: "all" })}`)).json(),
+  });
+  const planRequired = planRequiredFrom(businesses.error);
+  const noBusinesses = !!businesses.data && (businesses.data.total ?? 0) === 0 && !(businesses.data.items ?? []).length;
   return (
     <AppPage>
       {/* Google's format (owner, 2026-10-07): quiet titles with a hairline, pills, hairline rows. */}
@@ -71,12 +86,33 @@ export default function SocialMediaPage() {
         flush
         actions={<GooglePill onClick={() => setTab("guides")} label="How it works" />}
       />
-      <BusinessSelector value={business} onChange={v => setBusiness(v, true)} />
-      {business && valid ? <SocialWorkbench key={business} businessId={business === "all" ? null : Number(business)} all={business === "all"} /> : <>
-        {/* The guides don't depend on a business: /guides lands here. */}
-        {tab === "guides" && <GuidesContent />}
-        {!business && <p className="text-sm g-text-2">Choose a business above. Add or import businesses in <a className="g-link" href="/locations">Locations</a>.</p>}
-      </>}
+      {planRequired ? (
+        // The plan doesn't include social publishing: the standard plan card, in the page, instead of
+        // a "could not load" notice (the sidebar and ToolRouteGate already send most such accounts to the landing).
+        <>
+          <PlanRequired module="socialPublishing" error={businesses.error} />
+          {tab === "guides" && <GuidesContent />}
+        </>
+      ) : (
+        <>
+          <BusinessSelector value={business} onChange={v => setBusiness(v, true)} />
+          {noBusinesses && !business && (
+            <Notice
+              tone="info"
+              title="No businesses yet"
+              testId="notice-social-no-businesses"
+              action={<GooglePill size="sm" variant="solid" href="/locations" label="Add a location" />}
+            >
+              Social Media posts for a business from Locations. Add or import one there, then come back to connect its accounts.
+            </Notice>
+          )}
+          {business && valid ? <SocialWorkbench key={business} businessId={business === "all" ? null : Number(business)} all={business === "all"} /> : <>
+            {/* The guides don't depend on a business: /guides lands here. */}
+            {tab === "guides" && <GuidesContent />}
+            {!business && !noBusinesses && <p className="text-sm g-text-2">Choose a business above. Add or import businesses in <a className="g-link" href="/locations">Locations</a>.</p>}
+          </>}
+        </>
+      )}
       {/* The YouTube channel belongs to the account, not to one business: it is shown with the business's other
           connection (inside the workbench) and here whenever no single business is open. */}
       {!(business && valid && business !== "all") && <SocialYoutube />}
@@ -95,8 +131,16 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
   const scope = businessId ? `businessId=${businessId}` : "";
   const qs = new URLSearchParams({ offset: String(offset), search: postSearch, state: postState, platform: postPlatform, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, ...(businessId ? { businessId: String(businessId) } : {}), ...(calendarDate ? { day: calendarDate } : {}) });
   const { data, error, isLoading } = useQuery<any>({ queryKey: ["/api/social", businessId, all, qs.toString()], refetchInterval: 15000, queryFn: async () => (await apiRequest("GET", `/api/social${all ? "/calendar" : ""}?${qs}`)).json() });
-  const { data: media = [] } = useQuery<any[]>({ queryKey: ["/api/social", "media", businessId, mediaOffset, mediaSearch], enabled: !all, queryFn: async () => (await apiRequest("GET", `/api/social/media?${scope}&offset=${mediaOffset}&search=${encodeURIComponent(mediaSearch)}`)).json() });
-  const { data: sources = [] } = useQuery<any[]>({ queryKey: ["/api/social", "sources", businessId, sourceOffset, sourceSearch], enabled: !all, queryFn: async () => (await apiRequest("GET", `/api/social/sources?${scope}&offset=${sourceOffset}&search=${encodeURIComponent(sourceSearch)}`)).json() });
+  // Synced business photos and the saved content sources: each keeps its loading and error state, so a
+  // failed request reads as a failure with a retry, never as "no photos" / "no sources".
+  const mediaQuery = useQuery<any[]>({ queryKey: ["/api/social", "media", businessId, mediaOffset, mediaSearch], enabled: !all, queryFn: async () => (await apiRequest("GET", `/api/social/media?${scope}&offset=${mediaOffset}&search=${encodeURIComponent(mediaSearch)}`)).json() });
+  const sourcesQuery = useQuery<any[]>({ queryKey: ["/api/social", "sources", businessId, sourceOffset, sourceSearch], enabled: !all, queryFn: async () => (await apiRequest("GET", `/api/social/sources?${scope}&offset=${sourceOffset}&search=${encodeURIComponent(sourceSearch)}`)).json() });
+  const media: any[] = mediaQuery.data ?? [];
+  const sources: any[] = sourcesQuery.data ?? [];
+  // Drafts in the queue whose text was edited but not saved (PostRow reports them): bulk approval
+  // would publish the saved version, so it waits until they are saved or discarded.
+  const [dirtyDrafts, setDirtyDrafts] = useState<string[]>([]);
+  const markDirty = (id: string, dirty: boolean) => setDirtyDrafts((old) => (dirty ? (old.includes(id) ? old : [...old, id]) : old.filter((x) => x !== id)));
   const [tabParam, setTabParam] = useUrlParam("tab");
   const tab = all ? "queue" : tabParam || "compose", setTab = (v: string) => setTabParam(v === "compose" ? null : v);
   const [apiKey, setKey] = useState(""),
@@ -169,6 +213,7 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
         : uploading
           ? "Wait for the upload to finish."
           : mediaProblem;
+  const selectedDirty = selectedPosts.filter((id) => dirtyDrafts.includes(id)).length;
   function choose(a: Account, checked: boolean) {
     setDestinations((ds) =>
       checked
@@ -192,14 +237,12 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
     );
   }
   async function submit(draft: boolean) {
+    const count = destinations.length;
+    const when = schedule ? new Date(schedule) : null;
     try {
       await mutation.mutateAsync({
         path: "/posts",
-        success: draft
-          ? "Draft saved"
-          : schedule
-            ? "Post scheduled"
-            : "Post queued for publishing",
+        success: false,
         body: {
           requestId,
           text,
@@ -212,9 +255,18 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
           draft,
         },
       });
+      // The composer starts the next post clean: text, tweaks, media and the schedule time all go.
+      // Only the destinations stay, and they return to the business's saved mapping (not the last post's picks).
       setRequestId(crypto.randomUUID());
       setText("");
       setTweaks({});
+      setMediaText("");
+      setSchedule("");
+      setDestinations(data?.defaults || []);
+      toast({
+        title: draft ? "Draft saved" : when ? "Post scheduled" : "Post queued for publishing",
+        description: `${count} destination${count === 1 ? "" : "s"}${when ? ` · ${when.toLocaleString()}` : ""}${urls().length ? ` · ${urls().length} media` : ""}. The composer is clear for the next post.`,
+      });
       setTab("queue");
     } catch {
       /* toast from mutation */
@@ -246,11 +298,21 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
       setUploading(false);
     }
   }
+  // The plan doesn't include social publishing: the standard plan card, never a generic "could not load".
+  if (error && !data && planRequiredFrom(error)) return <PlanRequired module="socialPublishing" error={error} />;
   // Nothing loaded (e.g. a stale or foreign ?business=): say why instead of an empty workbench.
   if (error && !data) return (
-    <Notice tone="danger" testId="alert-social-load">
+    <Notice tone="danger" testId="alert-social-load" action={<GooglePill size="sm" label="Retry" onClick={() => void refreshSocial()} />}>
       Could not load Social Media: {apiErrorMessage(error)}. Choose another business above, or refresh the page.
     </Notice>
+  );
+  if (isLoading && !data) return (
+    <div className="space-y-4" aria-busy="true" data-testid="social-loading">
+      <Skeleton className="h-7 w-56" />
+      <Skeleton className="h-24 w-full" />
+      <Skeleton className="h-10 w-80" />
+      <Skeleton className="h-40 w-full" />
+    </div>
   );
   return (
     <div className="space-y-5 sm:space-y-6">
@@ -530,27 +592,42 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
               <input type="search" aria-label="Search business photos" value={mediaSearch} onChange={e => { setMediaSearch(e.target.value); setMediaOffset(0); }} placeholder="Search synced business photos" />
             </div>
             <Pager offset={mediaOffset} setOffset={setMediaOffset} more={media.length === 25} label="photos" />
+            {mediaQuery.isError && (
+              <Notice tone="danger" testId="alert-social-media" action={<GooglePill size="sm" label="Retry" onClick={() => void mediaQuery.refetch()} />}>
+                Could not load your synced business photos: {apiErrorMessage(mediaQuery.error)}
+              </Notice>
+            )}
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="block space-y-1.5">
                 <span className="text-sm font-medium">Media library</span>
-                <select
-                  aria-label="Media Library"
-                  className={selectClass}
-                  value=""
-                  onChange={(e) => {
-                    if (e.target.value)
-                      setMediaText((v) =>
-                        [v, e.target.value].filter(Boolean).join("\n"),
-                      );
-                  }}
-                >
-                  <option value="">Attach a saved photo</option>
-                  {media.map((p) => (
-                    <option key={p.id} value={p.url}>
-                      {p.name}
+                {mediaQuery.isLoading ? (
+                  <Skeleton className="h-10 w-full rounded-full" aria-label="Loading synced photos" />
+                ) : (
+                  <select
+                    aria-label="Media Library"
+                    className={selectClass}
+                    value=""
+                    disabled={mediaQuery.isError}
+                    onChange={(e) => {
+                      if (e.target.value)
+                        setMediaText((v) =>
+                          [v, e.target.value].filter(Boolean).join("\n"),
+                        );
+                    }}
+                  >
+                    <option value="">
+                      {mediaQuery.isError ? "Photos unavailable" : media.length ? "Attach a saved photo" : mediaSearch ? "No synced photo matches" : "No synced business photos yet"}
                     </option>
-                  ))}
-                </select>
+                    {media.map((p) => (
+                      <option key={p.id} value={p.url}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {!mediaQuery.isLoading && !mediaQuery.isError && !media.length && !mediaSearch && (
+                  <span className="block text-xs text-muted-foreground">Photos sync from the business's linked Google profile; upload below or paste a public link instead.</span>
+                )}
               </label>
               <label className="block space-y-1.5">
                 <span className="text-sm font-medium">Upload through Blotato (up to 100 MB)</span>
@@ -641,9 +718,14 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
             <p className="text-sm text-muted-foreground">{data?.total || 0} matching posts</p>
             <div className="flex flex-wrap gap-2">
               <GooglePill size="sm" onClick={() => setSelectedPosts((data?.posts || []).filter((p: any) => ["draft", "queued"].includes(p.state)).map((p: any) => p.id))} label="Select this page of posts" />
-              {["approve", "cancel"].map(action => <GooglePill key={action} size="sm" disabled={!selectedPosts.length || selectedPosts.length > 100 || mutation.isPending} onClick={() => mutation.mutate({ path: "/posts/bulk-action", body: { ids: selectedPosts, action }, success: action === "approve" ? "Selected drafts approved" : "Selected posts cancelled" })} label={action === "approve" ? "Approve selected drafts" : "Cancel selected posts"} />)}
+              {["approve", "cancel"].map(action => <GooglePill key={action} size="sm" disabled={!selectedPosts.length || selectedPosts.length > 100 || mutation.isPending || (action === "approve" && selectedDirty > 0)} onClick={() => mutation.mutate({ path: "/posts/bulk-action", body: { ids: selectedPosts, action }, success: action === "approve" ? "Selected drafts approved" : "Selected posts cancelled" })} label={action === "approve" ? "Approve selected drafts" : "Cancel selected posts"} />)}
             </div>
             <p className="text-xs text-muted-foreground">{selectedPosts.length} selected (up to 100 per action). Approve publishes each saved draft as written.</p>
+            {selectedDirty > 0 && (
+              <p role="status" className="text-sm g-text-2" data-testid="text-social-unsaved-edits">
+                {selectedDirty} selected draft{selectedDirty === 1 ? " has" : "s have"} unsaved edits. Save or discard them first, so approval publishes what you see.
+              </p>
+            )}
             {bulkErrors.map((error, i) => <p role="alert" key={i} className="text-sm text-destructive">{error}</p>)}
             <Pager offset={offset} setOffset={setOffset} more={offset + 25 < (data?.total || 0)} label="posts" />
             {(data?.posts || []).length > 0 && <GoogleList testId="list-social-posts">
@@ -655,10 +737,11 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
                   selected={selectedPosts.includes(p.id)}
                   onSelect={checked => setSelectedPosts(old => checked ? [...old, p.id] : old.filter(id => id !== p.id))}
                   pending={mutation.isPending}
+                  onDirtyChange={(dirty) => markDirty(p.id, dirty)}
                   action={(action, text) =>
                     mutation.mutate({
                       path: `/posts/${p.id}/action${p.business_id ? `?businessId=${p.business_id}` : "?"}`,
-                      success: action === "approve" ? "Draft approved and queued" : "Post cancelled",
+                      success: action === "approve" ? "Draft approved and queued" : action === "save" ? "Draft saved" : "Post cancelled",
                       body: { action, ...(text ? { text } : {}) },
                     })
                   }
@@ -989,6 +1072,19 @@ function SocialWorkbench({ businessId, all }: { businessId: number | null; all: 
                 <input type="search" aria-label="Search content sources" value={sourceSearch} onChange={e => { setSourceSearch(e.target.value); setSourceOffset(0); }} placeholder="Search sources" />
               </div>
               <Pager offset={sourceOffset} setOffset={setSourceOffset} more={sources.length === 25} label="sources" />
+              {sourcesQuery.isLoading && (
+                <div className="space-y-2" aria-busy="true" data-testid="social-sources-loading"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div>
+              )}
+              {sourcesQuery.isError && (
+                <Notice tone="danger" testId="alert-social-sources" action={<GooglePill size="sm" label="Retry" onClick={() => void sourcesQuery.refetch()} />}>
+                  Could not load your content sources: {apiErrorMessage(sourcesQuery.error)}
+                </Notice>
+              )}
+              {!sourcesQuery.isLoading && !sourcesQuery.isError && !sources.length && (
+                <p className="text-sm text-muted-foreground" data-testid="text-social-sources-empty">
+                  {sourceSearch ? "No source matches that search." : "No content sources yet. Add an offer above, or sync recent GBP updates, and auto mode will draw on them."}
+                </p>
+              )}
               {sources.length > 0 && (
                 <GoogleList testId="list-social-sources">
                   {sources.map((s) => (
@@ -1032,14 +1128,31 @@ function PostRow({
   onSelect,
   pending,
   action,
+  onDirtyChange,
 }: {
   post: any;
   selected: boolean;
   onSelect: (checked: boolean) => void;
   pending: boolean;
-  action: (a: string, text?: string) => void;
+  action: (a: "approve" | "cancel" | "save", text?: string) => void;
+  /** The draft's text differs from what is saved on the server (bulk approval waits for it). */
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
-  const [text, setText] = useState(p.payload.post.content.text);
+  const saved: string = p.payload.post.content.text;
+  const [text, setText] = useState(saved);
+  // A save (or another device's save) changes the saved text: follow it unless an edit is in progress here.
+  const lastSaved = useRef(saved);
+  useEffect(() => {
+    if (lastSaved.current !== saved) {
+      setText((t) => (t === lastSaved.current ? saved : t));
+      lastSaved.current = saved;
+    }
+  }, [saved]);
+  const dirty = p.state === "draft" && text !== saved;
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => onDirtyChange?.(false), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const when = new Date(p.scheduled_at || p.created_at || p.due_at);
   return (
     <article className="g-card space-y-2" data-testid={`card-post-${p.id}`}>
       <div className="flex flex-wrap items-center gap-2">
@@ -1048,15 +1161,14 @@ function PostRow({
         <span className="g-card__title g-card__title--md">{p.business_name || "Legacy / unassigned"}</span>
         <span className="text-sm g-text-2">{p.payload.post.content.platform}</span>
         <span className="text-sm g-text-2">
-          · {new Date(
-            p.scheduled_at || p.created_at || p.due_at,
-          ).toLocaleString()}
+          · {when.toLocaleString()}
         </span>
         {p.ai_generated && (
           <span className="g-chip g-chip--sm">
             AI-generated{p.state === "draft" ? " draft" : ""}
           </span>
         )}
+        {dirty && <span className="g-chip g-chip--sm" data-testid={`chip-post-unsaved-${p.id}`}>Unsaved edit</span>}
       </div>
       {p.state === "draft" ? (
         <Textarea
@@ -1077,18 +1189,38 @@ function PostRow({
       )}
       <div className="g-card__actions items-center">
         {p.state === "draft" && (
-          <GooglePill
-            variant="solid"
-            disabled={pending || !text.trim()}
-            onClick={() => action("approve", text)}
-            label="Approve & queue"
-          />
+          <>
+            <GooglePill
+              variant="solid"
+              disabled={pending || !text.trim()}
+              onClick={() => action("approve", dirty ? text : undefined)}
+              label="Approve & queue"
+            />
+            {/* Save keeps the edit without queueing anything; Discard returns to the saved text. */}
+            <GooglePill
+              disabled={pending || !dirty || !text.trim()}
+              onClick={() => action("save", text)}
+              label="Save edit"
+              testId={`button-post-save-${p.id}`}
+            />
+            {dirty && (
+              <GooglePill
+                variant="quiet"
+                disabled={pending}
+                onClick={() => setText(saved)}
+                label="Discard edit"
+                testId={`button-post-discard-${p.id}`}
+              />
+            )}
+          </>
         )}
         {["draft", "queued"].includes(p.state) && (
           <GooglePill
+            variant="quiet"
             disabled={pending}
-            onClick={() => action("cancel")}
-            label="Cancel"
+            onClick={() => setConfirmCancel(true)}
+            label="Cancel post"
+            testId={`button-post-cancel-${p.id}`}
           />
         )}
         {p.public_url && (
@@ -1109,14 +1241,34 @@ function PostRow({
               external
               label="Open Blotato status"
             />
-            {p.submission_id && (
-              <span className="break-all text-xs g-text-2">
-                Submission: {p.submission_id}
+            {/* The Blotato reference only matters while a submission is still open (pending, uncertain or
+                failed) and there is no live link: it is what support looks up in Blotato. A published post
+                shows its link, or nothing, never a raw id. */}
+            {p.submission_id && !p.public_url && p.state !== "published" && (
+              <span className="break-all text-xs g-text-2" data-testid={`text-post-submission-${p.id}`}>
+                Blotato reference {p.submission_id}
               </span>
             )}
           </>
         )}
       </div>
+      <AlertDialog open={confirmCancel} onOpenChange={setConfirmCancel}>
+        <AlertDialogContent data-testid={`dialog-cancel-post-${p.id}`}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel this {p.state === "draft" ? "draft" : "post"}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {p.state === "queued"
+                ? `It is queued for ${when.toLocaleString()} on ${p.payload.post.content.platform} and won't be published.`
+                : `The draft for ${p.payload.post.content.platform} is removed from the queue.`}{" "}
+              This can't be undone; compose a new post if you change your mind.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep it</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setConfirmCancel(false); action("cancel"); }} data-testid={`button-post-cancel-confirm-${p.id}`}>Cancel post</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </article>
   );
 }

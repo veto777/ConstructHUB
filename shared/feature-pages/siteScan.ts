@@ -1,5 +1,6 @@
 import type { FeatureAllowance, FeaturePage } from "./types";
 import { allowanceLine } from "./pricing";
+import { PLANS, planForModule } from "../plans";
 
 /**
  * Site Scan — the PILOT page: the reference every writer copies.
@@ -11,10 +12,14 @@ import { allowanceLine } from "./pricing";
  *   - share link (30 days), PDF, PDF branding, email checklist, AI draft, monthly schedule (max 10 sites),
  *     bulk location scans, the free 11-page scan with email verification: server/sitescan/routes.ts
  *   - the monthly allowance: shared/plans.ts limits.siteScans / siteScansPerLocation, reserved per scan
+ *   - PDF branding (your own company name and logo) is the whiteLabel module, saved behind requireModule("whiteLabel")
+ *     in server/sitescan/routes.ts: one plan has it (shared/plans.ts), named below from the price book
  * Numbers that live in the price book are read from it (allowanceLine), never typed.
  */
 
 const SCANS: FeatureAllowance = { limit: "siteScans", perLocation: "siteScansPerLocation", unit: "Site Scans", period: "month" };
+/** The plan whose modules include white-label reports (the branded PDF). */
+const WHITE_LABEL_PLAN = PLANS[planForModule("whiteLabel")].name;
 
 const page: FeaturePage = {
   key: "siteScan",
@@ -75,7 +80,7 @@ const page: FeaturePage = {
     {
       icon: "share",
       title: "Share it with your web person",
-      body: "Send a share link that expires after 30 days, download a PDF with your own company name and logo, or email the fix checklist.",
+      body: `Send a share link that expires after 30 days, download the PDF, or email the fix checklist. On the ${WHITE_LABEL_PLAN} plan the PDF carries your own company name and logo.`,
     },
     {
       icon: "sparkles",
@@ -118,13 +123,13 @@ const page: FeaturePage = {
     },
     {
       title: "Multi-location companies and agencies",
-      body: "Check each location's website against its own Google profile, and send branded PDFs to the people who need them.",
+      body: `Check each location's website against its own Google profile, and on the ${WHITE_LABEL_PLAN} plan send PDFs under your own brand to the people who need them.`,
     },
   ],
   pricing: {
     kind: "plan",
     allowance: SCANS,
-    note: "A rescan, a monthly scheduled scan and each location in a bulk scan use one scan from the allowance.",
+    note: `A rescan, a monthly scheduled scan and each location in a bulk scan use one scan from the allowance. PDF branding with your own company name and logo is part of the ${WHITE_LABEL_PLAN} plan.`,
   },
   faqs: [
     {
@@ -197,7 +202,7 @@ const page: FeaturePage = {
       "Checks your website against your linked Google profile: name, address, phone, service pages and service areas.",
       "Fix steps written for the site builder you use.",
       "An AI Readiness score: whether GPTBot and ClaudeBot may read your site, structured data, FAQ content and llms.txt.",
-      "Rescans mark every fix fixed, still present or new, and the report carries your brand.",
+      `Rescans mark every fix fixed, still present or new, and on the ${WHITE_LABEL_PLAN} plan the report carries your brand.`,
     ],
     theyNotUs: "Much deeper technical crawls of large sites.",
     noContractorAlternative: true,

@@ -1,12 +1,14 @@
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RefreshCw } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { apiErrorMessage } from "@/lib/queryClient";
-import { formatCount, getJson } from "../billing/format";
+import { formatCount, formatDateTime, getJson } from "../billing/format";
 import { maskedKey, type ApiKeysResponse, type ApiUsageResponse } from "./types";
 
 export type ApiUsagePanelProps = {
@@ -23,17 +25,30 @@ function dayLabel(date: string): string {
   return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 }
 
+/** External clients call the API while this panel is open: while it is on screen the numbers refresh themselves this often. */
+export const USAGE_REFRESH_MS = 60_000;
+
 /**
  * Settings → API usage: units and requests per day for the last 30 days,
  * stacked by key, with the same numbers in a table. Names come from the keys
- * list; a key that was revoked since still shows by its id.
+ * list; a key that was revoked since still shows by its id. The panel says
+ * when its numbers were last fetched, refreshes them every minute while it is
+ * visible, and has a Refresh button for right now.
  */
 export function ApiUsagePanel({ days = 30 }: ApiUsagePanelProps = {}) {
+  const queryClient = useQueryClient();
   const usage = useQuery<ApiUsageResponse>({
     queryKey: ["/api/account/api-usage", { days }],
     queryFn: () => getJson<ApiUsageResponse>(`/api/account/api-usage?days=${days}`),
+    refetchInterval: USAGE_REFRESH_MS,
+    refetchIntervalInBackground: false,
   });
   const keysQuery = useQuery<ApiKeysResponse>({ queryKey: ["/api/account/api-keys"] });
+  // One click refreshes the chart and the keys' "units this month" alike (the same calls move both).
+  const refresh = () => {
+    void usage.refetch();
+    void queryClient.invalidateQueries({ queryKey: ["/api/account/api-keys"] });
+  };
 
   const rows = usage.data?.days ?? [];
   const keyIds = useMemo(() => {
@@ -61,15 +76,28 @@ export function ApiUsagePanel({ days = 30 }: ApiUsagePanelProps = {}) {
   return (
     <div className="space-y-6">
       <Card data-testid="card-api-usage">
-        <CardHeader>
-          <CardTitle className="text-base">API usage</CardTitle>
-          <CardDescription>Units and requests over the last {days} days, by key. A read is 1 unit (+1 per 100 rows); a write is 5.</CardDescription>
+        <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0">
+          <div>
+            <CardTitle className="text-base">API usage</CardTitle>
+            <CardDescription>Units and requests over the last {days} days, by key. A read is 1 unit (+1 per 100 rows); a write is 5.</CardDescription>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-muted-foreground whitespace-nowrap" data-testid="text-api-usage-updated">
+              {usage.dataUpdatedAt ? `Updated ${formatDateTime(new Date(usage.dataUpdatedAt).toISOString())}` : usage.isLoading ? "Loading…" : "Not loaded"}
+            </span>
+            <Button size="sm" variant="outline" onClick={refresh} disabled={usage.isFetching} aria-label="Refresh usage" data-testid="button-api-usage-refresh">
+              <RefreshCw className={`h-4 w-4 mr-1.5 ${usage.isFetching ? "animate-spin" : ""}`} aria-hidden="true" />Refresh
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-6">
           {usage.isLoading ? (
             <div className="space-y-3" aria-busy="true"><Skeleton className="h-16 w-full" /><Skeleton className="h-56 w-full" /></div>
           ) : usage.error ? (
-            <p className="text-sm text-destructive" role="alert" data-testid="text-api-usage-error">Couldn't load API usage. {apiErrorMessage(usage.error)}</p>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-destructive" role="alert" data-testid="text-api-usage-error">Couldn't load API usage. {apiErrorMessage(usage.error)}</p>
+              <Button size="sm" variant="outline" onClick={refresh} disabled={usage.isFetching} data-testid="button-api-usage-retry">Try again</Button>
+            </div>
           ) : (
             <>
               <dl className="grid grid-cols-3 gap-3">

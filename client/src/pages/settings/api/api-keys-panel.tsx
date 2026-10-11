@@ -23,7 +23,7 @@ import { VerificationCancelled } from "@/components/recent-auth";
 import { Copy, Check, KeyRound, Loader2, MoreHorizontal, ShieldAlert, Sparkles } from "lucide-react";
 import { copyToClipboard, daysUntil, formatCount, formatDate, formatDateTime } from "../billing/format";
 import { PLANS, PLAN_KEYS } from "@shared/plans";
-import { joinNames } from "@shared/plan-copy";
+import { joinNames, plansWhere } from "@shared/plan-copy";
 import {
   API_SCOPES, EXPIRY_CHOICES, maskedKey,
   type ApiKeyItem, type ApiKeysResponse, type ApiScope, type CreateApiKeyBody, type CreateApiKeyResponse,
@@ -31,6 +31,13 @@ import {
 
 /** The one sentence every API surface repeats, word for word. */
 export const API_NO_AI_NOTICE = "API keys give access to your ConstructHUB data. AI features are not available through the API.";
+
+/**
+ * The plans with the API, cheapest first, from the price book: apiUnitsPerMonth is 0 on a plan
+ * without it, a count or -1 (unlimited) on one with it — so the test is "not 0", never "> 0",
+ * or the Unlimited plan drops out of the list.
+ */
+export const API_PLAN_KEYS = plansWhere((plan) => plan.limits.apiUnitsPerMonth !== 0);
 
 export type ApiKeysPanelProps = {
   /** "See plans" on the upgrade card (default: the pricing page). */
@@ -137,10 +144,10 @@ export function ApiKeysPanel({ onUpgrade, docsHref = "/developers" }: ApiKeysPan
                 <div className="flex items-start gap-3 min-w-0">
                   <Sparkles className="h-5 w-5 text-primary shrink-0 mt-0.5" aria-hidden="true" />
                   <div>
-                    <p className="font-semibold">API access starts with Pro</p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="font-semibold" data-testid="text-api-upgrade-title">API access starts with {PLANS[API_PLAN_KEYS[0] ?? PLAN_KEYS[PLAN_KEYS.length - 1]].name}</p>
+                    <p className="text-sm text-muted-foreground" data-testid="text-api-upgrade-plans">
                       Your plan doesn't include the API.{" "}
-                      {joinNames(PLAN_KEYS.filter((k) => PLANS[k].limits.apiUnitsPerMonth > 0).map((k) => PLANS[k].name))} include a
+                      {joinNames(API_PLAN_KEYS.map((k) => PLANS[k].name))} include a
                       monthly unit allowance for reading and updating your data.
                     </p>
                   </div>
@@ -168,30 +175,34 @@ export function ApiKeysPanel({ onUpgrade, docsHref = "/developers" }: ApiKeysPan
               ) : (
                 <>
                   <div className="hidden lg:block">
-                    <Table data-testid="table-api-keys">
+                    {/* Compact cells (the shadcn default p-4 alone is 288px across nine columns) so the table fits the settings shell at 1440px. */}
+                    <Table className="[&_th]:px-2 [&_td]:px-2 [&_td]:whitespace-nowrap" data-testid="table-api-keys">
                       <TableHeader>
+                        {/* Every header on one line: at 1440px (the settings shell leaves ~850px) the nine columns
+                            used to wrap "Units consu/med", "Li/mit" and "Expi/res" mid-word. Headers never wrap, dates
+                            are day-only (the full time is in the cell's title) and the title column truncates. */}
                         <TableRow>
-                          <TableHead>Title</TableHead>
-                          <TableHead>Key</TableHead>
-                          <TableHead>Scope</TableHead>
-                          <TableHead className="text-right">Units consumed</TableHead>
-                          <TableHead className="text-right">Limit</TableHead>
-                          <TableHead>Added</TableHead>
-                          <TableHead>Last used</TableHead>
-                          <TableHead>Expires</TableHead>
+                          <TableHead className="whitespace-nowrap">Title</TableHead>
+                          <TableHead className="whitespace-nowrap">Key</TableHead>
+                          <TableHead className="whitespace-nowrap">Scope</TableHead>
+                          <TableHead className="whitespace-nowrap text-right">Units used</TableHead>
+                          <TableHead className="whitespace-nowrap text-right">Limit</TableHead>
+                          <TableHead className="whitespace-nowrap">Added</TableHead>
+                          <TableHead className="whitespace-nowrap">Last used</TableHead>
+                          <TableHead className="whitespace-nowrap">Expires</TableHead>
                           <TableHead><span className="sr-only">Actions</span></TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {keys.map((k) => (
                           <TableRow key={k.id} data-testid={`row-api-key-${k.id}`}>
-                            <TableCell className="font-medium" data-testid={`text-key-name-${k.id}`}>{k.name}</TableCell>
-                            <TableCell><code className="text-xs" data-testid={`text-key-masked-${k.id}`}>{maskedKey(k)}</code></TableCell>
+                            <TableCell className="font-medium max-w-[12rem] truncate" title={k.name} data-testid={`text-key-name-${k.id}`}>{k.name}</TableCell>
+                            <TableCell><code className="text-xs whitespace-nowrap" data-testid={`text-key-masked-${k.id}`}>{maskedKey(k)}</code></TableCell>
                             <TableCell data-testid={`text-key-scopes-${k.id}`}><ScopeBadges scopes={k.scopes} /></TableCell>
                             <TableCell className="text-right tabular-nums" data-testid={`text-key-units-${k.id}`}>{formatCount(k.unitsThisMonth)}</TableCell>
                             <TableCell className="text-right tabular-nums" data-testid={`text-key-limit-${k.id}`}>{k.monthlyUnitLimit === null ? <span className="text-muted-foreground">Plan</span> : formatCount(k.monthlyUnitLimit)}</TableCell>
                             <TableCell className="whitespace-nowrap" data-testid={`text-key-added-${k.id}`}>{formatDate(k.createdAt)}</TableCell>
-                            <TableCell className="whitespace-nowrap" data-testid={`text-key-last-used-${k.id}`}>{k.lastUsedAt ? formatDateTime(k.lastUsedAt) : <span className="text-muted-foreground">Never</span>}</TableCell>
+                            <TableCell className="whitespace-nowrap" title={k.lastUsedAt ? formatDateTime(k.lastUsedAt) : undefined} data-testid={`text-key-last-used-${k.id}`}>{k.lastUsedAt ? formatDate(k.lastUsedAt) : <span className="text-muted-foreground">Never</span>}</TableCell>
                             <TableCell className="whitespace-nowrap" data-testid={`text-key-expires-${k.id}`}><Expiry item={k} /></TableCell>
                             <TableCell className="text-right">
                               <KeyMenu item={k} idSuffix="" onRename={setRenaming} onLimit={setLimiting} onRevoke={setRevoking} />
@@ -213,7 +224,7 @@ export function ApiKeysPanel({ onUpgrade, docsHref = "/developers" }: ApiKeysPan
                         </div>
                         <ScopeBadges scopes={k.scopes} />
                         <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-                          <dt className="text-muted-foreground">Units consumed</dt><dd className="tabular-nums text-right">{formatCount(k.unitsThisMonth)}</dd>
+                          <dt className="text-muted-foreground">Units used</dt><dd className="tabular-nums text-right">{formatCount(k.unitsThisMonth)}</dd>
                           <dt className="text-muted-foreground">Limit</dt><dd className="tabular-nums text-right">{k.monthlyUnitLimit === null ? "Plan" : formatCount(k.monthlyUnitLimit)}</dd>
                           <dt className="text-muted-foreground">Added</dt><dd className="text-right">{formatDate(k.createdAt)}</dd>
                           <dt className="text-muted-foreground">Last used</dt><dd className="text-right">{k.lastUsedAt ? formatDateTime(k.lastUsedAt) : "Never"}</dd>

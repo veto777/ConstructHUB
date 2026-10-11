@@ -1,6 +1,7 @@
 import type { FeatureAllowance, FeaturePage } from "./types";
 import { allowanceLine } from "./pricing";
-import { PLANS } from "../plans";
+import { PLANS, PLAN_KEYS } from "../plans";
+import { joinNames } from "../plan-copy";
 
 /**
  * Customer API — /api/v1 with chub_ keys, documented on /developers.
@@ -26,8 +27,23 @@ import { PLANS } from "../plans";
  */
 
 const API: FeatureAllowance = { limit: "apiUnitsPerMonth", unit: "API units", period: "month" };
-/** Requests per minute per key: the same on every plan that has the API, read from the price book. */
-const RATE = PLANS.growth.limits.apiRatePerMinute;
+
+/**
+ * Requests per minute per key, read from the price book and grouped by rate, because the plans
+ * that have the API don't all share one ("60 on Pro and Agency, 120 on Unlimited"):
+ * server/public-api/rate-limit.ts enforces each plan's own apiRatePerMinute.
+ */
+function rateLine(): string {
+  const byRate = new Map<number, string[]>();
+  for (const key of PLAN_KEYS) {
+    const plan = PLANS[key];
+    if (plan.limits.apiUnitsPerMonth === 0) continue;
+    byRate.set(plan.limits.apiRatePerMinute, [...(byRate.get(plan.limits.apiRatePerMinute) ?? []), plan.name]);
+  }
+  const groups = [...byRate.entries()].sort((a, b) => a[0] - b[0]);
+  if (groups.length === 1) return `Up to ${groups[0][0]} requests a minute per key`;
+  return groups.map(([rate, names], i) => (i === 0 ? `Up to ${rate} requests a minute per key on ${joinNames(names)}` : `${rate} on ${joinNames(names)}`)).join(", ");
+}
 
 const page: FeaturePage = {
   key: "customerApi",
@@ -111,7 +127,7 @@ const page: FeaturePage = {
     heading: { title: "Units You Can ", em: "Predict" },
     points: [
       "A read costs 1 unit plus 1 per 100 rows returned; a write costs 5 units. Only successful calls count.",
-      `Up to ${RATE} requests a minute per key, with a cap per account across all its keys.`,
+      `${rateLine()}, with a cap per account across all its keys.`,
       "Units reset on the 1st of each month (UTC), and each key can have its own lower cap.",
       "Over the limit you get a clear error: 429 with Retry-After, 429 quota_exceeded, or 402 plan_required on a plan without the API.",
     ],

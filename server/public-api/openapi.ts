@@ -5,7 +5,7 @@
 import { PLANS, PLAN_KEYS } from "@shared/plans";
 import { API_ERROR_CODES, API_EXTRA_ERROR_CODES } from "./errors";
 import { listResources } from "./registry";
-import { READ_UNITS, ROWS_PER_UNIT, WRITE_UNITS } from "./quota";
+import { isWriteMethod, READ_UNITS, ROWS_PER_UNIT, WRITE_UNITS } from "./quota";
 import { ACCOUNT_RATE_PER_MINUTE } from "./rate-limit";
 
 /** The one error shape; every resource fragment's `Error` / `ApiError` schema is replaced by this. */
@@ -59,6 +59,10 @@ const ME_SCHEMA = {
   },
 };
 
+const HTTP_METHODS = new Set(["get", "put", "post", "delete", "options", "head", "patch", "trace"]);
+/** How a read is metered, as the document and the Developers page print it. */
+export const READ_UNITS_LABEL = `${READ_UNITS} + 1 per ${ROWS_PER_UNIT} rows`;
+
 const errorResponse = (description: string) => ({ description, content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } } });
 
 export function buildOpenApiDocument(): Record<string, unknown> {
@@ -85,6 +89,18 @@ export function buildOpenApiDocument(): Record<string, unknown> {
   // One error vocabulary: whatever a fragment named its error schema, the document carries the shared one.
   schemas.Error = ERROR_SCHEMA;
   if ("ApiError" in schemas) schemas.ApiError = ERROR_SCHEMA;
+  // Every operation says what it needs and what it costs, whether or not its fragment did: the
+  // scope the middleware checks (server/public-api/auth.ts scopeByMethod: GET/HEAD read, the rest
+  // write) and the metering (quota.ts: a read is 1 unit + 1 per 100 rows, a write a flat 5).
+  for (const item of Object.values(paths)) {
+    for (const [method, op] of Object.entries(item as Record<string, Record<string, unknown>>)) {
+      if (!op || typeof op !== "object" || !HTTP_METHODS.has(method)) continue;
+      const write = isWriteMethod(method);
+      op["x-scope"] ??= write ? "write" : "read";
+      op["x-units"] ??= write ? WRITE_UNITS : READ_UNITS_LABEL;
+      op.security ??= [{ apiKey: [op["x-scope"] as string] }];
+    }
+  }
   return {
     openapi: "3.0.3",
     info: {
@@ -109,7 +125,7 @@ export function buildOpenApiDocument(): Record<string, unknown> {
     "x-limits": {
       ratePerMinute: PLANS.pro.limits.apiRatePerMinute,
       accountRatePerMinute: ACCOUNT_RATE_PER_MINUTE,
-      units: { read: `${READ_UNITS} + 1 per ${ROWS_PER_UNIT} rows`, write: WRITE_UNITS },
+      units: { read: READ_UNITS_LABEL, write: WRITE_UNITS },
       unitsPerMonth: Object.fromEntries(PLAN_KEYS.map((k) => [k, PLANS[k].limits.apiUnitsPerMonth])),
       errors: { rateLimited: "429 rate_limited (Retry-After; scope key | account)", quota: "429 quota_exceeded (Retry-After until the 1st)", noApiOnPlan: "402 plan_required" },
     },
