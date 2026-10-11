@@ -64,6 +64,13 @@ export async function enqueue(
   );
   return id;
 }
+/**
+ * The change a job previews. App-enqueued jobs wrap it as payload.change; some
+ * seeded rows store the change directly as the payload, so both shapes resolve.
+ */
+export const payloadChange = (job: any): Change =>
+  (job.payload?.change ??
+    (job.payload?.kind ? job.payload : undefined)) as Change;
 export async function saveConnection(
   userId: number,
   provider: string,
@@ -202,6 +209,18 @@ export async function preview(userId: number, ids: number[], change: Change) {
   const rows = await ownedDomains(userId, ids);
   if (rows.some((d) => !d.connection_id))
     throw new DomainError("Manual domains must be changed at the registrar.");
+  // A provider record id identifies one record of one domain. Forwarding it to
+  // several domains could hit a same-named record — or a colliding numeric id —
+  // on the wrong zone, so bulk changes only match by typed name/type/content.
+  if (
+    ids.length > 1 &&
+    change.kind !== "nameservers" &&
+    change.record.id
+  )
+    throw new DomainError(
+      "A record picked from the registrar belongs to one domain. Select that domain alone to change it, or clear the picked record.",
+      409,
+    );
   const jobs = [];
   for (const d of rows)
     jobs.push(
@@ -251,7 +270,10 @@ export async function confirm(
         409,
       );
     if (
-      rows.some((j) => emailWarning(j.payload.change, j.before_state)) &&
+      rows.some((j) => {
+        const c = payloadChange(j);
+        return c ? emailWarning(c, j.before_state) : false;
+      }) &&
       !warningAccepted
     )
       throw new DomainError("Acknowledge the email/DNS interruption warning.");
@@ -411,7 +433,7 @@ export async function processJob(job: any, deps: Dependencies = {}) {
       "Domain connection changed. Create a new preview.",
       409,
     );
-  let change: Change = job.payload.change;
+  let change: Change = payloadChange(job);
   if (job.status === "verifying") {
     const ok = await verify(
       d.domain,
@@ -419,17 +441,43 @@ export async function processJob(job: any, deps: Dependencies = {}) {
       job.after_state,
       deps.http || limitedFetch,
     );
+    const nextStatus = ok
+      ? "verified"
+      : job.attempts >= 288
+        ? "verification_failed"
+        : "verifying";
     await pool.query(
       "UPDATE domain_jobs SET status=$2,error=NULL,attempts=attempts+1,run_at=now()+interval '5 minutes',updated_at=now() WHERE id=$1",
-      [
-        job.id,
-        ok
-          ? "verified"
-          : job.attempts >= 288
-            ? "verification_failed"
-            : "verifying",
-      ],
+      [job.id, nextStatus],
     );
+    if (nextStatus !== "verifying") {
+      // The confirmation promises a notification with the verification result; the
+      // job leaves the verifying queue here, so this fires exactly once per change.
+      await logActivity(null, job.user_id, "domains.verify", {
+        domain: d.domain,
+        jobId: job.id,
+        result: nextStatus,
+      });
+      await notifyUser(
+        job.user_id,
+        nextStatus === "verified"
+          ? "domains.verified"
+          : "domains.verification_failed",
+        nextStatus === "verified"
+          ? {
+              title: "Domain change verified",
+              body: `${d.domain} — public DNS now matches the change.`,
+              link: "/domains",
+              severity: "info",
+            }
+          : {
+              title: "Domain change could not be verified",
+              body: `${d.domain} — public DNS still does not match. Review the change at the registrar.`,
+              link: "/domains",
+              severity: "warning",
+            },
+      );
+    }
     if (ok) {
       const r = change.kind === "nameservers" ? null : change.record;
       const dnsKey = r

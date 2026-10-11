@@ -91,6 +91,39 @@ describe("registrar capability boundary", () => {
     await expect(bad.list()).rejects.toThrow("Porkbun request failed");
     await expect(bad.list()).rejects.not.toThrow("never-log");
   });
+  it("reports unreachable registrars as transport failures instead of generic errors", async () => {
+    const down = async () => {
+      throw new Error("fetch failed");
+    };
+    await expect(
+      porkbun({ key: "k", secret: "s" }, down).list(),
+    ).rejects.toThrow("Could not reach Porkbun");
+    await expect(
+      namecom({ key: "k", secret: "s" }, down).list(),
+    ).rejects.toThrow("Could not reach Name.com");
+    // A reachable registrar that rejects the request is a credentials/API failure.
+    const rejected = porkbun(
+      { key: "k", secret: "s" },
+      async () => new Response('{"status":"ERROR"}', { status: 403 }),
+    );
+    await expect(rejected.list()).rejects.toThrow("Porkbun request failed");
+    const unauthorized = namecom(
+      { key: "k", secret: "s" },
+      async () => new Response("{}", { status: 401 }),
+    );
+    await expect(unauthorized.list()).rejects.toThrow("Name.com request failed");
+    // A reachable registrar returning a broken body says so.
+    const junk = porkbun(
+      { key: "k", secret: "s" },
+      async () => new Response("<html>gateway timeout</html>"),
+    );
+    await expect(junk.list()).rejects.toThrow("unreadable response");
+    const junkNc = namecom(
+      { key: "k", secret: "s" },
+      async () => new Response("not json"),
+    );
+    await expect(junkNc.list()).rejects.toThrow("unreadable response");
+  });
   it("validates all six record types, rejects side effects and Cloudflare DNS edits", () => {
     for (const type of ["A", "AAAA", "CNAME", "TXT", "MX", "CAA"]) {
       const content = (

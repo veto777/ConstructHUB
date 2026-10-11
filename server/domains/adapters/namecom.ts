@@ -23,8 +23,9 @@ export function namecom(
       (["PUT", "DELETE"].includes(method) &&
         /^\/core\/v1\/domains\/[a-z0-9.-]+\/records\/\d+$/.test(path));
     if (!allowed) throw new DomainError("Operation not allowed");
+    let r: Response;
     try {
-      const r = await http(`https://api.name.com${path}`, {
+      r = await http(`https://api.name.com${path}`, {
         method,
         headers: {
           Authorization: `Basic ${Buffer.from(`${credentials.key}:${credentials.secret}`).toString("base64")}`,
@@ -34,11 +35,24 @@ export function namecom(
         redirect: "error",
         signal: AbortSignal.timeout(15000),
       });
-      if (!r.ok) throw new Error();
-      return r.status === 204 ? {} : await r.json();
     } catch {
+      // Network drop, DNS failure or timeout — the registrar was never reached.
+      throw new DomainError(
+        "Could not reach Name.com — the request timed out or the network dropped it. Try again in a moment.",
+        502,
+      );
+    }
+    if (!r.ok)
       throw new DomainError(
         "Name.com request failed. Check API access and credentials.",
+        502,
+      );
+    if (r.status === 204) return {};
+    try {
+      return await r.json();
+    } catch {
+      throw new DomainError(
+        "Name.com returned an unreadable response. Try again in a moment.",
         502,
       );
     }

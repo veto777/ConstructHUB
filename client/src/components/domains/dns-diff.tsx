@@ -70,7 +70,10 @@ export function diffRecords(
     (x, y) =>
       rank[x.status] - rank[y.status] ||
       (x.before ?? x.after)!.type.localeCompare((y.before ?? y.after)!.type) ||
-      (x.before ?? x.after)!.name.localeCompare((y.before ?? y.after)!.name),
+      (x.before ?? x.after)!.name.localeCompare((y.before ?? y.after)!.name) ||
+      (x.before ?? x.after)!.content.localeCompare(
+        (y.before ?? y.after)!.content,
+      ),
   );
 }
 
@@ -134,6 +137,91 @@ export type JobLike = {
   before_state?: { nameservers?: string[]; records?: DnsRecordLike[] } | null;
   after_state?: { nameservers?: string[]; records?: DnsRecordLike[] } | null;
 };
+
+type JobRow = JobLike & {
+  id?: string;
+  kind?: string;
+  expires_at?: string | null;
+};
+
+/**
+ * Only previews that are waiting for confirmation can be confirmed: change jobs in
+ * 'ready' whose authorization window is still open. Discover/monitor jobs and changes
+ * already applied (or still building) are excluded from the confirm flow.
+ */
+export const canConfirmJob = (j: JobRow) =>
+  j.kind === "change" &&
+  j.status === "ready" &&
+  (!j.expires_at || new Date(j.expires_at).getTime() > Date.now());
+
+/** Applied changes (any verification state) can be previewed back to their before-values. */
+export const canRollbackJob = (j: JobRow) =>
+  j.kind === "change" &&
+  ["verified", "verifying", "verification_failed", "uncertain"].includes(
+    j.status,
+  );
+
+/**
+ * The change a job previews. App-enqueued jobs wrap it as payload.change; some
+ * seeded rows store the change directly as the payload.
+ */
+export const jobChange = (j: JobRow): any =>
+  (j as any).payload?.change ??
+  ((j as any).payload?.kind ? (j as any).payload : undefined);
+
+/** Mirrors the server's emailWarning(): which changes need the interruption acknowledgement. */
+export function changeNeedsEmailWarning(j: JobRow): boolean {
+  const c = jobChange(j);
+  if (!c) return false;
+  if (c.kind === "nameservers") return true;
+  if (["MX", "TXT", "CNAME"].includes(c.record?.type)) return true;
+  return !!(j.before_state?.records || []).some(
+    (r) => r.id === c.record?.id && ["MX", "TXT", "CNAME"].includes(r.type),
+  );
+}
+
+/** Plain words for registrar inventory and monitoring jobs (no preview/apply lifecycle). */
+export function BackgroundJobStatus({
+  kind,
+  status,
+}: {
+  kind: string;
+  status: string;
+}) {
+  const text: Record<string, Record<string, string>> = {
+    discover: {
+      queued: "Waiting to import domains…",
+      working: "Importing domains from the registrar…",
+      complete: "Import complete",
+      failed: "Import failed",
+    },
+    monitor: {
+      queued: "Waiting to check DNS and website…",
+      working: "Checking DNS and website…",
+      complete: "Check complete",
+      failed: "Check failed",
+    },
+  };
+  const label = text[kind]?.[status] || status;
+  const failed = status === "failed";
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 text-xs",
+        failed ? "g-closed" : "g-text-2",
+      )}
+    >
+      {failed ? (
+        <XCircle className="h-3.5 w-3.5" aria-hidden="true" />
+      ) : status === "complete" ? (
+        <CheckCircle2 className="h-3.5 w-3.5 g-open" aria-hidden="true" />
+      ) : (
+        <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+      )}
+      {label}
+    </span>
+  );
+}
 
 /** Previewed → Applied → Verified, from the job's own status. */
 export function JobStatusStepper({ status }: { status: string }) {
