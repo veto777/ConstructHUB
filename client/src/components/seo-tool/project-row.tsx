@@ -9,7 +9,8 @@
  *
  *   domain → Site explorer overview · ↗ → the website itself · analysed date → the same saved report
  *   group chip → edit the group · star → toggle · Site explorer / Rank tracker / Site audit / Action plan → that tool
- *   for this site · Refresh / Analyse → buys a new report (the only purchase on the page)
+ *   for this site · Refresh / Analyse → buys a new report (the only purchase on the page) · Run first crawl (no crawl
+ *   yet) → starts the site's first crawl here (`onCrawl`, a plan Site Scan), then "Crawling…" links to the audit
  *   Health badge → audit issues · its move → the two crawls compared · Crawled → audit pages · With errors → audit
  *   pages narrowed to errors · Last crawl → that crawl
  *   Authority → explorer overview · change → overview from the first month shown · sparkline → overview at the
@@ -26,7 +27,7 @@
  */
 import type { ReactNode } from "react";
 import { Link } from "wouter";
-import { CheckCircle2, Circle, ExternalLink, Loader2, RefreshCw, Star } from "lucide-react";
+import { CheckCircle2, Circle, ExternalLink, Loader2, Play, RefreshCw, Star } from "lucide-react";
 import { MetricStrip, StatCell, StatusBadge, ToolLink, scoreTone } from "@/components/tool";
 import { seoLinks, type PositionBand } from "@/pages/seo/links";
 import { fmtDate, fmtNum, type SeoSite } from "@/pages/seo/shell";
@@ -55,12 +56,34 @@ const change = (xs: (number | null | undefined)[] | undefined) => { const v = (x
 const healthWords = (p: HealthPoint) => (!p.readable ? "could not be read" : p.health === null ? "no page scored" : `health ${p.health}, ${fmtNum(p.errorPages ?? 0)} of ${fmtNum(p.pages ?? 0)} pages with errors`);
 const signed = (n: number) => `${n > 0 ? "up" : "down"} ${compact(Math.abs(n))}`;
 
+/** A site's first crawl, as the dashboard runs it: pending while the request is out, started once the server took it, and the server's words when it refused. */
+export type CrawlState = { pending: boolean; started: boolean; error: string | null };
+
+/**
+ * Where the health score will be, for a site that has never been crawled: a button that starts its first crawl right
+ * here (the audit page's "Run first crawl" — one of the plan's monthly Site Scans, no SEO data), then a link to the
+ * audit that watches it; a refusal is said under the button, which stays to try again. Without a starter (an older
+ * caller) the link to Site audit stays, so nothing ever lands on a dead cell.
+ */
+function FirstCrawl({ siteId, domain, onPick, onCrawl, crawl, testId, buttonTestId }: { siteId: number; domain: string; onPick?: () => void; onCrawl?: () => void; crawl?: CrawlState; /** The link's id (pinned by the links test). */ testId: string; buttonTestId: string }) {
+  if (!onCrawl) return <Link href={seoLinks.audit(siteId)} onClick={onPick} className="tool-btn self-start" aria-label="No crawl yet — open Site audit to run one" data-testid={testId}>Open Site audit</Link>;
+  const pending = !!crawl?.pending;
+  return (
+    <div className="flex flex-col items-start gap-1" data-testid={`first-crawl-${siteId}`}>
+      {crawl?.started
+        ? <Link href={seoLinks.audit(siteId)} onClick={onPick} className="tool-btn self-start" aria-label={`Crawling ${domain} — open Site audit to watch it`} title="The health score appears here when the crawl finishes" data-testid={testId}><Loader2 className="animate-spin" aria-hidden /> Crawling… · Site audit</Link>
+        : <button type="button" className="tool-btn" disabled={pending} onClick={onCrawl} aria-label={`No crawl of ${domain} yet — run its first crawl`} title="Uses one of your plan's monthly Site Scans. Crawls up to 150 pages." data-testid={buttonTestId}>{pending ? <Loader2 className="animate-spin" aria-hidden /> : <Play aria-hidden />} Run first crawl</button>}
+      {crawl?.error && <p className="text-[12px] leading-4" role="alert" style={{ color: "var(--g-red)" }} data-testid={`text-crawl-error-${siteId}`}>{crawl.error}</p>}
+    </div>
+  );
+}
+
 /**
  * Site health from the site's own crawls: the newest crawl's score, its move since the crawl just before it (only when
  * both have a score), the pages behind it, and the last few crawls. Health is a share of the pages crawled, so a move
  * can come from crawling different pages — the sizes are said whenever they differ.
  */
-export function HealthCell({ audit, siteId, onPick }: { audit: SiteCard["audit"]; siteId: number; /** The audit page keeps a chosen site: told which before a link is followed. */ onPick?: () => void }) {
+export function HealthCell({ audit, siteId, domain, onPick, onCrawl, crawl: firstCrawl }: { audit: SiteCard["audit"]; siteId: number; domain: string; /** The audit page keeps a chosen site: told which before a link is followed. */ onPick?: () => void; /** Starts the site's first crawl here (shown in place of the link to Site audit while there is no crawl). */ onCrawl?: () => void; crawl?: CrawlState }) {
   const trend = audit?.trend ?? [];
   const prev = trend.length > 1 ? trend[trend.length - 2] : null;
   const move = audit?.health != null && prev?.health != null ? audit.health - prev.health : null;
@@ -87,7 +110,7 @@ export function HealthCell({ audit, siteId, onPick }: { audit: SiteCard["audit"]
         { key: "crawled", label: "Last crawl", value: fmtDate(audit!.at), href: crawl(audit!.jobId), onClick: onPick, testId: `link-health-crawled-${siteId}`, ariaLabel: `Last crawl: ${fmtDate(audit!.at)} — open that crawl` },
       ] : undefined}
       note={note}>
-      {!audit && <Link href={seoLinks.audit(siteId)} onClick={onPick} className="tool-btn self-start" aria-label="No crawl yet — open Site audit to run one" data-testid={`link-health-audit-${siteId}`}>Open Site audit</Link>}
+      {!audit && <FirstCrawl siteId={siteId} domain={domain} onPick={onPick} onCrawl={onCrawl} crawl={firstCrawl} testId={`link-health-audit-${siteId}`} buttonTestId={`button-health-crawl-${siteId}`} />}
       {trend.length > 1 && (
         <details className="tool-about !mt-0" data-testid={`health-history-${siteId}`}>
           <summary>Last {trend.length} crawls</summary>
@@ -115,7 +138,7 @@ function StartStep({ n, done, title, text, children }: { n: number; done: boolea
   );
 }
 
-export function ProjectRow({ card, busy, canAnalyse, price, priceNote, onAnalyse, onPick, star, group }: {
+export function ProjectRow({ card, busy, canAnalyse, price, priceNote, onAnalyse, onPick, onCrawl, crawl, star, group }: {
   card: SiteCard;
   /** A report for this site is being bought right now. */
   busy: boolean;
@@ -127,6 +150,9 @@ export function ProjectRow({ card, busy, canAnalyse, price, priceNote, onAnalyse
   onAnalyse: () => void;
   /** The audit, rank tracker and plan keep a chosen site: a link to one site's page also makes it the chosen site. */
   onPick: () => void;
+  /** Starts the site's first crawl from the card (a site with no crawl offers "Run first crawl" instead of a link to the empty audit). */
+  onCrawl?: () => void;
+  crawl?: CrawlState;
   star: { pending: boolean; onToggle: () => void };
   group: { editing: boolean; draft: string; pending: boolean; onDraft: (v: string) => void; onEdit: () => void; onSave: () => void; onCancel: () => void };
 }) {
@@ -181,7 +207,7 @@ export function ProjectRow({ card, busy, canAnalyse, price, priceNote, onAnalyse
       {r ? (
         <>
           <MetricStrip cols={[2, 3, 6]}>
-            <HealthCell audit={audit} siteId={s.id} onPick={pick} />
+            <HealthCell audit={audit} siteId={s.id} domain={s.domain} onPick={pick} onCrawl={onCrawl} crawl={crawl} />
             <StatCell label="Authority" testId={`metric-authority-${s.id}`} href={ex()} linkTestId={`link-authority-${s.id}`} value={r.authority == null ? null : String(r.authority)} none={noReport}
               ariaLabel={`Authority: ${r.authority} out of 100 — open the site overview`}
               delta={{ value: change(vals(authorityPts)), period: since1(authorityPts), href: since("overview", authorityPts), testId: `link-authority-change-${s.id}`, ariaLabel: `Authority ${signed(change(vals(authorityPts)) ?? 0)}, ${span(authorityPts)} — open the overview from the first of those months` }}
@@ -232,9 +258,9 @@ export function ProjectRow({ card, busy, canAnalyse, price, priceNote, onAnalyse
             text={(s.keywordCount ?? 0) > 0 ? <><FigureLink href={seoLinks.rankTracker(s.id, { panel: "keywords" })} onClick={pick} testId={`link-start-tracked-${s.id}`}>{fmtNum(s.keywordCount)} tracked</FigureLink> — checked every week by default.</> : "Your services and towns: where the site is found in Google and the map pack, every week."}>
             <Link href={seoLinks.rankTracker(s.id)} className="tool-btn" onClick={pick} data-testid={`link-start-rank-${s.id}`}>Open Rank tracker</Link>
           </StartStep>
-          {audit ? <HealthCell audit={audit} siteId={s.id} onPick={pick} /> : (
+          {audit ? <HealthCell audit={audit} siteId={s.id} domain={s.domain} onPick={pick} /> : (
             <StartStep n={3} done={false} title="Crawl the site" text="Broken pages, redirects, titles, speed and what a crawler can read.">
-              <Link href={seoLinks.audit(s.id)} className="tool-btn" onClick={pick} data-testid={`link-start-audit-${s.id}`}>Open Site audit</Link>
+              <FirstCrawl siteId={s.id} domain={s.domain} onPick={pick} onCrawl={onCrawl} crawl={crawl} testId={`link-start-audit-${s.id}`} buttonTestId={`button-start-crawl-${s.id}`} />
             </StartStep>
           )}
         </MetricStrip>

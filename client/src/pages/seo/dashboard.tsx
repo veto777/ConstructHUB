@@ -3,7 +3,8 @@
  * domains, organic traffic and keywords (with their trend), and where its
  * tracked keywords rank. Everything shown is already saved, so opening this
  * page never spends SEO data; "Analyse" / "Refresh" on a card buys a new
- * Site Explorer report for that site.
+ * Site Explorer report for that site, and "Run first crawl" on a card with
+ * no crawl starts one (a plan Site Scan, as the audit page's button does).
  *
  * Every figure here — number, count, change, date, legend entry — is a link
  * to its data (links.ts): a figure on a card opens that site's explorer
@@ -48,7 +49,24 @@ export default function SeoDashboardPage() {
   const [site, onSite] = useSelectedSite(sites.data);
   const qc = useQueryClient();
   const { toast } = useToast();
-  const dash = useQuery<{ cards: Card[] }>({ queryKey: ["/api/seo/dashboard"], refetchOnMount: "always", });
+  // A site's first crawl, started from its card (the audit page's "Run first crawl", audit.tsx: POST /api/sitescan, up
+  // to 150 pages, one of the plan's monthly Site Scans — no SEO data, so the data source's `configured` does not gate it;
+  // a plan without a scan left is refused by the server, and its words are shown on the card). While one is out, the
+  // dashboard re-reads itself every 15 seconds so the health score takes the button's place when the crawl finishes.
+  const [crawling, setCrawling] = useState<number[]>([]);
+  const [crawlErrors, setCrawlErrors] = useState<Record<number, string>>({});
+  const dash = useQuery<{ cards: Card[] }>({ queryKey: ["/api/seo/dashboard"], refetchOnMount: "always", refetchInterval: crawling.length ? 15_000 : false });
+  useEffect(() => { if (dash.data && crawling.some((id) => dash.data!.cards.some((c) => c.site.id === id && c.audit))) setCrawling((ids) => ids.filter((id) => !dash.data!.cards.some((c) => c.site.id === id && c.audit))); }, [dash.data, crawling]);
+  const crawl = useMutation({
+    mutationFn: (s: SeoSite) => api("POST", "/api/sitescan", { url: `https://${s.domain}`, pageCap: 150, psiPages: 1 }),
+    onMutate: (s) => setCrawlErrors(({ [s.id]: _dropped, ...rest }) => rest),
+    onSuccess: (_r, s) => {
+      setCrawling((ids) => (ids.includes(s.id) ? ids : [...ids, s.id]));
+      void qc.invalidateQueries({ queryKey: [`/api/seo/sites/${s.id}/audit`] });
+      toast({ title: "Crawl started", description: `${s.domain} — its health score appears here when the crawl finishes, usually a few minutes. Site audit shows the progress.` });
+    },
+    onError: (e, s) => { const message = apiErrorMessage(e); setCrawlErrors((errs) => ({ ...errs, [s.id]: message })); toast({ title: "Couldn't start the crawl", description: message, variant: "destructive" }); },
+  });
   const analyse = useMutation({
     mutationFn: (domain: string) => { const s = dash.data?.cards.find((c) => c.site.domain === domain)?.site; return api("POST", "/api/seo/explorer", { domain, refresh: true, locationCode: s?.locationCode, languageCode: s?.languageCode }); },
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ["/api/seo/dashboard"] }); void qc.invalidateQueries({ queryKey: ["/api/seo/status"] }); void qc.invalidateQueries({ queryKey: ["/api/seo/explorer/recent"] }); },
@@ -204,6 +222,7 @@ export default function SeoDashboardPage() {
           return (
             <ProjectRow key={s.id} card={card} busy={analyse.isPending && analyse.variables === s.domain} canAnalyse={configured && affordable} price={price} priceNote={holdNote(status.data, "explorerReport")}
               onAnalyse={() => analyse.mutate(s.domain)} onPick={() => onSite(s.id)}
+              onCrawl={() => crawl.mutate(s)} crawl={{ pending: crawl.isPending && crawl.variables?.id === s.id, started: crawling.includes(s.id), error: crawlErrors[s.id] ?? null }}
               star={{ pending: star.isPending, onToggle: () => star.mutate({ id: s.id, starred: !s.starred }) }}
               group={{ editing: editing === s.id, draft: groupDraft, pending: setSiteGroup.isPending, onDraft: setGroupDraft, onEdit: () => { setEditing(s.id); setGroupDraft(s.group ?? ""); }, onSave: () => setSiteGroup.mutate({ id: s.id, group: groupDraft.trim() || null }), onCancel: () => setEditing(null) }} />
           );
