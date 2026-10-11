@@ -109,12 +109,15 @@ export function UrlActions({
           key={i}
           className="grid min-w-0 gap-2 rounded-lg border p-3 min-[1100px]:grid-cols-[auto_minmax(0,1fr)_minmax(0,2fr)_auto] min-[1100px]:items-center"
         >
-          <input
-            type="checkbox"
-            aria-label={`Select URL row ${i + 1}`}
-            checked={r.selected}
-            onChange={(e) => change(i, { selected: e.target.checked })}
-          />
+          <label className="flex items-center gap-2 justify-self-start text-sm">
+            <input
+              type="checkbox"
+              aria-label={`Select URL row ${i + 1}`}
+              checked={r.selected}
+              onChange={(e) => change(i, { selected: e.target.checked })}
+            />
+            <span aria-hidden="true" className="min-[1100px]:hidden">Include this row</span>
+          </label>
           <label className="min-w-0 text-sm">
             Property
             <select
