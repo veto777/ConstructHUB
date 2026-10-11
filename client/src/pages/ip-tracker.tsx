@@ -10,12 +10,13 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, type UseQueryResult } from "@tanstack/react-query";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import { useAppOrigin } from "@/lib/app-origin";
 import {
-  AppPage, Section, StatusPill,
+  AppPage, Section, StatusPill, Notice,
 } from "@/components/app-ui";
+import { countryName, geoLabel } from "@/components/ip-tracker/country-names";
 import { GoogleSectionHeader, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
 import { ToolTabs } from "@/components/tool";
 import {
@@ -225,6 +226,7 @@ function PercentBar({ value }: { value: number }) {
 function OnlineCell({ domainId }: { domainId: number }) {
   const { data, isError } = useQuery<{ count: number }>({
     queryKey: ["/api/click-guard/domains", domainId, "online"],
+    refetchInterval: ONLINE_REFETCH_MS,
   });
   return (
     <td className="px-3 py-2.5 sm:px-4 sm:py-3 align-middle text-right tabular-nums" data-testid={`text-online-${domainId}`} title="Distinct IPs in the last 20 minutes">
@@ -238,7 +240,10 @@ function InstallCard({ domain }: { domain: DomainWithStats }) {
   const appOrigin = useAppOrigin();
   const { toast } = useToast();
   const noVisits = domain.stats.totalVisits === 0;
-  const [open, setOpen] = useState(noVisits);
+  // Open while waiting for the first visit; once visits arrive the panel steps aside
+  // on its own unless the viewer explicitly opened or closed it.
+  const [openOverride, setOpenOverride] = useState<boolean | null>(null);
+  const open = openOverride ?? noVisits;
   const snippet = `<script src="${appOrigin}/api/click-guard/script/${domain.trackingId}" async></script>`;
 
   const copy = async () => {
@@ -263,7 +268,7 @@ function InstallCard({ domain }: { domain: DomainWithStats }) {
             </p>
           </div>
           {!noVisits && (
-            <Button size="sm" variant="ghost" className="text-xs" onClick={() => setOpen(o => !o)} data-testid="button-toggle-install">
+            <Button size="sm" variant="ghost" className="text-xs" onClick={() => setOpenOverride(o => !(o ?? noVisits))} data-testid="button-toggle-install">
               {open ? "Hide code" : "Show code"}
             </Button>
           )}
@@ -286,10 +291,21 @@ function InstallCard({ domain }: { domain: DomainWithStats }) {
   );
 }
 
-function DashboardView({ domainId, analytics, domains }: { domainId: number | null; analytics: Analytics | undefined; domains: DomainWithStats[] }) {
-  const { data: online } = useQuery<{ count: number; visitors: any[] }>({
+// Visible activity panels re-check on this cadence so "Online now" and the visitor
+// list stay live while the page is open (queries otherwise never refresh on their own).
+const ONLINE_REFETCH_MS = 15000;
+const ANALYTICS_REFETCH_MS = 30000;
+
+function DashboardView({ domainId, analyticsQuery, domains }: {
+  domainId: number | null;
+  analyticsQuery: UseQueryResult<Analytics, Error>;
+  domains: DomainWithStats[];
+}) {
+  const analytics = analyticsQuery.data;
+  const online = useQuery<{ count: number; visitors: any[] }>({
     queryKey: ["/api/click-guard/domains", domainId, "online"],
     enabled: !!domainId,
+    refetchInterval: ONLINE_REFETCH_MS,
   });
   const domain = domains.find(d => d.id === domainId);
 
@@ -316,17 +332,44 @@ function DashboardView({ domainId, analytics, domains }: { domainId: number | nu
     <div className="space-y-4 sm:space-y-5">
       {domain && <InstallCard key={domain.id} domain={domain} />}
 
-      {online && online.count > 0 && (
+      {domainId && (
+        <div className="flex flex-wrap items-center justify-between gap-2" data-testid="strip-dashboard-status">
+          <span className="text-xs text-muted-foreground" data-testid="text-dashboard-updated">
+            {analyticsQuery.dataUpdatedAt
+              ? `Updated ${formatTimeAgo(new Date(Math.max(analyticsQuery.dataUpdatedAt, online.dataUpdatedAt)).toISOString())}`
+              : "Loading…"}
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs"
+            disabled={online.isFetching || analyticsQuery.isFetching}
+            onClick={() => { void online.refetch(); void analyticsQuery.refetch(); }}
+            data-testid="button-refresh-dashboard"
+          >
+            Refresh
+          </Button>
+        </div>
+      )}
+
+      {analyticsQuery.isError && !analytics && (
+        <Notice tone="danger" title="Couldn't load dashboard data" testId="notice-dashboard-error"
+          action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void analyticsQuery.refetch()} data-testid="button-retry-dashboard">Retry</Button>}>
+          {apiErrorMessage(analyticsQuery.error, "The visit summary could not be loaded.")} Figures below would be zeros, not real data.
+        </Notice>
+      )}
+
+      {online.data && online.data.count > 0 && (
         <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900/60 dark:bg-emerald-950/30" data-testid="banner-online">
           <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
           <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
-            {online.count} ongoing visit{online.count > 1 ? "s" : ""} right now
+            {online.data.count} ongoing visit{online.data.count > 1 ? "s" : ""} right now
           </span>
         </div>
       )}
 
       <GoogleStatGrid cols={3}>
-        <GoogleStat label="Online now" value={online?.count ?? 0} testId="card-stat-online-now" hint="Last 20 minutes" />
+        <GoogleStat label="Online now" value={online.data?.count ?? 0} testId="card-stat-online-now" hint="Last 20 minutes" />
         <GoogleStat label="Today" value={countLabel(todayVisits, partialFrom(localDayKey(now)))} testId="card-stat-today" />
         <GoogleStat label="Yesterday" value={countLabel(yesterdayVisits, partialFrom(localDayKey(daysAgo(now, 1))))} testId="card-stat-yesterday" />
         <GoogleStat label="Last 7 days" value={countLabel(last7, partialFrom(chartDays[7][0]))} testId="card-stat-last-7-days" />
@@ -342,14 +385,20 @@ function DashboardView({ domainId, analytics, domains }: { domainId: number | nu
 
       {chartDays.some(([, v]) => v > 0) && (
         <Section title="Daily visits">
-          <div className="flex items-end gap-1 h-32">
+          {/* The column each bar hangs from needs its own height: a percentage height
+              inside a content-sized column collapses to the bar's minimum, drawing every
+              bar the same. h-full + an absolute bar keeps the percentage meaningful. */}
+          <div className="flex items-stretch gap-1 h-32">
             {chartDays.map(([date, count]) => (
-              <div key={date} className="flex-1 flex flex-col items-center gap-1">
-                <div
-                  className={`w-full rounded-t transition-colors min-h-[2px] ${oldestLoaded && date < oldestLoaded ? "bg-muted" : "bg-primary/80 hover:bg-primary"}`}
-                  style={{ height: `${(count / maxDaily) * 100}%` }}
-                  title={oldestLoaded && date < oldestLoaded ? `${date}: not loaded` : date === oldestLoaded ? `${date}: at least ${count} visits` : `${date}: ${count} visits`}
-                />
+              <div key={date} className="flex-1 flex h-full flex-col items-center gap-1">
+                <div className="relative w-full flex-1">
+                  <div
+                    className={`absolute bottom-0 left-0 right-0 rounded-t transition-colors ${oldestLoaded && date < oldestLoaded ? "bg-muted" : "bg-primary/80 hover:bg-primary"}`}
+                    style={{ height: `${(count / maxDaily) * 100}%` }}
+                    title={oldestLoaded && date < oldestLoaded ? `${date}: not loaded` : date === oldestLoaded ? `${date}: at least ${count} visits` : `${date}: ${count} visits`}
+                    data-testid={`bar-${date}`}
+                  />
+                </div>
                 <span className="text-[8px] text-muted-foreground truncate w-full text-center">
                   {Number(date.slice(8, 10))}
                 </span>
@@ -386,7 +435,9 @@ function DashboardView({ domainId, analytics, domains }: { domainId: number | nu
                     </td>
                     <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:text-right sm:tabular-nums">
                       <span className="sm:hidden text-muted-foreground">Unique: </span>
-                      {countLabel(d.stats.uniqueVisitors, d.stats.totalVisits >= VISIT_ROW_CAP)}
+                      {/* No "+" here: unlike totalVisits, the unique-visitor count has no
+                          known-cap flag of its own — showing one would invent a lower bound. */}
+                      {d.stats.uniqueVisitors.toLocaleString()}
                     </td>
                     <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:text-right sm:tabular-nums">
                       <span className="sm:hidden text-muted-foreground">Blocked: </span>
@@ -409,19 +460,25 @@ function VisitorListView({ domainId }: { domainId: number | null }) {
   const [page, setPage] = useState(1);
   const perPage = 20;
 
-  const { data: visitors = [], isLoading } = useQuery<Visitor[]>({
+  const visitorsQuery = useQuery<Visitor[]>({
     queryKey: ["/api/click-guard/domains", domainId, "visitors"],
     enabled: !!domainId,
+    refetchInterval: ONLINE_REFETCH_MS,
   });
+  const visitors = visitorsQuery.data;
+  const visitorsError = visitorsQuery.isError && !visitors;
 
-  const { data: visitorDetail } = useQuery<VisitorDetail>({
+  const detailQuery = useQuery<VisitorDetail>({
     queryKey: ["/api/click-guard/domains", domainId, "visitors", expandedIp],
     enabled: !!domainId && !!expandedIp,
   });
+  const visitorDetail = detailQuery.data;
 
-  const filtered = ipSearch ? visitors.filter(v => v.ipAddress.includes(ipSearch)) : visitors;
+  const filtered = (visitors || []).filter(v => v.ipAddress.includes(ipSearch));
   const totalPages = Math.ceil(filtered.length / perPage);
-  const paginated = filtered.slice((page - 1) * perPage, page * perPage);
+  // Results can shrink below the current page (visits deleted, search narrowed): stay on a real page.
+  const safePage = Math.min(page, Math.max(totalPages, 1));
+  const paginated = filtered.slice((safePage - 1) * perPage, safePage * perPage);
 
   return (
     <div className="space-y-4">
@@ -442,10 +499,15 @@ function VisitorListView({ domainId }: { domainId: number | null }) {
         </span>
       </div>
 
-      {isLoading ? (
+      {visitorsQuery.isLoading ? (
         <div className="flex justify-center py-12">
           <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
         </div>
+      ) : visitorsError ? (
+        <Notice tone="danger" title="Couldn't load visitors" testId="notice-visitors-error"
+          action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void visitorsQuery.refetch()} data-testid="button-retry-visitors">Retry</Button>}>
+          {apiErrorMessage(visitorsQuery.error, "The visitor list could not be loaded.")} This is a failed request, not an empty site.
+        </Notice>
       ) : paginated.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border bg-card py-14 text-center">
           <Users className="h-5 w-5 text-muted-foreground" strokeWidth={1.6} />
@@ -459,16 +521,20 @@ function VisitorListView({ domainId }: { domainId: number | null }) {
               className={`rounded-xl border bg-card transition-all ${expandedIp === v.ipAddress ? "ring-1 ring-primary/30" : ""}`}
               data-testid={`card-visitor-${v.ipAddress}`}
             >
-              <div
-                className="cursor-pointer p-4 hover:bg-muted/30 transition-colors"
+              <button
+                type="button"
+                className="w-full cursor-pointer p-4 text-left hover:bg-muted/30 transition-colors"
                 onClick={() => setExpandedIp(expandedIp === v.ipAddress ? null : v.ipAddress)}
+                aria-expanded={expandedIp === v.ipAddress}
+                aria-controls={`visitor-detail-${v.ipAddress}`}
+                data-testid={`button-expand-visitor-${v.ipAddress}`}
               >
                 <div className="flex items-center gap-3">
                   <div className={`h-2.5 w-2.5 rounded-full shrink-0 ${v.isOnline ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground/30"}`} />
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-sm font-medium" data-testid={`text-ip-${v.ipAddress}`}>
+                        <span className="font-mono text-sm font-medium break-all" data-testid={`text-ip-${v.ipAddress}`}>
                           {v.ipAddress}
                         </span>
                         {v.isSuspicious && (
@@ -491,7 +557,7 @@ function VisitorListView({ domainId }: { domainId: number | null }) {
                         </span>
                         {(v.city || v.country) && (
                           <span className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3" /> {[v.city, v.country].filter(Boolean).join(", ")}
+                            <MapPin className="h-3 w-3" /> {[v.city, countryName(v.country)].filter(Boolean).join(", ")}
                           </span>
                         )}
                       </div>
@@ -506,10 +572,24 @@ function VisitorListView({ domainId }: { domainId: number | null }) {
                   </div>
                   <ChevronRight className={`h-4 w-4 text-muted-foreground shrink-0 transition-transform ${expandedIp === v.ipAddress ? "rotate-90" : ""}`} />
                 </div>
-              </div>
+              </button>
 
-              {expandedIp === v.ipAddress && visitorDetail && (
-                <div className="border-t bg-muted/20 p-4">
+              {expandedIp === v.ipAddress && (
+                <div className="border-t bg-muted/20 p-4" id={`visitor-detail-${v.ipAddress}`}>
+                  {detailQuery.isLoading ? (
+                    <div className="flex justify-center py-8">
+                      <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full" />
+                    </div>
+                  ) : detailQuery.isError || !visitorDetail ? (
+                    <div className="flex flex-wrap items-center justify-between gap-2 py-2">
+                      <span className="text-sm text-destructive" role="alert" data-testid={`text-visitor-detail-error-${v.ipAddress}`}>
+                        {apiErrorMessage(detailQuery.error, "Couldn't load this visitor's details.")}
+                      </span>
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void detailQuery.refetch()} data-testid={`button-retry-visitor-${v.ipAddress}`}>
+                        Retry
+                      </Button>
+                    </div>
+                  ) : (
                   <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <div>
                       <h4 className="mb-3 text-xs font-semibold text-muted-foreground">System specs</h4>
@@ -536,7 +616,7 @@ function VisitorListView({ domainId }: { domainId: number | null }) {
                           <h4 className="mb-3 mt-6 text-xs font-semibold text-muted-foreground">Geolocation</h4>
                           <div className="space-y-2 text-sm">
                             <div className="flex justify-between gap-4"><span className="text-muted-foreground">City</span><span>{visitorDetail.geo.city || "Unknown"}</span></div>
-                            <div className="flex justify-between gap-4"><span className="text-muted-foreground">Country</span><span>{visitorDetail.geo.country || "Unknown"}</span></div>
+                            <div className="flex justify-between gap-4"><span className="text-muted-foreground">Country</span><span>{countryName(visitorDetail.geo.country) || "Unknown"}</span></div>
                           </div>
                         </>
                       )}
@@ -575,6 +655,7 @@ function VisitorListView({ domainId }: { domainId: number | null }) {
                       )}
                     </div>
                   </div>
+                  )}
                 </div>
               )}
             </div>
@@ -585,12 +666,12 @@ function VisitorListView({ domainId }: { domainId: number | null }) {
       {totalPages > 1 && (
         <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
           <span className="text-xs text-muted-foreground">
-            Showing {(page - 1) * perPage + 1}-{Math.min(page * perPage, filtered.length)} of {filtered.length}
+            Showing {(safePage - 1) * perPage + 1}-{Math.min(safePage * perPage, filtered.length)} of {filtered.length}
           </span>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)} data-testid="button-prev-page">Prev</Button>
-            <span className="text-sm tabular-nums text-muted-foreground">Page {page} / {totalPages}</span>
-            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)} data-testid="button-next-page">Next</Button>
+            <Button variant="outline" size="sm" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)} data-testid="button-prev-page">Prev</Button>
+            <span className="text-sm tabular-nums text-muted-foreground">Page {safePage} / {totalPages}</span>
+            <Button variant="outline" size="sm" disabled={safePage >= totalPages} onClick={() => setPage(safePage + 1)} data-testid="button-next-page">Next</Button>
           </div>
         </div>
       )}
@@ -598,13 +679,20 @@ function VisitorListView({ domainId }: { domainId: number | null }) {
   );
 }
 
-function TrafficSourcesView({ domainId, analytics, since }: { domainId: number | null; analytics: Analytics | undefined; since: Date }) {
+function TrafficSourcesView({ analyticsQuery, since }: { analyticsQuery: UseQueryResult<Analytics, Error>; since: Date }) {
+  const analytics = analyticsQuery.data;
   const sources = analytics?.trafficSources || [];
   const totalLoads = sources.reduce((s, t) => s + t.pageLoads, 0);
   const totalVisitors = sources.reduce((s, t) => s + t.visitors, 0);
 
   return (
     <div className="space-y-4">
+      {analyticsQuery.isError && !analytics && (
+        <Notice tone="danger" title="Couldn't load traffic sources" testId="notice-traffic-error"
+          action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void analyticsQuery.refetch()} data-testid="button-retry-traffic">Retry</Button>}>
+          {apiErrorMessage(analyticsQuery.error, "The traffic summary could not be loaded.")}
+        </Notice>
+      )}
       <p className="text-xs text-muted-foreground" data-testid="text-traffic-range">
         {(analytics?.totalVisits ?? 0) >= VISIT_ROW_CAP ? `Latest ${VISIT_ROW_CAP.toLocaleString()} visits` : "Visits"} since {since.toLocaleDateString("en-US", { month: "short", day: "numeric" })}.
       </p>
@@ -663,17 +751,26 @@ function TrafficSourcesView({ domainId, analytics, since }: { domainId: number |
 }
 
 function PagesView({ domainId }: { domainId: number | null }) {
-  const { data: pages = [], isLoading } = useQuery<PageStat[]>({
+  const pagesQuery = useQuery<PageStat[]>({
     queryKey: ["/api/click-guard/domains", domainId, "pages"],
     enabled: !!domainId,
+    refetchInterval: ANALYTICS_REFETCH_MS,
   });
+  const pages = pagesQuery.data;
 
   return (
     <div className="space-y-4">
       <GoogleStatGrid cols={2}>
-        <GoogleStat label="Total pages" value={pages.length} testId="card-stat-total-pages" />
-        <GoogleStat label="Total hits" value={pages.reduce((s, p) => s + p.hits, 0).toLocaleString()} testId="card-stat-total-hits" />
+        <GoogleStat label="Total pages" value={pages?.length ?? 0} testId="card-stat-total-pages" />
+        <GoogleStat label="Total hits" value={pages?.reduce((s, p) => s + p.hits, 0).toLocaleString() ?? 0} testId="card-stat-total-hits" />
       </GoogleStatGrid>
+
+      {pagesQuery.isError && !pages && (
+        <Notice tone="danger" title="Couldn't load pages" testId="notice-pages-error"
+          action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void pagesQuery.refetch()} data-testid="button-retry-pages">Retry</Button>}>
+          {apiErrorMessage(pagesQuery.error, "The page list could not be loaded.")}
+        </Notice>
+      )}
 
       <Section flush title="Pages">
         <div className="overflow-x-auto">
@@ -687,13 +784,13 @@ function PagesView({ domainId }: { domainId: number | null }) {
               </tr>
             </thead>
             <tbody>
-              {isLoading ? (
+              {pagesQuery.isLoading ? (
                 <tr><td colSpan={4} className="p-6 text-center"><div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full mx-auto" /></td></tr>
-              ) : pages.length === 0 ? (
+              ) : pagesQuery.isError ? null : pages!.length === 0 ? (
                 <tr><td colSpan={4} className="p-6 text-center text-muted-foreground">No page data available</td></tr>
               ) : (
-                pages.map((p, i) => {
-                  const totalHits = pages.reduce((s, x) => s + x.hits, 0);
+                pages!.map((p, i) => {
+                  const totalHits = pages!.reduce((s, x) => s + x.hits, 0);
                   const pct = totalHits ? (p.hits / totalHits) * 100 : 0;
                   return (
                     <tr key={i} className="border-t transition-colors hover:bg-muted/40 flex flex-col gap-1.5 px-3.5 py-3 sm:table-row sm:px-0 sm:py-0" data-testid={`row-page-${i}`}>
@@ -725,10 +822,12 @@ function PagesView({ domainId }: { domainId: number | null }) {
 
 function GeoView({ domainId }: { domainId: number | null }) {
   const [subTab, setSubTab] = useState<"countries" | "cities">("countries");
-  const { data: geo, isLoading } = useQuery<GeoData>({
+  const geoQuery = useQuery<GeoData>({
     queryKey: ["/api/click-guard/domains", domainId, "geo"],
     enabled: !!domainId,
+    refetchInterval: ANALYTICS_REFETCH_MS,
   });
+  const geo = geoQuery.data;
 
   const items = subTab === "countries" ? geo?.countries || [] : geo?.cities || [];
 
@@ -739,6 +838,13 @@ function GeoView({ domainId }: { domainId: number | null }) {
         <Button size="sm" variant={subTab === "cities" ? "default" : "outline"} onClick={() => setSubTab("cities")} data-testid="button-geo-cities">Cities</Button>
       </div>
       <p className="text-xs text-muted-foreground" data-testid="text-geo-source-note">Country/city come from Cloudflare on visits recorded after this update; older visits show Unknown.</p>
+
+      {geoQuery.isError && !geo && (
+        <Notice tone="danger" title="Couldn't load geographic data" testId="notice-geo-error"
+          action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void geoQuery.refetch()} data-testid="button-retry-geo">Retry</Button>}>
+          {apiErrorMessage(geoQuery.error, "The geographic breakdown could not be loaded.")}
+        </Notice>
+      )}
 
       <Section flush title={subTab === "countries" ? "Countries" : "Cities"}>
         <div className="overflow-x-auto">
@@ -752,9 +858,9 @@ function GeoView({ domainId }: { domainId: number | null }) {
               </tr>
             </thead>
             <tbody>
-              {isLoading ? (
+              {geoQuery.isLoading ? (
                 <tr><td colSpan={4} className="p-6 text-center"><div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full mx-auto" /></td></tr>
-              ) : items.length === 0 ? (
+              ) : geoQuery.isError ? null : items.length === 0 ? (
                 <tr><td colSpan={4} className="p-6 text-center text-muted-foreground">No geographic data available</td></tr>
               ) : (
                 items.map((item: any, i: number) => (
@@ -762,7 +868,7 @@ function GeoView({ domainId }: { domainId: number | null }) {
                     <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:font-medium">
                       <span className="flex items-center gap-2">
                         <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-                        {item.name}
+                        {subTab === "countries" ? countryName(item.name) : geoLabel(item.name)}
                       </span>
                     </td>
                     <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:text-right sm:tabular-nums sm:font-medium">
@@ -791,10 +897,12 @@ function GeoView({ domainId }: { domainId: number | null }) {
 }
 
 function PlatformsView({ domainId }: { domainId: number | null }) {
-  const { data: platforms, isLoading } = useQuery<PlatformData>({
+  const platformsQuery = useQuery<PlatformData>({
     queryKey: ["/api/click-guard/domains", domainId, "platforms"],
     enabled: !!domainId,
+    refetchInterval: ANALYTICS_REFETCH_MS,
   });
+  const platforms = platformsQuery.data;
 
   const renderBreakdown = (title: string, icon: any, data: Record<string, number> | undefined) => {
     if (!data) return null;
@@ -828,8 +936,17 @@ function PlatformsView({ domainId }: { domainId: number | null }) {
     );
   };
 
-  if (isLoading) {
+  if (platformsQuery.isLoading) {
     return <div className="flex justify-center py-12"><div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" /></div>;
+  }
+
+  if (platformsQuery.isError && !platforms) {
+    return (
+      <Notice tone="danger" title="Couldn't load platform data" testId="notice-platforms-error"
+        action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void platformsQuery.refetch()} data-testid="button-retry-platforms">Retry</Button>}>
+        {apiErrorMessage(platformsQuery.error, "The browser and OS breakdown could not be loaded.")}
+      </Notice>
+    );
   }
 
   return (
@@ -855,20 +972,25 @@ export default function IpTrackerPage() {
   const [newDomainName, setNewDomainName] = useState("");
   const { toast } = useToast();
 
-  const { data: domains = [], isLoading: domainsLoading } = useQuery<DomainWithStats[]>({
+  const domainsQuery = useQuery<DomainWithStats[]>({
     queryKey: ["/api/click-guard/domains"],
+    refetchInterval: ANALYTICS_REFETCH_MS,
   });
+  const domains = domainsQuery.data;
+  const domainsLoading = domainsQuery.isLoading;
+  const domainsError = domainsQuery.isError && !domains;
 
   // A stale or removed ?site= falls back to the first site rather than an id that no longer exists.
-  const selectedDomain = domains.find(d => d.id === selectedDomainId) ?? domains[0];
+  const selectedDomain = (domains ?? []).find(d => d.id === selectedDomainId) ?? domains?.[0];
   const domainId = selectedDomain?.id ?? null;
 
   const since = dashboardSince();
   const sinceIso = since.toISOString();
-  const { data: analytics } = useQuery<Analytics>({
+  const analyticsQuery = useQuery<Analytics>({
     queryKey: ["/api/click-guard/domains", domainId, "analytics", sinceIso],
     queryFn: async () => (await apiRequest("GET", `/api/click-guard/domains/${domainId}/analytics?start=${encodeURIComponent(sinceIso)}`)).json(),
     enabled: !!domainId,
+    refetchInterval: ANALYTICS_REFETCH_MS,
   });
 
   const addDomainMutation = useMutation({
@@ -917,7 +1039,7 @@ export default function IpTrackerPage() {
         </>}
         flush
         actions={
-          domains.length > 0 ? (
+          (domains?.length ?? 0) > 0 ? (
             <>
               <label className="block min-w-0 flex-1 space-y-1.5 text-sm sm:w-52 sm:flex-none">
                 <span className="text-muted-foreground sm:hidden">Site</span>
@@ -928,7 +1050,7 @@ export default function IpTrackerPage() {
                   aria-label="Site"
                   data-testid="select-domain"
                 >
-                  {domains.map(d => (
+                  {(domains ?? []).map(d => (
                     <option key={d.id} value={d.id}>{d.name || d.domain}</option>
                   ))}
                 </select>
@@ -1039,6 +1161,11 @@ export default function IpTrackerPage() {
 
       {domainsLoading ? (
         <div className="flex justify-center py-12"><div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" /></div>
+      ) : domainsError ? (
+        <Notice tone="danger" title="Couldn't load your sites" testId="notice-domains-error"
+          action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void domainsQuery.refetch()} data-testid="button-retry-domains">Retry</Button>}>
+          {apiErrorMessage(domainsQuery.error, "The site list could not be loaded.")} This is a failed request, not an empty account.
+        </Notice>
       ) : !domainId && !showAddDomain ? (
         <div className="flex flex-col items-center justify-center rounded-xl border bg-card py-14 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
@@ -1052,12 +1179,13 @@ export default function IpTrackerPage() {
         </div>
       ) : (
         <>
-          {activeTab === "dashboard" && <DashboardView domainId={domainId} analytics={analytics} domains={domains} />}
-          {activeTab === "visitors" && <VisitorListView domainId={domainId} />}
-          {activeTab === "traffic" && <TrafficSourcesView domainId={domainId} analytics={analytics} since={since} />}
-          {activeTab === "pages" && <PagesView domainId={domainId} />}
-          {activeTab === "geo" && <GeoView domainId={domainId} />}
-          {activeTab === "platforms" && <PlatformsView domainId={domainId} />}
+          {/* Keyed by site: search text, expanded rows and pagination must not leak between sites. */}
+          {activeTab === "dashboard" && <DashboardView domainId={domainId} analyticsQuery={analyticsQuery} domains={domains ?? []} />}
+          {activeTab === "visitors" && <VisitorListView key={domainId ?? "none"} domainId={domainId} />}
+          {activeTab === "traffic" && <TrafficSourcesView analyticsQuery={analyticsQuery} since={since} />}
+          {activeTab === "pages" && <PagesView key={domainId ?? "none"} domainId={domainId} />}
+          {activeTab === "geo" && <GeoView key={domainId ?? "none"} domainId={domainId} />}
+          {activeTab === "platforms" && <PlatformsView key={domainId ?? "none"} domainId={domainId} />}
         </>
       )}
     </AppPage>

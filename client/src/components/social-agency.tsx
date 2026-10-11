@@ -59,6 +59,18 @@ export function BusinessSelector({ value, onChange }: { value: string | null; on
           }
         />
         {error && <p role="alert" className="text-sm text-destructive">Could not load businesses.</p>}
+        {!error && data && (data.items || []).length === 0 && (data.total ?? 0) === 0 && (
+          <div className="rounded-xl border bg-card py-12 text-center" data-testid="empty-social-businesses">
+            <p className="text-sm font-medium">No businesses yet</p>
+            <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+              Add a location to start posting — it appears here as a business you can connect to Google and the social platforms.
+            </p>
+            <GooglePill className="mt-4" href="/locations" label="Add a location" testId="link-add-location" />
+          </div>
+        )}
+        {!error && data && (data.items || []).length === 0 && (data.total ?? 0) > 0 && (
+          <p className="text-sm text-muted-foreground" data-testid="text-no-business-match">No businesses match your search or filter.</p>
+        )}
         {(data?.items || []).length > 0 && (
           <GoogleList testId="list-social-businesses">
             {(data?.items || []).map((b: any) => (
