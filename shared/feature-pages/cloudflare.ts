@@ -3,7 +3,7 @@ import { PLANS, planForModule } from "../plans";
 import { plansWhere } from "../plan-copy";
 
 /**
- * Cloudflare — half of the Agency-only "Cloudflare + Search Console" module.
+ * Cloudflare — half of the "Cloudflare + Search Console" module.
  *
  * Every claim below is backed by the code in `sources`:
  *   - connect: Global API key exchanged for a created token (Zone Read, Analytics Read, Zone WAF Edit) on chosen
@@ -18,7 +18,7 @@ import { plansWhere } from "../plan-copy";
  *   - Click Guard's blocked IPs listed per zone, never published automatically: server/cloudflare/hooks.ts
  *   - disconnect deletes local data and the created token; applied rules remain: routes.ts /disconnect
  *   - background work, hourly budget, paused without the module: server/cloudflare/worker.ts, common.ts budget
- *   - Agency-only gate: requireModule("cloudflareSearchConsole") in routes.ts
+ *   - Module gate: requireModule("cloudflareSearchConsole") in routes.ts
  */
 
 const MODULE_PLAN = PLANS[planForModule("cloudflareSearchConsole")].name;

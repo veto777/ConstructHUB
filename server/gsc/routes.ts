@@ -68,7 +68,14 @@ export function registerGscRoutes(
       prompt: "consent select_account",
       state,
     });
-    res.json({ url: await appConnectUrl(req, "gsc", `https://accounts.google.com/o/oauth2/v2/auth?${q}`, "/search-console?connection=connected") });
+    res.json({
+      url: await appConnectUrl(
+        req,
+        "gsc",
+        `https://accounts.google.com/o/oauth2/v2/auth?${q}`,
+        "/search-console?connection=connected",
+      ),
+    });
   });
   // OAuth landing: saves the grant (edge_connections + queued 'discover') and redirects
   // to /search-console?connection=connected|failed. site-connections.tsx.
@@ -82,7 +89,11 @@ export function registerGscRoutes(
       pending.state !== req.query.state ||
       typeof req.query.code !== "string"
     )
-      return await finishAppConnection(req,res,"/search-console?connection=failed");
+      return await finishAppConnection(
+        req,
+        res,
+        "/search-console?connection=failed",
+      );
     try {
       const response = await http("https://oauth2.googleapis.com/token", {
         method: "POST",
@@ -109,9 +120,13 @@ export function registerGscRoutes(
       const who = await identity.json();
       await saveGscGrant(user, who, tokens);
       await connectionNotice(req, user, "gsc", true, who.email);
-      await finishAppConnection(req,res,"/search-console?connection=connected");
+      await finishAppConnection(
+        req,
+        res,
+        "/search-console?connection=connected",
+      );
     } catch {
-      await finishAppConnection(req,res,"/search-console?connection=failed");
+      await finishAppConnection(req, res, "/search-console?connection=failed");
     }
   });
   // Search analytics for one property: gsc_analytics grouped by date/day-week-month for
@@ -146,7 +161,7 @@ export function registerGscRoutes(
     const {
       rows: [work],
     } = await pool.query(
-      "SELECT count(*)::int pending FROM edge_jobs WHERE asset_id=$1 AND user_id=$2 AND kind='analytics' AND state!='done'",
+      "SELECT count(*)::int pending FROM (SELECT DISTINCT ON (payload) state FROM edge_jobs WHERE asset_id=$1 AND user_id=$2 AND kind='analytics' ORDER BY payload,id DESC) latest WHERE state!='done'",
       [a.id, user],
     );
     res.json({
@@ -156,6 +171,30 @@ export function registerGscRoutes(
       notice:
         "Google returns top rows, excludes some anonymized queries, and reports with a delay. CTR and position are weighted by impressions. Pending or failed jobs may leave incomplete results.",
     });
+  });
+  // Property totals use only the date dimension: never add overlapping breakdowns.
+  route("get", "/api/gsc/assets/:id/overview", async (req, res, user) => {
+    const a = await ownedAsset(user, idInput.parse(req.params.id), "gsc");
+    const p = z
+      .object({ start: z.string().date(), end: z.string().date() })
+      .parse(req.query);
+    if (p.start > p.end)
+      throw new ProviderError("Start date must be before the end date", 400);
+    const {
+      rows: [summary],
+    } = await pool.query(
+      `SELECT sum(clicks) clicks, sum(impressions) impressions,
+       sum(clicks)/NULLIF(sum(impressions),0) ctr,
+       sum(position*impressions)/NULLIF(sum(impressions),0) position,
+       min(date)::text first_date,max(date)::text last_date
+       FROM gsc_analytics WHERE asset_id=$1 AND dimension='date' AND date BETWEEN $2 AND $3`,
+      [a.id, p.start, p.end],
+    );
+    const { rows: trend } = await pool.query(
+      "SELECT date::text date,sum(clicks) clicks FROM gsc_analytics WHERE asset_id=$1 AND dimension='date' AND date BETWEEN $2 AND $3 GROUP BY date ORDER BY date DESC",
+      [a.id, p.start, p.end],
+    );
+    res.json({ summary, trend, start: p.start, end: p.end });
   });
   // Bulk URL work: queues 'inspect' or 'sitemap' jobs per assetId+url line (URL must be
   // inside the property; sitemap needs confirm + Full access). "Queue inspections" /
