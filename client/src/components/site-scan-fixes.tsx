@@ -2,8 +2,39 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Toolbar } from "@/components/app-ui";
+import { evidenceSummary } from "@/components/site-scan-helpers";
 const selectClass =
   "h-10 w-full rounded-md border bg-background px-3 text-sm sm:w-auto";
+/** What the scan saw for one fix: a short readable list, with the raw JSON behind "Technical evidence". */
+function EvidenceSummary({ evidence }: { evidence: unknown }) {
+  const isEmpty =
+    evidence == null ||
+    (typeof evidence === "object" && Object.keys(evidence as object).length === 0);
+  if (isEmpty) return null;
+  const lines = evidenceSummary(evidence);
+  return (
+    <div className="space-y-1">
+      {lines.length > 0 && (
+        <dl className="grid grid-cols-1 gap-x-3 gap-y-1 text-sm sm:grid-cols-[minmax(0,10rem)_minmax(0,1fr)]">
+          {lines.map((l, i) => (
+            <div key={i} className="contents">
+              <dt className="text-muted-foreground">{l.label}</dt>
+              <dd className="min-w-0 break-words">{l.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      <details>
+        <summary className="cursor-pointer text-sm text-muted-foreground">
+          Technical evidence
+        </summary>
+        <pre className="mt-1 max-h-80 overflow-auto whitespace-pre-wrap break-all rounded-md border p-2 text-xs text-muted-foreground">
+          {JSON.stringify(evidence, null, 2)}
+        </pre>
+      </details>
+    </div>
+  );
+}
 export function FixChecklist({
   report,
   onDone,
@@ -102,9 +133,7 @@ export function FixChecklist({
               </>
             )}
           </p>
-          <pre className="whitespace-pre-wrap break-all text-xs text-muted-foreground">
-            {JSON.stringify(f.evidence, null, 2)}
-          </pre>
+          <EvidenceSummary evidence={f.evidence} />
           <p className="text-sm text-muted-foreground">
             <strong className="text-foreground">{f.platform}:</strong>{" "}
             {f.clickPath}

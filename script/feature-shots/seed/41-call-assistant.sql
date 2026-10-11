@@ -23,6 +23,8 @@ create temp table fs_org on commit drop as
   select org_id from crm_members where user_id = 1 and status = 'active'
   order by (org_id = '40000000-0000-4000-8000-000000000001') desc, created_at asc limit 1;
 
+delete from voice_call_tasks where call_id like 'fs-voice-%';
+delete from voice_escalations where call_id like 'fs-voice-%';
 delete from voice_calls where call_sid like 'fs-voice-%';
 delete from voice_numbers where id like 'fs-voice-%';
 delete from voice_profile_versions where profile_id like 'fs-voice-%' or org_id in (select org_id from fs_org);
@@ -182,14 +184,14 @@ select 'fs-voice-call-' || c.n, o.org_id, 'fs-voice-num-1', 'fs-voice-call-' || 
     jsonb_build_object('role','assistant','text', c.reply)),
   c.spam, case when c.outcome = 'spam' then 'Robocall: recorded sales pitch' end, now() - c.ago + (((c.n * 29) % 43) || ' seconds')::interval
 from fs_org o, (values
-  (1, '+13035550161', interval '3 hours',  212, 'lead_submitted', 'Maria Delgado', 'Lakewood',  'Hail damage inspection',  'Hail last week dented gutters and knocked granules off the shingles. Wants an inspection before calling insurance. Lead sent to the CRM.', 'We had that hail storm and I think the roof took a beating.', 'I can set that up. What is the address of the property?', null::numeric),
+  (1, '+13035550161', interval '3 hours',  212, 'lead_submitted', 'Maria Delgado', 'Lakewood',  'Hail damage inspection',  'Hail last week dented gutters and knocked granules off the shingles. Wants an inspection before calling insurance.', 'We had that hail storm and I think the roof took a beating.', 'I can set that up. What is the address of the property?', null::numeric),
   (2, '+13035550162', interval '7 hours',  148, 'lead_submitted', 'Tom Becker',    'Aurora',    'Full roof replacement',    'Roof is 22 years old, asking about a full replacement and financing. Lead sent to the CRM.', 'Our roof is over twenty years old and we want a quote to replace it.', 'Happy to help. An estimator does a free inspection first. What is the address?', null),
   (3, '+13035550163', interval '1 day 2 hours', 96, 'alerted', 'Priya Natarajan', 'Denver', 'Active leak', 'Water coming through the ceiling during rain. Paged the on-call crew lead by text.', 'Water is dripping through my bedroom ceiling right now.', 'I am paging the on-call crew lead now; someone will call you right back.', null),
   (4, '+13035550164', interval '1 day 6 hours', 41, 'spam', null, null, null, 'Recorded sales pitch for business loans. Not counted against minutes.', 'This is an important message about your business funding.', 'Thanks, we are not interested. Goodbye.', 0.97),
   (5, '+13035550165', interval '2 days 1 hour', 175, 'lead_submitted', 'Grace Whitman', 'Littleton', 'Gutters and guards', 'Wants seamless gutters and guards on a two-story house. Lead sent to the CRM.', 'I need new gutters, the old ones are pulling off the fascia.', 'We can do seamless gutters and guards. What is the address?', null),
   (6, '+13035550166', interval '3 days 4 hours', 63, 'info', 'Dale Ortiz', 'Arvada', 'Hours question', 'Asked about Saturday hours and whether the inspection is free. Answered from the profile.', 'Are you open Saturday and is the inspection free?', 'Yes, Saturday 9 to 1, and the inspection and estimate are free.', null),
   (7, '+13035550167', interval '4 days 2 hours', 88, 'out_of_area', 'Kim Larsen', 'Colorado Springs', 'Roof repair', 'Property is outside the service area. Declined politely.', 'I am down in Colorado Springs, do you come out here?', 'I am sorry, that is outside the area we serve.', null),
-  (8, '+13035550168', interval '5 days 3 hours', 231, 'lead_submitted', 'Andre Wallace', 'Englewood', 'Skylight and re-roof', 'Re-roof with two replacement skylights; insurance claim already open. Lead sent to the CRM.', 'Insurance approved a new roof and I want the skylights replaced too.', 'We can handle both. What is the address and your claim timing?', null),
+  (8, '+13035550168', interval '5 days 3 hours', 231, 'lead_submitted', 'Andre Wallace', 'Englewood', 'Skylight and re-roof', 'Re-roof with two replacement skylights; insurance claim already open.', 'Insurance approved a new roof and I want the skylights replaced too.', 'We can handle both. What is the address and your claim timing?', null),
   (9, '+13035550169', interval '6 days 5 hours', 37, 'spam', null, null, null, 'Extended-warranty robocall. Not counted against minutes.', 'Your vehicle warranty is about to expire.', 'Thanks, we are not interested. Goodbye.', 0.99),
   (10,'+13035550170', interval '8 days 1 hour', 158, 'lead_submitted', 'Helen Park', 'Westminster', 'Missing shingles', 'Wind took off shingles on the north side. Wants a repair quote. Lead sent to the CRM.', 'The wind ripped some shingles off the back of the house.', 'We do repairs. What is the address and is anything leaking?', null),
   (11,'+13035550171', interval '11 days 3 hours', 120, 'voicemail', 'Luis Romero', 'Denver', 'Callback request', 'Caller asked for a callback about an existing job. Office notified by email.', 'I want to talk to someone about the job you did last month.', 'I will pass that to the office and they will call you back.', null),
@@ -198,6 +200,51 @@ from fs_org o, (values
 -- Oldest first: the call_no trigger (server/voice/schema.ts) numbers in insert order, so "Call #" follows arrival
 -- order (#1 = the oldest) and the two spam calls are the gaps the Calls tab's "Call #" tooltip explains.
 order by c.ago desc;
+
+-- The states round 4 added to the console (Kimi score-4: "seed 1-2 escalations and a recording"), so they can be
+-- filmed without a live call. Escalations: the active leak (call 3) paged the crew lead by text, reminded once and
+-- still waiting; the existing-job callback (call 11) went to the office by email and was confirmed.
+insert into voice_escalations (org_id, call_id, kind, rule_id, channel, recipient, recipient_name, body, sent_count, last_sent_at,
+  remind_every_minutes, remind_from_hour, remind_to_hour, max_days, follow_up_next_day, confirmed_at, reply_text, created_at)
+select o.org_id, e.call_id, e.kind, e.rule_id, e.channel, e.recipient, e.name, e.body, e.sent, now() - e.last_sent,
+  e.every, e.from_h, e.to_h, e.max_days, true, case when e.confirmed then now() - interval '10 days 22 hours' end,
+  case when e.confirmed then 'Confirmed by email link' end, now() - e.ago
+from fs_org o, (values
+  ('fs-voice-call-3', 'urgent', 'owner-urgent', 'sms', '+13035550124', 'Sam Rivera',
+   E'SUMMIT ROOFING — Janice (virtual assistant)\nEmergency\nCaller: Priya Natarajan · (303) 555-0163\nDenver\nWater coming through the ceiling during rain.\nReply OK to confirm you have it. (Reminders continue until confirmed.)',
+   2, interval '20 hours', interval '1 day 2 hours', 120, 7, 20, 14, false),
+  ('fs-voice-call-11', 'existing_customer', 'office', 'email', 'office@summitroofing.example', 'Office',
+   E'SUMMIT ROOFING — Janice (virtual assistant)\nExisting customer\nCaller: Luis Romero · (303) 555-0171\nDenver\nWants to talk to someone about the job done last month.\nReply OK to confirm you have it. (Reminders continue until confirmed.)',
+   1, interval '11 days 3 hours', interval '11 days 3 hours', 240, 8, 18, 7, true)
+) as e(call_id, kind, rule_id, channel, recipient, name, body, sent, last_sent, ago, every, from_h, to_h, max_days, confirmed);
+update voice_calls set flags = coalesce(flags, '{}'::jsonb) || '{"alertedKinds": ["urgent"]}'::jsonb where id = 'fs-voice-call-3';
+
+-- Recordings: the newest call's is still uploading from the phone system; the second call's was refused by the app
+-- (the engine keeps the WAV in its failed queue for a replay). No call claims a stored recording: there is no audio
+-- in R2 behind a seed.
+update voice_calls set flags = coalesce(flags, '{}'::jsonb)
+  || jsonb_build_object('recordingPending', true, 'recording', jsonb_build_object('state', 'pending', 'seq', 0, 'at', to_char((now() - interval '3 hours') at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')))
+  where id = 'fs-voice-call-1';
+update voice_calls set flags = coalesce(flags, '{}'::jsonb)
+  || jsonb_build_object('recording', jsonb_build_object('state', 'failed', 'reason', 'HTTP 413: the recording was larger than the upload limit', 'seq', 1, 'attempts', 1, 'at', to_char((now() - interval '7 hours') at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')))
+  where id = 'fs-voice-call-2';
+
+-- The CRM work each call owed (server/voice/call-tasks.ts): delivered for the older leads and the escalations; the
+-- newest lead still retrying (the CRM refused it twice; the next automatic try is due later); one older lead
+-- failed after its retry window, waiting for "Retry now".
+insert into voice_call_tasks (call_id, org_id, kind, task_key, payload, state, attempts, last_error, result, next_attempt_at, give_up_at, created_at, updated_at, done_at)
+select t.call_id, o.org_id, t.kind, t.task_key, t.payload::jsonb, t.state, t.attempts, t.last_error, t.result::jsonb,
+  now() + t.next_in, now() - t.ago + interval '3 days', now() - t.ago, now() - t.ago, case when t.state = 'done' then now() - t.ago + interval '2 seconds' end
+from fs_org o, (values
+  ('fs-voice-call-1',  'lead', 'lead', '{}', 'pending', 2, 'CRM write timed out (the database was busy); retrying', null, interval '40 minutes', interval '3 hours'),
+  ('fs-voice-call-2',  'lead', 'lead', '{}', 'done', 1, null, '{"created": true}', interval '0 minutes', interval '7 hours'),
+  ('fs-voice-call-3',  'escalation', 'escalation:urgent', '{"kind": "urgent", "summary": "Water coming through the ceiling during rain."}', 'done', 1, null, '{"fallback": true}', interval '0 minutes', interval '1 day 2 hours'),
+  ('fs-voice-call-5',  'lead', 'lead', '{}', 'done', 1, null, '{"created": true}', interval '0 minutes', interval '2 days 1 hour'),
+  ('fs-voice-call-8',  'lead', 'lead', '{}', 'failed', 37, 'Client could not be saved: the CRM refused the record (validation failed on the address)', null, interval '0 minutes', interval '5 days 3 hours'),
+  ('fs-voice-call-10', 'lead', 'lead', '{}', 'done', 1, null, '{"created": true}', interval '0 minutes', interval '8 days 1 hour'),
+  ('fs-voice-call-11', 'escalation', 'escalation:existing_customer', '{"kind": "existing_customer", "summary": "Wants to talk to someone about the job done last month."}', 'done', 1, null, '{}', interval '0 minutes', interval '11 days 3 hours'),
+  ('fs-voice-call-12', 'lead', 'lead', '{}', 'done', 1, null, '{"created": true}', interval '0 minutes', interval '14 days 2 hours')
+) as t(call_id, kind, task_key, payload, state, attempts, last_error, result, next_in, ago);
 
 insert into voice_usage (org_id, account_user_id, month, calls, minutes, spam_calls, blocked_calls, included_minutes, spam_free_calls, spam_free_minutes, stripe_usage_record_id, updated_at)
 select org_id, 1, to_char(now() at time zone 'UTC', 'YYYY-MM'), 10, 24, 2, 0, 1000, 2, 2, 'fs-voice-sample', now() from fs_org

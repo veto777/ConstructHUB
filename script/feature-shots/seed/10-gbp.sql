@@ -249,8 +249,20 @@ WHERE s.id BETWEEN 910001 AND 910003;
 -- ===================================================================================================
 INSERT INTO competitor_scans (id, user_id, industry, location, lat, lon, radius, status, total_found, created_at, error_message)
 OVERRIDING SYSTEM VALUE VALUES
- (910001, 1, 'Roofing Contractor', 'Denver, CO', '39.7392', '-104.9903', 25, 'completed', 12, now() - interval '3 days', NULL),
+ -- 910001 is always inside the current calendar month (UTC), even on the 1st-3rd, so the
+ -- "N of M used this month" line under the form counts at least the newest scan in the list.
+ (910001, 1, 'Roofing Contractor', 'Denver, CO', '39.7392', '-104.9903', 25, 'completed', 12,
+   greatest(now() - interval '3 days', (date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') + interval '5 minutes'), NULL),
  (910002, 1, 'Gutter Service',     'Aurora, CO', '39.7294', '-104.8319', 15, 'completed', 8,  now() - interval '18 days', NULL);
+
+-- The usage line reads the monthly meter (server/growth-quotas.ts quotaKey: quota:user:<id>:competitorScans:<YYYY-MM>,
+-- UTC), not the scan rows, so set this month's count to the scans the list shows for this month.
+INSERT INTO growth_budgets (key, period, used)
+SELECT 'quota:user:1:competitorScans:' || to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM'), '0', count(*)::int
+FROM competitor_scans
+WHERE user_id = 1 AND status = 'completed'
+  AND created_at >= date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
+ON CONFLICT (key, period) DO UPDATE SET used = EXCLUDED.used;
 
 INSERT INTO competitor_listings (id, scan_id, user_id, place_id, business_name, address, phone, website, rating, review_count, category, is_new, bs_score, bs_reasons, review_analysis, rank_history, last_checked_at, first_seen_at)
 OVERRIDING SYSTEM VALUE

@@ -371,6 +371,41 @@ export const VOICE_SCHEMA_DDL: readonly string[] = [
   // ── end lane: studio-backend ──
 
   // ── lane: calls+crm — append here ──
+  // The post-call CRM work of one call (Codex score-4 lane A): one row per effect — `lead` (client + project) and
+  // `escalation:<kind>` (the text/email and/or the owners' alert) — written in the SAME transaction that
+  // acknowledges the end report (internal-calls.ts acknowledgeCall), so an acknowledged report never leaves work
+  // unrecorded. (call_id, task_key) is the idempotency key; call-tasks.ts runs each under a lease and retries with
+  // backoff until it is done (or `failed` after its give-up window; the console's "Retry now" re-arms it).
+  `CREATE TABLE IF NOT EXISTS voice_call_tasks (
+     id bigserial PRIMARY KEY,
+     call_id varchar NOT NULL,
+     org_id varchar NOT NULL,
+     kind text NOT NULL,
+     task_key text NOT NULL,
+     payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+     state text NOT NULL DEFAULT 'pending',
+     attempts integer NOT NULL DEFAULT 0,
+     last_error text,
+     result jsonb,
+     next_attempt_at timestamp NOT NULL DEFAULT now(),
+     give_up_at timestamp,
+     leased_until timestamp,
+     lease_token uuid,
+     created_at timestamp NOT NULL DEFAULT now(),
+     updated_at timestamp NOT NULL DEFAULT now(),
+     done_at timestamp,
+     UNIQUE (call_id, task_key)
+   )`,
+  `CREATE INDEX IF NOT EXISTS voice_call_tasks_due_idx ON voice_call_tasks (state, next_attempt_at)`,
+  `CREATE INDEX IF NOT EXISTS voice_call_tasks_org_idx ON voice_call_tasks (org_id, state)`,
+  // One escalation per (call, kind) as a database invariant, so a retried task racing a mid-call alert can never
+  // page twice. Added only when the existing rows already satisfy it (a legacy duplicate must not stop the boot;
+  // escalations.ts also checks before inserting).
+  `DO $$ BEGIN
+     IF NOT EXISTS (SELECT 1 FROM voice_escalations WHERE call_id IS NOT NULL GROUP BY call_id, kind HAVING count(*) > 1) THEN
+       CREATE UNIQUE INDEX IF NOT EXISTS voice_escalations_call_kind_uidx ON voice_escalations (call_id, kind) WHERE call_id IS NOT NULL;
+     END IF;
+   END $$`,
   // ── end lane: calls+crm ──
 ];
 
@@ -394,7 +429,7 @@ export const VOICE_SCHEMA_BACKFILL: readonly string[] = [
 
 export const VOICE_TABLES: readonly string[] = [
   "voice_profiles", "voice_profile_versions", "voice_numbers", "voice_calls", "voice_escalations", "voice_spam", "voice_usage",
-  "voice_spam_reports",
+  "voice_spam_reports", "voice_call_tasks",
 ];
 
 type Queryable = { query: (text: string, values?: unknown[]) => Promise<{ rows: any[] }> };

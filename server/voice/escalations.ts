@@ -193,22 +193,42 @@ async function notifyOwners(ctx: OrgVoiceContext, call: VoiceCallRow, kind: stri
 
 export type RaiseResult = { escalationId: number | null; sent: boolean; fallback: boolean; recipientName: string | null; duplicate: boolean };
 
+/** A strict raise (the end report's durable task, call-tasks.ts) could not finish: the task retries it. */
+export class EscalationDeliveryError extends Error {
+  constructor(message: string, readonly escalationId: number | null) { super(message); }
+}
+
+/** Whether the owners must hear about this kind: no usable rule row and the fallback is on, or urgent/human always. */
+const ownersNeeded = (ctx: OrgVoiceContext, kind: string, hasRow: boolean) =>
+  (!hasRow && ctx.profile.escalations.fallbackToOwner) || kind === "urgent" || kind === "human";
+
+/** Postgres unique violation (voice_escalations_call_kind_uidx: one escalation per call and kind). */
+const isUniqueViolation = (e: any) => e?.code === "23505" || e?.cause?.code === "23505";
+
 /**
  * Raise one escalation for a call. Idempotent per (call, kind): a second
  * `alert` of the same kind during one call (or the end report repeating a
- * mid-call event) does not text anyone twice.
+ * mid-call event) does not text anyone twice — one row per (call, kind), a
+ * unique index where the data allows it (schema.ts).
+ *
+ * `strict` is the end report's durable task (call-tasks.ts): it finishes what an earlier attempt left undone —
+ * a first text/email that never went out is sent now, an owners' alert that failed is sent now — and throws
+ * EscalationDeliveryError while anything is still undelivered, so the task stays pending and is retried. The
+ * mid-call path (not strict) stays best-effort: the end report's task completes whatever it missed.
  */
 export async function raiseEscalation(args: {
-  ctx: OrgVoiceContext; call: VoiceCallRow; kind: string; summary: string; slots?: Record<string, string> | null;
+  ctx: OrgVoiceContext; call: VoiceCallRow; kind: string; summary: string; slots?: Record<string, string> | null; strict?: boolean;
 }): Promise<RaiseResult> {
-  const { ctx, call } = args;
+  const { ctx, call, strict = false } = args;
   const kind = isEscalationKind(args.kind) ? args.kind : "other";
   const facts = escalationFacts(ctx, call, kind, args.summary, args.slots);
   const rule = matchRule(ctx.profile.escalations.rules, kind);
-  const [existing] = await db.select().from(voiceEscalations)
-    .where(and(eq(voiceEscalations.orgId, ctx.org.id), eq(voiceEscalations.callId, call.id), eq(voiceEscalations.kind, kind))).limit(1);
+  const findExisting = async () => (await db.select().from(voiceEscalations)
+    .where(and(eq(voiceEscalations.orgId, ctx.org.id), eq(voiceEscalations.callId, call.id), eq(voiceEscalations.kind, kind))).limit(1))[0];
+  const existing = await findExisting();
   const callFlags = (call.flags ?? {}) as Record<string, unknown>;
   const alreadyFallback = Array.isArray(callFlags.alertedKinds) && (callFlags.alertedKinds as string[]).includes(kind);
+  const ownersDone = () => !!((call.flags ?? {}) as { alertFacts?: Record<string, unknown> }).alertFacts?.[kind];
   if (existing || alreadyFallback) {
     // The same kind again (a mid-call update, or the end report repeating it): no second page — but when the
     // call has since given a name or an address the first message lacked, the stored body (what reminders
@@ -218,6 +238,21 @@ export async function raiseEscalation(args: {
         console.error("[voice] escalation details update failed:", e?.message || e);
         void recordFailure("call_assistant", "Call Assistant escalation details update", e, { callId: call.id, orgId: ctx.org.id, kind });
       });
+    if (strict) {
+      // Finish what the first attempt left: a first message that never went out, an owners' alert that failed.
+      if (existing && existing.sentCount === 0 && !existing.lastSentAt && !existing.closedAt) {
+        const sent = await sendEscalation(ctx.org, existing, existing.body, `${facts.company}: ${facts.kind} — ${facts.callerName}`);
+        await db.update(voiceEscalations).set({
+          sentCount: sent.ok ? 1 : 0, lastSentAt: sent.ok ? new Date() : null, lastProviderSid: sent.sid, lastError: sent.error,
+        }).where(eq(voiceEscalations.id, existing.id));
+        if (!sent.ok) throw new EscalationDeliveryError(`escalation #${existing.id} not sent: ${sent.error ?? "send failed"}`, existing.id);
+      }
+      if (ownersNeeded(ctx, kind, !!existing) && !ownersDone()) {
+        await notifyOwners(ctx, call, kind, facts);   // throws → the task retries
+        await rememberOwnerFacts(call, kind, facts);
+      }
+      if (!alreadyFallback) await markAlerted(call, kind);
+    }
     return existing
       ? { escalationId: existing.id, sent: true, fallback: false, recipientName: existing.recipientName, duplicate: true }
       : { escalationId: null, sent: true, fallback: true, recipientName: null, duplicate: true };
@@ -229,37 +264,58 @@ export async function raiseEscalation(args: {
   });
 
   let result: RaiseResult = { escalationId: null, sent: false, fallback: false, recipientName: null, duplicate: false };
+  let undelivered: string | null = null;
   if (rule) {
     const recipient = rule.channel === "sms" ? normalizePhone(rule.recipient) : rule.recipient.trim().toLowerCase();
     if (recipient) {
       const body = escalationBody(rule, facts);
       const r = rule.reminders;
-      const [row] = await db.insert(voiceEscalations).values({
-        orgId: ctx.org.id, callId: call.id, kind, ruleId: rule.id, channel: rule.channel,
-        recipient, recipientName: rule.recipientName, body,
-        remindEveryMinutes: r.enabled ? r.everyMinutes : 0, remindFromHour: r.fromHour, remindToHour: r.toHour,
-        maxDays: r.maxDays, followUpNextDay: r.followUpNextDay,
-      }).returning();
+      let row: VoiceEscalationRow | undefined;
+      try {
+        [row] = await db.insert(voiceEscalations).values({
+          orgId: ctx.org.id, callId: call.id, kind, ruleId: rule.id, channel: rule.channel,
+          recipient, recipientName: rule.recipientName, body,
+          remindEveryMinutes: r.enabled ? r.everyMinutes : 0, remindFromHour: r.fromHour, remindToHour: r.toHour,
+          maxDays: r.maxDays, followUpNextDay: r.followUpNextDay,
+        }).returning();
+      } catch (e) {
+        // Another delivery of the same (call, kind) won the insert a moment ago: it owns the first message.
+        if (!isUniqueViolation(e)) throw e;
+        const winner = await findExisting();
+        if (!winner) throw e;
+        // strict: go through the existing-row path, which finishes whatever the winner has not delivered yet
+        if (strict) return raiseEscalation(args);
+        return { escalationId: winner.id, sent: true, fallback: false, recipientName: winner.recipientName, duplicate: true };
+      }
       const sent = await sendEscalation(ctx.org, row, body, `${facts.company}: ${facts.kind} — ${facts.callerName}`);
       await db.update(voiceEscalations).set({
         sentCount: sent.ok ? 1 : 0, lastSentAt: sent.ok ? new Date() : null, lastProviderSid: sent.sid, lastError: sent.error,
       }).where(eq(voiceEscalations.id, row.id));
       result = { escalationId: row.id, sent: sent.ok, fallback: false, recipientName: rule.recipientName, duplicate: false };
+      if (!sent.ok) undelivered = `escalation #${row.id} not sent: ${sent.error ?? "send failed"}`;
     }
   }
   // No rule (or an unusable recipient) → the owners; urgent/human always also reach the owners.
-  let ownersNotified = false;
-  if ((!result.escalationId && ctx.profile.escalations.fallbackToOwner) || kind === "urgent" || kind === "human") {
+  if (ownersNeeded(ctx, kind, !!result.escalationId)) {
+    let ownersOk = true;
     await notifyOwners(ctx, call, kind, facts).catch((e: any) => {
+      ownersOk = false;
       console.error("[voice] owner alert failed:", e?.message || e);
       void recordFailure("call_assistant", "Call Assistant owner alert", e, { callId: call.id, orgId: ctx.org.id, kind });
+      undelivered ??= `owners' alert failed: ${String(e?.message || e).slice(0, 200)}`;
     });
     result.fallback = true;
-    result.sent = true;
-    ownersNotified = true;
+    result.sent = ownersOk || result.sent;
+    // Only a delivered alert is remembered: a strict retry sends the owners' alert again until it lands.
+    if (ownersOk) await rememberOwnerFacts(call, kind, facts);
   }
-  if (ownersNotified) await rememberOwnerFacts(call, kind, facts);
-  // Remember the kind on the call (merged in SQL, so a concurrent end report keeps its own keys).
+  await markAlerted(call, kind);
+  if (strict && undelivered) throw new EscalationDeliveryError(undelivered, result.escalationId);
+  return result;
+}
+
+/** Remember the kind on the call (merged in SQL, so a concurrent end report keeps its own keys). */
+async function markAlerted(call: VoiceCallRow, kind: string): Promise<void> {
   await db.execute(sql`
     update voice_calls
        set flags = jsonb_set(coalesce(flags, '{}'::jsonb), '{alertedKinds}',
@@ -269,7 +325,6 @@ export async function raiseEscalation(args: {
   const flags = { ...((call.flags ?? {}) as Record<string, unknown>) };
   flags.alertedKinds = [...new Set([...(Array.isArray(flags.alertedKinds) ? flags.alertedKinds as string[] : []), kind])];
   call.flags = flags;
-  return result;
 }
 
 /** What the owners' alert carried, per kind (voice_calls.flags.alertFacts), so a later update can tell what's new. */

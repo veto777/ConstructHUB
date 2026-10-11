@@ -1,0 +1,125 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "intro-mail-alerts",
+  "title": "Mail alerts",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/mail-alerts",
+      "caption": "Mail alerts",
+      "chapter": "One provider inbox",
+      "narration": "This is Mail alerts. It keeps the provider emails that matter, matched to the client they're about."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"section-mail-inbox\"] h2",
+      "caption": "Provider inbox",
+      "narration": "Alert emails from Google, Cloudflare and domain registrars land in the Provider inbox."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-alert-910001\"]",
+      "caption": "Severity, client, sender",
+      "narration": "Each alert shows how serious it is, the client it's about, the sender, and when it arrived."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"triage-critical\"]",
+      "caption": "Critical first",
+      "chapter": "Triage",
+      "narration": "The counts at the top are filters. Choose Critical to see what needs you first."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"list-alerts\"]",
+      "caption": "Two critical alerts",
+      "narration": "Here, a suggested edit to a Business Profile, and a domain about to expire."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"triage-critical\"]",
+      "caption": "Back to all alerts",
+      "narration": "Choose it again to clear the filter."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"triage-unmapped\"]",
+      "caption": "Unmapped",
+      "chapter": "Match to a client",
+      "narration": "Unmapped lists the alerts that aren't matched to a client yet."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"card-alert-910003\"] button:has-text(\"Assign client\")",
+      "caption": "Assign client",
+      "narration": "To file one, choose Assign client."
+    },
+    {
+      "action": "select",
+      "selector": "select[aria-label=\"Map alerts to client\"]",
+      "value": "Summit Roofing Co.",
+      "caption": "Pick the client",
+      "narration": "Pick the client it belongs to."
+    },
+    {
+      "action": "click",
+      "selector": "button:has-text(\"Map selected alerts\")",
+      "caption": "Map selected alerts",
+      "narration": "Then choose Map selected alerts. It leaves the Unmapped list."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"triage-unmapped\"]",
+      "caption": "All alerts",
+      "narration": "Back on the full list, open any alert to read the email itself."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"card-alert-910002\"] summary",
+      "caption": "Read matched message",
+      "narration": "Choose Read matched message. Opening it marks the alert read."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//select[@aria-label=\"Alert category\"]/parent::*",
+      "caption": "Filter and search",
+      "narration": "You can also filter by provider, severity or client, or search. Alerts are kept for thirty days."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-mail-alerts\"]",
+      "caption": "Menu: Mail alerts",
+      "narration": "You'll find Mail alerts in the menu on the left, under Google Business, next to Domains."
+    }
+  ],
+  "youtube": {
+    "title": "Mail alerts in about a minute | ConstructHUB",
+    "description": "A one-minute tour of Mail alerts in ConstructHUB: alert emails from Google, Cloudflare and domain registrars in one inbox, marked by severity, filtered to what is critical or unread, and matched to the client each one is about.",
+    "tags": [
+      "ConstructHUB",
+      "provider alerts",
+      "Google Business Profile alerts",
+      "agency tools",
+      "client accounts",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Critical Alerts First",
+    "accent": "Critical",
+    "kicker": "Mail alerts",
+    "step": 2
+  },
+  "removeSelectors": [
+    "[data-testid=\"section-connection-status\"]",
+    "[data-testid=\"section-mail-inbox\"] ~ section"
+  ]
+}

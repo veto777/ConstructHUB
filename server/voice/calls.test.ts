@@ -96,7 +96,7 @@ let a: Who, n: Who, c: Who, field: Who;
 let numberA: { id: string; phoneNumber: string };
 const leadTech = fakePhone();
 
-const shared: { leadSid?: string; leadCallId?: string; customerId?: string; escalationId?: number; spammer?: string; infoCallId?: string; blockedSid?: string } = {};
+const shared: { leadSid?: string; leadCallId?: string; customerId?: string; escalationId?: number; spammer?: string; infoCallId?: string; blockedSid?: string; rejectedRecCallId?: string } = {};
 
 describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Call Assistant calls over HTTP (child server)", () => {
   beforeAll(async () => {
@@ -108,7 +108,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Call Assistant cal
     const env: NodeJS.ProcessEnv = {
       ...process.env, PORT: String(port), NODE_ENV: "development", DEV_AUTH_BYPASS_USER1: "false", CRM_DEMO_AUTOLOGIN: "false",
       SESSION_SECRET, VOICE_INTERNAL_SECRET: VOICE_SECRET, EMAIL_FORCE_SINK: "1", STRIPE_SECRET_KEY: "", GOOGLE_PLACES_API_KEY: "",
-      SCRAPE_SCHEDULER_DISABLED: "true", GBP_SYNC_DISABLED: "true", SMS_OUTBOX_PATH: smsOutbox, VOICE_ESCALATION_WORKER_ENABLED: "false",
+      SCRAPE_SCHEDULER_DISABLED: "true", GBP_SYNC_DISABLED: "true", SMS_OUTBOX_PATH: smsOutbox, VOICE_ESCALATION_WORKER_ENABLED: "false", VOICE_CALL_TASK_WORKER_ENABLED: "false",
     };
     // No carrier, no bucket: nothing in this suite can leave the box.
     for (const k of ["SIGNALWIRE_SPACE_URL", "SIGNALWIRE_PROJECT_ID", "SIGNALWIRE_API_TOKEN", "SIGNALWIRE_FROM_NUMBER", "SIGNALWIRE_SIGNING_KEY",
@@ -203,6 +203,8 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Call Assistant cal
       expect(end.body).toMatchObject({ callId: start.body.callId, outcome: "lead_submitted", blocked: false, escalations: [shared.escalationId] });
       expect(end.body.customerId).toBeTruthy();
       expect(end.body.projectId).toBeTruthy();
+      // The CRM work ran as durable tasks recorded with the acknowledgement (call-tasks.ts), and all of it is done.
+      expect(end.body.delivery).toMatchObject({ state: "done", tasks: [{ key: "lead", state: "done" }, { key: "escalation:urgent", state: "done" }] });
       shared.customerId = end.body.customerId;
 
       // The engine retries the end report: same answer, nothing done twice.
@@ -297,6 +299,21 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Call Assistant cal
       expect((await http("POST", `/api/voice-internal/recordings/${shared.leadSid}`, { body: { a: 1 } })).status).toBe(400);
       expect((await http("POST", `/api/voice-internal/recordings/${newSid()}`, { raw: wav })).status).toBe(404);
     });
+
+    it("artifact status: the engine's explicit failed/missing word replaces the age guess; older or repeated statuses are ignored", async () => {
+      const sid = newSid();
+      await internal("POST", "/calls", { callSid: sid, to: numberA.phoneNumber, from: fakePhone() });
+      const end = await internal("PUT", `/calls/${sid}`, { durationSeconds: 30, outcome: "info", summary: "Asked about gutters.", recordingPending: true });
+      shared.rejectedRecCallId = end.body.callId;
+      const failed = await internal("POST", `/calls/${sid}/artifacts`, { recording: { state: "failed", reason: "HTTP 413", seq: 2, attempts: 1 } });
+      expect(failed.status).toBe(200);
+      expect(failed.body).toEqual({ ok: true, applied: true, recordingState: "failed" });
+      expect((await internal("POST", `/calls/${sid}/artifacts`, { recording: { state: "pending", seq: 1 } })).body).toMatchObject({ applied: false, recordingState: "failed" });
+      expect((await internal("POST", `/calls/${sid}/artifacts`, { recording: { state: "failed", seq: 2 } })).body.applied).toBe(false);
+      expect((await internal("POST", `/calls/${sid}/artifacts`, { recording: { state: "lost", seq: 3 } })).status).toBe(400);
+      expect((await internal("POST", `/calls/${newSid()}/artifacts`, { recording: { state: "missing", seq: 1 } })).status).toBe(404);
+      expect((await http("POST", `/api/voice-internal/calls/${sid}/artifacts`, { bearer: null, body: { recording: { state: "missing", seq: 9 } } })).status).toBe(401);
+    });
   });
 
   describe("browser → app", () => {
@@ -343,7 +360,17 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Call Assistant cal
       expect(r.body.recordingState).toBe("pending");
       const list = await crm(a, "GET", "/calls");
       expect(list.body.calls.find((x: any) => x.id === shared.leadCallId)).toMatchObject({ recordingState: "pending", hasRecording: false });
-      expect(list.body.calls.every((x: any) => !("recordingPending" in x))).toBe(true);
+      expect(list.body.calls.every((x: any) => !("recordingPending" in x) && !("recordingStatus" in x))).toBe(true);
+      // The delivery of its CRM work, per task and in one word (the list row and the drawer).
+      expect(r.body.delivery).toMatchObject({ state: "done", tasks: [{ key: "lead", state: "done", label: "Client and project in your CRM" }, { key: "escalation:urgent", state: "done", label: "Escalation — Emergency" }] });
+      expect(list.body.calls.find((x: any) => x.id === shared.leadCallId).deliveryState).toBe("done");
+      expect(list.body.calls.find((x: any) => x.id === shared.infoCallId).deliveryState).toBeNull();
+      // Retry now: nothing left for this call → 409; another org's call → 404.
+      expect((await crm(a, "POST", `/calls/${shared.leadCallId}/delivery/retry`)).status).toBe(409);
+      expect((await crm(c, "POST", `/calls/${shared.leadCallId}/delivery/retry`)).status).toBe(404);
+      // The engine's refusal is shown as failed at once, with why — not "pending" for three days.
+      const rejected = await crm(a, "GET", `/calls/${shared.rejectedRecCallId}`);
+      expect(rejected.body).toMatchObject({ recordingState: "failed", recordingReason: expect.stringMatching(/refused \(HTTP 413\)/) });
       // The reminder loop reports its state with the escalations (off in this child: VOICE_ESCALATION_WORKER_ENABLED=false).
       const esc = await crm(a, "GET", "/escalations?open=1");
       expect(esc.body.reminders).toMatchObject({ running: false, intervalMinutes: 30 });

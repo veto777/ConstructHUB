@@ -93,6 +93,11 @@ def make_mock_app(secret: str, compiled: dict[str, Any] | None = None) -> web.Ap
         req.app[RECORDINGS][req.match_info["sid"]] = data
         return web.json_response({"recordingKey": f"voice/org-test/{req.match_info['sid']}.wav", "seconds": max(0, (len(data) - 44) // 16000)})
 
+    async def artifacts(req):
+        body = await req.json()
+        log(req, body)
+        return web.json_response({"ok": True, "applied": True, "recordingState": (body.get("recording") or {}).get("state")})
+
     async def status(req):
         body = await req.json()
         log(req, body)
@@ -122,6 +127,7 @@ def make_mock_app(secret: str, compiled: dict[str, Any] | None = None) -> web.Ap
         web.post("/api/voice-internal/calls/{sid}/events", call_event),
         web.put("/api/voice-internal/calls/{sid}", call_put),
         web.post("/api/voice-internal/recordings/{sid}", recording),
+        web.post("/api/voice-internal/calls/{sid}/artifacts", artifacts),
         web.post("/api/voice-internal/status", status),
         web.post("/api/voice-internal/support/start", support_start),
         web.post("/api/voice-internal/support/turn", support_turn),

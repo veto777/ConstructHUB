@@ -3,7 +3,7 @@ import { SegmentedTabs, TabCount } from "@/components/tool";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { PhoneIncoming, ShieldAlert, ShieldBan, BellRing, Mic, ChevronLeft, ChevronRight, Info, RefreshCw } from "lucide-react";
+import { PhoneIncoming, ShieldAlert, ShieldBan, BellRing, Mic, MicOff, ChevronLeft, ChevronRight, Info, RefreshCw } from "lucide-react";
 import { EmptyState, StatusPill, crmTable, crmTableCards } from "@/components/crm-ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,8 +20,8 @@ import { CALL_ASSISTANT_FREE_SPAM_CALLS } from "@shared/plans";
 import { CallDetailSheet, EscalationRow } from "./calls-detail";
 import { CallResults } from "./results";
 import {
-  OUTCOME_LABELS, outcomeLabel, outcomeTone, fmtPhone, fmtDuration, fmtWhen, fmtUpdated, LIVE_REFRESH_MS,
-  type VoiceCallList, type VoiceCallListRow, type VoiceEscalationList, type VoiceSpamEntry, type EscalationReminders,
+  OUTCOME_LABELS, outcomeLabel, outcomeTone, fmtPhone, fmtDuration, fmtWhen, fmtUpdated, LIVE_REFRESH_MS, callFingerprint,
+  type VoiceCallList, type VoiceCallListRow, type VoiceCallDetail, type VoiceEscalationList, type VoiceSpamEntry, type EscalationReminders,
 } from "./calls-shared";
 
 /**
@@ -248,7 +248,28 @@ function CallNoHeader({ hint, testId }: { hint: string; testId: string }) {
   );
 }
 
+/**
+ * A list refetch that shows a call in a newer state than its open (or cached) drawer — the report arrived, the
+ * recording landed, the CRM work finished — refetches that drawer, so an open call never sits on stale details.
+ */
+function useSyncOpenCallDrawers(calls: VoiceCallListRow[]) {
+  const qc = useQueryClient();
+  useEffect(() => {
+    for (const c of calls) {
+      const key = ["/api/crm/voice/calls", c.id];
+      const cached = qc.getQueryData<VoiceCallDetail>(key);
+      if (cached && callFingerprint(cached) !== callFingerprint(c)) qc.invalidateQueries({ queryKey: key });
+    }
+  }, [calls, qc]);
+}
+
+const DELIVERY_PILL = {
+  pending: { tone: "warning", label: "Sending to CRM" },
+  failed: { tone: "danger", label: "CRM delivery failed" },
+} as const;
+
 function CallsTable({ calls, onOpen, testId, numberHint }: { calls: VoiceCallListRow[]; onOpen: (id: string) => void; testId: string; numberHint: string }) {
+  useSyncOpenCallDrawers(calls);
   return (
     <div className={crmTable.wrapper}>
       <table className={crmTable.table} data-testid={testId}>
@@ -291,6 +312,9 @@ function CallsTable({ calls, onOpen, testId, numberHint }: { calls: VoiceCallLis
               <td className={cn(crmTable.td, crmTableCards.td)}>
                 <div className="flex flex-wrap items-center gap-1.5">
                   <StatusPill tone={outcomeTone(c.outcome)} data-testid={`pill-call-outcome-${c.id}`}>{outcomeLabel(c.outcome)}</StatusPill>
+                  {(c.deliveryState === "pending" || c.deliveryState === "failed") && (
+                    <StatusPill tone={DELIVERY_PILL[c.deliveryState].tone} data-testid={`pill-call-delivery-${c.id}`}>{DELIVERY_PILL[c.deliveryState].label}</StatusPill>
+                  )}
                   {c.customerId && (
                     <Link
                       href={`/crm/clients/${c.customerId}`}
@@ -312,6 +336,14 @@ function CallsTable({ calls, onOpen, testId, numberHint }: { calls: VoiceCallLis
                 <span className="inline-flex items-center gap-1.5">
                   {c.hasRecording ? <Mic className="h-3.5 w-3.5 text-muted-foreground" aria-label="Has a recording" />
                     : c.recordingState === "pending" ? <Mic className="h-3.5 w-3.5 text-muted-foreground/50 animate-pulse" aria-label="Recording is still uploading" data-testid={`icon-recording-pending-${c.id}`} />
+                    : c.recordingState === "failed" ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <MicOff className="h-3.5 w-3.5 text-red-600 dark:text-red-400" role="img" aria-label={`Recording not available${c.recordingReason ? `: ${c.recordingReason}` : ""}`} data-testid={`icon-recording-failed-${c.id}`} />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs text-xs">{c.recordingReason || "The recording didn't arrive from the phone system."}</TooltipContent>
+                      </Tooltip>
+                    )
                     : null}
                   {fmtDuration(c.durationSeconds)}
                 </span>

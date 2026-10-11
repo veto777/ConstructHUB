@@ -1,0 +1,126 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "intro-domains",
+  "title": "Domains",
+  "viewport": { "width": 1024, "height": 576 },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/domains",
+      "caption": "Domains",
+      "chapter": "One list of domains",
+      "narration": "This is Domains. It keeps your domains and your clients' in one list, and checks each one every day."
+    },
+    {
+      "action": "highlight",
+      "selector": "#domains-connect-registrar",
+      "caption": "Porkbun or Name.com",
+      "narration": "Connect a Porkbun or Name.com API key to import domains. Here, two accounts are connected."
+    },
+    {
+      "action": "highlight",
+      "selector": "button:has-text(\"Add domains\")",
+      "caption": "Any other registrar",
+      "narration": "Domains at any other registrar can be added by name, to be monitored too."
+    },
+    {
+      "action": "scroll-to",
+      "selector": "[data-testid=\"section-domain-inventory\"]",
+      "offset": 80,
+      "caption": "Domain inventory",
+      "narration": "The inventory lists all eight, with the registrar, the client location, and the last DNS check."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"row-domain-910004\"]",
+      "caption": "Expiry and auto-renew",
+      "chapter": "What needs attention",
+      "narration": "This one expires in twenty-six days, and its auto-renew is off. Both show right on the row."
+    },
+    {
+      "action": "select",
+      "selector": "select[aria-label=\"Filter by attention needed\"]",
+      "value": "Needs attention",
+      "caption": "Needs attention",
+      "narration": "Choose Needs attention to list only the domains that need a look."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"list-domains\"]",
+      "caption": "Expiring soon, auto-renew off",
+      "narration": "Three are expiring within sixty days or have auto-renew off. A failed HTTPS check lands here too."
+    },
+    {
+      "action": "scroll-to",
+      "selector": "[data-testid=\"section-domain-jobs\"]",
+      "offset": 80,
+      "caption": "Previews and change history",
+      "chapter": "Change DNS with a preview",
+      "narration": "On a connected registrar, every DNS change starts as a preview, listed here with its history."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"job-00910000-0000-4000-8000-000000000001\"] summary",
+      "caption": "Open a preview",
+      "narration": "Open one to see what would change."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"job-00910000-0000-4000-8000-000000000001\"]",
+      "caption": "Before and after, with a warning",
+      "narration": "This one adds a TXT record. Changes that can affect email carry a warning like this one."
+    },
+    {
+      "action": "highlight",
+      "selector": "button:has-text(\"Review and confirm selected previews\")",
+      "caption": "Nothing changes until you confirm",
+      "narration": "Nothing reaches the registrar until you tick a preview and choose Review and confirm."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"job-00910000-0000-4000-8000-000000000002\"]",
+      "caption": "Checked against public DNS",
+      "narration": "Once a change is applied, it is checked against public DNS until the new values show."
+    },
+    {
+      "action": "scroll-to",
+      "selector": "[data-testid=\"list-registrar-guides\"]",
+      "offset": 120,
+      "caption": "Registrar walkthroughs",
+      "narration": "For registrars without a connection here, Registrar walkthroughs give step-by-step guides."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-domains\"]",
+      "caption": "Menu: Domains",
+      "narration": "You'll find Domains in the menu on the left, under Google Business."
+    }
+  ],
+  "youtube": {
+    "title": "Domains in about a minute | ConstructHUB",
+    "description": "A one-minute tour of Domains in ConstructHUB: one list of your and your clients' domains, a daily check for expiry, auto-renew and DNS changes, a Needs attention filter, and DNS changes that start as a preview you confirm.",
+    "tags": [
+      "ConstructHUB",
+      "domain monitoring",
+      "domain expiry",
+      "DNS changes",
+      "agency tools",
+      "client domains",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Catch Expiring Domains",
+    "accent": "Expiring",
+    "kicker": "Domains",
+    "step": 4
+  },
+  "removeSelectors": [
+    "[data-testid=\"page-domains\"] div[role=\"alert\"].bg-orange-50",
+    "p:has(+ [data-testid=\"list-registrar-guides\"])"
+  ]
+}

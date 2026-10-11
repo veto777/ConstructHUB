@@ -12,6 +12,12 @@
  * `flags.processedAt` + `flags.result` are written at the end, and a retry
  * after that just gets the stored result back.
  *
+ * The CRM work a report asks for (the lead → client + project, each escalation) is not run before the
+ * acknowledgement any more: it becomes durable tasks (call-tasks.ts) written in the SAME transaction as
+ * `processedAt`, then runs; a failure stays pending and the delivery worker retries it, so an acknowledged
+ * report can never leave a lead or an escalation undone (Codex score-4 lane A). A repeated report answers the
+ * stored result with the tasks' current state and nudges whatever is still due.
+ *
  * Every write to the JSON columns merges in SQL (`flags || patch`,
  * `events || [event]`, `slots || patch`) so a status callback, a mid-call
  * event and the end report never overwrite each other's keys.
@@ -27,9 +33,14 @@ import { requireVoiceInternal, VOICE_INTERNAL_PATH } from "./internal-auth";
 import { loadOrgVoiceContext, findVoiceNumber } from "./org-profile";
 import { deliverLead, notifyCallSummary } from "./leads";
 import { raiseEscalation } from "./escalations";
+import {
+  insertCallTasks, leadTaskSpec, escalationTaskSpec, runCallTasksFor, listCallTasks, deliveryStateOf, startVoiceCallTaskWorker,
+  type CallTaskSpec, type CallTaskOpts, type CallTask, type DeliveryState,
+} from "./call-tasks";
 import { recordSpamVerdict, recordBlockedCall, callerSpamStatus, spamConfidenceWithFloor } from "./spam";
 import { meterCallUsage, billedMinutesFor } from "./usage";
 import { putRecording, recordingsConfigured } from "./recordings";
+import { recordingStateOf } from "./calls";
 import { recordActivity } from "../crm/activity";
 import { recordFailure } from "../ops/issues";
 import { recordCallReportIssues } from "../ops/call-assistant";
@@ -95,7 +106,15 @@ const statusSchema = z.object({ callSid: sid, callStatus: z.string().max(40), du
 const bad = (res: Response, issues: unknown) => res.status(400).json({ code: "invalid", issues });
 const asDate = (s?: string | null) => (s ? new Date(s) : null);
 
-export type FinishResult = { callId: string; outcome: CallOutcome; customerId: string | null; projectId: string | null; blocked: boolean; escalations: number[] };
+export type FinishResult = {
+  callId: string; outcome: CallOutcome; customerId: string | null; projectId: string | null; blocked: boolean; escalations: number[];
+  /** The post-call CRM work (call-tasks.ts): null when the call asked for none. */
+  delivery?: { state: DeliveryState | null; tasks: { key: string; state: CallTask["state"]; attempts: number }[] };
+};
+
+/** Test seams for finishCall: the task effects and clock, and a hook right after the acknowledgement commits
+ *  (a test throws there to simulate the process dying between acknowledging and running the work). */
+export type FinishOpts = CallTaskOpts & { afterAck?: () => unknown };
 
 async function loadCall(callSid: string): Promise<VoiceCallRow | null> {
   const [row] = await db.select().from(voiceCalls).where(eq(voiceCalls.callSid, callSid)).limit(1);
@@ -157,14 +176,17 @@ async function claimCall(callId: string): Promise<"claimed" | "processed" | "bus
 export type AckPool = { connect(): Promise<{ query: (text: string, values?: unknown[]) => Promise<{ rows: any[] }>; release(err?: Error): void }> };
 
 /**
- * Acknowledge a processed call: its durable meter task (a `voice_call_meter` row, pending; a repeat is a no-op),
- * the outcome and minutes on the call row (what the retry worker recovers from), and the processed flag — in ONE
- * transaction, so the flag never exists without the task. Throws when the write fails: the call stays unprocessed.
+ * Acknowledge a processed call: its durable CRM tasks (voice_call_tasks: the lead, each escalation; a repeat is a
+ * no-op), its durable meter task (a `voice_call_meter` row, pending; a repeat is a no-op), the outcome and minutes
+ * on the call row (what the retry worker recovers from), and the processed flag — in ONE transaction, so the flag
+ * never exists without the tasks. Throws when the write fails: the call stays unprocessed and the engine retries.
  */
-export async function acknowledgeCall(a: { callId: string; orgId: string; accountUserId: number; outcome: string | null; billedMinutes: number; at: Date; patch: Record<string, unknown> }, p: AckPool = pool): Promise<void> {
+export async function acknowledgeCall(a: { callId: string; orgId: string; accountUserId: number; outcome: string | null; billedMinutes: number; at: Date; patch: Record<string, unknown>; tasks?: CallTaskSpec[]; now?: Date }, p: AckPool = pool): Promise<void> {
   const client = await p.connect();
   try {
     await client.query("BEGIN");
+    // The CRM work first: the processed flag below never exists without every task it promises.
+    if (a.tasks?.length) await insertCallTasks(client, a.callId, a.orgId, a.tasks, a.now ?? new Date());
     await client.query(
       `INSERT INTO voice_call_meter (call_id, org_id, account_user_id, outcome, billed_minutes, started_at, state)
        VALUES ($1, $2, $3, $4, $5, $6, 'pending') ON CONFLICT (call_id) DO NOTHING`,
@@ -202,31 +224,58 @@ const isAppEvent = (e: VoiceCallEvent) => (e.detail as Record<string, unknown> |
  * call (SPEC § 10–12). Exported so tests drive it without HTTP. Throws
  * CallInProgressError when another report for the same call is mid-flight.
  */
-export async function finishCall(callIn: VoiceCallRow, report: EndReport): Promise<FinishResult> {
+export async function finishCall(callIn: VoiceCallRow, report: EndReport, opts: FinishOpts = {}): Promise<FinishResult> {
   const claim = await claimCall(callIn.id);
   if (claim === "busy") throw new CallInProgressError();
   if (claim === "processed") {
-    const [done] = await db.select({ flags: voiceCalls.flags }).from(voiceCalls).where(eq(voiceCalls.id, callIn.id)).limit(1);
-    return (done?.flags as Record<string, unknown>).result as FinishResult;
+    // Acknowledged before: whatever CRM work is still due runs now (the worker would get to it anyway).
+    await runCallTasksFor(callIn.id, opts).catch((e: any) => console.error("[voice] call tasks on a repeated report failed:", e?.message || e));
+    return currentFinishResult(callIn.id);
   }
+  let acknowledged = false;
   try {
-    return await processFinishedCall(callIn.id, report);
+    return await processFinishedCall(callIn.id, report, opts, () => { acknowledged = true; });
   } catch (e) {
-    // Let the engine's retry run the work again instead of waiting out the stale window.
-    await mergeCallFlags(callIn.id, {}, { dropKeys: ["processingAt"] }).catch(() => {});
+    // Let the engine's retry run the work again instead of waiting out the stale window. (After the
+    // acknowledgement there is nothing to drop: the tasks are durable and the worker finishes them.)
+    if (!acknowledged) await mergeCallFlags(callIn.id, {}, { dropKeys: ["processingAt"] }).catch(() => {});
     throw e;
   }
 }
 
-async function processFinishedCall(callId: string, report: EndReport): Promise<FinishResult> {
+/** The stored result of an acknowledged call, brought up to date with its client/project and its tasks' states. */
+export async function currentFinishResult(callId: string): Promise<FinishResult> {
+  const [row] = await db.select().from(voiceCalls).where(eq(voiceCalls.id, callId)).limit(1);
+  const stored = ((row?.flags as Record<string, unknown> | null)?.result ?? {}) as FinishResult;
+  const tasks = await listCallTasks(callId);
+  return withDelivery({ ...stored, callId, customerId: row?.customerId ?? stored.customerId ?? null, projectId: row?.projectId ?? stored.projectId ?? null }, tasks);
+}
+
+function withDelivery(result: FinishResult, tasks: CallTask[]): FinishResult {
+  const escalations = new Set(result.escalations ?? []);
+  for (const t of tasks) {
+    const id = (t.result as { escalationId?: number | null } | null)?.escalationId;
+    if (t.kind === "escalation" && typeof id === "number") escalations.add(id);
+  }
+  const lead = tasks.find((t) => t.kind === "lead" && t.state === "done")?.result as { customerId?: string; projectId?: string | null } | undefined;
+  return {
+    ...result,
+    customerId: lead?.customerId ?? result.customerId ?? null,
+    projectId: lead?.projectId ?? result.projectId ?? null,
+    escalations: [...escalations],
+    delivery: { state: deliveryStateOf(tasks), tasks: tasks.map((t) => ({ key: t.key, state: t.state, attempts: t.attempts })) },
+  };
+}
+
+async function processFinishedCall(callId: string, report: EndReport, opts: FinishOpts, onAck: () => void): Promise<FinishResult> {
   // Re-read after the claim: a mid-call event may have delivered the lead in the meantime.
   const [call] = await db.select().from(voiceCalls).where(eq(voiceCalls.id, callId)).limit(1);
   if (!call) throw new Error("call gone");
   const ctx = await loadOrgVoiceContext(call.orgId);
   if (!ctx) throw new Error("org gone");
-  const number = call.numberId ? await findVoiceNumber({ numberId: call.numberId }) : null;
   const { profile } = ctx;
   const patch: Record<string, unknown> = {};
+  const tasks: CallTaskSpec[] = [];
 
   // Spam decides everything else: a spam call notifies nobody and files nothing.
   let outcome: CallOutcome = report.outcome;
@@ -273,42 +322,24 @@ async function processFinishedCall(callId: string, report: EndReport): Promise<F
     patch.spam = verdict;
     recordActivity({ orgId: ctx.org.id, actorLabel: actor, action: "call.spam", entityType: "voice_call", entityId: row.id, meta: { reason: spam?.reason, confidence, strikes: verdict?.strikes, blocked: verdict?.blocked } });
   } else {
+    // What this call owes the CRM, as durable tasks (call-tasks.ts) — decided here, run after the acknowledgement.
     const submittedInEvents = report.events.some((e) => e.type === "submit_lead" || e.type === "lead");
     const wantsLead = report.lead?.requested === true || outcome === "lead_submitted" || outcome === "booked" || submittedInEvents || !!row.leadDeliveredAt;
-    let delivered = false;
-    if (wantsLead && profile.leadDelivery.crm.enabled) {
-      try {
-        const d = await deliverLead({ ctx, call: row, slots: row.slots, numberLabel: number?.label ?? null });
-        const deliveredAt = row.leadDeliveredAt ?? new Date();
-        await db.update(voiceCalls).set({ customerId: d.customerId, projectId: d.projectId, leadDeliveredAt: deliveredAt }).where(eq(voiceCalls.id, row.id));
-        row.customerId = d.customerId; row.projectId = d.projectId; row.leadDeliveredAt = deliveredAt;
-        result.customerId = d.customerId; result.projectId = d.projectId;
-        patch.lead = row.slots ?? {};
-        if (!d.alreadyDelivered) patch.notified = d.notified;
-        delivered = true;
-        if (outcome !== "booked") outcome = "lead_submitted";
-      } catch (e: any) {
-        console.error("[voice] lead delivery failed:", e?.message || e);
-        void recordFailure("call_assistant", "Call Assistant lead delivery", e, { callId: row.id, orgId: ctx.org.id });
-        patch.leadError = String(e?.message || e).slice(0, 300);
-      }
+    const leadTask = wantsLead && profile.leadDelivery.crm.enabled;
+    if (leadTask) {
+      tasks.push(leadTaskSpec());
+      if (outcome !== "booked") outcome = "lead_submitted";
     }
-    const alertKinds = new Set<string>();
-    for (const a of report.alerts) alertKinds.add(a.kind);
-    for (const e of report.events) if (e.type === "alert" && typeof (e as any).kind === "string") alertKinds.add((e as any).kind);
-    for (const kind of alertKinds) {
-      const summary = report.alerts.find((a) => a.kind === kind)?.summary || report.summary || "";
-      try {
-        const r = await raiseEscalation({ ctx, call: row, kind, summary, slots: row.slots });
-        if (r.escalationId) result.escalations.push(r.escalationId);
-      } catch (e: any) {
-        console.error("[voice] escalation failed:", e?.message || e);
-        void recordFailure("call_assistant", "Call Assistant escalation", e, { callId: row.id, orgId: ctx.org.id, kind });
-      }
-    }
-    if (alertKinds.size && !delivered) outcome = "alerted";
+    const alertKinds = new Map<string, string>();   // normalized kind (the task key) → summary
+    const addAlert = (kind: string, summary: string) => {
+      const spec = escalationTaskSpec(kind, summary);
+      if (!alertKinds.has(spec.key)) { alertKinds.set(spec.key, summary); tasks.push(spec); }
+    };
+    for (const a of report.alerts) addAlert(a.kind, a.summary || report.summary || "");
+    for (const e of report.events) if (e.type === "alert" && typeof (e as any).kind === "string") addAlert((e as any).kind, report.alerts.find((a) => a.kind === (e as any).kind)?.summary || report.summary || "");
+    if (alertKinds.size && !leadTask) outcome = "alerted";
     const quiet = (outcome === "hangup" || outcome === "voicemail") && durationSeconds < QUIET_CALL_SECONDS;
-    if (!delivered && !alertKinds.size && !quiet) {
+    if (!leadTask && !alertKinds.size && !quiet) {
       if (profile.leadDelivery.notifyOnEveryCall) {
         await notifyCallSummary(ctx, { ...row, outcome }).catch((e: any) => {
           console.error("[voice] summary notify failed:", e?.message || e);
@@ -320,18 +351,23 @@ async function processFinishedCall(callId: string, report: EndReport): Promise<F
   }
   result.outcome = outcome;
 
-  // Minutes: exactly once per call. The call is ACKNOWLEDGED (processedAt) only together with its durable meter
-  // task — the voice_call_meter row (keyed by the call) and the processed flag are one transaction
-  // (acknowledgeCall); if that write fails the call stays unprocessed, finishCall drops the claim and the engine's
-  // retry runs this again. The count itself follows; a failure there leaves the record pending (flags.meterPending
-  // stays true) for the retry worker (billing-usage.ts retryPendingVoiceMeters), which also recovers from the call
-  // rows themselves, so a failed meter is never acknowledged as done.
+  // ACKNOWLEDGE: the CRM tasks, the meter task and the processed flag commit together (acknowledgeCall). If that
+  // write fails the call stays unprocessed, finishCall drops the claim and the engine's retry runs this again.
+  // Minutes: exactly once per call. The count itself follows; a failure there leaves the record pending
+  // (flags.meterPending stays true) for the retry worker (billing-usage.ts retryPendingVoiceMeters), which also
+  // recovers from the call rows themselves, so a failed meter is never acknowledged as done.
   const at = row.startedAt ?? row.endedAt ?? new Date();
-  if (report.recordingPending && !row.recordingKey) patch.recordingPending = true;
+  if (report.recordingPending && !row.recordingKey) {
+    patch.recordingPending = true;
+    // The explicit recording state (POST /calls/:sid/artifacts moves it on); an earlier status is never overwritten.
+    if (!(call.flags as Record<string, unknown> | null)?.recording) patch.recording = { state: "pending", seq: 0, at: new Date().toISOString() };
+  }
   patch.processedAt = new Date().toISOString();
   patch.result = result;
   patch.meterPending = true;
-  await acknowledgeCall({ callId: row.id, orgId: ctx.org.id, accountUserId: ctx.org.ownerUserId, outcome, billedMinutes, at, patch });
+  await acknowledgeCall({ callId: row.id, orgId: ctx.org.id, accountUserId: ctx.org.ownerUserId, outcome, billedMinutes, at, patch, tasks, now: opts.now?.() });
+  onAck();
+  await opts.afterAck?.();
   try {
     // The month a call belongs to is its start (billing-usage.ts).
     await meterCallUsage({ callId: row.id, orgId: ctx.org.id, accountUserId: ctx.org.ownerUserId, billedMinutes, outcome, at });
@@ -347,7 +383,12 @@ async function processFinishedCall(callId: string, report: EndReport): Promise<F
     startedAt: report.startedAt ?? row.startedAt?.toISOString() ?? null, answeredAt: report.answeredAt ?? row.answeredAt?.toISOString() ?? null,
     endedAt: report.endedAt ?? row.endedAt?.toISOString() ?? null, engine: row.engine, model: row.model,
   });
-  return result;
+  // The CRM work, now that it is durable. A failure here never fails the report: the task stays pending.
+  const done = tasks.length ? await runCallTasksFor(row.id, opts).catch((e: any) => {
+    console.error("[voice] running the call's tasks failed (the worker retries them):", e?.message || e);
+    return listCallTasks(row.id).catch(() => [] as CallTask[]);
+  }) : [];
+  return withDelivery(result, done);
 }
 
 /** Something that must not wait for the end of the call. */
@@ -377,7 +418,39 @@ export async function handleCallEvent(call: VoiceCallRow, ev: z.infer<typeof eve
   return { delivered: r.sent, escalationId: r.escalationId, fallback: r.fallback };
 }
 
+export const artifactStatusSchema = z.object({
+  recording: z.object({
+    state: z.enum(["pending", "failed", "missing"]),
+    reason: z.string().max(300).optional(),
+    seq: z.number().int().min(0).max(1_000_000),
+    attempts: z.number().int().min(0).max(100_000).optional(),
+  }),
+});
+export type RecordingStatus = z.infer<typeof artifactStatusSchema>["recording"];
+
+/**
+ * Store the engine's recording status on the call (flags.recording) unless the call already has its recording or a
+ * status with this seq or newer. pending also (re)sets the recordingPending flag; failed/missing clear it.
+ */
+export async function applyRecordingStatus(callId: string, status: RecordingStatus, now = new Date()): Promise<boolean> {
+  const rec = { state: status.state, reason: status.reason ?? null, seq: status.seq, attempts: status.attempts ?? null, at: now.toISOString() };
+  const pending = status.state === "pending";
+  const r = await db.execute(sql`
+    update voice_calls
+       set flags = (coalesce(flags, '{}'::jsonb) - 'recordingPending')
+                   || jsonb_build_object('recording', ${JSON.stringify(rec)}::jsonb)
+                   || (case when ${pending}::boolean then '{"recordingPending": true}'::jsonb else '{}'::jsonb end)
+     where id = ${callId}
+       and recording_key is null
+       and coalesce((flags->'recording'->>'seq')::int, -1) < ${status.seq}
+     returning id`);
+  return ((r as any).rows ?? []).length > 0;
+}
+
 export function registerVoiceInternalCallRoutes(app: Express): void {
+  // Retries the post-call CRM work every minute (call-tasks.ts; on unless VOICE_CALL_TASK_WORKER_ENABLED=false).
+  startVoiceCallTaskWorker();
+
   /** POST { callSid, to, from, numberId?, startedAt, engine, model, persona, profileVersion } → 201 { callId } */
   app.post(`${VOICE_INTERNAL_PATH}/calls`, requireVoiceInternal, async (req: Request, res: Response) => {
     const parsed = startSchema.safeParse(req.body);
@@ -453,7 +526,7 @@ export function registerVoiceInternalCallRoutes(app: Express): void {
         if (!recordingsConfigured()) return res.status(503).json({ code: "r2_unconfigured", message: "R2 is not configured on this app; the recording was not stored." });
         const { recordingKey, seconds } = await putRecording(call.orgId, call.callSid, wav);
         await db.update(voiceCalls).set({ recordingKey, recordingSeconds: seconds }).where(eq(voiceCalls.id, call.id));
-        await mergeCallFlags(call.id, {}, { dropKeys: ["recordingPending"] });
+        await mergeCallFlags(call.id, { recording: { state: "available", at: new Date().toISOString() } }, { dropKeys: ["recordingPending"] });
         res.json({ recordingKey, seconds });
       } catch (e: any) {
         console.error("[voice] recording upload failed:", e?.message || e);
@@ -461,6 +534,33 @@ export function registerVoiceInternalCallRoutes(app: Express): void {
         res.status(502).json({ code: "recording_failed", message: "Could not store the recording." });
       }
     });
+
+  /**
+   * POST /calls/:callSid/artifacts — the engine's explicit word on a call's recording (voice/outbox.py), so the
+   * console never has to guess from the call's age:
+   *   { recording: { state: "pending" | "failed" | "missing", reason?, seq, attempts? } } → { ok, applied, recordingState }
+   * pending = (re)queued for upload (a replay after a correction says this again); failed = the app refused the
+   * upload for good (the engine keeps the WAV in its failed queue for a replay); missing = the WAV the engine expected
+   * is gone (nothing left to upload). `seq` is the engine job's counter: an older or repeated status never overwrites
+   * a newer one, and a stored recording (recording_key) always wins. Unknown call → 404 (the engine stops sending).
+   */
+  app.post(`${VOICE_INTERNAL_PATH}/calls/:callSid/artifacts`, requireVoiceInternal, async (req: Request, res: Response) => {
+    const parsed = artifactStatusSchema.safeParse(req.body);
+    if (!parsed.success) return bad(res, parsed.error.issues);
+    const callSid = String(req.params.callSid);
+    if (!CALL_SID_RE.test(callSid)) return res.status(400).json({ code: "invalid", message: "Bad callSid" });
+    try {
+      const call = await loadCall(callSid);
+      if (!call) return res.status(404).json({ code: "unknown_call" });
+      const applied = await applyRecordingStatus(call.id, parsed.data.recording);
+      const [fresh] = await db.select().from(voiceCalls).where(eq(voiceCalls.id, call.id)).limit(1);
+      res.json({ ok: true, applied, recordingState: fresh ? recordingStateOf(fresh) : null });
+    } catch (e: any) {
+      console.error("[voice] artifact status failed:", e?.message || e);
+      void recordFailure("call_assistant", "Call Assistant artifact status", e, { callSid });
+      res.status(500).json({ code: "artifact_status_failed" });
+    }
+  });
 
   /** POST /status — SignalWire status callbacks relayed by the engine: { callSid, callStatus, duration } → { ok } */
   app.post(`${VOICE_INTERNAL_PATH}/status`, requireVoiceInternal, async (req: Request, res: Response) => {

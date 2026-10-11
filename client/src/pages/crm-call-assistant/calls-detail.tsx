@@ -7,8 +7,11 @@ import { Link } from "wouter";
 import { StatusPill } from "@/components/crm-ui";
 import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Mic, User, FolderKanban } from "lucide-react";
-import { outcomeTone, outcomeLabel, fmtPhone, fmtDuration, fmtWhen, LIVE_REFRESH_MS, type VoiceCallDetail, type VoiceEscalation } from "./calls-shared";
+import { Mic, MicOff, User, FolderKanban, RefreshCw, Send } from "lucide-react";
+import {
+  outcomeTone, outcomeLabel, fmtPhone, fmtDuration, fmtWhen, fmtUpdated, LIVE_REFRESH_MS, callStillChanging,
+  type VoiceCallDetail, type VoiceEscalation, type CallDelivery, type CallTaskView,
+} from "./calls-shared";
 
 /** The default intake order first (need → address → … → best time), then any custom keys A–Z. */
 const SLOT_ORDER = ["need", "address", "city", "first_name", "name", "phone", "email", "best_time"];
@@ -26,12 +29,15 @@ const personaName = (id: string) => id.charAt(0).toUpperCase() + id.slice(1);
  */
 export function CallDetailSheet({ callId, onClose }: { callId: string | null; onClose: () => void }) {
   const open = !!callId;
-  // While a recording is still on its way from the phone system, check back every 30 s so it appears by itself.
+  // While the call can still change by itself — not finished yet (its report hasn't arrived), its recording on its
+  // way, its CRM work still being delivered — check back every 30 s. The list also refetches an open drawer
+  // whenever its row changes (calls.tsx useSyncOpenCallDrawers), so a call that finishes shows up at once.
   const q = useQuery<VoiceCallDetail>({
     queryKey: ["/api/crm/voice/calls", callId], enabled: open,
-    refetchInterval: (query) => (query.state.data?.recordingState === "pending" ? LIVE_REFRESH_MS : false),
+    refetchInterval: (query) => (query.state.data && callStillChanging(query.state.data) ? LIVE_REFRESH_MS : false),
   });
   const call = q.data;
+  const changing = !!call && callStillChanging(call);
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto break-words" data-testid="sheet-call-detail">
@@ -55,6 +61,15 @@ export function CallDetailSheet({ callId, onClose }: { callId: string | null; on
 
         {call && (
           <div className="mt-4 space-y-5 text-sm">
+            {changing && (
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground" role="status" data-testid="text-call-detail-live">
+                <RefreshCw className={`h-3.5 w-3.5 ${q.isFetching ? "animate-spin" : ""}`} aria-hidden="true" />
+                {!call.endedAt || !call.outcome
+                  ? "This call is still in progress, or its report hasn't arrived yet."
+                  : "Still finishing up."}
+                {" "}This updates by itself{fmtUpdated(q.dataUpdatedAt) ? ` · updated ${fmtUpdated(q.dataUpdatedAt)}` : ""}.
+              </p>
+            )}
             {(call.hasRecording || call.recordingUrl) && (
               <section>
                 <h3 className="mb-2 flex items-center gap-2 font-medium"><Mic className="h-4 w-4" aria-hidden="true" /> Recording</h3>
@@ -63,14 +78,22 @@ export function CallDetailSheet({ callId, onClose }: { callId: string | null; on
             )}
             {!call.hasRecording && !call.recordingUrl && (call.recordingState === "pending" || call.recordingState === "failed") && (
               <section data-testid={`text-recording-${call.recordingState}`}>
-                <h3 className="mb-1 flex items-center gap-2 font-medium"><Mic className="h-4 w-4" aria-hidden="true" /> Recording</h3>
+                <h3 className="mb-1 flex items-center gap-2 font-medium">
+                  {call.recordingState === "failed" ? <MicOff className="h-4 w-4" aria-hidden="true" /> : <Mic className="h-4 w-4" aria-hidden="true" />} Recording
+                  <StatusPill tone={call.recordingState === "failed" ? "danger" : "warning"} data-testid="pill-recording-state">
+                    {call.recordingState === "failed" ? "Not available" : "Uploading"}
+                  </StatusPill>
+                </h3>
                 <p className="text-muted-foreground">
                   {call.recordingState === "pending"
                     ? "Still uploading from the phone system. It shows up here by itself, usually within a few minutes."
-                    : "The recording never arrived from the phone system. The transcript below is complete."}
+                    : "The recording didn't arrive from the phone system. The transcript below is complete."}
                 </p>
+                {call.recordingReason && <p className="mt-1 text-xs text-muted-foreground" data-testid="text-recording-reason">{call.recordingReason}</p>}
               </section>
             )}
+
+            {call.delivery && call.delivery.tasks.length > 0 && <DeliverySection callId={call.id} delivery={call.delivery} />}
 
             {(call.customer || call.project) && (
               <section className="flex flex-wrap gap-2">
@@ -163,6 +186,72 @@ export function CallDetailSheet({ callId, onClose }: { callId: string | null; on
         )}
       </SheetContent>
     </Sheet>
+  );
+}
+
+const TASK_TONE: Record<CallTaskView["state"], "success" | "warning" | "danger" | "neutral"> = { done: "success", pending: "neutral", retrying: "warning", failed: "danger" };
+function taskStateLabel(t: CallTaskView): string {
+  if (t.state === "done") return "Done";
+  if (t.state === "failed") return "Failed";
+  if (t.state === "retrying") return `Retrying · attempt ${t.attempts}`;
+  return "Waiting";
+}
+
+/**
+ * What this call owed your CRM — the client and project, each escalation — and whether it got there. The report is
+ * only acknowledged together with this list (server/voice/call-tasks.ts), so nothing here can silently go missing:
+ * a step that failed keeps retrying by itself, and Retry now runs it immediately.
+ */
+function DeliverySection({ callId, delivery }: { callId: string; delivery: CallDelivery }) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const unfinished = delivery.tasks.some((t) => t.state !== "done");
+  const retry = useMutation({
+    mutationFn: async () => (await apiRequest("POST", `/api/crm/voice/calls/${callId}/delivery/retry`, {})).json() as Promise<{ delivery: CallDelivery }>,
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["/api/crm/voice/calls", callId] });
+      qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith("/api/crm/voice/calls?") || String(q.queryKey[0]).startsWith("/api/crm/voice/escalations") });
+      toast(r.delivery.state === "done"
+        ? { title: "Delivered", description: "Everything from this call is in your CRM now." }
+        : { title: "Still not through", description: "It keeps retrying by itself; the reason is shown on each step.", variant: "destructive" });
+    },
+    onError: (err) => toast({ title: "Couldn't retry", description: apiErrorMessage(err), variant: "destructive" }),
+  });
+  const headline = delivery.state === "failed" ? "Some of this call didn't reach your CRM"
+    : delivery.state === "pending" ? "Still being delivered to your CRM"
+    : "Delivered to your CRM";
+  return (
+    <section className={`rounded-md border p-3 ${delivery.state === "failed" ? "border-destructive/40" : delivery.state === "pending" ? "border-amber-500/40" : ""}`} data-testid="section-call-delivery">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <h3 className="flex items-center gap-2 font-medium"><Send className="h-4 w-4" aria-hidden="true" /> {headline}</h3>
+        {unfinished && (
+          <Button size="sm" variant="outline" className="ml-auto" onClick={() => retry.mutate()} disabled={retry.isPending} data-testid="button-call-delivery-retry">
+            <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${retry.isPending ? "animate-spin" : ""}`} aria-hidden="true" />
+            {retry.isPending ? "Retrying…" : "Retry now"}
+          </Button>
+        )}
+      </div>
+      <ul className="space-y-2" data-testid="list-call-delivery">
+        {delivery.tasks.map((t) => (
+          <li key={t.id} className="flex flex-wrap items-start gap-x-2 gap-y-1" data-testid={`row-call-task-${t.key}`}>
+            <span className="min-w-0 flex-1">{t.label}</span>
+            <StatusPill tone={TASK_TONE[t.state]} data-testid={`pill-call-task-${t.key}`}>{taskStateLabel(t)}</StatusPill>
+            {t.state !== "done" && t.lastError && (
+              <span className="basis-full text-xs text-red-600 dark:text-red-400" data-testid={`text-call-task-error-${t.key}`}>Last try failed: {t.lastError}</span>
+            )}
+            {(t.state === "retrying" || t.state === "pending") && t.nextAttemptAt && delivery.worker.running && (
+              <span className="basis-full text-xs text-muted-foreground">Next automatic try {fmtWhen(t.nextAttemptAt)}</span>
+            )}
+            {t.state === "failed" && (
+              <span className="basis-full text-xs text-muted-foreground">Automatic retries stopped{t.giveUpAt ? ` ${fmtWhen(t.giveUpAt)}` : ""}. Fix the cause, then Retry now.</span>
+            )}
+          </li>
+        ))}
+      </ul>
+      {unfinished && !delivery.worker.running && (
+        <p className="mt-2 text-xs text-amber-700 dark:text-amber-400" data-testid="text-call-delivery-worker-off">Automatic retries are switched off on this server — use Retry now.</p>
+      )}
+    </section>
   );
 }
 

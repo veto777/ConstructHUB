@@ -120,6 +120,17 @@ class AppClient:
             log.warning("upload_recording failed: %s", e)
             return {"error": str(e)[:200], "status": _status_of(e)}
 
+    async def artifact_status(self, call_sid: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """POST /calls/:sid/artifacts — the recording's explicit state for the console (outbox.py: failed, missing,
+        or pending again on a replay) → {ok, applied, recordingState}; {error, status} on failure (the outbox retries)."""
+        try:
+            r = await self._c.post(f"{BASE}/calls/{call_sid}/artifacts", json=payload)
+            r.raise_for_status()
+            return r.json()
+        except Exception as e:  # noqa: BLE001
+            log.warning("artifact_status failed: %s", e)
+            return {"error": str(e)[:200], "status": _status_of(e)}
+
     async def status_callback(self, payload: dict[str, Any]) -> None:
         """POST /status — a SignalWire status callback relayed as-is."""
         try:
