@@ -109,3 +109,13 @@ export function saveRowEdits(accountId: string | number | null | undefined, edit
   if (accountId === null || accountId === undefined) return;
   writeRaw(key(accountId, "rowEdits"), Object.keys(edits).length ? JSON.stringify(edits) : null);
 }
+
+/** Display stored destinations without exposing provider identifiers to people. */
+export function destinationLabel(d: Destination, accounts: { id: string; name?: string; pages?: { id: string; name?: string }[]; boards?: { id: string; name?: string }[] }[]): string {
+  const platform = ({ facebook: "Facebook", linkedin: "LinkedIn", pinterest: "Pinterest", twitter: "X", instagram: "Instagram", youtube: "YouTube", tiktok: "TikTok", threads: "Threads", bluesky: "Bluesky" })[d.platform];
+  const account = accounts.find(a => a.id === d.accountId);
+  const name = account?.name?.trim() || platform + " account";
+  const target = d.pageId ? account?.pages?.find(p => p.id === d.pageId)?.name?.trim() || platform + " page"
+    : d.boardId ? account?.boards?.find(p => p.id === d.boardId)?.name?.trim() || platform + " board" : "";
+  return target ? name + " · " + target + " (" + platform + ")" : name + " (" + platform + ")";
+}

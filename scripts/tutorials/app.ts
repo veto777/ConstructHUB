@@ -20,6 +20,7 @@ import { randomBytes } from "crypto";
 import fs from "fs";
 import path from "path";
 import { JOBCAM_STORE, ROOT, WORK_DIR, run, sleep } from "./lib";
+import { TUTORIAL_SOCIAL_ENCRYPTION_KEY } from "./social-sample";
 import { databaseUrl } from "./db";
 
 export const SLOT_PORT = (slot: number) => 8180 + slot;
@@ -100,6 +101,8 @@ export async function startApp(o: { slot: number; database: string; bootTimeoutM
     NODE_ENV: "development", PORT: String(port),
     DATABASE_URL: await databaseUrl(o.database),
     SESSION_SECRET: randomBytes(32).toString("hex"),
+    // Public sample key shared with the guarded tutorial seed; no provider access.
+    SOCIAL_ENCRYPTION_KEY: TUTORIAL_SOCIAL_ENCRYPTION_KEY,
     DEV_AUTH_BYPASS_USER1: "true",
     SEO_JOBS_DISABLED: "true",
     EMAIL_FORCE_SINK: "1",
