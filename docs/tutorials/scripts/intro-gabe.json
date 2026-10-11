@@ -1,0 +1,126 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "intro-gabe",
+  "title": "Gabe",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "showAssistant": true,
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/",
+      "caption": "Gabe, the AI helper",
+      "chapter": "Meet Gabe",
+      "narration": "Gabe is ConstructHUB's AI helper. He explains how each feature works and how to set it up."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"hub-launcher\"]",
+      "caption": "Open Gabe",
+      "narration": "Open him from the gator in the bottom corner."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"hub-allowance\"] >> xpath=..",
+      "caption": "Your questions and today's attempts",
+      "narration": "The top shows your plan's questions, and today's attempts so far."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"hub-chips\"]",
+      "caption": "Quick questions",
+      "narration": "Quick questions cover the common ones, like getting started or the CRM. They're never counted."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"hub-input\"]",
+      "value": "How do I get more Google reviews?",
+      "caption": "Type your own question",
+      "chapter": "Ask your own",
+      "narration": "Signed in, you can also type your own question, up to 500 characters."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"hub-send\"]",
+      "caption": "Send",
+      "narration": "Each one uses a question from your plan's monthly allowance."
+    },
+    {
+      "action": "wait-for",
+      "selector": "[data-testid=\"hub-msg-assistant\"]",
+      "timeoutMs": 90000,
+      "caption": "He can't see your account",
+      "narration": "He can't see your account, and emails or phone numbers you type are blanked out before he reads them."
+    },
+    {
+      "action": "wait",
+      "ms": 1500,
+      "caption": "A short answer",
+      "narration": "He answers in a few short lines, from ConstructHUB's own knowledge pack."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"hub-input\"]",
+      "value": "Where do I find my Google review link?",
+      "caption": "Ask a follow-up",
+      "chapter": "Follow up",
+      "narration": "Ask a follow-up. He keeps the last few turns of the chat in mind."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"hub-send\"]",
+      "caption": "Send",
+      "narration": "Send it."
+    },
+    {
+      "action": "wait-for",
+      "selector": "[data-testid=\"hub-msg-assistant\"] >> nth=1",
+      "timeoutMs": 90000,
+      "caption": "Links only to ConstructHUB pages",
+      "narration": "His answers stay short, and his links only go to ConstructHUB pages, where you do the step."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"hub-new-chat\"]",
+      "caption": "Start a new chat",
+      "narration": "The chat lives only in this tab. Start a new one here any time."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"hub-close\"]",
+      "caption": "Close",
+      "narration": "Close the panel when you're done."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"hub-launcher\"]",
+      "caption": "Gabe, bottom right",
+      "narration": "You'll find Gabe in the bottom corner of your dashboard."
+    }
+  ],
+  "youtube": {
+    "title": "Gabe, the AI helper, in about a minute | ConstructHUB",
+    "description": "A short tour of Gabe, ConstructHUB's AI helper: the quick questions anyone can tap, typing your own question when signed in, a follow-up, and what he can and can't see. He answers from ConstructHUB's own knowledge pack and links only to ConstructHUB pages.",
+    "tags": [
+      "ConstructHUB",
+      "Gabe",
+      "AI helper",
+      "AI assistant",
+      "contractor software",
+      "how to use ConstructHUB",
+      "Google reviews"
+    ],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Meet Gabe",
+    "accent": "Gabe",
+    "kicker": "AI Helper",
+    "step": 4
+  }
+}

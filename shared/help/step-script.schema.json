@@ -623,6 +623,10 @@
       "type": "boolean",
       "description": "Show an outside link's address bottom-left while the pointer is on it (off by default)."
     },
+    "showAssistant": {
+      "type": "boolean",
+      "description": "Keep Gabe's launcher and chat panel on screen (hidden in every other video; only intro-gabe sets it)."
+    },
     "removeSelectors": {
       "type": "array",
       "maxItems": 12,
