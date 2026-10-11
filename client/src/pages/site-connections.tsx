@@ -4,6 +4,7 @@ import {
   ReportTable,
   MetricTiles,
   ReportTrend,
+  SavedDataStrip,
   analyticsColumns,
   cloudflareColumns,
   sumKnown,
@@ -146,31 +147,42 @@ export function DataList({
   render,
   filters = [],
   columns,
+  sortable = false,
 }: {
   url: string;
   title: string;
   render: (row: any) => ReactNode;
   filters?: string[];
   columns?: Column[];
+  /** Wire sort/dir to the server (sorted in SQL before pagination) and persist them in the URL. */
+  sortable?: boolean;
 }) {
   const [q, Q] = useReportParam(`filter.${title}`),
     [page, P] = useReportPage(`page.${title}`),
-    [status, S] = useReportParam(`status.${title}`);
-  const path = `${url}${url.includes("?") ? "&" : "?"}q=${encodeURIComponent(q)}&page=${page}&limit=25&status=${encodeURIComponent(status)}`;
+    [status, S] = useReportParam(`status.${title}`),
+    [sort, Sort] = useReportParam(`sort.${title}`),
+    [dir, Dir] = useReportParam(`dir.${title}`);
+  // Hand-edited or stale URL values that are not real server columns never reach the request.
+  const validSort =
+    sortable && sort && columns?.some((c) => c.sortKey === sort) ? sort : "";
+  const path = `${url}${url.includes("?") ? "&" : "?"}q=${encodeURIComponent(q)}&page=${page}&limit=25&status=${encodeURIComponent(status)}${validSort ? `&sort=${encodeURIComponent(validSort)}&dir=${dir === "desc" ? "desc" : "asc"}` : ""}`;
   // Standard lifecycle: the default queryFn fetches the key (the request path).
   const data = useQuery<any>({
     queryKey: [path],
     refetchInterval: pollUnlessPlanRequired(15000),
   });
   // A page past the end (a stale ?page after the scope changed, or rows removed) snaps to the last page.
-  const total: number | undefined = data.error ? undefined : data.data?.total;
+  const total: number | undefined = data.data?.total;
   const lastPage = useClampPage(page, total, 25, P);
+  // A failed background refetch keeps the last-good rows, flagged by SavedDataStrip below;
+  // only a failure with nothing ever loaded falls back to the bare error panel.
+  const stale = !!data.error && !!data.data;
   return (
     <section className="space-y-3">
       <GoogleSectionHeader
         as="h3"
         title={title}
-        count={data.error ? undefined : data.data?.total}
+        count={data.data?.total}
         flush
       />
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
@@ -210,10 +222,17 @@ export function DataList({
       </div>
       {data.isLoading ? (
         <LoadingReport />
-      ) : data.error ? (
+      ) : data.error && (!data.data || planRequiredFrom(data.error)) ? (
+        // Nothing ever loaded (or the plan gate fired): the bare error / plan card.
         <ReportError error={data.error} retry={() => void data.refetch()} />
       ) : (
         <>
+          {stale && (
+            <SavedDataStrip
+              updatedAt={data.dataUpdatedAt}
+              retry={() => void data.refetch()}
+            />
+          )}
           <p className="text-sm g-text-2">{data.data?.total ?? 0} results</p>
           {data.data?.pendingJobs > 0 && (
             <Notice tone="warning">
@@ -232,6 +251,16 @@ export function DataList({
               columns={columns}
               caption={title}
               total={total}
+              sort={validSort ? { key: validSort, dir: dir === "desc" ? "desc" : "asc" } : null}
+              onSort={
+                sortable
+                  ? (key, d) => {
+                      Sort(key);
+                      Dir(d);
+                      P(1);
+                    }
+                  : undefined
+              }
             />
           ) : (
             <GoogleList>
@@ -345,6 +374,7 @@ function MetricRows({ asset }: { asset: any }) {
       <SearchOverview id={asset.id} start={start} end={end} />
       <DataList
         columns={columns}
+        sortable
         key={`${dimension}:${group}:${start}:${end}`}
         title="Search analytics"
         url={`/api/gsc/assets/${asset.id}/analytics?dimension=${dimension}&group=${group}&start=${start}&end=${end}`}
@@ -416,10 +446,17 @@ export function LocationSearchSummary({ locationId }: { locationId: number }) {
   // The containing location page remains useful without this optional module.
   if (planRequiredFrom(error)) return null;
   if (isLoading) return <LoadingReport />;
-  if (error) return <ReportError error={error} retry={() => void refetch()} />;
+  if (error && !data)
+    return <ReportError error={error} retry={() => void refetch()} />;
   return (
     <Card>
       <CardContent className="space-y-1 p-4">
+        {error && (
+          <SavedDataStrip
+            updatedAt={dataUpdatedAt}
+            retry={() => void refetch()}
+          />
+        )}
         <p className="font-medium">
           Google Search Console · property totals · last 30 days
         </p>
@@ -489,7 +526,9 @@ export default function SiteConnections({
     enabled: !!assetId,
     refetchInterval: pollUnlessPlanRequired(15000),
   });
-  const asset = detail.error ? null : detail.data;
+  // A failed background refetch keeps showing the last-good detail; only the bare error
+  // (below) replaces it, and only when nothing ever loaded.
+  const asset = detail.data ?? null;
   const A = (a: any) => {
     setAssetId(a ? String(a.id) : "");
     if (a) Select([a.id]);
@@ -931,7 +970,7 @@ export default function SiteConnections({
           )}
 
           {assetId && detail.isLoading && <LoadingReport />}
-          {assetId && detail.error && (
+          {assetId && detail.error && !detail.data && (
             <>
               <ReportError
                 error={detail.error}
@@ -942,6 +981,12 @@ export default function SiteConnections({
           )}
           {asset && (
             <section>
+              {detail.error && (
+                <SavedDataStrip
+                  updatedAt={detail.dataUpdatedAt}
+                  retry={() => void detail.refetch()}
+                />
+              )}
               <GoogleSectionHeader
                 title={asset.name}
                 actions={
@@ -1111,15 +1156,21 @@ export default function SiteConnections({
           </div>
           {!assetId && (
             <>
-              {assets.error ? (
+              {assets.isLoading ? (
+                <LoadingReport />
+              ) : assets.error && !assets.data ? (
                 <ReportError
                   error={assets.error}
                   retry={() => void assets.refetch()}
                 />
-              ) : assets.isLoading ? (
-                <LoadingReport />
               ) : (
                 <>
+                  {assets.error && (
+                    <SavedDataStrip
+                      updatedAt={assets.dataUpdatedAt}
+                      retry={() => void assets.refetch()}
+                    />
+                  )}
                   <p className="text-sm g-text-2">
                     {assets.data?.total ?? 0} sites
                   </p>
@@ -1525,12 +1576,18 @@ function CloudflareDetails({
   });
   const d = query.data?.data;
   if (query.isLoading) return <LoadingReport />;
-  if (query.error)
+  if (query.error && !query.data)
     return (
       <ReportError error={query.error} retry={() => void query.refetch()} />
     );
   return (
     <div className="space-y-4">
+      {query.error && (
+        <SavedDataStrip
+          updatedAt={query.dataUpdatedAt}
+          retry={() => void query.refetch()}
+        />
+      )}
       {!d ? (
         <Notice>
           Analytics have not been imported. Sync this site to retrieve its
@@ -1655,21 +1712,30 @@ export function ScanIndexingSummary({ scanId }: { scanId: string }) {
 }
 
 function InspectionCoverage({ id }: { id: number }) {
-  const { data, error, isLoading, refetch } = useQuery<any>({
+  const { data, error, isLoading, refetch, dataUpdatedAt } = useQuery<any>({
     queryKey: [`/api/gsc/assets/${id}/inspections?limit=1`],
     refetchInterval: pollUnlessPlanRequired(15000),
   });
   if (isLoading) return <LoadingReport />;
-  if (error) return <ReportError error={error} retry={() => void refetch()} />;
+  if (error && !data)
+    return <ReportError error={error} retry={() => void refetch()} />;
   return (
-    <p className="text-sm text-muted-foreground">
-      Inspected URL coverage:{" "}
-      {data?.coverage?.length
-        ? data.coverage
-            .map((c: any) => `${c.verdict ?? "Unknown"}: ${c.count}`)
-            .join(" · ")
-        : "Unavailable"}
-    </p>
+    <div className="space-y-2">
+      {error && (
+        <SavedDataStrip
+          updatedAt={dataUpdatedAt}
+          retry={() => void refetch()}
+        />
+      )}
+      <p className="text-sm text-muted-foreground">
+        Inspected URL coverage:{" "}
+        {data?.coverage?.length
+          ? data.coverage
+              .map((c: any) => `${c.verdict ?? "Unknown"}: ${c.count}`)
+              .join(" · ")
+          : "Unavailable"}
+      </p>
+    </div>
   );
 }
 
@@ -1687,13 +1753,19 @@ function SearchOverview({
     refetchInterval: pollUnlessPlanRequired(15000),
   });
   if (query.isLoading) return <LoadingReport />;
-  if (query.error)
+  if (query.error && !query.data)
     return (
       <ReportError error={query.error} retry={() => void query.refetch()} />
     );
   const s = query.data?.summary;
   return (
     <section className="space-y-3" aria-label="Search performance overview">
+      {query.error && (
+        <SavedDataStrip
+          updatedAt={query.dataUpdatedAt}
+          retry={() => void query.refetch()}
+        />
+      )}
       <p className="text-sm">
         Selected range: {start} – {end}. Available data:{" "}
         {s?.first_date && s?.last_date
@@ -1734,7 +1806,7 @@ export function DatasetStatus({
     refetchInterval: pollUnlessPlanRequired(15000),
   });
   if (query.isLoading) return <LoadingReport />;
-  if (query.error)
+  if (query.error && !query.data)
     return (
       <ReportError error={query.error} retry={() => void query.refetch()} />
     );
@@ -1753,6 +1825,12 @@ export function DatasetStatus({
         ];
   return (
     <section className="my-4 space-y-3" aria-label="Dataset sync status">
+      {query.error && (
+        <SavedDataStrip
+          updatedAt={query.dataUpdatedAt}
+          retry={() => void query.refetch()}
+        />
+      )}
       <div className="grid gap-3 sm:grid-cols-2">
         {names.map((n) => {
           const j = d?.jobs?.find((j: any) => j.kind === n.kind);

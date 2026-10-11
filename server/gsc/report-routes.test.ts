@@ -223,3 +223,25 @@ it("site activity scopes pagination to the owned site", async () => {
   expect(r.body.total).toBe(26);
   expect(query.mock.calls[0][1]).toEqual([7, 12, "%%", "", 25, 25]);
 });
+it("sorts the analytics report in SQL before pagination", async () => {
+  query
+    .mockResolvedValueOnce({ rows: [] } as any)
+    .mockResolvedValueOnce({ rows: [{ total: 58 }] } as any)
+    .mockResolvedValueOnce({ rows: [{ pending: 0 }] } as any);
+  const r = await request("/api/gsc/assets/:id/analytics", {
+    sort: "clicks",
+    dir: "asc",
+  });
+  expect(r.code).toBe(200);
+  const sql = query.mock.calls[0][0] as string;
+  // The ORDER BY lands before LIMIT/OFFSET, so it spans the whole report, not one page.
+  expect(sql).toContain("ORDER BY clicks asc, date DESC, clicks DESC, key");
+  expect(sql.indexOf("ORDER BY")).toBeLessThan(sql.indexOf("LIMIT"));
+});
+it("rejects unknown analytics sort columns instead of interpolating them", async () => {
+  const r = await request("/api/gsc/assets/:id/analytics", {
+    sort: "clicks;DROP TABLE",
+  });
+  expect(r.code).toBe(400);
+  expect(query).not.toHaveBeenCalled();
+});

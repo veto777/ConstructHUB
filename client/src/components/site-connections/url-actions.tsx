@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { GooglePill } from "@/components/google";
 import {
   Dialog,
@@ -9,6 +10,69 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { urlBelongsToProperty } from "./context";
+export type UrlRow = { assetId: string; url: string; selected: boolean };
+/**
+ * The review step before URL work is queued. Rendered inside a Radix portal: the action is a
+ * shadcn `Button` (not a `GooglePill` — `.g-pill` reads `--g-accent` from `.g-surface`, which
+ * does not reach a portal), and `DialogContent` re-supplies the surface tokens so the dialog
+ * matches the page in light and dark (same fix as domains.tsx).
+ */
+export function ReviewDialog({
+  review,
+  picked,
+  assets,
+  busy,
+  submit,
+  close,
+}: {
+  review: "inspect" | "sitemap";
+  picked: UrlRow[];
+  assets: any[];
+  busy: boolean;
+  submit: (body: any) => Promise<any>;
+  close: () => void;
+}) {
+  return (
+    <Dialog open onOpenChange={(open) => !open && close()}>
+      <DialogContent className="g-surface max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            {review === "sitemap" ? "Submit sitemaps" : "Queue URL inspections"}
+          </DialogTitle>
+          <DialogDescription>
+            Review the property and URL for each selected row. Sitemaps require
+            Full access.
+          </DialogDescription>
+        </DialogHeader>
+        <ul className="space-y-3">
+          {picked.map((r, i) => (
+            <li key={i} className="break-all text-sm">
+              <b>{assets.find((a) => String(a.id) === r.assetId)?.name}</b>
+              <p>{r.url}</p>
+            </li>
+          ))}
+        </ul>
+        <Button
+          disabled={busy}
+          onClick={async () => {
+            const result = await submit({
+              kind: review,
+              confirm: review === "sitemap",
+              items: picked.map((r) => ({
+                assetId: Number(r.assetId),
+                url: r.url,
+              })),
+            });
+            if (result) close();
+          }}
+          data-testid="button-confirm-queue"
+        >
+          Confirm and queue
+        </Button>
+      </DialogContent>
+    </Dialog>
+  );
+}
 export function UrlActions({
   assets,
   busy,
@@ -18,16 +82,16 @@ export function UrlActions({
   busy: boolean;
   submit: (body: any) => Promise<any>;
 }) {
-  const [rows, setRows] = useState([
+  const [rows, setRows] = useState<UrlRow[]>([
     { assetId: String(assets[0]?.id ?? ""), url: "", selected: true },
   ]);
   const [review, setReview] = useState<"inspect" | "sitemap" | null>(null);
   const picked = rows.filter((r) => r.selected);
-  const valid = (r: (typeof rows)[number]) => {
+  const valid = (r: UrlRow) => {
     const a = assets.find((a) => String(a.id) === r.assetId);
     return !!a && urlBelongsToProperty(a.external_id, r.url);
   };
-  const change = (i: number, patch: Partial<(typeof rows)[number]>) =>
+  const change = (i: number, patch: Partial<UrlRow>) =>
     setRows(rows.map((r, n) => (n === i ? { ...r, ...patch } : r)));
   return (
     <section className="space-y-3">
@@ -114,47 +178,19 @@ export function UrlActions({
           />
         ))}
       </div>
-      <Dialog open={!!review} onOpenChange={(open) => !open && setReview(null)}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {review === "sitemap"
-                ? "Submit sitemaps"
-                : "Queue URL inspections"}
-            </DialogTitle>
-            <DialogDescription>
-              Review the property and URL for each selected row. Sitemaps
-              require Full access.
-            </DialogDescription>
-          </DialogHeader>
-          <ul className="space-y-3">
-            {picked.map((r, i) => (
-              <li key={i} className="break-all text-sm">
-                <b>{assets.find((a) => String(a.id) === r.assetId)?.name}</b>
-                <p>{r.url}</p>
-              </li>
-            ))}
-          </ul>
-          <GooglePill
-            label="Confirm and queue"
-            disabled={busy}
-            onClick={async () => {
-              const result = await submit({
-                kind: review,
-                confirm: review === "sitemap",
-                items: picked.map((r) => ({
-                  assetId: Number(r.assetId),
-                  url: r.url,
-                })),
-              });
-              if (result) {
-                setReview(null);
-                setRows(rows.filter((r) => !r.selected));
-              }
-            }}
-          />
-        </DialogContent>
-      </Dialog>
+      {review && (
+        <ReviewDialog
+          review={review}
+          picked={picked}
+          assets={assets}
+          busy={busy}
+          submit={submit}
+          close={() => {
+            setReview(null);
+            setRows(rows.filter((r) => !r.selected));
+          }}
+        />
+      )}
     </section>
   );
 }
