@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import { isChallengeUrl } from '../shared/government-links';
 const UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 /**
@@ -68,6 +69,7 @@ async function fetchPlain(url: string): Promise<any> {
   return last;
 }
 export function classifyGovernmentPage(r: any, kind: string) {
+  if (isChallengeUrl(r.finalUrl)) return { status: 'unverified', reason: 'bot challenge URL', title: '', excerpt: '' };
   const final = r.finalUrl ? new URL(r.finalUrl) : null;
   const genericVendor = r.finalUrl && isGenericGovernmentVendorUrl(r.finalUrl);
   const $ = cheerio.load(r.html); $('script,style,noscript').remove();

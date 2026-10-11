@@ -1,12 +1,26 @@
 import { hasJurisdictionAdapter, isScrapablePlatform } from "./scrapable-platforms";
 
+/** Recognize challenge destinations by host, never by a URL embedded in the query. */
+export function isChallengeUrl(value: string | null | undefined): boolean {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase().replace(/\.$/, '');
+    return ['perfdrive.com', 'captcha-delivery.com', 'datadome.co', 'datadome.com',
+      'shieldsquare.com', 'challenges.cloudflare.com'].some(domain => host === domain || host.endsWith(`.${domain}`)) ||
+      /\/(?:bot[-_]?check|captcha)(?:\/|$)|\/cdn-cgi\/challenge-platform(?:\/|$)/i.test(url.pathname);
+  } catch { return false; }
+}
+
 /** Source-listed links remain usable when automated verification is inconclusive. */
 export function governmentLinksAvailable(row: { isActive: boolean; linkStatus?: string | null }): boolean {
   return row.isActive && ['live', 'verified', 'unconfirmed'].includes(row.linkStatus || '');
 }
 
 export function governmentLinksForDisplay<T extends { isActive: boolean; linkStatus?: string | null; portalUrl: string | null; searchUrl: string | null }>(row: T): T {
-  return governmentLinksAvailable(row) ? row : { ...row, portalUrl: null, searchUrl: null };
+  const challenge = isChallengeUrl(row.portalUrl) || isChallengeUrl(row.searchUrl);
+  const display = challenge ? { ...row, linkStatus: 'unconfirmed' } : row;
+  return governmentLinksAvailable(row) ? display : { ...display, portalUrl: null, searchUrl: null };
 }
 
 /** Portal availability does not imply that an automated records adapter exists.

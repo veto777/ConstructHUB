@@ -1,0 +1,42 @@
+import { beforeEach, expect, it, vi } from 'vitest';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import appraisers from './data/appraisers.json';
+import { governmentLinksForDisplay, isChallengeUrl } from '../shared/government-links';
+const state = vi.hoisted(() => ({ query: {} as any }));
+vi.mock('@tanstack/react-query', async original => ({ ...await original<any>(), useQuery: () => state.query }));
+import PropertyPage from '../client/src/pages/property';
+const office = { id: 1, countyId: 12, name: 'Test office', isActive: true, portalUrl: 'https://validate.perfdrive.com/', searchUrl: 'https://county.gov/records', linkStatus: 'verified', county: { name: 'Test', state: 'Test', stateCode: 'TS' } };
+beforeEach(() => {
+  state.query = { data: [office], isLoading: false, refetch: vi.fn() };
+  vi.stubGlobal('location', { pathname: '/property', search: '' });
+  vi.stubGlobal('navigator', { userAgent: '' });
+  vi.stubGlobal('window', { location: { search: '', pathname: '/property' } });
+});
+it('preserves the usable search action when the portal is a challenge, and vice versa', () => {
+  for (const row of [office, { ...office, portalUrl: office.searchUrl, searchUrl: office.portalUrl }]) {
+    state.query.data = [row];
+    const html = renderToStaticMarkup(createElement(PropertyPage));
+    expect(html).toContain('href="https://county.gov/records"');
+    expect(html).not.toContain('href="https://validate.perfdrive.com');
+    expect(html).toContain('Find property records');
+  }
+});
+it('retains offices on refresh failure with a saved-data notice and retry', () => {
+  state.query.error = new Error('503: offline');
+  const html = renderToStaticMarkup(createElement(PropertyPage));
+  expect(html).toContain('showing saved property offices');
+  expect(html).toContain('Test office');
+  expect(html).toContain('Retry');
+});
+it.each([401, 402, 403])('does not retain protected offices after access failure %s', code => {
+  state.query.error = new Error(`${code}: denied`);
+  expect(renderToStaticMarkup(createElement(PropertyPage))).not.toContain('Test office');
+});
+it('recovers Roseau only from the archived challenge URL and leaves verification pending', () => {
+  const roseau = appraisers.find(row => row.stateCode === 'MN' && row.county === 'Roseau')!;
+  expect(roseau.portalUrl).toBe(new URL(roseau.candidateUrl!).searchParams.get('ssc'));
+  expect(new URL(roseau.portalUrl!).hostname).toBe('www.co.roseau.mn.us');
+  expect(isChallengeUrl(roseau.portalUrl)).toBe(false);
+  expect(governmentLinksForDisplay({ ...roseau, isActive: true, searchUrl: null }).linkStatus).toBe('unconfirmed');
+});

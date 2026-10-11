@@ -4,17 +4,28 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 const state = vi.hoisted(() => ({ usage: new Map<string, number>(), failMeter: false }));
 vi.mock("../account/api-keys", () => ({
   apiMonthResetsAt: () => "2099-01-01T00:00:00.000Z",
-  monthlyUsage: async (key: string) => {
-    const snapshot = { key: state.usage.get(key) || 0, user: [...state.usage.values()].reduce((a, b) => a + b, 0) };
-    await new Promise(r => setTimeout(r, 5));
-    return snapshot;
-  },
-  recordUnits: async (key: string, _user: number, units: number) => {
-    await new Promise(r => setTimeout(r, 5));
-    if (state.failMeter) throw new Error("CODEX-meter-outage");
-    state.usage.set(key, (state.usage.get(key) || 0) + units);
-  },
 }));
+// HTTP behavior tests use an in-memory stand-in. The actual cross-process lock
+// and SQL accounting are exercised in quota-database.test.ts against the lane DB.
+vi.mock('./quota-reservation', () => {
+  let tail = Promise.resolve();
+  return { reserveQuota: async (_user: number, key: string) => {
+    const previous = tail;
+    let release!: () => void;
+    tail = new Promise<void>(resolve => { release = resolve; });
+    await previous;
+    const used = { key: state.usage.get(key) || 0, user: [...state.usage.values()].reduce((a, b) => a + b, 0) };
+    return {
+      used, rollback: async () => release(),
+      commit: async (units: number) => {
+        await new Promise(r => setTimeout(r, 5));
+        if (state.failMeter) throw new Error('CODEX-meter-outage');
+        state.usage.set(key, (state.usage.get(key) || 0) + units);
+        release();
+      },
+    };
+  } };
+});
 import { quota } from "./quota";
 
 let server: ReturnType<express.Express["listen"]>, base: string;
