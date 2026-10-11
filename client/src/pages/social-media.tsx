@@ -1,5 +1,5 @@
 import { BusinessSelector, MappingEditor, Pager, refreshSocial } from "@/components/social-agency";
-import { loadComposerDraft, loadRowEdits, saveComposerDraft, saveRowEdits } from "@/components/social-drafts";
+import { loadComposerDraft, loadRowEdits, saveComposerDraft, saveRowEdits, type ComposerSubmission } from "@/components/social-drafts";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
@@ -18,6 +18,7 @@ import { AlertTriangle, ExternalLink, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   autoSchema,
+  postSchema,
   publicMediaUrl,
   socialLimits,
   mixTypes,
@@ -107,7 +108,7 @@ export default function SocialMediaPage() {
     queryFn: async () => (await apiRequest("GET", `/api/social/businesses?${new URLSearchParams({ search: "", offset: "0", linked: "all" })}`)).json(),
   });
   const planRequired = planRequiredFrom(businesses.error);
-  const noBusinesses = !!businesses.data && (businesses.data.total ?? 0) === 0 && !(businesses.data.items ?? []).length;
+  const noBusinesses = !businesses.isError && !!businesses.data && (businesses.data.total ?? 0) === 0 && !(businesses.data.items ?? []).length;
   return (
     <AppPage>
       {/* Google's format (owner, 2026-10-07): quiet titles with a hairline, pills, hairline rows. */}
@@ -127,7 +128,7 @@ export default function SocialMediaPage() {
         </>
       ) : (
         <>
-          <BusinessSelector value={business} onChange={v => setBusiness(v, true)} accountTotal={businesses.data ? (businesses.data.total ?? 0) : null} />
+          <BusinessSelector value={business} onChange={v => setBusiness(v, true)} accountTotal={!businesses.isError && businesses.data ? (businesses.data.total ?? 0) : null} />
           {noBusinesses && !business && (
             <Notice
               tone="info"
@@ -138,7 +139,7 @@ export default function SocialMediaPage() {
               Social Media posts for a business from Locations. Add or import one there, then come back to connect its accounts.
             </Notice>
           )}
-          {business && valid ? <SocialWorkbench key={business} accountId={accountId} businessId={business === "all" ? null : Number(business)} all={business === "all"} draftEdits={draftEdits} onEditDraft={editDraft} /> : <>
+          {business && valid ? <SocialWorkbench key={JSON.stringify([accountId, business])} accountId={accountId} businessId={business === "all" ? null : Number(business)} all={business === "all"} draftEdits={editsFor === accountId ? draftEdits : {}} onEditDraft={editDraft} /> : <>
             {/* The guides don't depend on a business: /guides lands here. */}
             {tab === "guides" && <GuidesContent />}
             {!business && !noBusinesses && <p className="text-sm g-text-2">Choose a business above. Add or import businesses in <a className="g-link" href="/locations">Locations</a>.</p>}
@@ -168,7 +169,7 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
   const [mediaOffset, setMediaOffset] = useState(0), [mediaSearch, setMediaSearch] = useState("");
   const scope = businessId ? `businessId=${businessId}` : "";
   const qs = new URLSearchParams({ offset: String(offset), search: postSearch, state: postState, platform: postPlatform, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, ...(businessId ? { businessId: String(businessId) } : {}), ...(calendarDate ? { day: calendarDate } : {}) });
-  const { data, error, isLoading, dataUpdatedAt, refetch } = useQuery<any>({ queryKey: ["/api/social", businessId, all, qs.toString()], refetchInterval: 15000, queryFn: async () => (await apiRequest("GET", `/api/social${all ? "/calendar" : ""}?${qs}`)).json() });
+  const { data, error, isLoading, dataUpdatedAt, refetch } = useQuery<any>({ queryKey: ["/api/social", accountId, businessId, all, qs.toString()], refetchInterval: 15000, queryFn: async () => (await apiRequest("GET", `/api/social${all ? "/calendar" : ""}?${qs}`)).json() });
   // Prune the bulk selection against post state on every refetch (mirrors the draftEdits release
   // effect on the row): once a post leaves draft/queued its checkbox vanishes, so keeping it selected
   // overcounts, names a business for an uncancellable post in the dialog, and confirming spams 409s.
@@ -218,7 +219,7 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
   const tab = all ? "queue" : tabParam || "compose", setTab = (v: string) => setTabParam(v === "compose" ? null : v);
   // The composition is a per-business, per-account draft: it survives leaving the page (How it
   // works, browser Back) and switching businesses, so unsaved work never silently disappears.
-  // Loaded once per workbench mount (the workbench is keyed by business) before any defaults land.
+  // Loaded once per mount, keyed by account AND business, before any defaults land.
   const businessKey = businessId === null ? "all" : String(businessId);
   const [initialDraft] = useState(() => loadComposerDraft(accountId, businessKey));
   const [apiKey, setKey] = useState(""),
@@ -229,29 +230,14 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
     [schedule, setSchedule] = useState(initialDraft?.schedule ?? "");
   // Set when a stored draft (or a user pick) is in play: the saved mapping must not clobber it.
   const restoredRef = useRef(!!initialDraft);
-  const [draftFor, setDraftFor] = useState(accountId);
-  // Late auth / account switch in this tab: hydrate that account's draft, current in-memory values win.
-  useEffect(() => {
-    if (accountId === null || draftFor === accountId) return;
-    const stored = loadComposerDraft(accountId, businessKey);
-    if (stored) {
-      restoredRef.current = true;
-      setText((c) => c || stored.text);
-      setTweaks((c) => (Object.keys(c).length ? c : stored.tweaks));
-      setMediaText((c) => c || stored.mediaText);
-      setSchedule((c) => c || stored.schedule);
-      setDestinations((c) => (c.length ? c : stored.destinations));
-    }
-    setDraftFor(accountId);
-  }, [accountId, draftFor, businessKey]);
+  const [submission, setSubmission] = useState<ComposerSubmission | undefined>(initialDraft?.submission);
+  const submittingRef = useRef(false);
   // Save on every change — business switch, tab round trip and page leave all remount this
   // component. Posting clears the fields, which clears the stored draft for a clean next visit.
   useEffect(() => {
-    if (accountId === null || draftFor !== accountId) return;
-    saveComposerDraft(accountId, businessKey, { text, tweaks, destinations, mediaText, schedule });
-  }, [accountId, draftFor, businessKey, text, tweaks, destinations, mediaText, schedule]);
-  const [settings, setSettings] = useState<AutoSettings | null>(null),
-    [requestId, setRequestId] = useState(() => crypto.randomUUID());
+    saveComposerDraft(accountId, businessKey, { text, tweaks, destinations, mediaText, schedule, submission });
+  }, [accountId, businessKey, text, tweaks, destinations, mediaText, schedule, submission]);
+  const [settings, setSettings] = useState<AutoSettings | null>(null);
   const [sourceKind, setSourceKind] = useState("offers"),
     [sourceText, setSourceText] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -321,6 +307,7 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
           ? "Wait for the upload to finish."
           : mediaProblem;
   function choose(a: Account, checked: boolean) {
+    restoredRef.current = true;
     setDestinations((ds) =>
       checked
         ? [
@@ -338,44 +325,58 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
     );
   }
   function patchDestination(id: string, patch: Partial<Destination>) {
+    restoredRef.current = true;
     setDestinations((ds) =>
       ds.map((d) => (d.accountId === id ? { ...d, ...patch } : d)),
     );
   }
   async function submit(draft: boolean) {
-    const count = destinations.length;
-    const when = schedule ? new Date(schedule) : null;
+    if (submittingRef.current || accountId === null) return;
+    submittingRef.current = true;
+    let dispatched = false;
     try {
+      const body: ComposerSubmission = submission ?? postSchema.parse({
+        requestId: crypto.randomUUID(), text, tweaks, destinations, mediaUrls: urls(),
+        ...(schedule ? { scheduledTime: new Date(schedule).toISOString() } : {}), draft,
+      });
+      // Persist synchronously BEFORE dispatch: even an immediate navigation must restore
+      // the exact request, including its action, time and per-destination payload.
+      restoredRef.current = true;
+      saveComposerDraft(accountId, businessKey, { text, tweaks, destinations, mediaText, schedule, submission: body });
+      setSubmission(body);
+      dispatched = true;
       await mutation.mutateAsync({
         path: "/posts",
         success: false,
-        body: {
-          requestId,
-          text,
-          tweaks,
-          destinations,
-          mediaUrls: urls(),
-          ...(schedule
-            ? { scheduledTime: new Date(schedule).toISOString() }
-            : {}),
-          draft,
-        },
+        body,
       });
       // The composer starts the next post clean: text, tweaks, media and the schedule time all go.
       // Only the destinations stay, and they return to the business's saved mapping (not the last post's picks).
-      setRequestId(crypto.randomUUID());
+      saveComposerDraft(accountId, businessKey, { text: "", tweaks: {}, mediaText: "", schedule: "", destinations: [] });
+      setSubmission(undefined);
+      restoredRef.current = false;
       setText("");
       setTweaks({});
       setMediaText("");
       setSchedule("");
       setDestinations(data?.defaults || []);
+      const count = body.destinations.length;
+      const when = body.scheduledTime ? new Date(body.scheduledTime) : null;
       toast({
-        title: draft ? "Draft saved" : when ? "Post scheduled" : "Post queued for publishing",
-        description: `${count} destination${count === 1 ? "" : "s"}${when ? ` · ${when.toLocaleString()}` : ""}${urls().length ? ` · ${urls().length} media` : ""}. The composer is clear for the next post.`,
+        title: body.draft ? "Draft saved" : when ? "Post scheduled" : "Post queued for publishing",
+        description: `${count} destination${count === 1 ? "" : "s"}${when ? ` · ${when.toLocaleString()}` : ""}${body.mediaUrls.length ? ` · ${body.mediaUrls.length} media` : ""}. The composer is clear for the next post.`,
       });
       setTab("queue");
-    } catch {
-      /* toast from mutation */
+    } catch (error) {
+      if (!dispatched) toast({ title: "Check your post", description: "Check the post text, destinations, media links and schedule time before submitting.", variant: "destructive" });
+      // createPosts returns an existing request before destination/platform validation;
+      // an explicit validation rejection means this payload was not accepted.
+      if (error instanceof Error && /^(400|422):/.test(error.message)) {
+        setSubmission(undefined);
+        saveComposerDraft(accountId, businessKey, { text, tweaks, destinations, mediaText, schedule });
+      }
+    } finally {
+      submittingRef.current = false;
     }
   }
   async function upload(file: File) {
@@ -543,7 +544,12 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
       {tab === "compose" && (
         <section>
           <GoogleSectionHeader title="Compose" description={all ? undefined : "Write once — every chosen account gets its own version."} />
-          <div className="space-y-5">
+          {submission && <div role="status" className="mb-4 space-y-2 rounded-lg border p-3 text-sm">
+            <p>Submission awaiting confirmation. Your original post is saved. Retry it to confirm the result without creating duplicate posts.</p>
+            <GooglePill className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" label="Retry saved submission" disabled={mutation.isPending} onClick={() => void submit(submission.draft)} />
+          </div>}
+          <fieldset disabled={!!submission || mutation.isPending} className="min-w-0 space-y-5">
+            <legend className="sr-only">Compose post</legend>
             <fieldset className="space-y-3">
               <legend className="mb-2 text-sm font-medium">Post to</legend>
               {!data?.connected ? (
@@ -798,7 +804,7 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
                 </span>
               )}
             </div>
-          </div>
+          </fieldset>
         </section>
       )}
 
@@ -806,7 +812,7 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
         <section>
           <GoogleSectionHeader
             title={all ? "All-clients calendar" : "Calendar & queue"}
-            count={data?.total || 0}
+            count={error ? undefined : data?.total}
             description="Times are shown in your browser&rsquo;s timezone. Status refreshes every 15 seconds — published means Blotato confirmed publication; queued means it is still in ConstructHUB."
           />
           <div className="space-y-4">
@@ -832,14 +838,14 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
                 </label>
               </>}
             />
-            {!data?.posts?.length && (
+            {!error && !data?.posts?.length && (
               <p className="text-sm text-muted-foreground" data-testid="text-social-posts-empty">
                 {postSearch || postState || postPlatform || calendarDate
                   ? "No posts match your search or filters."
                   : "No posts yet. Compose your first update or generate an AI draft."}
               </p>
             )}
-            <p className="text-sm text-muted-foreground">{data?.total || 0} matching posts</p>
+            <p className="text-sm text-muted-foreground">{error ? "Post count unavailable" : `${data?.total ?? 0} matching posts`}</p>
             <div className="flex flex-wrap gap-2">
               <GooglePill size="sm" onClick={() => setSelected((old) => ({ ...old, ...Object.fromEntries((data?.posts || []).filter((p: any) => ["draft", "queued"].includes(p.state)).map((p: any) => [p.id, p.business_name || "Legacy / unassigned"])) }))} label="Select this page of posts" />
               <GooglePill size="sm" disabled={!selectedPosts.length} onClick={() => { setSelected({}); setBulkFailed([]); }} label="Clear selection" testId="button-clear-selection" />

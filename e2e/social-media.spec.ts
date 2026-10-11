@@ -1,5 +1,138 @@
 import { test, expect } from "@playwright/test";
 import { autoSchema } from "../shared/social";
+
+for (const draft of [false, true]) {
+test(`lost ${draft ? "draft" : "post"} response survives navigation and reload with one post per destination`, async ({ page }, testInfo) => {
+  const destinations = [
+    { accountId: "recovery-x", platform: "twitter", privacy: "private", tiktokPublic: false, isBrandedContent: false, isYourBrand: false },
+    { accountId: "recovery-threads", platform: "threads", privacy: "private", tiktokPublic: false, isBrandedContent: false, isYourBrand: false },
+  ];
+  const requests: any[] = [];
+  const accepted = new Map<string, any[]>();
+  await page.route("**/api/social**", async route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/social/posts") {
+      const body = route.request().postDataJSON();
+      requests.push(body);
+      if (!accepted.has(body.requestId)) accepted.set(body.requestId, body.destinations.map((d: any) => ({
+        id: crypto.randomUUID(), state: body.draft ? "draft" : "queued", due_at: new Date().toISOString(),
+        payload: { post: { content: { platform: d.platform, text: body.tweaks[d.platform] || body.text, mediaUrls: body.mediaUrls } } },
+      })));
+      // Simulate commit succeeding, with the first response lost on the network.
+      if (requests.length === 1) return route.abort("failed");
+      return route.fulfill({ json: { posts: accepted.get(body.requestId) } });
+    }
+    if (path === "/api/social/businesses") return route.fulfill({ json: { items: [{ id: 1, business_name: "Recovery fixture" }], total: 1 } });
+    if (path === "/api/social") return route.fulfill({ json: {
+      connected: true, accounts: destinations.map(d => ({ id: d.accountId, platform: d.platform, name: d.platform })),
+      defaults: destinations, settings: autoSchema.parse({}), posts: [...accepted.values()].flat(), total: [...accepted.values()].flat().length,
+    } });
+    if (path === "/api/social/youtube/status") return route.fulfill({ json: YT_STATUS });
+    return route.fulfill({ json: [] });
+  });
+  await page.goto("/social-media?business=1");
+  await page.getByLabel("Post text", { exact: true }).fill("Recovery fixture update");
+  await page.getByLabel("threads text tweak", { exact: true }).fill("Threads recovery fixture");
+  await page.getByLabel("Public media URLs", { exact: true }).fill("https://example.com/recovery.jpg");
+  await page.getByRole("button", { name: draft ? "Save draft" : "Post now", exact: true }).click();
+  const retry = page.getByRole("button", { name: "Retry saved submission", exact: true });
+  await expect(retry).toBeEnabled();
+  await page.getByRole("link", { name: "How it works", exact: true }).click();
+  await page.goBack();
+  await expect(retry).toBeVisible();
+  await page.reload(); // Discards module memory, exercising sessionStorage recovery too.
+  await expect(page.getByLabel("Post text", { exact: true })).toHaveValue("Recovery fixture update");
+  await expect(page.getByLabel("Post text", { exact: true })).toBeDisabled();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await retry.scrollIntoViewIfNeeded();
+  await retry.focus();
+  await expect(retry).toBeFocused();
+  expect(await retry.evaluate(el => {
+    const style = getComputedStyle(el);
+    return style.boxShadow !== "none" || (style.outlineStyle !== "none" && style.outlineWidth !== "0px");
+  })).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath("submission-recovery-phone.png"), fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.screenshot({ path: testInfo.outputPath("submission-recovery-desktop.png"), fullPage: true });
+  await retry.click();
+  await expect(page.getByRole("heading", { name: /Calendar & queue/ })).toBeVisible();
+  await page.getByRole("button", { name: "Compose", exact: true }).click();
+  await expect(retry).toHaveCount(0);
+  await expect(page.getByLabel("Post text", { exact: true })).toHaveValue("");
+  expect(requests).toHaveLength(2);
+  expect(requests[1]).toEqual(requests[0]);
+  expect([...accepted.values()].flat()).toHaveLength(2);
+  await page.getByLabel("Post text", { exact: true }).fill("A separate new post");
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect.poll(() => requests.length).toBe(3);
+  expect(requests[2].requestId).not.toBe(requests[0].requestId);
+});
+}
+
+test("switching account in place resets composer and restores only that account's draft", async ({ page }) => {
+  await page.route("**/api/social**", route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/social/businesses") return route.fulfill({ json: { items: [{ id: 1, business_name: "Account fixture" }], total: 1 } });
+    if (path === "/api/social") return route.fulfill({ json: { connected: true, accounts: [], defaults: [], posts: [], total: 0, settings: autoSchema.parse({}) } });
+    if (path === "/api/social/youtube/status") return route.fulfill({ json: YT_STATUS });
+    return route.fulfill({ json: [] });
+  });
+  await page.goto("/social-media?business=1");
+  const text = page.getByLabel("Post text", { exact: true });
+  await text.fill("Original account draft");
+  const original = await page.evaluate(async () => {
+    const modulePath = "/src/lib/queryClient.ts";
+    const { queryClient } = await import(/* @vite-ignore */ modulePath);
+    const me = queryClient.getQueryData(["/api/auth/me"]);
+    queryClient.setQueryData(["/api/auth/me"], { ...me, id: "recovery-second-account" });
+    return me;
+  });
+  await expect(text).toHaveValue("");
+  await text.fill("Second account draft");
+  await page.evaluate(async me => {
+    const modulePath = "/src/lib/queryClient.ts";
+    const { queryClient } = await import(/* @vite-ignore */ modulePath);
+    queryClient.setQueryData(["/api/auth/me"], me);
+  }, original);
+  await expect(text).toHaveValue("Original account draft");
+  await page.evaluate(async () => {
+    const modulePath = "/src/lib/queryClient.ts";
+    const { queryClient } = await import(/* @vite-ignore */ modulePath);
+    const me = queryClient.getQueryData(["/api/auth/me"]);
+    queryClient.setQueryData(["/api/auth/me"], { ...me, id: "recovery-second-account" });
+  });
+  await expect(text).toHaveValue("Second account draft");
+});
+
+test("validation rejection keeps the composer editable for a corrected new request", async ({ page }) => {
+  const requests: any[] = [];
+  await page.route("**/api/social**", route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/social/posts") {
+      requests.push(route.request().postDataJSON());
+      return requests.length === 1
+        ? route.fulfill({ status: 400, json: { message: "Use a shorter post" } })
+        : route.fulfill({ json: { posts: [] } });
+    }
+    if (path === "/api/social/businesses") return route.fulfill({ json: { items: [{ id: 1, business_name: "Validation fixture" }], total: 1 } });
+    if (path === "/api/social") return route.fulfill({ json: { connected: true, accounts: [{ id: "validation-x", platform: "twitter", name: "Validation" }], defaults: [{ accountId: "validation-x", platform: "twitter" }], posts: [], total: 0, settings: autoSchema.parse({}) } });
+    if (path === "/api/social/youtube/status") return route.fulfill({ json: YT_STATUS });
+    return route.fulfill({ json: [] });
+  });
+  await page.goto("/social-media?business=1");
+  const text = page.getByLabel("Post text", { exact: true });
+  await text.fill("x".repeat(281));
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(text).toBeEnabled();
+  await expect(page.getByText("Use a shorter post", { exact: true })).toBeVisible();
+  await text.fill("Corrected post");
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect.poll(() => requests.length).toBe(2);
+  expect(requests[1].text).toBe("Corrected post");
+  expect(requests[1].requestId).not.toBe(requests[0].requestId);
+});
+
 test("connect, compose, schedule, approve an AI draft, configure automatic mode, and read guides", async ({
   page,
 }) => {
@@ -445,6 +578,9 @@ test("all-clients calendar keeps saved data under a strip with Retry when a refr
   const strip = page.getByTestId("strip-social-saved-data");
   await expect(strip).toBeVisible({ timeout: 25000 });
   await expect(strip).toContainText("Refresh failed — showing saved data from");
+  await expect(page.getByText("Post count unavailable", { exact: true })).toBeVisible();
+  await expect(page.getByText(/^\d+ matching posts$/)).toHaveCount(0);
+  await expect(page.getByTestId("text-social-posts-empty")).toHaveCount(0);
   await expect(strip.getByRole("button", { name: "Retry", exact: true })).toBeVisible();
   // The saved row stays rendered underneath the strip.
   await expect(page.getByText("Saved queued text", { exact: true })).toBeVisible();
