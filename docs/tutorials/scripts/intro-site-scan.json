@@ -1,0 +1,115 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "intro-site-scan",
+  "title": "Site Scan",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/site-scan",
+      "caption": "Site Scan",
+      "chapter": "Start a scan",
+      "narration": "This is Site Scan. It reads your website the way a search engine does, and ends in a fix list."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//span[text()=\"Linked GBP location\"]/ancestor::div[contains(@class,\"grid\")][1]",
+      "caption": "Location, website, pages",
+      "narration": "Pick a Google Business Profile location and it uses that profile's website, and checks the site against it."
+    },
+    {
+      "action": "highlight",
+      "selector": "button:has-text(\"Start scan\")",
+      "caption": "Start scan",
+      "narration": "Start scan reads your pages in the background, with Google PageSpeed's mobile and desktop test."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"list-scan-schedules\"]",
+      "caption": "Monthly rescans",
+      "narration": "Turn on a monthly rescan and it runs on its own. These two sites are rescanned every month."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[@data-testid=\"list-scan-history\"]/*[1]",
+      "caption": "History & score trend",
+      "chapter": "Read the report",
+      "narration": "Every scan stays in your history, with its overall score and how far it moved since the scan before."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"list-scan-history\"] button >> nth=0",
+      "caption": "Open a report",
+      "narration": "Open the latest scan of this roofing company's site."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//div[contains(@class,\"rounded-lg\") and .//div[text()=\"AI Readiness\"]]/parent::div",
+      "caption": "Six scores",
+      "narration": "An overall score, then Local, Content, Technical, Performance and AI Readiness."
+    },
+    {
+      "action": "click",
+      "selector": "summary:has-text(\"What raised or lowered these scores?\")",
+      "caption": "What moved each score",
+      "narration": "Open this to see what raised or lowered each one."
+    },
+    {
+      "action": "highlight",
+      "selector": "article:has-text(\"Google Maps embed not found\") >> nth=0",
+      "caption": "Every finding, explained",
+      "narration": "Each finding says why it matters, links Google's own guidance, and lists the steps to fix it."
+    },
+    {
+      "action": "highlight",
+      "selector": "section[aria-label=\"Prioritized fix checklist\"] article >> nth=0",
+      "caption": "The fix checklist",
+      "chapter": "Fix and share",
+      "narration": "The checklist orders the fixes by impact. Each shows its page, and what the last rescan found."
+    },
+    {
+      "action": "highlight",
+      "selector": "button:has-text(\"Generate AI fix plan\")",
+      "caption": "AI plan, PDF, share link",
+      "narration": "Draft an AI fix plan to review, export a PDF, or create a share link for your web person."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"section-scan-followup\"]",
+      "caption": "Follow up",
+      "narration": "Then rescan to check what got fixed, or email them the prioritized checklist."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-site-scan\"]",
+      "caption": "Menu: Site Scan",
+      "narration": "You'll find Site Scan in the menu on the left, under Tools."
+    }
+  ],
+  "youtube": {
+    "title": "Site Scan in about a minute | ConstructHUB",
+    "description": "A one-minute tour of Site Scan in ConstructHUB: scan your website against your Google Business Profile, read six scores and every finding with steps to fix it, then share the report and rescan to check the fixes.",
+    "tags": [
+      "ConstructHUB",
+      "website audit",
+      "SEO audit",
+      "contractor website",
+      "site scan",
+      "local SEO",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Your Website Fix List",
+    "accent": "Fix",
+    "kicker": "Site Scan",
+    "step": 6
+  }
+}
