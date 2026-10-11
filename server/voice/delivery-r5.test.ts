@@ -28,7 +28,7 @@ vi.mock("../db", () => ({
     execute: async () => { const claimed = !f.summaryClaimed; f.summaryClaimed = true; return { rows: claimed ? [{ id: "call" }] : [] }; },
     insert: () => ({ values: (v: any) => ({ onConflictDoNothing: () => ({ returning: async () => { const exists = f.inserts.has(v.id); f.inserts.add(v.id); return exists ? [] : [{ id: v.id }]; } }) }) }),
     update: () => ({ set: (v: any) => ({ where: () => {
-      if (v.sentCount === 1 && !v.lastSentAt) return { returning: async () => {
+      if (v.lastError && typeof v.lastError === "object" && !("lastProviderSid" in v)) return { returning: async () => {
         if (f.escalationClaimed) return [];
         f.escalationClaimed = true; return [{ id: 1 }];
       } };
@@ -100,7 +100,7 @@ it("in-app replay uses the same notification identity", async () => {
 });
 
 it("claims the first escalation message before either racing sender reaches the provider", async () => {
-  const row = { id: 1, orgId: "org", channel: "sms", recipient: "person" } as any;
+  const row = { id: 1, orgId: "org", channel: "sms", recipient: "person", sentCount: 0, lastSentAt: null, lastError: null, followupSentAt: null } as any;
   const results = await Promise.all([sendFirstEscalation(ctx.org, row, "body", "subject"), sendFirstEscalation(ctx.org, row, "body", "subject")]);
   expect(results.filter(r => r.ok)).toHaveLength(1);
   expect(f.sms).toHaveBeenCalledTimes(1);

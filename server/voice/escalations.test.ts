@@ -6,7 +6,7 @@
  * max days), confirmation by SMS reply (scoped to the org's sender) and by
  * the signed email link, the next-day follow-up and the close.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
 import pg from "pg";
 import fs from "node:fs";
 import path from "node:path";
@@ -15,9 +15,22 @@ import { cleanup, fakePhone, made, makeAccount, makeCall, setProfile, type Accou
 process.env.DATABASE_URL = process.env.CRM_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 process.env.EMAIL_FORCE_SINK = "1";
 process.env.VOICE_INTERNAL_SECRET = "vitest-escalation-secret-0123456789";
-for (const k of ["SIGNALWIRE_SPACE_URL", "SIGNALWIRE_PROJECT_ID", "SIGNALWIRE_API_TOKEN", "SIGNALWIRE_FROM_NUMBER"]) delete process.env[k];
+const carrierEnv = {
+  SIGNALWIRE_SPACE_URL: "carrier.example.invalid", SIGNALWIRE_PROJECT_ID: "test-project",
+  SIGNALWIRE_API_TOKEN: "test-token", SIGNALWIRE_FROM_NUMBER: "+15550100000",
+};
 const SMS_OUTBOX = path.join(process.cwd(), "tmp", `voice-esc-sms-${process.pid}.jsonl`);
-process.env.SMS_OUTBOX_PATH = SMS_OUTBOX;
+const carrierMessages: { to: string; body: string }[] = [];
+beforeEach(() => {
+  vi.stubEnv("SMS_OUTBOX_PATH", SMS_OUTBOX);
+  for (const [k, v] of Object.entries(carrierEnv)) vi.stubEnv(k, v);
+  vi.stubGlobal("fetch", vi.fn(async (_url: unknown, init: RequestInit) => {
+    const form = new URLSearchParams(String(init.body));
+    carrierMessages.push({ to: form.get("To")!, body: form.get("Body")! });
+    return new Response(JSON.stringify({ sid: `SM-test-${carrierMessages.length}` }), { status: 201 });
+  }));
+});
+afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 const EMAIL_OUTBOX = path.join(process.cwd(), "tmp", "email-outbox.jsonl");
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
@@ -28,9 +41,7 @@ let a: Account;
 const lead = fakePhone(), pm = fakePhone();
 const officeEmail = `esc-office-${Date.now()}@example.invalid`;
 
-const smsTo = (to: string) => fs.existsSync(SMS_OUTBOX)
-  ? fs.readFileSync(SMS_OUTBOX, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)).filter((m) => m.to === to)
-  : [];
+const smsTo = (to: string) => carrierMessages.filter((m) => m.to === to);
 const emailsTo = (addr: string) => fs.existsSync(EMAIL_OUTBOX)
   ? fs.readFileSync(EMAIL_OUTBOX, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)).filter((m) => m.to.some((t: string) => t.includes(addr)))
   : [];
@@ -194,7 +205,7 @@ describe("raising and reminding (real DB)", () => {
       expect(await esc.confirmEscalationByReply(lead, "ok", otherSender, at("2026-10-02T08:30:00"))).toBe(0);
       expect(await esc.confirmEscalationByReply(lead, "OK on it", "+15550139999", at("2026-10-02T08:30:00"))).toBeGreaterThanOrEqual(1);
     } finally {
-      for (const k of ["SIGNALWIRE_SPACE_URL", "SIGNALWIRE_PROJECT_ID", "SIGNALWIRE_API_TOKEN", "SIGNALWIRE_FROM_NUMBER"]) delete process.env[k];
+      Object.assign(process.env, carrierEnv);
       await pool.query("update crm_orgs set custom_fields = $2::jsonb where id = $1", [a.orgId, JSON.stringify(o.custom_fields ?? {})]);
     }
     expect(await escRow(id!)).toMatchObject({ reply_text: "OK on it" });
@@ -256,5 +267,66 @@ describe("raising and reminding (real DB)", () => {
     expect((await esc.closeEscalation(a.orgId, id!, "closed by Olive"))?.closeReason).toBe("closed by Olive");
     expect(await esc.closeEscalation(a.orgId, id!, "again")).toBeNull();
     expect((await esc.listEscalations(a.orgId, { open: true })).some((e) => e.id === id)).toBe(false);
+  });
+});
+
+describe("carrier outcomes stay honest in the database", () => {
+  for (const stage of ["first", "reminder", "followup"] as const) {
+    for (const ambiguous of [false, true]) {
+      it(`${stage}: ${ambiguous ? "uncertain sends never auto-resend" : "log sends never count as sent"}`, async () => {
+        const ctx = (await orgProfile.loadOrgVoiceContext(a.orgId))!;
+        const recipient = fakePhone();
+        ctx.profile.escalations.rules = ctx.profile.escalations.rules.map((r) => ({ ...r, recipient: r.channel === "sms" ? recipient : r.recipient }));
+        const c = await makeCall(pool, a.orgId);
+        const run = () => esc.raiseEscalation({ ctx, call: { ...call }, kind: "existing_customer", summary: "Warranty question" });
+        const call = (await callRow(c.id))!;
+        let id: number;
+        if (stage !== "first") {
+          id = (await run()).escalationId!;
+          await pool.query("update voice_escalations set created_at = $2, last_sent_at = $2, confirmed_at = $3 where id = $1",
+            [id, at("2026-10-10T09:00:00"), stage === "followup" ? at("2026-10-10T09:00:00") : null]);
+        }
+        const beforeFetch = vi.mocked(fetch).mock.calls.length;
+        if (ambiguous) vi.mocked(fetch).mockRejectedValue(new Error("Response lost after acceptance"));
+        else vi.stubEnv("SIGNALWIRE_API_TOKEN", "");
+        if (stage === "first") id = (await run()).escalationId!;
+        else await esc.tickVoiceEscalations(at("2026-10-11T12:00:00"));
+        const row = await escRow(id!);
+        expect(row.sent_count).toBe(stage === "first" ? 0 : 1);
+        expect(row.last_sent_at).toEqual(stage === "first" ? null : at("2026-10-10T09:00:00"));
+        expect(row.followup_sent_at).toBeNull();
+        expect(row.last_error).toContain(ambiguous ? "Delivery uncertain;" : "Not sent: texting isn't set up.");
+        if (ambiguous) {
+          const requests = () => vi.mocked(fetch).mock.calls.filter(([, init]) => new URLSearchParams(String(init?.body)).get("To") === recipient).length;
+          const attempted = requests();
+          expect(attempted).toBe(stage === "first" ? 1 : 2);
+          await expect(esc.raiseEscalation({ ctx, call: (await callRow(c.id))!, kind: "existing_customer", summary: "Warranty question", strict: true })).rejects.toThrow("Delivery uncertain");
+          await esc.tickVoiceEscalations(at("2026-10-11T15:00:00"));
+          expect(requests()).toBe(attempted);
+        } else expect(vi.mocked(fetch).mock.calls.length).toBe(beforeFetch);
+      });
+    }
+  }
+
+  it("owner failures remain visible and retry only failed recipients", async () => {
+    const ctx = (await orgProfile.loadOrgVoiceContext(a.orgId))!;
+    ctx.org.customFields = { ...(ctx.org.customFields as any), notificationPrefs: { leadReceived: { inApp: true, email: false, sms: true } } };
+    const c = await makeCall(pool, a.orgId);
+    const call = (await callRow(c.id))!;
+    const ownerPhone = fakePhone();
+    await pool.query("update crm_members set phone = $2 where org_id = $1 and role = 'owner'", [a.orgId, ownerPhone]);
+    vi.mocked(fetch).mockImplementation(async (_url, init) => new Response(JSON.stringify(
+      new URLSearchParams(String(init?.body)).get("To") === ownerPhone ? { message: "Recipient opted out" } : { sid: "SM-rule" }),
+      { status: new URLSearchParams(String(init?.body)).get("To") === ownerPhone ? 400 : 201 }));
+    const result = await esc.raiseEscalation({ ctx, call, kind: "urgent", summary: "Leak" });
+    expect((await escRow(result.escalationId!)).last_error).toContain("Owner alert: Recipient opted out");
+    expect((await callRow(c.id))!.flags).not.toHaveProperty("alertFacts.urgent");
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ sid: "SM-owner" }), { status: 201 }));
+    await esc.raiseEscalation({ ctx, call: (await callRow(c.id))!, kind: "urgent", summary: "Leak", strict: true });
+    expect((await callRow(c.id))!.flags).toHaveProperty("alertFacts.urgent");
+    expect((await escRow(result.escalationId!)).last_error).toBeNull();
+    const requests = vi.mocked(fetch).mock.calls.map(([, init]) => new URLSearchParams(String(init?.body)).get("To"));
+    expect(requests.filter((to) => to === ownerPhone)).toHaveLength(2);
+    expect(requests.filter((to) => to === lead)).toHaveLength(1);
   });
 });

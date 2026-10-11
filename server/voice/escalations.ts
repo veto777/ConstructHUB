@@ -20,16 +20,16 @@
  * Reply DONE"), then the row closes. The assistant never gives out a
  * recipient's number.
  */
-import { createHmac, timingSafeEqual } from "crypto";
+import { createHash, createHmac, timingSafeEqual } from "crypto";
 import { db } from "../db";
 import {
-  crmMembers, crmOrgs, crmNotificationChannel, voiceEscalations,
+  crmMembers, crmOrgs, crmNotifications, crmNotificationChannel, voiceEscalations,
   type VoiceCallRow, type VoiceEscalationRow,
 } from "@shared/schema";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { ESCALATION_KINDS, type EscalationKind, type EscalationRule } from "@shared/voice-profile";
 import { normalizePhone, resolveSmsSender, sendSms } from "../crm/sms";
-import { notifyMembers } from "../crm/notify";
+import { appForLink, pushSoon } from "../apns";
 import { recordActivity } from "../crm/activity";
 import { sendWithFallback } from "../email";
 import { prettyPhone, leadFactsFrom } from "./leads";
@@ -143,14 +143,25 @@ export function publicBase(): string {
 
 // ── Sending ──────────────────────────────────────────────────────────────────
 
-type SendOutcome = { ok: boolean; sid: string | null; error: string | null };
+type SendOutcome = { ok: boolean; sid: string | null; error: string | null; ambiguous?: boolean };
+const UNCERTAIN = "Delivery uncertain; verify with the carrier before resending.";
+const uncertain = (row: Pick<VoiceEscalationRow, "lastError" | "sentCount" | "lastSentAt">) =>
+  !!row.lastError?.startsWith(UNCERTAIN) || (row.sentCount > 0 && !row.lastSentAt);
+
+/** The shared log provider is a successful log write, never a carrier acceptance. */
+export function escalationSmsOutcome(r: Awaited<ReturnType<typeof sendSms>>): SendOutcome {
+  if (r.ambiguous) return { ok: false, sid: r.sid ?? null, ambiguous: true, error: UNCERTAIN };
+  if (r.provider === "log") return { ok: false, sid: null, error: "Not sent: texting isn't set up." };
+  if (r.ok && !r.sid) return { ok: false, sid: null, ambiguous: true, error: UNCERTAIN };
+  return { ok: !!r.ok, sid: r.sid ?? null, error: r.ok ? null : (r.error ?? "send failed") };
+}
 
 async function sendEscalation(org: typeof crmOrgs.$inferSelect, row: Pick<VoiceEscalationRow, "id" | "orgId" | "channel" | "recipient" | "recipientName">, body: string, subject: string): Promise<SendOutcome> {
   if (row.channel === "sms") {
-    const r = await sendSms(row.recipient, body, org.customFields, org.id).catch((e: any) => ({ ok: false, sid: null, error: String(e?.message || e) } as any));
-    return { ok: !!r?.ok, sid: r?.sid ?? null, error: r?.ok ? null : (r?.error ?? "send failed") };
+    const r = await sendSms(row.recipient, body, org.customFields, org.id).catch((e: any) => ({ ok: false, provider: "signalwire", sid: null, ambiguous: true, error: String(e?.message || e) } as const));
+    return escalationSmsOutcome(r);
   }
-  const path = confirmPath(row.id, row.orgId);
+  const path = row.id ? confirmPath(row.id, row.orgId) : null;
   const link = path ? `${publicBase()}${path}` : null;
   try {
     await sendWithFallback({
@@ -168,27 +179,77 @@ async function sendEscalation(org: typeof crmOrgs.$inferSelect, row: Pick<VoiceE
 }
 
 /** Owners through the CRM's channels (bell/email/sms per the leadReceived matrix). */
-async function notifyOwners(ctx: OrgVoiceContext, call: VoiceCallRow, kind: string, facts: EscalationFacts, opts: { update?: boolean } = {}): Promise<void> {
+async function notifyOwnersImpl(ctx: OrgVoiceContext, call: VoiceCallRow, kind: string, facts: EscalationFacts, opts: { update?: boolean } = {}): Promise<void> {
   const who = facts.callerName === "unknown" ? facts.callback : facts.callerName;
   const base = kind === "human" ? `${who} asked for a person` : `${facts.kind} — call from ${who}`;
   const title = opts.update ? `Details added — ${base}` : base;
-  await notifyMembers({
-    org: ctx.org, pref: "leadReceived", type: `call.alert.${kind}`, title,
-    body: facts.summary || null, link: `/call-assistant?tab=calls&call=${call.id}`,
-  });
-  if (!crmNotificationChannel(ctx.org.customFields, "leadReceived", "email")) return;
   const members = await db.select().from(crmMembers).where(and(eq(crmMembers.orgId, ctx.org.id), eq(crmMembers.status, "active")));
-  const to = members.filter((m) => m.role === "owner" && m.email).map((m) => m.email);
-  if (!to.length) return;
-  await sendWithFallback({
-    to: to.join(","),
-    subject: `🚨 ${title}`,
-    html: `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif"><p style="white-space:pre-wrap">${esc(defaultEscalationBody(facts).replace(/\nReply OK.*$/, ""))}</p>` +
-      `<p>The call, transcript and recording are under Call Assistant → Calls.</p></div>`,
-  } as any).catch((e: any) => {
-    console.error("[voice] owner alert email failed:", e?.message || e);
-    void recordFailure("call_assistant", "Call Assistant owner alert email", e, { callId: call.id, orgId: ctx.org.id });
-  });
+  const owners = members.filter((m) => m.role === "owner");
+  const failures: string[] = [];
+  const revision = opts.update ? [facts.callerName, facts.address] : "initial";
+  if (crmNotificationChannel(ctx.org.customFields, "leadReceived", "inApp")) {
+    for (const member of owners) {
+      const key = createHash("sha256").update(JSON.stringify([call.id, kind, revision, member.id])).digest("hex");
+      try {
+        const link = `/call-assistant?tab=calls&call=${call.id}`;
+        const inserted = await db.insert(crmNotifications).values({
+          id: `voice-owner:${key}`, orgId: ctx.org.id, memberId: member.id, type: `call.alert.${kind}`,
+          title: title.slice(0, 300), body: facts.summary || null, link,
+        }).onConflictDoNothing().returning({ id: crmNotifications.id });
+        if (inserted.length && member.userId) pushSoon(member.userId, appForLink(link), { title: `${ctx.org.name}: ${title}`, body: facts.summary, link });
+      } catch (error) {
+        failures.push(`In-app alert: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  }
+  const deliver = async (channel: "sms" | "email", recipient: string) => {
+    // Stable per recipient and details revision: a retry cannot resend successful/uncertain recipients.
+    const key = createHash("sha256").update(JSON.stringify([kind, revision, channel, recipient])).digest("hex");
+    const pending = JSON.stringify({ status: "uncertain", kind, channel, recipient, error: UNCERTAIN });
+    const claim = await db.execute(sql`
+      update voice_calls set flags = jsonb_set(coalesce(flags, '{}'::jsonb), '{ownerEscalationDelivery}',
+        coalesce(flags->'ownerEscalationDelivery', '{}'::jsonb) || jsonb_build_object(${key}::text, ${pending}::jsonb))
+      where id = ${call.id} and coalesce(flags->'ownerEscalationDelivery'->${key}::text->>'status', 'failed') = 'failed'
+      returning id`);
+    if (!claim.rows.length) {
+      const saved = await db.execute(sql`select flags->'ownerEscalationDelivery'->${key}::text->>'status' as status from voice_calls where id = ${call.id}`);
+      if (saved.rows[0]?.status !== "sent") failures.push(UNCERTAIN);
+      return;
+    }
+    let outcome: SendOutcome;
+    try {
+      outcome = await sendEscalation(ctx.org, { id: 0, orgId: ctx.org.id, channel, recipient, recipientName: null },
+        defaultEscalationBody(facts).replace(/\nReply OK.*$/, ""), title);
+    } catch {
+      outcome = { ok: false, sid: null, ambiguous: true, error: UNCERTAIN };
+    }
+    const result = JSON.stringify({ status: outcome.ok ? "sent" : outcome.ambiguous ? "uncertain" : "failed", kind, channel, recipient, sid: outcome.sid, error: outcome.error });
+    await db.execute(sql`update voice_calls set flags = jsonb_set(flags, array['ownerEscalationDelivery', ${key}::text], ${result}::jsonb) where id = ${call.id}`);
+    if (!outcome.ok) failures.push(outcome.error || "send failed");
+  };
+  if (crmNotificationChannel(ctx.org.customFields, "leadReceived", "sms")) {
+    const numbers = new Set(owners.map((m) => normalizePhone(m.phone)).filter((p): p is string => !!p));
+    if (!numbers.size && normalizePhone(ctx.org.phone)) numbers.add(normalizePhone(ctx.org.phone)!);
+    for (const recipient of numbers) await deliver("sms", recipient);
+  }
+  if (crmNotificationChannel(ctx.org.customFields, "leadReceived", "email")) {
+    for (const recipient of new Set(owners.map((m) => m.email).filter((p): p is string => !!p))) await deliver("email", recipient);
+  }
+  if (failures.length) throw new Error(failures.join("; "));
+}
+
+/** Keep owner failures visible on the escalation, without erasing an uncertain rule send. */
+async function notifyOwners(ctx: OrgVoiceContext, call: VoiceCallRow, kind: string, facts: EscalationFacts, opts: { update?: boolean } = {}): Promise<void> {
+  try {
+    await notifyOwnersImpl(ctx, call, kind, facts, opts);
+    await db.update(voiceEscalations).set({ lastError: sql`nullif(rtrim(split_part(coalesce(${voiceEscalations.lastError}, ''), 'Owner alert:', 1), '; '), '')` })
+      .where(and(eq(voiceEscalations.callId, call.id), eq(voiceEscalations.kind, kind)));
+  } catch (error) {
+    const message = `Owner alert: ${error instanceof Error ? error.message : String(error)}`;
+    await db.update(voiceEscalations).set({ lastError: sql`concat_ws('; ', nullif(rtrim(split_part(coalesce(${voiceEscalations.lastError}, ''), 'Owner alert:', 1), '; '), ''), ${message})` })
+      .where(and(eq(voiceEscalations.callId, call.id), eq(voiceEscalations.kind, kind)));
+    throw error;
+  }
 }
 
 export type RaiseResult = { escalationId: number | null; sent: boolean; fallback: boolean; recipientName: string | null; duplicate: boolean };
@@ -225,7 +286,7 @@ export async function raiseEscalation(args: {
   const rule = matchRule(ctx.profile.escalations.rules, kind);
   const findExisting = async () => (await db.select().from(voiceEscalations)
     .where(and(eq(voiceEscalations.orgId, ctx.org.id), eq(voiceEscalations.callId, call.id), eq(voiceEscalations.kind, kind))).limit(1))[0];
-  const existing = await findExisting();
+  let existing = await findExisting();
   const callFlags = (call.flags ?? {}) as Record<string, unknown>;
   const alreadyFallback = Array.isArray(callFlags.alertedKinds) && (callFlags.alertedKinds as string[]).includes(kind);
   const ownersDone = () => !!((call.flags ?? {}) as { alertFacts?: Record<string, unknown> }).alertFacts?.[kind];
@@ -237,13 +298,16 @@ export async function raiseEscalation(args: {
       .catch((e: any) => {
         console.error("[voice] escalation details update failed:", e?.message || e);
         void recordFailure("call_assistant", "Call Assistant escalation details update", e, { callId: call.id, orgId: ctx.org.id, kind });
+        if (strict) throw e;
       });
+    existing = await findExisting();
     if (strict) {
       // Finish what the first attempt left: a first message that never went out, an owners' alert that failed.
-      if (existing && existing.sentCount > 0 && !existing.lastSentAt) throw new EscalationDeliveryError(existing.lastError || "First message is still being sent; verify delivery before resending", existing.id);
+      if (existing && uncertain(existing)) throw new EscalationDeliveryError(existing.lastError || "First message is still being sent; verify delivery before resending", existing.id);
       if (existing && existing.sentCount === 0 && !existing.lastSentAt && !existing.closedAt) {
         const sent = await sendFirstEscalation(ctx.org, existing, existing.body, `${facts.company}: ${facts.kind} — ${facts.callerName}`);
         if (!sent.ok) throw new EscalationDeliveryError(`escalation #${existing.id} not sent: ${sent.error ?? "send failed"}`, existing.id);
+        existing = (await findExisting())!;
       }
       if (ownersNeeded(ctx, kind, !!existing) && !ownersDone()) {
         await notifyOwners(ctx, call, kind, facts);   // throws → the task retries
@@ -252,8 +316,8 @@ export async function raiseEscalation(args: {
       if (!alreadyFallback) await markAlerted(call, kind);
     }
     return existing
-      ? { escalationId: existing.id, sent: true, fallback: false, recipientName: existing.recipientName, duplicate: true }
-      : { escalationId: null, sent: true, fallback: true, recipientName: null, duplicate: true };
+      ? { escalationId: existing.id, sent: !!(existing.lastSentAt && existing.sentCount > 0), fallback: false, recipientName: existing.recipientName, duplicate: true }
+      : { escalationId: null, sent: ownersDone(), fallback: true, recipientName: null, duplicate: true };
   }
   recordActivity({
     orgId: ctx.org.id, actorLabel: `${ctx.assistantName} (Call Assistant)`, action: "call.alert",
@@ -283,7 +347,7 @@ export async function raiseEscalation(args: {
         if (!winner) throw e;
         // strict: go through the existing-row path, which finishes whatever the winner has not delivered yet
         if (strict) return raiseEscalation(args);
-        return { escalationId: winner.id, sent: true, fallback: false, recipientName: winner.recipientName, duplicate: true };
+        return { escalationId: winner.id, sent: !!(winner.lastSentAt && winner.sentCount > 0), fallback: false, recipientName: winner.recipientName, duplicate: true };
       }
       const sent = await sendFirstEscalation(ctx.org, row, body, `${facts.company}: ${facts.kind} — ${facts.callerName}`);
       result = { escalationId: row.id, sent: sent.ok, fallback: false, recipientName: rule.recipientName, duplicate: false };
@@ -355,9 +419,9 @@ async function addEscalationDetails(ctx: OrgVoiceContext, call: VoiceCallRow, ki
     // when a name or a street is new
     const body = escalationBody(rule, facts);
     await db.update(voiceEscalations).set({ body }).where(eq(voiceEscalations.id, row.id));
-    if (row.sentCount > 0 && factsAddDetail(facts, row.body)) {
-      const sent = await sendEscalation(ctx.org, row, `Details added:\n\n${body}`, `${facts.company}: ${facts.kind} — details added for ${facts.callerName}`);
-      await db.update(voiceEscalations).set({ lastProviderSid: sent.sid, lastError: sent.error }).where(eq(voiceEscalations.id, row.id));
+    if (row.sentCount > 0 && !uncertain(row) && factsAddDetail(facts, row.body)) {
+      const sent = await sendTrackedEscalation(ctx.org, row, `Details added:\n\n${body}`, `${facts.company}: ${facts.kind} — details added for ${facts.callerName}`, "details");
+      if (!sent.ok) throw new EscalationDeliveryError(sent.error || "Details not sent", row.id);
     }
   }
   const sentToOwners = ((call.flags ?? {}) as { alertFacts?: Record<string, SentFacts> }).alertFacts?.[kind];
@@ -476,6 +540,7 @@ export async function tickVoiceEscalations(now = new Date()): Promise<TickReport
   const MIN = 60_000, HOUR = 60 * MIN, DAY = 24 * HOUR;
   for (const row of rows) {
     try {
+      if (uncertain(row)) continue;
       const found = await orgOf(row.orgId);
       if (!found) { await db.update(voiceEscalations).set({ closedAt: now, closeReason: "org gone" }).where(eq(voiceEscalations.id, row.id)); report.closed++; continue; }
       const { org } = found;
@@ -493,14 +558,9 @@ export async function tickVoiceEscalations(now = new Date()): Promise<TickReport
         if (row.sentCount > 0 && !row.lastSentAt) continue; // first send is claimed (or its outcome is unknown)
         const n = row.sentCount + 1;
         const body = row.sentCount === 0 ? row.body : `REMINDER #${n - 1} — still waiting on your OK:\n\n${row.body}`;
-        const sent = await (row.sentCount === 0 ? sendFirstEscalation : sendEscalation)(org, row, body, `Reminder: ${row.recipientName ? `${row.recipientName}, ` : ""}still waiting on your OK`);
-        if (sent.ok) {
-          await db.update(voiceEscalations).set({ sentCount: n, lastSentAt: now, lastProviderSid: sent.sid, lastError: null }).where(eq(voiceEscalations.id, row.id));
-          report.reminded++;
-        } else {
-          await db.update(voiceEscalations).set({ lastError: sent.error }).where(eq(voiceEscalations.id, row.id));
-          report.errors++;
-        }
+        const sent = await sendTrackedEscalation(org, row, body, `Reminder: ${row.recipientName ? `${row.recipientName}, ` : ""}still waiting on your OK`, row.sentCount === 0 ? "first" : "reminder", now);
+        if (sent.ok) report.reminded++;
+        else report.errors++;
         continue;
       }
       // Confirmed: one next-day follow-up, then close.
@@ -511,9 +571,9 @@ export async function tickVoiceEscalations(now = new Date()): Promise<TickReport
       if (!row.followupSentAt) {
         if (now.getTime() - row.confirmedAt.getTime() < FOLLOW_UP_AFTER_HOURS * HOUR || !open) continue;
         const gist = row.body.split("\nReply OK")[0];
-        const sent = await sendEscalation(org, row, `Next-day follow-up: was this taken care of? Reply DONE when it is.\n\n${gist}`, "Next-day follow-up: was this taken care of?");
-        if (sent.ok) { await db.update(voiceEscalations).set({ followupSentAt: now, lastProviderSid: sent.sid, lastError: null }).where(eq(voiceEscalations.id, row.id)); report.followedUp++; }
-        else { await db.update(voiceEscalations).set({ lastError: sent.error }).where(eq(voiceEscalations.id, row.id)); report.errors++; }
+        const sent = await sendTrackedEscalation(org, row, `Next-day follow-up: was this taken care of? Reply DONE when it is.\n\n${gist}`, "Next-day follow-up: was this taken care of?", "followup", now);
+        if (sent.ok) report.followedUp++;
+        else report.errors++;
         continue;
       }
       if (now.getTime() - row.followupSentAt.getTime() > CLOSE_AFTER_FOLLOW_UP_DAYS * DAY) {
@@ -593,12 +653,31 @@ export function startVoiceEscalationWorker(): boolean {
   return true;
 }
 
-/** Claim before contacting the provider. A competing live event, report or reminder cannot send this first message. */
-export async function sendFirstEscalation(org: typeof crmOrgs.$inferSelect, row: VoiceEscalationRow, body: string, subject: string) {
-  const [claimed] = await db.update(voiceEscalations).set({ sentCount: 1, lastError: "First message delivery in progress or outcome unknown; verify before resending" })
-    .where(and(eq(voiceEscalations.id, row.id), eq(voiceEscalations.sentCount, 0), isNull(voiceEscalations.closedAt))).returning();
-  if (!claimed) return { ok: false, sid: null, error: "First message already claimed by another sender" };
+/** Persist uncertainty before I/O. A crash or concurrent retry must never duplicate a send. */
+async function sendTrackedEscalation(org: typeof crmOrgs.$inferSelect, row: VoiceEscalationRow, body: string, subject: string, stage: "first" | "reminder" | "followup" | "details", now = new Date()): Promise<SendOutcome> {
+  if (uncertain(row)) return { ok: false, sid: null, ambiguous: true, error: row.lastError || UNCERTAIN };
+  const [claimed] = await db.update(voiceEscalations).set({ lastError: sql`concat_ws('; ', ${UNCERTAIN}::text,
+      case when position('Owner alert:' in coalesce(${voiceEscalations.lastError}, '')) > 0
+        then 'Owner alert:' || split_part(${voiceEscalations.lastError}, 'Owner alert:', 2) end)` })
+    .where(and(eq(voiceEscalations.id, row.id), isNull(voiceEscalations.closedAt),
+      eq(voiceEscalations.sentCount, row.sentCount),
+      sql`${voiceEscalations.lastError} is not distinct from ${row.lastError}`,
+      sql`${voiceEscalations.lastSentAt} is not distinct from ${row.lastSentAt}`,
+      sql`${voiceEscalations.followupSentAt} is not distinct from ${row.followupSentAt}`,
+      stage === "first" ? eq(voiceEscalations.sentCount, 0) : undefined)).returning();
+  if (!claimed) return { ok: false, sid: null, ambiguous: true, error: UNCERTAIN };
   const sent = await sendEscalation(org, row, body, subject);
-  await db.update(voiceEscalations).set({ sentCount: sent.ok ? 1 : 0, lastSentAt: sent.ok ? new Date() : null, lastProviderSid: sent.sid, lastError: sent.error }).where(eq(voiceEscalations.id, row.id));
+  await db.update(voiceEscalations).set({
+    lastProviderSid: sent.sid,
+    lastError: sql`nullif(concat_ws('; ', ${sent.error}::text,
+      case when position('Owner alert:' in coalesce(${voiceEscalations.lastError}, '')) > 0
+        then 'Owner alert:' || split_part(${voiceEscalations.lastError}, 'Owner alert:', 2) end), '')`,
+    ...(sent.ok && (stage === "first" || stage === "reminder") ? { sentCount: row.sentCount + 1, lastSentAt: now } : {}),
+    ...(sent.ok && stage === "followup" ? { followupSentAt: now } : {}),
+  }).where(eq(voiceEscalations.id, row.id));
   return sent;
+}
+
+export async function sendFirstEscalation(org: typeof crmOrgs.$inferSelect, row: VoiceEscalationRow, body: string, subject: string) {
+  return sendTrackedEscalation(org, row, body, subject, "first");
 }
