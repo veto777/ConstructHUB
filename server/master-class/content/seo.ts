@@ -118,7 +118,7 @@ export const SEO: ModuleLessons = {
           { title: "Trade associations and the local chamber", text: "Slow to get, trusted, rarely spammed." },
         ] },
         { type: "tip", text: [
-          "**Write the canonical version once** — legal name, address format, the one tracking-free phone number, the exact website URL — and paste it everywhere. Never let a directory \"improve\" it.",
+          "**Write the canonical details once** — real-world business name, accurate contact details and website URL. Follow each directory’s address rules; do not publish a private service-area address or invent an office for consistency.",
           "**Hunt duplicates.** Search your phone number and your old address in quotes; claim or remove every listing you did not create. Do the same after a move or a rename.",
           "**Skip the bulk packages.** \"500 citations for $50\" are the directory version of Fiverr backlinks: inconsistent, unmaintained and impossible to clean up later.",
         ] },

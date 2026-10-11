@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-import { PROGRESS_NOTE, progressLabel, useChecklist } from "@/components/guides/progress";
+import { progressLabel, useChecklist } from "@/components/guides/progress";
 
 export type LessonMeta = { id: string; title: string; icon?: LucideIcon };
 
@@ -38,7 +38,7 @@ export function Lesson({ id, title, icon, description, storageKey, children, con
       className={cn("scroll-mt-24", done && "border-primary/40", className)} contentClassName={contentClassName} testId={testId ?? `lesson-${id}`}
       actions={
         <label htmlFor={boxId} className="flex min-h-10 cursor-pointer select-none items-center gap-2 rounded-md px-1 text-xs font-medium text-muted-foreground hover:text-foreground">
-          <Checkbox id={boxId} checked={done} onCheckedChange={(v) => list.toggle(id, v === true)} aria-label={`Mark "${label}" done`} data-testid={`checkbox-${slug(id)}-done`} />
+          <Checkbox id={boxId} checked={done} disabled={!list.ready} onCheckedChange={(v) => list.toggle(id, v === true)} aria-label={`Mark "${label}" done`} data-testid={`checkbox-${slug(id)}-done`} />
           {done ? "Done" : "Mark done"}
         </label>
       }>
@@ -61,16 +61,16 @@ export function LessonOutline({ lessons, storageKey, locked = false, progress = 
   description?: ReactNode;
   testId?: string;
 }) {
-  const list = useChecklist(storageKey);
+  const list = useChecklist(storageKey, { itemIds: lessons.map((lesson) => lesson.id) });
   const total = lessons.length;
   const done = lessons.filter((l) => list.isDone(l.id)).length;
   const pct = total ? Math.round((done / total) * 100) : 0;
   const tracked = !locked && progress;
   return (
     <Section title={title} testId={testId ?? "lesson-outline"}
-      description={description ?? (tracked ? <>{progressLabel(done, total)} · {PROGRESS_NOTE}</> : `${total} ${locked ? "lesson" : "section"}${total === 1 ? "" : "s"}`)}
+      description={description ?? (tracked ? <>{list.ready && <>{progressLabel(done, total)} · </>}{list.note}</> : `${total} ${locked ? "lesson" : "section"}${total === 1 ? "" : "s"}`)}
       actions={tracked && done > 0 ? <Button variant="ghost" size="sm" onClick={list.reset} data-testid="button-lessons-reset">Reset progress</Button> : undefined}>
-      {tracked && <Progress value={pct} className="mb-3 h-1.5" aria-label={`${pct}% of lessons done`} />}
+      {tracked && list.ready && <Progress value={pct} className="mb-3 h-1.5" aria-label={`${pct}% of lessons done`} />}
       <ol className="grid gap-1 sm:grid-cols-2" data-testid="list-lessons">
         {lessons.map((l, i) => {
           const isDone = tracked && list.isDone(l.id);
@@ -100,15 +100,20 @@ export function LessonOutline({ lessons, storageKey, locked = false, progress = 
 export function useScrollToHash(ready: boolean) {
   useEffect(() => {
     if (!ready) return;
-    const scroll = () => {
+    let frame = 0;
+    const scroll = (attempt = 0) => {
       const hash = window.location.hash.slice(1);
-      if (hash) document.getElementById(hash)?.scrollIntoView({ block: "start" });
+      if (!hash) return;
+      const target = document.getElementById(hash);
+      if (target) target.scrollIntoView({ block: "start" });
+      else if (attempt < 3) frame = requestAnimationFrame(() => scroll(attempt + 1));
     };
-    const frame = requestAnimationFrame(scroll);
-    window.addEventListener("hashchange", scroll);
+    const onHashChange = () => { cancelAnimationFrame(frame); scroll(); };
+    frame = requestAnimationFrame(() => scroll());
+    window.addEventListener("hashchange", onHashChange);
     return () => {
       cancelAnimationFrame(frame);
-      window.removeEventListener("hashchange", scroll);
+      window.removeEventListener("hashchange", onHashChange);
     };
   }, [ready]);
 }

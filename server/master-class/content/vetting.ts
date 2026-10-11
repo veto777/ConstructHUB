@@ -27,7 +27,7 @@ export const VETTING: ModuleLessons = {
       ] },
     ]),
     tip(3, "The Permitting Loophole", [
-      { type: "p", text: "Many counties have no permitting requirements for certain work (siding, windows, doors). This creates a massive loophole allowing unqualified contractors to operate without oversight. No inspection means no accountability." },
+      { type: "p", text: "Permit and inspection requirements depend on the jurisdiction, project and scope. Before work begins, [check your state](/master-class?tab=state-guide) and confirm the local building department’s requirements. Even where a permit is not required, agree on installation standards and quality checks." },
       { type: "list", title: "Protect Yourself:", items: [
         "Ask for active jobs in the area — established companies always have them",
         "Demand industry-standard installation practices regardless of permit requirements",
@@ -53,9 +53,9 @@ export const VETTING: ModuleLessons = {
     tip(7, "Lower Price ≠ Equal Service", [
       { type: "p", text: "Comparing a 20-year company with staff and offices to a 1-year company working from a pickup truck is not \"apples to apples.\" Established companies anticipate structural issues. New companies discover them mid-project — costing you more." },
       { type: "list", title: "Real Risks of Cheap Bids:", tone: "warn", items: [
-        "No workers' comp — if an employee is injured on your property, YOU could be sued",
+        "Workers’ compensation requirements and injury liability vary; [check your state](/master-class?tab=state-guide) and verify applicable coverage or exemptions",
         "Insurance may not cover defective work or wrong materials",
-        "A $6K contractor bond won't cover your legal fees",
+        "Bond terms, claim limits and covered costs vary; [check your state](/master-class?tab=state-guide) and review the actual bond rather than assuming it covers a loss",
       ] },
     ]),
     tip(8, "New Companies Badmouthing Veterans", [
@@ -63,8 +63,8 @@ export const VETTING: ModuleLessons = {
       { type: "notes", items: [{ tone: "tip", text: "A company that actively works to tear down others rather than build up their own reputation likely doesn't have the skills or track record to succeed on merit alone." }] },
     ]),
     tip(9, "Licensed ≠ Legitimate", [
-      { type: "p", text: "In many states (like Washington), getting a contractor's license just means paying $65, getting a $300/year bond, and $100/month insurance. No experience required. No testing. States like California require 4 years experience + exams. Know your state's requirements." },
-      { type: "notes", items: [{ tone: "warn", text: "A license is just a minimum legal requirement — not proof of skill, experience, or quality workmanship. Use the State Guide tab to check your state's licensing requirements." }] },
+      { type: "p", text: "Licensing, registration, experience, exams, bonds and insurance requirements vary by state, locality and trade. Do not rely on generic fee or experience figures: [check your state](/master-class?tab=state-guide), follow the linked agency sources and confirm the requirements for the proposed work." },
+      { type: "notes", items: [{ tone: "warn", text: "Where a credential is required, verify its status and scope with the issuing agency. A credential alone does not establish workmanship quality; [check your state](/master-class?tab=state-guide) and check references and relevant projects as well." }] },
     ]),
     tip(10, "Web Presence ≠ Legitimacy", [
       { type: "p", text: "High Google rankings can be bought through marketing firms. A polished website with customer reviews, ads, and \"10 years in business\" claims means nothing without verification. Many companies pay to manipulate their online positions." },
@@ -74,11 +74,11 @@ export const VETTING: ModuleLessons = {
       { type: "p", text: "If a company calls you out of the blue, your information was likely sold through a lead generation form. These companies buy leads in bulk and often lack the experience to deliver quality work. Only engage with companies you've researched yourself." },
     ]),
     tip(12, "Warranty Is Key", [
-      { type: "p", text: "Companies offering 1-2 year warranties don't want to be held accountable. But beware the opposite too — a company in business for 2 years offering a 10-year warranty is a red flag. Always ask how long they've been operating before trusting a warranty promise." },
-      { type: "notes", items: [{ tone: "tip", text: "The warranty is the best indicator of a company's commitment to their work and customers. A company can't honor a 15-year warranty if they've only existed for 3." }] },
+      { type: "p", text: "Compare written warranty terms and the contractor’s ability to deliver support. Separate manufacturer coverage from the contractor’s workmanship warranty and ask how claims are handled." },
+      { type: "notes", items: [{ tone: "tip", text: "A warranty promise should identify the responsible business, scope, exclusions and claims process. Company age alone does not establish whether it can honor that promise." }] },
     ]),
     tip(13, "Physical Office Verification", [
-      { type: "p", text: "Schedule a meeting at their office. A legitimate company will have a physical space, showroom, or office. Ask how many employees they have. Verify the address on Google Maps — many scam companies use PO boxes, storage units, or random warehouses as false addresses." },
+      { type: "p", text: "Ask how and where the business operates and who is accountable for your project. A legitimate service-area business may work from home and hide its address on Google. Verify contact details and credentials; do not demand a storefront or accept a fake address as proof." },
       { type: "list", title: "Check for:", items: [
         "Real office or showroom (not a PO box, Suite #, or storage unit)",
         "Actual staff — customer service, project managers",
@@ -112,8 +112,8 @@ export const VETTING: ModuleLessons = {
       ] },
     ]),
     tip(18, "Real Financing vs. 3rd Party Referrals", [
-      { type: "p", text: "Legitimate in-house financing requires years of established operations, solid financial stability, and significant revenue (millions). Many new companies claim to offer financing but actually just partner with obscure third-party vendors for referral commissions." },
-      { type: "notes", items: [{ tone: "warn", text: "If a company offers financing but has been in business less than 5 years, chances are it's a third-party referral program — not real in-house financing." }] },
+      { type: "p", text: "Ask who the lender is and request the financing terms in writing. A referral to a third-party lender is different from credit offered directly by the contractor. Requirements depend on the arrangement and jurisdiction; [check your state](/master-class?tab=state-guide) and consult the relevant regulator before offering financing." },
+      { type: "notes", items: [{ tone: "warn", text: "Company age alone does not identify the lender or establish whether financing is legitimate. Verify the provider and compare the written terms." }] },
     ]),
     tip(19, "Too-Good-to-Be-True Prices", [
       { type: "p", text: "Low bids mean the company is cutting costs — unskilled labor, no insurance, no overhead. When you pay a higher price, you're investing in experience and a company that has already overcome the hurdles of running a business. Lack of experience often results in redoing the job entirely." },
@@ -127,10 +127,10 @@ export const VETTING: ModuleLessons = {
         { type: "list", cols: 2, tone: "plain", items: [
           "Build real experience over time — there are no shortcuts to expertise. Do the work, document every project, and let your portfolio speak for itself.",
           "Earn reviews organically from real customers — never buy or fabricate them. One honest 4-star review is worth more than ten fake 5-star reviews.",
-          "Keep permanent records of all estimates, contracts, change orders, and communications. This protects you legally and builds a professional reputation.",
-          "Carry proper insurance and workers' comp — it protects everyone. Cutting corners on coverage puts your customers, your employees, and your personal assets at risk.",
+          "Keep independent copies of estimates, contracts, change orders and communications. Retention and disclosure requirements vary: [check your state](/master-class?tab=state-guide) and ask your adviser what records to retain and for how long.",
+          "Confirm applicable insurance and workers’ compensation requirements and exemptions: [check your state](/master-class?tab=state-guide), then verify coverage with the insurer",
           "Establish a real physical presence — office, showroom, or shop. A real address shows permanence and gives customers confidence you'll be around to honor warranties.",
-          "Stand behind your warranty with real history to back it up. Only promise warranty periods that your company has actually been in business long enough to fulfill.",
+          "Offer written warranty terms you can support, including scope, exclusions and a clear claims process",
           "Compete on merit — never tear down others to build yourself up. The best companies focus on their own strengths rather than attacking competitors.",
           "Be transparent about your company's actual age and experience. Honesty about where you are in your journey builds more trust than inflated claims.",
         ] },
@@ -145,17 +145,17 @@ export const VETTING: ModuleLessons = {
         { type: "checklist", storageKey: "mc:vetting:checklist", resetLabel: "Reset", items: [
           "Verify contractor license with your state's licensing board",
           "Confirm active general liability insurance (get certificate)",
-          "Confirm workers compensation coverage (get certificate)",
+          "Confirm applicable workers’ compensation coverage or an agency-verified exemption",
           "Check BBB rating, accreditation status, and complaint history",
           "Ask for 5-10 recent project addresses you can drive by",
-          "Request a physical office visit or showroom tour",
+          "Confirm real contact details and how the business operates; a service-area business may have no public office",
           "Get a downloadable PDF estimate (not a disappearing link)",
           "Ask how long the company has been in business under this name",
           "Cross-reference Google reviews on Yelp, BBB, and Houzz",
           "Verify manufacturer certifications directly with the manufacturer",
           "Ask about their warranty terms relative to years in business",
           "Confirm they pull permits when required by your jurisdiction",
-          "Ask for proof of employees (not just subcontractors)",
+          "Ask who will perform the work, including any subcontractors, and who is responsible for supervision",
           "Check if financing is in-house or a third-party referral",
         ].map((text, i) => ({ id: `item-${i + 1}`, text })) },
       ],

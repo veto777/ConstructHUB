@@ -1,66 +1,43 @@
-/**
- * Checklist progress for the guides and the Master Class lessons.
- *
- * Done items are kept in this browser (localStorage) under one key per checklist; nothing is sent to the
- * server, because the account has no per-user preferences store yet. The pages say so (PROGRESS_NOTE) instead
- * of implying a synced record. Every read and write is wrapped: a private window or blocked storage leaves the
- * checklist working for the visit and simply forgets it afterwards.
- */
-import { useCallback, useEffect, useState } from "react";
+/** Shared progress for Guides and Master Class; no server sync or anonymous-to-account migration. */
+import { useCallback, useEffect, useSyncExternalStore } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { createProgressStore, type ProgressOptions } from "./progress-store";
 
-export const PROGRESS_NOTE = "Progress is saved in this browser.";
-const PREFIX = "constructhub.checklist.";
-const EVENT = "constructhub:checklist";
-
-function read(key: string): string[] {
-  try {
-    const raw = window.localStorage.getItem(PREFIX + key);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string") : [];
-  } catch {
-    return [];
-  }
-}
-
-function write(key: string, ids: string[]) {
-  try {
-    if (ids.length) window.localStorage.setItem(PREFIX + key, JSON.stringify(ids));
-    else window.localStorage.removeItem(PREFIX + key);
-  } catch { /* private window or blocked storage: the checklist still works for this visit */ }
-  window.dispatchEvent(new CustomEvent(EVENT, { detail: key }));
-}
+// Older guide consumers use this conditional disclosure; Master Class uses the live list.note.
+export const PROGRESS_NOTE = "Progress stays in this browser when storage is available; otherwise, only for this visit.";
+const store = createProgressStore(() => typeof window === "undefined" ? undefined : window.localStorage);
+const SERVER_SNAPSHOT = { ids: [], persistent: false } as const;
+const DEFAULT_OPTIONS: ProgressOptions = {};
 
 export type Checklist = {
   done: ReadonlySet<string>;
   isDone: (id: string) => boolean;
-  /** Toggle one item, or set it explicitly with `on`. */
   toggle: (id: string, on?: boolean) => void;
   reset: () => void;
   count: number;
+  note: string;
+  ready: boolean;
 };
 
-/** The done items of one checklist, shared live between every component on the page that uses the same key. */
-export function useChecklist(key: string): Checklist {
-  const [ids, setIds] = useState<string[]>(() => (typeof window === "undefined" ? [] : read(key)));
+/** Keep stable IDs for unchanged items; give changed tasks new IDs. Explicit migrations retain only current IDs. */
+export function useChecklist(key: string, options: ProgressOptions = DEFAULT_OPTIONS): Checklist {
+  const auth = useQuery<{ id: number | string } | null>({ queryKey: ["/api/auth/me"] });
+  const userId = auth.isSuccess ? auth.data?.id ?? null : null;
+  const snapshot = useSyncExternalStore(store.subscribe, () => store.read(userId, key, options), () => SERVER_SNAPSHOT);
   useEffect(() => {
-    setIds(read(key));
-    const onChange = (e: Event) => { if ((e as CustomEvent).detail === key) setIds(read(key)); };
-    const onStorage = (e: StorageEvent) => { if (e.key === PREFIX + key) setIds(read(key)); };
-    window.addEventListener(EVENT, onChange);
+    const onStorage = (event: StorageEvent) => store.storageChanged(event.key);
     window.addEventListener("storage", onStorage);
-    return () => { window.removeEventListener(EVENT, onChange); window.removeEventListener("storage", onStorage); };
-  }, [key]);
-  const toggle = useCallback((id: string, on?: boolean) => {
-    const current = read(key);
-    const has = current.includes(id);
-    const next = on ?? !has;
-    if (next === has) return;
-    write(key, next ? [...current, id] : current.filter((x) => x !== id));
-  }, [key]);
-  const reset = useCallback(() => write(key, []), [key]);
-  const done = new Set(ids);
-  return { done, isDone: (id) => done.has(id), toggle, reset, count: done.size };
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+  const toggle = useCallback((id: string, on?: boolean) => { if (auth.isSuccess) store.toggle(userId, key, id, on, options); }, [auth.isSuccess, userId, key, options]);
+  const reset = useCallback(() => { if (auth.isSuccess) store.reset(userId, key, options); }, [auth.isSuccess, userId, key, options]);
+  const done = new Set(auth.isSuccess ? snapshot.ids.filter((id) => !options.itemIds || options.itemIds.includes(id)) : []);
+  const note = auth.isError ? "Account unavailable — progress is paused."
+    : auth.isPending ? "Checking your account before saving progress…"
+    : userId === null ? "Saved for this visit only — sign in to keep account-specific progress."
+    : snapshot.persistent ? "Progress is saved for your account in this browser only."
+    : "Saved for this visit only — browser storage is unavailable.";
+  return { done, isDone: (id) => done.has(id), toggle, reset, count: done.size, note, ready: auth.isSuccess };
 }
 
-/** "3 of 8 done" — the progress line every checklist shows. */
 export const progressLabel = (done: number, total: number) => `${done} of ${total} done`;
