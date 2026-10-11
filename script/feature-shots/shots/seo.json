@@ -1,0 +1,60 @@
+[
+ {
+  "key": "seo",
+  "n": 1,
+  "route": "/seo",
+  "wait": "Tracked keywords",
+  "alt": "SEO Suite dashboard with portfolio tiles for sites, average site health, tracked keywords and estimated organic traffic, and a card per tracked site showing authority, referring domains, traffic trend and rankings.",
+  "caption": "Every site at a glance: authority, links, traffic and rankings",
+  "actions": [
+   {
+    "evaluate": "document.querySelectorAll('p').forEach(p => { if (p.textContent.trim().startsWith('Rank tracking is being switched on')) p.remove() })"
+   }
+  ]
+ },
+ {
+  "key": "seo",
+  "n": 2,
+  "route": "/seo/rank-tracker?site=910001",
+  "wait": "roof replacement denver",
+  "alt": "Rank tracker for summitroofing.example: tiles for visibility, average position, keywords in the top ten and in the Google map pack, the history chart of visibility over the last weeks and the positions of every check by band.",
+  "caption": "Weekly rank tracking with history and map-pack positions",
+  "actions": [
+   {
+    "evaluate": "document.querySelectorAll('p').forEach(p => { if (p.textContent.trim().startsWith('Rank tracking is being switched on')) p.remove() })"
+   }
+  ]
+ },
+ {
+  "key": "seo",
+  "n": 3,
+  "route": "/seo/explorer?domain=summitroofing.example&site=910001",
+  "wait": "summitroofing.example",
+  "alt": "Site Explorer report for summitroofing.example showing authority, backlinks and referring domains, organic keywords and estimated traffic, each with its trend, and the paid search footprint.",
+  "caption": "A full site report: authority, links, keywords and traffic",
+  "actions": [
+   {
+    "evaluate": "document.querySelectorAll('p').forEach(p => { if (p.textContent.trim().startsWith('Rank tracking is being switched on')) p.remove() })"
+   }
+  ]
+ },
+ {
+  "key": "seo",
+  "n": 4,
+  "route": "/seo/local-grid?site=910001",
+  "wait": "roofing contractor denver",
+  "actions": [
+   {
+    "evaluate": "document.querySelectorAll('p').forEach(p => { if (p.textContent.trim().startsWith('Rank tracking is being switched on')) p.remove() })"
+   },
+   {
+    "click": "text=roofing contractor denver"
+   },
+   {
+    "wait": 2500
+   }
+  ],
+  "alt": "Local grid scan for the search roofing contractor denver: the position score, points in the first three, a seven by seven grid of Google local positions around the Denver pin, and the businesses that lead across the area.",
+  "caption": "Where you rank on Google Maps, point by point"
+ }
+]
