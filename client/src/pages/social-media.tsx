@@ -1,5 +1,5 @@
 import { BusinessSelector, MappingEditor, Pager, refreshSocial } from "@/components/social-agency";
-import { loadComposerDraft, loadRowEdits, saveComposerDraft, saveRowEdits, type ComposerSubmission } from "@/components/social-drafts";
+import { destinationLabel, loadComposerDraft, loadRowEdits, saveComposerDraft, saveRowEdits, type ComposerSubmission } from "@/components/social-drafts";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
@@ -217,6 +217,10 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
   const businessSummary = [...businessCounts.entries()].map(([name, n]) => `${name} (${n})`).join(", ");
   const [tabParam, setTabParam] = useUrlParam("tab");
   const tab = all ? "queue" : tabParam || "compose", setTab = (v: string) => setTabParam(v === "compose" ? null : v);
+  const queueTop = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (tab === "queue") queueTop.current?.scrollIntoView({ block: "start" });
+  }, [tab, isLoading]);
   // The composition is a per-business, per-account draft: it survives leaving the page (How it
   // works, browser Back) and switching businesses, so unsaved work never silently disappears.
   // Loaded once per mount, keyed by account AND business, before any defaults land.
@@ -297,7 +301,8 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
     ? `Media URLs must be public HTTPS links. Fix or remove: ${badMedia[0]}`
     : "";
   // Why Post now / Save draft are disabled, in the order the user can fix it.
-  const postBlocker = !data?.connected
+  const setupProblem = data?.setupProblem as string | null | undefined;
+  const postBlocker = error ? "Refresh Social Media to check whether posting is available." : setupProblem || (!data?.connected
     ? "Connect Blotato above to post."
     : !destinations.length
       ? "Choose at least one account above."
@@ -305,7 +310,7 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
         ? "Write the post text."
         : uploading
           ? "Wait for the upload to finish."
-          : mediaProblem;
+          : mediaProblem);
   function choose(a: Account, checked: boolean) {
     restoredRef.current = true;
     setDestinations((ds) =>
@@ -331,7 +336,7 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
     );
   }
   async function submit(draft: boolean) {
-    if (submittingRef.current || accountId === null) return;
+    if (submittingRef.current || accountId === null || setupProblem || error) return;
     submittingRef.current = true;
     let dispatched = false;
     try {
@@ -534,7 +539,7 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
               key={key}
               selected={tab === key}
               ariaPressed={tab === key}
-              onClick={() => setTab(key)}
+              onClick={() => { setTab(key); if (key === "queue") queueTop.current?.scrollIntoView({ block: "start" }); }}
               label={label}
             />
           ))}
@@ -543,10 +548,11 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
 
       {tab === "compose" && (
         <section>
+          {setupProblem && <Notice tone="danger" testId="alert-social-setup"><span id="social-setup-reason">{setupProblem} Posting and saving drafts are unavailable until this is fixed.</span></Notice>}
           <GoogleSectionHeader title="Compose" description={all ? undefined : "Write once — every chosen account gets its own version."} />
           {submission && <div role="status" className="mb-4 space-y-2 rounded-lg border p-3 text-sm">
             <p>Submission awaiting confirmation. Your original post is saved. Retry it to confirm the result without creating duplicate posts.</p>
-            <GooglePill className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" label="Retry saved submission" disabled={mutation.isPending} onClick={() => void submit(submission.draft)} />
+            <GooglePill className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" label="Retry saved submission" disabled={mutation.isPending || !!setupProblem || !!error} onClick={() => void submit(submission.draft)} />
           </div>}
           <fieldset disabled={!!submission || mutation.isPending} className="min-w-0 space-y-5">
             <legend className="sr-only">Compose post</legend>
@@ -786,19 +792,21 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
                 onChange={(e) => setSchedule(e.target.value)}
               />
             </label>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Save or publish post" aria-describedby={setupProblem ? "social-setup-reason" : undefined}>
               <GooglePill
                 variant="solid"
                 disabled={!!postBlocker || mutation.isPending}
+                title={postBlocker || undefined}
                 onClick={() => void submit(false)}
                 label={schedule ? "Schedule post" : "Post now"}
               />
               <GooglePill
                 disabled={!!postBlocker || mutation.isPending}
+                title={postBlocker || undefined}
                 onClick={() => void submit(true)}
                 label="Save draft"
               />
-              {postBlocker && (
+              {postBlocker && !setupProblem && (
                 <span className="text-sm g-text-2 break-all">
                   {postBlocker}
                 </span>
@@ -809,7 +817,7 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
       )}
 
       {tab === "queue" && (
-        <section>
+        <section ref={queueTop} className="scroll-mt-4">
           <GoogleSectionHeader
             title={all ? "All-clients calendar" : "Calendar & queue"}
             count={error ? undefined : data?.total}
@@ -941,7 +949,7 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
                   ? current.destinations
                       .map(
                         (d) =>
-                          `${accounts.find((a) => a.id === d.accountId)?.name || d.accountId} (${d.platform}${d.pageId ? `, page ${d.pageId}` : ""})`,
+                          destinationLabel(d, accounts),
                       )
                       .join(" · ")
                   : "None"}

@@ -6,7 +6,7 @@ import { pool } from "../db";
 import { rateLimit } from "../growth-limits";
 import { requireModule } from "../entitlements";
 import { autoSchema, opaqueId, publicMediaUrl } from "../../shared/social";
-import { SocialError, socialErrorBody } from "./client";
+import { decryptKey, encryptKey, SocialError, socialErrorBody } from "./client";
 import {
   connect,
   disconnect,
@@ -58,6 +58,18 @@ export function socialInputMessage(e: z.ZodError): string {
     return issue.message;
   return fieldMessages[String(issue.path[0] ?? "")] ?? "Invalid Social Media input";
 }
+/** Read-only readiness check; never contacts the provider or exposes key material. */
+export function socialSetupProblem(keyEnc: string | undefined, userId: number): string | null {
+  try {
+    // Validate the server key even when no account is connected yet.
+    encryptKey("setup-check", userId);
+    if (keyEnc !== undefined) decryptKey(keyEnc, userId);
+    return null;
+  } catch (e) {
+    return e instanceof SocialError ? e.message : "This business’s social connection could not be unlocked. Reconnect Blotato above before posting or saving drafts.";
+  }
+}
+
 export function registerSocialRoutes(
   app: Express,
   auth: (req: any, res: any) => any,
@@ -153,7 +165,7 @@ export function registerSocialRoutes(
       platform:z.string().max(30).default(''),day:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(day=>Number.isFinite(Date.parse(day))&&new Date(day).toISOString().slice(0,10)===day).optional(),
       timezone:z.string().max(80).default('UTC')}).parse(req.query||{});
     try {new Intl.DateTimeFormat('en',{timeZone:q.timezone});}catch{throw new SocialError('Invalid timezone');}
-    const {rows:[c]}=await pool.query("SELECT accounts,updated_at,business_id FROM social_connections WHERE user_id=$1 AND (business_id=$2 OR business_id IS NULL) ORDER BY business_id NULLS LAST LIMIT 1",[id,businessId]);
+    const {rows:[c]}=await pool.query("SELECT accounts,updated_at,business_id,key_enc FROM social_connections WHERE user_id=$1 AND (business_id=$2 OR business_id IS NULL) ORDER BY business_id NULLS LAST LIMIT 1",[id,businessId]);
     const {rows:[s]}=await pool.query("SELECT settings,next_at,last_error FROM social_settings WHERE user_id=$1 AND business_id IS NOT DISTINCT FROM $2",[id,businessId]);
     const {rows:[config]}=await pool.query("SELECT destinations,sync_requested,sync_error,synced_at FROM social_business_config WHERE user_id=$1 AND business_id=$2",[id,businessId]);
     const params=[id,businessId,all,`%${q.search}%`,q.state,q.platform,q.day||null,q.timezone];
@@ -169,7 +181,7 @@ export function registerSocialRoutes(
     const accounts=businessId ? (c?.accounts||[]).filter((a:any)=>mappings.some((d:any)=>d.accountId===a.id)).map((a:any)=>({...a,
       pages:a.pages?.filter((p:any)=>mappings.some((d:any)=>d.accountId===a.id&&d.pageId===p.id)),
       boards:a.boards?.filter((p:any)=>mappings.some((d:any)=>d.accountId===a.id&&d.boardId===p.id))})) : (c?.accounts||[]).slice(0,25);
-    res.json({connected:!!c,agencyConnected:!!connections?.agency,businessConnected:!!connections?.business,connectionScope:c?.business_id?'business':'agency',accounts,settings:s?.settings||autoSchema.parse({}),
+    res.json({setupProblem:socialSetupProblem(c?.key_enc,id),connected:!!c,agencyConnected:!!connections?.agency,businessConnected:!!connections?.business,connectionScope:c?.business_id?'business':'agency',accounts,settings:s?.settings||autoSchema.parse({}),
       nextAt:s?.next_at,lastError:s?.last_error,posts:posts.map(publicPost),total:count.total,defaults:mappings,sourcesSync:config,
       business:businessId?await ownedBusiness(id,businessId):null});
   };

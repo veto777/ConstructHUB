@@ -29,6 +29,7 @@
  * constructhub_dev_* lane or the schema / database is constructhub_tut_*. The password reaches psql
  * through its environment, never a command line, and is never printed.
  */
+import { TUTORIAL_SOCIAL_ENCRYPTION_KEY, TUTORIAL_BLOTATO_PLACEHOLDER } from "./social-sample";
 import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
@@ -67,8 +68,11 @@ export const PLATFORM_CENSUS: Record<string, { table: string; byUser: boolean }>
 /** libpq environment from a recording database URL — refused unless it is one (same rule as seed-demo.ts). */
 export function libpqEnvFromUrl(raw: string): NodeJS.ProcessEnv {
   const u = new URL(raw);
-  const where = `${u.pathname.slice(1)} ${u.searchParams.get("options") ?? ""}`;
-  if (u.hostname !== "127.0.0.1" || (u.port || "5432") !== "5432" || !/constructhub_tut_[a-z0-9_]+/.test(where))
+  const options = u.searchParams.get("options") ?? "";
+  // Only the recording schema may override the target database's search path.
+  const schema = /^(?:-c TimeZone=UTC )?-c search_path=(constructhub_tut_[a-z0-9_]+)$/.exec(options)?.[1];
+  const recordingTarget = schema || (/^constructhub_tut_[a-z0-9_]+$/.test(u.pathname.slice(1)) && (!options || options === "-c TimeZone=UTC"));
+  if (u.hostname !== "127.0.0.1" || (u.port || "5432") !== "5432" || !recordingTarget)
     throw new Error("seed-platform.ts only writes to a constructhub_tut_* recording database on 127.0.0.1:5432");
   if (!/^postgres(ql)?:$/.test(u.protocol)) throw new Error("DATABASE_URL is not a postgres URL");
   return {
@@ -111,12 +115,33 @@ export async function platformCensus(env: NodeJS.ProcessEnv): Promise<Record<str
 }
 export const platformCensusLine = (c: Record<string, number>) => Object.entries(c).map(([k, v]) => `${k} ${v}`).join(" · ");
 
+/** Only the fixed sample connection is unlocked, after SQL seeding, inside its transaction. */
+export async function tutorialSocialSql(raw: string): Promise<string> {
+  libpqEnvFromUrl(raw); // Refuse non-recording targets before loading encryption or changing env.
+  const { encryptKey, BlotatoClient } = await import("../../server/social/client");
+  const previous = process.env.SOCIAL_ENCRYPTION_KEY;
+  let box: string;
+  try {
+    process.env.SOCIAL_ENCRYPTION_KEY = TUTORIAL_SOCIAL_ENCRYPTION_KEY;
+    box = encryptKey(TUTORIAL_BLOTATO_PLACEHOLDER, 1);
+  } finally {
+    if (previous === undefined) delete process.env.SOCIAL_ENCRYPTION_KEY;
+    else process.env.SOCIAL_ENCRYPTION_KEY = previous;
+  }
+  // Constructor computes the app's hash without making any network request.
+  const hash = new BlotatoClient(TUTORIAL_BLOTATO_PLACEHOLDER).hash;
+  return `UPDATE social_connections SET key_enc='${box}' WHERE user_id=1 AND business_id=910001 AND key_enc='fs-b-placeholder';
+UPDATE social_business_config SET connection_hash='${hash}' WHERE user_id=1 AND business_id=910001;
+UPDATE social_posts SET connection_hash='${hash}' WHERE user_id=1 AND business_id=910001 AND request_id LIKE 'fs-b-req-%';`;
+}
+
 async function main() {
   const raw = process.env.DATABASE_URL;
   if (!raw) throw new Error("DATABASE_URL is not set");
   const env = libpqEnvFromUrl(raw);
   const t = Date.now();
-  await psql(env, [], combinedSql());
+  const social = await tutorialSocialSql(raw);
+  await psql(env, [], combinedSql().replace(/COMMIT;\n$/, `${social}\nCOMMIT;\n`));
   const after = await platformCensus(env);
   console.log(`platform seed (${PLATFORM_SEED_FILES.join(", ")}) applied in ${((Date.now() - t) / 1000).toFixed(1)}s: ${platformCensusLine(after)}`);
 }
