@@ -17,7 +17,7 @@ import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Search, Loader2, Trash2, AlertTriangle, Shield, TrendingUp,
   Star, MapPin, Globe, Phone, ChevronDown, ChevronUp, Lock,
-  Eye, BarChart3, RefreshCw, Users, Bot,
+  Eye, BarChart3, RefreshCw, Users, Repeat,
   ThumbsUp, ThumbsDown, Camera, UserCheck, UserX, Clock,
   MessageSquare, Ban, CheckCircle2, XCircle,
 } from "lucide-react";
@@ -27,6 +27,7 @@ import { AppLocked } from "@/components/app-locked";
 import { inNativeApp } from "@/lib/app-shell";
 import { GoogleSurface, GoogleLocalCard, GooglePill, GoogleMoreButton, GoogleAiOverview, AiEntity } from "@/components/google";
 import { usageLine, type EntitlementsInfo } from "@/lib/pricing-display";
+import { COMPETITORS_SUBTITLE, commonPhrasesBadge } from "@/components/competitors/review-signals";
 import { topRatedPicks } from "@/components/competitors/top-rated";
 
 /**
@@ -229,7 +230,7 @@ export default function CompetitorsPage() {
   // Google look (owner, 2026-10-06): the page sits on a GoogleSurface; scan results are a local pack.
   return (
     <GoogleSurface page><AppPage className="before:hidden">
-      <PageHeader title={<span ref={titleRef} tabIndex={-1} data-testid="text-competitors-title">Competitor intelligence</span>} description="Find competitors and compare their rankings and reviews." />
+      <PageHeader title={<span ref={titleRef} tabIndex={-1} data-testid="text-competitors-title">Competitor intelligence</span>} description={COMPETITORS_SUBTITLE} />
         <Tabs defaultValue="market-scan" className="space-y-6">
           <AppTabsList>
             <TabsTrigger value="market-scan" className="flex items-center gap-1.5" data-testid="tab-market-scan">
@@ -355,7 +356,7 @@ function ReviewAnalysisPanel({ analysis }: { analysis: any }) {
   const total = analysis.totalAnalyzed;
   const goodPct = Math.round((analysis.goodReviews / total) * 100);
   const badPct = Math.round((analysis.badReviews / total) * 100);
-  const aiPct = Math.round((analysis.reviewsLookingAi / total) * 100);
+  const commonPhrasePct = Math.round((analysis.reviewsLookingAi / total) * 100);
   const genericPct = Math.round((analysis.reviewsGeneric / total) * 100);
   const photoPct = Math.round((analysis.reviewsWithPhotos / total) * 100);
   const realNamePct = Math.round((analysis.reviewsWithRealNames / total) * 100);
@@ -384,10 +385,10 @@ function ReviewAnalysisPanel({ analysis }: { analysis: any }) {
         </div>
         <div className="p-2 rounded border border-border bg-muted text-center">
           <div className="flex items-center justify-center gap-1">
-            <Bot className="w-3 h-3 text-muted-foreground" />
+            <Repeat className="w-3 h-3 text-muted-foreground" />
             <span className="text-sm font-bold text-muted-foreground">{analysis.reviewsLookingAi}</span>
           </div>
-          <p className="text-[10px] text-muted-foreground">Common phrases ({aiPct}%)</p>
+          <p className="text-[10px] text-muted-foreground">Common phrases ({commonPhrasePct}%)</p>
         </div>
         <div className="p-2 rounded border border-amber-500/20 bg-amber-500/5 text-center">
           <div className="flex items-center justify-center gap-1">
@@ -429,7 +430,7 @@ function ReviewAnalysisPanel({ analysis }: { analysis: any }) {
       {analysis.aiSuspectReviews && analysis.aiSuspectReviews.length > 0 && (
         <div className="space-y-1.5">
           <p className="text-[10px] font-semibold text-muted-foreground  flex items-center gap-1">
-            <Bot className="w-3 h-3" /> Repeated common phrases
+            <Repeat className="w-3 h-3" /> Repeated common phrases
           </p>
           {analysis.aiSuspectReviews.map((r: any, i: number) => (
             <div key={i} className="p-2 rounded border border-border bg-muted text-xs">
@@ -736,7 +737,7 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onCancel, canc
                           <Badge variant="outline" className={`text-[10px] px-1.5 ${bsBadge.color}`}>{bsBadge.label}</Badge>
                           {listing.reviewAnalysis?.reviewsLookingAi > 0 && (
                             <Badge variant="outline" className="bg-muted text-muted-foreground border-border text-[10px] px-1.5">
-                              <Bot className="w-2.5 h-2.5 mr-0.5" />{listing.reviewAnalysis.reviewsLookingAi} AI
+                              {commonPhrasesBadge(listing.reviewAnalysis.reviewsLookingAi)}
                             </Badge>
                           )}
                         </>}
