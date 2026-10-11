@@ -1,0 +1,127 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "intro-vpn-shield",
+  "title": "VPN Shield",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/vpn-shield",
+      "caption": "VPN Shield",
+      "chapter": "What it found",
+      "narration": "This is VPN Shield. It checks each visit to your website for signs of a VPN or proxy."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-vpn-mode\"]",
+      "caption": "What it does now",
+      "narration": "The top line says what it does right now. On this site, flagged visitors see a blocking overlay."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[@data-testid=\"card-stat-detections\"]/..",
+      "caption": "Detections, blocked, unique IPs",
+      "narration": "Overview counts all detections, today's, how many were blocked, and the unique VPN addresses."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[text()=\"Detections, last 30 days\"]/ancestor::*[.//*[starts-with(@data-testid,\"bar-vpn-\")]][1]",
+      "caption": "The last thirty days",
+      "narration": "A chart shows the detections of the last thirty days."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tab-vpn-blocked\"]",
+      "caption": "Every flagged visit",
+      "chapter": "Every flagged visit",
+      "narration": "Flagged visits lists each one: the IP, how it was detected, and the action taken."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"card-vpn-visit-\"]:has-text(\"198.51.100.65\"):has-text(\"Datacenter IP range\")",
+      "caption": "A data center address",
+      "narration": "This visit came from a data center address, so the visitor saw the blocking overlay."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"button-expand-vpn-visit-\"]:has-text(\"198.51.100.65\"):has-text(\"Datacenter IP range\")",
+      "caption": "The visit's details",
+      "narration": "Open one for the full record."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[text()=\"Visitor details\"]/..",
+      "caption": "Browser, location, landing page",
+      "narration": "Next to the detection details are the browser, the location, the landing page and the referrer."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tab-vpn-install\"]",
+      "caption": "Its own script tag",
+      "narration": "Install script has the tag to paste into your site. It's separate from the Click Guard code."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tab-vpn-settings\"]",
+      "caption": "Block, log or redirect",
+      "chapter": "Block, log or redirect",
+      "narration": "In Settings, you choose the response: Log only, Block, or Redirect to a page you pick."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"option-mode-log\"]",
+      "caption": "Start with Log only",
+      "narration": "New sites start in Log only, so you can look at the detections before you block anyone."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"textarea-whitelisted-ips\"]",
+      "caption": "Addresses you trust",
+      "narration": "List the addresses you trust, like your office, one per line, and they're never blocked."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-settings-crawler-whitelist\"]",
+      "caption": "Search engines pass",
+      "narration": "Googlebot, Bingbot and other known crawlers are let through."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-vpn-shield\"]",
+      "caption": "Menu: VPN Shield",
+      "narration": "You'll find VPN Shield in the menu on the left, under Tools."
+    }
+  ],
+  "youtube": {
+    "title": "VPN Shield in about a minute | ConstructHUB",
+    "description": "A one-minute tour of VPN Shield in ConstructHUB: how many visits to your website show signs of a VPN or proxy, each flagged visit with how it was detected and the action taken, and the settings to block, log or redirect them, with a whitelist for the addresses you trust.",
+    "tags": [
+      "ConstructHUB",
+      "VPN Shield",
+      "block VPN traffic",
+      "proxy detection",
+      "data center IP",
+      "website security",
+      "contractor website"
+    ],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Block VPN Traffic",
+    "accent": "VPN",
+    "kicker": "VPN Shield",
+    "step": 5
+  },
+  "hideSelectors": [
+    "[data-testid=\"button-open-chat\"]"
+  ],
+  "redactSelectors": [
+    "[data-testid=\"text-vpn-script-code\"]"
+  ]
+}
