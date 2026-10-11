@@ -29,6 +29,12 @@
       "narration": "Photos and media library takes up to one hundred job photos at a time, filed by Google photo category."
     },
     {
+      "action": "highlight",
+      "selector": "xpath=(//div[contains(@class,\"max-h-96\")]/div)[1]",
+      "caption": "Tick the photos to use",
+      "narration": "Tick the photos you want. A long file name is shortened to fit."
+    },
+    {
       "action": "click",
       "selector": "xpath=//summary[normalize-space(.)=\"AI drafts and style\"]",
       "caption": "AI drafts and style",
@@ -80,15 +86,15 @@
       "action": "scroll-to",
       "selector": "xpath=//button[normalize-space(.)=\"Calendar\"]",
       "offset": 140,
-      "caption": "Calendar, queue and history",
+      "caption": "New post at the top of the queue",
       "chapter": "Calendar, queue and history",
-      "narration": "Calendar, queue and history lists every item with its time and status."
+      "narration": "The approved post lands at the top of Calendar, queue and history."
     },
     {
       "action": "highlight",
       "selector": "xpath=(//article[contains(.,\"queued\")])[1]",
       "caption": "Cancel, retry, refresh status",
-      "narration": "Cancel anything still queued, retry a failure, or refresh the Google status."
+      "narration": "Every item shows its time and status. Cancel anything still queued, retry a failure, or refresh the Google status."
     },
     {
       "action": "scroll-to",
@@ -124,9 +130,9 @@
     "headline": "Google Posts On Schedule",
     "accent": "Schedule",
     "kicker": "Posts & Photos",
-    "step": 11
+    "step": 12
   },
-  "hideSelectors": [
+  "removeSelectors": [
     "div[role=\"alert\"].rounded-xl"
   ]
 }

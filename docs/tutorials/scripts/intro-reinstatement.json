@@ -61,8 +61,8 @@
     {
       "action": "click",
       "selector": "[data-testid=\"radio-multi-yes\"]",
-      "caption": "More than one location?",
-      "narration": "Tick Yes if the business has more than one location."
+      "caption": "More than one location? No or Yes",
+      "narration": "Answer No or Yes: does the business have more than one location? Nothing is picked for you."
     },
     {
       "action": "type",
@@ -124,7 +124,7 @@
     "kicker": "Reinstatement",
     "step": 9
   },
-  "hideSelectors": [
+  "removeSelectors": [
     "[data-testid=\"card-reinstatement-pricing\"]"
   ]
 }
