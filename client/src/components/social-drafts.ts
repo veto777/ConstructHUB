@@ -6,7 +6,10 @@
  * sessionStorage, with a try/catch + in-memory fallback, so blocked storage degrades to
  * visit-only persistence instead of losing the edit. Posting or scheduling clears the draft.
  */
-import { destinationSchema, type Destination } from "@shared/social";
+import { destinationSchema, postSchema, type Destination } from "@shared/social";
+import type { z } from "zod";
+
+export type ComposerSubmission = z.infer<typeof postSchema>;
 
 export type ComposerDraft = {
   text: string;
@@ -14,6 +17,7 @@ export type ComposerDraft = {
   destinations: Destination[];
   mediaText: string;
   schedule: string;
+  submission?: ComposerSubmission;
 };
 
 const VERSION = "v1";
@@ -22,9 +26,9 @@ const key = (accountId: string | number, part: string) =>
 
 // Memory wins over storage once written: after a quota/security failure it holds the newest state
 // for the visit, and it never resurrects stale storage over a newer in-memory write.
-const memory = new Map<string, string>();
+const memory = new Map<string, string | null>();
 const readRaw = (k: string): string | null => {
-  if (memory.has(k)) return memory.get(k)!;
+  if (memory.has(k)) return memory.get(k) ?? null;
   try {
     return window.sessionStorage.getItem(k);
   } catch {
@@ -33,10 +37,11 @@ const readRaw = (k: string): string | null => {
 };
 const writeRaw = (k: string, raw: string | null): void => {
   if (raw === null) {
-    memory.delete(k);
+    // Keep a tombstone: a failed removeItem must not expose the old storage value.
+    memory.set(k, null);
     try {
       window.sessionStorage.removeItem(k);
-    } catch { /* visit-only: the memory delete above is all we can do */ }
+    } catch { /* the tombstone prevents resurrection during this visit */ }
     return;
   }
   memory.set(k, raw);
@@ -68,18 +73,20 @@ const asDestinations = (v: unknown): Destination[] =>
     : [];
 
 export const isEmptyComposerDraft = (d: ComposerDraft): boolean =>
-  !d.text && !d.mediaText && !d.schedule && !Object.keys(d.tweaks).length && !d.destinations.length;
+  !d.submission && !d.text && !d.mediaText && !d.schedule && !Object.keys(d.tweaks).length && !d.destinations.length;
 
 export function loadComposerDraft(accountId: string | number | null | undefined, businessId: string): ComposerDraft | null {
   if (accountId === null || accountId === undefined) return null;
   const raw = parseJson(readRaw(key(accountId, `composer.${businessId}`)));
   if (!raw) return null;
+  const submission = postSchema.safeParse(raw.submission);
   const draft: ComposerDraft = {
     text: asText(raw.text),
     tweaks: asTweaks(raw.tweaks),
     destinations: asDestinations(raw.destinations),
     mediaText: asText(raw.mediaText),
     schedule: asText(raw.schedule),
+    ...(submission.success ? { submission: submission.data } : {}),
   };
   // An empty composer means "nothing in progress" — treat it as no draft so the saved mapping
   // (not an empty stash) drives the destination checkboxes on the next visit.
