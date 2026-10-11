@@ -321,6 +321,7 @@ async function buildTemplateLocked(rebuild: boolean): Promise<void> {
   });
   await step("scripts/seed-crm-demo.ts", () => run(tsx, [path.join(ROOT, "scripts/seed-crm-demo.ts")], { env, cwd: ROOT }));
   await step("scripts/tutorials/seed-demo.ts", () => run(tsx, [path.join(ROOT, "scripts/tutorials/seed-demo.ts")], { env, cwd: ROOT }));
+  await step("scripts/tutorials/seed-call-assistant.ts", () => run(tsx, [path.join(ROOT, "scripts/tutorials/seed-call-assistant.ts")], { env, cwd: ROOT }));
   await step("scripts/tutorials/seed-platform.ts", () => seedPlatform(TEMPLATE));
   await step("scripts/tutorials/seed-fixtures.ts", () => seedFixtures(TEMPLATE));
   // A second boot settles whatever the app creates lazily or re-checks after its first run (seed_state,
