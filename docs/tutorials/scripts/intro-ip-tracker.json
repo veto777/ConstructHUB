@@ -45,19 +45,19 @@
       "selector": "[data-testid=\"tab-visitors\"]",
       "caption": "Every visitor by IP",
       "chapter": "Open any visitor",
-      "narration": "Visitors groups the visits by IP address, with the visit count, location, browser and when each was last seen."
-    },
-    {
-      "action": "highlight",
-      "selector": "xpath=//*[@data-testid=\"input-ip-search\"]/..",
-      "caption": "Search by IP",
-      "narration": "Search by IP address to find one."
+      "narration": "Visitors groups the visits by IP address, with the visit count, location and browser. You can search by IP."
     },
     {
       "action": "click",
-      "selector": "[data-testid=\"button-expand-visitor-203.0.113.61\"]",
-      "caption": "Browser, device, screen, time zone",
-      "narration": "Open a visitor to see the browser, system, device, screen size, language and time zone."
+      "selector": "[data-testid=\"button-expand-visitor-2001:db8:85a3::8a2e:370:7334\"]",
+      "caption": "Open a visitor",
+      "narration": "Open a visitor. This one is marked Suspicious."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"suspicion-reasons-2001:db8:85a3::8a2e:370:7334\"]",
+      "caption": "Why it was flagged",
+      "narration": "PLACEHOLDER"
     },
     {
       "action": "highlight",
