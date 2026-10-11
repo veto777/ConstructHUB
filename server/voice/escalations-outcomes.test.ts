@@ -66,3 +66,11 @@ it("a crash marker or competing claim blocks every automatic send", async () => 
   await tickVoiceEscalations(now);
   expect(f.sms).not.toHaveBeenCalled();
 });
+it("reminders preserve pending details delivery instead of clearing its error", async () => {
+  const error = "Details update not sent: Not sent: texting isn't set up.";
+  Object.assign(f.row, { sentCount: 1, lastSentAt: new Date("2026-10-10T10:00:00Z"), lastError: error });
+  f.sms.mockResolvedValue({ ok: true, provider: "signalwire", sid: "SM-reminder" });
+  await tickVoiceEscalations(now);
+  expect(f.sms).not.toHaveBeenCalled();
+  expect(f.row.lastError).toBe(error);
+});

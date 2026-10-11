@@ -23,7 +23,7 @@
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import { db } from "../db";
 import {
-  crmMembers, crmOrgs, crmNotifications, crmNotificationChannel, voiceEscalations,
+  crmMembers, crmOrgs, crmNotifications, crmNotificationChannel, voiceEscalations, voiceCalls,
   type VoiceCallRow, type VoiceEscalationRow,
 } from "@shared/schema";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
@@ -145,8 +145,9 @@ export function publicBase(): string {
 
 type SendOutcome = { ok: boolean; sid: string | null; error: string | null; ambiguous?: boolean };
 const UNCERTAIN = "Delivery uncertain; verify with the carrier before resending.";
+const DETAILS_PENDING = "Details update not sent: ";
 const uncertain = (row: Pick<VoiceEscalationRow, "lastError" | "sentCount" | "lastSentAt">) =>
-  !!row.lastError?.startsWith(UNCERTAIN) || (row.sentCount > 0 && !row.lastSentAt);
+  !!row.lastError?.includes(UNCERTAIN) || (row.sentCount > 0 && !row.lastSentAt);
 
 /** The shared log provider is a successful log write, never a carrier acceptance. */
 export function escalationSmsOutcome(r: Awaited<ReturnType<typeof sendSms>>): SendOutcome {
@@ -413,22 +414,75 @@ export function factsAddDetail(facts: Pick<EscalationFacts, "callerName" | "addr
 }
 
 async function addEscalationDetails(ctx: OrgVoiceContext, call: VoiceCallRow, kind: string, facts: EscalationFacts, rule: EscalationRule | null, row: VoiceEscalationRow | null): Promise<void> {
+  if (row) await deliverEscalationDetails(ctx, call, facts, rule, row);
   const fuller = !!row && !!facts.address && !row.body.toLowerCase().includes(facts.address.toLowerCase());
   if (row && !row.closedAt && (factsAddDetail(facts, row.body) || fuller)) {
     // the reminders resend the stored body, so it always gets the fuller facts; a message goes out only
     // when a name or a street is new
     const body = escalationBody(rule, facts);
     await db.update(voiceEscalations).set({ body }).where(eq(voiceEscalations.id, row.id));
-    if (row.sentCount > 0 && !uncertain(row) && factsAddDetail(facts, row.body)) {
-      const sent = await sendTrackedEscalation(ctx.org, row, `Details added:\n\n${body}`, `${facts.company}: ${facts.kind} — details added for ${facts.callerName}`, "details");
-      if (!sent.ok) throw new EscalationDeliveryError(sent.error || "Details not sent", row.id);
-    }
   }
   const sentToOwners = ((call.flags ?? {}) as { alertFacts?: Record<string, SentFacts> }).alertFacts?.[kind];
   if (sentToOwners && factsAddDetail(facts, sentToOwners)) {
     await notifyOwners(ctx, call, kind, facts, { update: true });
     await rememberOwnerFacts(call, kind, facts);
   }
+}
+
+type DetailsDelivery = {
+  revision: string; body: string; subject: string;
+  status: "pending" | "uncertain" | "sent"; error: string | null;
+};
+
+/** The reminder body is not a delivery receipt. Keep the exact update through retries. */
+async function deliverEscalationDetails(ctx: OrgVoiceContext, call: VoiceCallRow, facts: EscalationFacts, rule: EscalationRule | null, row: VoiceEscalationRow): Promise<void> {
+  const key = String(row.id);
+  const saved = await db.execute(sql`select flags->'escalationDetailsDelivery'->${key}::text as delivery from voice_calls where id = ${call.id}`);
+  const previous = saved.rows[0]?.delivery as DetailsDelivery | undefined;
+  if ((!previous || previous.status === "sent") && (row.closedAt || row.sentCount === 0 || !factsAddDetail(facts, row.body))) return;
+
+  // Lock the escalation while saving both its fuller reminder body and its revision claim.
+  // A competing request sees uncertainty; a crash after this commit cannot resend the update.
+  const claim = await db.transaction(async (tx) => {
+    const [fresh] = await tx.select().from(voiceEscalations).where(eq(voiceEscalations.id, row.id)).for("update");
+    const [currentCall] = await tx.select().from(voiceCalls).where(eq(voiceCalls.id, call.id));
+    const deliveries = (currentCall?.flags as { escalationDetailsDelivery?: Record<string, DetailsDelivery> } | null)?.escalationDetailsDelivery;
+    let delivery = deliveries?.[key];
+    if (!fresh || !currentCall) throw new EscalationDeliveryError("Details update could not be loaded", row.id);
+    const body = escalationBody(rule, facts);
+    const revision = createHash("sha256").update(JSON.stringify([facts.callerName, facts.address, body])).digest("hex");
+    if (!delivery || delivery.status === "sent") {
+      if (fresh.closedAt || !factsAddDetail(facts, fresh.body) || delivery?.revision === revision) return null;
+      delivery = { revision, body: `Details added:\n\n${body}`,
+        subject: `${facts.company}: ${facts.kind} — details added for ${facts.callerName}`, status: "pending", error: null };
+    }
+    if (delivery.status === "uncertain" || uncertain(fresh)) throw new EscalationDeliveryError(UNCERTAIN, row.id);
+    if (fresh.closedAt) throw new EscalationDeliveryError(`${DETAILS_PENDING}escalation is closed`, row.id);
+    const claimed: DetailsDelivery = { ...delivery, status: "uncertain", error: UNCERTAIN };
+    await tx.execute(sql`update voice_calls set flags = jsonb_set(coalesce(flags, '{}'::jsonb), '{escalationDetailsDelivery}',
+      coalesce(flags->'escalationDetailsDelivery', '{}'::jsonb) || jsonb_build_object(${key}::text, ${JSON.stringify(claimed)}::jsonb)) where id = ${call.id}`);
+    await tx.update(voiceEscalations).set({ body: delivery.body.replace(/^Details added:\n\n/, ""),
+      lastError: sql`concat_ws('; ', ${DETAILS_PENDING + UNCERTAIN}::text,
+        case when position('Owner alert:' in coalesce(${voiceEscalations.lastError}, '')) > 0
+          then 'Owner alert:' || split_part(${voiceEscalations.lastError}, 'Owner alert:', 2) end)` }).where(eq(voiceEscalations.id, row.id));
+    return { delivery: claimed, row: fresh };
+  });
+  if (!claim) return;
+  const sent = await sendEscalation(ctx.org, claim.row, claim.delivery.body, claim.delivery.subject);
+  const completed: DetailsDelivery = { ...claim.delivery, status: sent.ok ? "sent" : sent.ambiguous ? "uncertain" : "pending", error: sent.error };
+  // Persist the outcome together: a failure saving acceptance leaves the pre-send uncertainty intact.
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`update voice_calls set flags = jsonb_set(flags, array['escalationDetailsDelivery', ${key}::text], ${JSON.stringify(completed)}::jsonb) where id = ${call.id}`);
+    await tx.update(voiceEscalations).set({ lastProviderSid: sent.sid,
+      lastError: sql`nullif(concat_ws('; ', ${sent.ok ? null : DETAILS_PENDING + (sent.error || "send failed")}::text,
+        case when position('Owner alert:' in coalesce(${voiceEscalations.lastError}, '')) > 0
+          then 'Owner alert:' || split_part(${voiceEscalations.lastError}, 'Owner alert:', 2) end), '')` }).where(eq(voiceEscalations.id, row.id));
+  });
+  if (!sent.ok) throw new EscalationDeliveryError(DETAILS_PENDING + (sent.error || "send failed"), row.id);
+  // There may be newer facts than the pending revision we just delivered. Re-read before considering them.
+  const [fresh] = await db.select().from(voiceEscalations).where(eq(voiceEscalations.id, row.id)).limit(1);
+  Object.assign(row, fresh);
+  await deliverEscalationDetails(ctx, call, facts, rule, row);
 }
 
 // ── Confirmation ─────────────────────────────────────────────────────────────
@@ -540,7 +594,7 @@ export async function tickVoiceEscalations(now = new Date()): Promise<TickReport
   const MIN = 60_000, HOUR = 60 * MIN, DAY = 24 * HOUR;
   for (const row of rows) {
     try {
-      if (uncertain(row)) continue;
+      if (uncertain(row) || row.lastError?.startsWith(DETAILS_PENDING)) continue;
       const found = await orgOf(row.orgId);
       if (!found) { await db.update(voiceEscalations).set({ closedAt: now, closeReason: "org gone" }).where(eq(voiceEscalations.id, row.id)); report.closed++; continue; }
       const { org } = found;
@@ -654,7 +708,7 @@ export function startVoiceEscalationWorker(): boolean {
 }
 
 /** Persist uncertainty before I/O. A crash or concurrent retry must never duplicate a send. */
-async function sendTrackedEscalation(org: typeof crmOrgs.$inferSelect, row: VoiceEscalationRow, body: string, subject: string, stage: "first" | "reminder" | "followup" | "details", now = new Date()): Promise<SendOutcome> {
+async function sendTrackedEscalation(org: typeof crmOrgs.$inferSelect, row: VoiceEscalationRow, body: string, subject: string, stage: "first" | "reminder" | "followup", now = new Date()): Promise<SendOutcome> {
   if (uncertain(row)) return { ok: false, sid: null, ambiguous: true, error: row.lastError || UNCERTAIN };
   const [claimed] = await db.update(voiceEscalations).set({ lastError: sql`concat_ws('; ', ${UNCERTAIN}::text,
       case when position('Owner alert:' in coalesce(${voiceEscalations.lastError}, '')) > 0

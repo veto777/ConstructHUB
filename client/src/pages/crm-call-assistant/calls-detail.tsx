@@ -281,7 +281,8 @@ export function EscalationRow({ e, callId, onOpenCall }: { e: VoiceEscalation; c
     onError: (err) => toast({ title: "Couldn't close it", description: apiErrorMessage(err), variant: "destructive" }),
   });
   const uncertain = !!e.lastError?.includes("Delivery uncertain;") || (e.sentCount > 0 && !e.lastSentAt);
-  const deliveryLabel = uncertain ? "Delivery uncertain — verify before resending" : e.lastError || (e.sentCount ? `sent ${e.sentCount}×` : "Not sent");
+  const detailsPending = e.lastError?.startsWith("Details update not sent:");
+  const deliveryLabel = detailsPending ? e.lastError : uncertain ? "Delivery uncertain — verify before resending" : e.lastError || (e.sentCount ? `sent ${e.sentCount}×` : "Not sent");
   const tone: "neutral" | "warning" | "success" = e.lastError || uncertain ? "warning" : e.state === "closed" ? "neutral" : e.state === "waiting" ? "warning" : "success";
   const stateLabels: Record<VoiceEscalation["state"], string> = {
     waiting: `waiting on ${e.recipientName || e.recipient}`,

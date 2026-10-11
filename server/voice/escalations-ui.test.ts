@@ -33,3 +33,12 @@ it("shows real sends, but prioritizes reminder and owner failures over past succ
   expect(html).toContain("Owner alert: Recipient opted out");
   expect(html).not.toContain("sent 2×");
 });
+it("identifies a pending details update despite an earlier successful first send", () => {
+  for (const reason of ["Not sent: texting isn't set up.", "Delivery uncertain; verify with the carrier before resending."]) {
+    const html = render({ sentCount: 1, lastSentAt: "2026-10-11T09:00:00Z", lastError: `Details update not sent: ${reason}` });
+    expect(html).toContain("Details update not sent:");
+    expect(html).not.toContain("sent 1×");
+    expect(html).not.toContain("waiting on");
+    if (reason.startsWith("Delivery uncertain")) expect(html).toContain("Automatic sends are paused");
+  }
+});

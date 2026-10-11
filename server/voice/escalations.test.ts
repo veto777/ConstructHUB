@@ -158,6 +158,95 @@ describe("raising and reminding (real DB)", () => {
     expect(smsTo(lead)).toHaveLength(before + 2);
   });
 
+  for (const failure of ["log", "rejected", "ambiguous"] as const) {
+    it(`details revision: ${failure} cannot complete the task; retries preserve the exact update`, async () => {
+      const ctx = (await orgProfile.loadOrgVoiceContext(a.orgId))!;
+      const c = await makeCall(pool, a.orgId);
+      const staleCall = (await callRow(c.id))!;
+      const initial = await esc.raiseEscalation({ ctx, call: staleCall, kind: "scheduling", summary: "Move the visit", slots: {} });
+      const before = await escRow(initial.escalationId!);
+      expect(before.sent_count).toBe(1);
+      expect(before.remind_every_minutes).toBe(0); // score8 reproduction: no reminder can recover it
+      const slots = { first_name: "Dana" };
+      await pool.query("update voice_calls set slots = $2::jsonb where id = $1", [c.id, JSON.stringify(slots)]);
+      const tasks = await import("./call-tasks");
+      const now = new Date();
+      await tasks.insertCallTasks(pool, c.id, a.orgId, [tasks.escalationTaskSpec("scheduling", "Move the visit")], now);
+      const [task] = await tasks.listCallTasks(c.id);
+      const requests: string[] = [];
+      if (failure === "log") {
+        for (const k of Object.keys(carrierEnv)) vi.stubEnv(k, "");
+      } else {
+        vi.stubGlobal("fetch", vi.fn(async (_url: unknown, init: RequestInit) => {
+          requests.push(new URLSearchParams(String(init.body)).get("Body")!);
+          if (failure === "ambiguous") throw new Error("Carrier accepted but response was lost");
+          return new Response(JSON.stringify({ message: "Rejected" }), { status: 400 });
+        }));
+      }
+      expect(await tasks.runCallTask(task.id, { now: () => now })).toBe("pending");
+      const failed = await escRow(initial.escalationId!);
+      expect(failed.body).toContain("Dana");
+      expect(failed.last_error).toContain("Details update not sent:");
+      expect(failed.sent_count).toBe(before.sent_count);
+      expect(failed.last_sent_at).toEqual(before.last_sent_at);
+      const revision = ((await callRow(c.id))!.flags as any).escalationDetailsDelivery[String(initial.escalationId)];
+      expect(revision.status).toBe(failure === "ambiguous" ? "uncertain" : "pending");
+      expect(revision.body).toBe(`Details added:\n\n${failed.body}`);
+
+      // Retry once while still unconfigured/refused: the saved fuller body must not imply completion.
+      const later = (minutes: number) => () => new Date(now.getTime() + minutes * 60_000);
+      expect(await tasks.runCallTask(task.id, { now: later(2) })).toBe("pending");
+      if (failure === "ambiguous") expect(requests).toHaveLength(1);
+      for (const [k, v] of Object.entries(carrierEnv)) vi.stubEnv(k, v);
+      const accepted: string[] = [];
+      vi.stubGlobal("fetch", vi.fn(async (_url: unknown, init: RequestInit) => {
+        accepted.push(new URLSearchParams(String(init.body)).get("Body")!);
+        return new Response(JSON.stringify({ sid: "SM-details-accepted" }), { status: 201 });
+      }));
+      expect(await tasks.runCallTask(task.id, { now: later(5) })).toBe(failure === "ambiguous" ? "pending" : "done");
+      const retry = () => esc.raiseEscalation({ ctx, call: staleCall, kind: "scheduling", summary: "Move the visit", slots, strict: true });
+      if (failure === "ambiguous") {
+        await expect(retry()).rejects.toThrow("Delivery uncertain");
+        expect(accepted).toEqual([]);
+      } else {
+        await retry(); // even a stale in-memory call cannot repeat the accepted revision
+        expect(accepted).toEqual([revision.body]);
+        expect((await escRow(initial.escalationId!)).last_error).toBeNull();
+        const receipt = ((await callRow(c.id))!.flags as any).escalationDetailsDelivery[String(initial.escalationId)];
+        expect(receipt).toMatchObject({ revision: revision.revision, status: "sent", error: null });
+      }
+      const [finalTask] = await tasks.listCallTasks(c.id);
+      expect(finalTask.state).toBe(failure === "ambiguous" ? "pending" : "done");
+      if (failure === "ambiguous") expect(finalTask.doneAt).toBeNull();
+    });
+  }
+
+  it("concurrent strict requests claim one details revision before carrier I/O", async () => {
+    const ctx = (await orgProfile.loadOrgVoiceContext(a.orgId))!;
+    const c = await makeCall(pool, a.orgId);
+    await esc.raiseEscalation({ ctx, call: (await callRow(c.id))!, kind: "scheduling", summary: "Move the visit", slots: {} });
+    let started!: () => void;
+    const sending = new Promise<void>((resolve) => { started = resolve; });
+    let finish!: () => void;
+    const held = new Promise<void>((resolve) => { finish = resolve; });
+    const carrier = vi.fn(async () => {
+      started();
+      await held;
+      return new Response(JSON.stringify({ sid: "SM-concurrent-details" }), { status: 201 });
+    });
+    vi.stubGlobal("fetch", carrier);
+    const call = (await callRow(c.id))!;
+    const args = { ctx, call, kind: "scheduling", summary: "Move the visit", slots: { first_name: "Dana" }, strict: true };
+    const first = esc.raiseEscalation(args);
+    try {
+      await sending;
+      await expect(esc.raiseEscalation(args)).rejects.toThrow("Delivery uncertain");
+    } finally { finish(); }
+    await first;
+    await esc.raiseEscalation(args);
+    expect(carrier).toHaveBeenCalledTimes(1);
+  });
+
   it("a kind with no rule goes to the owners' channels once; a custom template is rendered", async () => {
     const ctx = (await orgProfile.loadOrgVoiceContext(a.orgId))!;
     const c = await makeCall(pool, a.orgId);
