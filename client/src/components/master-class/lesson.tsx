@@ -39,7 +39,7 @@ export function Lesson({ id, title, icon, description, storageKey, children, con
     <Section id={`lesson-${id}`} title={title} icon={icon} description={description}
       className={cn("scroll-mt-24", done && "border-primary/40", className)} contentClassName={contentClassName} testId={testId ?? `lesson-${id}`}
       actions={
-        <label htmlFor={boxId} className="flex min-h-10 cursor-pointer select-none items-center gap-2 rounded-md px-1 text-xs font-medium text-muted-foreground hover:text-foreground">
+        <label htmlFor={boxId} className="flex min-h-10 min-w-24 cursor-pointer select-none items-center gap-2 rounded-md px-1 text-xs font-medium text-muted-foreground hover:text-foreground">
           <Checkbox id={boxId} checked={done} disabled={!list.ready || !available} onCheckedChange={(v) => { if (available) list.toggle(id, v === true); }} aria-label={`Mark "${label}" done`} data-testid={`checkbox-${slug(id)}-done`} />
           {done ? "Done" : "Mark done"}
         </label>
@@ -72,7 +72,7 @@ export function LessonOutline({ lessons, storageKey, locked = false, progress = 
   return (
     <Section title={title} testId={testId ?? "lesson-outline"}
       description={description ?? (tracked ? <>{list.ready && <>{progressLabel(done, total)} · </>}<ProgressNote list={list} /></> : `${total} ${locked ? "lesson" : "section"}${total === 1 ? "" : "s"}`)}
-      actions={tracked && done > 0 ? <Button variant="ghost" size="sm" onClick={() => {
+      actions={tracked ? <Button variant="ghost" size="sm" disabled={done === 0} className={done === 0 ? "invisible" : undefined} onClick={() => {
         if (window.confirm(`Reset ${done} completed lesson${done === 1 ? "" : "s"} in ${moduleName ?? storageKey.replace(/^mc:/, "")}? This cannot be undone.`)) list.reset();
       }} data-testid="button-lessons-reset">Reset progress</Button> : undefined}>
       {tracked && list.ready && <Progress value={pct} className="mb-3 h-1.5" aria-label={`${pct}% of lessons done`} />}

@@ -44,7 +44,7 @@ describe("the selected property's detail", () => {
     expect(count(detail.text, "<MetricRows")).toBe(1);
     expect(count(detail.text, "<UrlActions")).toBe(1);
     expect(detail.text).toMatch(/<Fragment key=\{`property-\$\{asset\.id\}`\}>\s*<MetricRows asset=\{asset\} \/>\s*<UrlActions\b/);
-    expect(src).toContain("import { Fragment, useState, useRef, type ReactNode } from \"react\";");
+    expect(src).toMatch(/import \{[^}]*\bFragment\b[^}]*\} from "react"/);
   });
   it("gives no two siblings the same key", () => {
     const keys = [...detail.text.matchAll(/\bkey=\{([^}]+(?:\{[^}]*\}[^}]*)*)\}/g)].map((m) => m[1]);

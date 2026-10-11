@@ -182,7 +182,7 @@ function StepList({ code, stateName, steps, written }: { code: string; stateName
     <Section id="lesson-state-steps" className="scroll-mt-24" icon={Briefcase}
       title={written ? `Step-by-step walkthrough for ${stateName}` : `Checklist for ${stateName}`}
       description={<>{list.ready && <>{progressLabel(done, steps.length)} · </>}<ProgressNote list={list} /></>}
-      actions={done > 0 ? <Button variant="ghost" size="sm" onClick={list.reset} data-testid="button-state-steps-reset">Reset</Button> : undefined}
+      actions={<Button variant="ghost" size="sm" disabled={done === 0} className={done === 0 ? "invisible" : undefined} onClick={list.reset} data-testid="button-state-steps-reset">Reset</Button>}
       testId="section-state-steps">
       {written ? (
         <Notice tone="info" testId="notice-steps-written">A walkthrough written for {stateName}: every step names the agency, what it issues and what it costs where the state publishes a fee. Confirm fees and forms with the agency before you file; they change.</Notice>

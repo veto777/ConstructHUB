@@ -98,7 +98,7 @@ export function UrlActions({
   const change = (i: number, patch: Partial<UrlRow>) =>
     setRows(rows.map((r, n) => (n === i ? { ...r, ...patch } : r)));
   return (
-    <section className="space-y-3">
+    <section className="space-y-3 pt-6">
       <h3 className="font-medium">Sitemaps and URL inspections</h3>
       <p className="text-sm text-muted-foreground">
         Choose a property and enter each URL. Select the rows to submit.
@@ -107,7 +107,7 @@ export function UrlActions({
       {rows.map((r, i) => (
         <div
           key={i}
-          className="grid gap-2 rounded-lg border p-3 sm:grid-cols-[auto_1fr_2fr_auto] sm:items-center"
+          className="grid min-w-0 gap-2 rounded-lg border p-3 sm:grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center"
         >
           <input
             type="checkbox"
@@ -118,7 +118,8 @@ export function UrlActions({
           <label className="text-sm">
             Property
             <select
-              className="block h-10 w-full rounded border bg-background px-2"
+              className="block h-10 w-full min-w-0 rounded border bg-background px-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+              title={assets.find(a => String(a.id) === r.assetId)?.name ?? "Choose property"}
               value={r.assetId}
               onChange={(e) => change(i, { assetId: e.target.value })}
             >
@@ -129,6 +130,7 @@ export function UrlActions({
                 </option>
               ))}
             </select>
+            <span className="block break-all text-xs text-muted-foreground">{assets.find(a => String(a.id) === r.assetId)?.name}</span>
           </label>
           <label className="text-sm">
             URL

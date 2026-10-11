@@ -691,7 +691,9 @@ export function registerCloudflareRoutes(
         zone: a.name,
         rules,
         warning:
-          "Review exemptions before confirming. Blocks affect real visitors. Ads rate limiting depends on your Cloudflare plan. High security level must be reviewed in Cloudflare; it is not changed by this pack.",
+          "Review exemptions before confirming. Rules affect real visitors." +
+          (p.kind === "ads-door" ? " Ads rate limiting depends on your Cloudflare plan. High security level must be reviewed in Cloudflare; it is not changed by this pack." :
+            p.kind === "bad-ua" ? " Site-wide rate limiting depends on your Cloudflare plan." : ""),
         before: a.data ?? null,
       };
       const {
