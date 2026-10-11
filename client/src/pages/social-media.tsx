@@ -1,5 +1,5 @@
 import { BusinessSelector, MappingEditor, Pager, refreshSocial } from "@/components/social-agency";
-import { destinationLabel, loadComposerDraft, loadRowEdits, saveComposerDraft, saveRowEdits, type ComposerSubmission } from "@/components/social-drafts";
+import { characterCount, latestPostsFirst, destinationLabel, loadComposerDraft, loadRowEdits, saveComposerDraft, saveRowEdits, type ComposerSubmission } from "@/components/social-drafts";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
@@ -163,6 +163,7 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
   const [bulkFailed, setBulkFailed] = useState<string[]>([]);
   const [bulkErrors, setBulkErrors] = useState<string[]>([]);
   const [confirmBulkCancel, setConfirmBulkCancel] = useState(false);
+  const [latestPosts, setLatestPosts] = useState<any[]>([]);
   const [offset, setOffset] = useState(0), [postSearch, setPostSearch] = useState(""), [postState, setPostState] = useState(""), [postPlatform, setPostPlatform] = useState("");
   const [calendarDate, setCalendarDate] = useState(""), [connectionScope, setConnectionScope] = useState("business");
   const [sourceOffset, setSourceOffset] = useState(0), [sourceSearch, setSourceSearch] = useState("");
@@ -218,6 +219,7 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
   const [tabParam, setTabParam] = useUrlParam("tab");
   const tab = all ? "queue" : tabParam || "compose", setTab = (v: string) => setTabParam(v === "compose" ? null : v);
   const queueTop = useRef<HTMLElement>(null);
+  const queuePosts = latestPostsFirst(data?.posts || [], offset === 0 && !postSearch && !postState && !postPlatform && !calendarDate ? latestPosts : []);
   useEffect(() => {
     if (tab === "queue") queueTop.current?.scrollIntoView({ block: "start" });
   }, [tab, isLoading]);
@@ -350,7 +352,7 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
       saveComposerDraft(accountId, businessKey, { text, tweaks, destinations, mediaText, schedule, submission: body });
       setSubmission(body);
       dispatched = true;
-      await mutation.mutateAsync({
+      const result = await mutation.mutateAsync({
         path: "/posts",
         success: false,
         body,
@@ -371,6 +373,12 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
         title: body.draft ? "Draft saved" : when ? "Post scheduled" : "Post queued for publishing",
         description: `${count} destination${count === 1 ? "" : "s"}${when ? ` · ${when.toLocaleString()}` : ""}${body.mediaUrls.length ? ` · ${body.mediaUrls.length} media` : ""}. The composer is clear for the next post.`,
       });
+      setLatestPosts(result.posts || []);
+      setOffset(0);
+      setPostSearch("");
+      setPostState("");
+      setPostPlatform("");
+      setCalendarDate("");
       setTab("queue");
     } catch (error) {
       if (!dispatched) toast({ title: "Check your post", description: "Check the post text, destinations, media links and schedule time before submitting.", variant: "destructive" });
@@ -382,6 +390,17 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
       }
     } finally {
       submittingRef.current = false;
+    }
+  }
+  async function attachLibraryPhoto(url: string) {
+    setUploading(true);
+    try {
+      const blob = await (await fetch(url)).blob();
+      await upload(new File([blob], "library-photo." + blob.type.split("/")[1], { type: blob.type }));
+    } catch {
+      toast({ title: "Could not read this library photo. Try again.", variant: "destructive" });
+    } finally {
+      setUploading(false);
     }
   }
   async function upload(file: File) {
@@ -700,8 +719,7 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
             {[...new Set(destinations.map((d) => d.platform))].map((p) => (
               <label className="block space-y-1" key={p}>
                 <span className="text-sm">
-                  {p} text tweak · {[...(tweaks[p] ?? text)].length}/
-                  {socialLimits[p]} characters
+                  {p} text tweak · {characterCount(p, tweaks[p] ?? text)}
                 </span>
                 <Textarea
                   aria-label={`${p} text tweak`}
@@ -741,9 +759,12 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
                     aria-label="Media Library"
                     className={selectClass}
                     value=""
-                    disabled={mediaQuery.isError}
+                    disabled={mediaQuery.isError || uploading}
                     onChange={(e) => {
-                      if (e.target.value)
+                      const photo = media.find(p => p.url === e.target.value);
+                      if (photo?.requiresUpload) {
+                        void attachLibraryPhoto(photo.url);
+                      } else if (e.target.value)
                         setMediaText((v) =>
                           [v, e.target.value].filter(Boolean).join("\n"),
                         );
@@ -846,7 +867,7 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
                 </label>
               </>}
             />
-            {!error && !data?.posts?.length && (
+            {!error && !queuePosts.length && (
               <p className="text-sm text-muted-foreground" data-testid="text-social-posts-empty">
                 {postSearch || postState || postPlatform || calendarDate
                   ? "No posts match your search or filters."
@@ -855,7 +876,7 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
             )}
             <p className="text-sm text-muted-foreground">{error ? "Post count unavailable" : `${data?.total ?? 0} matching posts`}</p>
             <div className="flex flex-wrap gap-2">
-              <GooglePill size="sm" onClick={() => setSelected((old) => ({ ...old, ...Object.fromEntries((data?.posts || []).filter((p: any) => ["draft", "queued"].includes(p.state)).map((p: any) => [p.id, p.business_name || "Legacy / unassigned"])) }))} label="Select this page of posts" />
+              <GooglePill size="sm" onClick={() => setSelected((old) => ({ ...old, ...Object.fromEntries(queuePosts.filter((p: any) => ["draft", "queued"].includes(p.state)).map((p: any) => [p.id, p.business_name || "Legacy / unassigned"])) }))} label="Select this page of posts" />
               <GooglePill size="sm" disabled={!selectedPosts.length} onClick={() => { setSelected({}); setBulkFailed([]); }} label="Clear selection" testId="button-clear-selection" />
               <GooglePill size="sm" disabled={!selectedPosts.length || selectedPosts.length > 100 || mutation.isPending || selectedDirty > 0} onClick={() => mutation.mutate({ path: "/posts/bulk-action", body: { ids: selectedPosts, action: "approve" }, success: "Selected drafts approved" })} label="Approve selected drafts" />
               <GooglePill size="sm" disabled={!selectedPosts.length || selectedPosts.length > 100 || mutation.isPending} onClick={() => setConfirmBulkCancel(true)} label="Cancel selected posts" />
@@ -871,8 +892,8 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
             )}
             {bulkErrors.map((error, i) => <p role="alert" key={i} className="text-sm text-destructive">{error}</p>)}
             <Pager offset={offset} setOffset={setOffset} more={offset + 25 < (data?.total || 0)} label="posts" />
-            {(data?.posts || []).length > 0 && <GoogleList testId="list-social-posts">
-            {(data?.posts || [])
+            {queuePosts.length > 0 && <GoogleList testId="list-social-posts">
+            {queuePosts
               .map((p: any) => (
                 <PostRow
                   key={p.id}

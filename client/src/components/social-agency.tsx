@@ -171,7 +171,7 @@ export function MappingEditor({ businessId, defaults }: { businessId: number; de
             <div key={a.id} className="space-y-2 rounded-lg border p-3">
               <label className="flex gap-2 text-sm">
                 <input type="checkbox" aria-label={`Map: ${a.name} · ${a.platform}`} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" disabled={!platforms.includes(a.platform)} checked={!!d} onChange={e => setDraft(e.target.checked ? [...choices, destinationSchema.parse({ accountId: a.id, platform: a.platform })] : choices.filter(d => d.accountId !== a.id))} />
-                {a.name} · {a.platform}
+                Map {a.name} · {a.platform}
               </label>
               {d && ["facebook", "linkedin", "pinterest"].includes(a.platform) && <><GooglePill size="sm" disabled={mutation.isPending} onClick={() => mutation.mutate({ path: `/accounts/${a.id}/pages` })} label={`Discover pages for ${a.name}`} /><TargetPicker businessId={businessId} account={a} destination={d} onChange={value => patch(a.id, a.platform === "pinterest" ? { boardId: value || undefined } : { pageId: value || undefined })} /></>}
               {d && ["youtube", "pinterest"].includes(a.platform) && <Input aria-label={`Default title for ${a.name}`} value={d.title || ""} onChange={e => patch(a.id, { title: e.target.value })} />}

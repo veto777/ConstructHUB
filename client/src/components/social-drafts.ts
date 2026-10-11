@@ -6,7 +6,7 @@
  * sessionStorage, with a try/catch + in-memory fallback, so blocked storage degrades to
  * visit-only persistence instead of losing the edit. Posting or scheduling clears the draft.
  */
-import { destinationSchema, postSchema, type Destination } from "@shared/social";
+import { destinationSchema, postSchema, socialLimits, type Destination } from "@shared/social";
 import type { z } from "zod";
 
 export type ComposerSubmission = z.infer<typeof postSchema>;
@@ -117,5 +117,19 @@ export function destinationLabel(d: Destination, accounts: { id: string; name?: 
   const name = account?.name?.trim() || platform + " account";
   const target = d.pageId ? account?.pages?.find(p => p.id === d.pageId)?.name?.trim() || platform + " page"
     : d.boardId ? account?.boards?.find(p => p.id === d.boardId)?.name?.trim() || platform + " board" : "";
-  return target ? name + " · " + target + " (" + platform + ")" : name + " (" + platform + ")";
+  return `${target || name} · ${platform}`;
+}
+
+/** Large Facebook limits matter only when the text approaches the cap. */
+export function characterCount(platform: string, text: string): string {
+  const count = [...text].length;
+  const limit = socialLimits[platform];
+  return platform === "facebook" && count < limit * 0.9
+    ? `${count} characters` : `${count}/${limit} characters`;
+}
+
+/** Keep accepted posts visible even when scheduled posts fill page one. */
+export function latestPostsFirst<T extends { id: string }>(posts: T[], latest: T[]): T[] {
+  const ids = new Set(latest.map(p => p.id));
+  return [...latest.map(p => posts.find(current => current.id === p.id) ?? p), ...posts.filter(p => !ids.has(p.id))];
 }

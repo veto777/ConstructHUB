@@ -29,10 +29,10 @@ describe("film readiness", () => {
   });
   it("labels accounts, pages and boards without provider ids, including missing names", () => {
     const fb = destinationSchema.parse({ accountId: "fs-b-fb", platform: "facebook", pageId: "fs-b-fb-page" });
-    expect(destinationLabel(fb, [{ id: fb.accountId, name: "Summit", pages: [{ id: fb.pageId!, name: "Denver" }] }])).toBe("Summit · Denver (Facebook)");
-    expect(destinationLabel(fb, [])).toBe("Facebook account · Facebook page (Facebook)");
+    expect(destinationLabel(fb, [{ id: fb.accountId, name: "Summit", pages: [{ id: fb.pageId!, name: "Denver" }] }])).toBe("Denver · Facebook");
+    expect(destinationLabel(fb, [])).toBe("Facebook page · Facebook");
     const pin = destinationSchema.parse({ accountId: "raw", platform: "pinterest", boardId: "raw-board" });
-    expect(destinationLabel(pin, [{ id: "raw", name: " ", boards: [{ id: "raw-board", name: " " }] }])).toBe("Pinterest account · Pinterest board (Pinterest)");
+    expect(destinationLabel(pin, [{ id: "raw", name: " ", boards: [{ id: "raw-board", name: " " }] }])).toBe("Pinterest board · Pinterest");
   });
   it("wires both submit controls to one upfront setup notice and its reason", () => {
     const page = source("../../client/src/pages/social-media.tsx");
@@ -52,5 +52,6 @@ describe("film readiness", () => {
     const mapping = source("../../client/src/components/social-agency.tsx");
     expect(mapping).toContain('aria-label={`Map: ${a.name} · ${a.platform}`}');
     expect(mapping).toContain("focus-visible:outline-2");
+    expect(mapping).toContain("Map {a.name} · {a.platform}");
   });
 });
