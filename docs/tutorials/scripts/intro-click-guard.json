@@ -1,0 +1,119 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "intro-click-guard",
+  "title": "Click Guard",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/google-ads",
+      "caption": "Click Guard",
+      "chapter": "Who clicks your ads",
+      "narration": "This is Click Guard. It records the visits your tracking code sees, and flags repeat and bot clicks."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"select-domain\"]",
+      "caption": "Pick the website",
+      "narration": "Pick the website. This roofing company protects three."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[@data-testid=\"card-stat-visits\"]/..",
+      "caption": "Visits, blocked, unique",
+      "narration": "For the range you pick, the Dashboard counts visits, blocked IPs and unique visitors."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-threat-level\"]",
+      "caption": "Threat level",
+      "narration": "Threat level is the share of those visits that were flagged."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-chart\"]",
+      "caption": "The visit trend",
+      "chapter": "The visit trend",
+      "narration": "The visit trend shows each day's visits, so a spike stands out."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tab-fraud\"]",
+      "caption": "Traffic signals",
+      "narration": "Choose Traffic signals, where the flagged traffic lives, with Blocked IPs first."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"table-blocked-ips\"] thead tr",
+      "caption": "Blocked IPs, with the reason",
+      "narration": "Blocked IPs lists each address with its reason: a bot user agent, too many visits an hour, or one device on many IPs.",
+      "chapter": "Traffic signals"
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"table-blocked-ips\"] tr:has-text(\"198.51.100.201\")",
+      "caption": "Blocked on its own",
+      "narration": "A flagged IP that passes ten visits in an hour is blocked on its own."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-block-ip\"]",
+      "caption": "Block an IP yourself",
+      "narration": "Block an address yourself: a single IP, a range or a wildcard, and unblock any of them."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[@data-testid=\"card-clicks-report\"]//*[contains(text(),\"Clicks report\")]",
+      "caption": "Every visit",
+      "narration": "Below, the Clicks report lists every visit: IP, device, browser, page and status, with a Block button on each."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tab-link-ads\"]",
+      "caption": "Google Ads script",
+      "chapter": "Into Google Ads",
+      "narration": "Google Ads script turns the list into IP exclusions: paste one script into your Ads account and schedule it hourly."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[@data-testid=\"card-blocked-count\"]/..",
+      "caption": "Ready to sync",
+      "narration": "It shows how many IPs are ready to sync, against Google's limit of five hundred per campaign."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-click-guard\"]",
+      "caption": "Menu: Click Guard",
+      "narration": "You'll find Click Guard in the menu on the left, under Google Ads."
+    }
+  ],
+  "youtube": {
+    "title": "Click Guard in about a minute | ConstructHUB",
+    "description": "A one-minute tour of Click Guard in ConstructHUB: the visits your tracking code records, the ones flagged as repeat or bot clicks, blocked IPs with the reason for each, the daily visit trend, and the Google Ads script that turns the list into IP exclusions.",
+    "tags": [
+      "ConstructHUB",
+      "click fraud protection",
+      "Click Guard",
+      "Google Ads IP exclusions",
+      "bot clicks",
+      "blocked IPs",
+      "contractor Google Ads"
+    ],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Block the Repeat Clickers",
+    "accent": "Block",
+    "kicker": "Click Guard",
+    "step": 6
+  },
+  "hideSelectors": [
+    "[data-testid=\"button-open-chat\"]"
+  ]
+}
