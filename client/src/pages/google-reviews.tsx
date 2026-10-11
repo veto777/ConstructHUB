@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { useUrlParam } from "@/hooks/use-url-param";
 import { caughtPrivatelyCount, describeReviewEscalationThreshold, normalizeReviewEscalationThreshold, REVIEW_ESCALATION_THRESHOLD_CHOICES } from "@shared/review-flow";
+import { MAX_OTHER_REVIEW_LINKS, MAX_REVIEW_LINK_LABEL, REVIEW_PLATFORMS, normalizeOtherReviewLinks, reviewLinkLabel, type OtherReviewLink } from "@shared/review-links";
 
 // Pacific time with the real abbreviation (PDT in summer, PST in winter).
 const formatPST = (dateStr: string) => {
@@ -140,6 +141,8 @@ export default function GoogleReviewsPage() {
   const [templateGoogleUrl, setTemplateGoogleUrl] = useState("");
   const [templateDescription, setTemplateDescription] = useState("");
   const [templateIsDefault, setTemplateIsDefault] = useState(false);
+  // Other review sites on the profile (shared/review-links.ts): rows the owner pastes in the profile dialog.
+  const [templateOtherLinks, setTemplateOtherLinks] = useState<OtherReviewLink[]>([]);
 
   const { data: reviews = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/reviews/list"],
@@ -382,6 +385,7 @@ export default function GoogleReviewsPage() {
         name: templateName,
         googleProfileUrl: templateGoogleUrl,
         projectDescription: templateDescription || undefined,
+        otherReviewLinks: templateOtherLinks,
         isDefault: templateIsDefault || templates.length === 0,
       });
       return res.json();
@@ -405,6 +409,7 @@ export default function GoogleReviewsPage() {
         name: templateName,
         googleProfileUrl: templateGoogleUrl,
         projectDescription: templateDescription || undefined,
+        otherReviewLinks: templateOtherLinks,
         isDefault: templateIsDefault,
       });
       return res.json();
@@ -436,12 +441,15 @@ export default function GoogleReviewsPage() {
 
   // Mirrors the server check (the server also resolves short links): only Google-hosted review links.
   const templateUrlInvalid = templateGoogleUrl.trim() !== "" && !looksLikeGoogleReviewLink(templateGoogleUrl);
+  // Same check the server runs on save; shown under the rows and blocks the save button.
+  const otherLinksError = normalizeOtherReviewLinks(templateOtherLinks).error;
 
   const resetTemplateForm = () => {
     setTemplateName("");
     setTemplateGoogleUrl("");
     setTemplateDescription("");
     setTemplateIsDefault(false);
+    setTemplateOtherLinks([]);
   };
 
   const openEditTemplate = (template: any) => {
@@ -450,6 +458,7 @@ export default function GoogleReviewsPage() {
     setTemplateGoogleUrl(template.googleProfileUrl);
     setTemplateDescription(template.projectDescription || "");
     setTemplateIsDefault(template.isDefault);
+    setTemplateOtherLinks(normalizeOtherReviewLinks(template.otherReviewLinks).links);
     setTemplateDialogOpen(true);
   };
 
@@ -587,6 +596,12 @@ export default function GoogleReviewsPage() {
                                   {review.feedbackRating}/10
                                 </Badge>
                               ) : null}
+                              {Array.isArray(review.otherLinksOpened) && review.otherLinksOpened.length > 0 && (
+                                <Badge variant="outline" className="text-xs" title="Other review sites the client opened" data-testid={`badge-other-links-opened-${review.id}`}>
+                                  <ExternalLink className="mr-0.5 h-3 w-3" aria-hidden="true" />
+                                  Also opened {review.otherLinksOpened.join(", ")}
+                                </Badge>
+                              )}
                               {review.status === "sent" && review.remindersSent > 0 && (
                                 <Badge variant="outline" className="text-xs">
                                   <Bell className="mr-0.5 h-3 w-3" aria-hidden="true" />
@@ -894,6 +909,11 @@ export default function GoogleReviewsPage() {
                         </p>
                         {template.projectDescription && (
                           <p className="mt-0.5 truncate text-xs text-muted-foreground">{template.projectDescription}</p>
+                        )}
+                        {normalizeOtherReviewLinks(template.otherReviewLinks).links.length > 0 && (
+                          <p className="mt-0.5 truncate text-xs text-muted-foreground" data-testid={`text-template-other-links-${template.id}`}>
+                            Also on: {normalizeOtherReviewLinks(template.otherReviewLinks).links.map(reviewLinkLabel).join(", ")}
+                          </p>
                         )}
                       </div>
                       <div className="flex shrink-0 items-center gap-1">
@@ -1718,6 +1738,76 @@ export default function GoogleReviewsPage() {
                 data-testid="input-template-description"
               />
             </div>
+            <div className="space-y-2" data-testid="section-other-review-links">
+              <div className="flex items-center justify-between gap-2">
+                <Label>Other review sites</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setTemplateOtherLinks((rows) => [...rows, { platform: "yelp", url: "" }])}
+                  disabled={templateOtherLinks.length >= MAX_OTHER_REVIEW_LINKS}
+                  data-testid="button-add-other-link"
+                >
+                  <Plus className="mr-1 h-3.5 w-3.5" aria-hidden="true" />Add a site
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Paste the page where a client writes a review on each site. Clients see these after the Google step, whatever their score.
+              </p>
+              {templateOtherLinks.map((link, i) => {
+                const platform = REVIEW_PLATFORMS.find((p) => p.key === link.platform);
+                const update = (patch: Partial<OtherReviewLink>) =>
+                  setTemplateOtherLinks((rows) => rows.map((row, j) => (j === i ? { ...row, ...patch } : row)));
+                return (
+                  <div key={i} className="flex flex-wrap items-center gap-2 sm:flex-nowrap" data-testid={`row-other-link-${i}`}>
+                    <Select value={link.platform} onValueChange={(v) => update({ platform: v as OtherReviewLink["platform"] })}>
+                      <SelectTrigger className="w-36 shrink-0" aria-label="Review site" data-testid={`select-other-link-platform-${i}`}><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {REVIEW_PLATFORMS.map((p) => (
+                          <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {link.platform === "other" && (
+                      <Input
+                        className="w-32 shrink-0"
+                        value={link.label ?? ""}
+                        onChange={(e) => update({ label: e.target.value })}
+                        placeholder="Site name"
+                        maxLength={MAX_REVIEW_LINK_LABEL}
+                        aria-label="Site name"
+                        data-testid={`input-other-link-label-${i}`}
+                      />
+                    )}
+                    <Input
+                      type="url"
+                      inputMode="url"
+                      className="min-w-0 flex-1"
+                      value={link.url}
+                      onChange={(e) => update({ url: e.target.value })}
+                      placeholder={`https://${platform?.hint ?? ""}`}
+                      aria-label="Review page address"
+                      data-testid={`input-other-link-url-${i}`}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0"
+                      onClick={() => setTemplateOtherLinks((rows) => rows.filter((_, j) => j !== i))}
+                      title="Remove this site"
+                      data-testid={`button-remove-other-link-${i}`}
+                    >
+                      <X className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                  </div>
+                );
+              })}
+              {otherLinksError && (
+                <p className="text-xs text-destructive" data-testid="text-other-links-error">{otherLinksError}</p>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -1731,7 +1821,7 @@ export default function GoogleReviewsPage() {
             <Button
               className="w-full"
               onClick={() => editingTemplate ? updateTemplateMutation.mutate() : createTemplateMutation.mutate()}
-              disabled={!templateName.trim() || !templateGoogleUrl.trim() || templateUrlInvalid || createTemplateMutation.isPending || updateTemplateMutation.isPending}
+              disabled={!templateName.trim() || !templateGoogleUrl.trim() || templateUrlInvalid || !!otherLinksError || createTemplateMutation.isPending || updateTemplateMutation.isPending}
               data-testid="button-save-template"
             >
               {(createTemplateMutation.isPending || updateTemplateMutation.isPending) ? (

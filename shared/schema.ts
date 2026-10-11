@@ -671,6 +671,9 @@ export const reviewRequests = pgTable("review_requests", {
   clientAddress: text("client_address"),
   companyName: text("company_name"),
   googleProfileUrl: text("google_profile_url").notNull(),
+  // The profile's other review sites at send time (shared/review-links.ts) and the labels the client opened.
+  otherReviewLinks: jsonb("other_review_links").notNull().default([]),
+  otherLinksOpened: jsonb("other_links_opened").notNull().default([]),
   projectDescription: text("project_description"),
   personalMessage: text("personal_message"),
   photos: jsonb("photos").notNull().default([]),
@@ -731,6 +734,8 @@ export const reviewTemplates = pgTable("review_templates", {
   userId: integer("user_id").notNull(),
   name: text("name").notNull(),
   googleProfileUrl: text("google_profile_url").notNull(),
+  // Other review sites (shared/review-links.ts): [{ platform, label?, url }], copied onto each request when it is sent.
+  otherReviewLinks: jsonb("other_review_links").notNull().default([]),
   projectDescription: text("project_description"),
   isDefault: boolean("is_default").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),

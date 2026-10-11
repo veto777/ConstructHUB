@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useRoute } from "wouter";
 import { isPrivateFirstScore, normalizeReviewEscalationThreshold, routeAfterRating } from "@shared/review-flow";
+import { normalizeOtherReviewLinks, reviewLinkLabel } from "@shared/review-links";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -147,6 +148,8 @@ export default function ReviewFeedbackPage({ initialStep, initialRating }: { ini
   const preview = reviewData?.preview === true;
   // The owner's score threshold: below it the private form comes first (routing only, never the Google link).
   const escalationThreshold = normalizeReviewEscalationThreshold(reviewData?.escalationThreshold);
+  // The owner's other review sites (shared/review-links.ts): the one-more-thing step after Google, for every client.
+  const otherReviewLinks = normalizeOtherReviewLinks(reviewData?.otherReviewLinks).links;
   const isHighRating = rating > 0 && !isPrivateFirstScore(rating, escalationThreshold);
   /** Customer-progress beacons; never sent from the owner's preview. */
   const track = (path: string, body?: unknown, keepalive = false) => {
@@ -265,7 +268,8 @@ export default function ReviewFeedbackPage({ initialStep, initialRating }: { ini
       return res.json();
     },
     onSuccess: () => {
-      if (rating === 10) {
+      // The other review sites are offered to everyone who has some to see, whatever the score.
+      if (otherReviewLinks.length > 0) {
         setStep("bonus_reviews");
       } else {
         setStep("done");
@@ -1155,40 +1159,46 @@ export default function ReviewFeedbackPage({ initialStep, initialRating }: { ini
                   <Award className="w-8 h-8 text-gray-500" />
                 </div>
                 <h2 className="text-xl sm:text-2xl font-bold" data-testid="text-bonus-reviews-heading">
-                  You're Amazing! One More Thing...
+                  Thank You! One More Thing...
                 </h2>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Since you had such an incredible experience, would you consider sharing your review on other platforms too?
+                  {companyName} is also on the sites below. If you have a moment, would you share your review there too?
                 </p>
               </div>
 
-              <div className="space-y-3">
-                <a
-                  href="https://www.bbb.org/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-4 p-4 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 group"
-                  data-testid="link-bbb-review"
-                >
-                  <div className="w-14 h-14 rounded-xl bg-gray-900 dark:bg-white flex items-center justify-center shrink-0">
-                    <span className="text-white dark:text-gray-900 font-black text-lg">BBB</span>
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-bold text-base">Better Business Bureau</p>
-                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">BBB reviews carry serious credibility with homeowners researching contractors.</p>
-                  </div>
-                  <ExternalLink className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
-                </a>
-
+              <div className="space-y-3" data-testid="list-other-review-links">
+                {otherReviewLinks.map((link) => {
+                  const label = reviewLinkLabel(link);
+                  return (
+                    <a
+                      key={link.url}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => track("other-link-opened", { url: link.url }, true)}
+                      className="flex items-center gap-4 p-4 rounded-xl border-2 border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 group"
+                      data-testid={`link-other-review-${link.platform}`}
+                    >
+                      <div className="w-14 h-14 rounded-xl bg-gray-900 dark:bg-white flex items-center justify-center shrink-0">
+                        <span className="text-white dark:text-gray-900 font-black text-base">{label.slice(0, 3)}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-base">Review us on {label}</p>
+                        <p className="text-xs text-muted-foreground mt-1 leading-relaxed truncate">{link.url.replace(/^https?:\/\/(www\.)?/, "")}</p>
+                      </div>
+                      <ExternalLink className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
+                    </a>
+                  );
+                })}
               </div>
 
               <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
                 <div className="flex items-start gap-3">
                   <Zap className="w-5 h-5 text-gray-500 shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-bold">Multi-Platform Reviews Make a Huge Difference</p>
+                    <p className="text-sm font-bold">Reviews on More Than One Site</p>
                     <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                      Having reviews on both Google and BBB makes {companyName} stand out as a trusted professional and boosts search rankings!
+                      Homeowners look in different places. A review on another site helps the next one find {companyName}.
                     </p>
                   </div>
                 </div>
