@@ -750,8 +750,7 @@ export default function DomainsPage() {
                   if (d?.jobs?.length)
                     toast({
                       title: `${d.jobs.length} preview${d.jobs.length === 1 ? "" : "s"} queued`,
-                      description:
-                        "Review the before/after below, then confirm. Nothing changes at the registrar until you do.",
+                      description: workerOff ? "Waiting for an operator: the domains worker is off. Previews cannot run until it is enabled." : "Review the before/after once the preview finishes, then confirm. Nothing changes at the registrar until you do.",
                     });
                 }}
                 label="Preview nameservers"
@@ -764,8 +763,7 @@ export default function DomainsPage() {
                   if (d?.jobs?.length)
                     toast({
                       title: `${d.jobs.length} preview${d.jobs.length === 1 ? "" : "s"} queued`,
-                      description:
-                        "Review the before/after below, then confirm. Nothing changes at the registrar until you do.",
+                      description: workerOff ? "Waiting for an operator: the domains worker is off. Previews cannot run until it is enabled." : "Review the before/after once the preview finishes, then confirm. Nothing changes at the registrar until you do.",
                     });
                 }}
                 label="Preview assigned Cloudflare pair"
@@ -882,8 +880,7 @@ export default function DomainsPage() {
                 if (d?.jobs?.length)
                   toast({
                     title: `${d.jobs.length} preview${d.jobs.length === 1 ? "" : "s"} queued`,
-                    description:
-                      "Review the before/after below, then confirm. Nothing changes at the registrar until you do.",
+                    description: workerOff ? "Waiting for an operator: the domains worker is off. Previews cannot run until it is enabled." : "Review the before/after once the preview finishes, then confirm. Nothing changes at the registrar until you do.",
                   });
               }}
               label="Preview DNS change"
@@ -1059,7 +1056,7 @@ export default function DomainsPage() {
                   const skipped = selectedJobs.length - rollbackableJobs.length;
                   toast({
                     title: "Rollback preview queued",
-                    description: `Review the restored before-values below, then confirm like any other change.${
+                    description: `${workerOff ? "Waiting for an operator: the domains worker is off. Previews cannot run until it is enabled." : "Review the restored before-values once the preview finishes, then confirm like any other change."}${
                       skipped
                         ? ` ${skipped} selected job${skipped === 1 ? "" : "s"} ${skipped === 1 ? "was" : "were"} not applied changes and ${skipped === 1 ? "was" : "were"} left out.`
                         : ""
@@ -1179,7 +1176,7 @@ export default function DomainsPage() {
                     title: `${n} change${n === 1 ? "" : "s"} queued`,
                     description: workerOff
                       ? "Domain background processing is off, so the change waits in the queue — nothing reaches the registrar until an administrator turns it back on."
-                      : "Applying at the registrar now. We check public DNS every 5 minutes until the change shows, and you get a notification with the result.",
+                      : "Queued for processing. After the worker applies the change, we check public DNS every 5 minutes until it shows, and you get a notification with the result.",
                   });
                   setJobSelection([]);
                   setReviewing(false);

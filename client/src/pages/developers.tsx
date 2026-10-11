@@ -129,13 +129,27 @@ function constraints(s: Schema): string[] {
  * Values come from the schema itself (example, default, the first enum value) or are typed
  * placeholders by type/format; nothing here is real account data, and the page says so.
  */
-export function exampleFor(s: Schema | undefined, doc: OpenApiDoc | undefined, seen: Set<string> = new Set(), depth = 0): unknown {
+export function gbpPostExamples(now = new Date()) {
+  const publish = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+  const start = new Date(publish.getTime() + 24 * 60 * 60 * 1000);
+  const end = new Date(start.getTime() + 60 * 60 * 1000);
+  const common = { text: "Example update for your business", scheduledAt: publish.toISOString() };
+  const event = { title: "Example open house", start: start.toISOString().slice(0, 16), end: end.toISOString().slice(0, 16) };
+  return {
+    STANDARD: { ...common, topicType: "STANDARD", callToAction: { actionType: "LEARN_MORE", url: "https://example.com/details" } },
+    EVENT: { ...common, topicType: "EVENT", event, callToAction: { actionType: "CALL" } },
+    OFFER: { ...common, topicType: "OFFER", event: { ...event, title: "Example seasonal offer" }, offer: { couponCode: "EXAMPLE", redeemOnlineUrl: "https://example.com/offer", termsConditions: "Replace with your offer terms." } },
+  };
+}
+
+export function exampleFor(s: Schema | undefined, doc: OpenApiDoc | undefined, seen: Set<string> = new Set(), depth = 0, now = new Date()): unknown {
   if (!s || depth > 8) return null;
   const name = refName(s);
+  if (name === "GbpPostInput") return gbpPostExamples(now).STANDARD;
   if (name) {
     if (seen.has(name)) return {}; // a self-referencing schema stops here
     const target = doc?.components?.schemas?.[name];
-    return exampleFor(target, doc, new Set([...seen, name]), depth + 1);
+    return exampleFor(target, doc, new Set([...seen, name]), depth + 1, now);
   }
   if (s.example !== undefined) return s.example;
   if (s.default !== undefined && s.type !== "object" && s.type !== "array") return s.default;
@@ -144,12 +158,13 @@ export function exampleFor(s: Schema | undefined, doc: OpenApiDoc | undefined, s
     case "integer": return s.minimum !== undefined ? s.minimum : 1;
     case "number": return s.minimum !== undefined ? s.minimum : 1.5;
     case "boolean": return true;
-    case "array": return [exampleFor(s.items, doc, seen, depth + 1)];
+    case "array": return [exampleFor(s.items, doc, seen, depth + 1, now)];
     case "string":
       switch (s.format) {
         case "uuid": return "3f1c7c54-7f1a-4a6e-9a8e-2b4d8c1e5f90";
-        case "date-time": return "2026-10-01T09:00:00Z";
-        case "date": return "2026-10-01";
+        case "date-time": return new Date(now.getTime() + 3 * 86_400_000).toISOString();
+        case "date": return new Date(now.getTime() + 3 * 86_400_000).toISOString().slice(0, 10);
+        case "local-date-time": return new Date(now.getTime() + 3 * 86_400_000).toISOString().slice(0, 16);
         case "uri": case "url": return "https://example.com/photo.jpg";
         case "email": return "name@example.com";
         default: return "string";
@@ -158,10 +173,10 @@ export function exampleFor(s: Schema | undefined, doc: OpenApiDoc | undefined, s
     default: {
       if (s.properties) {
         const out: Record<string, unknown> = {};
-        for (const [k, v] of Object.entries(s.properties)) out[k] = exampleFor(v, doc, seen, depth + 1);
+        for (const [k, v] of Object.entries(s.properties)) out[k] = exampleFor(v, doc, seen, depth + 1, now);
         return out;
       }
-      if (s.additionalProperties && typeof s.additionalProperties === "object") return { key: exampleFor(s.additionalProperties, doc, seen, depth + 1) };
+      if (s.additionalProperties && typeof s.additionalProperties === "object") return { key: exampleFor(s.additionalProperties, doc, seen, depth + 1, now) };
       return s.type === "object" || !s.type ? {} : null;
     }
   }
@@ -447,12 +462,12 @@ const CARD = "rounded-2xl border-mkt-rule bg-mkt-card shadow-none";
 const CARD_TITLE = "font-display font-semibold text-[1.35rem] leading-tight";
 
 /** A curl line for the operation: GET as is; a write with the JSON example as its body. Path parameters stay as {id} to fill in. */
-export function curlFor(e: Pick<Endpoint, "method" | "path" | "op">, doc: OpenApiDoc | undefined, base: string): string {
+export function curlFor(e: Pick<Endpoint, "method" | "path" | "op">, doc: OpenApiDoc | undefined, base: string, example?: unknown): string {
   const relative = e.path.replace(/^\/api\/v1/, "");
   const auth = `-H "Authorization: Bearer chub_abc123_YOUR_SECRET"`;
   if (e.method === "get") return `curl "${base}${relative}" ${auth}`;
   const schema = e.op.requestBody?.content?.["application/json"]?.schema;
-  const body = schema ? JSON.stringify(exampleFor(schema, doc), null, 2) : null;
+  const body = schema ? JSON.stringify(example ?? exampleFor(schema, doc), null, 2) : null;
   return `curl -X ${e.method.toUpperCase()} "${base}${relative}" \\\n  ${auth} \\\n  -H "Content-Type: application/json"${body ? ` \\\n  -d '${body.replace(/'/g, "'\\''")}'` : ""}`;
 }
 
@@ -536,7 +551,13 @@ function EndpointRow({ e, doc, base, open }: { e: Endpoint; doc: OpenApiDoc | un
         )}
         <div>
           <p className="font-medium mb-1">Example request{pathParams.length ? <span className="text-xs text-muted-foreground font-normal"> · replace {pathParams.map((p) => `{${p.name}}`).join(", ")}</span> : null}</p>
-          <pre className="rounded-xl bg-mkt-navy text-mkt-navy-ink p-4 text-xs overflow-x-auto" data-testid={`example-request-${e.id}`}>{curlFor(e, doc, base)}</pre>
+          {refName(body) === "GbpPostInput" ? <>
+            <p className="text-sm text-muted-foreground mb-2">Illustrative payloads: publish time is three days from now. Replace the text, URLs and local event times for your business. EVENT and OFFER require a title and an end after the start. A CTA needs an HTTPS URL except CALL; OFFER uses its redemption URL instead of a CTA.</p>
+            {Object.entries(gbpPostExamples()).map(([topic, example]) => <div key={topic} className="mb-3">
+              <p className="font-medium mb-1">{topic}</p>
+              <pre className="rounded-xl bg-mkt-navy text-mkt-navy-ink p-4 text-xs overflow-x-auto" data-testid={`example-request-${e.id}-${topic}`}>{curlFor(e, doc, base, example)}</pre>
+            </div>)}
+          </> : <pre className="rounded-xl bg-mkt-navy text-mkt-navy-ink p-4 text-xs overflow-x-auto" data-testid={`example-request-${e.id}`}>{curlFor(e, doc, base)}</pre>}
         </div>
         {okResponses.length > 0 && okResponses[0][1]?.content?.["application/json"]?.schema && (
           <div>

@@ -192,15 +192,16 @@ export const gbpPostsWriteOpenapi = {
     schemas: {
       GbpPostInput: {
         type: "object", required: ["text"],
+        description: "STANDARD posts need text. EVENT and OFFER posts also require event.title, event.start and event.end, with end strictly after start. Event times use YYYY-MM-DDTHH:MM in the location's local time, without an offset. callToAction requires actionType and an HTTPS url unless actionType is CALL. OFFER posts do not publish callToAction; use offer.redeemOnlineUrl instead. Offer fields are optional and only published for OFFER posts.",
         properties: {
           requestKey: { type: "string", format: "uuid", description: "Idempotency key; the same key + content returns the existing job" },
           text: { type: "string", maxLength: 1500 },
           mediaUrls: { type: "array", maxItems: 10, items: { type: "string", format: "uri", description: "Public HTTPS image URL (Google fetches it)" } },
           scheduledAt: { type: "string", format: "date-time", description: "When to publish; omitted or past = as soon as the worker runs" },
           topicType: { type: "string", enum: ["STANDARD", "EVENT", "OFFER"], default: "STANDARD" },
-          callToAction: { type: "object", properties: { actionType: { type: "string", enum: ["BOOK", "ORDER", "SHOP", "LEARN_MORE", "SIGN_UP", "CALL"] }, url: { type: "string", format: "uri" } } },
-          event: { type: "object", properties: { title: { type: "string", maxLength: 58 }, start: { type: "string", example: "2026-10-01T09:00" }, end: { type: "string", example: "2026-10-01T17:00" } } },
-          offer: { type: "object", properties: { couponCode: { type: "string" }, redeemOnlineUrl: { type: "string", format: "uri" }, termsConditions: { type: "string" } } },
+          callToAction: { type: "object", required: ["actionType"], description: "For STANDARD or EVENT. HTTPS url required except for CALL. Not published for OFFER.", properties: { actionType: { type: "string", enum: ["BOOK", "ORDER", "SHOP", "LEARN_MORE", "SIGN_UP", "CALL"] }, url: { type: "string", format: "uri", description: "HTTPS required unless actionType is CALL" } } },
+          event: { type: "object", required: ["title", "start", "end"], description: "Required for EVENT and OFFER. End must be strictly after start; local times without an offset.", properties: { title: { type: "string", maxLength: 58 }, start: { type: "string", format: "local-date-time", description: "YYYY-MM-DDTHH:MM" }, end: { type: "string", format: "local-date-time", description: "YYYY-MM-DDTHH:MM; strictly after start" } } },
+          offer: { type: "object", description: "Optional fields, published only for OFFER posts.", properties: { couponCode: { type: "string" }, redeemOnlineUrl: { type: "string", format: "uri", description: "HTTPS redemption URL" }, termsConditions: { type: "string" } } },
         },
       },
       GbpPostResult: {
