@@ -411,7 +411,6 @@ export async function handleCallEvent(call: VoiceCallRow, ev: z.infer<typeof eve
       current.summary = ev.summary;
     }
     const d = await deliverLead({ ctx, call: current, slots: mergedSlots, numberLabel: number?.label ?? null });
-    await db.update(voiceCalls).set({ customerId: d.customerId, projectId: d.projectId, leadDeliveredAt: current.leadDeliveredAt ?? new Date() }).where(eq(voiceCalls.id, call.id));
     return { delivered: true, customerId: d.customerId, projectId: d.projectId };
   }
   const r = await raiseEscalation({ ctx, call: current, kind: ev.kind, summary: ev.summary, slots: mergedSlots });

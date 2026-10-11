@@ -37,7 +37,7 @@ const smsTo = (to: string) => fs.existsSync(SMS_OUTBOX)
 const callRow = async (id: string) => (await import("../db")).db.query.voiceCalls.findFirst({ where: (c, { eq }) => eq(c.id, id) });
 
 beforeAll(async () => {
-  if (!/^\/constructhub_dev(?:_a\d+)?$/.test(new URL(process.env.DATABASE_URL!).pathname)) throw new Error("Requires a ConstructHUB development lane DB");
+  if (!/^\/constructhub_dev(?:_a\d+|_fs)?$/.test(new URL(process.env.DATABASE_URL!).pathname)) throw new Error("Requires a ConstructHUB development lane DB");
   const { ensureVoiceSchema } = await import("./schema");
   await ensureVoiceSchema(pool);
   leads = await import("./leads");
@@ -186,13 +186,17 @@ describe("lead delivery (real DB)", () => {
     const { rows: [proj] } = await pool.query("select * from crm_projects where id = $1", [d.projectId]);
     expect(proj).toMatchObject({ customer_id: cust.id, name: "Siding replacement — Bellingham", status: "lead", city: "Bellingham", description: "Wants a quote to replace cedar siding." });
 
+    const tasks = await import("./call-tasks");
+    const queued = await tasks.listCallTasks(c.id);
+    expect(queued.filter(t => t.kind === "notification")).toHaveLength(3);
+    expect(d.notified).toEqual({ bell: false, email: 0, sms: 0 });
+    await tasks.runCallTasksFor(c.id);
     const { rows: bell } = await pool.query("select * from crm_notifications where org_id = $1 and type = 'call.lead'", [a.orgId]);
     expect(bell).toHaveLength(1);
     expect(bell[0]).toMatchObject({ member_id: a.memberId, title: "New phone lead — Dana", link: `/crm/clients/${cust.id}` });
-    expect(d.notified).toMatchObject({ bell: true, email: 2 });
     const mail = emailsTo(a.email).filter((m) => m.subject.includes("New phone lead — Dana"));
     expect(mail).toHaveLength(1);
-    expect(mail[0].to[0]).toContain("office-extra@example.invalid");
+    expect(emailsTo("office-extra@example.invalid").filter(m => m.subject.includes("New phone lead — Dana"))).toHaveLength(1);
     expect(mail[0].html).toContain("Siding replacement");
     expect((await waitForActivity(pool, a.orgId, "call.lead")).length).toBe(1);
 
@@ -233,7 +237,8 @@ describe("lead delivery (real DB)", () => {
     const c = await makeCall(pool, b.orgId);
     const d = await leads.deliverLead({ ctx, call: (await callRow(c.id))!, slots: { need: "deck", first_name: "Sam" } });
     expect(d.projectId).toBeNull();
-    expect(d.notified.sms).toBe(1);
+    expect(d.notified.sms).toBe(0);
+    await (await import("./call-tasks")).runCallTasksFor(c.id);
     const texts = smsTo(smsTarget);
     expect(texts).toHaveLength(1);
     expect(texts[0].body).toContain("New phone lead — Sam");

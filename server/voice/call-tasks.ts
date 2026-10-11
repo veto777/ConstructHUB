@@ -6,7 +6,8 @@
  * Now the report decides WHAT must happen (one task per effect) and writes those tasks in the same transaction that
  * acknowledges it (internal-calls.ts acknowledgeCall). Only then does anything run:
  *
- *   lead                 → deliverLead (leads.ts): the client, the pipeline project, the audit row, the notifications
+ *   lead                 → deliverLead (leads.ts): client/project and the durable notification plan
+ *   notification:<channel>:<recipient> → one independent recipient delivery
  *   escalation:<kind>    → raiseEscalation(strict) (escalations.ts): the rule's text/email and/or the owners' alert
  *
  * Idempotency: (call_id, task_key) is unique, so a repeated report never adds a task twice. Each effect is safe to
@@ -18,7 +19,7 @@
  * whatever fails stays `pending` with backoff (30 s doubling to 30 min) and the worker below retries it every
  * minute, also after a restart (a task leased by a process that died is taken over once its lease runs out). A
  * task still failing at its give-up time (3 days) becomes `failed` — shown in the console with "Retry now"
- * (POST /api/crm/voice/calls/:id/delivery/retry), which re-arms it for another day. A call or org that no longer
+ * (POST /api/crm/voice/calls/:id/delivery/retry), which re-arms it for another day and returns; the worker sends it. A call or org that no longer
  * exists fails the task at once.
  */
 import { randomUUID } from "crypto";
@@ -26,11 +27,11 @@ import { db, pool } from "../db";
 import { voiceCalls, type VoiceCallRow } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import { loadOrgVoiceContext, findVoiceNumber } from "./org-profile";
-import { deliverLead } from "./leads";
+import { deliverLead, deliverLeadNotification } from "./leads";
 import { raiseEscalation, isEscalationKind, kindLabel } from "./escalations";
 import { recordFailure } from "../ops/issues";
 
-export type CallTaskKind = "lead" | "escalation";
+export type CallTaskKind = "lead" | "escalation" | "notification";
 export type CallTaskState = "pending" | "done" | "failed";
 export type CallTaskSpec = { key: string; kind: CallTaskKind; payload: Record<string, unknown> };
 export type CallTask = {
@@ -118,7 +119,7 @@ async function failAttempt(task: CallTask, token: string, err: unknown, now: Dat
   const giveUp = err instanceof PermanentTaskError || (task.giveUpAt != null && now.getTime() >= task.giveUpAt.getTime());
   const state: CallTaskState = giveUp ? "failed" : "pending";
   await pool.query(
-    `UPDATE voice_call_tasks SET state = $3, last_error = $4, next_attempt_at = $5, leased_until = NULL, lease_token = NULL, updated_at = $6
+    `UPDATE voice_call_tasks SET state = $3, last_error = $4, result = NULL, next_attempt_at = $5, leased_until = NULL, lease_token = NULL, updated_at = $6
       WHERE id = $1 AND lease_token = $2`,
     [task.id, token, state, message, new Date(now.getTime() + nextDelayMs(task.attempts)), now]);
   return state;
@@ -134,11 +135,17 @@ async function perform(task: CallTask, deps: CallTaskDeps, now: Date): Promise<R
   if (!call) throw new PermanentTaskError("the call no longer exists");
   const ctx = await loadOrgVoiceContext(call.orgId);
   if (!ctx) throw new PermanentTaskError("the CRM organization no longer exists");
+  if (task.kind === "notification") {
+    try { await deliverLeadNotification(ctx, call.id, task.payload); }
+    catch (e: any) {
+      if (e?.ambiguous) throw new PermanentTaskError(`Delivery outcome unknown: ${e.message}. Check with the recipient before retrying.`);
+      throw e;
+    }
+    return { channel: task.payload.channel, recipient: task.payload.recipient };
+  }
   if (task.kind === "lead") {
     const number = call.numberId ? await findVoiceNumber({ numberId: call.numberId }) : null;
     const d = await deps.deliverLead({ ctx, call: call as VoiceCallRow, slots: call.slots ?? {}, numberLabel: number?.label ?? null });
-    const deliveredAt = call.leadDeliveredAt ?? now;
-    await db.update(voiceCalls).set({ customerId: d.customerId, projectId: d.projectId, leadDeliveredAt: deliveredAt }).where(eq(voiceCalls.id, call.id));
     await mergeFlags(call.id, d.alreadyDelivered ? { lead: call.slots ?? {} } : { lead: call.slots ?? {}, notified: d.notified });
     return { customerId: d.customerId, projectId: d.projectId, created: d.created };
   }
@@ -155,26 +162,40 @@ export async function runCallTask(id: number, opts: CallTaskOpts = {}): Promise<
   if (!claimed) return null;
   const { task, token } = claimed;
   try {
+    if (task.kind === "notification" && task.payload.channel !== "inApp") {
+      if (task.result?.sending) throw new PermanentTaskError("Delivery outcome unknown after interrupted send; check with the recipient before retrying.");
+      // This marker survives a crash and a lease expiry, including retries that already have lastError.
+      // Never automatically resend an external message whose acceptance could not be recorded.
+      const marked = await pool.query("UPDATE voice_call_tasks SET result = '{\"sending\":true}'::jsonb WHERE id = $1 AND lease_token = $2 RETURNING id", [task.id, token]);
+      if (!marked.rows.length) return null;
+    }
     const result = await perform(task, deps, now());
-    await completeTask(task.id, token, result, now());
+    try { await completeTask(task.id, token, result, now()); }
+    catch (e) {
+      if (task.kind === "notification") throw new PermanentTaskError("Message sent but confirmation could not be saved. Check with recipient before retrying.");
+      throw e;
+    }
     return "done";
   } catch (e: any) {
     const state = await failAttempt(task, token, e, now());
     console.error(`[voice] call task ${task.key} for call ${task.callId} failed (attempt ${task.attempts}, now ${state}):`, e?.message || e);
     if (state === "failed" || task.attempts === 1) {
-      void recordFailure("call_assistant", task.kind === "lead" ? "Call Assistant lead delivery" : "Call Assistant escalation", e,
+      void recordFailure("call_assistant", task.kind === "lead" ? "Call Assistant lead delivery" : task.kind === "notification" ? "Call Assistant notification" : "Call Assistant escalation", e,
         { callId: task.callId, orgId: task.orgId, task: task.key, attempts: task.attempts, state });
     }
     return state;
   }
 }
 
-/** Run every due task of one call (the report's own request, a repeated report, "Retry now"); returns all its tasks. */
+/** Run every due task of one call (the report's own request, a repeated report); returns all its tasks. */
 export async function runCallTasksFor(callId: string, opts: CallTaskOpts = {}): Promise<CallTask[]> {
   const now = opts.now ?? (() => new Date());
   const { rows } = await pool.query(
     "SELECT id FROM voice_call_tasks WHERE call_id = $1 AND state = 'pending' AND next_attempt_at <= $2 ORDER BY id", [callId, now()]);
   for (const r of rows) await runCallTask(Number(r.id), opts);
+  // CRM delivery can add recipient tasks. Run those new tasks once on this report's happy path.
+  const seen = new Set(rows.map(r => Number(r.id)));
+  for (const task of await listCallTasks(callId)) if (!seen.has(task.id) && task.kind === "notification") await runCallTask(task.id, opts);
   return listCallTasks(callId);
 }
 
@@ -217,7 +238,7 @@ export type CallTaskView = {
 };
 
 export function presentCallTask(t: CallTask): CallTaskView {
-  const label = t.kind === "lead" ? "Client and project in your CRM" : `Escalation — ${kindLabel(String(t.payload.kind ?? "other"))}`;
+  const label = t.kind === "notification" ? `${t.payload.channel === "inApp" ? "In-app" : String(t.payload.channel).toUpperCase()} — ${t.payload.recipient}` : t.kind === "lead" ? "Client and project in your CRM" : `Escalation — ${kindLabel(String(t.payload.kind ?? "other"))}`;
   const state = t.state === "pending" && t.attempts > 0 && t.lastError ? "retrying" : t.state;
   return {
     id: t.id, key: t.key, kind: t.kind, label, state, attempts: t.attempts, lastError: t.lastError,
