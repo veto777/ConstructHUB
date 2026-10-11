@@ -235,9 +235,9 @@ describe("source guard — the paid text ships in no client bundle", () => {
       "A contract does not automatically transfer liability or determine employment status;",
       "Get those three right before anything else.",
       "Build these seven pages before anything else.",
-      "There is a feature called **Disavow**",
+      "Misuse of owner permissions",
       "Some companies falsely claim to have worked for or been affiliated with established brands",
-      "Verify contractor license with your state's licensing board",
+      "Verify any required contractor license and its scope with the issuing agency",
     ];
     for (const sentence of known) {
       expect(everyText.some((t) => t.includes(sentence)), sentence).toBe(true);

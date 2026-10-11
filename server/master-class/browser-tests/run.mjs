@@ -5,14 +5,14 @@ import path from 'node:path';
 import fs from 'node:fs/promises';
 
 const root = process.cwd();
-const out = '/tmp/r4-course-screens';
+const out = '/tmp/r5-course-screens';
 await fs.mkdir(out, { recursive: true });
 const server = await createServer({
-  configFile: false, root, cacheDir: '/tmp/r4-course-vite',
+  configFile: false, root, cacheDir: '/tmp/r5-course-vite',
   optimizeDeps: { entries: ['server/master-class/browser-tests/index.html'] },
   resolve: { alias: { '@': path.join(root, 'client/src'), '@shared': path.join(root, 'shared') } },
   esbuild: { jsx: 'automatic' },
-  server: { host: '127.0.0.1', port: 8144, strictPort: true },
+  server: { host: '127.0.0.1', port: 8155, strictPort: true },
 });
 let browser;
 try {
@@ -24,7 +24,7 @@ try {
   page.setDefaultTimeout(10000);
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  const url = 'http://127.0.0.1:8144/server/master-class/browser-tests/index.html';
+  const url = 'http://127.0.0.1:8155/server/master-class/browser-tests/index.html';
   const checkbox = (id) => page.getByTestId(`checkbox-${id}-done`);
   const outline = () => page.getByTestId('lesson-outline');
   await page.goto(url);
@@ -48,6 +48,48 @@ try {
   await expect(outline()).toContainText('Account unavailable');
   await expect(outline()).not.toContainText('0 of 8');
   await page.getByRole('button', { name: 'Learner A', exact: true }).click();
+  await page.getByRole('button', { name: 'Break account network', exact: true }).click();
+  await expect(outline()).toContainText('Account unavailable');
+  await expect(checkbox('setup')).toBeDisabled();
+  await outline().getByRole('button', { name: 'Check account', exact: true }).click();
+  await expect(outline().getByRole('button', { name: 'Checking account…', exact: true })).toBeDisabled();
+  await expect(outline().getByRole('button', { name: 'Check account', exact: true })).toBeEnabled();
+  await expect(outline()).not.toContainText('0 of 8');
+  await page.setViewportSize({ width: 390, height: 844 });
+  const accountRetry = outline().getByRole('button', { name: 'Check account', exact: true });
+  await accountRetry.focus();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Shift+Tab');
+  expect(await accountRetry.evaluate((el) => el.matches(':focus-visible') && getComputedStyle(el).boxShadow !== 'none')).toBe(true);
+  await page.screenshot({ path: `${out}/phone-account-paused.png` });
+  await page.getByRole('button', { name: 'Restore account network', exact: true }).click();
+  await accountRetry.click();
+  await expect(checkbox('setup')).toBeChecked();
+  await expect(outline()).toContainText('1 of 8 done');
+  await page.getByRole('button', { name: 'Fail refresh', exact: true }).click();
+  await expect(page.getByTestId('lessons-stale')).toBeVisible();
+  await expect(checkbox('setup')).toBeVisible();
+  await page.getByTestId('lessons-stale').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `${out}/phone-stale-lessons.png` });
+  await page.getByTestId('button-lessons-retry').click();
+  await expect(page.getByTestId('lessons-stale')).toBeVisible();
+  await expect(checkbox('setup')).toBeVisible();
+  await page.getByRole('button', { name: 'Restore lessons', exact: true }).click();
+  await page.getByTestId('button-lessons-retry').click();
+  await expect(page.getByTestId('lessons-stale')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Revoke access', exact: true }).click();
+  await expect(page.getByTestId('lessons-error')).toBeVisible();
+  await expect(checkbox('setup')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Fail refresh', exact: true }).click();
+  await expect(page.getByTestId('lessons-error')).toBeVisible();
+  await expect(checkbox('setup')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Remount', exact: true }).click();
+  await page.getByRole('button', { name: 'Remount', exact: true }).click();
+  await expect(page.getByTestId('lessons-error')).toBeVisible();
+  await expect(checkbox('setup')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Restore lessons', exact: true }).click();
+  await page.getByTestId('button-lessons-retry').click();
+  await expect(checkbox('setup')).toBeVisible();
   await page.getByRole('button', { name: 'Fail lessons', exact: true }).click();
   await expect(page.getByTestId('lessons-error')).toBeVisible();
   await page.getByRole('button', { name: 'Restore lessons', exact: true }).click();
@@ -62,6 +104,7 @@ try {
   await page.getByRole('button', { name: 'Remount', exact: true }).click();
   await expect(checkbox('photos')).toBeChecked();
   await page.evaluate(() => scrollTo(0, 0));
+  await page.setViewportSize({ width: 1280, height: 900 });
   await page.screenshot({ path: `${out}/desktop-blocked.png` });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => scrollTo(0, 0));
@@ -72,11 +115,18 @@ try {
   await expect(checkbox('photos')).not.toBeChecked();
   await page.getByRole('button', { name: 'licensing', exact: true }).click();
   await expect(checkbox('subcontractors')).toBeVisible();
+  const stats = page.getByTestId('lesson-sales').getByText('Close rate', { exact: true });
+  await stats.scrollIntoViewIfNeeded();
+  const values = await page.getByTestId('lesson-sales').locator('.grid.text-center > div').evaluateAll((els) => els.map((el) => { const b = el.getBoundingClientRect(); return { x: b.x, y: b.y, width: b.width }; }));
+  expect(values).toHaveLength(3);
+  expect(values.every((b) => b.width > 250 && b.x === values[0].x)).toBe(true);
+  expect(values[1].y).toBeGreaterThan(values[0].y);
+  await page.screenshot({ path: `${out}/phone-sales-stats.png` });
   await page.getByTestId('lesson-branding').scrollIntoViewIfNeeded();
   await page.screenshot({ path: `${out}/phone-branding.png` });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.getByRole('button', { name: 'vetting', exact: true }).click();
-  const first = page.getByTestId('checkbox-vetting-checklist-item-1');
+  const first = page.getByTestId('checkbox-vetting-checklist-r5-item-1');
   await first.click();
   await expect(first).toBeChecked();
   await expect(page.getByTestId('checklist-vetting-checklist')).toContainText('1 of 14 done');
@@ -97,6 +147,12 @@ try {
   expect(focus.visible).toBe(true);
   expect(focus.shadow !== 'none' || focus.outline !== 'none').toBe(true);
   await page.screenshot({ path: `${out}/phone-keyboard.png` });
+  for (const [module, lesson] of [['seo', 'search-console'], ['website', 'page-speed'], ['vetting', 'tip-13'], ['vetting', 'tip-14']]) {
+    await page.getByRole('button', { name: module, exact: true }).click();
+    await page.getByTestId(`lesson-${lesson}`).scrollIntoViewIfNeeded();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: `${out}/phone-${lesson}.png` });
+  }
   const blocked = await browser.newContext({ viewport: { width: 390, height: 844 } });
   await blocked.addInitScript(() => Object.defineProperty(window, 'localStorage', { get() { throw new DOMException('Blocked', 'SecurityError'); } }));
   const fresh = await blocked.newPage();
@@ -120,7 +176,7 @@ try {
   await fresh.getByRole('button', { name: 'Late anchor', exact: true }).click();
   await expect(fresh.locator('#lesson-late-test')).toBeInViewport();
   expect(errors).toEqual([]);
-  console.log(JSON.stringify({ result: 'passed', screenshots: out, cases: ['persistence', 'account switching', 'signed out', 'account error', 'lesson error/retry', 'write failure', 'remount', 'reset', 'phone width', 'truthful branding', 'inline checklist', 'cold anchor', 'keyboard focus', 'blocked storage getter', 'content-version change', 'late anchor'] }, null, 2));
+  console.log(JSON.stringify({ result: 'passed', screenshots: out, cases: ['persistence', 'account switching', 'signed out', 'account error/retry/repeated failure', 'cached refresh/retry', 'revoked access hides cache', 'phone stats', 'lesson error/retry', 'write failure', 'remount', 'reset', 'phone width', 'truthful branding', 'inline checklist', 'cold anchor', 'keyboard focus', 'blocked storage getter', 'content-version change', 'late anchor'] }, null, 2));
 } finally {
   await browser?.close();
   await server.close();

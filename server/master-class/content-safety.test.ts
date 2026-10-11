@@ -42,3 +42,47 @@ describe("Master Class trustworthy instruction", () => {
     expect(reviews).toContain("https://www.ftc.gov/business-guidance/resources/consumer-reviews-testimonials-rule-questions-answers");
   });
 });
+
+describe("round-five course accuracy", () => {
+  it("separates supported verification methods, scope and prerequisites", () => {
+    const lesson = LESSON_MODULES.seo.lessons.find((l) => l.id === "search-console")!;
+    const panels = lesson.blocks.find((b) => b.type === "panels");
+    expect(panels?.type).toBe("panels");
+    if (panels?.type !== "panels") return;
+    expect(panels.items[0].items).toEqual([
+      "Domain property: DNS TXT record at your domain provider",
+      "URL-prefix property: HTML file upload, HTML tag, Google Analytics or Google Tag Manager; DNS verification is also available",
+    ]);
+    const text = lessonText("seo", "search-console");
+    for (const phrase of ["all subdomains", "HTTP and HTTPS", "protocol, host and optional path", "prerequisites", "edit permission", "Publish or Admin permission", "9008080", "Google decides whether to index", "does not guarantee inclusion", "9012289"]) expect(text).toContain(phrase);
+  });
+
+  it("describes speed as one consideration and avoids guaranteed rankings", () => {
+    const text = lessonText("website", "page-speed");
+    expect(text).toContain("one of many ranking considerations");
+    expect(text).toContain("https://developers.google.com/search/docs/appearance/page-experience");
+    for (const phrase of ["will lose position", "mobile score is the one Google ranks by", "Google detects it", "pages will not rank", "destroy your rankings entirely"]) expect(all).not.toContain(phrase);
+  });
+
+  it("does not recommend PBNs or unsupported backlink quotas", () => {
+    const text = lessonText("seo", "backlinks");
+    expect(text).not.toContain("Press releases (PBNs)");
+    expect(text).not.toContain("75%");
+    expect(text).not.toContain("DR/DA of 30");
+    expect(text).toContain("not a private blog network");
+    expect(text).toContain("spam-policies");
+  });
+
+  it("accepts service-area operators throughout vetting and avoids categorical BBB claims", () => {
+    for (const id of ["tip-13", "brand", "checklist"]) expect(lessonText("vetting", id)).toMatch(/service-area business/);
+    expect(lessonText("vetting", "tip-13")).toContain("do not demand a storefront");
+    expect(lessonText("vetting", "tip-14")).toContain("does not by itself establish");
+    for (const phrase of ["Real office or showroom", "Establish a real physical presence", "either very new or have unresolved complaints"]) expect(all).not.toContain(phrase);
+  });
+
+  it("removes unsourced revenue, cost, salary, certification and traffic statistics", () => {
+    for (const phrase of ["33%+", "<15%", "$50-150/lead", "10-15%", "20-50%", "$500K", "$45,000", "80-90%", "36 full", "150 sq ft", "Over 70%", "15+ platforms"]) expect(all).not.toContain(phrase);
+    expect(lessonText("licensing", "sales")).toContain("not an industry benchmark");
+    expect(lessonText("licensing", "reputation")).toContain("no fixed revenue-loss percentage");
+  });
+});

@@ -26,12 +26,12 @@ export const GMB: ModuleLessons = {
           ] },
           { title: "Verification", items: [
             "Google decides which methods it offers a given profile: video, phone, email, postcard or a live call",
-            "Video verification is now the common path: be ready to film your signage, vehicles, tools and a proof of address",
+            "If video verification is offered, follow Google’s prompts for evidence of the business, its location and your authority to manage it",
             "Verify from a device signed in to the account that will keep owning the profile — an employee's personal Gmail is how businesses lose profiles",
             "Add a second owner (you, if an agency set it up) before you do anything else",
           ] },
         ] },
-        { type: "tip", text: "**Who owns the profile?** Check Users in the profile today. If a former marketing company or employee is the primary owner, transfer it now while they still answer the phone. Recovering a profile from someone who has left takes weeks and is not always possible." },
+        { type: "tip", text: "**Who owns the profile?** Review owner access and arrange any needed transfer while the current owner is available. Recovery time and outcome vary." },
         { type: "in-app", text: "Add each profile as a location in [Locations](/locations) and connect your Google account there; the rest of the course's Google tools work from those locations." },
       ],
     },
@@ -39,11 +39,11 @@ export const GMB: ModuleLessons = {
       id: "info",
       title: "Business information that matches everywhere",
       blocks: [
-        { type: "p", text: "Google cross-checks the name, address, phone number and hours on your profile against your website and every directory that lists you. Where they disagree, trust drops and so does the ranking; where they agree, nobody thinks about it. Decide the canonical version once and defend it." },
+        { type: "p", text: "Keep the real-world business name and contact details accurate on your profile, website and directories. Inconsistencies can confuse customers; they do not establish a fixed ranking penalty. Respect address-visibility rules for service-area businesses." },
         { type: "panels", items: [
-          { title: "Keep identical everywhere", items: [
+          { title: "Keep accurate and consistent", items: [
             "Real-world business name, consistent with how customers know you",
-            "Address format (Suite vs Ste, St vs Street) — pick one spelling",
+            "Where an address may be published, use an accurate format; keep a private service-area address hidden where required",
             "One primary phone number that you own, not a tracking number you may drop",
             "Website: the home page, or the city page for a multi-location profile",
             "Hours, including holiday hours set ahead of time",
@@ -63,7 +63,7 @@ export const GMB: ModuleLessons = {
       id: "photos",
       title: "A photo strategy that shows the work",
       blocks: [
-        { type: "p", text: "Photos are the part of the profile homeowners actually look at, and the part most contractors neglect after the first week. A profile with recent, real photos of jobs, crews and trucks reads as an active, local company; one with a logo and three stock images reads as a lead-gen front. Treat the photo section like a weekly habit, not a launch task." },
+        { type: "p", text: "Recent, accurate photos can help customers assess your work and team. A sparse photo section does not by itself establish that a business is a lead generator." },
         { type: "panels", items: [
           { title: "What to post", items: [
             "Finished jobs in daylight, with before-and-after pairs where you have them",
@@ -72,13 +72,13 @@ export const GMB: ModuleLessons = {
             "The owner and the people who answer the phone — the faces a customer will meet",
           ] },
           { title: "Habits", items: [
-            "A few new photos every week beats fifty on launch day",
-            "Take them with the location on and upload soon after the job; stale batches look staged",
+            "Choose a manageable schedule for adding useful project photos",
+            "Upload with customer permission and avoid sharing private location details",
             "Write the photo's caption or post text with the service and the city when the feature allows it",
             "Delete blurry, duplicate or off-brand photos; quality is what a browsing homeowner judges",
           ] },
         ] },
-        { type: "tip", text: "**No promises about ranking.** Photos help you get chosen once you are seen; they are not a ranking trick, and no filename or geotag changes where the profile shows up." },
+        { type: "tip", text: "**No promises about ranking.** Use photos to inform customers. Do not treat filenames, upload frequency or geotags as a guaranteed way to improve placement." },
         { type: "in-app", text: "Queue photo batches on a schedule from [Posts & Photos](/gbp-content); keep the originals in the [Media Library](/media-library)." },
       ],
     },
@@ -86,7 +86,7 @@ export const GMB: ModuleLessons = {
       id: "reviews",
       title: "Reviews: asking the right way, answering every one",
       blocks: [
-        { type: "p", text: "Reviews decide the map pack more than any other thing you control, and they are the first thing a homeowner reads about you. The companies with hundreds of reviews did not get them by luck: they ask every single customer, the same way, within days of finishing, and they answer every review that comes in." },
+        { type: "p", text: "Reviews can help customers evaluate a business and contribute to local prominence. Google describes [local ranking in terms of relevance, distance and prominence](https://support.google.com/business/answer/7091); review volume alone does not determine placement. Request honest feedback consistently." },
         { type: "panels", items: [
           { title: "Asking", items: [
             "Ask every completed job, by text or email, with your direct review link — the day the job is done",
@@ -97,7 +97,7 @@ export const GMB: ModuleLessons = {
           { title: "Answering", items: [
             "Reply to every review within a few days, in the owner's voice, with the customer's name and the job",
             "A 5-star reply is short and specific; a bad review gets a calm, factual reply and an offer to fix it offline",
-            "Never argue, never post private details, never reply angry — the reply is read by the next 100 homeowners, not by the reviewer",
+            "Keep replies calm and protect private details; prospective customers may read the exchange",
             "Fix the problem first, then ask for an honest update — never a change of rating in exchange for anything",
           ] },
         ] },
@@ -109,7 +109,7 @@ export const GMB: ModuleLessons = {
       id: "defense",
       title: "Fake reviews and competitor attacks",
       blocks: [
-        { type: "p", text: "A profile that ranks gets attacked: fake 1-star reviews from a competitor's circle, suggested edits that change your phone number or mark you closed, duplicate listings in your name, and spam profiles stuffed with keywords sitting above you. None of it is rare. Know what each one looks like and what Google actually offers to fix it." },
+        { type: "p", text: "Profiles can receive suspicious reviews or inaccurate edits. Investigate the evidence rather than assuming a competitor is responsible; report suspected policy violations through Google’s tools." },
         { type: "panels", items: [
           { title: "Signs of an attack", tone: "warn", items: [
             "A burst of 1-star reviews with no job details, from accounts with one review each",
@@ -124,7 +124,7 @@ export const GMB: ModuleLessons = {
             "Document everything with dates and screenshots; if the attacker is identifiable, that record is what a lawyer needs",
           ] },
         ] },
-        { type: "tip", text: "**Never retaliate.** Posting fake reviews on the attacker's profile, or asking friends to, is the one move that gets *your* profile suspended. Report, reply once, document, move on." },
+        { type: "tip", text: "**Never retaliate.** Do not post fake reviews or ask friends to do so. Report suspected violations, respond factually and retain relevant evidence." },
         { type: "in-app", text: "Profile Guard (in [Locations](/locations), per location) keeps an approved snapshot of your profile, watches for changes and can restore them, and its Report step assembles the evidence for Google's official form — you submit it yourself." },
       ],
     },
@@ -132,7 +132,7 @@ export const GMB: ModuleLessons = {
       id: "posts",
       title: "Posting cadence and a content calendar",
       blocks: [
-        { type: "p", text: "Profile posts are short updates that show on your listing for a while and then roll off. They do not rank you, but they tell the homeowner comparing three profiles which company is alive this month — and they give you a reason to put new photos up. Decide a cadence you can keep for a year, then keep it." },
+        { type: "p", text: "Use profile posts to share useful, current updates. Choose a sustainable schedule and review what customers can see; posting does not guarantee better rankings." },
         { type: "panels", items: [
           { title: "A calendar that holds up", items: [
             "One update a week: a finished job, a seasonal reminder, a team note or an offer",
@@ -154,20 +154,20 @@ export const GMB: ModuleLessons = {
       id: "suspension",
       title: "Suspension prevention and recovery",
       blocks: [
-        { type: "p", text: "A suspended profile disappears from Maps and Search overnight, and with it most of your calls. Suspensions are usually triggered by an edit Google's systems read as a guideline violation, and the fix is a reinstatement request with documents — not a new profile. Knowing the triggers avoids most of them." },
+        { type: "p", text: "A suspension can affect profile visibility and customer contact. Review the reason and current Google guidance, correct eligibility problems and use the available appeal process. Timing and outcomes vary." },
         { type: "panels", items: [
-          { title: "Common triggers", tone: "warn", items: [
-            "Changing the name, address or category in a burst, or adding keywords to the name",
+          { title: "Eligibility and accuracy issues to check", tone: "warn", items: [
+            "An inaccurate business name, location or category, including keywords added only for ranking",
             "An ineligible virtual office or mailbox, or displaying an address where customers are not served",
             "More than one profile for the same business, or a new profile after a suspension",
-            "Hours, phone or website edits that no longer match your site and directories",
-            "Being reported by a competitor while any of the above is true",
+            "Incorrect hours, phone or website details",
+            "Evidence that the listing does not meet Google’s representation rules",
           ] },
           { title: "Getting reinstated", items: [
-            "Do not create a new profile; it will be suspended too and makes the appeal harder",
+            "Do not create a replacement profile to bypass a suspension; use the appeal process for the existing profile",
             "Fix what triggered it first (name, address visibility, duplicates) so the profile is compliant when reviewed",
-            "Appeal through Google's reinstatement form once, with your business license, a utility bill or lease at the address and photos of permanent signage and vehicles",
-            "One appeal at a time, answered factually; repeated or angry appeals slow it down",
+            "Follow the current appeal instructions and provide relevant evidence of your legitimate operation; do not invent a storefront or signage",
+            "Keep the appeal factual and follow the instructions for its current status",
           ] },
         ] },
         { type: "in-app", text: "If your profile is suspended and you want help with the appeal, [Reinstatement](/reinstatement) is where you ask us to review and take on the case." },
@@ -186,10 +186,10 @@ export const GMB: ModuleLessons = {
             "Movement after a change — a new category, a photo push, a review month",
           ] },
           { title: "What to change when it's flat", items: [
-            "Reviews first: the gap between you and the leader is usually counted in reviews",
+            "Check relevance, distance and prominence before attributing a ranking gap to reviews",
             "Then the primary category and the services list",
             "Then the city pages on your website that the profile links to",
-            "Not the name, not the address — those changes are the suspension triggers above",
+            "Correct inaccurate business details, but never change the name or address solely to chase rankings",
           ] },
         ] },
         { type: "in-app", text: "The [GMB Ranking Grid](/ranking-grid) scans a grid across your service area and shows your map rank at each point, so a change is measured instead of guessed." },

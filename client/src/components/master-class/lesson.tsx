@@ -1,3 +1,4 @@
+import { ProgressNote } from "./progress-note";
 /**
  * A module home's lessons: an outline that links to each lesson (durable `#lesson-<id>` anchors, so a copied
  * link reopens the same material), each lesson as one card with a "Mark done" control, and the progress kept
@@ -68,7 +69,7 @@ export function LessonOutline({ lessons, storageKey, locked = false, progress = 
   const tracked = !locked && progress;
   return (
     <Section title={title} testId={testId ?? "lesson-outline"}
-      description={description ?? (tracked ? <>{list.ready && <>{progressLabel(done, total)} · </>}{list.note}</> : `${total} ${locked ? "lesson" : "section"}${total === 1 ? "" : "s"}`)}
+      description={description ?? (tracked ? <>{list.ready && <>{progressLabel(done, total)} · </>}<ProgressNote list={list} /></> : `${total} ${locked ? "lesson" : "section"}${total === 1 ? "" : "s"}`)}
       actions={tracked && done > 0 ? <Button variant="ghost" size="sm" onClick={list.reset} data-testid="button-lessons-reset">Reset progress</Button> : undefined}>
       {tracked && list.ready && <Progress value={pct} className="mb-3 h-1.5" aria-label={`${pct}% of lessons done`} />}
       <ol className="grid gap-1 sm:grid-cols-2" data-testid="list-lessons">
