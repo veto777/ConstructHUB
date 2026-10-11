@@ -46,7 +46,7 @@ import { resolveGoogleUrl, resolveGoogleShortUrl, isGoogleUrl, extractPlaceId, e
 import { scrapeGoogleMapsBusiness } from "./google-maps-scraper";
 import { uploadToR2, getFromR2, deleteFromR2, isR2Key, getR2Url } from "./r2";
 import { db, pool } from "./db";
-import { searchQueries, scrapeSchedules, trackedDomains, permitDatabases, subscriptions, reviewTemplates, competitorScans, competitorListings, businessLocations, citationCampaigns, citations, locationAnalytics, stateGuides, stateGuideSteps, masterClassModules, coursePurchases, insertBusinessLocationSchema, insertCitationCampaignSchema, clickVisits, blockedIps, adSpyKeywords, adSpyResults, seoContracts, reviewRequests, users, betaAccessCodes, googleProfileReviews, mediaFolders, mediaPhotos } from "@shared/schema";
+import { searchQueries, scrapeSchedules, trackedDomains, permitDatabases, subscriptions, reviewTemplates, competitorScans, competitorListings, businessLocations, citationCampaigns, citations, locationAnalytics, stateGuides, stateGuideSteps, masterClassModules, coursePurchases, insertBusinessLocationSchema, insertCitationCampaignSchema, clickVisits, blockedIps, seoContracts, reviewRequests, users, betaAccessCodes, googleProfileReviews, mediaFolders, mediaPhotos } from "@shared/schema";
 import { sendContractEmail, sendReviewRequestEmail, sendReviewReminderEmail, sendTrialInviteEmail, trialInviteUrl, sendWithFallback, trySend } from "./email";
 import { getBaseUrl } from "./auth";
 import { eq, and, or, isNull, inArray, desc, asc, gte, lte, sql, count, countDistinct } from "drizzle-orm";
@@ -2740,7 +2740,7 @@ export async function registerRoutes(
       const scanId = parseInt(req.params.id);
       const [scan] = await db.select().from(competitorScans).where(and(eq(competitorScans.id, scanId), eq(competitorScans.userId, userId)));
       if (!scan) return res.status(404).json({ message: "Scan not found" });
-      const listings = await db.select().from(competitorListings).where(eq(competitorListings.scanId, scanId)).orderBy(desc(competitorListings.rating));
+      const listings = await db.select().from(competitorListings).where(and(eq(competitorListings.scanId, scanId), eq(competitorListings.userId, userId))).orderBy(desc(competitorListings.rating));
       res.json({ scan, listings: listings.map(presentListing) });
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
@@ -2771,160 +2771,20 @@ export async function registerRoutes(
     try {
       const userId = (req as any).user.id;
       const scanId = parseInt(req.params.id);
-      // Cancels first when still active (refunds the month, nothing orphaned), then removes.
+      // One transaction: ownership verified under a row lock first (a foreign id changes nothing),
+      // an active scan cancelled and its month refunded, then listings and scan removed.
       const removed = await removeCompetitorScan(userId, scanId, new Date());
       if (!removed) return res.status(404).json({ message: "Scan not found" });
       res.json({ success: true });
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
 
-  // No ad data source exists: runAdSpyScan builds "ads" from Google Places
-  // listings, i.e. fabricated data. Refuse the whole surface until a real
-  // source is wired (client flag: SHOW_AD_ACTIVITY).
+  // No ad data source exists (the old handlers built "ads" from Google Places
+  // listings, i.e. fabricated data, and were removed). Refuse the whole
+  // surface until a real source is wired (client flag: SHOW_AD_ACTIVITY).
   app.use("/api/ad-spy", (_req, res) => {
     res.status(410).json({ message: "Ad activity is unavailable until a real ad data source is connected." });
   });
-
-  app.get("/api/ad-spy/keywords", async (req, res) => {
-    if (!(await requireCompetitorIntel(req, res))) return;
-    try {
-      const userId = (req as any).user.id;
-      const keywords = await db.select().from(adSpyKeywords).where(eq(adSpyKeywords.userId, userId)).orderBy(desc(adSpyKeywords.createdAt));
-      const keywordsWithStats = await Promise.all(keywords.map(async (kw) => {
-        const results = await db.select().from(adSpyResults).where(eq(adSpyResults.keywordId, kw.id));
-        const now = Date.now();
-        const oneDay = 24 * 60 * 60 * 1000;
-        const sevenDays = 7 * oneDay;
-        const thirtyDays = 30 * oneDay;
-        const day1 = results.filter(r => now - new Date(r.seenAt).getTime() < oneDay);
-        const day7 = results.filter(r => now - new Date(r.seenAt).getTime() < sevenDays);
-        const day30 = results.filter(r => now - new Date(r.seenAt).getTime() < thirtyDays);
-        const unique1 = new Set(day1.map(r => r.advertiserDomain || r.advertiserName)).size;
-        const unique7 = new Set(day7.map(r => r.advertiserDomain || r.advertiserName)).size;
-        const unique30 = new Set(day30.map(r => r.advertiserDomain || r.advertiserName)).size;
-        const uniqueAll = new Set(results.map(r => r.advertiserDomain || r.advertiserName)).size;
-        return { ...kw, advertisers1Day: unique1, advertisers7Day: unique7, advertisers30Day: unique30, totalAdvertisers: uniqueAll };
-      }));
-      res.json(keywordsWithStats);
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
-  });
-
-  app.post("/api/ad-spy/keywords", async (req, res) => {
-    if (!(await requireCompetitorIntel(req, res))) return;
-    try {
-      const userId = (req as any).user.id;
-      const { keyword, location, device } = req.body;
-      if (!keyword || !location) return res.status(400).json({ message: "keyword and location are required" });
-      const existing = await db.select().from(adSpyKeywords).where(eq(adSpyKeywords.userId, userId));
-      if (existing.length >= 10) return res.status(400).json({ message: "Maximum 10 keywords allowed" });
-      const [kw] = await db.insert(adSpyKeywords).values({
-        userId,
-        keyword: keyword.toLowerCase().trim(),
-        location: location.trim(),
-        device: device || "mobile",
-      }).returning();
-      await runAdSpyScan(kw.id, keyword, location, device || "mobile");
-      res.json(kw);
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
-  });
-
-  app.delete("/api/ad-spy/keywords/:id", async (req, res) => {
-    if (!(await requireCompetitorIntel(req, res))) return;
-    try {
-      const userId = (req as any).user.id;
-      const keywordId = parseInt(req.params.id);
-      const [kw] = await db.select().from(adSpyKeywords).where(and(eq(adSpyKeywords.id, keywordId), eq(adSpyKeywords.userId, userId)));
-      if (!kw) return res.status(404).json({ message: "Keyword not found" });
-      await db.delete(adSpyResults).where(eq(adSpyResults.keywordId, keywordId));
-      await db.delete(adSpyKeywords).where(eq(adSpyKeywords.id, keywordId));
-      res.json({ success: true });
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
-  });
-
-  app.get("/api/ad-spy/keywords/:id/advertisers", async (req, res) => {
-    if (!(await requireCompetitorIntel(req, res))) return;
-    try {
-      const userId = (req as any).user.id;
-      const keywordId = parseInt(req.params.id);
-      const [kw] = await db.select().from(adSpyKeywords).where(and(eq(adSpyKeywords.id, keywordId), eq(adSpyKeywords.userId, userId)));
-      if (!kw) return res.status(404).json({ message: "Keyword not found" });
-      const results = await db.select().from(adSpyResults).where(eq(adSpyResults.keywordId, keywordId)).orderBy(desc(adSpyResults.seenAt));
-      const grouped: Record<string, { advertiserName: string; advertiserDomain: string | null; ads: any[]; firstSeen: string; lastSeen: string; totalAppearances: number }> = {};
-      for (const r of results) {
-        const key = r.advertiserDomain || r.advertiserName;
-        if (!grouped[key]) {
-          grouped[key] = { advertiserName: r.advertiserName, advertiserDomain: r.advertiserDomain, ads: [], firstSeen: r.seenAt.toISOString(), lastSeen: r.seenAt.toISOString(), totalAppearances: 0 };
-        }
-        grouped[key].totalAppearances++;
-        if (new Date(r.seenAt) < new Date(grouped[key].firstSeen)) grouped[key].firstSeen = r.seenAt.toISOString();
-        if (new Date(r.seenAt) > new Date(grouped[key].lastSeen)) grouped[key].lastSeen = r.seenAt.toISOString();
-        if (grouped[key].ads.length < 5) {
-          grouped[key].ads.push({ headline: r.adHeadline, description: r.adDescription, displayUrl: r.displayUrl, position: r.position, device: r.device, seenAt: r.seenAt });
-        }
-      }
-      res.json(Object.values(grouped).sort((a, b) => b.totalAppearances - a.totalAppearances));
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
-  });
-
-  app.post("/api/ad-spy/keywords/:id/refresh", async (req, res) => {
-    if (!(await requireCompetitorIntel(req, res))) return;
-    try {
-      const userId = (req as any).user.id;
-      const keywordId = parseInt(req.params.id);
-      const [kw] = await db.select().from(adSpyKeywords).where(and(eq(adSpyKeywords.id, keywordId), eq(adSpyKeywords.userId, userId)));
-      if (!kw) return res.status(404).json({ message: "Keyword not found" });
-      await runAdSpyScan(kw.id, kw.keyword, kw.location, kw.device);
-      res.json({ success: true });
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
-  });
-
-  async function runAdSpyScan(keywordId: number, keyword: string, location: string, device: string) {
-    const apiKey = process.env.GOOGLE_PLACES_API_KEY;
-    if (!apiKey) return;
-
-    try {
-      const query = `${keyword} ${location}`;
-      const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&key=${apiKey}`;
-      const searchRes = await fetch(url);
-      const data = await searchRes.json() as any;
-
-      if (data.results && data.results.length > 0) {
-        const topResults = data.results.slice(0, 8);
-        for (let i = 0; i < topResults.length; i++) {
-          const place = topResults[i];
-          let website: string | null = null;
-          try {
-            const detailUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=website&key=${apiKey}`;
-            const detailRes = await fetch(detailUrl);
-            const detailData = await detailRes.json() as any;
-            if (detailData.result?.website) {
-              website = detailData.result.website;
-            }
-            await new Promise(r => setTimeout(r, 100));
-          } catch (e) {}
-
-          let domain: string | null = null;
-          if (website) {
-            try { domain = new URL(website).hostname.replace(/^www\./, ""); } catch {}
-          }
-
-          await db.insert(adSpyResults).values({
-            keywordId,
-            advertiserName: place.name || "Unknown",
-            advertiserDomain: domain,
-            adHeadline: `${place.name} - ${keyword} in ${location}`,
-            adDescription: place.formatted_address || null,
-            displayUrl: website,
-            position: i + 1,
-            device,
-          });
-        }
-      }
-    } catch (err) {
-      console.error("Ad spy scan error:", err);
-    }
-  }
-
 
   // Citation campaigns come with every paid plan; the paying account is the workspace owner.
   async function requireCitationsPlan(req: any, res: any): Promise<boolean> {

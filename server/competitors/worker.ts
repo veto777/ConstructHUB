@@ -10,6 +10,9 @@ import {
   type ExecuteDeps,
 } from "./scan";
 
+/** The scan card's copy when the results could not be written (the raw driver error is recorded for ops). */
+export const SAVE_FAILED = "Couldn't save the scan results. Run the scan again — it has not counted against your monthly limit.";
+
 /**
  * Durable Competitor Intel execution (COMP-1, round 2). A scan is a database
  * row with a lease: this process or the next one always finishes it, and the
@@ -57,7 +60,19 @@ export async function runCompetitorWorker(deps: WorkerDeps = {}): Promise<void> 
   const token = randomUUID();
   const job = await store.claimNextScan(token, new Date(now().getTime() + LEASE_MS), now(), MAX_ATTEMPTS);
   if (!job) return;
+  await runClaimedScan(job, token, deps);
+}
 
+/**
+ * One claimed scan, run to a settled end under its lease `token`: listings
+ * indexed and the scan completed, or released for a retry, or failed and
+ * refunded. Exported so the Postgres integration test can drive the worker's
+ * real execution on a row it leased itself (other processes' workers share
+ * the lane DB's queue).
+ */
+export async function runClaimedScan(job: store.ScanRow, token: string, deps: WorkerDeps = {}): Promise<void> {
+  const clock = deps.clock ?? systemClock;
+  const now = () => clock.now();
   let heartbeat: NodeJS.Timeout | null = null;
   if (deps.heartbeat !== false) {
     heartbeat = setInterval(() => {
@@ -72,29 +87,36 @@ export async function runCompetitorWorker(deps: WorkerDeps = {}): Promise<void> 
     let firstSeen = new Map<string, Date>();
     if (job.attempts > 1) {
       firstSeen = await store.firstSeenByPlace(job.id);
-      await store.clearListings(job.id);
+      if (!(await store.clearListings(job.id, token))) return; // lease already gone: someone else owns this row now
     }
     const exec: ExecuteDeps = { ...defaultExecuteDeps(), ...deps.exec };
     const { totalFound } = await executeCompetitorScan(job, exec, {
       isLive: () => store.isLive(job.id, token),
       note: (f) => store.noteProgress(job.id, token, f),
-      insert: (l) => store.insertListing(job.id, job.user_id, l),
-      firstSeenFor: (placeId) => firstSeen.get(placeId) ?? null,
+      // Lease-conditional: a write after a cancel/delete/takeover lands nothing and stops the run.
+      insert: async (l) => { if (!(await store.insertListing(job.id, job.user_id, token, l, now()))) throw new ScanLostError(); },
+      // A place this scan has not seen before is first seen now (the column is NOT NULL; an explicit NULL skips its default).
+      firstSeenFor: (placeId) => firstSeen.get(placeId) ?? now(),
     });
     // False when the scan was cancelled/deleted mid-run: nothing to settle here
     // (cancel refunded it; a deleted row is gone).
     await store.completeScan(job.id, token, totalFound, now());
   } catch (e) {
     if (e instanceof ScanLostError) return;
-    const err = e instanceof ScanFailedError ? e : new ScanFailedError(e instanceof Error ? e.message : String(e), true);
+    let err: ScanFailedError;
+    if (e instanceof ScanFailedError) err = e;
+    else {
+      // Not a provider failure (classify maps those): a database/driver error
+      // while saving. The raw message goes to ops, never onto the scan card.
+      void recordFailure("job", "Competitor Intel scan save", e);
+      err = new ScanFailedError(SAVE_FAILED, true);
+    }
     if (err.retryable && job.attempts < MAX_ATTEMPTS) {
       await store.releaseScan(job.id, token, new Date(now().getTime() + retryDelayMs(job.attempts)));
     } else {
-      // Terminal failure is never charged: partial listings come out and the
-      // persisted reservation is refunded (exactly once, by the row's CAS).
-      await store.clearListings(job.id);
-      await store.failScan(job.id, token, err.message || "Provider request failed.", now());
-      await store.refundScanQuota(job.id);
+      // Terminal failure is never charged: fail, drop partial listings and
+      // refund in one transaction under our lease (exactly once, by the row's CAS).
+      await store.failScanAndSettle(job.id, token, err.message || "Provider request failed.", now());
     }
   } finally {
     if (heartbeat) clearInterval(heartbeat);
@@ -127,10 +149,13 @@ export async function cancelCompetitorScan(userId: number, scanId: number, now: 
     : { status: 409, message: "This scan has already finished." };
 }
 
-/** DELETE's durable body: cancel first when still active (so nothing is orphaned and the month is refunded), then remove. */
-export async function removeCompetitorScan(userId: number, scanId: number, now: Date): Promise<boolean> {
-  await store.cancelActiveScan(userId, scanId, now);
-  return store.deleteScanRows(userId, scanId);
+/**
+ * DELETE's durable body: one transaction that verifies ownership under a row
+ * lock before touching anything, cancels an active scan, settles its
+ * reservation, and removes listings and scan. A foreign id changes nothing.
+ */
+export async function removeCompetitorScan(userId: number, scanId: number, _now: Date): Promise<boolean> {
+  return store.deleteOwnedScan(userId, scanId);
 }
 
 /**
