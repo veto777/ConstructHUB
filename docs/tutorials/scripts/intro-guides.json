@@ -1,0 +1,123 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "intro-guides",
+  "title": "Guides",
+  "viewport": { "width": 1024, "height": 576 },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/guides",
+      "caption": "Guides",
+      "chapter": "Every guide in one place",
+      "narration": "This is Guides. Playbooks, state licensing guides and setup walkthroughs, all on one page."
+    },
+    {
+      "action": "highlight",
+      "selector": "nav[aria-label=\"Guide topics\"]",
+      "caption": "Search, or filter by topic",
+      "narration": "Search every guide and step, or filter by topic: ads, licensing, your website, Google Business and more."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"library-google-ads-guide\"]",
+      "caption": "Playbooks: Google Ads, LSA, Ad Fraud",
+      "narration": "The playbooks come first, like the twelve-section Google Ads guide and the LSA guide."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"access-lsa-guide\"]",
+      "caption": "Free, or part of the Master Class",
+      "narration": "Each card's label says whether it's free, or part of the Master Class, and what your account has unlocked."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"library-state-guides\"]",
+      "caption": "State licensing guides",
+      "narration": "The state licensing guides cover each state's formation, licensing, workers' comp and tax agencies."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"library-connection\"]",
+      "caption": "Site connection guide",
+      "narration": "The site connection guide puts a site behind Cloudflare and connects Search Console, step by step."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"chip-topic-google\"]",
+      "caption": "Pick a topic",
+      "chapter": "Setup walkthroughs",
+      "narration": "Pick a topic, like Google Business, to see its setup walkthroughs."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"list-guide-steps-profile-guard\"]",
+      "caption": "The buttons, in order",
+      "narration": "Each walkthrough names the buttons in order, and says what each one does and doesn't do."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"checkbox-guide-profile-guard-1\"]",
+      "caption": "Tick steps as you go",
+      "narration": "Tick each step as you go. Your progress is saved in this browser."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"guide-profile-guard\"] a:has-text(\"Open Locations\")",
+      "caption": "Open the page it describes",
+      "narration": "This button opens the page the walkthrough describes, so you can follow along."
+    },
+    {
+      "action": "goto",
+      "url": "/google-ads-guide",
+      "caption": "Google Ads guide",
+      "chapter": "The ad playbooks",
+      "narration": "The Google Ads guide is a playbook for contractor campaigns."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-section-campaign-setup\"]",
+      "caption": "Twelve sections, in order",
+      "narration": "Start with campaign setup, and work through the twelve sections in order."
+    },
+    {
+      "action": "goto",
+      "url": "/",
+      "selector": "[data-testid=\"tile-guides\"]",
+      "caption": "Home: Learn",
+      "narration": "To come back, open Home."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"tile-guides\"]",
+      "caption": "Home → Learn → Guides",
+      "narration": "You'll find Guides on the Home dashboard, in the Learn section."
+    }
+  ],
+  "youtube": {
+    "title": "Guides in about a minute | ConstructHUB",
+    "description": "A one-minute tour of Guides in ConstructHUB: the Google Ads and Local Services Ads playbooks, the state licensing guides, the site connection guide, and setup walkthroughs that name the buttons in order, with a checkbox per step.",
+    "tags": [
+      "ConstructHUB",
+      "Google Ads for contractors",
+      "Local Services Ads guide",
+      "contractor licensing",
+      "Cloudflare setup",
+      "contractor marketing",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Know Where to Click",
+    "accent": "Click",
+    "kicker": "Guides",
+    "step": 7
+  },
+  "removeSelectors": [
+    "div:has(> [data-testid=\"card-stat-contractor-cpc\"])",
+    "[data-testid=\"button-open-chat\"]"
+  ]
+}

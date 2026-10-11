@@ -1,0 +1,128 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "intro-permits",
+  "title": "Permit Database Search",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/search",
+      "caption": "Search permits",
+      "chapter": "Search the portals",
+      "narration": "This is Permit Search. It searches government permit portals for you, from one page."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=Searchable portal",
+      "caption": "Each dot: a portal it can search",
+      "narration": "Each orange dot on the map is a county or city portal it can search live."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"select-search-type\"]",
+      "caption": "Address, keyword, name, company, license, permit",
+      "narration": "An address, a keyword, a name, a company, a license number, or a permit number."
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid=\"select-scope-state\"]",
+      "value": "Colorado",
+      "caption": "Pick the search area",
+      "narration": "Pick a state, and a county or city if you want to narrow the search."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-search-value\"]",
+      "value": "1200 Demo Ave, Denver",
+      "caption": "Type what you're looking for",
+      "narration": "Type the address, then choose Search."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-search\"]",
+      "caption": "Each portal shows its own status",
+      "narration": "Results come in portal by portal, and each portal shows whether it was searched, skipped, or could not be searched."
+    },
+    {
+      "action": "goto",
+      "url": "/databases?q=Denver%20County",
+      "caption": "Database Directory",
+      "chapter": "Find the permit office",
+      "narration": "The Database Directory lists US counties and cities, with each official permit portal where one is on record."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"card-database-\"]:has-text(\"Denver County, CO\")",
+      "caption": "Portal status, property records, alerts",
+      "narration": "Each entry shows whether its portal link was verified, links to property records, and marks portals that support alerts."
+    },
+    {
+      "action": "goto",
+      "url": "/permit-alerts",
+      "caption": "Permit Alerts",
+      "chapter": "Get permit alerts",
+      "narration": "Permit Alerts watches portals for new permits. Choose New watch."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-new-watch\"]",
+      "caption": "New watch",
+      "narration": "Watch an address, a parcel, a contractor, or the trades you care about in an area."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-jurisdiction-search\"]",
+      "value": "Denver County",
+      "caption": "Choose the jurisdictions to watch",
+      "narration": "Then choose the jurisdictions to watch."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"pick-\"]:has-text(\"Denver County, CO\")",
+      "caption": "Alerts supported",
+      "narration": "Alerts work where the portal can list permits by date. Those say Alerts supported."
+    },
+    {
+      "action": "press",
+      "value": "Escape",
+      "caption": "Checked every hour",
+      "narration": "Each watched portal is checked every hour, and new matches arrive by email, text or Telegram."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-search-permits\"]",
+      "caption": "Menu: Permits & Databases",
+      "narration": "You'll find Search Permits, the Database Directory and Permit Alerts in the menu, under Permits & Databases."
+    }
+  ],
+  "youtube": {
+    "title": "Permit Database Search in about a minute | ConstructHUB",
+    "description": "A one-minute tour of Permit Database Search in ConstructHUB: search the government permit portals it can reach by address, name, company, license or permit number, find a county's or city's permit office in the Database Directory, and set up Permit Alerts for the trades you care about.",
+    "tags": [
+      "ConstructHUB",
+      "building permits",
+      "permit search",
+      "permit lookup",
+      "permit alerts",
+      "contractor leads",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Search Permits in One Place",
+    "accent": "Permits",
+    "kicker": "Permit Search",
+    "step": 2
+  },
+  "removeSelectors": [
+    "[data-testid=\"notice-permit-alerts-coverage\"]",
+    "label:has([data-testid=\"input-watch-radius\"])"
+  ]
+}
