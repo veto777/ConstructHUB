@@ -158,7 +158,7 @@ export function registerGscRoutes(
       sum(clicks)/NULLIF(sum(impressions),0) ctr,sum(position*impressions)/NULLIF(sum(impressions),0) position
       FROM gsc_analytics WHERE asset_id=$1 AND dimension=$2 AND date BETWEEN $3 AND $4 AND key ILIKE $6 GROUP BY 1,2`;
     const order = p.sort
-      ? `${p.sort} ${p.dir}, date DESC, clicks DESC, key`
+      ? `${p.sort} ${p.dir} NULLS LAST, date DESC, clicks DESC, key`
       : "date DESC, clicks DESC, key";
     const { rows } = await pool.query(
       `${sql} ORDER BY ${order} LIMIT $7 OFFSET $8`,

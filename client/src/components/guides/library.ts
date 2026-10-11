@@ -121,7 +121,7 @@ export const WALKTHROUGHS: Walkthrough[] = [
   {
     id: "agency-social", topic: "social", title: "Agency social workflows", href: "/social-media", open: "Open Social Media",
     steps: [
-      "The business selector searches saved Locations and remembers the selected business in the URL. Switching businesses resets the composer and settings editor.",
+      "The business selector searches saved Locations and remembers the selected business in the URL. Switching businesses keeps each business's unsaved composer draft — pick the business again to continue where you left off.",
       "Open Bulk actions, select businesses across search pages, and write one update using {business}, {city}, and {phone}. Create bulk drafts for review or explicitly Queue bulk posts. Missing facts or invalid destinations produce per-business failures in Bulk results.",
       "Expand Per-business cadence to set each selected business’s frequency. Approval drafts is the default; choosing automatic publishing explicitly authorizes all selected businesses. You can also disable auto modes, refresh GBP sources, or generate drafts in bulk.",
       "Open All-clients calendar to search business names/post text and filter dates, status, and platform. Select drafts for bulk approval or cancel unsent posts. A single bulk action handles up to 100 posts.",

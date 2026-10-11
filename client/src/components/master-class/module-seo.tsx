@@ -11,7 +11,6 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { BarChart3, ClipboardList, FileSearch, Link2, ListChecks, Loader2, Megaphone, PenTool, Send, Share2, TrendingUp } from "lucide-react";
 import { Section } from "@/components/app-ui";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -118,19 +117,22 @@ export function SeoModule(p: ModuleHomeProps) {
           <Label>Services Interested In</Label>
           <div className="flex flex-wrap gap-2">
             {[
-              "Link Building", "Guest Posts", "Press Releases / PBNs", "SEO Audit",
+              "Link Building", "Guest Posts", "Press Releases", "SEO Audit",
               "Page Speed Optimization", "Google Search Console Setup", "Google Analytics Setup",
               "Content Writing", "Website Design", "Local SEO", "Backlink Cleanup"
             ].map(service => (
-              <Badge
+              <Button
+                type="button"
+                size="sm"
+                aria-pressed={seoServices.includes(service)}
                 key={service}
-                variant={seoServices.includes(service) ? "default" : "outline"}
-                className={`cursor-pointer transition-colors ${seoServices.includes(service) ? "bg-muted" : "hover:bg-muted"}`}
+                variant="outline"
+                className={`cursor-pointer transition-colors focus-visible:ring-2 focus-visible:ring-ring ${seoServices.includes(service) ? "border-primary bg-primary/10 text-foreground" : "hover:bg-muted"}`}
                 onClick={() => toggleSeoService(service)}
                 data-testid={`badge-service-${service.toLowerCase().replace(/\s+/g, "-")}`}
               >
                 {service}
-              </Badge>
+              </Button>
             ))}
           </div>
         </div>

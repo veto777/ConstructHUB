@@ -131,7 +131,9 @@ function ChecklistBlock({ block }: { block: Extract<LessonBlock, { type: "checkl
     <div className="space-y-2" data-testid={`checklist-${base}`}>
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
         <span role="status">{list.ready && <>{progressLabel(list.count, block.items.length)}{block.unit ? ` ${block.unit}` : ""} · </>}<ProgressNote list={list} /></span>
-        {list.count > 0 && <Button variant="ghost" size="sm" className="!min-h-8" onClick={list.reset} data-testid={`button-${base}-reset`}>{block.resetLabel ?? "Reset"}</Button>}
+        {list.count > 0 && <Button variant="ghost" size="sm" className="!min-h-8" onClick={() => {
+          if (window.confirm(`Reset ${list.count} completed items in this checklist? This cannot be undone.`)) list.reset();
+        }} data-testid={`button-${base}-reset`}>{block.resetLabel ?? "Reset"}</Button>}
       </div>
       <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2" data-testid={`list-${base}`}>
         {block.items.map((item) => {
@@ -272,8 +274,8 @@ export function LessonBlocks({ blocks, className }: { blocks: LessonBlock[]; cla
 export type RenderLesson = (meta: LessonMeta, body: LessonBody | undefined, index: number) => ReactNode;
 
 /** The lesson the server did not return — said plainly, never an empty card. */
-function MissingLesson() {
-  return <p className="text-sm text-muted-foreground" data-testid="text-lesson-missing">This lesson isn't available right now. Reload the page or come back later.</p>;
+function MissingLesson({ reload }: { reload: () => void }) {
+  return <div className="space-y-2"><p className="text-sm text-muted-foreground" data-testid="text-lesson-missing">This lesson isn't available right now.</p><Button variant="outline" onClick={reload}>Reload lesson</Button></div>;
 }
 
 /**
@@ -324,7 +326,7 @@ export function ModuleLessons({ module, lessons, storageKey, open, renderLesson,
   const extras = q.data.lessons.filter((l) => !lessons.some((m) => m.id === l.id)).map((l): LessonMeta => ({ id: l.id, title: l.title }));
   const render = renderLesson ?? ((meta, body) => (
     <Lesson id={meta.id} title={meta.title} icon={meta.icon} storageKey={storageKey} contentClassName="space-y-3">
-      {body ? <LessonBlocks blocks={body.blocks} /> : <MissingLesson />}
+      {body && <LessonBlocks blocks={body.blocks} />}
     </Lesson>
   ));
   return (
@@ -333,7 +335,11 @@ export function ModuleLessons({ module, lessons, storageKey, open, renderLesson,
         action={<Button variant="outline" size="sm" disabled={q.isFetching} onClick={() => void q.refetch()} data-testid="button-lessons-retry">{q.isFetching ? "Retrying…" : "Try again"}</Button>}>
         {apiErrorMessage(q.error)} These lessons may be out of date.
       </Notice>}
-      {[...lessons, ...extras].map((meta, i) => <Fragment key={meta.id}>{render(meta, byId.get(meta.id), i)}</Fragment>)}
+      {[...lessons, ...extras].map((meta, i) => <Fragment key={meta.id}>{byId.get(meta.id)?.blocks.length
+        ? render(meta, byId.get(meta.id), i)
+        : <Lesson id={meta.id} title={meta.title} storageKey={storageKey} available={false}>
+            <MissingLesson reload={() => void q.refetch()} />
+          </Lesson>}</Fragment>)}
       {q.data.footer.length > 0 && <div data-testid="lessons-footer"><LessonBlocks blocks={q.data.footer} /></div>}
       {children}
     </>

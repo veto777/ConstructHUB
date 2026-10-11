@@ -5,6 +5,7 @@ import {
   MetricTiles,
   ReportTrend,
   SavedDataStrip,
+  SavedDataSummary,
   analyticsColumns,
   cloudflareColumns,
   sumKnown,
@@ -256,7 +257,7 @@ export function DataList({
                 sortable
                   ? (key, d) => {
                       Sort(key);
-                      Dir(d);
+                      Dir(key ? d : "");
                       P(1);
                     }
                   : undefined
@@ -646,6 +647,7 @@ export default function SiteConnections({
   return (
     <AppPage testId={`page-site-connections-${provider}`}>
       {header}
+      <SavedDataSummary>
       {config.error &&
         (config.data ? (
           <SavedDataStrip
@@ -1569,10 +1571,11 @@ export default function SiteConnections({
           )}
         />
       )}
+      </SavedDataSummary>
     </AppPage>
   );
 }
-function CloudflareDetails({
+export function CloudflareDetails({
   id,
   onFlag,
 }: {
@@ -1632,6 +1635,8 @@ function CloudflareDetails({
           <ReportTrend
             rows={d.traffic ?? []}
             label="Requests by UTC day"
+            start={d.since?.slice(0, 10)}
+            end={d.until?.slice(0, 10)}
             date={(r) => r.dimensions?.date}
             value={(r) => r.sum?.requests}
           />

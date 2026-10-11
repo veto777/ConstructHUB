@@ -81,7 +81,7 @@ export function ModuleHome({ title, description, icon: Icon, badge, unlocked, le
       )}
       {open && (
         <>
-          <LessonOutline lessons={lessons} storageKey={storageKey} title={outlineTitle} progress={progress} />
+          <LessonOutline lessons={lessons} storageKey={storageKey} title={outlineTitle} progress={progress} moduleName={moduleTitle} />
           <ModuleLessons module={lessonsModule} lessons={lessons} storageKey={storageKey} open renderLesson={renderLesson}>
             {children}
           </ModuleLessons>

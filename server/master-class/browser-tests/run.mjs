@@ -110,6 +110,10 @@ try {
   await page.evaluate(() => scrollTo(0, 0));
   await page.screenshot({ path: `${out}/phone-blocked.png` });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  page.once('dialog', dialog => dialog.dismiss());
+  await page.getByTestId('button-lessons-reset').click();
+  await expect(checkbox('photos')).toBeChecked();
+  page.once('dialog', dialog => dialog.accept());
   await page.getByTestId('button-lessons-reset').click();
   await expect(outline()).toContainText('0 of 8 done');
   await expect(checkbox('photos')).not.toBeChecked();
@@ -131,6 +135,7 @@ try {
   await expect(first).toBeChecked();
   await expect(page.getByTestId('checklist-vetting-checklist')).toContainText('1 of 14 done');
   await expect(page.getByTestId('checklist-vetting-checklist')).toContainText('Saved for this visit only');
+  page.once('dialog', dialog => dialog.accept());
   await page.getByTestId('button-vetting-checklist-reset').click();
   await expect(first).not.toBeChecked();
   await page.getByRole('button', { name: 'gmb', exact: true }).click();

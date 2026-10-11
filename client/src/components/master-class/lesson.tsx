@@ -18,7 +18,7 @@ export type LessonMeta = { id: string; title: string; icon?: LucideIcon };
 
 const slug = (s: string) => s.replace(/[^a-zA-Z0-9_-]+/g, "-");
 
-export function Lesson({ id, title, icon, description, storageKey, children, contentClassName, className, testId }: {
+export function Lesson({ id, title, icon, description, storageKey, children, contentClassName, className, testId, available = true }: {
   id: string;
   title: ReactNode;
   icon?: LucideIcon;
@@ -29,6 +29,7 @@ export function Lesson({ id, title, icon, description, storageKey, children, con
   contentClassName?: string;
   className?: string;
   testId?: string;
+  available?: boolean;
 }) {
   const list = useChecklist(storageKey);
   const done = list.isDone(id);
@@ -39,7 +40,7 @@ export function Lesson({ id, title, icon, description, storageKey, children, con
       className={cn("scroll-mt-24", done && "border-primary/40", className)} contentClassName={contentClassName} testId={testId ?? `lesson-${id}`}
       actions={
         <label htmlFor={boxId} className="flex min-h-10 cursor-pointer select-none items-center gap-2 rounded-md px-1 text-xs font-medium text-muted-foreground hover:text-foreground">
-          <Checkbox id={boxId} checked={done} disabled={!list.ready} onCheckedChange={(v) => list.toggle(id, v === true)} aria-label={`Mark "${label}" done`} data-testid={`checkbox-${slug(id)}-done`} />
+          <Checkbox id={boxId} checked={done} disabled={!list.ready || !available} onCheckedChange={(v) => { if (available) list.toggle(id, v === true); }} aria-label={`Mark "${label}" done`} data-testid={`checkbox-${slug(id)}-done`} />
           {done ? "Done" : "Mark done"}
         </label>
       }>
@@ -52,7 +53,7 @@ export function Lesson({ id, title, icon, description, storageKey, children, con
  * The lesson list at the top of a module home. Unlocked: links with done marks and the progress line.
  * Locked: the same titles as a plain list — the outline is public, like the Google Ads guide's, the lessons are not.
  */
-export function LessonOutline({ lessons, storageKey, locked = false, progress = true, title = "Lessons", description, testId }: {
+export function LessonOutline({ lessons, storageKey, locked = false, progress = true, title = "Lessons", description, testId, moduleName }: {
   lessons: LessonMeta[];
   storageKey: string;
   locked?: boolean;
@@ -61,6 +62,7 @@ export function LessonOutline({ lessons, storageKey, locked = false, progress = 
   title?: ReactNode;
   description?: ReactNode;
   testId?: string;
+  moduleName?: string;
 }) {
   const list = useChecklist(storageKey, { itemIds: lessons.map((lesson) => lesson.id) });
   const total = lessons.length;
@@ -70,7 +72,9 @@ export function LessonOutline({ lessons, storageKey, locked = false, progress = 
   return (
     <Section title={title} testId={testId ?? "lesson-outline"}
       description={description ?? (tracked ? <>{list.ready && <>{progressLabel(done, total)} · </>}<ProgressNote list={list} /></> : `${total} ${locked ? "lesson" : "section"}${total === 1 ? "" : "s"}`)}
-      actions={tracked && done > 0 ? <Button variant="ghost" size="sm" onClick={list.reset} data-testid="button-lessons-reset">Reset progress</Button> : undefined}>
+      actions={tracked && done > 0 ? <Button variant="ghost" size="sm" onClick={() => {
+        if (window.confirm(`Reset ${done} completed lesson${done === 1 ? "" : "s"} in ${moduleName ?? storageKey.replace(/^mc:/, "")}? This cannot be undone.`)) list.reset();
+      }} data-testid="button-lessons-reset">Reset progress</Button> : undefined}>
       {tracked && list.ready && <Progress value={pct} className="mb-3 h-1.5" aria-label={`${pct}% of lessons done`} />}
       <ol className="grid gap-1 sm:grid-cols-2" data-testid="list-lessons">
         {lessons.map((l, i) => {

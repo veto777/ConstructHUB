@@ -119,9 +119,8 @@ export const LICENSING: ModuleLessons = {
         ] },
         { type: "h", text: "Project Managers (PMs)" },
         { type: "p", text: "Assign project management to someone with the capacity and relevant skills. An owner may fill this role initially; reassess when workload exceeds safe, effective supervision." },
-        { type: "stats", items: [
-          { value: "Research locally", label: "Compensation for the actual role" },
-          { value: "Experience & Scope", label: "Depends On" },
+        { type: "notes", items: [
+          { tone: "plain", text: "Research local compensation for the actual role, taking experience and scope of responsibility into account." },
         ] },
         { type: "p", text: "Incentivize PMs with performance bonuses, paid time off, and potentially a company vehicle. But don't buy assets you can't afford — if you're not closing enough work to support it, a company truck becomes a liability, not a perk." },
       ],

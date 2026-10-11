@@ -64,7 +64,7 @@ const page: FeaturePage = {
     {
       icon: "message",
       title: `${QUICK_QUESTIONS} quick questions`,
-      body: "Pricing, which plan fits, the trial, getting started, the CRM, the Agency plan, permits, Google tools, reviews, Click Guard, Site Scan, the Master Class and the AI Call Assistant.",
+      body: Object.values(HUB_PRESETS).map((preset) => preset.label).join(" · "),
     },
     {
       icon: "book",

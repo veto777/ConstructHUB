@@ -235,7 +235,7 @@ it("sorts the analytics report in SQL before pagination", async () => {
   expect(r.code).toBe(200);
   const sql = query.mock.calls[0][0] as string;
   // The ORDER BY lands before LIMIT/OFFSET, so it spans the whole report, not one page.
-  expect(sql).toContain("ORDER BY clicks asc, date DESC, clicks DESC, key");
+  expect(sql).toContain("ORDER BY clicks asc NULLS LAST, date DESC, clicks DESC, key");
   expect(sql.indexOf("ORDER BY")).toBeLessThan(sql.indexOf("LIMIT"));
 });
 it("rejects unknown analytics sort columns instead of interpolating them", async () => {
@@ -280,8 +280,10 @@ it("sorts a Cloudflare cache dataset in SQL before pagination", async () => {
   const sql = query.mock.calls[0][0] as string;
   // Typed numeric cast on the counter, direction honored, order lands before LIMIT.
   expect(sql).toContain(
-    "ORDER BY NULLIF(value->'sum'->>'requests','')::numeric desc NULLS LAST, value::text",
+    "THEN (value->'sum'->>'requests')::numeric END desc NULLS LAST, value::text",
   );
+  expect(sql).toContain("CASE WHEN length(value->'sum'->>'requests') <= 100");
+  expect(sql).toContain("~ '^[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)$'");
   expect(sql.indexOf("ORDER BY")).toBeLessThan(sql.indexOf("LIMIT"));
   expect(query.mock.calls[0][1]).toEqual([12, 7, "traffic", "%%", 25, 0]);
 });
@@ -313,4 +315,13 @@ it("rejects cache sorts outside the dataset whitelist instead of interpolating t
   });
   expect(r.code).toBe(400);
   expect(query).not.toHaveBeenCalled();
+});
+
+it.each(["ctr", "position"])("puts missing %s values last when sorting ascending", async sort => {
+  query.mockResolvedValueOnce({ rows: [] } as any)
+    .mockResolvedValueOnce({ rows: [{ total: 0 }] } as any)
+    .mockResolvedValueOnce({ rows: [{ pending: 0 }] } as any);
+  const result = await request("/api/gsc/assets/:id/analytics", { sort, dir: "asc" });
+  expect(result.code).toBe(200);
+  expect(query.mock.calls[0][0]).toContain(`ORDER BY ${sort} asc NULLS LAST`);
 });

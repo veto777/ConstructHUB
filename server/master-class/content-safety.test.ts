@@ -86,3 +86,12 @@ describe("round-five course accuracy", () => {
     expect(lessonText("licensing", "reputation")).toContain("no fixed revenue-loss percentage");
   });
 });
+
+it("presents hiring research as notes and keeps the permit checklist on topic", () => {
+  const hiring = LESSON_MODULES.licensing.lessons.find(l => l.id === "hiring")!;
+  expect(hiring.blocks.some(b => b.type === "stats")).toBe(false);
+  expect(lessonText("licensing", "hiring")).toContain("Research local compensation");
+  const permits = LESSON_MODULES.vetting.lessons.find(l => l.id === "tip-3")!.blocks.find(b => b.type === "list");
+  expect(permits?.type === "list" && permits.items[0]).toContain("permits and inspections");
+  expect(lessonText("vetting", "tip-14")).not.toContain("Review available business details");
+});

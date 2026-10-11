@@ -169,6 +169,28 @@ function HubConversation({ surface, userId }: { surface: HubSurface; userId: num
   const descId = useId();
   const panelId = useId();
 
+  useEffect(() => {
+    const field = inputRef.current;
+    if (!field) return;
+    field.style.height = "auto";
+    field.style.height = `${Math.min(field.scrollHeight, 112)}px`;
+  }, [input, open]);
+
+  useEffect(() => {
+    if (visible || !open) return;
+    setOpen(false);
+    setBubble(false);
+    // The launcher is hidden on this route. Move focus to its page landmark.
+    window.setTimeout(() => {
+      const target = document.querySelector<HTMLElement>("main, [role=main], h1, a[href]");
+      if (!target) return;
+      const previous = target.getAttribute("tabindex");
+      if (previous === null) target.setAttribute("tabindex", "-1");
+      target.focus();
+      if (previous === null) target.addEventListener("blur", () => target.removeAttribute("tabindex"), { once: true });
+    }, 0);
+  }, [visible, open]);
+
   const builder = meta?.tier === "builder";
   const allowance = meta?.allowance ?? null;
   // No typed questions this month: the plan has none (0), or they are all used.
@@ -337,6 +359,8 @@ function HubConversation({ surface, userId }: { surface: HubSurface; userId: num
       if (res.ok && typeof data.reply === "string") {
         push({ role: "assistant", content: data.reply });
         setTalking(true);
+      } else if ((res.status === 429 && ["slowdown", "limit"].includes(data.code)) || (res.status === 503 && data.code === "busy")) {
+        push({ role: "assistant", content: typeof data.reply === "string" ? data.reply : BUSY_TEXT, tone: "note" });
       } else {
         markFailed(userMsgId, true);
         push({ role: "assistant", content: typeof data.reply === "string" ? data.reply : BUSY_TEXT, tone: "error" });
@@ -388,7 +412,8 @@ function HubConversation({ surface, userId }: { surface: HubSurface; userId: num
       const data = await res.json().catch(() => ({}));
       // The chat was reset or the person changed while this was in flight: the reply is not for this conversation.
       if (!live()) return;
-      markFailed(userMsgId, !(res.ok && typeof data.reply === "string" && typeof data.sig === "string"));
+      const neutral = (res.status === 429 && ["slowdown", "limit"].includes(data.code)) || (res.status === 503 && data.code === "busy");
+      markFailed(userMsgId, !neutral && !(res.ok && typeof data.reply === "string" && typeof data.sig === "string"));
       if (res.ok && typeof data.reply === "string" && typeof data.sig === "string") {
         setConversationId(data.conversationId);
         setMessages((prev) => prev.map((m) => (m.id === userMsgId ? { ...m, inHistory: true } : m)));
@@ -396,6 +421,8 @@ function HubConversation({ surface, userId }: { surface: HubSurface; userId: num
         setTalking(true);
         // An answered question is one off the month: refresh the header's count.
         if (data.kind === "answer") void refetch();
+      } else if (neutral) {
+        push({ role: "assistant", content: typeof data.reply === "string" ? data.reply : BUSY_TEXT, tone: "note" });
       } else if (res.status === 401 || (res.status === 403 && data.presetsOnly)) {
         push({ role: "assistant", content: data.reply ?? "Sign up or log in to ask your own questions.", tone: "note" });
         void refetch();
@@ -421,7 +448,7 @@ function HubConversation({ surface, userId }: { surface: HubSurface; userId: num
     } catch {
       if (live()) { markFailed(userMsgId, true); push({ role: "assistant", content: BUSY_TEXT, tone: "error" }); }
     } finally {
-      if (live()) { inFlight.current = null; setBusy(false); }
+      if (live()) { inFlight.current = null; setBusy(false); void refetch(); }
     }
   };
 
@@ -539,7 +566,7 @@ function HubConversation({ surface, userId }: { surface: HubSurface; userId: num
               <p id={descId} className="text-xs text-white/85" data-testid="hub-allowance">
                 {headerLine}
               </p>
-              {!metaFailed && allowance && <p className="text-xs text-white/85" data-testid="hub-daily">Today: {allowance.daily.used.toLocaleString("en-US")} of {allowance.daily.limit.toLocaleString("en-US")} questions used</p>}
+              {!metaFailed && allowance && <p className="text-xs text-white/85" data-testid="hub-daily">Today: {allowance.daily.used.toLocaleString("en-US")} of {allowance.daily.limit.toLocaleString("en-US")} attempts used. Daily attempts include failures; monthly allowance counts answers.</p>}
             </div>
             {builder && messages.length > 0 && (
               <button type="button" onClick={() => { startOver(); focusComposer(); }}
@@ -687,7 +714,7 @@ function HubConversation({ surface, userId }: { surface: HubSurface; userId: num
               </div>
             ) : (
               <div className="flex items-center justify-between gap-3" data-testid="hub-signup-cta">
-                <p className="text-xs text-muted-foreground">Create a free account to ask Gabe anything.</p>
+                <p className="text-xs text-muted-foreground">Quick questions are free, with or without an account. Typed questions need a verified account and a plan allowance.</p>
                 <Link href="/auth" onClick={() => setOpen(false)}
                   className="shrink-0 rounded-full bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-600"
                   data-testid="hub-signup-link">
