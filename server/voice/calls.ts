@@ -11,7 +11,7 @@
  *     unblock needing manageSettings.
  *
  * Also here: the public "Got it" link an escalation email carries (signed,
- * org-less) and the reminder worker's start (VOICE_ESCALATION_WORKER_ENABLED).
+ * org-less) and the reminder worker's start (escalations.ts voiceEscalationWorkerOffReason).
  */
 import type { Express, Request, Response } from "express";
 import { z } from "zod";
@@ -23,7 +23,7 @@ import { voiceContext, type GetUser } from "./context";
 import { openRecording, parseRange } from "./recordings";
 import { listSpamLedger, presentSpamRow, unblockNumber, blockNumber, spamNumber } from "./spam";
 import { getVoiceUsageRow, summarizeVoiceUsage, voiceMonthKey } from "./billing-usage";
-import { closeEscalation, listEscalations, confirmEscalationByToken, startVoiceEscalationWorker, kindLabel } from "./escalations";
+import { closeEscalation, listEscalations, confirmEscalationByToken, startVoiceEscalationWorker, voiceEscalationWorkerStatus, kindLabel } from "./escalations";
 import { logActivity } from "../crm/activity";
 
 export const SPAM_OUTCOMES = ["spam", "blocked"] as const;
@@ -48,7 +48,21 @@ const listColumns = {
   summary: voiceCalls.summary, recordingKey: voiceCalls.recordingKey, recordingSeconds: voiceCalls.recordingSeconds,
   customerId: voiceCalls.customerId, projectId: voiceCalls.projectId, leadDeliveredAt: voiceCalls.leadDeliveredAt,
   spamConfidence: voiceCalls.spamConfidence, spamReason: voiceCalls.spamReason,
+  recordingPending: sql<boolean>`coalesce((${voiceCalls.flags}->>'recordingPending')::boolean, false)`,
 };
+
+/** The engine retries an upload for 3 days (voice/outbox.py max_age_s); past that (plus slack) "pending" is "failed". */
+export const RECORDING_PENDING_MAX_MS = (3 * 24 + 1) * 60 * 60 * 1000;
+export type RecordingState = "available" | "pending" | "failed" | "none";
+
+/** Where a call's recording stands: stored, on its way from the engine, never arrived, or there is none. */
+export function recordingStateOf(call: { recordingKey: string | null; recordingPending?: boolean | null; flags?: unknown; endedAt: Date | null }, now = new Date()): RecordingState {
+  if (call.recordingKey) return "available";
+  const pending = call.recordingPending ?? (call.flags as Record<string, unknown> | null | undefined)?.recordingPending === true;
+  if (!pending) return "none";
+  const ended = call.endedAt?.getTime() ?? now.getTime();
+  return now.getTime() - ended > RECORDING_PENDING_MAX_MS ? "failed" : "pending";
+}
 
 /**
  * Answer JSON without going through res.json: the request logger in
@@ -131,7 +145,7 @@ export function presentEscalation(row: typeof voiceEscalations.$inferSelect) {
 }
 
 export function registerVoiceCallRoutes(app: Express, getDevUser: GetUser): void {
-  // The reminder loop (production only: VOICE_ESCALATION_WORKER_ENABLED=true).
+  // The reminder loop (on in production unless VOICE_ESCALATION_WORKER_ENABLED=false; escalations.ts).
   startVoiceEscalationWorker();
 
   /** GET ?outcome=&spam=1&numberId=&from=&to=&q=&page=&limit= → { calls: [...], total, page, limit }.
@@ -170,7 +184,7 @@ export function registerVoiceCallRoutes(app: Express, getDevUser: GetUser): void
     const [{ n: total }] = await db.select({ n: sql<number>`count(*)::int` }).from(voiceCalls).where(cond);
     const calls = await db.select(listColumns).from(voiceCalls).where(cond)
       .orderBy(desc(voiceCalls.startedAt)).limit(q.limit).offset((q.page - 1) * q.limit);
-    sendUnlogged(res, { calls: calls.map((c) => ({ ...c, spamConfidence: c.spamConfidence == null ? null : Number(c.spamConfidence), hasRecording: !!c.recordingKey })), total, page: q.page, limit: q.limit });
+    sendUnlogged(res, { calls: calls.map(({ recordingPending, ...c }) => ({ ...c, spamConfidence: c.spamConfidence == null ? null : Number(c.spamConfidence), hasRecording: !!c.recordingKey, recordingState: recordingStateOf({ ...c, recordingPending }) })), total, page: q.page, limit: q.limit });
   });
 
   /**
@@ -216,6 +230,7 @@ export function registerVoiceCallRoutes(app: Express, getDevUser: GetUser): void
       ...call,
       spamConfidence: call.spamConfidence == null ? null : Number(call.spamConfidence),
       hasRecording: !!call.recordingKey,
+      recordingState: recordingStateOf(call),
       recordingUrl: call.recordingKey ? `/api/crm/voice/calls/${call.id}/recording` : null,
       customer: customer ?? null, project: project ?? null, number: number ?? null, escalations,
     });
@@ -311,7 +326,7 @@ export function registerVoiceCallRoutes(app: Express, getDevUser: GetUser): void
     if (!v) return;
     const open = req.query.open === "1" || req.query.open === "true";
     const rows = await listEscalations(v.ctx.org.id, { open, limit: 200 });
-    sendUnlogged(res, { escalations: rows.map(presentEscalation) });
+    sendUnlogged(res, { escalations: rows.map(presentEscalation), reminders: voiceEscalationWorkerStatus() });
   });
   /** POST /:id/close { reason? } → { closed: true, escalation } */
   app.post("/api/crm/voice/escalations/:id/close", async (req: any, res) => {

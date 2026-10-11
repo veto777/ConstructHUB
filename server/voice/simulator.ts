@@ -17,7 +17,7 @@
  */
 import type { Express, Response } from "express";
 import { randomBytes } from "crypto";
-import { z } from "zod";
+import { z, ZodError } from "zod";
 import { voiceContext, type GetUser } from "./context";
 import { voiceInternalHeaders } from "./internal-auth";
 import { voiceEngineUrl } from "./proxy";
@@ -67,12 +67,18 @@ function bad(res: Response, issues: unknown) {
 }
 
 /** Which compiled profile a session runs: the draft (compiled now) or the published one. */
-async function compiledFor(v: NonNullable<Awaited<ReturnType<typeof voiceContext>>>, useDraft: boolean): Promise<{ compiled: CompiledProfile; timezone: string; version: number } | { error: "unpublished" | "paused" }> {
+async function compiledFor(v: NonNullable<Awaited<ReturnType<typeof voiceContext>>>, useDraft: boolean): Promise<{ compiled: CompiledProfile; timezone: string; version: number } | { error: "unpublished" | "paused" | "draft_invalid" }> {
   const row = await getOrCreateProfile(v.ctx.org, v.ctx.member.id);
   if (useDraft) {
-    const p = await previewDraft(v.ctx.org.id);
-    if (!p) return { error: "unpublished" };
-    return { compiled: p.compiled, version: p.version, timezone: parseVoiceProfile(row.profile).company.timezone };
+    try {
+      const p = await previewDraft(v.ctx.org.id);
+      if (!p) return { error: "unpublished" };
+      return { compiled: p.compiled, version: p.version, timezone: parseVoiceProfile(row.profile).company.timezone };
+    } catch (e) {
+      // A stored draft the schema no longer accepts: say so in words, never a raw validation dump (or a 500).
+      if (e instanceof ZodError) return { error: "draft_invalid" };
+      throw e;
+    }
   }
   const st = publishedState(row);
   if (st.state !== "live") return { error: st.state };
@@ -85,17 +91,36 @@ async function engineFetch(path: string, init: RequestInit): Promise<globalThis.
   } catch { return null; }
 }
 
+/** The draft cannot be compiled (a stored value the schema no longer accepts). */
+export const SIM_DRAFT_INVALID = "Your draft has a setting the assistant can't read. Open Agent Studio, review each section and save the draft, then try again.";
+
+/** Any unexpected failure in a Simulator route answers plain words, never an error dump. */
+export const SIM_FAILED = "The Simulator couldn't run that just now. Try again in a moment; if it keeps happening, reload the page.";
+function guarded(fn: (req: any, res: Response) => Promise<unknown>) {
+  return async (req: any, res: Response) => {
+    try {
+      await fn(req, res);
+    } catch (e: any) {
+      console.error("[voice-sim] route failed:", e?.message || e);
+      if (!res.headersSent) res.status(500).json({ code: "simulator_failed", message: SIM_FAILED });
+    }
+  };
+}
+
 const engineDown = (res: Response) => res.status(503).json({ code: "voice_engine_unavailable", message: "The Call Assistant engine is not reachable right now." });
 
 export function registerVoiceSimulatorRoutes(app: Express, getDevUser: GetUser): void {
   /** POST { useDraft?: boolean, callerNumber?: string } → { sessionId, greeting, compiledVersion, backend } */
-  app.post("/api/crm/voice/simulator/session", async (req: any, res) => {
+  app.post("/api/crm/voice/simulator/session", guarded(async (req: any, res) => {
     const v = await voiceContext(req, res, getDevUser);
     if (!v) return;
     const body = sessionBody.safeParse(req.body ?? {});
     if (!body.success) return bad(res, body.error.issues);
     const picked = await compiledFor(v, body.data.useDraft);
-    if ("error" in picked) return res.status(409).json({ code: picked.error, message: picked.error === "paused" ? "The assistant is paused; resume it or simulate the draft." : "Nothing is published yet; simulate the draft or publish first." });
+    if ("error" in picked) {
+      if (picked.error === "draft_invalid") return res.status(422).json({ code: "draft_invalid", message: SIM_DRAFT_INVALID });
+      return res.status(409).json({ code: picked.error, message: picked.error === "paused" ? "The assistant is paused; resume it or simulate the draft." : "Nothing is published yet; simulate the draft or publish first." });
+    }
     const caller = body.data.callerNumber ? await callerStatus(v.ctx.org.id, body.data.callerNumber) : null;
     const callerCtx = { callerNumber: body.data.callerNumber ?? null, customer: caller?.customer ?? null };
 
@@ -115,10 +140,10 @@ export function registerVoiceSimulatorRoutes(app: Express, getDevUser: GetUser):
     sessions.set(id, { id, orgId: v.ctx.org.id, brain, createdAt: now, touchedAt: now, compiledVersion: picked.version, draft: body.data.useDraft });
     const greeting = brain.greet();
     return res.json({ sessionId: id, greeting, compiledVersion: picked.version, backend: "app", draft: body.data.useDraft, persona: picked.compiled.persona });
-  });
+  }));
 
   /** POST { sessionId, text } → Decision + { ended, outcome, events, turn, fallback } */
-  app.post("/api/crm/voice/simulator/turn", async (req: any, res) => {
+  app.post("/api/crm/voice/simulator/turn", guarded(async (req: any, res) => {
     const v = await voiceContext(req, res, getDevUser);
     if (!v) return;
     const body = turnBody.safeParse(req.body ?? {});
@@ -147,7 +172,7 @@ export function registerVoiceSimulatorRoutes(app: Express, getDevUser: GetUser):
       return res.status(502).json({ code: "ai_unavailable", message: "The AI provider did not answer. Try again in a moment." });
     }
     return res.json(turn);
-  });
+  }));
 
   /** GET → the transcript so far (the Studio's refresh). */
   app.get("/api/crm/voice/simulator/session/:id", async (req: any, res) => {

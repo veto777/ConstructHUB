@@ -8,7 +8,7 @@ import { StatusPill } from "@/components/crm-ui";
 import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Mic, User, FolderKanban } from "lucide-react";
-import { outcomeTone, outcomeLabel, fmtPhone, fmtDuration, fmtWhen, type VoiceCallDetail, type VoiceEscalation } from "./calls-shared";
+import { outcomeTone, outcomeLabel, fmtPhone, fmtDuration, fmtWhen, LIVE_REFRESH_MS, type VoiceCallDetail, type VoiceEscalation } from "./calls-shared";
 
 /** The default intake order first (need → address → … → best time), then any custom keys A–Z. */
 const SLOT_ORDER = ["need", "address", "city", "first_name", "name", "phone", "email", "best_time"];
@@ -26,7 +26,11 @@ const personaName = (id: string) => id.charAt(0).toUpperCase() + id.slice(1);
  */
 export function CallDetailSheet({ callId, onClose }: { callId: string | null; onClose: () => void }) {
   const open = !!callId;
-  const q = useQuery<VoiceCallDetail>({ queryKey: ["/api/crm/voice/calls", callId], enabled: open });
+  // While a recording is still on its way from the phone system, check back every 30 s so it appears by itself.
+  const q = useQuery<VoiceCallDetail>({
+    queryKey: ["/api/crm/voice/calls", callId], enabled: open,
+    refetchInterval: (query) => (query.state.data?.recordingState === "pending" ? LIVE_REFRESH_MS : false),
+  });
   const call = q.data;
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -55,6 +59,16 @@ export function CallDetailSheet({ callId, onClose }: { callId: string | null; on
               <section>
                 <h3 className="mb-2 flex items-center gap-2 font-medium"><Mic className="h-4 w-4" aria-hidden="true" /> Recording</h3>
                 <audio controls preload="none" className="w-full" src={call.recordingUrl ?? `/api/crm/voice/calls/${call.id}/recording`} data-testid="audio-call-recording" />
+              </section>
+            )}
+            {!call.hasRecording && !call.recordingUrl && (call.recordingState === "pending" || call.recordingState === "failed") && (
+              <section data-testid={`text-recording-${call.recordingState}`}>
+                <h3 className="mb-1 flex items-center gap-2 font-medium"><Mic className="h-4 w-4" aria-hidden="true" /> Recording</h3>
+                <p className="text-muted-foreground">
+                  {call.recordingState === "pending"
+                    ? "Still uploading from the phone system. It shows up here by itself, usually within a few minutes."
+                    : "The recording never arrived from the phone system. The transcript below is complete."}
+                </p>
               </section>
             )}
 

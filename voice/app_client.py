@@ -19,6 +19,12 @@ log = logging.getLogger("voice.app")
 BASE = "/api/voice-internal"
 
 
+def _status_of(e: Exception) -> int | None:
+    """The HTTP status of a failed request (None for a transport error): the outbox retries all but a final 4xx."""
+    resp = getattr(e, "response", None)
+    return getattr(resp, "status_code", None) if resp is not None else None
+
+
 class ProfileUnavailable(Exception):
     """The app answered 404 (unknown number) or 423 (paused/unpublished); `say` is the line to speak, if any."""
 
@@ -100,7 +106,7 @@ class AppClient:
                 return r.json()
             except Exception as e:  # noqa: BLE001
                 log.warning("call_finished failed: %s", e)
-                return {"error": str(e)[:200]}
+                return {"error": str(e)[:200], "status": _status_of(e)}
         return {"error": "call_in_progress"}
 
     async def upload_recording(self, call_sid: str, wav_path: Path) -> dict[str, Any]:
@@ -112,7 +118,7 @@ class AppClient:
             return r.json()
         except Exception as e:  # noqa: BLE001
             log.warning("upload_recording failed: %s", e)
-            return {"error": str(e)[:200]}
+            return {"error": str(e)[:200], "status": _status_of(e)}
 
     async def status_callback(self, payload: dict[str, Any]) -> None:
         """POST /status — a SignalWire status callback relayed as-is."""

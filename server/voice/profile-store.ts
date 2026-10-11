@@ -124,7 +124,8 @@ export async function previewDraft(orgId: string, now = new Date()): Promise<{ c
 export async function setProfileStatus(orgId: string, status: "paused" | "live", memberId: string | null): Promise<VoiceProfileRow | { error: "unpublished" }> {
   const row = await getProfileRow(orgId);
   if (!row) throw new Error("voice profile row missing");
-  if (row.publishedVersion === null || !row.compiled) return { error: "unpublished" };
+  // A published profile without a stored compiled copy still runs (publishedState compiles it), so it can be paused too.
+  if (row.publishedVersion === null || !row.publishedProfile) return { error: "unpublished" };
   const [updated] = await db.update(voiceProfiles).set({ status, updatedByMemberId: memberId, updatedAt: new Date() }).where(eq(voiceProfiles.orgId, orgId)).returning();
   return updated;
 }
@@ -262,9 +263,24 @@ export async function callerStatus(orgId: string, from: string | null | undefine
   };
 }
 
-/** The profile a call must run: the published compiled output, or why not. */
-export function publishedState(row: VoiceProfileRow | null): { state: "live"; compiled: CompiledProfile; version: number; profile: VoiceProfile } | { state: "paused" | "unpublished" } {
-  if (!row || row.publishedVersion === null || !row.compiled || !row.publishedProfile) return { state: "unpublished" };
+/**
+ * The profile a call must run: the published compiled output, or why not.
+ *
+ * A row that has a published profile but no stored `compiled` (a hand-written or imported row, a seed, a
+ * migration that only copied the JSON) is compiled here from `published_profile` at its published version, so
+ * the engine and the Simulator never tell a caller "isn't set up yet" while the Studio says "Version N is live".
+ * Only a published profile the compiler cannot read counts as unpublished.
+ */
+export function publishedState(row: VoiceProfileRow | null, now = new Date()): { state: "live"; compiled: CompiledProfile; version: number; profile: VoiceProfile } | { state: "paused" | "unpublished" } {
+  if (!row || row.publishedVersion === null || !row.publishedProfile) return { state: "unpublished" };
   if (row.status === "paused") return { state: "paused" };
-  return { state: "live", compiled: row.compiled, version: row.publishedVersion, profile: row.publishedProfile };
+  if (row.compiled) return { state: "live", compiled: row.compiled, version: row.publishedVersion, profile: row.publishedProfile };
+  try {
+    const profile = parseVoiceProfile(row.publishedProfile);
+    return { state: "live", compiled: compileVoiceProfile(profile, row.publishedVersion, now), version: row.publishedVersion, profile };
+  } catch (e: any) {
+    const why = Array.isArray(e?.issues) ? e.issues.map((i: any) => `${(i.path ?? []).join(".")}: ${i.message}`).join("; ") : String(e?.message || e);
+    console.warn(`[voice] org ${row.orgId}: published profile v${row.publishedVersion} has no compiled copy and does not compile: ${why.slice(0, 200)}`);
+    return { state: "unpublished" };
+  }
 }

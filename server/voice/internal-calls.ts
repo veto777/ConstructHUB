@@ -79,6 +79,9 @@ export const endReportSchema = startSchema.omit({ callSid: true }).extend({
   spam: z.object({ confidence: z.number().min(0).max(1), reason: z.string().max(300).default("") }).nullable().optional(),
   lead: z.object({ requested: z.boolean().default(true) }).nullable().optional(),
   alerts: z.array(z.object({ kind: z.string().max(40), summary: z.string().max(600).default("") })).max(20).default([]),
+  /** The engine has a recording for this call and will upload it (its outbox retries until it lands): the call
+   *  shows "Recording pending" until POST /recordings/:sid clears the flag (voice/outbox.py). */
+  recordingPending: z.boolean().optional(),
 });
 export type EndReport = z.infer<typeof endReportSchema>;
 
@@ -324,6 +327,7 @@ async function processFinishedCall(callId: string, report: EndReport): Promise<F
   // stays true) for the retry worker (billing-usage.ts retryPendingVoiceMeters), which also recovers from the call
   // rows themselves, so a failed meter is never acknowledged as done.
   const at = row.startedAt ?? row.endedAt ?? new Date();
+  if (report.recordingPending && !row.recordingKey) patch.recordingPending = true;
   patch.processedAt = new Date().toISOString();
   patch.result = result;
   patch.meterPending = true;
@@ -449,6 +453,7 @@ export function registerVoiceInternalCallRoutes(app: Express): void {
         if (!recordingsConfigured()) return res.status(503).json({ code: "r2_unconfigured", message: "R2 is not configured on this app; the recording was not stored." });
         const { recordingKey, seconds } = await putRecording(call.orgId, call.callSid, wav);
         await db.update(voiceCalls).set({ recordingKey, recordingSeconds: seconds }).where(eq(voiceCalls.id, call.id));
+        await mergeCallFlags(call.id, {}, { dropKeys: ["recordingPending"] });
         res.json({ recordingKey, seconds });
       } catch (e: any) {
         console.error("[voice] recording upload failed:", e?.message || e);
