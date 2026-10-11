@@ -79,7 +79,7 @@ chip as "Group: <name>".
 | "N of M pages with errors" | `seoLinks.audit(s.id, { tab: "pages" })` | Pages |
 | "crawled <date>" (also the date in "could not be read" / "no page scored") | `seoLinks.audit(s.id, { at: audit.jobId })` | Crawl of <date> |
 | "the crawl before has no score" / "the crawl before scored N pages (limit …, now …)" | `seoLinks.audit(s.id, { at: prev.jobId })` | Crawl of <date> |
-| "No crawl yet — run one in Site audit" | `seoLinks.audit(s.id)` | — |
+| "Run first crawl" (no crawl yet) | stays a button (starts the site's first crawl: `POST /api/sitescan`, as the audit page's button; then "Crawling… · Site audit" → `seoLinks.audit(s.id)`; a refusal is said under it) | — |
 | "Last N crawls": each row, date and health figure (one link) | `seoLinks.audit(s.id, { at: crawl.jobId })` | Crawl of <date> |
 | Authority (label and number) | `seoLinks.explorer(d)` — the overview (the backlink profile) | — |
 | Authority change | `seoLinks.explorer(d, "overview", { month: <first month shown> })` | Since <month> |
@@ -122,7 +122,7 @@ places.
 | Step 2 "N tracked" (— checked every week by default) | `seoLinks.rankTracker(s.id)` | — |
 | Step 2 "Open Rank tracker" | `seoLinks.rankTracker(s.id)` | — |
 | Step 3 "Site audit" in "Crawled — the health score and its issues are in Site audit" | `seoLinks.audit(s.id)` | — |
-| Step 3 "Open Site audit" (no crawl yet) | `seoLinks.audit(s.id)` | — |
+| Step 3 "Run first crawl" (no crawl yet) | stays a button (the same first crawl as the health cell's; "Crawling… · Site audit" → `seoLinks.audit(s.id)`) | — |
 | Step 3 health tile (crawled) | the same links as the Health score above | as above |
 | Empty dashboard: "Site explorer" | `seoLinks.explorer("")` — the explorer with no domain | — |
 
@@ -145,5 +145,7 @@ are one block link; the label inside it keeps its old `…-label` id, e.g. `link
 `link-tracked-due-<id>`, `link-dist-tracked-<id>-top3|top10|rest` and `-bar-…`, `link-add-keywords-<id>`,
 `link-spark-<authority|domains|traffic|keywords>-<id>-month-<YYYY-MM>` (the months under each sparkline, in
 `spark-…-<id>-months`), `link-trend-<id>-first|last` and `link-trend-<id>-<series>-month-<YYYY-MM>`,
-`link-start-tracked-<id>`, `link-start-rank-<id>`, `link-start-audit-<id>`. The pills keep `link-explore-<id>`,
+`link-start-tracked-<id>`, `link-start-rank-<id>`, `link-start-audit-<id>`; the first-crawl buttons `button-health-crawl-<id>` /
+`button-start-crawl-<id>` (their "Crawling…" link keeps `link-health-audit-<id>` / `link-start-audit-<id>`), the refusal
+`text-crawl-error-<id>`. The pills keep `link-explore-<id>`,
 `link-rank-<id>`, `link-audit-<id>`, `link-plan-<id>`. `server/seo/dashboard-links.test.ts` pins these.

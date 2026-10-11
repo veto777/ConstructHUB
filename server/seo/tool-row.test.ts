@@ -10,7 +10,7 @@ import { createElement as h } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Router } from "wouter";
 import * as cheerio from "cheerio";
-import { ProjectRow, type SiteCard } from "../../client/src/components/seo-tool/project-row";
+import { ProjectRow, type CrawlState, type SiteCard } from "../../client/src/components/seo-tool/project-row";
 
 const months = (n: number, f: (i: number) => number) => Array.from({ length: n }, (_, i) => ({ month: `2026-${String(i + 1).padStart(2, "0")}`, v: f(i) }));
 const card: SiteCard = {
@@ -28,8 +28,8 @@ const card: SiteCard = {
   },
 };
 const noop = () => {};
-const render = (c: SiteCard) => cheerio.load(renderToStaticMarkup(h(Router, { ssrPath: "/seo" }, h(ProjectRow, {
-  card: c, busy: false, canAnalyse: true, price: "$1.20", priceNote: "", onAnalyse: noop, onPick: noop,
+const render = (c: SiteCard, crawl?: { onCrawl: () => void; crawl: CrawlState }) => cheerio.load(renderToStaticMarkup(h(Router, { ssrPath: "/seo" }, h(ProjectRow, {
+  card: c, busy: false, canAnalyse: true, price: "$1.20", priceNote: "", onAnalyse: noop, onPick: noop, ...crawl,
   star: { pending: false, onToggle: noop },
   group: { editing: false, draft: "", pending: false, onDraft: noop, onEdit: noop, onSave: noop, onCancel: noop },
 }))));
@@ -114,5 +114,32 @@ describe("the site row", () => {
     const dash = partial('[data-testid="metric-authority-7"] .tool-stat__value--none');
     expect(dash.text()).toBe("—");
     expect(dash.attr("title")).toBe("Not in the saved report");
+  });
+
+  it("a site with no crawl offers its first crawl where the health score will be, not a link to an empty audit", () => {
+    const idle: CrawlState = { pending: false, started: false, error: null };
+    const uncrawled = { ...card, audit: null };
+    // With a report: the health cell. Without one: step 3 of the start strip. Each is a named button that starts the crawl.
+    for (const [c, id] of [[uncrawled, "health"], [{ ...uncrawled, report: null }, "start"]] as const) {
+      const $ = render(c, { onCrawl: noop, crawl: idle });
+      const b = $(`[data-testid="button-${id}-crawl-7"]`);
+      expect(b.is("button:not([disabled])"), id).toBe(true);
+      expect(b.text()).toContain("Run first crawl");
+      expect(nameOf($, b)).toBe("No crawl of fixture.example yet — run its first crawl");
+      expect(b.attr("title")).toContain("monthly Site Scans");
+      expect($(`[data-testid="link-${id}-audit-7"]`).length, `${id}: no link to the empty audit`).toBe(0);
+      expect($('[data-testid="link-audit-7"]').attr("href"), "the Site audit pill stays").toBe("/seo/audit?site=7");
+    }
+    // Pending: the button waits. Started: a link to the audit that watches the crawl. Refused: the server's words, the button back.
+    expect(render(uncrawled, { onCrawl: noop, crawl: { ...idle, pending: true } })('[data-testid="button-health-crawl-7"]').is("[disabled]")).toBe(true);
+    const started = render(uncrawled, { onCrawl: noop, crawl: { ...idle, started: true } });
+    expect(started('[data-testid="button-health-crawl-7"]').length).toBe(0);
+    expect(started('[data-testid="link-health-audit-7"]').attr("href")).toBe("/seo/audit?site=7");
+    expect(started('[data-testid="link-health-audit-7"]').text()).toContain("Crawling…");
+    const refused = render(uncrawled, { onCrawl: noop, crawl: { ...idle, error: "Your plan's Site Scans are used up this month." } });
+    expect(refused('[data-testid="text-crawl-error-7"][role="alert"]').text()).toBe("Your plan's Site Scans are used up this month.");
+    expect(refused('[data-testid="button-health-crawl-7"]').is("button:not([disabled])")).toBe(true);
+    // Without a starter (an older caller) the link to Site audit stays, as the empty-state test above expects.
+    expect(render(uncrawled)('[data-testid="link-health-audit-7"]').attr("href")).toBe("/seo/audit?site=7");
   });
 });

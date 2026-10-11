@@ -61,6 +61,16 @@ describe("the dashboard honours the address and links every figure", () => {
     expect(row.match(/onClick=\{onAnalyse\}/g)).toHaveLength(2);
     expect(row).not.toMatch(/useEffect/);
     expect(dash).not.toMatch(/useEffect\([^;]*analyse\.mutate/);
+    // The first crawl of a site with none is the other action a card starts: one mutation in the page, the audit page's
+    // request (POST /api/sitescan, 150 pages, one of the plan's scans), handed to the row as `onCrawl`, which the row calls
+    // from one button — rendered where the link to the empty audit was, in the health cell and in the start strip's step 3.
+    expect(page.match(/crawl\.mutate\(/g)).toHaveLength(1);
+    expect(page).toContain('mutationFn: (s: SeoSite) => api("POST", "/api/sitescan", { url: `https://${s.domain}`, pageCap: 150, psiPages: 1 })');
+    expect(page).toContain("onCrawl={() => crawl.mutate(s)} crawl={{ pending: crawl.isPending && crawl.variables?.id === s.id, started: crawling.includes(s.id), error: crawlErrors[s.id] ?? null }}");
+    expect(row.match(/onClick=\{onCrawl\}/g)).toHaveLength(1);
+    expect(row).toContain("{!audit && <FirstCrawl siteId={siteId} domain={domain} onPick={onPick} onCrawl={onCrawl} crawl={firstCrawl} testId={`link-health-audit-${siteId}`} buttonTestId={`button-health-crawl-${siteId}`} />}");
+    expect(row).toContain("<FirstCrawl siteId={s.id} domain={s.domain} onPick={pick} onCrawl={onCrawl} crawl={crawl} testId={`link-start-audit-${s.id}`} buttonTestId={`button-start-crawl-${s.id}`} />");
+    expect(dash).not.toMatch(/useEffect\([^;]*crawl\.mutate/);
   });
 
   it("writes no address of its own: every href is a builder", () => {
