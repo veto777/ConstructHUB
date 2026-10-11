@@ -6,7 +6,7 @@ import { pool } from "../db";
 import { rateLimit } from "../growth-limits";
 import { requireModule } from "../entitlements";
 import { autoSchema, opaqueId, publicMediaUrl } from "../../shared/social";
-import { SocialError } from "./client";
+import { SocialError, socialErrorBody } from "./client";
 import {
   connect,
   disconnect,
@@ -98,14 +98,16 @@ export function registerSocialRoutes(
                   ? 400
                   : 500,
             )
-            .json({
-              message:
-                e instanceof SocialError
-                  ? e.message
-                  : e instanceof z.ZodError
-                    ? socialInputMessage(e)
-                    : "Social Media operation could not be completed. Check your input and retry.",
-            });
+            .json(
+              e instanceof SocialError
+                ? socialErrorBody(e)
+                : {
+                    message:
+                      e instanceof z.ZodError
+                        ? socialInputMessage(e)
+                        : "Social Media operation could not be completed. Check your input and retry.",
+                  },
+            );
         }
       },
     );

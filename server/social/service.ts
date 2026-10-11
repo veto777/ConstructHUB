@@ -13,7 +13,7 @@ import {
   type AutoSettings,
   publicMediaUrl,
 } from "../../shared/social";
-import { BlotatoClient, encryptKey, decryptKey, SocialError } from "./client";
+import { BlotatoClient, encryptKey, decryptKey, SocialError, socialMisconfigured } from "./client";
 import {
   clientFactory, userLock, ownedBusiness, connection, validateDestinations, destinationFromPayload, destinationKey, requestFingerprint, insertPosts, createPosts,
   type ClientFactory,
@@ -180,7 +180,7 @@ export type Generate = (context: unknown) => Promise<string>;
 /** One post draft: cleaned of tool markup and reasoning; a bad answer is retried once, then a 502. */
 export async function generatePostText(context: unknown, client?: ChatClient): Promise<string> {
   if (!client && !process.env.AI_INTEGRATIONS_OPENAI_API_KEY)
-    throw new SocialError("AI is not configured", 503);
+    throw socialMisconfigured("Social Media post writing is not set up on this server yet: no AI provider is configured.");
   const source = JSON.stringify(context);
   try {
     const { text } = await aiComplete(client ?? aiClient({ timeoutFallbackMs: 25000 }), {

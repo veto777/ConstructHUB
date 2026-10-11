@@ -36,6 +36,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, or, ilike, inArray, and, sql, gte, lte, lt, isNull, isNotNull, count, countDistinct } from "drizzle-orm";
+import { resultPage, SEARCH_PAGE_MAX, type ResultPage } from "./search-page";
 
 /**
  * Permit directory totals. `total`/`county`/`city` count listed jurisdictions, not portals.
@@ -64,6 +65,16 @@ export interface PermitDirectoryCounts {
 // LSA account manager page (customer ID digits or any part of the account name).
 const lsaAccountSearch = (q: string) =>
   or(ilike(lsaAccounts.customerId, `%${q}%`), ilike(lsaAccounts.accountName, `%${q}%`));
+
+/** Which stored permit matches a search may read: the portals in the chosen area, one page at a time. */
+export interface LocalSearchScope {
+  /** Portal ids in scope; an empty list means nothing is in scope. Omit for every portal. */
+  databaseIds?: number[];
+  /** Rows per page (server/search-page.ts: at most and by default SEARCH_PAGE_MAX). */
+  limit?: number;
+  /** Only matches older than this result id — the previous page's nextCursor. */
+  before?: number;
+}
 
 export interface IStorage {
   getCounties(): Promise<County[]>;
@@ -94,7 +105,7 @@ export interface IStorage {
   createSearchResult(data: InsertSearchResult): Promise<SearchResult>;
   updateSearchResult(id: number, data: Partial<InsertSearchResult>): Promise<void>;
   findExistingResult(databaseId: number, permitNumber: string | null): Promise<SearchResult | undefined>;
-  searchLocalResults(searchType: string, searchValue: string): Promise<SearchResult[]>;
+  searchLocalResults(searchType: string, searchValue: string, scope?: LocalSearchScope): Promise<ResultPage<SearchResult>>;
   searchLocalResultsByDatabase(searchType: string, searchValue: string, databaseId: number): Promise<SearchResult[]>;
 
   getScrapeSchedules(): Promise<ScrapeSchedule[]>;
@@ -409,7 +420,7 @@ export class DatabaseStorage implements IStorage {
     return existing;
   }
 
-  async searchLocalResults(searchType: string, searchValue: string): Promise<SearchResult[]> {
+  async searchLocalResults(searchType: string, searchValue: string, scope: LocalSearchScope = {}): Promise<ResultPage<SearchResult>> {
     const terms = searchValue.trim().split(/\s+/).filter(Boolean);
 
     let conditions;
@@ -472,6 +483,12 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
+    const limit = scope.limit ?? SEARCH_PAGE_MAX;
+    if (scope.databaseIds && scope.databaseIds.length === 0) return resultPage([], limit, 0);
+    // The area filter belongs in SQL, before any cap: reading the newest 1,000 matches nationwide
+    // and then keeping the area's rows made older matches in a busy jurisdiction unreachable.
+    const inScope = scope.databaseIds ? and(conditions!, inArray(searchResults.databaseId, scope.databaseIds)) : conditions!;
+    const [{ total }] = await db.select({ total: count() }).from(searchResults).where(inScope);
     const rows = await db.select({
       result: searchResults,
       databaseName: permitDatabases.name,
@@ -480,16 +497,17 @@ export class DatabaseStorage implements IStorage {
     })
       .from(searchResults)
       .leftJoin(permitDatabases, eq(searchResults.databaseId, permitDatabases.id))
-      .where(conditions!)
-      .orderBy(desc(searchResults.createdAt))
-      .limit(1000);
+      .where(scope.before ? and(inScope, lt(searchResults.id, scope.before)) : inScope)
+      // Newest first by id (insertion order): stable where created_at ties, and what `before` keys on.
+      .orderBy(desc(searchResults.id))
+      .limit(limit + 1);
 
-    return rows.map(row => ({
+    return resultPage(rows.map(row => ({
       ...row.result,
       databaseName: row.databaseName,
       jurisdiction: row.jurisdiction,
       countyId: row.countyId,
-    }));
+    })), limit, Number(total));
   }
 
   async searchLocalResultsByDatabase(searchType: string, searchValue: string, databaseId: number): Promise<SearchResult[]> {

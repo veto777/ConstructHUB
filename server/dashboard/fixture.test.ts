@@ -36,7 +36,9 @@ describe("tileAccess", () => {
     const none = { accessPlan: null, allowances: null, modules: NONE, hasCrmOrg: false };
     expect(tileAccess(def("gbp"), none)).toEqual({ entitled: false, requiredPlan: "starter" });
     expect(tileAccess(def("clickGuard"), none)).toEqual({ entitled: false, requiredPlan: "starter" });
-    expect(tileAccess(def("property"), none)).toEqual({ entitled: true });
+    // Property Records is a Pro module (server/routes.ts requireModule("propertyRecords")); the tile says the same.
+    expect(tileAccess(def("property"), none)).toEqual({ entitled: false, requiredPlan: "pro", module: "propertyRecords" });
+    expect(tileAccess(def("property"), { accessPlan: "pro" as const, allowances: PLANS.pro.limits, modules: { ...NONE, propertyRecords: true }, hasCrmOrg: true })).toEqual({ entitled: true, module: "propertyRecords" });
     const starter = { accessPlan: "starter" as const, allowances: PLANS.starter.limits, modules: NONE, hasCrmOrg: true };
     expect(tileAccess(def("gbp"), starter).entitled).toBe(true);
     // Solo includes 1 protected website: Click Guard opens on it (the cheapest plan that allows any).
