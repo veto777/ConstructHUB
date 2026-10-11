@@ -24,7 +24,7 @@ import { openRecording, parseRange } from "./recordings";
 import { listSpamLedger, presentSpamRow, unblockNumber, blockNumber, spamNumber } from "./spam";
 import { getVoiceUsageRow, summarizeVoiceUsage, voiceMonthKey } from "./billing-usage";
 import { closeEscalation, listEscalations, confirmEscalationByToken, startVoiceEscalationWorker, voiceEscalationWorkerStatus, kindLabel } from "./escalations";
-import { listCallTasks, presentCallTask, deliveryStateOf, rearmCallTasks, runCallTasksFor, callTaskWorkerStatus, type DeliveryState } from "./call-tasks";
+import { listCallTasks, presentCallTask, deliveryStateOf, rearmCallTasks, callTaskWorkerStatus, type DeliveryState } from "./call-tasks";
 import { logActivity } from "../crm/activity";
 
 export const SPAM_OUTCOMES = ["spam", "blocked"] as const;
@@ -284,7 +284,7 @@ export function registerVoiceCallRoutes(app: Express, getDevUser: GetUser): void
     if (!call) return res.status(404).json({ message: "Call not found" });
     const rearmed = await rearmCallTasks(v.ctx.org.id, call.id);
     if (!rearmed) return res.status(409).json({ message: "Nothing left to deliver for this call." });
-    const tasks = await runCallTasksFor(call.id);
+    const tasks = await listCallTasks(call.id);
     logActivity(v.ctx, "call.delivery_retried", { entityType: "voice_call", entityId: call.id, meta: { tasks: rearmed } });
     sendUnlogged(res, { delivery: { state: deliveryStateOf(tasks), tasks: tasks.map(presentCallTask), worker: callTaskWorkerStatus() } });
   });

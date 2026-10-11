@@ -240,11 +240,9 @@ export async function raiseEscalation(args: {
       });
     if (strict) {
       // Finish what the first attempt left: a first message that never went out, an owners' alert that failed.
+      if (existing && existing.sentCount > 0 && !existing.lastSentAt) throw new EscalationDeliveryError(existing.lastError || "First message is still being sent; verify delivery before resending", existing.id);
       if (existing && existing.sentCount === 0 && !existing.lastSentAt && !existing.closedAt) {
-        const sent = await sendEscalation(ctx.org, existing, existing.body, `${facts.company}: ${facts.kind} — ${facts.callerName}`);
-        await db.update(voiceEscalations).set({
-          sentCount: sent.ok ? 1 : 0, lastSentAt: sent.ok ? new Date() : null, lastProviderSid: sent.sid, lastError: sent.error,
-        }).where(eq(voiceEscalations.id, existing.id));
+        const sent = await sendFirstEscalation(ctx.org, existing, existing.body, `${facts.company}: ${facts.kind} — ${facts.callerName}`);
         if (!sent.ok) throw new EscalationDeliveryError(`escalation #${existing.id} not sent: ${sent.error ?? "send failed"}`, existing.id);
       }
       if (ownersNeeded(ctx, kind, !!existing) && !ownersDone()) {
@@ -287,10 +285,7 @@ export async function raiseEscalation(args: {
         if (strict) return raiseEscalation(args);
         return { escalationId: winner.id, sent: true, fallback: false, recipientName: winner.recipientName, duplicate: true };
       }
-      const sent = await sendEscalation(ctx.org, row, body, `${facts.company}: ${facts.kind} — ${facts.callerName}`);
-      await db.update(voiceEscalations).set({
-        sentCount: sent.ok ? 1 : 0, lastSentAt: sent.ok ? new Date() : null, lastProviderSid: sent.sid, lastError: sent.error,
-      }).where(eq(voiceEscalations.id, row.id));
+      const sent = await sendFirstEscalation(ctx.org, row, body, `${facts.company}: ${facts.kind} — ${facts.callerName}`);
       result = { escalationId: row.id, sent: sent.ok, fallback: false, recipientName: rule.recipientName, duplicate: false };
       if (!sent.ok) undelivered = `escalation #${row.id} not sent: ${sent.error ?? "send failed"}`;
     }
@@ -495,9 +490,10 @@ export async function tickVoiceEscalations(now = new Date()): Promise<TickReport
         if (row.remindEveryMinutes <= 0) continue;
         const due = !row.lastSentAt || now.getTime() - row.lastSentAt.getTime() >= row.remindEveryMinutes * MIN;
         if (!due || !open) continue;
+        if (row.sentCount > 0 && !row.lastSentAt) continue; // first send is claimed (or its outcome is unknown)
         const n = row.sentCount + 1;
         const body = row.sentCount === 0 ? row.body : `REMINDER #${n - 1} — still waiting on your OK:\n\n${row.body}`;
-        const sent = await sendEscalation(org, row, body, `Reminder: ${row.recipientName ? `${row.recipientName}, ` : ""}still waiting on your OK`);
+        const sent = await (row.sentCount === 0 ? sendFirstEscalation : sendEscalation)(org, row, body, `Reminder: ${row.recipientName ? `${row.recipientName}, ` : ""}still waiting on your OK`);
         if (sent.ok) {
           await db.update(voiceEscalations).set({ sentCount: n, lastSentAt: now, lastProviderSid: sent.sid, lastError: null }).where(eq(voiceEscalations.id, row.id));
           report.reminded++;
@@ -595,4 +591,14 @@ export function startVoiceEscalationWorker(): boolean {
   setTimeout(run, 15_000).unref();
   console.log("[voice] escalation reminder worker on (every 30 min)");
   return true;
+}
+
+/** Claim before contacting the provider. A competing live event, report or reminder cannot send this first message. */
+export async function sendFirstEscalation(org: typeof crmOrgs.$inferSelect, row: VoiceEscalationRow, body: string, subject: string) {
+  const [claimed] = await db.update(voiceEscalations).set({ sentCount: 1, lastError: "First message delivery in progress or outcome unknown; verify before resending" })
+    .where(and(eq(voiceEscalations.id, row.id), eq(voiceEscalations.sentCount, 0), isNull(voiceEscalations.closedAt))).returning();
+  if (!claimed) return { ok: false, sid: null, error: "First message already claimed by another sender" };
+  const sent = await sendEscalation(org, row, body, subject);
+  await db.update(voiceEscalations).set({ sentCount: sent.ok ? 1 : 0, lastSentAt: sent.ok ? new Date() : null, lastProviderSid: sent.sid, lastError: sent.error }).where(eq(voiceEscalations.id, row.id));
+  return sent;
 }

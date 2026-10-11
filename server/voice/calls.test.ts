@@ -204,7 +204,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Call Assistant cal
       expect(end.body.customerId).toBeTruthy();
       expect(end.body.projectId).toBeTruthy();
       // The CRM work ran as durable tasks recorded with the acknowledgement (call-tasks.ts), and all of it is done.
-      expect(end.body.delivery).toMatchObject({ state: "done", tasks: [{ key: "lead", state: "done" }, { key: "escalation:urgent", state: "done" }] });
+      expect({ ...end.body.delivery, tasks: end.body.delivery.tasks.filter((t: any) => t.kind !== "notification") }).toMatchObject({ state: "done", tasks: [{ key: "lead", state: "done" }, { key: "escalation:urgent", state: "done" }] });
       shared.customerId = end.body.customerId;
 
       // The engine retries the end report: same answer, nothing done twice.
@@ -362,7 +362,7 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Call Assistant cal
       expect(list.body.calls.find((x: any) => x.id === shared.leadCallId)).toMatchObject({ recordingState: "pending", hasRecording: false });
       expect(list.body.calls.every((x: any) => !("recordingPending" in x) && !("recordingStatus" in x))).toBe(true);
       // The delivery of its CRM work, per task and in one word (the list row and the drawer).
-      expect(r.body.delivery).toMatchObject({ state: "done", tasks: [{ key: "lead", state: "done", label: "Client and project in your CRM" }, { key: "escalation:urgent", state: "done", label: "Escalation — Emergency" }] });
+      expect({ ...r.body.delivery, tasks: r.body.delivery.tasks.filter((t: any) => t.kind !== "notification") }).toMatchObject({ state: "done", tasks: [{ key: "lead", state: "done", label: "Client and project in your CRM" }, { key: "escalation:urgent", state: "done", label: "Escalation — Emergency" }] });
       expect(list.body.calls.find((x: any) => x.id === shared.leadCallId).deliveryState).toBe("done");
       expect(list.body.calls.find((x: any) => x.id === shared.infoCallId).deliveryState).toBeNull();
       // Retry now: nothing left for this call → 409; another org's call → 404.

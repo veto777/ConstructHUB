@@ -52,10 +52,13 @@ export function CallDetailSheet({ callId, onClose }: { callId: string | null; on
           </SheetDescription>
         </SheetHeader>
 
+        {q.isLoading && <div className="mt-5 space-y-4 animate-pulse" role="status" aria-label="Loading call details" data-testid="skeleton-call-detail">
+          <div className="h-20 rounded bg-muted" /><div className="h-32 rounded bg-muted" /><div className="h-24 rounded bg-muted" />
+        </div>}
         {q.isError && (
           <div className="mt-4 rounded-md border border-destructive/40 p-3 text-sm" role="alert" data-testid="error-call-detail">
             <div className="font-medium">Couldn't load this call</div>
-            <div className="text-muted-foreground">{apiErrorMessage(q.error)}</div>
+            <div className="text-muted-foreground">{apiErrorMessage(q.error)}</div><Button variant="outline" onClick={() => q.refetch()}>Retry</Button>
           </div>
         )}
 
@@ -200,9 +203,9 @@ function taskStateLabel(t: CallTaskView): string {
 /**
  * What this call owed your CRM — the client and project, each escalation — and whether it got there. The report is
  * only acknowledged together with this list (server/voice/call-tasks.ts), so nothing here can silently go missing:
- * a step that failed keeps retrying by itself, and Retry now runs it immediately.
+ * a step that failed keeps retrying by itself, and Retry now queues it for the worker.
  */
-function DeliverySection({ callId, delivery }: { callId: string; delivery: CallDelivery }) {
+export function DeliverySection({ callId, delivery }: { callId: string; delivery: CallDelivery }) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const unfinished = delivery.tasks.some((t) => t.state !== "done");
@@ -211,9 +214,7 @@ function DeliverySection({ callId, delivery }: { callId: string; delivery: CallD
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ["/api/crm/voice/calls", callId] });
       qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0]).startsWith("/api/crm/voice/calls?") || String(q.queryKey[0]).startsWith("/api/crm/voice/escalations") });
-      toast(r.delivery.state === "done"
-        ? { title: "Delivered", description: "Everything from this call is in your CRM now." }
-        : { title: "Still not through", description: "It keeps retrying by itself; the reason is shown on each step.", variant: "destructive" });
+      toast({ title: "Retry queued", description: r.delivery.worker.running ? "The delivery worker will try again on its next pass." : "Delivery is queued. The worker must be enabled before it can run." });
     },
     onError: (err) => toast({ title: "Couldn't retry", description: apiErrorMessage(err), variant: "destructive" }),
   });
@@ -249,7 +250,7 @@ function DeliverySection({ callId, delivery }: { callId: string; delivery: CallD
         ))}
       </ul>
       {unfinished && !delivery.worker.running && (
-        <p className="mt-2 text-xs text-amber-700 dark:text-amber-400" data-testid="text-call-delivery-worker-off">Automatic retries are switched off on this server — use Retry now.</p>
+        <p className="mt-2 text-xs text-amber-700 dark:text-amber-400" data-testid="text-call-delivery-worker-off">The delivery worker is switched off on this server. Queued retries will run when it is enabled.</p>
       )}
     </section>
   );

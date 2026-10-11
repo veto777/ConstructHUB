@@ -178,7 +178,7 @@ function callsUrl(params: Record<string, string | number | undefined>): string {
   return `/api/crm/voice/calls?${qs.toString()}`;
 }
 
-function CallLog({ onOpen, outcome, setOutcome }: { onOpen: (id: string) => void; outcome: string; setOutcome: (o: string) => void }) {
+export function CallLog({ onOpen, outcome, setOutcome }: { onOpen: (id: string) => void; outcome: string; setOutcome: (o: string) => void }) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const q = useDebounced(search.trim());
@@ -206,9 +206,10 @@ function CallLog({ onOpen, outcome, setOutcome }: { onOpen: (id: string) => void
       )} />
       <LiveStamp queries={[list]} testId="calls-log-updated" />
 
+      {list.isError && list.data && <InlineError title="Showing saved data — refresh failed" error={list.error} onRetry={() => list.refetch()} />}
       {list.isLoading ? (
         <TableSkeleton />
-      ) : list.isError ? (
+      ) : list.isError && !list.data ? (
         <InlineError title="Couldn't load the call log" error={list.error} onRetry={() => list.refetch()} />
       ) : !list.data?.calls.length ? (
         <EmptyState
@@ -347,6 +348,7 @@ function CallsTable({ calls, onOpen, testId, numberHint }: { calls: VoiceCallLis
                     : null}
                   {fmtDuration(c.durationSeconds)}
                 </span>
+                {c.recordingState === "failed" && <p className="mt-1 max-w-xs whitespace-normal text-xs text-red-600 dark:text-red-400">{c.recordingReason || "Recording unavailable"}</p>}
               </td>
             </tr>
           ))}
@@ -541,7 +543,7 @@ function SpamView({ canManage, onOpen }: { canManage: boolean; onOpen: (id: stri
   );
 }
 
-function EscalationsView({ onOpen }: { onOpen: (id: string) => void }) {
+export function EscalationsView({ onOpen }: { onOpen: (id: string) => void }) {
   const [showClosed, setShowClosed] = useState(false);
   const key = showClosed ? "/api/crm/voice/escalations" : "/api/crm/voice/escalations?open=1";
   const list = useQuery<VoiceEscalationList>({ queryKey: [key], refetchInterval: LIVE_REFRESH_MS });
@@ -562,7 +564,8 @@ function EscalationsView({ onOpen }: { onOpen: (id: string) => void }) {
         </div>
       </div>
       <LiveStamp queries={[list]} testId="escalations-updated" />
-      {list.isLoading ? <TableSkeleton rows={2} /> : list.isError ? (
+      {list.isError && list.data && <InlineError title="Showing saved data — refresh failed" error={list.error} onRetry={() => list.refetch()} />}
+      {list.isLoading ? <TableSkeleton rows={2} /> : list.isError && !list.data ? (
         <InlineError title="Couldn't load escalations" error={list.error} onRetry={() => list.refetch()} />
       ) : !list.data?.escalations.length ? (
         <EmptyState compact icon={BellRing} title={showClosed ? "No escalations yet" : "Nothing waiting"} description="When a caller needs a person, the hand-off and its reminders show up here." />
@@ -613,7 +616,7 @@ function InlineError({ title, error, onRetry }: { title: string; error: unknown;
         <div className="font-medium">{title}</div>
         <div className="text-muted-foreground">{apiErrorMessage(error)}</div>
       </div>
-      <Button size="sm" variant="outline" onClick={onRetry}>Try again</Button>
+      <Button size="sm" variant="outline" onClick={onRetry}>Retry</Button>
     </div>
   );
 }

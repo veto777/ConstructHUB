@@ -452,3 +452,30 @@ def test_real_app_client_sends_the_status_over_http(tmp_path):
     sent = run(go())
     assert len(sent) == 1 and sent[0]["path"] == "/api/voice-internal/calls/CA-http-1/artifacts"
     assert sent[0]["body"]["recording"]["state"] == "missing" and sent[0]["body"]["recording"]["seq"] == 1
+
+
+def test_expired_upload_reports_failed_after_restart_then_replays(tmp_path):
+    clock, app = Clock(), FakeApp()
+    app.recording_down = app.status_down = True
+    ob = Outbox(tmp_path / "outbox", clock, max_age_s=60)
+    wav = wav_in(tmp_path, "CA-expired")
+    ob.enqueue("CA-expired", REPORT, wav)
+    assert run(ob.deliver(app, "CA-expired")) == "retry"
+    clock.t += 61
+    assert run(ob.deliver(app, "CA-expired")) == "failed"
+    job = ob.load_failed("CA-expired")
+    assert job["statusOut"]["state"] == "failed" and not job["statusDone"]
+    assert wav.exists() and not ob.pending()
+    uploads = len(app.uploads)
+    app.status_down = False
+    restarted = Outbox(tmp_path / "outbox", clock)
+    run(restarted.drain(app))
+    assert app.recording_state["CA-expired"] == (1, "failed")
+    assert len(app.uploads) == uploads and wav.exists()
+    assert restarted.load_failed("CA-expired")["statusDone"]
+    app.recording_down = False
+    restarted.replay("CA-expired")
+    assert run(restarted.drain(app)) == {"done": 1}
+    assert app.statuses[-1][1]["recording"]["state"] == "pending"
+    assert "CA-expired" in app.recordings and app.leads_delivered == 1
+    assert not wav.exists() and not restarted.failed()

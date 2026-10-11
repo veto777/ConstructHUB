@@ -47,7 +47,7 @@ export type CallDeliveryState = "pending" | "failed" | "done";
 export type CallTaskView = {
   id: number;
   key: string;
-  kind: "lead" | "escalation";
+  kind: "lead" | "escalation" | "notification";
   label: string;
   /** retrying = pending after at least one failed attempt. */
   state: "pending" | "retrying" | "failed" | "done";

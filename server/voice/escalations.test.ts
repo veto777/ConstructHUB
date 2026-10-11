@@ -40,7 +40,7 @@ const escRow = async (id: number) => (await pool.query("select * from voice_esca
 const at = (iso: string) => new Date(`${iso}Z`);
 
 beforeAll(async () => {
-  if (!/^\/constructhub_dev(?:_a\d+)?$/.test(new URL(process.env.DATABASE_URL!).pathname)) throw new Error("Requires a ConstructHUB development lane DB");
+  if (!/^\/constructhub_dev(?:_a\d+|_fs)?$/.test(new URL(process.env.DATABASE_URL!).pathname)) throw new Error("Requires a ConstructHUB development lane DB");
   const { ensureVoiceSchema } = await import("./schema");
   await ensureVoiceSchema(pool);
   esc = await import("./escalations");

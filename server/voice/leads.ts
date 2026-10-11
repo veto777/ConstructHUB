@@ -7,13 +7,13 @@
  * source and a "VIRTUAL FORM — filled out by <assistant>" note), a pipeline
  * project (stage lead) when the profile says so, an audit row, and the org's
  * own notifications (bell + sms per the channel matrix, the leadReceived
- * email, plus the profile's extra recipients). Everything after the client
- * is best-effort: a dead SMTP never loses a lead.
+ * email, plus the profile's extra recipients). Each recipient/channel has its own durable task;
+ * a failed notification retries independently without recreating the client or project.
  */
 import { randomBytes } from "crypto";
-import { db } from "../db";
+import { db, pool } from "../db";
 import {
-  crmActivityLog, crmCustomers, crmLeadSources, crmMembers, crmOrgs, crmProjects, crmNotificationChannel, voiceCalls,
+  crmNotifications, crmActivityLog, crmCustomers, crmLeadSources, crmMembers, crmOrgs, crmProjects, crmNotificationChannel, voiceCalls,
   type VoiceCallRow,
 } from "@shared/schema";
 import { and, eq, isNull, sql } from "drizzle-orm";
@@ -21,6 +21,7 @@ import { normalizePhone, sendSms } from "../crm/sms";
 import { notifyMembers } from "../crm/notify";
 import { recordActivity } from "../crm/activity";
 import { sendWithFallback } from "../email";
+import { appForLink, pushSoon } from "../apns";
 import type { OrgVoiceContext } from "./org-profile";
 import type { VoiceProfile } from "@shared/voice-profile";
 
@@ -165,6 +166,20 @@ export async function deliverLead(args: {
   slots?: Record<string, string> | null;
   numberLabel?: string | null;
 }): Promise<LeadDelivery> {
+  // Serialize mid-call and end-report deliveries, including callers holding a stale row.
+  const lock = await pool.connect();
+  try {
+    const { rows } = await lock.query("SELECT pg_try_advisory_lock(hashtextextended($1, 0)) AS claimed", [args.call.id]);
+    if (!rows[0].claimed) throw new Error("Lead delivery is already running; retry shortly");
+    const [fresh] = await db.select().from(voiceCalls).where(eq(voiceCalls.id, args.call.id));
+    return await deliverLeadLocked({ ...args, call: fresh ?? args.call });
+  } finally {
+    try { await lock.query("SELECT pg_advisory_unlock(hashtextextended($1, 0))", [args.call.id]); }
+    finally { lock.release(); }
+  }
+}
+
+async function deliverLeadLocked(args: Parameters<typeof deliverLead>[0]): Promise<LeadDelivery> {
   const { ctx, call } = args;
   const { org, profile } = ctx;
   const slots = args.slots ?? call.slots ?? {};
@@ -278,52 +293,39 @@ export async function deliverLead(args: {
     meta: { outcome: call.outcome, durationSeconds: call.durationSeconds, summary: call.summary, recording: !!call.recordingKey, created, need: facts.need },
   });
 
-  // 4. Notify — only the first delivery for a call pings anyone.
+  // Persist the notification plan and delivery latch together. No network work belongs to CRM creation.
   const notified = { bell: false, email: 0, sms: 0 };
   if (!alreadyDelivered) {
     const title = `New phone lead — ${facts.name || prettyPhone(facts.phone)}`;
-    const bodyLine = [facts.need, facts.address, facts.phone ? prettyPhone(facts.phone) : null, facts.email].filter(Boolean).join(" · ") || null;
-    const link = `/crm/clients/${customer.id}`;
-    const cf = org.customFields;
-    const anyChannel = ["inApp", "email", "sms"].some((c) => crmNotificationChannel(cf, "leadReceived", c as any));
-    if (anyChannel) {
-      // Best-effort like the email and texts below: the client and project are filed; a notification hiccup
-      // must not send the delivery task round again.
-      await notifyMembers({ org, pref: "leadReceived", type: "call.lead", title, body: bodyLine, link })
-        .then(() => { notified.bell = crmNotificationChannel(cf, "leadReceived", "inApp"); })
-        .catch((e: any) => console.error("[voice] lead notification failed:", e?.message || e));
-    }
+    const body = [facts.name, facts.need, facts.address, facts.city, facts.phone, facts.email, facts.bestTime, call.summary].filter(Boolean).join(" · ");
+    const members = await db.select().from(crmMembers).where(and(eq(crmMembers.orgId, org.id), eq(crmMembers.status, "active")));
+    const owners = members.filter(m => m.role === "owner");
+    const recipients = new Map<string, { channel: string; recipient: string }>();
+    const add = (channel: string, recipient: string) => {
+      const to = channel === "sms" ? normalizePhone(recipient) : channel === "email" ? recipient.trim().toLowerCase() : recipient;
+      if (to) recipients.set(`${channel}:${to}`, { channel, recipient: to });
+    };
+    if (crmNotificationChannel(org.customFields, "leadReceived", "inApp")) for (const m of owners) add("inApp", m.id);
     if (profile.leadDelivery.email.enabled) {
-      const recipients = new Set<string>();
-      if (crmNotificationChannel(cf, "leadReceived", "email")) {
-        const members = await db.select().from(crmMembers).where(and(eq(crmMembers.orgId, org.id), eq(crmMembers.status, "active")));
-        for (const m of members) if (m.role === "owner" && m.email) recipients.add(m.email);
-      }
-      for (const e of profile.leadDelivery.email.extraRecipients) recipients.add(e);
-      if (recipients.size) {
-        const contact = [facts.phone ? prettyPhone(facts.phone) : null, facts.email].filter(Boolean).map(esc).join(" · ");
-        await sendWithFallback({
-          to: [...recipients].join(","),
-          subject: `📞 ${title}`,
-          html: `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">` +
-            `<p><strong>${esc(facts.name || "A caller")}</strong> just called${args.numberLabel ? ` the ${esc(args.numberLabel)} line` : ""} and ${esc(ctx.assistantName)} took the request.</p>` +
-            (contact ? `<p>${contact}</p>` : "") +
-            (facts.need ? `<p><strong>Need:</strong> ${esc(facts.need)}</p>` : "") +
-            (facts.address ? `<p><strong>Address:</strong> ${esc(facts.address)}${facts.city ? `, ${esc(facts.city)}` : ""}</p>` : "") +
-            (facts.bestTime ? `<p><strong>Best time to call:</strong> ${esc(facts.bestTime)}</p>` : "") +
-            (call.summary ? `<p style="white-space:pre-wrap">${esc(call.summary)}</p>` : "") +
-            `<p>The lead is waiting in Clients, tagged <strong>${esc(tags.join(", "))}</strong>; the call, transcript and recording are under Call Assistant → Calls.</p></div>`,
-        } as any).then(() => { notified.email = recipients.size; })
-          .catch((e: any) => console.error("[voice] lead email failed:", e?.message || e));
-      }
+      if (crmNotificationChannel(org.customFields, "leadReceived", "email")) for (const m of owners) if (m.email) add("email", m.email);
+      for (const to of profile.leadDelivery.email.extraRecipients) add("email", to);
     }
-    if (profile.leadDelivery.sms.enabled && profile.leadDelivery.sms.recipients.length) {
-      const text = `${org.name}: ${title}${bodyLine ? ` — ${bodyLine}` : ""}`.slice(0, 320);
-      for (const to of profile.leadDelivery.sms.recipients) {
-        const r = await sendSms(to, text, cf, org.id).catch((e: any) => { console.error("[voice] lead sms failed:", e?.message || e); return null; });
-        if (r?.ok) notified.sms++;
-      }
+    if (crmNotificationChannel(org.customFields, "leadReceived", "sms")) {
+      const phones = owners.map(m => normalizePhone(m.phone)).filter(Boolean);
+      for (const to of phones.length ? phones : [org.phone]) if (to) add("sms", to);
     }
+    if (profile.leadDelivery.sms.enabled) for (const to of profile.leadDelivery.sms.recipients) add("sms", to);
+    await db.transaction(async tx => {
+      const claimed = await tx.update(voiceCalls).set({ leadDeliveredAt: new Date(), customerId: customer.id, projectId })
+        .where(and(eq(voiceCalls.id, call.id), isNull(voiceCalls.leadDeliveredAt))).returning({ id: voiceCalls.id });
+      if (!claimed.length) return;
+      for (const [key, recipient] of recipients) {
+        const payload = { ...recipient, userId: recipient.channel === "inApp" ? owners.find(m => m.id === recipient.recipient)?.userId : null, title, body, link: `/crm/clients/${customer.id}` };
+        await tx.execute(sql`INSERT INTO voice_call_tasks (call_id, org_id, kind, task_key, payload, give_up_at)
+          VALUES (${call.id}, ${org.id}, 'notification', ${'notification:' + key}, ${JSON.stringify(payload)}::jsonb, now() + interval '3 days')
+          ON CONFLICT (call_id, task_key) DO NOTHING`);
+      }
+    });
   }
 
   return { customerId: customer.id, projectId, created, alreadyDelivered, notified };
@@ -331,9 +333,26 @@ export async function deliverLead(args: {
 
 /** notifyOnEveryCall: a one-line summary for non-lead outcomes (info, declined, out_of_area). */
 export async function notifyCallSummary(ctx: OrgVoiceContext, call: VoiceCallRow): Promise<void> {
+  const claimed = await db.execute(sql`UPDATE voice_calls SET flags = coalesce(flags, '{}'::jsonb) || '{"summaryNotified":true}'::jsonb
+    WHERE id = ${call.id} AND coalesce(flags->>'summaryNotified', 'false') <> 'true' RETURNING id`);
+  if (!claimed.rows.length) return;
   const title = `Call ${String(call.outcome ?? "ended").replace(/_/g, " ")} — ${call.callerName || prettyPhone(call.fromNumber)}`;
   await notifyMembers({
     org: ctx.org, pref: "leadReceived", type: "call.summary", title,
     body: call.summary ?? null, link: `/call-assistant?tab=calls&call=${call.id}`,
   });
+}
+
+/** A single durable recipient/channel effect. Throws so the task records the reason and retries. */
+export async function deliverLeadNotification(ctx: OrgVoiceContext, callId: string, payload: Record<string, unknown>): Promise<void> {
+  const { channel, recipient, title, body, link } = payload;
+  if (channel === "email") {
+    await sendWithFallback({ to: String(recipient), subject: String(title), html: `<p>${esc(String(body))}</p>` }, false, { failover: "definite" });
+  } else if (channel === "sms") {
+    const result = await sendSms(String(recipient), `${ctx.org.name}: ${title} — ${body}`.slice(0, 320), ctx.org.customFields, ctx.org.id);
+    if (!result.ok) throw new Error(result.error || "SMS delivery failed");
+  } else if (channel === "inApp") {
+    const inserted = await db.insert(crmNotifications).values({ id: `voice:${callId}:${recipient}`, orgId: ctx.org.id, memberId: String(recipient), type: "call.lead", title: String(title).slice(0, 300), body: String(body).slice(0, 1000), link: String(link) }).onConflictDoNothing().returning({ id: crmNotifications.id });
+    if (inserted.length && typeof payload.userId === "number") pushSoon(payload.userId, appForLink(String(link)), { title: `${ctx.org.name}: ${title}`, body: String(body), link: String(link) });
+  } else throw new Error("Unknown lead notification channel");
 }

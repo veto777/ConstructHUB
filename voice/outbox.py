@@ -138,7 +138,7 @@ class Outbox:
         return sorted(p.stem for p in self.failed_dir.glob("*.json") if SID_RE.match(p.stem))
 
     def _save(self, job: dict[str, Any]) -> None:
-        _write_atomic(self._path(job["sid"]), job)
+        _write_atomic(self._failed_path(job["sid"]) if job.get("failure") else self._path(job["sid"]), job)
 
     def _complete(self, job: dict[str, Any]) -> None:
         wav = Path(job["wav"]) if job.get("wav") else None
@@ -265,7 +265,12 @@ class Outbox:
         job["attempts"] = int(job.get("attempts", 0)) + 1
         job["lastError"] = "; ".join(errors)[:500]
         if now - float(job.get("createdAt", now)) >= self.max_age_s:
+            if wav is not None and not job.get("recordingDone"):
+                self._queue_status(job, "failed", "Recording upload retries expired: " + job["lastError"])
             self._move_to_failed(job, "expired", job["lastError"])
+            # The terminal status is durable even if the app is still down. drain retries it from failed/.
+            if job.get("reportDone") and not job.get("reportRejected"):
+                await self._send_status(client, sid, job, errors)
             return "failed"
         job["nextAt"] = now + min(self.max_delay_s, self.base_delay_s * (2 ** (job["attempts"] - 1)))
         self._save(job)
@@ -273,7 +278,7 @@ class Outbox:
         return "retry"
 
     async def drain(self, client: DeliveryClient) -> dict[str, int]:
-        """Deliver every due job once (the reaper calls this; a job not due yet is skipped). failed/ is never drained."""
+        """Deliver every due job once (the reaper calls this; a job not due yet is skipped). failed/ retries terminal statuses only; uploads require replay."""
         counts: dict[str, int] = {}
         for sid in self.pending():
             try:
@@ -284,6 +289,19 @@ class Outbox:
                 log.exception("outbox: delivering %s failed: %s", sid, ex)
                 r = "error"
             counts[r] = counts.get(r, 0) + 1
+        for sid in self.failed():
+            if sid in self._inflight or self._path(sid).exists():
+                continue
+            job = self.load_failed(sid)
+            if not job or not job.get("reportDone") or job.get("reportRejected") or not job.get("statusOut") or job.get("statusDone"):
+                continue
+            self._inflight.add(sid)
+            try:
+                await self._send_status(client, sid, job, [])
+            except Exception as ex:
+                log.warning("outbox: terminal status for %s pending: %s", sid, ex)
+            finally:
+                self._inflight.discard(sid)
         return counts
 
     def replay(self, sid: str) -> dict[str, Any]:

@@ -74,7 +74,7 @@ const leadReport = (over: Record<string, unknown> = {}) => ic.endReportSchema.pa
 });
 
 beforeAll(async () => {
-  if (!/^\/constructhub_dev(?:_a\d+)?$/.test(new URL(process.env.DATABASE_URL!).pathname)) throw new Error("Requires a ConstructHUB development lane DB");
+  if (!/^\/constructhub_dev(?:_a\d+|_fs)?$/.test(new URL(process.env.DATABASE_URL!).pathname)) throw new Error("Requires a ConstructHUB development lane DB");
   const { ensureVoiceSchema } = await import("./schema");
   await ensureVoiceSchema(pool);
   // The fault switch: a trigger that raises only while a row names its table and THIS run's org. It checks that the
@@ -176,8 +176,9 @@ describe("an acknowledged report never leaves CRM or escalation work undone", ()
     // The new process's worker, once the lease has run out: everything lands.
     const s2 = await tasks.runDueCallTasks({ now: later(10 * MIN) });
     expect(s2.done).toBeGreaterThanOrEqual(2);
+    await tasks.runDueCallTasks({ now: later(11 * MIN) }); // independent notification tasks from CRM delivery
     const t3 = await taskRows(c.id);
-    expect(t3.map((t: any) => t.state)).toEqual(["done", "done"]);
+    expect(t3.every((t: any) => t.state === "done")).toBe(true);
     const row3 = await callRow(c.id);
     expect(row3.customer_id).toBe(row1.customer_id);            // the same client, found through the call
     expect(row3.project_id).toBeTruthy();
@@ -218,7 +219,7 @@ describe("an acknowledged report never leaves CRM or escalation work undone", ()
     expect(await projects()).toBe(before.projects + 1);
     expect(await escalationsFor(c.id)).toBe(1);
     // the tasks are the ACKNOWLEDGED report's: a resend that differs adds nothing
-    expect((await taskRows(c.id)).map((t: any) => t.task_key)).toEqual(["lead", "escalation:existing_customer"]);
+    expect((await taskRows(c.id)).filter((t: any) => t.kind !== "notification").map((t: any) => t.task_key)).toEqual(["lead", "escalation:existing_customer"]);
   });
 
   it("an escalation insert the CRM refuses stays pending; a give-up is shown as failed and Retry now finishes it", async () => {
@@ -261,6 +262,7 @@ describe("an acknowledged report never leaves CRM or escalation work undone", ()
     await tasks.runDueCallTasks({ deps, now: later(5 * MIN) });                       // delivered
     expect((await taskRows(c.id))[0]).toMatchObject({ state: "done", attempts: 3, last_error: null });
     expect(await customers()).toBe(before + 1);
+    await tasks.runCallTasksFor(c.id); // settle this test's independently queued notification tasks
   });
 
   it("two runners racing for the same due tasks: one wins each task, one client, one project, one escalation", async () => {
@@ -310,4 +312,37 @@ describe("the engine's explicit recording status", () => {
     expect(await ic.applyRecordingStatus(lost.id, { state: "missing", reason: "wav gone", seq: 1 })).toBe(true);
     expect(recordingInfoOf(await loadCall(lost.id))).toMatchObject({ state: "failed", reason: expect.stringMatching(/lost/) });
   });
+});
+
+it("notification recovery never recreates CRM records or resends a successful recipient", async () => {
+  const b = await makeAccount(pool, bag, { orgName: "Recipient Retry Test" });
+  const first = fakePhone(), second = fakePhone();
+  await setProfile(pool, b.orgId, {
+    company: { name: "Recipient Retry Test" },
+    leadDelivery: { crm: { enabled: true, createProject: true }, email: { enabled: true }, sms: { enabled: true, recipients: [first, second] } },
+  });
+  const { loadOrgVoiceContext } = await import("./org-profile");
+  const { deliverLead } = await import("./leads");
+  const ctx = (await loadOrgVoiceContext(b.orgId))!;
+  const c = await makeCall(pool, b.orgId);
+  const stale = await loadCall(c.id);
+  const delivered = await deliverLead({ ctx, call: stale, slots: { first_name: "Retry test", need: "Roof inspection" } });
+  const queued = await tasks.listCallTasks(c.id);
+  const firstTask = queued.find(t => t.payload.recipient === first)!;
+  expect(await tasks.runCallTask(firstTask.id)).toBe("done");
+  carrierDown();
+  await tasks.runCallTasksFor(c.id);
+  const failed = (await tasks.listCallTasks(c.id)).find(t => t.payload.recipient === second)!;
+  expect(failed.state).toBe("pending");
+  expect(failed.lastError).toBeTruthy();
+  // A stale mid-call request cannot enqueue a second plan or create another project.
+  const repeated = await deliverLead({ ctx, call: stale });
+  expect(repeated).toMatchObject({ customerId: delivered.customerId, projectId: delivered.projectId, alreadyDelivered: true });
+  carrierBack();
+  await tasks.rearmCallTasks(b.orgId, c.id);
+  expect((await tasks.runCallTasksFor(c.id)).every(t => t.state === "done")).toBe(true);
+  expect(smsTo(first)).toHaveLength(1);
+  expect(smsTo(second)).toHaveLength(1);
+  expect(await count("select count(*)::int n from crm_customers where org_id = $1", [b.orgId])).toBe(1);
+  expect(await count("select count(*)::int n from crm_projects where org_id = $1", [b.orgId])).toBe(1);
 });
