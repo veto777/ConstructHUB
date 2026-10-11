@@ -153,7 +153,7 @@ export async function seedCallAssistant(raw: string): Promise<void> {
       const task = async (kind: string, key: string, payload: unknown, state: string, result: unknown, error: string | null = null) => {
         await db.query(`insert into voice_call_tasks
           (org_id,call_id,kind,task_key,payload,state,attempts,result,last_error,created_at,updated_at,next_attempt_at,give_up_at,done_at)
-          values ($1,$2,$3,$4,$5,$6,1,$7,$8,$9,$9,$9,$9+interval '3 days',$10)`,
+          values ($1,$2,$3,$4,$5,$6,1,$7,$8,$9::timestamptz,$9::timestamptz,$9::timestamptz,$9::timestamptz+interval '3 days',$10::timestamptz)`,
         [org.id, call.id, kind, key, json(payload), state, result == null ? null : json(result), error, end, state === "done" ? end : null]);
       };
       if (customerId) {
