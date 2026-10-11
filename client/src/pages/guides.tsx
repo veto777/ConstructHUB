@@ -25,20 +25,12 @@ import { useUrlParam } from "@/hooks/use-url-param";
 import { cn } from "@/lib/utils";
 import { SiteConnectionGuide } from "./site-connection-guide";
 import { PROGRESS_NOTE, progressLabel, useChecklist } from "@/components/guides/progress";
-import { LEGACY_ANCHORS, LIBRARY, TOPICS, WALKTHROUGHS, matchesQuery, type Access, type Topic, type Walkthrough } from "@/components/guides/library";
+import { LEGACY_ANCHORS, LIBRARY, TOPICS, WALKTHROUGHS, matchesQuery, type Topic, type Walkthrough } from "@/components/guides/library";
+import { accessLabel } from "@/components/guides/access-label";
 import type { CourseAccess } from "@/components/master-class/access";
 
 const TOPIC_KEYS = new Set<string>(TOPICS.map((t) => t.key));
 const CONNECTION_WORDS = ["connect your website", "site connection guide", "cloudflare", "search console", "nameservers", "dns", "limited key", "sitemaps"];
-
-function accessLabel(a: Access, access: CourseAccess | undefined): string {
-  switch (a.kind) {
-    case "free": return "Free";
-    case "account": return "Free with an account";
-    case "master-class": return access?.any ? "Unlocked on your account" : "Master Class";
-    case "plan": return a.plan ? `Free to read · connecting needs the ${a.plan} plan` : "Free to read";
-  }
-}
 
 function WalkthroughCard({ w }: { w: Walkthrough }) {
   const list = useChecklist(`guide:${w.id}`);
@@ -80,7 +72,7 @@ export function GuidesContent({ embedded }: { embedded?: boolean }) {
   const topic = topicParam && TOPIC_KEYS.has(topicParam) ? (topicParam as Topic) : null;
   const [q, setQ] = useState("");
   // The Master Class labels follow the account; signed out, the server answers "nothing unlocked".
-  const { data: access } = useQuery<CourseAccess>({ queryKey: ["/api/course-access"] });
+  const { data: access, isError: accessError } = useQuery<CourseAccess>({ queryKey: ["/api/course-access"] });
 
   // Older links (#guide-0 … #guide-8) still land on the walkthrough they meant.
   useEffect(() => {
@@ -141,7 +133,7 @@ export function GuidesContent({ embedded }: { embedded?: boolean }) {
                 </div>
                 <p className="g-text-2 flex-1 text-sm">{e.body}</p>
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                  <Badge variant="outline" className="whitespace-normal text-left font-normal leading-snug" data-testid={`access-${e.id}`}>{accessLabel(e.access, access)}</Badge>
+                  <Badge variant="outline" className="whitespace-normal text-left font-normal leading-snug" data-testid={`access-${e.id}`}>{accessLabel(e.access, access, accessError)}</Badge>
                   <GooglePill size="sm" href={e.href} label={e.open} testId={`link-library-${e.id}`} />
                 </div>
               </li>

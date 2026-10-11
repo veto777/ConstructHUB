@@ -25,8 +25,8 @@ export const CONNECTIONS_PLAN = planNamesWhere((p) => p.modules.cloudflareSearch
 export type Access =
   | { kind: "free" }
   | { kind: "account" }
-  /** Unlocked by any Master Class purchase or an included course (/api/course-access → any). */
-  | { kind: "master-class" }
+  /** Each destination follows its own course gate. */
+  | { kind: "master-class"; scope: "any" | "licensing" | "all" }
   /** The walkthrough is free to read; doing it inside ConstructHUB needs the plan named. */
   | { kind: "plan"; plan: string };
 
@@ -46,7 +46,7 @@ export const LIBRARY: LibraryEntry[] = [
   {
     id: "google-ads-guide", topic: "playbooks", title: "Google Ads guide",
     body: "The campaign setup playbook for contractors: setup, settings to switch off, assets, keywords, location targeting, bidding, ad copy, landing pages, IP exclusions, tracking, click fraud and a launch checklist.",
-    href: "/google-ads-guide", open: "Open the Google Ads guide", access: { kind: "master-class" }, count: "12 sections",
+    href: "/google-ads-guide", open: "Open the Google Ads guide", access: { kind: "master-class", scope: "any" }, count: "12 sections",
   },
   {
     id: "lsa-guide", topic: "playbooks", title: "LSA guide",
@@ -61,12 +61,12 @@ export const LIBRARY: LibraryEntry[] = [
   {
     id: "state-guides", topic: "licensing", title: "State licensing guides",
     body: "Every state's formation, licensing, workers' comp and tax agencies with checked links, plus the ordered steps to start a construction business there. The comparison table is free; each state's full guide is Module 1 of the Master Class.",
-    href: "/master-class?tab=state-guide", open: "Open the state guides", access: { kind: "master-class" }, count: "50 states",
+    href: "/master-class?tab=state-guide", open: "Open the state guides", access: { kind: "master-class", scope: "licensing" }, count: "50 states",
   },
   {
     id: "master-class", topic: "licensing", title: "Master Class",
     body: "The contractor business course: Business Formation & Licensing, GMB Setup & Optimization, Website & Online Presence, and SEO & Directory Domination, each with ordered lessons.",
-    href: "/master-class", open: "Open the Master Class", access: { kind: "master-class" }, count: "4 modules",
+    href: "/master-class", open: "Open the Master Class", access: { kind: "master-class", scope: "all" }, count: "4 modules",
   },
   {
     id: "connection", topic: "connections", title: "Site connection guide",
