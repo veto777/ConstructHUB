@@ -125,6 +125,7 @@ export { default as v_intro_property } from "./intro-property.json";
 export { default as v_intro_ranking_grid } from "./intro-ranking-grid.json";
 export { default as v_intro_reinstatement } from "./intro-reinstatement.json";
 export { default as v_intro_reviews } from "./intro-reviews.json";
+export { default as v_intro_search_console } from "./intro-search-console.json";
 export { default as v_intro_seo } from "./intro-seo.json";
 export { default as v_intro_site_scan } from "./intro-site-scan.json";
 export { default as v_intro_vpn_shield } from "./intro-vpn-shield.json";

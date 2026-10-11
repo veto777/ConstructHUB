@@ -1,0 +1,138 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "intro-search-console",
+  "title": "Search Console",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/search-console",
+      "caption": "Search Console",
+      "chapter": "Your properties",
+      "narration": "This is Search Console. It brings your Google search clicks and indexing checks into ConstructHUB."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"list-sites-gsc\"] > *:has(button:has-text(\"summitroofing\"))",
+      "caption": "Every property, listed",
+      "narration": "Every property your account can open is listed. Sync imports its data in the background."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"list-sites-gsc\"] button:has-text(\"summitroofing\")",
+      "caption": "Open a property",
+      "narration": "The list refreshes every hour. Open this roofing company's property."
+    },
+    {
+      "action": "highlight",
+      "selector": "section[aria-label=\"Search performance overview\"] dl",
+      "caption": "Clicks, impressions, CTR, position",
+      "chapter": "Read the report",
+      "narration": "The tiles total clicks, impressions, click-through rate and average position for the dates you pick."
+    },
+    {
+      "action": "click",
+      "selector": "button[data-trend-index=\"4\"]",
+      "caption": "Click a bar",
+      "narration": "Click any bar in the daily clicks chart."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-trend-selection\"]",
+      "caption": "Its date and value",
+      "narration": "Its date and its clicks are pinned up here."
+    },
+    {
+      "action": "select",
+      "selector": "select[aria-label=\"Breakdown\"]",
+      "value": "query",
+      "caption": "Break it down",
+      "narration": "Break the report down by query, page, device or country. Here, one row per search."
+    },
+    {
+      "action": "click",
+      "selector": "th button:has-text(\"Clicks\")",
+      "caption": "Most clicks first",
+      "narration": "Click the Clicks heading, and the searches with the most clicks come first."
+    },
+    {
+      "action": "highlight",
+      "selector": "p:has-text(\"Inspected URL coverage:\")",
+      "caption": "Indexing at a glance",
+      "chapter": "Check indexing",
+      "narration": "Each inspected page shows Google's verdict, and this line totals them: nine pass, one fails."
+    },
+    {
+      "action": "type",
+      "selector": "input[placeholder=\"https://your-site.com/sitemap.xml\"]",
+      "value": "https://summitroofing.example/roof-repair",
+      "caption": "Add a page",
+      "narration": "To check a page, type its address under the property."
+    },
+    {
+      "action": "click",
+      "selector": "button:has-text(\"Review inspections\")",
+      "caption": "Review inspections",
+      "narration": "Then choose Review inspections."
+    },
+    {
+      "action": "highlight",
+      "selector": "[role=\"dialog\"]",
+      "caption": "Review before queuing",
+      "narration": "You see each property and address before anything is queued."
+    },
+    {
+      "action": "press",
+      "value": "Escape",
+      "caption": "Your rows stay",
+      "narration": "Close it, and your rows stay where they were."
+    },
+    {
+      "action": "goto",
+      "url": "/locations?location=910001",
+      "caption": "On each location",
+      "narration": "Your locations show it too."
+    },
+    {
+      "action": "highlight",
+      "selector": "div:has(> div > p:has-text(\"Google Search Console \u00b7 property totals\")) >> nth=-1",
+      "caption": "Last 30 days, per location",
+      "narration": "A linked location's Insights tab shows its property's last 30 days."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-search-console\"]",
+      "caption": "Menu: Search Console",
+      "narration": "You'll find Search Console in the menu on the left, under Tools."
+    }
+  ],
+  "removeSelectors": [
+    "[data-testid=\"page-site-connections-gsc\"] div[role=\"alert\"].bg-orange-50"
+  ],
+  "youtube": {
+    "title": "Search Console in about a minute | ConstructHUB",
+    "description": "A one-minute tour of Search Console in ConstructHUB: see every Google Search Console property in one list, read clicks, impressions, click-through rate and position, sort searches by clicks, review URL inspections before they are queued, and see each linked location's last 30 days.",
+    "tags": [
+      "ConstructHUB",
+      "Google Search Console",
+      "search console",
+      "SEO reporting",
+      "URL inspection",
+      "contractor SEO",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "See What Google Sees",
+    "accent": "Google",
+    "kicker": "Search Console",
+    "step": 3
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "helpKey": "intro-search-console",
+  "durationSec": 82,
+  "video": {
+    "key": "tutorials/intro-search-console.32930f27.mp4",
+    "bytes": 7421421,
+    "sha256": "32930f271989662f450aaa3483792e432b90786ed8395f38e463608b74af17cd"
+  },
+  "captions": {
+    "key": "tutorials/intro-search-console.ddd470f9.vtt",
+    "bytes": 1795,
+    "sha256": "ddd470f9040fe53dad657d861ab6f8f2368f8f51e2a2a06872de954451bc69db"
+  },
+  "poster": {
+    "key": "tutorials/intro-search-console.14bbab49.jpg",
+    "bytes": 99355,
+    "sha256": "14bbab499e7db5a81fd886b19fc49b5515cf3db1136eb7e1bf5c1b08577a122d"
+  },
+  "uploaded": {
+    "at": "2026-10-11T20:46:13.989Z",
+    "video": "7d213a806666b8c75db66f26d3c73a43",
+    "captions": "8b630f67d752ef55ad18c71a28523c8e",
+    "poster": "6a9294ee51f391a9af40ad7e6ba73255"
+  }
+}
