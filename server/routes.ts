@@ -2,6 +2,7 @@ import { governmentLinksForDisplay, governmentLinksAvailable, canScrapeGovernmen
 import { getReferralSettings, saveReferralSettings, referralSettingsInput } from "./referral-settings";
 import { getReviewEscalationThreshold, saveReviewEscalationThreshold, reviewEscalationSettingsInput, escalatePrivateFeedback } from "./review-escalation";
 import { isPrivateFirstScore } from "@shared/review-flow";
+import { normalizeOtherReviewLinks, normalizePrimaryReviewUrl, reviewLinkLabel, type OtherReviewLink } from "@shared/review-links";
 import { reserveMonthlyQuota, refundQuota, refundReservation, gridCreditCost, monthlyUsage, resetsAt, type QuotaReservation } from "./growth-quotas";
 import { isConfigured as dataforseoConfigured, normalizeBusinessName } from "./seo/dataforseo";
 import { lookupPoint as lookupGridPoint, gridEstimateUsd } from "./seo/grid";
@@ -5224,6 +5225,9 @@ function main() {
       const [fullUser] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
       let googleProfileUrl = fullUser.googleProfileUrl || "";
       let templateDesc = "";
+      // The profile's other review sites travel with the request (shared/review-links.ts), like the Google link.
+      let otherReviewLinks: OtherReviewLink[] = [];
+      let templatePrimaryUrl: string | null = null;
 
       if (templateId) {
         const templates = await storage.getReviewTemplatesByUser(user.id);
@@ -5231,6 +5235,8 @@ function main() {
         if (template) {
           googleProfileUrl = template.googleProfileUrl;
           templateDesc = template.projectDescription || "";
+          otherReviewLinks = normalizeOtherReviewLinks(template.otherReviewLinks).links;
+          templatePrimaryUrl = template.primaryReviewUrl ?? null;
         }
       }
 
@@ -5240,6 +5246,15 @@ function main() {
 
       const companyName = fullUser.companyName || fullUser.displayName || "Our Company";
       const companyLogoUrl = fullUser.companyLogoUrl || null;
+
+      // The owner can include only some of the profile's other sites and pick which destination is primary.
+      if (Array.isArray(req.body.includedReviewUrls)) {
+        const included = new Set(req.body.includedReviewUrls.map((u: unknown) => String(u)));
+        otherReviewLinks = otherReviewLinks.filter((l) => included.has(l.url));
+      }
+      const primaryReviewUrl = normalizePrimaryReviewUrl(
+        req.body.primaryReviewUrl ?? templatePrimaryUrl, googleProfileUrl, otherReviewLinks,
+      );
 
       const token = randomUUID();
       const isScheduled = scheduledFor && new Date(scheduledFor) > new Date();
@@ -5253,6 +5268,8 @@ function main() {
         clientAddress: clientAddress || null,
         companyName,
         googleProfileUrl,
+        otherReviewLinks,
+        primaryReviewUrl,
         projectDescription: projectDescription || templateDesc || null,
         personalMessage: personalMessage || null,
         photos: photos || [],
@@ -5339,9 +5356,12 @@ function main() {
       if (!name || !googleProfileUrl) {
         return res.status(400).json({ message: "Template name and Google Profile URL are required" });
       }
+      const otherLinks = normalizeOtherReviewLinks(req.body.otherReviewLinks ?? []);
+      if (otherLinks.error) return res.status(400).json({ message: otherLinks.error });
 
       const resolvedProfileUrl = await resolveReviewLink(googleProfileUrl);
       if (!resolvedProfileUrl) return res.status(400).json({ message: GOOGLE_REVIEW_LINK_MESSAGE });
+      const primaryReviewUrl = normalizePrimaryReviewUrl(req.body.primaryReviewUrl, resolvedProfileUrl, otherLinks.links);
 
       // Count and insert under the per-account lock, so two saves at the limit can't both land.
       const outcome = await withAccountLock(user.id, async (tx) => {
@@ -5355,6 +5375,8 @@ function main() {
           userId: user.id,
           name,
           googleProfileUrl: resolvedProfileUrl,
+          otherReviewLinks: otherLinks.links,
+          primaryReviewUrl,
           projectDescription: projectDescription || null,
           isDefault: isDefault || used === 0,
         }).returning();
@@ -5393,6 +5415,17 @@ function main() {
         updateData.googleProfileUrl = resolvedProfileUrl;
       }
       if (projectDescription !== undefined) updateData.projectDescription = projectDescription || null;
+      if (req.body.otherReviewLinks !== undefined) {
+        const otherLinks = normalizeOtherReviewLinks(req.body.otherReviewLinks);
+        if (otherLinks.error) return res.status(400).json({ message: otherLinks.error });
+        updateData.otherReviewLinks = otherLinks.links;
+      }
+      if (req.body.primaryReviewUrl !== undefined) {
+        const current = templates.find((t) => t.id === id)!;
+        const gUrl = updateData.googleProfileUrl ?? current.googleProfileUrl;
+        const others = updateData.otherReviewLinks ?? normalizeOtherReviewLinks(current.otherReviewLinks).links;
+        updateData.primaryReviewUrl = normalizePrimaryReviewUrl(req.body.primaryReviewUrl, gUrl, others);
+      }
       if (isDefault === true) {
         for (const t of templates) {
           if (t.isDefault && t.id !== id) await storage.updateReviewTemplate(t.id, { isDefault: false });
@@ -5686,6 +5719,10 @@ function main() {
         companyName: request.companyName,
         companyLogoUrl,
         googleProfileUrl: request.googleProfileUrl,
+        // The profile's other review sites as they were when the request was sent (shared/review-links.ts):
+        // offered to every client whatever the score; primaryReviewUrl is where the main CTA routes ("" = Google).
+        otherReviewLinks: normalizeOtherReviewLinks(request.otherReviewLinks).links,
+        primaryReviewUrl: request.primaryReviewUrl || "",
         projectDescription: request.projectDescription,
         photos: request.photos,
         status: request.status,
@@ -5747,6 +5784,21 @@ function main() {
     if (!request) return res.status(404).json({ message: "Not found" });
     if (isOwnerPreview(req, request)) return res.json({ success: true, preview: true, recorded: false });
     await storage.updateReviewRequest(request.id, { googleLinkOpened: true, googleLinkOpenedAt: request.googleLinkOpenedAt || new Date() });
+    res.json({ success: true });
+  });
+
+  // "Review us on <site>" on the one-more-thing step: records which of the request's other review sites the
+  // client opened (by label, once each), for the owner's request list.
+  app.post("/api/review/:token/other-link-opened", async (req, res) => {
+    const request = await storage.getReviewRequestByToken(String(req.params.token));
+    if (!request) return res.status(404).json({ message: "Not found" });
+    if (isOwnerPreview(req, request)) return res.json({ success: true, preview: true, recorded: false });
+    const url = String(req.body?.url ?? "");
+    const link = normalizeOtherReviewLinks(request.otherReviewLinks).links.find((l) => l.url === url);
+    if (!link) return res.status(400).json({ message: "Unknown review link" });
+    const opened = (Array.isArray(request.otherLinksOpened) ? request.otherLinksOpened : []).filter((s): s is string => typeof s === "string");
+    const label = reviewLinkLabel(link);
+    if (!opened.includes(label)) await storage.updateReviewRequest(request.id, { otherLinksOpened: [...opened, label] });
     res.json({ success: true });
   });
 

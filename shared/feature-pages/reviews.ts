@@ -32,6 +32,10 @@ import { planNamesWhere } from "../plan-copy";
  *     shown on every step whatever the score: shared/review-flow.ts, server/review-escalation.ts,
  *     server/routes.ts /api/review/:token/feedback + /api/review-escalation-settings, google-reviews.tsx
  *     FeedbackRoutingCard ("Caught privately" tile, "Private feedback · n/10" badge)
+ *   - other review sites on a profile (Yelp, BBB, Houzz, Angi, HomeAdvisor, Facebook, Nextdoor, Thumbtack, other;
+ *     pasted links, up to 8, copied onto the request when sent, offered on the step after Google to every client,
+ *     opens recorded): shared/review-links.ts, server/routes.ts /api/review-templates + /api/review/:token +
+ *     /other-link-opened, google-reviews.tsx (profile dialog "Other review sites"), review-feedback.tsx (bonus_reviews step)
  */
 
 const TEMPLATES: FeatureAllowance = { limit: "reviewTemplates", unit: "saved review profiles", period: "count" };
@@ -52,7 +56,7 @@ const page: FeaturePage = {
   steps: [
     {
       title: "Save your review link",
-      body: "Add the Google review link for each listing as a review profile, with a default description of the work you do.",
+      body: "Add the Google review link for each listing as a review profile, with a default description of the work you do and, if you like, your review pages on other sites.",
     },
     {
       title: "Set your threshold",
@@ -113,9 +117,9 @@ const page: FeaturePage = {
       body: "Set a tone, a sign-off, a length and a rule for each star rating. Replies wait for your approval unless you choose auto-publish.",
     },
     {
-      icon: "shield-alert",
-      title: "Report a review",
-      body: "For a review that breaks Google's rules, gather the evidence and open Google's official form. Google makes the decision.",
+      icon: "link",
+      title: "Your other review sites",
+      body: "Paste your review page on Yelp, BBB, Angi, Houzz, HomeAdvisor and more. Pick a primary destination (usually Google) and which to include per request; clients are routed there, whatever their score.",
     },
   ],
   spotlight: {
@@ -164,7 +168,7 @@ const page: FeaturePage = {
   faqs: [
     {
       q: "What do I need to start?",
-      a: "Your Google review link and your clients' email addresses. To see and reply to the reviews on your profile, link the listing in Locations through a connected Google account.",
+      a: "Your Google review link and your clients' email addresses. Links to your review pages on other sites are optional. To see and reply to the reviews on your profile, link the listing in Locations through a connected Google account.",
     },
     {
       q: "Which plans include it?",
@@ -197,7 +201,8 @@ const page: FeaturePage = {
       "Google Reviews is a review request tool for contractors with a gatekeeper built in. When a job wraps up, you " +
         "send the client an email with your company name and logo and a link to a short page, now or on a schedule. " +
         "There the client scores the job privately from 1 to 10 and can write what went well or what didn't. Asking " +
-        "for Google reviews becomes one routine step at the end of every job.",
+        "for Google reviews becomes one routine step at the end of every job. A profile can also hold your review " +
+        "pages on other sites; clients are offered those on the last step, after Google.",
       "The gatekeeper is one setting: the score that goes straight to Google. You choose it in Feedback routing, " +
         "anywhere from 5 to 10, and it starts at 8. A client who scores at or above it goes straight to the Google " +
         "step. A client who scores below it is asked what you could have done better first, and you are alerted at " +
@@ -214,13 +219,13 @@ const page: FeaturePage = {
       "Reminders go only to clients who haven't answered yet. You set how many to send, up to 10, how far apart, and " +
         "the hours of the day they may go out in your time zone. A client who unsubscribes gets no more reminders and " +
         "can't be sent a new request. Each request records whether the email was opened, the link clicked, the job " +
-        "scored and the Google link opened. Google doesn't report whether a review was actually posted, so the " +
+        "scored and the Google link opened. Google doesn't report whether a review was posted, so the " +
         "request doesn't claim it.",
       "On the reply side, link the listing in Locations and its Google reviews sync in with the rest of the profile, " +
         "with an alert in the app and by email when a new one arrives. AI reply drafts follow the tone, sign-off, " +
         "length and per-star rules you set, and use only what the review says. Replies wait for your approval unless " +
-        "you choose auto-publish on a plan that includes it, and even then 1 and 2 star reviews stay drafts unless " +
-        "you allow them.",
+        "you choose auto-publish on a plan that includes it. For a review that breaks Google's rules, Report " +
+        "gathers the evidence and opens Google's official form.",
     ],
   },
   // Prices read on 2026-10-10 from: get.nicejob.com/pricing, gatherup.com/pricing/, grade.us/home/plans/
@@ -238,6 +243,7 @@ const page: FeaturePage = {
       "No review gating, by design: Google is offered to everyone, and a low rating also gets a private form for feedback.",
       "AI reply drafts written only from the client's own words, with per-star rules — one- and two-star replies stay drafts unless you allow them.",
       "Requests with your job photos and a personal note, sent now or scheduled, with follow-up reminders on your schedule.",
+      "Your own review pages on other sites (Yelp, BBB, Houzz and more) pasted onto a profile and offered to every client after Google.",
     ],
     theyNotUs: "Review requests by text (ours go by email), monitoring of other review sites, and website widgets.",
   },
@@ -266,6 +272,7 @@ const page: FeaturePage = {
     "server/review-suppression.ts",
     "server/review-escalation.ts",
     "shared/review-flow.ts",
+    "shared/review-links.ts",
     "server/notification-kinds.ts",
     "server/routes.ts",
     "server/storage.ts",

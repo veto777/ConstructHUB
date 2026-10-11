@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { useUrlParam } from "@/hooks/use-url-param";
 import { caughtPrivatelyCount, describeReviewEscalationThreshold, normalizeReviewEscalationThreshold, REVIEW_ESCALATION_THRESHOLD_CHOICES } from "@shared/review-flow";
+import { MAX_OTHER_REVIEW_LINKS, MAX_REVIEW_LINK_LABEL, REVIEW_PLATFORMS, destinationLabel, normalizeOtherReviewLinks, resolvePrimaryUrl, reviewDestinations, reviewLinkLabel, type OtherReviewLink } from "@shared/review-links";
 
 // Pacific time with the real abbreviation (PDT in summer, PST in winter).
 const formatPST = (dateStr: string) => {
@@ -140,6 +141,12 @@ export default function GoogleReviewsPage() {
   const [templateGoogleUrl, setTemplateGoogleUrl] = useState("");
   const [templateDescription, setTemplateDescription] = useState("");
   const [templateIsDefault, setTemplateIsDefault] = useState(false);
+  // Other review sites on the profile (shared/review-links.ts): rows the owner pastes in the profile dialog.
+  const [templateOtherLinks, setTemplateOtherLinks] = useState<OtherReviewLink[]>([]);
+  // The profile's default primary destination ("" = Google), and the per-send include/primary choice.
+  const [templatePrimaryUrl, setTemplatePrimaryUrl] = useState("");
+  const [sendIncludedUrls, setSendIncludedUrls] = useState<string[]>([]);
+  const [sendPrimaryUrl, setSendPrimaryUrl] = useState("");
 
   const { data: reviews = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/reviews/list"],
@@ -167,6 +174,19 @@ export default function GoogleReviewsPage() {
   });
   const templateLimit: number | null = entitlements ? (entitlements.allowances?.reviewTemplates ?? 0) : null;
   const atTemplateLimit = templateLimit !== null && templateLimit >= 0 && templates.length >= templateLimit;
+
+  // Send dialog: the selected profile's destinations (Google + its other sites), and which to include / make primary.
+  const selectedTemplate = templates.find((t: any) => String(t.id) === selectedTemplateId);
+  const sendGoogleUrl = selectedTemplate?.googleProfileUrl || user?.googleProfileUrl || "";
+  const sendDestinations = reviewDestinations(sendGoogleUrl, selectedTemplate?.otherReviewLinks);
+  const sendOtherDestinations = sendDestinations.filter((d) => d.platform !== "google");
+  const initSendSelection = (templateId: string) => {
+    const tpl = templates.find((t: any) => String(t.id) === templateId);
+    const gUrl = tpl?.googleProfileUrl || user?.googleProfileUrl || "";
+    const dests = reviewDestinations(gUrl, tpl?.otherReviewLinks);
+    setSendIncludedUrls(dests.filter((d) => d.platform !== "google").map((d) => d.url));
+    setSendPrimaryUrl(resolvePrimaryUrl(dests, tpl?.primaryReviewUrl));
+  };
   const templateCount = templateLimit === null || templateLimit < 0 ? `${templates.length}` : `${templates.length}/${templateLimit}`;
 
   const filteredReviews = useMemo(() => {
@@ -274,6 +294,10 @@ export default function GoogleReviewsPage() {
         emailTheme,
         bccEmail: bccEmail.trim() || undefined,
         scheduledFor,
+        // Only these other sites are included, and this destination is primary (shared/review-links.ts).
+        includedReviewUrls: sendPrimaryUrl && sendPrimaryUrl !== sendGoogleUrl && !sendIncludedUrls.includes(sendPrimaryUrl)
+          ? [...sendIncludedUrls, sendPrimaryUrl] : sendIncludedUrls,
+        primaryReviewUrl: sendPrimaryUrl,
       });
       return res.json();
     },
@@ -382,6 +406,8 @@ export default function GoogleReviewsPage() {
         name: templateName,
         googleProfileUrl: templateGoogleUrl,
         projectDescription: templateDescription || undefined,
+        otherReviewLinks: templateOtherLinks,
+        primaryReviewUrl: templatePrimaryUrl,
         isDefault: templateIsDefault || templates.length === 0,
       });
       return res.json();
@@ -405,6 +431,8 @@ export default function GoogleReviewsPage() {
         name: templateName,
         googleProfileUrl: templateGoogleUrl,
         projectDescription: templateDescription || undefined,
+        otherReviewLinks: templateOtherLinks,
+        primaryReviewUrl: templatePrimaryUrl,
         isDefault: templateIsDefault,
       });
       return res.json();
@@ -436,12 +464,16 @@ export default function GoogleReviewsPage() {
 
   // Mirrors the server check (the server also resolves short links): only Google-hosted review links.
   const templateUrlInvalid = templateGoogleUrl.trim() !== "" && !looksLikeGoogleReviewLink(templateGoogleUrl);
+  // Same check the server runs on save; shown under the rows and blocks the save button.
+  const otherLinksError = normalizeOtherReviewLinks(templateOtherLinks).error;
 
   const resetTemplateForm = () => {
     setTemplateName("");
     setTemplateGoogleUrl("");
     setTemplateDescription("");
     setTemplateIsDefault(false);
+    setTemplateOtherLinks([]);
+    setTemplatePrimaryUrl("");
   };
 
   const openEditTemplate = (template: any) => {
@@ -450,6 +482,8 @@ export default function GoogleReviewsPage() {
     setTemplateGoogleUrl(template.googleProfileUrl);
     setTemplateDescription(template.projectDescription || "");
     setTemplateIsDefault(template.isDefault);
+    setTemplateOtherLinks(normalizeOtherReviewLinks(template.otherReviewLinks).links);
+    setTemplatePrimaryUrl(template.primaryReviewUrl || "");
     setTemplateDialogOpen(true);
   };
 
@@ -469,6 +503,7 @@ export default function GoogleReviewsPage() {
     } else if (templates.length > 0) {
       setSelectedTemplateId(String(templates[0].id));
     }
+    initSendSelection(defaultTemplate ? String(defaultTemplate.id) : (templates[0] ? String(templates[0].id) : ""));
     setCreateOpen(true);
   };
 
@@ -587,6 +622,12 @@ export default function GoogleReviewsPage() {
                                   {review.feedbackRating}/10
                                 </Badge>
                               ) : null}
+                              {Array.isArray(review.otherLinksOpened) && review.otherLinksOpened.length > 0 && (
+                                <Badge variant="outline" className="text-xs" title="Other review sites the client opened" data-testid={`badge-other-links-opened-${review.id}`}>
+                                  <ExternalLink className="mr-0.5 h-3 w-3" aria-hidden="true" />
+                                  Also opened {review.otherLinksOpened.join(", ")}
+                                </Badge>
+                              )}
                               {review.status === "sent" && review.remindersSent > 0 && (
                                 <Badge variant="outline" className="text-xs">
                                   <Bell className="mr-0.5 h-3 w-3" aria-hidden="true" />
@@ -895,6 +936,11 @@ export default function GoogleReviewsPage() {
                         {template.projectDescription && (
                           <p className="mt-0.5 truncate text-xs text-muted-foreground">{template.projectDescription}</p>
                         )}
+                        {normalizeOtherReviewLinks(template.otherReviewLinks).links.length > 0 && (
+                          <p className="mt-0.5 truncate text-xs text-muted-foreground" data-testid={`text-template-other-links-${template.id}`}>
+                            Also on: {normalizeOtherReviewLinks(template.otherReviewLinks).links.map(reviewLinkLabel).join(", ")}
+                          </p>
+                        )}
                       </div>
                       <div className="flex shrink-0 items-center gap-1">
                         <Button
@@ -1028,7 +1074,7 @@ export default function GoogleReviewsPage() {
               )}
             </Section>
 
-            <Section title="Other review platforms" description="Quick links to manage your reviews elsewhere.">
+            <Section title="Other review platforms" description="Log in to manage reviews on these platforms. To collect reviews on them, add your review link to a Google Business Profile above and include it when you send a request.">
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {[
                   { name: "Yelp", url: "https://biz.yelp.com" },
@@ -1152,7 +1198,7 @@ export default function GoogleReviewsPage() {
           <DialogHeader>
             <DialogTitle>Send review request</DialogTitle>
             <DialogDescription>
-              Your client rates the experience and every client is invited to leave a Google review.
+              Your client rates the experience and every client is invited to leave a review.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-5">
@@ -1166,6 +1212,7 @@ export default function GoogleReviewsPage() {
                       openNewTemplate();
                     } else {
                       setSelectedTemplateId(val);
+                      initSendSelection(val);
                     }
                   }}>
                     <SelectTrigger data-testid="select-gmb-profile">
@@ -1186,7 +1233,7 @@ export default function GoogleReviewsPage() {
                       )}
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-muted-foreground">Reviews will be directed to this profile&rsquo;s Google review link.</p>
+                  <p className="text-xs text-muted-foreground">Each client is routed to this profile&rsquo;s primary destination (usually Google).</p>
                 </>
               ) : (
                 <Notice tone="warning">
@@ -1197,6 +1244,50 @@ export default function GoogleReviewsPage() {
                 </Notice>
               )}
             </div>
+
+            {selectedTemplateId && sendOtherDestinations.length > 0 && (
+              <div className="space-y-2" data-testid="section-send-destinations">
+                <Label>Where to send them</Label>
+                <p className="text-xs text-muted-foreground">Pick the review sites to include and the primary one each client is routed to first. Google is always included.</p>
+                <div className="space-y-1 rounded-xl border p-2">
+                  {sendDestinations.map((d) => {
+                    const label = destinationLabel(d);
+                    const isGoogle = d.platform === "google";
+                    const included = isGoogle || sendIncludedUrls.includes(d.url);
+                    return (
+                      <div key={d.url} className="flex items-center gap-2 rounded-lg px-2 py-1.5" data-testid={`row-send-dest-${d.platform}`}>
+                        <input
+                          type="checkbox"
+                          checked={included}
+                          disabled={isGoogle}
+                          onChange={(e) => {
+                            setSendIncludedUrls((urls) => e.target.checked ? [...urls, d.url] : urls.filter((u) => u !== d.url));
+                            if (!e.target.checked && sendPrimaryUrl === d.url) setSendPrimaryUrl(sendGoogleUrl);
+                          }}
+                          aria-label={`Include ${label}`}
+                          data-testid={`checkbox-send-dest-${d.platform}`}
+                        />
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium">{label}{isGoogle ? " · always included" : ""}</span>
+                        <label className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+                          <input
+                            type="radio"
+                            name="send-primary"
+                            checked={sendPrimaryUrl === d.url}
+                            disabled={!included}
+                            onChange={() => {
+                              setSendPrimaryUrl(d.url);
+                              if (!isGoogle && !sendIncludedUrls.includes(d.url)) setSendIncludedUrls((u) => [...u, d.url]);
+                            }}
+                            data-testid={`radio-send-primary-${d.platform}`}
+                          />
+                          Primary
+                        </label>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
@@ -1718,6 +1809,89 @@ export default function GoogleReviewsPage() {
                 data-testid="input-template-description"
               />
             </div>
+            <div className="space-y-2" data-testid="section-other-review-links">
+              <div className="flex items-center justify-between gap-2">
+                <Label>Other review sites</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setTemplateOtherLinks((rows) => [...rows, { platform: "yelp", url: "" }])}
+                  disabled={templateOtherLinks.length >= MAX_OTHER_REVIEW_LINKS}
+                  data-testid="button-add-other-link"
+                >
+                  <Plus className="mr-1 h-3.5 w-3.5" aria-hidden="true" />Add a site
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Paste the page where a client writes a review on each site. Clients see these after the Google step, whatever their score.
+              </p>
+              {templateOtherLinks.map((link, i) => {
+                const platform = REVIEW_PLATFORMS.find((p) => p.key === link.platform);
+                const update = (patch: Partial<OtherReviewLink>) =>
+                  setTemplateOtherLinks((rows) => rows.map((row, j) => (j === i ? { ...row, ...patch } : row)));
+                return (
+                  <div key={i} className="flex flex-wrap items-center gap-2 sm:flex-nowrap" data-testid={`row-other-link-${i}`}>
+                    <Select value={link.platform} onValueChange={(v) => update({ platform: v as OtherReviewLink["platform"] })}>
+                      <SelectTrigger className="w-36 shrink-0" aria-label="Review site" data-testid={`select-other-link-platform-${i}`}><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {REVIEW_PLATFORMS.map((p) => (
+                          <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {link.platform === "other" && (
+                      <Input
+                        className="w-32 shrink-0"
+                        value={link.label ?? ""}
+                        onChange={(e) => update({ label: e.target.value })}
+                        placeholder="Site name"
+                        maxLength={MAX_REVIEW_LINK_LABEL}
+                        aria-label="Site name"
+                        data-testid={`input-other-link-label-${i}`}
+                      />
+                    )}
+                    <Input
+                      type="url"
+                      inputMode="url"
+                      className="min-w-0 flex-1"
+                      value={link.url}
+                      onChange={(e) => update({ url: e.target.value })}
+                      placeholder={`https://${platform?.hint ?? ""}`}
+                      aria-label="Review page address"
+                      data-testid={`input-other-link-url-${i}`}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0"
+                      onClick={() => setTemplateOtherLinks((rows) => rows.filter((_, j) => j !== i))}
+                      title="Remove this site"
+                      data-testid={`button-remove-other-link-${i}`}
+                    >
+                      <X className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                  </div>
+                );
+              })}
+              {otherLinksError && (
+                <p className="text-xs text-destructive" data-testid="text-other-links-error">{otherLinksError}</p>
+              )}
+            </div>
+            <div className="space-y-2" data-testid="section-template-primary">
+              <Label htmlFor="tplPrimary">Primary destination</Label>
+              <p className="text-xs text-muted-foreground">Where clients are routed first. Usually Google; you can make another site primary. You can still change this per request.</p>
+              <Select value={templatePrimaryUrl || "__google__"} onValueChange={(v) => setTemplatePrimaryUrl(v === "__google__" ? "" : v)}>
+                <SelectTrigger id="tplPrimary" data-testid="select-template-primary"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__google__">Google</SelectItem>
+                  {normalizeOtherReviewLinks(templateOtherLinks).links.map((l) => (
+                    <SelectItem key={l.url} value={l.url}>{reviewLinkLabel(l)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -1731,7 +1905,7 @@ export default function GoogleReviewsPage() {
             <Button
               className="w-full"
               onClick={() => editingTemplate ? updateTemplateMutation.mutate() : createTemplateMutation.mutate()}
-              disabled={!templateName.trim() || !templateGoogleUrl.trim() || templateUrlInvalid || createTemplateMutation.isPending || updateTemplateMutation.isPending}
+              disabled={!templateName.trim() || !templateGoogleUrl.trim() || templateUrlInvalid || !!otherLinksError || createTemplateMutation.isPending || updateTemplateMutation.isPending}
               data-testid="button-save-template"
             >
               {(createTemplateMutation.isPending || updateTemplateMutation.isPending) ? (

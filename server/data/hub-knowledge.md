@@ -213,7 +213,7 @@ The Google Reviews page has two tabs: **Review Requests** and **Google Profile R
 ### Asking clients for reviews (Review Requests)
 **Set up once:**
 1. Google Reviews → **GMB Profiles & Templates** → **Add Profile**.
-2. Enter a name for the profile and your Google review link. Find it in your Google Business Profile under "Ask for reviews" (or "Get more reviews"); it is a short Google link that ends in "review". Optionally add a default project description.
+2. Enter a name for the profile and your Google review link. Find it in your Google Business Profile under "Ask for reviews" (or "Get more reviews"); it is a short Google link that ends in "review". Optionally add a default project description. Under **Other review sites** you can paste your review pages on other review sites (up to 8); every client is offered them on the last step, after Google, whatever their score.
 3. Add one profile per Google listing. Saved templates per plan: {{REVIEW_TEMPLATES_LINE}}.
 
 **Send a request:**

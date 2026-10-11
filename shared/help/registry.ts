@@ -579,7 +579,7 @@ const entries: Draft[] = [
     whatItIs: "Two tools on one page: asking clients for reviews, and working with the reviews already on your Google profile.",
     whatItDoes: "Review Requests emails a client a request with a button to leave a Google review, with optional reminders and tracking. Google Profile Reviews lists your synced reviews and lets you publish replies, save drafts, add private notes and prepare a report. AI can draft replies for approval.",
     howToUse: [
-      "Google Reviews → “GMB Profiles & Templates” → Add Profile, and paste your Google review link.",
+      "Google Reviews → “GMB Profiles & Templates” → Add Profile, and paste your Google review link. Add your review pages on other sites (Yelp, BBB, Houzz, Angi, HomeAdvisor and more) to the same profile if you want clients to see them after Google.",
       "Choose “New Review Request”, pick the profile, enter the client’s name and email, and send now or schedule it.",
       "Under “Feedback routing”, set the score below which a client’s feedback comes to you privately first (default 8; “10” means only a perfect score skips the private form), then watch each request’s tracking: opened, link clicked, feedback, caught privately.",
       "On the Google Profile Reviews tab, filter reviews and publish replies to Google.",
