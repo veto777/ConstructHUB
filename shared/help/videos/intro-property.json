@@ -1,25 +1,25 @@
 {
   "helpKey": "intro-property",
-  "durationSec": 81,
+  "durationSec": 83,
   "video": {
-    "key": "tutorials/intro-property.b99944b9.mp4",
-    "bytes": 6072991,
-    "sha256": "b99944b921c868003026de56982697e3a7ab58fc07397e3e161d1c00a464f373"
+    "key": "tutorials/intro-property.d19b9dc6.mp4",
+    "bytes": 6445357,
+    "sha256": "d19b9dc6a616e85a4542d05f17940533f4289d5b55da8ce0253ac4bde005f42b"
   },
   "captions": {
-    "key": "tutorials/intro-property.25901297.vtt",
-    "bytes": 1758,
-    "sha256": "25901297ad2a6084be78b04535ccee931d349c2ea13cb6ba53646427e6fe0f92"
+    "key": "tutorials/intro-property.62eb41c8.vtt",
+    "bytes": 1791,
+    "sha256": "62eb41c8fb766ecdb5ddaf683c0961560da89ad0369065649d107d58247b5442"
   },
   "poster": {
-    "key": "tutorials/intro-property.2a0ae9e5.jpg",
-    "bytes": 86433,
-    "sha256": "2a0ae9e55085f27fb5c29b44d936e72eb67592761355da8571144308ae8ac27e"
+    "key": "tutorials/intro-property.46cc6840.jpg",
+    "bytes": 91243,
+    "sha256": "46cc68403aeb270b0d2ce8c0f84805a59a46988da322f6a4c0b6b432693e9394"
   },
   "uploaded": {
-    "at": "2026-10-11T17:59:45.574Z",
-    "video": "eaf3b56d2c639372d751a3eac1b075c7",
-    "captions": "99dbef9545142acc766c351054d3a62e",
-    "poster": "43919271a57fb102fd2edc1486dff8cd"
+    "at": "2026-10-11T18:37:04.253Z",
+    "video": "309b0df04d7b3d61e0c40923e4226122",
+    "captions": "f54f621640fac3ab33b67d37736d63c4",
+    "poster": "56de40d4daf418e92743857376501096"
   }
 }

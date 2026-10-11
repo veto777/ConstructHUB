@@ -33,8 +33,8 @@
     {
       "action": "highlight",
       "selector": "[data-testid=\"select-county-filter\"]",
-      "caption": "Or pick a county",
-      "narration": "A County list appears next to it, or you can type the county's name."
+      "caption": "Or pick a county or jurisdiction",
+      "narration": "A County / jurisdiction list appears next to it, or you can type the county's name."
     },
     {
       "action": "type",
@@ -84,9 +84,9 @@
     {
       "action": "highlight",
       "selector": "[data-testid=\"page-property\"] p:has-text(\"Included with\")",
-      "caption": "Records stay on the county's site",
+      "caption": "The offices' own sites hold the records",
       "chapter": "Where to find it",
-      "narration": "Owners and values stay on the county's site. ConstructHUB doesn't pull them in."
+      "narration": "The offices' own sites hold ownership, values and tax records. ConstructHUB doesn't pull them in."
     },
     {
       "action": "highlight",
@@ -120,8 +120,5 @@
     "accent": "Records",
     "kicker": "Property Records",
     "step": 5
-  },
-  "removeSelectors": [
-    "[data-testid^=\"card-appraiser-\"] .g-chip"
-  ]
+  }
 }
