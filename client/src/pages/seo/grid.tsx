@@ -230,9 +230,9 @@ export default function SeoLocalGridPage() {
               {/* The scan's figures in one row; the move is against the comparable scan before it (lower position score is better).
                   Each figure outlines the points it counts on the grid below (the address says which); an earlier scan's figure opens that scan the same way. */}
               <div className="mb-4 rounded-xl border p-3 sm:p-4" style={CARD}>
-                <MetricRow cols={4} testId="grid-summary">
+                <MetricRow cols={4} testId="grid-summary" className="!grid-cols-1 sm:!grid-cols-2 2xl:!grid-cols-4 [&>div]:!border-l-0 2xl:[&>div:not(:first-child)]:!border-l">
                   <LinkedFigure href={here({ show: "checked" })} label="Position score" testId="tile-grid-avg" value={shown.summary.avgRank ?? "—"}
-                    delta={previous?.avgRank != null && shown.summary.avgRank != null ? <DeltaBadge value={shown.summary.avgRank - previous.avgRank} upIsBad label={`Change since the scan of ${fmtDate(previous.at)}`} /> : null}
+                    delta={previous?.avgRank != null && shown.summary.avgRank != null ? <span className="ml-2 inline-block align-middle"><DeltaBadge value={shown.summary.avgRank - previous.avgRank} upIsBad label={`Change since the scan of ${fmtDate(previous.at)}`} /></span> : null}
                     foot={<>Average over <Link href={here({ show: "checked" })} className={QUIET_LINK}>the {shown.summary.checked} points checked</Link>; "not in the first {depth}" counts as {depth + 1}{previous?.avgRank != null && shown.summary.avgRank != null ? <>. Was <Link href={at(previous.id, { show: "checked" })} className={TEXT_LINK}>{previous.avgRank} over {previous.checked} points on {fmtDate(previous.at)}</Link></> : ""}</>} />
                   <LinkedFigure href={here({ show: "top3" })} label="In the first 3" testId="tile-grid-top3" value={`${shown.summary.top3} of ${shown.summary.checked}`}
                     delta={previous && previous.checked === shown.summary.checked ? <DeltaBadge value={shown.summary.top3 - previous.top3} label={`Change since the scan of ${fmtDate(previous.at)}, over the same ${previous.checked} points`} /> : null}
@@ -248,7 +248,7 @@ export default function SeoLocalGridPage() {
                 const each = prices?.gridPer100 != null ? money(Math.ceil((shown.size * shown.size * prices.gridPer100) / 100)) : null;
                 return (
                   <p className="g-text-2 mb-3 flex flex-wrap items-center gap-2 text-[13px]" data-testid="grid-repeat">
-                    {mine ? <>This scan repeats every {mine.every === "weekly" ? "week" : "month"} — next on <Link href={seoLinks.usage()} className={QUIET_LINK} title="Usage: each repeat is taken from your included SEO data" data-testid="link-grid-repeat-next">{fmtDate(mine.nextAt)}</Link>. <button type="button" className="g-link min-h-11" disabled={unwatch.isPending} onClick={() => unwatch.mutate({ siteId: site.id, id: mine.id })} data-testid="button-grid-unwatch">Stop</button></> : <>
+                    {mine ? <><span>This scan repeats every {mine.every === "weekly" ? "week" : "month"} — next on <Link href={seoLinks.usage()} className={QUIET_LINK} title="Usage: each repeat is taken from your included SEO data" data-testid="link-grid-repeat-next">{fmtDate(mine.nextAt)}</Link>.</span><button type="button" className="g-link min-h-11" disabled={unwatch.isPending} onClick={() => unwatch.mutate({ siteId: site.id, id: mine.id })} data-testid="button-grid-unwatch">Stop</button></> : <>
                       <span>Repeat this scan automatically{each ? <> (about <Link href={seoLinks.usage()} className={QUIET_LINK}>{each} each time</Link>, from your included SEO data only)</> : ""}:</span>
                       {(["monthly", "weekly"] as const).map((every) => <button key={every} type="button" className="g-pill g-pill--sm !min-h-11" disabled={watch.isPending || !sameCenter(shown.center, pin ? { lat: pin.lat, lng: pin.lng, name: pin.name, cid: pin.cid } : null)} onClick={() => watch.mutate({ siteId: site.id, body: { keyword: shown.keyword, size: shown.size, spacing: shown.spacing, every } })} data-testid={`button-grid-watch-${every}`}>Every {every === "weekly" ? "week" : "month"}</button>)}
                     </>}
@@ -257,18 +257,20 @@ export default function SeoLocalGridPage() {
               })()}
               {unsure > 0 && <p className="g-text-2 mb-3 text-[13px]" role="status" data-testid="text-grid-unsure">At <Link href={here({ show: "found" })} className={QUIET_LINK}>{unsure} point{unsure === 1 ? "" : "s"}</Link> either Google's result or your pinned listing carried no listing id, so you were recognised by your website or name instead. If you have more than one location, that match could be another branch.</p>}
               <div className="grid min-w-0 gap-5 2xl:grid-cols-[auto,minmax(0,1fr)]">
-                <div>
+                <div className="min-w-0">
+                  <div className="mx-auto w-full max-w-fit">
                   <div className="g-text-2 mb-1 text-center text-[11px]">North</div>
                   {/* A point pressed is written to the address (?cell=), so the view can be linked to and the back button unpicks it. Outlined points are the ones a figure counts (?show=). */}
-                  <div role="group" aria-label={`Positions for "${shown.keyword}" at ${shown.summary.points} points, north at the top`} className="inline-grid gap-1.5" style={{ gridTemplateColumns: `repeat(${shown.size}, minmax(0, 1fr))` }} data-testid="grid-cells">
+                  <div role="group" aria-label={`Positions for "${shown.keyword}" at ${shown.summary.points} points, north at the top`} className="grid gap-1 sm:gap-1.5" style={{ gridTemplateColumns: `repeat(${shown.size}, minmax(0, 1fr))`, width: shown.size * (shown.size > 5 ? 44 : 48) + (shown.size - 1) * 6, maxWidth: '100%' }} data-testid="grid-cells">
                     {shown.points.map((p, i) => { const t = tone(p); const lit = !!show && counts(p, show); return (
                       <button key={i} type="button" onClick={() => setParam("cell", cell === i ? null : i)} aria-pressed={cell === i}
                         aria-label={`${whereIs(p, shown.size, shown.spacing)}: ${t.words}${lit ? " (counted)" : ""}`} title={`${whereIs(p, shown.size, shown.spacing)}: ${t.words}`} data-testid={`grid-cell-${p.row}-${p.col}`}
-                        className="flex items-center justify-center rounded-full text-[13px] font-medium tabular-nums"
-                        style={{ width: shown.size > 5 ? 44 : 48, height: shown.size > 5 ? 44 : 48, background: t.bg, color: t.fg, outline: cell === i ? "3px solid var(--g-blue, #1a73e8)" : lit ? "3px solid var(--g-text, #202124)" : undefined, outlineOffset: 2, opacity: show && !lit ? 0.45 : undefined }}>{t.label}</button>
+                        className="flex aspect-square w-full items-center justify-center rounded-full text-[13px] font-medium tabular-nums focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        style={{ background: t.bg, color: t.fg, outline: cell === i ? "3px solid var(--g-blue, #1a73e8)" : lit ? "3px solid var(--g-text, #202124)" : undefined, outlineOffset: 2, opacity: show && !lit ? 0.45 : undefined }}>{t.label}</button>
                     ); })}
                   </div>
                   <div className="g-text-2 mt-1 text-center text-[11px]">South</div>
+                  </div>
                   {/* The key: each colour's points can be outlined where a figure counts them. */}
                   <ul className="g-text-2 mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[12px]" aria-label="What the colours mean">
                     {([["#188038", "1–3", "top3"], ["#f9ab00", "4–10", "4-10"], ["#e8710a", "11–20", "11-20"], ["#c5221f", "20+ not found", "notFound"], ["var(--g-divider)", "? unknown", "failed"]] as const).map(([c, l, s]) => <li key={l} className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded-full" style={{ background: c }} aria-hidden /> <Link href={here({ show: s })} className={QUIET_LINK} title={`Outline ${SHOW_WORDS[s]}`} data-testid={`link-grid-key-${s}`}>{l}</Link></li>)}

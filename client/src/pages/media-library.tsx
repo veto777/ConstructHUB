@@ -340,7 +340,7 @@ export default function MediaLibraryPage() {
                 <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span>{activeFolder.clientAddress}</span>
                 {activeFolder.lat && <span className="text-xs">({activeFolder.lat.toFixed(4)}, {activeFolder.lon?.toFixed(4)})</span>}
-                <span className="g-chip g-chip--sm ml-1">{activeFolder.lat ? "GPS on file" : "Address set"}</span>
+                <span className="g-chip g-chip--sm !normal-case ml-1">{activeFolder.lat ? "GPS on file" : "Address set"}</span>
               </span>
             ) : undefined}
             actions={<>

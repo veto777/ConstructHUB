@@ -154,11 +154,10 @@ function MapGridView({ scan, results }: { scan: RankingGridScan; results: Rankin
 
   return (
     <div ref={setMapEl} className="w-full relative">
-      {/* On phones the grid fills the map's width, so the zoom controls sit in a
-          toolbar above the map instead of covering the top-right rank cells. */}
-      <div className="flex justify-end gap-1 mb-2 sm:mb-0 sm:absolute sm:top-3 sm:right-3 sm:z-10 sm:flex-col print:hidden">
+      {/* Keep zoom controls outside the point area at every viewport width. */}
+      <div className="flex justify-end gap-1 mb-2 print:hidden">
         <button
-          className="w-9 h-9 rounded-lg bg-black/60 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/80 transition-colors"
+          className="w-9 h-9 rounded-lg bg-black/60 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/80 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           onClick={() => setZoom(z => Math.min(z + 1, 20))}
           aria-label="Zoom in"
           data-testid="button-zoom-in"
@@ -166,7 +165,7 @@ function MapGridView({ scan, results }: { scan: RankingGridScan; results: Rankin
           <ZoomIn className="h-4 w-4" />
         </button>
         <button
-          className="w-9 h-9 rounded-lg bg-black/60 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/80 transition-colors"
+          className="w-9 h-9 rounded-lg bg-black/60 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/80 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           onClick={() => setZoom(z => Math.max(z - 1, 5))}
           aria-label="Zoom out"
           data-testid="button-zoom-out"
@@ -174,7 +173,7 @@ function MapGridView({ scan, results }: { scan: RankingGridScan; results: Rankin
           <ZoomOut className="h-4 w-4" />
         </button>
         <button
-          className="w-9 h-9 rounded-lg bg-black/60 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/80 transition-colors"
+          className="w-9 h-9 rounded-lg bg-black/60 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/80 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           onClick={() => setZoom(defaultZoom)}
           aria-label="Reset zoom"
           data-testid="button-zoom-reset"

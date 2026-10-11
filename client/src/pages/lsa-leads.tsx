@@ -420,7 +420,7 @@ function AccountsOverview({ onOpen }: { onOpen: (a: LsaAccount) => void }) {
                   size="md"
                   testId={`card-account-${a.customerId}`}
                   title={a.descriptiveName || `Account ${a.customerId}`}
-                  className="relative cursor-pointer focus-within:ring-2 focus-within:ring-ring focus-within:rounded-md [&_h3_button]:after:absolute [&_h3_button]:after:inset-0"
+                  className="relative cursor-pointer rounded-md hover:bg-muted/50 transition-colors [&_h3_button]:!no-underline focus-within:ring-2 focus-within:ring-ring focus-within:rounded-md [&_h3_button]:after:absolute [&_h3_button]:after:inset-0"
                   onOpen={() => onOpen(a)}
                   badges={<>
                     {a.lsaEnrolled === true && <span className="g-chip g-chip--sm g-open">LSA</span>}

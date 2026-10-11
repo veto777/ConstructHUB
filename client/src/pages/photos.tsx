@@ -2664,6 +2664,7 @@ export default function PhotosPage() {
 
       <Section
         title="Process & download"
+        contentClassName="space-y-4"
         actions={
           <div className="flex items-center gap-2">
             <Label className="text-xs text-muted-foreground" htmlFor="ai-toggle">AI descriptions</Label>
