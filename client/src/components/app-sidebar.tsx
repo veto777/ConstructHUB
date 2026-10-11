@@ -551,32 +551,7 @@ export function AppSidebar() {
             <div className="px-2 pb-2 text-xs font-medium text-muted-foreground">Growth</div>
             <SidebarMenu>
               {keptGoogle.map(group => (
-                <SidebarMenuItem key={group.label}>
-                  <details open className="text-sm">
-                    <summary data-testid={`link-nav-group-${group.label.toLowerCase().replace(/\s+/g, "-")}`} className="cursor-pointer rounded-md px-2 py-2 font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">{group.label}</summary>
-                    {group.landingUrl && !inNativeApp() && <Link href={group.landingUrl} className="block rounded-md px-4 py-2 text-xs underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" data-testid={`link-nav-${group.label.toLowerCase().replace(/\s+/g, "-")}-landing`}>About {group.label}</Link>}
-                    <SidebarMenuSub>
-                      {group.children.filter(shownHere).map(item => (
-                        <SidebarMenuSubItem key={item.url}>
-                          <SidebarMenuSubButton asChild isActive={location === item.url}>
-                            <Link href={item.url} onClick={() => scrollToFragment(item.url)} data-testid={navTestId(item)} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
-                              <item.icon className="h-4 w-4 shrink-0" />
-                              <span>{item.title}</span>
-                              {planBadgeFor(item.url) ? <PlanBadge plan={planBadgeFor(item.url)!} label={item.title} /> : item.badge ? <FeatureBadge type={item.badge} label={item.title} /> : null}
-                            </Link>
-                          </SidebarMenuSubButton>
-                          {item.subChildren?.filter(shownHere).map(sub => (
-                            <SidebarMenuSubButton key={sub.url} asChild isActive={location === sub.url} className="pl-6">
-                              <Link href={sub.url} data-testid={navTestId(sub)}>
-                                <sub.icon className="h-3 w-3 shrink-0" /><span>{sub.title}</span>
-                              </Link>
-                            </SidebarMenuSubButton>
-                          ))}
-                        </SidebarMenuSubItem>
-                      ))}
-                    </SidebarMenuSub>
-                  </details>
-                </SidebarMenuItem>
+                <CollapsibleNavGroup key={group.label} group={group} planBadgeFor={planBadgeFor} />
               ))}
               {reviewsShown && (
                 <SidebarMenuItem>
@@ -744,14 +719,14 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="p-5 pt-3">
         <div className="space-y-3">
-          {!countsError && !countiesError && dbCounts && counties && <details open className="text-xs text-muted-foreground"><summary className="cursor-pointer py-2 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">Directory totals</summary>
+          {!countsError && !countiesError && dbCounts && counties && <details className="text-xs text-muted-foreground"><summary className="cursor-pointer py-2 rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">Directory totals</summary>
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">Counties</span>
-            <span className="font-semibold tabular-nums">{countyCount}</span>
+            <span className="font-semibold tabular-nums">{countyCount?.toLocaleString()}</span>
           </div>
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">Directory entries</span>
-            <span className="font-semibold tabular-nums">{activeCount}</span>
+            <span className="font-semibold tabular-nums">{activeCount?.toLocaleString()}</span>
           </div>
           </details>}
           <div className="border-t border-sidebar-border pt-3 mt-2">

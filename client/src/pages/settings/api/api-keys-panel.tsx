@@ -372,7 +372,7 @@ function GenerateKeyDialog({ open, onOpenChange, planUnits, pending, message, on
   };
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) reset(); }}>
-      <DialogContent data-testid="dialog-generate-key">
+      <DialogContent data-testid="dialog-generate-key" className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Generate API key</DialogTitle>
           <DialogDescription>{API_NO_AI_NOTICE} You'll see the key once; store it somewhere safe.</DialogDescription>
