@@ -25,6 +25,8 @@ import { storage } from "./storage";
 import { photoDescription, reviewResponse, reviewFunnelDraft } from "./ai-features";
 import { AiAnswerError, aiErrorTag } from "./ai-output";
 import { scrapeByPlatform, getScrapeProgress, getAllScrapeJobs, startLiveSearch, getLiveSearchJob, scrapePermitDetail } from "./scraper";
+import { readSearchPage, SEARCH_PAGE_MESSAGE } from "./search-page";
+import { effectiveVpnMode, savedVpnMode, VPN_DEFAULT_MODE } from "./vpn-mode";
 import { getAdapter } from "./scrapers/registry";
 import { liveSearchOutcome } from "./live-search-outcome";
 import { randomUUID } from "crypto";
@@ -713,45 +715,65 @@ export async function registerRoutes(
     next();
   });
 
+  // One permit search's scope: the portals in the chosen county or state (every portal when
+  // nationwide) and the county names result rows carry. Shared by the search, its result pages
+  // and its live poll, so all three read the same stored matches.
+  const resolveSearchScope = async (scopeCountyId: unknown, scopeState: unknown) => {
+    const parsedCountyId = scopeCountyId ? parseInt(String(scopeCountyId)) : null;
+    const counties = await storage.getCounties();
+    const countyMap = new Map(counties.map(c => [c.id, c.name]));
+    let databases = await storage.getDatabases();
+    if (parsedCountyId) {
+      databases = databases.filter(db => db.countyId === parsedCountyId);
+    } else if (scopeState && scopeState !== "all") {
+      const stateCountyIds = new Set(counties.filter(c => c.stateCode === scopeState).map(c => c.id));
+      databases = databases.filter(db => stateCountyIds.has(db.countyId));
+    }
+    return { parsedCountyId: parsedCountyId || null, countyMap, databases };
+  };
+  const withCountyNames = (results: any[], countyMap: Map<number, string>) =>
+    results.map((r: any) => ({ ...r, countyName: r.countyId ? countyMap.get(r.countyId) ?? null : null }));
+  // The portal ids each live search was scoped to, so its poll reads the same stored matches the
+  // search did: the job itself only lists the portals it could scrape, and filtering the poll by
+  // those dropped saved matches from the area's other portals on the first refresh. Jobs are kept
+  // five minutes past completion (server/scraper.ts); these go a while later.
+  const liveSearchScopes = new Map<string, { databaseIds: number[]; at: number }>();
+  const LIVE_SEARCH_SCOPE_TTL_MS = 30 * 60 * 1000;
+  const rememberSearchScope = (searchId: string, databaseIds: number[]) => {
+    const now = Date.now();
+    for (const [id, scope] of liveSearchScopes) if (now - scope.at > LIVE_SEARCH_SCOPE_TTL_MS) liveSearchScopes.delete(id);
+    liveSearchScopes.set(searchId, { databaseIds, at: now });
+  };
+
   // The Search Permits page (/search): runs a permit search across the chosen county or
   // state's live-searchable portals, saves the query to history, starts the live search.
-  // Only a live search uses the monthly quota; saved/local results don't.
+  // Only a live search uses the monthly quota; saved/local results don't. Stored matches are
+  // scoped in SQL before any cap and come back as a cursor page (server/search-page.ts).
   app.post("/api/search", async (req, res) => {
     try {
       const { searchType, searchValue, scopeCountyId, scopeState } = req.body;
       if (!searchType || !searchValue) {
         return res.status(400).json({ message: "searchType and searchValue are required" });
       }
+      const page = readSearchPage(req.body);
+      if (!page) return res.status(400).json({ message: SEARCH_PAGE_MESSAGE });
 
-      const parsedCountyId = scopeCountyId ? parseInt(scopeCountyId) : null;
-
-      const counties = await storage.getCounties();
-      const countyMap = new Map(counties.map(c => [c.id, c.name]));
-
-      let databases = await storage.getDatabases();
-      if (parsedCountyId) {
-        databases = databases.filter(db => db.countyId === parsedCountyId);
-      } else if (scopeState && scopeState !== "all") {
-        const stateCountyIds = new Set(
-          counties.filter(c => c.stateCode === scopeState).map(c => c.id)
-        );
-        databases = databases.filter(db => stateCountyIds.has(db.countyId));
-      }
-
-      const scopeDbIds = new Set(databases.map(db => db.id));
+      const { parsedCountyId, countyMap, databases } = await resolveSearchScope(scopeCountyId, scopeState);
+      const scopeDbIds = databases.map(db => db.id);
       // Work out what can actually run before charging the search quota.
       const searchable = databases.filter(db => governmentLinksAvailable(db) && canScrapeGovernmentPortal(db));
 
-      const localResults = await storage.searchLocalResults(searchType, searchValue);
-      const filteredResults = localResults.filter((r: any) => scopeDbIds.has(r.databaseId));
+      const local = await storage.searchLocalResults(searchType, searchValue, { databaseIds: scopeDbIds, ...page });
 
-      if (searchable.length === 0 && filteredResults.length === 0) {
+      if (searchable.length === 0 && local.totalResults === 0) {
         // Nothing was searched: no quota, no history row, and say so plainly.
         return res.json({
           noSearchablePortals: true,
           searchId: null,
           results: [],
           totalResults: 0,
+          nextCursor: null,
+          hasMore: false,
           source: "none",
           message: "No permit portal in this area supports live search yet. Browse the Directory for the official portal links.",
         });
@@ -766,26 +788,49 @@ export async function registerRoutes(
         countyId: parsedCountyId,
       });
 
-      const enrichedResults = filteredResults.map((r: any) => ({
-        ...r,
-        countyName: r.countyId ? countyMap.get(r.countyId) ?? null : null,
-      }));
-
       const searchId = randomUUID().slice(0, 8);
+      rememberSearchScope(searchId, scopeDbIds);
       startLiveSearch(searchId, query.id, searchType, searchValue, searchable.map(governmentLinksForDisplay) as any)
         .catch((err) => console.error("Live search init error:", err));
 
       res.json({
         query,
         searchId,
-        results: enrichedResults,
-        totalResults: filteredResults.length,
-        source: filteredResults.length > 0 ? "local" : "none",
+        results: withCountyNames(local.results, countyMap),
+        totalResults: local.totalResults,
+        nextCursor: local.nextCursor,
+        hasMore: local.nextCursor !== null,
+        source: local.totalResults > 0 ? "local" : "none",
         searchablePortals: searchable.length,
       });
     } catch (err: any) {
       console.error("Permit search failed:", err);
       res.status(500).json({ message: "Search failed. Please try again." });
+    }
+  });
+
+  // Older pages of the same stored matches (/search, once the page asks the server for pages):
+  // the search's scope and terms again, read from `before` (the previous page's nextCursor). A
+  // read, not a search — no quota, no history row, no live search.
+  app.get("/api/search/results", async (req, res) => {
+    try {
+      const { searchType, searchValue, scopeCountyId, scopeState } = req.query as Record<string, string | undefined>;
+      if (!searchType || !searchValue) {
+        return res.status(400).json({ message: "searchType and searchValue are required" });
+      }
+      const page = readSearchPage(req.query);
+      if (!page) return res.status(400).json({ message: SEARCH_PAGE_MESSAGE });
+      const { countyMap, databases } = await resolveSearchScope(scopeCountyId, scopeState);
+      const local = await storage.searchLocalResults(searchType, searchValue, { databaseIds: databases.map(db => db.id), ...page });
+      res.json({
+        results: withCountyNames(local.results, countyMap),
+        totalResults: local.totalResults,
+        nextCursor: local.nextCursor,
+        hasMore: local.nextCursor !== null,
+      });
+    } catch (err: any) {
+      console.error("Permit result page failed:", err);
+      res.status(500).json({ message: "Could not load more results. Please try again." });
     }
   });
 
@@ -796,26 +841,22 @@ export async function registerRoutes(
     if (!job || !(await canReadQuery(req, job.queryId))) {
       return res.status(404).json({ message: "Search job not found" });
     }
+    const page = readSearchPage(req.query);
+    if (!page) return res.status(400).json({ message: SEARCH_PAGE_MESSAGE });
 
-    const localResults = await storage.searchLocalResults(job.searchType, job.searchValue);
-
-    const searchDbIds = new Set(job.databases.map(d => d.id));
-
+    // The scope the search ran with — every portal in the area, not only the ones being scraped.
+    const databaseIds = liveSearchScopes.get(job.searchId)?.databaseIds ?? job.databases.map(d => d.id);
     const counties = await storage.getCounties();
     const countyMap = new Map(counties.map(c => [c.id, c.name]));
-
-    const filteredResults = localResults.filter((r: any) => searchDbIds.has(r.databaseId));
-
-    const enrichedResults = filteredResults.map((r: any) => ({
-      ...r,
-      countyName: r.countyId ? countyMap.get(r.countyId) ?? null : null,
-    }));
+    const local = await storage.searchLocalResults(job.searchType, job.searchValue, { databaseIds, ...page });
 
     res.json({
       status: job.status,
       databases: job.databases,
-      results: enrichedResults,
-      totalResults: enrichedResults.length,
+      results: withCountyNames(local.results, countyMap),
+      totalResults: local.totalResults,
+      nextCursor: local.nextCursor,
+      hasMore: local.nextCursor !== null,
       totalResultsScraped: job.totalResultsFound,
       elapsedMs: Date.now() - job.startedAt,
     });
@@ -4809,7 +4850,8 @@ function main() {
 
       if (vpnDetected) {
         const settings = (domain.settings as any) || {};
-        const blockMode = ["block", "log", "redirect"].includes(settings.vpnBlockMode) ? settings.vpnBlockMode : "block";
+        // Log-first: a site with no saved mode records the visit and blocks nobody (server/vpn-mode.ts).
+        const blockMode = effectiveVpnMode(settings);
         const redirectUrl = blockMode === "redirect" ? safeRedirectUrl(settings.vpnRedirectUrl) : null;
         const geo = edgeGeo(req);
 
@@ -4858,6 +4900,8 @@ function main() {
           const uniqueIps = new Set(vpnBlocks.map(v => v.ipAddress)).size;
           return {
             ...d,
+            // The mode the server enforces for this site right now: the saved one, else Log only.
+            vpnEffectiveMode: effectiveVpnMode(d.settings),
             vpnStats: {
               totalBlocks: vpnBlocks.length,
               uniqueVpnIps: uniqueIps,
@@ -5111,7 +5155,9 @@ function main() {
         vpnWhitelistedIps: z.string().max(20000).optional().nullable(),
       }).safeParse(req.body ?? {});
       if (!input.success) return res.status(400).json({ message: firstZodMessage(input.error) });
-      const vpnBlockMode = input.data.vpnBlockMode || "block";
+      // A save that leaves the mode out (redirect link or whitelist only) keeps the saved mode; a
+      // site that never saved one stays in Log only. A save never switches a site to Block by omission.
+      const vpnBlockMode = input.data.vpnBlockMode ?? savedVpnMode(domain.settings) ?? VPN_DEFAULT_MODE;
       const vpnRedirectUrl = String(input.data.vpnRedirectUrl ?? "").trim();
       if (vpnBlockMode === "redirect" && !safeRedirectUrl(vpnRedirectUrl)) {
         return res.status(400).json({ message: "Redirect mode needs a full http:// or https:// link" });
@@ -5132,7 +5178,8 @@ function main() {
       };
 
       await storage.updateTrackedDomainSettings(id, newSettings);
-      res.json({ success: true });
+      // What is now in force, so the page can show what was saved rather than what it sent.
+      res.json({ success: true, vpnBlockMode, vpnRedirectUrl: newSettings.vpnRedirectUrl, vpnWhitelistedIps: newSettings.vpnWhitelistedIps });
     } catch (err: any) {
       console.error("Error saving VPN settings:", err);
       res.status(500).json({ message: "Failed to save settings" });
