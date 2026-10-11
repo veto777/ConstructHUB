@@ -14,7 +14,7 @@ import { Section } from "@/components/app-ui";
 import { Badge } from "@/components/ui/badge";
 import type { CourseAccess, MasterClassModule } from "./access";
 import { AccessChecking, AccessError, LockedModule } from "./gate";
-import { LessonOutline, useScrollToHash, type LessonMeta } from "./lesson";
+import { LessonOutline, type LessonMeta } from "./lesson";
 import { ModuleLessons, type LessonModuleKey, type RenderLesson } from "./lesson-body";
 
 export { AppLink, InApp } from "./lesson-body";
@@ -58,7 +58,6 @@ export function ModuleHome({ title, description, icon: Icon, badge, unlocked, le
   testId?: string;
 }) {
   const open = p.accessStatus === "success" && unlocked;
-  useScrollToHash(open);
   return (
     <div className="space-y-4 sm:space-y-6" data-testid={testId}>
       <Section>

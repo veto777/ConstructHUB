@@ -25,6 +25,8 @@ export function Pager({ offset, setOffset, more, label }: { offset: number; setO
 }
 
 export function BusinessSelector({ value, onChange }: { value: string | null; onChange: (v: string) => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const choose = (next: string) => { onChange(next); setExpanded(false); };
   const [search, setSearch] = useState(""), [offset, setOffset] = useState(0), [linked, setLinked] = useState("all");
   const [selected, setSelected] = useState<Record<number, { name: string; cadence: number; period: string }>>({});
   const [bulk, setBulk] = useState(false), [text, setText] = useState(""), [bulkMedia, setBulkMedia] = useState(""), [schedule, setSchedule] = useState(""), [mode, setMode] = useState("approval"), [jobOffset, setJobOffset] = useState(0), [jobSearch, setJobSearch] = useState("");
@@ -37,13 +39,20 @@ export function BusinessSelector({ value, onChange }: { value: string | null; on
   function enqueue(kind: string, draft = true, enabled = true) {
     mutation.mutate({ requestId, businessIds: ids, kind, ...(kind === "post" ? { text, draft, mediaUrls: bulkMedia.split("\n").map(v => v.trim()).filter(Boolean), ...(schedule ? { scheduledTime: new Date(schedule).toISOString() } : {}) } : {}), ...(kind === "settings" ? { enabled, mode, cadences: ids.map(businessId => ({ businessId, cadence: selected[businessId].cadence, period: selected[businessId].period })) } : {}) });
   }
+  if (value && !expanded) return (
+    <section className="flex min-w-0 flex-wrap items-center justify-between gap-2" aria-label="Selected business">
+      <p className="min-w-0 break-words text-sm font-medium">{value === "all" ? "All-clients calendar" : data?.items?.find((b: any) => String(b.id) === value)?.business_name || "Selected business"}</p>
+      <GooglePill size="sm" onClick={() => setExpanded(true)} label="Change business / bulk actions" testId="button-change-business" />
+    </section>
+  );
   return (
     <section>
       <GoogleSectionHeader
         title="Business"
-        description={`${data?.total ?? 0} businesses. Choose one to manage its accounts, posts and auto mode.`}
+        description={error ? "Businesses unavailable." : data ? `${data.total} businesses. Choose one to manage its accounts, posts and auto mode.` : "Loading businesses…"}
         actions={<>
-          <GooglePill size="sm" onClick={() => onChange("all")} label="All-clients calendar" />
+          {value && <GooglePill size="sm" onClick={() => setExpanded(false)} label="Close switcher" />}
+          <GooglePill size="sm" onClick={() => choose("all")} label="All-clients calendar" />
           <GooglePill size="sm" selected={bulk} ariaPressed={bulk} onClick={() => setBulk(!bulk)} testId="button-bulk-actions" label={`Bulk actions (${ids.length})`} />
         </>}
       />
@@ -80,7 +89,7 @@ export function BusinessSelector({ value, onChange }: { value: string | null; on
                 className={value === String(b.id) ? "bg-[color:var(--g-hover)] -mx-4 px-4 sm:-mx-0 sm:px-0" : undefined}
                 title={<span className="inline-flex items-center gap-3">
                   {bulk && <input type="checkbox" aria-label={`Select ${b.business_name} for bulk`} checked={!!selected[b.id]} onChange={e => setSelected(old => { const next = { ...old }; if (e.target.checked) next[b.id] = { name: b.business_name, cadence: 1, period: "week" }; else delete next[b.id]; return next; })} />}
-                  <button type="button" onClick={() => onChange(String(b.id))} aria-current={value === String(b.id) ? "true" : undefined}>{b.business_name}</button>
+                  <button type="button" className="min-h-10 rounded px-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => choose(String(b.id))} aria-current={value === String(b.id) ? "true" : undefined}>{b.business_name}</button>
                 </span>}
                 meta={[b.city, b.gbp_location_name ? <span key="g" className="g-open">Google linked</span> : null]}
               />

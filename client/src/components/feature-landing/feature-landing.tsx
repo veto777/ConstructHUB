@@ -47,7 +47,8 @@ export function FeatureLanding({ page }: { page: FeaturePage }) {
   const price = useMemo(() => featurePriceSummary(page.pricing), [page.pricing]);
   // Portal (CRM) features follow the org owner's plan, which this account's entitlements don't show.
   const checkPlan = !!user && page.app.surface === "app";
-  const { data: ent } = useQuery<EntitlementsInfo>({ queryKey: ["/api/entitlements"], enabled: checkPlan });
+  const entQuery = useQuery<EntitlementsInfo>({ queryKey: ["/api/entitlements"], enabled: checkPlan });
+  const ent = entQuery.isSuccess ? entQuery.data : undefined;
   const gap = checkPlan && ent ? featurePlanGap(page.pricing, ent) : null;
   useMetaDescription(page.seo.description);
   useDocumentTitle(page.seo.title);
@@ -60,7 +61,14 @@ export function FeatureLanding({ page }: { page: FeaturePage }) {
     [page.related],
   );
 
-  const primaryCta = (where: string) => gap
+  const primaryCta = (where: string) => checkPlan && !ent
+    ? (
+      <button type="button" className={`${BTN_PRIMARY} ${BTN_LG}`} disabled={!entQuery.isError}
+        onClick={() => void entQuery.refetch()} data-testid={`cta-feature-primary-${where}`} data-cta="check-access">
+        {entQuery.isError ? "Retry access check" : "Checking access…"}
+      </button>
+    )
+    : gap
     ? (
       <Link href={gap.href} className={`${BTN_PRIMARY} ${BTN_LG}`} data-testid={`cta-feature-primary-${where}`} data-cta="upgrade">
         {gap.label} <ArrowRight className="h-4 w-4" />
@@ -69,7 +77,8 @@ export function FeatureLanding({ page }: { page: FeaturePage }) {
     : user
     ? (
       <DashLink href={page.app.href} surface={page.app.surface} className={`${BTN_PRIMARY} ${BTN_LG}`} data-testid={`cta-feature-primary-${where}`} data-cta="open">
-        {page.app.label ?? `Open ${page.title}`} <ArrowRight className="h-4 w-4" />
+        {checkPlan && !ent?.accessPlan && ["module", "allowance", "addon"].includes(page.pricing.kind)
+          ? "Check access" : page.app.label ?? `Open ${page.title}`} <ArrowRight className="h-4 w-4" />
       </DashLink>
     )
     : (

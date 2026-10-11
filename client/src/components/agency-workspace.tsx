@@ -95,7 +95,7 @@ function AgencyBulkWorkspace({onOpen,compact=false}:{onOpen?:(id:number)=>void;c
     return{tone:l.gbpLocationName?'success':'neutral',label:l.gbpLocationName?'Linked':'Not linked'};
   };
   const {data:stats}=useQuery<any>({queryKey:['/api/agency/dashboard',f.params.toString()],queryFn:()=>apiRequest('GET','/api/agency/dashboard?'+f.params).then(r=>r.json())});
-  const {data:recentReviews}=useQuery<{items:any[]}>({queryKey:['/api/google-profile-reviews','paged','snippets',f.params.toString()],queryFn:()=>apiRequest('GET','/api/google-profile-reviews?paged=true&offset=0&'+f.params).then(r=>r.json()),enabled:!!data?.items?.length,staleTime:60_000});
+  const {data:recentReviews}=useQuery<{items:any[]}>({queryKey:['/api/google-profile-reviews','paged','snippets',f.params.toString()],queryFn:()=>apiRequest('GET','/api/google-profile-reviews?paged=true&'+f.params).then(r=>r.json()),enabled:!!data?.items?.length,staleTime:60_000});
   const latestReviews=new Map<number,LatestReview>();
   for(const r of recentReviews?.items??[])if(r.locationId&&r.comment&&!latestReviews.has(r.locationId))latestReviews.set(r.locationId,r);
   const selectedKey=JSON.stringify(f.filters);

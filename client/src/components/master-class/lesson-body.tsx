@@ -25,7 +25,7 @@ import { apiErrorMessage } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { PROGRESS_NOTE, progressLabel, useChecklist } from "@/components/guides/progress";
 import { planNamesWhere } from "@shared/plan-copy";
-import { Lesson, type LessonMeta } from "./lesson";
+import { Lesson, useScrollToHash, type LessonMeta } from "./lesson";
 
 /* ── The server's shapes (server/master-class/content.ts) ─────────────────────────────────────────────── */
 
@@ -292,6 +292,7 @@ export function ModuleLessons({ module, lessons, storageKey, open, renderLesson,
   children?: ReactNode;
 }) {
   const q = useLessonBodies(module, open);
+  useScrollToHash(open && q.isSuccess);
   if (!open) return null;
   if (q.isPending) {
     return (

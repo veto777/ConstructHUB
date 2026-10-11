@@ -502,11 +502,13 @@ function BlockedVisitorsTab({ domainId }: { domainId: number | null }) {
   );
 }
 
-function InstallScriptTab({ domains, selectedDomainId, setSelectedDomainId, detections, statsError }: {
+function InstallScriptTab({ domains, selectedDomainId, setSelectedDomainId, detections, statsError, lastDetection, detectionError }: {
   domains: VpnDomain[];
   selectedDomainId: number | null;
   setSelectedDomainId: (id: number) => void;
   detections: number | undefined;
+  lastDetection: string | null;
+  detectionError: boolean;
   statsError: boolean;
 }) {
   const appOrigin = useAppOrigin();
@@ -575,7 +577,7 @@ function InstallScriptTab({ domains, selectedDomainId, setSelectedDomainId, dete
             )}
             {!statsError && detections !== undefined && detections > 0 && (
               <p className="text-xs text-emerald-700 dark:text-emerald-400" data-testid="text-vpn-script-active">
-                Script is running — {detections} detection{detections === 1 ? "" : "s"} recorded so far.
+                {detections} detection{detections === 1 ? "" : "s"} recorded. Last detection: {lastDetection ? new Date(lastDetection).toLocaleString() : "unavailable"}{detectionError && lastDetection ? " (refresh failed; saved detection)" : ""}. Historical detections do not confirm the script is running now.
               </p>
             )}
           </div>
@@ -832,10 +834,11 @@ export default function VpnShieldPage() {
             </span>
           </span>
           <span className="text-xs text-muted-foreground" data-testid="text-vpn-last-detection">
-            Last detection: {lastDetection ? formatTimeAgo(lastDetection) : "none yet"}
+            Last detection: {lastDetection ? new Date(lastDetection).toLocaleString() : lastDetectionQuery.isError ? "unavailable" : lastDetectionQuery.isPending ? "loading…" : "none yet"}
+            {lastDetectionQuery.isError && lastDetection && " (refresh failed; saved detection)"}
           </span>
           <span className="text-xs text-muted-foreground" data-testid="text-vpn-updated">
-            {statsQuery.dataUpdatedAt ? `Updated ${formatTimeAgo(new Date(statsQuery.dataUpdatedAt).toISOString())}` : "Loading…"}
+            {statsQuery.dataUpdatedAt ? `${statsQuery.isError ? "Refresh failed — saved" : "Updated"} ${new Date(statsQuery.dataUpdatedAt).toLocaleString()}` : statsQuery.isError ? "Unavailable" : "Loading…"}
           </span>
           <span className="ml-auto flex items-center gap-2">
             {!savedMode && (
@@ -917,6 +920,8 @@ export default function VpnShieldPage() {
               selectedDomainId={domainId}
               setSelectedDomainId={setSelectedDomainId}
               detections={statsQuery.data?.total}
+              lastDetection={lastDetection}
+              detectionError={lastDetectionQuery.isError}
               statsError={statsQuery.isError && !statsQuery.data}
             />
           )}

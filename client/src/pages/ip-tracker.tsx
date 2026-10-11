@@ -224,7 +224,7 @@ function PercentBar({ value }: { value: number }) {
 }
 
 function OnlineCell({ domainId }: { domainId: number }) {
-  const { data, isError } = useQuery<{ count: number }>({
+  const { data, isError, dataUpdatedAt } = useQuery<{ count: number }>({
     queryKey: ["/api/click-guard/domains", domainId, "online"],
     refetchInterval: ONLINE_REFETCH_MS,
   });
@@ -232,6 +232,7 @@ function OnlineCell({ domainId }: { domainId: number }) {
     <td className="px-3 py-2.5 sm:px-4 sm:py-3 align-middle text-right tabular-nums" data-testid={`text-online-${domainId}`} title="Distinct IPs in the last 20 minutes">
       <span className="sm:hidden text-muted-foreground">Online: </span>
       {data ? data.count : isError ? "Unavailable" : "…"}
+      {data && isError && <span className="block text-xs text-muted-foreground">Refresh failed · saved {new Date(dataUpdatedAt).toLocaleString()}</span>}
     </td>
   );
 }
@@ -296,7 +297,13 @@ function InstallCard({ domain }: { domain: DomainWithStats }) {
 const ONLINE_REFETCH_MS = 15000;
 const ANALYTICS_REFETCH_MS = 30000;
 
-function DashboardView({ domainId, analyticsQuery, domains }: {
+function MetricStatus({ query, label }: { query: { isError: boolean; dataUpdatedAt: number }; label: string }) {
+  return <p className="text-xs text-muted-foreground" role="status">
+    {label}: {query.dataUpdatedAt ? `${query.isError ? "Refresh failed — showing saved data from" : "Updated"} ${new Date(query.dataUpdatedAt).toLocaleString()}` : query.isError ? "Unavailable" : "Loading…"}
+  </p>;
+}
+
+export function DashboardView({ domainId, analyticsQuery, domains }: {
   domainId: number | null;
   analyticsQuery: UseQueryResult<Analytics, Error>;
   domains: DomainWithStats[];
@@ -334,11 +341,10 @@ function DashboardView({ domainId, analyticsQuery, domains }: {
 
       {domainId && (
         <div className="flex flex-wrap items-center justify-between gap-2" data-testid="strip-dashboard-status">
-          <span className="text-xs text-muted-foreground" data-testid="text-dashboard-updated">
-            {analyticsQuery.dataUpdatedAt
-              ? `Updated ${formatTimeAgo(new Date(Math.max(analyticsQuery.dataUpdatedAt, online.dataUpdatedAt)).toISOString())}`
-              : "Loading…"}
-          </span>
+          <div data-testid="text-dashboard-updated">
+            <MetricStatus query={analyticsQuery} label="Visit summary" />
+            <MetricStatus query={online} label="Online visitors" />
+          </div>
           <Button
             size="sm"
             variant="outline"
@@ -359,7 +365,7 @@ function DashboardView({ domainId, analyticsQuery, domains }: {
         </Notice>
       )}
 
-      {online.data && online.data.count > 0 && (
+      {!online.isError && online.data && online.data.count > 0 && (
         <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900/60 dark:bg-emerald-950/30" data-testid="banner-online">
           <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
           <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
@@ -369,12 +375,12 @@ function DashboardView({ domainId, analyticsQuery, domains }: {
       )}
 
       <GoogleStatGrid cols={3}>
-        <GoogleStat label="Online now" value={online.data?.count ?? 0} testId="card-stat-online-now" hint="Last 20 minutes" />
-        <GoogleStat label="Today" value={countLabel(todayVisits, partialFrom(localDayKey(now)))} testId="card-stat-today" />
-        <GoogleStat label="Yesterday" value={countLabel(yesterdayVisits, partialFrom(localDayKey(daysAgo(now, 1))))} testId="card-stat-yesterday" />
-        <GoogleStat label="Last 7 days" value={countLabel(last7, partialFrom(chartDays[7][0]))} testId="card-stat-last-7-days" />
-        <GoogleStat label="This month" value={countLabel(thisMonth, partialFrom(`${monthPrefix}-01`))} testId="card-stat-this-month" />
-        <GoogleStat label="Total" value={countLabel(totalVisits, totalVisits >= VISIT_ROW_CAP)} testId="card-stat-total" hint="All time" />
+        <GoogleStat label="Online now" value={online.data?.count ?? (online.isError ? "Unavailable" : "…")} testId="card-stat-online-now" hint="Last 20 minutes" />
+        <GoogleStat label="Today" value={analytics ? countLabel(todayVisits, partialFrom(localDayKey(now))) : analyticsQuery.isError ? "Unavailable" : "…"} testId="card-stat-today" />
+        <GoogleStat label="Yesterday" value={analytics ? countLabel(yesterdayVisits, partialFrom(localDayKey(daysAgo(now, 1)))) : analyticsQuery.isError ? "Unavailable" : "…"} testId="card-stat-yesterday" />
+        <GoogleStat label="Last 7 days" value={analytics ? countLabel(last7, partialFrom(chartDays[7][0])) : analyticsQuery.isError ? "Unavailable" : "…"} testId="card-stat-last-7-days" />
+        <GoogleStat label="This month" value={analytics ? countLabel(thisMonth, partialFrom(`${monthPrefix}-01`)) : analyticsQuery.isError ? "Unavailable" : "…"} testId="card-stat-this-month" />
+        <GoogleStat label="Total" value={domain ? countLabel(totalVisits, totalVisits >= VISIT_ROW_CAP) : "…"} testId="card-stat-total" hint="All time" />
       </GoogleStatGrid>
 
       {oldestLoaded && (
@@ -679,7 +685,7 @@ function VisitorListView({ domainId }: { domainId: number | null }) {
   );
 }
 
-function TrafficSourcesView({ analyticsQuery, since }: { analyticsQuery: UseQueryResult<Analytics, Error>; since: Date }) {
+export function TrafficSourcesView({ analyticsQuery, since }: { analyticsQuery: UseQueryResult<Analytics, Error>; since: Date }) {
   const analytics = analyticsQuery.data;
   const sources = analytics?.trafficSources || [];
   const totalLoads = sources.reduce((s, t) => s + t.pageLoads, 0);
@@ -697,10 +703,11 @@ function TrafficSourcesView({ analyticsQuery, since }: { analyticsQuery: UseQuer
         {(analytics?.totalVisits ?? 0) >= VISIT_ROW_CAP ? `Latest ${VISIT_ROW_CAP.toLocaleString()} visits` : "Visits"} since {since.toLocaleDateString("en-US", { month: "short", day: "numeric" })}.
       </p>
       <GoogleStatGrid cols={3}>
-        <GoogleStat label="Total sources" value={sources.length} testId="card-stat-total-sources" />
-        <GoogleStat label="Total page loads" value={totalLoads.toLocaleString()} testId="card-stat-total-page-loads" />
-        <GoogleStat label="Unique visitors" value={totalVisitors.toLocaleString()} testId="card-stat-unique-visitors" />
+        <GoogleStat label="Total sources" value={analytics ? sources.length : analyticsQuery.isError ? "Unavailable" : "…"} testId="card-stat-total-sources" />
+        <GoogleStat label="Total page loads" value={analytics ? totalLoads.toLocaleString() : analyticsQuery.isError ? "Unavailable" : "…"} testId="card-stat-total-page-loads" />
+        <GoogleStat label="Unique visitors" value={analytics ? totalVisitors.toLocaleString() : analyticsQuery.isError ? "Unavailable" : "…"} testId="card-stat-unique-visitors" />
       </GoogleStatGrid>
+      <MetricStatus query={analyticsQuery} label="Traffic sources" />
 
       <Section flush title="Traffic sources by domain">
         <div className="overflow-x-auto">
@@ -750,7 +757,7 @@ function TrafficSourcesView({ analyticsQuery, since }: { analyticsQuery: UseQuer
   );
 }
 
-function PagesView({ domainId }: { domainId: number | null }) {
+export function PagesView({ domainId }: { domainId: number | null }) {
   const pagesQuery = useQuery<PageStat[]>({
     queryKey: ["/api/click-guard/domains", domainId, "pages"],
     enabled: !!domainId,
@@ -761,9 +768,10 @@ function PagesView({ domainId }: { domainId: number | null }) {
   return (
     <div className="space-y-4">
       <GoogleStatGrid cols={2}>
-        <GoogleStat label="Total pages" value={pages?.length ?? 0} testId="card-stat-total-pages" />
-        <GoogleStat label="Total hits" value={pages?.reduce((s, p) => s + p.hits, 0).toLocaleString() ?? 0} testId="card-stat-total-hits" />
+        <GoogleStat label="Total pages" value={pages?.length ?? (pagesQuery.isError ? "Unavailable" : "…")} testId="card-stat-total-pages" />
+        <GoogleStat label="Total hits" value={pages?.reduce((s, p) => s + p.hits, 0).toLocaleString() ?? (pagesQuery.isError ? "Unavailable" : "…")} testId="card-stat-total-hits" />
       </GoogleStatGrid>
+      <MetricStatus query={pagesQuery} label="Pages" />
 
       {pagesQuery.isError && !pages && (
         <Notice tone="danger" title="Couldn't load pages" testId="notice-pages-error"
@@ -1086,6 +1094,7 @@ export default function IpTrackerPage() {
         }
       />
 
+      {domains && <MetricStatus query={domainsQuery} label="Project totals" />}
       <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
         <AlertDialogContent data-testid="dialog-remove-domain">
           <AlertDialogHeader>

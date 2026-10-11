@@ -1,4 +1,5 @@
 import { PlanRequired, planRequiredFrom } from "@/components/plan-required";
+import { planNamesWhere } from "@shared/plan-copy";
 import { propertyOfficeForDisplay, resolvePropertyScope } from "./property-display";
 import { governmentLinkNotice, governmentLinksAvailable } from "@shared/government-links";
 import { useState, useMemo, useEffect } from "react";
@@ -165,7 +166,7 @@ export default function PropertyPage() {
   if (error) return <AppPage width="narrow" testId="page-property">
     <GoogleSectionHeader as="h1" title="Property records" flush />
     {planRequiredFrom(error) ? <PlanRequired module="propertyRecords" error={error} /> : /^401:/.test(error.message) ?
-      <Notice tone="info">Sign in to access Property Records with an eligible plan. <Button asChild variant="outline"><a href="/auth">Sign in</a></Button></Notice> :
+      <Notice tone="info">Sign in to access Property Records. Included with {planNamesWhere(p => p.modules.propertyRecords)}. <Button asChild variant="outline"><a href="/auth">Sign in</a></Button></Notice> :
       <Notice tone="danger">Couldn't load property offices. <Button variant="outline" onClick={() => void refetch()}>Retry</Button></Notice>}
   </AppPage>;
   return (
@@ -175,7 +176,7 @@ export default function PropertyPage() {
         as="h1"
         titleTestId="text-property-title"
         title="Property records"
-        description="County appraiser portals for ownership, values, construction history and tax records."
+        description={`County appraiser portals for ownership, values, construction history and tax records. Included with ${planNamesWhere(p => p.modules.propertyRecords)}.`}
         flush
       />
 

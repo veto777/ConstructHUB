@@ -79,7 +79,7 @@ export default function MasterClassPage() {
     {/* Signed out, this page has no app frame: the header brings the way home, sign-in and the cart the Add to cart buttons fill. */}
     <PublicPageHeader next="/master-class" cart />
     <div className="h-full overflow-y-auto">
-      <AppPage width="narrow" className="[&_p]:leading-relaxed [&_button]:min-h-10 [&_input]:min-h-10">
+      <AppPage width="narrow" className="[&_p]:leading-relaxed [&_button:not([role=checkbox])]:min-h-10 [&_input]:min-h-10">
         <PageHeader title={<span data-testid="text-master-class-title">Master Class</span>}
           description={<span data-testid="text-master-class-subtitle">Build your construction business, one lesson at a time.</span>}
           meta={<>

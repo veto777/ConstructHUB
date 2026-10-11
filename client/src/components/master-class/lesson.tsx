@@ -100,9 +100,15 @@ export function LessonOutline({ lessons, storageKey, locked = false, progress = 
 export function useScrollToHash(ready: boolean) {
   useEffect(() => {
     if (!ready) return;
-    const hash = window.location.hash.slice(1);
-    if (!hash) return;
-    const el = document.getElementById(hash);
-    if (el) el.scrollIntoView({ block: "start" });
+    const scroll = () => {
+      const hash = window.location.hash.slice(1);
+      if (hash) document.getElementById(hash)?.scrollIntoView({ block: "start" });
+    };
+    const frame = requestAnimationFrame(scroll);
+    window.addEventListener("hashchange", scroll);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("hashchange", scroll);
+    };
   }, [ready]);
 }
