@@ -5282,7 +5282,9 @@ function main() {
 
       if (request.unsubscribed || await isReviewSuppressed(request.userId, request.clientEmail)) return res.status(409).json({ message: "Recipient has unsubscribed" });
       if (!isScheduled) {
-        const baseUrl = getBaseUrl(req);
+        // Customer-facing link: always the configured public origin, never the request host —
+        // a request sent from the CRM portal host would land the customer on the sign-in screen.
+        const baseUrl = canonicalAppOrigin();
         await sendReviewRequestEmail(clientEmail, clientName, companyName, companyLogoUrl, token, baseUrl, emailTheme, personalMessage || undefined, bccEmail || undefined);
 
         const reminderSettings = await storage.getReminderSettings(user.id);
@@ -5656,7 +5658,8 @@ function main() {
       const [fullUser] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
       const companyLogoUrl = fullUser?.companyLogoUrl || null;
 
-      const baseUrl = getBaseUrl(req);
+      // Customer-facing link: always the configured public origin, never the request host.
+      const baseUrl = canonicalAppOrigin();
       await sendReviewRequestEmail(request.clientEmail, request.clientName, request.companyName || "Our Company", companyLogoUrl, request.token, baseUrl, request.emailTheme);
 
       // A customer who already answered keeps their recorded outcome, and no
