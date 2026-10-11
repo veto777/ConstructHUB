@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { AlertTriangle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Notice } from "@/components/app-ui";
 import { GooglePill } from "@/components/google";
@@ -30,54 +31,112 @@ export function ReportError({
     </Notice>
   );
 }
+/**
+ * A failed background refetch never wipes saved figures: the last-good tiles/tables stay, marked
+ * with the time they were saved and a Retry. (Bare error panel only when nothing ever loaded.)
+ * A polite `role="status"`, not an alert: the saved data below is still valid, only the refresh
+ * failed — same language as the ip-tracker freshness strip.
+ */
+export function SavedDataStrip({
+  updatedAt,
+  retry,
+}: {
+  /** Milliseconds since the last successful fetch (TanStack `dataUpdatedAt`). */
+  updatedAt?: number | null;
+  retry: () => void;
+}) {
+  return (
+    <div
+      role="status"
+      className="flex items-start gap-3 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-950 dark:border-orange-900/60 dark:bg-orange-950/30 dark:text-orange-100"
+      data-testid="strip-saved-data"
+    >
+      <AlertTriangle
+        className="mt-0.5 h-4 w-4 shrink-0 text-primary"
+        aria-hidden="true"
+      />
+      <div className="min-w-0 flex-1 opacity-90">
+        Refresh failed — showing saved data from{" "}
+        {updatedAt ? new Date(updatedAt).toLocaleString() : "an earlier visit"}.
+      </div>
+      <div className="shrink-0">
+        <GooglePill
+          size="sm"
+          label="Retry"
+          onClick={retry}
+          testId="button-retry-saved-data"
+        />
+      </div>
+    </div>
+  );
+}
 export type Column = {
   label: string;
   value: (row: any) => any;
   sortValue?: (row: any) => any;
+  /** Server-side sort key (a whitelisted SQL column); only set for reports whose endpoint sorts before pagination. */
+  sortKey?: string;
 };
+export type SortState = { key: string; dir: "asc" | "desc" };
 export function ReportTable({
   rows,
   columns,
   caption,
   total,
+  sort,
+  onSort,
 }: {
   rows: any[];
   columns: Column[];
   caption: string;
-  /** Rows in the whole report; when more than `rows`, sorting is disclosed as page-local. */
+  /** Rows in the whole report; with page-local sorting, more than `rows` is disclosed. */
   total?: number;
+  /** Server-side sort state (persisted in the URL by the caller). Rows arrive pre-sorted. */
+  sort?: SortState | null;
+  /** With onSort, header clicks sort the WHOLE report on the server before pagination. */
+  onSort?: (key: string, dir: "asc" | "desc") => void;
 }) {
-  const [sort, setSort] = useState<{ index: number; desc: boolean } | null>(
-    null,
-  );
-  // The server pages the report (date, then clicks); the client only has this page, so a sort
-  // reorders these rows. Say so where the user can see it rather than only in the sr-only caption.
+  const [localSort, setLocalSort] = useState<{
+    index: number;
+    desc: boolean;
+  } | null>(null);
+  const server = !!onSort;
+  // Server mode: the endpoint sorted before LIMIT/OFFSET, so the note always spans the report.
+  // Local mode: the server paged the report (date, then clicks) and the client only has this
+  // page, so a sort reorders these rows. Say so where the user can see it rather than only in
+  // the sr-only caption.
   const partial = total != null && total > rows.length;
-  const sortNote = sort
-    ? `Sorted by ${columns[sort.index].label} ${sort.desc ? "descending" : "ascending"}, ${
-        partial
-          ? `within this page of ${rows.length} rows only — ${total} rows in the whole report`
-          : `across all ${rows.length} rows`
-      }.`
-    : null;
-  const ordered = [...rows].sort((a, b) => {
-    if (!sort) return 0;
-    const column = columns[sort.index];
-    const get = column.sortValue ?? column.value;
-    const x = get(a),
-      y = get(b);
-    const comparison =
-      x == null
-        ? y == null
-          ? 0
-          : 1
-        : y == null
-          ? -1
-          : !isNaN(Number(x)) && !isNaN(Number(y))
-            ? Number(x) - Number(y)
-            : String(x).localeCompare(String(y));
-    return comparison * (sort.desc ? -1 : 1);
-  });
+  const sortNote = server
+    ? sort
+      ? `Sorted by ${columns.find((c) => c.sortKey === sort.key)?.label ?? sort.key} ${sort.dir === "desc" ? "descending" : "ascending"}, across all ${total ?? rows.length} rows.`
+      : null
+    : localSort
+      ? `Sorted by ${columns[localSort.index].label} ${localSort.desc ? "descending" : "ascending"}, ${
+          partial
+            ? `within this page of ${rows.length} rows only — ${total} rows in the whole report`
+            : `across all ${rows.length} rows`
+        }.`
+      : null;
+  const ordered =
+    server || !localSort
+      ? rows
+      : [...rows].sort((a, b) => {
+          const column = columns[localSort.index];
+          const get = column.sortValue ?? column.value;
+          const x = get(a),
+            y = get(b);
+          const comparison =
+            x == null
+              ? y == null
+                ? 0
+                : 1
+              : y == null
+                ? -1
+                : !isNaN(Number(x)) && !isNaN(Number(y))
+                  ? Number(x) - Number(y)
+                  : String(x).localeCompare(String(y));
+          return comparison * (localSort.desc ? -1 : 1);
+        });
   return (
     <div className="overflow-x-auto">
       {sortNote && (
@@ -87,41 +146,69 @@ export function ReportTable({
       )}
       <table className="g-table w-full text-sm">
         <caption className="sr-only">
-          {caption}; sort applies to the displayed rows
+          {caption};{" "}
+          {server
+            ? "sort applies to the whole report"
+            : "sort applies to the displayed rows"}
         </caption>
         <thead>
           <tr>
-            {columns.map((c, index) => (
-              <th
-                key={c.label}
-                scope="col"
-                aria-sort={
-                  sort?.index === index
-                    ? sort.desc
-                      ? "descending"
-                      : "ascending"
-                    : "none"
-                }
-              >
-                <button
-                  className="rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
-                  title={
-                    partial
-                      ? "Sorts the rows on this page only"
-                      : "Sorts all rows"
-                  }
-                  onClick={() =>
-                    setSort({
-                      index,
-                      desc: sort?.index === index ? !sort.desc : false,
-                    })
-                  }
-                >
-                  {c.label}
-                  {sort?.index === index ? (sort.desc ? " ↓" : " ↑") : ""}
-                </button>
-              </th>
-            ))}
+            {columns.map((c, index) => {
+              const serverActive = server && sort?.key === c.sortKey;
+              const localActive = !server && localSort?.index === index;
+              const ariaSort = server
+                ? serverActive
+                  ? sort!.dir === "desc"
+                    ? "descending"
+                    : "ascending"
+                  : "none"
+                : localActive
+                  ? localSort!.desc
+                    ? "descending"
+                    : "ascending"
+                  : "none";
+              const sortable = server ? !!c.sortKey : true;
+              return (
+                <th key={c.label} scope="col" aria-sort={ariaSort}>
+                  {sortable ? (
+                    <button
+                      className="rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                      title={
+                        server || !partial
+                          ? "Sorts all rows"
+                          : "Sorts the rows on this page only"
+                      }
+                      onClick={() => {
+                        if (server) {
+                          if (!c.sortKey) return;
+                          onSort!(
+                            c.sortKey,
+                            sort?.key === c.sortKey && sort.dir === "asc"
+                              ? "desc"
+                              : "asc",
+                          );
+                        } else {
+                          setLocalSort({
+                            index,
+                            desc:
+                              localSort?.index === index ? !localSort.desc : false,
+                          });
+                        }
+                      }}
+                    >
+                      {c.label}
+                      {(server ? serverActive : localActive)
+                        ? (server ? sort!.dir === "desc" : localSort!.desc)
+                          ? " ↓"
+                          : " ↑"
+                        : ""}
+                    </button>
+                  ) : (
+                    c.label
+                  )}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
@@ -179,30 +266,51 @@ export function ReportTrend({
     .sort((a, b) => String(date(a)).localeCompare(String(date(b))));
   const max = Math.max(1, ...valid.map((r) => Number(value(r))));
   if (!valid.length) return null;
+  const fmt = (n: number) => n.toLocaleString("en-US");
   return (
     <figure className="rounded-xl border p-4">
-      <figcaption className="mb-3 text-sm">
-        {label} · displayed periods
+      <figcaption className="mb-3 flex flex-wrap items-baseline justify-between gap-2 text-sm">
+        <span>{label} · displayed periods</span>
+        {/* The labelled scale maximum: bar heights are shares of this number. */}
+        <span
+          className="text-xs tabular-nums text-muted-foreground"
+          data-testid="text-trend-max"
+        >
+          Max {fmt(max)}
+        </span>
       </figcaption>
-      <div
-        className="flex h-28 items-end gap-1"
-        role="img"
-        aria-label={valid.map((r) => `${date(r)}: ${value(r)}`).join("; ")}
-      >
-        {valid.map((r, i) => (
-          <div
-            key={i}
-            title={`${date(r)}: ${value(r)}`}
-            className="min-w-0 flex-1 bg-primary/70"
-            style={{
-              height: `${Math.max(1, (Number(value(r)) / max) * 100)}%`,
-            }}
-          />
-        ))}
+      <div className="flex h-28 items-stretch gap-1" role="list" aria-label={label}>
+        {valid.map((r, i) => {
+          const v = Number(value(r));
+          return (
+            // The whole column is the control: the exact value is announced by the button's
+            // label and shown as a chip on hover or keyboard focus (bars stay exact shares).
+            <div key={i} role="listitem" className="relative min-w-0 flex-1">
+              <button
+                type="button"
+                aria-label={`${date(r)}: ${fmt(v)}`}
+                title={`${date(r)}: ${fmt(v)}`}
+                className="group absolute inset-0 w-full cursor-default rounded-sm hover:bg-primary/10 focus-visible:bg-primary/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
+              >
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-x-0 bottom-0 rounded-t-sm bg-primary/70"
+                  style={{ height: `${Math.max(1, (v / max) * 100)}%` }}
+                />
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-1/2 top-0 z-10 -translate-x-1/2 whitespace-nowrap rounded border bg-background px-1 text-[10px] tabular-nums text-foreground opacity-0 shadow-sm transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+                >
+                  {fmt(v)}
+                </span>
+              </button>
+            </div>
+          );
+        })}
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
-        {date(valid[0])} – {date(valid[valid.length - 1])}. Exact values in the
-        table.
+        {date(valid[0])} – {date(valid[valid.length - 1])}. Each bar shows its
+        exact value on hover or keyboard focus; exact values also in the table.
       </p>
     </figure>
   );
@@ -229,15 +337,16 @@ export function relativeTime(
   );
 }
 export const analyticsColumns: Column[] = [
-  { label: "Period", value: (r) => r.date },
-  { label: "Breakdown", value: (r) => r.key },
-  { label: "Clicks", value: (r) => r.clicks },
-  { label: "Impressions", value: (r) => r.impressions },
-  { label: "CTR", value: (r) => percent(r.ctr), sortValue: (r) => r.ctr },
+  { label: "Period", value: (r) => r.date, sortKey: "date" },
+  { label: "Breakdown", value: (r) => r.key, sortKey: "key" },
+  { label: "Clicks", value: (r) => r.clicks, sortKey: "clicks" },
+  { label: "Impressions", value: (r) => r.impressions, sortKey: "impressions" },
+  { label: "CTR", value: (r) => percent(r.ctr), sortValue: (r) => r.ctr, sortKey: "ctr" },
   {
     label: "Position",
     value: (r) => position(r.position),
     sortValue: (r) => r.position,
+    sortKey: "position",
   },
 ];
 export const cloudflareColumns: Record<string, Column[]> = {

@@ -131,7 +131,9 @@ export function registerGscRoutes(
   });
   // Search analytics for one property: gsc_analytics grouped by date/day-week-month for
   // the chosen dimension and date range (impression-weighted CTR/position; ?q filters
-  // keys). "Search analytics" DataList — site-connections.tsx MetricRows.
+  // keys). ?sort&dir order the WHOLE report in SQL before pagination (whitelisted columns
+  // only), so sorting spans pages, not just the 25 loaded rows. "Search analytics"
+  // DataList — site-connections.tsx MetricRows.
   route("get", "/api/gsc/assets/:id/analytics", async (req, res, user) => {
     const a = await ownedAsset(user, idInput.parse(req.params.id), "gsc");
     const p = listInput
@@ -145,14 +147,21 @@ export function registerGscRoutes(
             new Date(Date.now() - 31 * 86400000).toISOString().slice(0, 10),
           ),
         end: z.string().date().default(new Date().toISOString().slice(0, 10)),
+        sort: z
+          .enum(["date", "key", "clicks", "impressions", "ctr", "position"])
+          .optional(),
+        dir: z.enum(["asc", "desc"]).default("asc"),
       })
       .parse(req.query);
     const v = [a.id, p.dimension, p.start, p.end, p.group, `%${p.q}%`];
     const sql = `SELECT to_char(date_trunc($5,date),'YYYY-MM-DD') date,key,sum(clicks) clicks,sum(impressions) impressions,
       sum(clicks)/NULLIF(sum(impressions),0) ctr,sum(position*impressions)/NULLIF(sum(impressions),0) position
       FROM gsc_analytics WHERE asset_id=$1 AND dimension=$2 AND date BETWEEN $3 AND $4 AND key ILIKE $6 GROUP BY 1,2`;
+    const order = p.sort
+      ? `${p.sort} ${p.dir}, date DESC, clicks DESC, key`
+      : "date DESC, clicks DESC, key";
     const { rows } = await pool.query(
-      `${sql} ORDER BY date DESC,clicks DESC,key LIMIT $7 OFFSET $8`,
+      `${sql} ORDER BY ${order} LIMIT $7 OFFSET $8`,
       [...v, p.limit, (p.page - 1) * p.limit],
     );
     const {
