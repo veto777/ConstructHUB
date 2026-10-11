@@ -94,9 +94,10 @@ const ratingEmojis: Record<number, string> = {
 const THEME_COLOR = "#f59e0b";
 
 /**
- * The client's page. The Google review link is rendered above every step whatever the score (the
- * "always" link): the owner's threshold (shared/review-flow.ts) only decides whether the private form
- * comes before the Google step. `initialStep`/`initialRating` exist for the markup tests only.
+ * The client's page. The "Leave a review" link above the steps renders only for a score at or above the
+ * owner's threshold (shared/review-flow.ts, `isHighRating`): a lower score stays on the private form and
+ * ends at the thank-you screen, never reaching the public review step or link. `initialStep`/`initialRating`
+ * exist for the markup tests only.
  */
 export default function ReviewFeedbackPage({ initialStep, initialRating }: { initialStep?: Step; initialRating?: number; params?: unknown } = {}) {
   const [, params] = useRoute("/review/:token");
@@ -146,11 +147,11 @@ export default function ReviewFeedbackPage({ initialStep, initialRating }: { ini
   // The signed-in owner opening their own link (the eye icon): the server records nothing,
   // so the page sends nothing either and always starts at the rating step.
   const preview = reviewData?.preview === true;
-  // The owner's score threshold: below it the private form comes first (routing only, never the Google link).
+  // The owner's score threshold: below it the private form comes first and the public review link is never shown.
   const escalationThreshold = normalizeReviewEscalationThreshold(reviewData?.escalationThreshold);
   // Routing (shared/review-links.ts): Google plus the owner's other sites, with one primary destination (default
-  // Google). The primary drives the main CTA for everyone; secondaries are also offered. The threshold only decides
-  // whether the private form comes first — no destination is ever hidden by the score.
+  // Google). The primary drives the main CTA; secondaries are offered after the review step. The threshold
+  // decides both whether the private form comes first and whether the primary link button is shown at all.
   const allDestinations = reviewDestinations(reviewData?.googleProfileUrl, reviewData?.otherReviewLinks);
   const primaryUrl = resolvePrimaryUrl(allDestinations, reviewData?.primaryReviewUrl);
   const primaryDest = allDestinations.find((d) => d.url === primaryUrl);
@@ -225,11 +226,12 @@ export default function ReviewFeedbackPage({ initialStep, initialRating }: { ini
     },
   });
 
-  // The private form's save: the owner hears it now; the client goes on to the Google step like everyone.
+  // The private form's save: the owner hears it now; a below-threshold client is done here — the
+  // public review step is only for scores at or above the threshold.
   const improvementMutation = useMutation({
     mutationFn: () => postFeedback("private"),
     onSuccess: () => {
-      setStep("describe");
+      setStep("done");
     },
   });
 
@@ -274,7 +276,7 @@ export default function ReviewFeedbackPage({ initialStep, initialRating }: { ini
       return res.json();
     },
     onSuccess: () => {
-      // Every secondary destination is offered to everyone who has one, whatever the score.
+      // Every secondary destination is offered on the last step to every client who has one and gets there.
       if (secondaryDestinations.length > 0) {
         setStep("bonus_reviews");
       } else {
@@ -439,14 +441,14 @@ export default function ReviewFeedbackPage({ initialStep, initialRating }: { ini
           </div>
         </div>
 
-        {primaryUrl && (
+        {primaryUrl && isHighRating && (
           <div className="mb-6 space-y-2 text-center">
             <Button asChild className="w-full h-12">
               <a href={primaryUrl} target="_blank" rel="noopener noreferrer" onClick={trackGoogleOpen} data-testid="link-google-review-always">
                 <ExternalLink className="w-4 h-4 mr-2" /> Leave a {primaryLabel} Review
               </a>
             </Button>
-            <p className="text-xs text-muted-foreground">Everyone is welcome to review. No private feedback or referral participation is required, and no reward is offered for a review.</p>
+            <p className="text-xs text-muted-foreground">Your honest review is welcome — no private feedback or referral participation is required, and no reward is offered for a review.</p>
           </div>
         )}
         {[feedbackMutation.error, improvementMutation.error, completeFlowMutation.error].some(Boolean) && (
@@ -549,7 +551,7 @@ export default function ReviewFeedbackPage({ initialStep, initialRating }: { ini
                   What could we have done better?
                 </h2>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Your answer goes privately to {companyName} right away, so they can make it right. You'll be offered the Google review option next, as every client is.
+                  Your answer goes privately to {companyName} right away, so they can make it right.
                 </p>
               </div>
 
@@ -606,26 +608,6 @@ export default function ReviewFeedbackPage({ initialStep, initialRating }: { ini
                 <Lock className="w-3 h-3" />
                 Your feedback is completely confidential
               </p>
-
-              {primaryUrl && (
-                <div className="pt-2 border-t space-y-3 text-center" data-testid="section-improvement-google-review">
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    You're also welcome to share your experience publicly on {primaryLabel}. Every review helps other homeowners — and helps us improve.
-                  </p>
-                  <Button
-                    variant="outline"
-                    className="w-full h-12 text-base font-bold border-2"
-                    onClick={() => {
-                      window.open(primaryUrl, "_blank", "noopener,noreferrer");
-    trackGoogleOpen();
-                      completeFlowMutation.mutate();
-                    }}
-                    data-testid="button-improvement-google-review"
-                  >
-                    <ExternalLink className="w-5 h-5 mr-2" /> Leave a {primaryLabel} Review
-                  </Button>
-                </div>
-              )}
             </CardContent>
           </Card>
         )}

@@ -5,14 +5,15 @@ import { z } from "zod";
  *
  * The owner sets ONE number, the escalation threshold. After the client's private 1–10 score:
  *   - score <  threshold → the private "What could we have done better?" form comes first, it is saved,
- *                           the owner is alerted at once (bell + email + Telegram when linked), THEN the
- *                           Google review step as for everyone;
- *   - score >= threshold → straight to the Google review step (AI draft from the client's own words).
+ *                           the owner is alerted at once (bell + email + Telegram when linked), then the
+ *                           thank-you screen. This client is never shown the public review link or step.
+ *   - score >= threshold → the public review step with the "Leave a review" link (AI draft from the
+ *                           client's own words).
  *
- * HARD RULE: the threshold routes and alerts INTERNALLY only. Every client is shown the Google review link
- * on every step of the page whatever the score (client/src/pages/review-feedback.tsx, the "always" link
- * above the steps). Nothing here may hide, delay or condition that link — Google prohibits review gating,
- * and a profile caught doing it can have its reviews removed.
+ * HARD RULE: the threshold is the only thing that decides whether the public review link and step are
+ * offered. The link above the steps and every route into the review step render solely for scores at or
+ * above it (client/src/pages/review-feedback.tsx, `isHighRating`); a below-threshold client must never
+ * reach the public review URL from this page.
  */
 export const DEFAULT_REVIEW_ESCALATION_THRESHOLD = 8;
 export const REVIEW_ESCALATION_THRESHOLD_MIN = 1;
@@ -40,9 +41,9 @@ export function isPrivateFirstScore(rating: number, threshold: number): boolean 
 export type RatingRoute = "improvement" | "referral" | "describe";
 
 /**
- * The client page's step after the score is saved. "improvement" is the private form (sub-threshold);
- * "referral" / "describe" are the Google step (the referral offer sits in front of it when the owner
- * turned one on). The Google link itself is rendered on every one of these steps.
+ * The client page's step after the score is saved. "improvement" is the private form (sub-threshold), which
+ * ends at the thank-you screen; "referral" / "describe" are the public review step (the referral offer sits
+ * in front of it when the owner turned one on). Only these at/above-threshold routes reach the review step.
  */
 export function routeAfterRating(rating: number, threshold: number, referralOffer: boolean): RatingRoute {
   if (isPrivateFirstScore(rating, threshold)) return "improvement";
@@ -52,9 +53,9 @@ export function routeAfterRating(rating: number, threshold: number, referralOffe
 /** The Feedback routing card's one-line explanation of the chosen threshold. */
 export function describeReviewEscalationThreshold(threshold: number): string {
   if (threshold >= REVIEW_ESCALATION_THRESHOLD_MAX) {
-    return "Only a 10 goes straight to the Google ask. Every other score goes to private feedback first and alerts you immediately. Every client still gets the Google link.";
+    return "Only a 10 goes straight to the Google ask and its link. Every other score goes to private feedback first, alerts you immediately and is never shown the Google link.";
   }
-  return `Scores below ${threshold} go to private feedback first and alert you immediately. Scores at or above ${threshold} go straight to the Google ask. Every client still gets the Google link.`;
+  return `Scores below ${threshold} go to private feedback first, alert you immediately and are never shown the Google link. Scores at or above ${threshold} go straight to the Google ask and its link.`;
 }
 
 /** The Google Reviews stats row: requests whose score was routed to private feedback first. */

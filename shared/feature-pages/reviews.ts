@@ -11,8 +11,9 @@ import { planNamesWhere } from "../plan-copy";
  *     reviewTemplates: server/routes.ts POST /api/review-templates (requirePlan … reviewTemplates)
  *   - follow-up reminders (interval, how many, time windows, timezone): server/review-reminders.ts, processReminders
  *   - unsubscribe honoured (409 on a suppressed address): server/routes.ts isReviewSuppressed, server/review-suppression.ts
- *   - the client's page: private 1–10 rating, "Help Us Improve" private feedback, EVERY rating gets showReview:true,
- *     AI draft built only from the client's own words (never the private score), copy-and-paste into Google:
+ *   - the client's page: private 1–10 rating, "Help Us Improve" private feedback, the public review step
+ *     (and its showReview flag) only at or above the owner's threshold, AI draft built only from the
+ *     client's own words (never the private score), copy-and-paste into Google:
  *     server/routes.ts /api/review/:token/feedback + /generate-review, server/review-draft.ts, client/src/pages/review-feedback.tsx
  *   - what is tracked per request (email opened, link clicked, rating, Google link opened, reminders sent):
  *     shared/schema.ts reviewRequests, /api/review/:token/pixel.png + /click + /google-link-opened
@@ -187,8 +188,9 @@ const page: FeaturePage = {
       a: "No. Only Google removes reviews. For a review that breaks Google's rules, Report gathers the evidence and opens Google's official form; a low rating on its own isn't a rule break.",
     },
   ],
-  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"): the private 1–10 rating and showReview:true
-  // for every rating are server/routes.ts POST /api/review/:token/feedback; the threshold choices (5–10, default 8), the
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"): the private 1–10 rating and the
+  // showReview flag (false below the owner's threshold, where the client only gets the private form and the
+  // owner alert) are server/routes.ts POST /api/review/:token/feedback; the threshold choices (5–10, default 8), the
   // routing and the owner alert are shared/review-flow.ts + server/review-escalation.ts; the AI review draft rules
   // (client's own words, criticism kept, no keywords, never the score) are server/review-draft.ts reviewDraftMessages;
   // reminders only to unanswered requests (status "sent"), up to 10, interval, windows and timezone are server/storage.ts
