@@ -91,6 +91,7 @@ export { default as e_crm_team_cost_rate } from "./crm/crm-team-cost-rate";
 export { default as e_crm_team_crew_view } from "./crm/crm-team-crew-view";
 export { default as e_crm_team_profile } from "./crm/crm-team-profile";
 export { default as e_crm_team_roles } from "./crm/crm-team-roles";
+export { default as e_listing_editor } from "./google-business/listing-editor";
 export { default as e_brand_tour_crm } from "./start-here/brand-tour-crm";
 export { default as e_brand_vs_housecall_pro } from "./start-here/brand-vs-housecall-pro";
 export { default as e_brand_vs_jobber } from "./start-here/brand-vs-jobber";
