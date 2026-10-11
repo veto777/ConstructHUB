@@ -1,0 +1,25 @@
+{
+  "helpKey": "intro-mail-alerts",
+  "durationSec": 75,
+  "video": {
+    "key": "tutorials/intro-mail-alerts.24dc57a0.mp4",
+    "bytes": 6645970,
+    "sha256": "24dc57a0a1ba2b33d2417ec81b0b2273327ecf8226ea423766951d6e9fa568e3"
+  },
+  "captions": {
+    "key": "tutorials/intro-mail-alerts.bf716140.vtt",
+    "bytes": 1721,
+    "sha256": "bf716140c395b09dfe158e1109c4a6cf006bf59773de32c943c48f5991136dfe"
+  },
+  "poster": {
+    "key": "tutorials/intro-mail-alerts.b00ad002.jpg",
+    "bytes": 77683,
+    "sha256": "b00ad0024487029bb3571ce02fdf75cd61c3623a5f3e56c1673339e53380b74a"
+  },
+  "uploaded": {
+    "at": "2026-10-11T15:31:01.874Z",
+    "video": "3dc374eac0d91ae7710793fb8c26c3e1",
+    "captions": "5a5a0dfaf10f7d1f5f533d13db6fdbdc",
+    "poster": "e901546d0a0b001b1978ad7471e754d9"
+  }
+}
