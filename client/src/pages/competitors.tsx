@@ -1,5 +1,5 @@
 import { AppPage, PageHeader, Section, StatGrid, Stat, AppTabsList, Toolbar, Notice } from "@/components/app-ui";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -71,6 +71,9 @@ const INDUSTRIES = [
   "Pest Control",
 ];
 
+/** A scan that has not reached a terminal state yet: queued or indexing. */
+const ACTIVE_STATUSES = ["pending", "running"];
+
 function getBsColor(score: number) {
   if (score >= 60) return "text-red-500";
   if (score >= 30) return "text-muted-foreground";
@@ -109,7 +112,7 @@ export default function CompetitorsPage() {
   // the account's plan does not include Competitor Intel.
   const scansQuery = useQuery<any[]>({
     queryKey: ["/api/competitors/scans"],
-    refetchInterval: query => query.state.data?.some(scan => scan.status === "running") ? 1500 : false,
+    refetchInterval: query => query.state.data?.some((scan: any) => ACTIVE_STATUSES.includes(scan.status)) ? 1500 : false,
   });
   const scans = scansQuery.data;
   const scansLoading = scansQuery.isLoading;
@@ -129,11 +132,30 @@ export default function CompetitorsPage() {
       return res.json();
     },
     onSuccess: () => {
+      // The scan is reserved against the monthly count the moment it starts:
+      // refresh the scans and the "N of M used" line together.
       queryClient.invalidateQueries({ queryKey: ["/api/competitors/scans"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/entitlements"] });
       toast({ title: "Scan started", description: "Indexing competitors in your market. This may take a moment." });
     },
     onError: (err: Error) => {
       toast({ title: "Scan failed", description: apiErrorMessage(err, "The scan could not be started. Please try again."), variant: "destructive" });
+    },
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: async (scanId: number) => {
+      const res = await apiRequest("POST", `/api/competitors/scans/${scanId}/cancel`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/competitors/scans"] });
+      // A cancelled scan is not counted: bring the "N of M used" line in line.
+      queryClient.invalidateQueries({ queryKey: ["/api/entitlements"] });
+      toast({ title: "Scan cancelled", description: "Partial results stay on the card. This scan is not counted against your monthly limit." });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Could not cancel scan", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
@@ -144,6 +166,7 @@ export default function CompetitorsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/competitors/scans"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/entitlements"] });
       toast({ title: "Scan deleted" });
       titleRef.current?.focus({ preventScroll: true });
     },
@@ -306,6 +329,8 @@ export default function CompetitorsPage() {
                 onToggle={() => setExpandedScan(expandedScan === scan.id ? null : scan.id)}
                 onDelete={() => deleteMutation.mutate(scan.id)}
                 deleting={deleteMutation.isPending}
+                onCancel={() => cancelMutation.mutate(scan.id)}
+                cancelling={cancelMutation.isPending}
                 onRetry={() => scanMutation.mutate({ industry: scan.industry, location: scan.location, radius: scan.radius })}
                 retrying={scanMutation.isPending}
               />
@@ -439,29 +464,48 @@ function ReviewAnalysisPanel({ analysis }: { analysis: any }) {
   );
 }
 
-function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retrying }: {
+function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onCancel, cancelling, onRetry, retrying }: {
   scan: any;
   expanded: boolean;
   onToggle: () => void;
   onDelete: () => void;
   deleting: boolean;
+  onCancel: () => void;
+  cancelling: boolean;
   onRetry: () => void;
   retrying: boolean;
 }) {
   const [expandedListing, setExpandedListing] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
   // Google's local pack shows a few entries and a "More businesses" button; each press reveals the next batch.
   const PACK_SIZE = 5;
   const [shown, setShown] = useState(PACK_SIZE);
-  const isRunning = scan.status === "running";
+  const isActive = ACTIVE_STATUSES.includes(scan.status);
   const detailQuery = useQuery<{ scan: any; listings: any[] }>({
     queryKey: ["/api/competitors/scans", scan.id],
     enabled: expanded,
-    // While the scan runs, keep the expanded findings in step with it; the final poll
-    // lands after completion, so results never freeze at a stale partial set.
-    refetchInterval: isRunning ? 1500 : false,
+    // Poll while the list row or the detail itself still says active. The interval
+    // stops only on a terminal DETAIL response, so the last fetch always carries
+    // the final findings — the list can see completion a poll ahead of the detail,
+    // which used to freeze partial results as if they were the finished set.
+    refetchInterval: query => (isActive || ACTIVE_STATUSES.includes(query.state.data?.scan?.status) ? 1500 : false),
   });
   const { data, isLoading } = detailQuery;
+
+  // The running→terminal moment: the server settles (or refunds) the scan and
+  // the final findings replace the streamed partials. Fetch both explicitly —
+  // invalidation alone leaves the interval's stale data in place if this row's
+  // last detail poll answered while the scan was still running.
+  const wasActiveRef = useRef(isActive);
+  useEffect(() => {
+    if (wasActiveRef.current && !isActive) {
+      queryClient.invalidateQueries({ queryKey: ["/api/competitors/scans", scan.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/entitlements"] });
+      void detailQuery.refetch();
+    }
+    wasActiveRef.current = isActive;
+  }, [isActive, scan.id]);
 
   const listings = data?.listings || [];
   const detailError = detailQuery.isError && !data;
@@ -492,12 +536,19 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retry
             <div className="min-w-0">
               <CardTitle className="text-base">{scan.industry} — {scan.location}</CardTitle>
               <CardDescription className="text-xs">
-                {scan.radius} mile radius • {new Date(scan.createdAt).toLocaleDateString()} • {scan.totalFound || 0} competitors found
+                {scan.radius} mile radius • {new Date(scan.createdAt).toLocaleDateString()} •{" "}
+                {isActive ? "Indexing competitors…" : `${scan.totalFound || 0} competitors found`}
               </CardDescription>
             </div>
           </button>
           <div className="flex items-center gap-2 shrink-0">
-            {isRunning && (
+            {scan.status === "pending" && (
+              <Badge variant="outline" className="bg-muted text-muted-foreground border-border">
+                <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                Queued...
+              </Badge>
+            )}
+            {scan.status === "running" && (
               <Badge variant="outline" className="bg-muted text-muted-foreground border-border">
                 <Loader2 className="w-3 h-3 animate-spin mr-1" />
                 Scanning...
@@ -508,10 +559,20 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retry
                 Completed
               </Badge>
             )}
+            {scan.status === "cancelled" && (
+              <Badge variant="outline" className="bg-muted text-muted-foreground border-border">
+                Cancelled
+              </Badge>
+            )}
             {scan.status === "failed" && (
               <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">
                 Failed
               </Badge>
+            )}
+            {isActive && (
+              <Button variant="ghost" size="icon" onClick={() => setConfirmCancel(true)} disabled={cancelling} aria-label="Cancel scan" data-testid={`button-cancel-scan-${scan.id}`}>
+                <XCircle className="w-4 h-4" />
+              </Button>
             )}
             <Button variant="ghost" size="icon" onClick={() => setConfirmDelete(true)} disabled={deleting} aria-label="Delete scan" data-testid={`button-delete-scan-${scan.id}`}>
               <Trash2 className="w-4 h-4" />
@@ -542,6 +603,27 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retry
       </CardHeader>
 
       {/* Outside the clickable header: dialog clicks bubble through the React tree. */}
+      <AlertDialog open={confirmCancel} onOpenChange={setConfirmCancel}>
+        <AlertDialogContent data-testid={`dialog-cancel-scan-${scan.id}`}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel this scan?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The {scan.industry} scan for {scan.location} stops where it is and any competitors already indexed stay on the card. A cancelled scan is not counted against your monthly limit.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid={`button-dismiss-cancel-scan-${scan.id}`}>Keep scanning</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={onCancel}
+              data-testid={`button-confirm-cancel-scan-${scan.id}`}
+            >
+              Cancel scan
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent data-testid={`dialog-delete-scan-${scan.id}`}>
           <AlertDialogHeader>
@@ -578,7 +660,7 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retry
             </Notice>
           )}
 
-          {isRunning && (
+          {isActive && (
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Indexing competitors and analyzing reviews...</p>
               {/* Indeterminate: the scan row reports no progress, so show activity, not a fake percentage. */}
@@ -588,7 +670,7 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retry
             </div>
           )}
 
-          {isRunning && listings.length > 0 && (
+          {isActive && listings.length > 0 && (
             <p className="text-xs text-muted-foreground" data-testid={`text-scan-partial-${scan.id}`}>
               Partial results — {listings.length} indexed so far. The scan is still running; the list updates as more come in.
             </p>
@@ -700,6 +782,10 @@ function ScanCard({ scan, expanded, onToggle, onDelete, deleting, onRetry, retry
 
           {!isLoading && scan.status === "completed" && listings.length === 0 && (
             <p className="text-center text-muted-foreground py-4">No competitors found in this scan.</p>
+          )}
+
+          {!isLoading && scan.status === "cancelled" && listings.length === 0 && (
+            <p className="text-center text-muted-foreground py-4" data-testid={`text-scan-cancelled-${scan.id}`}>This scan was cancelled before it indexed any competitors.</p>
           )}
         </CardContent>
       )}
