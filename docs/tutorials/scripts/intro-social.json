@@ -1,0 +1,167 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "intro-social",
+  "title": "Social Media",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/social-media",
+      "caption": "Social Media",
+      "chapter": "Pick a business",
+      "narration": "This is Social Media. Write a post once, and send it to every account a business uses."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"list-social-businesses\"] button:has-text(\"Summit Roofing Co.\")",
+      "caption": "Open a business",
+      "narration": "Open this roofing company. It posts through Blotato, a separate service."
+    },
+    {
+      "action": "scroll-to",
+      "selector": "text=Post to",
+      "offset": 120,
+      "caption": "Post to",
+      "chapter": "Compose a post",
+      "narration": "Under Compose, the accounts mapped to it are already ticked."
+    },
+    {
+      "action": "click",
+      "selector": "label:text-is(\"Summit Roofing Co. \u00b7 linkedin\") input",
+      "caption": "Choose the accounts",
+      "narration": "Untick any to skip. This post skips LinkedIn."
+    },
+    {
+      "action": "type",
+      "selector": "[aria-label=\"Post text\"]",
+      "value": "Fall roof checkups are open in Denver.",
+      "caption": "Write it once",
+      "narration": "Type the post once."
+    },
+    {
+      "action": "highlight",
+      "selector": "[aria-label=\"twitter text tweak\"]",
+      "caption": "A copy per network, with a counter",
+      "narration": "Each network gets its own copy to tweak, with a character counter."
+    },
+    {
+      "action": "type",
+      "selector": "[aria-label=\"Public media URLs\"]",
+      "value": "https://cdn.summitroofing.example/roof.jpg",
+      "caption": "Add a photo",
+      "narration": "Instagram needs a photo, so paste a public link to one."
+    },
+    {
+      "action": "highlight",
+      "selector": "[aria-label=\"Media Library\"]",
+      "caption": "Your media library",
+      "narration": "Or attach a saved photo from the media library."
+    },
+    {
+      "action": "highlight",
+      "selector": "button:has-text(\"Save draft\") >> xpath=..",
+      "caption": "Post now, schedule, or save a draft",
+      "narration": "Then post now, set a schedule time, or save it as a draft."
+    },
+    {
+      "action": "click",
+      "selector": "button:has-text(\"Save draft\")",
+      "caption": "Save draft",
+      "chapter": "Calendar & queue",
+      "narration": "Choose Save draft. It lands in Calendar and queue."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"card-post-\"]:has-text(\"Fall roof checkups\")",
+      "caption": "One draft per account",
+      "narration": "Each account gets its own draft, at the top of the list."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"card-post-00000000-0000-4000-8000-000000092003\"] textarea",
+      "value": "Attic too hot? Ridge vents can help.",
+      "caption": "Edit a draft",
+      "narration": "Edit a draft, like this AI draft, right here."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-post-save-00000000-0000-4000-8000-000000092003\"]",
+      "caption": "Save edit",
+      "narration": "Save edit keeps it a draft until you approve it."
+    },
+    {
+      "action": "click",
+      "selector": "button:has-text(\"Auto mode\")",
+      "caption": "Auto mode",
+      "chapter": "Auto mode",
+      "narration": "Auto mode drafts posts for you, in the mix you choose."
+    },
+    {
+      "action": "highlight",
+      "selector": "[aria-label=\"Publishing mode\"]",
+      "caption": "Approval queue by default",
+      "narration": "Drafts wait for your approval, unless you choose fully automatic."
+    },
+    {
+      "action": "highlight",
+      "selector": "button:has-text(\"Generate draft from saved settings\")",
+      "caption": "Generate a draft",
+      "narration": "Or generate a draft now from these settings."
+    },
+    {
+      "action": "goto",
+      "url": "/social-media?business=all",
+      "caption": "All-clients calendar",
+      "chapter": "Every client",
+      "narration": "Running several businesses? The All-clients calendar lists all their posts."
+    },
+    {
+      "action": "select",
+      "selector": "[aria-label=\"Post platform filter\"]",
+      "value": "instagram",
+      "caption": "Filter by network",
+      "narration": "Filter it by status or network."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-post-00000000-0000-4000-8000-000000092012\"]",
+      "caption": "Each row names its business",
+      "narration": "Each row names its business."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-social-media\"]",
+      "caption": "Menu: Social Media",
+      "narration": "You'll find Social Media in the left menu, under Tools."
+    }
+  ],
+  "removeSelectors": [
+    "[data-testid=\"card-social-youtube\"]"
+  ],
+  "youtube": {
+    "title": "Social Media in about a minute | ConstructHUB",
+    "description": "A short tour of Social Media in ConstructHUB: pick a business, write a post once with a copy and character counter per network, check the calendar and queue, edit an AI draft, see auto mode's approval queue, and view every client's posts on one calendar. Posting runs through your own Blotato account.",
+    "tags": [
+      "ConstructHUB",
+      "social media scheduler",
+      "social media for contractors",
+      "social media posting",
+      "content calendar",
+      "roofing marketing",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Write Once, Post Everywhere",
+    "accent": "Everywhere",
+    "kicker": "Social Media",
+    "step": 5
+  }
+}

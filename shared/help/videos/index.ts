@@ -128,5 +128,6 @@ export { default as v_intro_reviews } from "./intro-reviews.json";
 export { default as v_intro_search_console } from "./intro-search-console.json";
 export { default as v_intro_seo } from "./intro-seo.json";
 export { default as v_intro_site_scan } from "./intro-site-scan.json";
+export { default as v_intro_social } from "./intro-social.json";
 export { default as v_intro_vpn_shield } from "./intro-vpn-shield.json";
 export { default as v_jobcam } from "./jobcam.json";
