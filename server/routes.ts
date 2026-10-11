@@ -3483,6 +3483,7 @@ export async function registerRoutes(
     }
   });
 
+  (await import("./master-class/routes")).registerMasterClassRoutes(app, getDevUser, DEV_AUTH_BYPASS); // lesson bodies, 401/403/200 (server/master-class/routes.ts)
   // ── Master Class: state guides, catalog and course access (rules: server/state-guides.ts) ──────────────
   // The free overview (/master-class): every state's license / workers' comp / sales-tax / B&O / bond flags
   // and its filing office — the comparison table the marketing calls free. Agency links, notes, the overview

@@ -7,20 +7,22 @@
  * the full guide (agency links with their check status, notes, the written walkthrough or the checklist built
  * from the agency records) is fetched only once access is confirmed, and the server refuses it otherwise.
  *
+ * The lessons on running the business (BUSINESS_LESSONS) are an outline here; their text is fetched from
+ * /api/master-class/lessons/licensing (lesson-body.tsx ModuleLessons) once the module is open, under the same rule.
+ *
  * The chosen state lives in the address (?state=) like the tab does, so a reload or a shared link reopens it.
  * Per-step checkboxes keep progress in this browser (components/guides/progress.ts).
  */
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  AlertCircle, AlertTriangle, Award, Ban, Briefcase, Building2, Calculator, CheckCircle2, CircleDollarSign, Clock, DollarSign, ExternalLink,
-  FileText, Handshake, HardHat, Heart, Lightbulb, Lock, MapPin, Phone, Scale, Search, Shield, Star, Target, Truck, Users, X,
+  AlertCircle, Award, Briefcase, Building2, Calculator, CheckCircle2, CircleDollarSign, DollarSign, ExternalLink,
+  FileText, Handshake, HardHat, Heart, Lightbulb, Lock, MapPin, Scale, Search, Shield, Star, Users, X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { EmptyState, Notice, Section, Stat, StatGrid } from "@/components/app-ui";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -28,8 +30,9 @@ import { apiErrorMessage } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { PROGRESS_NOTE, progressLabel, useChecklist } from "@/components/guides/progress";
 import { AccessChecking, AccessError, LockedModule, UnlockBadge } from "./gate";
-import { Lesson, LessonOutline, useScrollToHash, type LessonMeta } from "./lesson";
-import { AppLink, InApp, type ModuleHomeProps } from "./module-home";
+import { LessonOutline, useScrollToHash, type LessonMeta } from "./lesson";
+import { ModuleLessons } from "./lesson-body";
+import type { ModuleHomeProps } from "./module-home";
 
 const KEY = "mc:licensing";
 
@@ -429,347 +432,7 @@ export function StateGuideTab(p: StateGuideTabProps) {
             <p className="text-sm text-muted-foreground">The way you structure your company — hiring, sales, branding, subcontractors — can make or break you, especially in the early stages. These lessons cover the operations most courses skip.</p>
           </div>
 
-    <Lesson id="subcontractors" title="Working with Subcontractors (1099)" icon={Handshake} storageKey={KEY} contentClassName="space-y-3">
-      <p className="text-sm text-muted-foreground">
-        Using subs will always be easier than building a W-2 crew, but there are critical legal and operational realities you need to understand.
-      </p>
-      <div className="space-y-2">
-        <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted border border-border">
-          <AlertTriangle className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
-          <p className="text-xs text-muted-foreground">
-            <strong className="text-foreground">Insurance & Workers Comp:</strong> Every sub MUST carry their own insurance and workers comp. If they don't and one of their employees gets hurt on your jobsite, the liability falls back on YOU. Always verify their certificates of insurance (COIs) and make sure they're current.
-          </p>
-        </div>
-        <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted border border-border">
-          <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
-          <p className="text-xs text-muted-foreground">
-            <strong className="text-foreground">Subcontractor Agreement:</strong> Create a contract stating they are responsible for their own employees, taxes, fees, and liability. This is your legal protection. Without it, you're exposed.
-          </p>
-        </div>
-        <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted border border-border">
-          <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
-          <p className="text-xs text-muted-foreground">
-            <strong className="text-foreground">1099 Rule — No Schedule Dictation:</strong> You cannot dictate a sub's schedule. This is a hard legal requirement for 1099 classification. If you control when and how they work, the IRS can reclassify them as W-2 employees, exposing you to back taxes, penalties, and fines.
-          </p>
-        </div>
-      </div>
-
-      <h4 className="font-semibold text-sm mt-3">Quality vs. Efficiency Trade-off</h4>
-      <p className="text-sm text-muted-foreground">
-        Controlling quality is always harder with subs — it's a constant balance of quality vs. efficiency and less hands-on work. Most subs will NOT clean up jobsites or do the small things to cater to clients (covering furniture, cleaning up after themselves, communicating updates). These details always reflect on YOUR company, not the sub.
-      </p>
-
-      <h4 className="font-semibold text-sm mt-3">Keeping Subs Anonymous to Clients</h4>
-      <p className="text-sm text-muted-foreground">
-        Most clients don't like knowing a company uses subs — they hired YOU, not a mystery crew. Make sure subs keep this anonymous:
-      </p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-        {[
-          "Subs should NOT wear their own logos or company decals on the jobsite",
-          "Provide branded shirts and vehicle magnets with YOUR company logo",
-          "Amazon does this with their delivery drivers — branded vans, branded uniforms",
-          "Uber, Lyft, and FedEx all operate with 1099 contractors using company branding",
-          "FedEx drivers use company trucks despite being classified as 1099",
-          "There are gray areas in this space — but consistent branding is key to client trust"
-        ].map((item, i) => (
-          <div key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
-            <CheckCircle2 className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />
-            <span>{item}</span>
-          </div>
-        ))}
-      </div>
-
-      <h4 className="font-semibold text-sm mt-3">Non-Competes vs NDAs</h4>
-      <p className="text-sm text-muted-foreground">
-        Non-compete agreements have been largely abolished due to freedom of rights rulings. You can no longer force a sub to sign one. However, you CAN have them sign an <strong>NDA (Non-Disclosure Agreement)</strong> which limits who they can talk to — restricting them from sharing your client lists, pricing structures, operational processes, or contacting your clients directly. This is your best legal protection for keeping your business intelligence private.
-      </p>
-    </Lesson>
-
-    <Lesson id="sales" title="Sales — The Most Important Role" icon={CircleDollarSign} storageKey={KEY} contentClassName="space-y-3">
-      <p className="text-sm text-muted-foreground">
-        The most important role in any construction business is <strong>SALES</strong>. Without sales, nothing else matters — not your crew, not your tools, not your license. Everything starts with closing jobs.
-      </p>
-
-      <div className="p-3 rounded-lg border border-border bg-muted">
-        <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
-          <Target className="h-4 w-4 text-muted-foreground" /> Close Rate Benchmarks
-        </h4>
-        <div className="grid grid-cols-3 gap-3 text-center">
-          <div>
-            <p className="text-lg font-semibold text-muted-foreground">33%+</p>
-            <p className="text-[10px] text-muted-foreground">Great Sales (1 of 3)</p>
-          </div>
-          <div>
-            <p className="text-lg font-semibold text-yellow-500">20%</p>
-            <p className="text-[10px] text-muted-foreground">Average</p>
-          </div>
-          <div>
-            <p className="text-lg font-semibold text-muted-foreground">&lt;15%</p>
-            <p className="text-[10px] text-muted-foreground">Dangerous</p>
-          </div>
-        </div>
-        <p className="text-xs text-muted-foreground mt-2">
-          Anything below 15% is dangerous because of the cost of leads. At $50-150/lead, a low close rate can be financially devastating for a business.
-        </p>
-      </div>
-
-      <h4 className="font-semibold text-sm mt-3">Hiring a Sales Rep</h4>
-      <div className="space-y-2">
-        <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted border border-border">
-          <CheckCircle2 className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
-          <p className="text-xs text-muted-foreground">
-            <strong className="text-foreground">Commission only — 8-10% of revenue minus sales tax.</strong> Do NOT put a sales rep on salary. This is a huge long-term exposure. Commission-only reps perform better because if they don't sell, they don't eat.
-          </p>
-        </div>
-        <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted border border-border">
-          <Lightbulb className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
-          <p className="text-xs text-muted-foreground">
-            <strong className="text-foreground">Poaching from competitors:</strong> This is what Elon Musk does — he recruits top talent from Microsoft and Google. Hiring a proven sales rep from a competitor saves you training time and they already know the trade. However, this is risky: they could flip on you, and they may have an NDA with their previous employer that could expose you legally. Always ask about prior arrangements before bringing them on.
-          </p>
-        </div>
-      </div>
-      <p className="text-xs text-muted-foreground mt-2">
-        <strong>Best places to recruit:</strong> Craigslist and Indeed are the best platforms to find a new sales rep or project manager. Post clear commission structures and expectations upfront.
-      </p>
-
-      <h4 className="font-semibold text-sm mt-3">Sales Tactics That Win Jobs</h4>
-      <div className="space-y-2">
-        <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted border border-border">
-          <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
-          <p className="text-xs text-muted-foreground">
-            <strong className="text-foreground">Never say you're available same day — even if you are.</strong> Schedule estimates 1-2 days ahead. If you show up immediately, the client assumes you're not busy, which signals you don't have much work. A slight wait creates perceived demand and makes them value your time more.
-          </p>
-        </div>
-        <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted border border-border">
-          <Phone className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
-          <p className="text-xs text-muted-foreground">
-            <strong className="text-foreground">Stay in constant contact while bidding.</strong> Out of sight, out of mind — and that's deadly during the bidding process. Follow up after the estimate, send a thank-you text or email, check in 2-3 days later. Most contractors give a bid and disappear. The one who stays top of mind wins the job.
-          </p>
-        </div>
-        <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted border border-border">
-          <Award className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
-          <p className="text-xs text-muted-foreground">
-            <strong className="text-foreground">Differentiate yourself from the competition.</strong> Every homeowner is getting 3-5 bids. If your estimate looks like everyone else's — a number scribbled on a piece of paper — you blend in. Present a professional proposal with your branding, scope of work, timeline, warranty details, and photos of past work. Make it impossible for the client to compare you to the guy in a beat-up truck with a handwritten quote.
-          </p>
-        </div>
-      </div>
-
-      <h4 className="font-semibold text-sm mt-3">Avoid High-Pressure Sales Tactics</h4>
-      <p className="text-sm text-muted-foreground">
-        Don't fall into the trap of sleazy one-call-close tactics — "sign today or lose the price" pressure selling. High-pressure sales is an art form that takes years to master, and if you don't know what you're doing, it will backfire badly. You'll lose the sale, damage your reputation, and potentially earn a bad review that costs you far more than the job was worth. Homeowners talk to each other, post in neighborhood groups, and share experiences online. One pushy encounter can label your company as "aggressive" or "scammy" in an entire community. Instead, focus on building trust through professionalism, clear communication, and honest timelines. Let the quality of your proposal and follow-up do the selling — the best closers in construction don't need to pressure anyone because they've already built enough confidence during the estimate.
-      </p>
-    </Lesson>
-
-    <Lesson id="reputation" title="Reputation & Review Management" icon={Star} storageKey={KEY} contentClassName="space-y-3">
-      <p className="text-sm text-muted-foreground">
-        Your online reputation is the single most valuable asset in your business — more important than your trucks, your tools, or even your crew. Every decision you make with a client should be filtered through this question: <strong>"Is this worth risking a bad review?"</strong>
-      </p>
-
-      <div className="p-3 rounded-lg border border-border bg-muted">
-        <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-muted-foreground" /> The Real Cost of Bad Reviews
-        </h4>
-        <div className="grid grid-cols-2 gap-3 text-center mb-3">
-          <div className="p-2 rounded border border-border">
-            <p className="text-lg font-semibold text-muted-foreground">10-15%</p>
-            <p className="text-[10px] text-muted-foreground">Business loss per year from a single bad review</p>
-          </div>
-          <div className="p-2 rounded border border-border">
-            <p className="text-lg font-semibold text-muted-foreground">20-50%</p>
-            <p className="text-[10px] text-muted-foreground">Business loss from damaging reviews (scam, abandoned job, etc.)</p>
-          </div>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          A standard negative review — "slow communication" or "went over budget" — will cost you roughly 10-15% of your annual revenue. But devastating reviews that use words like <strong>"walked off the job," "didn't finish the work," "ripped us off,"</strong> or <strong>"scammers"</strong> can destroy 20-50% of your business. These are the reviews that kill companies, because the number one thing a customer looks for in reviews is <strong>trustworthiness</strong>. Quality matters, but trust comes first — if a company looks untrustworthy, they're not getting the job no matter how good their work is.
-        </p>
-      </div>
-
-      <h4 className="font-semibold text-sm mt-3">Resolve Disputes on Their Merits</h4>
-      <p className="text-sm text-muted-foreground">
-        Resolve unfinished work and disputes according to the contract and the customer's concerns. Keep that process separate from review requests. Ask every client for honest feedback, with no reward or preferred rating.
-      </p>
-      <div className="space-y-2 mt-2">
-        <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted border border-border">
-          <CheckCircle2 className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
-          <p className="text-xs text-muted-foreground">
-            <strong className="text-foreground">Fix it first, then ask — with no strings attached.</strong> If a client has a remaining $500-1,000 complaint, resolve it because it's the right call, not as payment for a review. Afterward, ask for an honest review exactly as you would any client. Never make the fix, a discount, or any reward conditional on a review or its star rating — Google removes incentivized reviews, and the FTC's consumer-review rule (16 CFR Part 465) carries civil penalties for buying positive reviews. A client whose problem you solved often writes the best review you'll get anyway.
-          </p>
-        </div>
-        <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted border border-border">
-          <Ban className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
-          <p className="text-xs text-muted-foreground">
-            <strong className="text-foreground">Never get into a pissing contest with a client.</strong> You will always lose. Even if you're right, even if the client is being unreasonable — the public will side with the homeowner every time. A back-and-forth argument in Google Reviews makes you look petty and unprofessional. Responding to negative reviews should be calm, professional, and focused on resolution — never defensive or combative.
-          </p>
-        </div>
-      </div>
-
-      <h4 className="font-semibold text-sm mt-3">What Clients Actually Look For in Reviews</h4>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
-        {[
-          { rank: "1", trait: "Trustworthiness", desc: "Did they do what they said? Did they show up? Did they finish? This is the #1 filter and the reason 'scam' reviews are devastating", weight: "text-muted-foreground" },
-          { rank: "2", trait: "Communication", desc: "Did they keep the client in the loop? Were they responsive? Did they return calls and texts promptly?", weight: "text-muted-foreground" },
-          { rank: "3", trait: "Quality of Work", desc: "Was the craftsmanship good? Did they pay attention to details? Were there callbacks or warranty issues?", weight: "text-yellow-500" },
-          { rank: "4", trait: "Timeline & Reliability", desc: "Did they start and finish on time? Were there unexplained delays? Did they manage expectations?", weight: "text-muted-foreground" },
-          { rank: "5", trait: "Cleanliness & Respect", desc: "Did they protect the property? Clean up daily? Treat the home and family with respect?", weight: "text-muted-foreground" },
-          { rank: "6", trait: "Price Fairness", desc: "Was pricing transparent? Were there surprise charges? Interestingly, price is one of the least-mentioned traits in positive reviews", weight: "text-muted-foreground" },
-        ].map((item, i) => (
-          <div key={i} className="flex items-start gap-2.5 p-2.5 rounded-md border border-border/30">
-            <div className={`w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs font-semibold ${item.weight} shrink-0`}>{item.rank}</div>
-            <div>
-              <p className="text-xs font-semibold">{item.trait}</p>
-              <p className="text-[10px] text-muted-foreground leading-relaxed">{item.desc}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="flex items-start gap-2 p-3 rounded-md bg-muted border border-border mt-2">
-        <Lightbulb className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-        <div>
-          <p className="text-sm font-medium mb-1">The Math That Should Change How You Handle Every Client</p>
-          <p className="text-xs text-muted-foreground">
-            If your business does $500K/year and a single bad review costs you 10-15%, that's $50,000-$75,000 in lost revenue — every year it sits there. A devastating "scam" or "abandoned job" review at 20-50% impact is $100,000-$250,000 per year. Now compare that to the $500-1,000 of disputed work you're arguing about. The math is not even close. Resolve the dispute fairly, document the agreed outcome, and keep any request for an honest review separate.
-          </p>
-        </div>
-      </div>
-
-      <h4 className="font-semibold text-sm mt-3">Handling Difficult Clients</h4>
-      <p className="text-sm text-muted-foreground">
-        Some clients will never be satisfied — no matter how good your work is, how many extras you throw in, or how many times you come back to fix things. These clients exist in every market, and you need to recognize them early. Their goal may be to get free work, negotiate after the fact, or simply find fault with everything. Some are looking for blood from the start, and you may be their chosen victim before you even pick up a hammer.
-      </p>
-
-      <div className="space-y-2 mt-2">
-        <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted border border-border">
-          <AlertTriangle className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
-          <p className="text-xs text-muted-foreground">
-            <strong className="text-foreground">The goal is always the same: walk away without a lawsuit or a bad review.</strong> You won't win every client relationship, but you can control how it ends. A clean exit — where the client feels heard and you part on neutral terms — is worth more than being "right." Standing your ground with a difficult client is not a winning approach. Pride has no ROI in this business.
-          </p>
-        </div>
-        <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted border border-border">
-          <Shield className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
-          <p className="text-xs text-muted-foreground">
-            <strong className="text-foreground">Never get personal — no politics, religion, personal views, or opinions.</strong> Keep every interaction 100% professional and focused on the work. Even casual small talk can turn dangerous. If a client brings up a topic you disagree with — don't engage, don't push back, don't even hint at your position. They may seem fine in the moment, but disagreements plant seeds of resentment that surface later as "difficult to work with" reviews or refusal to pay. You are there to build, not to debate.
-          </p>
-        </div>
-        <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted border border-border">
-          <Handshake className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
-          <p className="text-xs text-muted-foreground">
-            <strong className="text-foreground">Always be agreeable — stay neutral, stay relevant, stay professional.</strong> Even when the client is wrong about a construction method, a timeline, or a material choice — correct them with facts, not attitude. "I totally understand why you'd think that, and here's what we've found works best..." will always land better than "That's not how it works." Agreeable doesn't mean pushover — it means you control the conversation without creating conflict. The contractors who build the biggest businesses are the ones who know how to manage people, not just projects.
-          </p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
-        <div className="p-2.5 rounded-md border border-border/30">
-          <p className="text-xs font-semibold text-muted-foreground mb-1">Red Flags of a Problem Client</p>
-          <div className="space-y-1">
-            {[
-              "Mentions lawsuits or attorneys early in the process",
-              "Has left multiple 1-star reviews for other businesses",
-              "Constantly compares your pricing to other bids",
-              "Wants to negotiate the price after work has started",
-              "Refuses to sign a contract or put anything in writing",
-              "Changes scope repeatedly without acknowledging cost changes",
-              "Becomes overly friendly too fast — could be setting you up for a favor later",
-            ].map((flag, i) => (
-              <div key={i} className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
-                <X className="h-2.5 w-2.5 text-muted-foreground shrink-0 mt-0.5" />
-                <span>{flag}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="p-2.5 rounded-md border border-border/30">
-          <p className="text-xs font-semibold text-muted-foreground mb-1">How to De-Escalate & Exit Clean</p>
-          <div className="space-y-1">
-            {[
-              "Document everything — texts, emails, photos of completed work",
-              "Communicate in writing, not just phone calls or in-person",
-              "Offer a resolution before they escalate — be the bigger person",
-              "If they want free work, trade it for a written positive review",
-              "Never raise your voice, curse, or get emotional on a jobsite",
-              "If it's unsalvageable, offer a partial refund to close the chapter",
-              "Consult your attorney before walking off any job mid-contract",
-            ].map((tip, i) => (
-              <div key={i} className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
-                <CheckCircle2 className="h-2.5 w-2.5 text-muted-foreground shrink-0 mt-0.5" />
-                <span>{tip}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-      <InApp>Review requests, reminders and replies — including AI drafts for your approval — run from <AppLink href="/google-reviews">Google Reviews</AppLink>; the Google Business module covers the profile side.</InApp>
-    </Lesson>
-
-    <Lesson id="hiring" title="Hiring & Staffing Strategy" icon={Users} storageKey={KEY} contentClassName="space-y-3">
-      <div className="flex items-start gap-2 p-2.5 rounded-md bg-muted border border-border">
-        <AlertTriangle className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
-        <p className="text-xs text-muted-foreground">
-          <strong className="text-foreground">Avoid hiring too fast.</strong> In the early stages, do NOT hire a ton of help like PMs or secretaries. The majority of the work will fall back on you regardless. Every salary you add is overhead that eats into margins before you have consistent revenue to support it.
-        </p>
-      </div>
-
-      <h4 className="font-semibold text-sm mt-3">Project Managers (PMs)</h4>
-      <p className="text-sm text-muted-foreground">
-        Your PM is the most trusted person in the operation. In the beginning, this should be YOU. Don't rush to fill this role until the workload is genuinely too large to keep up with.
-      </p>
-      <div className="p-3 rounded-lg border border-border/40 bg-muted/30">
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <p className="text-xs text-muted-foreground">Typical PM Salary</p>
-            <p className="text-sm font-semibold">$45,000 – $75,000/yr</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Depends On</p>
-            <p className="text-sm font-semibold">Experience & Scope</p>
-          </div>
-        </div>
-      </div>
-      <p className="text-xs text-muted-foreground mt-2">
-        Incentivize PMs with performance bonuses, paid time off, and potentially a company vehicle. But don't buy assets you can't afford — if you're not closing enough work to support it, a company truck becomes a liability, not a perk.
-      </p>
-    </Lesson>
-
-    <Lesson id="branding" title="Branding & Professional Image" icon={Award} storageKey={KEY} contentClassName="space-y-3">
-      <p className="text-sm text-muted-foreground">
-        Creating the illusion of size is critical for customer trust. Clients want to know they're hiring a real company that isn't going anywhere — not a one-person operation that might disappear.
-      </p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        {[
-          { icon: Truck, text: "Have at least a few company vehicles with a full wrap — this signals permanence and professionalism" },
-          { icon: Users, text: "All reps should wear branded uniforms — never trashy clothes, even if you're doing physical work" },
-          { icon: Shield, text: "Clients want to know they'll be taken care of by a company with staff, even if you're running lean" },
-          { icon: Building2, text: "If you're owner-operator, never tell the client you're the owner — say you're a PM or sales rep" },
-        ].map((item, i) => (
-          <div key={i} className="flex items-start gap-2 p-2.5 rounded-md border border-border/30">
-            <item.icon className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
-            <p className="text-xs text-muted-foreground">{item.text}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="flex items-start gap-2 p-3 rounded-md bg-muted border border-border mt-2">
-        <Lightbulb className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-        <div>
-          <p className="text-sm font-medium mb-1">Why Separation Between You and the Brand Matters</p>
-          <p className="text-xs text-muted-foreground">
-            If a client knows you're the owner doing the install, they take you less seriously. There should be a clear separation between you and the brand. Tell them you're the PM or the sales rep — it creates a perception of structure, hierarchy, and accountability that makes clients feel safer about their investment. They want to see a company with departments, not a solo operator with a pickup truck.
-          </p>
-        </div>
-      </div>
-    </Lesson>
-
-    <Section flush className="border-border bg-muted" testId="card-business-structure-summary">
-      <CardContent className="p-4">
-        <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
-          <Lightbulb className="h-4 w-4 text-muted-foreground" /> The Bottom Line on Business Structure
-        </h4>
-        <p className="text-sm text-muted-foreground">
-          How your company is structured can make you or break you, especially in the early stages. Keep overhead low, use subs strategically with proper contracts, hire sales commission-only, don't rush into salaried positions, and always project a professional image. The companies that survive year one are the ones that sell well and spend smart — not the ones that hire fastest.
-        </p>
-      </CardContent>
-    </Section>
+            <ModuleLessons module="licensing" lessons={BUSINESS_LESSONS} storageKey={KEY} open={open} />
         </>
       )}
     </div>
