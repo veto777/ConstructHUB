@@ -44,6 +44,7 @@ export function diffRecords(
   }
   const rows: DiffRow[] = [];
   const consumedAfter = new Set<DnsRecordLike>();
+  const removedBefore: DnsRecordLike[] = [];
   // First pass: match by provider id, then by exact type/name/content.
   for (const b of before) {
     const candidates = unmatched.get(rowKey(b)) || [];
@@ -60,11 +61,44 @@ export function diffRecords(
         after: m,
       });
     } else {
+      removedBefore.push(b);
+    }
+  }
+  // Second pass: an id-less record whose content changed has no key in common
+  // with its successor, so the first pass reads it as removed + added. Pair
+  // those leftovers by type/name so the diff shows one "Changed" row (the
+  // before value struck through) instead of a spurious add and remove. Records
+  // WITH provider ids never pair here: an unmatched id means the record was
+  // really deleted or created, not edited.
+  const leftoverAfter = after.filter((a) => !consumedAfter.has(a));
+  const looseKey = (r: DnsRecordLike) => `ln:${r.type}:${r.name}`;
+  const pending = new Map<string, DnsRecordLike[]>();
+  for (const a of leftoverAfter) {
+    if (a.id) continue;
+    const k = looseKey(a);
+    pending.set(k, [...(pending.get(k) || []), a]);
+  }
+  const paired = new Set<DnsRecordLike>();
+  for (const b of removedBefore) {
+    if (b.id) {
+      rows.push({ status: "removed", before: b });
+      continue;
+    }
+    const candidates = pending.get(looseKey(b)) || [];
+    const m = candidates[0];
+    if (m) {
+      paired.add(m);
+      pending.set(
+        looseKey(b),
+        candidates.filter((x) => x !== m),
+      );
+      rows.push({ status: "changed", before: b, after: m });
+    } else {
       rows.push({ status: "removed", before: b });
     }
   }
-  for (const a of after)
-    if (!consumedAfter.has(a)) rows.push({ status: "added", after: a });
+  for (const a of leftoverAfter)
+    if (!paired.has(a)) rows.push({ status: "added", after: a });
   const rank = { changed: 0, added: 1, removed: 2, unchanged: 3 } as const;
   return rows.sort(
     (x, y) =>
@@ -184,19 +218,23 @@ export function changeNeedsEmailWarning(j: JobRow): boolean {
 export function BackgroundJobStatus({
   kind,
   status,
+  workerEnabled = true,
 }: {
   kind: string;
   status: string;
+  /** False when the domain worker is off: queued work waits, it does not run. */
+  workerEnabled?: boolean;
 }) {
+  const off = "Waiting for background processing to be turned on…";
   const text: Record<string, Record<string, string>> = {
     discover: {
-      queued: "Waiting to import domains…",
+      queued: workerEnabled ? "Waiting to import domains…" : off,
       working: "Importing domains from the registrar…",
       complete: "Import complete",
       failed: "Import failed",
     },
     monitor: {
-      queued: "Waiting to check DNS and website…",
+      queued: workerEnabled ? "Waiting to check DNS and website…" : off,
       working: "Checking DNS and website…",
       complete: "Check complete",
       failed: "Check failed",
@@ -224,7 +262,14 @@ export function BackgroundJobStatus({
 }
 
 /** Previewed → Applied → Verified, from the job's own status. */
-export function JobStatusStepper({ status }: { status: string }) {
+export function JobStatusStepper({
+  status,
+  workerEnabled = true,
+}: {
+  status: string;
+  /** False when the domain worker is off: a queued change waits rather than applying. */
+  workerEnabled?: boolean;
+}) {
   const step =
     status === "previewing"
       ? 0 // building the preview
@@ -259,9 +304,13 @@ export function JobStatusStepper({ status }: { status: string }) {
     },
   ];
   const statusText: Record<string, string> = {
-    previewing: "Building preview…",
+    previewing: workerEnabled
+      ? "Building preview…"
+      : "Waiting for background processing to be turned on before it can build…",
     ready: "Previewed — awaiting your confirmation",
-    queued: "Queued to apply…",
+    queued: workerEnabled
+      ? "Queued to apply…"
+      : "Queued — background processing is off, so this applies only after an administrator turns it back on",
     applying: "Applying at the registrar…",
     working: "Applying at the registrar…",
     verifying: "Verifying against public DNS…",

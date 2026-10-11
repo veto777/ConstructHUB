@@ -46,8 +46,8 @@ import {
 import {
   PlanRequired,
   planRequiredFrom,
-  pollUnlessPlanRequired,
 } from "@/components/plan-required";
+import { pollWithinBudget } from "@/components/domains/polling";
 import {
   BackgroundJobStatus,
   DnsStateDiff,
@@ -133,11 +133,14 @@ export default function DomainsPage() {
     refetch: refetchDomains,
   } = useQuery<any>({
     queryKey: [domainsUrl],
-    refetchInterval: pollUnlessPlanRequired(5000),
+    // 20 s: 30 requests/10 min of the route's 120 — see components/domains/polling.ts.
+    refetchInterval: pollWithinBudget(20_000),
   });
   const { data: guides, error: guidesError } = useQuery<any>({
     queryKey: ["/api/domains/guides"],
   });
+  // Background processing off: queued work waits rather than applying, and copy says so.
+  const workerOff = guides?.workerEnabled === false;
   const {
     data: connections,
     error: connectionsError,
@@ -152,7 +155,9 @@ export default function DomainsPage() {
     refetch: refetchJobs,
   } = useQuery<any>({
     queryKey: [`/api/domains/jobs?page=${jobPage}&q=${encodeURIComponent(q)}`],
-    refetchInterval: pollUnlessPlanRequired(3000),
+    // 12 s: 50 requests/10 min; with the inventory poll, 80 of the route's 120 —
+    // the rest stays reserved for previews, confirms and syncs.
+    refetchInterval: pollWithinBudget(12_000),
   });
   const {
     data: locations,
@@ -247,7 +252,7 @@ export default function DomainsPage() {
           it before queued previews, changes and monitoring can run.
         </Notice>
       )}
-      <section>
+      <section id="domains-connect-registrar">
         <GoogleSectionHeader
           title="Connect registrar"
           description="Use a Porkbun or Name.com API key to sync and change client DNS."
@@ -369,7 +374,9 @@ export default function DomainsPage() {
                   if (d)
                     toast({
                       title: "Sync queued",
-                      description: `Re-importing the domain inventory from ${d.synced ?? "all saved"} connection${d.synced === 1 ? "" : "s"}.`,
+                      description: workerOff
+                        ? `The re-import of ${d.synced ?? "all saved"} connection${d.synced === 1 ? "" : "s"} waits until background processing is turned back on.`
+                        : `Re-importing the domain inventory from ${d.synced ?? "all saved"} connection${d.synced === 1 ? "" : "s"}.`,
                     });
                 }}
                 label="Sync all connections"
@@ -549,7 +556,9 @@ export default function DomainsPage() {
                   if (d)
                     toast({
                       title: "Fresh check queued",
-                      description: `The ${selected.length} selected domain${selected.length === 1 ? "" : "s"} will be checked as soon as the worker is free.`,
+                      description: workerOff
+                        ? `The ${selected.length} selected domain${selected.length === 1 ? "" : "s"} wait until background processing is turned back on.`
+                        : `The ${selected.length} selected domain${selected.length === 1 ? "" : "s"} will be checked as soon as the worker is free.`,
                     });
                 }}
                 label="Check selected domains"
@@ -882,6 +891,11 @@ export default function DomainsPage() {
             {pickedDomain ? (
               <RecordPicker
                 domainId={Number(pickedDomain.id)}
+                onReconnect={() =>
+                  document
+                    .getElementById("domains-connect-registrar")
+                    ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                }
                 onPick={(action, r: DnsRecordLike) => {
                   setKind(action);
                   setType(r.type);
@@ -960,9 +974,9 @@ export default function DomainsPage() {
                       ·{" "}
                     </span>
                     {j.kind === "change" ? (
-                      <JobStatusStepper status={j.status} />
+                      <JobStatusStepper status={j.status} workerEnabled={!workerOff} />
                     ) : (
-                      <BackgroundJobStatus kind={j.kind} status={j.status} />
+                      <BackgroundJobStatus kind={j.kind} status={j.status} workerEnabled={!workerOff} />
                     )}
                   </summary>
                   {j.error && (
@@ -1082,7 +1096,9 @@ export default function DomainsPage() {
         </div>
       </section>
       <Dialog open={reviewing} onOpenChange={setReviewing}>
-        <DialogContent className="max-w-2xl" data-testid="dialog-confirm-previews">
+        {/* `g-surface`: the dialog portals to <body>, outside the platform surface — without
+            the tokens here the solid Confirm pill renders transparent-on-white (invisible). */}
+        <DialogContent className="g-surface max-w-2xl" data-testid="dialog-confirm-previews">
           <DialogHeader>
             <DialogTitle>
               Confirm {confirmableJobs.length} change
@@ -1161,8 +1177,9 @@ export default function DomainsPage() {
                 if (d) {
                   toast({
                     title: `${n} change${n === 1 ? "" : "s"} queued`,
-                    description:
-                      "Applying at the registrar now. We check public DNS every 5 minutes until the change shows, and you get a notification with the result.",
+                    description: workerOff
+                      ? "Domain background processing is off, so the change waits in the queue — nothing reaches the registrar until an administrator turns it back on."
+                      : "Applying at the registrar now. We check public DNS every 5 minutes until the change shows, and you get a notification with the result.",
                   });
                   setJobSelection([]);
                   setReviewing(false);
