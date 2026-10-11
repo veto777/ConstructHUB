@@ -1,0 +1,130 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "intro-ads-manager",
+  "title": "Agency Ads & LSA manager",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/ads-manager",
+      "caption": "Agency Ads & LSA manager",
+      "chapter": "Every client account",
+      "narration": "This is the Agency Ads and LSA manager. Every client account under your Google Ads MCC, in one place."
+    },
+    {
+      "action": "click",
+      "selector": "button:has-text(\"Client accounts\")",
+      "caption": "Client accounts",
+      "narration": "Client accounts lists each account: status, currency, timezone, and whether Local Services campaigns were found."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"ads-row\"]:has-text(\"Clearpeak Exteriors\")",
+      "caption": "One client account",
+      "narration": "Each row also shows its Click Guard mapping and when it was last checked."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"ads-row\"]:has-text(\"Clearpeak Exteriors\") input[type=checkbox]",
+      "caption": "Tick accounts",
+      "chapter": "Health audit",
+      "narration": "Tick the accounts you want to look over."
+    },
+    {
+      "action": "highlight",
+      "selector": "button:has-text(\"Queue health audit\")",
+      "caption": "Queue health audit",
+      "narration": "Queue health audit runs the checks in the background. It only reads; nothing in Google changes."
+    },
+    {
+      "action": "click",
+      "selector": "button:has-text(\"Health audit\")",
+      "caption": "Health audit",
+      "narration": "Health audit lists each finding by account, with its severity and a way to fix it."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"ads-row\"]:has-text(\"14 search terms\")",
+      "caption": "A finding and its fix",
+      "narration": "Here, fourteen search terms spent money with no conversions, and the fix is a negative keyword preview."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"ads-row\"]:has-text(\"unavailable\")",
+      "caption": "Unavailable is not a pass",
+      "narration": "When Google doesn't answer a check, it shows as unavailable, never as a pass."
+    },
+    {
+      "action": "click",
+      "selector": "button:has-text(\"Protection previews\")",
+      "caption": "Protection previews",
+      "chapter": "Preview before Google",
+      "narration": "Next, Protection previews."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"ads-row\"]:first-child",
+      "caption": "One preview per account",
+      "narration": "Each change is built per account: IP exclusions, negative keywords, presence-only targeting."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"ads-row\"]:first-child button:has-text(\"Review preview\")",
+      "caption": "Review preview",
+      "narration": "Choose Review preview to see exactly what would change: each campaign, how many IPs, and the limit."
+    },
+    {
+      "action": "highlight",
+      "selector": "[role=\"dialog\"]",
+      "caption": "Warnings, expiry, operations",
+      "narration": "Warnings are spelled out, the preview expires, and every operation is listed."
+    },
+    {
+      "action": "press",
+      "value": "Escape",
+      "caption": "Nothing written yet",
+      "narration": "Close it, and nothing has changed in Google."
+    },
+    {
+      "action": "highlight",
+      "selector": "label:has-text(\"I reviewed the selected previews\")",
+      "caption": "Confirm only after review",
+      "narration": "Tick that you reviewed the previews, then confirm. Each account is re-checked before anything is written."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-agency-ads-&-lsa\"]",
+      "caption": "Menu: Agency Ads & LSA",
+      "narration": "You'll find Agency Ads and LSA in the menu on the left, under Google Ads."
+    }
+  ],
+  "youtube": {
+    "title": "Agency Ads & LSA manager in about a minute | ConstructHUB",
+    "description": "A one-minute tour of the Agency Ads & LSA manager in ConstructHUB: every client account under your Google Ads MCC in one list, a read-only health audit with a fix for each finding, and protection previews you review and confirm before anything changes in Google.",
+    "tags": [
+      "ConstructHUB",
+      "Google Ads agency",
+      "MCC",
+      "Google Ads audit",
+      "Local Services Ads",
+      "ad protections",
+      "contractor marketing agency"
+    ],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Preview Before Google",
+    "accent": "Before",
+    "kicker": "Agency Ads & LSA",
+    "step": 11
+  },
+  "hideSelectors": [
+    "#agency-connection [role=\"alert\"]"
+  ]
+}

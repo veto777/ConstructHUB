@@ -1,0 +1,124 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "intro-agency",
+  "title": "Agency workspace",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/agency",
+      "caption": "Agency workspace",
+      "chapter": "One workspace",
+      "narration": "This is the Agency workspace: every client's Google Business Profile locations in one list."
+    },
+    {
+      "action": "highlight",
+      "selector": "select[aria-label=\"Location status\"]",
+      "caption": "Filter by status",
+      "narration": "Filter by status: synced, needs reconnect, not linked, Guard alerts, unanswered reviews or failed posts."
+    },
+    {
+      "action": "select",
+      "selector": "select[aria-label=\"Client filter\"]",
+      "value": "Clearpeak Exteriors",
+      "caption": "One client at a time",
+      "chapter": "Client workspaces",
+      "narration": "Or pick one client. Choose Clearpeak Exteriors, and only their locations are left."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"agency-locations-list\"]",
+      "caption": "Each location as its Google listing",
+      "narration": "Each location shows as its Google listing, with its client and whether it's linked."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"agency-location-92003\"] input[type=checkbox]",
+      "caption": "Tick the locations",
+      "chapter": "Bulk actions",
+      "narration": "To act on several at once, tick the locations you want."
+    },
+    {
+      "action": "highlight",
+      "selector": "button:has-text(\"Select all matching\")",
+      "caption": "Select all matching",
+      "narration": "Or choose Select all matching to take every location that fits your filters."
+    },
+    {
+      "action": "highlight",
+      "selector": "select[aria-label=\"Bulk action\"]",
+      "caption": "Pick the action",
+      "narration": "Then pick the action: sync, assign to a client, Guard mode, AI replies, a post batch, or Site Scans."
+    },
+    {
+      "action": "select",
+      "selector": "select[aria-label=\"Bulk action\"]",
+      "value": "Set Guard mode",
+      "caption": "Set Guard mode",
+      "narration": "Set Guard mode asks which mode, and reminds you each location needs an approved snapshot first."
+    },
+    {
+      "action": "highlight",
+      "selector": "button:has-text(\"Queue selected action\")",
+      "caption": "Queue selected action",
+      "narration": "Queue selected action runs it in the background, one job per location, and reports under Jobs."
+    },
+    {
+      "action": "click",
+      "selector": "[role=\"tab\"]:has-text(\"Clients\")",
+      "caption": "Clients",
+      "chapter": "Clients, team, onboarding",
+      "narration": "Clients is where you add a client workspace, with a name and a contact email."
+    },
+    {
+      "action": "highlight",
+      "selector": "article:has-text(\"Clearpeak Exteriors\")",
+      "caption": "A client workspace",
+      "narration": "Each client keeps its email, folder, tags and notes."
+    },
+    {
+      "action": "click",
+      "selector": "[role=\"tab\"]:has-text(\"Team\")",
+      "caption": "Team",
+      "narration": "Team gives each person a role, admin, manager or viewer, and the clients they work on."
+    },
+    {
+      "action": "click",
+      "selector": "[role=\"tab\"]:has-text(\"Onboarding\")",
+      "caption": "Onboarding",
+      "narration": "Onboarding emails a client the steps to add your agency as a Manager on Google. They keep ownership."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-agency\"]",
+      "caption": "Menu: Agency",
+      "narration": "You'll find Agency in the menu on the left, under Google Business."
+    }
+  ],
+  "youtube": {
+    "title": "Agency workspace in about a minute | ConstructHUB",
+    "description": "A one-minute tour of the Agency workspace in ConstructHUB: every client's Google Business Profile locations in one list, filters by client and status, bulk actions queued across the locations you select, and the Clients, Team and Onboarding tabs.",
+    "tags": [
+      "ConstructHUB",
+      "agency workspace",
+      "Google Business Profile agency",
+      "multi-location management",
+      "bulk actions",
+      "client workspaces",
+      "contractor marketing agency"
+    ],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "All Clients, One Workspace",
+    "accent": "One",
+    "kicker": "Agency workspace",
+    "step": 3
+  }
+}
