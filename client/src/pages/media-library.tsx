@@ -340,7 +340,7 @@ export default function MediaLibraryPage() {
                 <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span>{activeFolder.clientAddress}</span>
                 {activeFolder.lat && <span className="text-xs">({activeFolder.lat.toFixed(4)}, {activeFolder.lon?.toFixed(4)})</span>}
-                <span className="g-chip g-chip--sm ml-1">{activeFolder.lat ? "GPS embedded" : "Address set"}</span>
+                <span className="g-chip g-chip--sm ml-1">{activeFolder.lat ? "GPS on file" : "Address set"}</span>
               </span>
             ) : undefined}
             actions={<>
@@ -367,7 +367,7 @@ export default function MediaLibraryPage() {
           as="h1"
           titleTestId="heading-media-library"
           title="Media library"
-          description="Project photo folders. Set a client address to embed GPS coordinates into photos."
+          description="Project photo folders with client addresses. Photos processed in the Photo Optimizer carry GPS coordinates in their file data; direct uploads are stored exactly as uploaded."
           flush
           actions={
             <GooglePill
@@ -482,7 +482,7 @@ export default function MediaLibraryPage() {
                   />
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                  GPS coordinates are embedded into photos in this folder — just like when a phone takes a photo with location on. Google strips this data when photos are uploaded to a Business Profile, so it's for your own records and other sites, not a ranking boost.
+                  The address is saved with this folder. GPS coordinates are written into a photo's file data only when you process it through the Photo Optimizer — just like when a phone takes a photo with location on — while photos uploaded directly to a folder are stored exactly as uploaded. Google strips this data when photos are uploaded to a Business Profile, so it's for your own records and other sites, not a ranking boost.
                 </p>
                 {geocodedResult && (
                   <div className="flex items-center gap-2 p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800">
@@ -609,7 +609,7 @@ export default function MediaLibraryPage() {
               <EmptyState
                 icon={FolderOpen}
                 title="No folders yet"
-                description="Create your first folder to start organizing project photos. You can add a client address to embed GPS coordinates into every photo — Google strips EXIF on upload, so geotags don't promise a ranking boost."
+                description="Create your first folder to start organizing project photos. You can add a client address to keep the project location on file — photos processed in the Photo Optimizer carry GPS coordinates in their file data. Google strips EXIF on upload to a Business Profile, so geotags don't promise a ranking boost."
                 action={
                   <GooglePill icon={FolderPlus} onClick={() => setShowNewFolder(true)} label="Create your first folder" testId="button-empty-new-folder" />
                 }
@@ -678,7 +678,7 @@ export default function MediaLibraryPage() {
               <EmptyState
                 icon={ImagePlus}
                 title="This folder is empty"
-                description={`Upload photos directly, or process them in the Photo Optimizer and save them here.${activeFolder?.clientAddress ? " GPS coordinates from the folder's address will be embedded into photos." : ""}`}
+                description={`Upload photos directly, or process them in the Photo Optimizer and save them here.${activeFolder?.clientAddress ? " Photos processed in the Photo Optimizer carry GPS coordinates from the location you set there; direct uploads are stored exactly as uploaded." : ""}`}
                 action={
                   <GooglePill icon={Upload} onClick={() => fileInputRef.current?.click()} label="Upload photos" testId="button-empty-upload" />
                 }
