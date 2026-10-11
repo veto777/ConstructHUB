@@ -90,7 +90,7 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"page-property\"] p:has-text(\"Included with\")",
+      "selector": "[data-testid=\"text-property-title\"]",
       "caption": "Included with Pro, Agency and Unlimited",
       "narration": "Property Records is included with the Pro, Agency and Unlimited plans."
     },
