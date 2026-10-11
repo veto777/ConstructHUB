@@ -1,7 +1,7 @@
 import { PlanRequired, planRequiredFrom } from "@/components/plan-required";
 import { planNamesWhere } from "@shared/plan-copy";
 import { propertyOfficeForDisplay, resolvePropertyScope } from "./property-display";
-import { governmentLinkNotice, governmentLinksAvailable } from "@shared/government-links";
+import { governmentLinkNotice, governmentLinksAvailable, isChallengeUrl } from "@shared/government-links";
 import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { readQueryInt, readQueryParam, replaceQueryParams } from "@/lib/url-query";
@@ -163,7 +163,7 @@ export default function PropertyPage() {
   const hasFilters = stateFilter !== "all" || countyFilter !== "all" || searchQuery.trim() !== "";
   const activeFilters = (stateFilter !== "all" ? 1 : 0) + (countyFilter !== "all" ? 1 : 0);
 
-  if (error) return <AppPage width="narrow" testId="page-property">
+  if (error && (!rawAppraisers || planRequiredFrom(error) || /^40[123]:/.test(error.message))) return <AppPage width="narrow" testId="page-property">
     <GoogleSectionHeader as="h1" title="Property records" flush />
     {planRequiredFrom(error) ? <PlanRequired module="propertyRecords" error={error} /> : /^401:/.test(error.message) ?
       <Notice tone="info">Sign in to access Property Records. Included with {planNamesWhere(p => p.modules.propertyRecords)}. <Button asChild variant="outline"><a href={`/auth?next=${encodeURIComponent(window.location.pathname + window.location.search)}`}>Sign in</a></Button></Notice> :
@@ -171,6 +171,7 @@ export default function PropertyPage() {
   </AppPage>;
   return (
     <AppPage width="narrow" testId="page-property">
+      {error && <Notice tone="danger">Refresh failed — showing saved property offices. <Button variant="outline" onClick={() => void refetch()}>Retry</Button></Notice>}
       {/* Google's local-pack format (owner, 2026-10-07): a quiet header, hairline rows, pill actions. */}
       <GoogleSectionHeader
         as="h1"
@@ -246,8 +247,10 @@ export default function PropertyPage() {
           </p>
           <GoogleList testId="list-appraisers">
             {paginated.map((appraiser) => {
-              const challenge = [appraiser.portalUrl, appraiser.searchUrl].some(url => url && /(?:perfdrive\.com|\/bot[-_]?check|\/captcha)(?:[/?#]|$)/i.test(url));
-              const linksOk = !challenge && governmentLinksAvailable(appraiser);
+              const portalChallenge = isChallengeUrl(appraiser.portalUrl);
+              const searchChallenge = isChallengeUrl(appraiser.searchUrl);
+              const challenge = portalChallenge || searchChallenge;
+              const linksOk = governmentLinksAvailable(appraiser);
               const checkedAt = appraiser.lastVerifiedAt ? new Date(appraiser.lastVerifiedAt) : null;
               const notice = challenge ? "The recorded link leads to a bot challenge. Find the official office below." : linksOk ? governmentLinkNotice(appraiser) ?? (checkedAt && !Number.isNaN(checkedAt.getTime()) ? 'Last checked ' + checkedAt.toLocaleDateString() + ' · links can change' : 'Check date unavailable · confirm with the office') : null;
               // No usable official link on record: an honest web search, never a fabricated portal.
@@ -269,10 +272,10 @@ export default function PropertyPage() {
                     </>
                   ) : undefined}
                   actions={<>
-                    {linksOk && appraiser.portalUrl && (
+                    {linksOk && appraiser.portalUrl && !portalChallenge && (
                       <GooglePill icon={ExternalLink} label={appraiser.linkStatus === "unconfirmed" ? "Open unconfirmed site" : "Open portal"} href={appraiser.portalUrl} external testId={`button-visit-appraiser-${appraiser.id}`} />
                     )}
-                    {linksOk && appraiser.searchUrl && appraiser.searchUrl !== appraiser.portalUrl && (
+                    {linksOk && appraiser.searchUrl && !searchChallenge && appraiser.searchUrl !== appraiser.portalUrl && (
                       <GooglePill icon={Search} label={appraiser.linkStatus === "unconfirmed" ? "Search unconfirmed site" : "Search records"} href={appraiser.searchUrl} external testId={`button-search-appraiser-${appraiser.id}`} />
                     )}
                     {fallback && (

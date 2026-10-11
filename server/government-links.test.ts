@@ -1,6 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { governmentLinkNotice, governmentLinksAvailable, governmentLinksForDisplay, canScrapeGovernmentPortal, governmentPermitForDisplay } from '../shared/government-links';
+import { governmentLinkNotice, governmentLinksAvailable, governmentLinksForDisplay, canScrapeGovernmentPortal, governmentPermitForDisplay, isChallengeUrl } from '../shared/government-links';
 describe('government link visibility', () => {
+  it.each(['https://validate.perfdrive.com', 'https://geo.captcha-delivery.com/', 'https://api.datadome.co/', 'https://datadome.com/', 'https://county.gov/captcha?next=assessor', 'https://county.gov/bot-check'])('downgrades challenge URL %s at serialization', portalUrl => {
+    const row = { isActive: true, linkStatus: 'verified', portalUrl, searchUrl: 'https://county.gov/records' };
+    expect(isChallengeUrl(portalUrl)).toBe(true);
+    expect(governmentLinksForDisplay(row)).toEqual({ ...row, linkStatus: 'unconfirmed' });
+    expect(governmentLinksForDisplay({ ...row, portalUrl: row.searchUrl, searchUrl: portalUrl }).linkStatus).toBe('unconfirmed');
+    expect(row.linkStatus).toBe('verified');
+  });
+  it('matches host boundaries rather than unrelated URL text', () => {
+    for (const value of [null, 'invalid', 'https://notperfdrive.com/', 'https://county.gov/?source=https://perfdrive.com', 'https://perfdrive.com.county.gov/']) expect(isChallengeUrl(value)).toBe(false);
+  });
   it('requires a verified, active link', () => {
     expect(governmentLinksAvailable({isActive: true, linkStatus: 'live'})).toBe(true);
     for (const linkStatus of ['dead', 'unverified', 'unchecked', 'none', null, undefined]) {

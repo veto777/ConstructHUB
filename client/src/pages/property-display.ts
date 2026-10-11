@@ -1,3 +1,4 @@
+import { isChallengeUrl } from '@shared/government-links';
 /** Display-only safeguards; source corrections belong to the government-link pipeline. */
 export function propertyOfficeForDisplay<T extends { name: string; portalUrl: string | null; searchUrl: string | null; linkStatus: string | null }>(row: T): T {
   const safe = (value: string | null) => {
@@ -5,7 +6,7 @@ export function propertyOfficeForDisplay<T extends { name: string; portalUrl: st
     try { const u = new URL(value); return ['http:', 'https:'].includes(u.protocol) ? value : null; } catch { return null; }
   };
   const portalUrl = safe(row.portalUrl), searchUrl = safe(row.searchUrl);
-  const challenge = [portalUrl, searchUrl].some(u => u && /(?:perfdrive\.com|\/bot[-_]?check|\/captcha)(?:[/?#]|$)/i.test(u));
+  const challenge = isChallengeUrl(portalUrl) || isChallengeUrl(searchUrl);
   return { ...row, portalUrl, searchUrl,
     name: / property records$/i.test(row.name) ? 'County records (office name unavailable)' : row.name,
     linkStatus: challenge ? 'unconfirmed' : row.linkStatus };

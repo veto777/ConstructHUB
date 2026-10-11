@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { classifyGovernmentPage } from './government-url-check';
 const page = (title: string, body: string, httpStatus = 200, finalUrl = 'https://county.gov/assessor') => ({ html: `<html><title>${title}</title><body>${body}</body></html>`, httpStatus, finalUrl });
 describe('government page verification', () => {
+  it.each(['https://validate.perfdrive.com/?ssc=https://county.gov/assessor', 'https://geo.captcha-delivery.com/captcha/', 'https://api-js.datadome.co/js/', 'https://challenges.cloudflare.com/'])('rejects challenge host %s even with topic content', url => {
+    expect(classifyGovernmentPage(page('County Assessor', '<main>Property records and parcel search</main>', 200, url), 'appraiser')).toMatchObject({ status: 'unverified', reason: 'bot challenge URL' });
+  });
   it('accepts a records department with content', () => {
     expect(classifyGovernmentPage(page('County Assessor', '<main>Property records and parcel search</main>'), 'appraiser').status).toBe('live');
   });

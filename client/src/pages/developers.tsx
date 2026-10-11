@@ -161,7 +161,7 @@ export function exampleFor(s: Schema | undefined, doc: OpenApiDoc | undefined, s
     case "array": return [exampleFor(s.items, doc, seen, depth + 1, now)];
     case "string":
       switch (s.format) {
-        case "uuid": return "3f1c7c54-7f1a-4a6e-9a8e-2b4d8c1e5f90";
+        case "uuid": return crypto.randomUUID();
         case "date-time": return new Date(now.getTime() + 3 * 86_400_000).toISOString();
         case "date": return new Date(now.getTime() + 3 * 86_400_000).toISOString().slice(0, 10);
         case "local-date-time": return new Date(now.getTime() + 3 * 86_400_000).toISOString().slice(0, 16);
@@ -178,6 +178,24 @@ export function exampleFor(s: Schema | undefined, doc: OpenApiDoc | undefined, s
       }
       if (s.additionalProperties && typeof s.additionalProperties === "object") return { key: exampleFor(s.additionalProperties, doc, seen, depth + 1, now) };
       return s.type === "object" || !s.type ? {} : null;
+    }
+  }
+}
+
+/** Minimal inputs for the write contracts, with optional settings kept below. */
+export function minimalWriteExample(schema: Schema | undefined, doc?: OpenApiDoc): unknown {
+  switch (refName(schema)) {
+    case 'SocialPostInput': return {
+      businessId: 123, requestId: crypto.randomUUID(), text: 'An update from our team.',
+      destinations: [{ accountId: 'YOUR_CONNECTED_ACCOUNT_ID', platform: 'twitter' }],
+    };
+    case 'GbpPostInput': return { requestKey: crypto.randomUUID(), text: 'An update from our team.' };
+    case 'GbpReplyInput': return { text: 'Thank you for sharing your feedback.' };
+    case 'SiteScanInput': return { url: 'https://example.com' };
+    default: {
+      const s = resolve(schema, doc);
+      if (!s?.properties) return exampleFor(s, doc);
+      return Object.fromEntries((s.required ?? []).map(key => [key, exampleFor(s.properties![key], doc)]));
     }
   }
 }
@@ -474,6 +492,12 @@ export function curlFor(e: Pick<Endpoint, "method" | "path" | "op">, doc: OpenAp
 function EndpointRow({ e, doc, base, open }: { e: Endpoint; doc: OpenApiDoc | undefined; base: string; open: boolean }) {
   const body = e.op.requestBody?.content?.["application/json"]?.schema;
   const bodySchema = resolve(body, doc);
+  // Stable for this mounted example, including copying and expanding schemas.
+  const [minimal] = useState(() => minimalWriteExample(body, doc));
+  const [fullExample] = useState(() => exampleFor(body, doc));
+  const [gbpExamples] = useState(() => Object.fromEntries(Object.entries(gbpPostExamples()).map(
+    ([topic, value]) => [topic, { ...value, requestKey: crypto.randomUUID() }],
+  )));
   const [copied, setCopied] = useState(false);
   const copyLink = async () => {
     const url = `${window.location.origin}${window.location.pathname}#${e.id}`;
@@ -488,7 +512,7 @@ function EndpointRow({ e, doc, base, open }: { e: Endpoint; doc: OpenApiDoc | un
   const okResponses = responses.filter(([code]) => /^2/.test(code));
   return (
     <details className="py-3 group scroll-mt-24" id={e.id} open={open || undefined} data-testid={`endpoint-${e.id}`}>
-      <summary className="flex flex-wrap items-center gap-2 cursor-pointer list-none">
+      <summary className="flex flex-wrap items-center gap-2 cursor-pointer list-none rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-mkt-orange">
         <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${METHOD_CLASS[e.method]}`}>{e.method}</span>
         <code className="text-sm break-all">{e.path}</code>
         <Badge variant="outline" className="text-[10px]" data-testid={`badge-scope-${e.id}`}>{scope}</Badge>
@@ -497,6 +521,13 @@ function EndpointRow({ e, doc, base, open }: { e: Endpoint; doc: OpenApiDoc | un
         {e.op.summary && <span className="text-sm text-muted-foreground basis-full sm:basis-auto">{e.op.summary}</span>}
       </summary>
       <div className="mt-3 space-y-4 text-sm">
+        {e.method !== 'get' && <div>
+          <p className="font-medium mb-1">Minimal example request</p>
+          <p className="text-muted-foreground mb-2">Illustrative values: replace IDs, text and URLs with your own before sending. Find your business ID in Social Media after opening a business: the number in <code className="break-all">?business=123</code>, or the <code>id</code> returned by <code>GET /locations</code>. Replace path placeholders with the location or review ID from the corresponding read endpoint.</p>
+          {refName(body) === 'SocialPostInput' && <p className="text-muted-foreground mb-2">Use an account ID and platform mapped to that business in Social Media settings. This text-only example uses Twitter; other networks may require media or a page/board ID. Omitting scheduling queues the post for the next worker run.</p>}
+          {['SocialPostInput', 'GbpPostInput'].includes(refName(body) ?? '') && <p className="text-muted-foreground mb-2">This example has a fresh idempotency key. Retries must reuse the same key and identical payload. Generate a new UUID for each new operation; do not reuse a key after editing the content. The key stays unchanged while this example is open.</p>}
+          <pre className="max-w-full rounded-xl bg-mkt-navy text-mkt-navy-ink p-4 text-xs overflow-x-auto" data-testid={`example-minimal-${e.id}`}>{curlFor(e, doc, base, minimal)}</pre>
+        </div>}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <span>Scope: <code>{scope}</code> · Cost: {cost}</span>
           <a href={`#${e.id}`} className="inline-flex items-center gap-1 underline underline-offset-4" data-testid={`link-endpoint-${e.id}`}><LinkIcon className="h-3 w-3" aria-hidden="true" />#{e.id}</a>
@@ -549,16 +580,16 @@ function EndpointRow({ e, doc, base, open }: { e: Endpoint; doc: OpenApiDoc | un
             </ul>
           </div>
         )}
-        <div>
-          <p className="font-medium mb-1">Example request{pathParams.length ? <span className="text-xs text-muted-foreground font-normal"> · replace {pathParams.map((p) => `{${p.name}}`).join(", ")}</span> : null}</p>
+        <details>
+          <summary className="font-medium mb-1 cursor-pointer rounded focus-visible:ring-2 focus-visible:ring-mkt-orange">{e.method === 'get' ? 'Example request' : 'Optional fields and scheduling examples'}{pathParams.length ? <span className="text-xs text-muted-foreground font-normal"> · replace {pathParams.map((p) => `{${p.name}}`).join(", ")}</span> : null}</summary>
           {refName(body) === "GbpPostInput" ? <>
             <p className="text-sm text-muted-foreground mb-2">Illustrative payloads: publish time is three days from now. Replace the text, URLs and local event times for your business. EVENT and OFFER require a title and an end after the start. A CTA needs an HTTPS URL except CALL; OFFER uses its redemption URL instead of a CTA.</p>
-            {Object.entries(gbpPostExamples()).map(([topic, example]) => <div key={topic} className="mb-3">
+            {Object.entries(gbpExamples).map(([topic, example]) => <div key={topic} className="mb-3">
               <p className="font-medium mb-1">{topic}</p>
               <pre className="rounded-xl bg-mkt-navy text-mkt-navy-ink p-4 text-xs overflow-x-auto" data-testid={`example-request-${e.id}-${topic}`}>{curlFor(e, doc, base, example)}</pre>
             </div>)}
-          </> : <pre className="rounded-xl bg-mkt-navy text-mkt-navy-ink p-4 text-xs overflow-x-auto" data-testid={`example-request-${e.id}`}>{curlFor(e, doc, base)}</pre>}
-        </div>
+          </> : <><p className="text-muted-foreground mb-2">Full schema illustration. Optional fields depend on your network and settings; start with the minimal request above for writes.</p><pre className="rounded-xl bg-mkt-navy text-mkt-navy-ink p-4 text-xs overflow-x-auto" data-testid={`example-request-${e.id}`}>{curlFor(e, doc, base, fullExample)}</pre></>}
+        </details>
         {okResponses.length > 0 && okResponses[0][1]?.content?.["application/json"]?.schema && (
           <div>
             <p className="font-medium mb-1">Example response <span className="text-xs text-muted-foreground font-normal">{okResponses[0][0]} · shape only, generated from the schema</span></p>

@@ -13,8 +13,8 @@
  * or a `data` / `items` / `results` array in the JSON body.
  */
 import type { Request, RequestHandler, Response } from "express";
-import { apiMonthResetsAt, monthlyUsage, recordUnits } from "../account/api-keys";
-import type { PublicApiContext } from "./auth";
+import { apiMonthResetsAt } from "../account/api-keys";
+import { reserveQuota, type QuotaReservation } from "./quota-reservation";
 import { apiError } from "./errors";
 import { UNLIMITED } from "@shared/plans";
 
@@ -44,30 +44,10 @@ export function inferRows(body: unknown): number {
   return 0;
 }
 
-// Like billing changes and rate-limit windows, this lock is per process: the
-// production app runs one process. A multi-process deployment must move this
-// critical section to a shared reservation store before enabling replicas.
-const accountTurns = new Map<number, Promise<void>>();
-async function acquireTurn(userId: number): Promise<() => void> {
-  const prior = accountTurns.get(userId) ?? Promise.resolve();
-  let resolve!: () => void;
-  const mine = new Promise<void>((done) => { resolve = done; });
-  const tail = prior.then(() => mine);
-  accountTurns.set(userId, tail);
-  await prior;
-  let released = false;
-  return () => {
-    if (released) return;
-    released = true;
-    resolve();
-    if (accountTurns.get(userId) === tail) accountTurns.delete(userId);
-  };
-}
-
 export const quota: RequestHandler = async (req, res, next) => {
   const ctx = req.publicApi;
   if (!ctx) return apiError(res, 401, "unauthorized", "Authenticate with an API key first.");
-  let release: (() => void) | undefined;
+  let reservation: QuotaReservation | undefined;
   try {
     const unlimited = ctx.plan.unitsPerMonth === UNLIMITED;
     if (!unlimited && ctx.plan.unitsPerMonth <= 0) {
@@ -76,9 +56,9 @@ export const quota: RequestHandler = async (req, res, next) => {
         ? `API access is included with the ${ctx.plan.requiredPlan[0].toUpperCase()}${ctx.plan.requiredPlan.slice(1)} plan and above. Upgrade in Pricing to use it.`
         : "This account has no active plan. API access is included with a paid plan.", { requiredPlan: ctx.plan.requiredPlan });
     }
-    release = await acquireTurn(ctx.userId);
-    if (res.destroyed) { release(); return; }
-    const used = await monthlyUsage(ctx.key.id, ctx.userId);
+    reservation = await reserveQuota(ctx.userId, ctx.key.id);
+    if (res.destroyed) { await reservation.rollback(); return; }
+    const { used } = reservation;
     const cost = unitsFor(req.method);
     const planLeft = unlimited ? Number.POSITIVE_INFINITY : ctx.plan.unitsPerMonth - used.user;
     const keyLeft = ctx.key.monthlyUnitLimit == null ? Number.POSITIVE_INFINITY : ctx.key.monthlyUnitLimit - used.key;
@@ -97,18 +77,18 @@ export const quota: RequestHandler = async (req, res, next) => {
         resetsAt,
       });
     };
-    if (left < cost) { release(); return refuse(); }
+    if (left < cost) { await reservation.rollback(); return refuse(); }
     res.setHeader("X-Units-Remaining", unitsRemaining(left - cost));
-    installMetering(req, res, ctx, left, refuse, release);
+    installMetering(req, res, left, refuse, reservation);
     next();
   } catch (e) {
-    release?.();
+    await reservation?.rollback();
     next(e);
   }
 };
 
 /** Keep the account's turn until its successful response is durably metered. */
-function installMetering(req: Request, res: Response, ctx: PublicApiContext, left: number, refuse: () => unknown, release: () => void) {
+function installMetering(req: Request, res: Response, left: number, refuse: () => unknown, reservation: QuotaReservation) {
   let metering: Promise<void> | undefined;
   const json = res.json.bind(res);
   const meter = (body?: unknown, sendJson = false): Promise<void> => {
@@ -125,7 +105,7 @@ function installMetering(req: Request, res: Response, ctx: PublicApiContext, lef
             if (!res.headersSent && !res.destroyed) refuse();
             return;
           }
-          await recordUnits(ctx.key.id, ctx.userId, units);
+          await reservation.commit(units);
           res.locals.apiUnits = units;
           if (!res.headersSent) res.setHeader("X-Units-Remaining", unitsRemaining(left - units));
         } else if (!res.headersSent) {
@@ -138,7 +118,7 @@ function installMetering(req: Request, res: Response, ctx: PublicApiContext, lef
         if (!res.headersSent && !res.destroyed) {
           apiError(res, 503, "internal_error", "API usage could not be recorded. Check the resource before retrying a write.");
         }
-      } finally { release(); }
+      } finally { await reservation.rollback(); }
     })();
     return metering;
   };
