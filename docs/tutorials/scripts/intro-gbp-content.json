@@ -1,0 +1,132 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "intro-gbp-content",
+  "title": "Posts & Photos",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/gbp-content?location=910001",
+      "caption": "Posts & photos",
+      "chapter": "Posts and photos on schedule",
+      "narration": "This is Posts and Photos. Write Google updates, add job photos, and schedule them to publish to your Google Business Profile."
+    },
+    {
+      "action": "highlight",
+      "selector": "select[aria-label=\"Location\"]",
+      "caption": "Choose a linked location",
+      "narration": "Start by choosing a location that is linked to its Google listing."
+    },
+    {
+      "action": "click",
+      "selector": "xpath=//summary[normalize-space(.)=\"Photos and media library\"]",
+      "caption": "Photos and media library",
+      "narration": "Photos and media library takes up to one hundred job photos at a time, filed by Google photo category."
+    },
+    {
+      "action": "click",
+      "selector": "xpath=//summary[normalize-space(.)=\"AI drafts and style\"]",
+      "caption": "AI drafts and style",
+      "chapter": "AI drafts in your voice",
+      "narration": "AI drafts and style: give instructions or example wording, and the AI drafts captions and posts for you."
+    },
+    {
+      "action": "highlight",
+      "selector": "textarea[aria-label=\"Style guidance\"]",
+      "caption": "Saved style guidance",
+      "narration": "Saved style guidance keeps the drafts friendly, plain-spoken and local."
+    },
+    {
+      "action": "scroll-to",
+      "selector": "textarea[aria-label=\"Post draft\"]",
+      "offset": 200,
+      "caption": "Compose a Google update",
+      "chapter": "Compose and approve",
+      "narration": "Compose a Google update: a standard update, an event or an offer."
+    },
+    {
+      "action": "type",
+      "selector": "textarea[aria-label=\"Post draft\"]",
+      "value": "Fall gutter clean-outs are booking now. Call for a free inspection.",
+      "caption": "Write the update",
+      "narration": "Type the update, or generate a draft above and edit it."
+    },
+    {
+      "action": "select",
+      "selector": "select[aria-label=\"Call to action\"]",
+      "value": "call",
+      "caption": "Add a button",
+      "narration": "Add a button like Book, Call or Learn more."
+    },
+    {
+      "action": "scroll-to",
+      "selector": "input[aria-label=\"First publish\"]",
+      "offset": 160,
+      "caption": "Schedule and approve",
+      "narration": "Pick the first publish time, how many per day or per week, and business hours if you like."
+    },
+    {
+      "action": "click",
+      "selector": "xpath=//button[normalize-space(.)=\"Approve & queue post\"]",
+      "caption": "Approve & queue post",
+      "narration": "Nothing publishes until you approve it. Choose Approve and queue post."
+    },
+    {
+      "action": "scroll-to",
+      "selector": "xpath=//button[normalize-space(.)=\"Calendar\"]",
+      "offset": 140,
+      "caption": "Calendar, queue and history",
+      "chapter": "Calendar, queue and history",
+      "narration": "Calendar, queue and history lists every item with its time and status."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=(//article[contains(.,\"queued\")])[1]",
+      "caption": "Cancel, retry, refresh status",
+      "narration": "Cancel anything still queued, retry a failure, or refresh the Google status."
+    },
+    {
+      "action": "scroll-to",
+      "selector": "[data-testid=\"link-nav-posts-&-photos\"]",
+      "offset": 260,
+      "caption": "Photos and words in, published on schedule",
+      "narration": "Photos and words in, approved by you, published on your schedule."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-posts-&-photos\"]",
+      "caption": "Menu: Posts & Photos",
+      "narration": "You'll find Posts and Photos in the menu on the left, under Google Business."
+    }
+  ],
+  "youtube": {
+    "title": "Google Posts & Photos in about a minute | ConstructHUB",
+    "description": "A one-minute tour of Posts & Photos in ConstructHUB: upload job photos by Google category, write Google updates or draft them with AI in your own style, approve them, and let the schedule publish them to your Google Business Profile at the pace you set. The calendar shows every item's status at Google.",
+    "tags": [
+      "ConstructHUB",
+      "Google Business Profile posts",
+      "Google posts scheduler",
+      "GBP photos",
+      "AI post drafts",
+      "contractor marketing",
+      "local SEO",
+      "roofing marketing"
+    ],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Google Posts On Schedule",
+    "accent": "Schedule",
+    "kicker": "Posts & Photos",
+    "step": 11
+  },
+  "hideSelectors": [
+    "div[role=\"alert\"].rounded-xl"
+  ]
+}

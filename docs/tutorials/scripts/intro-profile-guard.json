@@ -1,0 +1,119 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "intro-profile-guard",
+  "title": "Profile Guard",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/locations?location=910001&tab=guard",
+      "caption": "Profile Guard",
+      "chapter": "Edits caught",
+      "narration": "This is Profile Guard. It checks your Google listing on a schedule and compares it with the values you approved."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//p[starts-with(normalize-space(.),\"Current mode\")]",
+      "caption": "Mode and last check",
+      "narration": "This listing is in Notify mode, and you can see when it was last checked."
+    },
+    {
+      "action": "highlight",
+      "selector": "select[aria-label=\"Guard mode\"]",
+      "caption": "Off, Notify or Lockdown",
+      "narration": "Notify alerts you to each change. Lockdown also writes your approved value back to Google once a change is found."
+    },
+    {
+      "action": "click",
+      "selector": "xpath=//summary[normalize-space(.)=\"Watched fields\"]",
+      "caption": "The eleven watched fields",
+      "narration": "Watched fields are the eleven that matter, from business name, phone and website to hours and open status."
+    },
+    {
+      "action": "scroll-to",
+      "selector": "xpath=//h3[normalize-space(.)=\"Pending changes and history\"]",
+      "offset": 60,
+      "caption": "Pending changes and history",
+      "chapter": "Approved versus detected",
+      "narration": "Below, every change Profile Guard has found on this listing."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//article[starts-with(normalize-space(.),\"Website — pending\")]",
+      "caption": "Field, time found, source",
+      "narration": "Each one names the field, when it was found, and the source as Google reports it. Your approved value sits on the left, the detected value on the right."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//article[starts-with(normalize-space(.),\"Website — pending\")]//button[normalize-space(.)=\"Approve\"]/..",
+      "caption": "Approve or reject",
+      "narration": "Approve takes the new value into your snapshot. Reject writes your approved value back to Google."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//article[starts-with(normalize-space(.),\"Website — pending\")]//button[normalize-space(.)=\"Report\"]",
+      "caption": "Report to Google",
+      "narration": "For a misleading edit, Report prepares the evidence for Google's official form."
+    },
+    {
+      "action": "scroll-to",
+      "selector": "xpath=//article[starts-with(normalize-space(.),\"Phone numbers — reverted\")]",
+      "offset": 120,
+      "caption": "History keeps every change",
+      "chapter": "History with evidence",
+      "narration": "History keeps every change with its outcome. This phone number change was reverted, and the old and new values stay on record."
+    },
+    {
+      "action": "goto",
+      "url": "/gmb-monitor",
+      "caption": "GMB Edit Monitor",
+      "chapter": "GMB Edit Monitor",
+      "narration": "No Google connection yet? GMB Edit Monitor checks any public listing when you ask it to. It runs on demand and sends no automatic alerts."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-history-910001\"]",
+      "caption": "Edit History",
+      "narration": "Choose Edit History to see what changed between checks."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-gmb-edit-monitor\"]",
+      "caption": "Menu: GMB Edit Monitor",
+      "narration": "GMB Edit Monitor is in the menu on the left, under Google Business."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-locations\"]",
+      "caption": "Profile Guard: a tab on every location",
+      "narration": "Profile Guard is a tab on every linked location, under Locations."
+    }
+  ],
+  "youtube": {
+    "title": "Profile Guard in about a minute | ConstructHUB",
+    "description": "A one-minute tour of Profile Guard in ConstructHUB: it checks your Google Business Profile on a schedule, shows each detected change next to the value you approved, lets you approve or reject it, and keeps the history with Google's evidence. GMB Edit Monitor does on-demand checks of any public listing.",
+    "tags": [
+      "ConstructHUB",
+      "Profile Guard",
+      "Google Business Profile",
+      "edit alerts",
+      "GBP changes",
+      "listing protection",
+      "contractor marketing",
+      "local SEO"
+    ],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Catch Every Listing Edit",
+    "accent": "Every",
+    "kicker": "Profile Guard",
+    "step": 5
+  }
+}

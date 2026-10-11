@@ -1,0 +1,125 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "intro-gbp",
+  "title": "Google Business Profile",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/locations",
+      "caption": "Locations",
+      "chapter": "Every listing in one list",
+      "narration": "This is Locations. Every Google Business Profile you manage sits in one list, synced from Google every six hours."
+    },
+    {
+      "action": "scroll-to",
+      "selector": "[data-testid=\"agency-location-910001\"]",
+      "offset": 140,
+      "caption": "Search, filter, scroll",
+      "narration": "Search the list, filter it by client or status, and scroll to the listing you want."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"agency-location-910001\"]",
+      "caption": "Rating, reviews, category, quick links",
+      "narration": "Each row shows the rating and review count, the primary category, and quick links to call, get directions, open the website and read reviews."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-open-location-910001\"]",
+      "caption": "Open profile",
+      "chapter": "Open a location",
+      "narration": "Choose Open profile."
+    },
+    {
+      "action": "scroll-to",
+      "selector": "[data-testid=\"tab-insights\"]",
+      "offset": 110,
+      "caption": "Eight tabs per location",
+      "narration": "The location opens on Insights. Eight tabs run down the side, from Insights to Citations."
+    },
+    {
+      "action": "scroll-to",
+      "selector": "[data-testid=\"table-performance\"]",
+      "offset": 200,
+      "caption": "Insights: Google's performance report",
+      "narration": "Insights is the performance report Google shares for a verified listing."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"row-performance-total\"]",
+      "caption": "Views, clicks, calls, directions",
+      "narration": "Search and Maps views on mobile and desktop, plus website clicks, call clicks and directions."
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid=\"select-perf-group\"]",
+      "value": "By month",
+      "caption": "By day, week or month",
+      "narration": "Group it by day, week or month, from the last thirty days to all stored history."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tab-info\"]",
+      "caption": "Location Info",
+      "chapter": "Details and services",
+      "narration": "Location Info is the profile as Google has it."
+    },
+    {
+      "action": "scroll-to",
+      "selector": "[data-testid=\"info-phone\"]",
+      "offset": 150,
+      "caption": "Name, address, phone, website, hours",
+      "narration": "Name, description, address, service areas, phone, website, hours and open status."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tab-services\"]",
+      "caption": "Services and categories",
+      "narration": "Services lists every service and category on the listing, primary category marked. Edit them in Google Business Profile and they update here on the next sync."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tab-guard\"]",
+      "caption": "Profile Guard",
+      "narration": "Profile Guard, the edit alert, has its own tab on every linked listing. It gets its own video.",
+      "chapter": "Profile Guard"
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-locations\"]",
+      "caption": "Menu: Locations",
+      "narration": "You'll find Locations in the menu on the left, under Google Business."
+    }
+  ],
+  "youtube": {
+    "title": "Google Business Profile in about a minute | ConstructHUB",
+    "description": "A one-minute tour of Locations in ConstructHUB: every Google Business Profile you manage in one list, each with Google's performance figures, the profile details and services as Google has them, a citation checklist and its own Profile Guard tab, synced from Google every six hours.",
+    "tags": [
+      "ConstructHUB",
+      "Google Business Profile",
+      "GBP management",
+      "contractor marketing",
+      "local SEO",
+      "Google Maps listing",
+      "roofing marketing",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "All Your Google Profiles",
+    "accent": "All",
+    "kicker": "Google Business Profile",
+    "step": 2
+  },
+  "hideSelectors": [
+    "div:has(> div.p-4 > a[href=\"/search-console\"])"
+  ]
+}
