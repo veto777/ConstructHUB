@@ -1,0 +1,25 @@
+{
+  "helpKey": "intro-social",
+  "durationSec": 93,
+  "video": {
+    "key": "tutorials/intro-social.b99a2c62.mp4",
+    "bytes": 9026057,
+    "sha256": "b99a2c62706a774ec149d9ac5c6b0f0b36c5f44ed32175de156b992f3224d3d5"
+  },
+  "captions": {
+    "key": "tutorials/intro-social.decb1267.vtt",
+    "bytes": 1927,
+    "sha256": "decb126770fcd61eb8b0dd7095737d54f6d0edebe2adf74d23fee30e5c7013ce"
+  },
+  "poster": {
+    "key": "tutorials/intro-social.78709d9e.jpg",
+    "bytes": 88905,
+    "sha256": "78709d9ee145df5f194f812458540fb8564524001e05f8dfab1e1e9935bce500"
+  },
+  "uploaded": {
+    "at": "2026-10-11T21:10:45.007Z",
+    "video": "dd48083c1c92ffb55e0a7f223f53f659",
+    "captions": "58e19bfdd72aeb4440b7094011bf79c9",
+    "poster": "25d4532311f3d37a743ca32bb9443159"
+  }
+}
