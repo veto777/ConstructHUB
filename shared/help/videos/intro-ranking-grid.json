@@ -2,24 +2,24 @@
   "helpKey": "intro-ranking-grid",
   "durationSec": 85,
   "video": {
-    "key": "tutorials/intro-ranking-grid.4e4ce1fc.mp4",
-    "bytes": 8947241,
-    "sha256": "4e4ce1fcd4f4255c5a621f805569dafe7933ff531934d6b396c85f5668415f87"
+    "key": "tutorials/intro-ranking-grid.88d221ec.mp4",
+    "bytes": 10695174,
+    "sha256": "88d221ec6df81aacb19148907ec202c01ebdbf16da77b8b7126daa3a73522990"
   },
   "captions": {
-    "key": "tutorials/intro-ranking-grid.c5467ad7.vtt",
-    "bytes": 1862,
-    "sha256": "c5467ad750c0fd46d9620942a7c14390a28838a8af75bbf1a67593238d33f472"
+    "key": "tutorials/intro-ranking-grid.e0961d7c.vtt",
+    "bytes": 1870,
+    "sha256": "e0961d7cdc2b2d8a3507a094617392514508a7c8961e93aa5fc2ed982bd37424"
   },
   "poster": {
-    "key": "tutorials/intro-ranking-grid.bbc30cca.jpg",
-    "bytes": 81977,
-    "sha256": "bbc30ccae3b4d403db0db7dc7589831834077f36404f3713765b75a36e86b388"
+    "key": "tutorials/intro-ranking-grid.1e780b48.jpg",
+    "bytes": 81839,
+    "sha256": "1e780b48ff8650d4cf60b4910a22562f992ec0e3cc1ee8e5e1e9922bc6aab9be"
   },
   "uploaded": {
-    "at": "2026-10-11T06:50:04.902Z",
-    "video": "49a149a76c9c1c9888e8a5dbb08b41dc",
-    "captions": "6b9c5341d423ef0187a18ec024dcf3d6",
-    "poster": "4d3784c71e55f981731c8b77a8801ec5"
+    "at": "2026-10-11T13:57:26.851Z",
+    "video": "512fbfd0c1ec822ceeecab32bafec123",
+    "captions": "ec06192f62465a31bb9ed4eb58ae7db0",
+    "poster": "8ee84255cfb07c27ed94945401349736"
   }
 }
