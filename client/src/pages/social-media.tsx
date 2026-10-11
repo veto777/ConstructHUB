@@ -1,5 +1,6 @@
 import { BusinessSelector, MappingEditor, Pager, refreshSocial } from "@/components/social-agency";
-import { useEffect, useState } from "react";
+import { loadComposerDraft, loadRowEdits, saveComposerDraft, saveRowEdits } from "@/components/social-drafts";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
@@ -13,7 +14,7 @@ import { AppPage, Notice, Toolbar } from "@/components/app-ui";
 import { PlanRequired, planRequiredFrom } from "@/components/plan-required";
 import { ToolTabs } from "@/components/tool";
 import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
-import { ExternalLink, Search } from "lucide-react";
+import { AlertTriangle, ExternalLink, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   autoSchema,
@@ -66,10 +67,27 @@ type Account = {
 export default function SocialMediaPage() {
   const [business, setBusiness] = useUrlParam("business");
   const [tab] = useUrlParam("tab");
+  // Drafts are scoped to the signed-in account (the router resolves /api/auth/me before any page
+  // renders, so the id is available synchronously here).
+  const me = useQuery<any>({ queryKey: ["/api/auth/me"] });
+  const accountId = me.data?.id ?? null;
   // Edited draft text keyed by post id, hoisted above the workbench: a row's textarea state used to
   // die with the row (filter/tab round trip, paging, switching businesses), silently discarding the
-  // edit. Keyed here it survives every unmount and remount until it is saved, discarded or approved.
-  const [draftEdits, setDraftEdits] = useState<Record<string, string>>({});
+  // edit. Keyed here it survives every unmount and remount until it is saved, discarded or approved,
+  // and it is persisted per account so leaving the page (How it works, browser Back) keeps it too.
+  const [draftEdits, setDraftEdits] = useState<Record<string, string>>(() => loadRowEdits(accountId));
+  const [editsFor, setEditsFor] = useState(accountId);
+  // Late auth (or an account switch in this tab): load that account's edits before persisting, so
+  // one account's drafts never bleed into another's stash.
+  useEffect(() => {
+    if (accountId === null || editsFor === accountId) return;
+    setDraftEdits(loadRowEdits(accountId));
+    setEditsFor(accountId);
+  }, [accountId, editsFor]);
+  useEffect(() => {
+    if (accountId === null || editsFor !== accountId) return;
+    saveRowEdits(accountId, draftEdits);
+  }, [accountId, editsFor, draftEdits]);
   const editDraft = (id: string, value: string | undefined) =>
     setDraftEdits((old) => {
       if (value === undefined) {
@@ -120,7 +138,7 @@ export default function SocialMediaPage() {
               Social Media posts for a business from Locations. Add or import one there, then come back to connect its accounts.
             </Notice>
           )}
-          {business && valid ? <SocialWorkbench key={business} businessId={business === "all" ? null : Number(business)} all={business === "all"} draftEdits={draftEdits} onEditDraft={editDraft} /> : <>
+          {business && valid ? <SocialWorkbench key={business} accountId={accountId} businessId={business === "all" ? null : Number(business)} all={business === "all"} draftEdits={draftEdits} onEditDraft={editDraft} /> : <>
             {/* The guides don't depend on a business: /guides lands here. */}
             {tab === "guides" && <GuidesContent />}
             {!business && !noBusinesses && <p className="text-sm g-text-2">Choose a business above. Add or import businesses in <a className="g-link" href="/locations">Locations</a>.</p>}
@@ -134,11 +152,14 @@ export default function SocialMediaPage() {
   );
 }
 
-function SocialWorkbench({ businessId, all, draftEdits, onEditDraft }: { businessId: number | null; all: boolean; draftEdits: Record<string, string>; onEditDraft: (id: string, value: string | undefined) => void }) {
+function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }: { accountId: number | string | null; businessId: number | null; all: boolean; draftEdits: Record<string, string>; onEditDraft: (id: string, value: string | undefined) => void }) {
   const { toast } = useToast();
   // Selected post ids keyed to their business names (for the bulk-cancel dialog), so the names
   // survive paging and refetches even when the selected row is not on the current page.
   const [selected, setSelected] = useState<Record<string, string>>({});
+  // Ids the latest bulk action failed on: kept selected (and exempt from the stale-selection prune)
+  // so the user sees exactly what went wrong and can retry or uncheck them — no re-selecting 100 rows.
+  const [bulkFailed, setBulkFailed] = useState<string[]>([]);
   const [bulkErrors, setBulkErrors] = useState<string[]>([]);
   const [confirmBulkCancel, setConfirmBulkCancel] = useState(false);
   const [offset, setOffset] = useState(0), [postSearch, setPostSearch] = useState(""), [postState, setPostState] = useState(""), [postPlatform, setPostPlatform] = useState("");
@@ -147,7 +168,25 @@ function SocialWorkbench({ businessId, all, draftEdits, onEditDraft }: { busines
   const [mediaOffset, setMediaOffset] = useState(0), [mediaSearch, setMediaSearch] = useState("");
   const scope = businessId ? `businessId=${businessId}` : "";
   const qs = new URLSearchParams({ offset: String(offset), search: postSearch, state: postState, platform: postPlatform, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, ...(businessId ? { businessId: String(businessId) } : {}), ...(calendarDate ? { day: calendarDate } : {}) });
-  const { data, error, isLoading } = useQuery<any>({ queryKey: ["/api/social", businessId, all, qs.toString()], refetchInterval: 15000, queryFn: async () => (await apiRequest("GET", `/api/social${all ? "/calendar" : ""}?${qs}`)).json() });
+  const { data, error, isLoading, dataUpdatedAt, refetch } = useQuery<any>({ queryKey: ["/api/social", businessId, all, qs.toString()], refetchInterval: 15000, queryFn: async () => (await apiRequest("GET", `/api/social${all ? "/calendar" : ""}?${qs}`)).json() });
+  // Prune the bulk selection against post state on every refetch (mirrors the draftEdits release
+  // effect on the row): once a post leaves draft/queued its checkbox vanishes, so keeping it selected
+  // overcounts, names a business for an uncancellable post in the dialog, and confirming spams 409s.
+  // Ids the latest bulk just failed on are exempt — they are the visible "what went wrong" set.
+  const posts: any[] = data?.posts || [];
+  useEffect(() => {
+    if (!posts.length) return;
+    const stateById = new Map(posts.map((p: any) => [p.id, p.state]));
+    setSelected((old) => {
+      const next = Object.fromEntries(
+        Object.entries(old).filter(([id]) => {
+          const state = stateById.get(id);
+          return state === undefined || ["draft", "queued"].includes(state) || bulkFailed.includes(id);
+        }),
+      );
+      return Object.keys(next).length === Object.keys(old).length ? old : next;
+    });
+  }, [posts, bulkFailed]);
   // Synced business photos and the saved content sources: each keeps its loading and error state, so a
   // failed request reads as a failure with a retry, never as "no photos" / "no sources".
   const mediaQuery = useQuery<any[]>({ queryKey: ["/api/social", "media", businessId, mediaOffset, mediaSearch], enabled: !all, queryFn: async () => (await apiRequest("GET", `/api/social/media?${scope}&offset=${mediaOffset}&search=${encodeURIComponent(mediaSearch)}`)).json() });
@@ -159,24 +198,64 @@ function SocialWorkbench({ businessId, all, draftEdits, onEditDraft }: { busines
   // made on another page/filter still counts — the map outlives the row.
   const selectedPosts = Object.keys(selected);
   const selectedDirty = selectedPosts.filter((id) => draftEdits[id] !== undefined).length;
+  // The unsaved-edit gate names the affected businesses (same pattern as businessSummary below),
+  // so the user can find the edits — and offers one escape hatch instead of row-by-row discards.
+  const dirtyCounts = new Map<string, number>();
+  for (const id of selectedPosts) {
+    if (draftEdits[id] === undefined) continue;
+    const name = selected[id];
+    dirtyCounts.set(name, (dirtyCounts.get(name) ?? 0) + 1);
+  }
+  const dirtySummary = [...dirtyCounts.entries()].map(([name, n]) => `${name} (${n})`).join(", ");
+  const discardAllEdits = () => {
+    for (const id of selectedPosts) if (draftEdits[id] !== undefined) onEditDraft(id, undefined);
+  };
   // For the bulk-cancel confirmation: how many posts per business, names included.
   const businessCounts = new Map<string, number>();
   for (const name of Object.values(selected)) businessCounts.set(name, (businessCounts.get(name) ?? 0) + 1);
   const businessSummary = [...businessCounts.entries()].map(([name, n]) => `${name} (${n})`).join(", ");
   const [tabParam, setTabParam] = useUrlParam("tab");
   const tab = all ? "queue" : tabParam || "compose", setTab = (v: string) => setTabParam(v === "compose" ? null : v);
+  // The composition is a per-business, per-account draft: it survives leaving the page (How it
+  // works, browser Back) and switching businesses, so unsaved work never silently disappears.
+  // Loaded once per workbench mount (the workbench is keyed by business) before any defaults land.
+  const businessKey = businessId === null ? "all" : String(businessId);
+  const [initialDraft] = useState(() => loadComposerDraft(accountId, businessKey));
   const [apiKey, setKey] = useState(""),
-    [text, setText] = useState(""),
-    [tweaks, setTweaks] = useState<Record<string, string>>({});
-  const [destinations, setDestinations] = useState<Destination[]>([]),
-    [mediaText, setMediaText] = useState(""),
-    [schedule, setSchedule] = useState("");
+    [text, setText] = useState(initialDraft?.text ?? ""),
+    [tweaks, setTweaks] = useState<Record<string, string>>(initialDraft?.tweaks ?? {});
+  const [destinations, setDestinations] = useState<Destination[]>(initialDraft?.destinations ?? []),
+    [mediaText, setMediaText] = useState(initialDraft?.mediaText ?? ""),
+    [schedule, setSchedule] = useState(initialDraft?.schedule ?? "");
+  // Set when a stored draft (or a user pick) is in play: the saved mapping must not clobber it.
+  const restoredRef = useRef(!!initialDraft);
+  const [draftFor, setDraftFor] = useState(accountId);
+  // Late auth / account switch in this tab: hydrate that account's draft, current in-memory values win.
+  useEffect(() => {
+    if (accountId === null || draftFor === accountId) return;
+    const stored = loadComposerDraft(accountId, businessKey);
+    if (stored) {
+      restoredRef.current = true;
+      setText((c) => c || stored.text);
+      setTweaks((c) => (Object.keys(c).length ? c : stored.tweaks));
+      setMediaText((c) => c || stored.mediaText);
+      setSchedule((c) => c || stored.schedule);
+      setDestinations((c) => (c.length ? c : stored.destinations));
+    }
+    setDraftFor(accountId);
+  }, [accountId, draftFor, businessKey]);
+  // Save on every change — business switch, tab round trip and page leave all remount this
+  // component. Posting clears the fields, which clears the stored draft for a clean next visit.
+  useEffect(() => {
+    if (accountId === null || draftFor !== accountId) return;
+    saveComposerDraft(accountId, businessKey, { text, tweaks, destinations, mediaText, schedule });
+  }, [accountId, draftFor, businessKey, text, tweaks, destinations, mediaText, schedule]);
   const [settings, setSettings] = useState<AutoSettings | null>(null),
     [requestId, setRequestId] = useState(() => crypto.randomUUID());
   const [sourceKind, setSourceKind] = useState("offers"),
     [sourceText, setSourceText] = useState("");
   const [uploading, setUploading] = useState(false);
-  useEffect(() => { setDestinations(data?.defaults || []); }, [JSON.stringify(data?.defaults)]);
+  useEffect(() => { if (restoredRef.current) return; setDestinations(data?.defaults || []); }, [JSON.stringify(data?.defaults)]);
   const mutation = useMutation({
     mutationFn: async ({
       path,
@@ -198,7 +277,13 @@ function SocialWorkbench({ businessId, all, draftEdits, onEditDraft }: { busines
       let title = vars.success ?? "Saved";
       if (result.results) {
         const failed = result.results.filter((r: any) => !r.ok);
-        setBulkErrors(failed.map((r: any) => r.error)); setSelected({}); setConfirmBulkCancel(false);
+        setBulkErrors(failed.map((r: any) => r.error));
+        // A partial failure keeps the failed posts selected (names preserved from the current
+        // selection) so one glance shows what went wrong and a retry takes one click — instead of
+        // re-selecting up to 100 rows to find the failures again.
+        setSelected((old) => Object.fromEntries(failed.map((r: any) => [r.id, old[r.id] ?? ""])));
+        setBulkFailed(failed.map((r: any) => r.id));
+        setConfirmBulkCancel(false);
         if (failed.length) title = `${result.results.length - failed.length} of ${result.results.length} posts updated`;
       }
       refreshSocial();
@@ -341,7 +426,23 @@ function SocialWorkbench({ businessId, all, draftEdits, onEditDraft }: { busines
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="g-header__title">{data?.business?.business_name || "Business workspace"}</h2>
           {isLoading && <span className="text-sm g-text-2">Loading…</span>}
-          {error && <span role="alert" className="text-sm g-closed">Could not refresh Social Media: {apiErrorMessage(error)}</span>}
+        </div>
+      )}
+      {/* A failed background refresh keeps the last-good data underneath: flag it with a timestamp
+          and a Retry above the calendar — in both the single-business and all-clients views. */}
+      {error && data && (
+        <div
+          role="status"
+          data-testid="strip-social-saved-data"
+          className="flex items-start gap-3 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-950 dark:border-orange-900/60 dark:bg-orange-950/30 dark:text-orange-100"
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+          <div className="min-w-0 flex-1 opacity-90">
+            Refresh failed — showing saved data from{" "}
+            {dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleString() : "an earlier visit"}.{" "}
+            {apiErrorMessage(error)}
+          </div>
+          <GooglePill size="sm" label="Retry" onClick={() => void refetch()} />
         </div>
       )}
 
@@ -732,21 +833,27 @@ function SocialWorkbench({ businessId, all, draftEdits, onEditDraft }: { busines
               </>}
             />
             {!data?.posts?.length && (
-              <p className="text-sm text-muted-foreground">
-                No posts yet. Compose your first update or generate an AI draft.
+              <p className="text-sm text-muted-foreground" data-testid="text-social-posts-empty">
+                {postSearch || postState || postPlatform || calendarDate
+                  ? "No posts match your search or filters."
+                  : "No posts yet. Compose your first update or generate an AI draft."}
               </p>
             )}
             <p className="text-sm text-muted-foreground">{data?.total || 0} matching posts</p>
             <div className="flex flex-wrap gap-2">
               <GooglePill size="sm" onClick={() => setSelected((old) => ({ ...old, ...Object.fromEntries((data?.posts || []).filter((p: any) => ["draft", "queued"].includes(p.state)).map((p: any) => [p.id, p.business_name || "Legacy / unassigned"])) }))} label="Select this page of posts" />
+              <GooglePill size="sm" disabled={!selectedPosts.length} onClick={() => { setSelected({}); setBulkFailed([]); }} label="Clear selection" testId="button-clear-selection" />
               <GooglePill size="sm" disabled={!selectedPosts.length || selectedPosts.length > 100 || mutation.isPending || selectedDirty > 0} onClick={() => mutation.mutate({ path: "/posts/bulk-action", body: { ids: selectedPosts, action: "approve" }, success: "Selected drafts approved" })} label="Approve selected drafts" />
               <GooglePill size="sm" disabled={!selectedPosts.length || selectedPosts.length > 100 || mutation.isPending} onClick={() => setConfirmBulkCancel(true)} label="Cancel selected posts" />
             </div>
             <p className="text-xs text-muted-foreground">{selectedPosts.length} selected (up to 100 per action). Approve publishes each saved draft as written.</p>
             {selectedDirty > 0 && (
-              <p role="status" className="text-sm g-text-2" data-testid="text-social-unsaved-edits">
-                {selectedDirty} selected draft{selectedDirty === 1 ? " has" : "s have"} unsaved edits. Save or discard them first, so approval publishes what you see.
-              </p>
+              <div className="flex flex-wrap items-center gap-2" role="status" data-testid="text-social-unsaved-edits">
+                <p className="text-sm g-text-2">
+                  {selectedDirty} selected draft{selectedDirty === 1 ? " has" : "s have"} unsaved edits ({dirtySummary}). Save or discard them first, so approval publishes what you see.
+                </p>
+                <GooglePill size="sm" variant="quiet" label="Discard all edits" testId="button-discard-all-edits" onClick={discardAllEdits} />
+              </div>
             )}
             {bulkErrors.map((error, i) => <p role="alert" key={i} className="text-sm text-destructive">{error}</p>)}
             <Pager offset={offset} setOffset={setOffset} more={offset + 25 < (data?.total || 0)} label="posts" />
@@ -1209,7 +1316,7 @@ function PostRow({
       </div>
       {p.state === "draft" ? (
         <Textarea
-          aria-label="Edit draft"
+          aria-label={`Edit draft for ${p.business_name || "Legacy / unassigned"} · ${p.payload.post.content.platform}`}
           value={text}
           onChange={(e) => onEdit(e.target.value)}
         />
