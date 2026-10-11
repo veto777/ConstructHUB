@@ -17,6 +17,8 @@ import { CALL_ASSISTANT_SEPARATE_LINE, COMPETITOR_INTEL_PLANS, PROTECTED_SITE_PL
 import type { HelpDraft, HelpEntry, HelpGroup } from "./types";
 import * as moreEntries from "./entries/index";
 import { helpVideoFor } from "./videos";
+import { FEATURE_PAGES } from "../feature-pages";
+import { INTRO_VIDEO_PREFIX, introVideoKey } from "../feature-pages/intro-video";
 
 export { HELP_GROUPS } from "./types";
 export type { HelpEntry, HelpGroup, HelpVideo } from "./types";
@@ -896,7 +898,33 @@ const collected = (Object.values(moreEntries) as unknown as Draft[]).slice().sor
 export const HELP_ENTRIES: readonly HelpEntry[] = [...entries, ...collected].map((e) => ({ ...e, video: helpVideoFor(e.key) }));
 
 const BY_KEY = new Map(HELP_ENTRIES.map((e) => [e.key, e]));
-export const helpEntry = (key: string): HelpEntry | undefined => BY_KEY.get(key);
+/**
+ * A feature page's intro film (`intro-<key>`, shared/feature-pages/intro-video.ts) has no written entry: the page
+ * itself is the entry. Synthesized from the page's own copy so the recorder, the YouTube description and the
+ * social cuts have title, route and text to work from; `unlisted`, so it gets no Tutorials card and no "i" panel.
+ */
+const INTRO_GROUPS: Record<string, HelpGroup> = {
+  reviews: "Reviews", adsManager: "Google Ads", clickGuard: "Google Ads", lsaLeads: "Google Ads",
+  permits: "Permits & Databases", property: "Permits & Databases",
+  crm: "CRM", crmLeads: "CRM", crmSchedule: "CRM", jobcam: "CRM", texting: "CRM",
+  gbp: "Google Business", profileGuard: "Google Business", gbpContent: "Google Business", media: "Google Business",
+  rankingGrid: "Google Business", agency: "Google Business", reinstatement: "Google Business", domains: "Google Business",
+  mailAlerts: "Google Business", competitors: "Google Business",
+};
+export const introHelpEntry = (key: string): HelpEntry | undefined => {
+  if (!key.startsWith(INTRO_VIDEO_PREFIX)) return undefined;
+  const page = FEATURE_PAGES.find((p) => introVideoKey(p.key) === key);
+  if (!page) return undefined;
+  return {
+    key, title: page.title, route: page.app.href, group: INTRO_GROUPS[page.key] ?? "Tools", unlisted: true,
+    whatItIs: page.lede,
+    whatItDoes: page.cards.map((c) => `${c.title}: ${c.body}`).join(" "),
+    howToUse: page.steps.map((st) => `${st.title}: ${st.body}`),
+    howItWorks: page.inDepth?.paragraphs[0] ?? page.lede,
+    video: helpVideoFor(key),
+  };
+};
+export const helpEntry = (key: string): HelpEntry | undefined => BY_KEY.get(key) ?? introHelpEntry(key);
 
 /** The features (one Tutorials card each), in sidebar order within their group. */
 export const HELP_FEATURES: readonly HelpEntry[] = HELP_ENTRIES.filter((e) => !e.parent && !e.unlisted);
