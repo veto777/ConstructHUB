@@ -1,0 +1,25 @@
+{
+  "helpKey": "intro-seo",
+  "durationSec": 110,
+  "video": {
+    "key": "tutorials/intro-seo.fabc28e9.mp4",
+    "bytes": 10879539,
+    "sha256": "fabc28e957d4bd786c195d8fdb230f002c79da7aaf6893ff397c719748ae5ce2"
+  },
+  "captions": {
+    "key": "tutorials/intro-seo.5c4160bd.vtt",
+    "bytes": 2539,
+    "sha256": "5c4160bd8f7d16c036acfc3713efa3d00c3ce68d5a47cd614f334baa7efcef95"
+  },
+  "poster": {
+    "key": "tutorials/intro-seo.4c46ff62.jpg",
+    "bytes": 116207,
+    "sha256": "4c46ff6274db7e77119e999f7cd3fe7b68b2aecdff4dcfad724aae193940e564"
+  },
+  "uploaded": {
+    "at": "2026-10-11T14:14:54.624Z",
+    "video": "223cb89681322aa98bb13fc63e4d0d75",
+    "captions": "d920c4c8e3b404255832a07f6c193574",
+    "poster": "ba7785c1464d79cc76119de8890109f4"
+  }
+}
