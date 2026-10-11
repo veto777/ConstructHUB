@@ -2601,6 +2601,8 @@ export async function registerRoutes(
    *
    * The business is recognised by Google's listing id (cid) once one point has shown it; until
    * then by its exact name within a mile of the pin (the grid is centred on the business itself).
+   * It is never listed among its own top competitors: the report's "Top competitors" table
+   * excludes it (older rows that still contain it are filtered on the client by name+address).
    */
   async function runRankingGridScan(scanId: number, userId: number, businessName: string, centerLat: number, centerLon: number, gridSize: number, distanceMiles: number, keyword: string): Promise<boolean> {
     if (!dataforseoConfigured()) {
@@ -2649,12 +2651,17 @@ export async function registerRoutes(
               known += r.costUsd;
               returned++;
               totalResults = r.listings.length;
-              topCompetitors = r.listings.slice(0, 5).map((l) => ({ name: l.name, address: l.address ?? "", rank: l.rank }));
+              // Find our own listing first (by cid once one point revealed it, else exact
+              // name near the pin) so the scanned business never lands in its own top list.
               for (const l of r.listings) {
                 const hit = targetCid && l.cid ? l.cid === targetCid
                   : ourName.length >= 4 && normalizeBusinessName(l.name) === ourName && nearPin(l);
                 if (hit) { rank = l.rank; if (l.cid) targetCid = l.cid; break; }
               }
+              const isSelf = (l: { cid: string | null; name: string; lat: number | null; lng: number | null }) =>
+                (targetCid !== null && l.cid !== null && l.cid === targetCid) ||
+                (ourName.length >= 4 && normalizeBusinessName(l.name) === ourName && nearPin(l));
+              topCompetitors = r.listings.filter((l) => !isSelf(l)).slice(0, 5).map((l) => ({ name: l.name, address: l.address ?? "", rank: l.rank }));
             } catch (err: any) {
               firstError ??= err;
               if (typeof err?.costUsd === "number") known += err.costUsd;

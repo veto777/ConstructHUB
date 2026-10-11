@@ -1,5 +1,5 @@
 import { AppPage, PageHeader, Section, StatGrid, Stat, AppTabsList, Toolbar, Notice, appTable, appTableCards } from "@/components/app-ui";
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -47,6 +47,21 @@ interface CompetitorAgg {
   bestRank: number;
 }
 
+// "A B C" / "A, B-C!" both become "a b c", so a listing address like "Denver, CO"
+// compares against the scanned address "Denver, CO 80202".
+const normKey = (s: string | null | undefined) => (s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+// The scanned business is not its own competitor. Stored per-point rows only carry
+// name+address (no place id), so match both; a same-name listing at a different
+// address is another branch of the brand, not the scanned business.
+function isScannedBusiness(c: { name: string; address: string }, scan: RankingGridScan): boolean {
+  const bizName = normKey(scan.businessName);
+  if (bizName.length < 4 || normKey(c.name) !== bizName) return false;
+  const scanAddr = normKey(scan.address), compAddr = normKey(c.address);
+  if (!scanAddr || !compAddr) return true;
+  return scanAddr.includes(compAddr) || compAddr.includes(scanAddr);
+}
+
 function getRankBgColor(rank: number | null): string {
   if (rank === null) return "rgba(156,163,175,0.85)";
   if (rank <= 3) return "rgba(16,185,129,0.9)";
@@ -88,21 +103,24 @@ function getDefaultZoom(gridSize: number, distanceMiles: number): number {
 }
 
 function MapGridView({ scan, results }: { scan: RankingGridScan; results: RankingGridResult[] }) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  // The panel element doubles as the tooltips' collision boundary: by default Radix only
+  // avoids the viewport, so a point on the right edge got a tooltip that ran off the map.
+  const [mapEl, setMapEl] = useState<HTMLDivElement | null>(null);
   const [containerWidth, setContainerWidth] = useState(800);
+  const [mapFailed, setMapFailed] = useState(false);
   const defaultZoom = getDefaultZoom(scan.gridSize, parseFloat(scan.gridDistance));
   const [zoom, setZoom] = useState(defaultZoom);
 
   useEffect(() => {
+    if (!mapEl) return;
+    const el = mapEl;
     function updateSize() {
-      if (containerRef.current) {
-        setContainerWidth(containerRef.current.offsetWidth);
-      }
+      setContainerWidth(el.offsetWidth);
     }
     updateSize();
     window.addEventListener("resize", updateSize);
     return () => window.removeEventListener("resize", updateSize);
-  }, []);
+  }, [mapEl]);
 
   const grid: (RankingGridResult | null)[][] = [];
   for (let r = 0; r < scan.gridSize; r++) {
@@ -135,7 +153,7 @@ function MapGridView({ scan, results }: { scan: RankingGridScan; results: Rankin
   const mapUrl = `/api/ranking-grid/map/${scan.id}?w=${reqW}&h=${reqH}&zoom=${zoom}`;
 
   return (
-    <div ref={containerRef} className="w-full relative">
+    <div ref={setMapEl} className="w-full relative">
       {/* On phones the grid fills the map's width, so the zoom controls sit in a
           toolbar above the map instead of covering the top-right rank cells. */}
       <div className="flex justify-end gap-1 mb-2 sm:mb-0 sm:absolute sm:top-3 sm:right-3 sm:z-10 sm:flex-col print:hidden">
@@ -168,13 +186,25 @@ function MapGridView({ scan, results }: { scan: RankingGridScan; results: Rankin
         className="relative rounded-xl overflow-hidden shadow-lg border border-border"
         style={{ width: "100%", height: mapH }}
       >
-        <img
-          src={mapUrl}
-          alt="Map"
-          className="absolute inset-0 w-full h-full object-cover"
-          style={{ filter: "brightness(0.85) contrast(1.1)" }}
-          data-testid="img-ranking-map"
-        />
+        {/* The Static Maps proxy 500s when no Places key is configured; on failure the
+            grid still stands on a plain panel with a small note instead of a broken image. */}
+        {!mapFailed ? (
+          <img
+            src={mapUrl}
+            alt="Map"
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{ filter: "brightness(0.85) contrast(1.1)" }}
+            onError={() => setMapFailed(true)}
+            data-testid="img-ranking-map"
+          />
+        ) : (
+          <>
+            <div className="absolute inset-0 bg-muted" aria-hidden="true" />
+            <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-sm rounded-lg px-2.5 py-1.5" data-testid="text-map-unavailable">
+              <span className="text-[10px] text-white font-medium">Map unavailable</span>
+            </div>
+          </>
+        )}
 
         <div
           className="absolute grid"
@@ -221,7 +251,7 @@ function MapGridView({ scan, results }: { scan: RankingGridScan; results: Rankin
                       </div>
                     </div>
                   </TooltipTrigger>
-                  <TooltipContent side="bottom" className="max-w-[280px] z-[100]">
+                  <TooltipContent side="bottom" collisionBoundary={mapEl ?? []} collisionPadding={8} className="max-w-[280px] z-[100]">
                     {isCenter && <p className="font-semibold text-xs mb-1">📍 Business location</p>}
                     {cell ? (
                       <div className="space-y-1">
@@ -280,12 +310,14 @@ function MapGridView({ scan, results }: { scan: RankingGridScan; results: Rankin
   );
 }
 
-function computeCompetitors(results: RankingGridResult[]): CompetitorAgg[] {
+function computeCompetitors(results: RankingGridResult[], scan: RankingGridScan): CompetitorAgg[] {
   const map = new Map<string, { ranks: number[]; address: string; bestRank: number }>();
   const totalLocations = results.length;
 
   for (const r of results) {
-    const comps = (r.topCompetitors as Array<{ name: string; address: string; rank: number }>) || [];
+    const comps = ((r.topCompetitors as Array<{ name: string; address: string; rank: number }>) || []).filter(
+      (c) => !isScannedBusiness(c, scan)
+    );
     for (const c of comps) {
       const existing = map.get(c.name);
       if (existing) {
@@ -380,7 +412,7 @@ function RankDistributionChart({ results }: { results: RankingGridResult[] }) {
 }
 
 function ScanReport({ scan, results, onBack }: { scan: RankingGridScan; results: RankingGridResult[]; onBack: () => void }) {
-  const competitors = useMemo(() => computeCompetitors(results), [results]);
+  const competitors = useMemo(() => computeCompetitors(results, scan), [results, scan]);
   const dist = computeRankDistribution(results);
 
   const rankedResults = results.filter(r => r.rank !== null && r.rank > 0);

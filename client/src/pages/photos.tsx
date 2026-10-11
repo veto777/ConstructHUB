@@ -1606,7 +1606,7 @@ export default function PhotosPage() {
                   id="companyName"
                   value={businessInfo.companyName}
                   onChange={e => updateBusiness("companyName", e.target.value)}
-                  placeholder="Acme Roofing"
+                  placeholder="Your business name"
                   data-testid="input-company-name"
                 />
               </div>
@@ -1616,7 +1616,7 @@ export default function PhotosPage() {
                   id="phone"
                   value={businessInfo.phone}
                   onChange={e => updateBusiness("phone", e.target.value)}
-                  placeholder="(555) 123-4567"
+                  placeholder="(555) 010-0000"
                   data-testid="input-phone"
                 />
               </div>
@@ -1636,7 +1636,7 @@ export default function PhotosPage() {
                   id="city"
                   value={businessInfo.city}
                   onChange={e => updateBusiness("city", e.target.value)}
-                  placeholder="Seattle"
+                  placeholder="Your city"
                   data-testid="input-city"
                 />
               </div>
@@ -1656,7 +1656,7 @@ export default function PhotosPage() {
                   id="website"
                   value={businessInfo.website}
                   onChange={e => updateBusiness("website", e.target.value)}
-                  placeholder="https://acmeroofing.com"
+                  placeholder="https://yourwebsite.com"
                   data-testid="input-website"
                 />
               </div>
@@ -1676,7 +1676,7 @@ export default function PhotosPage() {
                   id="copyright"
                   value={businessInfo.copyright}
                   onChange={e => updateBusiness("copyright", e.target.value)}
-                  placeholder="© 2026 Acme Roofing"
+                  placeholder="© 2026 Your business name"
                   data-testid="input-copyright"
                 />
               </div>
@@ -2678,12 +2678,12 @@ export default function PhotosPage() {
       >
         {!useAIDescriptions && (
           <p className="text-xs text-muted-foreground">
-            Using smart templates for SEO descriptions (free, instant). Toggle on AI for unique OpenAI-generated descriptions.
+            Using smart templates for SEO descriptions (free, instant). Toggle on AI for unique, AI-written descriptions.
           </p>
         )}
         {useAIDescriptions && (
           <p className="text-xs text-muted-foreground">
-            Using OpenAI to generate unique descriptions per photo. This uses API credits.
+            Using AI to write unique descriptions per photo. This uses API credits.
           </p>
         )}
 
