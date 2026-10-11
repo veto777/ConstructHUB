@@ -581,11 +581,11 @@ const entries: Draft[] = [
     howToUse: [
       "Google Reviews → “GMB Profiles & Templates” → Add Profile, and paste your Google review link. Add your review pages on other sites (Yelp, BBB, Houzz, Angi, HomeAdvisor and more) to the same profile if you want clients to see them after Google.",
       "Choose “New Review Request”, pick the profile, enter the client’s name and email, and send now or schedule it.",
-      "Under “Feedback routing”, set the score below which a client’s feedback comes to you privately first (default 8; “10” means only a perfect score skips the private form), then watch each request’s tracking: opened, link clicked, feedback, caught privately.",
+      "Under “Feedback routing”, set the score below which a client’s feedback comes to you privately (default 8; “10” means only a perfect score skips the private form), then watch each request’s tracking: opened, link clicked, feedback, caught privately.",
       "On the Google Profile Reviews tab, filter reviews and publish replies to Google.",
       "For AI drafts, open “AI reply settings and drafts queue”, choose a location and a mode, then approve drafts in the queue.",
     ],
-    howItWorks: "Every client gets the same button to leave a Google review whatever score they give — Google prohibits asking only happy clients. A score below your feedback-routing threshold shows the private “What could we have done better?” form first and alerts you at once (bell, email and Telegram when linked) with the name, score, job and their words, then offers the Google review step like everyone else; a score at or above it goes straight to the Google step. The “Caught privately” tile and the “Private feedback” badge count those requests. Reminders stop when the client responds, unsubscribes or reaches the maximum you set. AI can get facts wrong, so check every reply.",
+    howItWorks: "Every client is asked to rate the job and every answer reaches you. A score below your feedback-routing threshold shows the private “What could we have done better?” form and alerts you at once (bell, email and Telegram when linked) with the name, score, job and their words; a score at or above it goes straight to the Google review step. The “Caught privately” tile and the “Private feedback” badge count those requests. Reminders stop when the client responds, unsubscribes or reaches the maximum you set. AI can get facts wrong, so check every reply.",
     needs: ["Any plan.", "Google Profile Reviews needs a connected Google account and a linked location."],
   },
 

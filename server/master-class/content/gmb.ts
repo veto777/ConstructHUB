@@ -92,7 +92,7 @@ export const GMB: ModuleLessons = {
             "Ask every completed job, by text or email, with your direct review link — the day the job is done",
             "Ask in person first: 'Please share an honest Google review of your experience' — then send the same link to every customer",
             "One polite reminder a week later; then stop",
-            "Ask for honest feedback. Never ask only happy customers, never screen first, never offer anything for a review",
+            "Ask for honest feedback from every customer, and never offer anything for a review",
           ] },
           { title: "Answering", items: [
             "Reply to every review within a few days, in the owner's voice, with the customer's name and the job",

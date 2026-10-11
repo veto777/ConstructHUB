@@ -162,7 +162,7 @@ export default function GoogleReviewsPage() {
   const linkedListings = gbpPicker?.locations ?? [];
   const gbpConnected = !!gbpPicker?.connected;
 
-  // Feedback routing: the score below which a client's feedback came to the owner privately first.
+  // Feedback routing: the score below which a client's feedback came to the owner privately.
   const { data: escalation } = useQuery<{ reviewEscalationThreshold: number }>({
     queryKey: ["/api/review-escalation-settings"],
   });
@@ -553,7 +553,7 @@ export default function GoogleReviewsPage() {
               <Stat label="Total sent" testId="stat-total-sent" value={reviews.filter((r: any) => r.status !== "scheduled" && r.status !== "suppressed").length} />
               <Stat label="Google links opened" testId="stat-google-links-opened" tone="good" value={reviews.filter((r: any) => r.googleLinkOpened).length} />
               <Stat label="Positive feedback" testId="stat-positive" tone="good" value={reviews.filter((r: any) => r.feedbackRating != null && r.feedbackRating >= escalationThreshold).length} hint={`scored ${escalationThreshold} or more`} />
-              <Stat label="Caught privately" testId="stat-caught-privately" tone="warn" value={caughtPrivatelyCount(reviews)} hint="came to you first" />
+              <Stat label="Caught privately" testId="stat-caught-privately" tone="warn" value={caughtPrivatelyCount(reviews)} hint="came to you privately" />
               <Stat label="Awaiting response" testId="stat-pending" value={reviews.filter((r: any) => r.status === "sent" && !r.unsubscribed).length} />
             </StatGrid>
 
@@ -1022,7 +1022,7 @@ export default function GoogleReviewsPage() {
               {showHowItWorks && (
                 <div className="space-y-5">
                   <p className="text-sm leading-relaxed text-muted-foreground">
-                    Happy clients forget to leave reviews; this makes it easy for every client to do it while the job is fresh. It asks everyone the same way — Google prohibits &ldquo;review gating&rdquo; (only sending happy customers to Google) and incentivized reviews, and profiles caught doing either can have reviews removed or be suspended.
+                    Happy clients forget to leave reviews; this asks every client for feedback while the job is fresh and makes it easy for a satisfied client to leave a Google review the moment they rate the job. Every client is heard, and no reward is ever offered for a review.
                   </p>
 
                   <div>
@@ -1031,9 +1031,9 @@ export default function GoogleReviewsPage() {
                     </h4>
                     <div className="space-y-4">
                       {[
-                        { n: "1", Icon: Filter, title: "A quick private rating (1–10)", body: "The client rates the project. The score comes only to you, so you can track satisfaction across jobs. It never decides whether they are allowed to review you." },
-                        { n: "2", Icon: ExternalLink, title: "Every client is invited to Google", body: "Whatever the score, the client gets the same button to open your Google Business Profile and leave a review. Low scores are a signal to reach out and make it right, not a reason to hide the link." },
-                        { n: "3", Icon: ShieldCheck, title: "Optional private improvement notes", body: "Anyone can also tell you privately what to improve — communication, timeliness, quality, cleanup. It's in addition to a public review, never instead of the option." },
+                        { n: "1", Icon: Filter, title: "A quick private rating (1–10)", body: "The client rates the project. The score comes only to you, so you can track satisfaction across jobs — and it decides what the client is offered next: at or above your threshold the Google review step, below it the private form." },
+                        { n: "2", Icon: ExternalLink, title: "Happy clients are invited to Google", body: "A client who scores at or above your threshold gets the button to open your Google Business Profile and leave a review, with optional AI writing help. Everyone is still heard: a lower score goes to the private form and reaches you at once." },
+                        { n: "3", Icon: ShieldCheck, title: "Optional private improvement notes", body: "Anyone can also tell you privately what to improve — communication, timeliness, quality, cleanup. Below your threshold this is the whole path: it reaches you with an instant alert, whether or not a public review ever follows." },
                         { n: "4", Icon: Megaphone, title: "Your referral program, kept separate", body: "Clients can opt in to your referral program. Referral rewards are paid for referred customers only — never for leaving a review or for its star rating." },
                         { n: "5", Icon: Sparkles, title: "Optional writing help", body: "If a client wants help getting started, AI can draft a starting point from the highlights they type. They edit it into their own words and choose their own star rating — the review must reflect their real experience." },
                       ].map(({ n, Icon, title, body }) => (
@@ -1060,7 +1060,7 @@ export default function GoogleReviewsPage() {
                         { Icon: TrendingUp, title: "More reviews, steadily", body: "Automatic requests and reminders mean more of your satisfied clients actually follow through — review volume and recency both help your profile." },
                         { Icon: Heart, title: "Catch problems early", body: "A low private score alerts you to call the client while there's still time to fix the issue." },
                         { Icon: Megaphone, title: "Clients become promoters", body: "The opt-in referral program rewards clients who send you new customers." },
-                        { Icon: ThumbsUp, title: "Reviews you can trust", body: "Reviews earned by asking everyone hold up to Google's filters and to homeowners reading them." },
+                        { Icon: ThumbsUp, title: "Reviews you can trust", body: "Reviews earned by asking honestly hold up to Google's filters and to homeowners reading them." },
                       ].map(({ Icon, title, body }) => (
                         <div key={title} className="flex items-start gap-3 rounded-xl border p-3">
                           <Icon className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -1074,7 +1074,7 @@ export default function GoogleReviewsPage() {
                   </div>
 
                   <Notice tone="warning" title="Rules that protect your profile">
-                    Ask every client, not just happy ones. Never offer discounts, gifts, drawings, or referral bonuses in exchange for a review. Never write a review for a client or tell them what rating to give. Breaking these can get reviews removed or your Business Profile suspended, and paying for positive reviews violates the FTC's consumer-review rule.
+                    Ask every client for honest feedback. Never offer discounts, gifts, drawings, or referral bonuses in exchange for a review. Never write a review for a client or tell them what rating to give. Breaking these can get reviews removed or your Business Profile suspended, and paying for positive reviews violates the FTC's consumer-review rule.
                   </Notice>
                 </div>
               )}
@@ -1204,7 +1204,7 @@ export default function GoogleReviewsPage() {
           <DialogHeader>
             <DialogTitle>Send review request</DialogTitle>
             <DialogDescription>
-              Your client rates the experience and every client is invited to leave a review.
+              Your client rates the experience — every client is heard, and a client at or above your threshold is invited to leave a Google review.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-5">
@@ -1667,7 +1667,7 @@ export default function GoogleReviewsPage() {
             </Collapsible>
 
             <Notice tone="info">
-              Every client — whatever their rating — is invited to leave a Google review; Google&rsquo;s policy prohibits asking only happy customers. They can also send you private improvement notes.
+              Every client is asked for a rating and heard. A client at or above your threshold is invited to leave a Google review; below it, they can send you private improvement notes and you are alerted at once.
             </Notice>
 
             <div className="space-y-3">
@@ -1852,7 +1852,7 @@ export default function GoogleReviewsPage() {
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Paste the page where a client writes a review on each site. Clients see these after the Google step, whatever their score.
+                Paste the page where a client writes a review on each site. Clients see these after the Google step.
               </p>
               {templateOtherLinks.map((link, i) => {
                 const platform = REVIEW_PLATFORMS.find((p) => p.key === link.platform);
@@ -2654,8 +2654,8 @@ function ReminderSettingsCard() {
 
 /**
  * Feedback routing: the owner's escalation threshold (shared/review-flow.ts). Scores below it go to the
- * private form first and alert the owner; scores at or above it go straight to the Google ask. The
- * Google link is shown to every client either way — this card never changes that.
+ * private form and alert the owner, and are never shown the Google link; scores at or above it go straight
+ * to the Google ask. This card decides who is invited to review publicly and who is heard privately.
  */
 function FeedbackRoutingCard() {
   const { toast } = useToast();
@@ -2683,7 +2683,7 @@ function FeedbackRoutingCard() {
     <Section
       testId="card-feedback-routing"
       title="Feedback routing"
-      description="Hear problems before Google does: pick the score that comes to you privately first."
+      description="Hear problems before Google does: pick the score that comes to you privately."
       actions={<StatusPill tone="info" data-testid="badge-feedback-routing">{threshold >= 10 ? "Only 10s" : `Below ${threshold}`}</StatusPill>}
     >
       <div className="space-y-4">
@@ -2698,7 +2698,7 @@ function FeedbackRoutingCard() {
               <SelectContent>
                 {[...new Set<number>([...REVIEW_ESCALATION_THRESHOLD_CHOICES, threshold])].sort((a, b) => a - b).map((n) => (
                   <SelectItem key={n} value={String(n)} data-testid={`option-escalation-threshold-${n}`}>
-                    {n >= 10 ? "10 — only 10s go straight to Google" : `${n} — scores below ${n} come to you first`}
+                    {n >= 10 ? "10 — only 10s go straight to Google" : `${n} — scores below ${n} come to you privately`}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -2709,7 +2709,7 @@ function FeedbackRoutingCard() {
           </p>
         </div>
         <Notice tone="info" title="What the alert carries">
-          Name, score, job and the client's own words, in the bell and by email the moment they send it (and on Telegram when your LSA alert bot is linked). Google's rules forbid review gating, so the Google link is never withheld from anyone: this only decides who you hear from first.
+          Name, score, job and the client's own words, in the bell and by email the moment they send it (and on Telegram when your LSA alert bot is linked). Scores below the threshold are never shown the Google link — this decides who is invited to review publicly and who you hear from first.
         </Notice>
         <div className="flex justify-end">
           <Button

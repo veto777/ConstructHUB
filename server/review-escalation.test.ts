@@ -1,8 +1,8 @@
 /**
  * Feedback routing (shared/review-flow.ts, server/review-escalation.ts, the client page): the owner's score
- * threshold persists and validates, a score below it goes to the private form first and alerts the owner,
- * a score at or above it goes straight to the Google step — and BOTH branches render the Google review link
- * (the hard rule: the threshold routes internally, it never gates Google).
+ * threshold persists and validates, a score below it goes to the private form first and alerts the owner and
+ * is never shown the public review link or step, a score at or above it goes straight to the Google step
+ * with the link shown.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "fs";
@@ -101,17 +101,18 @@ describe("routing branch", () => {
   });
 
   it("explains the threshold in the owner's words, with the only-10s position", () => {
-    expect(describeReviewEscalationThreshold(8)).toBe("Scores below 8 go to private feedback first and alert you immediately. Scores at or above 8 go straight to the Google ask. Every client still gets the Google link.");
-    expect(describeReviewEscalationThreshold(10)).toMatch(/^Only a 10 goes straight to the Google ask/);
-    expect(describeReviewEscalationThreshold(10)).toMatch(/Every client still gets the Google link\.$/);
+    expect(describeReviewEscalationThreshold(8)).toBe("Scores below 8 go to private feedback first, alert you immediately and are never shown the Google link. Scores at or above 8 go straight to the Google ask and its link.");
+    expect(describeReviewEscalationThreshold(10)).toMatch(/^Only a 10 goes straight to the Google ask and its link/);
+    expect(describeReviewEscalationThreshold(10)).toMatch(/never shown the Google link\.$/);
   });
 
-  it("renders the Google review link on the private-feedback branch (score below the threshold)", () => {
+  it("hides the Google review link on the private-feedback branch (score below the threshold)", () => {
     const markup = renderToStaticMarkup(createElement(ReviewFeedbackPage, { initialStep: "improvement", initialRating: 6 }));
-    expect(markup).toContain('data-testid="link-google-review-always"');
-    expect(markup).toContain(`href="${GOOGLE}"`);
+    expect(markup).not.toContain('data-testid="link-google-review-always"');
+    expect(markup).not.toContain(`href="${GOOGLE}"`);
     expect(markup).toContain("What could we have done better?");
-    expect(markup).toContain('data-testid="section-improvement-google-review"');
+    expect(markup).not.toContain('data-testid="section-improvement-google-review"');
+    expect(markup).not.toContain('data-testid="button-improvement-google-review"');
   });
 
   it("renders the Google review link on the straight-to-Google branch (score at or above the threshold)", () => {
@@ -123,22 +124,33 @@ describe("routing branch", () => {
     }
   });
 
-  it("renders the Google review link on the rating and done steps too, whatever the score", () => {
-    for (const [step, rating] of [["rating", 0], ["done", 3], ["done", 10]] as const) {
-      const markup = renderToStaticMarkup(createElement(ReviewFeedbackPage, { initialStep: step, initialRating: rating }));
-      expect(markup, `${step}/${rating}`).toContain('data-testid="link-google-review-always"');
-    }
+  it("shows the Google review link only once a rating at or above the threshold exists", () => {
+    // No rating chosen yet: the link must not appear before the client has picked one.
+    const before = renderToStaticMarkup(createElement(ReviewFeedbackPage, { initialStep: "rating", initialRating: 0 }));
+    expect(before).not.toContain('data-testid="link-google-review-always"');
+    // Below the threshold, even after finishing: still no link.
+    const lowDone = renderToStaticMarkup(createElement(ReviewFeedbackPage, { initialStep: "done", initialRating: 3 }));
+    expect(lowDone).not.toContain('data-testid="link-google-review-always"');
+    // At or above the threshold the link is there.
+    const highDone = renderToStaticMarkup(createElement(ReviewFeedbackPage, { initialStep: "done", initialRating: 10 }));
+    expect(highDone).toContain('data-testid="link-google-review-always"');
+    expect(highDone).toContain(`href="${GOOGLE}"`);
   });
 
-  it("the server never conditions the Google step on the score: showReview is always true", () => {
+  it("the server routes a below-threshold score to private feedback only: showReview follows the threshold", () => {
     const routes = src("server/routes.ts");
     const route = routes.slice(routes.indexOf('app.post("/api/review/:token/feedback"'), routes.indexOf('app.post("/api/review/:token/google-link-opened"'));
-    expect(route).toContain("res.json({ success: true, showReview: true, privateFirst });");
-    expect(route).not.toMatch(/showReview:\s*(rating|privateFirst|!)/);
-    // The client page: the always-link sits outside every step branch and is never hidden by the score.
+    // The real (non-preview) response: the public review step is offered only at or above the threshold.
+    const real = route.slice(route.indexOf("const threshold = await getReviewEscalationThreshold"));
+    expect(real).toContain("res.json({ success: true, showReview: !privateFirst, privateFirst });");
+    expect(real).not.toContain("showReview: true");
+    // The client page: the always-link sits behind isHighRating, and the private form never routes on
+    // to the public review step or carries its own public-review button.
     const page = src("client/src/pages/review-feedback.tsx");
-    expect(page).toMatch(/\{primaryUrl && \(\s*<div[^>]*>\s*<Button asChild[^>]*>\s*<a href=\{primaryUrl\}[^>]*data-testid="link-google-review-always"/);
-    expect(page).not.toMatch(/link-google-review-always[\s\S]{0,400}(rating|escalationThreshold|isHighRating)\s*[<>]/);
+    expect(page).toMatch(/\{primaryUrl && isHighRating && \(\s*<div[^>]*>\s*<Button asChild[^>]*>\s*<a href=\{primaryUrl\}[^>]*data-testid="link-google-review-always"/);
+    expect(page).not.toContain("section-improvement-google-review");
+    expect(page).not.toContain("button-improvement-google-review");
+    expect(page).not.toMatch(/postFeedback\("private"\)[\s\S]{0,200}setStep\("describe"\)/);
   });
 });
 
@@ -163,7 +175,7 @@ describe("the owner alert on a sub-threshold score", () => {
     expect(msg.body).toContain("Job: Roof replacement");
     expect(msg.body).toContain("Areas: Communication, Cleanup");
     expect(msg.body).toContain('"Crew left nails in the driveway."');
-    expect(msg.body).toContain("still being offered the Google link");
+    expect(msg.body).toContain("not shown the Google review link");
     expect(msg.actionUrl).toBe("/google-reviews");
     expect(chatIdFor).toHaveBeenCalledWith(42);
     expect(telegram).toHaveBeenCalledWith("12345", expect.stringContaining("Dana"));

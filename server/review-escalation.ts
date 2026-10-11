@@ -7,8 +7,8 @@
  *                                               reviews.private_feedback) and Telegram through the LSA bot
  *                                               when the owner linked it, then escalation_alerted_at.
  *
- * Routing itself is shared/review-flow.ts. None of this touches the Google link: the client page shows it
- * on every step whatever the score (the hard rule in review-flow.ts).
+ * Routing itself is shared/review-flow.ts. None of this decides whether the client sees the public
+ * review link; that is the threshold plus the client page's `isHighRating` (the hard rule there).
  */
 import { pool } from "./db";
 import { notifyUser } from "./account-events";
@@ -82,7 +82,7 @@ export async function escalatePrivateFeedback(
     `Job: ${job}`,
     categories.length ? `Areas: ${categories.join(", ")}` : "",
     text ? `"${text}"` : "No written feedback yet.",
-    `Score ${rating}/10 is below your threshold of ${threshold}. They were asked privately first and are still being offered the Google link, so a quick call now can fix it before it becomes a public review.`,
+    `Score ${rating}/10 is below your threshold of ${threshold}. They were asked privately first and are not shown the Google review link, so a quick call now can fix it before it becomes a public review.`,
   ].filter(Boolean);
 
   let sent = false, tg = false;
@@ -107,7 +107,7 @@ export async function escalatePrivateFeedback(
         `🔧 Job: <b>${esc(job)}</b>\n` +
         (categories.length ? `🗂️ Areas: ${esc(categories.join(", "))}\n` : "") +
         (text ? `💬 "${esc(text)}"\n` : `💬 No written feedback yet.\n`) +
-        `\nBelow your threshold of ${threshold}. They are still being offered the Google link — reach out now, while they are reachable.`;
+        `\nBelow your threshold of ${threshold}. They are not shown the Google review link — reach out now, while they are reachable.`;
       tg = await telegram(chatId, html);
     }
   } catch (e: any) {

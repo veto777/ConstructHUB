@@ -5753,7 +5753,7 @@ function main() {
         // Lets a reopened link resume on the finished step instead of the rating form.
         lastStep: request.lastStep,
         referralOffer: await getReferralSettings(request.userId).then(s => s.enabled ? s.offer : null),
-        // Routing only (shared/review-flow.ts): the Google link above is shown on every step whatever the score.
+        // Routing (shared/review-flow.ts): the client page shows the Google link only for scores at or above it.
         escalationThreshold: await getReviewEscalationThreshold(request.userId),
         preview,
       });
@@ -5766,7 +5766,8 @@ function main() {
   // notes, stops reminders, and marks the request positive/negative feedback against the owner's
   // escalation threshold (shared/review-flow.ts, default 8). A score below it is stamped
   // privateFeedbackAt; when the private form is saved (stage "private") the owner is alerted once
-  // (server/review-escalation.ts). showReview is ALWAYS true: the Google link is never conditioned on the score.
+  // (server/review-escalation.ts). showReview follows the same threshold: false for a sub-threshold
+  // score, which is never routed to the public review step or link.
   app.post("/api/review/:token/feedback", async (req, res) => {
     try {
       const request = await storage.getReviewRequestByToken(String(req.params.token));
@@ -5795,7 +5796,7 @@ function main() {
         await escalatePrivateFeedback(updated, threshold);
       }
 
-      res.json({ success: true, showReview: true, privateFirst });
+      res.json({ success: true, showReview: !privateFirst, privateFirst });
     } catch (err: any) {
       res.status(500).json({ message: "Failed to submit feedback" });
     }

@@ -46,8 +46,8 @@
     "wait": 300
    }
   ],
-  "alt": "The feedback page a client opens from the email: the company name, a Leave a Google Review button offered to everyone, and a private 1 to 10 rating with 9 selected.",
-  "caption": "What your client sees: a private rating, and Google offered to everyone",
+  "alt": "The feedback page a client opens from the email: the company name, a private 1 to 10 rating with 9 selected, and the Leave a Google Review button a score at or above the owner's threshold earns.",
+  "caption": "What your client sees: a private rating first, and the Google review step for happy scores",
   "signedOut": true
  },
  {

@@ -1,7 +1,8 @@
 /**
  * Other review sites on a review profile (shared/review-links.ts): the pasted links validate and normalize, a
- * request carries the profile's links and the client page offers them on the step after Google to every client,
- * with no site hard-coded — and, as for the Google link, nothing conditions them on the score.
+ * request carries the profile's links and the client page offers them on the step after the public review
+ * step, with no site hard-coded — and the threshold never changes which sites are listed, only who gets that
+ * far (a below-threshold score ends at the private thank-you screen).
  */
 import { describe, expect, it } from "vitest";
 import fs from "fs";
@@ -119,10 +120,11 @@ describe("the links travel with the request and reach the client page (source gu
     expect(routes).toMatch(/app\.get\("\/api\/review\/:token"[\s\S]*?primaryReviewUrl: request\.primaryReviewUrl/);
   });
 
-  it("the client page lists the owner's links on the one-more-thing step with no site hard-coded, for every score", () => {
+  it("the client page lists the owner's links on the one-more-thing step with no site hard-coded, for every client who gets there", () => {
     expect(page).not.toContain("https://www.bbb.org/");
     expect(page).toMatch(/secondaryDestinations\.map\(/);
-    // The step is reached by every client who has links to see, not only by a 10.
+    // The step is reached by every client who has links to see and has finished the public review step;
+    // the threshold decides only who gets that far, not which links are listed.
     expect(page).toMatch(/secondaryDestinations\.length > 0[\s\S]{0,80}setStep\("bonus_reviews"\)/);
     expect(page).not.toMatch(/rating === 10[\s\S]{0,80}setStep\("bonus_reviews"\)/);
     // The client routes to the primary destination, not a hard-coded Google link.
