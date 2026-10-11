@@ -208,7 +208,9 @@ describe("help registry", () => {
     }
     // The feature pages' intro films: the same proof, under their own keys (none of them is a help entry).
     for (const key of listed.filter((k) => INTRO_KEYS.has(k))) {
-      expect(helpEntry(key), `${key} is an intro film, not a help entry`).toBeUndefined();
+      // An intro film has no written entry: helpEntry() synthesizes an unlisted one from its feature page (no card, no "i").
+      expect(HELP_ENTRIES.some((e) => e.key === key), `${key} must not be a written help entry`).toBe(false);
+      expect(helpEntry(key)?.unlisted, `${key} resolves to a synthesized, unlisted entry`).toBe(true);
       expectRealRecording(key, helpVideoFor(key)!);
     }
     // The intro frame never shows a play control without a video either.
