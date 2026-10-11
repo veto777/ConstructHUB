@@ -70,6 +70,17 @@ export async function warmApp(port: number): Promise<number> {
   return ok;
 }
 
+/** The slot's opt-in local model server (see startApp): loopback URLs only, otherwise an error at launch. */
+export function hubAiEnv(src: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const key = (src.TUTORIAL_HUB_AI_KEY ?? "").trim();
+  if (!key) return {};
+  const base = (src.TUTORIAL_HUB_AI_BASE ?? "").trim();
+  let host = "";
+  try { host = new URL(base).hostname; } catch { /* checked below */ }
+  if (!/^(127\.0\.0\.1|localhost|\[?::1\]?)$/.test(host)) throw new Error("TUTORIAL_HUB_AI_BASE must be a loopback URL (the model server on this machine)");
+  return { AI_INTEGRATIONS_OPENAI_API_KEY: key, AI_INTEGRATIONS_OPENAI_BASE_URL: base, AI_MODEL: (src.TUTORIAL_HUB_AI_MODEL ?? "truthcode-api").trim() };
+}
+
 /**
  * `fixtures` (default: on for slots 1–8, off for the template's slot 0) starts the app with the
  * tutorial fixtures: stand-ins for Stripe, HOVER, Google Calendar and texting, so their pages show
@@ -105,6 +116,10 @@ export async function startApp(o: { slot: number; database: string; bootTimeoutM
     TUTORIALS_LOCAL_DIR: path.join(ROOT, "tmp", "tutorials"),
     // The AI client is constructed at import; a placeholder keeps boot alive and can reach nothing.
     AI_INTEGRATIONS_OPENAI_API_KEY: "tutorial-recording-no-key", AI_INTEGRATIONS_OPENAI_BASE_URL: "http://127.0.0.1:9/v1",
+    // Opt-in, read at launch only: TUTORIAL_HUB_AI_KEY=<key> + TUTORIAL_HUB_AI_BASE=<loopback URL> point the slot's AI at
+    // the model server on this same machine (TruthCoder), so Gabe's typed chat can be filmed. Loopback only: the egress
+    // guard already allows it and nothing leaves the box; any other host is refused. The key is never printed.
+    ...hubAiEnv(process.env),
   };
   const fixtures = o.fixtures ?? isSlot(o.slot);
   // One JobCam object store for every slot (see lib.ts JOBCAM_STORE): demo photos are seeded there once.
