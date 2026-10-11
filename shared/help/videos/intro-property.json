@@ -1,0 +1,25 @@
+{
+  "helpKey": "intro-property",
+  "durationSec": 83,
+  "video": {
+    "key": "tutorials/intro-property.2437e5af.mp4",
+    "bytes": 6371436,
+    "sha256": "2437e5af3b95c2e606daf50ac5ccc95a5668d34275141faa9f73060d514a72d9"
+  },
+  "captions": {
+    "key": "tutorials/intro-property.952a6144.vtt",
+    "bytes": 1791,
+    "sha256": "952a614440135b90a24af7d4337d738f0d348b61d0c033a618f4e5383ff5f6ad"
+  },
+  "poster": {
+    "key": "tutorials/intro-property.a3fe89d2.jpg",
+    "bytes": 89828,
+    "sha256": "a3fe89d2967f13361f30f67c133f296fa8ddbf8f5e70137cb037d43b4451470e"
+  },
+  "uploaded": {
+    "at": "2026-10-11T18:48:13.829Z",
+    "video": "28e241937143d11fb5a51d10c8e28b54",
+    "captions": "04e796a5d21237c5da0e038e5e29cfa3",
+    "poster": "7fceb3313b911b6b81fdea4443d3a334"
+  }
+}

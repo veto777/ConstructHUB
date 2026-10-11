@@ -118,6 +118,7 @@ export { default as v_intro_mail_alerts } from "./intro-mail-alerts.json";
 export { default as v_intro_media } from "./intro-media.json";
 export { default as v_intro_permits } from "./intro-permits.json";
 export { default as v_intro_profile_guard } from "./intro-profile-guard.json";
+export { default as v_intro_property } from "./intro-property.json";
 export { default as v_intro_ranking_grid } from "./intro-ranking-grid.json";
 export { default as v_intro_reinstatement } from "./intro-reinstatement.json";
 export { default as v_intro_reviews } from "./intro-reviews.json";
