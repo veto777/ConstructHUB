@@ -1,0 +1,126 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "intro-ranking-grid",
+  "title": "GMB Ranking Grid",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/ranking-grid",
+      "caption": "GMB Ranking Grid",
+      "chapter": "A business and a phrase",
+      "narration": "This is the GMB Ranking Grid. It searches from a grid of points across your area and shows your rank at each one."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-business-search\"]",
+      "caption": "Find your business",
+      "narration": "Find your business by name or address, or paste its Google Maps link."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-keyword\"]",
+      "caption": "The phrase a customer searches",
+      "narration": "Type the phrase a customer would search for, such as roofing contractor."
+    },
+    {
+      "action": "click",
+      "selector": "text=Advanced · Grid size and spacing",
+      "caption": "Advanced: grid size and spacing",
+      "narration": "Open Advanced to pick a grid from three by three up to fifteen by fifteen, and the spacing."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-scan-910001\"]",
+      "caption": "Scan history",
+      "chapter": "Read the report",
+      "narration": "Start ranking scan runs it, and finished scans wait in Scan history. This one is a seven by seven grid for roofing contractor."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-view-report-910001\"]",
+      "caption": "Open the report",
+      "narration": "Choose Report to open it."
+    },
+    {
+      "action": "wait",
+      "holdMs": 1500,
+      "caption": "The scan details and the grid",
+      "narration": "The report opens with the business, the keyword and the grid size, and the points on the right."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"grid-cell-4-3\"]",
+      "caption": "Your rank at each point",
+      "punch": 1.3,
+      "narration": "Each point is your rank from that spot. Green is the top three, yellow four to ten, red eleven to twenty."
+    },
+    {
+      "action": "hover",
+      "selector": "[data-testid=\"grid-cell-2-0\"]",
+      "caption": "Hover a point for the top results there",
+      "narration": "Hover a point to see who came up at the top there."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[text()=\"Rank summary\"]/ancestor::div[.//*[contains(text(),\"Best Rank\")]][1]",
+      "caption": "Rank summary",
+      "narration": "Rank summary gives the average and best rank, and how many points landed in the top three."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"rank-distribution-chart\"]",
+      "caption": "Rank distribution",
+      "chapter": "Who else shows up",
+      "narration": "Rank distribution shows the share of points in each band."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"row-competitor-0\"]",
+      "caption": "Top competitors across the grid",
+      "narration": "Top competitors lists the businesses found most often across the grid, with their best rank."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-print-report\"]",
+      "caption": "Print / PDF",
+      "narration": "Print or PDF turns the report into a file for a client or your records."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-gmb-ranking-grid\"]",
+      "caption": "Menu: GMB Ranking Grid",
+      "narration": "You'll find the GMB Ranking Grid in the menu on the left, under Google Business."
+    }
+  ],
+  "youtube": {
+    "title": "GMB Ranking Grid in about a minute | ConstructHUB",
+    "description": "A one-minute tour of the GMB Ranking Grid in ConstructHUB: find your business, enter the phrase a customer searches, size the grid, then read a finished scan: your rank at every point, the summary, the distribution and the businesses found most often across the grid.",
+    "tags": [
+      "ConstructHUB",
+      "ranking grid",
+      "local rankings",
+      "Google Maps ranking",
+      "Google Business Profile",
+      "local SEO",
+      "roofing marketing",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "See Where You Rank",
+    "accent": "Rank",
+    "kicker": "GMB Ranking Grid",
+    "step": 7
+  },
+  "hideSelectors": [
+    "[data-testid=\"img-ranking-map\"]"
+  ]
+}

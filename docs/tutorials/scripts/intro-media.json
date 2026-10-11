@@ -1,0 +1,123 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "intro-media",
+  "title": "Photo Optimizer",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/photos",
+      "caption": "Photo Optimizer",
+      "chapter": "Name, tag and watermark",
+      "narration": "This is the Photo Optimizer. It gives a batch of job photos a watermark, photo details and clear filenames."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-toggle-business\"]",
+      "caption": "Business info",
+      "narration": "Choose Business info to open the details every photo will carry."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-business-search\"]",
+      "caption": "Find your business on Google",
+      "narration": "Search your business on Google to fill them in, or type them in below."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-copyright\"]",
+      "caption": "Written into each photo's details",
+      "narration": "The name, address, website and your copyright line go into each photo's details."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-service-areas\"]",
+      "caption": "Service area cities",
+      "chapter": "Areas and keywords",
+      "narration": "Turn on Service area cities to find the towns around your address and work them into the photos."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"select-category\"]",
+      "caption": "Category and keywords",
+      "narration": "Pick your category and keywords. They become part of each filename."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"dropzone-photos\"]",
+      "caption": "Drop in the photos",
+      "chapter": "Photos and watermark",
+      "narration": "Drag in your job photos, up to ten per batch, or choose Browse files."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"input-watermark-text\"]",
+      "caption": "Your name or logo on every photo",
+      "narration": "Watermark stamps your company name or logo on every photo, at the opacity you choose."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-process-photos\"]",
+      "caption": "Process photos",
+      "narration": "Then choose Process photos. Download the results, or keep them in the Media Library."
+    },
+    {
+      "action": "goto",
+      "url": "/media-library",
+      "caption": "Media Library",
+      "chapter": "Media Library",
+      "narration": "The Media Library keeps a folder per job, with the job address and GPS on it."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"folder-card-92001\"]",
+      "caption": "A folder with its address and GPS",
+      "narration": "This one is a job site in Highland, Denver, with its coordinates attached."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"folder-name-92001\"]",
+      "caption": "Open a folder",
+      "narration": "Open a folder to see its photos."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"photo-card-92001\"]",
+      "caption": "Named for the company, the work and the area",
+      "narration": "Every photo is named for the company, the work and the area, not a camera number."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-photo-optimizer\"]",
+      "caption": "Menu: Photo Optimizer",
+      "narration": "You'll find Photo Optimizer in the menu on the left, under Google Business, with Media Library under it."
+    }
+  ],
+  "youtube": {
+    "title": "Photo Optimizer in about a minute | ConstructHUB",
+    "description": "A one-minute tour of the Photo Optimizer in ConstructHUB: fill in your business details, pick service areas and keywords, drop in a batch of job photos, watermark them, and keep the named, geotagged results in Media Library folders by job.",
+    "tags": [
+      "ConstructHUB",
+      "photo optimizer",
+      "job photos",
+      "geotag photos",
+      "photo watermark",
+      "SEO filenames",
+      "media library",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Job Photos Named",
+    "accent": "Named",
+    "kicker": "Photo Optimizer",
+    "step": 12
+  }
+}
