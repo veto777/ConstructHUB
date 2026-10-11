@@ -29,7 +29,7 @@ export const VETTING: ModuleLessons = {
     tip(3, "The Permitting Loophole", [
       { type: "p", text: "Permit and inspection requirements depend on the jurisdiction, project and scope. Before work begins, [check your state](/master-class?tab=state-guide) and confirm the local building department’s requirements. Even where a permit is not required, agree on installation standards and quality checks." },
       { type: "list", title: "Protect Yourself:", items: [
-        "Ask for relevant completed or active projects and references you have permission to contact",
+        "Confirm required permits and inspections with the local building department and agree who will arrange them",
         "Demand industry-standard installation practices regardless of permit requirements",
         "Consider hiring a third-party inspector if permits aren't required",
       ] },
@@ -87,7 +87,6 @@ export const VETTING: ModuleLessons = {
     ]),
     tip(14, "BBB & Online Credibility", [
       { type: "p", text: "Use available BBB information as one part of your research. A missing A+ rating or lack of accreditation does not by itself establish unresolved complaints or poor workmanship. Check the underlying record, relevant credentials and references." },
-      { type: "notes", items: [{ tone: "plain", lead: "BBB information to review:", text: "Review available business details, complaint history and responses, rating explanations and accreditation status. Confirm identity and credentials independently." }] },
     ]),
     tip(15, "Fabricated Accomplishments", [
       { type: "p", text: "Ask contractors to explain their role in each project they present, including subcontracted work. Verify claimed affiliations and do not assume subcontracting itself makes a project claim false." },

@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Notice } from "@/components/app-ui";
@@ -37,13 +37,53 @@ export function ReportError({
  * A polite `role="status"`, not an alert: the saved data below is still valid, only the refresh
  * failed — same language as the ip-tracker freshness strip.
  */
-export function SavedDataStrip({
+type SavedNotice = { updatedAt?: number | null; retry: () => void };
+const SavedDataContext = createContext<{
+  count: number;
+  register: (id: string, notice: SavedNotice | null) => void;
+} | null>(null);
+
+/** Count only mounted notices, so hidden tabs and unrelated cached queries never join the warning. */
+export function SavedDataSummary({ children }: { children: ReactNode }) {
+  const [notices, setNotices] = useState<Map<string, SavedNotice>>(() => new Map());
+  const register = useCallback((id: string, notice: SavedNotice | null) => {
+    setNotices((previous) => {
+      const next = new Map(previous);
+      if (notice) next.set(id, notice); else next.delete(id);
+      return next;
+    });
+  }, []);
+  const entries = [...notices.values()];
+  return <SavedDataContext.Provider value={{ count: notices.size, register }}>
+    {entries.length > 1 && <SavedDataNotice
+      updatedAt={Math.min(...entries.map((n) => n.updatedAt || 0))}
+      retry={() => entries.forEach((n) => n.retry())} retryLabel="Retry all" />}
+    {children}
+  </SavedDataContext.Provider>;
+}
+
+export function SavedDataStrip({ updatedAt, retry }: SavedNotice) {
+  const context = useContext(SavedDataContext);
+  const register = context?.register;
+  const id = useId();
+  const retryRef = useRef(retry);
+  retryRef.current = retry;
+  useEffect(() => {
+    register?.(id, { updatedAt, retry: () => retryRef.current() });
+    return () => register?.(id, null);
+  }, [register, id, updatedAt]);
+  return context && context.count > 1 ? null : <SavedDataNotice updatedAt={updatedAt} retry={retry} />;
+}
+
+function SavedDataNotice({
   updatedAt,
   retry,
+  retryLabel = "Retry",
 }: {
   /** Milliseconds since the last successful fetch (TanStack `dataUpdatedAt`). */
   updatedAt?: number | null;
   retry: () => void;
+  retryLabel?: string;
 }) {
   return (
     <div
@@ -62,7 +102,7 @@ export function SavedDataStrip({
       <div className="shrink-0">
         <GooglePill
           size="sm"
-          label="Retry"
+          label={retryLabel}
           onClick={retry}
           testId="button-retry-saved-data"
         />
@@ -155,11 +195,10 @@ export function ReportTable({
             Sort by
             <select
               aria-label={`Sort ${caption} by`}
-              className="h-9 rounded-full border bg-background px-3 text-sm text-foreground"
+              className="h-9 rounded-full border bg-background px-3 text-sm text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
               value={sort?.key ?? ""}
               onChange={(e) => {
-                if (e.target.value)
-                  onSort!(
+                onSort!(
                     e.target.value,
                     sort?.dir === "desc" ? "desc" : "asc",
                   );
@@ -179,7 +218,7 @@ export function ReportTable({
             Direction
             <select
               aria-label={`Sort direction for ${caption}`}
-              className="h-9 rounded-full border bg-background px-3 text-sm text-foreground disabled:opacity-50"
+              className="h-9 rounded-full border bg-background px-3 text-sm text-foreground disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
               value={sort?.dir ?? "asc"}
               disabled={!sort}
               onChange={(e) =>
@@ -308,7 +347,7 @@ export function MetricTiles({
     </dl>
   );
 }
-type TrendPeriod = { date: string; value: number };
+type TrendPeriod = { date: string; value: number | null; partial?: boolean };
 /** Monday of the ISO week containing the YYYY-MM-DD date (UTC arithmetic). */
 function weekStart(iso: string) {
   const d = new Date(`${iso}T00:00:00Z`);
@@ -338,46 +377,38 @@ export function toTrendPeriods(
   lastDate: string;
 } {
   const valid = rows
-    .filter((r) => value(r) != null && Number.isFinite(Number(value(r))))
+    .filter((r) => value(r) != null && String(value(r)).trim() !== "" && Number.isFinite(Number(value(r))) && /^\d{4}-\d{2}-\d{2}$/.test(String(date(r))))
     .slice()
     .sort((a, b) => String(date(a)).localeCompare(String(date(b))));
-  const firstDate = valid.length ? String(date(valid[0])) : "",
-    lastDate = valid.length ? String(date(valid[valid.length - 1])) : "";
-  const first = valid.length ? Date.parse(`${firstDate}T00:00:00Z`) : NaN,
-    last = valid.length ? Date.parse(`${lastDate}T00:00:00Z`) : NaN;
-  const start = rangeStart ? Date.parse(`${rangeStart}T00:00:00Z`) : NaN,
-    end = rangeEnd ? Date.parse(`${rangeEnd}T00:00:00Z`) : NaN;
-  const spanFirst = Number.isFinite(start) ? Math.min(first, start) : first,
-    spanLast = Number.isFinite(end) ? Math.max(last, end) : last;
-  const weekly =
-    valid.length > 1 &&
-    Number.isFinite(spanFirst) &&
-    Number.isFinite(spanLast) &&
-    spanLast - spanFirst > 90 * 86400000;
-  if (!weekly)
-    return {
-      periods: valid.map((r) => ({
-        date: String(date(r)),
-        value: Number(value(r)),
-      })),
-      weekly,
-      firstDate,
-      lastDate,
-    };
-  const byWeek = new Map<string, number>();
+  const firstDate = rangeStart || (valid.length ? String(date(valid[0])) : ""),
+    lastDate = rangeEnd || (valid.length ? String(date(valid[valid.length - 1])) : "");
+  const first = Date.parse(`${firstDate}T00:00:00Z`),
+    last = Date.parse(`${lastDate}T00:00:00Z`);
+  const weekly = last - first > 90 * 86400000;
+  const byDay = new Map<string, number>();
   for (const r of valid) {
-    const w = weekStart(String(date(r)));
-    byWeek.set(w, (byWeek.get(w) ?? 0) + Number(value(r)));
+    const day = String(date(r));
+    byDay.set(day, (byDay.get(day) ?? 0) + Number(value(r)));
   }
-  return {
-    periods: [...byWeek.entries()].map(([date, value]) => ({
-      date: `Week of ${date}`,
-      value,
-    })),
-    weekly,
-    firstDate,
-    lastDate,
-  };
+  const periods: TrendPeriod[] = [];
+  // Report endpoints cap date ranges; also bound malformed caller input here.
+  if (!Number.isFinite(first) || !Number.isFinite(last) || last < first || last - first > 3660 * 86400000)
+    return { periods, weekly, firstDate, lastDate };
+  for (let t = first; t <= last; t += 86400000) {
+    const day = new Date(t).toISOString().slice(0, 10);
+    const amount = byDay.get(day) ?? null;
+    const label = weekly ? `Week of ${weekStart(day)}` : day;
+    const previous = periods[periods.length - 1];
+    if (weekly && previous?.date === label) {
+      if (amount !== null) previous.value = (previous.value ?? 0) + amount;
+      if (amount === null) previous.partial = true;
+    } else {
+      periods.push({ date: label, value: amount, ...(weekly ? { partial: amount === null || day !== weekStart(day) } : {}) });
+    }
+  }
+  if (weekly && periods.length && new Date(`${lastDate}T00:00:00Z`).getUTCDay() !== 0)
+    periods[periods.length - 1].partial = true;
+  return { periods, weekly, firstDate, lastDate };
 }
 export function ReportTrend({
   rows,
@@ -402,13 +433,18 @@ export function ReportTrend({
     start,
     end,
   );
-  const max = Math.max(1, ...periods.map((p) => p.value));
-  const fmt = (n: number) => n.toLocaleString("en-US");
+  const max = Math.max(1, ...periods.map((p) => p.value ?? 0));
+  const fmt = (n: number | null) => n === null ? "No imported data" : n.toLocaleString("en-US");
+  const describe = (p: TrendPeriod) => `${p.date}: ${fmt(p.value)}${p.partial && p.value !== null ? " (partial week)" : ""}`;
   // One Tab stop for the whole chart: only the selected bar sits in the tab order,
   // arrow keys move the selection (roving tabindex).
-  const [selected, setSelected] = useState(() =>
-    periods.reduce((best, p, i) => (p.value > periods[best].value ? i : best), 0),
-  );
+  const signature = JSON.stringify([start, end, periods]);
+  const maximum = periods.reduce((best, p, i) => ((p.value ?? -Infinity) > (periods[best]?.value ?? -Infinity) ? i : best), 0);
+  const [selection, setSelection] = useState({ signature, index: maximum });
+  if (selection.signature !== signature) setSelection({ signature, index: maximum });
+  // Equal refetch results preserve selection; changed periods/range select their new maximum.
+  const selected = selection.signature === signature ? selection.index : maximum;
+  const setSelected = (index: number) => setSelection({ signature, index });
   const listRef = useRef<HTMLDivElement>(null);
   const sel = Math.min(selected, periods.length - 1);
   const focusBar = (i: number) =>
@@ -449,7 +485,7 @@ export function ReportTrend({
             data-testid="text-trend-selection"
             aria-live="polite"
           >
-            {periods[sel].date}: {fmt(periods[sel].value)}
+            {describe(periods[sel])}
           </span>
           {/* The labelled scale maximum: bar heights are shares of this number. */}
           <span
@@ -462,32 +498,32 @@ export function ReportTrend({
       </figcaption>
       <div
         ref={listRef}
-        className="flex h-28 items-stretch gap-1"
+        className="flex h-28 items-stretch gap-1 overflow-x-auto overflow-y-hidden"
         role="list"
         aria-label={label}
       >
         {periods.map((p, i) => (
           // The whole column is the control: it selects on tap/click, announces its
           // exact date and value, and shows the value chip while selected or hovered.
-          <div key={i} role="listitem" className="relative min-w-0 flex-1">
+          <div key={i} role="listitem" className="relative min-w-[24px] flex-1">
             <button
               type="button"
               data-trend-index={i}
               tabIndex={i === sel ? 0 : -1}
               aria-pressed={i === sel}
-              aria-label={`${p.date}: ${fmt(p.value)}`}
-              title={`${p.date}: ${fmt(p.value)}`}
+              aria-label={describe(p)}
+              title={describe(p)}
               onClick={() => setSelected(i)}
               onKeyDown={(e) => move(e, i)}
               className={`group absolute inset-0 w-full cursor-pointer rounded-sm hover:bg-primary/10 focus-visible:bg-primary/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary ${
                 i === sel ? "bg-primary/15" : ""
               }`}
             >
-              <span
+              {p.value !== null && <span
                 aria-hidden="true"
                 className="pointer-events-none absolute inset-x-0 bottom-0 rounded-t-sm bg-primary/70"
                 style={{ height: `${Math.max(1, (p.value / max) * 100)}%` }}
-              />
+              />}
               <span
                 aria-hidden="true"
                 className="pointer-events-none absolute left-1/2 top-0 z-10 -translate-x-1/2 whitespace-nowrap rounded border bg-background px-1 text-[10px] tabular-nums text-foreground opacity-0 shadow-sm transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
@@ -501,9 +537,9 @@ export function ReportTrend({
       <p className="mt-2 text-xs text-muted-foreground">
         {firstDate} – {lastDate}.{" "}
         {weekly
-          ? "Range over 90 days: each bar totals one week (starting Monday). "
+          ? "Range over 90 days: each bar totals one week (starting Monday); partial weeks include only imported days. "
           : ""}
-        Tap or arrow to a bar to pin its date and value; exact values also in the
+        Gaps mean no imported data, not zero. Scroll, tap or arrow to a bar to pin its date and value; exact values also in the
         table.
       </p>
     </figure>

@@ -53,3 +53,11 @@ describe("lesson refresh recovery", () => {
     expect(html).toContain("focus-visible:ring-2");
   });
 });
+
+it.each([{ bodies: [] }, { bodies: [{ id: "retained", title: "Empty", blocks: [] }] }])("never completes absent or empty content, even with a custom renderer", ({ bodies }) => {
+  query.current = { isSuccess: true, data: { ...data, lessons: bodies }, refetch: vi.fn() };
+  const html = render();
+  expect(html).toContain("text-lesson-missing");
+  expect(html).toContain("Reload lesson");
+  expect(html).toMatch(/<button[^>]*disabled[^>]*data-testid="checkbox-retained-done"/);
+});

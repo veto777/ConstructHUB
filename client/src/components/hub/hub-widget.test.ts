@@ -142,7 +142,7 @@ describe("Gabe recovery in the browser", () => {
     const { page, state } = await fixture(390);
     try {
       await open(page);
-      expect(await page.getByTestId("hub-daily").innerText()).toBe("Today: 3 of 40 questions used");
+      expect(await page.getByTestId("hub-daily").innerText()).toContain("Today: 3 of 40 attempts used");
       expect(await page.getByTestId("hub-panel").getAttribute("aria-modal")).toBeNull();
       await send(page, "How do I set up my account?");
       const retry = page.getByRole("button", { name: "Retry", exact: true }); await retry.waitFor();
@@ -169,4 +169,74 @@ describe("Gabe recovery in the browser", () => {
       await page.getByTestId("hub-launcher").waitFor();
     } finally { await page.close(); }
   });
+});
+
+it.each([[429, "slowdown"], [429, "limit"], [503, "busy"]] as const)("renders %s %s neutrally and refreshes attempt usage", async (status, code) => {
+  const { page, state } = await fixture(390);
+  try {
+    await page.route("**/api/hub/chat", route => route.fulfill({ status, json: { code, reply: "Please wait before asking again." } }));
+    await open(page);
+    const before = state.calls;
+    state.meta.allowance.daily.used = 4;
+    await send(page, "How does this work?");
+    await expect.poll(() => page.getByTestId("hub-msg-assistant").last().getAttribute("data-tone")).toBe("note");
+    expect(await page.getByRole("button", { name: "Retry", exact: true }).count()).toBe(0);
+    expect(await page.getByRole("button", { name: "Edit", exact: true }).count()).toBe(0);
+    await expect.poll(() => state.calls).toBeGreaterThan(before);
+    await expect.poll(() => page.getByTestId("hub-daily").innerText()).toContain("4 of 40 attempts");
+  } finally { await page.close(); }
+});
+
+it("refreshes daily usage after a transport failure and grows a restored long question", async () => {
+  const { page, state } = await fixture(390);
+  try {
+    await open(page);
+    const before = state.calls;
+    state.meta.allowance.daily.used = 4;
+    await page.route("**/api/hub/chat", route => route.abort());
+    const question = "How can I configure my business and get started with the tools? ".repeat(6);
+    await send(page, question);
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await expect.poll(() => state.calls).toBeGreaterThan(before);
+    expect(await page.getByTestId("hub-input").inputValue()).toBe(question.trim());
+    await expect.poll(async () => (await page.getByTestId("hub-input").boundingBox())!.height).toBeGreaterThan(40);
+  } finally { await page.close(); }
+});
+
+it("closes on a hidden route, moves focus to the page and stays closed on return", async () => {
+  const { page } = await fixture();
+  try {
+    await open(page);
+    await page.evaluate(() => { history.pushState(null, "", "/privacy"); window.dispatchEvent(new PopStateEvent("popstate")); });
+    await page.getByTestId("hub-panel").waitFor({ state: "hidden" });
+    await expect.poll(() => page.evaluate(() => document.activeElement?.tagName)).toBe("MAIN");
+    await page.evaluate(() => { history.pushState(null, "", "/"); window.dispatchEvent(new PopStateEvent("popstate")); });
+    await page.getByTestId("hub-launcher").waitFor();
+    expect(await page.getByTestId("hub-panel").count()).toBe(0);
+  } finally { await page.close(); }
+});
+
+it("describes free quick questions and the verified-account plan requirement consistently", async () => {
+  const { page, state } = await fixture(390);
+  try {
+    Object.assign(state.meta, { tier: "browse", chat: false, allowance: null });
+    await open(page);
+    await page.getByTestId("hub-signup-cta").waitFor();
+    const copy = await page.getByTestId("hub-signup-cta").innerText();
+    expect(copy).toContain("Quick questions are free, with or without an account");
+    expect(copy).toContain("verified account and a plan allowance");
+    expect(await page.getByTestId("hub-input").count()).toBe(0);
+  } finally { await page.close(); }
+});
+
+it("treats preset throttling as a note without retry actions", async () => {
+  const { page } = await fixture(390);
+  try {
+    await page.route("**/api/hub/preset", route => route.fulfill({ status: 429, json: { code: "slowdown", reply: "Please wait before asking again." } }));
+    await open(page); await page.getByTestId("hub-chip-help").click();
+    await expect.poll(() => page.getByTestId("hub-msg-assistant").last().getAttribute("data-tone")).toBe("note");
+    expect(await page.getByRole("button", { name: "Retry", exact: true }).count()).toBe(0);
+    expect(await page.getByRole("button", { name: "Edit", exact: true }).count()).toBe(0);
+    await page.screenshot({ path: "/tmp/gabe-neutral-phone.png" });
+  } finally { await page.close(); }
 });

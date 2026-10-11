@@ -578,8 +578,8 @@ it("trend ranges over 90 days aggregate to weeks with a persistent date-value re
   expect(html.match(/<button/g)!.length).toBe(periods.length);
   // The readout is pinned to the max period without any hover, date and value both shown.
   expect(html).toContain("text-trend-selection");
-  const maxPeriod = periods.reduce((a, b) => (b.value > a.value ? b : a));
-  expect(html).toContain(`${maxPeriod.date}: ${maxPeriod.value.toLocaleString("en-US")}`);
+  const maxPeriod = periods.reduce((a, b) => ((b.value ?? -Infinity) > (a.value ?? -Infinity) ? b : a));
+  expect(html).toContain(`${maxPeriod.date}: ${maxPeriod.value!.toLocaleString("en-US")}`);
   expect(html).toContain('aria-pressed="true"');
 });
 it("the trend chart is a single Tab stop with arrow-key roving selection", () => {
@@ -663,4 +663,20 @@ it("a failed config refetch keeps the saved data under a strip, never a bare ale
   } finally {
     (globalThis as any).window = original;
   }
+});
+
+it("preserves missing dates as unknown, distinguishes observed zero and labels partial weeks", () => {
+  const rows = [{ date: "2026-06-01", clicks: 0 }, { date: "2026-06-03", clicks: 9 }];
+  const daily = toTrendPeriods(rows, r => r.clicks, r => r.date, "2026-06-01", "2026-06-04");
+  expect(daily.periods.map(p => p.value)).toEqual([0, null, 9, null]);
+  const weekly = toTrendPeriods(rows, r => r.clicks, r => r.date, "2026-06-01", "2026-10-01");
+  expect(weekly.weekly).toBe(true);
+  expect(weekly.periods[0]).toMatchObject({ value: 9, partial: true });
+  expect(weekly.periods[1].value).toBeNull();
+  const empty = toTrendPeriods([], r => r.clicks, r => r.date, "2026-06-01", "2026-06-03");
+  expect(empty.periods.map(p => p.value)).toEqual([null, null, null]);
+  const html = renderToStaticMarkup(h(ReportTrend, { rows, label: "Clicks", value: r => r.clicks, date: r => r.date }));
+  expect(html).toContain("No imported data");
+  expect(html).toContain("min-w-[24px]");
+  expect(html).toContain("overflow-x-auto");
 });

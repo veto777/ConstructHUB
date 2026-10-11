@@ -13,7 +13,7 @@
  * The open tab, the chosen state and the lesson (#lesson-…) live in the address, so a reload or a shared link
  * returns to the same material.
  */
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, CheckCircle2, Layers, Lock, Search, Sparkles, Target } from "lucide-react";
 import { Link } from "wouter";
 import { AppPage, AppTabsList, Notice, PageHeader, Section, Stat, StatGrid, appTable, appTableCards } from "@/components/app-ui";
@@ -24,10 +24,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsTrigger } from "@/components/ui/tabs";
 import { useUrlParam } from "@/hooks/use-url-param";
 import { PublicPageFooter, PublicPageHeader } from "@/components/public-page-chrome";
-import { apiErrorMessage } from "@/lib/queryClient";
+import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { SALES_HREF, SALES_REP_LABEL, formatUsd, priceOrSalesRep } from "@shared/plan-copy";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   CATEGORY_TAB, MASTER_CLASS_TABS, TAB_LABELS, resolveTab, tabUnlocked,
   type CourseAccess, type CourseCatalog, type MasterClassTab, type ModuleCategory,
@@ -53,14 +53,30 @@ export default function MasterClassPage() {
 
   const guidesQ = useQuery<PublicStateGuide[]>({ queryKey: ["/api/state-guides"] });
   const catalogQ = useQuery<CourseCatalog>({ queryKey: ["/api/course-catalog"] });
-  const accessQ = useQuery<CourseAccess>({ queryKey: ["/api/course-access"] });
+  const auth = useQuery<{ id: number | string } | null>({ queryKey: ["/api/auth/me"] });
+  const identity = auth.isSuccess ? auth.data?.id ?? null : undefined;
+  const queryClient = useQueryClient();
+  const accessKey = ["/api/course-access", identity];
+  const accessQ = useQuery<CourseAccess>({
+    queryKey: accessKey,
+    queryFn: async () => (await apiRequest("GET", "/api/course-access")).json(),
+    enabled: identity !== undefined,
+  });
+  const accessDenied = accessQ.isError && /^(401|403)\b/.test(accessQ.error.message);
+  useEffect(() => {
+    if (accessDenied) queryClient.getQueryCache().find({ queryKey: accessKey, exact: true })
+      ?.setState({ data: undefined, dataUpdatedAt: 0 });
+  }, [accessDenied, identity, queryClient]);
 
   const guides = guidesQ.data;
   const catalog = catalogQ.data;
-  const access = accessQ.isSuccess ? accessQ.data : undefined;
+  const access = identity !== undefined && !accessDenied ? accessQ.data : undefined;
+  const accessStatus = identity === undefined ? status(auth) : access ? "success" as const : status(accessQ);
+  const accessError = identity === undefined ? auth.error : accessQ.error;
+  const retryAccess = () => { void (identity === undefined ? auth.refetch() : accessQ.refetch()); };
   const moduleFor = (category: ModuleCategory) => catalog?.modules.find((m) => m.category === category) ?? null;
   const moduleProps = {
-    access, accessStatus: status(accessQ), accessError: accessQ.error, onRetryAccess: () => void accessQ.refetch(),
+    access, accessStatus, accessError, onRetryAccess: retryAccess,
     onEnroll: () => setActiveTab("pricing"),
   };
 
@@ -92,7 +108,11 @@ export default function MasterClassPage() {
             <Button variant="outline" onClick={() => setActiveTab("pricing")} data-testid="button-overview-enroll">{everything ? "Your modules" : "How to enroll"}</Button>
           </> : undefined} />
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+        {accessQ.isError && access && <Notice title="Access refresh failed">
+          <p>Showing previously authorized lessons for this account. Access could not be refreshed.</p>
+          <Button className="mt-3" variant="outline" onClick={() => void accessQ.refetch()}>Retry access check</Button>
+        </Notice>}
+        <Tabs key={identity ?? "signed-out"} value={activeTab} onValueChange={setActiveTab}>
           <AppTabsList data-testid="tabs-master-class">
             {MASTER_CLASS_TABS.map((tab) => (
               <TabsTrigger key={tab} value={tab} className="gap-1 px-2 text-xs sm:gap-1.5 sm:px-3 sm:text-sm" data-testid={`tab-${tab}`}>
@@ -308,7 +328,7 @@ export default function MasterClassPage() {
           <TabsContent value="seo" className="mt-4 sm:mt-6" data-testid="tab-content-seo"><SeoModule {...moduleProps} module={moduleFor("seo")} /></TabsContent>
           <TabsContent value="vetting" className="mt-4 sm:mt-6"><VettingModule {...moduleProps} module={null} /></TabsContent>
           <TabsContent value="pricing" className="mt-4 sm:mt-6">
-            <EnrollTab access={access} accessStatus={status(accessQ)} accessError={accessQ.error} onRetryAccess={() => void accessQ.refetch()}
+            <EnrollTab access={access} accessStatus={accessStatus} accessError={accessError} onRetryAccess={retryAccess}
               catalog={catalog} catalogStatus={status(catalogQ)} catalogError={catalogQ.error} onRetryCatalog={() => void catalogQ.refetch()}
               onOpenTab={(tab) => setActiveTab(tab)} writtenStates={writtenStates} />
           </TabsContent>

@@ -472,13 +472,17 @@ export function registerCloudflareRoutes(
   // WHOLE dataset in SQL before pagination, whitelisted per dataset (typed numeric casts
   // for counters, text order for names/dates) — same contract as the GSC analytics route.
   // "Traffic"/"Events"/"Paths"/"Bots"/"Countries" DataLists — site-connections.tsx.
+  // Accept ordinary decimals only; bound the input length before casting so even
+  // malformed or enormous cached strings cannot overflow PostgreSQL numeric.
+  const numeric = (expression: string) =>
+    `CASE WHEN length(${expression}) <= 100 AND ${expression} ~ '^[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)$' THEN (${expression})::numeric END`;
   const cacheSorts: Record<string, Record<string, string>> = {
     traffic: {
       date: "value->'dimensions'->>'date'",
-      requests: "NULLIF(value->'sum'->>'requests','')::numeric",
-      pageViews: "NULLIF(value->'sum'->>'pageViews','')::numeric",
-      threats: "NULLIF(value->'sum'->>'threats','')::numeric",
-      uniques: "NULLIF(value->'uniq'->>'uniques','')::numeric",
+      requests: numeric("value->'sum'->>'requests'"),
+      pageViews: numeric("value->'sum'->>'pageViews'"),
+      threats: numeric("value->'sum'->>'threats'"),
+      uniques: numeric("value->'uniq'->>'uniques'"),
     },
     events: {
       datetime: "value->>'datetime'",
@@ -490,16 +494,16 @@ export function registerCloudflareRoutes(
     },
     paths: {
       clientRequestPath: "value->'dimensions'->>'clientRequestPath'",
-      count: "NULLIF(value->>'count','')::numeric",
+      count: numeric("value->>'count'"),
     },
     bots: {
-      botScore: "NULLIF(value->'dimensions'->>'botScore','')::numeric",
-      count: "NULLIF(value->>'count','')::numeric",
+      botScore: numeric("value->'dimensions'->>'botScore'"),
+      count: numeric("value->>'count'"),
     },
     countries: {
       country: "value->>'country'",
-      requests: "NULLIF(value->>'requests','')::numeric",
-      threats: "NULLIF(value->>'threats','')::numeric",
+      requests: numeric("value->>'requests'"),
+      threats: numeric("value->>'threats'"),
     },
   };
   route("get", "/api/cloudflare/assets/:id/cache", async (req, res, user) => {

@@ -429,7 +429,7 @@ export function StateGuideTab(p: StateGuideTabProps) {
 
       {open && (
         <>
-          <LessonOutline lessons={outline} storageKey={KEY} title="Lessons in this module" />
+          <LessonOutline lessons={outline} storageKey={KEY} title="Lessons in this module" moduleName="Business Formation & Licensing" />
           <div className="space-y-1">
             <h3 className="flex items-center gap-2 text-lg font-semibold"><Building2 className="h-5 w-5 text-muted-foreground" aria-hidden="true" /> Building &amp; running your business</h3>
             <p className="text-sm text-muted-foreground">The way you structure your company — hiring, sales, branding, subcontractors — can make or break you, especially in the early stages. These lessons cover the operations most courses skip.</p>

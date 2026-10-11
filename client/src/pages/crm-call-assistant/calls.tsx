@@ -383,7 +383,7 @@ type SpamLedger = {
   thisMonth?: { month: string; spamCalls: number; screened: number; rejected: number; freeSpamCalls: number; freeSpamMinutes: number; freeSpamCallsLimit: number };
 };
 
-function SpamView({ canManage, onOpen }: { canManage: boolean; onOpen: (id: string) => void }) {
+export function SpamView({ canManage, onOpen }: { canManage: boolean; onOpen: (id: string) => void }) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const ledger = useQuery<SpamLedger>({ queryKey: ["/api/crm/voice/spam"], refetchInterval: LIVE_REFRESH_MS });
@@ -421,20 +421,20 @@ function SpamView({ canManage, onOpen }: { canManage: boolean; onOpen: (id: stri
         <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
           <div className="p-3">
             <dt className="text-xs text-muted-foreground">Spam stopped this month</dt>
-            <dd className="text-2xl font-bold tabular-nums" data-testid="text-spam-this-month">{(month?.spamCalls ?? 0).toLocaleString("en-US")}</dd>
+            <dd className="text-2xl font-bold tabular-nums" data-testid="text-spam-this-month">{month?.spamCalls?.toLocaleString("en-US") ?? "Unavailable"}</dd>
           </div>
           <div className="p-3">
             <dt className="text-xs text-muted-foreground">Rejected before answering</dt>
-            <dd className="text-2xl font-bold tabular-nums" data-testid="text-spam-rejected">{(month?.rejected ?? 0).toLocaleString("en-US")}</dd>
+            <dd className="text-2xl font-bold tabular-nums" data-testid="text-spam-rejected">{month?.rejected?.toLocaleString("en-US") ?? "Unavailable"}</dd>
           </div>
           <div className="p-3">
             <dt className="text-xs text-muted-foreground">Numbers blocked</dt>
-            <dd className="text-2xl font-bold tabular-nums" data-testid="text-spam-numbers-blocked">{(ledger.data?.blocked ?? 0).toLocaleString("en-US")}</dd>
+            <dd className="text-2xl font-bold tabular-nums" data-testid="text-spam-numbers-blocked">{ledger.data?.blocked?.toLocaleString("en-US") ?? "Unavailable"}</dd>
           </div>
           <div className="p-3">
             <dt className="text-xs text-muted-foreground">Free spam calls used</dt>
             <dd className="text-2xl font-bold tabular-nums" data-testid="text-spam-free-used">
-              {(month?.freeSpamCalls ?? 0).toLocaleString("en-US")}<span className="text-sm font-medium text-muted-foreground"> / {(month?.freeSpamCallsLimit ?? CALL_ASSISTANT_FREE_SPAM_CALLS).toLocaleString("en-US")}</span>
+              {month?.freeSpamCalls?.toLocaleString("en-US") ?? "Unavailable"}<span className="text-sm font-medium text-muted-foreground"> / {(month?.freeSpamCallsLimit ?? CALL_ASSISTANT_FREE_SPAM_CALLS).toLocaleString("en-US")}</span>
             </dd>
           </div>
         </dl>
@@ -474,7 +474,8 @@ function SpamView({ canManage, onOpen }: { canManage: boolean; onOpen: (id: stri
           <p className="text-xs text-muted-foreground">Only members who can manage settings can block or unblock numbers.</p>
         )}
 
-        {ledger.isLoading ? <TableSkeleton rows={3} /> : ledger.isError ? (
+        {ledger.isError && ledger.data && <InlineError title="Showing saved data — refresh failed" error={ledger.error} onRetry={() => ledger.refetch()} />}
+        {ledger.isLoading ? <TableSkeleton rows={3} /> : ledger.isError && !ledger.data ? (
           <InlineError title="Couldn't load the spam ledger" error={ledger.error} onRetry={() => ledger.refetch()} />
         ) : !ledger.data?.entries.length ? (
           <EmptyState compact icon={ShieldAlert} title="No spam yet" description="Numbers the assistant screens out land here." />
@@ -526,7 +527,8 @@ function SpamView({ canManage, onOpen }: { canManage: boolean; onOpen: (id: stri
 
       <section className="space-y-3" aria-labelledby="spam-calls-title">
         <h2 id="spam-calls-title" className="text-base font-semibold">Spam and blocked calls</h2>
-        {spamCalls.isLoading ? <TableSkeleton rows={3} /> : spamCalls.isError ? (
+        {spamCalls.isError && spamCalls.data && <InlineError title="Showing saved data — refresh failed" error={spamCalls.error} onRetry={() => spamCalls.refetch()} />}
+        {spamCalls.isLoading ? <TableSkeleton rows={3} /> : spamCalls.isError && !spamCalls.data ? (
           <InlineError title="Couldn't load the spam calls" error={spamCalls.error} onRetry={() => spamCalls.refetch()} />
         ) : !spamCalls.data?.calls.length ? (
           <p className="text-sm text-muted-foreground">None so far.</p>
