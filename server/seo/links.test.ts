@@ -9,8 +9,8 @@ import { seoLinks } from "../../client/src/pages/seo/links";
 describe("seoLinks: keywords explorer", () => {
   it("a keyword alone, and the view tabs", () => {
     expect(seoLinks.keywords("roof repair")).toBe("/seo/keywords?keyword=roof+repair");
-    expect(seoLinks.keywords("", { view: "bulk" })).toBe("/seo/keywords?view=bulk");
-    expect(seoLinks.keywords("", { view: "lists", list: 7 })).toBe("/seo/keywords?view=lists&list=7");
+    expect(seoLinks.keywords("", { tab: "bulk" })).toBe("/seo/keywords?tab=bulk");
+    expect(seoLinks.keywords("", { tab: "lists", list: 7 })).toBe("/seo/keywords?tab=lists&list=7");
   });
   it("the parts of an overview a figure lands on", () => {
     expect(seoLinks.keywords("roof repair", { section: "volume" })).toBe("/seo/keywords?keyword=roof+repair&section=volume");
@@ -67,9 +67,9 @@ describe("seoLinks: backlinks", () => {
 
 describe("seoLinks: the parameters appended for the second pass (owner 2026-10-09)", () => {
   it("keywords: a list's topic groups, and the Service × town tiles' cells", () => {
-    expect(seoLinks.keywords("", { view: "lists", list: 7, topic: "*" })).toBe("/seo/keywords?view=lists&list=7&topic=*");
-    expect(seoLinks.keywords("", { view: "bulk", topic: "roof" })).toBe("/seo/keywords?view=bulk&topic=roof");
-    expect(seoLinks.keywords("", { view: "area", show: "gaps" })).toBe("/seo/keywords?view=area&show=gaps");
+    expect(seoLinks.keywords("", { tab: "lists", list: 7, topic: "*" })).toBe("/seo/keywords?tab=lists&list=7&topic=*");
+    expect(seoLinks.keywords("", { tab: "bulk", topic: "roof" })).toBe("/seo/keywords?tab=bulk&topic=roof");
+    expect(seoLinks.keywords("", { tab: "area", show: "gaps" })).toBe("/seo/keywords?tab=area&show=gaps");
   });
   it("content: the page of results is part of the address", () => {
     expect(seoLinks.content("siding cost", { offset: 25 })).toBe("/seo/content?q=siding+cost&offset=25");
@@ -94,7 +94,7 @@ describe("seoLinks: the parameters appended for round 3 (Kimi round 2)", () => {
   });
   it("keywords: the ideas table's order and page, and the Service × town grid's row and column", () => {
     expect(seoLinks.keywords("roof repair", { table: "questions", sort: "difficulty", offset: 25, limit: 25 })).toBe("/seo/keywords?keyword=roof+repair&table=questions&sort=difficulty&offset=25&limit=25");
-    expect(seoLinks.keywords("", { view: "area", show: "gaps", service: "roof repair" })).toBe("/seo/keywords?view=area&show=gaps&service=roof+repair");
-    expect(seoLinks.keywords("", { view: "area", town: "mount vernon" })).toBe("/seo/keywords?view=area&town=mount+vernon");
+    expect(seoLinks.keywords("", { tab: "area", show: "gaps", service: "roof repair" })).toBe("/seo/keywords?tab=area&show=gaps&service=roof+repair");
+    expect(seoLinks.keywords("", { tab: "area", town: "mount vernon" })).toBe("/seo/keywords?tab=area&town=mount+vernon");
   });
 });

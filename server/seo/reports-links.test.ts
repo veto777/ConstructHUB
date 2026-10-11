@@ -29,7 +29,7 @@ describe("the addresses (links.ts, appended only)", () => {
   it("round 3: one grid outline per colour, the alerts' reveals, the site's planner", () => {
     for (const show of ["4-10", "11-20", "notFound"] as const) expect(seoLinks.localGrid(3, { scan: 9, show })).toBe(`/seo/local-grid?site=3&scan=9&show=${show}`);
     expect(seoLinks.alerts({ site: 3, all: "41,42", more: 2 })).toBe("/seo/alerts?site=3&all=41%2C42&more=2");
-    expect(seoLinks.servicePlanner(3)).toBe("/seo/keywords?view=area&site=3");
+    expect(seoLinks.servicePlanner(3)).toBe("/seo/keywords?tab=area&site=3");
   });
   it("the app pages and Google's own listing — no hand-written address anywhere", () => {
     expect(seoLinks.appSettings({ tab: "notifications" })).toBe("/settings?tab=notifications");
@@ -86,10 +86,10 @@ describe("usage: every paid lookup opens the page that spent it, and nothing is 
     expect(spentOn("Directories — a.com (second try for alpine.example, a.com)", sites)).toBe("/seo/explorer?domain=alpine.example&view=directories&rivals=a.com");
     // An older second try names no comparison: nothing is guessed.
     expect(spentOn("Directories — a.com (second try)", sites)).toBeNull();
-    expect(spentOn("Service-area planner — beta.example (3 × 5)", sites)).toBe("/seo/keywords?view=area&site=2");
+    expect(spentOn("Service-area planner — beta.example (3 × 5)", sites)).toBe("/seo/keywords?tab=area&site=2");
     expect(spentOn("Service-area planner — gone.example (3 × 5)", sites)).toBeNull();
     expect(spentOn("Opportunities — alpine.example", sites)).toBe("/seo/explorer?domain=alpine.example&view=opportunities");
-    expect(spentOn("Bulk keyword analysis — 12 keywords", sites)).toBe("/seo/keywords?view=bulk");
+    expect(spentOn("Bulk keyword analysis — 12 keywords", sites)).toBe("/seo/keywords?tab=bulk");
     // Labels that only look like "<name> — <target>" stay words.
     expect(spentOn("Content explorer — missing figures for 3 pages (second try)", sites)).toBeNull();
     expect(routes).toContain("`Directories — ${again.join(\", \")} (second try for ${sites.join(\", \")})`");

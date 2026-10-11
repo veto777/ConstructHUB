@@ -1,5 +1,7 @@
 /**
- * /seo/competitors — keyword gap: what a competitor ranks for that this site does not.
+ * /seo/competitors — Competitor gap: what a competitor ranks for that this site does not (one paid comparison).
+ * Named apart from the rank tracker's "Competitors on your keywords" panel (rank-competitors.tsx), which is share of
+ * voice on the tracked keywords and spends nothing (findings 2026-10-11 #2).
  *
  * ?competitor= fills the box (links.ts seoLinks.competitors) — nothing is bought until "Find the gap" is pressed.
  * Every row opens somewhere: the keyword in Keywords explorer, the competitor's position in its Site explorer
@@ -45,7 +47,7 @@ export default function SeoCompetitorsPage() {
   const configured = !!status.data?.configured;
   const r = gap.data;
   return (
-    <SeoShell title="Competitors" description="Keywords a competitor ranks for on Google that your site does not — the gap to close." site={site} onSite={onSite} sites={sites} status={status}>
+    <SeoShell title="Competitor gap" description="Keywords a competitor ranks for on Google that your site does not — the gap to close." site={site} onSite={onSite} sites={sites} status={status} spends="lookups">
       {missing && site && <p className="mb-3 text-[13px]" role="status" style={{ color: "#b06000" }} data-testid="competitors-site-missing">The site this link is for isn't one of yours (or was removed). Showing {site.domain}.</p>}
       {/* Clearing drops the competitor from the address, empties the box and takes its results off the screen: nothing narrowed is left without its chip. */}
       {wanted && <ActiveFilter onClear={() => { clearParams(["competitor"], false); setCompetitor(""); gap.reset(); }} clearLabel="Clear">Competitor: {wanted}{r?.competitor === clean(wanted) ? "" : " — press Find the gap to compare (nothing is bought until then)"}</ActiveFilter>}
@@ -57,12 +59,12 @@ export default function SeoCompetitorsPage() {
           </Button>
         </form>
       )}
-      {site && !r && <Empty testId="seo-gap-empty"><h3>Compare {site.domain} with a competitor</h3><p>One comparison ({priceOf(status.data, "competitorGap")} of your SEO data) returns up to 100 keywords where the competitor ranks in Google's organic results and {site.domain} does not, with their position, the search volume and the difficulty. Track the ones worth going after. The competitors the rank tracker already follows are in its <Link href={seoLinks.rankTracker(site.id, { panel: "competitors" })} className={TEXT_LINK} data-testid="link-competitors-panel">competitors panel</Link>.</p></Empty>}
+      {site && !r && <Empty testId="seo-gap-empty"><h3>Compare {site.domain} with a competitor</h3><p>One comparison ({priceOf(status.data, "competitorGap")} of your SEO data) returns up to 100 keywords where the competitor ranks in Google's organic results and {site.domain} does not, with their position, the search volume and the difficulty. Track the ones worth going after. How visible the competitors you follow are on your tracked keywords is the rank tracker's <Link href={seoLinks.rankTracker(site.id, { panel: "competitors" })} className={TEXT_LINK} data-testid="link-competitors-panel">Competitors on your keywords</Link> panel (share of voice; spends nothing).</p></Empty>}
       {!site && sites.isSuccess && <Empty testId="seo-empty-sites"><h3>No sites yet</h3><p>Add your own site above first; the gap is measured against it.</p></Empty>}
       {r && site && (
         <>
           {/* Both sites open in Site explorer; the competitor also in the rank tracker's competitors panel. */}
-          <p className="g-text-2 mb-2 text-[13px]" data-testid="text-gap-meta"><Link href={seoLinks.explorer(r.ours, "contentGap")} className={QUIET_LINK} title="Site explorer's content gap: the keywords competitors rank for and this site does not (this page lists the first 100)" data-testid="link-gap-total">{r.totalCount != null ? `${fmtNum(r.totalCount)} keywords` : `${r.items.length} keywords`}</Link> <Link href={seoLinks.explorer(r.competitor, "keywords")} className={TEXT_LINK} data-testid="link-gap-competitor">{r.competitor}</Link> ranks for that <Link href={seoLinks.explorer(r.ours, "keywords")} className={TEXT_LINK}>{r.ours}</Link> doesn't · showing <Link href={seoLinks.explorer(r.ours, "contentGap")} className={QUIET_LINK}>{r.items.length}</Link> · <Link href={seoLinks.rankTracker(site.id, { panel: "competitors" })} className={TEXT_LINK}>compare in the rank tracker</Link></p>
+          <p className="g-text-2 mb-2 text-[13px]" data-testid="text-gap-meta"><Link href={seoLinks.explorer(r.ours, "contentGap")} className={QUIET_LINK} title="Site explorer's content gap: the keywords competitors rank for and this site does not (this page lists the first 100)" data-testid="link-gap-total">{r.totalCount != null ? `${fmtNum(r.totalCount)} keywords` : `${r.items.length} keywords`}</Link> <Link href={seoLinks.explorer(r.competitor, "keywords")} className={TEXT_LINK} data-testid="link-gap-competitor">{r.competitor}</Link> ranks for that <Link href={seoLinks.explorer(r.ours, "keywords")} className={TEXT_LINK}>{r.ours}</Link> doesn't · showing <Link href={seoLinks.explorer(r.ours, "contentGap")} className={QUIET_LINK}>{r.items.length}</Link> · <Link href={seoLinks.rankTracker(site.id, { panel: "competitors" })} className={TEXT_LINK}>share of voice on your keywords, in the rank tracker</Link></p>
           {r.items.length === 0 ? <Empty>No gap found — no organic rankings for <Link href={seoLinks.explorer(r.competitor, "keywords")} className={TEXT_LINK}>{r.competitor}</Link> that {r.ours} lacks.</Empty> : (
             <table className="g-table" data-testid="table-gap">
               <thead><tr><th>Keyword</th><th className="num">Their position</th><th className="num">Volume / mo</th><th className="num">Difficulty</th><th className="num">CPC</th><th>Their page</th><th aria-label="Track" /></tr></thead>

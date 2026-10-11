@@ -21,7 +21,7 @@ import { Download, ListPlus, Loader2, Plus, RefreshCw, Trash2 } from "lucide-rea
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { ActiveFilter, api, Empty, fmtDate, fmtNum, isNotRunYet, money, useAddress, type SeoSite, type SeoStatus } from "./shell";
+import { ActiveFilter, api, Empty, fmtDate, fmtNum, isNotRunYet, money, SAVED_FOR, useAddress, type SeoSite, type SeoStatus } from "./shell";
 import { PALETTE } from "./viz";
 import { BarFigure, BLOCK_LINK, FIG_LINK, KdBadge, LINK_CUE, TEXT_LINK } from "./viz-keywords";
 
@@ -82,8 +82,8 @@ export function AddToList({ rows, onDone, label = "Add to a list", market = DEFA
 /** The address of this view (bulk or a list) with a different `topic`: what the topic links write. */
 function useTopicAddress(): { topic: string | undefined; at: (topic: string | undefined) => string } {
   const a = useAddress();
-  const view = a.get("view"), topic = a.get("topic")?.trim() || undefined;
-  const at = (t: string | undefined) => seoLinks.keywords(a.get("keyword") ?? "", { view: view === "bulk" || view === "lists" || view === "area" ? view : undefined, list: Number(a.get("list")) || undefined, locationCode: Number(a.get("locationCode")) || undefined, languageCode: a.get("languageCode") || undefined, topic: t });
+  const tab = a.get("tab") ?? a.get("view"), topic = a.get("topic")?.trim() || undefined;
+  const at = (t: string | undefined) => seoLinks.keywords(a.get("keyword") ?? "", { tab: tab === "bulk" || tab === "lists" || tab === "area" ? tab : undefined, list: Number(a.get("list")) || undefined, locationCode: Number(a.get("locationCode")) || undefined, languageCode: a.get("languageCode") || undefined, topic: t });
   return { topic, at };
 }
 
@@ -187,7 +187,7 @@ export function BulkKeywords({ status, site, onTrack, initial = "", market, onMa
           {market && onMarket && <MarketPicker value={market} onChange={(m) => { setAsked([]); clear(); onMarket(m); }} />}
           {market && onPlace && <PlacePicker value={place} onChange={(p) => { setAsked([]); clear(); onPlace(p); }} market={market} />}
           <Button type="submit" disabled={!draft.length} data-testid="button-bulk-prepare">Analyse {draft.length ? `${Math.min(draft.length, MAX_BULK)} keyword${draft.length === 1 ? "" : "s"}` : "keywords"}</Button>
-          <span className="g-text-2 text-[13px]">{draft.length > MAX_BULK ? `Only the first ${MAX_BULK} of ${fmtNum(draft.length)} are analysed at once. ` : ""}{price != null && draft.length ? <>About <Link href={seoLinks.usage()} className={TEXT_LINK} title="Usage and credit: what lookups cost and what is left this month" data-testid="link-bulk-price">{money(bulkPrice(status, Math.min(draft.length, MAX_BULK)))}</Link> of your SEO data; reopening the same set within a day is free. {placeWords(place, market?.label ?? "United States")}, Google.{place ? " Volume and cost per click are the place's; difficulty and intent are the country's." : ""}</> : `Volume, difficulty, cost per click and intent for each. ${placeWords(place, market?.label ?? "United States")}, Google.${place ? " Volume and cost per click are the place's; difficulty and intent are the country's." : ""}`}</span>
+          <span className="g-text-2 text-[13px]">{draft.length > MAX_BULK ? `Only the first ${MAX_BULK} of ${fmtNum(draft.length)} are analysed at once. ` : ""}{price != null && draft.length ? <>About <Link href={seoLinks.usage()} className={TEXT_LINK} title="Usage and credit: what lookups cost and what is left this month" data-testid="link-bulk-price">{money(bulkPrice(status, Math.min(draft.length, MAX_BULK)))}</Link> of your SEO data; reopening the same set within {SAVED_FOR} is free. {placeWords(place, market?.label ?? "United States")}, Google.{place ? " Volume and cost per click are the place's; difficulty and intent are the country's." : ""}</> : `Volume, difficulty, cost per click and intent for each. ${placeWords(place, market?.label ?? "United States")}, Google.${place ? " Volume and cost per click are the place's; difficulty and intent are the country's." : ""}`}</span>
         </div>
       </form>
       <div className="mt-4">
@@ -281,7 +281,7 @@ export function KeywordLists({ status, site, onTrack }: { status: SeoStatus | un
             {all.length === 0 ? <p className="g-text-2 text-[13px]">No lists yet. Name one above, or tick keywords in any report and choose "Add to a list".</p> : (
               <ul className="space-y-0.5" aria-label="Your keyword lists">
                 {all.map((l) => (
-                  <li key={l.id}><Link href={seoLinks.keywords("", { view: "lists", list: l.id })} aria-current={current === l.id ? "true" : undefined} className={`flex w-full min-h-11 items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] ${LINK_CUE} ${current === l.id ? "font-medium" : "g-text"}`} style={current === l.id ? { background: "var(--g-accent-soft)", color: "var(--g-blue)" } : undefined} data-testid={`list-${l.id}`}>
+                  <li key={l.id}><Link href={seoLinks.keywords("", { tab: "lists", list: l.id })} aria-current={current === l.id ? "true" : undefined} className={`flex w-full min-h-11 items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] ${LINK_CUE} ${current === l.id ? "font-medium" : "g-text"}`} style={current === l.id ? { background: "var(--g-accent-soft)", color: "var(--g-blue)" } : undefined} data-testid={`list-${l.id}`}>
                     <span className="min-w-0 flex-1 truncate">{l.name}{sameMarket(l, DEFAULT_MARKET) ? "" : <span className="g-text-2 font-normal"> · {marketLabel(l.locationCode ?? 2840, l.languageCode ?? "en")}</span>}</span><span className="tabular-nums">{fmtNum(l.keywords)}</span>
                   </Link></li>
                 ))}
@@ -300,7 +300,7 @@ export function KeywordLists({ status, site, onTrack }: { status: SeoStatus | un
                 <div className="mb-2 flex flex-wrap items-center gap-2 text-[13px]">
                   <h3 className="text-[17px] font-medium [overflow-wrap:anywhere]" style={{ color: "var(--g-blue)" }}>{items.data.list.name}</h3>
                   {/* The list's figures are its own address (the rows below; the link to share it), the total grouped by topic. */}
-                  <span className="g-text-2"><Link href={seoLinks.keywords("", { view: "lists", list: items.data.list.id })} className={TEXT_LINK} title="This list's own address — its keywords, below" data-testid="link-list-count">{fmtNum(rows.length)} keyword{rows.length === 1 ? "" : "s"}</Link> · {(() => { const known = rows.filter((r) => r.volume != null); return known.length === 0 ? "no search volumes yet" : <Link href={seoLinks.keywords("", { view: "lists", list: items.data.list.id, topic: "*" })} className={TEXT_LINK} title="The same keywords grouped by topic, each group with its own total" data-testid="link-list-volume">{fmtNum(known.reduce((a, r) => a + (r.volume ?? 0), 0))} searches a month {known.length < rows.length ? `for the ${fmtNum(known.length)} with a figure` : "in total"}</Link>; })()}</span>
+                  <span className="g-text-2"><Link href={seoLinks.keywords("", { tab: "lists", list: items.data.list.id })} className={TEXT_LINK} title="This list's own address — its keywords, below" data-testid="link-list-count">{fmtNum(rows.length)} keyword{rows.length === 1 ? "" : "s"}</Link> · {(() => { const known = rows.filter((r) => r.volume != null); return known.length === 0 ? "no search volumes yet" : <Link href={seoLinks.keywords("", { tab: "lists", list: items.data.list.id, topic: "*" })} className={TEXT_LINK} title="The same keywords grouped by topic, each group with its own total" data-testid="link-list-volume">{fmtNum(known.reduce((a, r) => a + (r.volume ?? 0), 0))} searches a month {known.length < rows.length ? `for the ${fmtNum(known.length)} with a figure` : "in total"}</Link>; })()}</span>
                   <span className="ml-auto flex flex-wrap items-center gap-2">
                     {onTrack && site && <button type="button" className={PILL} disabled={!chosen.length} onClick={() => onTrack(chosen, listMarket)} data-testid="button-list-track"><Plus /> Track {chosen.length || ""} on {site.domain}</button>}
                     <button type="button" className={PILL} disabled={!chosen.length || remove.isPending} onClick={() => remove.mutate(chosen.map((r) => r.keyword))} data-testid="button-list-remove"><Trash2 /> Remove {chosen.length || ""}</button>

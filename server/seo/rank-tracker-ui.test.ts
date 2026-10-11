@@ -117,7 +117,7 @@ describe("every figure on the rank tracker is a link that lands on its data (aud
     expect(page).toContain('data-testid={`link-recent-check-${r.id}`}');
     expect(page).toContain('data-testid="link-no-volume"');
     expect(page).toContain("to({ ...onDevice, noVolume: true })");
-    expect(page).not.toContain('seoLinks.keywords("", { view: "bulk" })');
+    expect(page).not.toContain('seoLinks.keywords("", { tab: "bulk" })');
     expect(page).toContain('id="table-shown"');
     expect(page).toContain('id="table-all"');
     expect(page).toContain('id="visibility-basis"');

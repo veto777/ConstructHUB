@@ -33,7 +33,7 @@ export function spentOn(what: string, sites: SeoSite[]): string | null {
   // AI mentions of any website: the box on the AI visibility page shows the saved result (any site's page will do).
   if ((m = /^AI mentions — (\S+) \((Google AI Overviews|ChatGPT)\)$/.exec(what))) { const s = byDomain(m[1]) ?? only ?? sites[0]; return s ? seoLinks.ai(s.id, { mentions: m[1], platform: m[2] === "ChatGPT" ? "chat_gpt" : "google" }) : null; }
   if ((m = /^Mentions — (\S+) \(link check/.exec(what))) { const s = byDomain(m[1]); return s ? seoLinks.mentions(s.id) : null; }
-  if (/^Refresh list — /.test(what)) return seoLinks.keywords("", { view: "lists" });
+  if (/^Refresh list — /.test(what)) return seoLinks.keywords("", { tab: "lists" });
   if (/^Local grid — /.test(what)) return only ? seoLinks.localGrid(only.id) : null;
   // A question asked of the assistants: its site (newer rows name it) and, for a monthly question, its id; otherwise its
   // first 90 characters, which the AI page opens as the one saved question that begins with them.
@@ -57,7 +57,7 @@ export function spentOn(what: string, sites: SeoSite[]): string | null {
   if ((m = /^Service-area planner — (\S+) \(/.exec(what))) { const s = byDomain(m[1]); return s ? seoLinks.servicePlanner(s.id) : null; }
   if ((m = /^Opportunities — (\S+)$/.exec(what))) return seoLinks.explorer(m[1], "opportunities");
   // The label keeps how many keywords, not which: the page it was made on.
-  if (/^Bulk keyword analysis — /.test(what)) return seoLinks.keywords("", { view: "bulk" });
+  if (/^Bulk keyword analysis — /.test(what)) return seoLinks.keywords("", { tab: "bulk" });
   // One page of a Site explorer / Keywords explorer table: "<the table's name> — <domain or keyword>".
   if ((m = /^(.+?) — (.+)$/.exec(what))) {
     if (Object.prototype.hasOwnProperty.call(REPORT_VIEWS, m[1])) return seoLinks.explorer(m[2], REPORT_VIEWS[m[1]]);

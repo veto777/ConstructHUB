@@ -131,7 +131,7 @@ export default function SeoDashboardPage() {
   useEffect(() => { if (dash.isSuccess && hash === "sites") scrollToSites(); }, [dash.isSuccess, hash]);
 
   return (
-    <SeoShell title="SEO Suite" description="Your sites at a glance: authority, backlinks, estimated search traffic and rankings." site={site} onSite={onSite} sites={sites} status={status}>
+    <SeoShell title="SEO Suite" description="Your sites at a glance: authority, backlinks, estimated search traffic and rankings." site={site} onSite={onSite} sites={sites} status={status} spends="lookups">
       {dash.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading your sites…</p>}
       {dash.isError && <div className="g-callout mb-4" role="alert" data-testid="seo-dashboard-error"><h3>Couldn't load your sites</h3><p>{apiErrorMessage(dash.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void dash.refetch()}>Try again</button></div>}
       {dash.isSuccess && cards.length === 0 && !sites.isError && (
@@ -187,7 +187,7 @@ export default function SeoDashboardPage() {
             <PortfolioCell label="Sites" color={PALETTE.domains} value={fmtNum(shownCards.length)} testId="tile-sites" href={listAt({})} onClick={scrollToSites} linkTestId="link-sites"
               foot={<><FigureLink href={listAt({ filter: "analysed" })} onClick={scrollToSites} testId="link-sites-analysed">{fmtNum(analysed.length)} analysed</FigureLink> · <FigureLink href={listAt({ filter: "crawled" })} onClick={scrollToSites} testId="link-sites-crawled">{fmtNum(crawled.length)} crawled</FigureLink></>} />
             <PortfolioCell label="Average site health" color={PALETTE.health} value={avgHealth == null ? null : <StatusBadge tone={scoreTone(avgHealth)} size="lg">{avgHealth}</StatusBadge>} testId="tile-health" href={listAt({ sort: "health" })} onClick={scrollToSites} linkTestId="link-health-average"
-              foot={scored.length ? <FigureLink href={listAt({ filter: "crawled", sort: "health" })} onClick={scrollToSites} testId="link-health-scored">Of the {fmtNum(scored.length)} crawled site{scored.length === 1 ? "" : "s"}{scored.length < crawled.length ? " with a score" : ""}</FigureLink>
+              foot={scored.length ? <><FigureLink href={listAt({ filter: "crawled", sort: "health" })} onClick={scrollToSites} testId="link-health-scored">Of the {fmtNum(scored.length)} crawled site{scored.length === 1 ? "" : "s"}{scored.length < crawled.length ? " with a score" : ""}</FigureLink>{/* The sites the average leaves out are said too (each card offers its first crawl). */}{crawled.length < shownCards.length ? <span data-testid="text-health-uncrawled"> · {fmtNum(shownCards.length - crawled.length)} not crawled yet</span> : null}</>
                 : crawled.length ? <FigureLink href={listAt({ filter: "crawled" })} onClick={scrollToSites} testId="link-health-scored">{fmtNum(crawled.length)} crawled, no score yet</FigureLink> : "No site crawled yet"} />
             <PortfolioCell label="Tracked keywords" color={PALETTE.tracked} value={fmtNum(totals.keywords)} testId="tile-tracked" href={listAt({ sort: "keywords" })} onClick={scrollToSites} linkTestId="link-tracked-total"
               foot={totals.checked ? <FigureLink href={listAt({ sort: "top10" })} onClick={scrollToSites} testId="link-top10-total">{fmtNum(totals.top10)} in the top 10 in the newest checks</FigureLink> : totals.keywords ? "No check saved yet" : "No keyword tracked yet"} />

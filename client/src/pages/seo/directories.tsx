@@ -19,7 +19,7 @@ import { Download, Loader2, Play, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { ActiveFilter, api, Empty, fmtDate, isNotRunYet, money, type SeoStatus } from "./shell";
+import { ActiveFilter, api, Empty, fmtDate, isNotRunYet, money, SAVED_FOR, type SeoStatus } from "./shell";
 import { AddToPlan, type PlanTask } from "./plan-button";
 import { seoLinks, setParams } from "./links";
 import { marketParams } from "./keyword-links";
@@ -131,7 +131,7 @@ export function DirectoriesView({ domain, status, suggestions, planSiteId, marke
       {(!applied || dirty) && (
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <Button onClick={use} data-testid="button-directories-prepare">{applied ? "Use these sites" : `Check ${draft.length ? `${1 + draft.length} sites` : "this site"}`}</Button>
-          <span className="g-text-2 text-[13px]">{quote(1 + draft.length) != null ? <>Up to <Fig href={seoLinks.usage()} testId="link-directories-price" label={`Up to ${money(quote(1 + draft.length)!)} — what lookups cost and what is left, on the Usage page`}>{money(quote(1 + draft.length)!)}</Fig> of your SEO data for {draft.length ? `these ${1 + draft.length} sites` : "this site"}; kept for a day and free to reopen.</> : status ? "The price couldn't be loaded, so this can't be bought yet — reload the page." : "Getting the price…"}</span>
+          <span className="g-text-2 text-[13px]">{quote(1 + draft.length) != null ? <>Up to <Fig href={seoLinks.usage()} testId="link-directories-price" label={`Up to ${money(quote(1 + draft.length)!)} — what lookups cost and what is left, on the Usage page`}>{money(quote(1 + draft.length)!)}</Fig> of your SEO data for {draft.length ? `these ${1 + draft.length} sites` : "this site"}; kept for {SAVED_FOR} and free to reopen.</> : status ? "The price couldn't be loaded, so this can't be bought yet — reload the page." : "Getting the price…"}</span>
         </div>
       )}
       {applied && !dirty && saved.isLoading && <p className="g-text-2 flex items-center gap-2 text-[13px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Checking for a saved copy…</p>}

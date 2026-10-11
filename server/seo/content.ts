@@ -2,7 +2,7 @@
  * Content Explorer: search the web for pages about a topic — who is writing
  * about it, how strong their site is, and when. For finding content ideas and
  * the sites worth asking for a link or a mention. One lookup per page of
- * results, bought through server/seo/budget.ts, saved for a day.
+ * results, bought through server/seo/budget.ts, saved for the window in shared/seo-constants.ts.
  */
 import { z } from "zod";
 import { request, assertOk, taskItems, safeHttpUrl, safeDomain, normalizeDomain } from "./dataforseo";

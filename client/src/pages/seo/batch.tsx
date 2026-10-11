@@ -2,7 +2,7 @@
  * /seo/batch — Batch analysis: paste up to 100 websites and get each one's
  * authority, linking sites, links, estimated search visits and keywords, to
  * size up a list of competitors or link prospects at a glance. The price is
- * shown first; reopening the same list within a day is free.
+ * shown first; reopening the same list within the saved-copy window (shared/seo-constants.ts) is free.
  *
  * Every row opens that website in Site explorer, and every figure in it opens the explorer's report for that figure
  * (links.ts seoLinks.explorer: linking sites, links, pages, keywords). The meta line too: the count of sites opens
@@ -15,7 +15,7 @@ import { Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { api, Empty, fmtDate, fmtNum, isNotRunYet, money, SeoShell, useHash, useScrollTo, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
+import { api, Empty, fmtDate, fmtNum, isNotRunYet, money, SAVED_FOR, SeoShell, useHash, useScrollTo, useSelectedSite, useSeoSites, useSeoStatus } from "./shell";
 import { seoLinks } from "./links";
 import { FIGURE_LINK, QUIET_LINK, TEXT_LINK } from "./viz-more";
 
@@ -80,14 +80,14 @@ export default function SeoBatchPage() {
     </th>
   );
   return (
-    <SeoShell title="Batch analysis" description="The headline numbers for many websites at once — to size up a list of competitors or sites you might get a link from." site={site} onSite={onSite} sites={sites} status={status} picker={false}>
+    <SeoShell title="Batch analysis" description="The headline numbers for many websites at once — to size up a list of competitors or sites you might get a link from." site={site} onSite={onSite} sites={sites} status={status} picker={false} spends="lookups">
       <form onSubmit={(e) => { e.preventDefault(); setAsked(draft.slice(0, MAX)); }} data-testid="form-batch">
         <label className="block text-[13px]"><span className="g-text-2">Websites — one per line, up to {MAX}. Full addresses are fine; only the site name is used.</span>
           <textarea className="g-input mt-1 min-h-[140px] w-full py-2" value={text} onChange={(e) => setText(e.target.value)} placeholder={"competitor-one.com\ncompetitor-two.com\nlocal-directory.org"} data-testid="textarea-batch" />
         </label>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <Button type="submit" disabled={!draft.length} data-testid="button-batch-prepare">Analyse {draft.length ? `${Math.min(draft.length, MAX)} site${draft.length === 1 ? "" : "s"}` : "sites"}</Button>
-          <span className="g-text-2 text-[13px]">{draft.length > MAX ? `Only the first ${MAX} of ${fmtNum(draft.length)} are analysed at once. ` : ""}{draft.length && priceFor(Math.min(draft.length, MAX)) != null ? `About ${money(priceFor(Math.min(draft.length, MAX)))} of your SEO data; reopening the same list within a day is free.` : "Authority, linking sites, links, estimated search visits and keywords for each."}</span>
+          <span className="g-text-2 text-[13px]">{draft.length > MAX ? `Only the first ${MAX} of ${fmtNum(draft.length)} are analysed at once. ` : ""}{draft.length && priceFor(Math.min(draft.length, MAX)) != null ? `About ${money(priceFor(Math.min(draft.length, MAX)))} of your SEO data; reopening the same list within ${SAVED_FOR} is free.` : "Authority, linking sites, links, estimated search visits and keywords for each."}</span>
         </div>
       </form>
       <div className="mt-4">

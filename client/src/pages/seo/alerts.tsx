@@ -8,8 +8,9 @@
  * picker are links and the back button undoes them; a chip says what narrowed the list. Every alert, and every keyword,
  * site or scan in it, opens the thing it is about: a rank move opens that keyword in the rank tracker, a lost link the
  * site it came from on Backlinks, a grid move that scan on the local grid, a mention its check on Mentions. A keyword
- * alert's "Open this comparison" is a link too (?now= ?before=): the keyword watch on this page reads the pair from
- * the address (keyword-watch.tsx), with its list (?watch=) and "show all" (?watchAll=). The reveals are addresses too:
+ * alert's "Open this comparison" is a link too (?now= ?before=): the keyword watch, below the alert list on this page
+ * (the alerts come first — findings 2026-10-11 #3), reads the pair from the address (keyword-watch.tsx), with its list
+ * (?watch=) and "show all" (?watchAll=). The reveals are addresses too:
  * ?all= (alert ids) lists every movement / kept keyword of those alerts, ?more= how many pages of older alerts follow the
  * newest — so "Show all" and "Show more" are links and the back button undoes them.
  */
@@ -200,7 +201,7 @@ export default function SeoAlertsPage() {
   const allHref = (id: number) => here({ all: allIds.has(id) ? [...allIds].filter((x) => x !== id) : [...allIds, id] });
 
   return (
-    <SeoShell title="Alerts" description="What changed since the last check — rankings, the Google map pack and the sites that link to you." site={site} onSite={onSite} sites={sites} status={status}>
+    <SeoShell title="Alerts" description="What changed since the last check — rankings, the Google map pack and the sites that link to you." site={site} onSite={onSite} sites={sites} status={status} spends="lookups">
       {missing && site && <p className="mb-3 text-[13px]" role="status" style={{ color: "#b06000" }} data-testid="alerts-site-missing">The site this link is for isn't one of yours (or was removed). Showing every site.</p>}
       {chip && <ActiveFilter onClear={() => clearParams(["kind", "site", "alert", "undelivered", "more", "all"], false)} clearLabel="All alerts">{chip}</ActiveFilter>}
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -219,7 +220,6 @@ export default function SeoAlertsPage() {
       </div>
       <p className="g-text-2 text-[12px]">Alerts also go to the bell and your inbox (falls and lost links). Emails: <Link href={seoLinks.appSettings({ tab: "notifications" })} className={TEXT_LINK} data-testid="link-alerts-settings">Settings → Notifications</Link> · what counts as a move: {site ? <Link href={seoLinks.rankTracker(site.id)} className={TEXT_LINK}>Rank tracker → Tracking settings</Link> : "Rank tracker → Tracking settings"}.</p>
 
-      {site && <div id="keyword-watch" className="scroll-mt-4"><KeywordWatch site={site} pick={kwPick} onPick={pickKw} /></div>}
       {page.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Loading alerts…</p>}
       {page.isError && <div className="g-callout" role="alert" data-testid="alerts-error"><h3>Couldn't load your alerts</h3><p>{apiErrorMessage(page.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void page.refetch()}>Try again</button></div>}
       {page.isSuccess && undelivered > 0 && (
@@ -287,6 +287,8 @@ export default function SeoAlertsPage() {
           : failedAt === loadKey && loaded.length < morePages ? <button type="button" className="g-pill !min-h-11" onClick={() => setFailedAt(null)} data-testid="button-alerts-more-retry">Try loading the older alerts again</button>
           : <Link href={here({ more: shownPages + 1 })} className={`g-pill !min-h-11 ${FOCUS_RING}`} data-testid="button-alerts-more">{`Show more (${fmtNum(Math.max(0, total - alerts.length))} older)`}</Link>}</p>
       )}
+      {/* The keyword watch — the data's own view of the site's searches, with its snapshots — sits after the alerts: this page opens on the alert list. An alert's "Open this comparison" scrolls here. */}
+      {site && <div id="keyword-watch" className="mt-6 scroll-mt-4"><KeywordWatch site={site} pick={kwPick} onPick={pickKw} /></div>}
     </SeoShell>
   );
 }

@@ -206,7 +206,7 @@ export default function SeoLocalGridPage() {
   ].filter(Boolean).join(" · ");
 
   return (
-    <SeoShell title="Local grid" description="Where your business shows up in Google's local results across your service area — looked up for point after point, for the searches your customers make." site={site} onSite={changeSite} sites={sites} status={status}>
+    <SeoShell title="Local grid" description="Where your business shows up in Google's local results across your service area — looked up for point after point, for the searches your customers make." site={site} onSite={changeSite} sites={sites} status={status} spends="lookups">
       {missing && site && <p className="mb-3 text-[13px]" role="status" style={{ color: "#b06000" }} data-testid="grid-site-missing">The site this link is for isn't one of yours (or was removed). Showing {site.domain}.</p>}
       {chip && <ActiveFilter onClear={() => clearParams(OWN_PARAMS, false)} clearLabel="Close the scan">{chip}</ActiveFilter>}
       {!site && sites.isSuccess && <Empty testId="grid-empty-sites"><h3>No sites yet</h3><p>Add your site above; then find your business on Google Maps and scan the area around it.</p></Empty>}
@@ -341,15 +341,17 @@ export default function SeoLocalGridPage() {
                     </div>
                   ) : <p className="g-text-2 mb-4 text-[13px]">Select a point to see who is in the first three there.</p>}
                   <Heading level={3}>Who shows up across the area</Heading>
+                  {/* Each business is counted at every point where Google's local results listed it — in the first three, or at all — so several businesses can be "in the first 3" at one point, and a rival's count can exceed yours while your position score is good. The headings say what is counted. */}
+                  <p className="g-text-2 mb-2 text-[12px]" data-testid="text-grid-rivals-note">Each business is counted at every one of the <Link href={here({ show: "checked" })} className={QUIET_LINK}>{shown.summary.checked} points checked</Link> where Google listed it in the first three local results, or at all — so more than one business can be in the first 3 at the same point.</p>
                   {shown.rivals.length ? (
                     <div className="overflow-x-auto"><table className="g-table" data-testid="table-grid-rivals">
-                      <thead><tr><th>Business</th><th className="num">In the first 3</th><th className="num">Found</th><th className="num">Average position where found</th><th className="num">Reviews</th></tr></thead>
+                      <thead><tr><th>Business</th><th className="num" title="At how many of the points checked this business was one of the first three local results">Points in the first 3</th><th className="num" title="At how many of the points checked this business was listed at all">Points found</th><th className="num">Average position where found</th><th className="num">Reviews</th></tr></thead>
                       {/* A business with a website opens in Site explorer, its figures too (no view holds a rival's points); your own row and figures open your points here, and your map-pack keywords in the rank tracker. Reviews are Google's, not ours to open. */}
                       <tbody>{shown.rivals.map((r, i) => { const rival = r.domain ? seoLinks.explorer(r.domain) : null; const cellOf = (s: Show, text: string) => r.ours ? <Link href={here({ show: s })} className={FIGURE_LINK}>{text}</Link> : rival ? <Link href={rival} className={FIGURE_LINK} title={`${r.name} in Site explorer`}>{text}</Link> : <span title="No website in Google's listing, so there is nowhere to open">{text}<span className="g-text-2 text-[11px] max-sm:ml-1 sm:sr-only"> · no website to open</span></span>; return (
                         <tr key={`${r.name}-${i}`} style={r.ours ? { background: "var(--g-hover, rgba(26,115,232,.06))" } : undefined}>
                           <td>{r.ours ? <Link href={seoLinks.rankTracker(site.id, { mapPack: true })} className={TEXT_LINK} data-testid="link-grid-rival-you">{r.name}</Link> : rival ? <Link href={rival} className={TEXT_LINK} title={`Open ${r.domain} in Site explorer`} data-testid={`link-grid-rival-${i}`}>{r.name}</Link> : <>{r.name} <span className="g-text-2 text-[12px]">(no website in Google's listing)</span></>}{r.ours && <span className="g-chip g-chip--sm ml-2">You</span>}{r.domain && <span className="g-text-2 block text-[12px]"><Link href={seoLinks.explorer(r.domain)} className={QUIET_LINK}>{r.domain}</Link></span>}</td>
-                          <td className="num" data-label="In the first 3"><MiniBar value={r.top3} total={shown.summary.checked} className="mr-2" />{cellOf("top3", `${r.top3} of ${shown.summary.checked}`)}</td>
-                          <td className="num" data-label="Found"><MiniBar value={r.found} total={shown.summary.checked} className="mr-2" />{cellOf("found", `${r.found} of ${shown.summary.checked}`)}</td>
+                          <td className="num" data-label="Points in the first 3"><MiniBar value={r.top3} total={shown.summary.checked} className="mr-2" />{cellOf("top3", `${r.top3} of ${shown.summary.checked}`)}</td>
+                          <td className="num" data-label="Points found"><MiniBar value={r.found} total={shown.summary.checked} className="mr-2" />{cellOf("found", `${r.found} of ${shown.summary.checked}`)}</td>
                           <td className="num" data-label="Average position where found">{cellOf("found", String(r.avgRank))}</td>
                           <td className="num" data-label="Reviews">{r.rating != null ? <a href={seoLinks.googleMaps({ cid: r.cid, name: r.name, address: r.ours ? pin?.address : null })} target="_blank" rel="noreferrer" className={QUIET_LINK} title={`${r.name} on Google Maps: Google's own stars and reviews (no view here holds them)`}>{`${r.rating} (${fmtNum(r.reviews)})`} ↗</a> : "—"}</td>
                         </tr>
@@ -377,7 +379,7 @@ export default function SeoLocalGridPage() {
               <Heading>Scans so far</Heading>
               {q.data.scans.length === 0 ? <Empty testId="grid-no-scans"><h3>No scans yet</h3><p>Enter a search your customers make — "siding contractor", "roof repair near me" — and scan the area. Green points are where you are one of the first three local businesses Google lists.</p></Empty> : (
                 <div className="overflow-x-auto"><table className="g-table" data-testid="table-grid-scans">
-                  <thead><tr><th>Search</th><th>Grid</th><th className="num">Position score</th><th className="num">In the first 3</th><th className="num">Found</th><th className="num">When</th></tr></thead>
+                  <thead><tr><th>Search</th><th>Grid</th><th className="num">Position score</th><th className="num" title="At how many of the points checked you were one of the first three local results">Points in the first 3</th><th className="num" title="At how many of the points checked you were listed at all">Points found</th><th className="num">When</th></tr></thead>
                   {/* A scan opened here is an address (?scan=), the same one a report or alert links to; its figures open it with the points they count outlined. */}
                   <tbody>{q.data.scans.map((s) => { const open = { scan: s.id }; return (
                     <tr key={s.id} style={openId === s.id ? { background: "var(--g-hover, rgba(26,115,232,.06))" } : undefined}>
@@ -385,8 +387,8 @@ export default function SeoLocalGridPage() {
                       <td data-label="Grid" className="g-text-2"><Link href={seoLinks.localGrid(site.id, open)} className={QUIET_LINK}>{s.size} × {s.size}, {miles(s.spacing)}</Link></td>
                       {s.status === "failed" ? <td colSpan={3} className="g-text-2" data-label="Result"><Link href={seoLinks.localGrid(site.id, open)} className={QUIET_LINK}>Didn't finish</Link>{s.error ? ` — ${s.error}` : ""}</td> : <>
                         <td className="num" data-label="Position score"><Link href={seoLinks.localGrid(site.id, { ...open, show: "checked" })} className={FIGURE_LINK}>{s.avgRank ?? "—"}</Link></td>
-                        <td className="num" data-label="In the first 3"><Link href={seoLinks.localGrid(site.id, { ...open, show: "top3" })} className={FIGURE_LINK}>{s.top3} of {s.checked}</Link></td>
-                        <td className="num" data-label="Found"><Link href={seoLinks.localGrid(site.id, { ...open, show: "found" })} className={FIGURE_LINK}>{s.found} of {s.checked}</Link></td>
+                        <td className="num" data-label="Points in the first 3"><Link href={seoLinks.localGrid(site.id, { ...open, show: "top3" })} className={FIGURE_LINK}>{s.top3} of {s.checked}</Link></td>
+                        <td className="num" data-label="Points found"><Link href={seoLinks.localGrid(site.id, { ...open, show: "found" })} className={FIGURE_LINK}>{s.found} of {s.checked}</Link></td>
                       </>}
                       <td className="num g-text-2" data-label="When"><Link href={seoLinks.localGrid(site.id, open)} className={QUIET_LINK}>{fmtDate(s.at)}</Link></td>
                     </tr>

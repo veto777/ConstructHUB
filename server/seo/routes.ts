@@ -43,8 +43,9 @@ import {
 import { estimateLabsUsd, estimateAdsVolumeUsd, estimateRankCheckUsd, estimateBacklinkSnapshotUsd, serpKeywordMultiplier, estimateLostLinksUsd } from "./pricing";
 import { creditStatus, outOfCreditMessage, owedCreditMessage } from "./credits";
 import { retailCents, SEO_CREDIT_PACKS } from "@shared/seo-credits";
+import { SEO_SAVED_DAYS } from "@shared/seo-constants";
 import {
-  reportInput, reportRequest, TooManyFilters, SCOPED_TABLES, isKeywordTable, reportCacheKey, cacheKey, cached, saveCached, fetchReportPage, fetchKeywordOverview,
+  reportInput, reportRequest, TooManyFilters, SCOPED_TABLES, isKeywordTable, reportCacheKey, cacheKey, cached, lastSavedAt, saveCached, fetchReportPage, fetchKeywordOverview,
   effectiveReport, fetchAdsSnapshot, adsPage, ADS_MAX, ADS_ESTIMATE_USD, ADS_TYPICAL_USD, type AdsSnapshot,
   CACHE_HOURS, KEYWORD_OVERVIEW_TTL_DAYS, REPORT_ESTIMATE_USD, REPORT_TYPICAL_USD, KEYWORD_OVERVIEW_ESTIMATE_USD, KEYWORD_OVERVIEW_TYPICAL_USD,
   type ReportPage, type KeywordOverview,
@@ -214,8 +215,8 @@ const researchInput = z.object({
   languageCode: z.string().regex(/^[a-z]{2}$/).default("en"),
   placeCode: placeCodeInput,
 }).strict();
-/** Google's free keyword ideas are kept a week per account, seed and place (they are monthly figures). */
-const FREE_IDEAS_HOURS = 7 * 24;
+/** Google's free keyword ideas are kept for the saved-copy window per account, seed and place (they are monthly figures). */
+const FREE_IDEAS_HOURS = CACHE_HOURS;
 const competitorInput = z.object({ competitor: z.string().min(3).max(253) }).strict();
 const explorerInput = z.object({
   domain: z.string().min(3).max(253),
@@ -321,6 +322,14 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   // imports count the plan limit, then insert, and the count holds because nobody else is between the two.
 
   const notReady = (res: any) => res.status(503).json({ configured: false, code: "seo_not_ready", message: SEO_NOT_READY_MESSAGE });
+  /**
+   * A `peek` with nothing fresh to show answers 404 either way — but when a copy older than the window exists, it says
+   * when that copy was made (`code: "expired"`, `lastAt`), so the page can say "last run <date>; kept N days" rather
+   * than "not run yet" while the usage ledger lists the lookup (findings 2026-10-11 #4).
+   */
+  const notSaved = (res: any, lastAt: string | null, message: string) => lastAt
+    ? res.status(404).json({ code: "expired", message: `Last run ${lastAt.slice(0, 10)}; a saved copy is kept ${SEO_SAVED_DAYS} days, so this one is bought again.`, lastAt })
+    : res.status(404).json({ code: "no_report", message });
 
   /** This account's plan units: keywords tracked (standing) and the two monthly meters. */
   const planUsage = async (user: number, ent: Entitlements) => {
@@ -1098,7 +1107,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     const saved = input.refresh ? null : await cached<Planner>(user, key, CACHE_HOURS);
     if (!input.peek || input.remember) await remember();
     if (saved) return res.json({ page: saved, reused: true });
-    if (input.peek) return res.status(404).json({ code: "no_report", message: "Not run yet." });
+    if (input.peek) return notSaved(res, await lastSavedAt(user, key), "Not run yet.");
     if (!isConfigured()) return notReady(res);
     const out = await buyOnce<Planner>(user, key, "planner", CACHE_HOURS, plannerEstimateUsd(services.length * towns.length),
       () => fetchPlanner({ domain: site.domain, locationCode: site.location_code, languageCode: site.language_code, services, towns }), input.refresh, `Service-area planner — ${site.domain} (${services.length} × ${towns.length})`);
@@ -1142,7 +1151,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   });
 
   // ── Content gap / Link intersect (Site Explorer) ────────────────────────────
-  // Up to three competitors against one domain. Saved for a day; `peek` returns the saved copy or 404.
+  // Up to three competitors against one domain. Saved for the window (CACHE_HOURS); `peek` returns the saved copy or 404.
   route("post", "/api/seo/gap", async (req, res, user) => {
     const input = gapInput.parse(req.body);
     if (!marketOk(input)) return res.status(400).json({ message: "That country isn't available." });
@@ -1195,7 +1204,7 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   });
 
   // ── Keywords Explorer: many keywords at once ────────────────────────────────
-  // Volume, difficulty, CPC and intent for up to 200 keywords in one lookup. Saved for a day; `peek` never buys.
+  // Volume, difficulty, CPC and intent for up to 200 keywords in one lookup. Saved for the window (CACHE_HOURS); `peek` never buys.
   route("post", "/api/seo/keywords/bulk", async (req, res, user) => {
     const input = bulkInput.parse(req.body);
     if (!marketOk(input)) return res.status(400).json({ message: "That country isn't available." });
@@ -1252,20 +1261,20 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
   });
   route("delete", "/api/seo/lists/:id", async (req, res, user) => { await deleteList(user, id.parse(req.params.id)); res.json({ ok: true }); });
 
-  // ── Content explorer: pages across the web about a topic. Saved for a day; `peek` never buys. ──
+  // ── Content explorer: pages across the web about a topic. Saved for the window (CACHE_HOURS); `peek` never buys. ──
   route("post", "/api/seo/content", async (req, res, user) => {
     const input = contentInput.parse(req.body);
     const { peek, ...search } = input;
     const key = cacheKey("content", [cleanKeyword(search.query), search.sort, search.sinceDays ?? 0, search.minAuthority ?? 0, search.kind ?? "", search.exclude ? normalizeDomain(search.exclude) ?? "" : "", search.limit, search.offset]);
     const saved = await cached<ContentPage>(user, key, CACHE_HOURS);
     if (saved) return res.json({ page: saved, reused: true });
-    if (peek) return res.status(404).json({ code: "no_report", message: "Not searched yet." });
+    if (peek) return notSaved(res, await lastSavedAt(user, key), "Not searched yet.");
     if (!isConfigured()) return notReady(res);
     const out = await buyOnce<ContentPage>(user, key, "content", CACHE_HOURS, CONTENT_ESTIMATE_USD, () => fetchContent(input), false, `Content explorer — "${search.query}"${search.offset ? ` (results ${search.offset + 1}–${search.offset + search.limit})` : ""}`);
     res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, saved: out.saved });
   });
 
-  // ── Batch analysis: headline numbers for up to 100 websites. Saved for a day; `peek` never buys. ──
+  // ── Batch analysis: headline numbers for up to 100 websites. Saved for the window (CACHE_HOURS); `peek` never buys. ──
   route("post", "/api/seo/batch", async (req, res, user) => {
     const input = batchInput.parse(req.body);
     const { domains, rejected } = cleanDomains(input.domains);
@@ -1328,17 +1337,17 @@ export function registerSeoRoutes(app: Express, auth: (req: any, res: any) => an
     res.json({ tracked: await trackedPrompts(site.id) });
   }));
 
-  // The questions for which an AI answer already uses a site as a source. Saved for a week; `peek` never buys.
+  // The questions for which an AI answer already uses a site as a source. Saved for the window (CACHE_HOURS); `peek` never buys.
   route("post", "/api/seo/ai/mentions", async (req, res, user) => {
     const input = mentionsInput.parse(req.body);
     const domain = normalizeDomain(input.domain);
     if (!domain) return res.status(400).json({ message: "Enter a website like example.com" });
     const key = cacheKey("ai-mentions", [domain, input.platform]);
-    const saved = await cached<AiMentionsPage>(user, key, 7 * 24);
+    const saved = await cached<AiMentionsPage>(user, key, CACHE_HOURS);
     if (saved) return res.json({ page: saved, reused: true });
     if (input.peek) return res.status(404).json({ code: "no_report", message: "Not looked up yet." });
     if (!isConfigured()) return notReady(res);
-    const out = await buyOnce<AiMentionsPage>(user, key, "ai-mentions", 7 * 24, AI_MENTIONS_ESTIMATE_USD, () => fetchAiMentions({ domain, platform: input.platform }), false, `AI mentions — ${domain} (${input.platform === "google" ? "Google AI Overviews" : "ChatGPT"})`);
+    const out = await buyOnce<AiMentionsPage>(user, key, "ai-mentions", CACHE_HOURS, AI_MENTIONS_ESTIMATE_USD, () => fetchAiMentions({ domain, platform: input.platform }), false, `AI mentions — ${domain} (${input.platform === "google" ? "Google AI Overviews" : "ChatGPT"})`);
     res.status(out.reused ? 200 : 201).json({ page: out.data, reused: out.reused, saved: out.saved });
   });
 

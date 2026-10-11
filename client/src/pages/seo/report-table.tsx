@@ -21,7 +21,7 @@ import { Download, Loader2, Play, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { api, canAfford, Empty, fmtDate, fmtNum, money, type SeoStatus } from "./shell";
+import { api, canAfford, Empty, fmtDate, fmtNum, money, SAVED_FOR, type SeoStatus } from "./shell";
 import { DifficultyBadge, PositionBadge } from "./viz";
 import { Fig, FIG, OpenIcon } from "./viz-explorer";
 import { seoLinks, setParam, setParams } from "./links";
@@ -432,7 +432,7 @@ export function ReportView({ table, domain, keyword, status, onExplore, onTrack,
       {saved.isSuccess && !page && (
         <Empty testId="report-not-run">
           <h3>{offset ? `Rows ${fmtNum(offset + 1)}–${fmtNum(offset + limit)} haven't been loaded` : hasFilters ? "This report hasn't been run with these settings" : "This report hasn't been run yet"}</h3>
-          <p>{whole ? `This report costs about ${price} of your SEO data and brings every ad Google's library will give (up to 120); paging through them is free.` : `Each page of a report costs about ${price} of your SEO data.`} {whole ? "It" : "A page you've run"} is kept for a day and opens free.{holdNote(status, priceKey)}</p>
+          <p>{whole ? `This report costs about ${price} of your SEO data and brings every ad Google's library will give (up to 120); paging through them is free.` : `Each page of a report costs about ${price} of your SEO data.`} {whole ? "It" : "A page you've run"} is kept for {SAVED_FOR} and opens free.{holdNote(status, priceKey)}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Button disabled={run.isPending || !status?.configured || !affordable} onClick={() => run.mutate({ body, key: queryKey })} data-testid="button-run-report">
               {run.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Play className="mr-1 h-4 w-4" />}{offset ? "Load these rows" : "Run report"} — about {price}

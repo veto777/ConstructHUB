@@ -1,6 +1,6 @@
 /**
  * Content gap and Link intersect, inside Site Explorer. Pick up to three
- * competitors; the result is saved for a day (POST /api/seo/gap, peek first),
+ * competitors; the result is saved for the window in shared/seo-constants.ts (POST /api/seo/gap, peek first),
  * so reopening it costs nothing. The price is shown before anything is bought.
  * Every figure in the tables is a link to where its data lives (links.ts): a keyword, its volume, cost per click and
  * intent to its overview, its difficulty to who ranks for it, a competitor's position and "their traffic" to that
