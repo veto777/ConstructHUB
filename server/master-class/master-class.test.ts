@@ -108,7 +108,7 @@ describe("the lesson registry", () => {
     }
   });
 
-  it("the interactive checklists keep the browser keys the first round used, so a learner's ticks survive the move", () => {
+  it("the interactive checklists retain their logical names within account-scoped storage", () => {
     const keys = everyBlock().filter((b): b is Extract<LessonBlock, { type: "checklist" }> => b.type === "checklist").map((b) => b.storageKey);
     expect(keys).toEqual(["mc:seo:maintenance", "mc:vetting:checklist"]);
   });
@@ -232,7 +232,7 @@ describe("source guard — the paid text ships in no client bundle", () => {
 
   it("a known lesson sentence from every module is found nowhere under client/ or shared/", () => {
     const known = [
-      "Every sub MUST carry their own insurance and workers comp.",
+      "A contract does not automatically transfer liability or determine employment status;",
       "Get those three right before anything else.",
       "Build these seven pages before anything else.",
       "There is a feature called **Disavow**",

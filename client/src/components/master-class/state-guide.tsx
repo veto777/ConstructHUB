@@ -28,7 +28,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
-import { PROGRESS_NOTE, progressLabel, useChecklist } from "@/components/guides/progress";
+import { progressLabel, useChecklist } from "@/components/guides/progress";
 import { AccessChecking, AccessError, LockedModule, UnlockBadge } from "./gate";
 import { LessonOutline, useScrollToHash, type LessonMeta } from "./lesson";
 import { ModuleLessons } from "./lesson-body";
@@ -170,14 +170,17 @@ function StateFlags({ g }: { g: PublicStateGuide }) {
   );
 }
 
+/** Reordering retains completion; changed instructions require fresh completion. */
+export const stateStepId = (step: StateGuideStep) => JSON.stringify([step.category, step.title, step.description, step.url, step.tips, step.isRequired]);
+
 /** The ordered steps for a state with a checkbox per step: the written walkthrough, or the agency-record checklist. */
 function StepList({ code, stateName, steps, written }: { code: string; stateName: string; steps: StateGuideStep[]; written: boolean }) {
-  const list = useChecklist(`mc:state:${code}`);
-  const done = steps.filter((s) => list.isDone(`step-${s.stepNumber}`)).length;
+  const list = useChecklist(`mc:state:${code}`, { itemIds: steps.map(stateStepId) });
+  const done = steps.filter((s) => list.isDone(stateStepId(s))).length;
   return (
     <Section id="lesson-state-steps" className="scroll-mt-24" icon={Briefcase}
       title={written ? `Step-by-step walkthrough for ${stateName}` : `Checklist for ${stateName}`}
-      description={<>{progressLabel(done, steps.length)} · {PROGRESS_NOTE}</>}
+      description={<>{list.ready && <>{progressLabel(done, steps.length)} · </>}{list.note}</>}
       actions={done > 0 ? <Button variant="ghost" size="sm" onClick={list.reset} data-testid="button-state-steps-reset">Reset</Button> : undefined}
       testId="section-state-steps">
       {written ? (
@@ -191,14 +194,14 @@ function StepList({ code, stateName, steps, written }: { code: string; stateName
         {steps.map((step) => {
           const cat = CATEGORY_CONFIG[step.category] || CATEGORY_CONFIG.formation;
           const CatIcon = cat.icon;
-          const id = `step-${step.stepNumber}`;
+          const id = stateStepId(step);
           const isDone = list.isDone(id);
-          const boxId = `state-${code}-${id}`;
+          const boxId = `state-${code}-step-${step.stepNumber}`;
           return (
             <li key={id} className={cn("rounded-lg border bg-card p-4", isDone && "border-primary/40")} data-testid={`card-step-${step.stepNumber}`}>
               <div className="flex items-start gap-3">
                 <label htmlFor={boxId} className="flex min-h-8 cursor-pointer items-center">
-                  <Checkbox id={boxId} checked={isDone} onCheckedChange={(v) => list.toggle(id, v === true)} aria-label={`Mark step ${step.stepNumber} done`} data-testid={`checkbox-step-${step.stepNumber}`} />
+                  <Checkbox id={boxId} checked={isDone} disabled={!list.ready} onCheckedChange={(v) => list.toggle(id, v === true)} aria-label={`Mark step ${step.stepNumber} done`} data-testid={`checkbox-step-${step.stepNumber}`} />
                 </label>
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold tabular-nums">{step.stepNumber}</div>
                 <div className="min-w-0 flex-1">
@@ -250,11 +253,10 @@ export function StateGuideTab(p: StateGuideTabProps) {
     enabled: !!summary && unlocked && accessOk,
   });
   const lessons = useChecklist(KEY);
-  const stepsList = useChecklist(`mc:state:${code}`);
-  // The outline's "Your state's guide" entry is done when every step of the chosen state is.
-  const stepTotal = detail.data ? (detail.data.steps.length || detail.data.checklist.length) : 0;
-  const stepsDone = stepTotal > 0 && stepsList.count >= stepTotal;
-  useEffect(() => { if (detail.data && code) lessons.toggle("state", stepsDone); }, [stepsDone, code, detail.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  const currentSteps = detail.data ? (detail.data.steps.length ? detail.data.steps : detail.data.checklist) : [];
+  const stepsList = useChecklist(`mc:state:${code}`, { itemIds: currentSteps.map(stateStepId) });
+  const stepsDone = currentSteps.length > 0 && currentSteps.every((step) => stepsList.isDone(stateStepId(step)));
+  useEffect(() => { if (detail.isSuccess && code) lessons.toggle("state", stepsDone); }, [stepsDone, code, detail.isSuccess, lessons.toggle]);
 
   const open = accessOk && unlocked;
   useScrollToHash(open && (!code || detail.isSuccess));

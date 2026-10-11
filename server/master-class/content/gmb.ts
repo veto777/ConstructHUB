@@ -14,12 +14,13 @@ export const GMB: ModuleLessons = {
       id: "setup",
       title: "Claim, verify and set up the profile",
       blocks: [
-        { type: "p", text: "For most contractors the Google Business Profile is the first thing a homeowner sees and the only \"website\" many of them ever open. It is free, it ranks in the map pack above every paid ad, and it is governed by Google's Business Profile guidelines: one profile per real business location, in the real business name, with a verified owner. Get those three right before anything else." },
+        { type: "p", text: "A Google Business Profile helps customers find a business on Maps and Search, but placement is not guaranteed. Follow [Google’s representation guidelines](https://support.google.com/business/answer/3038177?hl=en): use your real-world business name, eligible locations and an account you control. Get those three right before anything else." },
         { type: "panels", items: [
           { title: "Setting it up", items: [
             "Search for your business first: claim the existing listing rather than creating a second one",
-            "Use the exact legal or trading name on your license and your trucks — no added keywords or cities",
-            "Service-area business (you go to the customer): hide the address and set the service area instead",
+            "Use the name customers know from your real-world signage, website and stationery; do not add keywords or cities just to rank",
+            "If you travel to customers and do not serve them at your address, hide that address and enter your actual service area",
+            "Do not use fake addresses, PO boxes or rented virtual-office addresses as operating locations; check Google’s eligibility rules before listing any office",
             "Pick the primary category that names your trade; add secondary categories only for work you actually do",
             "List your services under each category and write the description in plain words about the work and the area",
           ] },
@@ -41,7 +42,7 @@ export const GMB: ModuleLessons = {
         { type: "p", text: "Google cross-checks the name, address, phone number and hours on your profile against your website and every directory that lists you. Where they disagree, trust drops and so does the ranking; where they agree, nobody thinks about it. Decide the canonical version once and defend it." },
         { type: "panels", items: [
           { title: "Keep identical everywhere", items: [
-            "Business name, exactly as filed and as on the license",
+            "Real-world business name, consistent with how customers know you",
             "Address format (Suite vs Ste, St vs Street) — pick one spelling",
             "One primary phone number that you own, not a tracking number you may drop",
             "Website: the home page, or the city page for a multi-location profile",
@@ -89,7 +90,7 @@ export const GMB: ModuleLessons = {
         { type: "panels", items: [
           { title: "Asking", items: [
             "Ask every completed job, by text or email, with your direct review link — the day the job is done",
-            "Ask in person first: 'If you're happy, a Google review helps us more than anything' — then send the link",
+            "Ask in person first: 'Please share an honest Google review of your experience' — then send the same link to every customer",
             "One polite reminder a week later; then stop",
             "Ask for honest feedback. Never ask only happy customers, never screen first, never offer anything for a review",
           ] },
@@ -100,7 +101,7 @@ export const GMB: ModuleLessons = {
             "Fix the problem first, then ask for an honest update — never a change of rating in exchange for anything",
           ] },
         ] },
-        { type: "tip", text: "**Incentives and gating break the rules.** Google's review policy removes incentivised reviews and can suspend the profile, and the FTC's consumer-review rule (16 CFR Part 465) carries civil penalties for buying positive reviews or suppressing negative ones. Same rule as the Reputation lesson in Module 1: resolve the dispute on its merits, keep the review request separate." },
+        { type: "tip", text: "**Keep review requests honest.** Google prohibits incentivized reviews and selectively soliciting positive reviews. The [FTC review-rule guidance](https://www.ftc.gov/business-guidance/resources/consumer-reviews-testimonials-rule-questions-answers) explains restrictions on buying reviews conditioned on sentiment and certain review-suppression practices. These are distinct rules; [check your state](/master-class?tab=state-guide) for local consumer-protection guidance and seek advice for specific disputes. Source reviewed October 11, 2026." },
         { type: "in-app", text: "[Google Reviews](/google-reviews) sends the review requests and reminders from your templates, pulls the reviews in, and drafts replies for your approval with AI reply settings." },
       ],
     },
@@ -157,7 +158,7 @@ export const GMB: ModuleLessons = {
         { type: "panels", items: [
           { title: "Common triggers", tone: "warn", items: [
             "Changing the name, address or category in a burst, or adding keywords to the name",
-            "A virtual office, mailbox or home address with the address shown for a service-area business",
+            "An ineligible virtual office or mailbox, or displaying an address where customers are not served",
             "More than one profile for the same business, or a new profile after a suspension",
             "Hours, phone or website edits that no longer match your site and directories",
             "Being reported by a competitor while any of the above is true",

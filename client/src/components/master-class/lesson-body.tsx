@@ -23,7 +23,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
-import { PROGRESS_NOTE, progressLabel, useChecklist } from "@/components/guides/progress";
+import { progressLabel, useChecklist } from "@/components/guides/progress";
 import { planNamesWhere } from "@shared/plan-copy";
 import { Lesson, useScrollToHash, type LessonMeta } from "./lesson";
 
@@ -65,7 +65,7 @@ const slug = (s: string) => s.replace(/[^a-zA-Z0-9_-]+/g, "-");
 
 /** A link to a platform page inside lesson text. */
 export function AppLink({ href, children, testId }: { href: string; children: ReactNode; testId?: string }) {
-  return <Link href={href} className="font-medium text-foreground underline underline-offset-2 hover:text-primary" data-testid={testId}>{children}</Link>;
+  return <Link href={href} className="font-medium text-foreground underline underline-offset-2 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-testid={testId}>{children}</Link>;
 }
 
 /** "In ConstructHUB: …" — where the lesson's work is done inside the platform, with the page it opens. */
@@ -89,7 +89,7 @@ export function Inline({ text }: { text: string }) {
         if (link) {
           return link[2].startsWith("/")
             ? <AppLink key={i} href={link[2]}>{link[1]}</AppLink>
-            : <a key={i} href={link[2]} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 font-medium text-foreground underline underline-offset-2 hover:text-primary">{link[1]}<ExternalLink className="h-3 w-3" aria-hidden="true" /></a>;
+            : <a key={i} href={link[2]} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 font-medium text-foreground underline underline-offset-2 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{link[1]}<ExternalLink className="h-3 w-3" aria-hidden="true" /></a>;
         }
         if (part.startsWith("*") && part.endsWith("*") && part.length > 2) return <em key={i}>{part.slice(1, -1)}</em>;
         return part;
@@ -124,12 +124,12 @@ const gridCols = (cols: 2 | 3 | undefined) => (cols === 3 ? "grid grid-cols-1 ga
 
 /** An interactive checklist whose ticks the browser keeps (components/guides/progress.ts). */
 function ChecklistBlock({ block }: { block: Extract<LessonBlock, { type: "checklist" }> }) {
-  const list = useChecklist(block.storageKey);
+  const list = useChecklist(block.storageKey, { itemIds: block.items.map((item) => item.id) });
   const base = slug(block.storageKey.replace(/^mc:/, ""));
   return (
     <div className="space-y-2" data-testid={`checklist-${base}`}>
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-        <span role="status">{progressLabel(list.count, block.items.length)}{block.unit ? ` ${block.unit}` : ""} · {PROGRESS_NOTE}</span>
+        <span role="status">{list.ready && <>{progressLabel(list.count, block.items.length)}{block.unit ? ` ${block.unit}` : ""} · </>}{list.note}</span>
         {list.count > 0 && <Button variant="ghost" size="sm" className="!min-h-8" onClick={list.reset} data-testid={`button-${base}-reset`}>{block.resetLabel ?? "Reset"}</Button>}
       </div>
       <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2" data-testid={`list-${base}`}>
@@ -139,7 +139,7 @@ function ChecklistBlock({ block }: { block: Extract<LessonBlock, { type: "checkl
           return (
             <li key={item.id}>
               <label htmlFor={boxId} className="flex min-h-10 cursor-pointer items-start gap-2 rounded-md border bg-background/60 px-3 py-2 text-xs text-muted-foreground hover:bg-muted/50">
-                <Checkbox id={boxId} checked={done} onCheckedChange={(v) => list.toggle(item.id, v === true)} className="mt-0.5" data-testid={`checkbox-${base}-${slug(item.id)}`} />
+                <Checkbox id={boxId} checked={done} disabled={!list.ready} onCheckedChange={(v) => list.toggle(item.id, v === true)} className="mt-0.5" data-testid={`checkbox-${base}-${slug(item.id)}`} />
                 <span className={cn("min-w-0 [overflow-wrap:anywhere]", done && "line-through")}>{item.text}</span>
               </label>
             </li>
