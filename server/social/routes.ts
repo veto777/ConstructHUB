@@ -1,4 +1,5 @@
 import { listBusinesses, pageInput, saveMapping, enqueueBulk, requestSync } from "./agency";
+import { libraryMedia } from "./library-media";
 import { ownedBusiness } from "./service";
 import type { Express, Request, Response } from "express";
 import { z } from "zod";
@@ -252,7 +253,7 @@ export function registerSocialRoutes(
       AND COALESCE(m.description,m.category,'Business photo') ILIKE $3 ORDER BY m.create_time DESC NULLS LAST,m.name LIMIT $4 OFFSET $5`
       : "SELECT id,name,url FROM media_photos WHERE user_id=$1 AND name ILIKE $2 ORDER BY created_at DESC,id LIMIT $3 OFFSET $4",
       businessId?[id,businessId,`%${q.search}%`,q.limit,q.offset]:[id,`%${q.search}%`,q.limit,q.offset]);
-    res.json(rows.filter(r=>publicMediaUrl.safeParse(r.url).success));
+    res.json(libraryMedia(rows));
   });
   route("post", "/uploads", async (req, res, id, businessId) => {
     const { filename } = z
