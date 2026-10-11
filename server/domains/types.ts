@@ -77,6 +77,8 @@ export class DomainError extends Error {
   constructor(
     message: string,
     public status = 400,
+    /** Stable machine-readable reason (e.g. "credentials_unreadable"); echoed as `code` in the route's JSON. */
+    public code?: string,
   ) {
     super(message);
   }

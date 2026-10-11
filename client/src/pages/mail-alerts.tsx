@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
@@ -20,8 +20,8 @@ import { GoogleSurface, GoogleSectionHeader, GoogleList, GoogleListRow, GooglePi
 import {
   PlanRequired,
   planRequiredFrom,
-  pollUnlessPlanRequired,
 } from "@/components/plan-required";
+import { pollWithinBudget } from "@/components/domains/polling";
 // Google's rounded field shape for the native selects (the surface supplies the hairline colour).
 const selectClass =
   "h-10 w-full rounded-full border bg-background px-4 text-sm sm:w-auto";
@@ -47,7 +47,12 @@ export default function MailAlertsPage() {
     [severity, setSeverity] = useState(""),
     [unread, setUnread] = useState(""),
     [mapped, setMapped] = useState(""),
-    [clientId, setClientId] = useState(""),
+    // The inbox filter and the map-target are separate concerns: choosing a map
+    // target must not re-filter the inbox, and filtering must not clear the
+    // chosen target (2026-10-11 findings).
+    [filterClient, setFilterClient] = useState(""),
+    [assignClient, setAssignClient] = useState(""),
+    [assignName, setAssignName] = useState(""),
     [selected, setSelected] = useState<number[]>([]),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -55,6 +60,9 @@ export default function MailAlertsPage() {
     [manageOpen, setManageOpen] = useState(false);
   const [clientQuery, setClientQuery] = useState(""),
     [clientPage, setClientPage] = useState(1);
+  // Names of clients seen or chosen, so a selected filter/assignment keeps its
+  // label even when the client falls off the picker's current search/page.
+  const [knownClients, setKnownClients] = useState<Record<string, string>>({});
   const {
     data: settings,
     error: settingsError,
@@ -76,10 +84,11 @@ export default function MailAlertsPage() {
         severity,
         unread,
         mapped,
-        ...(clientId ? { locationId: clientId } : {}),
+        ...(filterClient ? { locationId: filterClient } : {}),
       })}`,
     ],
-    refetchInterval: pollUnlessPlanRequired(5000),
+    // 15 s: 40 requests/10 min of the route's 120 — see components/domains/polling.ts.
+    refetchInterval: pollWithinBudget(15_000),
   });
   const {
     data: clients,
@@ -90,6 +99,24 @@ export default function MailAlertsPage() {
       `/api/domains/locations?q=${encodeURIComponent(clientQuery)}&page=${clientPage}`,
     ],
   });
+  const loadedClients: { id: string | number; name: string }[] = (
+    clients?.items || []
+  ).map((c: any) => ({ id: c.id, name: c.business_name }));
+  // Every client seen on any page/search stays nameable in both selects.
+  useEffect(() => {
+    const fresh = loadedClients.filter((c) => !knownClients[String(c.id)]);
+    if (fresh.length)
+      setKnownClients((k) => ({
+        ...k,
+        ...Object.fromEntries(fresh.map((c) => [String(c.id), c.name])),
+      }));
+  }, [clients]);
+  // A selected client that isn't on the picker's current page/search still
+  // renders as a labelled option instead of a blank select.
+  const clientOptions = [...loadedClients];
+  for (const [id, name] of Object.entries(knownClients))
+    if (!clientOptions.some((c) => String(c.id) === id))
+      clientOptions.push({ id, name });
   const invalidate = () =>
     queryClient.invalidateQueries({
       predicate: (x) =>
@@ -111,21 +138,21 @@ export default function MailAlertsPage() {
       setBusy(false);
     }
   };
+  /** True only when the request persisted — callers toast success on true only. */
   const markRead = async (ids: number[]) => {
     setBusy(true);
     setError("");
     try {
       await apiRequest("POST", "/api/mail-alerts/read", { ids });
       await invalidate();
+      return true;
     } catch (e) {
       setError(apiErrorMessage(e, "Operation failed"));
+      return false;
     } finally {
       setBusy(false);
     }
   };
-  const clientName = (id: string) =>
-    (clients?.items || []).find((c: any) => String(c.id) === String(id))
-      ?.business_name;
   const counts = messages?.counts;
   const configured = !!settings?.address;
   // Google's format (owner, 2026-10-07): a quiet page title, section headings with a hairline, alerts as rows.
@@ -183,7 +210,7 @@ export default function MailAlertsPage() {
       on: mapped === "unmapped",
       toggle: () => {
         setMapped((s) => (s ? "" : "unmapped"));
-        setClientId("");
+        setFilterClient("");
         setPage(1);
       },
     },
@@ -294,7 +321,7 @@ export default function MailAlertsPage() {
               placeholder: "Search alerts",
             }}
             activeFilters={
-              (category ? 1 : 0) + (severity ? 1 : 0) + (mapped || clientId ? 1 : 0)
+              (category ? 1 : 0) + (severity ? 1 : 0) + (mapped || filterClient ? 1 : 0)
             }
             filters={
               <>
@@ -339,15 +366,15 @@ export default function MailAlertsPage() {
                 <select
                   aria-label="Filter by client"
                   className={selectClass}
-                  value={mapped || clientId}
+                  value={mapped || filterClient}
                   onChange={(e) => {
                     const v = e.target.value;
                     if (v === "unmapped") {
                       setMapped("unmapped");
-                      setClientId("");
+                      setFilterClient("");
                     } else {
                       setMapped("");
-                      setClientId(v);
+                      setFilterClient(v);
                     }
                     setSelected([]);
                     setPage(1);
@@ -355,9 +382,9 @@ export default function MailAlertsPage() {
                 >
                   <option value="">All clients</option>
                   <option value="unmapped">Unmapped</option>
-                  {(clients?.items || []).map((c: any) => (
+                  {clientOptions.map((c) => (
                     <option key={c.id} value={String(c.id)}>
-                      {c.business_name}
+                      {c.name}
                     </option>
                   ))}
                 </select>
@@ -402,10 +429,10 @@ export default function MailAlertsPage() {
                 disabled={busy}
                 onClick={async () => {
                   const ids = selected;
-                  await markRead(ids);
-                  toast({
-                    title: `${ids.length} alert${ids.length === 1 ? "" : "s"} marked read`,
-                  });
+                  if (await markRead(ids))
+                    toast({
+                      title: `${ids.length} alert${ids.length === 1 ? "" : "s"} marked read`,
+                    });
                 }}
                 label="Mark read"
               />
@@ -422,14 +449,19 @@ export default function MailAlertsPage() {
                 />
                 <select
                   aria-label="Map alerts to client"
-                  value={clientId}
-                  onChange={(e) => setClientId(e.target.value)}
+                  value={assignClient}
+                  onChange={(e) => {
+                    setAssignClient(e.target.value);
+                    // The toast names the chosen option, not a lookup that may
+                    // fail when the client isn't on the picker's current page.
+                    setAssignName(e.target.selectedOptions[0]?.text || "");
+                  }}
                   className={`${selectClass} h-9`}
                 >
                   <option value="">Choose a client…</option>
-                  {(clients?.items || []).map((c: any) => (
+                  {clientOptions.map((c) => (
                     <option key={c.id} value={String(c.id)}>
-                      {c.business_name}
+                      {c.name}
                     </option>
                   ))}
                 </select>
@@ -450,14 +482,14 @@ export default function MailAlertsPage() {
                   />
                 </div>
                 <GooglePill
-                  variant={mapped || clientId ? "solid" : "outline"}
+                  variant={assignClient ? "solid" : "outline"}
                   size="sm"
-                  disabled={!selected.length || busy || !clientId || !!clientsError}
+                  disabled={!selected.length || busy || !assignClient || !!clientsError}
                   onClick={async () => {
-                    const name = clientName(clientId);
+                    const name = assignName;
                     const d = await action("/mapping", {
                       ids: selected,
-                      locationId: clientId ? Number(clientId) : null,
+                      locationId: assignClient ? Number(assignClient) : null,
                     });
                     if (d)
                       toast({
@@ -517,7 +549,7 @@ export default function MailAlertsPage() {
             </Notice>
           ) : !messages?.items?.length ? (
             <p className="py-4 text-sm g-text-2">
-              {q || category || severity || unread || mapped || clientId
+              {q || category || severity || unread || mapped || filterClient
                 ? "No alerts match these filters."
                 : "No provider alerts yet. Forward provider mail here and recognised alerts appear in this inbox."}
             </p>

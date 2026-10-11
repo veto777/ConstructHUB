@@ -44,10 +44,22 @@ export async function limitedFetch(
 }
 function adapter(c: any, deps: Dependencies) {
   if (deps.adapter) return deps.adapter(c);
-  const keys = JSON.parse(decryptToken(c.credentials)!);
+  let keys: { key?: unknown; secret?: unknown } | null = null;
+  try {
+    const raw = decryptToken(c.credentials);
+    keys = raw ? JSON.parse(raw) : null;
+  } catch {
+    keys = null; // unreadable storage — the actionable error below replaces a raw 500
+  }
+  if (!keys || typeof keys !== "object" || !keys.key || !keys.secret)
+    throw new DomainError(
+      `The saved ${c.provider === "namecom" ? "Name.com" : "Porkbun"} key "${c.label}" can't be read. Disconnect it and connect the key again to resume registrar sync and DNS changes.`,
+      502,
+      "credentials_unreadable",
+    );
   return c.provider === "porkbun"
-    ? porkbun(keys, limitedFetch)
-    : namecom(keys, limitedFetch);
+    ? porkbun(keys as { key: string; secret: string }, limitedFetch)
+    : namecom(keys as { key: string; secret: string }, limitedFetch);
 }
 export async function enqueue(
   userId: number,

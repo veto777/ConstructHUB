@@ -71,6 +71,7 @@ export function registerDomainRoutes(
                 : 500,
           )
           .json({
+            ...(e instanceof DomainError && e.code ? { code: e.code } : {}),
             message:
               e instanceof DomainError
                 ? e.message

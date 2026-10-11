@@ -1,12 +1,28 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Pencil, Search, Trash2 } from "lucide-react";
+import { Pencil, Search, Trash2, Unplug } from "lucide-react";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Notice } from "@/components/app-ui";
 import { GooglePill } from "@/components/google";
 import type { DnsRecordLike } from "./dns-diff";
+
+/** Reads the JSON body's `code` out of a query error ("502: {json}"), like planRequiredFrom does for 402s. */
+const errorCode = (err: unknown): string | null => {
+  const raw =
+    typeof (err as { message?: unknown } | null)?.message === "string"
+      ? (err as { message: string }).message
+      : "";
+  const m = /^\d{3}:\s*([\s\S]*)$/.exec(raw);
+  if (!m) return null;
+  try {
+    const parsed = JSON.parse(m[1]);
+    return typeof parsed?.code === "string" ? parsed.code : null;
+  } catch {
+    return null;
+  }
+};
 
 /**
  * The current DNS records of the one selected domain, read live from its registrar
@@ -17,9 +33,12 @@ import type { DnsRecordLike } from "./dns-diff";
 export function RecordPicker({
   domainId,
   onPick,
+  onReconnect,
 }: {
   domainId: number;
   onPick: (action: "update" | "delete", record: DnsRecordLike) => void;
+  /** Scrolls to the connect form; offered when the saved registrar key can't be read. */
+  onReconnect?: () => void;
 }) {
   const [search, setSearch] = useState("");
   const { data, isLoading, error, refetch, isFetching } = useQuery<any>({
@@ -28,6 +47,8 @@ export function RecordPicker({
     retry: false,
   });
   const records: DnsRecordLike[] = data?.records || [];
+  // Saved key unreadable (rotated/undecryptable): name the fix and offer the way there.
+  const reconnectNeeded = errorCode(error) === "credentials_unreadable";
   const needle = search.trim().toLowerCase();
   const shown = needle
     ? records.filter((r) =>
@@ -70,7 +91,17 @@ export function RecordPicker({
           tone="danger"
           testId="record-picker-error"
           action={
-            <GooglePill size="sm" onClick={() => refetch()} label="Try again" />
+            <>
+              <GooglePill size="sm" onClick={() => refetch()} label="Try again" />
+              {reconnectNeeded && onReconnect && (
+                <GooglePill
+                  size="sm"
+                  icon={Unplug}
+                  onClick={onReconnect}
+                  label="Reconnect registrar"
+                />
+              )}
+            </>
           }
         >
           {apiErrorMessage(error, "Could not load the domain's records.")}

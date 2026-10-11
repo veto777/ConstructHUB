@@ -46,6 +46,45 @@ describe("diffRecords", () => {
     );
     expect(rows[0].status).toBe("unchanged");
   });
+  it("pairs an id-less record with a new value as one changed row", () => {
+    // Providers that don't expose record ids (and seeded before/after states)
+    // used to diff an edited record as Added + Removed.
+    const rows = diffRecords(
+      [{ type: "A", name: "www", content: "192.0.2.1", ttl: 600 }],
+      [{ type: "A", name: "www", content: "192.0.2.2", ttl: 600 }],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe("changed");
+    expect(rows[0].before?.content).toBe("192.0.2.1");
+    expect(rows[0].after?.content).toBe("192.0.2.2");
+  });
+  it("keeps true adds and removes apart when names differ", () => {
+    const rows = diffRecords(
+      [{ type: "A", name: "www", content: "192.0.2.1" }],
+      [{ type: "A", name: "mail", content: "192.0.2.2" }],
+    );
+    expect(rows.map((r) => r.status).sort()).toEqual(["added", "removed"]);
+  });
+  it("pairs only as many id-less rows as exist on both sides", () => {
+    const rows = diffRecords(
+      [
+        { type: "TXT", name: "@", content: "a" },
+        { type: "TXT", name: "@", content: "b" },
+      ],
+      [{ type: "TXT", name: "@", content: "c" }],
+    );
+    expect(rows).toHaveLength(2);
+    expect(rows.filter((r) => r.status === "changed")).toHaveLength(1);
+    expect(rows.filter((r) => r.status === "removed")).toHaveLength(1);
+  });
+  it("keeps unmatched id-bearing records as add/remove even with the same name and type", () => {
+    // A replaced record (new provider id) is a delete + a create, not an edit.
+    const rows = diffRecords(
+      [{ id: "301", type: "A", name: "www", content: "192.0.2.1" }],
+      [{ id: "302", type: "A", name: "www", content: "192.0.2.2" }],
+    );
+    expect(rows.map((r) => r.status).sort()).toEqual(["added", "removed"]);
+  });
   it("a ttl-only edit is a change, not add+remove", () => {
     const rows = diffRecords(
       [{ id: "9", type: "A", name: "@", content: "192.0.2.1", ttl: 600 }],
