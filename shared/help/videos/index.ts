@@ -106,6 +106,7 @@ export { default as v_database_directory } from "./database-directory.json";
 export { default as v_intro_ads_manager } from "./intro-ads-manager.json";
 export { default as v_intro_agency } from "./intro-agency.json";
 export { default as v_intro_click_guard } from "./intro-click-guard.json";
+export { default as v_intro_cloudflare } from "./intro-cloudflare.json";
 export { default as v_intro_competitors } from "./intro-competitors.json";
 export { default as v_intro_customer_api } from "./intro-customer-api.json";
 export { default as v_intro_domains } from "./intro-domains.json";

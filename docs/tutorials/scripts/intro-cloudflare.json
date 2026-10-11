@@ -1,0 +1,127 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "intro-cloudflare",
+  "title": "Cloudflare",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/cloudflare",
+      "caption": "Cloudflare",
+      "chapter": "Every site in one list",
+      "narration": "This is Cloudflare. It shows each site's traffic and firewall events, and adds rules you review first."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"list-sites-cloudflare\"]",
+      "caption": "Connected sites",
+      "narration": "Every connected site is listed. New zones are found every hour; a site's analytics refresh when you choose Sync."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"list-sites-cloudflare\"] button:has-text(\"summitroofing.example\")",
+      "caption": "Open a site",
+      "chapter": "Traffic and threats",
+      "narration": "Open a site to see its last day of traffic."
+    },
+    {
+      "action": "highlight",
+      "selector": "dl:has(dt:has-text(\"Requests (UTC days)\"))",
+      "caption": "Requests, threats, page views, bots",
+      "narration": "The tiles add up requests, threats and page views, and the share of scored requests that were bots."
+    },
+    {
+      "action": "click",
+      "selector": "button[data-trend-index=\"1\"]",
+      "caption": "Pin a day",
+      "narration": "Click a bar in the trend, and that day's date and request count show above it."
+    },
+    {
+      "action": "scroll-to",
+      "selector": "section:has(> div > [role=\"search\"] > input[aria-label=\"Search Events\"])",
+      "offset": 160,
+      "caption": "Latest firewall events",
+      "chapter": "Firewall events",
+      "narration": "Further down are the latest firewall events: the action, the IP address, the country and the path."
+    },
+    {
+      "action": "click",
+      "selector": "section:has(> div > [role=\"search\"] > input[aria-label=\"Search Events\"]) th button:has-text(\"Country\")",
+      "caption": "Sort any column",
+      "narration": "Click a column, like Country, to sort all the rows."
+    },
+    {
+      "action": "scroll-to",
+      "selector": "#flagged-ips",
+      "offset": 160,
+      "caption": "Flagged IPs",
+      "narration": "Flagged IPs lists the addresses Click Guard blocked for this domain."
+    },
+    {
+      "action": "click",
+      "selector": "#flagged-ips button:has-text(\"Add to preview\") >> nth=0",
+      "caption": "Add to preview",
+      "chapter": "Preview before blocking",
+      "narration": "Choose Add to preview, and the address goes into the Flagged IPs rule pack."
+    },
+    {
+      "action": "highlight",
+      "selector": "select[aria-label=\"Rule pack\"]",
+      "caption": "Three rule packs",
+      "narration": "The other packs guard your ads landing page, or block bad user agents across the site."
+    },
+    {
+      "action": "click",
+      "selector": "button:has-text(\"Preview rules\")",
+      "caption": "Preview rules",
+      "narration": "Choose Preview rules. Nothing is sent to Cloudflare yet."
+    },
+    {
+      "action": "highlight",
+      "selector": "div.rounded-lg.border:has(h3:has-text(\"Review before applying\"))",
+      "caption": "The zone, a warning, the exact rule",
+      "narration": "The preview shows the zone, a warning, and the exact rule expression it would add."
+    },
+    {
+      "action": "highlight",
+      "selector": "button:has-text(\"Confirm and queue edge changes\")",
+      "caption": "Nothing changes until you confirm",
+      "narration": "Rules are queued for Cloudflare only when you confirm. Each change is kept in the Edge audit, ready to undo."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-cloudflare\"]",
+      "caption": "Menu: Cloudflare",
+      "narration": "You'll find Cloudflare in the menu on the left, under Tools."
+    }
+  ],
+  "youtube": {
+    "title": "Cloudflare in about a minute | ConstructHUB",
+    "description": "A one-minute tour of Cloudflare in ConstructHUB: every connected site in one list, each site's traffic, threats and firewall events, and protection rules you preview before anything is queued for Cloudflare.",
+    "tags": [
+      "ConstructHUB",
+      "Cloudflare",
+      "firewall rules",
+      "website security",
+      "bot traffic",
+      "click fraud",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Preview Before Blocking",
+    "accent": "Preview",
+    "kicker": "Cloudflare",
+    "step": 11
+  },
+  "removeSelectors": [
+    "div[role=\"alert\"].bg-orange-50:has(~ * [data-testid=\"tab-connection-sites\"], ~ [data-testid=\"tab-connection-sites\"])"
+  ]
+}
