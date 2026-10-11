@@ -12,8 +12,7 @@ import { PAYMENT_NEEDED_STATUSES, PLANS, fitsLimit } from "@shared/plans";
 import { isSalesOnly, sendTalkToSales, salesInquirySubject } from "./catalog";
 import { isReviewSuppressed, unsubscribeRecipient, resubscribeRecipient } from "./review-suppression";
 import { reminderSettingsInput, calculateNextReminderTime, inReminderWindow, canonicalAppOrigin } from "./review-reminders";
-import { analyzeReviews, analyzeBsScore, presentListing } from "./competitor-analysis";
-import { competitorPlaces, placesResponse } from "./competitor-provider";
+import { presentListing } from "./competitor-analysis";
 import { rateLimit, actorKey, takeBudget } from "./growth-limits";
 import { ownedBy } from "./ownership";
 import { buildExclusionList } from "./click-guard-exclusions";
@@ -55,6 +54,9 @@ import { isPlatformAdmin as isAdmin } from "./admin";
 import { platformGatePassed, ADMIN_REAUTH_BODY } from "./crm/admin";
 import { trialCodeDays, ACCESS_GRANT_MIN_DAYS, ACCESS_GRANT_MAX_DAYS } from "@shared/access-grants";
 import { recordFailure } from "./ops/issues";
+import { ensureCompetitorWorkerSchema } from "./competitors/schema";
+import { competitorScanActions } from "./competitors/routes";
+import { enqueueCompetitorScan, removeCompetitorScan, startCompetitorWorker } from "./competitors/worker";
 
 // SECURITY: local-dev auth bypass (treat anonymous requests as user 1). This is
 // deliberately decoupled from NODE_ENV — it requires an explicit opt-in env var
@@ -455,6 +457,8 @@ export async function registerRoutes(
   registerSiteScanRoutes(app, getDevUser);
   const { startSiteScanWorker } = await import("./sitescan/worker");
   startSiteScanWorker();
+  await ensureCompetitorWorkerSchema();
+  startCompetitorWorker();
   // SEO toolset (server/seo): rank tracker, keyword research, backlinks,
   // competitor gap on DataForSEO pay-as-you-go, capped by SEO_MONTHLY_BUDGET_USD.
   // Guarded (server/seo/boot.ts): the schema step runs zero DDL when its stored hash matches, with lock and
@@ -2713,6 +2717,9 @@ export async function registerRoutes(
     } catch (err) { planCheckFailed(res, err); return false; }
   }
 
+  // Cancel a running/queued scan (POST /api/competitors/scans/:id/cancel): keeps the card, refunds the month.
+  app.use("/api/competitors/scans", competitorScanActions);
+
   // The Competitors market-scan cards (plan-gated — a 402 here is the page's plan-locked screen): the
   // owner's scans, newest first.
   app.get("/api/competitors/scans", async (req, res) => {
@@ -2750,22 +2757,12 @@ export async function registerRoutes(
       if (!(await reserveMonthlyQuota(req, res, "competitorScans"))) return;
       const reservation: QuotaReservation | undefined = res.locals.growthQuota;
 
-      const [scan] = await db.insert(competitorScans).values({
-        userId,
-        industry,
-        location,
-        lat: lat || null,
-        lon: lon || null,
-        radius: radius || 25,
-        status: "running",
-      }).returning();
-
-      // A scan that fails gives its scan back.
-      runCompetitorScan(scan.id, userId, industry, location, lat, lon, radius || 25)
-        .then(ok => { if (!ok) return refundReservation(reservation, 1); })
-        .catch(err => console.error("Competitor scan error:", err));
-
-      res.json(scan);
+      // Queued durably; the Competitor Intel worker runs it (lease/recovery) and settles the reservation.
+      let scan;
+      try {
+        scan = await enqueueCompetitorScan(userId, { industry, location, lat, lon, radius: radius || 25 }, reservation, new Date());
+      } catch (e) { await refundReservation(reservation, 1); throw e; }
+      res.json(scan); // status "pending" until the worker claims it
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
 
@@ -2774,10 +2771,9 @@ export async function registerRoutes(
     try {
       const userId = (req as any).user.id;
       const scanId = parseInt(req.params.id);
-      const [scan] = await db.select().from(competitorScans).where(and(eq(competitorScans.id, scanId), eq(competitorScans.userId, userId)));
-      if (!scan) return res.status(404).json({ message: "Scan not found" });
-      await db.delete(competitorListings).where(eq(competitorListings.scanId, scanId));
-      await db.delete(competitorScans).where(eq(competitorScans.id, scanId));
+      // Cancels first when still active (refunds the month, nothing orphaned), then removes.
+      const removed = await removeCompetitorScan(userId, scanId, new Date());
+      if (!removed) return res.status(404).json({ message: "Scan not found" });
       res.json({ success: true });
     } catch (err: any) { res.status(500).json({ message: err.message }); }
   });
@@ -2929,70 +2925,6 @@ export async function registerRoutes(
     }
   }
 
-  /** Runs a competitor scan; resolves false when it failed (the scan is then refunded). */
-  async function runCompetitorScan(scanId: number, userId: number, industry: string, location: string, lat: string | null, lon: string | null, radius: number): Promise<boolean> {
-    const apiKey = process.env.GOOGLE_PLACES_API_KEY;
-    if (!apiKey) {
-      await db.update(competitorScans).set({ status: "failed", errorMessage: "Google Places is not configured." }).where(eq(competitorScans.id, scanId));
-      return false;
-    }
-
-    try {
-      const found = await competitorPlaces(industry, location, radius, apiKey);
-      const allPlaces = found.places;
-      // A partly paged result is still real data; say it may be incomplete (shown as a note on the completed scan).
-      await db.update(competitorScans).set({
-        lat: String(found.center.lat), lon: String(found.center.lng),
-        errorMessage: found.complete ? null : "Google's later results pages could not be loaded, so this list may be incomplete. Run the scan again for the full list.",
-      }).where(eq(competitorScans.id, scanId));
-
-      for (const place of allPlaces) {
-        let detailReviews: any[] = [];
-        let phone: string | null = null;
-        let website: string | null = null;
-
-        try {
-          const detailUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place.place_id}&fields=reviews,formatted_phone_number,website&key=${apiKey}`;
-          const detailData = await placesResponse(detailUrl, "Competitor details");
-          if (detailData.result) {
-            detailReviews = detailData.result.reviews || [];
-            phone = detailData.result.formatted_phone_number || null;
-            website = detailData.result.website || null;
-          }
-          await new Promise(r => setTimeout(r, 200));
-        } catch (e) { throw e; }
-
-        const reviewAnalysis = analyzeReviews(detailReviews, place, industry);
-        const bsAnalysis = analyzeBsScore(place, reviewAnalysis);
-
-        await db.insert(competitorListings).values({
-          scanId,
-          userId,
-          placeId: place.place_id,
-          businessName: place.name || "Unknown",
-          address: place.formatted_address || null,
-          phone,
-          website,
-          rating: place.rating ? String(place.rating) : null,
-          reviewCount: place.user_ratings_total || 0,
-          category: (place.types || []).filter((t: string) => !["point_of_interest", "establishment"].includes(t)).map((t: string) => t.replace(/_/g, " ")).slice(0, 2).join(", "),
-          isNew: false,
-          bsScore: bsAnalysis.score,
-          bsReasons: bsAnalysis.reasons,
-          reviewAnalysis,
-          rankHistory: [{ rank: allPlaces.indexOf(place) + 1, date: new Date().toISOString() }],
-        });
-      }
-
-      await db.update(competitorScans).set({ status: "completed", totalFound: allPlaces.length }).where(eq(competitorScans.id, scanId));
-      return true;
-    } catch (err: any) {
-      console.error("Competitor scan failed:", err);
-      await db.delete(competitorListings).where(eq(competitorListings.scanId, scanId));
-      await db.update(competitorScans).set({ status: "failed", totalFound: 0, errorMessage: err.message || "Provider request failed." }).where(eq(competitorScans.id, scanId));
-      return false;
-    }
-  }
 
   // Citation campaigns come with every paid plan; the paying account is the workspace owner.
   async function requireCitationsPlan(req: any, res: any): Promise<boolean> {
