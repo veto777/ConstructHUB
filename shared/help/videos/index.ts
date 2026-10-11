@@ -107,6 +107,7 @@ export { default as v_intro_ads_manager } from "./intro-ads-manager.json";
 export { default as v_intro_agency } from "./intro-agency.json";
 export { default as v_intro_click_guard } from "./intro-click-guard.json";
 export { default as v_intro_competitors } from "./intro-competitors.json";
+export { default as v_intro_customer_api } from "./intro-customer-api.json";
 export { default as v_intro_domains } from "./intro-domains.json";
 export { default as v_intro_gbp_content } from "./intro-gbp-content.json";
 export { default as v_intro_gbp } from "./intro-gbp.json";

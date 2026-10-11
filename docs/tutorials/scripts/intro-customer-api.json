@@ -1,0 +1,146 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "intro-customer-api",
+  "title": "Customer API",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/developers",
+      "caption": "The API reference",
+      "chapter": "The API reference",
+      "narration": "This is the Customer API reference. Your own scripts read and update your ConstructHUB data with it."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"banner-developers-no-ai\"]",
+      "caption": "No AI through the API",
+      "narration": "What it doesn't do: no AI. What you send is stored exactly as you sent it."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-developers-auth\"]",
+      "caption": "A key, read or write",
+      "narration": "Every request carries a key as a bearer token, with read, write, or both."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-developers-limits\"] ul",
+      "caption": "Units and limits",
+      "narration": "A read costs one unit plus one per hundred rows, and a write costs five."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"nav-developers-resources\"]",
+      "caption": "Endpoints by resource",
+      "chapter": "Find an endpoint",
+      "narration": "The endpoints are grouped by resource, from locations and reviews to Site Scans."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-developers-search\"]",
+      "value": "reply",
+      "caption": "Search: reply",
+      "narration": "Search to find one. Type reply."
+    },
+    {
+      "action": "scroll-to",
+      "selector": "[data-testid=\"card-developers-tag-reviews\"]",
+      "offset": 274,
+      "caption": "Reply to a review",
+      "narration": "This one replies to a Google review, published or saved as a draft."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"badge-cost-post-reviews-id-reply\"]",
+      "caption": "Scope and cost",
+      "narration": "Open it: write scope, five units a call."
+    },
+    {
+      "action": "scroll-to",
+      "selector": "[data-testid=\"example-minimal-post-reviews-id-reply\"]",
+      "offset": 120,
+      "caption": "A minimal example",
+      "narration": "The minimal example shows the call: the address, your key and your reply's text."
+    },
+    {
+      "action": "goto",
+      "url": "/settings?tab=api-keys",
+      "caption": "Your API keys",
+      "chapter": "Your API keys",
+      "narration": "Your keys live in Settings, under API keys."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-api-key-key_sample930303\"]",
+      "caption": "Every key and its use",
+      "narration": "Each key shows its scope, units used this month, its own limit, when it was added and last used, and when it expires."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-generate-key\"]",
+      "caption": "Generate API key",
+      "narration": "To add one, choose Generate API key."
+    },
+    {
+      "action": "type",
+      "selector": "[data-testid=\"input-key-name\"]",
+      "value": "Weekly review report",
+      "caption": "Title, scope, limit, expiry",
+      "narration": "Give it a title, a scope, and an optional unit limit and expiry."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-generate-submit\"]",
+      "caption": "Confirm it's you",
+      "narration": "First you confirm it's you, with a code sent to your own email."
+    },
+    {
+      "action": "press",
+      "value": "Escape",
+      "caption": "No key without the check",
+      "narration": "Cancel the check, and no key is made. Once you confirm, the key is shown once."
+    },
+    {
+      "action": "press",
+      "value": "Escape",
+      "caption": "Rename, limit, revoke",
+      "narration": "From a key's menu you can rename it, set its limit, or revoke it."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"button-settings-tab-api-keys\"]",
+      "caption": "Settings: API keys",
+      "narration": "You'll find your keys in Settings, under API keys."
+    }
+  ],
+  "youtube": {
+    "title": "Customer API in about a minute | ConstructHUB",
+    "description": "A one-minute tour of the ConstructHUB Customer API: the API reference with its scopes, units and limits, how to find an endpoint and its minimal example, and where to create and manage your API keys. No AI runs through the API; what you send is stored exactly as sent.",
+    "tags": [
+      "ConstructHUB",
+      "Customer API",
+      "REST API",
+      "API keys",
+      "Google Business Profile API",
+      "contractor software",
+      "developer docs"
+    ],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Your Data, Your Scripts",
+    "accent": "Scripts",
+    "kicker": "Customer API",
+    "step": 10
+  },
+  "redactSelectors": [
+    "[data-testid=\"text-new-key\"]"
+  ]
+}
