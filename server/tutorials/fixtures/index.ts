@@ -33,9 +33,12 @@ export function installTutorialEgressGuard(): boolean {
   if (!tutorialFixturesOn() || egressGuarded) return egressGuarded;
   const real = globalThis.fetch;
   globalThis.fetch = (async (input: any, init?: any) => {
-    let host = "";
-    try { host = new URL(typeof input === "string" ? input : input?.url ?? String(input)).hostname; } catch { /* a relative URL cannot leave */ }
-    if (host && !/^(127\.0\.0\.1|localhost|\[?::1\]?)$/.test(host)) throw new TypeError(`tutorial recording slot: outbound request to ${host} blocked (no fixture answers it)`);
+    let host = "", path = "";
+    try { const u = new URL(typeof input === "string" ? input : input?.url ?? String(input)); host = u.hostname; path = u.pathname; } catch { /* a relative URL cannot leave */ }
+    // One opt-in exception: a slot launched with TUTORIAL_PLACES_KEY may fetch a Google Static Maps image (the Ranking
+    // Grid report's backdrop). Read-only, an image of a map, nothing about the demo account is sent.
+    const staticMap = !!process.env.TUTORIAL_PLACES_KEY && host === "maps.googleapis.com" && path === "/maps/api/staticmap";
+    if (host && !staticMap && !/^(127\.0\.0\.1|localhost|\[?::1\]?)$/.test(host)) throw new TypeError(`tutorial recording slot: outbound request to ${host} blocked (no fixture answers it)`);
     return real(input, init);
   }) as typeof fetch;
   egressGuarded = true;
