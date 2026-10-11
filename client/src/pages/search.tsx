@@ -163,6 +163,13 @@ export default function SearchPage() {
   // Older pages of stored matches (GET /api/search/results), each read from the previous page's cursor.
   const [olderPages, setOlderPages] = useState<(ResultPage & { before: number })[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
+  const searchGeneration = useRef(0);
+  const olderRequest = useRef<number | null>(null);
+  const olderController = useRef<AbortController | null>(null);
+  useEffect(() => () => {
+    searchGeneration.current += 1;
+    olderController.current?.abort();
+  }, []);
   const [loadMoreError, setLoadMoreError] = useState<Error | null>(null);
   // Set when nothing in the chosen area can be searched live: nothing ran, so there is no search to poll.
   const [noPortalsMessage, setNoPortalsMessage] = useState<string | null>(null);
@@ -372,6 +379,11 @@ export default function SearchPage() {
       toast({ title: "Enter a search value", variant: "destructive" });
       return;
     }
+    searchGeneration.current += 1;
+    olderController.current?.abort();
+    olderController.current = null;
+    olderRequest.current = null;
+    setLoadingMore(false);
     setPollError(null); setLastUpdate(null); setResultPage(1);
     setSubmitted({ state: scopeState, loc: scopeLocation, type: searchType, q: searchValue.trim() });
     setSearchId(null);
@@ -411,7 +423,11 @@ export default function SearchPage() {
 
   // The next 50 older matches, in the area the search ran with (submitted, not the live form).
   const loadMore = async () => {
-    if (nextCursor === null || loadingMore) return;
+    if (nextCursor === null || olderRequest.current !== null) return;
+    const generation = searchGeneration.current;
+    olderRequest.current = generation;
+    const controller = new AbortController();
+    olderController.current = controller;
     setLoadingMore(true); setLoadMoreError(null);
     const before = nextCursor;
     const scopeCounty = countyIdForLocation(submitted.loc, databases);
@@ -419,13 +435,26 @@ export default function SearchPage() {
     if (scopeCounty) params.set("scopeCountyId", String(scopeCounty));
     if (submitted.state !== "all") params.set("scopeState", submitted.state);
     try {
-      const data: ResultPage = await (await apiRequest("GET", `/api/search/results?${params}`)).json();
+      const response = await fetch(`/api/search/results?${params}`, {
+        credentials: "include", cache: "no-store",
+        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15_000)]),
+      });
+      if (!response.ok) throw new Error(`${response.status}: ${await response.text()}`);
+      const data: ResultPage = await response.json();
+      if (generation !== searchGeneration.current) return;
       setOlderPages(pages => [...pages, { results: data.results ?? [], totalResults: data.totalResults, nextCursor: data.nextCursor ?? null, before }]);
       // Land on the page the new rows start (exact without client-side filters; clamped otherwise).
       setResultPage(Math.floor(rawResults.length / SEARCH_PAGE_SIZE) + 1);
     } catch (e) {
+      if (generation !== searchGeneration.current) return;
       setLoadMoreError(e instanceof Error ? e : new Error("Could not load more results"));
-    } finally { setLoadingMore(false); }
+    } finally {
+      if (generation === searchGeneration.current) {
+        olderRequest.current = null;
+        olderController.current = null;
+        setLoadingMore(false);
+      }
+    }
   };
 
   const availableStatuses = useMemo(() => {

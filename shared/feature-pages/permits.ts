@@ -1,5 +1,6 @@
 import type { FeatureAllowance, FeaturePage } from "./types";
 import { allowanceLine } from "./pricing";
+import { PLANS, planForModule } from "../plans";
 
 /**
  * Permit Database Search (+ the Database Directory).
@@ -141,7 +142,7 @@ const page: FeaturePage = {
     },
     {
       q: "Do I need an account to use the directory?",
-      a: "No. The Database Directory and Property Records are open to anyone. Running a live permit search needs an account on a plan.",
+      a: `The Database Directory is open to anyone. Property Records requires signing in with a plan that includes it, starting with ${PLANS[planForModule("propertyRecords")].name}. Running a live permit search needs an account on a plan.`,
     },
     {
       q: "Does it have every permit in the country?",

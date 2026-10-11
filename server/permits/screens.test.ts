@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createElement } from 'react';
+import { createElement, Children, isValidElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 const state = vi.hoisted(() => ({ query: {} as any, infinite: {} as any }));
 vi.mock('@tanstack/react-query', async original => ({ ...await original<any>(), useQuery: () => state.query, useQueries: () => [], useInfiniteQuery: () => state.infinite }));
@@ -16,6 +16,20 @@ beforeEach(() => {
   vi.stubGlobal('window', { location: { search: '', pathname: '/property' } });
 });
 describe('property access and unavailable data', () => {
+  it('preserves the complete county deep link through sign-in', () => {
+    window.location.search = '?state=MN&countyId=12&q=Roseau&page=2';
+    state.query.error = new Error('401: Unauthorized');
+    const html = renderToStaticMarkup(createElement(PropertyPage));
+    expect(html).toContain('/auth?next=%2Fproperty%3Fstate%3DMN%26countyId%3D12%26q%3DRoseau%26page%3D2');
+  });
+  it('makes web search the action for a recorded challenge destination', () => {
+    state.query.data = [{ id: 1, countyId: 12, name: 'Test office', portalUrl: 'https://www.perfdrive.com/?id=test', linkStatus: 'verified', county: { name: 'Test', state: 'Test', stateCode: 'TS' } }];
+    const html = renderToStaticMarkup(createElement(PropertyPage));
+    expect(html).toContain('Find property records');
+    expect(html).toContain('recorded link leads to a bot challenge');
+    expect(html).not.toContain('href="https://www.perfdrive.com');
+    expect(html).not.toContain('Open unconfirmed site');
+  });
   it.each([401, 402, 500])('never presents %s as an empty directory', status => {
     state.query.error = new Error(`${status}: ${JSON.stringify({ code: 'plan_required', requiredPlan: 'pro', message: 'Eligible plan required' })}`);
     const html = renderToStaticMarkup(createElement(PropertyPage));
@@ -28,6 +42,31 @@ describe('property access and unavailable data', () => {
   });
 });
 describe('watch history and editing', () => {
+  it.each([false, true])('retries the failed operation with cached data (next page: %s)', nextPageFailed => {
+    const refetch = vi.fn(), fetchNextPage = vi.fn();
+    state.infinite = {
+      data: { pages: [{ hits: [{ id: 1, permit: {} }], total: 2, nextCursor: 1 }] },
+      error: new Error('offline'), isFetchNextPageError: nextPageFailed, refetch, fetchNextPage,
+    };
+    // Inspect the actual callback produced by HitList; the query hook is mocked above.
+    const buttons: any[] = [];
+    const visit = (node: ReactNode) => Children.forEach(node, child => {
+      if (!isValidElement<{ children?: ReactNode; onClick?: () => void }>(child)) return;
+      if (child.props.children === 'Retry') buttons.push(child);
+      visit(child.props.children);
+    });
+    visit(HitList({ watchId: 1 }));
+    expect(buttons).toHaveLength(1);
+    buttons[0].props.onClick();
+    expect(nextPageFailed ? fetchNextPage : refetch).toHaveBeenCalledOnce();
+    expect(nextPageFailed ? refetch : fetchNextPage).not.toHaveBeenCalled();
+  });
+  it('keeps refresh available for a successful empty history', () => {
+    state.infinite.data = { pages: [{ hits: [], total: 0, nextCursor: null }] };
+    const html = renderToStaticMarkup(createElement(HitList, { watchId: 1 }));
+    expect(html).toContain('Refresh matches');
+    expect(html).toContain('No permits have matched');
+  });
   it('a failed watch list has a retry and no false empty state', () => {
     state.query.error = new Error('503: Unavailable');
     const html = renderToStaticMarkup(createElement(PermitAlertsPage));

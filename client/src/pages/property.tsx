@@ -166,7 +166,7 @@ export default function PropertyPage() {
   if (error) return <AppPage width="narrow" testId="page-property">
     <GoogleSectionHeader as="h1" title="Property records" flush />
     {planRequiredFrom(error) ? <PlanRequired module="propertyRecords" error={error} /> : /^401:/.test(error.message) ?
-      <Notice tone="info">Sign in to access Property Records. Included with {planNamesWhere(p => p.modules.propertyRecords)}. <Button asChild variant="outline"><a href="/auth">Sign in</a></Button></Notice> :
+      <Notice tone="info">Sign in to access Property Records. Included with {planNamesWhere(p => p.modules.propertyRecords)}. <Button asChild variant="outline"><a href={`/auth?next=${encodeURIComponent(window.location.pathname + window.location.search)}`}>Sign in</a></Button></Notice> :
       <Notice tone="danger">Couldn't load property offices. <Button variant="outline" onClick={() => void refetch()}>Retry</Button></Notice>}
   </AppPage>;
   return (
@@ -246,9 +246,10 @@ export default function PropertyPage() {
           </p>
           <GoogleList testId="list-appraisers">
             {paginated.map((appraiser) => {
-              const linksOk = governmentLinksAvailable(appraiser);
+              const challenge = [appraiser.portalUrl, appraiser.searchUrl].some(url => url && /(?:perfdrive\.com|\/bot[-_]?check|\/captcha)(?:[/?#]|$)/i.test(url));
+              const linksOk = !challenge && governmentLinksAvailable(appraiser);
               const checkedAt = appraiser.lastVerifiedAt ? new Date(appraiser.lastVerifiedAt) : null;
-              const notice = linksOk ? governmentLinkNotice(appraiser) ?? (checkedAt && !Number.isNaN(checkedAt.getTime()) ? 'Last checked ' + checkedAt.toLocaleDateString() + ' · links can change' : 'Check date unavailable · confirm with the office') : null;
+              const notice = challenge ? "The recorded link leads to a bot challenge. Find the official office below." : linksOk ? governmentLinkNotice(appraiser) ?? (checkedAt && !Number.isNaN(checkedAt.getTime()) ? 'Last checked ' + checkedAt.toLocaleDateString() + ' · links can change' : 'Check date unavailable · confirm with the office') : null;
               // No usable official link on record: an honest web search, never a fabricated portal.
               const fallback = appraiser.linkStatus === "unconfirmed" || !linksOk || (!appraiser.portalUrl && !appraiser.searchUrl);
               return (
@@ -277,11 +278,11 @@ export default function PropertyPage() {
                     {fallback && (
                       <GooglePill
                         icon={Search}
-                        variant="quiet"
+                        variant={challenge ? "solid" : "quiet"}
                         label="Find property records"
                         external
                         testId={`link-appraiser-fallback-${appraiser.id}`}
-                        title="No official portal on record — search the web for this county's property records"
+                        title="Find the official county office through a web search"
                         href={`https://www.google.com/search?q=${encodeURIComponent(`${appraiser.county?.name || appraiser.name} ${appraiser.county?.stateCode || ""} assessor property records`)}`}
                       />
                     )}

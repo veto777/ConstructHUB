@@ -95,7 +95,7 @@ Creating an account is free and needs no card. Forgot your password? Use **Forgo
 3. A first-time subscriber starts with a {{TRIAL_LABEL}} (one trial per customer; the system decides eligibility at checkout, so the button itself doesn't promise it). The card is charged when the trial ends.
 4. You come back to Pricing with a "You're subscribed" message. Your plan, renewal date and add-ons are in **Settings → Billing**.
 
-There is no free plan. Without a plan you can still browse the public pages: Pricing, the Database Directory of permit offices, Property Records, the free 60-second website scan, the LSA Guide, the Ad Fraud page, the overview pages of the Google Ads guide and the Master Class, the reinstatement request form and the CRM overview.
+There is no free plan. Without a plan you can still browse the public pages: Pricing, the Database Directory of permit offices, the free 60-second website scan, the LSA Guide, the Ad Fraud page, the overview pages of the Google Ads guide and the Master Class, the reinstatement request form and the CRM overview. Property Records requires signing in with a plan that includes the propertyRecords module; see the current price book for eligible plans.
 
 ### Managing your plan (Settings → Billing)
 - See your plan, billing interval, renewal or trial-end date, add-ons, and this month's usage: permit searches, ranking-grid credits, Site Scans and Competitor Intel scans. Monthly counts reset at the start of each month (UTC).
@@ -143,7 +143,7 @@ There is no free plan. Without a plan you can still browse the public pages: Pri
 - **Property Records** (/property): finds the official county property appraiser or assessor office (sourced from NETR Online) and links to it. Ownership, assessed values and tax records are looked up on the county's own site. Permit search results include a **Property Lookup** link.
 - **Search History** (/history): reopen or delete past searches.
 
-**Plan:** the Directory and Property Records are free to browse. Permit searches come with every plan; each search counts toward your plan's monthly permit searches.
+**Plan:** the Database Directory is free to browse. Property Records requires signing in with a plan that includes the propertyRecords module; see the current price book for eligible plans. Permit searches come with every plan; each search counts toward your plan's monthly permit searches.
 
 **How to search permits:**
 1. Sidebar → Permits & Databases → **Search Permits**.

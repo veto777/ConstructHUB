@@ -124,6 +124,11 @@ export default function PermitAlertsPage() {
 function WatchRow({ watch: w, busy, hitsOpen, onToggleHits, onPause, onCheck, onDelete, onEdit }: {
   watch: PermitWatchDto; busy: boolean; hitsOpen: boolean; onToggleHits: () => void; onPause: () => void; onCheck: () => void; onDelete: () => void; onEdit: () => void;
 }) {
+  const checkRevision = w.jurisdictions.map(j => `${j.databaseId}:${j.lastSuccessAt}`).join("|");
+  // Watch polling can discover new matches while the history remains open.
+  useEffect(() => {
+    void queryClient.invalidateQueries({ queryKey: [`/api/permits/watches/${w.id}/hits`] });
+  }, [w.id, w.updatedAt, w.lastMatchedAt, w.hitCount, checkRevision]);
   const channels = [w.channels.email && "email", w.channels.sms && "text", w.channels.telegram && "Telegram"].filter(Boolean).join(", ");
   const supported = w.jurisdictions.filter((j) => j.alertsSupported);
   const failing = w.jurisdictions.filter((j) => j.failingSince);
@@ -169,7 +174,7 @@ function WatchRow({ watch: w, busy, hitsOpen, onToggleHits, onPause, onCheck, on
 }
 
 export function HitList({ watchId, unavailable = false }: { watchId: number; unavailable?: boolean }) {
-  const { data, isLoading, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+  const { data, isLoading, error, refetch, fetchNextPage, hasNextPage, isFetching, isFetchingNextPage, isFetchNextPageError } = useInfiniteQuery({
     queryKey: [`/api/permits/watches/${watchId}/hits`],
     initialPageParam: null as number | null,
     queryFn: async ({ pageParam }) => (await apiRequest("GET", `/api/permits/watches/${watchId}/hits?limit=50${pageParam ? '&before=' + pageParam : ''}`)).json() as Promise<{ hits: Hit[]; nextCursor: number | null; total: number }>,
@@ -178,14 +183,13 @@ export function HitList({ watchId, unavailable = false }: { watchId: number; una
   if (isLoading) return <Skeleton className="h-24 w-full mt-3" />;
   if (planRequiredFrom(error)) return <PlanRequired module="permitAlerts" error={error} />;
   const hits = data?.pages.flatMap(page => page.hits) ?? [];
-  const failure = error ? <Notice tone="danger">Could not load matches. <Button onClick={() => void (data ? fetchNextPage() : refetch())}>Retry</Button></Notice> : null;
+  const failure = error ? <Notice tone="danger">Could not load matches. <Button disabled={isFetching} onClick={() => void (isFetchNextPageError ? fetchNextPage() : refetch())}>Retry</Button></Notice> : null;
   if (error && !hits.length) return failure;
-  if (!hits.length) return <p className="pt-3 text-sm g-text-2" data-testid={`text-no-hits-${watchId}`}>{unavailable ? "No matches are stored yet. Portal data is unavailable or has not been checked; this does not mean there are no permits." : "No permits have matched this watch yet."}</p>;
   return (
     <>
     {failure}
-    <Button variant="outline" className="mt-3" onClick={() => void refetch()}>Refresh matches</Button>
-    <p className="mt-3 text-sm" aria-live="polite">Showing {hits.length} of {data?.pages.at(-1)?.total ?? hits.length} retained matches</p>
+    <Button variant="outline" className="mt-3" disabled={isFetching} onClick={() => void refetch()}>Refresh matches</Button>
+    {!hits.length ? <p className="pt-3 text-sm g-text-2" data-testid={`text-no-hits-${watchId}`}>{unavailable ? "No matches are stored yet. Portal data is unavailable or has not been checked; this does not mean there are no permits." : "No permits have matched this watch yet."}</p> : !error && <p className="mt-3 text-sm" aria-live="polite">Showing {hits.length} of {data?.pages.at(-1)?.total ?? hits.length} retained matches</p>}
     <ul className="mt-3 space-y-3 border-t pt-3" data-testid={`list-hits-${watchId}`}>
       {hits.map((h) => {
         const p = h.permit;
@@ -208,7 +212,7 @@ export function HitList({ watchId, unavailable = false }: { watchId: number; una
         );
       })}
     </ul>
-    {hasNextPage && <Button className="mt-3" variant="outline" disabled={isFetchingNextPage} onClick={() => void fetchNextPage()}>{isFetchingNextPage ? "Loading…" : "Load more matches"}</Button>}
+    {hasNextPage && <Button className="mt-3" variant="outline" disabled={isFetching} onClick={() => void fetchNextPage()}>{isFetchingNextPage ? "Loading…" : "Load more matches"}</Button>}
     </>
   );
 }
