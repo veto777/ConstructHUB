@@ -1022,7 +1022,7 @@ export default function GoogleReviewsPage() {
               {showHowItWorks && (
                 <div className="space-y-5">
                   <p className="text-sm leading-relaxed text-muted-foreground">
-                    Happy clients forget to leave reviews; this asks every client for feedback while the job is fresh and makes it easy for a satisfied client to leave a Google review the moment they rate the job. Every client is heard, and no reward is ever offered for a review.
+                    Happy clients forget to leave reviews; this asks every client for feedback while the job is fresh and invites a satisfied client to leave a public review the moment they rate the job. Every client is heard — a rating below your threshold reaches you privately — and no reward is ever offered for a review.
                   </p>
 
                   <div>
@@ -1031,9 +1031,9 @@ export default function GoogleReviewsPage() {
                     </h4>
                     <div className="space-y-4">
                       {[
-                        { n: "1", Icon: Filter, title: "A quick private rating (1–10)", body: "The client rates the project. The score comes only to you, so you can track satisfaction across jobs — and it decides what the client is offered next: at or above your threshold the Google review step, below it the private form." },
-                        { n: "2", Icon: ExternalLink, title: "Happy clients are invited to Google", body: "A client who scores at or above your threshold gets the button to open your Google Business Profile and leave a review, with optional AI writing help. Everyone is still heard: a lower score goes to the private form and reaches you at once." },
-                        { n: "3", Icon: ShieldCheck, title: "Optional private improvement notes", body: "Anyone can also tell you privately what to improve — communication, timeliness, quality, cleanup. Below your threshold this is the whole path: it reaches you with an instant alert, whether or not a public review ever follows." },
+                        { n: "1", Icon: Filter, title: "A quick private rating (1–10)", body: "The client opens a short public page — no account needed — and rates the project. The score comes only to you, and it sets the path: at or above your threshold the public review step, below it the private form. A Back button lets them fix a mis-tapped rating." },
+                        { n: "2", Icon: ExternalLink, title: "Happy clients are invited to review", body: "A client who scores at or above your threshold gets the button to your primary destination (usually Google) plus any other sites you included on the request, with optional AI writing help from their own words. Everyone is still heard: a lower score goes to the private form and reaches you at once." },
+                        { n: "3", Icon: ShieldCheck, title: "Optional private improvement notes", body: "Anyone can also tell you privately what to improve — communication, timeliness, quality, cleanup. Below your threshold this is the whole path: the private form reaches you with an instant alert, a bell in the app, an email, and a Telegram message when your alert bot is linked." },
                         { n: "4", Icon: Megaphone, title: "Your referral program, kept separate", body: "Clients can opt in to your referral program. Referral rewards are paid for referred customers only — never for leaving a review or for its star rating." },
                         { n: "5", Icon: Sparkles, title: "Optional writing help", body: "If a client wants help getting started, AI can draft a starting point from the highlights they type. They edit it into their own words and choose their own star rating — the review must reflect their real experience." },
                       ].map(({ n, Icon, title, body }) => (
@@ -1204,7 +1204,7 @@ export default function GoogleReviewsPage() {
           <DialogHeader>
             <DialogTitle>Send review request</DialogTitle>
             <DialogDescription>
-              Your client rates the experience — every client is heard, and a client at or above your threshold is invited to leave a Google review.
+              Your client opens a short public page — no account needed — and rates the job privately from 1 to 10. Every client is heard: at or above your threshold they're invited to review on your primary destination; below it, they can send you private improvement notes and you are alerted at once.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-5">
@@ -1667,7 +1667,7 @@ export default function GoogleReviewsPage() {
             </Collapsible>
 
             <Notice tone="info">
-              Every client is asked for a rating and heard. A client at or above your threshold is invited to leave a Google review; below it, they can send you private improvement notes and you are alerted at once.
+              Every client is asked for a rating and heard. A client at or above your threshold is invited to review on your primary destination (usually Google); below it, they can send you private improvement notes and you are alerted at once.
             </Notice>
 
             <div className="space-y-3">

@@ -7,36 +7,39 @@ import { planNamesWhere } from "../plan-copy";
  *   - review requests by email (name + email required, personal note, job photos, email theme, BCC, company
  *     name/logo, send now or schedule): server/routes.ts POST /api/reviews/create, processScheduledReviews;
  *     client/src/pages/google-reviews.tsx (Send Review Request dialog)
- *   - saved review profiles / templates (Google review link + default job description), capped by the plan's
- *     reviewTemplates: server/routes.ts POST /api/review-templates (requirePlan … reviewTemplates)
+ *   - review profiles (Google review link + default job description): paste a link or pick one of the
+ *     owner's linked Google listings, which fills the name and link (connect Google first when no account is
+ *     linked): server/routes.ts /api/review-templates/gbp-locations, client/src/pages/google-reviews.tsx
+ *     (Add Google Business Profile dialog)
+ *   - other review sites on a profile (Yelp, BBB, Houzz, Angi, HomeAdvisor, GuildQuality, Facebook,
+ *     Nextdoor, Thumbtack, other; pasted links, up to 8), a PRIMARY destination (usually Google), and a
+ *     per-request choice of which sites to include: shared/review-links.ts, google-reviews.tsx
+ *     (Other review sites, Primary destination, Where to send them)
  *   - follow-up reminders (interval, how many, time windows, timezone): server/review-reminders.ts, processReminders
  *   - unsubscribe honoured (409 on a suppressed address): server/routes.ts isReviewSuppressed, server/review-suppression.ts
- *   - the client's page: private 1–10 rating, "Help Us Improve" private feedback, the public review step
- *     (and its showReview flag) only at or above the owner's threshold, AI draft built only from the
- *     client's own words (never the private score), copy-and-paste into Google:
- *     server/routes.ts /api/review/:token/feedback + /generate-review, server/review-draft.ts, client/src/pages/review-feedback.tsx
- *   - what is tracked per request (email opened, link clicked, rating, Google link opened, reminders sent):
+ *   - the client's page: a public page, no account; a private 1–10 rating; a Back button to fix a mis-tapped
+ *     rating; the "Help Us Improve" private form; the public review step (and its showReview flag) only at or
+ *     above the owner's threshold; AI draft built only from the client's own words (never the private score),
+ *     checked and posted by the client themselves: server/routes.ts /api/review/:token/feedback +
+ *     /generate-review, server/review-draft.ts, client/src/pages/review-feedback.tsx
+ *   - feedback routing: the owner's threshold (choices 5–10, default 8); a score below it shows the private form
+ *     and alerts the owner at once (bell + email, Telegram when the LSA bot is linked) with name, score, job and
+ *     the client's words, then the thank-you screen — the public review link and step are shown only at or above
+ *     the threshold: shared/review-flow.ts, server/review-escalation.ts,
+ *     server/routes.ts /api/review/:token/feedback + /api/review-escalation-settings, google-reviews.tsx
+ *     FeedbackRoutingCard ("Caught privately" tile, "Private feedback · n/10" badge)
+ *   - what is tracked per request (email opened, link clicked, rating, review link opened, reminders sent):
  *     shared/schema.ts reviewRequests, /api/review/:token/pixel.png + /click + /google-link-opened
  *   - Google Profile Reviews tab (synced reviews, rating + answered filters, private notes, reply):
  *     google-reviews.tsx, server/gbp/service.ts syncLocation, server/gbp/routes.ts (reply)
  *   - AI replies (off / draft / auto, tone, sign-off, length, per-star rules, 1–2 star stay drafts unless allowed,
  *     up to 50 a day, auto-publish only where autoPublishAiReplies): server/gbp/review-automation.ts,
- *     client/src/components/ai-review-replies.tsx, server/routes.ts registerPlanGates (/ai-replies)
+ *     client/src/components/ai-review-replies.tsx, server/routes.ts plan registration (/ai-replies)
  *   - new-review alerts (in app + email by default, first import silent): server/notification-kinds.ts gbp.new_review,
  *     review-automation.ts notifyNewReviews
  *   - Report: prepares evidence + opens Google's form, "a negative rating alone is not a policy violation":
  *     client/src/components/profile-guard.tsx GoogleReport
  *   - no reward tied to a review (and no incentives): client/src/lib/features.ts (SHOW_GOOGLE_REVIEWS note)
- *   - feedback routing: the owner's 1–10 escalation threshold (default 8); a score below it shows the private form
- *     and alerts the owner at once (bell + email, Telegram when the LSA bot is linked) with name, score, job
- *     and the client's words, then the thank-you screen — the public review link and step are shown only at or
- *     above the threshold: shared/review-flow.ts, server/review-escalation.ts,
- *     server/routes.ts /api/review/:token/feedback + /api/review-escalation-settings, google-reviews.tsx
- *     FeedbackRoutingCard ("Caught privately" tile, "Private feedback · n/10" badge)
- *   - other review sites on a profile (Yelp, BBB, Houzz, Angi, HomeAdvisor, Facebook, Nextdoor, Thumbtack, other;
- *     pasted links, up to 8, copied onto the request when sent, offered on the step after Google to every client
- *     who reaches it, opens recorded): shared/review-links.ts, server/routes.ts /api/review-templates + /api/review/:token +
- *     /other-link-opened, google-reviews.tsx (profile dialog "Other review sites"), review-feedback.tsx (bonus_reviews step)
  */
 
 const TEMPLATES: FeatureAllowance = { limit: "reviewTemplates", unit: "saved review profiles", period: "count" };
@@ -49,105 +52,105 @@ const page: FeaturePage = {
   status: "ready",
   title: "Google Reviews",
   kicker: "Reviews",
-  headline: { lead: "A Gatekeeper for Your ", swipe: "Google Reviews" },
+  headline: { lead: "Hear Every Customer, ", swipe: "Earn Every Review" },
   lede:
-    "Every client gets a feedback link after the job, and every answer reaches you. You set the score that " +
-    "sends a happy client straight to Google, from 5 up to a perfect 10; anything below it comes to you " +
-    "privately instead, while the client is still reachable.",
-  hero: { mascot: "standing", bubble: "You pick the score that goes straight to Google." },
+    "Send every customer a short feedback request after the job. Each one rates the work privately from " +
+    "1 to 10: a rating below your threshold reaches you privately, and a happy customer is invited to " +
+    "leave a public review.",
+  hero: { mascot: "standing", bubble: "Every customer is heard. Happy customers are invited to review." },
   steps: [
     {
-      title: "Save your review link",
-      body: "Add the Google review link for each listing as a review profile, with a default description of the work you do and, if you like, your review pages on other sites.",
+      title: "Set up a review profile",
+      body: "Paste your Google review link or pick one of your linked Google listings and let the link fill in for you — connect Google first when no account is linked. Add your review pages on other sites and choose a primary destination.",
     },
     {
       title: "Set your threshold",
-      body: "Choose the score that goes straight to Google, anywhere from 5 to 10. It starts at 8. Set it to 10 if only perfection should go straight through.",
+      body: "Pick the private score that invites the customer to review publicly, from 5 to 10. It starts at 8; set it to 10 if only a perfect score should skip the private form.",
     },
     {
       title: "Send the request",
-      body: "Enter the client's name and email, add a personal note or job photos, and send it now or schedule it. Reminders follow on their own.",
+      body: "Enter the customer's name and email, add a personal note or job photos, and send it now or schedule it. Reminders follow up on their own with people who haven't answered.",
     },
     {
-      title: "The client scores the job",
-      body: "They score it privately from 1 to 10. At or above your threshold, they're invited to the Google step. Below it, the private form comes first and you're alerted at once. Every client is heard.",
+      title: "The customer rates the job",
+      body: "On a short public page — no account needed — they rate the work privately from 1 to 10. Below your threshold they get the private form and you are alerted at once; at or above it they are invited to review, with AI help from their own words.",
     },
     {
-      title: "Follow up and reply",
-      body: "Clients who haven't answered get reminders on your schedule. Reviews from your linked profile sync in, ready for a reply.",
+      title: "Reply from one place",
+      body: "Reviews from your linked listing sync in, AI drafts replies you approve, an alert lands on each new review, and a Report tool covers reviews that break the rules.",
     },
   ],
   cards: [
     {
-      icon: "filter",
-      title: "The gatekeeper",
-      body: "Set the score that goes straight to Google, from 5 up to 10. Anyone who scores below it is asked what you could have done better before anything else.",
+      icon: "link",
+      title: "Profiles from your Google listings",
+      body: "Add a review profile by pasting your Google review link or by picking one of your linked Google listings — the name and link fill in for you. No Google account linked yet? The dialog offers the connect step first.",
     },
     {
-      icon: "alert",
-      title: "Alerted at once",
-      body: "A bell in the app, an email, and a Telegram message when your alert bot is linked, with the client's name, score, job and their own words.",
-    },
-    {
-      icon: "send",
-      title: "Requests by email",
-      body: "Your company name and logo, an optional personal note and job photos, a choice of email themes, and a copy to yourself by BCC.",
-    },
-    {
-      icon: "bell",
-      title: "Follow-up reminders",
-      body: "Pick how often and how many times to remind clients who haven't answered, and the hours of the day reminders may go out.",
+      icon: "globe",
+      title: "Your other review sites",
+      body: "Paste your review page on Yelp, BBB, Angi, Houzz, HomeAdvisor and more. Pick a primary destination (usually Google) and choose which sites to include on each request.",
     },
     {
       icon: "star",
       title: "Every customer is heard",
-      body: "Every client is asked for a rating and their answer reaches you. The threshold decides who is invited to leave the public review: at or above it they get the Google link, below it they are asked privately what could have been better.",
+      body: "Every customer is asked for a private rating and their answer reaches you. The threshold only decides who is invited to review publicly: at or above it they get your review link, below it they are asked privately what could have been better.",
+    },
+    {
+      icon: "filter",
+      title: "Feedback routing",
+      body: "You choose the threshold, from 5 to 10. A Back button lets a customer fix a mis-tapped rating before the private form goes to you, and the public review step is offered only at or above the threshold.",
+    },
+    {
+      icon: "alert",
+      title: "Alerted at once",
+      body: "A bell in the app, an email, and a Telegram message when your alert bot is linked, with the customer's name, score, job and their own words.",
+    },
+    {
+      icon: "send",
+      title: "Requests by email",
+      body: "Your company name and logo, an optional personal note and job photos, a choice of email themes, and a copy to yourself by BCC to help the message land.",
+    },
+    {
+      icon: "bell",
+      title: "Follow-up reminders",
+      body: "Pick how often and how many times to remind customers who haven't answered, and the hours of the day reminders may go out.",
     },
     {
       icon: "sparkles",
-      title: "AI help, in the client's words",
-      body: "If the client wants help, AI edits what they typed into a draft. They check it, then paste it into Google themselves.",
+      title: "AI help, in their words",
+      body: "If the customer wants help, AI turns what they typed into a draft. They check it and post it themselves — it never posts for them and never mentions the private score.",
     },
     {
       icon: "message",
-      title: "Your profile's reviews",
-      body: "Reviews from each linked listing, filtered by stars or by answered and unanswered, with an alert in the app and by email when a new one lands.",
-    },
-    {
-      icon: "bot",
-      title: "AI reply drafts",
-      body: "Set a tone, a sign-off, a length and a rule for each star rating. Replies wait for your approval unless you choose auto-publish.",
-    },
-    {
-      icon: "link",
-      title: "Your other review sites",
-      body: "Paste your review page on Yelp, BBB, Angi, Houzz, HomeAdvisor and more. Pick a primary destination (usually Google) and which to include per request; clients are routed there after the Google step.",
+      title: "Reviews, replies and reports",
+      body: "Reviews from each linked listing sync in, filtered by stars or answered and unanswered, with an alert when a new one lands. AI drafts replies you approve, and Report covers reviews that break Google's rules.",
     },
   ],
   spotlight: {
-    kicker: "The Gatekeeper",
-    heading: { title: "Problems Come to You, ", em: "Not Google" },
+    kicker: "Feedback Routing",
+    heading: { title: "Problems Come to You, ", em: "Not\u00a0Google" },
     points: [
-      "Pick any threshold from 5 to 10. At 10, only a perfect score goes straight to the Google step.",
-      "Below the threshold, the client is asked what you could have done better before anything else.",
+      "Pick the private score that invites a public review, from 5 to 10. It starts at 8; at 10, only a perfect score is invited straight through.",
+      "Below the threshold, the customer is asked what you could have done better before anything else — and a Back button lets them fix a mis-tapped rating.",
       "You're alerted the moment they answer, while there is still time to make it right.",
-      "The Google Reviews page counts the requests caught privately and badges each one with its score.",
-      "Every client is heard: a score below your threshold still reaches you, with the client's own words.",
+      "The Google Reviews page counts the requests heard privately and badges each one with its score.",
+      "Every customer is heard: a rating below your threshold still reaches you, with the customer's own words.",
     ],
     panel: {
       label: "Feedback routing",
       title: "What the alert carries",
       items: [
-        "Client name", "Score out of 10", "Job description", "The client's own words", "Areas to improve",
+        "Customer name", "Score out of 10", "Job description", "The customer's own words", "Areas to improve",
         "Bell, email and Telegram", "Caught privately count", "Private feedback badge",
       ],
-      note: "Every client is still heard, and Google doesn't tell us whether a review was posted.",
+      note: "Every customer is still heard, and Google doesn't tell us whether a review was posted.",
     },
   },
   audience: [
     {
-      title: "Owners who want bad news first",
-      body: "Set the threshold high and every disappointing score reaches you before it reaches anyone else.",
+      title: "Owners who want problems first",
+      body: "Set the threshold high and every disappointing score reaches you at once, while the customer is still reachable.",
     },
     {
       title: "Contractors who forget to ask",
@@ -159,7 +162,7 @@ const page: FeaturePage = {
     },
     {
       title: "Several listings or brands",
-      body: "One review profile per listing, so each request sends the client to the right Google page.",
+      body: "One review profile per listing, so each request sends the customer to the right Google page.",
     },
   ],
   pricing: {
@@ -170,19 +173,19 @@ const page: FeaturePage = {
   faqs: [
     {
       q: "What do I need to start?",
-      a: "Your Google review link and your clients' email addresses. Links to your review pages on other sites are optional. To see and reply to the reviews on your profile, link the listing in Locations through a connected Google account.",
+      a: "Your Google review link — or a connected Google account, so you can pick one of your listings when you set up a profile — plus your customers' email addresses. Links to your review pages on other sites are optional. To see and reply to the reviews on your profile, link the listing in Locations through a connected Google account.",
     },
     {
       q: "Which plans include it?",
-      a: `Every plan includes review requests, the gatekeeper threshold, review alerts and AI reply drafts. Publishing AI replies automatically is included with the ${AUTO_PUBLISH_PLANS} plans. ${allowanceLine(TEMPLATES)}.`,
+      a: `Every plan includes review requests, feedback routing, review alerts and AI reply drafts. Publishing AI replies automatically is included with the ${AUTO_PUBLISH_PLANS} plans. ${allowanceLine(TEMPLATES)}.`,
     },
     {
       q: "How does the threshold work, and can I change it?",
-      a: "Pick it in Feedback routing on the Google Reviews page, from 5 to 10, and change it whenever you like. A score at or above it goes straight to the Google step; a score below it opens the private form and alerts you. Every client is still heard — the rating and anything they write reach you either way.",
+      a: "Pick it in Feedback routing on the Google Reviews page, from 5 to 10, and change it whenever you like. A rating at or above it invites the customer to review publicly; a rating below it opens the private form and alerts you. Every customer is still heard — the rating and anything they write reach you either way.",
     },
     {
       q: "Will AI write reviews or replies on its own?",
-      a: "It never writes a review for a client: it only edits the client's own words, and they post it themselves. Replies stay drafts unless you choose auto-publish, which still leaves 1 and 2 star reviews as drafts unless you allow them. AI replies are capped at 50 a day per account.",
+      a: "It never writes a review for a customer: it only edits the customer's own words, and they post it themselves. Replies stay drafts unless you choose auto-publish, which still leaves 1 and 2 star reviews as drafts unless you allow them. AI replies are capped at 50 a day per account.",
     },
     {
       q: "Can it remove bad reviews?",
@@ -190,46 +193,50 @@ const page: FeaturePage = {
     },
   ],
   // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"): the private 1–10 rating and the
-  // showReview flag (false below the owner's threshold, where the client only gets the private form and the
+  // showReview flag (false below the owner's threshold, where the customer only gets the private form and the
   // owner alert) are server/routes.ts POST /api/review/:token/feedback; the threshold choices (5–10, default 8), the
-  // routing and the owner alert are shared/review-flow.ts + server/review-escalation.ts; the AI review draft rules
-  // (client's own words, criticism kept, no keywords, never the score) are server/review-draft.ts reviewDraftMessages;
-  // reminders only to unanswered requests (status "sent"), up to 10, interval, windows and timezone are server/storage.ts
-  // getPendingReminders + server/review-reminders.ts; suppression is server/review-suppression.ts; tracking is
-  // shared/schema.ts reviewRequests; the AI reply rules, per-star rules, scope (new / existing reviews) and the
-  // low-star hold are server/gbp/review-automation.ts (replyPrompt, shouldAutoPublish, replySettingsSchema, the existing-review preview).
+  // routing and the owner alert are shared/review-flow.ts + server/review-escalation.ts; the Back button is
+  // client/src/pages/review-feedback.tsx (button-improvement-back); the linked-listing picker is server/routes.ts
+  // /api/review-templates/gbp-locations + google-reviews.tsx; the primary destination and the per-request include
+  // list are shared/review-links.ts; the AI review draft rules (customer's own words, criticism kept, no keywords,
+  // never the score) are server/review-draft.ts reviewDraftMessages; reminders only to unanswered requests (status
+  // "sent"), up to 10, interval, windows and timezone are server/storage.ts getPendingReminders +
+  // server/review-reminders.ts; suppression is server/review-suppression.ts; tracking is shared/schema.ts
+  // reviewRequests; the AI reply rules, per-star rules, scope (new / existing reviews) and the low-star hold are
+  // server/gbp/review-automation.ts (replyPrompt, shouldAutoPublish, replySettingsSchema, the existing-review
+  // preview); the Report tool is client/src/components/profile-guard.tsx GoogleReport.
   inDepth: {
-    heading: { title: "How the Review Gatekeeper ", em: "Works" },
+    heading: { title: "How Feedback Routing ", em: "Earns You Reviews" },
     paragraphs: [
-      "Google Reviews is a review request tool for contractors with a gatekeeper built in. When a job wraps up, you " +
-        "send the client an email with your company name and logo and a link to a short page, now or on a schedule. " +
-        "There the client scores the job privately from 1 to 10 and can write what went well or what didn't. Asking " +
-        "for Google reviews becomes one routine step at the end of every job. A profile can also hold your review " +
-        "pages on other sites, offered after the Google step.",
-      "The gatekeeper is one setting: the score that goes straight to Google. You choose it in Feedback routing, " +
-        "anywhere from 5 to 10, and it starts at 8. A client who scores at or above it goes straight to the Google " +
-        "step. A client who scores below it is asked what you could have done better, and you are alerted at " +
-        "once in the app, by email and on Telegram when your alert bot is linked, with the client's name, score, job " +
-        "and words. Set it to 10 and only a perfect score goes straight through. The Google Reviews page counts the " +
-        "requests caught privately and badges each one with its score, so you can call while the client is still " +
-        "reachable and fix the problem before it becomes a public review.",
-      "The threshold decides who is invited to review publicly, never who is heard. Every client is " +
-        "heard: the rating and whatever they write reach you whatever the score; a client below the threshold " +
-        "is asked privately what you could have done better and thanked — the Google link is offered only " +
-        "at or above it. If the client wants help with the " +
-        "wording, AI edits what they typed into a first-person draft. It uses only their own words, keeps any " +
-        "criticism, adds no keywords and never mentions the private score. The client checks the draft and posts it " +
-        "on Google themselves.",
-      "Reminders go only to clients who haven't answered yet. You set how many to send, up to 10, how far apart, and " +
-        "the hours of the day they may go out in your time zone. A client who unsubscribes gets no more reminders and " +
-        "can't be sent a new request. Each request records whether the email was opened, the link clicked, the job " +
-        "scored and the Google link opened. Google doesn't report whether a review was posted, so the " +
-        "request doesn't claim it.",
-      "On the reply side, link the listing in Locations and its Google reviews sync in with the rest of the profile, " +
-        "with an alert in the app and by email when a new one arrives. AI reply drafts follow the tone, sign-off, " +
-        "length and per-star rules you set, and use only what the review says. Replies wait for your approval unless " +
-        "you choose auto-publish on a plan that includes it. For a review that breaks Google's rules, Report " +
-        "gathers the evidence and opens Google's official form.",
+      "Google Reviews is a review request tool for contractors. When a job wraps up, you send the customer an " +
+        "email with your company name and logo, an optional personal note and job photos, your choice of email " +
+        "theme and a copy to yourself by BCC. Send it now or on a schedule; the email links to a short public " +
+        "page, no account needed, where the customer rates the job privately from 1 to 10. Follow-up reminders " +
+        "go out on their own until the customer answers.",
+      "A review profile holds your Google review link and a default description of the work. You can paste the " +
+        "link, or pick one of your linked Google listings and have the name and link filled in for you; when no " +
+        "Google account is linked, the dialog offers the connect step first. A profile can also carry your review " +
+        "pages on other sites, like Yelp, BBB, Angi, Houzz and HomeAdvisor, and you choose a primary destination, " +
+        "usually Google, plus which sites to include on each request.",
+      "Feedback routing is one setting: the private score that invites the customer to review publicly. You pick " +
+        "it from 5 to 10 and it starts at 8. A customer who rates at or above it is invited to leave a public " +
+        "review on the primary destination, with the other included sites offered after. A customer who rates " +
+        "below it is asked privately what you could have done better, and you are alerted at once in the app, by " +
+        "email and on Telegram when your alert bot is linked, with their name, score, job and words. A Back " +
+        "button lets a customer fix a mis-tapped rating before the private form goes to you. The Google Reviews " +
+        "page counts the requests heard privately and badges each one with its score, so you can call while the " +
+        "customer is still reachable.",
+      "If an invited customer wants help with the wording, AI turns what they typed into a first-person draft. It " +
+        "uses only their own words, keeps any criticism, adds no keywords and never mentions the private score. " +
+        "The customer checks the draft and posts it themselves. A customer who unsubscribes gets no more " +
+        "reminders and cannot be sent a new request.",
+      "On the reply side, link the listing in Locations and its Google reviews sync in, with an alert in the app " +
+        "and by email when a new one arrives. AI reply drafts follow the tone, sign-off, length and per-star rules " +
+        "you set, and they wait for your approval unless you choose auto-publish on a plan that includes it. Each " +
+        "request also records whether the email was opened, the link clicked, the job rated and the review link " +
+        "opened; Google does not report whether a review was posted, so the request does not claim it. For a " +
+        "review that breaks Google's rules, Report gathers the evidence and opens Google's official form; a low " +
+        "rating on its own is not a rule break.",
     ],
   },
   // Prices read on 2026-10-10 from: get.nicejob.com/pricing, gatherup.com/pricing/, grade.us/home/plans/
@@ -244,10 +251,10 @@ const page: FeaturePage = {
       { name: "Birdeye / Podium", price: { kind: "quote" } },
     ],
     onlyUs: [
-      "Every customer is heard: a low rating gets a private form and an instant alert, and only satisfied scores are offered the Google review.",
-      "AI reply drafts written only from the client's own words, with per-star rules — one- and two-star replies stay drafts unless you allow them.",
+      "Every customer is heard: a low rating gets a private form and an instant alert, and only satisfied ratings are invited to the public review.",
+      "AI reply drafts written only from the review's own words, with per-star rules — one- and two-star replies stay drafts unless you allow them.",
       "Requests with your job photos and a personal note, sent now or scheduled, with follow-up reminders on your schedule.",
-      "Your own review pages on other sites (Yelp, BBB, Houzz and more) pasted onto a profile and offered after the Google step.",
+      "Your own review pages on other sites (Yelp, BBB, Houzz and more) on a profile with a primary destination, and a per-request choice of what to include.",
     ],
     theyNotUs: "Review requests by text (ours go by email), monitoring of other review sites, and website widgets.",
   },
@@ -261,7 +268,7 @@ const page: FeaturePage = {
   seo: {
     title: "Google Review Requests for Contractors | ConstructHUB",
     description:
-      "A gatekeeper for your Google reviews: set the score that goes straight to Google, from 5 to 10. Lower scores reach you privately instead.",
+      "Hear every customer: send feedback requests after each job. Happy customers are invited to review you on Google; lower ratings reach you privately first.",
   },
   flag: "SHOW_GOOGLE_REVIEWS",
   sources: [

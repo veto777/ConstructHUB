@@ -14,7 +14,7 @@
       "url": "/google-reviews",
       "caption": "Google Reviews",
       "chapter": "Ask every client",
-      "narration": "This is Google Reviews. It asks every client for a Google review after the job, and keeps the answers in one place."
+      "narration": "This is Google Reviews. After a job it asks every customer for feedback, and happy customers are invited to leave a public review."
     },
     {
       "action": "highlight",
@@ -26,7 +26,7 @@
       "action": "highlight",
       "selector": "[data-testid^=\"card-review-request-\"]",
       "caption": "Each request and where it stands",
-      "narration": "Below it, each request shows the client, the job, and where it stands: scheduled, pending, or Google link opened, with their private rating."
+      "narration": "Below it, each request shows the client, the job, and where it stands: scheduled, sent, rated privately, or review link opened."
     },
     {
       "action": "click",
@@ -58,7 +58,7 @@
       "action": "click",
       "selector": "[data-testid=\"button-rating-9\"]",
       "caption": "A private rating",
-      "narration": "Whatever the score, the Google review option is right there at the top. No gating, no rewards."
+      "narration": "Every customer is heard. At or above your threshold they're invited to the public review; a lower rating goes straight to you as private feedback."
     },
     {
       "action": "goto",
@@ -82,7 +82,7 @@
   ],
   "youtube": {
     "title": "Google Reviews in about a minute | ConstructHUB",
-    "description": "A one-minute tour of Google Reviews in ConstructHUB: send review requests after each job, see what each client did, show every client the Google review option, and reply to synced Google reviews with AI drafts you approve.",
+    "description": "A one-minute tour of Google Reviews in ConstructHUB: send review requests after each job, hear every customer privately, invite happy customers to leave the public review, and reply to synced Google reviews with AI drafts you approve.",
     "tags": [
       "ConstructHUB",
       "Google reviews",
