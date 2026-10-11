@@ -55,9 +55,9 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"ads-row\"]:has-text(\"unavailable\")",
-      "caption": "Unavailable is not a pass",
-      "narration": "When Google doesn't answer a check, it shows as unavailable, never as a pass."
+      "selector": "[data-testid=\"ads-row\"]:has-text(\"could not be checked\")",
+      "caption": "Not checked is not a pass",
+      "narration": "When Google doesn't answer, the check says it could not be checked, never a pass."
     },
     {
       "action": "click",
@@ -69,20 +69,26 @@
     {
       "action": "highlight",
       "selector": "[data-testid=\"ads-row\"]:first-child",
-      "caption": "One preview per account",
-      "narration": "Each change is built per account: IP exclusions, negative keywords, presence-only targeting."
+      "caption": "Account and change, in plain words",
+      "narration": "Each preview names the account and says what it does, like block seven IPs on two campaigns."
     },
     {
       "action": "click",
       "selector": "[data-testid=\"ads-row\"]:first-child button:has-text(\"Review preview\")",
       "caption": "Review preview",
-      "narration": "Choose Review preview to see exactly what would change: each campaign, how many IPs, and the limit."
+      "narration": "Choose Review preview to see what would change on each campaign, and the limit."
     },
     {
       "action": "highlight",
       "selector": "[role=\"dialog\"]",
-      "caption": "Warnings, expiry, operations",
-      "narration": "Warnings are spelled out, the preview expires, and every operation is listed."
+      "caption": "Summary, warnings, expiry",
+      "narration": "The summary comes first, then the warnings, the number of operations and when it expires."
+    },
+    {
+      "action": "highlight",
+      "selector": "[role=\"dialog\"] summary:has-text(\"Technical details\")",
+      "caption": "Technical details",
+      "narration": "The raw operations stay folded away under Technical details."
     },
     {
       "action": "press",
