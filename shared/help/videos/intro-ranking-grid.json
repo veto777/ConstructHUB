@@ -1,0 +1,25 @@
+{
+  "helpKey": "intro-ranking-grid",
+  "durationSec": 85,
+  "video": {
+    "key": "tutorials/intro-ranking-grid.4e4ce1fc.mp4",
+    "bytes": 8947241,
+    "sha256": "4e4ce1fcd4f4255c5a621f805569dafe7933ff531934d6b396c85f5668415f87"
+  },
+  "captions": {
+    "key": "tutorials/intro-ranking-grid.c5467ad7.vtt",
+    "bytes": 1862,
+    "sha256": "c5467ad750c0fd46d9620942a7c14390a28838a8af75bbf1a67593238d33f472"
+  },
+  "poster": {
+    "key": "tutorials/intro-ranking-grid.bbc30cca.jpg",
+    "bytes": 81977,
+    "sha256": "bbc30ccae3b4d403db0db7dc7589831834077f36404f3713765b75a36e86b388"
+  },
+  "uploaded": {
+    "at": "2026-10-11T06:50:04.902Z",
+    "video": "49a149a76c9c1c9888e8a5dbb08b41dc",
+    "captions": "6b9c5341d423ef0187a18ec024dcf3d6",
+    "poster": "4d3784c71e55f981731c8b77a8801ec5"
+  }
+}
