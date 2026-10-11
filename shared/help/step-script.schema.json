@@ -217,7 +217,7 @@
             "required": [
               "headline"
             ],
-            "description": "card: a full-screen brand card — a stat, or two columns (them, us). A card that shows a price needs a footnote with a year.",
+            "description": "card: a full-screen brand card \u2014 a stat, or two columns (them, us). A card that shows a price needs a footnote with a year.",
             "properties": {
               "kicker": {
                 "type": "string",
@@ -464,7 +464,7 @@
       "minimum": 1,
       "maximum": 3,
       "default": 1,
-      "description": "Device scale factor: the video is viewport × zoom pixels. House style: 1024×576 at 1.875 → 1920×1080."
+      "description": "Device scale factor: the video is viewport \u00d7 zoom pixels. House style: 1024\u00d7576 at 1.875 \u2192 1920\u00d71080."
     },
     "youtube": {
       "type": "object",
@@ -595,7 +595,7 @@
         "minLength": 1,
         "maxLength": 200
       },
-      "description": "Plain CSS selectors made invisible (space kept) on every page from page load — a mark that may not appear in a film."
+      "description": "Plain CSS selectors made invisible (space kept) on every page from page load \u2014 a mark that may not appear in a film."
     },
     "before": {
       "type": "array",
@@ -622,6 +622,16 @@
     "showLinkAddress": {
       "type": "boolean",
       "description": "Show an outside link's address bottom-left while the pointer is on it (off by default)."
+    },
+    "removeSelectors": {
+      "type": "array",
+      "maxItems": 12,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      },
+      "description": "Plain CSS selectors taken out of the layout (display:none) on every page from page load, so no blank gap is left."
     }
   }
 }

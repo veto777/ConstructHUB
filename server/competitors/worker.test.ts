@@ -9,23 +9,26 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
-  calls: [] as { sql: string; params: any[] }[],
+  calls: [] as { sql: string; params: any[]; result?: { rows: any[]; rowCount: number } }[],
   handler: null as null | ((sql: string, params: any[]) => Promise<{ rows: any[]; rowCount: number }>),
 }));
-vi.mock("../db", () => ({
-  pool: {
-    query: vi.fn(async (sql: string, params: any[] = []) => {
-      db.calls.push({ sql, params });
-      if (db.handler) return db.handler(sql, params);
-      return { rows: [], rowCount: 1 };
-    }),
-  },
-}));
+vi.mock("../db", () => {
+  const query = vi.fn(async (sql: string, params: any[] = []) => {
+    const call: { sql: string; params: any[]; result?: any } = { sql, params };
+    db.calls.push(call);
+    call.result = db.handler ? await db.handler(sql, params) : { rows: [], rowCount: 1 };
+    return call.result;
+  });
+  // Transactions run on a client whose statements land in the same recorder.
+  return { pool: { query, connect: vi.fn(async () => ({ query, release: () => {} })) } };
+});
 vi.mock("../ops/issues", () => ({ recordFailure: vi.fn(async () => {}) }));
 
 import { PlacesStatusError } from "../competitor-provider";
 import * as store from "./store";
+import { PROVIDER_FAILED } from "./scan";
 import {
+  SAVE_FAILED,
   LEASE_MS,
   MAX_ATTEMPTS,
   enqueueCompetitorScan,
@@ -64,6 +67,10 @@ const okExec = (places: any = found2, over: any = {}) => ({
 
 const calls = (re: RegExp) => db.calls.filter(c => re.test(c.sql));
 const last = (re: RegExp) => calls(re).at(-1);
+/** Settlement statements (flag + budget in one statement) and the units they returned. */
+const SETTLE = /SET quota_refunded=true/;
+const ID_SETTLE = /SET quota_refunded=true\s+WHERE id=\$1/;
+const refunded = () => calls(SETTLE).reduce((n, c) => n + Number(c.result?.rows?.[0]?.refunded ?? 0), 0);
 beforeEach(() => {
   db.calls.length = 0;
   db.handler = null;
@@ -139,34 +146,41 @@ describe("retry with backoff, settlement once", () => {
     expect(release.params[0]).toBe(claimed.id);
     expect(release.params[2].getTime()).toBe(now.getTime() + retryDelayMs(claimed.attempts));
     expect(calls(/SET status='failed',error_message=\$3,finished_at=\$4/).length).toBe(0); // the worker's own fail, not the pre-claim sweep
-    expect(calls(/growth_budgets/).length).toBe(0); // nothing settled, nothing re-reserved
+    expect(calls(ID_SETTLE)).toHaveLength(0); // nothing settled, nothing re-reserved
+    expect(refunded()).toBe(0);
   });
 
   it("a non-retryable failure is terminal, refunds through the row's CAS, and a second sweep refunds nothing", async () => {
     let refundAnswered = false;
     db.handler = async sql => {
       if (/SET status='running',lease_token/.test(sql)) return { rows: [job()], rowCount: 1 };
-      if (/SET quota_refunded=true\s+WHERE id=\$1/.test(sql)) {
-        if (!refundAnswered) { refundAnswered = true; return { rows: [{ quota_key: "quota:user:3:competitorScans:2026-10", quota_amount: 1 }], rowCount: 1 }; }
-        return { rows: [], rowCount: 0 };
+      if (ID_SETTLE.test(sql)) {
+        if (!refundAnswered) { refundAnswered = true; return { rows: [{ refunded: 1 }], rowCount: 1 }; }
+        return { rows: [{ refunded: 0 }], rowCount: 1 };
       }
       return { rows: [], rowCount: 1 };
     };
     const exec = okExec(found2, { places: vi.fn(async () => { throw new Error("Location could not be geocoded. Use a city and state or a full address."); }) });
     await runCompetitorWorker({ clock, heartbeat: false, exec });
     expect(last(/SET status='failed',error_message/)?.params[2]).toContain("geocoded");
-    const refunds = calls(/UPDATE growth_budgets SET used=greatest\(0,used-\$2\)/);
-    expect(refunds).toHaveLength(1);
-    expect(refunds[0].params).toEqual(["quota:user:3:competitorScans:2026-10", 1]);
+    // Fail, listing cleanup and refund share one transaction under the lease.
+    const sqls = db.calls.map(c => c.sql.trim().split(/\s+/).slice(0, 3).join(" "));
+    const begin = sqls.lastIndexOf("BEGIN");
+    expect(db.calls[begin + 1].sql).toMatch(/SET status='failed'.*\n.*lease_token=\$2/);
+    expect(db.calls[begin + 2].sql).toMatch(/DELETE FROM competitor_listings WHERE scan_id=\$1/);
+    expect(db.calls[begin + 3].sql).toMatch(ID_SETTLE);
+    expect(db.calls[begin + 3].sql).toMatch(/UPDATE growth_budgets/); // flag and balance: one statement
+    expect(db.calls[begin + 4].sql).toBe("COMMIT");
+    expect(refunded()).toBe(1);
     // The process "restarts": recovery finds the settled row and stays quiet.
     await recoverCompetitorScans(now);
-    expect(calls(/UPDATE growth_budgets SET used=greatest\(0,used-\$2\)/)).toHaveLength(1);
+    expect(refunded()).toBe(1);
   });
 
   it("a scan out of tries fails for good on the next sweep, in plain words, and its month is refunded", async () => {
     db.handler = async sql => {
       if (/SET status='failed',error_message=\$2,finished_at=\$3/.test(sql)) return { rows: [{ id: 9 }], rowCount: 1 };
-      if (/SET quota_refunded=true/.test(sql)) return { rows: [{ quota_key: "k", quota_amount: 1 }], rowCount: 1 };
+      if (SETTLE.test(sql)) return { rows: [{ refunded: 1 }], rowCount: 1 };
       return { rows: [], rowCount: 1 };
     };
     const summary = await recoverCompetitorScans(now);
@@ -174,7 +188,8 @@ describe("retry with backoff, settlement once", () => {
     const sweep = last(/SET status='failed',error_message=\$2,finished_at=\$3/)!;
     expect(sweep.params[1]).toContain("interrupted");
     expect(sweep.params[1]).toContain("not counted against your monthly limit");
-    expect(calls(/UPDATE growth_budgets SET used=greatest\(0,used-\$2\)/)).toHaveLength(1);
+    expect(sweep.sql).toMatch(/DELETE FROM competitor_listings WHERE scan_id IN \(SELECT id FROM d\)/); // no half-index left on a failed card
+    expect(refunded()).toBe(1);
   });
 
   it("a completed scan is never refunded — success keeps the charge", async () => {
@@ -184,21 +199,21 @@ describe("retry with backoff, settlement once", () => {
     };
     await runCompetitorWorker({ clock, heartbeat: false, exec: okExec() });
     expect(calls(/SET status='completed'/)).toHaveLength(1);
-    expect(calls(/growth_budgets/)).toHaveLength(0);
+    expect(calls(ID_SETTLE)).toHaveLength(0);
     await recoverCompetitorScans(now);
-    expect(calls(/growth_budgets/)).toHaveLength(0);
+    expect(refunded()).toBe(0);
   });
 
   it("no API key fails fast with the provider-unconfigured message — no retry, no charge", async () => {
     db.handler = async sql => {
       if (/SET status='running',lease_token/.test(sql)) return { rows: [job()], rowCount: 1 };
-      if (/SET quota_refunded=true\s+WHERE id=\$1/.test(sql)) return { rows: [{ quota_key: "k", quota_amount: 1 }], rowCount: 1 };
+      if (ID_SETTLE.test(sql)) return { rows: [{ refunded: 1 }], rowCount: 1 };
       return { rows: [], rowCount: 1 };
     };
     await runCompetitorWorker({ clock, heartbeat: false, exec: okExec(found2, { apiKey: null }) });
     expect(last(/SET status='failed',error_message/)?.params[2]).toContain("Google Places is not configured");
     expect(calls(/SET status='pending',lease_token=NULL/)).toHaveLength(0); // no retry for config errors
-    expect(calls(/UPDATE growth_budgets SET used=greatest\(0,used-\$2\)/)).toHaveLength(1);
+    expect(refunded()).toBe(1);
   });
 });
 
@@ -224,6 +239,9 @@ describe("recovery and takeover across a restart", () => {
     const requeue = last(/SET status='pending',lease_token=NULL,lease_until=NULL,abandoned=abandoned\+1,run_at=\$2/)!;
     expect(requeue.params[0]).toBe(4);
     expect(requeue.params[1].getTime()).toBe(now.getTime() + retryDelayMs(2)); // 60 s
+    // The requeue re-proves staleness and the attempts it read: a lease renewed or re-claimed since the SELECT is left alone.
+    expect(requeue.sql).toMatch(/attempts=\$5 AND \(lease_until IS NOT NULL AND lease_until<\$3 OR lease_until IS NULL AND created_at<\$4\)/);
+    expect(requeue.params.slice(2)).toEqual([now, new Date(now.getTime() - 5 * 60_000), 2]);
     // The claim gate uses whatever instant the clock holds when the claim runs:
     // advance past the backoff and the same claim SQL carries the advanced time.
     advance(retryDelayMs(2) - 1);
@@ -236,15 +254,18 @@ describe("recovery and takeover across a restart", () => {
     db.handler = async sql => {
       if (/SET status='running',lease_token/.test(sql)) return { rows: [job({ attempts: 2 })], rowCount: 1 };
       if (/SELECT place_id,first_seen_at FROM competitor_listings/.test(sql)) return { rows: [{ place_id: "a", first_seen_at: "2026-09-20T00:00:00Z" }], rowCount: 1 };
+      if (/DELETE FROM competitor_listings l USING s/.test(sql)) return { rows: [{ live: 1 }], rowCount: 1 };
       if (/SELECT 1 FROM competitor_scans/.test(sql)) return { rows: [{}], rowCount: 1 };
       return { rows: [], rowCount: 1 };
     };
     await runCompetitorWorker({ clock, heartbeat: false, exec: okExec() });
-    expect(calls(/DELETE FROM competitor_listings WHERE scan_id=\$1/)).toHaveLength(1);
+    const clear = last(/DELETE FROM competitor_listings l USING s/)!;
+    expect(clear.sql).toMatch(/lease_token=\$2 AND status='running' FOR SHARE/); // only the live lease may clear
+    expect(clear.params).toEqual([7, expect.any(String)]);
     const inserts = calls(/INSERT INTO competitor_listings/);
     expect(inserts).toHaveLength(2);
-    expect(inserts[0].params[14].toISOString()).toBe("2026-09-20T00:00:00.000Z"); // place "a" keeps its history
-    expect(inserts[1].params[14]).toBeNull(); // place "b" is genuinely new
+    expect(inserts[0].params[15].toISOString()).toBe("2026-09-20T00:00:00.000Z"); // place "a" keeps its history
+    expect(inserts[1].params[15].toISOString()).toBe(T0); // place "b" is new: first seen now, never NULL (the column is NOT NULL)
   });
 });
 
@@ -252,11 +273,12 @@ describe("cancel and delete without orphans", () => {
   it("cancelling an active scan refunds its month exactly once and returns success", async () => {
     db.handler = async sql => {
       if (/SET status='cancelled',lease_token=NULL/.test(sql)) return { rows: [{ id: 7 }], rowCount: 1 };
-      if (/SET quota_refunded=true\s+WHERE id=\$1/.test(sql)) return { rows: [{ quota_key: "k", quota_amount: 1 }], rowCount: 1 };
+      if (ID_SETTLE.test(sql)) return { rows: [{ refunded: 1 }], rowCount: 1 };
       return { rows: [], rowCount: 1 };
     };
     expect(await cancelCompetitorScan(3, 7, now)).toEqual({ ok: true });
-    expect(calls(/UPDATE growth_budgets SET used=greatest\(0,used-\$2\)/)).toHaveLength(1);
+    expect(refunded()).toBe(1);
+    expect(db.calls.map(c => c.sql.trim().slice(0, 6))).toEqual(["BEGIN", "UPDATE", "WITH r", "COMMIT"]); // cancel + refund commit together
   });
 
   it("cancelling a finished scan says so; cancelling a missing scan 404s", async () => {
@@ -270,18 +292,26 @@ describe("cancel and delete without orphans", () => {
     expect(await cancelCompetitorScan(3, 7, now)).toEqual({ status: 404, message: "Scan not found" });
   });
 
-  it("delete cancels first, so an in-flight run stops writing and the month comes back", async () => {
+  it("delete locks and verifies the owned row first, cancels it, refunds, and removes everything in one transaction", async () => {
     db.handler = async sql => {
-      if (/SET status='cancelled',lease_token=NULL/.test(sql)) return { rows: [{ id: 7 }], rowCount: 1 };
-      if (/SET quota_refunded=true\s+WHERE id=\$1/.test(sql)) return { rows: [{ quota_key: "k", quota_amount: 1 }], rowCount: 1 };
-      if (/DELETE FROM competitor_scans/.test(sql)) return { rows: [], rowCount: 1 };
+      if (/SELECT id,status FROM competitor_scans WHERE id=\$1 AND user_id=\$2 FOR UPDATE/.test(sql)) return { rows: [{ id: 7, status: "running" }], rowCount: 1 };
+      if (ID_SETTLE.test(sql)) return { rows: [{ refunded: 1 }], rowCount: 1 };
       return { rows: [], rowCount: 1 };
     };
     expect(await removeCompetitorScan(3, 7, now)).toBe(true);
-    expect(calls(/SET status='cancelled',lease_token=NULL/)).toHaveLength(1);
-    expect(calls(/UPDATE growth_budgets SET used=greatest\(0,used-\$2\)/)).toHaveLength(1);
-    expect(calls(/DELETE FROM competitor_listings/)).toHaveLength(1);
-    expect(calls(/DELETE FROM competitor_scans/)).toHaveLength(1);
+    expect(db.calls.map(c => c.sql.trim().split(/\s+/).slice(0, 3).join(" "))).toEqual([
+      "BEGIN", "SELECT id,status FROM", "UPDATE competitor_scans SET", "WITH r AS", "DELETE FROM competitor_listings", "DELETE FROM competitor_scans", "COMMIT",
+    ]);
+    expect(refunded()).toBe(1);
+    expect(last(/DELETE FROM competitor_listings/)!.params).toEqual([7, 3]);
+  });
+
+  it("delete with another account's scan id touches no listing and no scan", async () => {
+    db.handler = async sql => /FOR UPDATE/.test(sql) ? { rows: [], rowCount: 0 } : { rows: [], rowCount: 1 };
+    expect(await removeCompetitorScan(3, 99, now)).toBe(false);
+    expect(calls(/DELETE FROM/)).toHaveLength(0);
+    expect(calls(SETTLE)).toHaveLength(0);
+    expect(calls(/^COMMIT$/)).toHaveLength(1);
   });
 
   it("an executor whose scan vanished mid-run stops quietly — no failed write, no double refund", async () => {
@@ -294,7 +324,69 @@ describe("cancel and delete without orphans", () => {
     expect(calls(/INSERT INTO competitor_listings/)).toHaveLength(0);
     expect(calls(/SET status='failed',error_message=\$3,finished_at=\$4/)).toHaveLength(0); // no worker fail; the pre-claim sweep UPDATE is expected
     expect(calls(/SET status='completed'/)).toHaveLength(0);
-    expect(calls(/growth_budgets/)).toHaveLength(0);
+    expect(calls(ID_SETTLE)).toHaveLength(0);
+  });
+
+  it("an insert after the lease is lost writes nothing and stops the run quietly", async () => {
+    db.handler = async sql => {
+      if (/SET status='running',lease_token/.test(sql)) return { rows: [job()], rowCount: 1 };
+      if (/SELECT 1 FROM competitor_scans/.test(sql)) return { rows: [{}], rowCount: 1 }; // live at the check...
+      if (/INSERT INTO competitor_listings/.test(sql)) return { rows: [], rowCount: 0 }; // ...cancelled before the write
+      return { rows: [], rowCount: 1 };
+    };
+    await runCompetitorWorker({ clock, heartbeat: false, exec: okExec() });
+    const insert = last(/INSERT INTO competitor_listings/)!;
+    expect(insert.sql).toMatch(/WITH s AS \(SELECT id FROM competitor_scans WHERE id=\$1 AND lease_token=\$2 AND status='running' FOR SHARE\)/);
+    expect(calls(/INSERT INTO competitor_listings/)).toHaveLength(1); // stopped after the refused write
+    expect(calls(/SET status='completed'|SET status='failed',error_message=\$3/)).toHaveLength(0);
+  });
+});
+
+describe("listing rows match the table", () => {
+  it("binds the jsonb columns as JSON text and every listing has a first-seen instant", async () => {
+    db.handler = async sql => /SET status='running',lease_token/.test(sql) ? { rows: [job()], rowCount: 1 } : { rows: [], rowCount: 1 };
+    await runCompetitorWorker({ clock, heartbeat: false, exec: okExec(found2, {
+      analyzeReviews: vi.fn(() => ({ totalAnalyzed: 2, themes: ["leak"] })),
+      analyzeBsScore: vi.fn(() => ({ score: 40, reasons: ["Keyword-stuffed name", "Few reviews"] })),
+    }) });
+    const insert = calls(/INSERT INTO competitor_listings/)[0];
+    expect(insert.sql).toMatch(/\$13::jsonb,\$14::jsonb,\$15::jsonb/);
+    const [bsReasons, reviewAnalysis, rankHistory] = insert.params.slice(12, 15);
+    for (const v of [bsReasons, reviewAnalysis, rankHistory]) expect(typeof v).toBe("string"); // node-pg would send a JS array as '{...}', which jsonb rejects
+    expect(JSON.parse(bsReasons)).toEqual(["Keyword-stuffed name", "Few reviews"]);
+    expect(JSON.parse(reviewAnalysis)).toEqual({ totalAnalyzed: 2, themes: ["leak"] });
+    expect(JSON.parse(rankHistory)).toEqual([{ rank: 1, date: T0 }]);
+    expect(insert.params[15]).toBeInstanceOf(Date);
+  });
+});
+
+describe("failure copy on the scan card", () => {
+  const failWith = async (exec: any) => {
+    db.handler = async sql => {
+      if (/SET status='running',lease_token/.test(sql)) return { rows: [job({ attempts: MAX_ATTEMPTS })], rowCount: 1 };
+      if (/SELECT 1 FROM competitor_scans/.test(sql)) return { rows: [{}], rowCount: 1 };
+      if (/DELETE FROM competitor_listings l USING s/.test(sql)) return { rows: [{ live: 1 }], rowCount: 1 }; // last try: resume clears under the live lease
+      if (/INSERT INTO competitor_listings/.test(sql) && exec.dbError) throw exec.dbError;
+      return { rows: [], rowCount: 1 };
+    };
+    await runCompetitorWorker({ clock, heartbeat: false, exec: okExec(found2, exec.over ?? {}) });
+    return last(/SET status='failed',error_message=\$3/)?.params[2];
+  };
+
+  it("a database error while saving shows plain words, not the driver's message", async () => {
+    const msg = await failWith({ dbError: new Error('invalid input syntax for type json') });
+    expect(msg).toBe(SAVE_FAILED);
+    expect(msg).not.toMatch(/syntax|json/i);
+  });
+
+  it("an unexpected provider-side error is shown in plain words", async () => {
+    const msg = await failWith({ over: { getDetails: vi.fn(async () => { throw new TypeError("Cannot read properties of undefined (reading 'result')"); }) } });
+    expect(msg).toBe(PROVIDER_FAILED);
+  });
+
+  it("the provider's own plain messages still reach the card", async () => {
+    const msg = await failWith({ over: { getDetails: vi.fn(async () => { throw new Error("Competitor details could not be reached. Please try again later."); }) } });
+    expect(msg).toBe("Competitor details could not be reached. Please try again later.");
   });
 });
 

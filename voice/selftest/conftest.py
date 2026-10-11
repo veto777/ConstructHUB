@@ -28,3 +28,15 @@ TEST_ENV = {
 os.environ.update(TEST_ENV)
 sys.path.insert(0, str(VOICE))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import pytest  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _fresh_outbox(tmp_path, monkeypatch):
+    """Each test gets its own delivery outbox (server.OUTBOX): a job one test leaves behind (its mock app closed
+    before the call finished) must never be drained into the next test's mock app."""
+    import server
+    from outbox import Outbox
+    monkeypatch.setattr(server, "OUTBOX", Outbox(tmp_path / "outbox"))
+    yield

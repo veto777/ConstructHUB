@@ -13,6 +13,7 @@ import { CrmPage, CrmPageHeader } from "@/components/crm-ui";
 import { callAssistantGateFrom } from "@/components/plan-required";
 import { AppLocked } from "@/components/app-locked";
 import { inNativeApp } from "@/lib/app-shell";
+import { apiErrorMessage } from "@/lib/queryClient";
 import { ADDONS, CALL_ASSISTANT_NAME, CALL_ASSISTANT_PRICING_HREF, CALL_ASSISTANT_TIERS } from "@shared/plans";
 import { CALL_ASSISTANT_SEPARATE_LINE, callAssistantAboveTopLine, callAssistantSpamAllowanceLine, callAssistantTiers } from "@shared/plan-copy";
 import { OverviewPanel } from "./overview";
@@ -36,6 +37,12 @@ import { CallsPanel } from "./calls";
  * other /api/crm/voice/* route answers 402 call_assistant_required (with
  * `addon: "call_assistant"` and the pricing link). The gate card below is the
  * one prompt.
+ *
+ * Unavailable: /status itself failed for a reason that is not the gate (the
+ * app is restarting, the network dropped, a 500). That is its own state — a
+ * notice with Retry — never a fall-through to tabs that would then render as
+ * if nothing were set up (audit r3). A failed background refetch keeps the
+ * last good answer on screen.
  *
  * Paused: the service is bought but its subscription needs a payment
  * (`paused: true`). The tabs stay readable, a banner says "Paused — update
@@ -184,6 +191,21 @@ export default function CrmCallAssistantPage() {
 
       {status.isError && callAssistantGateFrom(status.error) ? (
         <CallAssistantPlanRequired error={status.error} />
+      ) : status.isError && !status.data ? (
+        <div className="pt-2">
+          <Notice
+            tone="danger"
+            title="Couldn't load your Call Assistant"
+            testId="notice-call-assistant-unavailable"
+            action={(
+              <Button size="sm" variant="outline" onClick={() => status.refetch()} disabled={status.isFetching} data-testid="button-call-assistant-retry">
+                {status.isFetching ? "Checking…" : "Retry"}
+              </Button>
+            )}
+          >
+            We couldn't check its status just now, so nothing below would be accurate yet. {apiErrorMessage(status.error)}
+          </Notice>
+        </div>
       ) : status.data && !enabled && !paused ? (
         <CallAssistantPlanRequired status={status.data} />
       ) : (

@@ -195,6 +195,8 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Call Assistant cal
         events: [{ t: "6.0", type: "alert", kind: "urgent" }],
         alerts: [{ kind: "urgent", summary: "water coming through the ceiling" }],
         lead: { requested: true },
+        // The engine has a WAV it will upload through its outbox (voice/outbox.py).
+        recordingPending: true,
       };
       const end = await internal("PUT", `/calls/${sid}`, report);
       expect(end.status).toBe(200);
@@ -337,6 +339,14 @@ describe.skipIf(process.env.CRM_TEST_SINGLE_PORT === "true")("Call Assistant cal
       expect(r.body.escalations).toHaveLength(1);
       expect(r.body.escalations[0]).toMatchObject({ id: shared.escalationId, state: "waiting", kindLabel: "Emergency", recipientName: "Lead Tech" });
       expect(r.body.recordingUrl).toBeNull();
+      // The engine said a recording is on its way and R2 refused it (503 above): still pending, not "none".
+      expect(r.body.recordingState).toBe("pending");
+      const list = await crm(a, "GET", "/calls");
+      expect(list.body.calls.find((x: any) => x.id === shared.leadCallId)).toMatchObject({ recordingState: "pending", hasRecording: false });
+      expect(list.body.calls.every((x: any) => !("recordingPending" in x))).toBe(true);
+      // The reminder loop reports its state with the escalations (off in this child: VOICE_ESCALATION_WORKER_ENABLED=false).
+      const esc = await crm(a, "GET", "/escalations?open=1");
+      expect(esc.body.reminders).toMatchObject({ running: false, intervalMinutes: 30 });
       expect((await crm(a, "GET", `/calls/${shared.leadCallId}/recording`)).status).toBe(404);
       expect((await crm(c, "GET", `/calls/${shared.leadCallId}`)).status).toBe(404);
       expect((await crm(c, "GET", `/calls/${shared.leadCallId}/recording`)).status).toBe(404);

@@ -76,7 +76,7 @@ const STUDIO: { icon: LucideIcon; title: string; body: string }[] = [
   { icon: UserRound, title: "Voice & greeting", body: "The name, the voice, the greeting, the recording notice and how warm, brief or formal it sounds." },
   { icon: ListOrdered, title: "The questions it asks", body: "Every intake question in your order: required or optional, read back to confirm, checked as an address, phone or email." },
   { icon: MessagesSquare, title: "Answers to common questions", body: "Your exact answers to the questions callers ask most, word for word." },
-  { icon: Siren, title: "Escalations", body: "Who gets a text or email for emergencies, existing customers, \"I want a person\", payments or complaints, with reminders until someone replies." },
+  { icon: Siren, title: "Escalations", body: "Who gets a text or email for emergencies, existing customers, \"I want a person\", payments or complaints, with reminders on the schedule you set until someone replies." },
   { icon: Send, title: "Lead delivery", body: "A CRM client and pipeline project for every real lead, with your tags, plus extra email and text recipients." },
   { icon: Settings2, title: "Advanced", body: "Extra instructions in your own words, call length, silence handling, spam sensitivity and the trade words it should recognize." },
   { icon: FlaskConical, title: "Simulator & versions", body: "Chat with your draft assistant by text before it takes a real call. Publish, pause, and restore any earlier version." },
@@ -91,7 +91,7 @@ const CALL_FIELDS = [
 const AFTER_CALL: string[] = [
   "A real lead becomes a client in your CRM, plus a pipeline project if you want one, with \"Call Assistant\" as the lead source.",
   "Your team hears about it the way it hears about every new lead: in the app, by email or by text, as each person has set it up.",
-  "Emergencies, existing customers and \"I want a person\" go by text or email to the teammate you choose, with reminders until someone replies.",
+  "Emergencies, existing customers and \"I want a person\" go by text or email to the teammate you choose, with reminders on the schedule you set until someone replies.",
   "Spam calls forwarded to your assistant ping nobody. They show under Calls → Spam blocked, where you can block or unblock a number, and in a weekly spam report email.",
 ];
 
@@ -103,7 +103,8 @@ const AFTER_CALL: string[] = [
  * server/voice/prompt-compiler.ts (SPAM SCREENING, prefill hints, callerLine); the default intake order and
  * the email read-back: shared/voice-profile.ts DEFAULT_INTAKE_QUESTIONS; the out-of-area line and
  * "take the lead anyway": voice-profile.ts outOfArea/outOfAreaLine; escalations by text or email:
- * server/voice/escalations.ts; spam notifies nobody, two strikes block, a blocked number is rejected
+ * server/voice/escalations.ts (the reminder worker runs by default on the production server —
+ * voiceEscalationWorkerOffReason — and the Escalations tab says when it is off); spam notifies nobody, two strikes block, a blocked number is rejected
  * before it is answered: server/voice/spam.ts; the CRM client, the "Call Assistant" lead source and the
  * existing client matched by phone: server/voice/leads.ts (callAssistantLeadSourceId, findCustomerByPhone);
  * the hang-up safety net: voice/brain.py _should_force_submit/force_submit, server/voice/brain.ts.

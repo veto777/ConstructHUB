@@ -16,6 +16,7 @@ export class ScanFailedError extends Error {
 const NO_KEY = "Google Places is not configured.";
 const INCOMPLETE = "Google's later results pages could not be loaded, so this list may be incomplete. Run the scan again for the full list.";
 export const INCOMPLETE_NOTE = INCOMPLETE;
+export const PROVIDER_FAILED = "Couldn't load results from Google Places. Run the scan again — it has not counted against your monthly limit.";
 
 export type ExecuteDeps = {
   apiKey: string | null;
@@ -31,8 +32,8 @@ export type ScanControl = {
   isLive: () => Promise<boolean>;
   note: (fields: { lat: string | null; lon: string | null; note: string | null }) => Promise<void>;
   insert: (listing: import("./store").ListingInsert) => Promise<void>;
-  /** Original firstSeenAt when this run resumes an earlier attempt, else null. */
-  firstSeenFor: (placeId: string) => Date | null;
+  /** The place's first-seen instant: an earlier attempt's date on a resume, else now. */
+  firstSeenFor: (placeId: string) => Date;
 };
 
 /** Provider/key problems worth another try vs. ones that cannot fix themselves. */
@@ -43,8 +44,11 @@ function classify(e: unknown): ScanFailedError {
     return new ScanFailedError(e.message, retryable);
   }
   const message = e instanceof Error ? e.message : String(e);
+  // The provider's own plain-language messages (geocoding, unreachable, HTTP status) are safe to show.
   if (/could not be geocoded/i.test(message)) return new ScanFailedError(message, false);
-  return new ScanFailedError(message || "Provider request failed.", true);
+  if (/^[\w ]+ (could not be reached\. Please try again later\.|failed \(HTTP \d+\)\.)$/.test(message)) return new ScanFailedError(message, true);
+  // Anything else is an unexpected error whose text is not for the scan card.
+  return new ScanFailedError(PROVIDER_FAILED, true);
 }
 
 /** Stops the run quietly when the scan was cancelled, deleted, or re-leased. */

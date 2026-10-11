@@ -10,8 +10,9 @@
  * `fallbackToOwner`: the org's CRM notification channels. `urgent` and
  * `human` always also reach the owners.
  *
- * The reminder worker (every 30 min, VOICE_ESCALATION_WORKER_ENABLED=true on
- * production only) resends unconfirmed escalations every
+ * The reminder worker (every 30 min; ON by default on a production server,
+ * VOICE_ESCALATION_WORKER_ENABLED=false turns it off, =true turns it on in a
+ * lane — the same switch shape as the spam-report job) resends unconfirmed escalations every
  * `remind_every_minutes` between `remind_from_hour` and `remind_to_hour` in
  * the company's timezone until `max_days`; a reply from the recipient (inbound
  * SMS hook in server/crm/sms.ts, or the email link) confirms; 20 h after a
@@ -479,13 +480,58 @@ export async function tickVoiceEscalations(now = new Date()): Promise<TickReport
 
 let worker: NodeJS.Timeout | null = null;
 
-/** Start the 30-minute reminder loop when VOICE_ESCALATION_WORKER_ENABLED=true (production only). */
+/**
+ * Why the reminder worker is off, or null when it runs. The landing page and the Escalations tab promise
+ * "reminders until someone replies", so a production server runs it unless told not to (the same switch shape
+ * as the weekly spam report, spam-report.ts): "false" → off, "true" → on (a lane), unset → on in production only.
+ */
+export function voiceEscalationWorkerOffReason(env: NodeJS.ProcessEnv = process.env): string | null {
+  const flag = env.VOICE_ESCALATION_WORKER_ENABLED;
+  if (flag === "false") return "VOICE_ESCALATION_WORKER_ENABLED is false";
+  if (flag === "true") return null;
+  if (env.NODE_ENV !== "production") return "this is not a production server (set VOICE_ESCALATION_WORKER_ENABLED=true to run it)";
+  return null;
+}
+
+/** What the Escalations tab shows about the reminder loop (no env names, no internals beyond on/last run). */
+export type EscalationWorkerStatus = {
+  running: boolean;
+  intervalMinutes: number;
+  lastRunAt: string | null;
+  lastOk: boolean | null;
+  /** True when the last run is older than two intervals (the loop stalled). */
+  stale: boolean;
+};
+const workerHealth: { lastRunAt: Date | null; lastOk: boolean | null } = { lastRunAt: null, lastOk: null };
+
+export function voiceEscalationWorkerStatus(now = new Date()): EscalationWorkerStatus {
+  const running = worker !== null;
+  const last = workerHealth.lastRunAt;
+  return {
+    running, intervalMinutes: WORKER_INTERVAL_MS / 60_000,
+    lastRunAt: last ? last.toISOString() : null, lastOk: workerHealth.lastOk,
+    stale: running && !!last && now.getTime() - last.getTime() > 2 * WORKER_INTERVAL_MS,
+  };
+}
+
+/** Test hook: record a run without the timer. */
+export function noteEscalationWorkerRun(ok: boolean, at = new Date()): void {
+  workerHealth.lastRunAt = at; workerHealth.lastOk = ok;
+}
+
+/** Start the 30-minute reminder loop (see voiceEscalationWorkerOffReason for when it runs). */
 export function startVoiceEscalationWorker(): boolean {
   if (worker) return true;
-  if (process.env.VOICE_ESCALATION_WORKER_ENABLED !== "true") return false;
+  const off = voiceEscalationWorkerOffReason();
+  if (off) {
+    console.log(`[voice] escalation reminder worker off: ${off}`);
+    return false;
+  }
   const run = () => tickVoiceEscalations().then((r) => {
+    noteEscalationWorkerRun(r.errors === 0);
     if (r.reminded || r.followedUp || r.closed || r.errors) console.log(`[voice] escalations: ${JSON.stringify(r)}`);
   }).catch((e: any) => {
+    noteEscalationWorkerRun(false);
     console.error("[voice] escalation worker failed:", e?.message || e);
     void recordFailure("job", "Call escalation reminder worker", e);
   });

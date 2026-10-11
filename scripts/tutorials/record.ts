@@ -216,6 +216,8 @@ function overlay() {
 export const redactCss = (selectors: readonly string[]): string => `${selectors.join(",")}{filter:blur(9px)!important;user-select:none!important}`;
 /** …and the one behind `hideSelectors`: not drawn, its space kept. */
 export const hideCss = (selectors: readonly string[]): string => `${selectors.join(",")}{visibility:hidden!important}`;
+/** …and the one behind `removeSelectors`: out of the layout, the page closes up. */
+export const removeCss = (selectors: readonly string[]): string => `${selectors.join(",")}{display:none!important}`;
 /** Runs in every document before any of its own scripts: the rule is in place before the app can draw the element. */
 function redactFromLoad(css: string) {
   const add = () => { if (document.getElementById("__tut-redact") || !document.documentElement) return !!document.getElementById("__tut-redact"); const s = document.createElement("style"); s.id = "__tut-redact"; s.textContent = css; document.documentElement.appendChild(s); return true; };
@@ -784,8 +786,8 @@ async function main() {
     await context.addInitScript((on) => { (window as any).__tutLinkAddress = on; }, !!script.showLinkAddress);
     await context.addInitScript(overlay);
     // Secrets that appear by themselves are blurred by a stylesheet that is there before the page draws anything.
-    if (script.redactSelectors?.length || script.hideSelectors?.length)
-      await context.addInitScript(redactFromLoad, (script.redactSelectors?.length ? redactCss(script.redactSelectors) : "") + (script.hideSelectors?.length ? hideCss(script.hideSelectors) : ""));
+    if (script.redactSelectors?.length || script.hideSelectors?.length || script.removeSelectors?.length)
+      await context.addInitScript(redactFromLoad, (script.redactSelectors?.length ? redactCss(script.redactSelectors) : "") + (script.hideSelectors?.length ? hideCss(script.hideSelectors) : "") + (script.removeSelectors?.length ? removeCss(script.removeSelectors) : ""));
     await context.addInitScript(() => { try { localStorage.setItem("hub.welcomeSeen", "1"); } catch { /* storage off */ } });
     // One tab is recorded. A button that opens a new tab (an estimate's Preview, "See what the client
     // sees") opens it in this one instead; the script comes back with a `back` step.
