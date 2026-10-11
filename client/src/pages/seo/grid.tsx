@@ -156,6 +156,11 @@ export default function SeoLocalGridPage() {
   const watchingFailed = activeId != null && active.isError;
   const isRunning = active.data?.status === "running" || scan.isPending;
   const shown: Scan | null = openId != null && view.data?.status === "done" ? view.data.scan : null;
+  // Initialize once per saved configuration; polling must not overwrite edits to a new scan.
+  useEffect(() => {
+    if (!shown) return;
+    setKeyword(shown.keyword); setSize(shown.size); setSpacing(shown.spacing);
+  }, [site?.id, openId, shown?.keyword, shown?.size, shown?.spacing]);
   // When the running scan ends, the history and what is left of the SEO data are both out of date.
   const ended = active.data && active.data.status !== "running" ? active.data.id : undefined;
   useEffect(() => {
@@ -214,6 +219,95 @@ export default function SeoLocalGridPage() {
       {site && q.isError && <div className="g-callout" role="alert"><h3>Couldn't load the local grid</h3><p>{apiErrorMessage(q.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void q.refetch()}>Try again</button></div>}
       {site && q.data && (
         <>
+          {active.data?.status === "running" && <p className="g-text mb-4 flex items-center gap-2 text-[14px]" role="status" data-testid="grid-running"><Loader2 className="h-4 w-4 animate-spin" /> Looking up Google's local results for each point — this takes a minute or two. You can leave this page; the scan will be in the list below when it is done.</p>}
+          {watchingFailed && <p className="mb-3 text-[13px]" role="alert" style={{ color: "var(--g-red)" }} data-testid="grid-watch-error">Couldn't check on the running scan just now ({apiErrorMessage(active.error)}). Still trying; the scan itself is not affected.</p>}
+          {openId != null && !shown && view.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Opening the scan…</p>}
+          {openId != null && !shown && view.isError && <div className="g-callout" role="alert"><h3>Couldn't open that scan</h3><p>{apiErrorMessage(view.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void view.refetch()}>Try again</button></div>}
+          {openId != null && view.data?.status === "failed" && <div className="g-callout mb-4" role="alert" data-testid="grid-failed"><h3>The scan didn't finish</h3><p>{view.data.error}</p></div>}
+          {shown && (
+            <section className="mb-6" data-testid="grid-result">
+              <Heading className="!mb-3 !text-[18px]" meta={<><Link href={here()} className={QUIET_LINK}>{shown.size} × {shown.size}, {miles(shown.spacing)} apart</Link> · <Link href={here()} className={QUIET_LINK}>{fmtDate(shown.fetchedAt)}</Link> · <Link href={seoLinks.explorer(pin?.domain || site.domain)} className={QUIET_LINK}>{shown.center.name}</Link></>}><Link href={here()} className={QUIET_LINK}>"{shown.keyword}"</Link></Heading>
+              {/* The scan's figures in one row; the move is against the comparable scan before it (lower position score is better).
+                  Each figure outlines the points it counts on the grid below (the address says which); an earlier scan's figure opens that scan the same way. */}
+              <div className="mb-4 rounded-xl border p-3 sm:p-4" style={CARD}>
+                <MetricRow cols={4} testId="grid-summary">
+                  <LinkedFigure href={here({ show: "checked" })} label="Position score" testId="tile-grid-avg" value={shown.summary.avgRank ?? "—"}
+                    delta={previous?.avgRank != null && shown.summary.avgRank != null ? <DeltaBadge value={shown.summary.avgRank - previous.avgRank} upIsBad label={`Change since the scan of ${fmtDate(previous.at)}`} /> : null}
+                    foot={<>Average over <Link href={here({ show: "checked" })} className={QUIET_LINK}>the {shown.summary.checked} points checked</Link>; "not in the first {depth}" counts as {depth + 1}{previous?.avgRank != null && shown.summary.avgRank != null ? <>. Was <Link href={at(previous.id, { show: "checked" })} className={TEXT_LINK}>{previous.avgRank} over {previous.checked} points on {fmtDate(previous.at)}</Link></> : ""}</>} />
+                  <LinkedFigure href={here({ show: "top3" })} label="In the first 3" testId="tile-grid-top3" value={`${shown.summary.top3} of ${shown.summary.checked}`}
+                    delta={previous && previous.checked === shown.summary.checked ? <DeltaBadge value={shown.summary.top3 - previous.top3} label={`Change since the scan of ${fmtDate(previous.at)}, over the same ${previous.checked} points`} /> : null}
+                    foot={previous ? <>was <Link href={at(previous.id, { show: "top3" })} className={TEXT_LINK}>{previous.top3} of {previous.checked} on {fmtDate(previous.at)}</Link></> : "points where you are one of the first three local results"}
+                    chart={<RatioBar value={shown.summary.top3} total={shown.summary.checked} label="Points in the first 3" />} />
+                  <LinkedFigure href={here({ show: "found" })} label="Found" testId="tile-grid-found" value={`${shown.summary.found} of ${shown.summary.checked}`} foot={previous ? <>was <Link href={at(previous.id, { show: "found" })} className={TEXT_LINK}>{previous.found} of {previous.checked} on {fmtDate(previous.at)}</Link> · in the first {depth} local results</> : `points where you are in the first ${depth} local results`}
+                    chart={<RatioBar value={shown.summary.found} total={shown.summary.checked} label="Points where you are found" />} />
+                  <LinkedFigure href={here()} label="Area" testId="tile-grid-area" value={span ? `${span} × ${span} mi` : "1 point"} foot={shown.summary.checked < shown.summary.points ? <Link href={here({ show: "failed" })} className={QUIET_LINK} data-testid="link-grid-failed">{shown.summary.points - shown.summary.checked} point{shown.summary.points - shown.summary.checked === 1 ? "" : "s"} could not be checked</Link> : <Link href={here({ show: "checked" })} className={QUIET_LINK}>{shown.summary.points} points checked</Link>} />
+                </MetricRow>
+              </div>
+              {(() => {
+                const mine = watches.find((w) => w.keyword === shown.keyword && w.size === shown.size && w.spacing === shown.spacing);
+                const each = prices?.gridPer100 != null ? money(Math.ceil((shown.size * shown.size * prices.gridPer100) / 100)) : null;
+                return (
+                  <p className="g-text-2 mb-3 flex flex-wrap items-center gap-2 text-[13px]" data-testid="grid-repeat">
+                    {mine ? <>This scan repeats every {mine.every === "weekly" ? "week" : "month"} — next on <Link href={seoLinks.usage()} className={QUIET_LINK} title="Usage: each repeat is taken from your included SEO data" data-testid="link-grid-repeat-next">{fmtDate(mine.nextAt)}</Link>. <button type="button" className="g-link min-h-11" disabled={unwatch.isPending} onClick={() => unwatch.mutate({ siteId: site.id, id: mine.id })} data-testid="button-grid-unwatch">Stop</button></> : <>
+                      <span>Repeat this scan automatically{each ? <> (about <Link href={seoLinks.usage()} className={QUIET_LINK}>{each} each time</Link>, from your included SEO data only)</> : ""}:</span>
+                      {(["monthly", "weekly"] as const).map((every) => <button key={every} type="button" className="g-pill g-pill--sm !min-h-11" disabled={watch.isPending || !sameCenter(shown.center, pin ? { lat: pin.lat, lng: pin.lng, name: pin.name, cid: pin.cid } : null)} onClick={() => watch.mutate({ siteId: site.id, body: { keyword: shown.keyword, size: shown.size, spacing: shown.spacing, every } })} data-testid={`button-grid-watch-${every}`}>Every {every === "weekly" ? "week" : "month"}</button>)}
+                    </>}
+                  </p>
+                );
+              })()}
+              {unsure > 0 && <p className="g-text-2 mb-3 text-[13px]" role="status" data-testid="text-grid-unsure">At <Link href={here({ show: "found" })} className={QUIET_LINK}>{unsure} point{unsure === 1 ? "" : "s"}</Link> either Google's result or your pinned listing carried no listing id, so you were recognised by your website or name instead. If you have more than one location, that match could be another branch.</p>}
+              <div className="grid min-w-0 gap-5 2xl:grid-cols-[auto,minmax(0,1fr)]">
+                <div>
+                  <div className="g-text-2 mb-1 text-center text-[11px]">North</div>
+                  {/* A point pressed is written to the address (?cell=), so the view can be linked to and the back button unpicks it. Outlined points are the ones a figure counts (?show=). */}
+                  <div role="group" aria-label={`Positions for "${shown.keyword}" at ${shown.summary.points} points, north at the top`} className="inline-grid gap-1.5" style={{ gridTemplateColumns: `repeat(${shown.size}, minmax(0, 1fr))` }} data-testid="grid-cells">
+                    {shown.points.map((p, i) => { const t = tone(p); const lit = !!show && counts(p, show); return (
+                      <button key={i} type="button" onClick={() => setParam("cell", cell === i ? null : i)} aria-pressed={cell === i}
+                        aria-label={`${whereIs(p, shown.size, shown.spacing)}: ${t.words}${lit ? " (counted)" : ""}`} title={`${whereIs(p, shown.size, shown.spacing)}: ${t.words}`} data-testid={`grid-cell-${p.row}-${p.col}`}
+                        className="flex items-center justify-center rounded-full text-[13px] font-medium tabular-nums"
+                        style={{ width: shown.size > 5 ? 44 : 48, height: shown.size > 5 ? 44 : 48, background: t.bg, color: t.fg, outline: cell === i ? "3px solid var(--g-blue, #1a73e8)" : lit ? "3px solid var(--g-text, #202124)" : undefined, outlineOffset: 2, opacity: show && !lit ? 0.45 : undefined }}>{t.label}</button>
+                    ); })}
+                  </div>
+                  <div className="g-text-2 mt-1 text-center text-[11px]">South</div>
+                  {/* The key: each colour's points can be outlined where a figure counts them. */}
+                  <ul className="g-text-2 mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[12px]" aria-label="What the colours mean">
+                    {([["#188038", "1–3", "top3"], ["#f9ab00", "4–10", "4-10"], ["#e8710a", "11–20", "11-20"], ["#c5221f", "20+ not found", "notFound"], ["var(--g-divider)", "? unknown", "failed"]] as const).map(([c, l, s]) => <li key={l} className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded-full" style={{ background: c }} aria-hidden /> <Link href={here({ show: s })} className={QUIET_LINK} title={`Outline ${SHOW_WORDS[s]}`} data-testid={`link-grid-key-${s}`}>{l}</Link></li>)}
+                  </ul>
+                </div>
+                <div className="min-w-0">
+                  {selected ? (
+                    <div className="mb-4 rounded-xl border p-3" style={CARD} data-testid="grid-cell-detail" role="status">
+                      <Heading level={3} className="!mb-0 !text-[14px]">{whereIs(selected, shown.size, shown.spacing).replace(/^./, (c) => c.toUpperCase())}</Heading>
+                      <p className="g-text-2 text-[13px]">You: <Link href={here({ show: bandOf(selected), cell: cell ?? undefined })} className={QUIET_LINK} title={`Outline ${SHOW_WORDS[bandOf(selected)]}`} data-testid="link-grid-cell-band">{tone(selected).words}</Link>{selected.by && selected.by !== "id" ? ` (recognised by your ${selected.by})` : ""}.</p>
+                      {selected.top.length > 0 && <ol className="g-text mt-2 list-decimal pl-5 text-[13px]">{selected.top.map((t) => { const rival = shown.rivals.find((r) => r.name === t.name); return <li key={t.rank}>{rival?.ours ? <Link href={seoLinks.rankTracker(site.id, { mapPack: true })} className={TEXT_LINK}>{t.name}</Link> : rival?.domain ? <Link href={seoLinks.explorer(rival.domain)} className={TEXT_LINK} title={`Open ${rival.domain} in Site explorer`}>{t.name}</Link> : <>{t.name} <span className="g-text-2">(no website in Google's listing)</span></>}</li>; })}</ol>}
+                    </div>
+                  ) : <p className="g-text-2 mb-4 text-[13px]">Select a point to see who is in the first three there.</p>}
+                  <Heading level={3}>Who shows up across the area</Heading>
+                  {/* Each business is counted at every point where Google's local results listed it — in the first three, or at all — so several businesses can be "in the first 3" at one point, and a rival's count can exceed yours while your position score is good. The headings say what is counted. */}
+                  <p className="g-text-2 mb-2 text-[12px]" data-testid="text-grid-rivals-note">Each business is counted at every one of the <Link href={here({ show: "checked" })} className={QUIET_LINK}>{shown.summary.checked} points checked</Link> where Google listed it in the first three local results, or at all — so more than one business can be in the first 3 at the same point.</p>
+                  {shown.rivals.length ? (
+                    <div className="overflow-x-auto"><table className="g-table" data-testid="table-grid-rivals">
+                      <thead><tr><th>Business</th><th className="num" title="At how many of the points checked this business was one of the first three local results">Points in the first 3</th><th className="num" title="At how many of the points checked this business was listed at all">Points found</th><th className="num">Average position where found</th><th className="num">Reviews</th></tr></thead>
+                      {/* A business with a website opens in Site explorer, its figures too (no view holds a rival's points); your own row and figures open your points here, and your map-pack keywords in the rank tracker. Reviews are Google's, not ours to open. */}
+                      <tbody>{shown.rivals.map((r, i) => { const rival = r.domain ? seoLinks.explorer(r.domain) : null; const cellOf = (s: Show, text: string) => r.ours ? <Link href={here({ show: s })} className={FIGURE_LINK}>{text}</Link> : rival ? <Link href={rival} className={FIGURE_LINK} title={`${r.name} in Site explorer`}>{text}</Link> : <span title="No website in Google's listing, so there is nowhere to open">{text}<span className="g-text-2 text-[11px] max-sm:ml-1 sm:sr-only"> · no website to open</span></span>; return (
+                        <tr key={`${r.name}-${i}`} style={r.ours ? { background: "var(--g-hover, rgba(26,115,232,.06))" } : undefined}>
+                          <td>{r.ours ? <Link href={seoLinks.rankTracker(site.id, { mapPack: true })} className={TEXT_LINK} data-testid="link-grid-rival-you">{r.name}</Link> : rival ? <Link href={rival} className={TEXT_LINK} title={`Open ${r.domain} in Site explorer`} data-testid={`link-grid-rival-${i}`}>{r.name}</Link> : <>{r.name} <span className="g-text-2 text-[12px]">(no website in Google's listing)</span></>}{r.ours && <span className="g-chip g-chip--sm ml-2">You</span>}{r.domain && <span className="g-text-2 block min-w-0 text-[12px]"><Link href={seoLinks.explorer(r.domain)} className={`${QUIET_LINK} !block truncate`} title={r.domain}>{r.domain}</Link></span>}</td>
+                          <td className="num" data-label="Points in the first 3"><MiniBar value={r.top3} total={shown.summary.checked} className="mr-2" />{cellOf("top3", `${r.top3} of ${shown.summary.checked}`)}</td>
+                          <td className="num" data-label="Points found"><MiniBar value={r.found} total={shown.summary.checked} className="mr-2" />{cellOf("found", `${r.found} of ${shown.summary.checked}`)}</td>
+                          <td className="num" data-label="Average position where found">{cellOf("found", String(r.avgRank))}</td>
+                          <td className="num" data-label="Reviews">{r.rating != null ? <a href={seoLinks.googleMaps({ cid: r.cid, name: r.name, address: r.ours ? pin?.address : null })} target="_blank" rel="noreferrer" className={QUIET_LINK} title={`${r.name} on Google Maps: Google's own stars and reviews (no view here holds them)`}>{`${r.rating} (${fmtNum(r.reviews)})`} ↗</a> : "—"}</td>
+                        </tr>
+                      ); })}</tbody>
+                    </table></div>
+                  ) : <p className="g-text-2 text-[13px]">Google showed no local businesses for this search here.</p>}
+                  <p className="g-text-2 mt-2 text-[12px]">These are positions in Google's local finder — the full list of local businesses Google shows for a search — for a search made from each point at the time of the scan. It is not the three-business map pack on the ordinary results page (the <Link href={seoLinks.rankTracker(site.id, { mapPack: true })} className={TEXT_LINK}>rank tracker</Link> follows that), and a real customer's results also depend on their own history and device. Reviews are Google's own count.</p>
+                </div>
+              </div>
+            </section>
+          )}
+
+          <details key={`${site.id}:${scanParam ?? "new"}`} open={scanParam === null} className="mb-5" data-testid="grid-new-scan">
+            <summary className="mb-3 cursor-pointer rounded p-2 text-[14px] font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Run a new scan</summary>
           {(!pin || changing) ? (
             <section className="mb-5 rounded-xl border p-3 sm:p-4" style={CARD} data-testid="grid-locate">
               <Heading className="!mb-1">{pin ? "Choose a different listing" : "First, find your business on Google Maps"}</Heading>
@@ -277,92 +371,7 @@ export default function SeoLocalGridPage() {
             </section>
           )}
 
-          {active.data?.status === "running" && <p className="g-text mb-4 flex items-center gap-2 text-[14px]" role="status" data-testid="grid-running"><Loader2 className="h-4 w-4 animate-spin" /> Looking up Google's local results for each point — this takes a minute or two. You can leave this page; the scan will be in the list below when it is done.</p>}
-          {watchingFailed && <p className="mb-3 text-[13px]" role="alert" style={{ color: "var(--g-red)" }} data-testid="grid-watch-error">Couldn't check on the running scan just now ({apiErrorMessage(active.error)}). Still trying; the scan itself is not affected.</p>}
-          {openId != null && !shown && view.isLoading && <p className="g-text-2 flex items-center gap-2 text-[14px]" role="status"><Loader2 className="h-4 w-4 animate-spin" /> Opening the scan…</p>}
-          {openId != null && !shown && view.isError && <div className="g-callout" role="alert"><h3>Couldn't open that scan</h3><p>{apiErrorMessage(view.error)}</p><button type="button" className="g-pill mt-2" onClick={() => void view.refetch()}>Try again</button></div>}
-          {openId != null && view.data?.status === "failed" && <div className="g-callout mb-4" role="alert" data-testid="grid-failed"><h3>The scan didn't finish</h3><p>{view.data.error}</p></div>}
-          {shown && (
-            <section className="mb-6" data-testid="grid-result">
-              <Heading className="!mb-3 !text-[18px]" meta={<><Link href={here()} className={QUIET_LINK}>{shown.size} × {shown.size}, {miles(shown.spacing)} apart</Link> · <Link href={here()} className={QUIET_LINK}>{fmtDate(shown.fetchedAt)}</Link> · <Link href={seoLinks.explorer(pin?.domain || site.domain)} className={QUIET_LINK}>{shown.center.name}</Link></>}><Link href={here()} className={QUIET_LINK}>"{shown.keyword}"</Link></Heading>
-              {/* The scan's figures in one row; the move is against the comparable scan before it (lower position score is better).
-                  Each figure outlines the points it counts on the grid below (the address says which); an earlier scan's figure opens that scan the same way. */}
-              <div className="mb-4 rounded-xl border p-3 sm:p-4" style={CARD}>
-                <MetricRow cols={4} testId="grid-summary">
-                  <LinkedFigure href={here({ show: "checked" })} label="Position score" testId="tile-grid-avg" value={shown.summary.avgRank ?? "—"}
-                    delta={previous?.avgRank != null && shown.summary.avgRank != null ? <DeltaBadge value={shown.summary.avgRank - previous.avgRank} upIsBad label={`Change since the scan of ${fmtDate(previous.at)}`} /> : null}
-                    foot={<>Average over <Link href={here({ show: "checked" })} className={QUIET_LINK}>the {shown.summary.checked} points checked</Link>; "not in the first {depth}" counts as {depth + 1}{previous?.avgRank != null && shown.summary.avgRank != null ? <>. Was <Link href={at(previous.id, { show: "checked" })} className={TEXT_LINK}>{previous.avgRank} over {previous.checked} points on {fmtDate(previous.at)}</Link></> : ""}</>} />
-                  <LinkedFigure href={here({ show: "top3" })} label="In the first 3" testId="tile-grid-top3" value={`${shown.summary.top3} of ${shown.summary.checked}`}
-                    delta={previous && previous.checked === shown.summary.checked ? <DeltaBadge value={shown.summary.top3 - previous.top3} label={`Change since the scan of ${fmtDate(previous.at)}, over the same ${previous.checked} points`} /> : null}
-                    foot={previous ? <>was <Link href={at(previous.id, { show: "top3" })} className={TEXT_LINK}>{previous.top3} of {previous.checked} on {fmtDate(previous.at)}</Link></> : "points where you are one of the first three local results"}
-                    chart={<RatioBar value={shown.summary.top3} total={shown.summary.checked} label="Points in the first 3" />} />
-                  <LinkedFigure href={here({ show: "found" })} label="Found" testId="tile-grid-found" value={`${shown.summary.found} of ${shown.summary.checked}`} foot={previous ? <>was <Link href={at(previous.id, { show: "found" })} className={TEXT_LINK}>{previous.found} of {previous.checked} on {fmtDate(previous.at)}</Link> · in the first {depth} local results</> : `points where you are in the first ${depth} local results`}
-                    chart={<RatioBar value={shown.summary.found} total={shown.summary.checked} label="Points where you are found" />} />
-                  <LinkedFigure href={here()} label="Area" testId="tile-grid-area" value={span ? `${span} × ${span} mi` : "1 point"} foot={shown.summary.checked < shown.summary.points ? <Link href={here({ show: "failed" })} className={QUIET_LINK} data-testid="link-grid-failed">{shown.summary.points - shown.summary.checked} point{shown.summary.points - shown.summary.checked === 1 ? "" : "s"} could not be checked</Link> : <Link href={here({ show: "checked" })} className={QUIET_LINK}>{shown.summary.points} points checked</Link>} />
-                </MetricRow>
-              </div>
-              {(() => {
-                const mine = watches.find((w) => w.keyword === shown.keyword && w.size === shown.size && w.spacing === shown.spacing);
-                const each = prices?.gridPer100 != null ? money(Math.ceil((shown.size * shown.size * prices.gridPer100) / 100)) : null;
-                return (
-                  <p className="g-text-2 mb-3 flex flex-wrap items-center gap-2 text-[13px]" data-testid="grid-repeat">
-                    {mine ? <>This scan repeats every {mine.every === "weekly" ? "week" : "month"} — next on <Link href={seoLinks.usage()} className={QUIET_LINK} title="Usage: each repeat is taken from your included SEO data" data-testid="link-grid-repeat-next">{fmtDate(mine.nextAt)}</Link>. <button type="button" className="g-link min-h-11" disabled={unwatch.isPending} onClick={() => unwatch.mutate({ siteId: site.id, id: mine.id })} data-testid="button-grid-unwatch">Stop</button></> : <>
-                      <span>Repeat this scan automatically{each ? <> (about <Link href={seoLinks.usage()} className={QUIET_LINK}>{each} each time</Link>, from your included SEO data only)</> : ""}:</span>
-                      {(["monthly", "weekly"] as const).map((every) => <button key={every} type="button" className="g-pill g-pill--sm !min-h-11" disabled={watch.isPending || !sameCenter(shown.center, pin ? { lat: pin.lat, lng: pin.lng, name: pin.name, cid: pin.cid } : null)} onClick={() => watch.mutate({ siteId: site.id, body: { keyword: shown.keyword, size: shown.size, spacing: shown.spacing, every } })} data-testid={`button-grid-watch-${every}`}>Every {every === "weekly" ? "week" : "month"}</button>)}
-                    </>}
-                  </p>
-                );
-              })()}
-              {unsure > 0 && <p className="g-text-2 mb-3 text-[13px]" role="status" data-testid="text-grid-unsure">At <Link href={here({ show: "found" })} className={QUIET_LINK}>{unsure} point{unsure === 1 ? "" : "s"}</Link> either Google's result or your pinned listing carried no listing id, so you were recognised by your website or name instead. If you have more than one location, that match could be another branch.</p>}
-              <div className="grid gap-5 lg:grid-cols-[auto,1fr]">
-                <div>
-                  <div className="g-text-2 mb-1 text-center text-[11px]">North</div>
-                  {/* A point pressed is written to the address (?cell=), so the view can be linked to and the back button unpicks it. Outlined points are the ones a figure counts (?show=). */}
-                  <div role="group" aria-label={`Positions for "${shown.keyword}" at ${shown.summary.points} points, north at the top`} className="inline-grid gap-1.5" style={{ gridTemplateColumns: `repeat(${shown.size}, minmax(0, 1fr))` }} data-testid="grid-cells">
-                    {shown.points.map((p, i) => { const t = tone(p); const lit = !!show && counts(p, show); return (
-                      <button key={i} type="button" onClick={() => setParam("cell", cell === i ? null : i)} aria-pressed={cell === i}
-                        aria-label={`${whereIs(p, shown.size, shown.spacing)}: ${t.words}${lit ? " (counted)" : ""}`} title={`${whereIs(p, shown.size, shown.spacing)}: ${t.words}`} data-testid={`grid-cell-${p.row}-${p.col}`}
-                        className="flex items-center justify-center rounded-full text-[13px] font-medium tabular-nums"
-                        style={{ width: shown.size > 5 ? 44 : 48, height: shown.size > 5 ? 44 : 48, background: t.bg, color: t.fg, outline: cell === i ? "3px solid var(--g-blue, #1a73e8)" : lit ? "3px solid var(--g-text, #202124)" : undefined, outlineOffset: 2, opacity: show && !lit ? 0.45 : undefined }}>{t.label}</button>
-                    ); })}
-                  </div>
-                  <div className="g-text-2 mt-1 text-center text-[11px]">South</div>
-                  {/* The key: each colour's points can be outlined where a figure counts them. */}
-                  <ul className="g-text-2 mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[12px]" aria-label="What the colours mean">
-                    {([["#188038", "1–3", "top3"], ["#f9ab00", "4–10", "4-10"], ["#e8710a", "11–20", "11-20"], ["#c5221f", "20+ not found", "notFound"], ["var(--g-divider)", "? unknown", "failed"]] as const).map(([c, l, s]) => <li key={l} className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded-full" style={{ background: c }} aria-hidden /> <Link href={here({ show: s })} className={QUIET_LINK} title={`Outline ${SHOW_WORDS[s]}`} data-testid={`link-grid-key-${s}`}>{l}</Link></li>)}
-                  </ul>
-                </div>
-                <div className="min-w-0">
-                  {selected ? (
-                    <div className="mb-4 rounded-xl border p-3" style={CARD} data-testid="grid-cell-detail" role="status">
-                      <Heading level={3} className="!mb-0 !text-[14px]">{whereIs(selected, shown.size, shown.spacing).replace(/^./, (c) => c.toUpperCase())}</Heading>
-                      <p className="g-text-2 text-[13px]">You: <Link href={here({ show: bandOf(selected), cell: cell ?? undefined })} className={QUIET_LINK} title={`Outline ${SHOW_WORDS[bandOf(selected)]}`} data-testid="link-grid-cell-band">{tone(selected).words}</Link>{selected.by && selected.by !== "id" ? ` (recognised by your ${selected.by})` : ""}.</p>
-                      {selected.top.length > 0 && <ol className="g-text mt-2 list-decimal pl-5 text-[13px]">{selected.top.map((t) => { const rival = shown.rivals.find((r) => r.name === t.name); return <li key={t.rank}>{rival?.ours ? <Link href={seoLinks.rankTracker(site.id, { mapPack: true })} className={TEXT_LINK}>{t.name}</Link> : rival?.domain ? <Link href={seoLinks.explorer(rival.domain)} className={TEXT_LINK} title={`Open ${rival.domain} in Site explorer`}>{t.name}</Link> : <>{t.name} <span className="g-text-2">(no website in Google's listing)</span></>}</li>; })}</ol>}
-                    </div>
-                  ) : <p className="g-text-2 mb-4 text-[13px]">Select a point to see who is in the first three there.</p>}
-                  <Heading level={3}>Who shows up across the area</Heading>
-                  {/* Each business is counted at every point where Google's local results listed it — in the first three, or at all — so several businesses can be "in the first 3" at one point, and a rival's count can exceed yours while your position score is good. The headings say what is counted. */}
-                  <p className="g-text-2 mb-2 text-[12px]" data-testid="text-grid-rivals-note">Each business is counted at every one of the <Link href={here({ show: "checked" })} className={QUIET_LINK}>{shown.summary.checked} points checked</Link> where Google listed it in the first three local results, or at all — so more than one business can be in the first 3 at the same point.</p>
-                  {shown.rivals.length ? (
-                    <div className="overflow-x-auto"><table className="g-table" data-testid="table-grid-rivals">
-                      <thead><tr><th>Business</th><th className="num" title="At how many of the points checked this business was one of the first three local results">Points in the first 3</th><th className="num" title="At how many of the points checked this business was listed at all">Points found</th><th className="num">Average position where found</th><th className="num">Reviews</th></tr></thead>
-                      {/* A business with a website opens in Site explorer, its figures too (no view holds a rival's points); your own row and figures open your points here, and your map-pack keywords in the rank tracker. Reviews are Google's, not ours to open. */}
-                      <tbody>{shown.rivals.map((r, i) => { const rival = r.domain ? seoLinks.explorer(r.domain) : null; const cellOf = (s: Show, text: string) => r.ours ? <Link href={here({ show: s })} className={FIGURE_LINK}>{text}</Link> : rival ? <Link href={rival} className={FIGURE_LINK} title={`${r.name} in Site explorer`}>{text}</Link> : <span title="No website in Google's listing, so there is nowhere to open">{text}<span className="g-text-2 text-[11px] max-sm:ml-1 sm:sr-only"> · no website to open</span></span>; return (
-                        <tr key={`${r.name}-${i}`} style={r.ours ? { background: "var(--g-hover, rgba(26,115,232,.06))" } : undefined}>
-                          <td>{r.ours ? <Link href={seoLinks.rankTracker(site.id, { mapPack: true })} className={TEXT_LINK} data-testid="link-grid-rival-you">{r.name}</Link> : rival ? <Link href={rival} className={TEXT_LINK} title={`Open ${r.domain} in Site explorer`} data-testid={`link-grid-rival-${i}`}>{r.name}</Link> : <>{r.name} <span className="g-text-2 text-[12px]">(no website in Google's listing)</span></>}{r.ours && <span className="g-chip g-chip--sm ml-2">You</span>}{r.domain && <span className="g-text-2 block text-[12px]"><Link href={seoLinks.explorer(r.domain)} className={QUIET_LINK}>{r.domain}</Link></span>}</td>
-                          <td className="num" data-label="Points in the first 3"><MiniBar value={r.top3} total={shown.summary.checked} className="mr-2" />{cellOf("top3", `${r.top3} of ${shown.summary.checked}`)}</td>
-                          <td className="num" data-label="Points found"><MiniBar value={r.found} total={shown.summary.checked} className="mr-2" />{cellOf("found", `${r.found} of ${shown.summary.checked}`)}</td>
-                          <td className="num" data-label="Average position where found">{cellOf("found", String(r.avgRank))}</td>
-                          <td className="num" data-label="Reviews">{r.rating != null ? <a href={seoLinks.googleMaps({ cid: r.cid, name: r.name, address: r.ours ? pin?.address : null })} target="_blank" rel="noreferrer" className={QUIET_LINK} title={`${r.name} on Google Maps: Google's own stars and reviews (no view here holds them)`}>{`${r.rating} (${fmtNum(r.reviews)})`} ↗</a> : "—"}</td>
-                        </tr>
-                      ); })}</tbody>
-                    </table></div>
-                  ) : <p className="g-text-2 text-[13px]">Google showed no local businesses for this search here.</p>}
-                  <p className="g-text-2 mt-2 text-[12px]">These are positions in Google's local finder — the full list of local businesses Google shows for a search — for a search made from each point at the time of the scan. It is not the three-business map pack on the ordinary results page (the <Link href={seoLinks.rankTracker(site.id, { mapPack: true })} className={TEXT_LINK}>rank tracker</Link> follows that), and a real customer's results also depend on their own history and device. Reviews are Google's own count.</p>
-                </div>
-              </div>
-            </section>
-          )}
+          </details>
 
           {pin && !changing && watches.length > 0 && (
             <section className="mb-5" data-testid="grid-watches">

@@ -201,11 +201,12 @@ export default function SeoPlanPage() {
         <>
           {/* The plan's counts in one row (as the dashboard lays a site's figures out); each opens the tasks it counts. */}
           <div className="mb-4 rounded-xl border p-3 sm:p-4" style={CARD}>
-            <MetricRow cols={overdue > 0 ? 5 : 4} testId="plan-summary">
-              <LinkedFigure href={seoLinks.plan(site.id, { status: "todo" })} label="To do" value={fmtNum(counts?.todo ?? 0)} testId="tile-plan-todo" />
-              <LinkedFigure href={seoLinks.plan(site.id, { status: "doing" })} label="In progress" value={fmtNum(counts?.doing ?? 0)} testId="tile-plan-doing" />
-              <LinkedFigure href={seoLinks.plan(site.id, { status: "done" })} label="Done in the last 30 days" value={fmtNum(counts?.doneRecently ?? 0)} testId="tile-plan-done" foot="the done list has every one" />
-              <LinkedFigure href={seoLinks.plan(site.id, { status: "done" })} label="Done in all" value={fmtNum(counts?.done ?? 0)} testId="tile-plan-total" />
+            <MetricRow cols={overdue > 0 ? 6 : 5} testId="plan-summary">
+              <LinkedFigure href={seoLinks.plan(site.id, { status: "todo" })} label="To do (open)" value={counts ? fmtNum(counts.todo) : "—"} testId="tile-plan-todo" />
+              <LinkedFigure href={seoLinks.plan(site.id, { status: "doing" })} label="In progress (open)" value={counts ? fmtNum(counts.doing) : "—"} testId="tile-plan-doing" />
+              <LinkedFigure href={seoLinks.plan(site.id, { status: "done" })} label="Done in the last 30 days" value={counts ? fmtNum(counts.doneRecently) : "—"} testId="tile-plan-done" foot="included in Done (all time)" />
+              <LinkedFigure href={seoLinks.plan(site.id, { status: "done" })} label="Done (all time)" value={counts ? fmtNum(counts.done) : "—"} testId="tile-plan-total" />
+              <LinkedFigure href={seoLinks.plan(site.id, { status: "dropped" })} label="Dropped (all time)" value={counts ? fmtNum(counts.dropped) : "—"} testId="tile-plan-dropped" />
               {overdue > 0 && <LinkedFigure href={seoLinks.plan(site.id, { status: "overdue" })} label="Past their due date" value={fmtNum(overdue)} testId="tile-plan-overdue" />}
             </MetricRow>
           </div>
@@ -217,8 +218,8 @@ export default function SeoPlanPage() {
           </form>
           {/* The tabs and the kind pills are the address (?status= ?kind=): a link and a picked filter are the same thing. */}
           <TabStrip label="Tasks">
-            <Link href={here({ status: "" })} aria-current={!showClosed ? "page" : undefined} data-testid="tab-plan-open">Open <span className="g-text-2 tabular-nums">{fmtNum(open.length)}</span></Link>
-            <Link href={here({ status: "closed" })} aria-current={showClosed ? "page" : undefined} data-testid="tab-plan-closed">Done and dropped <span className="g-text-2 tabular-nums">{fmtNum(closedTotal)}</span></Link>
+            <Link href={here({ status: "" })} aria-current={!showClosed ? "page" : undefined} data-testid="tab-plan-open">Open (to do + in progress) <span className="g-text-2 tabular-nums">{fmtNum(counts ? counts.todo + counts.doing : open.length)}</span></Link>
+            <Link href={here({ status: "closed" })} aria-current={showClosed ? "page" : undefined} data-testid="tab-plan-closed">Closed (done + dropped) <span className="g-text-2 tabular-nums">{fmtNum(closedTotal)}</span></Link>
           </TabStrip>
           {kinds.length > 1 && (
             <div className="mb-3 flex flex-wrap items-center gap-1.5 text-[13px]" role="group" aria-label="Show only">

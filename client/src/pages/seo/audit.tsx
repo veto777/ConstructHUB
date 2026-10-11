@@ -293,17 +293,17 @@ export default function SeoAuditPage() {
               warnings and notices as columns with thin dividers. On a phone the ring and the crawl count take a full line
               each and the three severities share one. */}
           <section className="mb-4 rounded-xl border p-3 shadow-sm sm:p-5" style={card} data-testid="audit-overview">
-            <div className="grid grid-cols-6 gap-x-3 gap-y-5 lg:grid-cols-7 lg:gap-y-0">
-              <div className="col-span-6 flex min-w-0 items-center gap-3 lg:col-span-2" data-testid="audit-health">
+            <div className="grid grid-cols-6 gap-x-3 gap-y-5 2xl:grid-cols-7 2xl:gap-y-0">
+              <div className="col-span-6 flex min-w-0 items-center gap-3 2xl:col-span-2" data-testid="audit-health">
                 <Link href={go({})} className="shrink-0 rounded-full" title="Every issue this crawl found" data-testid="link-health"><HealthRing value={a.health} /></Link>
-                <div className="min-w-0">
+                <div className="min-w-0 max-w-prose">
                   <h2 className="text-[13px] font-medium" style={heading}><Link href={go({})} className={FIG} data-testid="link-health-label">Health score</Link></h2>
-                  <p className="g-text-2 text-[12px] leading-4">The share of crawled pages with no errors.</p>
+                  <p className="g-text-2 text-[12px] leading-4">The share of crawled pages with no errors. Warnings and notices do not lower this score, even when they affect every page.</p>
                   {a.healthChange !== null && a.healthChange !== 0 && <p className="g-text-2 mt-1 text-[12px] leading-4 [&>span]:!ml-0"><Link href={`${go({ vs: cmp?.jobId ?? vs ?? undefined })}${changeHash}`} className={`${FIG} gap-1`} title={`What changed against ${before}: fixed, and not re-checked`} data-testid="link-health-change"><DeltaBadge value={a.healthChange} label={`${a.healthChange > 0 ? "Up" : "Down"} ${Math.abs(a.healthChange)} since ${before}`} /> since {before}</Link></p>}
                   <p className="g-text-2 mt-1 text-[12px] leading-4"><Link href={go({ at: a.jobId })} className={FIG} title="Keep this crawl in the address" data-testid="link-crawled-at">Crawled {fmtDate(shownDate)}</Link></p>
                 </div>
               </div>
-              <div className="col-span-6 min-w-0 lg:col-span-2 lg:border-l lg:pl-3" style={divider} data-testid="audit-crawled">
+              <div className="col-span-6 min-w-0 2xl:col-span-2 2xl:border-l 2xl:pl-3" style={divider} data-testid="audit-crawled">
                 {/* Laid out like viz's MetricColumn, with the audit's own figure links (a dotted underline that shows without hovering). */}
                 <div className="flex min-w-0 flex-col">
                   <div className="text-[13px] font-medium" style={heading}><Link href={go({ tab: "pages" })} className={FIG} title="Every crawled page" data-testid="link-pages-crawled-label">Pages crawled</Link></div>
@@ -314,7 +314,7 @@ export default function SeoAuditPage() {
               {/* The three severities are grid cells of the row above (display: contents), kept together for the tests. */}
               <div className="contents" data-testid="audit-totals">
                 {(Object.keys(SEVERITY) as Severity[]).map((s, i) => (
-                  <div key={s} className={`col-span-2 min-w-0 lg:col-span-1 lg:border-l lg:pl-3${i > 0 ? " border-l pl-3" : ""}`} style={divider}>
+                  <div key={s} className={`col-span-2 min-w-0 2xl:col-span-1 2xl:border-l 2xl:pl-3${i > 0 ? " border-l pl-3" : ""}`} style={divider}>
                     <SeverityColumn label={SEVERITY[s].plural} color={SEVERITY[s].color} value={fmtNum(a.totals[s].issues)} foot={`${fmtNum(a.totals[s].affected)} affected`}
                       pressed={view === "issues" && severity === s} href={go({ severity: view === "issues" && severity === s ? undefined : s, area: areaParam ?? undefined })} footHref={go({ tab: "pages", severity: s })} footTestId={`link-affected-${s}`} testId={`button-severity-${s}`} />
                   </div>

@@ -1,0 +1,37 @@
+/* SEO-only adaptations; the shared tool shell belongs to other lanes too. */
+.seo-layout { display: contents; }
+.seo-layout .seo-more { display: none; }
+.seo-layout .tool-main :is([id], [data-testid]) {
+  scroll-margin-top: calc(var(--seo-header-height, 96px) + 12px);
+}
+@media (min-width: 768px) and (max-width: 1279px) {
+  .seo-layout .seo-more { display: inline-flex; }
+  .seo-layout .tool-top__tabs .tool-tabs__list > a:not([aria-current="page"]):not([data-testid="tool-tab-dashboard"]) { display: none; }
+  .seo-layout .tool-top__tabs .tool-tabs__nudge { display: none; }
+  .seo-layout .tool-top__tabs .tool-tabs[data-variant="bar"] .tool-tabs__list > a { padding-inline: 8px; }
+}
+@media (max-height: 650px) and (min-width: 768px) and (pointer: fine) {
+  .seo-layout .tool-top__row { min-height: 38px; }
+  .seo-layout .tool-top__tabs .tool-tabs[data-variant="bar"] .tool-tabs__list > a { min-height: 38px; }
+  .seo-layout .tool-top__row2 { min-height: 38px; padding-block: 3px; }
+  .seo-layout .tool-slot { gap: 4px 8px; }
+  .seo-layout .tool-slot__crumb { display: none; }
+  .seo-layout .tool-slot__end { flex: 1 1 320px; min-width: 0; }
+  .seo-layout .tool-slot__end > .stat-chips { width: 100%; overflow-x: auto; }
+  .seo-layout .tool-slot__end .stat-chips { flex-wrap: nowrap; }
+  .seo-layout .tool-slot__end .stat-chips > * { flex: none; }
+}
+.seo-layout .tool-slot > .seo-explorer-form { flex: 1 1 100%; max-width: none; justify-content: flex-start; }
+.seo-layout .tool-slot > .seo-explorer-form > label { flex: 1 1 180px; max-width: 320px; }
+.seo-layout .tool-slot > .seo-explorer-form > button { flex: none; }
+@media (max-width: 767px) {
+  .seo-layout .tool-slot > .seo-explorer-form > label { flex-basis: 100%; max-width: none; }
+}
+.seo-layout [data-testid="grid-cells"] { max-width: 100%; overflow-x: auto; padding: 4px; }
+@media (min-width: 640px) {
+  .seo-layout [data-testid="table-grid-rivals"] { width: 100%; table-layout: fixed; }
+  .seo-layout [data-testid="table-grid-rivals"] th { white-space: normal; overflow-wrap: normal; }
+  .seo-layout [data-testid="table-grid-rivals"] th:first-child { width: 36%; }
+  .seo-layout [data-testid="table-grid-rivals"] th:not(:first-child) { width: 16%; }
+  .seo-layout [data-testid="table-grid-rivals"] td { overflow-wrap: normal; }
+}
