@@ -5,8 +5,8 @@
  *   tsx scripts/tutorials/db.ts fresh <name>     drop + copy of constructhub_tut_template
  *   tsx scripts/tutorials/db.ts drop  <name>
  *   tsx scripts/tutorials/db.ts template [--rebuild]   build the template (schema, demo owner, demo seed)
- *   tsx scripts/tutorials/db.ts reseed [--fixtures]   apply scripts/tutorials/seed-demo.ts (and, with --fixtures,
- *                                                seed-fixtures.ts) to the EXISTING template — safe while producers
+ *   tsx scripts/tutorials/db.ts reseed [--fixtures]   apply scripts/tutorials/seed-demo.ts and seed-platform.ts (and, with
+ *                                                --fixtures, seed-fixtures.ts) to the EXISTING template — safe while producers
  *                                                are recording (see TEMPLATE_LOCK). It prints the workspace's row
  *                                                counts before and after and refuses a template with ids the app
  *                                                would reject. `--without-lock`: only past a dead producer's lock
@@ -36,6 +36,7 @@ import path from "path";
 import pg from "pg";
 import { ROOT, WORK_DIR, parseArgs, readEnvFile, run, withLock } from "./lib";
 import { UUID_ID_TABLES } from "./demo-ids";
+import { platformCensus, platformCensusLine } from "./seed-platform";
 
 export const TUT_NAME = /^constructhub_tut_[a-z0-9_]+$/;
 export const TEMPLATE = "constructhub_tut_template";
@@ -194,6 +195,17 @@ export async function seedDemo(name: string): Promise<string> {
 }
 
 /**
+ * The platform sample data — "Summit Roofing Co." (Denver CO): Google Business Profile locations, reviews,
+ * Ranking Grid, Google Ads / Click Guard, Ads Manager, LSA leads, Agency, Cloudflare, Search Console,
+ * Domains, Mail alerts, Site Scan, IP Tracker, VPN Shield, Social, Photos — script/feature-shots/seed/
+ * applied by seed-platform.ts: one transaction, idempotent, user 1 stays the demo owner. It runs on the
+ * TEMPLATE only (build and reseed): a fresh copy carries its rows, with dates relative to the last reseed.
+ */
+export async function seedPlatform(name: string): Promise<string> {
+  return (await run(path.join(ROOT, "node_modules/.bin/tsx"), [path.join(ROOT, "scripts/tutorials/seed-platform.ts")], { env: { ...process.env, DATABASE_URL: await databaseUrl(name) }, cwd: ROOT })).stdout.trim();
+}
+
+/**
  * The tutorial fixture rows (a connected payment account, online payments in every state, the
  * calendar / texting / HOVER connection settings) — after seedDemo, one transaction, idempotent.
  * seed-fixtures.ts itself refuses without TUTORIAL_FIXTURES=1 and outside a recording database.
@@ -237,6 +249,10 @@ export async function reseedTemplate(opts: { fixtures?: boolean; withoutLock?: b
     // Before and after are read under the exclusive lock: nothing else that has this code is writing.
     const before = await census(TEMPLATE);
     let out = await seedDemo(TEMPLATE);
+    // The platform sample data (seed-platform.ts): its own single transaction, rows only, same lock;
+    // the demo seed does not touch its tables, so its "before" is still before.
+    const platformBefore = await platformCensus(await libpqEnv(TEMPLATE));
+    out += `\n${await seedPlatform(TEMPLATE)}`;
     // `--fixtures`: also the fixture rows, each seed its own single transaction of rows only, under
     // this one exclusive lock. Every copy made afterwards carries them — also the copies of working
     // copies WITHOUT the fixture code, whose Payments page then lists the five online payments
@@ -246,8 +262,9 @@ export async function reseedTemplate(opts: { fixtures?: boolean; withoutLock?: b
     const [database, schema] = await locate(TEMPLATE);
     await query(database, schema, "analyze");
     const after = await census(TEMPLATE);
+    const platformAfter = await platformCensus(await libpqEnv(TEMPLATE));
     if (after.nonUuidIds) throw new Error(`the template has ${after.nonUuidIds} client / project row(s) whose id is not a uuid — their pages say "not found" (scripts/tutorials/demo-ids.ts)`);
-    return `before: ${censusLine(before)}\nafter:  ${censusLine(after)}\n${out}`;
+    return `before: ${censusLine(before)}\nafter:  ${censusLine(after)}\nplatform before: ${platformCensusLine(platformBefore)}\nplatform after:  ${platformCensusLine(platformAfter)}\n${out}`;
   });
 }
 
@@ -264,7 +281,7 @@ export async function list(): Promise<string[]> {
  * Build the template: an empty database, the schema from shared/schema.ts (drizzle-kit export) and
  * scripts/apply-schema-migration.ts, one boot of the app (its own ensure/seed path creates the
  * rest), the demo owner as user 1 (the dev bypass signs every request in as user 1), then the CRM
- * demo seed and scripts/tutorials/seed-demo.ts.
+ * demo seed, scripts/tutorials/seed-demo.ts and the platform sample data (seed-platform.ts).
  */
 const buildTemplate = (rebuild: boolean): Promise<void> => withLock(TEMPLATE_LOCK, () => buildTemplateLocked(rebuild));
 async function buildTemplateLocked(rebuild: boolean): Promise<void> {
@@ -304,6 +321,7 @@ async function buildTemplateLocked(rebuild: boolean): Promise<void> {
   });
   await step("scripts/seed-crm-demo.ts", () => run(tsx, [path.join(ROOT, "scripts/seed-crm-demo.ts")], { env, cwd: ROOT }));
   await step("scripts/tutorials/seed-demo.ts", () => run(tsx, [path.join(ROOT, "scripts/tutorials/seed-demo.ts")], { env, cwd: ROOT }));
+  await step("scripts/tutorials/seed-platform.ts", () => seedPlatform(TEMPLATE));
   await step("scripts/tutorials/seed-fixtures.ts", () => seedFixtures(TEMPLATE));
   // A second boot settles whatever the app creates lazily or re-checks after its first run (seed_state,
   // the appraiser and portal passes), so the copies start in seconds instead of redoing it.

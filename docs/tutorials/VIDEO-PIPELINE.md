@@ -43,6 +43,7 @@ orange with the mascot.
 | One command per video | `scripts/tutorials/produce.ts <helpKey> [--slot 1-8] [--no-upload] [--keep-raw] [--no-fixtures]` |
 | Recording databases: `template`, `reseed` (new demo rows into the existing template, one transaction — safe beside running producers), `fresh <name>`, `drop <name>`, `list`, `mode` — names must match `/^constructhub_tut_[a-z0-9_]+$/`, server must be 127.0.0.1:5432 (5433 is production) | `scripts/tutorials/db.ts` |
 | The demo workspace: "Aspire Interiors" (Sarasota FL), owner "Demo Account" | `scripts/seed-crm-demo.ts` + `scripts/tutorials/seed-demo.ts` (a CRM plan, six team members, a week of appointments around today, message threads, six JobCam colour cards, payments in several states, and — since 2026-10-07 — four clients in New York and four in Texas with their own jobs, documents, visits and messages: the list is "Demo data" in `PRODUCER-GUIDE.md`; moves every date forward to today on each fresh copy) |
+| The platform sample data: "Summit Roofing Co." (Denver CO) — GBP locations, reviews, Ranking Grid, Google Ads / Click Guard, Ads Manager, LSA, Agency, Cloudflare, Search Console, Domains, Mail alerts, Site Scan, IP Tracker, VPN Shield, Social, Photos — applied to the template by build and `reseed` (see "Platform sample data" below) | `scripts/tutorials/seed-platform.ts` → `script/feature-shots/seed/{10-gbp,20-reviews,30-ads}.sql` |
 | The app for a slot: dev server on 8180+N, signed in as user 1, environment built from nothing (no SMTP, SignalWire, Stripe, Google, HOVER, R2 or voice keys; `EMAIL_FORCE_SINK=1`; `SEO_JOBS_DISABLED=true`; no edge or GBP worker); `up N` / `down N` for operating by hand | `scripts/tutorials/app.ts` |
 | Machine-wide locks under `/tmp/claude-1000/constructhub-tutorials/`: `tts.lock` (one voice request at a time, 250 ms pause, shared clip cache `tts-cache/`), `encode.lock` (one ffmpeg at a time, `nice -n 10`, `-threads 4`), `slot<N>.lock` | `scripts/tutorials/lib.ts` (`withLock`, `run`) |
 | Tutorial fixtures: stand-ins for Stripe, HOVER, Google Calendar, texting and the recipient's inbox, in a recording slot only (gate, registry, providers); the fixture rows; the demo files an `upload` step may use | `server/tutorials/fixtures/`, `scripts/tutorials/seed-fixtures.ts`, `scripts/tutorials/assets/` + `gen-assets.ts` — **`docs/tutorials/FIXTURES.md`** |
@@ -60,7 +61,29 @@ the stream, into `psql` (15–35 s). `db.ts mode` says which is in use. The data
 and switches on by itself when the role can create databases (`ALTER ROLE constructhub_dev CREATEDB`
 as a superuser, then `db.ts template`), but it has **never run here**. The template takes ~3 minutes
 to build (schema from `shared/schema.ts` via `drizzle-kit export`, `apply-schema-migration.ts`, the
-demo owner as user 1, three boots of the app for its own ensure/seed path, the two demo seeds).
+demo owner as user 1, three boots of the app for its own ensure/seed path, the two demo seeds, the platform
+sample data).
+
+**Platform sample data (2026-10-11).** The main-host tools were empty on camera — each needs a connected
+provider account the owner will not create. `scripts/tutorials/seed-platform.ts` applies the feature-page
+screenshot seeds `script/feature-shots/seed/10-gbp.sql`, `20-reviews.sql` and `30-ads.sql` (not
+`00-identity`, not the CRM / call-assistant files) to a recording database through psql with the
+URL's `search_path`, as one transaction, idempotent; `db.ts template` and `db.ts reseed` run it after
+`seed-demo.ts`, and `reseed` prints its counts before and after (`platform before/after`). It fills
+Google Business Profile locations, reviews and review requests, the Ranking Grid, Competitor Intel,
+Google Ads / Click Guard, the Ads Manager, LSA leads, Agency, Cloudflare, Search Console, Domains, Mail
+alerts, Site Scan, IP Tracker, VPN Shield, Social and Photos. Everything in it is fictional
+(`script/feature-shots/BRIEF.md`): the listings belong to **"Summit Roofing Co."** (Denver CO, with
+"Clearpeak Exteriors" and "Front Range Gutters" as the agency's other clients, agency workspace "Rivera
+Growth Partners") and are **managed by the Demo Account** — user 1 stays "Demo Account" / "Aspire
+Interiors", so the CRM videos are unchanged. A fresh copy (`produce.ts`, `app.ts up`) carries these rows
+from the template and nothing more is run per slot; their dates are relative to the last reseed (the CRM
+demo moves its dates, this does not), so reseed before a batch of platform recordings. **Connect-an-account
+flows cannot be filmed with this data:** the provider rows (`gbp_grants`, `ads_grants`,
+`edge_connections`, `lsa_connections`, `social_connections`, `domain_connections`) carry placeholder
+tokens, nothing can call Google or Cloudflare with them, and the slot app has no provider keys — the pages
+show an account that is already connected and the data it holds; a sync, verify or reconnect button on
+camera will fail.
 
 **House framing.** `"viewport": { "width": 1024, "height": 576 }, "zoom": 1.875`: the page is laid
 out for a 1024-wide window and filmed at 1920×1080 real pixels — 25% larger than on a 1280 screen,
@@ -84,7 +107,8 @@ text; nothing new is recorded that way. The 1080p master is also the in-app file
 | Tests that keep all of it honest | `server/help-registry.test.ts`, `server/tutorials/media.test.ts`, `server/tutorials/production-line.test.ts`, `server/tutorials/recorder-actions.test.ts`, `server/tutorials/fixtures/fixtures.test.ts` |
 
 What does **not** exist yet: fixtures for the platform providers (Google Business Profile, Google Ads,
-Search Console beyond its skeleton, Cloudflare, SEO data, Site Scan), a signed-out second session (the
+Search Console beyond its skeleton, Cloudflare, SEO data, Site Scan — their pages show the platform sample
+data above, but no call to a provider can be answered), a signed-out second session (the
 slot signs every visitor of the CRM in as the demo owner), any Higgsfield integration, YouTube
 credentials, and the other videos.
 

@@ -5,7 +5,11 @@
 \set ON_ERROR_STOP on
 BEGIN;
 DO $$ BEGIN
-  IF current_database() NOT LIKE 'constructhub\_dev\_%' THEN
+  -- A feature-shot lane database, or a walkthrough recording database (scripts/tutorials/db.ts: a
+  -- constructhub_tut_* schema of the dev database, or such a database) — nothing else, ever.
+  IF current_database() NOT LIKE 'constructhub\_dev\_%'
+     AND current_schema() NOT LIKE 'constructhub\_tut\_%'
+     AND current_database() NOT LIKE 'constructhub\_tut\_%' THEN
     RAISE EXCEPTION 'feature-shot seed refused: % is not a constructhub_dev_* lane database', current_database();
   END IF;
 END $$;
