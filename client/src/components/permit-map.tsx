@@ -1,3 +1,4 @@
+import { Skeleton } from "@/components/ui/skeleton";
 /**
  * US permit-coverage map for the Search Permits page. States fill blue where at
  * least one COUNTY permit portal is live-searchable; every searchable portal is a
@@ -58,7 +59,7 @@ function gridStep(zoom: number): number {
 }
 
 export function PermitMap({ onPick }: { onPick: (p: MapPortal) => void }) {
-  const { data, isLoading, isError } = useQuery<MapData>({ queryKey: ["/api/permits/map"] });
+  const { data, isLoading, isError, refetch } = useQuery<MapData>({ queryKey: ["/api/permits/map"] });
   const [zoom, setZoom] = useState(1);
   const [center, setCenter] = useState<[number, number]>([-97, 38]);
   const [selected, setSelected] = useState<Cell | null>(null);
@@ -112,12 +113,12 @@ export function PermitMap({ onPick }: { onPick: (p: MapPortal) => void }) {
         <span className="inline-flex items-center gap-1.5"><span className="inline-block h-3 w-4 rounded-sm" style={{ background: "var(--map-blue)", border: "1px solid var(--map-blue-stroke)" }} />County permits searchable</span>
         <span className="inline-flex items-center gap-1.5"><span className="inline-block h-3 w-4 rounded-sm" style={{ background: "var(--map-land)" }} />No county portal yet</span>
         <span className="inline-flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: "var(--map-dot)", border: "1.5px solid var(--map-dot-stroke)" }} />Searchable portal</span>
-        {data && <span className="ml-auto">{data.summary.withCoords.toLocaleString()} portals mapped · zoom in for names</span>}
+        {data && !isError && <span className="ml-auto">{data.summary.withCoords.toLocaleString()} portals mapped · zoom in for names</span>}
       </div>
 
       <div className="relative">
-        {isLoading && <div className="flex h-[300px] items-center justify-center g-text-2 text-sm">Loading map…</div>}
-        {isError && <div className="flex h-[300px] items-center justify-center g-text-2 text-sm">Map unavailable right now.</div>}
+        {isLoading && <Skeleton className="h-[300px] w-full" />}
+        {isError && <div className="flex h-[300px] items-center justify-center g-text-2 text-sm">Map unavailable right now. <Button variant="outline" onClick={() => void refetch()}>Retry</Button></div>}
         {data && (
           <>
             <div className="absolute right-2 top-2 z-10 flex flex-col gap-1">

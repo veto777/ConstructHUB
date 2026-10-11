@@ -1,7 +1,10 @@
+import { readSearchUpdate } from "./permit-search-poll";
+import { planRequiredFrom } from "@/components/plan-required";
+import { Skeleton } from "@/components/ui/skeleton";
 import { governmentLinksAvailable, canScrapeGovernmentPortal } from "@shared/government-links";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, apiErrorMessage } from "@/lib/queryClient";
 import { readQueryParam, replaceQueryParams } from "@/lib/url-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +19,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
-import { AppPage, StatusPill, EmptyState } from "@/components/app-ui";
+import { AppPage, StatusPill, EmptyState, Notice } from "@/components/app-ui";
 import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
 import {
   Search,
@@ -139,8 +142,6 @@ export default function SearchPage() {
     const sid = readQueryParam("sid");
     return sid && /^[A-Za-z0-9-]{1,40}$/.test(sid) ? sid : null;
   });
-  // True while showing a search reopened from the URL rather than one started here.
-  const restoredSearchRef = useRef(searchId !== null);
   // The form the search in the address bar (sid) was run with: set by handleSearch, or read from the
   // URL when a search is reopened. While a sid is present the URL keeps these instead of the live
   // inputs, so a reload never pairs an old search's results with a query or area typed since.
@@ -149,7 +150,10 @@ export default function SearchPage() {
   const [initialResults, setInitialResults] = useState<any[] | null>(null);
   // Set when nothing in the chosen area can be searched live: nothing ran, so there is no search to poll.
   const [noPortalsMessage, setNoPortalsMessage] = useState<string | null>(null);
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [pollError, setPollError] = useState<Error | null>(null);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [retryPoll, setRetryPoll] = useState(0);
+  const [resultPage, setResultPage] = useState(1);
 
   const [expandedResults, setExpandedResults] = useState<Set<number>>(new Set());
   const [permitDetails, setPermitDetails] = useState<Record<number, any>>({});
@@ -162,16 +166,16 @@ export default function SearchPage() {
   const [filterJurisdiction, setFilterJurisdiction] = useState<string>("all");
   const [filterStatuses, setFilterStatuses] = useState<Set<string>>(new Set());
 
-  const { data: counties } = useQuery<County[]>({
+  const { data: counties, error: countiesError, refetch: retryCounties } = useQuery<County[]>({
     queryKey: ["/api/counties"],
   });
 
   // `searchable` (nationwide live-searchable portals) is used when the server reports it.
-  const { data: dbCounts } = useQuery<{ total: number; county: number; city: number; searchable?: number; searchableCounty?: number; searchableCity?: number; searchableStates?: number }>({
+  const { data: dbCounts, error: countsError, refetch: retryCounts } = useQuery<{ total: number; county: number; city: number; searchable?: number; searchableCounty?: number; searchableCity?: number; searchableStates?: number }>({
     queryKey: ["/api/databases/counts"],
   });
 
-  const { data: databases, isLoading: databasesLoading } = useQuery<PermitDatabase[]>({
+  const { data: databases, isLoading: databasesLoading, error: databasesError, refetch: retryDatabases } = useQuery<PermitDatabase[]>({
     queryKey: ["/api/databases/county-state", scopeState],
     queryFn: async () => {
       if (scopeState === "all") return [];
@@ -179,7 +183,7 @@ export default function SearchPage() {
       // against). The paged directory list stops at 100 rows, which cut the
       // count and the city picker short in states with more portals.
       const res = await fetch(`/api/databases?searchable=true&stateCode=${encodeURIComponent(scopeState)}`);
-      if (!res.ok) return [];
+      if (!res.ok) throw new Error("Could not load searchable portals");
       return res.json();
     },
     enabled: scopeState !== "all",
@@ -329,57 +333,39 @@ export default function SearchPage() {
       setSearchId(data.searchId);
     },
     onError: (err: Error) => {
-      toast({ title: "Search failed", description: err.message, variant: "destructive" });
+      toast({ title: "Search failed", description: apiErrorMessage(err), variant: "destructive" });
     },
   });
 
   useEffect(() => {
     if (!searchId) return;
-
-    if (pollingRef.current) clearInterval(pollingRef.current);
-
+    let cancelled = false, inFlight = false;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const stop = () => { if (timer) clearInterval(timer); timer = undefined; };
     const poll = async () => {
+      if (inFlight) return;
+      inFlight = true;
       try {
-        const res = await fetch(`/api/search/live/${searchId}`);
-        if (res.status === 404) {
-          // Live searches are kept in server memory; an old link (or a restart) loses them.
-          if (pollingRef.current) clearInterval(pollingRef.current);
-          pollingRef.current = null;
-          if (restoredSearchRef.current) {
-            restoredSearchRef.current = false;
-            setSearchId(null);
-            toast({ title: "That search is no longer available", description: "Run it again to get fresh results." });
-          }
-          return;
-        }
-        if (res.ok) {
-          const data: LiveSearchStatus = await res.json();
-          setLiveStatus(data);
-          if (data.status === "completed") {
-            if (pollingRef.current) clearInterval(pollingRef.current);
-            pollingRef.current = null;
-          }
-        }
-      } catch {}
+        const data = await readSearchUpdate<LiveSearchStatus>(searchId, controller.signal, stop);
+        if (cancelled) return;
+        setLiveStatus(data); setPollError(null); setLastUpdate(new Date());
+        if (data.status === 'completed') stop();
+      } catch (error) {
+        if (!cancelled) setPollError(error instanceof Error ? error : new Error('Connection lost'));
+      } finally { inFlight = false; }
     };
-
-    poll();
-    pollingRef.current = setInterval(poll, 2000);
-
-    return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-        pollingRef.current = null;
-      }
-    };
-  }, [searchId]);
+    timer = setInterval(poll, 4000);
+    void poll();
+    return () => { cancelled = true; controller.abort(); stop(); };
+  }, [searchId, retryPoll]);
 
   const handleSearch = () => {
     if (!searchValue.trim()) {
       toast({ title: "Enter a search value", variant: "destructive" });
       return;
     }
-    restoredSearchRef.current = false;
+    setPollError(null); setLastUpdate(null); setResultPage(1);
     setSubmitted({ state: scopeState, loc: scopeLocation, type: searchType, q: searchValue.trim() });
     setSearchId(null);
     setLiveStatus(null);
@@ -481,6 +467,9 @@ export default function SearchPage() {
     return results;
   }, [rawResults, filterDateFrom, filterDateTo, filterCounty, filterJurisdiction, filterStatuses, counties]);
 
+  useEffect(() => { setResultPage(1); }, [filterDateFrom, filterDateTo, filterCounty, filterJurisdiction, filterStatuses]);
+  const resultPages = Math.max(1, Math.ceil(filteredResults.length / 50));
+  const visiblePage = Math.min(resultPage, resultPages);
   const dateRangeInverted = !!filterDateFrom && !!filterDateTo && filterDateFrom > filterDateTo;
 
   const activeFilterCount = [
@@ -529,8 +518,8 @@ export default function SearchPage() {
   const selectedIcon = searchTypes.find((t) => t.value === searchType)?.icon ?? Search;
   const IconComponent = selectedIcon;
 
-  const isSearching = searchMutation.isPending || (liveStatus?.status === "running");
-  const isComplete = liveStatus?.status === "completed";
+  const isSearching = searchMutation.isPending || (!!searchId && !pollError && (!liveStatus || liveStatus.status === "running"));
+  const isComplete = liveStatus?.status === "completed" && !pollError;
 
   // A portal is finished whether it was searched or failed; only "completed"
   // means it was actually searched. Failed portals are counted and named, so
@@ -601,9 +590,9 @@ export default function SearchPage() {
           />
         </div>
         <p className="g-text-2 text-sm" data-testid="text-scope-count">
-          {scopeState === "all"
+          {countsError || databasesError ? "Portal counts are unavailable" : scopeState === "all"
             ? (typeof dbCounts?.searchable === "number"
-                ? `${dbCounts.searchable.toLocaleString()} searchable portals in ${dbCounts.searchableStates ?? 50} states (${(dbCounts.searchableCounty ?? 0).toLocaleString()} counties)`
+                ? `${dbCounts.searchable.toLocaleString()} searchable portals${dbCounts.searchableStates != null ? ` in ${dbCounts.searchableStates} states` : ""}${dbCounts.searchableCounty != null ? ` (${dbCounts.searchableCounty.toLocaleString()} counties)` : ""}`
                 : "Searches every live-searchable portal nationwide")
             : scopedDbCount !== null
               ? `${portalCount(scopedDbCount)} ${scopePlace}`
@@ -775,8 +764,17 @@ export default function SearchPage() {
 
       </section>
 
+      {countiesError && <Notice tone="danger">County filters are unavailable. <Button onClick={() => void retryCounties()}>Retry</Button></Notice>}
+      {countsError && <Notice tone="danger">Portal counts are unavailable. <Button onClick={() => void retryCounts()}>Retry</Button></Notice>}
+      {databasesError && <Notice tone="danger">Searchable portals are unavailable. <Button onClick={() => void retryDatabases()}>Retry</Button></Notice>}
+      {planRequiredFrom(searchMutation.error || pollError) ? <Notice tone="info">{apiErrorMessage(searchMutation.error || pollError)} <Button asChild variant="outline"><a href="/pricing">View plans</a></Button></Notice> : pollError && <Notice tone="danger">
+        {/^401:/.test(pollError.message) ? <span>Your session has ended. <a className="underline focus-visible:outline" href="/auth">Sign in</a> to continue.</span> : /^(404):/.test(pollError.message) ? "This search was interrupted or has expired." : "Search updates are unavailable. We'll keep your partial results while reconnecting."}
+        {lastUpdate && <span> Last updated {lastUpdate.toLocaleTimeString()}.</span>}
+        <div className="flex flex-wrap gap-2 mt-2"><Button variant="outline" onClick={() => setRetryPoll(n => n + 1)}>Retry updates</Button><Button onClick={handleSearch}>Run again</Button></div>
+      </Notice>}
       {(searchId || searchMutation.isPending) && (
         <div className="space-y-5">
+          {!liveStatus && !pollError && <Skeleton className="h-24 w-full" />}
           {liveStatus && (
             <section className="rounded-xl border bg-card p-4 sm:p-5 space-y-4">
               <div className="flex items-center justify-between gap-2">
@@ -791,9 +789,11 @@ export default function SearchPage() {
                     <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                   )}
                   <span className="text-sm font-semibold" role="status" data-testid="text-search-status">
-                    {isSearching
+                    {pollError ? "Search updates interrupted" : isSearching
                       ? "Searching databases..."
-                      : failedDbs === 0
+                      : searchedDbs === 0
+                        ? "No portal returned searchable data"
+                        : failedDbs === 0
                         ? "Search complete"
                         : searchedDbs === 0
                           ? `Search failed: ${failedDbs === 1 ? "the portal could not be searched" : `none of the ${portalWord(failedDbs)} could be searched`}`
@@ -846,7 +846,7 @@ export default function SearchPage() {
                         <span className="block text-xs text-muted-foreground">Slow portal — still trying (gives up at 75 s)</span>
                       )}
                       {db.status === "error" && db.message && (
-                        <span className="block text-destructive break-words" data-testid={`status-db-message-${db.id}`}>{db.message}</span>
+                        <details className="text-destructive break-words" data-testid={`status-db-message-${db.id}`}><summary className="cursor-pointer focus-visible:outline focus-visible:outline-2">This portal could not be searched. View details</summary>{db.message}</details>
                       )}
                     </div>
                     {(db.status === "completed" || db.status === "error") && db.resultsFound > 0 && (
@@ -915,7 +915,7 @@ export default function SearchPage() {
                     action={<GooglePill label="Clear filters" onClick={clearFilters} testId="button-clear-filters-empty" />}
                   />
                 ) : (
-                  filteredResults.map((result: any) => (
+                  filteredResults.slice((visiblePage - 1) * 50, visiblePage * 50).map((result: any) => (
                     <GoogleListRow
                       key={result.id}
                       testId={`card-result-${result.id}`}
@@ -1066,12 +1066,14 @@ export default function SearchPage() {
                   ))
                 )}
               </GoogleList>
+              {resultPages > 1 && <div className="flex flex-wrap items-center justify-center gap-3 py-4"><Button variant="outline" disabled={visiblePage === 1} onClick={() => setResultPage(visiblePage - 1)}>Previous results</Button><span aria-live="polite">Page {visiblePage} of {resultPages} · {filteredResults.length} results</span><Button variant="outline" disabled={visiblePage === resultPages} onClick={() => setResultPage(visiblePage + 1)}>Next results</Button></div>}
             </div>
           )}
 
+          {isComplete && <Notice tone="info">The search service returns up to 1,000 stored matches before applying the area filter. Narrow the search to find older matches; this may not be the complete history.</Notice>}
           {isComplete && rawResults.length === 0 && (
             <div data-testid="empty-search-results">
-              {searchedDbs === 0 && failedDbs > 0 ? (
+              {searchedDbs === 0 ? (
                 <EmptyState
                   icon={AlertCircle}
                   title="No portal could be searched"
@@ -1081,7 +1083,7 @@ export default function SearchPage() {
               ) : (
                 <EmptyState
                   icon={AlertCircle}
-                  title="No results found"
+                  title="No matches returned"
                   description={failedDbs > 0
                     ? `${portalWord(searchedDbs)} searched with no matches; ${portalWord(failedDbs)} could not be searched, so results may be incomplete.`
                     : "Try a different search term or search type."}
