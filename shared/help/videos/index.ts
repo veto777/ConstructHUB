@@ -107,5 +107,8 @@ export { default as v_intro_lsa_leads } from "./intro-lsa-leads.json";
 export { default as v_intro_media } from "./intro-media.json";
 export { default as v_intro_ranking_grid } from "./intro-ranking-grid.json";
 export { default as v_intro_reinstatement } from "./intro-reinstatement.json";
+export { default as v_intro_gbp_content } from "./intro-gbp-content.json";
+export { default as v_intro_gbp } from "./intro-gbp.json";
+export { default as v_intro_profile_guard } from "./intro-profile-guard.json";
 export { default as v_intro_reviews } from "./intro-reviews.json";
 export { default as v_jobcam } from "./jobcam.json";
