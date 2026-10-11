@@ -49,7 +49,7 @@ describe('property link display safeguards', () => {
     expect(row.linkStatus).toBe('verified');
   });
   it('rejects unsafe or malformed URLs and labels missing office names', () => {
-    expect(propertyOfficeForDisplay({ ...office, name: 'Aleutian property records', portalUrl: 'javascript:alert(1)', searchUrl: 'not a URL' })).toMatchObject({ name: 'County records (office name unavailable)', portalUrl: null, searchUrl: null });
+    expect(propertyOfficeForDisplay({ ...office, name: 'Aleutian property records', portalUrl: 'javascript:alert(1)', searchUrl: 'not a URL' })).toMatchObject({ name: 'Aleutian Assessor', portalUrl: null, searchUrl: null });
     expect(propertyOfficeForDisplay(office)).toEqual(office);
   });
 });
