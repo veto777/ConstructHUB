@@ -63,7 +63,7 @@ test("manual inventory, server search, bulk client mapping and queued monitoring
   await page.getByRole("button", { name: "Add domains", exact: true }).click();
   await page.getByLabel("Search domains", { exact: true }).fill(domain);
   await expect(
-    page.getByRole("cell", { name: domain, exact: false }).first(),
+    page.getByRole("article").filter({ hasText: domain }).first(),
   ).toBeVisible();
   await page.getByLabel(`Select ${domain}`, { exact: true }).check();
   await page
@@ -76,12 +76,16 @@ test("manual inventory, server search, bulk client mapping and queued monitoring
     .getByLabel("Client location", { exact: true })
     .selectOption(String(location));
   await page.getByRole("button", { name: "Map selected to client" }).click();
+  // Attribution shows the client's business name, never a bare location id.
   await expect(
-    page.getByRole("cell", { name: String(location), exact: true }),
+    page
+      .getByRole("article")
+      .filter({ hasText: domain })
+      .getByText(`A7 Browser Fixture ${suffix}`),
   ).toBeVisible();
   await page.getByRole("button", { name: "Check selected domains" }).click();
   await expect(
-    page.getByRole("status").filter({ hasText: "Saved." }),
+    page.getByRole("status").filter({ hasText: "Fresh check queued" }),
   ).toBeVisible();
   await page
     .getByText("Wix · Manual DNS only; nameserver change unavailable", {
@@ -100,7 +104,7 @@ test("forwarding setup, shared-secret rejection, confirmation and critical trans
   request,
 }) => {
   await page.goto("/mail-alerts");
-  const input = page.getByLabel("Forwarding address");
+  const input = page.getByRole("textbox", { name: "Forwarding address" });
   await expect(input).toHaveValue(/^alerts\+[a-f0-9]{48}@/);
   const address = await input.inputValue();
   const denied = await request.post("/api/inbound-mail", {
@@ -151,8 +155,11 @@ test("forwarding setup, shared-secret rejection, confirmation and critical trans
   ).toBeVisible();
   await expect(page.getByText("123456789", { exact: true })).toHaveCount(0);
   await page.getByLabel("Select alert page").check();
-  await page.getByRole("button", { name: "Mark selected as read" }).click();
-  await expect(page.locator("article").getByText(/· Read ·/)).toBeVisible();
+  await page
+    .getByTestId("selection-bar")
+    .getByRole("button", { name: "Mark read", exact: true })
+    .click();
+  await expect(page.locator("article").getByText(/· Read/)).toBeVisible();
 });
 
 test("DNS preview requires confirmation and the shared step-up dialog before apply (mocked provider)", async ({
@@ -250,11 +257,17 @@ test("DNS preview requires confirmation and the shared step-up dialog before app
   const preview = page
     .locator("details")
     .filter({ hasText: "preview.example.test" });
-  await preview.locator("summary").click();
+  await preview.locator("summary").first().click();
+  // The review is a readable diff: nameservers removed/added, not raw JSON.
   await expect(
-    preview.getByRole("heading", { name: "Before", exact: true }),
+    preview.getByRole("heading", { name: "Nameservers", exact: true }),
   ).toBeVisible();
-  await expect(preview.getByText(/old-a.example.test/)).toBeVisible();
+  await expect(
+    preview.locator("li", { hasText: "old-a.example.test" }),
+  ).toBeVisible();
+  await expect(
+    preview.locator("li", { hasText: "new-a.example.test" }),
+  ).toBeVisible();
   expect(applied).toBe(false);
   await page.getByLabel(`Select job ${jobId}`).check();
   await page.getByLabel("I reviewed the changes", { exact: false }).check();
@@ -267,6 +280,8 @@ test("DNS preview requires confirmation and the shared step-up dialog before app
     .getByLabel("Verification", { exact: true })
     .fill("fixture-password");
   await page.getByRole("button", { name: "Verify and continue" }).click();
-  await expect(preview.locator("summary")).toContainText("verifying");
+  await expect(
+    preview.locator("summary").first(),
+  ).toContainText(/Verifying against public DNS/);
   expect(applied).toBe(true);
 });
