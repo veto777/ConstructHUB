@@ -6,7 +6,9 @@ import {
   initialReportFilters,
 } from "@/components/site-scan-fixes";
 import { ScanIndexingSummary } from "./site-connections";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { emptyCategoryMessage, ownLocation } from "@/components/site-scan-helpers";
+import { Switch } from "@/components/ui/switch";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -185,6 +187,8 @@ export function ScanReport({
   summary = false,
   onDone,
   surface = false,
+  actions,
+  filters,
 }: {
   report: any;
   draft?: string;
@@ -192,6 +196,10 @@ export function ScanReport({
   onDone?: (keys: string[], done: boolean) => void;
   /** Inside the signed-in Google surface: the AI draft takes the AI-Overview block (the public pages have no surface tokens). */
   surface?: boolean;
+  /** Report actions and filters, shown right after the scores (scores always come first). */
+  actions?: ReactNode;
+  /** The findings filters in effect, so an empty category says whether it is empty or just elsewhere. */
+  filters?: { q?: string; category?: string };
 }) {
   if (!report) return null;
   return (
@@ -261,7 +269,11 @@ export function ScanReport({
           )}
         </div>
       )}
-      {["technical", "performance", "local", "content", "ai-readiness"].map(
+      {actions}
+      {["technical", "performance", "local", "content", "ai-readiness"]
+        // A Category filter lists only that category; the others are not "empty", just filtered out.
+        .filter((category) => !filters?.category || filters.category === category)
+        .map(
         (category) => (
           <section key={category}>
             <h2 className="border-b pb-2 text-xl font-normal leading-6">
@@ -358,9 +370,12 @@ export function ScanReport({
                     : category === "performance" &&
                         report.scores.categories.performance === null
                       ? "Not scored: PageSpeed data was unavailable for this scan (see Why Performance is N/A above)."
-                      : report.findingTotal
-                        ? "No findings in this category on the current results page. Use filters or Next findings to see more."
-                        : "No findings from available checks."}
+                      : emptyCategoryMessage({
+                          shown: report.findings.length,
+                          total: report.findingTotal,
+                          offset: report.offset,
+                          searching: !!filters?.q,
+                        })}
                 </p>
               )}
             </div>
@@ -466,7 +481,7 @@ export default function SiteScanPage() {
     [busy, setBusy] = useState(false),
     [share, setShare] = useState("");
   // Same cached query AgencyWorkspace uses: a delegated member acts through a business.
-  const { data: agencyMe } = useQuery<any>({ queryKey: ["/api/agency/me"] });
+  const { data: agencyMe, isFetched: agencyFetched } = useQuery<any>({ queryKey: ["/api/agency/me"] });
   const delegated = !!agencyMe && agencyMe.owner !== agencyMe.actor;
   // PDF branding is the account owner's; delegated members cannot read or change it.
   const { data: brand } = useQuery<any>({
@@ -509,12 +524,23 @@ export default function SiteScanPage() {
     : !whole(psi, 0, 5)
       ? "PageSpeed pages must be a whole number from 0 to 5."
       : "";
+  // The form opens on the signed-in account's own business (its location named like the account's company),
+  // never on whichever client location happens to sort first. No match leaves it empty with the picker.
+  // Prefilled once, so clearing the URL is not undone by the next list refetch.
+  const { data: me } = useQuery<any>({ queryKey: ["/api/auth/me"] });
+  const prefilled = useRef(false);
   useEffect(() => {
-    if (!url && data?.locations?.[0]?.website) {
-      setUrl(data.locations[0].website);
-      setLocationId(String(data.locations[0].id));
+    if (prefilled.current || !data?.locations || !me || !agencyFetched) return;
+    prefilled.current = true;
+    const own: any = delegated ? null : ownLocation(data.locations as any[], me.companyName);
+    if (own && !url) {
+      setUrl(own.website);
+      setLocationId(String(own.id));
     }
-  }, [data]);
+  }, [data, me, agencyFetched]);
+  const currentSchedule = url
+    ? data?.schedules?.find((s: any) => s.url === canonicalUrl(url))
+    : undefined;
   const action = async (fn: () => Promise<void>) => {
     setError("");
     setNotice("");
@@ -533,6 +559,36 @@ export default function SiteScanPage() {
       setBusy(false);
     }
   };
+  // Delete stays in the header while a scan has no report; with a report it sits with the other report actions.
+  const deleteScan = job ? (
+    <GooglePill
+      icon={Trash2}
+      variant="danger"
+      size="sm"
+      label="Delete scan"
+      disabled={busy}
+      onClick={() => {
+        const id = job.id;
+        if (
+          !window.confirm(
+            `Delete this scan of ${job.url}? Its report, fix progress and any share link are removed${
+              ["queued", "running"].includes(job.status)
+                ? " and the scan stops"
+                : ""
+            }. It still counts toward today's scan limit. This cannot be undone.`,
+          )
+        )
+          return;
+        void action(async () => {
+          await api("DELETE", `/api/sitescan/jobs/${id}`);
+          setSelected("");
+          setShare("");
+          cache.removeQueries({ queryKey: ["/api/sitescan/jobs/" + id] });
+          setNotice("Scan deleted.");
+        });
+      }}
+    />
+  ) : null;
   const scheduleFor = (target: string, enabled: boolean, extra = {}) =>
     action(async () => {
       await api("POST", "/api/sitescan/schedule", {
@@ -738,26 +794,31 @@ export default function SiteScanPage() {
               }
               label="Start scan"
             />
-            <GooglePill
-              className="w-full sm:w-auto"
+          </div>
+          {/* A toggle that shows its state for the URL above, not a bare "Disable" action beside Start scan. */}
+          <div className="flex items-start gap-3" data-testid="toggle-monthly-rescan">
+            <Switch
+              id="monthly-rescan"
+              checked={!!currentSchedule}
               disabled={busy || !url || !!limitsError}
-              label={data?.schedules.some((s: any) => s.url === canonicalUrl(url))
-                ? "Disable monthly rescan"
-                : "Enable monthly rescan"}
-              onClick={() =>
-                scheduleFor(
-                  url,
-                  !data?.schedules.some(
-                    (s: any) => s.url === canonicalUrl(url),
-                  ),
-                  {
-                    locationId: locationId ? Number(locationId) : undefined,
-                    pageCap: Number(cap),
-                    psiPages: Number(psi),
-                  },
-                )
+              onCheckedChange={(on) =>
+                scheduleFor(url, on, {
+                  locationId: locationId ? Number(locationId) : undefined,
+                  pageCap: Number(cap),
+                  psiPages: Number(psi),
+                })
               }
             />
+            <label htmlFor="monthly-rescan" className="text-sm">
+              <span className="font-medium">Monthly rescan</span>{" "}
+              <span className="g-text-2">
+                {!url
+                  ? "· Enter a website URL to schedule it."
+                  : currentSchedule
+                    ? `· On, next run ${new Date(currentSchedule.next_at).toLocaleDateString()}`
+                    : "· Off for this site"}
+              </span>
+            </label>
           </div>
           <div className="space-y-2 g-divider pt-4">
             <h2 className="g-card__title g-card__title--md">
@@ -765,8 +826,8 @@ export default function SiteScanPage() {
             </h2>
             {!data?.schedules?.length ? (
               <p className="text-sm g-text-2">
-                No monthly rescans. Enter a website URL above and choose
-                Enable monthly rescan.
+                No monthly rescans. Enter a website URL above and turn on
+                Monthly rescan.
               </p>
             ) : (
               <GoogleList as="ul" testId="list-scan-schedules">
@@ -780,7 +841,7 @@ export default function SiteScanPage() {
                     trailing={
                       <GooglePill
                         size="sm"
-                        ariaLabel={`Disable schedule for ${s.url}`}
+                        ariaLabel={`Turn off monthly rescan for ${s.url}`}
                         disabled={busy}
                         // Agency members may only change a schedule through its business;
                         // the owner disables by URL, which also covers a deleted business.
@@ -793,7 +854,7 @@ export default function SiteScanPage() {
                               : {},
                           )
                         }
-                        label="Disable"
+                        label="Turn off"
                       />
                     }
                   />
@@ -947,33 +1008,7 @@ export default function SiteScanPage() {
             title={job.url}
             description={<span role="status">{job.status} · {job.pages} of {pageCount(job.pageCap)} checked</span>}
             flush
-            actions={<GooglePill
-              icon={Trash2}
-              variant="danger"
-              size="sm"
-              label="Delete scan"
-              disabled={busy}
-              onClick={() => {
-                const id = job.id;
-                if (
-                  !window.confirm(
-                    `Delete this scan of ${job.url}? Its report, fix progress and any share link are removed${
-                      ["queued", "running"].includes(job.status)
-                        ? " and the scan stops"
-                        : ""
-                    }. It still counts toward today's scan limit. This cannot be undone.`,
-                  )
-                )
-                  return;
-                void action(async () => {
-                  await api("DELETE", `/api/sitescan/jobs/${id}`);
-                  setSelected("");
-                  setShare("");
-                  cache.removeQueries({ queryKey: ["/api/sitescan/jobs/" + id] });
-                  setNotice("Scan deleted.");
-                });
-              }}
-            />}
+            actions={job.report ? undefined : deleteScan}
           />
           {job.error && (
             <p role="alert" className="text-sm g-closed">
@@ -982,277 +1017,283 @@ export default function SiteScanPage() {
           )}
           {job.report && (
             <>
-              <div className="flex flex-wrap gap-2">
-                <GooglePill
-                  variant="solid"
-                  disabled={busy}
-                  onClick={() =>
-                    action(async () => {
-                      await api("POST", `/api/sitescan/jobs/${selected}/plan`);
-                    })
-                  }
-                  label={busy ? "Working…" : "Generate AI fix plan"}
-                />
-                <GooglePill icon={Download} href={`/api/sitescan/jobs/${selected}/pdf`} label="Export PDF" />
-                <GooglePill
-                  label={job.shareEnabled ? "Replace share link" : "Create share link"}
-                  disabled={busy}
-                  onClick={() => {
-                    // Only a hash is stored, so a new link always replaces the old one.
-                    if (
-                      job.shareEnabled &&
-                      !window.confirm(
-                        "The current share link will stop working. Create a new link?",
-                      )
-                    )
-                      return;
-                    void action(async () => {
-                      const r = await api(
-                        "POST",
-                        `/api/sitescan/jobs/${selected}/share`,
-                      );
-                      setShare(window.location.origin + r.path);
-                    });
-                  }}
-                />
-                {job.shareEnabled && (
-                  <GooglePill
-                    variant="quiet"
-                    onClick={() =>
-                      action(async () => {
-                        await api(
-                          "DELETE",
-                          `/api/sitescan/jobs/${selected}/share`,
-                        );
-                        setShare("");
-                      })
-                    }
-                    label="Revoke share link"
-                  />
-                )}
-              </div>
-              {share ? (
-                <div className="space-y-1">
-                  <p className="break-all text-sm">
-                    Read-only link (30 days):{" "}
-                    <a href={share} className="g-link">
-                      {share}
-                    </a>
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Copy key={share} text={share} label="Copy link" />
-                    <span className="text-sm g-text-2">
-                      Copy this link now; it is shown only once.
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                job.shareEnabled && (
-                  <p className="text-sm g-text-2">
-                    A share link is active. For security it is shown only when
-                    created; use Replace share link to get a new one (the old
-                    link stops working).
-                  </p>
-                )
-              )}
-              <section data-testid="section-scan-followup">
-                <GoogleSectionHeader title="Follow up" />
-                <div className="space-y-3">
-                  <div className="flex flex-wrap gap-2">
-                    <GooglePill
-                      disabled={busy}
-                      onClick={() =>
-                        action(async () => {
-                          const r = await api(
-                            "POST",
-                            `/api/sitescan/jobs/${selected}/retry`,
-                          );
-                          setSelected(r.id);
-                          setFilters(initialReportFilters);
-                        })
-                      }
-                      // A rescan keeps the scan's own settings: with PageSpeed off, it stays off (nothing to retry).
-                      label={job?.psiPages === 0 ? "Rescan (PageSpeed stays off)" : "Rescan / retry PageSpeed"}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
-                    <label className="block min-w-0 flex-1 space-y-1.5 text-sm sm:max-w-xs">
-                      <span className="g-text-2">
-                        Send to my web person — email
-                      </span>
-                      <Input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                      />
-                    </label>
-                    <GooglePill
-                      label="Send prioritized checklist"
-                      disabled={busy || !email}
-                      className="w-full sm:w-auto"
-                      onClick={() =>
-                        action(async () => {
-                          const r = await api(
-                            "POST",
-                            `/api/sitescan/jobs/${selected}/email`,
-                            { email },
-                          );
-                          setMailResult(
-                            r.sink
-                              ? "Checklist saved to local email sink."
-                              : "Checklist email sent.",
-                          );
-                        })
-                      }
-                    />
-                  </div>
-                  {mailResult && (
-                    <p role="status" className="text-sm">
-                      {mailResult}
-                    </p>
-                  )}
-                  <details className="g-card border-t">
-                    <summary className="cursor-pointer text-sm font-medium">
-                      White-label PDF branding
-                    </summary>
-                    {delegated ? (
-                      <p className="py-2 text-sm g-text-2">
-                        PDF branding is managed by the workspace owner.
-                      </p>
-                    ) : (
-                      <div className="space-y-3 pt-3">
-                        <label className="block space-y-1.5 text-sm">
-                          <span className="g-text-2">
-                            Agency name
-                          </span>
-                          <Input
-                            value={agencyName}
-                            onChange={(e) => {
-                              setAgencyName(e.target.value);
-                              setBrandNotice("");
-                            }}
-                          />
-                        </label>
-                        <label className="block space-y-1.5 text-sm">
-                          <span className="g-text-2">
-                            Agency logo (PNG/JPEG, up to 200 KB)
-                          </span>
-                          <Input
-                            type="file"
-                            accept="image/png,image/jpeg"
-                            onChange={(e) => {
-                              const f = e.target.files?.[0];
-                              setBrandNotice("");
-                              if (!f) return;
-                              if (f.size > 200000) {
-                                setError("Logo must be under 200 KB");
-                                return;
-                              }
-                              const r = new FileReader();
-                              r.onload = () => setLogo(String(r.result));
-                              r.readAsDataURL(f);
-                            }}
-                          />
-                        </label>
-                        {logo && (
-                          <div className="flex flex-wrap items-center gap-2">
-                            <img
-                              src={logo}
-                              alt="Logo for PDF exports"
-                              className="max-h-12 max-w-[160px] rounded-md border"
-                            />
-                            <GooglePill
-                              size="sm"
-                              disabled={busy}
-                              onClick={() => {
-                                setLogo(null);
-                                setBrandNotice(
-                                  "Logo removed from the form. Save PDF branding to apply it.",
-                                );
-                              }}
-                              label="Remove logo"
-                            />
-                          </div>
-                        )}
-                        <div className="flex flex-wrap gap-2">
-                          <GooglePill
-                            label="Save PDF branding"
-                            disabled={busy || !agencyName.trim()}
-                            onClick={() =>
-                              action(async () => {
-                                await api("POST", "/api/sitescan/branding", {
-                                  name: agencyName,
-                                  // Send the logo only when it changed; an omitted logo keeps the saved one
-                                  // (the stored, normalized image can be larger than an upload may be).
-                                  ...(logo === (brand?.logo ?? null)
-                                    ? {}
-                                    : { logo }),
-                                });
-                                await cache.invalidateQueries({
-                                  queryKey: ["/api/sitescan/branding"],
-                                });
-                                const saved = cache.getQueryData<any>([
-                                  "/api/sitescan/branding",
-                                ]);
-                                setBrandNotice(
-                                  `PDF branding saved${(saved ? saved.logo : logo) ? " with logo" : " without a logo"}. It applies to your next PDF export.`,
-                                );
-                              })
-                            }
-                          />
-                          {brand?.name && (
-                            <GooglePill
-                              variant="quiet"
-                              label="Remove branding"
-                              disabled={busy}
-                              onClick={() => {
-                                if (
-                                  !window.confirm(
-                                    "Remove your PDF branding? Exports go back to the ConstructHUB title.",
-                                  )
-                                )
-                                  return;
-                                void action(async () => {
-                                  await api("DELETE", "/api/sitescan/branding");
-                                  await cache.invalidateQueries({
-                                    queryKey: ["/api/sitescan/branding"],
-                                  });
-                                  setAgencyName("");
-                                  setLogo(null);
-                                  setBrandNotice(
-                                    "PDF branding removed. Exports use the ConstructHUB title.",
-                                  );
-                                });
-                              }}
-                            />
-                          )}
-                        </div>
-                        {brandNotice && (
-                          <p role="status" className="text-sm">
-                            {brandNotice}
-                          </p>
-                        )}
-                        <p className="text-xs g-text-2">
-                          Branding is applied on the next PDF download. No
-                          remote logo URL is fetched.
-                        </p>
-                      </div>
-                    )}
-                  </details>
-                </div>
-              </section>
-              <ReportFilters
-                filters={filters}
-                setFilters={setFilters}
-                total={Math.max(
-                  job.report.fixTotal || 0,
-                  job.report.findingTotal || 0,
-                )}
-              />
               <ScanReport
                 report={job.report}
                 draft={job.aiDraft}
                 surface
+                filters={filters}
+                actions={
+                  <div className="space-y-4" data-testid="section-report-actions">
+                    <div className="flex flex-wrap gap-2">
+                      <GooglePill
+                        variant="solid"
+                        disabled={busy}
+                        onClick={() =>
+                          action(async () => {
+                            await api("POST", `/api/sitescan/jobs/${selected}/plan`);
+                          })
+                        }
+                        label={busy ? "Working…" : "Generate AI fix plan"}
+                      />
+                      <GooglePill icon={Download} href={`/api/sitescan/jobs/${selected}/pdf`} label="Export PDF" />
+                      <GooglePill
+                        label={job.shareEnabled ? "Replace share link" : "Create share link"}
+                        disabled={busy}
+                        onClick={() => {
+                          // Only a hash is stored, so a new link always replaces the old one.
+                          if (
+                            job.shareEnabled &&
+                            !window.confirm(
+                              "The current share link will stop working. Create a new link?",
+                            )
+                          )
+                            return;
+                          void action(async () => {
+                            const r = await api(
+                              "POST",
+                              `/api/sitescan/jobs/${selected}/share`,
+                            );
+                            setShare(window.location.origin + r.path);
+                          });
+                        }}
+                      />
+                      {job.shareEnabled && (
+                        <GooglePill
+                          variant="quiet"
+                          onClick={() =>
+                            action(async () => {
+                              await api(
+                                "DELETE",
+                                `/api/sitescan/jobs/${selected}/share`,
+                              );
+                              setShare("");
+                            })
+                          }
+                          label="Revoke share link"
+                        />
+                      )}
+                      {deleteScan}
+                    </div>
+                    {share ? (
+                      <div className="space-y-1">
+                        <p className="break-all text-sm">
+                          Read-only link (30 days):{" "}
+                          <a href={share} className="g-link">
+                            {share}
+                          </a>
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Copy key={share} text={share} label="Copy link" />
+                          <span className="text-sm g-text-2">
+                            Copy this link now; it is shown only once.
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      job.shareEnabled && (
+                        <p className="text-sm g-text-2">
+                          A share link is active. For security it is shown only when
+                          created; use Replace share link to get a new one (the old
+                          link stops working).
+                        </p>
+                      )
+                    )}
+                    <section data-testid="section-scan-followup">
+                      <GoogleSectionHeader title="Follow up" />
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap gap-2">
+                          <GooglePill
+                            disabled={busy}
+                            onClick={() =>
+                              action(async () => {
+                                const r = await api(
+                                  "POST",
+                                  `/api/sitescan/jobs/${selected}/retry`,
+                                );
+                                setSelected(r.id);
+                                setFilters(initialReportFilters);
+                              })
+                            }
+                            // A rescan keeps the scan's own settings: with PageSpeed off, it stays off (nothing to retry).
+                            label={job?.psiPages === 0 ? "Rescan (PageSpeed stays off)" : "Rescan / retry PageSpeed"}
+                          />
+                        </div>
+                        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
+                          <label className="block min-w-0 flex-1 space-y-1.5 text-sm sm:max-w-xs">
+                            <span className="g-text-2">
+                              Send to my web person — email
+                            </span>
+                            <Input
+                              type="email"
+                              value={email}
+                              onChange={(e) => setEmail(e.target.value)}
+                            />
+                          </label>
+                          <GooglePill
+                            label="Send prioritized checklist"
+                            disabled={busy || !email}
+                            className="w-full sm:w-auto"
+                            onClick={() =>
+                              action(async () => {
+                                const r = await api(
+                                  "POST",
+                                  `/api/sitescan/jobs/${selected}/email`,
+                                  { email },
+                                );
+                                setMailResult(
+                                  r.sink
+                                    ? "Checklist saved to local email sink."
+                                    : "Checklist email sent.",
+                                );
+                              })
+                            }
+                          />
+                        </div>
+                        {mailResult && (
+                          <p role="status" className="text-sm">
+                            {mailResult}
+                          </p>
+                        )}
+                        <details className="g-card border-t">
+                          <summary className="cursor-pointer text-sm font-medium">
+                            White-label PDF branding
+                          </summary>
+                          {delegated ? (
+                            <p className="py-2 text-sm g-text-2">
+                              PDF branding is managed by the workspace owner.
+                            </p>
+                          ) : (
+                            <div className="space-y-3 pt-3">
+                              <label className="block space-y-1.5 text-sm">
+                                <span className="g-text-2">
+                                  Agency name
+                                </span>
+                                <Input
+                                  value={agencyName}
+                                  onChange={(e) => {
+                                    setAgencyName(e.target.value);
+                                    setBrandNotice("");
+                                  }}
+                                />
+                              </label>
+                              <label className="block space-y-1.5 text-sm">
+                                <span className="g-text-2">
+                                  Agency logo (PNG/JPEG, up to 200 KB)
+                                </span>
+                                <Input
+                                  type="file"
+                                  accept="image/png,image/jpeg"
+                                  onChange={(e) => {
+                                    const f = e.target.files?.[0];
+                                    setBrandNotice("");
+                                    if (!f) return;
+                                    if (f.size > 200000) {
+                                      setError("Logo must be under 200 KB");
+                                      return;
+                                    }
+                                    const r = new FileReader();
+                                    r.onload = () => setLogo(String(r.result));
+                                    r.readAsDataURL(f);
+                                  }}
+                                />
+                              </label>
+                              {logo && (
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <img
+                                    src={logo}
+                                    alt="Logo for PDF exports"
+                                    className="max-h-12 max-w-[160px] rounded-md border"
+                                  />
+                                  <GooglePill
+                                    size="sm"
+                                    disabled={busy}
+                                    onClick={() => {
+                                      setLogo(null);
+                                      setBrandNotice(
+                                        "Logo removed from the form. Save PDF branding to apply it.",
+                                      );
+                                    }}
+                                    label="Remove logo"
+                                  />
+                                </div>
+                              )}
+                              <div className="flex flex-wrap gap-2">
+                                <GooglePill
+                                  label="Save PDF branding"
+                                  disabled={busy || !agencyName.trim()}
+                                  onClick={() =>
+                                    action(async () => {
+                                      await api("POST", "/api/sitescan/branding", {
+                                        name: agencyName,
+                                        // Send the logo only when it changed; an omitted logo keeps the saved one
+                                        // (the stored, normalized image can be larger than an upload may be).
+                                        ...(logo === (brand?.logo ?? null)
+                                          ? {}
+                                          : { logo }),
+                                      });
+                                      await cache.invalidateQueries({
+                                        queryKey: ["/api/sitescan/branding"],
+                                      });
+                                      const saved = cache.getQueryData<any>([
+                                        "/api/sitescan/branding",
+                                      ]);
+                                      setBrandNotice(
+                                        `PDF branding saved${(saved ? saved.logo : logo) ? " with logo" : " without a logo"}. It applies to your next PDF export.`,
+                                      );
+                                    })
+                                  }
+                                />
+                                {brand?.name && (
+                                  <GooglePill
+                                    variant="quiet"
+                                    label="Remove branding"
+                                    disabled={busy}
+                                    onClick={() => {
+                                      if (
+                                        !window.confirm(
+                                          "Remove your PDF branding? Exports go back to the ConstructHUB title.",
+                                        )
+                                      )
+                                        return;
+                                      void action(async () => {
+                                        await api("DELETE", "/api/sitescan/branding");
+                                        await cache.invalidateQueries({
+                                          queryKey: ["/api/sitescan/branding"],
+                                        });
+                                        setAgencyName("");
+                                        setLogo(null);
+                                        setBrandNotice(
+                                          "PDF branding removed. Exports use the ConstructHUB title.",
+                                        );
+                                      });
+                                    }}
+                                  />
+                                )}
+                              </div>
+                              {brandNotice && (
+                                <p role="status" className="text-sm">
+                                  {brandNotice}
+                                </p>
+                              )}
+                              <p className="text-xs g-text-2">
+                                Branding is applied on the next PDF download. No
+                                remote logo URL is fetched.
+                              </p>
+                            </div>
+                          )}
+                        </details>
+                      </div>
+                    </section>
+                    <ReportFilters
+                      filters={filters}
+                      setFilters={setFilters}
+                      total={Math.max(
+                        job.report.fixTotal || 0,
+                        job.report.findingTotal || 0,
+                      )}
+                    />
+                  </div>
+                }
                 onDone={(keys, done) => {
                   void action(async () => {
                     await api("POST", `/api/sitescan/jobs/${selected}/fixes`, {
@@ -1288,15 +1329,21 @@ export function SharedSiteScanPage() {
     <main className="max-w-6xl mx-auto p-6 space-y-6">
       <h1 className="text-3xl font-bold">Shared Site Scan</h1>
       {error && <p role="alert">This report link is unavailable or revoked.</p>}
-      <ReportFilters
+      <ScanReport
+        report={data?.report}
+        draft={data?.aiDraft}
         filters={filters}
-        setFilters={setFilters}
-        total={Math.max(
-          data?.report?.fixTotal || 0,
-          data?.report?.findingTotal || 0,
-        )}
+        actions={
+          <ReportFilters
+            filters={filters}
+            setFilters={setFilters}
+            total={Math.max(
+              data?.report?.fixTotal || 0,
+              data?.report?.findingTotal || 0,
+            )}
+          />
+        }
       />
-      <ScanReport report={data?.report} draft={data?.aiDraft} />
     </main>
     </>
   );
