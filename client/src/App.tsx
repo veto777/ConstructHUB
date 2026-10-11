@@ -828,6 +828,18 @@ function AppContent() {
     return <Route path="/contract/sign/:token" component={ContractSignPage} />;
   }
 
+  // The review request a customer opens from email is a client-facing page:
+  // it renders full-bleed, never inside the signed-in app shell (which would
+  // drop the owner onto their dashboard instead of serving /review/<token>).
+  if (location.startsWith("/review/")) {
+    return (
+      <Switch>
+        {SHOW_GOOGLE_REVIEWS && <Route path="/review/:token/unsubscribe" component={ReviewUnsubscribePage} />}
+        {SHOW_GOOGLE_REVIEWS && <Route path="/review/:token" component={ReviewFeedbackPage} />}
+      </Switch>
+    );
+  }
+
   // Client-facing pages render full-bleed on any host — no app chrome.
   if (location === "/crm-terms") return <CrmTermsPage />;
   if (location === "/crm-privacy") return <CrmPrivacyPage />;
