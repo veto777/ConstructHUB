@@ -147,7 +147,8 @@ type SendOutcome = { ok: boolean; sid: string | null; error: string | null; ambi
 const UNCERTAIN = "Delivery uncertain; verify with the carrier before resending.";
 const DETAILS_PENDING = "Details update not sent: ";
 const uncertain = (row: Pick<VoiceEscalationRow, "lastError" | "sentCount" | "lastSentAt">) =>
-  !!row.lastError?.includes(UNCERTAIN) || (row.sentCount > 0 && !row.lastSentAt);
+  // Only this row's own sends: an owner alert's uncertainty ("Owner alert: …") must not block the row or other owners.
+  !!row.lastError?.startsWith(UNCERTAIN) || !!row.lastError?.startsWith(DETAILS_PENDING + UNCERTAIN) || (row.sentCount > 0 && !row.lastSentAt);
 
 /** The shared log provider is a successful log write, never a carrier acceptance. */
 export function escalationSmsOutcome(r: Awaited<ReturnType<typeof sendSms>>): SendOutcome {
