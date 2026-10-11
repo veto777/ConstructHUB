@@ -16,7 +16,7 @@ import { useAppOrigin } from "@/lib/app-origin";
 import {
   AppPage, Section, StatusPill, Notice,
 } from "@/components/app-ui";
-import { countryName, geoLabel } from "@/components/ip-tracker/country-names";
+import { countryName, geoLabel, GEO_SOURCE_NOTE } from "@/components/ip-tracker/country-names";
 import { GoogleSectionHeader, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
 import { ToolTabs } from "@/components/tool";
 import {
@@ -24,7 +24,8 @@ import {
   Search, ChevronRight, MapPin,
   FileText, Plus, Copy, Trash2,
   Clock, Activity, AlertTriangle,
-  Laptop, Chrome, MoreHorizontal,
+  Laptop, Chrome, Compass, MoreHorizontal,
+  type LucideIcon,
 } from "lucide-react";
 
 type DomainWithStats = {
@@ -215,6 +216,39 @@ function DeviceIcon({ type }: { type: string | null }) {
   return <Monitor className="h-3.5 w-3.5" />;
 }
 
+/** Chrome has its own icon; Safari gets the compass its logo is; every other browser a neutral globe. */
+export function browserIcon(name: string): LucideIcon {
+  const n = name.toLowerCase();
+  if (n.includes("chrome") || n.includes("chromium")) return Chrome;
+  if (n.includes("safari")) return Compass;
+  return Globe;
+}
+
+/** Phones for iOS/Android, a tablet for iPadOS, a laptop for desktop systems, a globe when unknown. */
+export function osIcon(name: string): LucideIcon {
+  const n = name.toLowerCase();
+  if (n.includes("ipad")) return Tablet;
+  if (n === "ios" || n.includes("iphone") || n.includes("android")) return Smartphone;
+  if (/windows|mac|linux|chrome ?os|ubuntu|fedora/.test(n)) return Laptop;
+  return Globe;
+}
+
+export function deviceIcon(name: string): LucideIcon {
+  const n = name.toLowerCase();
+  if (n === "mobile") return Smartphone;
+  if (n === "tablet") return Tablet;
+  if (n === "desktop") return Monitor;
+  return Globe;
+}
+
+/** The range line for views that load every recorded visit (no start date), capped at VISIT_ROW_CAP. */
+function allTimeRange(visits: number | undefined) {
+  if (visits === undefined) return "All recorded visits.";
+  return visits >= VISIT_ROW_CAP ? `Latest ${VISIT_ROW_CAP.toLocaleString()} recorded visits (all time).` : "All recorded visits (all time).";
+}
+
+const shortDay = (key: string) => new Date(`${key}T00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
 function PercentBar({ value }: { value: number }) {
   return (
     <div className="w-full bg-muted rounded-full h-2">
@@ -297,16 +331,27 @@ function InstallCard({ domain }: { domain: DomainWithStats }) {
 const ONLINE_REFETCH_MS = 15000;
 const ANALYTICS_REFETCH_MS = 30000;
 
-function MetricStatus({ query, label }: { query: { isError: boolean; dataUpdatedAt: number }; label: string }) {
-  return <p className="text-xs text-muted-foreground" role="status">
-    {label}: {query.dataUpdatedAt ? `${query.isError ? "Refresh failed — showing saved data from" : "Updated"} ${new Date(query.dataUpdatedAt).toLocaleString()}` : query.isError ? "Unavailable" : "Loading…"}
+type StatusQuery = { isError: boolean; dataUpdatedAt: number };
+
+/**
+ * One "Updated …" line for everything a view shows. With several queries it names the oldest
+ * successful load (every figure is at least that fresh) and says so when any refresh failed.
+ */
+function MetricStatus({ queries, testId }: { queries: StatusQuery[]; testId?: string }) {
+  const loaded = queries.filter(q => q.dataUpdatedAt);
+  const failed = queries.some(q => q.isError);
+  const at = loaded.length ? Math.min(...loaded.map(q => q.dataUpdatedAt)) : 0;
+  return <p className="text-xs text-muted-foreground" role="status" data-testid={testId}>
+    {at ? `${failed ? "Refresh failed — showing saved data from" : "Updated"} ${new Date(at).toLocaleString()}` : failed ? "Unavailable" : "Loading…"}
   </p>;
 }
 
-export function DashboardView({ domainId, analyticsQuery, domains }: {
+export function DashboardView({ domainId, analyticsQuery, domains, domainsQuery }: {
   domainId: number | null;
   analyticsQuery: UseQueryResult<Analytics, Error>;
   domains: DomainWithStats[];
+  /** The site list behind the per-site table; its refresh state joins the one status line. */
+  domainsQuery?: StatusQuery;
 }) {
   const analytics = analyticsQuery.data;
   const online = useQuery<{ count: number; visitors: any[] }>({
@@ -341,10 +386,7 @@ export function DashboardView({ domainId, analyticsQuery, domains }: {
 
       {domainId && (
         <div className="flex flex-wrap items-center justify-between gap-2" data-testid="strip-dashboard-status">
-          <div data-testid="text-dashboard-updated">
-            <MetricStatus query={analyticsQuery} label="Visit summary" />
-            <MetricStatus query={online} label="Online visitors" />
-          </div>
+          <MetricStatus queries={[analyticsQuery, online, ...(domainsQuery ? [domainsQuery] : [])]} testId="text-dashboard-updated" />
           <Button
             size="sm"
             variant="outline"
@@ -393,34 +435,56 @@ export function DashboardView({ domainId, analyticsQuery, domains }: {
         <Section title="Daily visits">
           {/* The column each bar hangs from needs its own height: a percentage height
               inside a content-sized column collapses to the bar's minimum, drawing every
-              bar the same. h-full + an absolute bar keeps the percentage meaningful. */}
-          <div className="flex items-stretch gap-1 h-32">
-            {chartDays.map(([date, count]) => (
-              <div key={date} className="flex-1 flex h-full flex-col items-center gap-1">
-                <div className="relative w-full flex-1">
+              bar the same. h-full + an absolute bar keeps the percentage meaningful.
+              The dashed line is the top of the scale, labelled with the busiest day's count;
+              each day shows its value on hover or keyboard focus. */}
+          <div className="flex items-center gap-2 text-[10px] text-muted-foreground" data-testid="text-daily-max">
+            <span className="tabular-nums">{maxDaily.toLocaleString()} visit{maxDaily === 1 ? "" : "s"}</span>
+            <span className="flex-1 border-t border-dashed" aria-hidden="true" />
+          </div>
+          <div className="flex items-stretch gap-1 h-32" role="list" aria-label="Visits per day, last 14 days">
+            {chartDays.map(([date, count], i) => {
+              const notLoaded = !!oldestLoaded && date < oldestLoaded;
+              const value = notLoaded ? "not loaded" : date === oldestLoaded ? `at least ${count.toLocaleString()} visits` : `${count.toLocaleString()} visit${count === 1 ? "" : "s"}`;
+              const label = `${shortDay(date)}: ${value}`;
+              const align = i < 2 ? "left-0" : i > chartDays.length - 3 ? "right-0" : "left-1/2 -translate-x-1/2";
+              return (
+                <div key={date} className="group flex-1 flex h-full flex-col items-center gap-1" role="listitem">
                   <div
-                    className={`absolute bottom-0 left-0 right-0 rounded-t transition-colors ${oldestLoaded && date < oldestLoaded ? "bg-muted" : "bg-primary/80 hover:bg-primary"}`}
-                    style={{ height: `${(count / maxDaily) * 100}%` }}
-                    title={oldestLoaded && date < oldestLoaded ? `${date}: not loaded` : date === oldestLoaded ? `${date}: at least ${count} visits` : `${date}: ${count} visits`}
+                    className="relative w-full flex-1 rounded-t outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    tabIndex={0}
+                    aria-label={label}
                     data-testid={`bar-${date}`}
-                  />
+                  >
+                    <div
+                      className={`absolute bottom-0 left-0 right-0 rounded-t transition-colors ${notLoaded ? "bg-muted" : "bg-primary/80 group-hover:bg-primary group-focus-within:bg-primary"}`}
+                      style={{ height: `${(count / maxDaily) * 100}%` }}
+                    />
+                    <span
+                      className={`pointer-events-none absolute bottom-full z-10 mb-1 whitespace-nowrap rounded bg-foreground px-1.5 py-0.5 text-[10px] font-medium text-background opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 ${align}`}
+                      aria-hidden="true"
+                      data-testid={`tip-${date}`}
+                    >
+                      {label}
+                    </span>
+                  </div>
+                  <span className="text-[8px] text-muted-foreground truncate w-full text-center" aria-hidden="true">
+                    {Number(date.slice(8, 10))}
+                  </span>
                 </div>
-                <span className="text-[8px] text-muted-foreground truncate w-full text-center">
-                  {Number(date.slice(8, 10))}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </Section>
       )}
 
       {domains.length > 0 && (
-        <Section title="All projects" flush>
+        <Section title="All sites" flush>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-muted/50">
                 <tr className="hidden sm:table-row">
-                  <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Project</th>
+                  <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Site</th>
                   <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">Online</th>
                   <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">Total</th>
                   <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">Unique</th>
@@ -596,6 +660,21 @@ function VisitorListView({ domainId }: { domainId: number | null }) {
                       </Button>
                     </div>
                   ) : (
+                  <div className="space-y-4">
+                  {visitorDetail.isSuspicious && (
+                    <div className="rounded-lg border border-red-500/25 bg-red-500/5 p-3" data-testid={`suspicion-reasons-${v.ipAddress}`}>
+                      <h4 className="flex items-center gap-1.5 text-xs font-semibold text-red-700 dark:text-red-400">
+                        <AlertTriangle className="h-3.5 w-3.5" /> Why Click Guard flagged this visitor
+                      </h4>
+                      {visitorDetail.suspicionReasons.length > 0 ? (
+                        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
+                          {visitorDetail.suspicionReasons.map(reason => <li key={reason}>{reason}</li>)}
+                        </ul>
+                      ) : (
+                        <p className="mt-2 text-sm text-muted-foreground">Click Guard recorded no reason for this flag.</p>
+                      )}
+                    </div>
+                  )}
                   <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                     <div>
                       <h4 className="mb-3 text-xs font-semibold text-muted-foreground">System specs</h4>
@@ -661,6 +740,7 @@ function VisitorListView({ domainId }: { domainId: number | null }) {
                       )}
                     </div>
                   </div>
+                  </div>
                   )}
                 </div>
               )}
@@ -690,6 +770,7 @@ export function TrafficSourcesView({ analyticsQuery, since }: { analyticsQuery: 
   const sources = analytics?.trafficSources || [];
   const totalLoads = sources.reduce((s, t) => s + t.pageLoads, 0);
   const totalVisitors = sources.reduce((s, t) => s + t.visitors, 0);
+  const sinceHint = `Since ${since.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
 
   return (
     <div className="space-y-4">
@@ -703,11 +784,11 @@ export function TrafficSourcesView({ analyticsQuery, since }: { analyticsQuery: 
         {(analytics?.totalVisits ?? 0) >= VISIT_ROW_CAP ? `Latest ${VISIT_ROW_CAP.toLocaleString()} visits` : "Visits"} since {since.toLocaleDateString("en-US", { month: "short", day: "numeric" })}.
       </p>
       <GoogleStatGrid cols={3}>
-        <GoogleStat label="Total sources" value={analytics ? sources.length : analyticsQuery.isError ? "Unavailable" : "…"} testId="card-stat-total-sources" />
-        <GoogleStat label="Total page loads" value={analytics ? totalLoads.toLocaleString() : analyticsQuery.isError ? "Unavailable" : "…"} testId="card-stat-total-page-loads" />
-        <GoogleStat label="Unique visitors" value={analytics ? totalVisitors.toLocaleString() : analyticsQuery.isError ? "Unavailable" : "…"} testId="card-stat-unique-visitors" />
+        <GoogleStat label="Total sources" value={analytics ? sources.length : analyticsQuery.isError ? "Unavailable" : "…"} testId="card-stat-total-sources" hint={sinceHint} />
+        <GoogleStat label="Total page loads" value={analytics ? totalLoads.toLocaleString() : analyticsQuery.isError ? "Unavailable" : "…"} testId="card-stat-total-page-loads" hint={sinceHint} />
+        <GoogleStat label="Unique visitors" value={analytics ? totalVisitors.toLocaleString() : analyticsQuery.isError ? "Unavailable" : "…"} testId="card-stat-unique-visitors" hint={sinceHint} />
       </GoogleStatGrid>
-      <MetricStatus query={analyticsQuery} label="Traffic sources" />
+      <MetricStatus queries={[analyticsQuery]} />
 
       <Section flush title="Traffic sources by domain">
         <div className="overflow-x-auto">
@@ -742,7 +823,7 @@ export function TrafficSourcesView({ analyticsQuery, since }: { analyticsQuery: 
                     </td>
                     <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:w-48">
                       <div className="flex items-center gap-2">
-                        <span className="w-14 text-xs tabular-nums text-muted-foreground">{s.percentage.toFixed(1)}%</span>
+                        <span className="w-14 shrink-0 whitespace-nowrap text-xs tabular-nums text-muted-foreground">{s.percentage.toFixed(1)}%</span>
                         <PercentBar value={s.percentage} />
                       </div>
                     </td>
@@ -764,14 +845,18 @@ export function PagesView({ domainId }: { domainId: number | null }) {
     refetchInterval: ANALYTICS_REFETCH_MS,
   });
   const pages = pagesQuery.data;
+  const hits = pages?.reduce((s, p) => s + p.hits, 0);
+  // GET …/pages is called without a start date: every recorded visit, up to the newest VISIT_ROW_CAP.
+  const capped = (hits ?? 0) >= VISIT_ROW_CAP;
 
   return (
     <div className="space-y-4">
+      <p className="text-xs text-muted-foreground" data-testid="text-pages-range">{allTimeRange(hits)}</p>
       <GoogleStatGrid cols={2}>
-        <GoogleStat label="Total pages" value={pages?.length ?? (pagesQuery.isError ? "Unavailable" : "…")} testId="card-stat-total-pages" />
-        <GoogleStat label="Total hits" value={pages?.reduce((s, p) => s + p.hits, 0).toLocaleString() ?? (pagesQuery.isError ? "Unavailable" : "…")} testId="card-stat-total-hits" />
+        <GoogleStat label="Total pages" value={pages?.length ?? (pagesQuery.isError ? "Unavailable" : "…")} testId="card-stat-total-pages" hint="All time" />
+        <GoogleStat label="Total hits" value={hits !== undefined ? countLabel(hits, capped) : (pagesQuery.isError ? "Unavailable" : "…")} testId="card-stat-total-hits" hint={capped ? `Latest ${VISIT_ROW_CAP.toLocaleString()} visits` : "All time"} />
       </GoogleStatGrid>
-      <MetricStatus query={pagesQuery} label="Pages" />
+      <MetricStatus queries={[pagesQuery]} />
 
       {pagesQuery.isError && !pages && (
         <Notice tone="danger" title="Couldn't load pages" testId="notice-pages-error"
@@ -845,7 +930,10 @@ function GeoView({ domainId }: { domainId: number | null }) {
         <Button size="sm" variant={subTab === "countries" ? "default" : "outline"} onClick={() => setSubTab("countries")} data-testid="button-geo-countries">Countries</Button>
         <Button size="sm" variant={subTab === "cities" ? "default" : "outline"} onClick={() => setSubTab("cities")} data-testid="button-geo-cities">Cities</Button>
       </div>
-      <p className="text-xs text-muted-foreground" data-testid="text-geo-source-note">Country/city come from Cloudflare on visits recorded after this update; older visits show Unknown.</p>
+      <p className="text-xs text-muted-foreground">
+        <span data-testid="text-geo-range">{allTimeRange(geo ? (geo.countries ?? []).reduce((n, c) => n + c.count, 0) : undefined)}</span>{" "}
+        <span data-testid="text-geo-source-note">{GEO_SOURCE_NOTE}</span>
+      </p>
 
       {geoQuery.isError && !geo && (
         <Notice tone="danger" title="Couldn't load geographic data" testId="notice-geo-error"
@@ -862,7 +950,7 @@ function GeoView({ domainId }: { domainId: number | null }) {
                 <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap">Location</th>
                 <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">Visits</th>
                 <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">Visitors</th>
-                <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap w-32">Share</th>
+                <th className="px-3 py-2 sm:px-4 sm:py-2.5 text-left text-xs font-medium text-muted-foreground whitespace-nowrap w-44">Share</th>
               </tr>
             </thead>
             <tbody>
@@ -887,10 +975,10 @@ function GeoView({ domainId }: { domainId: number | null }) {
                       <span className="sm:hidden text-muted-foreground">Visitors: </span>
                       {item.visitors.toLocaleString()}
                     </td>
-                    <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:w-32">
+                    <td className="block p-0 sm:table-cell sm:px-4 sm:py-3 sm:align-middle sm:w-44">
                       <div className="flex items-center gap-2">
                         <PercentBar value={parseFloat(item.percentage)} />
-                        <span className="w-10 text-xs tabular-nums text-muted-foreground">{item.percentage}%</span>
+                        <span className="w-14 shrink-0 whitespace-nowrap text-right text-xs tabular-nums text-muted-foreground" data-testid={`text-geo-share-${i}`}>{item.percentage}%</span>
                       </div>
                     </td>
                   </tr>
@@ -912,11 +1000,10 @@ function PlatformsView({ domainId }: { domainId: number | null }) {
   });
   const platforms = platformsQuery.data;
 
-  const renderBreakdown = (title: string, icon: any, data: Record<string, number> | undefined) => {
+  const renderBreakdown = (title: string, iconFor: (name: string) => LucideIcon, data: Record<string, number> | undefined) => {
     if (!data) return null;
     const entries = Object.entries(data).sort((a, b) => b[1] - a[1]);
     const total = entries.reduce((s, [, v]) => s + v, 0);
-    const Icon = icon;
     return (
       <Section title={title}>
         <div className="space-y-2">
@@ -925,6 +1012,7 @@ function PlatformsView({ domainId }: { domainId: number | null }) {
           ) : (
             entries.map(([name, count]) => {
               const pct = total ? (count / total) * 100 : 0;
+              const Icon = iconFor(name);
               return (
                 <div key={name} className="space-y-1">
                   <div className="flex items-center justify-between text-sm">
@@ -932,7 +1020,7 @@ function PlatformsView({ domainId }: { domainId: number | null }) {
                       <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                       <span className="truncate">{name}</span>
                     </span>
-                    <span className="tabular-nums text-muted-foreground">{count} ({pct.toFixed(1)}%)</span>
+                    <span className="shrink-0 whitespace-nowrap tabular-nums text-muted-foreground">{count} ({pct.toFixed(1)}%)</span>
                   </div>
                   <PercentBar value={pct} />
                 </div>
@@ -958,11 +1046,16 @@ function PlatformsView({ domainId }: { domainId: number | null }) {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 sm:gap-5">
-      {renderBreakdown("Browsers", Chrome, platforms?.browsers)}
-      {renderBreakdown("Operating systems", Laptop, platforms?.oses)}
-      {renderBreakdown("Devices", Monitor, platforms?.devices)}
-      {renderBreakdown("Screen resolutions", Monitor, platforms?.resolutions)}
+    <div className="space-y-4">
+      <p className="text-xs text-muted-foreground" data-testid="text-platforms-range">
+        {allTimeRange(platforms ? Object.values(platforms.devices).reduce((n, c) => n + c, 0) : undefined)}
+      </p>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 sm:gap-5">
+        {renderBreakdown("Browsers", browserIcon, platforms?.browsers)}
+        {renderBreakdown("Operating systems", osIcon, platforms?.oses)}
+        {renderBreakdown("Devices", deviceIcon, platforms?.devices)}
+        {renderBreakdown("Screen resolutions", () => Monitor, platforms?.resolutions)}
+      </div>
     </div>
   );
 }
@@ -1094,7 +1187,6 @@ export default function IpTrackerPage() {
         }
       />
 
-      {domains && <MetricStatus query={domainsQuery} label="Project totals" />}
       <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
         <AlertDialogContent data-testid="dialog-remove-domain">
           <AlertDialogHeader>
@@ -1182,14 +1274,14 @@ export default function IpTrackerPage() {
           </div>
           <h2 className="mt-3 g-card__title g-card__title--md">No sites being tracked</h2>
           <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-            Add your first website to start tracking visitors in real time. You'll get a tracking code to embed on your site.
+            Add your first site to start tracking visitors in real time. You'll get a tracking code to embed on your site.
           </p>
           <GooglePill icon={Plus} variant="solid" className="mt-4" label="Add your first site" onClick={() => setShowAddDomain(true)} testId="button-add-first-domain" />
         </div>
       ) : (
         <>
           {/* Keyed by site: search text, expanded rows and pagination must not leak between sites. */}
-          {activeTab === "dashboard" && <DashboardView domainId={domainId} analyticsQuery={analyticsQuery} domains={domains ?? []} />}
+          {activeTab === "dashboard" && <DashboardView domainId={domainId} analyticsQuery={analyticsQuery} domains={domains ?? []} domainsQuery={domainsQuery} />}
           {activeTab === "visitors" && <VisitorListView key={domainId ?? "none"} domainId={domainId} />}
           {activeTab === "traffic" && <TrafficSourcesView analyticsQuery={analyticsQuery} since={since} />}
           {activeTab === "pages" && <PagesView key={domainId ?? "none"} domainId={domainId} />}

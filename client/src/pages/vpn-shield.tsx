@@ -15,7 +15,7 @@ import {
 } from "@/components/app-ui";
 import { GoogleSectionHeader, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
 import { ToolTabs } from "@/components/tool";
-import { countryName } from "@/components/ip-tracker/country-names";
+import { countryName, GEO_SOURCE_NOTE } from "@/components/ip-tracker/country-names";
 import {
   ChevronRight, Copy, Monitor, Smartphone, Tablet,
   MapPin, Fingerprint, Clock, Shield,
@@ -311,7 +311,7 @@ function OverviewTab({ domainId, statsQuery }: { domainId: number | null; statsQ
             </div>
           </Section>
           <Section title="Top countries">
-            <p className="mb-2 text-xs text-muted-foreground" data-testid="text-countries-source-note">Country/city come from Cloudflare on visits recorded after this update; older visits show Unknown.</p>
+            <p className="mb-2 text-xs text-muted-foreground" data-testid="text-countries-source-note">{GEO_SOURCE_NOTE}</p>
             <div className="space-y-2">
               {stats.topCountries.slice(0, 8).map(c => (
                 <div key={c.name} className="flex items-center justify-between gap-2 text-sm">
@@ -467,8 +467,9 @@ function BlockedVisitorsTab({ domainId }: { domainId: number | null }) {
                       <div className="flex justify-between gap-4"><span className="text-muted-foreground">Device</span><span className="font-medium">{v.deviceType || "Unknown"}</span></div>
                       <div className="flex justify-between gap-4"><span className="text-muted-foreground">Country</span><span className="font-medium">{countryName(v.country) || "Unknown"}</span></div>
                       <div className="flex justify-between gap-4"><span className="text-muted-foreground">City</span><span className="font-medium">{v.city || "Unknown"}</span></div>
-                      <div className="flex justify-between gap-4"><span className="text-muted-foreground">Landing page</span><span className="max-w-[200px] truncate">{v.landingPage || "Unknown"}</span></div>
-                      <div className="flex justify-between gap-4"><span className="text-muted-foreground">Referrer</span><span className="max-w-[200px] truncate">{v.referrer || "Direct"}</span></div>
+                      {/* Full URLs wrap (and carry a tooltip) instead of truncating: a cut-off link can't be read. */}
+                      <div className="flex justify-between gap-4"><span className="shrink-0 text-muted-foreground">Landing page</span><span className="min-w-0 break-all text-right" title={v.landingPage || undefined} data-testid={`text-vpn-landing-${v.id}`}>{v.landingPage || "Unknown"}</span></div>
+                      <div className="flex justify-between gap-4"><span className="shrink-0 text-muted-foreground">Referrer</span><span className="min-w-0 break-all text-right" title={v.referrer || undefined} data-testid={`text-vpn-referrer-${v.id}`}>{v.referrer || "Direct"}</span></div>
                       {v.userAgent && (
                         <>
                           <h4 className="mb-2 mt-4 text-xs font-semibold text-muted-foreground">User agent</h4>
@@ -617,6 +618,16 @@ function isIpAddress(v: string): boolean {
   try { new URL(`http://[${v.split("%")[0]}]/`); return true; } catch { return false; }
 }
 
+/**
+ * The warning above Save: "after you save" only while the form is switching to a blocking mode;
+ * when that mode is already saved it says blocking is on now.
+ */
+export function blockingNotice(blockMode: string, savedMode: string | undefined): { headline: string; changing: boolean } | null {
+  if (blockMode === "log") return null;
+  const changing = blockMode !== (savedMode || VPN_DEFAULT_MODE);
+  return { headline: changing ? "Blocking turns ON when you save." : "Blocking is ON.", changing };
+}
+
 function SettingsTab({ domainId, domains }: { domainId: number | null; domains: VpnDomain[] }) {
   const { toast } = useToast();
   const domain = domains.find(d => d.id === domainId);
@@ -631,6 +642,7 @@ function SettingsTab({ domainId, domains }: { domainId: number | null; domains: 
     : trimmedRedirect && !isHttpLink(trimmedRedirect) ? "The redirect link must start with http:// or https://." : "";
   const whitelist = String(whitelistedIps).split(/[\n,]+/).map((v: string) => v.trim()).filter(Boolean);
   const badIp = whitelist.find((ip: string) => !isIpAddress(ip));
+  const notice = blockingNotice(blockMode, settings.vpnBlockMode);
   const whitelistError = badIp ? `"${badIp.slice(0, 60)}" is not a valid IP address. Enter one IPv4 or IPv6 address per line (no ranges).`
     : whitelist.length > 500 ? "Whitelist up to 500 IP addresses." : "";
 
@@ -685,13 +697,13 @@ function SettingsTab({ domainId, domains }: { domainId: number | null; domains: 
         </div>
       </Section>
 
-      {blockMode !== "log" && (
+      {notice && (
         <Notice tone="warning" testId="notice-blocking-active">
           <span data-testid="text-blocking-state">
-            <span className="font-semibold">Blocking is ON after you save.</span>{" "}
+            <span className="font-semibold">{notice.headline}</span>{" "}
             {blockMode === "block"
-              ? "Flagged visitors will see an overlay instead of your page. Browser overlays can be bypassed and may affect legitimate visitors."
-              : "Flagged visitors will be sent to the redirect link instead of your page."}
+              ? `Flagged visitors ${notice.changing ? "will see" : "see"} an overlay instead of your page. Browser overlays can be bypassed and may affect legitimate visitors.`
+              : `Flagged visitors ${notice.changing ? "will be sent" : "are sent"} to the redirect link instead of your page.`}
           </span>
         </Notice>
       )}
@@ -713,10 +725,10 @@ function SettingsTab({ domainId, domains }: { domainId: number | null; domains: 
 
       <Section
         title="Whitelisted IPs"
-        description="IP addresses that should never be blocked, one per line. Useful for your office VPN or testing."
+        description="Public IP addresses that should never be blocked, one per line, such as your office's public IP or the address you test from. Your site sees the public address, never a private one like 192.168.x.x."
       >
         <Textarea
-          placeholder={"192.168.1.1\n10.0.0.1"}
+          placeholder={"203.0.113.10\n2001:db8::10"}
           value={whitelistedIps}
           onChange={e => setWhitelistedIps(e.target.value)}
           className="resize-none font-mono text-sm"

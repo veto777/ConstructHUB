@@ -71,3 +71,10 @@ export function geoLabel(name: string): string {
     .map(part => countryName(part) ?? part)
     .join(", ");
 }
+
+/**
+ * Country and city have been stored from Cloudflare's edge headers since commit 4ae61a91 (2026-09-30,
+ * server/route-guards.ts edgeGeo). Visits recorded before that carry no location and show as Unknown.
+ */
+export const EDGE_GEO_SINCE = "Sep 30, 2026";
+export const GEO_SOURCE_NOTE = `Country and city come from Cloudflare on visits recorded since ${EDGE_GEO_SINCE}; older visits show Unknown.`;
