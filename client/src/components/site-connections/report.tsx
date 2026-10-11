@@ -1,3 +1,4 @@
+import { formatNumber } from "./format";
 import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -154,13 +155,13 @@ export function ReportTable({
   const partial = total != null && total > rows.length;
   const sortNote = server
     ? sort
-      ? `Sorted by ${columns.find((c) => c.sortKey === sort.key)?.label ?? sort.key} ${sort.dir === "desc" ? "descending" : "ascending"}, across all ${total ?? rows.length} rows.`
+      ? `Sorted by ${columns.find((c) => c.sortKey === sort.key)?.label ?? sort.key} ${sort.dir === "desc" ? "descending" : "ascending"}, across all ${formatNumber(total ?? rows.length)} rows.`
       : null
     : localSort
       ? `Sorted by ${columns[localSort.index].label} ${localSort.desc ? "descending" : "ascending"}, ${
           partial
-            ? `within this page of ${rows.length} rows only — ${total} rows in the whole report`
-            : `across all ${rows.length} rows`
+            ? `within this page of ${formatNumber(rows.length)} rows only — ${formatNumber(total)} rows in the whole report`
+            : `across all ${formatNumber(rows.length)} rows`
         }.`
       : null;
   const ordered =
@@ -317,7 +318,7 @@ export function ReportTable({
                   data-label={c.label}
                   className="max-w-md break-words"
                 >
-                  {c.value(row) ?? "Unavailable"}
+                  {(typeof c.value(row) === "number" || (c.numeric && !c.sortValue)) ? formatNumber(c.value(row)) : c.value(row) ?? "Unavailable"}
                 </td>
               ))}
             </tr>
@@ -343,7 +344,7 @@ export function MetricTiles({
         <div key={m.label} className="rounded-xl border p-4">
           <dt className="text-sm text-muted-foreground">{m.label}</dt>
           <dd className="mt-2 text-2xl font-semibold tabular-nums">
-            {typeof m.value === "number" ? (Number.isFinite(m.value) ? m.value.toLocaleString("en-US") : "Unavailable") : m.value ?? "Unavailable"}
+            {typeof m.value === "number" ? formatNumber(m.value) : m.value ?? "Unavailable"}
           </dd>
         </div>
       ))}
@@ -437,7 +438,7 @@ export function ReportTrend({
     end,
   );
   const max = Math.max(1, ...periods.map((p) => p.value ?? 0));
-  const fmt = (n: number | null) => n === null ? "No imported data" : n.toLocaleString("en-US");
+  const fmt = (n: number | null) => n === null ? "No imported data" : formatNumber(n);
   const describe = (p: TrendPeriod) => `${p.date}: ${fmt(p.value)}${p.partial && p.value !== null ? " (partial week)" : ""}`;
   // One Tab stop for the whole chart: only the selected bar sits in the tab order,
   // arrow keys move the selection (roving tabindex).
@@ -559,8 +560,8 @@ export function ReportTrend({
   );
 }
 export const percent = (v: any) =>
-  v == null ? null : `${(Number(v) * 100).toFixed(2)}%`;
-export const position = (v: any) => (v == null ? null : Number(v).toFixed(1));
+  v == null ? null : `${formatNumber(Number(v) * 100, "Unavailable", 2)}%`;
+export const position = (v: any) => (v == null ? null : formatNumber(v, "Unavailable", 1));
 export function relativeTime(
   value: string | null | undefined,
   now = Date.now(),
@@ -608,12 +609,12 @@ export const cloudflareColumns: Record<string, Column[]> = {
             ? "Requests"
             : "Threats",
       value: (r: any) => r.sum?.[k],
-      sortKey: k,
+      sortKey: k, numeric: true,
     })),
     {
       label: "Unique visitors",
       value: (r) => r.uniq?.uniques,
-      sortKey: "uniques",
+      sortKey: "uniques", numeric: true,
     },
   ],
   events: [
@@ -630,20 +631,20 @@ export const cloudflareColumns: Record<string, Column[]> = {
       value: (r) => r.dimensions?.clientRequestPath,
       sortKey: "clientRequestPath",
     },
-    { label: "Requests (sampled)", value: (r) => r.count, sortKey: "count" },
+    { label: "Requests (sampled)", value: (r) => r.count, sortKey: "count", numeric: true },
   ],
   bots: [
     {
       label: "Bot score",
       value: (r) => r.dimensions?.botScore,
-      sortKey: "botScore",
+      sortKey: "botScore", numeric: true,
     },
-    { label: "Requests (sampled)", value: (r) => r.count, sortKey: "count" },
+    { label: "Requests (sampled)", value: (r) => r.count, sortKey: "count", numeric: true },
   ],
   countries: [
     { label: "Country", value: (r) => r.country, sortKey: "country" },
-    { label: "Requests", value: (r) => r.requests, sortKey: "requests" },
-    { label: "Threats", value: (r) => r.threats, sortKey: "threats" },
+    { label: "Requests", value: (r) => r.requests, sortKey: "requests", numeric: true },
+    { label: "Threats", value: (r) => r.threats, sortKey: "threats", numeric: true },
   ],
 };
 export function sumKnown(rows: any[] | null | undefined, key: string) {

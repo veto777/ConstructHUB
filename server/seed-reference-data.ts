@@ -151,6 +151,7 @@ export async function seedCourseReferenceData(
   database = db,
   modulesData: typeof import("./data/master-class-modules.json") = loadJson("master-class-modules.json"),
   stepsData: typeof import("./data/state-guide-steps.json") = loadJson("state-guide-steps.json"),
+  guidesData: { state_code: string; overview: string }[] = loadJson("state-guides.json"),
 ) {
   return database.transaction(async (db) => {
     const stepCount = await db.execute(sql`SELECT COUNT(*) as count FROM state_guide_steps`);
@@ -220,8 +221,13 @@ export async function seedCourseReferenceData(
       WHERE g.state_code = j.state_code AND s.state_guide_id = g.id
         AND s.step_number = j.step_number
         AND (s.description IS DISTINCT FROM j.description OR s.tips IS DISTINCT FROM j.tips)`);
-    const counts = { modules: modules.rowCount ?? 0, steps: steps.rowCount ?? 0 };
-    console.log(`Updated reference copy: ${counts.modules} module(s), ${counts.steps} state guide step(s).`);
+    const guides = await db.execute(sql`UPDATE state_guides g
+      SET overview = j.overview
+      FROM jsonb_to_recordset(${JSON.stringify(guidesData)}::jsonb)
+        AS j(state_code text, overview text)
+      WHERE g.state_code = j.state_code AND g.overview IS DISTINCT FROM j.overview`);
+    const counts = { modules: modules.rowCount ?? 0, steps: steps.rowCount ?? 0, guides: guides.rowCount ?? 0 };
+    console.log(`Updated reference copy: ${counts.modules} module(s), ${counts.steps} state guide step(s), ${counts.guides} state guide overview(s).`);
     return counts;
   });
 }

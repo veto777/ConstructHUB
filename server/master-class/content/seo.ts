@@ -57,7 +57,7 @@ export const SEO: ModuleLessons = {
     },
     {
       id: "content",
-      title: "Content Strategy That Actually Ranks",
+      title: "Content Strategy for Local Search",
       blocks: [
         { type: "p", text: "Write useful content that explains your services and the places you actually serve. Prioritize accurate answers to customer questions and evidence from real projects; no publishing formula guarantees rankings." },
         { type: "panels", items: [
