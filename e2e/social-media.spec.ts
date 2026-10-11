@@ -160,7 +160,7 @@ test("connect, compose, schedule, approve an AI draft, configure automatic mode,
   await expect(
     page.getByText("AI-generated draft", { exact: true }),
   ).toBeVisible();
-  await page.getByLabel("Edit draft").fill("Reviewed AI fixture");
+  await page.getByLabel(/^Edit draft for /).fill("Reviewed AI fixture");
   await page.getByRole("button", { name: "Approve & queue" }).click();
   await expect(
     page.getByText("Reviewed AI fixture", { exact: true }),
@@ -244,7 +244,7 @@ test("unsaved draft edits survive status-filter, tab and business-switch round t
   });
   await page.goto("/social-media?business=1");
   await page.getByRole("button", { name: "Calendar & queue", exact: true }).click();
-  const edit = page.getByLabel("Edit draft", { exact: true });
+  const edit = page.getByLabel(/^Edit draft for /);
   await edit.fill("Edited marker text");
   // The row unmounts and remounts on each of these; the edit must not die with it.
   await page.getByLabel("Post status filter", { exact: true }).selectOption("queued");
@@ -383,4 +383,165 @@ test('agency searches 1,000 saved businesses, remembers URL scope, isolates sour
     await db.query('DELETE FROM business_locations WHERE user_id=1 AND id=ANY($1)',[rows.map(r=>r.id)]);
     await db.end();
   }
+});
+
+
+test("row edits and a new composition survive How it works, browser Back and business switches", async ({ page }) => {
+  const draft = { id: "55555555-5555-4555-8555-555555555555", state: "draft", due_at: new Date(Date.now() + 86400000).toISOString(), business_name: "Fixture business", payload: { post: { content: { platform: "twitter", text: "Saved draft text" } } } };
+  await page.route("**/api/social**", route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/social/businesses") return route.fulfill({ json: { items: [{ id: 1, business_name: "Fixture business" }, { id: 2, business_name: "Second business" }], total: 2 } });
+    if (path === "/api/social") return route.fulfill({ json: { connected: true, accounts: [], settings: autoSchema.parse({}), posts: [draft], total: 1, defaults: [] } });
+    if (path === "/api/social/youtube/status") return route.fulfill({ json: YT_STATUS });
+    return route.fulfill({ json: [] });
+  });
+  await page.goto("/social-media?business=1");
+  await page.getByRole("button", { name: "Calendar & queue", exact: true }).click();
+  const edit = page.getByLabel(/^Edit draft for /);
+  await edit.fill("Surviving row edit");
+  await page.getByRole("button", { name: "Compose", exact: true }).click();
+  await page.getByLabel("Post text", { exact: true }).fill("Surviving composition");
+  await page.getByLabel("Public media URLs", { exact: true }).fill("https://example.com/survives.jpg");
+  await page.getByLabel("Schedule time", { exact: true }).fill("2030-10-05T10:00");
+  // Leave through "How it works" and return with the browser — nothing may be lost.
+  await page.getByRole("link", { name: "How it works", exact: true }).click();
+  await expect(page).toHaveURL(/\/guides\?topic=social$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/social-media\?business=1/);
+  await page.getByRole("button", { name: "Calendar & queue", exact: true }).click();
+  await expect(edit).toHaveValue("Surviving row edit");
+  await page.getByRole("button", { name: "Compose", exact: true }).click();
+  await expect(page.getByLabel("Post text", { exact: true })).toHaveValue("Surviving composition");
+  await expect(page.getByLabel("Public media URLs", { exact: true })).toHaveValue("https://example.com/survives.jpg");
+  await expect(page.getByLabel("Schedule time", { exact: true })).toHaveValue("2030-10-05T10:00");
+  // Switching business and coming back restores the per-business composer draft.
+  await page.getByRole("button", { name: "Change business / bulk actions", exact: true }).click();
+  await page.getByRole("button", { name: "Second business", exact: true }).click();
+  await expect(page).toHaveURL(/business=2/);
+  await page.getByRole("button", { name: "Change business / bulk actions", exact: true }).click();
+  await page.getByRole("button", { name: "Fixture business", exact: true }).click();
+  await expect(page).toHaveURL(/business=1/);
+  await page.getByRole("button", { name: "Compose", exact: true }).click();
+  await expect(page.getByLabel("Post text", { exact: true })).toHaveValue("Surviving composition");
+});
+
+test("all-clients calendar keeps saved data under a strip with Retry when a refresh fails", async ({ page }) => {
+  let calendarDown = false;
+  const queued = { id: "66666666-6666-4666-8666-666666666666", state: "queued", due_at: new Date(Date.now() + 86400000).toISOString(), business_name: "Fixture business", payload: { post: { content: { platform: "twitter", text: "Saved queued text" } } } };
+  await page.route("**/api/social**", route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/social/calendar") {
+      if (calendarDown) return route.abort();
+      return route.fulfill({ json: { posts: [queued], total: 1 } });
+    }
+    if (path === "/api/social/businesses") return route.fulfill({ json: { items: [{ id: 1, business_name: "Fixture business" }], total: 1 } });
+    if (path === "/api/social/youtube/status") return route.fulfill({ json: YT_STATUS });
+    return route.fulfill({ json: [] });
+  });
+  await page.goto("/social-media?business=all");
+  await expect(page.getByText("Saved queued text", { exact: true })).toBeVisible();
+  calendarDown = true;
+  // The queue polls every 15 seconds; the failed poll must surface as a strip over saved data.
+  const strip = page.getByTestId("strip-social-saved-data");
+  await expect(strip).toBeVisible({ timeout: 25000 });
+  await expect(strip).toContainText("Refresh failed — showing saved data from");
+  await expect(strip.getByRole("button", { name: "Retry", exact: true })).toBeVisible();
+  // The saved row stays rendered underneath the strip.
+  await expect(page.getByText("Saved queued text", { exact: true })).toBeVisible();
+  // Retry while still down keeps the strip; recovering clears it.
+  await strip.getByRole("button", { name: "Retry", exact: true }).click();
+  await page.waitForTimeout(1000);
+  await expect(strip).toBeVisible();
+  calendarDown = false;
+  await strip.getByRole("button", { name: "Retry", exact: true }).click();
+  await expect(strip).toBeHidden({ timeout: 10000 });
+});
+
+test("stale bulk selection prunes itself when a selected post leaves draft or queued", async ({ page }) => {
+  let published = false;
+  const queued = { id: "77777777-7777-4777-8777-777777777777", state: "queued", due_at: new Date(Date.now() + 86400000).toISOString(), business_name: "Fixture business", payload: { post: { content: { platform: "twitter", text: "Queued fixture text" } } } };
+  await page.route("**/api/social**", route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/social/calendar") return route.fulfill({ json: { posts: published ? [{ ...queued, state: "published" }] : [queued], total: 1 } });
+    if (path === "/api/social/businesses") return route.fulfill({ json: { items: [{ id: 1, business_name: "Fixture business" }], total: 1 } });
+    if (path === "/api/social/youtube/status") return route.fulfill({ json: YT_STATUS });
+    return route.fulfill({ json: [] });
+  });
+  await page.goto("/social-media?business=all");
+  await page.getByLabel(`Select post ${queued.id}`).check();
+  await expect(page.getByText("1 selected", { exact: false }).first()).toBeVisible();
+  // A refetch (a filter change fetches with a new key) reconciles the selection against post state.
+  published = true;
+  await page.getByLabel("Search calendar", { exact: true }).fill("Queued");
+  await expect(page.getByText("0 selected", { exact: false }).first()).toBeVisible();
+  await expect(page.getByLabel(`Select post ${queued.id}`)).toHaveCount(0);
+});
+
+test("zero-match post search says so instead of pretending the account is empty", async ({ page }) => {
+  await page.route("**/api/social**", route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/social/calendar") return route.fulfill({ json: { posts: [], total: 0 } });
+    if (path === "/api/social/businesses") return route.fulfill({ json: { items: [{ id: 1, business_name: "Fixture business" }], total: 1 } });
+    if (path === "/api/social/youtube/status") return route.fulfill({ json: YT_STATUS });
+    return route.fulfill({ json: [] });
+  });
+  await page.goto("/social-media?business=all");
+  await page.getByLabel("Search calendar", { exact: true }).fill("nothing-matches-this");
+  await expect(page.getByTestId("text-social-posts-empty")).toHaveText("No posts match your search or filters.");
+  // No filter with no posts at all keeps the original empty-state copy.
+  await page.getByLabel("Search calendar", { exact: true }).fill("");
+  await expect(page.getByTestId("text-social-posts-empty")).toHaveText("No posts yet. Compose your first update or generate an AI draft.");
+});
+
+test("unsaved-edit gate names the businesses and Discard all edits reverts every edit", async ({ page }) => {
+  const d1 = { id: "88888888-8888-4888-8888-888888888888", state: "draft", due_at: new Date(Date.now() + 86400000).toISOString(), business_name: "Fixture business", payload: { post: { content: { platform: "twitter", text: "First saved" } } } };
+  const d2 = { id: "99999999-9999-4999-8999-999999999999", state: "draft", due_at: new Date(Date.now() + 86400000).toISOString(), business_name: "Second business", payload: { post: { content: { platform: "facebook", text: "Second saved" } } } };
+  await page.route("**/api/social**", route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/social/calendar") return route.fulfill({ json: { posts: [d1, d2], total: 2 } });
+    if (path === "/api/social/businesses") return route.fulfill({ json: { items: [{ id: 1, business_name: "Fixture business" }], total: 1 } });
+    if (path === "/api/social/youtube/status") return route.fulfill({ json: YT_STATUS });
+    return route.fulfill({ json: [] });
+  });
+  await page.goto("/social-media?business=all");
+  // The unique per-row labels find each draft without ambiguity.
+  const edit1 = page.getByLabel("Edit draft for Fixture business · twitter", { exact: true });
+  const edit2 = page.getByLabel("Edit draft for Second business · facebook", { exact: true });
+  await edit1.fill("Edited one");
+  await edit2.fill("Edited two");
+  await page.getByLabel(`Select post ${d1.id}`).check();
+  await page.getByLabel(`Select post ${d2.id}`).check();
+  const gate = page.getByTestId("text-social-unsaved-edits");
+  await expect(gate).toContainText("Fixture business (1)");
+  await expect(gate).toContainText("Second business (1)");
+  await page.getByTestId("button-discard-all-edits").click();
+  await expect(edit1).toHaveValue("First saved");
+  await expect(edit2).toHaveValue("Second saved");
+  await expect(gate).toHaveCount(0);
+});
+
+test("partial bulk failure keeps the failed ids selected with the error visible", async ({ page }) => {
+  const p1 = { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", state: "queued", due_at: new Date(Date.now() + 86400000).toISOString(), business_name: "Fixture business", payload: { post: { content: { platform: "twitter", text: "Bulk one" } } } };
+  const p2 = { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", state: "queued", due_at: new Date(Date.now() + 86400000).toISOString(), business_name: "Second business", payload: { post: { content: { platform: "twitter", text: "Bulk two" } } } };
+  await page.route("**/api/social**", route => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/social/posts/bulk-action") return route.fulfill({ json: { results: [{ id: p1.id, ok: true }, { id: p2.id, ok: false, error: "Post already submitted or finalized" }] } });
+    if (path === "/api/social/calendar") return route.fulfill({ json: { posts: [p1, p2], total: 2 } });
+    if (path === "/api/social/businesses") return route.fulfill({ json: { items: [{ id: 1, business_name: "Fixture business" }], total: 1 } });
+    if (path === "/api/social/youtube/status") return route.fulfill({ json: YT_STATUS });
+    return route.fulfill({ json: [] });
+  });
+  await page.goto("/social-media?business=all");
+  await page.getByLabel(`Select post ${p1.id}`).check();
+  await page.getByLabel(`Select post ${p2.id}`).check();
+  await page.getByRole("button", { name: "Cancel selected posts", exact: true }).click();
+  await page.getByTestId("button-bulk-cancel-confirm").click();
+  await expect(page.getByText("Post already submitted or finalized")).toBeVisible();
+  // The failure stays selected (retry-ready, checkbox still there) and the success clears.
+  await expect(page.getByText("1 selected", { exact: false }).first()).toBeVisible();
+  await expect(page.getByLabel(`Select post ${p2.id}`)).toBeChecked();
+  await expect(page.getByLabel(`Select post ${p1.id}`)).not.toBeChecked();
+  // Clear selection releases even a failed id whose row later loses its checkbox.
+  await page.getByTestId("button-clear-selection").click();
+  await expect(page.getByText("0 selected", { exact: false }).first()).toBeVisible();
 });
