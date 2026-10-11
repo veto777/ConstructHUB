@@ -353,24 +353,32 @@ describe("page copy outside /pricing", () => {
     },
   );
 
-  it("master-class prices its modules from the modules table, not literals", () => {
-    // The course text itself quotes job values and ad budgets; only the
-    // selling surfaces are checked here.
-    const src = read("client/src/pages/master-class.tsx");
-    expect(src).not.toMatch(/(price|value): "\$\d/);
-    expect(src).toContain("const bundlePriceShown = showsPrice(BUNDLE_PRICE_CENTS)");
-    expect(src).toContain("showsPrice(mod.price)");
+  it("master-class prices its modules and the bundle from the server catalog, not literals", () => {
+    // The course text itself quotes job values and ad budgets; only the selling surfaces are checked here:
+    // the page and its Enroll tab (client/src/components/master-class/enroll.tsx) read /api/course-catalog,
+    // which server/catalog.ts COURSE_BUNDLE prices — no cents literal anywhere on the client side.
+    const page = read("client/src/pages/master-class.tsx");
+    const enroll = read("client/src/components/master-class/enroll.tsx");
+    for (const src of [page, enroll]) {
+      expect(src).not.toMatch(/(price|value): "\$\d/);
+      expect(src).not.toMatch(/\b\d{5,7}\b/); // 150000, 249900 …: the catalog's numbers never appear here
+    }
+    expect(enroll).toContain("const bundlePriceShown = !catalog.bundle.salesOnly && showsPrice(catalog.bundle.priceCents)");
+    expect(enroll).toContain("showsPrice(mod.price)");
+    expect(page).toContain('queryKey: ["/api/course-catalog"]');
   });
 
   it("master-class shows the bundle price only behind the sales-threshold check", () => {
-    // Every place that prints the bundle price must sit in a bundlePriceShown
-    // branch — the overview tab's stat card once printed it unconditionally.
-    const lines = read("client/src/pages/master-class.tsx").split("\n");
-    const sites = lines.map((line, i) => ({ line, i })).filter(({ line }) => line.includes("usd(BUNDLE_PRICE_CENTS)"));
-    expect(sites.length).toBeGreaterThan(0);
-    for (const { i } of sites) {
-      const context = lines.slice(Math.max(0, i - 45), i + 1).join("\n");
-      expect(context, `line ${i + 1}`).toMatch(/bundlePriceShown/);
+    // Every place that prints the bundle price must sit in a bundlePriceShown branch — the overview tab's
+    // stat card once printed it unconditionally.
+    for (const file of ["client/src/pages/master-class.tsx", "client/src/components/master-class/enroll.tsx"]) {
+      const lines = read(file).split("\n");
+      const sites = lines.map((line, i) => ({ line, i })).filter(({ line }) => line.includes("formatUsd(catalog.bundle.priceCents)"));
+      expect(sites.length, file).toBeGreaterThan(0);
+      for (const { i } of sites) {
+        const context = lines.slice(Math.max(0, i - 45), i + 1).join("\n");
+        expect(context, `${file} line ${i + 1}`).toMatch(/bundlePriceShown/);
+      }
     }
   });
 

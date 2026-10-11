@@ -3510,40 +3510,98 @@ export async function registerRoutes(
     }
   });
 
-  // The Master Class page (/master-class): the states that have a permit-guide tab.
+  // ── Master Class: state guides, catalog and course access (rules: server/state-guides.ts) ──────────────
+  // The free overview (/master-class): every state's license / workers' comp / sales-tax / B&O / bond flags
+  // and its filing office — the comparison table the marketing calls free. Agency links, notes, the overview
+  // and the steps are the paid guide and are served only by the per-state route below.
   app.get("/api/state-guides", async (_req, res) => {
-    const guides = await db.select().from(stateGuides).orderBy(asc(stateGuides.stateName));
-    res.json(guides);
+    try {
+      const { publicStateGuide } = await import("./state-guides");
+      const [guides, counts] = await Promise.all([
+        db.select().from(stateGuides).orderBy(asc(stateGuides.stateName)),
+        db.select({ guideId: stateGuideSteps.stateGuideId, n: sql<number>`count(*)::int` }).from(stateGuideSteps).groupBy(stateGuideSteps.stateGuideId),
+      ]);
+      const stepCounts = new Map(counts.map((c) => [c.guideId, Number(c.n)]));
+      res.json(guides.map((g) => publicStateGuide(g, stepCounts.get(g.id) ?? 0)));
+    } catch (err) {
+      console.error("Error loading the state guide index:", err);
+      res.status(500).json({ message: "Could not load the state guides. Please try again." });
+    }
   });
 
-  // The Master Class page's per-state guide tab (/master-class): one state's guide and its steps.
+  // One state's full guide: its agency links with their check status, the notes, the written walkthrough where
+  // one exists and the checklist built from its agency records. Sold with the Business Formation & Licensing
+  // module or the bundle, or included on a plan — the check is here, not only on the page (audit: the paywall
+  // used to be client-only). Signed out → 401, signed in without the module → 403.
   app.get("/api/state-guides/:stateCode", async (req, res) => {
-    const code = req.params.stateCode.toUpperCase();
-    const [guide] = await db.select().from(stateGuides).where(eq(stateGuides.stateCode, code));
-    if (!guide) return res.status(404).json({ message: "State guide not found" });
-    const steps = await db.select().from(stateGuideSteps).where(eq(stateGuideSteps.stateGuideId, guide.id)).orderBy(asc(stateGuideSteps.stepNumber));
-    res.json({ ...guide, steps });
+    try {
+      const code = String(req.params.stateCode).toUpperCase();
+      const user = req.user ? getDevUser(req, res) : null;
+      const { getCourseAccess } = await import("./course-access");
+      const { courseUnlocks, STATE_GUIDE_CATEGORY, agencyChecklist } = await import("./state-guides");
+      const [access, modules] = await Promise.all([
+        getCourseAccess(user?.id ?? null),
+        db.select({ id: masterClassModules.id, category: masterClassModules.category }).from(masterClassModules),
+      ]);
+      res.setHeader("Cache-Control", "private, no-store");
+      if (!courseUnlocks(access, modules, DEV_AUTH_BYPASS).unlocked[STATE_GUIDE_CATEGORY]) {
+        return user
+          ? res.status(403).json({ code: "course_purchase_required", message: "The full state guide opens with the Business Formation & Licensing module or the complete bundle." })
+          : res.status(401).json({ code: "sign_in_required", message: "Sign in to open the state guides." });
+      }
+      const [guide] = await db.select().from(stateGuides).where(eq(stateGuides.stateCode, code));
+      if (!guide) return res.status(404).json({ message: "State guide not found" });
+      const steps = await db.select().from(stateGuideSteps).where(eq(stateGuideSteps.stateGuideId, guide.id)).orderBy(asc(stateGuideSteps.stepNumber));
+      res.json({ ...guide, steps, checklist: agencyChecklist(guide) });
+    } catch (err) {
+      console.error("Error loading a state guide:", err);
+      res.status(500).json({ message: "Could not load this state guide. Please try again." });
+    }
   });
 
-  // The Master Class page (/master-class): the active course modules (title, price, order).
+  // The active course modules (title, price, category, order) — kept for older clients; the page reads the catalog.
   app.get("/api/master-class-modules", async (_req, res) => {
     const modules = await db.select().from(masterClassModules).where(eq(masterClassModules.isActive, true)).orderBy(asc(masterClassModules.sortOrder));
     res.json(modules);
   });
 
-  // The signed-in user's Master Class purchases (course_purchases); the guide index uses
-  // any row to unlock the paid playbook. google-ads-guide.tsx.
-  app.get(["/api/course-purchases", "/api/course-access"], async (req, res) => {
-    // Signed out: no purchases (getDevUser would already have sent a 401, so it isn't asked).
-    const user = req.user ? getDevUser(req, res) : null;
-    res.setHeader("Cache-Control", "private, no-store");
-    if (req.path === "/api/course-access") {
-      const { getCourseAccess } = await import("./course-access");
-      return res.json(await getCourseAccess(user?.id ?? null));
+  // The course catalog the Master Class page sells from: the active modules and the complete bundle, priced by
+  // the server's price authority (server/catalog.ts COURSE_BUNDLE) so no price is typed into the page.
+  app.get("/api/course-catalog", async (_req, res) => {
+    try {
+      const { COURSE_BUNDLE } = await import("./catalog");
+      const modules = await db.select().from(masterClassModules).where(eq(masterClassModules.isActive, true)).orderBy(asc(masterClassModules.sortOrder));
+      res.json({ modules, bundle: { id: "course_bundle", name: COURSE_BUNDLE.name, priceCents: COURSE_BUNDLE.priceCents, salesOnly: isSalesOnly(COURSE_BUNDLE.priceCents) } });
+    } catch (err) {
+      console.error("Error loading the course catalog:", err);
+      res.status(500).json({ message: "Could not load the course catalog. Please try again." });
     }
-    if (!user) return res.json([]);
-    const purchases = await db.select().from(coursePurchases).where(eq(coursePurchases.userId, user.id));
-    res.json(purchases);
+  });
+
+  // The signed-in user's Master Class purchases (course_purchases), and /api/course-access: the same rows
+  // resolved into what they open (server/state-guides.ts courseUnlocks) — the page never maps a purchase
+  // to a tab by a guessed id. The guide index (google-ads-guide.tsx) uses any row to unlock the paid playbook.
+  app.get(["/api/course-purchases", "/api/course-access"], async (req, res) => {
+    try {
+      // Signed out: no purchases (getDevUser would already have sent a 401, so it isn't asked).
+      const user = req.user ? getDevUser(req, res) : null;
+      res.setHeader("Cache-Control", "private, no-store");
+      if (req.path === "/api/course-access") {
+        const { getCourseAccess } = await import("./course-access");
+        const { courseUnlocks } = await import("./state-guides");
+        const [access, modules] = await Promise.all([
+          getCourseAccess(user?.id ?? null),
+          db.select({ id: masterClassModules.id, category: masterClassModules.category }).from(masterClassModules),
+        ]);
+        return res.json({ ...access, ...courseUnlocks(access, modules, DEV_AUTH_BYPASS), signedIn: !!user });
+      }
+      if (!user) return res.json([]);
+      const purchases = await db.select().from(coursePurchases).where(eq(coursePurchases.userId, user.id));
+      res.json(purchases);
+    } catch (err) {
+      console.error("Error resolving course access:", err);
+      res.status(500).json({ message: "Couldn't verify your course access. Please try again." });
+    }
   });
 
   // The paid Google Ads playbook, one section at a time. Same entitlement rule as the guide
