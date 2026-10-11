@@ -14,13 +14,13 @@
  */
 import { useState, type ReactNode } from "react";
 import { Link } from "wouter";
-import { ArrowRight, CheckCircle2, ChevronDown, Minus } from "lucide-react";
+import { ArrowRight, CheckCircle2, ChevronDown, Minus, X } from "lucide-react";
 import type { FeatureCompare, FeatureHeading, FeatureScreen, LandingContent } from "@shared/feature-pages/types";
 import type { FeaturePriceSummary } from "@shared/feature-pages/pricing";
 import { competitorPriceLabel, comparePricesNote } from "@shared/feature-pages/compare";
 import { SALES_REP_LABEL } from "@shared/plan-copy";
 import { GabeAvatar, StandingGator } from "@/components/mascot";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { FEATURE_ICON_COMPONENTS } from "./icons";
 import { H2, Kicker, LEAD, PANEL_RULE, TEXT_LINK } from "./primitives";
 
@@ -273,6 +273,16 @@ export function ScreensSection({ page, screens, n, tone }: { page: Pick<LandingC
       <Dialog open={zoom} onOpenChange={setZoom}>
         <DialogContent className="max-w-[min(96vw,1600px)] p-2 sm:p-3">
           <DialogTitle className="sr-only">{shot.caption}</DialogTitle>
+          <DialogClose asChild>
+            <button
+              type="button"
+              aria-label="Close"
+              data-testid="button-feature-screen-zoom-close"
+              className="absolute right-2 top-2 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 p-2 text-white transition-colors hover:bg-black/80"
+            >
+              <X size={20} />
+            </button>
+          </DialogClose>
           <img src={shot.src} alt={shot.alt} width={shot.width} height={shot.height} className="block w-full h-auto rounded-lg" />
         </DialogContent>
       </Dialog>
