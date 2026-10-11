@@ -931,12 +931,12 @@ function DashboardView({ analytics, dateRange, setDateRange, threatColor, threat
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-2">
-            <div className="flex items-end gap-1 h-40">
+            <div className="flex items-stretch gap-1 h-40">
               {dailyEntries.map(([date, count]) => (
-                <div key={date} className="flex-1 flex flex-col items-center gap-1">
-                  <div className="w-full flex flex-col items-center justify-end flex-1">
+                <div key={date} className="flex-1 flex h-full flex-col items-center gap-1">
+                  <div className="relative w-full flex-1">
                     <div
-                      className="w-full max-w-[32px] bg-orange-500 rounded-t-sm opacity-80"
+                      className="absolute bottom-0 left-1/2 w-full max-w-[32px] -translate-x-1/2 bg-orange-500 rounded-t-sm opacity-80"
                       style={{ height: `${(count / maxDailyVisits) * 100}%`, minHeight: "4px" }}
                       title={`${count} visits on ${date}`}
                       data-testid={`bar-${date}`}

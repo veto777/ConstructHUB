@@ -173,9 +173,9 @@ test("connect, compose, schedule, approve an AI draft, configure automatic mode,
 });
 
 test("guides match shipped approval controls and link to every walkthrough", async ({ page }) => {
-  // Old /guides links now open the Guides tab of Social Media.
+  // /guides is its own page again (fix/tools-course); the Social tab embeds it with a link out.
   await page.goto("/guides");
-  await expect(page).toHaveURL(/\/social-media\?tab=guides$/);
+  await expect(page).toHaveURL(/\/guides$/);
   const main = page.getByRole("region", { name: "Guides walkthroughs" });
   await expect(main).toBeVisible();
   for (const [label, href] of [

@@ -6,7 +6,7 @@ export default async function setup() {
   const raw = process.env.DATABASE_URL;
   if (!raw) return;
   const url = new URL(raw);
-  if (!["localhost", "127.0.0.1", "::1"].includes(url.hostname) || !/^\/constructhub_dev(?:_a\d+)?$/.test(url.pathname)) {
+  if (!["localhost", "127.0.0.1", "::1"].includes(url.hostname) || !/^\/constructhub_dev(?:_[a-z0-9]+)?$/.test(url.pathname)) {
     throw new Error("Integration tests require a local ConstructHUB development database");
   }
   const pool = new pg.Pool({ connectionString: raw });

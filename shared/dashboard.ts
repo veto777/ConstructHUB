@@ -94,7 +94,7 @@ export const DASHBOARD_TILES: readonly DashboardTileDef[] = [
   { key: "profileGuard", group: "grow", title: "Profile Guard", description: "Alerts when someone edits your Google profile. Turn it on per location in Locations.", href: "/locations", surface: "app", gate: { kind: "plan" } },
   { key: "rankingGrid", group: "grow", title: "GMB Ranking Grid", description: "Where you rank on the map, street by street.", href: "/ranking-grid", surface: "app", gate: { kind: "plan" } },
   { key: "gbpContent", group: "grow", title: "Posts & Photos", description: "Scheduled Google posts and photo uploads.", href: "/gbp-content", surface: "app", gate: { kind: "plan" } },
-  { key: "social", group: "grow", title: "Social Media", description: "Posts queued and published across your social accounts.", href: "/social-media", surface: "app", gate: { kind: "none" } },
+  { key: "social", group: "grow", title: "Social Media", description: "Posts queued and published across your social accounts.", href: "/social-media", surface: "app", gate: { kind: "module", module: "socialPublishing" } },
   { key: "siteScan", group: "grow", title: "Site Scan", description: "SEO and speed score for your website.", href: "/site-scan", surface: "app", gate: { kind: "plan" } },
   { key: "media", group: "grow", title: "Photo Optimizer", description: "Geotagged, compressed job photos in your media library.", href: "/media-library", surface: "app", gate: { kind: "plan" }, links: [{ label: "Optimize photos", href: "/photos", surface: "app" }] },
   // ── Protect ──────────────────────────────────────────────────────────────
