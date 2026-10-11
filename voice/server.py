@@ -43,6 +43,7 @@ from aiohttp import web
 import audio
 from app_client import AppClient, CallProfile, ProfileUnavailable
 from brain import Brain
+from outbox import Outbox
 from support_brain import SupportBrain
 from config import settings
 from decision import SAY_MAX
@@ -110,6 +111,10 @@ SUPPORT_WRAP = "I need to wrap up this call now. Please email support at constru
 SUPPORT_IDLE_BYE = "I haven't heard anything for a while, so I'll let you go. Please call back, or email support at constructhub dot us. Goodbye."
 CALL_WRAP = "I'm sorry, I have to let you go now. Thank you for calling, goodbye."
 REAPER = web.AppKey("reaper", asyncio.Task)
+# Finished calls whose report / recording the app has not taken yet (outbox.py): written before anything is sent,
+# drained by the reaper loop, so an app outage or an engine restart never loses a call's paperwork.
+OUTBOX = Outbox(settings.recordings_dir / "outbox")
+OUTBOX_EVERY_S = 30.0
 STARTED = datetime.now(timezone.utc)
 
 
@@ -998,17 +1003,27 @@ class Call:
             log.info("support call %s finished (%ss)", sid, dur)
             return
         report = await self.brain.report(datetime.now(timezone.utc), dur)
-        res = await self.app.call_finished(sid, report)
-        log.info("call %s finished: %s (%ss) → %s", sid, report["outcome"], dur, json.dumps(res)[:200])
-        if wav_path and wav_path.exists():
-            up = await self.app.upload_recording(sid, wav_path)
-            if up.get("recordingKey"):
-                try:
-                    wav_path.unlink()
-                except OSError:
-                    pass
-            else:
-                log.warning("recording kept at %s (upload failed: %s)", wav_path, up.get("error"))
+        has_wav = bool(wav_path and wav_path.exists())
+        # Tells the app a recording is on its way, so the call shows "Recording pending" until the upload lands.
+        report["recordingPending"] = has_wav
+        try:
+            OUTBOX.enqueue(sid, report, wav_path if has_wav else None)
+        except Exception as ex:  # noqa: BLE001 — a full/broken disk: fall back to one direct attempt, as before
+            log.error("outbox write failed for %s (%s); delivering once without it", sid, ex)
+            res = await self.app.call_finished(sid, report)
+            log.info("call %s finished: %s (%ss) → %s", sid, report["outcome"], dur, json.dumps(res)[:200])
+            if has_wav:
+                up = await self.app.upload_recording(sid, wav_path)
+                if up.get("recordingKey"):
+                    try:
+                        wav_path.unlink()
+                    except OSError:
+                        pass
+                else:
+                    log.warning("recording kept at %s (upload failed: %s)", wav_path, up.get("error"))
+            return
+        state = await OUTBOX.deliver(self.app, sid)
+        log.info("call %s finished: %s (%ss) → delivery %s", sid, report["outcome"], dur, state)
 
 
 FINISHING: set[asyncio.Task] = set()
@@ -1248,8 +1263,24 @@ def reap(now: float | None = None) -> list[tuple[str, str]]:
     return done
 
 
-async def reaper() -> None:
+async def drain_outbox(client: Any) -> None:
+    try:
+        counts = await OUTBOX.drain(client)
+        if any(k != "waiting" for k in counts):
+            log.info("outbox drain: %s", counts)
+    except Exception as ex:  # noqa: BLE001
+        log.exception("outbox drain failed: %s", ex)
+
+
+async def reaper(client: Any = None) -> None:
+    """Every REAP_EVERY_S: close stuck calls. Every OUTBOX_EVERY_S (and once at start): retry undelivered call
+    reports and recordings — in its own task, so a slow app never delays reaping a stuck call."""
+    drain: asyncio.Task | None = None
+    last_drain: float | None = None
     while True:
+        if client is not None and (drain is None or drain.done()) and (last_drain is None or time.monotonic() - last_drain >= OUTBOX_EVERY_S):
+            last_drain = time.monotonic()
+            drain = asyncio.create_task(drain_outbox(client))
         await asyncio.sleep(REAP_EVERY_S)
         try:
             reap()
@@ -1276,7 +1307,7 @@ async def on_startup(app: web.Application) -> None:
     except Exception as e:  # noqa: BLE001
         log.warning("app health check failed (%s) — calls cannot be served until it passes", e)
     PERSONAS = load_personas()
-    app[REAPER] = asyncio.create_task(reaper())
+    app[REAPER] = asyncio.create_task(reaper(app[CLIENT]))
     if app.get(LOAD_MODELS, True):
         try:
             log.info("loading models on %s…", settings.tts_device)

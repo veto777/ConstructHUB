@@ -196,6 +196,18 @@ describe("simulator helpers", () => {
     expect(simulatorErrorText(apiError(501, { code: "not_implemented" }))).toMatch(/isn't wired up/);
     expect(simulatorErrorText(apiError(400, { message: "Too long." }))).toBe("Too long.");
   });
+
+  it("never shows a raw validation dump or a server error message (audit r3: the Draft start showed a Zod JSON dump)", () => {
+    const zodDump = JSON.stringify([{ code: "invalid_enum_value", options: ["replacements_only"], path: ["policies", "repairs"], message: "Invalid enum value" }], null, 2);
+    const t500 = simulatorErrorText(apiError(500, { message: zodDump }));
+    expect(t500).toMatch(/couldn't run that just now/);
+    expect(t500).not.toMatch(/invalid_enum_value|path/);
+    expect(simulatorErrorText(new Error(`500: ${zodDump}`))).toMatch(/couldn't run that just now/);
+    expect(simulatorErrorText(apiError(400, { message: zodDump }))).toBe("Something went wrong — please try again.");
+    expect(simulatorErrorText(apiError(422, { code: "draft_invalid", message: "Your draft has a setting the assistant can't read." }))).toMatch(/can't read/);
+    expect(simulatorErrorText(apiError(422, { code: "draft_invalid" }))).toMatch(/Agent Studio/);
+    expect(simulatorErrorText(apiError(500, { code: "simulator_failed", message: "The Simulator couldn't run that just now." }))).toBe("The Simulator couldn't run that just now.");
+  });
 });
 
 describe("profileIssueText", () => {

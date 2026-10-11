@@ -117,8 +117,14 @@ export function simulatorErrorText(err: unknown): string {
   if (code === "paused") return "The assistant is paused. Run the draft, or resume it in Agent Studio.";
   if (code === "unknown_session") return "That simulated call has expired. Start a new one.";
   if (code === "session_ended") return "That simulated call has already ended. Start a new one.";
+  if (code === "draft_invalid") return message ?? "Your draft has a setting the assistant can't read. Open Agent Studio, review each section and save the draft, then try again.";
+  if (code === "rate_limited" && message) return message;
   if (status === 501) return "The Simulator backend isn't wired up yet (studio-backend lane).";
-  return message ?? (typeof body === "string" && body ? body : "Something went wrong — please try again.");
+  // A server failure, or a message that is really a serialized validation/stack dump, never reaches the screen as-is.
+  const readable = (t: string | null) => !!t && t.length <= 300 && !/^\s*[[{]/.test(t) && !/"(code|path|issues)"\s*:/.test(t);
+  if (status !== null && status >= 500) return code === "simulator_failed" && readable(message) ? message! : "The Simulator couldn't run that just now. Try again in a moment; if it keeps happening, reload the page.";
+  if (readable(message)) return message!;
+  return typeof body === "string" && readable(body) ? body : "Something went wrong — please try again.";
 }
 
 const SECTION_BY_PATH: Record<string, string> = {

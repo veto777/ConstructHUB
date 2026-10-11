@@ -33,6 +33,8 @@ export type VoiceCallListRow = {
   spamConfidence: number | null;
   spamReason: string | null;
   hasRecording: boolean;
+  /** available = stored; pending = the engine is still uploading it; failed = it never arrived (absent on an older server). */
+  recordingState?: "available" | "pending" | "failed" | "none";
 };
 
 export type VoiceCallList = { calls: VoiceCallListRow[]; total: number; page: number; limit: number };
@@ -59,6 +61,19 @@ export type VoiceEscalation = {
   createdAt: string | null;
   state: "waiting" | "confirmed" | "followed_up" | "closed";
 };
+
+/** The reminder loop's state, as GET /api/crm/voice/escalations reports it (absent on an older server). */
+export type EscalationReminders = { running: boolean; intervalMinutes: number; lastRunAt: string | null; lastOk: boolean | null; stale: boolean };
+export type VoiceEscalationList = { escalations: VoiceEscalation[]; reminders?: EscalationReminders };
+
+/** How often the Calls tab's operational views (log, spam, escalations) refetch while the tab is visible. */
+export const LIVE_REFRESH_MS = 30_000;
+
+/** "2:41:05 PM" for an "Updated …" stamp (react-query's dataUpdatedAt; 0 = never). */
+export function fmtUpdated(ms: number): string | null {
+  if (!ms) return null;
+  return new Date(ms).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", second: "2-digit" });
+}
 
 export type VoiceTranscriptTurn = { role: "caller" | "assistant" | "system"; text: string; t?: string };
 
