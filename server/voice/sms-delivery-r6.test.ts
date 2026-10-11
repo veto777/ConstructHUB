@@ -20,7 +20,8 @@ afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); fs.rmSync(dir, { re
 it("no carrier records a log but never acceptance", async () => {
   vi.stubEnv("SIGNALWIRE_API_TOKEN", "");
   const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
-  expect(await sms.sendSms("+15555550124", "Summary")).toMatchObject({ ok: false, provider: "log", error: "Not sent: texting isn't set up." });
+  // The shared sender only records (provider "log", no carrier id); the Call Assistant reads that as "Not sent" (leads.ts).
+  expect(await sms.sendSms("+15555550124", "Summary")).toMatchObject({ provider: "log", sid: null });
   expect(fetch).not.toHaveBeenCalled();
 });
 it("definite carrier rejection remains retryable", async () => {

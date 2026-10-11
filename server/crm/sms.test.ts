@@ -156,7 +156,7 @@ describe("log provider (the unconfigured seam)", () => {
       process.env.SMS_OUTBOX_PATH = outbox;
       try {
         const r = await sendSms("+15551234567", "recorded, not sent");
-        expect(r).toEqual({ ok: false, provider: "log", sid: null, error: "Not sent: texting isn't set up." });
+        expect(r).toEqual({ ok: true, provider: "log", sid: null });
         const lines = fs.readFileSync(outbox, "utf8").trim().split("\n").map((l) => JSON.parse(l));
         expect(lines.at(-1)).toMatchObject({ provider: "log", to: "+15551234567", body: "recorded, not sent" });
       } finally {

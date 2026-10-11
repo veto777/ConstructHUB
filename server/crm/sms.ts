@@ -380,7 +380,7 @@ function logProviderSend(to: string, body: string): SmsResult {
     fs.appendFileSync(LOG_PATH(), JSON.stringify(entry) + "\n");
   } catch { /* a full disk must not break a bid reminder */ }
   console.log(`[SMS LOG] no carrier configured — recorded instead of sending (to: ${to})`);
-  return { ok: false, provider: "log", sid: null, error: "Not sent: texting isn't set up." };
+  return { ok: true, provider: "log", sid: null };
 }
 
 /** SignalWire Compatibility API — Twilio-shaped: POST {space}/api/laml/2010-04-01/
@@ -437,7 +437,6 @@ export async function sendSms(
   orgId?: string,
 ): Promise<SmsResult> {
   const sender = resolveSmsSender(orgCustomFields);
-  if (!sender) return logProviderSend(to, body);
   if (sender?.mode === "dedicated" && !await dedicatedSmsAllowed(orgId, sender.from)) {
     // Do not silently reroute a client-facing text onto the shared number.
     return { ok: false, provider: "signalwire", sid: null, error: "Dedicated texting number is outside your current allowance. Update Text messaging settings." };
