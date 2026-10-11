@@ -158,7 +158,7 @@ export function buildDashboardFixture(
   now = new Date(),
 ): DashboardPayload {
   const plan: PlanKey | null = scenario === "full" ? "growth" : scenario === "new" ? "starter" : null;
-  const modules = NO_MODULES;
+  const modules = plan ? PLANS[plan].modules : NO_MODULES;
   const hasCrmOrg = scenario !== "noplan";
   const displayName = user.displayName?.trim() || null;
   const recent = recentFor(now, scenario);

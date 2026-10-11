@@ -8,7 +8,10 @@ async function throwIfResNotOk(res: Response) {
     // A gateway error page (Cloudflare's 502 while the app restarts, a proxy timeout) is HTML, not our JSON. Pages
     // print the error message as-is, so the whole HTML document landed on screen (owner, 2026-10-07). Give it the
     // same shape as our own answers instead.
-    if ((res.status >= 502 && res.status <= 504) || (res.status >= 520 && res.status <= 530) || /^\s*<(!doctype|html)\b/i.test(text)) {
+    // Our own 5xx answers are JSON with a message (and sometimes a code, e.g. 503 social_misconfigured): keep them.
+    let ownJson = false;
+    try { const j = JSON.parse(text); ownJson = !!j && typeof j === "object" && typeof j.message === "string"; } catch { /* not JSON */ }
+    if (!ownJson && ((res.status >= 502 && res.status <= 504) || (res.status >= 520 && res.status <= 530) || /^\s*<(!doctype|html)\b/i.test(text))) {
       throw new Error(`${res.status}: ${JSON.stringify({ message: "ConstructHUB is restarting or briefly unavailable. Try again in a minute." })}`);
     }
     throw new Error(`${res.status}: ${text}`);
