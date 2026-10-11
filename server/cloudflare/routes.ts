@@ -156,6 +156,59 @@ export function registerAssetRoutes(
     const a = await ownedAsset(user, idInput.parse(req.params.id), provider);
     res.json(a);
   });
+  // Each dataset reports its own latest work, separately from cached sitemap time.
+  route("get", `${base}/assets/:id/activity`, async (req, res, user) => {
+    const a = await ownedAsset(user, idInput.parse(req.params.id), provider);
+    const p = listInput.parse(req.query);
+    const values = [user, a.id, `%${p.q}%`, p.status];
+    const where =
+      "user_id=$1 AND asset_id=$2 AND kind ILIKE $3 AND ($4='' OR state=$4)";
+    const { rows: items } = await pool.query(
+      `SELECT id,kind,state,error,started_at,finished_at FROM edge_jobs WHERE ${where} ORDER BY id DESC LIMIT $5 OFFSET $6`,
+      [...values, p.limit, (p.page - 1) * p.limit],
+    );
+    const {
+      rows: [n],
+    } = await pool.query(
+      `SELECT count(*)::int total FROM edge_jobs WHERE ${where}`,
+      values,
+    );
+    res.json({ items, total: n.total });
+  });
+  route("get", `${base}/assets/:id/sync-status`, async (req, res, user) => {
+    const a = await ownedAsset(user, idInput.parse(req.params.id), provider);
+    const { rows } = await pool.query(
+      `SELECT DISTINCT ON (kind) kind,state,error,finished_at,started_at
+       FROM edge_jobs WHERE user_id=$1 AND connection_id=$2 AND (asset_id=$3 OR (asset_id IS NULL AND kind='discover'))
+       ORDER BY kind,id DESC`,
+      [user, a.connection_id, a.id],
+    );
+    const {
+      rows: [analytics],
+    } = await pool.query(
+      `SELECT count(*) FILTER (WHERE state IN ('queued','running'))::int pending,
+       count(*) FILTER (WHERE state IN ('failed','uncertain'))::int failed,
+       max(finished_at) FILTER (WHERE state='done') updated_at
+       FROM (SELECT DISTINCT ON (payload) payload,state,finished_at FROM edge_jobs WHERE user_id=$1 AND asset_id=$2 AND kind='analytics' ORDER BY payload,id DESC) latest`,
+      [user, a.id],
+    );
+    const { rows: datasets } = await pool.query(
+      `SELECT payload->>'dimension' dimension,
+       count(*) FILTER (WHERE state IN ('queued','running'))::int pending,
+       count(*) FILTER (WHERE state IN ('failed','uncertain'))::int failed,
+       max(finished_at) FILTER (WHERE state='done') updated_at
+       FROM (SELECT DISTINCT ON (payload) payload,state,finished_at FROM edge_jobs WHERE user_id=$1 AND asset_id=$2 AND kind='analytics' ORDER BY payload,id DESC) latest
+       GROUP BY 1 ORDER BY 1`,
+      [user, a.id],
+    );
+    res.json({
+      jobs: rows,
+      analytics,
+      datasets,
+      syncedAt: a.synced_at,
+      error: a.error,
+    });
+  });
   // Re-imports sites/properties from the chosen connections (queued 'discover' /
   // 'memberships' jobs into edge_jobs). "Discover sites" — site-connections.tsx.
   route("post", `${base}/discover`, async (req, res, user) => {
@@ -431,7 +484,7 @@ export function registerCloudflareRoutes(
     const from =
       "FROM edge_assets a,jsonb_array_elements(COALESCE(NULLIF(a.data->$3,'null'::jsonb),'[]')) value WHERE a.id=$1 AND a.user_id=$2 AND value::text ILIKE $4";
     const { rows } = await pool.query(
-      `SELECT value ${from} LIMIT $5 OFFSET $6`,
+      `SELECT value ${from} ORDER BY value::text LIMIT $5 OFFSET $6`,
       [...values, p.limit, (p.page - 1) * p.limit],
     );
     const {
@@ -449,6 +502,7 @@ export function registerCloudflareRoutes(
     const p = globalInput
       .extend({
         page: z.number().int().min(1).max(10000).default(1),
+        accountPage: z.number().int().min(1).max(10000).default(1),
         q: z.string().max(200).default(""),
         accountId: cfId.optional(),
       })
@@ -458,9 +512,13 @@ export function registerCloudflareRoutes(
     const q = new URLSearchParams({ page: String(p.page), per_page: "50" });
     if (p.q) q.set("name", p.q);
     if (p.accountId) q.set("account.id", p.accountId);
-    const accounts = await client.call(`/accounts?page=${p.page}&per_page=50`),
+    const accounts = await client.call(
+        `/accounts?page=${p.accountPage}&per_page=50`,
+      ),
       zones = await client.call(`/zones?${q}`);
     res.json({
+      accountPage: p.accountPage,
+      accountTotal: accounts.result_info?.total_count ?? accounts.result.length,
       accounts: accounts.result.map((a: any) => ({ id: a.id, name: a.name })),
       zones: zones.result.map((a: any) => ({
         id: a.id,

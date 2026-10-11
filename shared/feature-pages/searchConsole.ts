@@ -4,7 +4,7 @@ import { plansWhere } from "../plan-copy";
 import { WEBSITE_TOOLS_COMPARE } from "./cloudflare";
 
 /**
- * Search Console — half of the Agency-only "Cloudflare + Search Console" module.
+ * Search Console — half of the "Cloudflare + Search Console" module.
  *
  * Every claim below is backed by the code in `sources`:
  *   - connect with Google (its own grant, webmasters scope, separate from GBP/Calendar): server/gsc/routes.ts
@@ -21,7 +21,7 @@ import { WEBSITE_TOOLS_COMPARE } from "./cloudflare";
  *   - location Insights card (last 30 days) and Site Scan indexing card: site-connections.tsx LocationSearchSummary,
  *     ScanIndexingSummary; client/src/pages/locations.tsx; client/src/pages/site-scan.tsx
  *   - client onboarding emails: server/cloudflare/routes.ts /invites, server/cloudflare/worker.ts deliverInvite
- *   - Agency-only gate: requireModule("cloudflareSearchConsole") in server/cloudflare/routes.ts registerAssetRoutes
+ *   - Module gate: requireModule("cloudflareSearchConsole") in server/cloudflare/routes.ts registerAssetRoutes
  */
 
 const MODULE_PLAN = PLANS[planForModule("cloudflareSearchConsole")].name;

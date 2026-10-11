@@ -1,4 +1,25 @@
-import { useState, type ReactNode } from "react";
+import {
+  LoadingReport,
+  ReportError,
+  ReportTable,
+  MetricTiles,
+  ReportTrend,
+  analyticsColumns,
+  cloudflareColumns,
+  sumKnown,
+  percent,
+  position,
+  relativeTime,
+  type Column,
+} from "@/components/site-connections/report";
+import {
+  useReportParam,
+  useReportPage,
+  syncRange,
+  previewFingerprint,
+} from "@/components/site-connections/context";
+import { UrlActions } from "@/components/site-connections/url-actions";
+import { useState, useRef, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
@@ -8,10 +29,19 @@ import { Link } from "wouter";
 import { SiteConnectionGuide } from "./site-connection-guide";
 import { AppPage, Toolbar, Notice } from "@/components/app-ui";
 import { ToolTabs } from "@/components/tool";
-import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
+import {
+  GoogleSectionHeader,
+  GoogleList,
+  GoogleListRow,
+  GooglePill,
+} from "@/components/google";
 import { Search } from "lucide-react";
 import { HelpButton } from "@/components/help-button";
-import { CloudflareConnectSteps, CloudflareTokenSteps, SearchConsoleConnectSteps } from "./site-connect-steps";
+import {
+  CloudflareConnectSteps,
+  CloudflareTokenSteps,
+  SearchConsoleConnectSteps,
+} from "./site-connect-steps";
 import {
   PlanRequired,
   planRequiredFrom,
@@ -19,7 +49,7 @@ import {
 } from "@/components/plan-required";
 // Google's rounded field shape for the native selects (the surface supplies the hairline colour).
 const selectClass =
-  "h-10 w-full rounded-full border bg-background px-4 text-sm sm:w-auto";
+  "h-10 w-full rounded-full border bg-background px-4 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary sm:w-auto";
 const sampledBlocks = (snapshot: any) =>
   Array.isArray(snapshot?.events)
     ? snapshot.events.filter((e: any) => e.action === "block").length
@@ -40,7 +70,11 @@ function Field({
  * The views as the shared tab bar (components/tool/tabs.tsx); it scrolls sideways, never wraps. Plain buttons:
  * e2e reaches tabs by role "button" (e.g. getByRole("button", { name: "Work queue" })).
  */
-function TabStrip({ tabs, active, onChange }: {
+function TabStrip({
+  tabs,
+  active,
+  onChange,
+}: {
   tabs: { tab: string; helpKey: string }[];
   active: string;
   onChange: (t: string) => void;
@@ -57,7 +91,9 @@ function TabStrip({ tabs, active, onChange }: {
           testId={`tab-connection-${t.toLowerCase().replace(/\s+/g, "-")}`}
         />,
         // Each view with its "i" (what it's for, what it does, how to run it, how it works), beside its tab.
-        <span key={`${t}-help`} className="tool-tabs__aside"><HelpButton k={helpKey} /></span>,
+        <span key={`${t}-help`} className="tool-tabs__aside">
+          <HelpButton k={helpKey} />
+        </span>,
       ])}
     </ToolTabs>
   );
@@ -78,36 +114,47 @@ const SEARCH_CONSOLE_TABS = [
   { tab: "Work queue", helpKey: "search-console.work-queue" },
   { tab: "Guide", helpKey: "search-console.guide" },
 ];
-function DataList({
+export function DataList({
   url,
   title,
   render,
   filters = [],
+  columns,
 }: {
   url: string;
   title: string;
   render: (row: any) => ReactNode;
   filters?: string[];
+  columns?: Column[];
 }) {
-  const [q, Q] = useState(""),
-    [page, P] = useState(1),
-    [status, S] = useState("");
+  const [q, Q] = useReportParam(`filter.${title}`),
+    [page, P] = useReportPage(`page.${title}`),
+    [status, S] = useReportParam(`status.${title}`);
   const path = `${url}${url.includes("?") ? "&" : "?"}q=${encodeURIComponent(q)}&page=${page}&limit=25&status=${encodeURIComponent(status)}`;
   const data = useQuery({
     queryKey: [path],
     queryFn: () => read(path),
-    refetchInterval: 15000,
+    refetchInterval: pollUnlessPlanRequired(15000),
   });
   return (
     <section className="space-y-3">
-      <GoogleSectionHeader as="h3" title={title} count={data.data?.total} flush />
+      <GoogleSectionHeader
+        as="h3"
+        title={title}
+        count={data.error ? undefined : data.data?.total}
+        flush
+      />
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="g-search sm:w-80" role="search">
           <Search aria-hidden="true" />
           <input
             type="search"
             aria-label={`Search ${title}`}
-            placeholder={`Search ${title.toLowerCase()}`}
+            placeholder={
+              title === "Search analytics"
+                ? "Filter report rows…"
+                : `Filter ${title.toLowerCase()}…`
+            }
             value={q}
             onChange={(e) => {
               Q(e.target.value);
@@ -133,37 +180,58 @@ function DataList({
         )}
       </div>
       {data.isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <LoadingReport />
       ) : data.error ? (
-        <p role="alert" className="text-sm text-destructive">
-          {apiErrorMessage(data.error)}
-        </p>
+        <ReportError error={data.error} retry={() => void data.refetch()} />
       ) : (
         <>
-          <p className="text-sm g-text-2">
-            {data.data?.total ?? 0} results
-          </p>
-          <GoogleList>
-            {data.data?.items?.map((r: any, i: number) => (
-              <div
-                className="g-card"
-                key={r.id ?? r.url ?? r.path ?? `${r.date}:${r.key}:${i}`}
-              >
-                {render(r)}
-              </div>
-            ))}
-            {!data.data?.items?.length && (
-              <p className="py-6 text-sm g-text-2">
-                No data available yet.
-              </p>
-            )}
-          </GoogleList>
+          <p className="text-sm g-text-2">{data.data?.total ?? 0} results</p>
+          {data.data?.pendingJobs > 0 && (
+            <Notice tone="warning">
+              Importing history or awaiting recovery: {data.data.pendingJobs}{" "}
+              unfinished analytics jobs. Check Work queue for failures.
+            </Notice>
+          )}
+          {data.data?.syncedAt && (
+            <p className="text-sm text-muted-foreground">
+              Last updated {new Date(data.data.syncedAt).toLocaleString()}
+            </p>
+          )}
+          {columns ? (
+            <ReportTable
+              rows={data.data?.items ?? []}
+              columns={columns}
+              caption={title}
+            />
+          ) : (
+            <GoogleList>
+              {data.data?.items?.map((r: any, i: number) => (
+                <div
+                  className="g-card"
+                  key={r.id ?? r.url ?? r.path ?? `${r.date}:${r.key}:${i}`}
+                >
+                  {render(r)}
+                </div>
+              ))}
+              {!data.data?.items?.length && (
+                <p className="py-6 text-sm g-text-2">No data available yet.</p>
+              )}
+            </GoogleList>
+          )}
           <div className="flex flex-wrap items-center gap-2">
-            <GooglePill size="sm" disabled={page === 1} onClick={() => P(page - 1)} label="Previous" />
-            <span className="text-sm tabular-nums g-text-2">
-              Page {page}
-            </span>
-            <GooglePill size="sm" disabled={page * 25 >= (data.data?.total ?? 0)} onClick={() => P(page + 1)} label="Next" />
+            <GooglePill
+              size="sm"
+              disabled={page === 1}
+              onClick={() => P(page - 1)}
+              label="Previous"
+            />
+            <span className="text-sm tabular-nums g-text-2">Page {page}</span>
+            <GooglePill
+              size="sm"
+              disabled={page * 25 >= (data.data?.total ?? 0)}
+              onClick={() => P(page + 1)}
+              label="Next"
+            />
           </div>
         </>
       )}
@@ -171,17 +239,23 @@ function DataList({
   );
 }
 function MetricRows({ asset }: { asset: any }) {
-  const [dimension, D] = useState("date"),
-    [group, G] = useState("day"),
-    [start, S] = useState(
+  const [dimension, D] = useReportParam("dimension", "date"),
+    [group, G] = useReportParam("group", "day"),
+    [start, S] = useReportParam(
+      "reportStart",
       new Date(Date.now() - 31 * 86400000).toISOString().slice(0, 10),
     ),
-    [end, E] = useState(new Date().toISOString().slice(0, 10));
+    [end, E] = useReportParam(
+      "reportEnd",
+      new Date().toISOString().slice(0, 10),
+    );
   return (
     <div className="space-y-4">
       <p className="flex items-center gap-1.5 text-sm g-text-2">
-        About this data: search analytics <HelpButton k="search-console.analytics" />
-        <span aria-hidden="true">·</span> sitemaps and index checks <HelpButton k="search-console.sitemaps-indexing" />
+        About this data: search analytics{" "}
+        <HelpButton k="search-console.analytics" />
+        <span aria-hidden="true">·</span> sitemaps and index checks{" "}
+        <HelpButton k="search-console.sitemaps-indexing" />
       </p>
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
         <label className="block space-y-1.5 text-sm">
@@ -223,7 +297,9 @@ function MetricRows({ asset }: { asset: any }) {
           onChange={(e) => E(e.target.value)}
         />
       </div>
+      <SearchOverview id={asset.id} start={start} end={end} />
       <DataList
+        columns={analyticsColumns}
         key={`${dimension}:${group}:${start}:${end}`}
         title="Search analytics"
         url={`/api/gsc/assets/${asset.id}/analytics?dimension=${dimension}&group=${group}&start=${start}&end=${end}`}
@@ -283,12 +359,14 @@ function MetricRows({ asset }: { asset: any }) {
   );
 }
 export function LocationSearchSummary({ locationId }: { locationId: number }) {
-  const { data, error } = useQuery({
+  const { data, error, isLoading, refetch } = useQuery({
     queryKey: [`/api/gsc/locations/${locationId}/summary`],
   });
   const s = (data as any)?.search;
-  // Search Console is an Agency-plan module; without it this location card has nothing honest to show.
+  // The containing location page remains useful without this optional module.
   if (planRequiredFrom(error)) return null;
+  if (isLoading) return <LoadingReport />;
+  if (error) return <ReportError error={error} retry={() => void refetch()} />;
   return (
     <Card>
       <CardContent className="p-4">
@@ -315,18 +393,19 @@ export default function SiteConnections({
   const cf = provider === "cloudflare",
     base = `/api/${provider}`,
     { toast } = useToast();
-  const [tab, T] = useState("Sites"),
+  const [tab, T] = useReportParam("tab", "Sites"),
     [selected, Select] = useState<number[]>([]),
     [connection, C] = useState<number | null>(null),
-    [asset, A] = useState<any>(null),
-    [q, Q] = useState(""),
-    [page, P] = useState(1),
-    [status, Status] = useState("");
+    [assetId, setAssetId] = useReportParam("site"),
+    [q, Q] = useReportParam("sitesQuery"),
+    [page, P] = useReportPage("sitesPage"),
+    [status, Status] = useReportParam("sitesStatus");
   const [email, Email] = useState(""),
     [key, Key] = useState(""),
     [token, Token] = useState(""),
     [zones, Z] = useState<any>(null),
     [zonePage, ZP] = useState(1),
+    [accountPage, setAccountPage] = useState(1),
     [zoneSearch, ZS] = useState(""),
     [zoneIds, ZI] = useState<string[]>([]);
   const [busy, B] = useState(false),
@@ -335,10 +414,34 @@ export default function SiteConnections({
     [path, Path] = useState("/ads"),
     [ips, Ips] = useState(""),
     [officeIps, OfficeIps] = useState(""),
-    [urls, Urls] = useState(""),
     [inviteRows, Invites] = useState(""),
-    [start, Start] = useState(""),
-    [end, End] = useState("");
+    [start, Start] = useReportParam("syncStart"),
+    [end, End] = useReportParam("syncEnd");
+  const [detailTab, setDetailTab] = useReportParam("detail", "Overview");
+  const detail = useQuery<any>({
+    queryKey: [`${base}/assets/${assetId}`],
+    enabled: !!assetId,
+    refetchInterval: pollUnlessPlanRequired(15000),
+  });
+  const asset = detail.error ? null : detail.data;
+  const A = (a: any) => {
+    setAssetId(a ? String(a.id) : "");
+    if (a) Select([a.id]);
+  };
+  const [queuedIds, setQueuedIds] = useState<number[]>([]);
+  const [actionError, setActionError] = useState<unknown>(null);
+  const [previewKey, setPreviewKey] = useState("");
+  const previewIds = asset ? [asset.id] : selected;
+  const fingerprint = previewFingerprint(
+    previewIds,
+    pack,
+    path,
+    ips,
+    officeIps,
+  );
+  const currentFingerprint = useRef(fingerprint);
+  currentFingerprint.current = fingerprint;
+  const previewValid = previewKey === fingerprint;
   const listUrl = `${base}/assets?q=${encodeURIComponent(q)}&page=${page}&limit=25&status=${status}`;
   const assets = useQuery({
     queryKey: [listUrl],
@@ -349,9 +452,12 @@ export default function SiteConnections({
     queryKey: [`${base}/connections?limit=1`],
     queryFn: () => read(`${base}/connections?limit=1`),
   });
-  const planGate = [config.error, assets.error].find((e) => planRequiredFrom(e));
+  const planGate = [config.error, assets.error, actionError].find((e) =>
+    planRequiredFrom(e),
+  );
   async function act(fn: () => Promise<any>, title = "Request saved") {
     B(true);
+    setActionError(null);
     try {
       const r = await fn();
       await queryClient.invalidateQueries({
@@ -367,6 +473,7 @@ export default function SiteConnections({
       });
       return r;
     } catch (e) {
+      setActionError(e);
       toast({
         title: "Could not complete request",
         description: apiErrorMessage(e),
@@ -385,20 +492,32 @@ export default function SiteConnections({
         ? selected.filter((x) => x !== id)
         : [...selected, id],
     );
-  async function discover(p: number) {
-    ZP(p);
+  async function discover(p: number, accounts = accountPage) {
     const d = await act(
-      () => post("/key-discovery", { email, key, page: p, q: zoneSearch }),
+      () =>
+        post("/key-discovery", {
+          email,
+          key,
+          page: p,
+          accountPage: accounts,
+          q: zoneSearch,
+        }),
       "Cloudflare zones loaded",
     );
-    if (d) Z(d);
+    if (d) {
+      Z(d);
+      ZP(p);
+      setAccountPage(accounts);
+    }
   }
   // Google's format (owner, 2026-10-07): a quiet page title, the views as pills, hairline lists, pill actions.
   const header = (
     <GoogleSectionHeader
       as="h1"
       title={cf ? "Cloudflare protection" : "Google Search Console"}
-      titleAfter={cf ? <HelpButton k="cloudflare" /> : <HelpButton k="search-console" />}
+      titleAfter={
+        cf ? <HelpButton k="cloudflare" /> : <HelpButton k="search-console" />
+      }
       description={
         cf
           ? "Connect client accounts, inspect traffic, and review changes before blocking at the edge."
@@ -422,24 +541,36 @@ export default function SiteConnections({
   return (
     <AppPage testId={`page-site-connections-${provider}`}>
       {header}
+      {config.error && (
+        <ReportError error={config.error} retry={() => void config.refetch()} />
+      )}
+      {config.isLoading && <LoadingReport />}
       {config.data?.workerEnabled === false && (
         <Notice tone="warning">
           Background processing is disabled. Queued work will wait until the
           owner enables the site integration worker.
         </Notice>
       )}
-      {new URLSearchParams(window.location.search).get("connection") ===
-        "failed" && (
-        <Notice tone="danger">
-          Google consent failed. Reconnect and grant Search Console access.
-        </Notice>
-      )}
+      {!cf &&
+        new URLSearchParams(window.location.search).get("connection") ===
+          "failed" && (
+          <Notice tone="danger">
+            Google consent failed. Reconnect and grant Search Console access.
+          </Notice>
+        )}
       {/* Nothing connected yet: say so first and take them to the steps (on a phone the Sites tab's own prompt is below the fold). */}
       {config.data && !(config.data.total > 0) && tab !== "Connections" && (
-        <div className="g-callout mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" data-testid="connect-first-prompt">
+        <div
+          className="g-callout mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+          data-testid="connect-first-prompt"
+        >
           <p className="text-[14px] leading-5 g-text">
-            {cf ? "Start here: connect your Cloudflare account." : "Start here: connect Google Search Console."}{" "}
-            <span className="g-text-2">It takes about two minutes and the steps are spelled out.</span>
+            {cf
+              ? "Start here: connect your Cloudflare account."
+              : "Start here: connect Google Search Console."}{" "}
+            <span className="g-text-2">
+              It takes about two minutes and the steps are spelled out.
+            </span>
           </p>
           <GooglePill
             variant="solid"
@@ -465,9 +596,11 @@ export default function SiteConnections({
             />
             {/* Click-by-click: most people have never fetched a key from Cloudflare (owner, 2026-10-07). */}
             <div className="mb-4">
-              {cf
-                ? <CloudflareConnectSteps open={!(config.data?.total > 0)} />
-                : <SearchConsoleConnectSteps open={!(config.data?.total > 0)} />}
+              {cf ? (
+                <CloudflareConnectSteps open={!(config.data?.total > 0)} />
+              ) : (
+                <SearchConsoleConnectSteps open={!(config.data?.total > 0)} />
+              )}
             </div>
             {cf ? (
               <div className="space-y-4">
@@ -508,6 +641,23 @@ export default function SiteConnections({
                         Account: {a.name}
                       </p>
                     ))}
+                    <div className="flex flex-wrap gap-2">
+                      <GooglePill
+                        label="Previous accounts"
+                        disabled={busy || accountPage === 1}
+                        onClick={() => discover(zonePage, accountPage - 1)}
+                      />
+                      <span className="text-sm">
+                        Accounts page {accountPage}
+                      </span>
+                      <GooglePill
+                        label="Next accounts"
+                        disabled={
+                          busy || accountPage * 50 >= zones.accountTotal
+                        }
+                        onClick={() => discover(zonePage, accountPage + 1)}
+                      />
+                    </div>
                     {zones.zones.map((z: any) => (
                       <label className="flex gap-2 text-sm" key={z.id}>
                         <input
@@ -641,9 +791,7 @@ export default function SiteConnections({
                     />
                     <b>{c.email ?? c.subject}</b>
                   </label>
-                  <p className="text-sm g-text-2">
-                    {c.token_name ?? c.method}
-                  </p>
+                  <p className="text-sm g-text-2">{c.token_name ?? c.method}</p>
                   <p className="text-sm g-text-2">
                     {c.permissions
                       ?.map((p: any) =>
@@ -693,372 +841,480 @@ export default function SiteConnections({
       )}
       {tab === "Sites" && (
         <div className="space-y-4 sm:space-y-5">
-          <Toolbar
-            search={{
-              value: q,
-              onChange: (v) => {
-                Q(v);
-                P(1);
-                Select([]);
-              },
-              placeholder: "Search sites",
-            }}
-            activeFilters={status ? 1 : 0}
-            filters={
-              <select
-                aria-label="Site status"
-                className={selectClass}
-                value={status}
-                onChange={(e) => {
-                  Status(e.target.value);
-                  P(1);
-                  Select([]);
-                }}
-              >
-                <option value="">All statuses</option>
-                {(cf
-                  ? ["active", "pending"]
-                  : [
-                      "siteOwner",
-                      "siteFullUser",
-                      "siteRestrictedUser",
-                      "access_removed",
-                    ]
-                ).map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
-            }
-          />
-          <div className="flex flex-wrap items-end gap-3">
-            {!cf && (
-              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
-                <span className="order-last self-start sm:self-end sm:pb-3"><HelpButton k="search-console.sync-range" /></span>
-                <Field
-                  label="Sync from (up to 16 months)"
-                  type="date"
-                  value={start}
-                  onChange={(e) => Start(e.target.value)}
-                />
-                <Field
-                  label="Sync through"
-                  type="date"
-                  value={end}
-                  onChange={(e) => End(e.target.value)}
-                />
-              </div>
-            )}
-            <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row">
-              <GooglePill
-                variant="solid"
-                disabled={busy || !selected.length}
-                className="w-full sm:w-auto"
-                onClick={() =>
-                  act(() =>
-                    post("/sync", {
-                      ids: selected,
-                      ...(!cf && start ? { start, end: end || undefined } : {}),
-                    }),
-                  )
-                }
-                label={`Sync selected (${selected.length})`}
+          {!cf && (
+            <fieldset className="flex flex-col gap-2 rounded-xl border p-3 sm:flex-row sm:flex-wrap sm:items-end">
+              <legend className="px-1 text-sm font-medium">
+                Import date range
+              </legend>
+              <span className="order-last self-start sm:self-end sm:pb-3">
+                <HelpButton k="search-console.sync-range" />
+              </span>
+              <Field
+                label="Sync from (up to 16 months)"
+                type="date"
+                value={start}
+                onChange={(e) => Start(e.target.value)}
               />
-              <GooglePill
-                disabled={busy || !assets.data?.total}
-                className="w-full sm:w-auto"
-                onClick={() =>
-                  act(() =>
-                    post("/sync", {
-                      allMatching: true,
-                      q,
-                      status,
-                      ...(!cf && start ? { start, end: end || undefined } : {}),
-                    }),
-                  )
-                }
-                label="Sync all matching sites"
+              <Field
+                label="Sync through"
+                type="date"
+                value={end}
+                onChange={(e) => End(e.target.value)}
               />
-            </div>
-          </div>
-          {assets.error ? (
-            <p role="alert" className="text-sm text-destructive">
-              {apiErrorMessage(assets.error)}
-            </p>
-          ) : assets.isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading sites…</p>
-          ) : (
-            <>
-              <p className="text-sm g-text-2">
-                {assets.data?.total ?? 0} sites
-              </p>
-              <label className="flex gap-2 text-sm g-text-2">
-                <input
-                  type="checkbox"
-                  aria-label="Select this page"
-                  checked={
-                    !!assets.data?.items.length &&
-                    assets.data.items.every((a: any) =>
-                      selected.includes(a.id),
-                    )
-                  }
-                  onChange={(e) =>
-                    Select(
-                      e.target.checked
-                        ? assets.data.items.map((a: any) => a.id)
-                        : [],
-                    )
-                  }
-                />
-                Select this page
-              </label>
-              {assets.data?.items.length ? (
-                <GoogleList testId={`list-sites-${provider}`}>
-                  {assets.data.items.map((a: any) => (
-                    <GoogleListRow
-                      key={a.id}
-                      size="md"
-                      title={
-                        <span className="inline-flex items-center gap-3">
-                          <input
-                            type="checkbox"
-                            aria-label={`Select ${a.name}`}
-                            checked={selected.includes(a.id)}
-                            onChange={() => toggle(a.id)}
-                          />
-                          <button type="button" onClick={() => A(a)}>{a.name}</button>
-                        </span>
-                      }
-                      meta={[
-                        `ID ${a.id}`,
-                        a.status,
-                        `${a.locations} linked locations`,
-                        a.synced_at
-                          ? `Synced ${new Date(a.synced_at).toLocaleString()}`
-                          : "Not synced",
-                      ]}
-                      line={a.error ? <span role="alert" className="g-closed">{a.error}</span> : undefined}
-                      trailing={
-                        <GooglePill
-                          size="sm"
-                          disabled={busy}
-                          onClick={() => act(() => post("/sync", { ids: [a.id] }))}
-                          label="Sync"
-                        />
-                      }
-                    />
-                  ))}
-                </GoogleList>
-              ) : (
-                <div className="py-6 space-y-3">
-                  <p className="text-sm g-text-2">
-                    No connected sites yet. Connect {cf ? "your Cloudflare account" : "Google Search Console"} first — the steps are on the Connections tab.
-                  </p>
-                  <GooglePill
-                    variant="solid"
-                    label={cf ? "Connect Cloudflare — show me how" : "Connect Search Console — show me how"}
-                    onClick={() => T("Connections")}
-                    testId="button-open-connect-steps"
-                  />
-                </div>
-              )}
-              <div className="flex flex-wrap items-center gap-2">
-                <GooglePill size="sm" disabled={page === 1} onClick={() => P(page - 1)} label="Previous sites" />
-                <span className="text-sm tabular-nums g-text-2">
-                  Page {page}
-                </span>
-                <GooglePill size="sm" disabled={page * 25 >= (assets.data?.total ?? 0)} onClick={() => P(page + 1)} label="Next sites" />
-              </div>
-            </>
+            </fieldset>
           )}
-          {cf ? (
-            <section>
-              <GoogleSectionHeader
-                title="Preview edge protection for selected zones"
-                titleAfter={<HelpButton k="cloudflare.protection" />}
-                description="Review Click Guard / VPN Shield findings before adding IPs. Rules affect visitors."
+
+          {assetId && detail.isLoading && <LoadingReport />}
+          {assetId && detail.error && (
+            <>
+              <ReportError
+                error={detail.error}
+                retry={() => void detail.refetch()}
               />
-              <div className="space-y-3">
-                <select
-                  aria-label="Rule pack"
-                  className={selectClass}
-                  value={pack}
-                  onChange={(e) => Pack(e.target.value)}
-                >
-                  <option value="ads-door">Ads door</option>
-                  <option value="bad-ua">Site-wide bad user agents</option>
-                  <option value="ips">Flagged IPs</option>
-                </select>
-                <Field
-                  label="Ads path"
-                  value={path}
-                  onChange={(e) => Path(e.target.value)}
-                />
-                <Field
-                  label="Flagged IP addresses (comma separated)"
-                  value={ips}
-                  onChange={(e) => Ips(e.target.value)}
-                />
-                <Field
-                  label="Office IP exemptions (comma separated)"
-                  value={officeIps}
-                  onChange={(e) => OfficeIps(e.target.value)}
-                />
-                <p className="text-sm text-muted-foreground">
-                  Check office-IP exemptions in Cloudflare first.
-                </p>
-                <GooglePill
-                  label="Preview rules"
-                  disabled={busy || !selected.length}
-                  onClick={async () => {
-                    const d = await act(
-                      () =>
-                        post("/preview", {
-                          ids: selected,
-                          kind: pack,
-                          path,
-                          officeIps: officeIps
-                            .split(",")
-                            .map((x) => x.trim())
-                            .filter(Boolean),
-                          ips: ips
-                            .split(",")
-                            .map((x) => x.trim())
-                            .filter(Boolean),
-                        }),
-                      "Preview ready",
-                    );
-                    if (d) Preview(d.items);
-                  }}
-                />
-                {preview.length > 0 && (
-                  <div className="space-y-3 rounded-lg border p-4">
-                    <h3 className="g-card__title g-card__title--md">
-                      Review before applying
-                    </h3>
-                    {preview.map((p) => (
-                      <div key={p.id} className="text-sm">
-                        <b>{p.zone}</b>
-                        <p className="text-muted-foreground">{p.warning}</p>
-                        {p.rules.map((r: any, i: number) => (
-                          <div key={i}>
-                            <p>{r.rule.description}</p>
-                            <code className="break-all text-xs">
-                              {r.rule.expression}
-                            </code>
-                          </div>
-                        ))}
-                      </div>
-                    ))}
-                    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                      <GooglePill
-                        variant="danger"
-                        label="Confirm and queue edge changes"
-                        disabled={busy}
-                        onClick={async () => {
-                          const r = await act(
-                            () =>
-                              post("/confirm", {
-                                ids: preview.map((p) => p.id),
-                              }),
-                            "Protection queued",
-                          );
-                          if (r) Preview([]);
-                        }}
-                      />
-                      <GooglePill onClick={() => Preview([])} label="Cancel preview" />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </section>
-          ) : (
-            <section>
-              <GoogleSectionHeader
-                title="Bulk sitemap submission or inspection"
-                titleAfter={<HelpButton k="search-console.sitemaps-indexing" />}
-                description="One property ID and URL per line, separated by a comma. URLs must belong to the property."
-              />
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Selected IDs: {selected.join(", ") || "None"}.
-                </p>
-                <textarea
-                  className="w-full rounded-lg border bg-background p-3 text-sm"
-                  aria-label="Property IDs and URLs"
-                  rows={4}
-                  value={urls}
-                  onChange={(e) => Urls(e.target.value)}
-                  placeholder="123, https://example.com/sitemap.xml"
-                />
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  {["inspect", "sitemap"].map((kind) => (
-                    <GooglePill
-                      key={kind}
-                      className="w-full sm:w-auto"
-                      disabled={busy || !urls.trim()}
-                      label={kind === "inspect"
-                        ? "Queue inspections"
-                        : "Review and submit sitemaps"}
-                      onClick={() => {
-                        if (
-                          kind === "sitemap" &&
-                          !window.confirm(
-                            "Submit these sitemaps to Google?",
-                          )
-                        )
-                          return;
-                        act(() =>
-                          post("/urls", {
-                            kind,
-                            confirm: kind === "sitemap",
-                            items: urls
-                              .trim()
-                              .split("\n")
-                              .map((line) => {
-                                const [id, ...rest] = line.split(",");
-                                return {
-                                  assetId: Number(id),
-                                  url: rest.join(",").trim(),
-                                };
-                              }),
-                          }),
-                        );
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-            </section>
+              <GooglePill label="Return to sites" onClick={() => A(null)} />
+            </>
           )}
           {asset && (
             <section>
               <GoogleSectionHeader
                 title={asset.name}
-                actions={<GooglePill variant="quiet" size="sm" onClick={() => A(null)} label="Close details" />}
+                actions={
+                  <GooglePill
+                    variant="quiet"
+                    size="sm"
+                    onClick={() => A(null)}
+                    label="Close details"
+                  />
+                }
+              />
+              {cf && (
+                <ToolTabs as="group" label="Selected site views">
+                  {["Overview", "Protection", "Activity"].map((t) => (
+                    <GooglePill
+                      key={t}
+                      label={t}
+                      selected={detailTab === t}
+                      ariaPressed={detailTab === t}
+                      onClick={() => {
+                        setDetailTab(t);
+                        if (t === "Protection") Select([asset.id]);
+                      }}
+                    />
+                  ))}
+                </ToolTabs>
+              )}
+              <DatasetStatus
+                provider={provider}
+                id={asset.id}
+                onSync={() =>
+                  act(
+                    () =>
+                      post("/sync", {
+                        ids: [asset.id],
+                        ...(!cf ? syncRange(start, end) : {}),
+                      }),
+                    "Sync queued",
+                  )
+                }
+                busy={busy}
               />
               {cf ? (
-                <CloudflareDetails
-                  id={asset.id}
-                  onFlag={(ip) => {
-                    Ips(ips ? `${ips}, ${ip}` : ip);
-                    Pack("ips");
-                    Select([asset.id]);
-                  }}
-                />
+                detailTab === "Overview" && (
+                  <CloudflareDetails
+                    id={asset.id}
+                    onFlag={(ip) => {
+                      Ips(ips ? `${ips}, ${ip}` : ip);
+                      Pack("ips");
+                      Select([asset.id]);
+                      setDetailTab("Protection");
+                    }}
+                  />
+                )
               ) : (
                 <MetricRows key={asset.id} asset={asset} />
               )}
+              {!cf && (
+                <UrlActions
+                  key={asset.id}
+                  assets={[asset]}
+                  busy={busy}
+                  submit={(body) =>
+                    act(() => post("/urls", body), "URL work queued")
+                  }
+                />
+              )}
+              {cf && detailTab === "Activity" && (
+                <DataList
+                  title="Site activity"
+                  url={`${base}/assets/${asset.id}/activity`}
+                  render={(j) => (
+                    <div className="text-sm">
+                      <b>
+                        {j.kind} · {j.state}
+                      </b>
+                      <p>
+                        {j.finished_at
+                          ? new Date(j.finished_at).toLocaleString()
+                          : "Not completed"}
+                      </p>
+                      {j.error && <p className="text-destructive">{j.error}</p>}
+                    </div>
+                  )}
+                />
+              )}
             </section>
           )}
+          {!assetId && (
+            <>
+              <Toolbar
+                search={{
+                  value: q,
+                  onChange: (v) => {
+                    Q(v);
+                    P(1);
+                    Select([]);
+                  },
+                  placeholder: "Search sites…",
+                }}
+                activeFilters={status ? 1 : 0}
+                filters={
+                  <select
+                    aria-label="Site status"
+                    className={selectClass}
+                    value={status}
+                    onChange={(e) => {
+                      Status(e.target.value);
+                      P(1);
+                      Select([]);
+                    }}
+                  >
+                    <option value="">All statuses</option>
+                    {(cf
+                      ? ["active", "pending"]
+                      : [
+                          "siteOwner",
+                          "siteFullUser",
+                          "siteRestrictedUser",
+                          "access_removed",
+                        ]
+                    ).map((s) => (
+                      <option key={s}>{s}</option>
+                    ))}
+                  </select>
+                }
+              />
+            </>
+          )}
+          <div className="flex flex-wrap items-end gap-3">
+            {!assetId && (
+              <div className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row">
+                <GooglePill
+                  variant="solid"
+                  disabled={busy || !selected.length}
+                  className="w-full sm:w-auto"
+                  onClick={() =>
+                    act(() =>
+                      post("/sync", {
+                        ids: selected,
+                        ...(!cf ? syncRange(start, end) : {}),
+                      }),
+                    )
+                  }
+                  label={`Sync selected (${selected.length})`}
+                />
+                <GooglePill
+                  disabled={busy || !assets.data?.total}
+                  className="w-full sm:w-auto"
+                  onClick={() =>
+                    act(() =>
+                      post("/sync", {
+                        allMatching: true,
+                        q,
+                        status,
+                        ...(!cf ? syncRange(start, end) : {}),
+                      }),
+                    )
+                  }
+                  label="Sync all matching sites"
+                />
+              </div>
+            )}
+          </div>
+          {!assetId && (
+            <>
+              {assets.error ? (
+                <ReportError
+                  error={assets.error}
+                  retry={() => void assets.refetch()}
+                />
+              ) : assets.isLoading ? (
+                <LoadingReport />
+              ) : (
+                <>
+                  <p className="text-sm g-text-2">
+                    {assets.data?.total ?? 0} sites
+                  </p>
+                  <label className="flex gap-2 text-sm g-text-2">
+                    <input
+                      type="checkbox"
+                      aria-label="Select this page"
+                      checked={
+                        !!assets.data?.items.length &&
+                        assets.data.items.every((a: any) =>
+                          selected.includes(a.id),
+                        )
+                      }
+                      onChange={(e) =>
+                        Select(
+                          e.target.checked
+                            ? assets.data.items.map((a: any) => a.id)
+                            : [],
+                        )
+                      }
+                    />
+                    Select this page
+                  </label>
+                  {assets.data?.items.length ? (
+                    <GoogleList testId={`list-sites-${provider}`}>
+                      {assets.data.items.map((a: any) => (
+                        <GoogleListRow
+                          key={a.id}
+                          size="md"
+                          title={
+                            <span className="inline-flex items-center gap-3">
+                              <input
+                                type="checkbox"
+                                aria-label={`Select ${a.name}`}
+                                checked={selected.includes(a.id)}
+                                onChange={() => toggle(a.id)}
+                              />
+                              <button
+                                className="rounded text-left text-primary underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                                type="button"
+                                onClick={() => A(a)}
+                              >
+                                {a.name}
+                              </button>
+                            </span>
+                          }
+                          meta={[
+                            a.status,
+                            `${a.locations} linked locations`,
+                            a.synced_at
+                              ? `${cf ? "Analytics" : "Sitemaps"} updated ${new Date(a.synced_at).toLocaleString()}`
+                              : "Not synced",
+                          ]}
+                          line={
+                            a.error ? (
+                              <span role="alert" className="g-closed">
+                                {a.error}
+                              </span>
+                            ) : undefined
+                          }
+                          trailing={
+                            <GooglePill
+                              size="sm"
+                              disabled={busy}
+                              onClick={async () => {
+                                const result = await act(
+                                  () =>
+                                    post("/sync", {
+                                      ids: [a.id],
+                                      ...(!cf ? syncRange(start, end) : {}),
+                                    }),
+                                  "Sync queued",
+                                );
+                                if (result)
+                                  setQueuedIds((ids) => [...ids, a.id]);
+                              }}
+                              label={
+                                queuedIds.includes(a.id)
+                                  ? "Sync requested · sync again"
+                                  : "Sync"
+                              }
+                            />
+                          }
+                        />
+                      ))}
+                    </GoogleList>
+                  ) : (
+                    <div className="py-6 space-y-3">
+                      <p className="text-sm g-text-2">
+                        No connected sites yet. Connect{" "}
+                        {cf
+                          ? "your Cloudflare account"
+                          : "Google Search Console"}{" "}
+                        first — the steps are on the Connections tab.
+                      </p>
+                      <GooglePill
+                        variant="solid"
+                        label={
+                          cf
+                            ? "Connect Cloudflare — show me how"
+                            : "Connect Search Console — show me how"
+                        }
+                        onClick={() => T("Connections")}
+                        testId="button-open-connect-steps"
+                      />
+                    </div>
+                  )}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <GooglePill
+                      size="sm"
+                      disabled={page === 1}
+                      onClick={() => P(page - 1)}
+                      label="Previous sites"
+                    />
+                    <span className="text-sm tabular-nums g-text-2">
+                      Page {page}
+                    </span>
+                    <GooglePill
+                      size="sm"
+                      disabled={page * 25 >= (assets.data?.total ?? 0)}
+                      onClick={() => P(page + 1)}
+                      label="Next sites"
+                    />
+                  </div>
+                </>
+              )}
+            </>
+          )}
+          {cf
+            ? (!assetId || (asset && detailTab === "Protection")) && (
+                <section>
+                  <GoogleSectionHeader
+                    title="Preview edge protection for selected zones"
+                    titleAfter={<HelpButton k="cloudflare.protection" />}
+                    description="Review Click Guard / VPN Shield findings before adding IPs. Rules affect visitors."
+                  />
+                  <div className="space-y-3">
+                    <select
+                      aria-label="Rule pack"
+                      className={selectClass}
+                      value={pack}
+                      onChange={(e) => Pack(e.target.value)}
+                    >
+                      <option value="ads-door">Ads door</option>
+                      <option value="bad-ua">Site-wide bad user agents</option>
+                      <option value="ips">Flagged IPs</option>
+                    </select>
+                    <Field
+                      label="Ads path"
+                      value={path}
+                      onChange={(e) => Path(e.target.value)}
+                    />
+                    <Field
+                      label="Flagged IP addresses (comma separated)"
+                      value={ips}
+                      onChange={(e) => Ips(e.target.value)}
+                    />
+                    <Field
+                      label="Office IP exemptions (comma separated)"
+                      value={officeIps}
+                      onChange={(e) => OfficeIps(e.target.value)}
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Check office-IP exemptions in Cloudflare first.
+                    </p>
+                    <GooglePill
+                      label="Preview rules"
+                      disabled={busy || !previewIds.length}
+                      onClick={async () => {
+                        const d = await act(
+                          () =>
+                            post("/preview", {
+                              ids: previewIds,
+                              kind: pack,
+                              path,
+                              officeIps: officeIps
+                                .split(",")
+                                .map((x) => x.trim())
+                                .filter(Boolean),
+                              ips: ips
+                                .split(",")
+                                .map((x) => x.trim())
+                                .filter(Boolean),
+                            }),
+                          "Preview ready",
+                        );
+                        if (d && currentFingerprint.current === fingerprint) {
+                          Preview(d.items);
+                          setPreviewKey(fingerprint);
+                        }
+                      }}
+                    />
+                    {preview.length > 0 && !previewValid && (
+                      <Notice tone="warning">
+                        Inputs changed. Preview these rules again before
+                        confirming.
+                      </Notice>
+                    )}
+                    {preview.length > 0 && previewValid && (
+                      <div className="space-y-3 rounded-lg border p-4">
+                        <h3 className="g-card__title g-card__title--md">
+                          Review before applying
+                        </h3>
+                        {preview.map((p) => (
+                          <div key={p.id} className="text-sm">
+                            <b>{p.zone}</b>
+                            <p className="text-muted-foreground">{p.warning}</p>
+                            {p.rules.map((r: any, i: number) => (
+                              <div key={i}>
+                                <p>{r.rule.description}</p>
+                                <code className="break-all text-xs">
+                                  {r.rule.expression}
+                                </code>
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                          <GooglePill
+                            variant="danger"
+                            label="Confirm and queue edge changes"
+                            disabled={busy}
+                            onClick={async () => {
+                              const r = await act(
+                                () =>
+                                  post("/confirm", {
+                                    ids: preview.map((p) => p.id),
+                                  }),
+                                "Protection queued",
+                              );
+                              if (r) Preview([]);
+                            }}
+                          />
+                          <GooglePill
+                            onClick={() => Preview([])}
+                            label="Cancel preview"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              )
+            : !assetId &&
+              !assets.error &&
+              !assets.isLoading && (
+                <UrlActions
+                  key="inventory"
+                  assets={assets.data?.items ?? []}
+                  busy={busy}
+                  submit={(body) =>
+                    act(() => post("/urls", body), "URL work queued")
+                  }
+                />
+              )}
         </div>
       )}
       {tab === "Onboarding" && (
         <div className="space-y-5">
           <p className="text-sm text-muted-foreground">
             Select a connection under Connections, then enter one client per
-            line: email, location ID{cf ? ", Cloudflare account ID" : ""}.
-            Email goes to the client with steps to grant access. Active
-            connection: {connection ?? "None"}.
+            line: email, location ID{cf ? ", Cloudflare account ID" : ""}. Email
+            goes to the client with steps to grant access. Active connection:{" "}
+            {connection ?? "None"}.
           </p>
           <DataList
             title="Locations"
@@ -1142,14 +1398,20 @@ export default function SiteConnections({
                 {a.name} · {a.kind} · {a.state}
               </b>
               <p className="text-muted-foreground">
-                {new Date(a.created_at).toLocaleString()}
+                <time
+                  dateTime={a.created_at}
+                  title={new Date(a.created_at).toLocaleString()}
+                >
+                  {relativeTime(a.created_at)}
+                </time>
               </p>
               <p className="text-muted-foreground">
-                Before snapshot: {a.preview.before?.until ?? "Unavailable"} ·
-                Latest snapshot: {a.after?.until ?? "Unavailable"}. Latest-event
-                sample blocks: {sampledBlocks(a.preview.before) ?? "Unavailable"}{" "}
-                before / {sampledBlocks(a.after) ?? "Unavailable"} latest. Sync
-                after applying; sampled events do not prove causation.
+                {sampledBlocks(a.preview.before) ?? "Unknown number of"} blocked
+                requests sampled before the change;{" "}
+                {sampledBlocks(a.after) ?? "unknown number of"} in the latest
+                snapshot. Latest snapshot: {relativeTime(a.after?.until)}. Sync
+                after applying. Samples do not prove the change caused a
+                difference.
               </p>
               {["applied", "uncertain"].includes(a.state) && (
                 <GooglePill
@@ -1175,71 +1437,101 @@ function CloudflareDetails({
   id: number;
   onFlag: (ip: string) => void;
 }) {
-  const { data, error } = useQuery({
+  const query = useQuery<any>({
     queryKey: [`/api/cloudflare/assets/${id}`],
+    refetchInterval: pollUnlessPlanRequired(15000),
   });
-  const d = (data as any)?.data;
-  if (error) return <p className="text-sm text-destructive">{apiErrorMessage(error)}</p>;
-  if (!d)
+  const d = query.data?.data;
+  if (query.isLoading) return <LoadingReport />;
+  if (query.error)
     return (
-      <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          Analytics unavailable. Queue a sync and check Work queue.
-        </p>
+      <ReportError error={query.error} retry={() => void query.refetch()} />
+    );
+  return (
+    <div className="space-y-4">
+      {!d ? (
+        <Notice>
+          Analytics have not been imported. Sync this site to retrieve its
+          available reports.
+        </Notice>
+      ) : (
+        <>
+          <p className="text-sm text-muted-foreground">
+            {d.since ? new Date(d.since).toLocaleString() : "Unknown start"} –{" "}
+            {d.until ? new Date(d.until).toLocaleString() : "Unknown end"}.{" "}
+            {d.notice}
+          </p>
+          <MetricTiles
+            metrics={[
+              {
+                label: "Requests (UTC days)",
+                value: sumKnown(d.traffic, "requests"),
+              },
+              {
+                label: "Threats (UTC days)",
+                value: sumKnown(d.traffic, "threats"),
+              },
+              {
+                label: "Page views (UTC days)",
+                value: sumKnown(d.traffic, "pageViews"),
+              },
+              {
+                label: "Bot share of scored requests",
+                value: percent(d.botShare),
+              },
+            ]}
+          />
+          <ReportTrend
+            rows={d.traffic ?? []}
+            label="Requests by UTC day"
+            date={(r) => r.dimensions?.date}
+            value={(r) => r.sum?.requests}
+          />
+          {Object.keys(cloudflareColumns).map((field) => (
+            <section key={field} className="space-y-2">
+              {d[field] == null ? (
+                <Notice>
+                  {field}: unavailable from Cloudflare with the current
+                  permissions or plan.
+                </Notice>
+              ) : (
+                <DataList
+                  title={field[0].toUpperCase() + field.slice(1)}
+                  url={`/api/cloudflare/assets/${id}/cache?field=${field}`}
+                  columns={cloudflareColumns[field]}
+                  render={() => null}
+                />
+              )}
+              {field === "countries" && (
+                <a
+                  href="#flagged-ips"
+                  className="text-sm text-primary underline"
+                >
+                  Review flagged IPs for this site
+                </a>
+              )}
+            </section>
+          ))}
+        </>
+      )}
+      <div id="flagged-ips">
         <DataList
           title="Flagged IPs"
           url={`/api/cloudflare/assets/${id}/flagged-ips`}
           render={(r) => (
-            <p className="text-sm text-muted-foreground">
-              {r.ip_address} · {r.source} · {r.reason}{" "}
-              <GooglePill size="sm" onClick={() => onFlag(r.ip_address)} label="Add to preview" />
-            </p>
+            <div className="space-y-2 text-sm">
+              <p>
+                {r.ip_address} · {r.source} · {r.reason}
+              </p>
+              <GooglePill
+                size="sm"
+                onClick={() => onFlag(r.ip_address)}
+                label="Add to preview"
+              />
+            </div>
           )}
         />
       </div>
-    );
-  return (
-    <div className="space-y-4">
-      <p className="text-sm">{d.notice}</p>
-      <DataList
-        title="Flagged IPs"
-        url={`/api/cloudflare/assets/${id}/flagged-ips`}
-        render={(r) => (
-          <p className="text-sm text-muted-foreground">
-            {r.ip_address} · {r.source} · {r.reason}{" "}
-            <GooglePill size="sm" onClick={() => onFlag(r.ip_address)} label="Add to preview" />
-          </p>
-        )}
-      />
-      <p className="text-sm text-muted-foreground">
-        Bot traffic share (score 1–29 among scored requests):{" "}
-        {d.botShare == null
-          ? "Unavailable on this plan or permission set"
-          : `${(d.botShare * 100).toFixed(1)}%`}
-      </p>
-      <GoogleList>
-        {d.traffic?.map((day: any) => (
-          <p key={day.dimensions?.date} className="g-card text-sm g-text-2">
-            <b className="text-foreground">{day.dimensions?.date} UTC</b> ·
-            Requests: {day.sum?.requests ?? "Unavailable"} · Unique visitors:{" "}
-            {day.uniq?.uniques ?? "Unavailable"} · Page views:{" "}
-            {day.sum?.pageViews ?? "Unavailable"} · Threats:{" "}
-            {day.sum?.threats ?? "Unavailable"}
-          </p>
-        ))}
-      </GoogleList>
-      {["traffic", "events", "paths", "bots", "countries"].map((field) => (
-        <DataList
-          key={field}
-          title={field}
-          url={`/api/cloudflare/assets/${id}/cache?field=${field}`}
-          render={(row) => (
-            <pre className="whitespace-pre-wrap break-all text-xs">
-              {JSON.stringify(row, null, 2)}
-            </pre>
-          )}
-        />
-      ))}
     </div>
   );
 }
@@ -1281,9 +1573,12 @@ export function ScanIndexingSummary({ scanId }: { scanId: string }) {
 }
 
 function InspectionCoverage({ id }: { id: number }) {
-  const { data } = useQuery<any>({
+  const { data, error, isLoading, refetch } = useQuery<any>({
     queryKey: [`/api/gsc/assets/${id}/inspections?limit=1`],
+    refetchInterval: pollUnlessPlanRequired(15000),
   });
+  if (isLoading) return <LoadingReport />;
+  if (error) return <ReportError error={error} retry={() => void refetch()} />;
   return (
     <p className="text-sm text-muted-foreground">
       Inspected URL coverage:{" "}
@@ -1293,5 +1588,148 @@ function InspectionCoverage({ id }: { id: number }) {
             .join(" · ")
         : "Unavailable"}
     </p>
+  );
+}
+
+function SearchOverview({
+  id,
+  start,
+  end,
+}: {
+  id: number;
+  start: string;
+  end: string;
+}) {
+  const query = useQuery<any>({
+    queryKey: [`/api/gsc/assets/${id}/overview?start=${start}&end=${end}`],
+    refetchInterval: pollUnlessPlanRequired(15000),
+  });
+  if (query.isLoading) return <LoadingReport />;
+  if (query.error)
+    return (
+      <ReportError error={query.error} retry={() => void query.refetch()} />
+    );
+  const s = query.data?.summary;
+  return (
+    <section className="space-y-3" aria-label="Search performance overview">
+      <p className="text-sm">
+        Selected range: {start} – {end}. Available data:{" "}
+        {s?.first_date && s?.last_date
+          ? `${s.first_date} – ${s.last_date}`
+          : "No imported dates in this range"}
+        .
+      </p>
+      <MetricTiles
+        metrics={[
+          { label: "Clicks", value: s?.clicks },
+          { label: "Impressions", value: s?.impressions },
+          { label: "CTR", value: percent(s?.ctr) },
+          { label: "Average position", value: position(s?.position) },
+        ]}
+      />
+      <ReportTrend
+        rows={query.data?.trend ?? []}
+        label="Daily clicks"
+        date={(r) => r.date}
+        value={(r) => r.clicks}
+      />
+    </section>
+  );
+}
+export function DatasetStatus({
+  provider,
+  id,
+  busy,
+  onSync,
+}: {
+  provider: string;
+  id: number;
+  busy: boolean;
+  onSync: () => void;
+}) {
+  const query = useQuery<any>({
+    queryKey: [`/api/${provider}/assets/${id}/sync-status`],
+    refetchInterval: pollUnlessPlanRequired(15000),
+  });
+  if (query.isLoading) return <LoadingReport />;
+  if (query.error)
+    return (
+      <ReportError error={query.error} retry={() => void query.refetch()} />
+    );
+  const d = query.data;
+  const names =
+    provider === "gsc"
+      ? [
+          { kind: "discover", label: "Property discovery" },
+          { kind: "sync", label: "Sitemaps" },
+          { kind: "analytics", label: "Search analytics" },
+          { kind: "inspect", label: "URL inspections" },
+        ]
+      : [
+          { kind: "discover", label: "Zone discovery" },
+          { kind: "sync", label: "Traffic and security reports" },
+        ];
+  return (
+    <section className="my-4 space-y-3" aria-label="Dataset sync status">
+      <div className="grid gap-3 sm:grid-cols-2">
+        {names.map((n) => {
+          const j = d?.jobs?.find((j: any) => j.kind === n.kind);
+          const analytics = n.kind === "analytics";
+          const updated = analytics
+            ? d?.analytics?.updated_at
+            : j?.state === "done"
+              ? j.finished_at
+              : n.kind === "sync"
+                ? d?.syncedAt
+                : null;
+          const state =
+            analytics && d?.analytics?.pending > 0
+              ? `Importing history · ${d.analytics.pending} jobs pending`
+              : (j?.state ?? (updated ? "Imported" : "Not yet recorded"));
+          return (
+            <div key={n.kind} className="rounded-lg border p-3 text-sm">
+              <h3 className="font-medium">{n.label}</h3>
+              <p role="status">{state}</p>
+              {updated && (
+                <p className="text-muted-foreground">
+                  Last completed {new Date(updated).toLocaleString()}
+                </p>
+              )}
+              {analytics && d?.analytics?.failed > 0 && (
+                <p className="text-destructive">
+                  {d.analytics.failed} failed or uncertain jobs. Check Work
+                  queue; sync again to retry analytics.
+                </p>
+              )}
+              {j?.error && <p className="text-destructive">{j.error}</p>}
+            </div>
+          );
+        })}
+      </div>
+      {d?.datasets?.length > 0 && (
+        <ReportTable
+          caption="Analytics import status by dataset"
+          rows={d.datasets}
+          columns={[
+            { label: "Dataset", value: (r) => r.dimension },
+            { label: "Importing", value: (r) => r.pending },
+            { label: "Failed / uncertain", value: (r) => r.failed },
+            {
+              label: "Last completed",
+              value: (r) =>
+                r.updated_at ? new Date(r.updated_at).toLocaleString() : null,
+            },
+          ]}
+        />
+      )}
+      {d?.error && <Notice tone="danger">{d.error}</Notice>}
+      <GooglePill label="Sync this site" disabled={busy} onClick={onSync} />
+      {provider === "gsc" && (
+        <p className="text-xs text-muted-foreground">
+          Sync uses the import date range above. URL inspections are queued
+          separately.
+        </p>
+      )}
+    </section>
   );
 }
