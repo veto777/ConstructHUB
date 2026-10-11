@@ -1,14 +1,16 @@
 import { createPool } from '../db';
 
 // Lock waiters must not occupy the connections used by downstream handlers.
-const pool = createPool('public-api-quota');
+// Created on first use, so importing this module (or mocking ../db in a test) opens nothing.
+let pool: ReturnType<typeof createPool> | undefined;
+const quotaPool = () => (pool ??= createPool('public-api-quota'));
 
 /** One transaction owns the account from allowance check through durable metering.
  * All queries use its client: waiting requests cannot exhaust the pool needed to
  * finish metering. The namespace is separate from Social Media's locks.
  */
 export async function reserveQuota(userId: number, keyId: string) {
-  const client = await pool.connect();
+  const client = await quotaPool().connect();
   let settled = false;
   const rollback = async () => {
     if (settled) return;

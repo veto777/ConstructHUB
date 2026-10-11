@@ -83,6 +83,11 @@ const endStop = (s: string) => (/[.!?]$/.test(s) ? s : `${s}.`);
 const hashtagsIn = (text: string): string[] => text.match(/(?<![\w&])#[A-Za-z][A-Za-z0-9_]*/g) ?? [];
 
 /** What may not be in a post, beyond the description's banned words. Returns what is wrong (empty = fine). */
+/** Web addresses in `text` other than constructhub.us (a registrar's name such as Name.com counts: it reads as a link). */
+export function otherAddresses(text: string): string[] {
+  return (text.match(/\b(?:https?:\/\/)?(?:[a-z0-9-]+\.)+(?:us|com|io|net|org|app|co|ai)\b/gi) ?? []).filter((m) => !/^(?:https?:\/\/)?constructhub\.us$/i.test(m));
+}
+
 export function lintPost(platform: SocialPlatform, text: string, entryText = ""): string[] {
   const rule = PLATFORM_RULES[platform], bad: string[] = [];
   if (text.length > rule.max) bad.push(`${text.length} characters, over ${rule.max}`);
@@ -94,8 +99,7 @@ export function lintPost(platform: SocialPlatform, text: string, entryText = "")
   // A price only when the help entry itself states it.
   for (const m of text.match(/\$\s?\d[\d,.]*/g) ?? []) if (!entryText.includes(m)) bad.push(`a price (${m}) that the help entry does not state`);
   // The only address is constructhub.us (no sub-domain, no other site).
-  for (const m of text.match(/\b(?:https?:\/\/)?(?:[a-z0-9-]+\.)+(?:us|com|io|net|org|app|co|ai)\b/gi) ?? [])
-    if (!/^(?:https?:\/\/)?constructhub\.us$/i.test(m)) bad.push(`an address other than constructhub.us (${m})`);
+  for (const m of otherAddresses(text)) bad.push(`an address other than constructhub.us (${m})`);
   if (/\b(?:real|actual)\s+(?:results?|customers?|clients?|numbers?|revenue)\b|\bour customers?\b|\bresults? (?:like|you)\b/i.test(text)) bad.push("reads as a claim about real results");
   return bad;
 }
@@ -113,7 +117,7 @@ export function benefitLines(input: SocialTextInput, area: string, maxLen = 120,
     for (const raw of pool) {
       if (out.length >= count) break;
       const s = endStop(plain(raw));
-      if (s.length > maxNow || s.length < 20 || bannedIn(s).length || /\$\s?\d/.test(s) || out.some((y) => sameThing(s, y))) continue;
+      if (s.length > maxNow || s.length < 20 || bannedIn(s).length || /\$\s?\d/.test(s) || otherAddresses(s).length || out.some((y) => sameThing(s, y))) continue;
       out.push(s);
     }
   }
@@ -125,7 +129,7 @@ export function buildSocialText(input: SocialTextInput): SocialText {
   const area = areaFor({ helpKey: key, track: input.track, group: e?.group }), A = AREAS[area] ?? AREAS.crm;
   const crm = area !== "permits" && area !== "platform";
   const product = crm ? "ConstructHUB CRM" : "ConstructHUB";
-  const ok = (t: string) => !bannedIn(t).length && !/\$\s?\d/.test(t);
+  const ok = (t: string) => !bannedIn(t).length && !/\$\s?\d/.test(t) && !otherAddresses(t).length;
   const task = taskOf(input.title) || plain(e?.title ?? key);
   const taskLine = endStop(/^how to\b/i.test(task) ? `${task} ${crm ? "in" : "on"} ${product}` : `${task} - a ${product} walkthrough`);
   const headline = plain(input.headline ?? "").replace(/[.!]+$/, "");

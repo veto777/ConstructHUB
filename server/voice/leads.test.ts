@@ -27,6 +27,8 @@ const bag = made();
 let leads: typeof import("./leads");
 let orgProfile: typeof import("./org-profile");
 let a: Account, other: Account;
+// The email outbox is append-only and shared by every run, so the extra recipient is unique to this run.
+const EXTRA = `office-extra-${Date.now()}@example.invalid`;
 
 const emailsTo = (addr: string) => fs.existsSync(EMAIL_OUTBOX)
   ? fs.readFileSync(EMAIL_OUTBOX, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)).filter((m) => m.to.some((t: string) => t.includes(addr)))
@@ -48,7 +50,7 @@ beforeAll(async () => {
     company: { name: "Acme Siding LLC", spokenName: "Acme Siding" },
     serviceArea: { defaultStateCode: "WA" },
     persona: { presetId: "janice", assistantName: "Janice" },
-    leadDelivery: { crm: { tags: ["call-assistant", "phone"] }, email: { extraRecipients: ["office-extra@example.invalid"] } },
+    leadDelivery: { crm: { tags: ["call-assistant", "phone"] }, email: { extraRecipients: [EXTRA] } },
   });
 });
 
@@ -196,7 +198,7 @@ describe("lead delivery (real DB)", () => {
     expect(bell[0]).toMatchObject({ member_id: a.memberId, title: "New phone lead — Dana", link: `/crm/clients/${cust.id}` });
     const mail = emailsTo(a.email).filter((m) => m.subject.includes("New phone lead — Dana"));
     expect(mail).toHaveLength(1);
-    expect(emailsTo("office-extra@example.invalid").filter(m => m.subject.includes("New phone lead — Dana"))).toHaveLength(1);
+    expect(emailsTo(EXTRA).filter(m => m.subject.includes("New phone lead — Dana"))).toHaveLength(1);
     expect(mail[0].html).toContain("Siding replacement");
     expect((await waitForActivity(pool, a.orgId, "call.lead")).length).toBe(1);
 
