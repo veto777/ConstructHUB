@@ -276,7 +276,7 @@ describe("the screens: every figure a link, honest chips, 44 px targets", () => 
     expect(plan).toContain("seoLinks.alerts({ site: site.id, before: Number(m[1]), now: Number(m[2]) })");
     expect(plan).toContain('typeof t.facts.origin === "string"');
     expect(plan).toContain('<TabStrip label="Tasks">');
-    expect(plan).toContain("const CHIP_LINK = `g-chip g-chip--sm ${TAP_PAD} ${LINK_CUE} ${FOCUS_RING}`;");
+    expect(plan).toContain("const CHIP_LINK = `g-chip g-chip--sm !normal-case ${TAP_PAD} ${LINK_CUE} ${FOCUS_RING}`;");
     expect(plan.match(/className="g-pill g-pill--sm !min-h-11"/g)?.length ?? 0).toBeGreaterThanOrEqual(6);
     expect(planButton).toContain("seoLinks.plan(v.siteId)");
     expect(planButton).toContain("slice(0, cutSource ? 11 : 12)");

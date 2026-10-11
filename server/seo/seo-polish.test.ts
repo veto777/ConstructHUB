@@ -113,7 +113,7 @@ describe("#1 the 'being switched on' notice only where the page spends the sourc
     const page = code(read("index.tsx"));
     expect(page).not.toContain("Being switched on");
     expect(page).toContain('{fmtDate(o.nextCheck.nextAt)}</Fig>}');
-    expect(page).toContain('per check${configured ? "" : " — waits until rank tracking is on"}');
+    expect(page).toContain('per check${configured ? "" : " — automatic checks start once rank tracking is set up"}');
   });
 });
 
