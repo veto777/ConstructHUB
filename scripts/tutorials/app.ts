@@ -95,6 +95,10 @@ export async function startApp(o: { slot: number; database: string; bootTimeoutM
     // Placeholder provider settings (never reachable): the Google Ads / LSA screens only render when these exist,
     // and the sample rows carry placeholder tokens, so nothing can call Google. No worker flag is set, so no job runs.
     GOOGLE_ADS_CLIENT_ID: "sample-client-id.apps.example", GOOGLE_ADS_CLIENT_SECRET: "sample-secret", GOOGLE_ADS_DEVELOPER_TOKEN: "sample-developer-token",
+    // Opt-in, read at launch only: TUTORIAL_PLACES_KEY=<key> gives the slot a Static Maps / Places key, so the
+    // Ranking Grid report's map backdrop renders (/api/ranking-grid/map/:scanId proxies Google Static Maps). Without
+    // it that image is a broken icon and a script hides it. The key is never printed or written to a file.
+    ...(process.env.TUTORIAL_PLACES_KEY ? { GOOGLE_PLACES_API_KEY: process.env.TUTORIAL_PLACES_KEY } : {}),
     SMS_OUTBOX_PATH: path.join(dir, "sms-outbox.jsonl"),
     VITE_CACHE_DIR: path.join(ROOT, ".cache", `vite-tut-slot${o.slot}`),
     TUTORIALS_LOCAL_DIR: path.join(ROOT, "tmp", "tutorials"),
