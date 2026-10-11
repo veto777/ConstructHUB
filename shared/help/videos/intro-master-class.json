@@ -1,0 +1,25 @@
+{
+  "helpKey": "intro-master-class",
+  "durationSec": 82,
+  "video": {
+    "key": "tutorials/intro-master-class.e3c5c103.mp4",
+    "bytes": 9155964,
+    "sha256": "e3c5c103523cf56448ca806e0adc7d84be5aeaa1fcf6e9ddab7b5401bc7516b7"
+  },
+  "captions": {
+    "key": "tutorials/intro-master-class.b0af764a.vtt",
+    "bytes": 1896,
+    "sha256": "b0af764a9c8e860bfbba345e2b52b6c4858b32899cacd8d9cb95e32bdac72fc1"
+  },
+  "poster": {
+    "key": "tutorials/intro-master-class.3ce4a045.jpg",
+    "bytes": 88157,
+    "sha256": "3ce4a0453dafc80836866b0f8d1c8cade8a0ab29d9c3faf65046c36f2483b994"
+  },
+  "uploaded": {
+    "at": "2026-10-11T20:38:46.854Z",
+    "video": "ba865bc765c302af42a3d3d4c9ef4601",
+    "captions": "9551cf4f049bf1b49e8215ad3ac9bd5a",
+    "poster": "f23d7ab42ac1fbdf261bb391a3868728"
+  }
+}
