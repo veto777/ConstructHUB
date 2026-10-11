@@ -34,7 +34,7 @@ import fs from "fs";
 import path from "path";
 
 export const PLATFORM_SEED_DIR = path.resolve(import.meta.dirname, "../../script/feature-shots/seed");
-export const PLATFORM_SEED_FILES = ["10-gbp.sql", "20-reviews.sql", "30-ads.sql"] as const;
+export const PLATFORM_SEED_FILES = ["10-gbp.sql", "20-reviews.sql", "30-ads.sql", "50-seo.sql"] as const;
 /** The guard every applied file must carry (fix_guards, 2026-10-11): a file without it is not applied. */
 const SCHEMA_GUARD = "current_schema() NOT LIKE 'constructhub\\_tut\\_%'";
 
