@@ -27,7 +27,7 @@ import {
   BTN_LG, BTN_OUTLINE, BTN_OUTLINE_ON_NAVY, BTN_PRIMARY, TEXT_LINK, useDocumentTitle, useMetaDescription, useStartAtTop,
 } from "./primitives";
 import {
-  AudienceSection, CardsSection, CompareSection, FaqSection, FeatureHero, FinalCta, InDepthSection, PricingSection, RelatedSection,
+  AudienceSection, CardsSection, OfferSection, FaqSection, FeatureHero, FinalCta, InDepthSection, PricingSection, RelatedSection,
   ScreensSection, SpotlightSection, StepsSection, type Tone,
 } from "./sections";
 import { AlacarteOffer } from "./alacarte-offer";
@@ -107,8 +107,8 @@ export function FeatureLanding({ page }: { page: FeaturePage }) {
   const nSpot = n("spotlight", !!page.spotlight);
   const nAudience = n("audience", page.audience.length > 0);
   const nPricing = n("pricing", true);
-  // The comparison and the à la carte offer (owner, 2026-10-10), when the content file has one.
-  const nCompare = n("compare", !!page.compare);
+  // The feature on its own and the à la carte offer (owner, 2026-10-10), when the content file has one.
+  const nOffer = n("offer", !!page.offer);
   const nFaq = n("faq", page.faqs.length > 0);
   const nInDepth = n("in-depth", !!page.inDepth);
   const nRelated = n("related", related.length > 0);
@@ -130,10 +130,10 @@ export function FeatureLanding({ page }: { page: FeaturePage }) {
         <SpotlightSection page={page} n={nSpot} tone={tone("spotlight")} />
         <AudienceSection page={page} n={nAudience} tone={tone("audience")} />
         <PricingSection page={page} price={price} n={nPricing} tone={tone("pricing")} ctas={<>{primaryCta("pricing")}{salesCta(BTN_OUTLINE, "pricing")}</>} />
-        {page.compare && (
-          <CompareSection
-            page={page} compare={page.compare} n={nCompare} tone={tone("compare")}
-            offer={<AlacarteOffer keys={page.compare.alacarte} price={price} slug={page.slug} signedIn={!!user} />}
+        {page.offer && (
+          <OfferSection
+            page={page} offer={page.offer} n={nOffer} tone={tone("offer")}
+            buy={<AlacarteOffer keys={page.offer.alacarte} price={price} slug={page.slug} signedIn={!!user} />}
           />
         )}
         <FaqSection page={page} n={nFaq} tone={tone("faq")} />

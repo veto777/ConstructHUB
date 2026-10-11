@@ -64,7 +64,7 @@ const tools = [
   {
     icon: MapPin,
     title: "Locations Manager",
-    description: "Track views, calls, direction requests, and site visits in one Semrush-style dashboard. Run citation campaigns to boost local authority.",
+    description: "Track views, calls, direction requests, and site visits in one dashboard. Run citation campaigns to boost local authority.",
     gradient: "from-pink-500 to-rose-500",
     border: "border-pink-500/20",
     link: "/locations",

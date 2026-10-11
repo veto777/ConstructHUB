@@ -1,4 +1,4 @@
-import type { FeatureAllowance, FeatureCompare, FeaturePage } from "./types";
+import type { FeatureAllowance, FeatureOffer, FeaturePage } from "./types";
 import { allowanceLine } from "./pricing";
 import { ADDONS, PLANS, planForModule } from "../plans";
 import { joinNames, plansWhere } from "../plan-copy";
@@ -29,25 +29,14 @@ const EXTRA_SITE = ADDONS.protected_site;
 const EXTRA_SITE_PLANS = joinNames(EXTRA_SITE.availableOn.map((key) => PLANS[key].name));
 const ADS_MANAGER_PLAN = PLANS[planForModule("adsManager")].name;
 
-export const CLICK_GUARD_COMPARE: FeatureCompare = {
-  // Prices read on 2026-10-10 from: clickcease.com/pricing, clickguard.com/pricing, fraudblocker.com/pricing
-  // (~/codex-audits/a-la-carte-competitors.md → click_guard). Lunio is quote only.
+export const CLICK_GUARD_OFFER: FeatureOffer = {
   alacarte: ["click_guard"],
-  checkedOn: "2026-10-10",
-  competitors: [
-    { name: "ClickCease", plan: "Starter", price: { kind: "monthly", cents: 9900 }, per: "1 site", note: "a lower intro price for the first three cycles", source: "https://www.clickcease.com/pricing" },
-    { name: "ClickGUARD", plan: "Lite", price: { kind: "monthly", cents: 7400 }, per: "1 site", source: "https://www.clickguard.com/pricing" },
-    { name: "Fraud Blocker", plan: "Standard", price: { kind: "monthly", cents: 7900 }, per: "1 site", source: "https://fraudblocker.com/pricing" },
-    { name: "Lunio", price: { kind: "quote" } },
-  ],
-  onlyUs: [
+  highlights: [
     "A visitor-by-visitor IP log: who is online now, traffic sources, top pages and the last visits of any address.",
     "A per-site VPN policy — block, log or redirect — that never blocks search engines, with a whitelist for your office and crew.",
     "The exclusion script runs inside your own Google Ads account and only ever adds, up to Google's 500 per campaign.",
     "Manual blocks by single IP, CIDR range or wildcard.",
   ],
-  theyNotUs: "Meta and Microsoft ads, filing refund claims with Google, and firewall-level blocking.",
-  noContractorAlternative: true,
 };
 
 const page: FeaturePage = {
@@ -210,7 +199,7 @@ const page: FeaturePage = {
         "preview a mapped client's Click Guard list as exclusions in that client's ad account before applying it.",
     ],
   },
-  compare: CLICK_GUARD_COMPARE,
+  offer: CLICK_GUARD_OFFER,
   related: ["ipTracker", "vpnShield", "masterClass"],
   app: { href: "/google-ads", surface: "app" },
   headings: {

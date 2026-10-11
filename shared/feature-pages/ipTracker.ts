@@ -1,6 +1,6 @@
 import type { FeatureAllowance, FeaturePage } from "./types";
 import { allowanceLine } from "./pricing";
-import { CLICK_GUARD_COMPARE } from "./clickGuard";
+import { CLICK_GUARD_OFFER } from "./clickGuard";
 import { ADDONS, PLANS } from "../plans";
 import { plansWhere } from "../plan-copy";
 
@@ -180,7 +180,7 @@ const page: FeaturePage = {
     ],
   },
   // Sold with Click Guard as one item (shared/alacarte.ts click_guard): the same comparison.
-  compare: CLICK_GUARD_COMPARE,
+  offer: CLICK_GUARD_OFFER,
   related: ["clickGuard", "vpnShield", "siteScan"],
   app: { href: "/ip-tracker", surface: "app" },
   headings: {

@@ -164,7 +164,7 @@ const services = [
     icon: MapPin,
     title: "GMB Locations Manager",
     href: featureIntroPath("gbp"),
-    description: "Manage all your business locations with Semrush-style GBP analytics — search/maps views, interactions, phone calls, and citation campaign tracking.",
+    description: "Manage all your business locations with GBP analytics — search/maps views, interactions, phone calls, and citation campaign tracking.",
   },
   {
     icon: ShieldAlert,

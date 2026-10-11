@@ -34,7 +34,8 @@ set in the file (kebab-case of the key: `profileGuard` → `/features/profile-gu
 - Title Case for the H1 and section headings (as on `/call-assistant`); sentence case everywhere else.
 - Use the feature's name exactly as the app's sidebar and page call it.
 - No exclamation marks, no "revolutionary", "game-changing", "dominate", "#1", "guaranteed".
-- No competitor names (no other software products, agencies or marketplaces by name).
+- No competitor names (no other software products, agencies or marketplaces by name), anywhere: not in prose,
+  not in the `offer` block, not in a comment. The site never lists another company (owner, 2026-10-10).
 
 ## Every claim traceable to code
 

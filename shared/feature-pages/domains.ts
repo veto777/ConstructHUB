@@ -1,7 +1,7 @@
 import type { FeaturePage } from "./types";
 import { PLANS, planForModule } from "../plans";
 import { plansWhere } from "../plan-copy";
-import { WEBSITE_TOOLS_COMPARE } from "./cloudflare";
+import { WEBSITE_TOOLS_OFFER } from "./cloudflare";
 
 /**
  * Domains — half of the Agency-only "Domains + Gmail alerts" module.
@@ -182,7 +182,7 @@ const page: FeaturePage = {
     ],
   },
   // Sold as Website Tools, one item with Cloudflare (shared/alacarte.ts website_tools): the same comparison.
-  compare: WEBSITE_TOOLS_COMPARE,
+  offer: WEBSITE_TOOLS_OFFER,
   related: ["mailAlerts", "cloudflare", "agency"],
   app: { href: "/domains", surface: "app" },
   headings: {
