@@ -8,7 +8,7 @@ is invented (Permits and Property show only real directory data).
 
 | Piece | What it is |
 | --- | --- |
-| `seed/*.sql` | The sample data, one file per group. Each is idempotent and refuses to run unless `current_database()` is a `constructhub_dev_*` lane. `00-identity.sql` renames user 1. |
+| `seed/*.sql` | The sample data, one file per group. Each is idempotent and refuses to run unless `current_database()` is a `constructhub_dev_*` lane — `10-gbp`, `20-reviews` and `30-ads` also accept a walkthrough recording database (`constructhub_tut_*` schema or database; `scripts/tutorials/seed-platform.ts` applies them to the video template, user 1 untouched). `00-identity.sql` renames user 1. |
 | `shots/*.json` | What to capture: `{ key, n, route, alt, caption, wait?, actions?, clip? }` — see `capture.mjs`. |
 | `capture.mjs` | Playwright → `client/public/feature-shots/<key>-<n>.webp` (1600 px wide). Local lane servers only. |
 | `manifest.mjs` | Writes `shared/feature-pages/screens.ts` (generated — never edit by hand) from the JSON + images. |
