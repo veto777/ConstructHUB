@@ -77,7 +77,9 @@ export default function PermitAlertsPage() {
           {data && !data.geocoder ? " Distance matching is off on this server, so an area watch covers its whole jurisdictions." : ""}
         </Notice>
         <Dialog open={showForm} onOpenChange={open => { if (!busy) setShowForm(open); }}>
-          <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
+          {/* `g-surface`: the dialog portals to <body>, outside the platform surface, so the form's pills
+              (trade and jurisdiction chips) need the surface tokens re-declared here to render. */}
+          <DialogContent className="g-surface max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
             <DialogTitle className="sr-only">{editing ? "Edit watch" : "New watch"}</DialogTitle>
             <DialogDescription className="sr-only">Choose permit criteria, jurisdictions and delivery channels.</DialogDescription>
           {error && <Notice tone="danger">{apiErrorMessage(error)}</Notice>}
@@ -351,8 +353,10 @@ export function WatchForm({ busy, geocoder, onCancel, onSave, initial }: { initi
 
       <Notice tone="info">{initial ? "Changes apply to future matches; existing history is kept. " : "Review your watch: "}{WATCH_KIND_LABELS[kind]} · {[address, parcel, contractorName, contractorLicense, kind === "trade_area" && (trades.join(", ") || "all trades"), keywords, radius && `${radius} miles`].filter(Boolean).join(" · ")} · {picked.map(j => j.jurisdiction).join(", ") || "no jurisdictions selected"} · {[email && "email", sms && "text", telegram && "Telegram"].filter(Boolean).join(", ") || "no delivery channels"}.</Notice>
       <div className="flex flex-wrap gap-2">
-        <GooglePill icon={Bell} label="Save watch" variant="solid" type="submit" disabled={busy || !picked.length || (kind === "trade_area" && (!!tradesError || tradesLoading))} testId="button-save-watch" />
-        <GooglePill icon={X} label="Cancel" onClick={onCancel} disabled={busy} testId="button-cancel-watch" />
+        {/* shadcn Buttons, not GooglePills: this form lives in a Dialog that portals to <body>, outside the
+            `.g-surface` that defines the pill tokens — a solid pill there has no background (invisible Save). */}
+        <Button type="submit" disabled={busy || !picked.length || (kind === "trade_area" && (!!tradesError || tradesLoading))} data-testid="button-save-watch"><Bell aria-hidden="true" />Save watch</Button>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={busy} data-testid="button-cancel-watch"><X aria-hidden="true" />Cancel</Button>
       </div>
     </form>
   );

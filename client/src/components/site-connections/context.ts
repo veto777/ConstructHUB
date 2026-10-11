@@ -30,6 +30,23 @@ export function useReportPage(key: string) {
     (page: number) => setRaw(String(page)),
   ] as const;
 }
+/**
+ * Snaps a URL-held page back to the last real page once the total is known (a stale ?page after the
+ * report's scope changed, or rows that disappeared). Returns the last page, or null until the total is known.
+ */
+export function useClampPage(
+  page: number,
+  total: number | undefined,
+  pageSize: number,
+  setPage: (page: number) => void,
+) {
+  const lastPage =
+    total == null ? null : Math.max(1, Math.ceil(total / pageSize));
+  useEffect(() => {
+    if (lastPage != null && page > lastPage) setPage(lastPage);
+  }, [page, lastPage]);
+  return lastPage;
+}
 export function urlBelongsToProperty(property: string, url: string) {
   try {
     const u = new URL(url);

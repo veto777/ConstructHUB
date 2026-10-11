@@ -39,14 +39,27 @@ export function ReportTable({
   rows,
   columns,
   caption,
+  total,
 }: {
   rows: any[];
   columns: Column[];
   caption: string;
+  /** Rows in the whole report; when more than `rows`, sorting is disclosed as page-local. */
+  total?: number;
 }) {
   const [sort, setSort] = useState<{ index: number; desc: boolean } | null>(
     null,
   );
+  // The server pages the report (date, then clicks); the client only has this page, so a sort
+  // reorders these rows. Say so where the user can see it rather than only in the sr-only caption.
+  const partial = total != null && total > rows.length;
+  const sortNote = sort
+    ? `Sorted by ${columns[sort.index].label} ${sort.desc ? "descending" : "ascending"}, ${
+        partial
+          ? `within this page of ${rows.length} rows only — ${total} rows in the whole report`
+          : `across all ${rows.length} rows`
+      }.`
+    : null;
   const ordered = [...rows].sort((a, b) => {
     if (!sort) return 0;
     const column = columns[sort.index];
@@ -67,6 +80,11 @@ export function ReportTable({
   });
   return (
     <div className="overflow-x-auto">
+      {sortNote && (
+        <p className="mb-2 text-sm g-text-2" aria-live="polite">
+          {sortNote}
+        </p>
+      )}
       <table className="g-table w-full text-sm">
         <caption className="sr-only">
           {caption}; sort applies to the displayed rows
@@ -87,6 +105,11 @@ export function ReportTable({
               >
                 <button
                   className="rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                  title={
+                    partial
+                      ? "Sorts the rows on this page only"
+                      : "Sorts all rows"
+                  }
                   onClick={() =>
                     setSort({
                       index,
