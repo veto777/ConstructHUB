@@ -141,6 +141,11 @@ describe("the links travel with the request and reach the client page (source gu
     expect(owner).toContain('data-testid="select-template-primary"');
     expect(owner).toContain("primaryReviewUrl: templatePrimaryUrl");
     expect(owner).toContain("primaryReviewUrl: sendPrimaryUrl");
+    // Pick a linked Google listing in "Add profile", or connect Google first.
+    expect(owner).toContain('/api/review-templates/gbp-locations');
+    expect(owner).toContain('data-testid="select-gbp-location"');
+    expect(owner).toContain('href="/api/gbp/connect"');
+    expect(routes).toContain('app.get("/api/review-templates/gbp-locations"');
   });
 
   it("the schema and the additive migration carry the columns", () => {

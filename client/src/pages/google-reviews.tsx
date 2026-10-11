@@ -155,6 +155,12 @@ export default function GoogleReviewsPage() {
   const { data: templates = [] } = useQuery<any[]>({
     queryKey: ["/api/review-templates"],
   });
+  // Linked Google listings the owner can pick from in "Add profile" (shared/review-links.ts flow).
+  const { data: gbpPicker } = useQuery<{ connected: boolean; locations: { id: number; name: string; reviewUrl: string }[] }>({
+    queryKey: ["/api/review-templates/gbp-locations"],
+  });
+  const linkedListings = gbpPicker?.locations ?? [];
+  const gbpConnected = !!gbpPicker?.connected;
 
   // Feedback routing: the score below which a client's feedback came to the owner privately first.
   const { data: escalation } = useQuery<{ reviewEscalationThreshold: number }>({
@@ -1766,6 +1772,28 @@ export default function GoogleReviewsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {linkedListings.length > 0 ? (
+              <div className="space-y-2" data-testid="section-gbp-picker">
+                <Label htmlFor="tplPick">Choose from your linked Google listings</Label>
+                <Select onValueChange={(v) => {
+                  const loc = linkedListings.find((l) => String(l.id) === v);
+                  if (loc) { setTemplateName(loc.name); setTemplateGoogleUrl(loc.reviewUrl); }
+                }}>
+                  <SelectTrigger id="tplPick" data-testid="select-gbp-location"><SelectValue placeholder="Pick a linked listing…" /></SelectTrigger>
+                  <SelectContent>
+                    {linkedListings.map((l) => (
+                      <SelectItem key={l.id} value={String(l.id)} data-testid={`option-gbp-location-${l.id}`}>{l.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Fills the name and review link for you. You can still edit them below.</p>
+              </div>
+            ) : !gbpConnected ? (
+              <Notice tone="info">
+                Link your Google account to pick a listing automatically instead of pasting a link.{" "}
+                <a href="/api/gbp/connect" className="font-medium text-primary hover:underline" data-testid="link-connect-google">Connect Google Business Profile</a>
+              </Notice>
+            ) : null}
             <div className="space-y-2">
               <Label htmlFor="tplName">Profile or location name *</Label>
               <Input

@@ -5331,6 +5331,28 @@ function main() {
     }
   });
 
+  // The owner's linked Google listings, so "Add profile" can pick one and fill the review link instead of
+  // pasting it. `connected` says whether any Google account is linked (if not, the dialog asks them to link first).
+  app.get("/api/review-templates/gbp-locations", async (req, res) => {
+    try {
+      const user = (req as any).user;
+      if (!user) return res.status(401).json({ message: "Login required" });
+      const { rows: grants } = await pool.query("SELECT 1 FROM gbp_grants WHERE user_id=$1 LIMIT 1", [user.id]);
+      // gbp_google_subject / gbp_unlinked_by_user are migration-only columns (server/gbp/schema.ts), so raw SQL.
+      const { rows } = await pool.query(
+        `SELECT id, business_name AS name, place_id AS "placeId" FROM business_locations
+         WHERE user_id=$1 AND gbp_google_subject IS NOT NULL AND gbp_unlinked_by_user = false AND place_id IS NOT NULL
+         ORDER BY business_name`, [user.id]);
+      const locations = rows
+        .map((l: any) => ({ id: l.id as number, name: String(l.name), reviewUrl: googleReviewLink(`https://search.google.com/local/writereview?placeid=${encodeURIComponent(String(l.placeId))}`) }))
+        .filter((l): l is { id: number; name: string; reviewUrl: string } => !!l.reviewUrl);
+      res.json({ connected: grants.length > 0, locations });
+    } catch (err: any) {
+      console.error("Error loading linked listings:", err);
+      res.status(500).json({ message: "Failed to load linked listings" });
+    }
+  });
+
   // "Add profile" in that card: resolves/validates the Google review link, enforces the plan's
   // template limit under the per-account lock, and marks the first template default.
   app.post("/api/review-templates", async (req, res) => {
