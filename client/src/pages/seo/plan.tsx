@@ -47,7 +47,7 @@ const STATUS_WORDS: Record<string, string> = { open: "Open tasks", todo: "To do"
 const CLOSED = new Set(["done", "dropped", "closed"]);
 const OWN_PARAMS = ["task", "status", "kind", "due", "owner"];
 /** A small chip that is a link: its own size, a 44 px tap area around it, the dotted underline and the focus ring. */
-const CHIP_LINK = `g-chip g-chip--sm ${TAP_PAD} ${LINK_CUE} ${FOCUS_RING}`;
+const CHIP_LINK = `g-chip g-chip--sm !normal-case ${TAP_PAD} ${LINK_CUE} ${FOCUS_RING}`;
 /** The facts carried from the finding, in words. */
 function facts(t: Task): string {
   return factWords(t).join(" · ");
