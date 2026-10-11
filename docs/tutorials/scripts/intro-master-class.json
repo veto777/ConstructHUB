@@ -1,0 +1,122 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "intro-master-class",
+  "title": "Master Class",
+  "viewport": { "width": 1024, "height": 576 },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/master-class",
+      "caption": "Master Class",
+      "chapter": "Four modules",
+      "narration": "This is the Master Class, a course on the business side of running a construction company."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"card-overview-hero\"] .grid",
+      "caption": "Modules, state guides, your access",
+      "narration": "At the top: four modules, a guide for all fifty states, and what your account has unlocked."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"curriculum-licensing\"]",
+      "caption": "Module 1: Business Formation & Licensing",
+      "narration": "The modules run in order: forming and licensing the business, then Google Business, your website, and SEO and ads."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tab-seo\"]",
+      "caption": "SEO & ads",
+      "chapter": "Lessons",
+      "narration": "Each module has its own tab. Open SEO & ads."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"link-lesson-search-console\"]",
+      "caption": "Eight lessons, in order",
+      "narration": "The outline lists its eight lessons. Choose Google Search Console to jump to that one."
+    },
+    {
+      "action": "highlight",
+      "selector": "xpath=//*[text()=\"GSC Verification Methods\"]/..",
+      "caption": "GSC Verification Methods",
+      "narration": "This lesson walks through verifying your site, with the methods for a domain or a URL-prefix property."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"checkbox-search-console-done\"]",
+      "caption": "Mark done",
+      "narration": "When you've finished it, tick Mark done."
+    },
+    {
+      "action": "goto",
+      "url": "/master-class?tab=seo",
+      "caption": "Reload the page",
+      "narration": "Reload the page, and the lesson is still marked done."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"lesson-outline\"]",
+      "caption": "1 of 8 done",
+      "narration": "One of eight done. Your progress is saved in this browser."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tab-state-guide\"]",
+      "caption": "State guide",
+      "chapter": "Your state's guide",
+      "narration": "The State guide tab covers forming and licensing a company where you work."
+    },
+    {
+      "action": "select",
+      "selector": "[data-testid=\"select-state\"]",
+      "value": "Colorado",
+      "caption": "Pick your state",
+      "narration": "Pick your state. Colorado has no statewide contractor license, so its guide points to local rules."
+    },
+    {
+      "action": "highlight",
+      "selector": "div:has(> [data-testid=\"link-agency-sos\"])",
+      "caption": "Agencies, with checked links",
+      "narration": "Each agency's tile links to its own site. A link the check couldn't confirm is marked unconfirmed."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"checkbox-step-1\"]",
+      "caption": "Checklist for Colorado",
+      "narration": "Those agencies become a checklist. Tick each step as you finish it."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-nav-master-class\"]",
+      "caption": "Menu: Master Class",
+      "narration": "You'll find the Master Class in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "Master Class in about a minute | ConstructHUB",
+    "description": "A one-minute tour of the Master Class in ConstructHUB: four modules of ordered lessons on the business side of contracting, a lesson you mark done, and a guide for every state with its agencies and a checklist you tick off.",
+    "tags": [
+      "ConstructHUB",
+      "contractor course",
+      "contractor license requirements",
+      "start a construction company",
+      "contractor business",
+      "Google Search Console",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Learn the Business Side",
+    "accent": "Business",
+    "kicker": "Master Class",
+    "step": 8
+  },
+  "removeSelectors": [
+    "[data-testid=\"button-open-chat\"]"
+  ]
+}

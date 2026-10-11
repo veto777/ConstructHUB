@@ -117,6 +117,7 @@ export { default as v_intro_guides } from "./intro-guides.json";
 export { default as v_intro_ip_tracker } from "./intro-ip-tracker.json";
 export { default as v_intro_lsa_leads } from "./intro-lsa-leads.json";
 export { default as v_intro_mail_alerts } from "./intro-mail-alerts.json";
+export { default as v_intro_master_class } from "./intro-master-class.json";
 export { default as v_intro_media } from "./intro-media.json";
 export { default as v_intro_permits } from "./intro-permits.json";
 export { default as v_intro_profile_guard } from "./intro-profile-guard.json";
