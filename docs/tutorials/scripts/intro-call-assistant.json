@@ -1,0 +1,138 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "intro-call-assistant",
+  "title": "AI Call Assistant",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/call-assistant",
+      "caption": "Call Assistant",
+      "chapter": "Every call answered",
+      "narration": "This is the Call Assistant. It answers calls on your ConstructHUB number and files every estimate request in your CRM."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tool-tab-calls\"]",
+      "caption": "Calls",
+      "narration": "Open Calls to see what it did with every call."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"list-results-outcomes\"]",
+      "caption": "Every outcome, counted",
+      "narration": "Each tile is an outcome: estimate requests, calls sent to a person, questions answered, messages and spam."
+    },
+    {
+      "action": "scroll-to",
+      "selector": "[data-testid=\"button-calls-view-log\"]",
+      "offset": 20,
+      "caption": "The call log",
+      "narration": "Below, the call log lists each caller, the outcome, and what the call was about."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid^=\"button-open-call-\"]:has-text(\"Nora Finch\")",
+      "caption": "Open a call",
+      "chapter": "Open a call",
+      "narration": "Open a call to see what happened."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"section-call-delivery\"]",
+      "caption": "Saved in your CRM, office emailed",
+      "narration": "This caller was saved as a client with a project in your CRM, and the email to the office was accepted."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"text-call-summary\"]",
+      "caption": "Summary and transcript",
+      "narration": "Under it is a short summary, then the full transcript."
+    },
+    {
+      "action": "press",
+      "value": "Escape",
+      "caption": "Back to the log",
+      "narration": "Calls that need a person right away become escalations."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-calls-view-escalations\"]",
+      "caption": "Escalations",
+      "chapter": "Escalations and spam",
+      "narration": "Escalations lists the texts and emails the assistant sent to your team."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"row-escalation-\"]",
+      "caption": "An urgent call, paged by text",
+      "narration": "This emergency paged Morgan Ellis by text. Delivery is uncertain, so automatic sends pause until you check."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-calls-view-spam\"]",
+      "caption": "Spam blocked",
+      "narration": "Spam blocked shows the sales pitches it screened out, so you never had to pick up."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"tool-tab-studio\"]",
+      "caption": "Agent studio",
+      "chapter": "Teach it your business",
+      "narration": "In Agent studio you teach it your business: services, service area, hours and policies."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"studio-nav-persona\"]",
+      "caption": "Persona",
+      "narration": "Persona picks the voice the assistant answers with."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"studio-nav-escalations\"]",
+      "caption": "Escalation rules",
+      "narration": "Escalations decide who gets paged for which calls, by text or email."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"button-all-tools\"]",
+      "caption": "All tools",
+      "narration": "To get here from any tool, open All tools,"
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"all-tools-call-assistant\"]",
+      "caption": "All tools: Call Assistant",
+      "narration": "and choose Call Assistant."
+    }
+  ],
+  "youtube": {
+    "title": "AI Call Assistant in about a minute | ConstructHUB",
+    "description": "A one-minute tour of the AI Call Assistant in ConstructHUB: see the outcome of every call, open a call's summary and transcript and how it reached your CRM, follow escalations and blocked spam, and set the assistant's persona, greeting and escalation rules in Agent studio.",
+    "tags": [
+      "ConstructHUB",
+      "AI call assistant",
+      "AI receptionist",
+      "contractor phone answering",
+      "missed calls",
+      "lead capture",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Every Call Answered",
+    "accent": "Answered",
+    "kicker": "Call Assistant",
+    "step": 9
+  },
+  "removeSelectors": [
+    "[data-testid=\"text-reminders-off\"]"
+  ]
+}
