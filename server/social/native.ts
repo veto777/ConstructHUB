@@ -148,10 +148,15 @@ export function oauthStateMatches(p: PendingOAuth | undefined | null, userId: nu
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-/** Where to send the customer to sign in. */
+/**
+ * Where to send the customer to sign in. Our app is a Business app (Facebook Login for Business): with a saved
+ * configuration (SOCIAL_META_CONFIG_ID, the six permissions above) Meta asks for exactly those; without one, `scope`.
+ */
 export function metaAuthUrl(state: string): string {
   const env = nativeDeps.env();
-  const q = new URLSearchParams({ client_id: String(env.SOCIAL_META_APP_ID), redirect_uri: nativeRedirectUri(), state, response_type: "code", scope: META_SCOPES.join(",") });
+  const config = /^\d{6,30}$/.test(env.SOCIAL_META_CONFIG_ID ?? "") ? env.SOCIAL_META_CONFIG_ID! : null;
+  const q = new URLSearchParams({ client_id: String(env.SOCIAL_META_APP_ID), redirect_uri: nativeRedirectUri(), state, response_type: "code",
+    ...(config ? { config_id: config, override_default_response_type: "true" } : { scope: META_SCOPES.join(",") }) });
   return `https://www.facebook.com/v25.0/dialog/oauth?${q}`;
 }
 

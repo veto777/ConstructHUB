@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { pool } from "../db";
 import {
   NativeClient, ensureNativeSchema, facebookPlan, graphError, instagramPlan, nativeDeps, nativeNetworks, nativeNetworksFor, newOAuthState,
-  oauthStateMatches, receiveUpload, savePending, nativePendingList, nativeFinalize, removeNativeAccounts,
+  oauthStateMatches, receiveUpload, metaAuthUrl, savePending, nativePendingList, nativeFinalize, removeNativeAccounts,
 } from "./native";
 import { clientFactory } from "./schedule";
 
@@ -62,6 +62,19 @@ describe("what each network receives", () => {
     expect(graphError({ code: 4 }, 400).status).toBe(429);
     expect(graphError({ code: 200, message: "(#200) Requires pages_manage_posts" }, 403).message).toMatch(/didn't allow/);
     expect(graphError({ code: 100, error_user_msg: "Bad image" }, 400).message).toBe("The network refused it: Bad image");
+  });
+});
+
+describe("the Meta sign-in address", () => {
+  it("uses the saved configuration when there is one, the permission list otherwise", () => {
+    nativeDeps.env = () => ({ SOCIAL_META_APP_ID: "1609986400506072" }) as any;
+    const plain = new URL(metaAuthUrl("st"));
+    expect(plain.searchParams.get("scope")).toContain("pages_manage_posts");
+    expect(plain.searchParams.get("redirect_uri")).toMatch(/\/api\/social\/native\/callback$/);
+    nativeDeps.env = () => ({ SOCIAL_META_APP_ID: "1609986400506072", SOCIAL_META_CONFIG_ID: "123456789012" }) as any;
+    const cfg = new URL(metaAuthUrl("st"));
+    expect(cfg.searchParams.get("config_id")).toBe("123456789012");
+    expect(cfg.searchParams.get("scope")).toBeNull();
   });
 });
 
