@@ -210,7 +210,7 @@ export function registerSocialRoutes(
     const {rows:[count]}=await pool.query(`SELECT count(*)::int total FROM social_posts p LEFT JOIN business_locations l ON l.id=p.business_id AND l.user_id=p.user_id WHERE ${where}`,params);
     const {rows:[connections]}=await pool.query("SELECT bool_or(business_id IS NULL) AS agency, bool_or(business_id=$2) AS business FROM social_connections WHERE user_id=$1",[id,businessId]);
     const mappings=config?.destinations||[];
-    const accounts=businessId ? (c?.accounts||[]).filter((a:any)=>mappings.some((d:any)=>d.accountId===a.id)).map((a:any)=>({...a,
+    const accounts=businessId && c?.business_id!==businessId ? (c?.accounts||[]).filter((a:any)=>mappings.some((d:any)=>d.accountId===a.id)).map((a:any)=>({...a,
       pages:a.pages?.filter((p:any)=>mappings.some((d:any)=>d.accountId===a.id&&d.pageId===p.id)),
       boards:a.boards?.filter((p:any)=>mappings.some((d:any)=>d.accountId===a.id&&d.boardId===p.id))})) : (c?.accounts||[]).slice(0,25);
     res.json({setupProblem:socialSetupProblem(c?.key_enc,id),provider:connectionProvider(c?.key_enc,id),outstand:outstandConfigured()?{networks:CONNECTABLE}:null,native:nativeNetworksFor(isPlatformAdmin(req.user)).length?{networks:nativeNetworksFor(isPlatformAdmin(req.user))}:null,connected:!!c,agencyConnected:!!connections?.agency,businessConnected:!!connections?.business,connectionScope:c?.business_id?'business':'agency',accounts,settings:s?.settings||autoSchema.parse({}),
