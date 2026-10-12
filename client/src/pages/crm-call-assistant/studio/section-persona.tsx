@@ -50,19 +50,19 @@ export function PersonaSection({ value, onChange, disabled, companyName, noticeS
     <SectionCard title="Persona" blurb="Pick a voice, give it a name, write the first thing a caller hears." testid="section-persona">
       <div className="space-y-1.5">
         <Label>Voice</Label>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" role="radiogroup" aria-label="Voice" data-testid="persona-cards">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,16rem),1fr))] gap-3" role="radiogroup" aria-label="Voice" data-testid="persona-cards">
           {list.map((p) => {
             const selected = value.presetId === p.id;
             return (
               <div key={p.id} role="radio" aria-checked={selected} tabIndex={disabled ? -1 : 0}
                 data-testid={`card-persona-${p.id}`}
-                className={cn("rounded-lg border p-3 text-left transition-colors", selected ? "border-primary ring-2 ring-primary/30 bg-primary/5" : "hover:bg-muted/40", disabled ? "opacity-70" : "cursor-pointer")}
+                className={cn("min-w-0 rounded-lg border p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", selected ? "border-primary ring-2 ring-primary/30 bg-primary/5" : "hover:bg-muted/40", disabled ? "opacity-70" : "cursor-pointer")}
                 onClick={() => !disabled && set("presetId", p.id)}
                 onKeyDown={(e) => { if (!disabled && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); set("presetId", p.id); } }}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{p.name}</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="whitespace-nowrap font-medium">{p.name}</span>
                       <Badge variant="outline" className="text-[10px] capitalize">{p.gender}</Badge>
                       {selected && <Check className="h-4 w-4 text-primary" aria-hidden="true" />}
                     </div>

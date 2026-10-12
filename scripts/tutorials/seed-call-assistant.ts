@@ -20,7 +20,7 @@ export function assertCallAssistantTarget(raw: string): void {
     throw new Error("Call Assistant samples require a development or recording database");
 }
 
-export function callAssistantProfile() {
+export function callAssistantProfile(counties: ReturnType<typeof defaultVoiceProfile>["serviceArea"]["counties"] = []) {
   const p = defaultVoiceProfile({ name: "Aspire Interiors", timezone: "America/New_York", state: "FL",
     phone: "+19415550120", website: "https://aspire-interiors.example" });
   p.company.spokenName = "Aspire Interiors";
@@ -30,7 +30,8 @@ export function callAssistantProfile() {
     { name: "Bathroom remodeling", details: "Showers, vanities and tile renovations.", tier: "primary" },
     { name: "Interior painting", details: "Walls and trim as part of a remodel.", tier: "secondary" },
   ];
-  // Spoken areas need no invented county IDs or government records.
+  // Use the app's county rows, never invented IDs or a parallel FIPS mapping.
+  p.serviceArea.counties = counties;
   p.serviceArea.spokenAreas = ["Sarasota", "Bradenton", "Venice"];
   p.persona.presetId = "janice";
   p.persona.assistantName = "Janice";
@@ -87,12 +88,36 @@ export async function seedCallAssistant(raw: string): Promise<void> {
     if (orgs.length !== 1 || !orgs[0].owner_user_id) throw new Error("Expected exactly one Aspire Interiors demo org with an owner; run seed-demo.ts first");
     const org = orgs[0];
     const prefix = `tutorial-call-assistant:${org.id}:`;
-    const p = callAssistantProfile();
+    const { rows: counties } = await db.query(`select id, name, state_code as "stateCode" from counties
+      where state_code = 'FL' and name in ('Sarasota', 'Manatee') order by name`);
+    if (counties.length !== 2 || new Set(counties.map(c => c.name)).size !== 2)
+      throw new Error("Seed the verified Florida county catalog before Call Assistant samples (Sarasota and Manatee required)");
+    const p = callAssistantProfile(counties);
     const compiled = compileVoiceProfile(p, 1);
     const json = (v: unknown) => JSON.stringify(v);
-    // Leave a completed seed unchanged. The call SID is our org-scoped idempotency key.
+    // The call SID is our org-scoped idempotency key; an older seed only needs its empty county selection repaired.
     const { rows: existing } = await db.query("select id from voice_calls where call_sid = $1", [prefix + "10"]);
-    if (existing.length) { await db.query("COMMIT"); return; }
+    if (existing.length) {
+      // Repair pre-r9 sample profiles on rerun; preserve any county selection the owner already made.
+      const { rows: profiles } = await db.query("select id, profile, published_profile, published_version from voice_profiles where org_id=$1 for update", [org.id]);
+      for (const row of profiles) {
+        const draft = parseVoiceProfile(row.profile);
+        const published = row.published_profile ? parseVoiceProfile(row.published_profile) : null;
+        const repairDraft = draft.serviceArea.counties.length === 0;
+        const repairPublished = published && published.serviceArea.counties.length === 0;
+        if (repairDraft) draft.serviceArea.counties = counties;
+        if (repairPublished) published.serviceArea.counties = counties;
+        if (repairDraft) await db.query("update voice_profiles set profile=$2 where id=$1", [row.id, json(draft)]);
+        if (repairPublished) {
+          const compiledPublished = compileVoiceProfile(published, row.published_version ?? 1);
+          await db.query("update voice_profiles set published_profile=$2, compiled=$3 where id=$1", [row.id, json(published), json(compiledPublished)]);
+          await db.query(`update voice_profile_versions set profile=$3, compiled=$4
+            where profile_id=$1 and version=$2 and note='Fictional tutorial workspace'`,
+          [row.id, row.published_version, json(published), json(compiledPublished)]);
+        }
+      }
+      await db.query("COMMIT"); return;
+    }
     const { rows: profiles } = await db.query("select id from voice_profiles where org_id=$1", [org.id]);
     if (profiles.length) throw new Error("Aspire Interiors already has a voice profile; refusing to replace it");
     await db.query(`insert into call_assistant_subscriptions (user_id,tier,status,billing_interval,current_period_end,stripe_subscription_id)

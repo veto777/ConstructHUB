@@ -54,7 +54,7 @@ export function EscalationsSection({ value, onChange, disabled }: SectionProps<E
         {rules.map((r, i) => (
           <RowCard key={r.id} disabled={disabled} testid={`row-escalation-${i}`} onRemove={() => set("rules", rules.filter((_, j) => j !== i))} removeLabel="Remove rule">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary" className="font-mono text-[10px]">{r.id}</Badge>
+              <Badge variant="secondary" className="whitespace-normal">{r.kinds.map(k => k === "urgent" ? "Urgent site issue" : ESCALATION_KIND_LABELS[k]).join(" / ")}</Badge>
               <SwitchInline id={`esc-enabled-${i}`} label="Enabled" checked={r.enabled} disabled={disabled} testid={`switch-escalation-enabled-${i}`} onChange={(v) => setRule(i, { enabled: v })} />
             </div>
             <div className="space-y-1.5">

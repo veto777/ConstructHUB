@@ -16,13 +16,14 @@ import { cn } from "@/lib/utils";
 import { accentClasses, type Accent } from "@/components/app-ui";
 
 export type ResultsRange = "7d" | "30d" | "month" | "all";
-export type ResultsPick = "lead_submitted" | "alerted" | "info" | "declined" | "hangup" | "spam";
+export type ResultsPick = "lead_submitted" | "alerted" | "info" | "declined" | "hangup" | "voicemail" | "spam";
 
 type Summary = {
   range: ResultsRange;
   total: number;
   minutes: number;
   recordings: number;
+  sentToPerson?: number;
   firstCallAt: string | null;
   outcomes: Record<string, number>;
   lines: { label: string; calls: number; leads: number }[];
@@ -36,7 +37,8 @@ const TILES: { key: ResultsPick; label: string; hint: string; outcomes: string[]
   { key: "alerted", label: "Sent to a person", hint: "Urgent or follow-up, someone was alerted", outcomes: ["alerted"], icon: BellRing, tone: "orange" },
   { key: "info", label: "Questions answered", hint: "Callers who only needed information", outcomes: ["info"], icon: Info, tone: "orange" },
   { key: "declined", label: "Declined", hint: "Work you don't do, or outside your area", outcomes: ["declined", "out_of_area"], icon: XCircle, tone: "orange" },
-  { key: "hangup", label: "Hung up", hint: "Ended before saying what they needed", outcomes: ["hangup", "voicemail"], icon: PhoneMissed, tone: "orange" },
+  { key: "hangup", label: "Hung up", hint: "Ended before saying what they needed", outcomes: ["hangup"], icon: PhoneMissed, tone: "orange" },
+  { key: "voicemail", label: "Messages taken", hint: "Voicemails left for your team", outcomes: ["voicemail"], icon: Mic, tone: "orange" },
   { key: "spam", label: "Spam blocked", hint: "You never had to pick up", outcomes: ["spam", "blocked"], icon: ShieldBan, tone: "orange" },
 ];
 
@@ -91,7 +93,7 @@ export function CallResults({ onPick, className }: { onPick: (pick: ResultsPick)
 
             <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3" data-testid="list-results-outcomes">
               {TILES.map((t) => {
-                const n = sum(d.outcomes, t.outcomes);
+                const n = t.key === "alerted" ? d.sentToPerson ?? sum(d.outcomes, t.outcomes) : sum(d.outcomes, t.outcomes);
                 return (
                   <li key={t.key}>
                     <button

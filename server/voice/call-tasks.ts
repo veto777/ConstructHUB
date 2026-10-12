@@ -246,12 +246,37 @@ export type CallTaskView = {
   attempts: number; lastError: string | null; nextAttemptAt: string | null; giveUpAt: string | null; doneAt: string | null;
 };
 
+export type DeliverySummaryTask = Pick<CallTask, "kind" | "state" | "payload" | "result" | "lastError">;
+export type EscalationDeliveryEvidence = { kind: string; sentCount: number; lastSentAt: unknown; lastError: string | null };
+/** A durable escalation receipt is more specific than the task runner's generic failure. */
+export function withEscalationEvidence<T extends DeliverySummaryTask>(task: T, rows: EscalationDeliveryEvidence[]): T {
+  if (task.kind !== "escalation") return task;
+  const uncertain = rows.find(e => e.kind === task.payload.kind && (
+    (e.sentCount > 0 && !e.lastSentAt) || taskDeliveryUncertain({ result: null, lastError: e.lastError })
+  ));
+  return uncertain ? { ...task, result: { ...task.result, uncertain: true }, lastError: uncertain.lastError ?? "Delivery uncertain; verify with the carrier before resending." } : task;
+}
+export function taskDeliveryUncertain(t: Pick<DeliverySummaryTask, "result" | "lastError">): boolean {
+  return !!t.result?.uncertain || !!t.result?.sending || /delivery uncertain|outcome unknown|confirmation could not be saved/i.test(t.lastError ?? "");
+}
+
+/** Name the failed step, never imply that a notification failure lost the CRM record. */
+export function deliveryLabelOf(tasks: DeliverySummaryTask[]): string | null {
+  if (tasks.some(t => t.kind === "lead" && t.state === "failed")) return "CRM delivery failed";
+  if (tasks.some(taskDeliveryUncertain)) return "Delivery uncertain";
+  const failed = tasks.filter(t => t.state === "failed");
+  if (failed.length) return failed.every(t => t.payload.channel === "sms") ? "Text not sent" : "Notification not sent";
+  if (tasks.some(t => t.kind === "lead" && t.state === "pending")) return "Saving to CRM";
+  if (tasks.some(t => t.state === "pending")) return "Sending notifications";
+  return null;
+}
+
 export function presentCallTask(t: CallTask): CallTaskView {
   const label = t.kind === "notification" ? `${t.payload.channel === "inApp" ? "In-app" : String(t.payload.channel).toUpperCase()} — ${t.payload.recipient}` : t.kind === "lead" ? "Client and project in your CRM" : `Escalation — ${kindLabel(String(t.payload.kind ?? "other"))}`;
   const state = t.state === "pending" && t.attempts > 0 && t.lastError ? "retrying" : t.state;
   return {
     id: t.id, key: t.key, kind: t.kind, label, state, attempts: t.attempts, lastError: t.lastError,
-    uncertain: !!t.result?.uncertain || !!t.result?.sending || /outcome unknown|confirmation could not be saved/i.test(t.lastError ?? ""),
+    uncertain: taskDeliveryUncertain(t),
     nextAttemptAt: t.state === "pending" ? t.nextAttemptAt.toISOString() : null,
     giveUpAt: t.giveUpAt ? t.giveUpAt.toISOString() : null, doneAt: t.doneAt ? t.doneAt.toISOString() : null,
   };

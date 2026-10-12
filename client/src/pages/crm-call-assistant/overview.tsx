@@ -52,7 +52,7 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
   const profileStatus = status.profile?.status ?? "draft";
   // The server probes the engine's /health (cached ~30 s); "configured" alone says nothing about whether calls get answered.
   const engine: { tone: "success" | "warning" | "danger"; text: string; hint: string } =
-    !status.engine.configured ? { tone: "warning", text: "Engine not configured", hint: "The app has no engine secret set." }
+    !status.engine.configured ? { tone: "warning", text: "Contact support to connect your assistant", hint: "ConstructHUB support needs to connect the phone service before this assistant can answer calls." }
     : !status.engine.reachable ? { tone: "danger", text: "Engine down", hint: "The voice engine is not answering; calls to your numbers can't be picked up right now." }
     : !status.engine.models ? { tone: "warning", text: "Engine starting", hint: "The engine is up but its speech models are still loading." }
     : { tone: "success", text: "Engine up", hint: "The voice engine is answering." };
@@ -67,6 +67,7 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
     ext && !ownLive ? { text: `${ext.name} answers your calls — ${ext.callsLast30Days.toLocaleString("en-US")} in the last 30 days`, href: "/call-assistant/calls", testid: "link-overview-next-calls", label: "View calls" }
     : !ownLive ? { text: "Set up and publish your assistant", href: "/call-assistant/studio", testid: "link-overview-next-studio", label: "Continue" }
     : numbers.length === 0 ? { text: "Get a local number", href: "/call-assistant/numbers", testid: "link-overview-next-numbers", label: "Continue" }
+    : !calls.isSuccess || recent.length > 0 || (status.usage?.calls ?? 0) > 0 ? { text: "Review your latest calls and follow up", href: "/call-assistant/calls", testid: "link-overview-next-calls", label: "View calls" }
     : { text: "Try a test conversation", href: "/call-assistant/simulator", testid: "link-overview-next-simulator", label: "Continue" };
 
   const paymentPaused = !status.enabled && status.paused === true;
@@ -192,7 +193,7 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
               <Badge variant="secondary">{status.addon.name}</Badge>
               {status.addon.preview && <Badge variant="outline" data-testid="badge-overview-preview">Coming soon</Badge>}
               {status.plan && !inNativeApp() && <Badge variant="outline" className="capitalize">{status.plan} plan</Badge>}
-              <StatusPill tone={engine.tone} data-testid="pill-overview-engine" title={engine.hint}>{engine.text}</StatusPill>
+              {(!ext || ownLive) && <StatusPill tone={engine.tone} className="whitespace-normal" data-testid="pill-overview-engine" title={engine.hint}>{engine.text}</StatusPill>}
             </div>
           </CardContent>
         </Section>

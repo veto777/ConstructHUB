@@ -39,12 +39,14 @@ export type VoiceCallListRow = {
   recordingReason?: string | null;
   /** The call's post-call CRM work in one word (server/voice/call-tasks.ts): null = it had none. */
   deliveryState?: CallDeliveryState | null;
+  deliveryLabel?: string | null;
 };
 
 export type CallDeliveryState = "pending" | "failed" | "done";
 
 /** One piece of a call's CRM work (the lead, an escalation) — GET /api/crm/voice/calls/:id → delivery.tasks. */
 export type CallTaskView = {
+  uncertain?: boolean;
   id: number;
   key: string;
   kind: "lead" | "escalation" | "notification";
@@ -69,8 +71,8 @@ export function callStillChanging(c: Pick<VoiceCallListRow, "endedAt" | "outcome
 }
 
 /** What the list row says about a call that its open drawer must agree with (a change → refetch the drawer). */
-export function callFingerprint(c: Pick<VoiceCallListRow, "endedAt" | "outcome" | "recordingState" | "deliveryState" | "hasRecording" | "customerId">): string {
-  return [c.endedAt ?? "", c.outcome ?? "", c.recordingState ?? "", c.deliveryState ?? "", c.hasRecording ? 1 : 0, c.customerId ?? ""].join("|");
+export function callFingerprint(c: Pick<VoiceCallListRow, "endedAt" | "outcome" | "recordingState" | "deliveryState" | "deliveryLabel" | "hasRecording" | "customerId">): string {
+  return [c.endedAt ?? "", c.outcome ?? "", c.recordingState ?? "", c.deliveryState ?? "", c.deliveryLabel ?? "", c.hasRecording ? 1 : 0, c.customerId ?? ""].join("|");
 }
 
 export type VoiceCallList = { calls: VoiceCallListRow[]; total: number; page: number; limit: number };
