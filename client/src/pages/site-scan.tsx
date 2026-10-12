@@ -17,6 +17,9 @@ import { GoogleAiOverview, GoogleSectionHeader, GoogleList, GoogleListRow, Googl
 import { Download, Search, Trash2 } from "lucide-react";
 import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
 import { useUrlParam } from "@/hooks/use-url-param";
+import { useToolView } from "@/hooks/use-tool-view";
+import { useInToolShell } from "@/components/tool/in-shell";
+import { SITE_SCAN_VIEWS } from "@/components/website-tool/nav";
 const api = async (method: string, url: string, body?: unknown) =>
   (await apiRequest(method, url, body)).json();
 // Google's rounded field shape for the native selects (the surface supplies the hairline colour).
@@ -469,6 +472,11 @@ export default function SiteScanPage() {
     offset: String(filters.offset),
   });
 
+  // New scan (/site-scan) and Scan history (/site-scan/history) are separate views in the Website tool; the open
+  // report (?scan=) shows under either. Outside the full-screen tool both sections show, as before.
+  const [view] = useToolView<"scan" | "history">("/site-scan", SITE_SCAN_VIEWS, "scan", ["scan"]);
+  const inShell = useInToolShell();
+  const showStart = !inShell || view === "scan", showHistory = !inShell || view === "history";
   const [scanParam, setScanParam] = useUrlParam("scan");
   const selected = scanParam ?? "",
     setSelected = (v: string | number) =>
@@ -602,16 +610,20 @@ export default function SiteScanPage() {
       {/* Google's format (owner, 2026-10-07): quiet titles with a hairline, Google's search box, hairline rows, pills. */}
       <GoogleSectionHeader
         as="h1"
-        title="Site Scan"
-        description="Find website issues, compare your Google Business Profile, and draft your next fixes."
+        title={!inShell ? "Site Scan" : view === "history" ? "Scan history" : "New scan"}
+        description={!inShell ? "Find website issues, compare your Google Business Profile, and draft your next fixes." : view === "scan" ? "Find website issues, compare your Google Business Profile, and draft your next fixes." : "Every scan you ran, its score over time, and its report."}
         flush
+        actions={inShell ? (view === "history"
+          ? <GooglePill variant="solid" href="/site-scan" label="New scan" testId="link-site-scan-new" />
+          : <GooglePill href="/site-scan/history" label="Scan history" testId="link-site-scan-history" />) : undefined}
       />
       <AgencyWorkspace compact />
-      <section>
-        <GoogleSectionHeader
+      {showStart && <section>
+        {!inShell && <GoogleSectionHeader
           title="Start a scan"
           description="Up to 5 scans/day, 20 PageSpeed requests/day and 3 AI drafts/day. Larger scans take minutes."
-        />
+        />}
+        {inShell && <p className="mb-3 text-xs g-text-2">Up to 5 scans/day, 20 PageSpeed requests/day and 3 AI drafts/day. Larger scans take minutes.</p>}
         <div className="space-y-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <div className="g-search min-w-0 flex-1 sm:max-w-xs" role="search">
@@ -863,11 +875,11 @@ export default function SiteScanPage() {
             )}
           </div>
         </div>
-      </section>
+      </section>}
       {error && <Notice tone="danger">{error}</Notice>}
       {notice && <Notice>{notice}</Notice>}
-      <section data-testid="section-scan-history">
-        <GoogleSectionHeader title="History & score trend" />
+      {showHistory && <section data-testid="section-scan-history">
+        {!inShell && <GoogleSectionHeader title="History & score trend" />}
         <div className="space-y-3">
           {listError && (
             <Notice tone="danger">
@@ -994,7 +1006,7 @@ export default function SiteScanPage() {
             <p className="text-sm g-text-2">No scans yet.</p>
           )}
         </div>
-      </section>
+      </section>}
       {selected && jobError && (
         <Notice tone="danger">
           {/^(400|404):/.test((jobError as any).message)

@@ -7,17 +7,26 @@
  * to SHELLED_TOOLS. The routes it claims are every tool `path`/`paths` and anything below them.
  */
 import type { ReactNode } from "react";
+import { InToolShell } from "@/components/tool/in-shell";
 import { Link } from "wouter";
 import { CHLogo } from "@/components/ch-logo";
 import { useSidebar } from "@/components/ui/sidebar";
 import { ToolShell, type ToolShellConfig } from "@/components/tool/shell";
 import { AllTools } from "@/components/seo-tool/layout";
 import { socialNav } from "@/components/social-tool/nav";
+import { websiteNav } from "@/components/website-tool/nav";
+import { trafficNav } from "@/components/traffic-tool/nav";
+import { competitorsNav } from "@/components/competitors-tool/nav";
+import { SHOW_COMPETITOR_INTEL } from "@/lib/features";
 
 export type ShelledTool = { nav: () => ToolShellConfig };
 export const SHELLED_TOOLS: ShelledTool[] = [
   { nav: socialNav },
+  { nav: websiteNav },
+  { nav: trafficNav },
+  ...(SHOW_COMPETITOR_INTEL ? [{ nav: competitorsNav }] : []),
 ];
+export { useInToolShell } from "@/components/tool/in-shell";
 
 const owns = (config: ToolShellConfig, location: string) =>
   config.tools.some((t) => [t.path, ...(t.paths ?? [])].some((p) => location === p || location.startsWith(`${p}/`)));
@@ -31,11 +40,13 @@ export function shelledToolFor(location: string): ToolShellConfig | null {
 export function ProductToolLayout({ config, actions, banner, footer, children }: { config: ToolShellConfig; actions?: ReactNode; banner?: ReactNode; footer?: ReactNode; children: ReactNode }) {
   const { setOpenMobile } = useSidebar();
   return (
+    <InToolShell.Provider value>
     <ToolShell config={config} testId={`${config.key}-tool-shell`}
       brand={<Link href="/" aria-label="ConstructHUB home" title="ConstructHUB home" data-testid="link-tool-home"><CHLogo height={26} /></Link>}
       allToolsNote={`Everything else in ConstructHUB. ${config.label} stays where you left it.`} allTools={(close) => <AllTools close={close} />} onAllToolsPhone={() => setOpenMobile(true)}
       actions={actions} banner={banner} footer={footer}>
       {children}
     </ToolShell>
+    </InToolShell.Provider>
   );
 }

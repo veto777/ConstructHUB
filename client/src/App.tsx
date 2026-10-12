@@ -244,8 +244,18 @@ function DashboardRouter() {
       <Route path="/guides" component={GuidesPage} />
       <Route path="/tutorials" component={TutorialsPage} />
       <Route path="/cloudflare" component={CloudflarePage} />
+      <Route path="/cloudflare/connections" component={CloudflarePage} />
+      <Route path="/cloudflare/onboarding" component={CloudflarePage} />
+      <Route path="/cloudflare/work-queue" component={CloudflarePage} />
+      <Route path="/cloudflare/edge-audit" component={CloudflarePage} />
+      <Route path="/cloudflare/guide" component={CloudflarePage} />
       <Route path="/search-console" component={SearchConsolePage} />
+      <Route path="/search-console/connections" component={SearchConsolePage} />
+      <Route path="/search-console/onboarding" component={SearchConsolePage} />
+      <Route path="/search-console/work-queue" component={SearchConsolePage} />
+      <Route path="/search-console/guide" component={SearchConsolePage} />
       <Route path="/site-scan" component={SiteScanPage} />
+      <Route path="/site-scan/history" component={SiteScanPage} />
       <Route path="/seo" component={SeoDashboardPage} />
       <Route path="/seo/rank-tracker" component={SeoOverviewPage} />
       <Route path="/seo/explorer" component={SeoExplorerPage} />
@@ -276,6 +286,11 @@ function DashboardRouter() {
       <Route path="/lsa-guide" component={LsaGuidePage} />
       <Route path="/lsa-leads" component={LsaLeadsPage} />
       <Route path="/ip-tracker" component={IpTrackerPage} />
+      <Route path="/ip-tracker/visitors" component={IpTrackerPage} />
+      <Route path="/ip-tracker/traffic" component={IpTrackerPage} />
+      <Route path="/ip-tracker/pages" component={IpTrackerPage} />
+      <Route path="/ip-tracker/geo" component={IpTrackerPage} />
+      <Route path="/ip-tracker/platforms" component={IpTrackerPage} />
       <Route path="/crm-app" component={CrmGatewayPage} />
       {/* The AI Call Assistant's marketing page; signed in it keeps the sidebar (its "Call Assistant" entry lands here). */}
       <Route path="/call-assistant" component={CrmCallAssistantPage} />
@@ -305,6 +320,9 @@ function DashboardRouter() {
       {/* Anyone, signed in or out: a report to the issue desk (POST /api/issues/report) and the reporter's own list. */}
       <Route path="/report-issue" component={ReportIssuePage} />
       <Route path="/vpn-shield" component={VpnShieldPage} />
+      <Route path="/vpn-shield/flagged" component={VpnShieldPage} />
+      <Route path="/vpn-shield/install" component={VpnShieldPage} />
+      <Route path="/vpn-shield/settings" component={VpnShieldPage} />
       <Route path="/individual-pricing" component={IndividualPricingRedirect} />
       {SHOW_COMPETITOR_INTEL && <Route path="/competitors-landing" component={CompetitorsLanding} />}
       <Route path="/master-class-landing" component={MasterClassLanding} />
@@ -398,6 +416,11 @@ function PublicRouter() {
       <Route path="/google-ad-fraud" component={GoogleAdFraudPage} />
       <Route path="/lsa-guide" component={LsaGuidePage} />
       <Route path="/ip-tracker" component={Ribboned.IpTrackerPage} />
+      <Route path="/ip-tracker/visitors" component={Ribboned.IpTrackerPage} />
+      <Route path="/ip-tracker/traffic" component={Ribboned.IpTrackerPage} />
+      <Route path="/ip-tracker/pages" component={Ribboned.IpTrackerPage} />
+      <Route path="/ip-tracker/geo" component={Ribboned.IpTrackerPage} />
+      <Route path="/ip-tracker/platforms" component={Ribboned.IpTrackerPage} />
       <Route path="/crm-app" component={CrmGatewayPage} />
       <Route path="/call-assistant" component={CallAssistantLandingPage} />
       <Route path="/features" component={FeaturesCataloguePage} />
@@ -409,6 +432,9 @@ function PublicRouter() {
       <Route path="/done-for-you" component={DfyCataloguePage} />
       <Route path="/done-for-you/:slug" component={DfyPageRoute} />
       <Route path="/vpn-shield" component={Ribboned.VpnShieldPage} />
+      <Route path="/vpn-shield/flagged" component={Ribboned.VpnShieldPage} />
+      <Route path="/vpn-shield/install" component={Ribboned.VpnShieldPage} />
+      <Route path="/vpn-shield/settings" component={Ribboned.VpnShieldPage} />
       <Route path="/individual-pricing" component={IndividualPricingRedirect} />
       <Route path="/developers" component={DevelopersPage} />
       <Route path="/permits-landing" component={PermitsLanding} />
@@ -436,7 +462,7 @@ function PublicRouter() {
 /** Dashboard routes that need an account (everything else here is public). */
 const SIGNED_IN_ONLY = [
   "/search", "/schedules", "/history", "/permit-alerts", "/media-library", "/gmb-monitor", "/ranking-grid",
-  "/social-media", "/guides", "/tutorials", "/cloudflare", "/search-console", "/seo", "/lsa-leads", "/lsa-account-manager", "/settings",
+  "/social-media", "/guides", "/tutorials", "/site-scan/history", "/cloudflare", "/search-console", "/seo", "/lsa-leads", "/lsa-account-manager", "/settings",
   "/agency", "/locations", "/domains", "/mail-alerts", "/gbp-content", "/listing-editor", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/youtube",
   ...(SHOW_COMPETITOR_INTEL ? ["/competitors"] : []),
   ...(SHOW_GOOGLE_REVIEWS ? ["/google-reviews"] : []),
@@ -466,7 +492,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/gmb-monitor": "GMB Edit Monitor", "/ranking-grid": "GMB Ranking Grid", "/pricing": "Pricing",
   "/competitors": "Competitor Intel", "/agency": "Agency", "/locations": "Locations", "/domains": "Domains",
   "/mail-alerts": "Mail Alerts", "/gbp-content": "Posts & Photos", "/listing-editor": "Listing editor", "/social-media": "Social Media", "/social-media/calendar": "Social calendar", "/social-media/compose": "New social post", "/social-media/posts": "Social posts", "/social-media/analytics": "Social analytics", "/social-media/inbox": "Social inbox", "/social-media/accounts": "Social accounts", "/social-media/auto": "Social auto mode", "/social-media/guides": "Social guides",
-  "/guides": "Guides", "/tutorials": "Tutorials", "/cloudflare": "Cloudflare", "/search-console": "Search Console", "/site-scan": "Site Scan",
+  "/guides": "Guides", "/tutorials": "Tutorials", "/cloudflare": "Cloudflare", "/search-console": "Search Console", "/site-scan": "Site Scan", "/site-scan/history": "Site Scan history",
   "/seo": "SEO Suite", "/seo/rank-tracker": "Rank tracker", "/seo/local-grid": "Local grid", "/seo/plan": "SEO action plan", "/seo/audit": "Site audit", "/seo/alerts": "SEO alerts", "/seo/mentions": "SEO mentions", "/seo/usage": "SEO data usage", "/seo/reports": "SEO reports", "/seo/ai": "AI visibility", "/seo/batch": "Batch analysis", "/seo/content": "Content explorer", "/seo/explorer": "Site explorer", "/seo/keywords": "Keywords explorer", "/seo/backlinks": "Backlinks", "/seo/competitors": "Competitor gap",
   "/master-class": "Master Class", "/reinstatement": "Reinstatement", "/google-business": "Google Business",
   "/google-ads": "Click Guard", "/ads-manager": "Agency Ads & LSA", "/google-ads-guide": "Google Ads Guide",

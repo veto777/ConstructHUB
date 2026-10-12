@@ -1,4 +1,5 @@
 import { AppPage, PageHeader, Section, StatGrid, Stat, AppTabsList, Toolbar, Notice } from "@/components/app-ui";
+import { useInToolShell } from "@/components/tool/in-shell";
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -103,6 +104,7 @@ function BsMeter({ score }: { score: number }) {
 }
 
 export default function CompetitorsPage() {
+  const inShell = useInToolShell();
   const { toast } = useToast();
   const [industry, setIndustry] = useState("");
   const [location, setLocation] = useState("");
@@ -232,12 +234,13 @@ export default function CompetitorsPage() {
     <GoogleSurface page><AppPage className="before:hidden">
       <PageHeader title={<span ref={titleRef} tabIndex={-1} data-testid="text-competitors-title">Competitor intelligence</span>} description={COMPETITORS_SUBTITLE} />
         <Tabs defaultValue="market-scan" className="space-y-6">
-          <AppTabsList>
+          {/* One view: in the full-screen tool the menu already names it, so no tab strip of one. */}
+          {!inShell && <AppTabsList>
             <TabsTrigger value="market-scan" className="flex items-center gap-1.5" data-testid="tab-market-scan">
               <Search className="w-4 h-4" />
               Market scan
             </TabsTrigger>
-          </AppTabsList>
+          </AppTabsList>}
 
           <TabsContent value="market-scan" className="space-y-6">
             <Section title="New market scan" testId="card-new-scan">

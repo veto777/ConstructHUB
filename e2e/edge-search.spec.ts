@@ -142,11 +142,12 @@ test("Cloudflare 1,000-site list → bulk preview → confirmation → durable q
       ),
     )
     .toBe(25);
-  await page.getByRole("button", { name: "Work queue", exact: true }).click();
+  // Work queue is its own view in the Website tool's menu (/cloudflare/work-queue).
+  await page.getByRole("link", { name: "Work queue", exact: true }).click();
   await expect(
     page.getByText(/Apply edge protection\s*Queued/).first(),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Guide", exact: true }).click();
+  await page.getByRole("link", { name: "Guide", exact: true }).click();
   await expect(
     page.getByText("Put a client site behind Cloudflare", { exact: true }),
   ).toBeVisible();
@@ -200,12 +201,12 @@ test("Search Console 1,000-property list → cached analytics → bulk sync → 
       ),
     )
     .toBe(1);
-  await page.getByRole("button", { name: "Connections", exact: true }).click();
+  await page.getByRole("link", { name: "Connections", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Connect Google Search Console" }),
   ).toBeVisible();
   await page.getByRole("radio").first().check();
-  await page.getByRole("button", { name: "Onboarding", exact: true }).click();
+  await page.getByRole("link", { name: "Onboarding", exact: true }).click();
   await page.getByLabel("Search Locations", { exact: true }).fill(tag);
   await expect(page.getByText("1000 results", { exact: true })).toBeVisible();
 });

@@ -15,6 +15,10 @@ import {
 } from "@/components/app-ui";
 import { GoogleSectionHeader, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
 import { ToolTabs } from "@/components/tool";
+import { ToolBarSlot } from "@/components/tool/shell";
+import { useInToolShell } from "@/components/tool/in-shell";
+import { useToolView } from "@/hooks/use-tool-view";
+import { VPN_SHIELD_VIEWS } from "@/components/traffic-tool/nav";
 import { countryName, GEO_SOURCE_NOTE } from "@/components/ip-tracker/country-names";
 import {
   ChevronRight, Copy, Monitor, Smartphone, Tablet,
@@ -74,6 +78,14 @@ const tabs = [
 ] as const;
 
 type TabId = typeof tabs[number]["id"];
+
+/** Each section's title and line in the full-screen tool. */
+const VPN_HEAD: Record<TabId, [string, string]> = {
+  overview: ["VPN Shield", "Possible VPN and proxy visits on the chosen site, and how they are handled."],
+  blocked: ["Flagged visits", "Each visit flagged as a likely VPN or proxy, newest first."],
+  install: ["Install script", "Add the script to your site so VPN Shield can check visitors."],
+  settings: ["Settings", "Choose what happens to flagged visitors. Browser overlays can be bypassed and may affect legitimate visitors."],
+};
 
 /** Tab and site live in the query string (?site=10&tab=settings) so a reload or shared link keeps them. */
 function useUrlState() {
@@ -771,9 +783,9 @@ function SettingsTab({ domainId, domains }: { domainId: number | null; domains: 
 export default function VpnShieldPage() {
   const { toast } = useToast();
   const { params, set: setUrlParam } = useUrlState();
-  const tabParam = params.get("tab");
-  const activeTab: TabId = tabs.some(t => t.id === tabParam) ? (tabParam as TabId) : "overview";
-  const setActiveTab = (tab: TabId) => setUrlParam("tab", tab === "overview" ? null : tab);
+  // Each section is its own address (/vpn-shield/flagged; components/traffic-tool/nav.ts); old ?tab= links land there.
+  const [activeTab, setActiveTab] = useToolView<TabId>("/vpn-shield", VPN_SHIELD_VIEWS, "overview");
+  const inShell = useInToolShell();
   const selectedDomainId = Number(params.get("site")) || null;
   const setSelectedDomainId = (id: number | null) => setUrlParam("site", id ? String(id) : null);
 
@@ -802,19 +814,8 @@ export default function VpnShieldPage() {
   const lastDetection = lastDetectionQuery.data?.[0]?.visitedAt ?? null;
   const savedMode = (selectedDomain as any)?.settings?.vpnBlockMode as string | undefined;
 
-  return (
-    <AppPage testId="page-vpn-shield">
-      {/* Google's page format (owner, 2026-10-07): a quiet header, hairline cards, pill actions, stat tiles. */}
-      <GoogleSectionHeader
-        as="h1"
-        titleTestId="text-vpn-page-title"
-        title="VPN Shield"
-        description={<>
-          <span data-testid="text-vpn-subtitle">Review possible VPN or proxy traffic and choose how flagged visitors are handled. Browser overlays can be bypassed and may affect legitimate visitors.</span>
-          {selectedDomain && <>{" "}<StatusPill tone="neutral" data-testid="badge-vpn-shield">{selectedDomain.name || selectedDomain.domain}</StatusPill></>}
-        </>}
-        flush
-        actions={
+  // In the full-screen tool the site picker sits in the tool bar, beside the menu.
+  const siteControls = (
           (domains?.length ?? 0) > 0 ? (
             <label className="block min-w-0 flex-1 space-y-1.5 text-sm sm:w-56 sm:flex-none">
               <span className="text-muted-foreground sm:hidden">Site</span>
@@ -831,7 +832,20 @@ export default function VpnShieldPage() {
               </select>
             </label>
           ) : undefined
-        }
+  );
+  return (
+    <AppPage testId="page-vpn-shield">
+      {/* Google's page format (owner, 2026-10-07): a quiet header, hairline cards, pill actions, stat tiles. */}
+      <GoogleSectionHeader
+        as="h1"
+        titleTestId="text-vpn-page-title"
+        title={inShell ? VPN_HEAD[activeTab][0] : "VPN Shield"}
+        description={<>
+          <span data-testid="text-vpn-subtitle">{inShell ? VPN_HEAD[activeTab][1] : "Review possible VPN or proxy traffic and choose how flagged visitors are handled. Browser overlays can be bypassed and may affect legitimate visitors."}</span>
+          {selectedDomain && <>{" "}<StatusPill tone="neutral" data-testid="badge-vpn-shield">{selectedDomain.name || selectedDomain.domain}</StatusPill></>}
+        </>}
+        flush
+        actions={inShell ? undefined : siteControls}
       />
 
       {domainId && (
@@ -885,7 +899,8 @@ export default function VpnShieldPage() {
         </div>
       )}
 
-      <ToolTabs as="tablist" label="VPN Shield sections">
+      {inShell && (domains?.length ?? 0) > 0 && <ToolBarSlot><div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-sm" data-testid="toolbar-vpn-site"><span className="hidden g-text-2 sm:inline">Site</span>{siteControls}</div></ToolBarSlot>}
+      {!inShell && <ToolTabs as="tablist" label="VPN Shield sections">
         {tabs.map(tab => (
           <button
             key={tab.id}
@@ -898,7 +913,7 @@ export default function VpnShieldPage() {
             {tab.label}
           </button>
         ))}
-      </ToolTabs>
+      </ToolTabs>}
 
       {domainsLoading ? (
         <div className="flex items-center justify-center py-20">

@@ -34,6 +34,9 @@ import { Link } from "wouter";
 import { SiteConnectionGuide } from "./site-connection-guide";
 import { AppPage, Toolbar, Notice } from "@/components/app-ui";
 import { ToolTabs } from "@/components/tool";
+import { useInToolShell } from "@/components/tool/in-shell";
+import { useToolView } from "@/hooks/use-tool-view";
+import { CLOUDFLARE_VIEWS, SEARCH_CONSOLE_VIEWS } from "@/components/website-tool/nav";
 import {
   GoogleSectionHeader,
   GoogleList,
@@ -137,6 +140,24 @@ const CLOUDFLARE_TABS = [
   { tab: "Edge audit", helpKey: "cloudflare.edge-audit" },
   { tab: "Guide", helpKey: "cloudflare.guide" },
 ];
+/** Each view's line under its title in the full-screen tool (from the help registry's "what it is"). */
+const VIEW_LINE: Record<"cloudflare" | "gsc", Record<string, string>> = {
+  cloudflare: {
+    Sites: "The websites (zones) in your connected Cloudflare accounts, with traffic and protection.",
+    Connections: "Give ConstructHUB access to a Cloudflare account, see the accounts already connected, and remove them.",
+    Onboarding: "Email a client the steps for giving your Cloudflare login access to their account.",
+    "Work queue": "Background jobs for your Cloudflare connections: is it done yet?",
+    "Edge audit": "Every protection change: each preview you made and what happened to it.",
+    Guide: "Step-by-step instructions for Cloudflare.",
+  },
+  gsc: {
+    Sites: "The Search Console properties in your connected Google accounts: searches, pages, sitemaps and indexing.",
+    Connections: "Connect a Google account for Search Console, see the connected accounts, and remove them.",
+    Onboarding: "Email a client the steps for adding your Google account to their Search Console property.",
+    "Work queue": "Background jobs for your Search Console connections.",
+    Guide: "Step-by-step instructions for Search Console.",
+  },
+};
 const SEARCH_CONSOLE_TABS = [
   { tab: "Sites", helpKey: "search-console.sites" },
   { tab: "Connections", helpKey: "search-console.connections" },
@@ -147,6 +168,7 @@ const SEARCH_CONSOLE_TABS = [
 export function DataList({
   url,
   title,
+  label,
   render,
   filters = [],
   columns,
@@ -154,6 +176,8 @@ export function DataList({
 }: {
   url: string;
   title: string;
+  /** The heading shown, when it differs from `title` (which also keys the list's address parameters). */
+  label?: string;
   render: (row: any) => ReactNode;
   filters?: string[];
   columns?: Column[];
@@ -184,7 +208,7 @@ export function DataList({
     <section className="space-y-3">
       <GoogleSectionHeader
         as="h3"
-        title={title}
+        title={label ?? title}
         count={data.data?.total == null ? null : formatNumber(data.data.total)}
         flush
       />
@@ -497,7 +521,9 @@ export default function SiteConnections({
   const cf = provider === "cloudflare",
     base = `/api/${provider}`,
     { toast } = useToast();
-  const [tab, T] = useReportParam("tab", "Sites"),
+  // Each view is its own address (/cloudflare/work-queue; components/website-tool/nav.ts); old ?tab= links land there.
+  const [tab, T] = useToolView<string>(cf ? "/cloudflare" : "/search-console", cf ? CLOUDFLARE_VIEWS : SEARCH_CONSOLE_VIEWS, "Sites"),
+    inShell = useInToolShell(),
     [selected, Select] = useState<number[]>([]),
     [connection, C] = useState<number | null>(null),
     [assetId, setAssetId] = useReportParam("site"),
@@ -629,7 +655,18 @@ export default function SiteConnections({
     }
   }
   // Google's format (owner, 2026-10-07): a quiet page title, the views as pills, hairline lists, pill actions.
-  const header = (
+  const TABS = cf ? CLOUDFLARE_TABS : SEARCH_CONSOLE_TABS;
+  const viewHelp = TABS.find((t) => t.tab === tab)?.helpKey;
+  // In the full-screen tool the title is the view (the shell's menu says which tool); elsewhere the tool's name.
+  const header = inShell ? (
+    <GoogleSectionHeader
+      as="h1"
+      title={tab}
+      titleAfter={viewHelp ? <HelpButton k={viewHelp} /> : undefined}
+      description={VIEW_LINE[cf ? "cloudflare" : "gsc"][tab]}
+      flush
+    />
+  ) : (
     <GoogleSectionHeader
       as="h1"
       title={cf ? "Cloudflare protection" : "Google Search Console"}
@@ -644,7 +681,6 @@ export default function SiteConnections({
       flush
     />
   );
-  const TABS = cf ? CLOUDFLARE_TABS : SEARCH_CONSOLE_TABS;
   if (planGate)
     return (
       <AppPage testId={`page-site-connections-${provider}`}>
@@ -709,7 +745,7 @@ export default function SiteConnections({
           />
         </div>
       )}
-      <TabStrip tabs={TABS} active={tab} onChange={T} />
+      {!inShell && <TabStrip tabs={TABS} active={tab} onChange={T} />}
       {tab === "Guide" && <SiteConnectionGuide />}
       {tab === "Connections" && (
         <div className="space-y-5 sm:space-y-6">
@@ -1525,6 +1561,7 @@ export default function SiteConnections({
       {tab === "Work queue" && (
         <DataList
           title="Work queue"
+          label={inShell ? "Jobs" : undefined}
           url={`${base}/jobs`}
           filters={["queued", "running", "done", "failed", "uncertain"]}
           render={(j) => (
@@ -1550,6 +1587,7 @@ export default function SiteConnections({
       {tab === "Edge audit" && (
         <DataList
           title="Edge audit"
+          label={inShell ? "Changes" : undefined}
           url={`${base}/actions`}
           filters={["preview", "queued", "applied", "reverted", "uncertain"]}
           render={(a) => (

@@ -19,6 +19,10 @@ import {
 import { countryName, geoLabel, GEO_SOURCE_NOTE } from "@/components/ip-tracker/country-names";
 import { GoogleSectionHeader, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
 import { ToolTabs } from "@/components/tool";
+import { ToolBarSlot } from "@/components/tool/shell";
+import { useInToolShell } from "@/components/tool/in-shell";
+import { useToolView } from "@/hooks/use-tool-view";
+import { IP_TRACKER_VIEWS } from "@/components/traffic-tool/nav";
 import {
   Fingerprint, Globe, Eye, Users, Monitor, Smartphone, Tablet,
   Search, ChevronRight, MapPin,
@@ -144,6 +148,16 @@ const tabs = [
 ] as const;
 
 type TabId = typeof tabs[number]["id"];
+
+/** Each section's title and line in the full-screen tool. */
+const IP_HEAD: Record<TabId, [string, string]> = {
+  dashboard: ["Dashboard", "Visits, visitors and where they came from on the chosen site, updated live."],
+  visitors: ["Visitors", "Every visitor with their IP address, location, device and the pages they opened."],
+  traffic: ["Traffic", "Where visits come from: search, ads, social and other sites."],
+  pages: ["Pages", "The pages people land on and open the most."],
+  geo: ["Geo", "Where your visitors are, by country, region and city."],
+  platforms: ["Platforms", "Browsers, operating systems, devices and screen sizes."],
+};
 
 /** Tab and site live in the query string (?site=10&tab=platforms) so a reload or shared link keeps them. */
 function useUrlState() {
@@ -1062,9 +1076,9 @@ function PlatformsView({ domainId }: { domainId: number | null }) {
 
 export default function IpTrackerPage() {
   const { params, set: setUrlParam } = useUrlState();
-  const tabParam = params.get("tab");
-  const activeTab: TabId = tabs.some(t => t.id === tabParam) ? (tabParam as TabId) : "dashboard";
-  const setActiveTab = (tab: TabId) => setUrlParam("tab", tab === "dashboard" ? null : tab);
+  // Each section is its own address (/ip-tracker/visitors; components/traffic-tool/nav.ts); old ?tab= links land there.
+  const [activeTab, setActiveTab] = useToolView<TabId>("/ip-tracker", IP_TRACKER_VIEWS, "dashboard");
+  const inShell = useInToolShell();
   const selectedDomainId = Number(params.get("site")) || null;
   const setSelectedDomainId = (id: number | null) => setUrlParam("site", id ? String(id) : null);
   const [showAddDomain, setShowAddDomain] = useState(false);
@@ -1127,19 +1141,8 @@ export default function IpTrackerPage() {
     },
   });
 
-  return (
-    <AppPage width="wide" testId="page-ip-tracker">
-      {/* Google's page format (owner, 2026-10-07): a quiet header, hairline cards, pill actions, stat tiles. */}
-      <GoogleSectionHeader
-        as="h1"
-        titleTestId="text-page-title"
-        title="IP Tracker"
-        description={<>
-          <span data-testid="text-subtitle">Real-time website visitor tracking. See who visits your site, where they come from, and what they do.</span>
-          {selectedDomain && <>{" "}<StatusPill tone="neutral" data-testid="badge-ip-tracker">{selectedDomain.name || selectedDomain.domain}</StatusPill></>}
-        </>}
-        flush
-        actions={
+  // In the full-screen tool the site picker sits in the tool bar, beside the menu (like Social Media's business).
+  const siteControls = (
           (domains?.length ?? 0) > 0 ? (
             <>
               <label className="block min-w-0 flex-1 space-y-1.5 text-sm sm:w-52 sm:flex-none">
@@ -1184,7 +1187,20 @@ export default function IpTrackerPage() {
               </div>
             </>
           ) : undefined
-        }
+  );
+  return (
+    <AppPage width="wide" testId="page-ip-tracker">
+      {/* Google's page format (owner, 2026-10-07): a quiet header, hairline cards, pill actions, stat tiles. */}
+      <GoogleSectionHeader
+        as="h1"
+        titleTestId="text-page-title"
+        title={inShell ? IP_HEAD[activeTab][0] : "IP Tracker"}
+        description={<>
+          <span data-testid="text-subtitle">{inShell ? IP_HEAD[activeTab][1] : "Real-time website visitor tracking. See who visits your site, where they come from, and what they do."}</span>
+          {selectedDomain && <>{" "}<StatusPill tone="neutral" data-testid="badge-ip-tracker">{selectedDomain.name || selectedDomain.domain}</StatusPill></>}
+        </>}
+        flush
+        actions={inShell ? undefined : siteControls}
       />
 
       <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
@@ -1245,7 +1261,8 @@ export default function IpTrackerPage() {
         </div>
       )}
 
-      <ToolTabs as="tablist" label="IP tracker sections">
+      {inShell && (domains?.length ?? 0) > 0 && <ToolBarSlot><div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-sm" data-testid="toolbar-ip-site"><span className="hidden g-text-2 sm:inline">Site</span>{siteControls}</div></ToolBarSlot>}
+      {!inShell && <ToolTabs as="tablist" label="IP tracker sections">
         {tabs.map(tab => (
           <button
             key={tab.id}
@@ -1258,7 +1275,7 @@ export default function IpTrackerPage() {
             {tab.label}
           </button>
         ))}
-      </ToolTabs>
+      </ToolTabs>}
 
       {domainsLoading ? (
         <div className="flex justify-center py-12"><div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" /></div>
