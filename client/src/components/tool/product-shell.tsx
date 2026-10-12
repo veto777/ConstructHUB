@@ -14,11 +14,15 @@ import { ToolShell, type ToolShellConfig } from "@/components/tool/shell";
 import { AllTools } from "@/components/seo-tool/layout";
 import { socialNav } from "@/components/social-tool/nav";
 import { googleAdsNav } from "@/components/google-ads-tool/nav";
+import { googleBusinessNav } from "@/components/google-business-tool/nav";
+import { permitsNav } from "@/components/permits-tool/nav";
 
 export type ShelledTool = { nav: () => ToolShellConfig };
 export const SHELLED_TOOLS: ShelledTool[] = [
   { nav: socialNav },
   { nav: googleAdsNav },
+  { nav: googleBusinessNav },
+  { nav: permitsNav },
 ];
 
 const owns = (config: ToolShellConfig, location: string) =>

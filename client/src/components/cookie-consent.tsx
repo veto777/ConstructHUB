@@ -1,19 +1,14 @@
 /**
- * Cookie consent banner + first-party pageview tracker.
- *
- * Until the visitor answers, nothing is tracked and no analytics cookie is
- * set. "Accept" sets ch_consent=granted + a ch_vid visitor id (server-side
- * Set-Cookie) and pageviews start flowing; "Decline" sets ch_consent=denied
- * and the tracker stays off — the server refuses events without the granted
- * cookie either way.
+ * First-party pageview tracker. No banner (owner, 2026-10-12: the cookie pop-up kept coming back — "Lets disable
+ * this crap they are in the terms"): the privacy policy (§1.3) covers it. A visitor without the ch_consent cookie
+ * gets it set to granted once, silently (server-side Set-Cookie with a ch_vid visitor id), and pageviews flow; a
+ * visitor who declined under the old banner stays declined. The server still refuses events without the granted
+ * cookie.
  */
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { Button } from "@/components/ui/button";
-import { Cookie } from "lucide-react";
 import { analyticsPath } from "@shared/analytics-path";
 import { utmFromSearch } from "@shared/campaign-attribution";
-import { isClientPortal, isPortal } from "@/lib/site";
 import { inNativeApp } from "@/lib/app-shell";
 
 function readCookie(name: string): string | null {
@@ -59,64 +54,26 @@ function sendPageview(path: string) {
 export function CookieConsent() {
   const [location] = useLocation();
   const [consent, setConsent] = useState<string | null>(() => readCookie("ch_consent"));
-  const [saving, setSaving] = useState(false);
+
+  // First visit: record the site's own analytics cookie once, with no pop-up.
+  useEffect(() => {
+    if (consent || inNativeApp()) return;
+    fetch("/api/analytics/consent", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ granted: true }),
+    }).then((r) => { if (r.ok) setConsent("granted"); }).catch(() => {});
+  }, [consent]);
 
   // Track every route change once consent is granted. Bearer-token document
   // paths (/e/<token>, /i/<token>, …) are normalized so the tokens never land
   // in the analytics tables or the /admin Top-pages list.
   useEffect(() => {
-    // Inside the iPhone apps nothing is tracked and no banner shows (App Store 5.1.2(i); docs/app/APP-STORE-PLAN.md).
+    // Inside the iPhone apps nothing is tracked (App Store 5.1.2(i); docs/app/APP-STORE-PLAN.md).
     if (consent !== "granted" || inNativeApp()) return;
-    const path = analyticsPath(location);
-    sendPageview(path);
+    sendPageview(analyticsPath(location));
   }, [location, consent]);
 
-  if (consent || inNativeApp()) return null;
-
-  const answer = async (granted: boolean) => {
-    setSaving(true);
-    try {
-      await fetch("/api/analytics/consent", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        credentials: "same-origin",
-        body: JSON.stringify({ granted }),
-      });
-    } catch { /* the cookie simply stays unset; banner returns next load */ }
-    setConsent(granted ? "granted" : "denied");
-    setSaving(false);
-  };
-
-  // Each product face links its own policy: the CRM and client portal hosts
-  // serve /crm-privacy; the marketing site's policy is /privacy.
-  const privacyHref = isPortal() || isClientPortal() ? "/crm-privacy" : "/privacy";
-
-  // In normal document flow: consent must never cover an action or a footer.
-  return (
-    <div
-      className="relative p-3 sm:p-4 flex justify-center border-b bg-background"
-      data-testid="cookie-consent-banner"
-    >
-      <div className="pointer-events-auto w-full max-w-2xl sm:max-w-lg rounded-xl border bg-card text-card-foreground shadow-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3">
-        <div className="flex items-start gap-2.5 min-w-0 flex-1">
-          <Cookie className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-          <p className="text-sm text-muted-foreground">
-            We use cookies to understand how ConstructHUB is used — pages visited, general
-            location, and device info — so we can improve the product. See our{" "}
-            <a href={privacyHref} className="underline hover:text-foreground" data-testid="link-cookies-privacy">Privacy Policy</a>.
-          </p>
-        </div>
-        <div className="flex gap-2 shrink-0">
-          <Button size="sm" variant="outline" disabled={saving}
-            onClick={() => answer(false)} data-testid="button-cookies-decline">
-            Decline
-          </Button>
-          <Button size="sm" disabled={saving}
-            onClick={() => answer(true)} data-testid="button-cookies-accept">
-            Accept
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
+  return null;
 }

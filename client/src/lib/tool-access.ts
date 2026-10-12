@@ -97,6 +97,7 @@ export function toolRuleFor(url: string): Rule | undefined {
   if (path.startsWith("/social-media/")) return TOOL_RULES["/social-media"];
   if (path.startsWith("/google-ads/")) return TOOL_RULES["/google-ads"];
   if (path.startsWith("/ads-manager/")) return TOOL_RULES["/ads-manager"];
+  if (path.startsWith("/agency/")) return TOOL_RULES["/agency"];
   return undefined;
 }
 

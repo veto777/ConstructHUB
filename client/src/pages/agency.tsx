@@ -9,11 +9,21 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useUrlParam } from '@/hooks/use-url-param';
+import { useLocation } from 'wouter';
+import { useToolSlot } from '@/components/tool/shell';
+import { agencyHref } from '@/components/google-business-tool/nav';
 import { PlanRequired } from '@/components/plan-required';
 const knownTabs=['locations','clients','team','onboarding','jobs','settings'];
 const emailPattern=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export default function AgencyPage(){
-  const [tabParam,setTabParam]=useUrlParam('tab');
+  // Each tab is its own address (/agency/clients …) so the Google Business menu can link to it; an old ?tab= link moves there.
+  const [path,navigate]=useLocation();
+  const [oldTab]=useUrlParam('tab');
+  const seg=path.split('/')[2]||null;
+  const tabParam=seg??oldTab;
+  const setTabParam=(t:string|null)=>navigate(agencyHref(t??'locations'));
+  useEffect(()=>{if(oldTab&&!seg&&knownTabs.includes(oldTab))navigate(agencyHref(oldTab),{replace:true});},[oldTab]);// eslint-disable-line react-hooks/exhaustive-deps
+  const inShell=!!useToolSlot();
   const [message,setMessage]=useState(''),[failed,setFailed]=useState(false),[busy,setBusy]=useState(false),[offset,setOffset]=useState(0),[search,setSearch]=useState('');
   const [name,setName]=useState(''),[email,setEmail]=useState(''),[notes,setNotes]=useState(''),[tags,setTags]=useState(''),[folder,setFolder]=useState(''),[editId,setEditId]=useState<number|null>(null);
   const [role,setRole]=useState('viewer'),[allClients,setAllClients]=useState(false),[clientIds,setClientIds]=useState('');
@@ -64,11 +74,13 @@ export default function AgencyPage(){
     <PlanRequired module="agencyWorkspace" className="max-w-3xl"/>
   </AppPage></GoogleSurface>;
   // The Google Business group: Google's blue like its siblings (owner, 2026-10-07).
-  return <GoogleSurface page><AppPage><PageHeader title="Agency workspace" description={entitled?"Manage clients, locations and the people who look after them.":"Manage the people on your platform team."} actions={tab==='locations'?<Button asChild><a href="/locations?import=gbp">Add location</a></Button>:undefined}/>
+  const VIEW:Record<string,[string,string]>={clients:['Clients','Client workspaces with contact, folder, tags and notes.'],team:['Team','Who can see and change which clients and locations.'],onboarding:['Onboarding','Email a client the steps to add your agency as a Google manager.'],jobs:['Jobs','Queued Google work for your clients and how it went.'],settings:['Agency settings','Your agency name and how invitations are accepted.']};
+  const head:[string,string]=inShell&&VIEW[tab]?VIEW[tab]:['Agency workspace',entitled?"Manage clients, locations and the people who look after them.":"Manage the people on your platform team."];
+  return <GoogleSurface page><AppPage><PageHeader title={head[0]} description={head[1]} actions={tab==='locations'?<Button asChild><a href="/locations?import=gbp">Add location</a></Button>:undefined}/>
     {switcher}
-    <Tabs value={tab} onValueChange={t=>{setTabParam(t==='locations'?null:t);setOffset(0);say('');}}><AppTabsList>{tabs.map(t=><TabsTrigger key={t} value={t}>{t[0].toUpperCase()+t.slice(1)}</TabsTrigger>)}</AppTabsList></Tabs>
+    {!inShell&&<Tabs value={tab} onValueChange={t=>{setTabParam(t==='locations'?null:t);setOffset(0);say('');}}><AppTabsList>{tabs.map(t=><TabsTrigger key={t} value={t}>{t[0].toUpperCase()+t.slice(1)}</TabsTrigger>)}</AppTabsList></Tabs>}
     {message&&<p ref={messageRef} role={failed?'alert':'status'} className={failed?'text-destructive':undefined}>{message}</p>}
-    {tab==='locations'?(entitled?<AgencyWorkspace/>:<p>Open <a className="underline" href="/locations">Locations</a> to work with your team.</p>):<Section title={tab[0].toUpperCase()+tab.slice(1)} contentClassName="space-y-4 text-sm">
+    {tab==='locations'?(entitled?<AgencyWorkspace/>:<p>Open <a className="underline" href="/locations">Locations</a> to work with your team.</p>):<Section title={inShell?undefined:tab[0].toUpperCase()+tab.slice(1)} contentClassName="space-y-4 text-sm">
       {tab!=='settings'&&<Input aria-label="Search agency records" placeholder="Search records or clients…" value={search} onChange={e=>{setSearch(e.target.value);setOffset(0);}}/>}
       {/* Owner-only, and "Current setting" is only known once /api/agency/me answers (a ?tab=settings link renders before it). */}
       {tab==='settings'&&me?.role==='owner'&&<fieldset disabled={busy} className="space-y-3"><legend>Agency settings</legend><Input aria-label="Agency name" placeholder={me?.workspace?.name||'Agency name'} value={agencyName} onChange={e=>setAgencyName(e.target.value)}/><label className="flex gap-2"><input type="checkbox" checked={acceptAll} onChange={e=>setAcceptAll(e.target.checked)}/>Auto-accept all location invitations for connected agency Google accounts</label><p>Unmatched invitations stay unassigned; they are never assigned to a guessed client. Current setting: {me?.workspace?.auto_accept_all?'enabled':'disabled'}.</p><Button onClick={()=>run('/settings',{name:agencyName||me?.workspace?.name||'Agency',autoAcceptAll:acceptAll},'PUT')}>Save agency settings</Button><a className="block text-primary underline" href="/api/gbp/connect">Connect agency Google account</a><Button variant="outline" onClick={()=>run('/google/refresh',{})}>Refresh Google listings in background</Button></fieldset>}
