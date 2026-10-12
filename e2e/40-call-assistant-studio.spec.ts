@@ -606,7 +606,7 @@ test.describe("Call Assistant — paused for a payment", () => {
     await expect(page.getByTestId("plan-required-callAssistant")).toHaveCount(0);
     await expect(page.getByTestId("text-overview-price")).toContainText(CALL_ASSISTANT_SEPARATE_LINE);
 
-    await page.getByTestId("tab-call-assistant-numbers").click();
+    await page.getByTestId("tool-rail-numbers").click();
     await expect(page.getByTestId("banner-call-assistant-paused")).toBeVisible();
     await expect(page.getByTestId("text-voice-numbers-rule-own")).toHaveText(CALL_ASSISTANT_NUMBER_RULES.ownNumbers);
     await expect(page.getByTestId("text-voice-numbers-rule-cancel")).toHaveText(CALL_ASSISTANT_NUMBER_RULES.cancel);

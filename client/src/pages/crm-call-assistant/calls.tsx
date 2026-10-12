@@ -31,7 +31,7 @@ import {
  * calls+crm lane (LANES.md). API: /api/crm/voice/calls*, /spam*,
  * /escalations* (server/voice/calls.ts).
  *
- * Deep link: /call-assistant?tab=calls&call=<id> opens that call's
+ * Deep link: /call-assistant/calls?call=<id> (old ?tab=calls links are moved there) opens that call's
  * drawer (the link every call notification carries); &view=spam|escalations
  * opens a sub-view.
  *
@@ -48,7 +48,7 @@ function readParam(name: string): string | null {
   return new URLSearchParams(window.location.search).get(name);
 }
 
-/** Keep ?call= and ?view= in the URL without a navigation (the shell owns ?tab=). */
+/** Keep ?call= and ?view= in the URL without a navigation (the route is the view). */
 function writeParams(patch: Record<string, string | null>) {
   const url = new URL(window.location.href);
   for (const [k, v] of Object.entries(patch)) {

@@ -64,10 +64,10 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
   // (owner 2026-10-04: "why are the stats not updated such as spam this month and min").
   const extMonth = ext && !ownLive ? ext.thisMonth ?? null : null;
   const nextStep: { text: string; href: string; testid: string; label: string } =
-    ext && !ownLive ? { text: `${ext.name} answers your calls — ${ext.callsLast30Days.toLocaleString("en-US")} in the last 30 days`, href: "/call-assistant?tab=calls", testid: "link-overview-next-calls", label: "View calls" }
-    : !ownLive ? { text: "Set up and publish your assistant", href: "/call-assistant?tab=studio", testid: "link-overview-next-studio", label: "Continue" }
-    : numbers.length === 0 ? { text: "Get a local number", href: "/call-assistant?tab=numbers", testid: "link-overview-next-numbers", label: "Continue" }
-    : { text: "Try a test conversation", href: "/call-assistant?tab=simulator", testid: "link-overview-next-simulator", label: "Continue" };
+    ext && !ownLive ? { text: `${ext.name} answers your calls — ${ext.callsLast30Days.toLocaleString("en-US")} in the last 30 days`, href: "/call-assistant/calls", testid: "link-overview-next-calls", label: "View calls" }
+    : !ownLive ? { text: "Set up and publish your assistant", href: "/call-assistant/studio", testid: "link-overview-next-studio", label: "Continue" }
+    : numbers.length === 0 ? { text: "Get a local number", href: "/call-assistant/numbers", testid: "link-overview-next-numbers", label: "Continue" }
+    : { text: "Try a test conversation", href: "/call-assistant/simulator", testid: "link-overview-next-simulator", label: "Continue" };
 
   const paymentPaused = !status.enabled && status.paused === true;
   const tiers = callAssistantTiers();
@@ -93,32 +93,32 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
       </Section>
       <GoogleStatGrid cols={4}>
         {ext && !ownLive ? (
-          <GoogleStat label="Assistant" testId="metric-overview-assistant" href="/call-assistant?tab=calls"
+          <GoogleStat label="Assistant" testId="metric-overview-assistant" href="/call-assistant/calls"
             value="Live" hint={`${ext.name}, your own receptionist · last call ${new Date(ext.lastCallAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`} />
         ) : (
-          <GoogleStat label="Assistant" testId="metric-overview-assistant" href="/call-assistant?tab=studio"
+          <GoogleStat label="Assistant" testId="metric-overview-assistant" href="/call-assistant/studio"
             value={paymentPaused ? <span className="text-amber-600 dark:text-amber-400">Paused</span> : <span className="capitalize">{profileStatus}</span>}
             hint={paymentPaused ? "Waiting for a payment" : ownLive ? `Version ${status.profile!.publishedVersion} is live` : "Not published yet"} />
         )}
         {ext && numbers.length === 0 ? (
-          <GoogleStat label="Lines" value={ext.lines.length || 1} testId="metric-overview-numbers" href="/call-assistant?tab=calls"
+          <GoogleStat label="Lines" value={ext.lines.length || 1} testId="metric-overview-numbers" href="/call-assistant/calls"
             hint={`${ext.lines.length ? ext.lines.join(" & ") + " · " : ""}answered by ${ext.name}`} />
         ) : (
-          <GoogleStat label="Numbers" value={numbers.length} testId="metric-overview-numbers" href="/call-assistant?tab=numbers"
+          <GoogleStat label="Numbers" value={numbers.length} testId="metric-overview-numbers" href="/call-assistant/numbers"
             hint={`${status.allowance.numbers} included`} />
         )}
         {extMonth ? (
-          <GoogleStat label="Minutes this month" value={extMonth.minutes.toLocaleString("en-US")} testId="metric-overview-minutes" href="/call-assistant?tab=calls"
+          <GoogleStat label="Minutes this month" value={extMonth.minutes.toLocaleString("en-US")} testId="metric-overview-minutes" href="/call-assistant/calls"
             hint={`${extMonth.calls.toLocaleString("en-US")} calls answered by ${ext!.name} · not billed here`} />
         ) : (
-          <GoogleStat label="Minutes this month" value={used.toLocaleString("en-US")} testId="metric-overview-minutes" href="/call-assistant?tab=calls"
+          <GoogleStat label="Minutes this month" value={used.toLocaleString("en-US")} testId="metric-overview-minutes" href="/call-assistant/calls"
             hint={`${unlimitedMinutes ? "Unlimited minutes" : `of ${included.toLocaleString("en-US")} · ${(status.usage?.calls ?? 0).toLocaleString("en-US")} calls${overage > 0 ? ` · ${overage} over${inNativeApp() ? "" : ` (${overageCost})`}` : ""}`}${extAlso ? ` · + ${extAlso.minutes.toLocaleString("en-US")} min answered by ${ext!.name}` : ""}`} />
         )}
         {extMonth ? (
-          <GoogleStat label="Spam stopped this month" value={extMonth.spam.toLocaleString("en-US")} testId="metric-overview-spam" href="/call-assistant?tab=calls&view=spam"
+          <GoogleStat label="Spam stopped this month" value={extMonth.spam.toLocaleString("en-US")} testId="metric-overview-spam" href="/call-assistant/calls?view=spam"
             hint={`Screened out by ${ext!.name}`} />
         ) : (
-          <GoogleStat label="Spam stopped this month" value={spamThisMonth.toLocaleString("en-US")} testId="metric-overview-spam" href="/call-assistant?tab=calls&view=spam"
+          <GoogleStat label="Spam stopped this month" value={spamThisMonth.toLocaleString("en-US")} testId="metric-overview-spam" href="/call-assistant/calls?view=spam"
             hint={`${Math.min(freeSpamUsed, freeSpamLimit).toLocaleString("en-US")} of ${freeSpamLimit.toLocaleString("en-US")} free spam calls used`} />
         )}
       </GoogleStatGrid>
@@ -127,7 +127,7 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
 
       <CallResults onPick={(p) => {
         if (onPickResult) onPickResult(p);
-        else window.location.assign(p === "spam" ? "/call-assistant?tab=calls&view=spam" : `/call-assistant?tab=calls&outcome=${p}`);
+        else window.location.assign(p === "spam" ? "/call-assistant/calls?view=spam" : `/call-assistant/calls?outcome=${p}`);
       }} />
 
       {/* The iPhone apps sell nothing (owner, 2026-10-04 — App Store 3.1.3(f)): no tier names, prices,
@@ -201,7 +201,7 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
           <CardContent className="p-5 space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="g-card__title g-card__title--md">Numbers ringing the assistant</h3>
-              <GooglePill icon={ArrowRight} size="sm" variant="quiet" href="/call-assistant?tab=numbers" label="Manage" testId="link-overview-numbers" />
+              <GooglePill icon={ArrowRight} size="sm" variant="quiet" href="/call-assistant/numbers" label="Manage" testId="link-overview-numbers" />
             </div>
             {numbers.length === 0 ? (
               <p className="text-sm text-muted-foreground" data-testid="text-overview-no-numbers">
@@ -233,7 +233,7 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
         <CardContent className="p-5 space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="g-card__title g-card__title--md">Recent calls</h3>
-            <GooglePill icon={ArrowRight} size="sm" variant="quiet" href="/call-assistant?tab=calls" label="All calls" testId="link-overview-calls" />
+            <GooglePill icon={ArrowRight} size="sm" variant="quiet" href="/call-assistant/calls" label="All calls" testId="link-overview-calls" />
           </div>
           {calls.isError || recent.length === 0 ? (
             <p className="text-sm text-muted-foreground" data-testid="text-overview-no-calls">
@@ -249,7 +249,7 @@ export function OverviewPanel({ status, loading, onPickResult }: { status: Voice
                   testId={`row-overview-call-${i}`}
                   leading={<Activity aria-hidden="true" />}
                   title={<span className="tabular-nums">{prettyPhone(c.from ?? c.fromNumber ?? "")}</span>}
-                  href={`/call-assistant?tab=calls&call=${encodeURIComponent(String(c.id))}`}
+                  href={`/call-assistant/calls?call=${encodeURIComponent(String(c.id))}`}
                   titleTestId={`link-overview-call-${i}`}
                   badges={c.outcome ? <StatusPill tone={outcomeTone(c.outcome)}>{outcomeLabel(c.outcome)}</StatusPill> : undefined}
                   meta={[c.summary || null, c.startedAt ? fmtWhen(c.startedAt) : null]}

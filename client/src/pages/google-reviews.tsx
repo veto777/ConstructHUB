@@ -3,7 +3,7 @@ import { GoogleReport } from "@/components/profile-guard";
 import { AiReplySettings } from "@/components/ai-review-replies";
 import { GoogleSurface, GoogleAvatar, GoogleStarRow, GooglePill, GoogleAiOverview, relativeTime } from "@/components/google";
 import { GbpConnection } from "@/components/gbp-connection";
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, apiErrorMessage, queryClient } from "@/lib/queryClient";
 import { inNativeApp } from "@/lib/app-shell";
@@ -16,10 +16,9 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
-  AppPage, AppTabsList, EmptyState, Notice, PageHeader, Section, Stat, StatGrid, StatusPill, Toolbar,
+  AppPage, EmptyState, Notice, PageHeader, Section, Stat, StatGrid, StatusPill, Toolbar,
 } from "@/components/app-ui";
 import {
   Star, Send, Plus, Trash2, RefreshCw, Loader2, ExternalLink,
@@ -32,6 +31,8 @@ import {
   CalendarDays, StickyNote, FolderOpen,
 } from "lucide-react";
 import { useUrlParam } from "@/hooks/use-url-param";
+import { useLocation } from "wouter";
+import { REVIEWS_VIEW_HEAD, reviewsHref, reviewsViewOf } from "@/components/reviews-tool/nav";
 import { caughtPrivatelyCount, describeReviewEscalationThreshold, normalizeReviewEscalationThreshold, REVIEW_ESCALATION_THRESHOLD_CHOICES } from "@shared/review-flow";
 import { MAX_OTHER_REVIEW_LINKS, MAX_REVIEW_LINK_LABEL, REVIEW_PLATFORMS, destinationLabel, normalizeOtherReviewLinks, resolvePrimaryUrl, reviewDestinations, reviewLinkLabel, type OtherReviewLink } from "@shared/review-links";
 
@@ -98,9 +99,17 @@ const stepLabels: Record<string, string> = {
 
 export default function GoogleReviewsPage() {
   const { toast } = useToast();
-  const [tabParam, setTabParam] = useUrlParam("tab");
-  const pageTab: "requests" | "profile-reviews" = tabParam === "profile-reviews" ? "profile-reviews" : "requests";
-  const setPageTab = (v: "requests" | "profile-reviews") => setTabParam(v === "requests" ? null : v);
+  // One view per address (owner, 2026-10-12: the full-screen tool format; components/reviews-tool/nav.ts).
+  const [path, navigate] = useLocation();
+  const [tabParam] = useUrlParam("tab");
+  const view = reviewsViewOf(path, tabParam);
+  // The old one-page links (?tab=profile-reviews) open their own view now.
+  useEffect(() => {
+    if (!tabParam) return;
+    const rest = new URLSearchParams(window.location.search);
+    rest.delete("tab");
+    navigate(reviewsHref(view, Object.fromEntries(rest)), { replace: true });
+  }, [tabParam]); // eslint-disable-line react-hooks/exhaustive-deps
   const [createOpen, setCreateOpen] = useState(false);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<any>(null);
@@ -530,25 +539,19 @@ export default function GoogleReviewsPage() {
   return (
     <GoogleSurface page><AppPage className="before:hidden">
       <PageHeader
-        title={<span data-testid="text-reviews-title">Google Reviews</span>}
-        description={pageTab === "requests"
-          ? "Hear it first. Set the score that comes to you privately; everything above it goes straight to Google."
-          : "Read and reply to the reviews on your Google Business Profiles."}
-        actions={pageTab === "requests" ? (
+        title={<span data-testid="text-reviews-title">{REVIEWS_VIEW_HEAD[view][0]}</span>}
+        description={REVIEWS_VIEW_HEAD[view][1]}
+        actions={view === "requests" ? (
           <Button onClick={openSendDialog} data-testid="button-new-review-request">
             <Plus className="mr-2 h-4 w-4" aria-hidden="true" />New review request
           </Button>
         ) : undefined}
       />
 
-      <Tabs value={pageTab} onValueChange={(v) => setPageTab(v as any)}>
-        <AppTabsList>
-          <TabsTrigger value="requests" data-testid="tab-review-requests">Review requests</TabsTrigger>
-          <TabsTrigger value="profile-reviews" data-testid="tab-profile-reviews">Google profile reviews</TabsTrigger>
-        </AppTabsList>
 
-        <TabsContent value="requests" className="mt-5 sm:mt-6">
+        {view !== "reviews" && (
           <div className="space-y-5 sm:space-y-6">
+            {view === "requests" && (<>
             <StatGrid cols={5}>
               <Stat label="Total sent" testId="stat-total-sent" value={reviews.filter((r: any) => r.status !== "scheduled" && r.status !== "suppressed").length} />
               <Stat label="Google links opened" testId="stat-google-links-opened" tone="good" value={reviews.filter((r: any) => r.googleLinkOpened).length} />
@@ -557,7 +560,7 @@ export default function GoogleReviewsPage() {
               <Stat label="Awaiting response" testId="stat-pending" value={reviews.filter((r: any) => r.status === "sent" && !r.unsubscribed).length} />
             </StatGrid>
 
-            <Section title="Review requests">
+            <Section title="Sent requests">
               {!isLoading && reviews.length > 0 && (
                 <div className="relative mb-4">
                   <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
@@ -907,7 +910,9 @@ export default function GoogleReviewsPage() {
                 </div>
               )}
             </Section>
+            </>)}
 
+            {view === "profiles" && (
             <Section
               title={<span className="flex items-center gap-2">Google Business Profiles<Badge variant="outline" className="text-xs" data-testid="badge-template-count">{templateCount}</Badge></span>}
               description="One profile per Google Business listing — each gets its own review link."
@@ -1008,11 +1013,13 @@ export default function GoogleReviewsPage() {
                 </div>
               )}
             </Section>
+            )}
 
-            <FeedbackRoutingCard />
+            {view === "settings" && <FeedbackRoutingCard />}
 
-            <ReminderSettingsCard />
+            {view === "settings" && <ReminderSettingsCard />}
 
+            {view === "requests" && (
             <Section
               title={<button className="flex w-full items-center justify-between gap-2 text-left" onClick={() => setShowHowItWorks(!showHowItWorks)} data-testid="button-toggle-how-it-works">
                 <span>How review requests work</span>
@@ -1079,7 +1086,9 @@ export default function GoogleReviewsPage() {
                 </div>
               )}
             </Section>
+            )}
 
+            {view === "profiles" && (
             <Section title="Other review platforms" description="Log in to manage reviews on these platforms. To collect reviews on them, add your review link to a Google Business Profile above and include it when you send a request.">
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {[
@@ -1106,8 +1115,9 @@ export default function GoogleReviewsPage() {
                 ))}
               </div>
             </Section>
+            )}
 
-            {trashQuery.data && trashQuery.data.length > 0 && (
+            {view === "requests" && trashQuery.data && trashQuery.data.length > 0 && (
               <Section
                 title={<span className="flex items-center gap-2">Trash<Badge variant="secondary" className="text-xs">{trashQuery.data.length}</Badge></span>}
                 description="Auto-deletes after 14 days."
@@ -1191,12 +1201,9 @@ export default function GoogleReviewsPage() {
               </Section>
             )}
           </div>
-        </TabsContent>
+        )}
 
-        <TabsContent value="profile-reviews" className="mt-5 sm:mt-6">
-          <GoogleProfileReviewsTab />
-        </TabsContent>
-      </Tabs>
+        {view === "reviews" && <GoogleProfileReviewsTab />}
 
       {/* ── Send review request ─────────────────────────────────────────── */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -2511,7 +2518,7 @@ function ReminderSettingsCard() {
     <Section
       testId="card-reminder-settings"
       title="Follow-up reminders"
-      description={expanded ? undefined : "Automatically remind clients who haven&rsquo;t responded."}
+      description={expanded ? undefined : "Automatically remind clients who haven’t responded."}
       actions={<>
         <StatusPill tone={currentSettings.enabled ? "success" : "neutral"} data-testid="badge-reminder-status">
           {currentSettings.enabled ? "Active" : "Disabled"}

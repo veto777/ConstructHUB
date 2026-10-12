@@ -98,7 +98,7 @@ export function LocationLocalCard({ location: l, latestReview, onOpen, testId, w
         {l.phone && <GooglePill icon={Phone} label="Call" href={`tel:${l.phone.replace(/[^\d+]/g, "")}`} testId={`button-call-location-${l.id}`} />}
         {maps && <GooglePill icon={Navigation} label="Directions" href={maps} external testId={`button-directions-location-${l.id}`} />}
         {website && <GooglePill icon={Globe} label="Website" href={website} external testId={`button-website-location-${l.id}`} />}
-        {linked && <GooglePill icon={MessageSquare} label="Reviews" href={`/google-reviews?tab=profile-reviews&location=${l.id}`} testId={`button-reviews-location-${l.id}`} />}
+        {linked && <GooglePill icon={MessageSquare} label="Reviews" href={`/google-reviews/reviews?location=${l.id}`} testId={`button-reviews-location-${l.id}`} />}
         <GooglePill icon={Store} label="Open profile" onClick={onOpen} testId={`button-open-location-${l.id}`} />
       </>}
     />

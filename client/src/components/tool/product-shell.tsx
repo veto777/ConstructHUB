@@ -13,10 +13,15 @@ import { useSidebar } from "@/components/ui/sidebar";
 import { ToolShell, type ToolShellConfig } from "@/components/tool/shell";
 import { AllTools } from "@/components/seo-tool/layout";
 import { socialNav } from "@/components/social-tool/nav";
+import { callAssistantNav } from "@/components/call-assistant-tool/nav";
+import { reviewsNav } from "@/components/reviews-tool/nav";
+import { SHOW_GOOGLE_REVIEWS } from "@/lib/features";
 
 export type ShelledTool = { nav: () => ToolShellConfig };
 export const SHELLED_TOOLS: ShelledTool[] = [
   { nav: socialNav },
+  { nav: callAssistantNav },
+  ...(SHOW_GOOGLE_REVIEWS ? [{ nav: reviewsNav }] : []),
 ];
 
 const owns = (config: ToolShellConfig, location: string) =>

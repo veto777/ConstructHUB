@@ -279,6 +279,10 @@ function DashboardRouter() {
       <Route path="/crm-app" component={CrmGatewayPage} />
       {/* The AI Call Assistant's marketing page; signed in it keeps the sidebar (its "Call Assistant" entry lands here). */}
       <Route path="/call-assistant" component={CrmCallAssistantPage} />
+      <Route path="/call-assistant/calls" component={CrmCallAssistantPage} />
+      <Route path="/call-assistant/numbers" component={CrmCallAssistantPage} />
+      <Route path="/call-assistant/studio" component={CrmCallAssistantPage} />
+      <Route path="/call-assistant/simulator" component={CrmCallAssistantPage} />
       {/* Every feature's intro page (shared/feature-pages), inside the app frame when signed in. */}
       <Route path="/features" component={FeaturesCataloguePage} />
       {/* Google Ads landing doors: the same pages, reached only from an ad (server/ads-landing.ts). */}
@@ -309,6 +313,9 @@ function DashboardRouter() {
       {SHOW_COMPETITOR_INTEL && <Route path="/competitors-landing" component={CompetitorsLanding} />}
       <Route path="/master-class-landing" component={MasterClassLanding} />
       {SHOW_GOOGLE_REVIEWS && <Route path="/google-reviews" component={GoogleReviewsPage} />}
+      {SHOW_GOOGLE_REVIEWS && <Route path="/google-reviews/reviews" component={GoogleReviewsPage} />}
+      {SHOW_GOOGLE_REVIEWS && <Route path="/google-reviews/profiles" component={GoogleReviewsPage} />}
+      {SHOW_GOOGLE_REVIEWS && <Route path="/google-reviews/settings" component={GoogleReviewsPage} />}
       {SHOW_GOOGLE_REVIEWS && <Route path="/review/:token/unsubscribe" component={ReviewUnsubscribePage} />}
       {SHOW_GOOGLE_REVIEWS && <Route path="/review/:token" component={ReviewFeedbackPage} />}
       <Route path="/contract/sign/:token" component={ContractSignPage} />
@@ -436,7 +443,7 @@ function PublicRouter() {
 /** Dashboard routes that need an account (everything else here is public). */
 const SIGNED_IN_ONLY = [
   "/search", "/schedules", "/history", "/permit-alerts", "/media-library", "/gmb-monitor", "/ranking-grid",
-  "/social-media", "/guides", "/tutorials", "/cloudflare", "/search-console", "/seo", "/lsa-leads", "/lsa-account-manager", "/settings",
+  "/social-media", "/call-assistant", "/guides", "/tutorials", "/cloudflare", "/search-console", "/seo", "/lsa-leads", "/lsa-account-manager", "/settings",
   "/agency", "/locations", "/domains", "/mail-alerts", "/gbp-content", "/listing-editor", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/youtube",
   ...(SHOW_COMPETITOR_INTEL ? ["/competitors"] : []),
   ...(SHOW_GOOGLE_REVIEWS ? ["/google-reviews"] : []),
@@ -471,9 +478,9 @@ const PAGE_TITLES: Record<string, string> = {
   "/master-class": "Master Class", "/reinstatement": "Reinstatement", "/google-business": "Google Business",
   "/google-ads": "Click Guard", "/ads-manager": "Agency Ads & LSA", "/google-ads-guide": "Google Ads Guide",
   "/google-ad-fraud": "Ad Fraud", "/lsa-guide": "LSA Guide", "/lsa-leads": "LSA Leads", "/ip-tracker": "IP Tracker",
-  "/vpn-shield": "VPN Shield", "/google-reviews": "Google Reviews",
+  "/vpn-shield": "VPN Shield", "/google-reviews": "Google Reviews", "/google-reviews/reviews": "Google reviews", "/google-reviews/profiles": "Review profiles & links", "/google-reviews/settings": "Review settings",
   "/lsa-account-manager": "Account Manager", "/settings": "Settings", "/auth": "Sign in", "/developers": "Developers",
-  "/call-assistant": "AI Call Assistant", "/report-issue": "Report an issue",
+  "/call-assistant": "AI Call Assistant", "/call-assistant/calls": "Calls", "/call-assistant/numbers": "Call Assistant numbers", "/call-assistant/studio": "Agent studio", "/call-assistant/simulator": "Call simulator", "/report-issue": "Report an issue",
 };
 
 /** The sidebar's collapsed/expanded choice (ui/sidebar.tsx writes this cookie) survives a reload. */

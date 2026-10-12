@@ -1,10 +1,10 @@
 import { Section } from "@/components/app-ui";
 import { useEffect, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
+import { CALL_ASSISTANT_VIEW_HEAD, callAssistantHref, callAssistantViewOf } from "@/components/call-assistant-tool/nav";
 import { useQuery } from "@tanstack/react-query";
 import { Phone, Lock } from "lucide-react";
-import { Tabs, TabsContent, TabsTrigger } from "@/components/ui/tabs";
-import { AppPage, AppTabsList, Notice, StatusPill } from "@/components/app-ui";
+import { AppPage, Notice, StatusPill } from "@/components/app-ui";
 import { GoogleSectionHeader, GooglePill } from "@/components/google";
 import { CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -52,9 +52,6 @@ import { CallsPanel } from "./calls";
  */
 export const CALL_ASSISTANT_TABS = ["overview", "numbers", "studio", "simulator", "calls"] as const;
 export type CallAssistantTab = (typeof CALL_ASSISTANT_TABS)[number];
-const TAB_LABELS: Record<CallAssistantTab, string> = {
-  overview: "Overview", numbers: "Numbers", studio: "Agent studio", simulator: "Simulator", calls: "Calls",
-};
 
 export type VoiceStatus = {
   enabled: boolean;
@@ -90,10 +87,6 @@ export type VoiceStatus = {
   } | null;
 };
 
-function tabFromSearch(): CallAssistantTab {
-  const t = new URLSearchParams(window.location.search).get("tab");
-  return (CALL_ASSISTANT_TABS as readonly string[]).includes(t ?? "") ? (t as CallAssistantTab) : "overview";
-}
 
 /** The prompt for an account without the service: honest copy from the price book, one way to its pricing. */
 export function CallAssistantPlanRequired({ error, status }: { error?: unknown; status?: VoiceStatus | null }) {
@@ -149,19 +142,19 @@ export function CallAssistantPlanRequired({ error, status }: { error?: unknown; 
 }
 
 export default function CrmCallAssistantPage() {
-  const [, navigate] = useLocation();
-  const [tab, setTab] = useState<CallAssistantTab>(tabFromSearch);
-  const goToTab = (t: string) => {
-    const next = (CALL_ASSISTANT_TABS as readonly string[]).includes(t) ? (t as CallAssistantTab) : "overview";
-    setTab(next);
-    navigate(`/call-assistant?tab=${next}`, { replace: true });
-  };
-  // Back/forward keeps the tab in step with the URL.
+  // One view per address (owner, 2026-10-12: the full-screen tool format; components/call-assistant-tool/nav.ts).
+  const [path, navigate] = useLocation();
+  const search = useSearch();
+  const params = new URLSearchParams(search);
+  const oldTab = params.get("tab");
+  const tab: CallAssistantTab = callAssistantViewOf(path, oldTab);
+  // Notifications and old links say ?tab=calls&call=<id>: move them to /call-assistant/calls?call=<id>.
   useEffect(() => {
-    const onPop = () => setTab(tabFromSearch());
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  }, []);
+    if (!oldTab) return;
+    const rest = new URLSearchParams(window.location.search);
+    rest.delete("tab");
+    navigate(callAssistantHref(tab, Object.fromEntries(rest)), { replace: true });
+  }, [oldTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: me } = useQuery<any>({ queryKey: ["/api/crm/me"] });
   const status = useQuery<VoiceStatus>({ queryKey: ["/api/crm/voice/status"] });
@@ -175,10 +168,10 @@ export default function CrmCallAssistantPage() {
       <GoogleSectionHeader
         as="h1"
         titleTestId="text-call-assistant-title"
-        title="Call Assistant"
+        title={tab === "overview" ? "Call Assistant" : CALL_ASSISTANT_VIEW_HEAD[tab][0]}
         description={<>
-          Answer calls, capture leads and keep your team informed.
-          {status.data?.external && status.data.profile?.publishedVersion == null ? (
+          {CALL_ASSISTANT_VIEW_HEAD[tab][1]}
+          {tab !== "overview" ? null : status.data?.external && status.data.profile?.publishedVersion == null ? (
             <>{" "}<StatusPill tone="success" data-testid="badge-call-assistant-status">live · {status.data.external.name}</StatusPill></>
           ) : status.data?.profile?.status ? (
             <>{" "}<StatusPill tone={status.data.profile.status === "live" ? "success" : status.data.profile.status === "paused" ? "warning" : "neutral"} data-testid="badge-call-assistant-status">
@@ -209,21 +202,15 @@ export default function CrmCallAssistantPage() {
       ) : status.data && !enabled && !paused ? (
         <CallAssistantPlanRequired status={status.data} />
       ) : (
-        <Tabs value={tab} onValueChange={goToTab} data-testid="tabs-call-assistant">
-          {/* The Overview shows the banner itself; every other tab gets it above the tab strip. */}
+        <div data-testid="tabs-call-assistant" className="space-y-4">
+          {/* The Overview shows the banner itself; every other view gets it at the top. */}
           {paused && status.data && tab !== "overview" && <div className="mb-3"><CallAssistantPausedBanner status={status.data} /></div>}
-          <AppTabsList>
-            {CALL_ASSISTANT_TABS.map((t) => (
-              <TabsTrigger key={t} value={t} className="rounded-lg px-3.5" data-testid={`tab-call-assistant-${t}`}>{TAB_LABELS[t]}</TabsTrigger>
-            ))}
-          </AppTabsList>
-          <TabsContent value="overview"><OverviewPanel status={status.data ?? null} loading={status.isLoading} onPickResult={(p) => {
-            // Open the Calls tab already filtered: the Calls panel reads ?outcome= / ?view= when it mounts.
-            setTab("calls");
-            navigate(p === "spam" ? "/call-assistant?tab=calls&view=spam" : `/call-assistant?tab=calls&outcome=${p}`, { replace: true });
-          }} /></TabsContent>
-          <TabsContent value="numbers"><NumbersPanel canManage={canManage} /></TabsContent>
-          <TabsContent value="studio">
+          {tab === "overview" && <OverviewPanel status={status.data ?? null} loading={status.isLoading} onPickResult={(p) => {
+            // Open Calls already filtered: the Calls panel reads ?outcome= / ?view= when it mounts.
+            navigate(p === "spam" ? callAssistantHref("calls", { view: "spam" }) : callAssistantHref("calls", { outcome: p }));
+          }} />}
+          {tab === "numbers" && <NumbersPanel canManage={canManage} />}
+          {tab === "studio" && <>
             {status.data?.external && (
               <div className="pt-4">
                 <Notice tone="info" title={`${status.data.external.name} answers your phones today`} testId="notice-studio-external">
@@ -233,10 +220,10 @@ export default function CrmCallAssistantPage() {
               </div>
             )}
             <StudioPanel canManage={canManage} />
-          </TabsContent>
-          <TabsContent value="simulator"><SimulatorPanel /></TabsContent>
-          <TabsContent value="calls"><CallsPanel canManage={canManage} /></TabsContent>
-        </Tabs>
+          </>}
+          {tab === "simulator" && <SimulatorPanel />}
+          {tab === "calls" && <CallsPanel canManage={canManage} />}
+        </div>
       )}
     </AppPage>
   );
