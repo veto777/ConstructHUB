@@ -303,6 +303,7 @@ a.stat-chip:focus-visible { outline: 2px solid var(--tool-accent); outline-offse
 .tool-top__all { display: inline-flex; flex: none; align-items: center; gap: 6px; min-height: 32px; padding: 0 10px; border: 1px solid color-mix(in srgb, #fff 34%, transparent); border-radius: 6px; background: transparent; color: #fff; font-size: 13px; font-weight: 500; white-space: nowrap; cursor: pointer; }
 .tool-top__all:hover { background: color-mix(in srgb, #fff 12%, transparent); border-color: #fff; }
 .tool-top__all > svg { width: 15px; height: 15px; }
+.tool-top__title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; font-size: 15px; font-weight: 600; padding-left: 4px; }
 .tool-top__tabs { flex: 1 1 auto; min-width: 0; align-self: stretch; display: flex; }
 .tool-top__tabs > .tool-tabs { flex: 1 1 auto; align-self: stretch; }
 .tool-top__tabs .tool-tabs__scroll, .tool-top__tabs .tool-tabs__list { height: 100%; }

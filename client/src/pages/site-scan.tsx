@@ -613,9 +613,8 @@ export default function SiteScanPage() {
         title={!inShell ? "Site Scan" : view === "history" ? "Scan history" : "New scan"}
         description={!inShell ? "Find website issues, compare your Google Business Profile, and draft your next fixes." : view === "scan" ? "Find website issues, compare your Google Business Profile, and draft your next fixes." : "Every scan you ran, its score over time, and its report."}
         flush
-        actions={inShell ? (view === "history"
-          ? <GooglePill variant="solid" href="/site-scan" label="New scan" testId="link-site-scan-new" />
-          : <GooglePill href="/site-scan/history" label="Scan history" testId="link-site-scan-history" />) : undefined}
+        // The side menu already lists Scan history; from the history the one action is starting a scan.
+        actions={inShell && view === "history" ? <GooglePill variant="solid" href="/site-scan" label="New scan" testId="link-site-scan-new" /> : undefined}
       />
       <AgencyWorkspace compact />
       {showStart && <section>

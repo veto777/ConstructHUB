@@ -5,7 +5,6 @@
   scroll-margin-top: calc(var(--seo-header-height, 96px) + 12px);
 }
 @media (min-width: 768px) and (max-width: 1279px) {
-  .seo-layout .seo-more { display: inline-flex; }
   .seo-layout .tool-top__tabs .tool-tabs__list > a:not([aria-current="page"]):not([data-testid="tool-tab-dashboard"]) { display: none; }
   .seo-layout .tool-top__tabs .tool-tabs__nudge { display: none; }
   .seo-layout .tool-top__tabs .tool-tabs[data-variant="bar"] .tool-tabs__list > a { padding-inline: 8px; }

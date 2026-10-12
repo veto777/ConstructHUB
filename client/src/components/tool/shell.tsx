@@ -1,7 +1,7 @@
 /**
  * The tool shell: the frame of a multi-view tool (styles: client/src/styles/tool.css, `.tool-shell*`).
  *
- *   ┌ navy top bar ─ row 1: brand · "All tools" · the tools as tabs · the app's own controls
+ *   ┌ navy top bar ─ row 1: brand · "All tools" · the tool's name (phones: the tools as tabs) · the app's own controls
  *   │                row 2: the tool's global input (a slot the page fills: site switcher, add a site, balance)
  *   ├ icon rail ─ one icon + small label per tool (active: orange icon and indicator)
  *   ├ sub-navigation ─ the active tool's views: ungrouped first, then collapsible bold groups
@@ -172,11 +172,10 @@ export function ToolShell({ config, brand, allToolsLabel = "All tools", allTools
           <div className="tool-top__row">
             <span className="tool-top__brand">{brand}</span>
             <button type="button" className="tool-top__all" onClick={openAll} aria-haspopup="dialog" aria-expanded={menu} data-testid="button-all-tools"><LayoutGrid aria-hidden="true" /> {allToolsLabel}</button>
-            {!phone && (
-              <div className="tool-top__tabs">
-                {tabs}
-              </div>
-            )}
+            {/* Owner, 2026-10-12: "why are there the same buttons on the sidebar and top ribbon? … maybe the side is
+                enough". From 768px the icon rail is the menu and the bar names the tool; phones have no rail, so the
+                tools stay as the bar's tabs there. */}
+            {!phone && <span className="tool-top__title" data-testid="tool-top-title">{config.label}</span>}
             {actions && <div className="tool-top__actions">{actions}</div>}
           </div>
           {phone && (
