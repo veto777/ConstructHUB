@@ -1,3 +1,4 @@
+import { ensureNativeSchema } from "./native";
 import { pool } from "../db";
 export async function ensureSocialSchema() {
   await pool.query(`
@@ -51,4 +52,5 @@ export async function ensureSocialSchema() {
     CREATE INDEX IF NOT EXISTS social_bulk_owner ON social_bulk_jobs(user_id,id DESC);
     CREATE INDEX IF NOT EXISTS social_business_owner ON social_business_config(user_id,business_id);
   `);
+  await ensureNativeSchema();
 }

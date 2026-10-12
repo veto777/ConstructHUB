@@ -5,7 +5,7 @@
  *                                    through us (OAuth), tagged with their tenant id, and we post on their behalf
  * The queue, schedule, AI writing, approvals and calendar sit above this and do not know which one is in use.
  * Owner, 2026-10-11: "lets add a platform that can be used on the behalf of customers … per post … until we get
- * some users". Our own Meta / LinkedIn / TikTok / YouTube apps can later be a third provider (or plugged into
+ * some users". Our own Meta / LinkedIn / TikTok / YouTube apps are the third provider, NativeClient (./native.ts, 2026-10-12) (or plugged into
  * Outstand as bring-your-own keys) without the layers above changing.
  */
 export type SocialAccount = { id: string; platform: string; name: string; pages?: { id: string; name: string }[]; boards?: { id: string; name: string }[] };
@@ -24,7 +24,7 @@ export type UploadStart = { presignedUrl: string; contentType?: string; /** Know
 
 export interface SocialClient {
   /** Which provider: shown in errors and stored nowhere. */
-  readonly provider: "blotato" | "outstand";
+  readonly provider: "blotato" | "outstand" | "native";
   /** Identifies the connection; a post queued under one connection is never sent through another. */
   readonly hash: string;
   accounts(): Promise<SocialAccount[]>;
@@ -32,6 +32,7 @@ export interface SocialClient {
   targets(account: SocialAccount): Promise<{ kind: "pages" | "boards"; items: { id: string; name: string }[] } | null>;
   submit(payload: PostPayload, idempotencyKey: string): Promise<SubmitResult>;
   status(submissionId: string): Promise<StatusResult>;
-  startUpload(filename: string): Promise<UploadStart>;
+  /** `userId`: the signed-in user (ConstructHUB Direct binds the upload link to them). */
+  startUpload(filename: string, userId?: number): Promise<UploadStart>;
   confirmUpload?(uploadId: string): Promise<string>;
 }

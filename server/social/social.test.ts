@@ -663,7 +663,8 @@ describe("route authentication, owner scope and key redaction", () => {
       make,
     );
     expect(routes.length).toBeGreaterThan(10);
-    for (const r of routes) {
+    // Signed webhooks prove themselves with a signature, not a session (tested in outstand.test.ts).
+    for (const r of routes.filter((x) => x.path !== "/api/social/outstand/webhook")) {
       const next = vi.fn(),
         res: any = { status: vi.fn().mockReturnThis(), json: vi.fn() };
       await r.handlers[0]({}, res, next);

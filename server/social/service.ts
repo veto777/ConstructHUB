@@ -15,6 +15,7 @@ import {
 } from "../../shared/social";
 import { BlotatoClient, encryptKey, decryptKey, SocialError, socialMisconfigured } from "./client";
 import { CONNECTABLE, OUTSTAND_MARK, OutstandClient, outstandConfigured, tenantFor, type Connectable } from "./outstand";
+import { NATIVE_MARK, NativeClient, nativeNetworks, newOAuthState, oauthStateMatches, metaAuthUrl, metaPagesFromCode, savePending, nativePendingList, nativeFinalize as nativeSave, removeNativeAccounts, type PendingOAuth } from "./native";
 import {
   clientFactory, userLock, ownedBusiness, connection, validateDestinations, destinationFromPayload, destinationKey, requestFingerprint, insertPosts, createPosts,
   type ClientFactory,
@@ -54,6 +55,8 @@ export async function disconnect(userId: number, req: any, businessId: number | 
   if (connectionProvider(conn?.key_enc, userId) === "outstand") {
     await new OutstandClient(tenantFor(userId, businessId)).removeAll().catch((e) => console.warn("[social] outstand disconnect:", e?.message));
   }
+  // ConstructHUB Direct: the stored sign-ins are deleted (the customer can also remove our app in the network's settings).
+  if (connectionProvider(conn?.key_enc, userId) === "native") await removeNativeAccounts(tenantFor(userId, businessId));
   return userLock(userId, async (c) => {
     await c.query("BEGIN");
     try {
@@ -77,9 +80,9 @@ export async function disconnect(userId: number, req: any, businessId: number | 
   });
 }
 /** Which provider a stored connection uses ("outstand" | "blotato"), or null when it cannot be read. */
-export function connectionProvider(keyEnc: string | undefined | null, userId: number): "outstand" | "blotato" | null {
+export function connectionProvider(keyEnc: string | undefined | null, userId: number): "native" | "outstand" | "blotato" | null {
   if (!keyEnc) return null;
-  try { return decryptKey(keyEnc, userId).startsWith(OUTSTAND_MARK) ? "outstand" : "blotato"; } catch { return null; }
+  try { const k = decryptKey(keyEnc, userId); return k.startsWith(NATIVE_MARK) ? "native" : k.startsWith(OUTSTAND_MARK) ? "outstand" : "blotato"; } catch { return null; }
 }
 
 /**
@@ -132,6 +135,74 @@ export async function outstandFinalize(userId: number, businessId: number | null
   const n = await OutstandClient.finalize(session, pageIds);
   await logActivity(req, userId, "social.pages_connected", { pages: n });
   return outstandRefresh(userId, businessId);
+}
+
+// ── ConstructHUB Direct: our own apps (server/social/native.ts) ──────────────────────────────────────────────
+
+/**
+ * "Connect Facebook / Instagram" through ConstructHUB's own Meta app. The business's connection becomes our own
+ * tenant for that business (a Blotato key or Outstand tenant it had is replaced), a one-time state is kept in the
+ * session, and the customer is sent to Meta's sign-in. They come back through nativeCallback.
+ */
+export async function nativeConnectUrl(userId: number, businessId: number | null, network: string, req: any): Promise<{ authUrl: string }> {
+  if (!nativeNetworks().includes(network)) throw new SocialError("That network can't be connected here yet");
+  return userLock(userId, async () => {
+    await ownedBusiness(userId, businessId);
+    const { rows: [r] } = await pool.query("SELECT key_enc FROM social_connections WHERE user_id=$1 AND business_id IS NOT DISTINCT FROM $2", [userId, businessId]);
+    if (connectionProvider(r?.key_enc, userId) !== "native") {
+      await pool.query(
+        `INSERT INTO social_connections(user_id,key_enc,accounts,business_id) VALUES($1,$2,'[]',$3) ON CONFLICT(user_id,business_id) DO UPDATE SET key_enc=$2,accounts='[]',updated_at=now()`,
+        [userId, encryptKey(NATIVE_MARK + tenantFor(userId, businessId), userId), businessId]);
+      await logActivity(req, userId, "social.connected", { provider: "native" });
+    }
+    const pending = newOAuthState(userId, businessId, network);
+    req.session.socialNativeOAuth = pending;
+    return { authUrl: metaAuthUrl(pending.state) };
+  });
+}
+
+/** Back from Meta: the pages this sign-in can connect are kept for 15 minutes; the customer ticks them next. Returns where to send the browser. */
+export async function nativeCallback(req: any, userId: number): Promise<string> {
+  const pending: PendingOAuth | undefined = req.session.socialNativeOAuth;
+  delete req.session.socialNativeOAuth; // one use, whatever happens next
+  const business = pending?.businessId ?? null;
+  const back = (q: string) => `/social-media?business=${business ?? "all"}&${q}`;
+  if (!oauthStateMatches(pending, userId, req.query?.state)) return back("connect_error=expired");
+  if (typeof req.query?.error === "string" || typeof req.query?.code !== "string") return back("connect_error=cancelled");
+  try {
+    const pages = await metaPagesFromCode(req.query.code);
+    const session = await savePending(tenantFor(userId, business), userId, pending.network, pages);
+    await logActivity(req, userId, "social.signed_in", { provider: "native", network: pending.network, pages: pages.length });
+    return back(`session=${session}`);
+  } catch (e) {
+    console.warn("[social] native sign-in failed:", (e as Error)?.message);
+    return back("connect_error=failed");
+  }
+}
+
+/** The connected accounts as stored now (kept boards are carried over). */
+export async function nativeRefresh(userId: number, businessId: number | null) {
+  return userLock(userId, async () => {
+    const { client, accounts: before, businessId: scope } = await connection(userId, clientFactory, businessId);
+    if (!(client instanceof NativeClient)) throw new SocialError("This business isn't connected through ConstructHUB", 409);
+    const now = await client.accounts();
+    const kept = new Map((before as any[]).map((a) => [a.id, a]));
+    const merged = now.map((a) => ({ ...a, ...(kept.get(a.id)?.boards ? { boards: kept.get(a.id).boards } : {}) }));
+    await pool.query("UPDATE social_connections SET accounts=$3,updated_at=now() WHERE user_id=$1 AND business_id IS NOT DISTINCT FROM $2", [userId, scope, JSON.stringify(merged)]);
+    return { accounts: merged.map(({ id, platform, name }) => ({ id, platform, name })) };
+  });
+}
+
+export async function nativePending(userId: number, businessId: number | null, session: string) {
+  await ownedBusiness(userId, businessId);
+  return nativePendingList(session, tenantFor(userId, businessId), userId);
+}
+
+export async function nativeFinalize(userId: number, businessId: number | null, session: string, ids: string[], req: any) {
+  await ownedBusiness(userId, businessId);
+  const n = await nativeSave(session, tenantFor(userId, businessId), userId, ids);
+  await logActivity(req, userId, "social.pages_connected", { provider: "native", accounts: n });
+  return nativeRefresh(userId, businessId);
 }
 
 export async function discoverPages(

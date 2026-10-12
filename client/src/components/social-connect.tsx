@@ -21,22 +21,31 @@ const NOTE: Record<string, string> = {
 
 type Account = { id: string; platform: string; name: string };
 
-export function SocialConnect({ businessId, networks, accounts, connected }: { businessId: number | null; networks: readonly string[]; accounts: Account[]; connected: boolean }) {
+/** `via`: "native" = ConstructHUB's own apps (server/social/native.ts); "outstand" = the Outstand account. */
+export function SocialConnect({ businessId, networks, accounts, connected, via = "outstand" }: { businessId: number | null; networks: readonly string[]; accounts: Account[]; connected: boolean; via?: "outstand" | "native" }) {
+  const api = `/api/social/${via}`;
   const { toast } = useToast();
   const qc = useQueryClient();
   const scope = businessId ? `?businessId=${businessId}` : "";
   const [justConnected, setJustConnected] = useUrlParam("connected");
+  const [connectError, setConnectError] = useUrlParam("connect_error");
+  useEffect(() => {
+    if (!connectError) return;
+    const why: Record<string, string> = { expired: "That sign-in link expired. Start again.", cancelled: "The sign-in was cancelled.", failed: "The network didn't let us read your pages. Start again, and allow every permission it asks for." };
+    toast({ title: "Not connected", description: why[connectError] ?? why.failed, variant: "destructive" });
+    setConnectError(null);
+  }, [connectError]); // eslint-disable-line react-hooks/exhaustive-deps
   const [session, setSession] = useUrlParam("session");
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const refresh = () => void qc.invalidateQueries({ queryKey: ["/api/social"] });
 
   const start = useMutation({
-    mutationFn: async (network: string) => (await apiRequest("POST", `/api/social/outstand/connect${scope}`, { network })).json() as Promise<{ authUrl: string }>,
+    mutationFn: async (network: string) => (await apiRequest("POST", `${api}/connect${scope}`, { network })).json() as Promise<{ authUrl: string }>,
     onSuccess: (d) => { window.location.assign(d.authUrl); },
     onError: (e) => toast({ title: "Couldn't start connecting", description: apiErrorMessage(e), variant: "destructive" }),
   });
   const reread = useMutation({
-    mutationFn: async () => (await apiRequest("POST", `/api/social/outstand/refresh${scope}`)).json() as Promise<{ accounts: Account[] }>,
+    mutationFn: async () => (await apiRequest("POST", `${api}/refresh${scope}`)).json() as Promise<{ accounts: Account[] }>,
     onSuccess: (d, _v) => { refresh(); if (justConnected) toast({ title: `${LABEL[justConnected] ?? justConnected} connected`, description: `${d.accounts.length} account${d.accounts.length === 1 ? "" : "s"} connected for this business.` }); setJustConnected(null); },
     onError: (e) => { setJustConnected(null); toast({ title: "Couldn't read your accounts", description: apiErrorMessage(e), variant: "destructive" }); },
   });
@@ -47,11 +56,11 @@ export function SocialConnect({ businessId, networks, accounts, connected }: { b
   const [token] = useState(() => session);
   useEffect(() => { if (session) setSession(null); }, [session]); // eslint-disable-line react-hooks/exhaustive-deps
   const pending = useQuery<{ network: string; pages: { id: string; name: string; kind: string | null }[] }>({
-    queryKey: ["/api/social/outstand/pending", token], enabled: !!token, retry: false,
-    queryFn: async () => (await apiRequest("GET", `/api/social/outstand/pending/${encodeURIComponent(token!)}${scope}`)).json(),
+    queryKey: [`${api}/pending`, token], enabled: !!token, retry: false,
+    queryFn: async () => (await apiRequest("GET", `${api}/pending/${encodeURIComponent(token!)}${scope}`)).json(),
   });
   const finalize = useMutation({
-    mutationFn: async () => (await apiRequest("POST", `/api/social/outstand/pending/${encodeURIComponent(token!)}/finalize${scope}`, { pageIds: [...picked] })).json() as Promise<{ accounts: Account[] }>,
+    mutationFn: async () => (await apiRequest("POST", `${api}/pending/${encodeURIComponent(token!)}/finalize${scope}`, { pageIds: [...picked] })).json() as Promise<{ accounts: Account[] }>,
     onSuccess: (d) => { refresh(); setJustConnected(null); toast({ title: "Pages connected", description: `${d.accounts.length} account${d.accounts.length === 1 ? "" : "s"} connected for this business.` }); window.location.reload(); },
     onError: (e) => toast({ title: "Couldn't connect those pages", description: apiErrorMessage(e), variant: "destructive" }),
   });

@@ -1,3 +1,4 @@
+import { NATIVE_MARK, NativeClient } from "./native";
 /**
  * The AI-free half of the Social Media service: connection lookup,
  * destination validation and scheduling posts with text the caller wrote.
@@ -17,7 +18,9 @@ import type { SocialClient } from "./provider";
 
 /** The stored secret picks the provider: "outstand:<tenant>" is ConstructHUB's own Outstand account, anything else a Blotato key. */
 export type ClientFactory = (key: string) => SocialClient;
-export const clientFactory: ClientFactory = (key) => (key.startsWith(OUTSTAND_MARK) ? new OutstandClient(key.slice(OUTSTAND_MARK.length)) : new BlotatoClient(key));
+export const clientFactory: ClientFactory = (key) =>
+  key.startsWith(NATIVE_MARK) ? new NativeClient(key.slice(NATIVE_MARK.length))
+  : key.startsWith(OUTSTAND_MARK) ? new OutstandClient(key.slice(OUTSTAND_MARK.length)) : new BlotatoClient(key);
 
 export async function userLock<T>(
   userId: number,

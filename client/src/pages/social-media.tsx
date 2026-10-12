@@ -306,7 +306,7 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
   // Why Post now / Save draft are disabled, in the order the user can fix it.
   const setupProblem = data?.setupProblem as string | null | undefined;
   const postBlocker = error ? "Refresh Social Media to check whether posting is available." : setupProblem || (!data?.connected
-    ? (data?.outstand ? "Connect your social accounts above to post." : "Connect Blotato above to post.")
+    ? (data?.outstand || data?.native ? "Connect your social accounts above to post." : "Connect Blotato above to post.")
     : !destinations.length
       ? "Choose at least one account above."
       : !text.trim()
@@ -474,11 +474,14 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
         </div>
       )}
 
-      {!all && data?.outstand && (
+      {!all && data?.native && (
+        <SocialConnect via="native" businessId={businessId} networks={data.native.networks} accounts={data?.provider === "native" ? accounts : []} connected={data?.provider === "native" && !!data?.connected} />
+      )}
+      {!all && !data?.native && data?.outstand && (
         <SocialConnect businessId={businessId} networks={data.outstand.networks} accounts={data?.provider === "outstand" ? accounts : []} connected={data?.provider === "outstand" && !!data?.connected} />
       )}
 
-      {!all && !data?.outstand && (
+      {!all && !data?.outstand && !data?.native && (
         <section>
           <GoogleSectionHeader
             title="Blotato connection"

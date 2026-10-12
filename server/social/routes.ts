@@ -23,8 +23,16 @@ import {
   outstandRefresh,
   outstandPending,
   outstandFinalize,
+  nativeConnectUrl,
+  nativeCallback,
+  nativeRefresh,
+  nativePending,
+  nativeFinalize,
 } from "./service";
 import { CONNECTABLE, outstandConfigured, webhookSigned } from "./outstand";
+import { nativeNetworks, receiveUpload, NATIVE_UPLOAD_MAX_BYTES } from "./native";
+import { putToR2Key } from "../r2";
+import express from "express";
 // Curated, field-specific messages. Raw Zod text is never echoed; custom
 // refinements (written for people) pass through as-is.
 const fieldMessages: Record<string, string> = {
@@ -200,7 +208,7 @@ export function registerSocialRoutes(
     const accounts=businessId ? (c?.accounts||[]).filter((a:any)=>mappings.some((d:any)=>d.accountId===a.id)).map((a:any)=>({...a,
       pages:a.pages?.filter((p:any)=>mappings.some((d:any)=>d.accountId===a.id&&d.pageId===p.id)),
       boards:a.boards?.filter((p:any)=>mappings.some((d:any)=>d.accountId===a.id&&d.boardId===p.id))})) : (c?.accounts||[]).slice(0,25);
-    res.json({setupProblem:socialSetupProblem(c?.key_enc,id),provider:connectionProvider(c?.key_enc,id),outstand:outstandConfigured()?{networks:CONNECTABLE}:null,connected:!!c,agencyConnected:!!connections?.agency,businessConnected:!!connections?.business,connectionScope:c?.business_id?'business':'agency',accounts,settings:s?.settings||autoSchema.parse({}),
+    res.json({setupProblem:socialSetupProblem(c?.key_enc,id),provider:connectionProvider(c?.key_enc,id),outstand:outstandConfigured()?{networks:CONNECTABLE}:null,native:nativeNetworks().length?{networks:nativeNetworks()}:null,connected:!!c,agencyConnected:!!connections?.agency,businessConnected:!!connections?.business,connectionScope:c?.business_id?'business':'agency',accounts,settings:s?.settings||autoSchema.parse({}),
       nextAt:s?.next_at,lastError:s?.last_error,posts:posts.map(publicPost),total:count.total,defaults:mappings,sourcesSync:config,
       business:businessId?await ownedBusiness(id,businessId):null});
   };
@@ -224,6 +232,34 @@ export function registerSocialRoutes(
     res.json(await outstandConnectUrl(id, businessId, network, req));
   });
   // Back from the sign-in: read the connected accounts again.
+  // ConstructHUB Direct (server/social/native.ts): our own apps on each network.
+  route("post", "/native/connect", async (req, res, id, businessId) => {
+    const { network } = z.object({ network: z.string().min(2).max(20) }).strict().parse(req.body);
+    res.json(await nativeConnectUrl(id, businessId, network, req));
+  });
+  route("post", "/native/refresh", async (_req, res, id, businessId) => res.json(await nativeRefresh(id, businessId)));
+  route("get", "/native/pending/:session", async (req, res, id, businessId) => res.json(await nativePending(id, businessId, z.string().regex(/^[\w-]{20,64}$/).parse(req.params.session))));
+  route("post", "/native/pending/:session/finalize", async (req, res, id, businessId) => {
+    const { pageIds } = z.object({ pageIds: z.array(z.string().regex(/^\d{1,40}$/)).min(1).max(50) }).strict().parse(req.body);
+    res.json(await nativeFinalize(id, businessId, z.string().regex(/^[\w-]{20,64}$/).parse(req.params.session), pageIds, req));
+  });
+  // Back from the network's sign-in (ungated: an in-flight sign-in always lands; the session state proves it is ours).
+  app.get("/api/social/native/callback", async (req: Request, res: Response) => {
+    const user = auth(req, res); if (!user) return;
+    res.setHeader("Cache-Control", "no-store");
+    res.redirect(302, await nativeCallback(req, user.id));
+  });
+  // The composer's file goes through us to our storage; the networks fetch it from its public address.
+  app.put("/api/social/native/upload/:token", (req: Request, res: Response, next: () => void) => { if (auth(req, res)) next(); },
+    express.raw({ type: () => true, limit: NATIVE_UPLOAD_MAX_BYTES }), async (req: Request, res: Response) => {
+    const user = req.user!;
+    res.setHeader("Cache-Control", "no-store");
+    try {
+      res.json(await receiveUpload(String(req.params.token), user.id, Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0), req.get("content-type") ?? undefined, putToR2Key));
+    } catch (e) {
+      res.status(e instanceof SocialError ? e.status : 500).json({ message: e instanceof SocialError ? e.message : "The upload didn't work. Try again." });
+    }
+  });
   route("post", "/outstand/refresh", async (_req, res, id, businessId) => res.json(await outstandRefresh(id, businessId)));
   // Facebook / LinkedIn come back with a session: which pages may be connected, then the ones ticked.
   route("get", "/outstand/pending/:session", async (req, res) => res.json(await outstandPending(z.string().regex(/^[\w.-]{8,400}$/).parse(req.params.session))));
@@ -298,7 +334,7 @@ export function registerSocialRoutes(
       .strict()
       .parse(req.body);
     const { client } = await connection(id, make, businessId);
-    const up = await client.startUpload(filename);
+    const up = await client.startUpload(filename, id);
     // Blotato knows the public address now; Outstand gives an upload id to confirm after the PUT (then the address).
     res.json({ publicUrl: up.publicUrl, presignedUrl: up.presignedUrl, ...(up.uploadId ? { uploadId: up.uploadId, contentType: up.contentType ?? null } : {}) });
   });
