@@ -81,7 +81,7 @@ export function outstandBody(p: PostPayload): Record<string, unknown> {
   if (network === "pinterest") body.pinterest = { board_id: target.boardId, ...(target.title ? { title: target.title } : {}) };
   if (network === "youtube") body.youtube = { title: target.title, privacyStatus: target.privacyStatus ?? "private", madeForKids: false, containsSyntheticMedia: !!target.containsSyntheticMedia };
   if (network === "tiktok") body.tiktok = {
-    privacyLevel: target.privacyLevel ?? "SELF_ONLY", disableComment: true, disableDuet: true, disableStitch: true,
+    privacyLevel: target.privacyLevel ?? "SELF_ONLY", disableComment: target.disabledComments ?? true, disableDuet: target.disabledDuet ?? true, disableStitch: target.disabledStitch ?? true,
     brandContentToggle: !!target.isBrandedContent, brandOrganicToggle: !!target.isYourBrand, isAigc: !!target.isAiGenerated,
   };
   return body;

@@ -146,10 +146,14 @@ describe("social validation and HTTP boundary", () => {
       ["https://example.com/photo.jpg"],
       true,
     );
+    // No audience chosen: no privacyLevel at all (never a default), interactions off.
     expect(payload.post.target).toMatchObject({
-      privacyLevel: "SELF_ONLY",
+      disabledComments: true,
+      disabledDuet: true,
+      disabledStitch: true,
       isAiGenerated: true,
     });
+    expect(payload.post.target).not.toHaveProperty("privacyLevel");
   });
   it.each(platforms)("enforces the %s text boundary and builds its target", (platform) => {
     const d = destinationSchema.parse({ accountId: "fixture", platform, ...(platform === "facebook" ? { pageId: "page" } : {}), ...(platform === "pinterest" ? { boardId: "board" } : {}), title: "Fixture title" });
@@ -163,6 +167,16 @@ describe("social validation and HTTP boundary", () => {
   it("keeps YouTube privacy and TikTok commercial disclosures explicit", () => {
     expect(postPayload({ ...destination, platform: "youtube", title: "Title", privacy: "unlisted" }, "Fixture", ["https://example.com/video.mp4"], true).post.target).toMatchObject({ privacyStatus: "unlisted", containsSyntheticMedia: true });
     expect(postPayload({ ...destination, platform: "tiktok", tiktokPublic: true, isBrandedContent: true, isYourBrand: true }, "Fixture", ["https://example.com/video.mp4"]).post.target).toMatchObject({ privacyLevel: "PUBLIC_TO_EVERYONE", isBrandedContent: true, isYourBrand: true });
+    // The explicit TikTok fields: the chosen audience, and each interaction allowed only when ticked.
+    expect(postPayload({ ...destination, platform: "tiktok", tiktokPrivacy: "FOLLOWER_OF_CREATOR", allowComment: true, allowDuet: false, allowStitch: true }, "Fixture", ["https://example.com/video.mp4"]).post.target)
+      .toMatchObject({ privacyLevel: "FOLLOWER_OF_CREATOR", disabledComments: false, disabledDuet: true, disabledStitch: false, isBrandedContent: false, isYourBrand: false });
+    // Stored settings and drafts from before: tiktokPublic still parses and means what it said.
+    const legacy = destinationSchema.parse({ accountId: "tt", platform: "tiktok", tiktokPublic: false });
+    expect(postPayload(legacy, "Fixture", ["https://example.com/video.mp4"]).post.target).toMatchObject({ privacyLevel: "SELF_ONLY" });
+    expect(destinationSchema.parse({ accountId: "tt", platform: "tiktok" })).toMatchObject({ tiktokPrivacy: "", allowComment: false, allowDuet: false, allowStitch: false });
+    expect(() => destinationSchema.parse({ accountId: "tt", platform: "tiktok", tiktokPrivacy: "EVERYONE" })).toThrow();
+    // Branded content can't be private.
+    expect(() => postPayload({ ...destination, platform: "tiktok", tiktokPrivacy: "SELF_ONLY", isBrandedContent: true }, "Fixture", ["https://example.com/video.mp4"])).toThrow(/cannot be set to private/);
     expect(() => postPayload({ ...destination, platform: "pinterest" }, "Fixture", ["https://example.com/photo.jpg"])).toThrow("board");
   });
   it("rejects private URL literals and overnight blackout handles timezone", () => {
@@ -667,7 +681,9 @@ describe("route authentication, owner scope and key redaction", () => {
     // Signed callbacks from Meta/Threads authenticate with signed_request (tested in deletion.test.ts); the status
     // lookup is public by design (a confirmation code reveals only "completed" and a date).
     const signed = new Set(["/api/social/native/meta/data-deletion", "/api/social/native/meta/deauthorize", "/api/social/native/instagram/data-deletion",
-      "/api/social/native/instagram/deauthorize", "/api/social/native/threads/delete", "/api/social/native/threads/uninstall", "/api/social/native/data-deletion/status"]);
+      "/api/social/native/instagram/deauthorize", "/api/social/native/threads/delete", "/api/social/native/threads/uninstall", "/api/social/native/data-deletion/status",
+      // TikTok's webhook authenticates with TikTok-Signature (tested in tiktok-webhook.test.ts).
+      "/api/social/native/tiktok/webhook"]);
     for (const r of routes.filter((x) => x.path !== "/api/social/outstand/webhook" && !signed.has(x.path))) {
       const next = vi.fn(),
         res: any = { status: vi.fn().mockReturnThis(), json: vi.fn() };

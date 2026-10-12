@@ -164,9 +164,8 @@ export async function postStats(client: NativeClient, submissionId: string): Pro
     if (sub.stage !== "published") return { ...out, note: "Stats appear once the post is published." };
     const id = sub.external_id;
     if (api === "tiktok") {
-      if (!id) return { ...out, note: "Private TikTok posts have no public stats." };
-      const v = (await tk("/v2/video/query/?fields=id,like_count,comment_count,share_count,view_count", token, { filters: { video_ids: [id] } })).data?.videos?.[0] ?? {};
-      return { ...out, likes: num(v.like_count), comments: num(v.comment_count), shares: num(v.share_count), views: num(v.view_count) };
+      // Reading a video's numbers needs the video.list scope, which ConstructHUB does not ask for (docs/social-apps/tiktok.md §2.2).
+      return { ...out, note: id ? "See this post's views and likes in the TikTok app." : "Private TikTok posts have no public stats." };
     }
     if (!id) return { ...out, note: "The network didn't return this post's ID, so its stats can't be read." };
     if (api === "threads") {

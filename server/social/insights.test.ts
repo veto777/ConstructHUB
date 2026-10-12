@@ -54,7 +54,8 @@ describe.skipIf(!process.env.DATABASE_URL || !process.env.GBP_TOKEN_KEY)("stats,
     await nativeNetConnect("tiktok", tenant, "code");
     for (const a of await c.accounts()) acct[a.platform] = a.id;
   });
-  afterAll(async () => { await removeNativeAccounts(tenant); await pool.query("DELETE FROM social_native_submissions WHERE tenant=$1", [tenant]); });
+  // Disconnecting revokes the TikTok token at TikTok: answered by the fake, never the real network.
+  afterAll(async () => { fake(() => ({})); await removeNativeAccounts(tenant); nativeDeps.http = realHttp; netDeps.http = realNet; await pool.query("DELETE FROM social_native_submissions WHERE tenant=$1", [tenant]); });
 
   it("reads each account's followers and period stats; one failing does not hide the others", async () => {
     const calls = fake(({ host, path, params }) => {
@@ -161,13 +162,10 @@ describe.skipIf(!process.env.DATABASE_URL || !process.env.GBP_TOKEN_KEY)("stats,
     await hideComment(c, id, "r1", true);
   });
 
-  it("TikTok: video stats, but no comments and no deleting", async () => {
+  it("TikTok: no per-post stats (no video.list scope), no comments and no deleting", async () => {
     const id = await sub("tiktok", "7300");
-    fake(({ path }) => {
-      if (path === "/v2/video/query/") return { data: { videos: [{ id: "7300", like_count: 50, comment_count: 4, share_count: 2, view_count: 1200 }] }, error: { code: "ok" } };
-      throw new Error(`unexpected ${path}`);
-    });
-    expect(await postStats(c, id)).toMatchObject({ likes: 50, comments: 4, shares: 2, views: 1200 });
+    fake(({ path }) => { throw new Error(`unexpected ${path}`); });   // nothing is asked of TikTok
+    expect(await postStats(c, id)).toMatchObject({ likes: null, views: null, note: expect.stringMatching(/TikTok app/) });
     expect((await comments(c, id)).note).toMatch(/TikTok doesn't let apps/);
     await expect(deletePost(c, id)).rejects.toThrow(/delete it in the TikTok app/);
     await expect(replyComment(c, id, "x1", "hi")).rejects.toThrow(/TikTok/);

@@ -11,7 +11,7 @@ import { NATIVE_MARK, NativeClient } from "./native";
 import { createHash, randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import { pool } from "../db";
-import { postSchema, postPayload, type Destination } from "../../shared/social";
+import { postSchema, postPayload, tiktokPrivacyOf, type Destination } from "../../shared/social";
 import { BlotatoClient, decryptKey, SocialError } from "./client";
 import { OutstandClient, OUTSTAND_MARK } from "./outstand";
 import type { SocialClient } from "./provider";
@@ -162,6 +162,8 @@ export async function createPosts(userId: number, raw: unknown, businessId: numb
       } catch (e) {
         throw new SocialError((e as Error).message);
       }
+      // TikTok: a post (not a draft) goes out only with the audience the customer picked — never a default.
+      if (!input.draft && d.platform === "tiktok" && !tiktokPrivacyOf(d)) throw new SocialError("Choose who can view this TikTok post.");
     }
     await c.query("BEGIN");
     try {

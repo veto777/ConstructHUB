@@ -22,7 +22,7 @@ const enc = (v: string): string => { const b = encryptToken(v); if (!b) throw ne
 const dec = (v: string): string => { const t = decryptToken(v); if (!t) throw new SocialError("This account's saved sign-in can't be read; reconnect it", 409); return t; };
 import { SocialError } from "./client";
 import type { PostPayload, SocialAccount, SocialClient, StatusResult, SubmitResult, UploadStart } from "./provider";
-import { netConfigured, netExchange, netPublish, netRead, netRefresh, needsRefresh, netScopes, type NetApi } from "./native-nets";
+import { netConfigured, netExchange, netPublish, netRead, netRefresh, needsRefresh, netScopes, tiktokCreatorInfo, tiktokRevoke, type CreatorInfo, type NetApi } from "./native-nets";
 
 export const NATIVE_MARK = "native:";
 export const GRAPH = "https://graph.facebook.com/v25.0";
@@ -257,10 +257,38 @@ export async function nativeNetConnect(api: NetApi, tenant: string, code: string
 }
 export const netScopesFor = netScopes;
 
+/** Disconnect lets go of our access at TikTok too (/v2/oauth/revoke/); best effort — the rows are deleted either way. */
+async function revokeTikTok(rows: { token_enc: string }[]) {
+  for (const r of rows) {
+    const token = decryptToken(r.token_enc);
+    if (token) await tiktokRevoke(token).catch((e) => console.warn("[social] tiktok revoke:", (e as Error)?.message));
+  }
+}
+
 export async function removeNativeAccounts(tenant: string): Promise<number> {
+  const { rows: tt } = await pool.query("SELECT token_enc FROM social_native_accounts WHERE tenant=$1 AND api='tiktok'", [tenant]);
+  await revokeTikTok(tt);
   const { rowCount } = await pool.query("DELETE FROM social_native_accounts WHERE tenant=$1", [tenant]);
   await pool.query("DELETE FROM social_native_pending WHERE tenant=$1", [tenant]);
   return rowCount ?? 0;
+}
+
+/**
+ * TikTok's `authorization.removed` webhook (server/social/tiktok-webhook.ts): the person removed ConstructHUB in TikTok,
+ * so every connected TikTok account with that open_id goes, with its tokens (TikTok has already revoked them), and the
+ * cached account list of each connection drops it. Returns how many accounts were deleted.
+ */
+export async function removeTikTokOpenId(openId: string): Promise<number> {
+  if (!/^[\w.:-]{1,128}$/.test(openId)) return 0;
+  if (!(await pool.query("SELECT to_regclass('social_native_accounts') AS t")).rows[0]?.t) return 0;
+  const { rows } = await pool.query("DELETE FROM social_native_accounts WHERE platform='tiktok' AND api='tiktok' AND (external_id=$1 OR owner_user_id=$1) RETURNING id", [openId]);
+  const ids = rows.map((r) => String(r.id));
+  if (ids.length) {
+    await pool.query(
+      `UPDATE social_connections SET accounts=COALESCE((SELECT jsonb_agg(a) FROM jsonb_array_elements(accounts) a WHERE NOT (a->>'id' = ANY($1::text[]))),'[]'::jsonb),updated_at=now()
+       WHERE jsonb_typeof(accounts)='array' AND EXISTS (SELECT 1 FROM jsonb_array_elements(accounts) a WHERE a->>'id' = ANY($1::text[]))`, [ids]);
+  }
+  return ids.length;
 }
 
 // ── publishing ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -339,6 +367,14 @@ export class NativeClient implements SocialClient {
     if (!/^nat_[\w-]{1,64}$/.test(id)) return null;
     const { rows: [s] } = await pool.query("SELECT id,account_id,platform,stage,external_id,public_url FROM social_native_submissions WHERE tenant=$1 AND id=$2", [this.tenant, id]);
     return s ?? null;
+  }
+  /** TikTok's creator_info for the post panel, asked fresh every time (never cached — TikTok's rule). */
+  async tiktokCreatorInfo(accountId: string): Promise<CreatorInfo> {
+    const row = await this.row(accountId);
+    if (row.api !== "tiktok") throw new SocialError("That isn't a TikTok account", 400);
+    if (row.needs_reconnect) throw new SocialError("This TikTok account's sign-in has expired; reconnect it under Connected accounts", 409);
+    try { return await tiktokCreatorInfo(await this.token(row)); }
+    catch (e) { await this.markReconnect(row.id, e); throw e; }
   }
   /** An expired sign-in found while reading stats marks the account for reconnecting, as publishing does. */
   async noteError(accountId: string, e: unknown) { await this.markReconnect(accountId, e); }

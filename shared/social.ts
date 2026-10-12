@@ -51,6 +51,7 @@ export const publicMediaUrl = z
       return false;
     }
   }, "Use a public HTTPS media URL");
+export const tiktokPrivacyLevels = ["PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "FOLLOWER_OF_CREATOR", "SELF_ONLY"] as const;
 export const destinationSchema = z
   .object({
     accountId: opaqueId,
@@ -59,11 +60,23 @@ export const destinationSchema = z
     boardId: opaqueId.optional(),
     title: z.string().max(100).optional(),
     privacy: z.enum(["public", "private", "unlisted"]).default("private"),
-    tiktokPublic: z.boolean().default(false),
+    // TikTok (Content Sharing Guidelines, docs/social-apps/tiktok.md §5.2): who can view has NO default — "" until
+    // the customer picks one of the creator's own options; comments / Duet / Stitch are off until ticked.
+    tiktokPrivacy: z.enum(["", ...tiktokPrivacyLevels]).default(""),
+    allowComment: z.boolean().default(false),
+    allowDuet: z.boolean().default(false),
+    allowStitch: z.boolean().default(false),
     isBrandedContent: z.boolean().default(false),
     isYourBrand: z.boolean().default(false),
+    /** @deprecated The old "Publish publicly" checkbox, still read from stored settings, drafts and the public API. */
+    tiktokPublic: z.boolean().optional(),
   })
   .strict();
+/** The TikTok privacy level a destination chose, or "" when none was chosen (legacy `tiktokPublic` honoured). */
+export function tiktokPrivacyOf(d: Pick<Destination, "tiktokPrivacy" | "tiktokPublic">): string {
+  if (d.tiktokPrivacy) return d.tiktokPrivacy;
+  return d.tiktokPublic === undefined ? "" : d.tiktokPublic ? "PUBLIC_TO_EVERYONE" : "SELF_ONLY";
+}
 export type Destination = z.infer<typeof destinationSchema>;
 export const postSchema = z
   .object({
@@ -172,16 +185,22 @@ export function postPayload(
       isMadeForKids: false,
       containsSyntheticMedia: ai,
     });
-  if (d.platform === "tiktok")
+  if (d.platform === "tiktok") {
+    // Blotato's field names; the native adapter (server/social/native-nets.ts tiktokPlan) reads the same ones.
+    // No privacy chosen → no privacyLevel: the post can be a draft, but it is never sent with a guessed audience.
+    const privacyLevel = tiktokPrivacyOf(d);
+    if (d.isBrandedContent && privacyLevel === "SELF_ONLY")
+      throw new Error("tiktok: Branded content visibility cannot be set to private.");
     Object.assign(target, {
-      privacyLevel: d.tiktokPublic ? "PUBLIC_TO_EVERYONE" : "SELF_ONLY",
-      disabledComments: true,
-      disabledDuet: true,
-      disabledStitch: true,
-      isBrandedContent: d.isBrandedContent,
-      isYourBrand: d.isYourBrand,
+      ...(privacyLevel ? { privacyLevel } : {}),
+      disabledComments: !d.allowComment,
+      disabledDuet: !d.allowDuet,
+      disabledStitch: !d.allowStitch,
+      isBrandedContent: !!d.isBrandedContent,
+      isYourBrand: !!d.isYourBrand,
       isAiGenerated: ai,
     });
+  }
   return {
     post: {
       accountId: d.accountId,

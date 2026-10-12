@@ -36,6 +36,7 @@ import { accountStats, postStats, comments as postComments, replyComment, hideCo
 import { isPlatformAdmin } from "../admin";
 import { putToR2Key } from "../r2";
 import { registerDeletionRoutes } from "./deletion";
+import { registerTikTokWebhook } from "./tiktok-webhook";
 import express from "express";
 // Curated, field-specific messages. Raw Zod text is never echoed; custom
 // refinements (written for people) pass through as-is.
@@ -238,6 +239,8 @@ export function registerSocialRoutes(
   // Back from the sign-in: read the connected accounts again.
   // Data deletion / deauthorize callbacks from Meta and Threads (signed_request; no session — server/social/deletion.ts).
   registerDeletionRoutes(app);
+  // TikTok's webhooks (signed with the client secret; no session — server/social/tiktok-webhook.ts).
+  registerTikTokWebhook(app);
   // ConstructHUB Direct (server/social/native.ts): our own apps on each network.
   route("post", "/native/connect", async (req, res, id, businessId) => {
     const { network } = z.object({ network: z.string().min(2).max(20) }).strict().parse(req.body);
@@ -261,6 +264,14 @@ export function registerSocialRoutes(
     return p as { id: string; submission_id: string; state: string };
   };
   const commentParam = z.string().regex(/^[\w.-]{1,120}$/);
+  // The TikTok post panel asks this every time it opens for an account (TikTok's rule: never cached) — who is
+  // posting, the privacy levels this creator offers, whether comments / Duet / Stitch are off, the longest video.
+  route("get", "/native/tiktok/creator-info", async (req, res, id, businessId) => {
+    const accountId = opaqueId.parse(req.query.accountId);
+    const client = await direct(req, id, businessId);
+    res.setHeader("Cache-Control", "no-store, max-age=0");
+    res.json(await client.tiktokCreatorInfo(accountId));
+  });
   route("get", "/native/stats", async (req, res, id, businessId) => {
     const days = z.coerce.number().pipe(z.union([z.literal(7), z.literal(28)])).catch(28).parse(req.query.days);
     res.json({ accounts: await accountStats(await direct(req, id, businessId), days as 7 | 28) });
