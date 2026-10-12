@@ -24,7 +24,8 @@ import {
   Loader2, ShieldCheck,
 } from "lucide-react";
 import { useLocation } from "wouter";
-import { useUrlParam } from "@/hooks/use-url-param";
+import { useRouteTab } from "@/components/google-ads-tool/use-route-tab";
+import { LSA_MANAGER_TABS } from "@/components/google-ads-tool/nav";
 
 type ManagerStatus = {
   connected: boolean;
@@ -102,15 +103,12 @@ type AuditEntry = {
 };
 
 type Tab = "manager" | "accounts" | "invitations" | "audit";
-const TABS: readonly Tab[] = ["manager", "accounts", "invitations", "audit"];
 
 export default function LsaAccountManagerPage() {
   const { data: user } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const [, navigate] = useLocation();
-  // The tab lives in the URL (?tab=invitations) so a reload or a shared link keeps it.
-  const [tabParam, setTabParam] = useUrlParam("tab");
-  const activeTab: Tab = (TABS as readonly string[]).includes(tabParam ?? "") ? (tabParam as Tab) : "manager";
-  const setActiveTab = (tab: Tab) => setTabParam(tab === "manager" ? null : tab);
+  // Each section is its own address (/lsa-account-manager/accounts …); old ?tab= links move there.
+  const [activeTab, setActiveTab] = useRouteTab<Tab>("/lsa-account-manager", LSA_MANAGER_TABS);
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
 
   // Who counts as a platform admin is the server's decision (server/admin.ts,

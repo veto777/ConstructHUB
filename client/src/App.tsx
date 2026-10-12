@@ -225,6 +225,11 @@ function DashboardRouter() {
       <Route path="/pricing" component={PricingPage} />
       {SHOW_COMPETITOR_INTEL && <Route path="/competitors" component={CompetitorsPage} />}
       <Route path="/agency" component={AgencyPage} />
+      <Route path="/agency/clients" component={AgencyPage} />
+      <Route path="/agency/team" component={AgencyPage} />
+      <Route path="/agency/onboarding" component={AgencyPage} />
+      <Route path="/agency/jobs" component={AgencyPage} />
+      <Route path="/agency/settings" component={AgencyPage} />
       <Route path="/locations" component={LocationsPage} />
       <Route path="/google-profile" component={GoogleProfilePage} />
       <Route path="/invite/:code" component={InvitePage} />
@@ -266,7 +271,18 @@ function DashboardRouter() {
       <Route path="/reinstatement" component={ReinstatementPage} />
       <Route path="/google-business" component={GoogleBusinessPage} />
       <Route path="/google-ads" component={GoogleAdsPage} />
+      <Route path="/google-ads/traffic" component={GoogleAdsPage} />
+      <Route path="/google-ads/signals" component={GoogleAdsPage} />
+      <Route path="/google-ads/tools" component={GoogleAdsPage} />
+      <Route path="/google-ads/settings" component={GoogleAdsPage} />
+      <Route path="/google-ads/script" component={GoogleAdsPage} />
       <Route path="/ads-manager" component={AdsManagerPage} />
+      <Route path="/ads-manager/accounts" component={AdsManagerPage} />
+      <Route path="/ads-manager/invitations" component={AdsManagerPage} />
+      <Route path="/ads-manager/previews" component={AdsManagerPage} />
+      <Route path="/ads-manager/queue" component={AdsManagerPage} />
+      <Route path="/ads-manager/audit" component={AdsManagerPage} />
+      <Route path="/ads-manager/landing-door" component={AdsManagerPage} />
       {/* Retired landing pages: the old URLs redirect to their /features page. */}
       <Route path="/google-ads-landing" component={GoogleAdsLanding} />
       <Route path="/permits-landing" component={PermitsLanding} />
@@ -326,6 +342,9 @@ function DashboardRouter() {
       <Route path="/terms" component={TermsOfUsePage} />
       <Route path="/support" component={SupportPage} />
       <Route path="/lsa-account-manager" component={LsaAccountManagerPage} />
+      <Route path="/lsa-account-manager/accounts" component={LsaAccountManagerPage} />
+      <Route path="/lsa-account-manager/invitations" component={LsaAccountManagerPage} />
+      <Route path="/lsa-account-manager/audit" component={LsaAccountManagerPage} />
       {/* Deep links into Account settings (the shell's Billing / API keys / API usage sections) and the public API reference. */}
       <Route path="/settings/billing" component={SettingsBillingRedirect} />
       <Route path="/settings/api" component={SettingsApiRedirect} />
@@ -398,7 +417,18 @@ function PublicRouter() {
       <Route path="/reinstatement" component={ReinstatementPage} />
       <Route path="/google-business" component={GoogleBusinessPage} />
       <Route path="/google-ads" component={Ribboned.GoogleAdsPage} />
+      <Route path="/google-ads/traffic" component={Ribboned.GoogleAdsPage} />
+      <Route path="/google-ads/signals" component={Ribboned.GoogleAdsPage} />
+      <Route path="/google-ads/tools" component={Ribboned.GoogleAdsPage} />
+      <Route path="/google-ads/settings" component={Ribboned.GoogleAdsPage} />
+      <Route path="/google-ads/script" component={Ribboned.GoogleAdsPage} />
       <Route path="/ads-manager" component={Ribboned.AdsManagerPage} />
+      <Route path="/ads-manager/accounts" component={Ribboned.AdsManagerPage} />
+      <Route path="/ads-manager/invitations" component={Ribboned.AdsManagerPage} />
+      <Route path="/ads-manager/previews" component={Ribboned.AdsManagerPage} />
+      <Route path="/ads-manager/queue" component={Ribboned.AdsManagerPage} />
+      <Route path="/ads-manager/audit" component={Ribboned.AdsManagerPage} />
+      <Route path="/ads-manager/landing-door" component={Ribboned.AdsManagerPage} />
       <Route path="/google-ads-landing" component={GoogleAdsLanding} />
       <Route path="/google-ads-guide" component={GoogleAdsGuidePage} />
       <Route path="/google-ads-guide/:section" component={Ribboned.GoogleAdsGuideSectionPage} />
@@ -471,7 +501,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/search": "Search Permits", "/databases": "Database Directory", "/property": "Property Records",
   "/schedules": "Scrape Schedules", "/history": "Search History", "/permit-alerts": "Permit Alerts", "/photos": "Photo Optimizer",
   "/gmb-monitor": "GMB Edit Monitor", "/ranking-grid": "GMB Ranking Grid", "/pricing": "Pricing",
-  "/competitors": "Competitor Intel", "/agency": "Agency", "/locations": "Locations", "/domains": "Domains",
+  "/competitors": "Competitor Intel", "/agency": "Agency", "/agency/clients": "Agency clients", "/agency/team": "Agency team", "/agency/onboarding": "Agency onboarding", "/agency/jobs": "Agency jobs", "/agency/settings": "Agency settings", "/locations": "Locations", "/domains": "Domains",
   "/mail-alerts": "Mail Alerts", "/gbp-content": "Posts & Photos", "/listing-editor": "Listing editor", "/social-media": "Social Media", "/social-media/calendar": "Social calendar", "/social-media/compose": "New social post", "/social-media/posts": "Social posts", "/social-media/analytics": "Social analytics", "/social-media/inbox": "Social inbox", "/social-media/accounts": "Social accounts", "/social-media/auto": "Social auto mode", "/social-media/guides": "Social guides",
   "/guides": "Guides", "/tutorials": "Tutorials", "/cloudflare": "Cloudflare", "/search-console": "Search Console", "/site-scan": "Site Scan",
   "/seo": "SEO Suite", "/seo/rank-tracker": "Rank tracker", "/seo/local-grid": "Local grid", "/seo/plan": "SEO action plan", "/seo/audit": "Site audit", "/seo/alerts": "SEO alerts", "/seo/mentions": "SEO mentions", "/seo/usage": "SEO data usage", "/seo/reports": "SEO reports", "/seo/ai": "AI visibility", "/seo/batch": "Batch analysis", "/seo/content": "Content explorer", "/seo/explorer": "Site explorer", "/seo/keywords": "Keywords explorer", "/seo/backlinks": "Backlinks", "/seo/competitors": "Competitor gap",
@@ -479,7 +509,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/google-ads": "Click Guard", "/ads-manager": "Agency Ads & LSA", "/google-ads-guide": "Google Ads Guide",
   "/google-ad-fraud": "Ad Fraud", "/lsa-guide": "LSA Guide", "/lsa-leads": "LSA Leads", "/ip-tracker": "IP Tracker",
   "/vpn-shield": "VPN Shield", "/google-reviews": "Google Reviews", "/google-reviews/reviews": "Google reviews", "/google-reviews/profiles": "Review profiles & links", "/google-reviews/settings": "Review settings",
-  "/lsa-account-manager": "Account Manager", "/settings": "Settings", "/auth": "Sign in", "/developers": "Developers",
+  "/lsa-account-manager": "Account Manager", "/google-ads/traffic": "Click Guard", "/google-ads/signals": "Click Guard", "/google-ads/tools": "Click Guard", "/google-ads/settings": "Click Guard", "/google-ads/script": "Click Guard", "/ads-manager/accounts": "Agency Ads & LSA", "/ads-manager/invitations": "Agency Ads & LSA", "/ads-manager/previews": "Agency Ads & LSA", "/ads-manager/queue": "Agency Ads & LSA", "/ads-manager/audit": "Agency Ads & LSA", "/ads-manager/landing-door": "Agency Ads & LSA", "/lsa-account-manager/accounts": "Account Manager", "/lsa-account-manager/invitations": "Account Manager", "/lsa-account-manager/audit": "Account Manager", "/settings": "Settings", "/auth": "Sign in", "/developers": "Developers",
   "/call-assistant": "AI Call Assistant", "/call-assistant/calls": "Calls", "/call-assistant/numbers": "Call Assistant numbers", "/call-assistant/studio": "Agent studio", "/call-assistant/simulator": "Call simulator", "/report-issue": "Report an issue",
 };
 
@@ -918,7 +948,8 @@ function AppContent() {
           <ToolRouteGate location={location}><DashboardRouter /></ToolRouteGate>
         </ProductToolLayout>
         <AppTabBar />
-        <HubWidget surface="growth" signedIn />
+        {/* The Google Ads pages keep their own consultant chat; everywhere else Gabe helps. */}
+        {showAdsChat ? <AdsConsultantChat /> : <HubWidget surface="growth" signedIn />}
       </SidebarProvider>
     );
   }

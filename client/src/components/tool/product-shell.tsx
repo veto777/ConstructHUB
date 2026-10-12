@@ -16,12 +16,18 @@ import { socialNav } from "@/components/social-tool/nav";
 import { callAssistantNav } from "@/components/call-assistant-tool/nav";
 import { reviewsNav } from "@/components/reviews-tool/nav";
 import { SHOW_GOOGLE_REVIEWS } from "@/lib/features";
+import { googleAdsNav } from "@/components/google-ads-tool/nav";
+import { googleBusinessNav } from "@/components/google-business-tool/nav";
+import { permitsNav } from "@/components/permits-tool/nav";
 
 export type ShelledTool = { nav: () => ToolShellConfig };
 export const SHELLED_TOOLS: ShelledTool[] = [
   { nav: socialNav },
   { nav: callAssistantNav },
   ...(SHOW_GOOGLE_REVIEWS ? [{ nav: reviewsNav }] : []),
+  { nav: googleAdsNav },
+  { nav: googleBusinessNav },
+  { nav: permitsNav },
 ];
 
 const owns = (config: ToolShellConfig, location: string) =>

@@ -481,7 +481,7 @@ export default function GoogleAdFraudPage() {
                   {
                     icon: Link2,
                     title: "Apply Your List in Google Ads",
-                    href: "/google-ads?tab=link-ads",
+                    href: "/google-ads/script",
                     desc: "Copy the script from the Google Ads Script tab and paste it into your own Google Ads account. Scheduled hourly, it adds your blocked IPs to your enabled campaigns.",
                     color: "text-[#34A853]",
                     bg: "bg-[#34A853]/10",
@@ -489,7 +489,7 @@ export default function GoogleAdFraudPage() {
                   {
                     icon: Fingerprint,
                     title: "Track Device Fingerprints",
-                    href: "/google-ads?tab=tools",
+                    href: "/google-ads/tools",
                     desc: "IP blocking alone isn't enough. Click Guard's canvas fingerprint can link visits from one browser across different IPs, such as a VPN switch. Similar devices can share a fingerprint, so treat a match as a signal.",
                     color: "text-[#FBBC05]",
                     bg: "bg-[#FBBC05]/10",
@@ -497,7 +497,7 @@ export default function GoogleAdFraudPage() {
                   {
                     icon: BarChart3,
                     title: "Monitor Your Data",
-                    href: "/google-ads?tab=fraud",
+                    href: "/google-ads/signals",
                     desc: "Use the Dashboard and Traffic Signals tabs to see which visits were flagged, how often an IP returns, and what devices and browsers they use.",
                     color: "text-[#4285F4]",
                     bg: "bg-[#4285F4]/10",
@@ -505,7 +505,7 @@ export default function GoogleAdFraudPage() {
                   {
                     icon: Download,
                     title: "Export Evidence",
-                    href: "/google-ads?tab=fraud",
+                    href: "/google-ads/signals",
                     desc: "Download a CSV of the visits Click Guard recorded, including which ones were flagged. Keep it as your own record if you ask Google to review invalid-click charges.",
                     color: "text-[#34A853]",
                     bg: "bg-[#34A853]/10",
