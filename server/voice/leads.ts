@@ -347,7 +347,7 @@ export async function callSummaryTaskSpecs(ctx: OrgVoiceContext, call: VoiceCall
   }
   const title = `Call ${String(call.outcome ?? "ended").replace(/_/g, " ")} — ${call.callerName || prettyPhone(call.fromNumber)}`;
   return [...recipients].map(([key, recipient]) => ({ key: `summary:${key}`, kind: "notification", payload: {
-    ...recipient, type: "call.summary", title, body: call.summary ?? "", link: `/call-assistant?tab=calls&call=${call.id}`,
+    ...recipient, type: "call.summary", title, body: call.summary ?? "", link: `/call-assistant/calls?call=${call.id}`,
   } }));
 }
 

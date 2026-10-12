@@ -22,7 +22,7 @@ export default function AgencyPage(){
   const seg=path.split('/')[2]||null;
   const tabParam=seg??oldTab;
   const setTabParam=(t:string|null)=>navigate(agencyHref(t??'locations'));
-  useEffect(()=>{if(oldTab&&!seg&&knownTabs.includes(oldTab))navigate(agencyHref(oldTab),{replace:true});},[oldTab]);// eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(()=>{if(oldTab&&!seg&&knownTabs.includes(oldTab)){const rest=new URLSearchParams(window.location.search);rest.delete('tab');const q=rest.toString();navigate(`${agencyHref(oldTab)}${q?`${agencyHref(oldTab).includes('?')?'&':'?'}${q}`:''}`,{replace:true});}},[oldTab]);// eslint-disable-line react-hooks/exhaustive-deps
   const inShell=!!useToolSlot();
   const [message,setMessage]=useState(''),[failed,setFailed]=useState(false),[busy,setBusy]=useState(false),[offset,setOffset]=useState(0),[search,setSearch]=useState('');
   const [name,setName]=useState(''),[email,setEmail]=useState(''),[notes,setNotes]=useState(''),[tags,setTags]=useState(''),[folder,setFolder]=useState(''),[editId,setEditId]=useState<number|null>(null);

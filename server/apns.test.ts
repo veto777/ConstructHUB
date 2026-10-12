@@ -57,7 +57,7 @@ describe("payload", () => {
     expect(pushUrl("platform", "/settings?tab=notifications")).toBe("https://constructhub.us/settings?tab=notifications");
     expect(pushUrl("crm", "/crm/clients/7")).toBe("https://portal.constructhub.us/crm/clients/7");
     for (const bad of [null, "", "https://evil.example/x", "//evil.example/x", "javascript:alert(1)"]) expect(pushUrl("crm", bad)).toBe("https://portal.constructhub.us/");
-    expect(appForLink("/call-assistant?tab=calls&call=3")).toBe("platform");
+    expect(appForLink("/call-assistant/calls?call=3")).toBe("platform");
     expect(appForLink("/crm/inbox?c=1")).toBe("crm");
     expect(appForLink(null)).toBe("crm");
   });
@@ -72,7 +72,7 @@ describe("payload", () => {
 
 describe("pushToUser", () => {
   it("sends a signed alert to each live phone and deletes tokens Apple calls dead", async () => {
-    expect(await pushToUser(userId, "platform", { title: "Janice answered a call", body: "Roof leak, Tacoma", link: "/call-assistant?tab=calls" })).toBe(1);
+    expect(await pushToUser(userId, "platform", { title: "Janice answered a call", body: "Roof leak, Tacoma", link: "/call-assistant/calls" })).toBe(1);
     expect(seen).toHaveLength(2);
     for (const { headers, body } of seen) {
       expect(headers["apns-topic"]).toBe("us.constructhub.app");
@@ -81,7 +81,7 @@ describe("pushToUser", () => {
       expect(JSON.parse(Buffer.from(h, "base64url").toString())).toMatchObject({ alg: "ES256", kid: "KEYID12345" });
       expect(JSON.parse(Buffer.from(c, "base64url").toString())).toMatchObject({ iss: "TEAM123456" });
       expect(verify("SHA256", Buffer.from(`${h}.${c}`), { key: publicKey, dsaEncoding: "ieee-p1363" }, Buffer.from(s, "base64url"))).toBe(true);
-      expect(body).toEqual({ aps: { alert: { title: "Janice answered a call", body: "Roof leak, Tacoma" }, sound: "default" }, url: "https://constructhub.us/call-assistant?tab=calls" });
+      expect(body).toEqual({ aps: { alert: { title: "Janice answered a call", body: "Roof leak, Tacoma" }, sound: "default" }, url: "https://constructhub.us/call-assistant/calls" });
     }
     const { rows } = await pool.query("SELECT token FROM app_push_tokens WHERE user_id=$1", [userId]);
     expect(rows.map((r) => r.token)).toEqual([live]);

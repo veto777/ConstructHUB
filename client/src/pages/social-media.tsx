@@ -242,7 +242,8 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
   // Which section the view shows; the all-clients view has only the calendar and the posts.
   const [, navigate] = useLocation();
   const VIEW_TAB: Record<SocialView, string> = { overview: "overview", calendar: "calendar", compose: "compose", posts: "queue", analytics: "queue", inbox: "queue", accounts: "accounts", auto: "auto", guides: "guides" };
-  const tab = all ? (view === "calendar" ? "calendar" : "queue") : VIEW_TAB[view];
+  // All clients: the calendar, posts, inbox and analytics lists and the guides cover every business; the rest need one.
+  const tab = all ? (view === "calendar" ? "calendar" : view === "guides" ? "guides" : ["posts", "inbox", "analytics"].includes(view) ? "queue" : "one-business") : VIEW_TAB[view];
   const setTab = (v: string) => navigate(socialHref(v === "queue" ? "posts" : (v as SocialView), all ? "all" : String(businessId)));
   // Posts: the menu's All / Drafts / Scheduled / Published / Failed is ?state=; Inbox and Analytics list published posts.
   const [stateParam] = useUrlParam("state");
@@ -507,6 +508,11 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
 
       {!all && tab === "overview" && <SocialOverview business={String(businessId)} businessId={businessId} accounts={accounts} />}
       {!all && tab === "overview" && <SocialWeek businessId={businessId} all={false} business={String(businessId)} />}
+      {tab === "one-business" && (
+        <Notice tone="info" title="Choose one business" testId="notice-social-one-business">
+          {view === "compose" ? "Posts are written for one business at a time." : view === "auto" ? "Auto mode is set for each business." : view === "accounts" ? "Accounts are connected for each business." : "This view is for one business at a time."} Pick it in the Business menu above.
+        </Notice>
+      )}
       {tab === "calendar" && <SocialWeek full businessId={businessId} all={all} business={all ? "all" : String(businessId)} />}
       {!all && tab === "accounts" && data?.native && (
         <SocialConnect via="native" businessId={businessId} networks={data.native.networks} accounts={data?.provider === "native" ? accounts : []} connected={data?.provider === "native" && !!data?.connected} />

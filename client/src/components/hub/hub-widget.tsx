@@ -247,7 +247,11 @@ function HubConversation({ surface, userId }: { surface: HubSurface; userId: num
   // and the bubble never shows on phones, where it would sit on top of the page.
   useEffect(() => {
     // Shown once: seen counts as dismissed (owner, 2026-10-12: it popped up "all the time none stop").
-    if (visible && builder && !readFlag(welcomeKey)) { setWelcomePending(true); setBubble(true); writeFlag(welcomeKey, "1"); }
+    if (visible && builder && !readFlag(welcomeKey)) {
+      setWelcomePending(true); setBubble(true);
+      // The bubble is hidden on phones (sm:block): it only counts as seen where it is shown.
+      if (typeof window !== "undefined" && window.matchMedia?.("(min-width: 640px)").matches) writeFlag(welcomeKey, "1");
+    }
   }, [visible, builder, welcomeKey]);
   useEffect(() => {
     if (!bubble) return;
