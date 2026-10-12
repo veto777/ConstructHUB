@@ -233,7 +233,14 @@ function DashboardRouter() {
       <Route path="/gbp-content" component={GbpContentPage} />
       <Route path="/listing-editor" component={ListingEditorPage} />
       <Route path="/social-media" component={SocialMediaPage} />
-      <Route path="/social-media/:view" component={SocialMediaPage} />
+      <Route path="/social-media/calendar" component={SocialMediaPage} />
+      <Route path="/social-media/compose" component={SocialMediaPage} />
+      <Route path="/social-media/posts" component={SocialMediaPage} />
+      <Route path="/social-media/analytics" component={SocialMediaPage} />
+      <Route path="/social-media/inbox" component={SocialMediaPage} />
+      <Route path="/social-media/accounts" component={SocialMediaPage} />
+      <Route path="/social-media/auto" component={SocialMediaPage} />
+      <Route path="/social-media/guides" component={SocialMediaPage} />
       <Route path="/guides" component={GuidesPage} />
       <Route path="/tutorials" component={TutorialsPage} />
       <Route path="/cloudflare" component={CloudflarePage} />
