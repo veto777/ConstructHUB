@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import fs from "node:fs";
 import { socialSetupProblem } from "./routes";
+import { LEGACY_CONNECTION } from "./schedule";
 import { encryptKey } from "./client";
 import { destinationSchema } from "../../shared/social";
 import { destinationLabel } from "../../client/src/components/social-drafts";
@@ -19,13 +20,19 @@ describe("film readiness", () => {
   });
   it("reports an unreadable connection without exposing cryptographic errors", () => {
     process.env.SOCIAL_ENCRYPTION_KEY = "ab".repeat(32);
-    const box = encryptKey("sample", 1);
+    const box = encryptKey("native:chu1b0", 1);
     expect(socialSetupProblem(box, 1)).toBeNull();
+    expect(socialSetupProblem(encryptKey("outstand:chu1b0", 1), 1)).toBeNull();
     expect(socialSetupProblem(undefined, 1)).toBeNull();
-    expect(socialSetupProblem(box, 2)).toMatch(/Reconnect Blotato/);
+    expect(socialSetupProblem(box, 2)).toMatch(/could not be unlocked. Reconnect your accounts/);
     process.env.SOCIAL_ENCRYPTION_KEY = "cd".repeat(32);
-    expect(socialSetupProblem(box, 1)).toMatch(/Reconnect Blotato/);
-    expect(socialSetupProblem("fs-b-placeholder", 1)).toMatch(/Reconnect Blotato/);
+    expect(socialSetupProblem(box, 1)).toMatch(/could not be unlocked. Reconnect your accounts/);
+    expect(socialSetupProblem("fs-b-placeholder", 1)).toMatch(/could not be unlocked. Reconnect your accounts/);
+  });
+  it("asks a legacy (non-ConstructHUB) connection to reconnect through ConstructHUB", () => {
+    process.env.SOCIAL_ENCRYPTION_KEY = "ab".repeat(32);
+    expect(socialSetupProblem(encryptKey("an-old-third-party-api-key", 1), 1)).toBe(LEGACY_CONNECTION);
+    expect(LEGACY_CONNECTION).toMatch(/Reconnect your accounts through ConstructHUB/);
   });
   it("labels accounts, pages and boards without provider ids, including missing names", () => {
     const fb = destinationSchema.parse({ accountId: "fs-b-fb", platform: "facebook", pageId: "fs-b-fb-page" });

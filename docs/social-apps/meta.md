@@ -7,10 +7,9 @@ one of two marks:
 - **(verified 2026-10-11)** — read on developers.facebook.com that day (source URL given in section 9).
 - **(to confirm)** — our understanding, not found on an official page that day; check before relying on it.
 
-Nothing in this kit describes code that exists today. The native Meta connection is **not built**:
-today the Social Media tool publishes through the customer's own Blotato account and API key
-(`server/social/client.ts`, encryption key `SOCIAL_ENCRYPTION_KEY`). Section 5 lists what must be
-built before anything is submitted.
+When this kit was written the native Meta connection was **not built**; it now exists as
+ConstructHUB Direct (`server/social/native.ts`, connections encrypted with `SOCIAL_ENCRYPTION_KEY`).
+Section 5 lists what had to be built before anything is submitted.
 
 Proposed shape (one Meta app for both networks):
 

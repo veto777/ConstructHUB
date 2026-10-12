@@ -329,7 +329,7 @@ describe("what a post says", () => {
   it("the platform limits are the published ones", () => {
     expect(Object.fromEntries(SOCIAL_PLATFORMS.map((p) => [p, PLATFORM_RULES[p].limit]))).toEqual({ instagram: 2200, tiktok: 2200, linkedin: 3000, facebook: 63206, twitter: 280, threads: 500 });
     expect(PLATFORM_RULES.instagram.hashtags.max).toBe(5); // Instagram's cap since December 2025
-    expect(PLATFORM_RULES.threads.cut).toBe("vertical"); // 60 s at most through Blotato
+    expect(PLATFORM_RULES.threads.cut).toBe("vertical"); // Threads takes video up to 60 s
   });
   it("gives the four published videos a full Instagram caption and a LinkedIn post of the asked length, each its own", () => {
     const four = ["database-directory", "crm-clients", "crm-create-estimate", "crm-schedule"].map(build);

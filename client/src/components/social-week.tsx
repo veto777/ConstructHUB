@@ -1,5 +1,5 @@
 /**
- * A week of posts, day by day (owner, 2026-10-12, after Blotato`s Overview and Calendar): each day shows its posts`
+ * A week of posts, day by day (owner, 2026-10-12): each day shows its posts`
  * networks and count; `full` lists every post of the day by time. One request per day through the page`s own
  * GET /api/social?day= filter (the browser`s timezone), so the days agree with the Posts list.
  */

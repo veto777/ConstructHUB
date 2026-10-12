@@ -69,7 +69,7 @@ describe("what each network receives", () => {
   });
   it("TikTok: comments / Duet / Stitch only when allowed, and never when the creator switched them off", () => {
     const vid = ["https://x.us/a.mp4"];
-    // Unknown = not allowed (both field spellings: native disableX, Blotato's disabledX).
+    // Unknown = not allowed (both field spellings: native disableX, the stored payload's disabledX).
     expect(tiktokPlan("x", vid, { privacyLevel: "SELF_ONLY" }).body.post_info).toMatchObject({ disable_comment: true, disable_duet: true, disable_stitch: true });
     expect(tiktokPlan("x", vid, { privacyLevel: "SELF_ONLY", disableComment: false, disableDuet: true, disableStitch: false }).body.post_info)
       .toMatchObject({ disable_comment: false, disable_duet: true, disable_stitch: false });

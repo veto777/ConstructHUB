@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 import fs from "node:fs";
 import { combinedSql, tutorialSocialSql } from "../../scripts/tutorials/seed-platform";
-import { TUTORIAL_BLOTATO_PLACEHOLDER, TUTORIAL_SOCIAL_ENCRYPTION_KEY } from "../../scripts/tutorials/social-sample";
-import { BlotatoClient, decryptKey } from "../social/client";
+import { TUTORIAL_SOCIAL_TENANT, TUTORIAL_SOCIAL_ENCRYPTION_KEY } from "../../scripts/tutorials/social-sample";
+import { decryptKey } from "../social/client";
+import { NATIVE_MARK, NativeClient } from "../social/native";
+import { tenantFor } from "../social/outstand";
 const original = process.env.SOCIAL_ENCRYPTION_KEY;
 afterEach(() => {
   if (original === undefined) delete process.env.SOCIAL_ENCRYPTION_KEY;
@@ -14,8 +16,9 @@ describe("Social recording sample", () => {
     const sql = await tutorialSocialSql("postgres://sample:sample@127.0.0.1:5432/constructhub_tut_slot1");
     expect(process.env.SOCIAL_ENCRYPTION_KEY).toBe("caller-value-must-survive");
     process.env.SOCIAL_ENCRYPTION_KEY = TUTORIAL_SOCIAL_ENCRYPTION_KEY;
-    expect(decryptKey(sql.match(/SET key_enc='([^']+)'/)![1], 1)).toBe(TUTORIAL_BLOTATO_PLACEHOLDER);
-    expect(sql).toContain(new BlotatoClient(TUTORIAL_BLOTATO_PLACEHOLDER).hash);
+    expect(decryptKey(sql.match(/SET key_enc='([^']+)'/)![1], 1)).toBe(NATIVE_MARK + TUTORIAL_SOCIAL_TENANT);
+    expect(TUTORIAL_SOCIAL_TENANT).toBe(tenantFor(1, 910001));
+    expect(sql).toContain(new NativeClient(TUTORIAL_SOCIAL_TENANT).hash);
     expect(sql).toContain("business_id=910001 AND key_enc='fs-b-placeholder'");
     const app = fs.readFileSync(new URL("../../scripts/tutorials/app.ts", import.meta.url), "utf8");
     expect(app).toContain("SOCIAL_ENCRYPTION_KEY: TUTORIAL_SOCIAL_ENCRYPTION_KEY");

@@ -9,6 +9,7 @@ import { ensureGbpSchema } from "../gbp/schema";
 import { ensureAdsSchema } from "../ads/schema";
 import { ensureCloudflareSearchSchema } from "../cloudflare/schema";
 import { ensureSocialSchema } from "../social/schema";
+import { encryptKey } from "../social/client";
 import { ensureDomainsSchema } from "../domains/schema";
 import { ensureMailAlertsSchema } from "../mail-alerts/schema";
 import { registerIntegrationsRoute, integrationItems, listNames, INTEGRATION_BUILDERS } from "./integrations-route";
@@ -18,7 +19,7 @@ vi.mock("../email", () => ({ sendWithFallback: vi.fn(async () => ({ accepted: []
 const users = {} as Record<"agency" | "pro" | "none", number>;
 let base = "", server: ReturnType<express.Express["listen"]>;
 const tag = randomUUID().slice(0, 8);
-const IDS = ["google_business", "google_ads", "cloudflare", "search_console", "blotato", "registrars", "gmail_alerts", "client_texting"];
+const IDS = ["google_business", "google_ads", "cloudflare", "search_console", "social", "registrars", "gmail_alerts", "client_texting"];
 
 async function get(user: number | null) {
   const r = await fetch(`${base}/api/account/integrations`, { headers: user ? { "x-fixture-user": String(user) } : {} });
@@ -31,6 +32,7 @@ beforeAll(async () => {
   if (!/^\/constructhub_dev(?:_[a-z0-9]+)?$/.test(target.pathname) || !["localhost", "127.0.0.1"].includes(target.hostname)) throw Error("Local development DB required");
   await ensureGrowthSchema(); await ensureGbpSchema(); await ensureAdsSchema(); await ensureCloudflareSearchSchema();
   await ensureSocialSchema(); await ensureDomainsSchema(); await ensureMailAlertsSchema();
+  process.env.SOCIAL_ENCRYPTION_KEY ||= "ab".repeat(32);
   for (const key of ["agency", "pro", "none"] as const)
     users[key] = (await pool.query("INSERT INTO users(email) VALUES($1) RETURNING id", [`ACCT-l5-int-${key}-${randomUUID()}@example.invalid`])).rows[0].id;
   await pool.query("INSERT INTO subscriptions(user_id,plan,status) VALUES($1,'agency','active'),($2,'pro','active')", [users.agency, users.pro]);
@@ -44,8 +46,8 @@ beforeAll(async () => {
   const { rows: [cf] } = await pool.query("INSERT INTO edge_connections(user_id,provider,subject,email,token_name,method) VALUES($1,'cloudflare','cf-sub','cf@example.invalid','ACCT-l5 token','token') RETURNING id", [a]);
   await pool.query("INSERT INTO edge_assets(user_id,connection_id,provider,external_id,name,domain,status) VALUES($1,$2,'cloudflare','z1','ACCT-l5 zone one','one.example.test','active'),($1,$2,'cloudflare','z2','ACCT-l5 zone two','two.example.test','active')", [a, cf.id]);
   await pool.query("INSERT INTO edge_connections(user_id,provider,subject,email,method,expires_at,refresh_token) VALUES($1,'gsc','gsc-sub','gsc@example.invalid','oauth',now()-interval '1 day',NULL)", [a]);
-  // Blotato: an agency-wide key with three social accounts.
-  await pool.query("INSERT INTO social_connections(user_id,key_enc,accounts) VALUES($1,'enc',$2::jsonb)", [a, JSON.stringify([{ id: "1", platform: "facebook", name: "ACCT-l5 FB" }, { id: "2", platform: "instagram", name: "ACCT-l5 IG" }, { id: "3", platform: "linkedin", name: "ACCT-l5 LI" }])]);
+  // Social media: an agency-wide ConstructHUB connection with three social accounts.
+  await pool.query("INSERT INTO social_connections(user_id,key_enc,accounts) VALUES($1,$2,$3::jsonb)", [a, encryptKey(`native:chu${a}b0`, a), JSON.stringify([{ id: "1", platform: "facebook", name: "ACCT-l5 FB" }, { id: "2", platform: "instagram", name: "ACCT-l5 IG" }, { id: "3", platform: "linkedin", name: "ACCT-l5 LI" }])]);
   // Registrars: one API key, two monitored domains.
   const { rows: [reg] } = await pool.query("INSERT INTO domain_connections(user_id,provider,label,credentials) VALUES($1,'porkbun','ACCT-l5 porkbun key','enc') RETURNING id", [a]);
   await pool.query("INSERT INTO managed_domains(user_id,connection_id,domain,registrar) VALUES($1,$2,$3,'porkbun'),($1,NULL,$4,'manual')", [a, reg.id, `acct-l5-${tag}-a.example.test`, `acct-l5-${tag}-b.example.test`]);
@@ -88,7 +90,7 @@ describe("GET /api/account/integrations", () => {
     expect(items.google_ads).toMatchObject({ status: "connected", manageHref: "/ads-manager", detail: "Manager account 123-456-7890 · 2 client accounts." });
     expect(items.cloudflare).toMatchObject({ status: "connected", manageHref: "/cloudflare", detail: "1 connection (cf@example.invalid) · 2 zones." });
     expect(items.search_console).toMatchObject({ status: "reconnect", manageHref: "/search-console", detail: "gsc@example.invalid needs to be reconnected." });
-    expect(items.blotato).toMatchObject({ status: "connected", manageHref: "/social-media", detail: "3 social accounts linked · agency-wide key." });
+    expect(items.social).toMatchObject({ status: "connected", manageHref: "/social-media/accounts", detail: "3 social accounts linked · agency-wide connection." });
     expect(items.registrars).toMatchObject({ status: "connected", manageHref: "/domains", detail: "porkbun: ACCT-l5 porkbun key · 2 domains monitored." });
     expect(items.gmail_alerts).toMatchObject({ status: "connected", manageHref: "/mail-alerts", detail: "Reading alerts@example.invalid · forwarding address set." });
   });
@@ -105,7 +107,7 @@ describe("GET /api/account/integrations", () => {
     const pro = byId((await get(users.pro)).data.items);
     for (const id of IDS) expect(pro[id].status, id).toBe("not_connected");
     expect(pro.google_business.detail).toBe("No Google account connected.");
-    expect(pro.blotato.detail).toBe("No Blotato API key connected.");
+    expect(pro.social.detail).toBe("No social accounts connected.");
     // Pro includes these modules, so the row says what a Pro account would do next.
     expect(pro.google_ads.detail).toBe("No Google Ads manager account connected.");
     expect(pro.cloudflare.detail).toBe("No Cloudflare connection.");
@@ -119,6 +121,14 @@ describe("GET /api/account/integrations", () => {
     expect(none.client_texting.detail).toBe("No number on our carrier yet — add the Client texting number add-on, or move to the Agency plan, which includes one.");
     await pool.query("INSERT INTO mail_alert_addresses(user_id,token_hash,token_cipher) VALUES($1,$2,'enc')", [users.pro, `acct-l5-${tag}-pro`]);
     expect(byId(await integrationItems(users.pro)).gmail_alerts).toMatchObject({ status: "connected", detail: "Forwarding address set; no Gmail account connected." });
+  });
+  it("asks for a reconnect when a stored social connection is not one ConstructHUB can post through", async () => {
+    await pool.query("INSERT INTO social_connections(user_id,key_enc,accounts) VALUES($1,$2,'[]'::jsonb)", [users.none, encryptKey("legacy-third-party-key", users.none)]);
+    try {
+      expect(byId(await integrationItems(users.none)).social).toMatchObject({ status: "reconnect", detail: "Reconnect your social accounts through ConstructHUB in Social Media > Accounts." });
+    } finally {
+      await pool.query("DELETE FROM social_connections WHERE user_id=$1", [users.none]);
+    }
   });
   it("names a few and counts the rest", () => {
     expect(listNames([])).toBe("");

@@ -4,14 +4,11 @@ import { ensureGrowthSchema } from "../growth-schema";
 import { ensureGbpSchema } from "../gbp/schema";
 import { ensureSocialSchema } from "./schema";
 import { ensureAccountEventsSchema } from "../account-events";
+import { encryptKey, decryptKey } from "./client";
+import { FixtureClient, connectFixture } from "./test-client";
+import { tenantFor } from "./outstand";
+import { LEGACY_CONNECTION } from "./schedule";
 import {
-  BlotatoClient,
-  encryptKey,
-  decryptKey,
-  reserveRequest,
-} from "./client";
-import {
-  connect,
   disconnect,
   discoverPages,
   createPosts,
@@ -40,24 +37,24 @@ let submitMode = "ok",
   pollStatus = "published";
 const http = vi.fn(async (url: any, options: any) => {
   const path = new URL(url).pathname;
-  if (path.endsWith("/subaccounts"))
+  if (path.endsWith("/pages"))
     return response({ items: [{ id: "page-one", name: "Fixture page" }] });
   if (path.endsWith("/accounts"))
     return response({
       items: [
-        { id: "fixture-twitter", platform: "twitter", fullname: "Fixture X" },
+        { id: "fixture-twitter", platform: "twitter", name: "Fixture X" },
         {
           id: "fixture-facebook",
           platform: "facebook",
-          fullname: "Fixture Facebook",
+          name: "Fixture Facebook",
         },
       ],
     });
-  if (path === "/v2/posts" && options.method === "POST") {
+  if (path === "/posts" && options.method === "POST") {
     if (submitMode === "timeout") throw new Error("SECRET must not be exposed");
     if (submitMode === "reject")
       return response({ errorMessage: "SECRET" }, 400);
-    return response({ postSubmissionId: "fixture-submission" });
+    return response({ submissionId: "fixture-submission" });
   }
   if (path.includes("/posts/"))
     return response({
@@ -67,7 +64,9 @@ const http = vi.fn(async (url: any, options: any) => {
     });
   throw new Error(`Unexpected mocked endpoint ${path}`);
 });
-const make = (key: string) => new BlotatoClient(key, http, async () => {});
+const make = (key: string) => new FixtureClient(key, http as any);
+/** The stored secret of an agency-wide ConstructHUB Direct connection for this owner. */
+const keyFor = (owner: number) => `native:${tenantFor(owner, null)}`;
 const destination = destinationSchema.parse({
   accountId: "fixture-twitter",
   platform: "twitter",
@@ -116,7 +115,6 @@ afterAll(async () => {
   await pool.query("DELETE FROM growth_budgets WHERE key=$1", [
     `social-ai:${userId}`,
   ]);
-  await pool.query("DELETE FROM social_rate WHERE key_hash LIKE 'fixture-%'");
   await pool.end();
 });
 describe("social validation and HTTP boundary", () => {
@@ -200,67 +198,17 @@ describe("social validation and HTTP boundary", () => {
     expect(inBlackout(s, new Date("2026-09-29T16:00:00Z"))).toBe(false);
     expect(inBlackout({ ...s, blackoutStart: 8, blackoutEnd: 8 })).toBe(false);
   });
-  it("persists pacing across clients and restarts", async () => {
-    await reserveRequest("fixture-rate");
-    await expect(reserveRequest("fixture-rate")).rejects.toMatchObject({
-      status: 429,
-    });
-    const {
-      rows: [r],
-    } = await pool.query(
-      "SELECT next_at>now() busy FROM social_rate WHERE key_hash=$1",
-      ["fixture-rate"],
-    );
-    expect(r.busy).toBe(true);
-  });
-  it("persists provider 429 cooldown across client instances without retrying HTTP", async () => {
-    const limited = vi.fn(async () => new Response("{}", { status: 429, headers: { "Retry-After": "120" } }));
-    const key = `fixture-rate-${crypto.randomUUID()}`;
-    const client = new BlotatoClient(key, limited);
-    try {
-      await expect(client.request("/posts", {})).rejects.toMatchObject({ status: 429 });
-      const cooldown = (await pool.query("SELECT next_at > now() + interval '110 seconds' AS active FROM social_rate WHERE key_hash=$1", [client.hash])).rows[0];
-      expect(cooldown.active).toBe(true);
-      await expect(new BlotatoClient(key, limited).request("/posts", {})).rejects.toMatchObject({ status: 429 });
-      expect(limited).toHaveBeenCalledTimes(1);
-    } finally { await pool.query("DELETE FROM social_rate WHERE key_hash=$1", [client.hash]); }
-  });
-  it("never retries a POST and never exposes provider bodies", async () => {
-    const failed = vi.fn(async () => {
-      throw new Error("secret-key");
-    });
-    await expect(
-      new BlotatoClient("secret-key", failed, async () => {}).request(
-        "/posts",
-        {},
-      ),
-    ).rejects.not.toThrow("secret-key");
-    expect(failed).toHaveBeenCalledTimes(1);
-    expect(
-      http.mock.calls.every((c) =>
-        String(c[0]).startsWith("https://backend.blotato.com/v2/"),
-      ),
-    ).toBe(true);
-  });
 });
-describe("real Postgres, mocked Blotato publishing", () => {
-  it("verifies a key, encrypts it, logs connection, and keeps owner data private", async () => {
-    await connect(userId, "fixture-secret-key", null, make);
+describe("real Postgres, mocked provider publishing", () => {
+  it("stores the connection encrypted and keeps owner data private", async () => {
+    await connectFixture(userId, keyFor(userId), make);
     const {
       rows: [c],
     } = await pool.query("SELECT * FROM social_connections WHERE user_id=$1", [
       userId,
     ]);
-    expect(c.key_enc).not.toContain("fixture-secret-key");
-    expect(decryptKey(c.key_enc, userId)).toBe("fixture-secret-key");
-    expect(
-      (
-        await pool.query(
-          "SELECT * FROM account_activity WHERE user_id=$1 AND kind='social.connected'",
-          [userId],
-        )
-      ).rows,
-    ).toHaveLength(1);
+    expect(c.key_enc).not.toContain(keyFor(userId));
+    expect(decryptKey(c.key_enc, userId)).toBe(keyFor(userId));
     await expect(createPosts(otherId, request())).rejects.toMatchObject({
       status: 409,
     });
@@ -323,7 +271,7 @@ describe("real Postgres, mocked Blotato publishing", () => {
   });
   it("the worker skips an owner whose plan does not include social publishing", async () => {
     const [p] = await createPosts(userId, request());
-    // Hand the queued post to a plan-less owner: it stays queued and Blotato is never called.
+    // Hand the queued post to a plan-less owner: it stays queued and the provider is never called.
     await pool.query("UPDATE social_posts SET user_id=$1 WHERE id=$2", [otherId, p.id]);
     try {
       http.mockClear();
@@ -414,7 +362,7 @@ describe("real Postgres, mocked Blotato publishing", () => {
     await workerUser(userId, make);
     expect((await rows()).find((r) => r.id === p.id)).toMatchObject({
       state: "failed",
-      error: "Blotato rejected the request",
+      error: "The social network rejected the request",
     });
     expect(JSON.stringify(await rows())).not.toContain("SECRET");
     expect(
@@ -694,11 +642,11 @@ describe("route authentication, owner scope and key redaction", () => {
   });
   it("discovers Pinterest boards and LinkedIn pages without crossing owners", async () => {
     const discovery = vi.fn(async (url: any) => {
-      if (String(url).endsWith("/users/me/accounts")) return response({ items: [{ id: "pin", platform: "pinterest" }, { id: "li", platform: "linkedin" }] });
+      if (String(url).endsWith("/accounts")) return response({ items: [{ id: "pin", platform: "pinterest" }, { id: "li", platform: "linkedin" }] });
       return response({ items: [{ id: "verified-target", name: "Fixture destination" }] });
     });
-    const factory = (key: string) => new BlotatoClient(key, discovery, async () => {});
-    await connect(otherId, "fixture-discovery-key", null, factory);
+    const factory = (key: string) => new FixtureClient(key, discovery as any);
+    await connectFixture(otherId, keyFor(otherId), factory);
     for (const [accountId, platform, field] of [["pin", "pinterest", "boardId"], ["li", "linkedin", "pageId"]]) {
       const d = { ...destination, accountId, platform, [field]: "verified-target" };
       await expect(createPosts(otherId, request({ destinations: [d], mediaUrls: ["https://example.com/photo.jpg"], draft: true }))).rejects.toThrow("verified");
@@ -707,14 +655,14 @@ describe("route authentication, owner scope and key redaction", () => {
       expect(p.payload.post.target[field]).toBe("verified-target");
       await expect(changePost(userId, p.id, "cancel")).rejects.toMatchObject({ status: 404 });
     }
-    expect(discovery.mock.calls.some(([url]) => String(url).endsWith("/social/pinterest/boards?accountId=pin"))).toBe(true);
+    expect(discovery.mock.calls.some(([url]) => String(url).endsWith("/accounts/pin/boards"))).toBe(true);
     await disconnect(otherId, null);
     await pool.query("DELETE FROM social_posts WHERE user_id=$1", [otherId]);
   });
   it("scopes library and source routes and returns only safe upload URLs", async () => {
     const uploadHttp = vi.fn(async () => response({ publicUrl: "https://example.com/fixture.jpg", presignedUrl: "https://example.com/fixture-put?signature=fixture" }));
-    const factory = (key: string) => new BlotatoClient(key, uploadHttp, async () => {});
-    await connect(otherId, "fixture-upload-key", null, make);
+    const factory = (key: string) => new FixtureClient(key, uploadHttp as any);
+    await connectFixture(otherId, keyFor(otherId), make);
     const routes = new Map<string, any>();
     const app: any = {};
     for (const method of ["get", "post", "put", "delete"])
@@ -739,7 +687,7 @@ describe("route authentication, owner scope and key redaction", () => {
       expect((await call("delete", "/sources/:id", otherId, {}, { id: source.body.id })).status).toBe(200);
       const upload = await call("post", "/uploads", otherId, { filename: "fixture.jpg" });
       expect(upload.body).toEqual({ publicUrl: "https://example.com/fixture.jpg", presignedUrl: "https://example.com/fixture-put?signature=fixture" });
-      expect(JSON.stringify(upload.body)).not.toContain("fixture-upload-key");
+      expect(JSON.stringify(upload.body)).not.toContain(keyFor(otherId));
       expect((await call("post", "/uploads", otherId, { filename: "../fixture.exe" })).status).toBe(400);
       expect(uploadHttp).toHaveBeenCalledTimes(1);
       uploadHttp.mockResolvedValueOnce(response({ publicUrl: "https://example.com/fixture.jpg", presignedUrl: "https://0.0.0.0/upload" }));
@@ -768,7 +716,29 @@ describe("route authentication, owner scope and key redaction", () => {
       posts: [],
     });
     expect(JSON.stringify(res.json.mock.calls)).not.toMatch(
-      /key_enc|apiKey|fixture-secret-key/,
+      /key_enc|apiKey|native:chu/,
     );
+  });
+  it("shows a legacy (non-ConstructHUB) connection as disconnected, asks to reconnect, and never posts through it", async () => {
+    await pool.query("INSERT INTO social_connections(user_id,key_enc,accounts) VALUES($1,$2,$3)", [
+      otherId, encryptKey("legacy-third-party-api-key", otherId), JSON.stringify([{ id: "fixture-twitter", platform: "twitter", name: "Fixture X" }]),
+    ]);
+    try {
+      const routes = new Map<string, any>();
+      const app: any = {};
+      for (const method of ["get", "post", "put", "delete"])
+        app[method] = (path: string, ...handlers: any[]) => routes.set(`${method} ${path}`, handlers.at(-1));
+      registerSocialRoutes(app, () => true, make);
+      const res: any = { setHeader: vi.fn(), json: vi.fn(), status: vi.fn().mockReturnThis() };
+      await routes.get("get /api/social")({ user: { id: otherId } }, res);
+      expect(res.json.mock.calls[0][0]).toMatchObject({ connected: false, provider: null, accounts: [], setupProblem: LEGACY_CONNECTION });
+      expect(JSON.stringify(res.json.mock.calls)).not.toContain("legacy-third-party-api-key");
+      await expect(createPosts(otherId, request())).rejects.toMatchObject({ status: 409, message: LEGACY_CONNECTION });
+      // Disconnect still clears it, so the business can connect through ConstructHUB.
+      await disconnect(otherId, null);
+      expect((await pool.query("SELECT 1 FROM social_connections WHERE user_id=$1", [otherId])).rowCount).toBe(0);
+    } finally {
+      await pool.query("DELETE FROM social_connections WHERE user_id=$1", [otherId]);
+    }
   });
 });

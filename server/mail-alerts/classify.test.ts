@@ -28,7 +28,6 @@ describe("mail allowlist, MIME and confirmations", () => {
       ["sc-noreply@google.com", "Indexing coverage issue", "gsc"],
       ["ads-noreply@google.com", "Policy disapproval", "ads"],
       ["noreply@notify.cloudflare.com", "Member invitation", "cloudflare"],
-      ["support@blotato.com", "Publishing failed", "blotato"],
     ])
       expect(classifyMail({ ...mail, from, subject })?.category).toBe(category);
   });

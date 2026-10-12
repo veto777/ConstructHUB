@@ -1,11 +1,11 @@
 /**
- * Put a video's social cuts where Blotato (and so Instagram, TikTok, LinkedIn…) can fetch them:
+ * Put a video's social cuts where a social network (Instagram, TikTok, LinkedIn…) can fetch them:
  * our own R2 bucket, served publicly by https://constructhub.us/api/tutorials/media/<name>.
  *
  *   npx tsx scripts/tutorials/social-upload.ts <helpKey>… [--out-dir DIR]… [--dry-run]
  *   npx tsx scripts/tutorials/social-upload.ts <helpKey>… --check        only ask the public address for each file
  *
- * Blotato needs nothing uploaded to it: "pass any publicly accessible URL in mediaUrls". The media
+ * A network fetches a post's media from a public address. The media
  * route serves `tutorials/<name>.<section>.<hash8>.(mp4|jpg)` (shared/help/videos.ts, TUTORIAL_FILE),
  * so a cut is stored as  tutorials/<helpKey>.social-<what>.<hash8>.<ext>  — <what> is vertical, tiktok,
  * feed, cover-vertical or cover-feed, <hash8> the first 8 hex digits of the file's sha256 — and is
@@ -15,7 +15,7 @@
  * CREATE-ONLY, like upload.ts: every put carries `If-None-Match: *`, an existing key is left alone
  * when its size matches and is an error when it does not, nothing is ever deleted. After the puts the
  * public address of every file is asked for its first bytes (a 206 with the right total length) and
- * social/hosted.json is written — social-post.ts posts only what that file lists.
+ * social/hosted.json is written: the public address of every cut, for posting.
  * R2 keys are read at run time from the live env file and never printed.
  */
 import fs from "fs";

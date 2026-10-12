@@ -3,7 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createHmac } from "node:crypto";
 import { accountFrom, isTenant, OutstandClient, outstandBody, outstandDeps, statusFrom, tenantFor, webhookSigned } from "./outstand";
 import { clientFactory } from "./schedule";
-import { BlotatoClient } from "./client";
+import { NativeClient } from "./native";
+import { LEGACY_CONNECTION } from "./schedule";
 
 const ok = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 afterEach(() => { outstandDeps.http = fetch; outstandDeps.env = () => process.env; });
@@ -30,7 +31,10 @@ describe("tenants and accounts", () => {
   });
   it("picks the provider from the stored secret", () => {
     expect(clientFactory("outstand:chu1b2").provider).toBe("outstand");
-    expect(clientFactory("blotato-key-fixture")).toBeInstanceOf(BlotatoClient);
+    expect(clientFactory("native:chu1b2")).toBeInstanceOf(NativeClient);
+    // Any other stored secret (a legacy third-party key) builds no client: the business reconnects through ConstructHUB.
+    expect(() => clientFactory("legacy-key-fixture")).toThrow(LEGACY_CONNECTION);
+    try { clientFactory("legacy-key-fixture"); } catch (e: any) { expect(e.status).toBe(409); }
   });
 });
 

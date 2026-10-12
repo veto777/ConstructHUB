@@ -196,7 +196,7 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
   const [confirmBulkCancel, setConfirmBulkCancel] = useState(false);
   const [latestPosts, setLatestPosts] = useState<any[]>([]);
   const [offset, setOffset] = useState(0), [postSearch, setPostSearch] = useState(""), [postState, setPostState] = useState(""), [postPlatform, setPostPlatform] = useState("");
-  const [calendarDate, setCalendarDate] = useState(""), [connectionScope, setConnectionScope] = useState("business");
+  const [calendarDate, setCalendarDate] = useState("");
   const [sourceOffset, setSourceOffset] = useState(0), [sourceSearch, setSourceSearch] = useState("");
   const [mediaOffset, setMediaOffset] = useState(0), [mediaSearch, setMediaSearch] = useState("");
   const scope = businessId ? `businessId=${businessId}` : "";
@@ -269,8 +269,7 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
   // Loaded once per mount, keyed by account AND business, before any defaults land.
   const businessKey = businessId === null ? "all" : String(businessId);
   const [initialDraft] = useState(() => loadComposerDraft(accountId, businessKey));
-  const [apiKey, setKey] = useState(""),
-    [text, setText] = useState(initialDraft?.text ?? ""),
+  const [text, setText] = useState(initialDraft?.text ?? ""),
     [tweaks, setTweaks] = useState<Record<string, string>>(initialDraft?.tweaks ?? {});
   const [destinations, setDestinations] = useState<Destination[]>(() => withoutLegacyTikTok(initialDraft?.destinations ?? [])),
     [mediaText, setMediaText] = useState(initialDraft?.mediaText ?? ""),
@@ -303,9 +302,7 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
       /** Toast title on success; false when the caller reports the outcome itself. */
       success?: string | false;
     }) => {
-      const isConnection = ["/connect", "/disconnect"].includes(path);
-      const activeScope = isConnection && connectionScope === "agency" ? "" : scope;
-      const url = path.includes("?") ? `/api/social${path}` : `/api/social${path}?${activeScope}`;
+      const url = path.includes("?") ? `/api/social${path}` : `/api/social${path}?${scope}`;
       return (await apiRequest(method, url, body)).json();
     },
     onSuccess: (result, vars) => {
@@ -348,7 +345,7 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
   // Why Post now / Save draft are disabled, in the order the user can fix it.
   const setupProblem = data?.setupProblem as string | null | undefined;
   const draftBlocker = error ? "Refresh Social Media to check whether posting is available." : setupProblem || (!data?.connected
-    ? (data?.outstand || data?.native ? "Connect your social accounts above to post." : "Connect Blotato above to post.")
+    ? "Connect your social accounts above to post."
     : !destinations.length
       ? "Choose at least one account above."
       : !text.trim()
@@ -540,75 +537,10 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
         <SocialConnect businessId={businessId} networks={data.outstand.networks} accounts={data?.provider === "outstand" ? accounts : []} connected={data?.provider === "outstand" && !!data?.connected} />
       )}
 
-      {!all && tab === "accounts" && !data?.outstand && !data?.native && (
-        <section>
-          <GoogleSectionHeader
-            title="Blotato connection"
-            description="Blotato is a separate subscription you buy from Blotato. Creating a key there activates your paid Blotato subscription; ConstructHUB does not bill for it."
-            actions={<span className={data?.connected ? "g-open text-sm" : "g-text-2 text-sm"}>{data?.connected ? "Connected" : "Not connected"}</span>}
-          />
-          <div className="space-y-4">
-            <p className="text-sm">
-              <a href="https://www.blotato.com" target="_blank" rel="noreferrer" className="g-link">Visit Blotato</a> to create an API key.
-            </p>
-            <div className="grid gap-4 sm:grid-cols-2 sm:max-w-2xl">
-              <label className="block space-y-1.5">
-                <span className="text-sm font-medium">Key to manage</span>
-                <select aria-label="Connection key scope" className={selectClass} value={connectionScope} onChange={e => setConnectionScope(e.target.value)}>
-                  <option value="business">This business only (optional)</option>
-                  <option value="agency">Agency shared key</option>
-                </select>
-              </label>
-              <p className="self-end text-sm text-muted-foreground">Effective connection: {data?.connectionScope === "business" ? "Business key" : "Agency key (fallback)"}</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Input
-                aria-label="Blotato API key"
-                type="password"
-                autoComplete="off"
-                className="max-w-sm"
-                placeholder="Paste your Blotato API key"
-                value={apiKey}
-                onChange={(e) => setKey(e.target.value)}
-              />
-              <GooglePill
-                variant={data?.connected ? "outline" : "solid"}
-                label={data?.connected ? "Verify / replace key" : "Connect Blotato"}
-                disabled={mutation.isPending || apiKey.length < 8}
-                onClick={async () => {
-                  try {
-                    await mutation.mutateAsync({
-                      path: "/connect",
-                      body: { apiKey },
-                      success: "Blotato key verified",
-                    });
-                    setKey("");
-                  } catch {
-                    setKey("");
-                  }
-                }}
-              />
-              {(connectionScope === "agency" ? data?.agencyConnected : data?.businessConnected ?? data?.connected) && (
-                <GooglePill
-                  variant="quiet"
-                  disabled={mutation.isPending}
-                  onClick={() => mutation.mutate({ path: "/disconnect", success: "Blotato disconnected" })}
-                  label="Disconnect"
-                />
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Your key is encrypted and never displayed again. Disconnect stops local queued posts and auto mode. Posts already accepted by Blotato must be managed there.
-            </p>
-            {data?.connected && (
-              <p className="text-sm">
-                {accounts.length
-                  ? accounts.map((a) => `${a.name} (${a.platform})`).join(" · ")
-                  : "No connected social accounts. Connect them in Blotato, then verify your key again."}
-              </p>
-            )}
-          </div>
-        </section>
+      {!all && tab === "accounts" && data && !data.outstand && !data.native && (
+        <Notice tone="info" title="Social accounts" testId="notice-social-unavailable">
+          Connecting social accounts through ConstructHUB isn&rsquo;t switched on for this account yet.
+        </Notice>
       )}
 
       {!all && tab === "accounts" && <SocialYoutube businessId={businessId} />}
@@ -630,14 +562,14 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
               <legend className="mb-2 text-sm font-medium">Post to</legend>
               {!data?.connected ? (
                 <p className="text-sm text-muted-foreground">
-                  Connect Blotato above to choose accounts.
+                  Connect your social accounts above to choose accounts.
                 </p>
               ) : (
                 !accounts.length && (
                   <p className="text-sm text-muted-foreground">
                     No social accounts are available for this business.
-                    Connect accounts in Blotato, then add them under Map
-                    accounts and pages to this business above.
+                    Connect accounts through ConstructHUB above, then add them
+                    under Map accounts and pages to this business.
                   </p>
                 )
               )}
@@ -823,7 +755,7 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
                 )}
               </label>
               <label className="block space-y-1.5">
-                <span className="text-sm font-medium">{data?.provider === "outstand" || data?.provider === "native" ? "Upload a photo or video" : "Upload through Blotato"} (up to 100 MB)</span>
+                <span className="text-sm font-medium">Upload a photo or video (up to 100 MB)</span>
                 <Input
                   aria-label="Upload media"
                   type="file"
@@ -882,7 +814,7 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
           <GoogleSectionHeader
             title={all ? "All clients" : view === "inbox" ? "Published posts" : view === "analytics" ? "Published posts" : ({ draft: "Drafts", queued: "Scheduled", published: "Published", failed: "Failed" } as Record<string, string>)[postState] ?? "All posts"}
             count={error ? undefined : data?.total}
-            description="Times are shown in your browser&rsquo;s timezone. Status refreshes every 15 seconds — published means Blotato confirmed publication; queued means it is still in ConstructHUB."
+            description="Times are shown in your browser&rsquo;s timezone. Status refreshes every 15 seconds — published means the network confirmed publication; queued means it is still in ConstructHUB."
           />
           <div className="space-y-4">
             <Toolbar
@@ -1449,30 +1381,13 @@ function PostRow({
         {p.public_url && (
           <GooglePill icon={ExternalLink} href={p.public_url} external label="View published post" />
         )}
-        {["submitted", "published", "failed", "uncertain"].includes(
-          p.state,
-        ) && !(typeof p.submission_id === "string" && p.submission_id.startsWith("nat_")) && (
-          <>
-            <GooglePill
-              icon={ExternalLink}
-              variant="quiet"
-              href={
-                p.state === "failed"
-                  ? "https://my.blotato.com/failed"
-                  : "https://my.blotato.com"
-              }
-              external
-              label="Open Blotato status"
-            />
-            {/* The Blotato reference only matters while a submission is still open (pending, uncertain or
-                failed) and there is no live link: it is what support looks up in Blotato. A published post
-                shows its link, or nothing, never a raw id. */}
-            {p.submission_id && !p.public_url && p.state !== "published" && (
-              <span className="break-all text-xs g-text-2" data-testid={`text-post-submission-${p.id}`}>
-                Blotato reference {p.submission_id}
-              </span>
-            )}
-          </>
+        {/* The submission reference only matters while a submission is still open (pending, uncertain or
+            failed) and there is no live link: it is what support looks up. A published post shows its
+            link, or nothing, never a raw id. */}
+        {["submitted", "failed", "uncertain"].includes(p.state) && p.submission_id && !p.public_url && (
+          <span className="break-all text-xs g-text-2" data-testid={`text-post-submission-${p.id}`}>
+            Reference {p.submission_id}
+          </span>
         )}
       </div>
       <AlertDialog open={confirmCancel} onOpenChange={setConfirmCancel}>
@@ -1514,7 +1429,7 @@ function BusinessSwitch({ business, items, total, onChange }: { business: string
   );
 }
 
-/** Overview: the connected accounts at a glance and what is coming up next (Blotato's Overview, our data). */
+/** Overview: the connected accounts at a glance and what is coming up next. */
 function SocialOverview({ business, businessId, accounts }: { business: string; businessId: number | null; accounts: Account[] }) {
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const next = useQuery<any>({

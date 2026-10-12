@@ -9,7 +9,9 @@ it.skipIf(!process.env.DATABASE_URL)("replays a restored accepted submission int
   }
   const { pool } = await import("../db");
   const { ensureSocialSchema } = await import("./schema");
-  const { encryptKey, BlotatoClient } = await import("./client");
+  const { encryptKey } = await import("./client");
+  const { NativeClient, NATIVE_MARK } = await import("./native");
+  const { tenantFor } = await import("./outstand");
   const { createPosts } = await import("./schedule");
   vi.stubEnv("SOCIAL_ENCRYPTION_KEY", "ab".repeat(32));
   const memory = new Map<string, string>();
@@ -28,12 +30,13 @@ it.skipIf(!process.env.DATABASE_URL)("replays a restored accepted submission int
       destinations: [{ accountId: "recovery-x", platform: "twitter" }, { accountId: "recovery-threads", platform: "threads" }],
       tweaks: { threads: "Threads recovery fixture" },
     });
-    const fixtureKey = "recovery-fixture-key";
+    const tenant = tenantFor(owner!, business);
+    const fixtureKey = NATIVE_MARK + tenant;
     await pool.query("INSERT INTO social_connections(user_id,business_id,key_enc,accounts) VALUES($1,$2,$3,$4::jsonb)", [
       owner, business, encryptKey(fixtureKey, owner!), JSON.stringify(submission.destinations.map(d => ({ id: d.accountId, platform: d.platform }))),
     ]);
     await pool.query("INSERT INTO social_business_config(user_id,business_id,destinations,connection_hash) VALUES($1,$2,$3::jsonb,$4)", [
-      owner, business, JSON.stringify(submission.destinations), new BlotatoClient(fixtureKey).hash,
+      owner, business, JSON.stringify(submission.destinations), new NativeClient(tenant).hash,
     ]);
     saveComposerDraft(owner, String(business), { text: submission.text, tweaks: submission.tweaks, destinations: submission.destinations, schedule: "", mediaText: "", submission });
     const accepted = await createPosts(owner!, submission, business);

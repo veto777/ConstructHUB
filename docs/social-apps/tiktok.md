@@ -7,8 +7,8 @@ day (sources in section 9); **(to confirm)** = our understanding only.
 The native TikTok connection is **built** (ConstructHUB Direct, `server/social/native-nets.ts` +
 `server/social/native.ts`; admins only until `SOCIAL_NATIVE_PUBLIC=true`), including the TikTok post panel
 of section 5.2 (`client/src/components/social-tiktok.tsx`) and the webhook (`server/social/tiktok-webhook.ts`),
-on branch `social/tiktok-ux` (2026-10-12). Customers on a Blotato key or Outstand still reach TikTok through
-those, with the same panel (without the live creator info).
+on branch `social/tiktok-ux` (2026-10-12). Customers connected through Outstand still reach TikTok through
+it, with the same panel (without the live creator info).
 
 Products: **Login Kit** (web) + **Content Posting API** with **Direct Post** enabled.
 

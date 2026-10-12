@@ -10,14 +10,13 @@
  *     "the CRM is a separate product with its own plans" — never "included";
  *   · constructhub.us is the only address a post gives.
  *
- * Limits, as published by the platforms and repeated in Blotato's media requirements
- * (https://help.blotato.com/rest-api-reference/publish-post/media.md, read 2026-10-08):
+ * Limits, as published by the platforms (read 2026-10-08):
  *   Instagram  caption 2,200 characters. Hashtags: Instagram has enforced FIVE per post or Reel since
  *              December 2025 (it was 30) — more are blocked or stripped, so a post carries 5, not 8–12.
  *   TikTok     description 2,200 characters.
  *   LinkedIn   3,000 characters per post.
  *   Facebook   63,206 characters.
- *   X          280 characters per post through Blotato (we keep to 270; a link counts as 23 there,
+ *   X          280 characters per post (we keep to 270; a link counts as 23 there,
  *              so counting it in full is the safe side).
  *   Threads    500 characters per post.
  */
@@ -44,7 +43,7 @@ export const PLATFORM_RULES: Record<SocialPlatform, PlatformRule> = {
   linkedin: { limit: 3000, max: 1400, aim: 1050, hashtags: { min: 3, max: 5, use: 4 }, cut: "feed" },
   facebook: { limit: 63206, max: 1200, aim: 0, hashtags: { min: 2, max: 3, use: 3 }, cut: "feed" },
   twitter: { limit: 280, max: 270, aim: 0, hashtags: { min: 0, max: 2, use: 2 }, cut: "vertical" },
-  // Blotato accepts Threads video up to 60 s: the vertical cut (≤ 59 s) is the one that fits.
+  // Threads takes video up to 60 s: the vertical cut (≤ 59 s) is the one that fits.
   threads: { limit: 500, max: 480, aim: 0, hashtags: { min: 0, max: 2, use: 2 }, cut: "vertical" },
 };
 

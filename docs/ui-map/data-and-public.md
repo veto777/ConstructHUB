@@ -964,7 +964,7 @@ Column key — Backend: "—" means no server involvement (static/anchor). Statu
 |---|---|---|---|---|---|---|
 | "Get started" button | anchor | Scrolls to the first guide (`#guide-0`) | guides.tsx:114 | — | code read | OK |
 | "Connect your website" nav link | anchor | Jumps to the Cloudflare/Search-Console walkthrough (`#guide-connection`) | guides.tsx:117 | — | code read | OK |
-| 9 guide nav links (Blotato, Manual posting, Auto mode, Agency social workflows, Profile Guard, AI review replies, Posts & Photos, Security, Site Scan) | anchors | Jumps to `#guide-0` … `#guide-8` | guides.tsx:118 | — | code read | OK |
+| 9 guide nav links (Connect your social accounts, Manual posting, Auto mode, Agency social workflows, Profile Guard, AI review replies, Posts & Photos, Security, Site Scan) | anchors | Jumps to `#guide-0` … `#guide-8` | guides.tsx:118 | — | code read | OK |
 | SiteConnectionGuide (guide-connection) | content | 3 cards: "Put a client site behind Cloudflare" (5 steps), "Connect Cloudflare to ConstructHUB" (7 paragraphs), "Connect Google Search Console" (5 steps + 2 notes) | site-connection-guide.tsx:2-186 | — | code read | OK |
 | "Cloudflare setup instructions" link | external link | Opens Cloudflare docs full-setup page | site-connection-guide.tsx:41-48 | — | curl -L → 200 | OK |
 | "Cloudflare role reference" link | external link | Opens Cloudflare members-roles docs | site-connection-guide.tsx:113-120 | — | curl -L → 200 | OK |
@@ -974,7 +974,7 @@ Column key — Backend: "—" means no server involvement (static/anchor). Statu
 
 | Element (visible label / testid) | Kind | What it does | Frontend (file:line) | Backend | Verified how | Status |
 |---|---|---|---|---|---|---|
-| Steps of "Connect Blotato" (5) | text | Blotato account/API-key walkthrough; Blotato is a third-party paid subscription | guides.tsx:6-16 | — | code read | OK |
+| Steps of "Connect your social accounts" (5) | text | Connecting each network through ConstructHUB, then mapping accounts to the business | guides.tsx:6-16 | — | code read | OK |
 | "Open Social Media" button | app link | Goes to `/social-media` | guides.tsx:124 | — | route exists App.tsx:185 | OK |
 | Steps of "Manual posting" (6) | text | Compose / schedule / queue walkthrough | guides.tsx:17-28 | — | code read | OK |
 | "Open Social Media" button | app link | `/social-media` | guides.tsx:124 | — | route exists | OK |
@@ -1541,7 +1541,7 @@ Agency batches ✓.
 
 ### social (Social Media) — grow — kind "plan" — ready
 Claims: 9 networks, up to 20 destinations per post ✓ (shared/social.ts postSchema); 10 public media
-links, uploads <100 MB ✓; Blotato separately-billed, key encrypted ✓ (server/social/client.ts
+links, uploads <100 MB ✓; connection encrypted ✓ (server/social/client.ts
 encryptKey); auto mode approval-first, content from offers + Google updates last 30 days, missing
 sources reported not invented ✓ (server/social/service.ts sourceFor/generateDue); bulk tools up to
 100 posts ✓ (server/social/agency.ts); pricing note truthful: no plan check on social routes —
@@ -1846,7 +1846,7 @@ Not bugs but worth noting:
   this checkout ("Invalid URL" / "SASL: client password must be a string" — missing env/DB URL for
   that suite). `server/feature-pages.test.ts` (the suite that guards this lane's registry) passes
   18/18.
-- **Unverifiable externally**: Blotato/Google/Cloudflare/Stripe/Telegram/SignalWire behaviors are
+- **Unverifiable externally**: social network/Google/Cloudflare/Stripe/Telegram/SignalWire behaviors are
   verified only against this repo's code, not live third-party calls. The `tryIt` "Free 60-second
   website scan" label is marketing phrasing for /free-site-scan (actual free-scan cap: 11 pages,
   site-scan.tsx:1368) — the "60-second" figure is not enforced anywhere but is a duration estimate,

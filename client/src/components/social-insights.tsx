@@ -1,6 +1,6 @@
 /**
  * Social Media → stats, comments and deleting for accounts connected through ConstructHUB's own apps
- * (server/social/insights.ts). Owner, 2026-10-12: Blotato "can't see followers, stats, likes, or delete videos".
+ * (server/social/insights.ts). Owner, 2026-10-12: customers need followers, stats, likes and deleting videos.
  *
  *   SocialAccountStats   one tile per connected account: followers, and reach / views / engagement over 7 or 28 days
  *   SocialPostInsights   on a published post: likes, comments, shares, views; its comments (reply, hide, delete); delete the post

@@ -74,7 +74,6 @@ export function registerMailAlertRoutes(
             "ads",
             "cloudflare",
             "registrar",
-            "blotato",
             "forwarding",
           ])
           .default(""),

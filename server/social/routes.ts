@@ -9,7 +9,6 @@ import { requireModule } from "../entitlements";
 import { autoSchema, opaqueId, publicMediaUrl } from "../../shared/social";
 import { decryptKey, encryptKey, SocialError, socialErrorBody } from "./client";
 import {
-  connect,
   disconnect,
   discoverPages,
   createPosts,
@@ -19,6 +18,7 @@ import {
   type ClientFactory,
   clientFactory,
   connectionProvider,
+  LEGACY_CONNECTION,
   outstandConnectUrl,
   outstandRefresh,
   outstandPending,
@@ -41,7 +41,6 @@ import express from "express";
 // Curated, field-specific messages. Raw Zod text is never echoed; custom
 // refinements (written for people) pass through as-is.
 const fieldMessages: Record<string, string> = {
-  apiKey: "Paste a Blotato API key (8 to 512 characters).",
   text: "Enter the text. It cannot be empty or longer than the allowed length.",
   mediaUrls: "Media URLs must be public HTTPS links (up to 10).",
   destinations: "Choose valid accounts and pages (up to 20).",
@@ -83,10 +82,10 @@ export function socialSetupProblem(keyEnc: string | undefined, userId: number): 
   try {
     // Validate the server key even when no account is connected yet.
     encryptKey("setup-check", userId);
-    if (keyEnc !== undefined) decryptKey(keyEnc, userId);
+    if (keyEnc !== undefined && !/^(native|outstand):/.test(decryptKey(keyEnc, userId))) return LEGACY_CONNECTION;
     return null;
   } catch (e) {
-    return e instanceof SocialError ? e.message : "This business’s social connection could not be unlocked. Reconnect Blotato above before posting or saving drafts.";
+    return e instanceof SocialError ? e.message : "This business’s social connection could not be unlocked. Reconnect your accounts above before posting or saving drafts.";
   }
 }
 
@@ -98,7 +97,7 @@ export function registerSocialRoutes(
   const publicPost = ({connection_hash, request_hash, ...post}:any) => post;
   const gate = rateLimit("social", 60, 120);
   // The whole Social Media tool is a Pro-and-up module (shared/plans.ts
-  // socialPublishing): every route answers 401/402 before touching Blotato.
+  // socialPublishing): every route answers 401/402 before touching a provider.
   // Extra middleware can gate a route further (autoPosts — the scheduled AI
   // generation, also Pro and up).
   const route = (
@@ -213,24 +212,16 @@ export function registerSocialRoutes(
     const accounts=businessId ? (c?.accounts||[]).filter((a:any)=>mappings.some((d:any)=>d.accountId===a.id)).map((a:any)=>({...a,
       pages:a.pages?.filter((p:any)=>mappings.some((d:any)=>d.accountId===a.id&&d.pageId===p.id)),
       boards:a.boards?.filter((p:any)=>mappings.some((d:any)=>d.accountId===a.id&&d.boardId===p.id))})) : (c?.accounts||[]).slice(0,25);
-    res.json({setupProblem:socialSetupProblem(c?.key_enc,id),provider:connectionProvider(c?.key_enc,id),outstand:outstandConfigured()?{networks:CONNECTABLE}:null,native:nativeNetworksFor(isPlatformAdmin(req.user)).length?{networks:nativeNetworksFor(isPlatformAdmin(req.user))}:null,connected:!!c,agencyConnected:!!connections?.agency,businessConnected:!!connections?.business,connectionScope:c?.business_id?'business':'agency',accounts,settings:s?.settings||autoSchema.parse({}),
+    // A connection we cannot use (unreadable, or a legacy key: LEGACY_CONNECTION) shows as not connected; setupProblem says why.
+    const provider=connectionProvider(c?.key_enc,id);
+    res.json({setupProblem:socialSetupProblem(c?.key_enc,id),provider,outstand:outstandConfigured()?{networks:CONNECTABLE}:null,native:nativeNetworksFor(isPlatformAdmin(req.user)).length?{networks:nativeNetworksFor(isPlatformAdmin(req.user))}:null,connected:!!c&&!!provider,agencyConnected:!!connections?.agency,businessConnected:!!connections?.business,connectionScope:c?.business_id?'business':'agency',accounts:provider?accounts:[],settings:s?.settings||autoSchema.parse({}),
       nextAt:s?.next_at,lastError:s?.last_error,posts:posts.map(publicPost),total:count.total,defaults:mappings,sourcesSync:config,
       business:businessId?await ownedBusiness(id,businessId):null});
   };
-  // The Social Media page for the chosen business: Blotato connection state and accounts, auto-mode
+  // The Social Media page for the chosen business: connection state and accounts, auto-mode
   // settings, and the filtered post queue/calendar (plus the all-businesses calendar view).
   route("get", "", async(req,res,id,businessId)=>dashboard(req,res,id,businessId));
   route("get", "/calendar", async(req,res,id,businessId)=>dashboard(req,res,id,businessId,true));
-  // The "Connect Blotato" / "Verify and replace key" button: verifies the API key with Blotato and stores
-  // it encrypted (business-scoped or agency-shared), returning the connected accounts.
-  route("post", "/connect", async (req, res, id, businessId) => {
-    const { apiKey } = z
-      .object({ apiKey: z.string().trim().min(8).max(512) })
-      .strict()
-      .parse(req.body);
-    const result=await connect(id, apiKey, req, make, businessId);
-    res.json({connected:result.connected,accounts:result.accounts.slice(0,25).map(({id,platform,name}:any)=>({id,platform,name}))});
-  });
   // "Connect Facebook / Instagram / …": the network's own sign-in, through ConstructHUB's publishing account.
   route("post", "/outstand/connect", async (req, res, id, businessId) => {
     const { network } = z.object({ network: z.enum(CONNECTABLE) }).strict().parse(req.body);
@@ -411,7 +402,7 @@ export function registerSocialRoutes(
       .parse(req.body);
     const { client } = await connection(id, make, businessId);
     const up = await client.startUpload(filename, id);
-    // Blotato knows the public address now; Outstand gives an upload id to confirm after the PUT (then the address).
+    // ConstructHUB Direct knows the public address now; Outstand gives an upload id to confirm after the PUT (then the address).
     res.json({ publicUrl: up.publicUrl, presignedUrl: up.presignedUrl, ...(up.uploadId ? { uploadId: up.uploadId, contentType: up.contentType ?? null } : {}) });
   });
   // After the browser PUT the file: providers that hand out the public address only then (Outstand) confirm it here.

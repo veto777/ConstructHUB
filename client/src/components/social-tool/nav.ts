@@ -1,6 +1,6 @@
 /**
  * Social Media as its own tool (owner, 2026-10-12: "the sidebar with all features should vanish when accessing this
- * like SEO SUITE", modeled on the Blotato screens they shared). Every view is a route under /social-media; the chosen
+ * like SEO SUITE"). Every view is a route under /social-media; the chosen
  * business (?business=) carries from view to view. The views are pages/social-media.tsx`s own sections.
  */
 import { BarChart3, BookOpenText, Bot, CalendarDays, FileText, Inbox, LayoutDashboard, PenSquare, Users } from "lucide-react";

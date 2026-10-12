@@ -156,6 +156,9 @@ test("connect, compose, schedule, approve an AI draft, configure automatic mode,
 }) => {
   let state: any = {
     connected: false,
+    provider: null,
+    outstand: { networks: ["twitter"] },
+    native: null,
     accounts: [],
     settings: autoSchema.parse({}),
     posts: [],
@@ -170,7 +173,7 @@ test("connect, compose, schedule, approve an AI draft, configure automatic mode,
     await uploadFinished;
     await route.fulfill({ status: 200, body: "" });
   });
-  // Browser contract fixture: no key or publish request can reach Blotato or AI.
+  // Browser contract fixture: no connect or publish request can reach a social network or AI.
   await page.route("**/api/social**", async (route) => {
     const req = route.request(),
       url = new URL(req.url()),
@@ -181,13 +184,17 @@ test("connect, compose, schedule, approve an AI draft, configure automatic mode,
     if (path === "/api/social/businesses") result = {items:[{id:1,business_name:'Fixture business'}],total:1};
     else if (path === "/api/social/accounts") result = {items:state.accounts,hasMore:false};
     else if (path === "/api/social") result = {...state,total:state.posts.length,business:{business_name:'Fixture business'}};
-    else if (path === "/api/social/connect") {
+    else if (path === "/api/social/outstand/connect") {
+      // The network's sign-in is skipped: the fixture sends the browser straight back, connected.
+      expect(body).toEqual({ network: "twitter" });
       state.connected = true;
+      state.provider = "outstand";
       state.accounts = [
         { id: "fixture-x", name: "Fixture business", platform: "twitter" },
       ];
-      result = { connected: true, accounts: state.accounts };
-    } else if (path === "/api/social/media")
+      result = { authUrl: "/social-media/accounts?business=1&connected=twitter" };
+    } else if (path === "/api/social/outstand/refresh") result = { accounts: state.accounts };
+    else if (path === "/api/social/media")
       result = [
         {
           id: 1,
@@ -241,6 +248,7 @@ test("connect, compose, schedule, approve an AI draft, configure automatic mode,
       if (body.text) p.payload.post.content.text = body.text;
     } else if (path === "/api/social/disconnect") {
       state.connected = false;
+      state.provider = null;
       state.accounts = [];
     } else throw new Error(`Unmocked Social request ${path}`);
     await route.fulfill({
@@ -253,16 +261,9 @@ test("connect, compose, schedule, approve an AI draft, configure automatic mode,
   await expect(
     page.getByRole("heading", { level: 1, name: "Accounts", exact: true }),
   ).toBeVisible();
-  await expect(
-    page.getByText("Blotato is a separate subscription you buy from Blotato.", {
-      exact: false,
-    }),
-  ).toBeVisible();
-  await page.getByLabel("Blotato API key").fill("fixture-key-never-real");
-  await page
-    .getByRole("button", { name: "Connect Blotato", exact: true })
-    .click();
-  await expect(page.getByLabel("Blotato API key")).toHaveValue("");
+  await expect(page.getByTestId("social-connect")).toBeVisible();
+  await page.getByTestId("network-twitter").getByRole("button", { name: "Connect", exact: true }).click();
+  await expect(page.getByTestId("network-twitter").getByText("Fixture business", { exact: true })).toBeVisible();
   await openView(page, "compose");
   await page.locator("fieldset")
     .getByRole("checkbox", { name: "Fixture business · twitter" })
@@ -323,12 +324,12 @@ test("connect, compose, schedule, approve an AI draft, configure automatic mode,
   await page.getByRole("button", { name: "Save auto settings" }).click();
   await expect.poll(() => state.settings.mode).toBe("automatic");
   await openView(page, "accounts");
-  await page.getByRole("button", { name: "Disconnect", exact: true }).click();
-  await expect(page.getByText("Not connected", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Disconnect all", exact: true }).click();
+  await expect(page.getByTestId("social-connect").getByText("Not connected", { exact: true }).first()).toBeVisible();
   await page.goto("/guides");
   for (const title of [
     "Guides",
-    "Connect Blotato",
+    "Connect your social accounts",
     "Manual posting",
     "Auto mode",
     "Profile Guard",

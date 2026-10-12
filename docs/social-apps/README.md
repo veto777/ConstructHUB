@@ -9,9 +9,10 @@ Kits in this folder:
 | `tiktok.md` | TikTok | Login Kit + Content Posting API (Direct Post), app review → Direct Post audit | **Strict posting-screen UX**; private-only until audited |
 | `~/ConstructHUB-release/docs/youtube/AUDIT-PACK.md` (tower1) | YouTube | YouTube API audit + Google OAuth verification | Draft is written and ready but **not submitted**; customer use case B is on branch `youtube-customers`, not deployed |
 
-Nothing in this folder has been sent to any platform. The native Meta/LinkedIn/TikTok connections
-**do not exist yet** — Social Media publishes to these networks today only through each customer's
-own Blotato key (`server/social/client.ts`), which the public privacy policy does not mention.
+Nothing in this folder has been sent to any platform. When these kits were written the native
+Meta/LinkedIn/TikTok connections did not exist yet; ConstructHUB Direct (`server/social/native.ts`,
+`native-nets.ts`) and ConstructHUB's Outstand account (`server/social/outstand.ts`) now connect
+customers' accounts.
 Every kit marks claims as **(verified 2026-10-11)** against official docs or **(to confirm)**.
 
 ---

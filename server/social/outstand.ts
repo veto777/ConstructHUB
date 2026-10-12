@@ -71,7 +71,7 @@ export function accountFrom(a: any): SocialAccount | null {
   return platform === "facebook" ? { id, platform, name, pages: [{ id, name }] } : { id, platform, name };
 }
 
-/** The stored payload (Blotato-shaped, shared/social.ts) → an Outstand create-post body. Pure. */
+/** The stored payload (shared/social.ts postPayload) → an Outstand create-post body. Pure. */
 export function outstandBody(p: PostPayload): Record<string, unknown> {
   const { content, target, accountId } = p.post;
   const network = TO_NETWORK[content.platform];

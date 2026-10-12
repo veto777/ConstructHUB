@@ -171,7 +171,7 @@ export function MappingEditor({ businessId, defaults }: { businessId: number; de
       <summary className="cursor-pointer g-card__title g-card__title--md">Map accounts and pages to this business</summary>
       <div className="space-y-3 pt-3">
         <p className="text-sm text-muted-foreground">Choose up to 20 destinations. These become composer defaults and bulk destinations. Saving a mapping pauses this business&rsquo;s auto mode for review.</p>
-        <Input aria-label="Search Blotato accounts" type="search" value={search} onChange={e => { setSearch(e.target.value); setOffset(0); }} placeholder="Search account or platform" />
+        <Input aria-label="Search social accounts" type="search" value={search} onChange={e => { setSearch(e.target.value); setOffset(0); }} placeholder="Search account or platform" />
         {(data?.items || []).map((a: any) => {
           const d = choices.find(d => d.accountId === a.id);
           return (

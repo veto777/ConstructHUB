@@ -412,7 +412,7 @@ const entries: Draft[] = [
   {
     key: "mail-alerts", group: "Google Business", route: "/mail-alerts", title: "Mail alerts",
     whatItIs: "One inbox for the important provider emails about client accounts.",
-    whatItDoes: "Collects emails from providers such as Google Business Profile, Search Console, Google Ads, Cloudflare, registrars and Blotato that you forward to a private address, and matches them to clients.",
+    whatItDoes: "Collects emails from providers such as Google Business Profile, Search Console, Google Ads, Cloudflare and registrars that you forward to a private address, and matches them to clients.",
     howToUse: [
       "Sidebar → Google Business → Mail alerts, and copy your private forwarding address.",
       "In Gmail: Settings → See all settings → Forwarding and POP/IMAP → Add a forwarding address, and finish Google’s confirmation with the code shown in ConstructHUB.",
@@ -606,17 +606,17 @@ const entries: Draft[] = [
   },
   {
     key: "social-media", group: "Tools", route: "/social-media", title: "Social Media",
-    whatItIs: "A composer, scheduler and approval queue for social posts, per business, sent through Blotato.",
-    whatItDoes: "Writes and schedules posts for the social accounts you connected in Blotato, with a calendar and queue, an optional auto mode that drafts posts from your business details, and bulk tools for agencies.",
+    whatItIs: "A composer, scheduler and approval queue for social posts, per business, posted to the accounts ConstructHUB connects for you.",
+    whatItDoes: "Writes and schedules posts for the social accounts you connected through ConstructHUB, with a calendar and queue, an optional auto mode that drafts posts from your business details, and bulk tools for agencies.",
     howToUse: [
-      "Create your own Blotato account, connect your social accounts there, and create an API key in Blotato’s settings.",
-      "In Social Media, select a business, paste the key and choose “Connect Blotato”.",
+      "In Social Media, select a business and open Accounts.",
+      "Choose Connect for a network and sign in to it; for Facebook and LinkedIn, tick the Pages you manage.",
       "Open “Map accounts and pages to this business” and save the destinations.",
       "Under Compose, write the post, add media, and choose Post now, Schedule post or Save draft.",
       "Follow each destination under “Calendar & queue”.",
     ],
-    howItWorks: "The Blotato key is stored encrypted and never shown again. “Queued” or “accepted by Blotato” is not the same as published; if a status is uncertain, check Blotato before posting again. Disconnecting stops ConstructHUB’s queue but cannot recall posts Blotato already accepted.",
-    needs: ["A Blotato subscription of your own — bought from Blotato, not billed by ConstructHUB.", "At least one Location to post for."],
+    howItWorks: "ConstructHUB connects your social accounts directly; your sign-ins are stored encrypted and never shown again. “Queued” or “submitted” is not the same as published; if a status is uncertain, check the account on the network before posting again. Disconnecting stops ConstructHUB’s queue but cannot recall posts a network already published.",
+    needs: ["A social account you can sign in to for each network you post to.", "At least one Location to post for."],
   },
   {
     key: "social-youtube", group: "Tools", route: "/social-media", title: "Social Media → YouTube",

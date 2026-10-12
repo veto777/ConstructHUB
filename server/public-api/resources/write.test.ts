@@ -27,8 +27,8 @@ import { ensureSiteScanSchema } from "../../sitescan/schema";
 import { ensureAccountEventsSchema } from "../../account-events";
 import { GoogleError } from "../../gbp/client";
 import { reply as realReply } from "../../gbp/service";
-import { BlotatoClient } from "../../social/client";
-import { connect as connectSocial } from "../../social/service";
+import { FixtureClient, connectFixture } from "../../social/test-client";
+import { tenantFor } from "../../social/outstand";
 import { saveMapping } from "../../social/agency";
 import { quotaKey, reserveQuotaFor } from "../../growth-quotas";
 import { PUBLIC_API_BASE, WRITE_UNITS, registerWriteResources, rejectApiKeysOutsidePublicApi, writeOpenapiFragment, writeResources } from "./index-write";
@@ -76,13 +76,13 @@ beforeAll(async () => {
   otherLocation = (await pool.query("INSERT INTO business_locations(user_id,business_name,gbp_account_name,gbp_location_name,gbp_google_subject) VALUES($1,'ACCT- l7 other','accounts/l7o','locations/l7o','subject-l7o') RETURNING id", [other])).rows[0].id;
   review = (await pool.query("INSERT INTO google_profile_reviews(user_id,location_id,google_review_id,reviewer_name,rating,comment,review_date) VALUES($1,$2,'accounts/l7/locations/l7/reviews/r1','Fixture reviewer',5,'Great crew',now()) RETURNING id", [owner, location])).rows[0].id;
   otherReview = (await pool.query("INSERT INTO google_profile_reviews(user_id,location_id,google_review_id,reviewer_name,rating,comment,review_date) VALUES($1,$2,'accounts/l7o/locations/l7o/reviews/r1','Other reviewer',4,'Fine',now()) RETURNING id", [other, otherLocation])).rows[0].id;
-  // A Blotato connection + a business mapping, through the real social service with the provider HTTP mocked.
+  // A ConstructHUB Direct connection + a business mapping, through the real social service with the provider HTTP mocked.
   const http = vi.fn(async (input: any) => {
     const path = new URL(input).pathname;
-    if (path.endsWith("/accounts")) return new Response(JSON.stringify({ items: [{ id: "l7-twitter", platform: "twitter", fullname: "L7 X" }] }));
+    if (path.endsWith("/accounts")) return new Response(JSON.stringify({ items: [{ id: "l7-twitter", platform: "twitter", name: "L7 X" }] }));
     throw new Error(`Unexpected provider call ${path}`);
   });
-  await connectSocial(owner, "l7-fixture-key", null, (key) => new BlotatoClient(key, http, async () => {}), location);
+  await connectFixture(owner, `native:${tenantFor(owner, location)}`, (key) => new FixtureClient(key, http as any), location);
   await saveMapping(owner, location, { destinations: [{ accountId: "l7-twitter", platform: "twitter" }] });
 
   const app = express();

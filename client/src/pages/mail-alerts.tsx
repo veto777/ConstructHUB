@@ -342,7 +342,6 @@ export default function MailAlertsPage() {
                     "ads",
                     "cloudflare",
                     "registrar",
-                    "blotato",
                     "forwarding",
                   ].map((c) => (
                     <option key={c}>{c}</option>
@@ -735,8 +734,7 @@ export default function MailAlertsPage() {
                     </p>
                     <p className="text-sm g-text-2">
                       Registrar domains: {settings?.registrarSenders?.join(", ")}.
-                      Blotato: blotato.com. Only recognized alert subjects are
-                      retained.
+                      Only recognized alert subjects are retained.
                     </p>
                   </details>
                 </GoogleList>

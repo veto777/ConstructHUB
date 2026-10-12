@@ -29,7 +29,7 @@ export const GMAIL_QUERY = `newer_than:30d {${Object.values(SENDERS)
   .map((s) => `from:${s}`)
   .join(
     " ",
-  )} ${[...REGISTRAR_SENDERS, "blotato.com"].map((s) => `from:(@${s})`).join(" ")}}`;
+  )} ${REGISTRAR_SENDERS.map((s) => `from:(@${s})`).join(" ")}}`;
 const mailInput = z
   .object({
     from: z.string().max(500),
@@ -95,8 +95,6 @@ export function classifyMail(mail: Mail) {
     REGISTRAR_SENDERS.some((d) => host === d || host.endsWith(`.${d}`))
   )
     category = "registrar";
-  if (!category && (host === "blotato.com" || host.endsWith(".blotato.com")))
-    category = "blotato";
   if (!category) return null;
   const text = `${mail.subject}\n${mail.text}`;
   if (category === "forwarding") {
@@ -129,7 +127,6 @@ export function classifyMail(mail: Mail) {
     ads: /policy|disapprov|billing|payment|suspend|suspension/i,
     cloudflare: /invite|invitation|member|attack|ssl|certificate|security/i,
     registrar: /expir|renew|transfer|nameserver|dns|security/i,
-    blotato: /fail|error|disconnect|quota|billing|payment|publish/i,
   };
   if (!topics[category].test(mail.subject)) return null;
   const critical =

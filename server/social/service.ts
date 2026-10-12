@@ -13,43 +13,22 @@ import {
   type AutoSettings,
   publicMediaUrl,
 } from "../../shared/social";
-import { BlotatoClient, encryptKey, decryptKey, SocialError, socialMisconfigured } from "./client";
+import { encryptKey, SocialError, socialMisconfigured } from "./client";
 import { CONNECTABLE, OUTSTAND_MARK, OutstandClient, outstandConfigured, tenantFor, type Connectable } from "./outstand";
 import { NATIVE_MARK, NativeClient, nativeNetworks, newOAuthState, oauthStateMatches, metaAuthUrl, metaPagesFromCode, savePending, nativePendingList, nativeFinalize as nativeSave, removeNativeAccounts, NETWORK_API, nativeNetConnect, type PendingOAuth } from "./native";
 import { netAuthUrl, type NetApi } from "./native-nets";
 import {
-  clientFactory, userLock, ownedBusiness, connection, validateDestinations, destinationFromPayload, destinationKey, requestFingerprint, insertPosts, createPosts,
+  clientFactory, connectionProvider, LEGACY_CONNECTION, userLock, ownedBusiness, connection, validateDestinations, destinationFromPayload, destinationKey, requestFingerprint, insertPosts, createPosts,
   type ClientFactory,
 } from "./schedule";
 export {
-  clientFactory, userLock, ownedBusiness, connection, validateDestinations, destinationFromPayload, destinationKey, requestFingerprint, insertPosts, createPosts,
+  clientFactory, connectionProvider, LEGACY_CONNECTION, userLock, ownedBusiness, connection, validateDestinations, destinationFromPayload, destinationKey, requestFingerprint, insertPosts, createPosts,
   type ClientFactory,
 };
 import { aiModel } from "../ai-config";
 import { AiAnswerError, aiClient, aiComplete, NO_TOOLS_RULE, type ChatClient } from "../ai-output";
 import { recordFailure } from "../ops/issues";
 import { getEntitlements, usersWithModule } from "../entitlements";
-export async function connect(
-  userId: number,
-  key: string,
-  req: any,
-  make = clientFactory,
-  businessId: number | null = null,
-) {
-  return userLock(userId, async () => {
-    await ownedBusiness(userId, businessId);
-    const box = encryptKey(key, userId);
-    const accounts = await make(key).accounts();
-    await pool.query(
-      `INSERT INTO social_connections(user_id,key_enc,accounts,business_id) VALUES($1,$2,$3,$4) ON CONFLICT(user_id,business_id) DO UPDATE SET key_enc=$2,accounts=$3,updated_at=now()`,
-      [userId, box, JSON.stringify(accounts), businessId],
-    );
-    await logActivity(req, userId, "social.connected", {
-      accounts: accounts.length,
-    });
-    return { connected: true, accounts };
-  });
-}
 export async function disconnect(userId: number, req: any, businessId: number | null = null) {
   // An Outstand connection also lets go of the accounts at Outstand (best effort; ours are deleted either way).
   const { rows: [conn] } = await pool.query("SELECT key_enc FROM social_connections WHERE user_id=$1 AND business_id IS NOT DISTINCT FROM $2", [userId, businessId]);
@@ -80,17 +59,12 @@ export async function disconnect(userId: number, req: any, businessId: number | 
     return { connected: false };
   });
 }
-/** Which provider a stored connection uses ("outstand" | "blotato"), or null when it cannot be read. */
-export function connectionProvider(keyEnc: string | undefined | null, userId: number): "native" | "outstand" | "blotato" | null {
-  if (!keyEnc) return null;
-  try { const k = decryptKey(keyEnc, userId); return k.startsWith(NATIVE_MARK) ? "native" : k.startsWith(OUTSTAND_MARK) ? "outstand" : "blotato"; } catch { return null; }
-}
 
 /**
  * "Connect Facebook / Instagram / …" (owner, 2026-10-11: "so we can add their social media for them"): the business's
  * connection becomes ConstructHUB's Outstand tenant for that business, and the customer is sent to the network's own
  * sign-in. They come back to /social-media with `connected=<network>` (or `session=…` for Facebook / LinkedIn, whose
- * pages are picked next). A Blotato key the business had is replaced.
+ * pages are picked next). Any other connection the business had is replaced.
  */
 export async function outstandConnectUrl(userId: number, businessId: number | null, network: string, req: any): Promise<{ authUrl: string }> {
   if (!outstandConfigured()) throw new SocialError("Social posting isn't switched on yet.", 503);
@@ -142,7 +116,7 @@ export async function outstandFinalize(userId: number, businessId: number | null
 
 /**
  * "Connect Facebook / Instagram" through ConstructHUB's own Meta app. The business's connection becomes our own
- * tenant for that business (a Blotato key or Outstand tenant it had is replaced), a one-time state is kept in the
+ * tenant for that business (any other connection it had is replaced), a one-time state is kept in the
  * session, and the customer is sent to Meta's sign-in. They come back through nativeCallback.
  */
 export async function nativeConnectUrl(userId: number, businessId: number | null, network: string, req: any): Promise<{ authUrl: string }> {
@@ -525,7 +499,7 @@ export async function workerUser(
     const { client } = await connection(userId, make, businessId);
     // A process may have died after submitting but before saving the acknowledgement. Never re-POST it.
     await c.query(
-      "UPDATE social_posts SET state='uncertain',error='Submission interrupted. Check Blotato before creating another post.',updated_at=now() WHERE user_id=$1 AND business_id IS NOT DISTINCT FROM $2 AND state='submitting'",
+      "UPDATE social_posts SET state='uncertain',error='Submission interrupted. Check the social account before creating another post.',updated_at=now() WHERE user_id=$1 AND business_id IS NOT DISTINCT FROM $2 AND state='submitting'",
       [userId,businessId],
     );
     try {
@@ -640,7 +614,7 @@ async function notifyPostEvents(c:PoolClient,userId:number,businessId:number|nul
               : "Social post needs attention",
           body:
             e.state === "uncertain"
-              ? "Submission outcome is uncertain. Check Blotato before submitting again."
+              ? "Submission outcome is uncertain. Check the social account before submitting again."
               : undefined,
           link: businessId ? `/social-media/posts?business=${businessId}` : "/social-media/posts",
         },
@@ -681,8 +655,9 @@ export async function runSocialWorker(
     for (const r of rows)
       try {
         await workerUser(r.user_id, make, generate, r.business_id);
-      } catch {
-        await pool.query("UPDATE social_settings SET next_at=now()+interval '1 hour',last_error='Connection unavailable; check Blotato settings' WHERE user_id=$1 AND business_id IS NOT DISTINCT FROM $2",[r.user_id,r.business_id]);
+      } catch (e) {
+        await pool.query("UPDATE social_settings SET next_at=now()+interval '1 hour',last_error=$3 WHERE user_id=$1 AND business_id IS NOT DISTINCT FROM $2",[r.user_id,r.business_id,
+          e instanceof SocialError && e.message === LEGACY_CONNECTION ? LEGACY_CONNECTION : "Connection unavailable; check Social Media > Accounts"]);
         await pool.query("UPDATE social_posts SET due_at=now()+interval '1 hour' WHERE user_id=$1 AND business_id IS NOT DISTINCT FROM $2 AND state IN ('queued','submitted','submitting')",[r.user_id,r.business_id]);
       }
   } finally {
