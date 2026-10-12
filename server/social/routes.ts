@@ -30,7 +30,8 @@ import {
   nativeFinalize,
 } from "./service";
 import { CONNECTABLE, outstandConfigured, webhookSigned } from "./outstand";
-import { nativeNetworks, receiveUpload, NATIVE_UPLOAD_MAX_BYTES } from "./native";
+import { nativeNetworksFor, receiveUpload, NATIVE_UPLOAD_MAX_BYTES } from "./native";
+import { isPlatformAdmin } from "../admin";
 import { putToR2Key } from "../r2";
 import express from "express";
 // Curated, field-specific messages. Raw Zod text is never echoed; custom
@@ -208,7 +209,7 @@ export function registerSocialRoutes(
     const accounts=businessId ? (c?.accounts||[]).filter((a:any)=>mappings.some((d:any)=>d.accountId===a.id)).map((a:any)=>({...a,
       pages:a.pages?.filter((p:any)=>mappings.some((d:any)=>d.accountId===a.id&&d.pageId===p.id)),
       boards:a.boards?.filter((p:any)=>mappings.some((d:any)=>d.accountId===a.id&&d.boardId===p.id))})) : (c?.accounts||[]).slice(0,25);
-    res.json({setupProblem:socialSetupProblem(c?.key_enc,id),provider:connectionProvider(c?.key_enc,id),outstand:outstandConfigured()?{networks:CONNECTABLE}:null,native:nativeNetworks().length?{networks:nativeNetworks()}:null,connected:!!c,agencyConnected:!!connections?.agency,businessConnected:!!connections?.business,connectionScope:c?.business_id?'business':'agency',accounts,settings:s?.settings||autoSchema.parse({}),
+    res.json({setupProblem:socialSetupProblem(c?.key_enc,id),provider:connectionProvider(c?.key_enc,id),outstand:outstandConfigured()?{networks:CONNECTABLE}:null,native:nativeNetworksFor(isPlatformAdmin(req.user)).length?{networks:nativeNetworksFor(isPlatformAdmin(req.user))}:null,connected:!!c,agencyConnected:!!connections?.agency,businessConnected:!!connections?.business,connectionScope:c?.business_id?'business':'agency',accounts,settings:s?.settings||autoSchema.parse({}),
       nextAt:s?.next_at,lastError:s?.last_error,posts:posts.map(publicPost),total:count.total,defaults:mappings,sourcesSync:config,
       business:businessId?await ownedBusiness(id,businessId):null});
   };
@@ -235,6 +236,7 @@ export function registerSocialRoutes(
   // ConstructHUB Direct (server/social/native.ts): our own apps on each network.
   route("post", "/native/connect", async (req, res, id, businessId) => {
     const { network } = z.object({ network: z.string().min(2).max(20) }).strict().parse(req.body);
+    if (!nativeNetworksFor(isPlatformAdmin(req.user)).includes(network)) throw new SocialError("That network can't be connected here yet");
     res.json(await nativeConnectUrl(id, businessId, network, req));
   });
   route("post", "/native/refresh", async (_req, res, id, businessId) => res.json(await nativeRefresh(id, businessId)));

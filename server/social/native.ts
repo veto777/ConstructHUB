@@ -34,6 +34,13 @@ export function nativeNetworks(env: NodeJS.ProcessEnv = process.env): string[] {
   return meta ? ["facebook", "instagram"] : [];
 }
 export const nativeConfigured = (env: NodeJS.ProcessEnv = process.env) => nativeNetworks(env).length > 0;
+/**
+ * Until Meta approves the app (App Review), only people with a role on it can sign in, so customers do not see
+ * ConstructHUB Direct: platform admins do, to test it on our own Page. SOCIAL_NATIVE_PUBLIC=true opens it to all. Pure on env.
+ */
+export function nativeNetworksFor(isAdmin: boolean, env: NodeJS.ProcessEnv = process.env): string[] {
+  return isAdmin || env.SOCIAL_NATIVE_PUBLIC === "true" ? nativeNetworks(env) : [];
+}
 
 const appBase = () => (process.env.APP_URL || "https://constructhub.us").replace(/\/$/, "");
 export const nativeRedirectUri = () => `${appBase()}/api/social/native/callback`;

@@ -2,7 +2,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { pool } from "../db";
 import {
-  NativeClient, ensureNativeSchema, facebookPlan, graphError, instagramPlan, nativeDeps, nativeNetworks, newOAuthState,
+  NativeClient, ensureNativeSchema, facebookPlan, graphError, instagramPlan, nativeDeps, nativeNetworks, nativeNetworksFor, newOAuthState,
   oauthStateMatches, receiveUpload, savePending, nativePendingList, nativeFinalize, removeNativeAccounts,
 } from "./native";
 import { clientFactory } from "./schedule";
@@ -28,6 +28,12 @@ describe("which networks are switched on", () => {
     expect(nativeNetworks({} as any)).toEqual([]);
     expect(nativeNetworks({ SOCIAL_META_APP_ID: "1609986400506072" } as any)).toEqual([]);
     expect(nativeNetworks({ SOCIAL_META_APP_ID: "1609986400506072", SOCIAL_META_APP_SECRET: "0123456789abcdef0123" } as any)).toEqual(["facebook", "instagram"]);
+  });
+  it("is shown only to platform admins until it is opened to everyone", () => {
+    const env = { SOCIAL_META_APP_ID: "1609986400506072", SOCIAL_META_APP_SECRET: "0123456789abcdef0123" } as any;
+    expect(nativeNetworksFor(false, env)).toEqual([]);
+    expect(nativeNetworksFor(true, env)).toEqual(["facebook", "instagram"]);
+    expect(nativeNetworksFor(false, { ...env, SOCIAL_NATIVE_PUBLIC: "true" })).toEqual(["facebook", "instagram"]);
   });
   it("picks ConstructHUB Direct from the stored marker", () => {
     expect(clientFactory("native:chu1b2").provider).toBe("native");
