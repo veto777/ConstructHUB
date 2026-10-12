@@ -31,7 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { AppPage, EmptyState } from "@/components/app-ui";
+import { AppPage, EmptyState, Notice } from "@/components/app-ui";
 import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -110,12 +110,10 @@ export default function SchedulesPage() {
   if (error) {
     return (
       <AppPage width="narrow">
-        <div className="rounded-xl border bg-card p-5" role="alert">
-          <h1 className="g-header__title">Scrape schedules</h1>
-          <p className="mt-2 g-text-2">
-            {String(error).includes("403") ? "Administrator access is required to manage these shared schedules." : "Schedules could not be loaded. Please sign in or try again later."}
-          </p>
-        </div>
+        <GoogleSectionHeader as="h1" title="Scrape schedules" description="Automatic permit refreshes for live-searchable portals." flush />
+        <Notice tone={String(error).includes("403") ? "info" : "danger"} testId="notice-schedules-error">
+          {String(error).includes("403") ? "Administrator access is required to manage these shared schedules." : "Schedules could not be loaded. Please sign in or try again later."}
+        </Notice>
       </AppPage>
     );
   }
