@@ -10,6 +10,7 @@ import { useLocation } from "wouter";
 import { analyticsPath } from "@shared/analytics-path";
 import { utmFromSearch } from "@shared/campaign-attribution";
 import { inNativeApp } from "@/lib/app-shell";
+import { isClientPortal, isPortal } from "@/lib/site";
 
 function readCookie(name: string): string | null {
   for (const part of document.cookie.split(";")) {
@@ -51,27 +52,32 @@ function sendPageview(path: string) {
   }).catch(() => {});
 }
 
+// The CRM, the client portal and the links customers get (documents, invoices, reviews, forms, contracts) record
+// nothing: their privacy notice (pages/crm-legal.tsx §7) says so. Only the main site and app are measured.
+const CUSTOMER_LINKS = ["/e/", "/i/", "/co/", "/lead-form/", "/portal/", "/review/", "/contract/sign/", "/site-scan/report/"];
+const untracked = (path: string) => inNativeApp() || isPortal() || isClientPortal() || CUSTOMER_LINKS.some((p) => path.startsWith(p));
+
 export function CookieConsent() {
   const [location] = useLocation();
   const [consent, setConsent] = useState<string | null>(() => readCookie("ch_consent"));
 
   // First visit: record the site's own analytics cookie once, with no pop-up.
   useEffect(() => {
-    if (consent || inNativeApp()) return;
+    if (consent || untracked(location)) return;
     fetch("/api/analytics/consent", {
       method: "POST",
       headers: { "content-type": "application/json" },
       credentials: "same-origin",
       body: JSON.stringify({ granted: true }),
     }).then((r) => { if (r.ok) setConsent("granted"); }).catch(() => {});
-  }, [consent]);
+  }, [consent, location]);
 
   // Track every route change once consent is granted. Bearer-token document
   // paths (/e/<token>, /i/<token>, …) are normalized so the tokens never land
   // in the analytics tables or the /admin Top-pages list.
   useEffect(() => {
     // Inside the iPhone apps nothing is tracked (App Store 5.1.2(i); docs/app/APP-STORE-PLAN.md).
-    if (consent !== "granted" || inNativeApp()) return;
+    if (consent !== "granted" || untracked(location)) return;
     sendPageview(analyticsPath(location));
   }, [location, consent]);
 

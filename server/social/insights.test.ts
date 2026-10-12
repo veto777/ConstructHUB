@@ -94,7 +94,8 @@ describe.skipIf(!process.env.DATABASE_URL || !process.env.GBP_TOKEN_KEY)("stats,
   it("Facebook comments: read with replies, reply, hide, delete — and the list is re-read after each change", async () => {
     const id = await sub("facebook", "111_333");
     let listed = 0;
-    const calls = fake(({ path, method }) => {
+    const calls = fake(({ path, method, params }) => {
+      if (path === "/111_333/comments" && method === "GET" && params.get("filter") === "stream") return { data: [{ id: "c1" }, { id: "c2" }] };
       if (path === "/111_333/comments" && method === "GET") { listed++; return { data: [{ id: "c1", message: "Great work!", from: { name: "Ann", id: "9" }, created_time: "2026-10-11T12:00:00+0000", like_count: 1, is_hidden: false, can_hide: true, can_remove: true,
         comments: { data: [{ id: "c2", message: "Thanks Ann", from: { name: "Summit Roofing", id: "111" }, can_hide: false, can_remove: true }] } }] }; }
       if (path === "/c1/comments" && method === "POST") return { id: "c3" };
@@ -113,6 +114,9 @@ describe.skipIf(!process.env.DATABASE_URL || !process.env.GBP_TOKEN_KEY)("stats,
     await comments(c, id);
     expect(listed).toBe(2);
     await expect(replyComment(c, id, "../x", "hi")).rejects.toThrow(/Invalid comment/);
+    // An id that is not one of this post's comments (another post, say) is refused before anything is sent.
+    await expect(deleteComment(c, id, "111_999")).rejects.toThrow(/isn't on this post/);
+    expect(calls.some((x) => x.path === "/111_999")).toBe(false);
   });
 
   it("Instagram: post stats, comment replies go to /replies, hiding uses hide", async () => {
@@ -120,13 +124,20 @@ describe.skipIf(!process.env.DATABASE_URL || !process.env.GBP_TOKEN_KEY)("stats,
     const calls = fake(({ path, params, method }) => {
       if (path === "/IM1") return { like_count: 14, comments_count: 3 };
       if (path === "/IM1/insights") return { data: [{ values: [{ value: ({ reach: 200, views: 450, saved: 4, shares: 2 } as any)[params.get("metric")!] }] }] };
-      if (path === "/IM1/comments") return { data: [{ id: "k1", text: "Nice", username: "bob", timestamp: "2026-10-11T12:00:00+0000", hidden: false, replies: { data: [] } }] };
+      if (path === "/IM1/comments" && params.get("after") === "CUR2") return { data: [{ id: "k5", text: "Later", username: "dee", hidden: false, replies: { data: [] } }] };
+      if (path === "/IM1/comments") return { data: [{ id: "k1", text: "Nice", username: "bob", timestamp: "2026-10-11T12:00:00+0000", hidden: false, replies: { data: [] } }], paging: { cursors: { after: "CUR2" }, next: "https://graph/next" } };
+      if (path === "/k1" && method === "GET") return { id: "k1", media: { id: "IM1" } };
+      if (path === "/k9" && method === "GET") return { id: "k9", media: { id: "IM2" } };
       if (path === "/k1/replies" && method === "POST") return { id: "k2" };
       if (path === "/k1" && method === "POST") return { success: true };
       throw new Error(`unexpected ${method} ${path}`);
     });
     expect(await postStats(c, id)).toMatchObject({ likes: 14, comments: 3, reach: 200, views: 450, saves: 4, shares: 2 });
-    expect((await comments(c, id)).comments[0]).toMatchObject({ author: "bob", canHide: true });
+    const page1 = await comments(c, id);
+    expect(page1.comments[0]).toMatchObject({ author: "bob", canHide: true });
+    expect(page1.next).toBe("CUR2");
+    expect((await comments(c, id, "CUR2")).comments[0]).toMatchObject({ id: "k5" });
+    await expect(hideComment(c, id, "k9", true)).rejects.toThrow(/isn't on this post/);
     expect(await replyComment(c, id, "k1", "Thanks Bob")).toEqual({ id: "k2" });
     await hideComment(c, id, "k1", true);
     expect(calls.find((x) => x.path === "/k1" && x.method === "POST")!.params.get("hide")).toBe("true");
@@ -140,6 +151,7 @@ describe.skipIf(!process.env.DATABASE_URL || !process.env.GBP_TOKEN_KEY)("stats,
       if (path === "/th1/threads" && method === "POST") return { id: "CONT" };
       if (path === "/th1/threads_publish" && method === "POST") return { id: "R2" };
       if (path === "/r1/manage_reply") return { success: true };
+      if (path === "/r1" && method === "GET") return { id: "r1", root_post: { id: "T1" } };
       throw new Error(`unexpected ${method} ${path}`);
     });
     expect(await postStats(c, id)).toMatchObject({ views: 90, likes: 5, comments: 1, shares: 1 });

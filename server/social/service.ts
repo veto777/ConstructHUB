@@ -106,7 +106,7 @@ export async function outstandConnectUrl(userId: number, businessId: number | nu
       await logActivity(req, userId, "social.connected", { provider: "outstand" });
     }
     const base = (process.env.APP_URL || "https://constructhub.us").replace(/\/$/, "");
-    const back = `${base}/social-media?business=${businessId ?? "all"}&connected=${network}`;
+    const back = `${base}/social-media/accounts?business=${businessId ?? "all"}&connected=${network}`;
     return { authUrl: await new OutstandClient(tenant).authUrl(network as Connectable, back) };
   });
 }
@@ -168,7 +168,7 @@ export async function nativeCallback(req: any, userId: number): Promise<string> 
   const pending: PendingOAuth | undefined = req.session.socialNativeOAuth;
   delete req.session.socialNativeOAuth; // one use, whatever happens next
   const business = pending?.businessId ?? null;
-  const back = (q: string) => `/social-media?business=${business ?? "all"}&${q}`;
+  const back = (q: string) => `/social-media/accounts?business=${business ?? "all"}&${q}`;
   if (!oauthStateMatches(pending, userId, req.query?.state)) return back("connect_error=expired");
   if (typeof req.query?.error === "string" || typeof req.query?.code !== "string") return back("connect_error=cancelled");
   try {
@@ -187,7 +187,7 @@ export async function nativeNetCallback(req: any, userId: number, api: NetApi): 
   const pending: PendingOAuth | undefined = req.session.socialNativeOAuth;
   delete req.session.socialNativeOAuth;
   const business = pending?.businessId ?? null;
-  const back = (q: string) => `/social-media?business=${business ?? "all"}&${q}`;
+  const back = (q: string) => `/social-media/accounts?business=${business ?? "all"}&${q}`;
   if (!oauthStateMatches(pending, userId, req.query?.state) || NETWORK_API[pending.network] !== api) return back("connect_error=expired");
   if (typeof req.query?.error === "string" || typeof req.query?.code !== "string") return back("connect_error=cancelled");
   try {
@@ -629,7 +629,7 @@ async function notifyPostEvents(c:PoolClient,userId:number,businessId:number|nul
             e.state === "uncertain"
               ? "Submission outcome is uncertain. Check Blotato before submitting again."
               : undefined,
-          link: businessId ? `/social-media?business=${businessId}&tab=queue` : "/social-media?tab=queue",
+          link: businessId ? `/social-media/posts?business=${businessId}` : "/social-media/posts",
         },
       );
       await c.query("UPDATE social_posts SET notified_at=now() WHERE id=$1", [

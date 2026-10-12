@@ -38,7 +38,9 @@ export function BusinessSelector({ value, onChange, accountTotal }: { value: str
   const ids = Object.keys(selected).map(Number);
   // Owner, 2026-10-12: "i did not know you can select a company". An account with one business opens it at once;
   // with more, each row has a visible Open button and the hint above the list says what to do.
-  const only = !search && linked === "all" && offset === 0 && data?.total === 1 && data?.items?.length === 1 ? String(data.items[0].id) : null;
+  // ?pick=1 is "show me the list" (the bar's "All businesses and bulk actions"): no automatic opening then.
+  const picking = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("pick") === "1";
+  const only = !picking && !search && linked === "all" && offset === 0 && data?.total === 1 && data?.items?.length === 1 ? String(data.items[0].id) : null;
   useEffect(() => { if (!value && only) onChange(only); }, [value, only]); // eslint-disable-line react-hooks/exhaustive-deps
   function enqueue(kind: string, draft = true, enabled = true) {
     mutation.mutate({ requestId, businessIds: ids, kind, ...(kind === "post" ? { text, draft, mediaUrls: bulkMedia.split("\n").map(v => v.trim()).filter(Boolean), ...(schedule ? { scheduledTime: new Date(schedule).toISOString() } : {}) } : {}), ...(kind === "settings" ? { enabled, mode, cadences: ids.map(businessId => ({ businessId, cadence: selected[businessId].cadence, period: selected[businessId].period })) } : {}) });

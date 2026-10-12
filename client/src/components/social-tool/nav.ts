@@ -23,6 +23,7 @@ export function socialViewOf(path: string, tab?: string | null): SocialView {
   const seg = path.replace(/^\/social-media\/?/, "").split("/")[0];
   if ((SOCIAL_VIEWS as readonly string[]).includes(seg)) return seg as SocialView;
   if (tab === "queue") return "posts";
+  if (path === "/social-media" && typeof window !== "undefined" && /[?&](session|connected|connect_error|youtube)=/.test(window.location.search)) return "accounts";
   if (tab === "compose" || tab === "auto" || tab === "guides") return tab;
   return "overview";
 }

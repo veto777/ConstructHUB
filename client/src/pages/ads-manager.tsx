@@ -125,6 +125,9 @@ export default function AdsManagerPage() {
   const campaigns=useQuery<any>({queryKey:['ads-campaigns',campaignCustomer,campaignQ,campaignPage],enabled:!!campaignCustomer,queryFn:async()=>(await apiRequest('GET',`/api/ads/accounts/${campaignCustomer}/campaigns?q=${encodeURIComponent(campaignQ)}&page=${campaignPage}`)).json()});
   const action=useMutation({mutationFn:async({path,body}:{path:string;body:unknown})=>(await apiRequest('POST',`/api/ads${path}`,body)).json(),onSuccess:r=>{setMessage(r.message||`Queued ${r.queued??1}. Review progress in Queue.`);setSelected([]);setReviewed(false);setInvitePreview(false);qc.invalidateQueries({queryKey:['ads-list']});qc.invalidateQueries({queryKey:['/api/ads/status']});if(r.url)window.location.assign(r.url);},onError:e=>setMessage(apiErrorMessage(e))});
   const run=(path:string,body:unknown)=>action.mutate({path,body});
+  // The shell's menu changes the route without switchTab: reset the same list state here (accounts ↔ recommendations share it).
+  const prevTab=useRef(tab);
+  useEffect(()=>{const was=prevTab.current;prevTab.current=tab;if(was===tab)return;const pair=(t:string)=>t==='accounts'||t==='recommendations';if(pair(was)&&pair(tab))return;setPage(1);setQ('');setFilter('');setLsa('');setSelected([]);setAll(false);setReviewed(false);},[tab]);
   const switchTab=(t:Tab)=>{if(accountTab&&(t==='accounts'||t==='recommendations')){setTab(t);return;}setTab(t);setPage(1);setQ('');setFilter('');setLsa('');setSelected([]);setAll(false);setReviewed(false);};
   const select=(id:string)=>{setReviewed(false);setSelected(s=>s.includes(id)?s.filter(x=>x!==id):[...s,id]);};
   const selection=all?{filter:{q,lsa}}:{ids:selected};

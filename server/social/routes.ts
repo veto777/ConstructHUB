@@ -194,7 +194,7 @@ export function registerSocialRoutes(
   const dashboard = async (req:Request,res:Response,id:number,businessId:number|null,all=false) => {
     const q=pageInput.extend({state:z.enum(['','draft','queued','submitting','submitted','published','failed','uncertain','cancelled']).default(''),
       platform:z.string().max(30).default(''),day:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(day=>Number.isFinite(Date.parse(day))&&new Date(day).toISOString().slice(0,10)===day).optional(),
-      timezone:z.string().max(80).default('UTC')}).parse(req.query||{});
+      timezone:z.string().max(80).default('UTC'),order:z.enum(['desc','asc']).default('desc')}).parse(req.query||{});
     try {new Intl.DateTimeFormat('en',{timeZone:q.timezone});}catch{throw new SocialError('Invalid timezone');}
     const {rows:[c]}=await pool.query("SELECT accounts,updated_at,business_id,key_enc FROM social_connections WHERE user_id=$1 AND (business_id=$2 OR business_id IS NULL) ORDER BY business_id NULLS LAST LIMIT 1",[id,businessId]);
     const {rows:[s]}=await pool.query("SELECT settings,next_at,last_error FROM social_settings WHERE user_id=$1 AND business_id IS NOT DISTINCT FROM $2",[id,businessId]);
@@ -205,7 +205,7 @@ export function registerSocialRoutes(
       AND ($6='' OR p.payload->'post'->'content'->>'platform'=$6)
       AND ($7::date IS NULL OR (COALESCE(p.scheduled_at,p.created_at) AT TIME ZONE $8)::date=$7::date)`;
     const {rows:posts}=await pool.query(`SELECT p.*,l.business_name FROM social_posts p LEFT JOIN business_locations l ON l.id=p.business_id AND l.user_id=p.user_id
-      WHERE ${where} ORDER BY COALESCE(p.scheduled_at,p.created_at) DESC,p.id LIMIT $9 OFFSET $10`,[...params,q.limit,q.offset]);
+      WHERE ${where} ORDER BY COALESCE(p.scheduled_at,p.created_at) ${q.order==='asc'?'ASC':'DESC'},p.id LIMIT $9 OFFSET $10`,[...params,q.limit,q.offset]);
     const {rows:[count]}=await pool.query(`SELECT count(*)::int total FROM social_posts p LEFT JOIN business_locations l ON l.id=p.business_id AND l.user_id=p.user_id WHERE ${where}`,params);
     const {rows:[connections]}=await pool.query("SELECT bool_or(business_id IS NULL) AS agency, bool_or(business_id=$2) AS business FROM social_connections WHERE user_id=$1",[id,businessId]);
     const mappings=config?.destinations||[];
@@ -271,7 +271,7 @@ export function registerSocialRoutes(
   });
   route("get", "/native/posts/:postId/comments", async (req, res, id, businessId) => {
     const client = await direct(req, id, businessId);
-    res.json(await postComments(client, (await nativePost(id, businessId, String(req.params.postId))).submission_id));
+    res.json(await postComments(client, (await nativePost(id, businessId, String(req.params.postId))).submission_id, typeof req.query.after === "string" ? req.query.after : null));
   });
   route("post", "/native/posts/:postId/comments/:commentId/reply", async (req, res, id, businessId) => {
     const { message } = z.object({ message: z.string().trim().min(1, "Write a reply first").max(2200) }).strict().parse(req.body);

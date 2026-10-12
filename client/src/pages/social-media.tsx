@@ -86,16 +86,18 @@ const VIEW_HEAD: Record<SocialView, [string, string]> = {
 export default function SocialMediaPage() {
   const [business, setBusiness] = useUrlParam("business");
   const [tab] = useUrlParam("tab");
+  const [, setPick] = useUrlParam("pick");
   const [path, navigate] = useLocation();
   const view = socialViewOf(path, tab);
   // The old one-page links (?tab=queue from notifications, ?tab=guides) open their own view now.
+  const signInResult = path === "/social-media" && view === "accounts";
   useEffect(() => {
-    if (!tab) return;
+    if (!tab && !signInResult) return;
     const rest = new URLSearchParams(window.location.search);
     rest.delete("tab");
     const b = rest.get("business"); rest.delete("business");
     navigate(socialHref(view, b, Object.fromEntries(rest)), { replace: true });
-  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tab, signInResult]); // eslint-disable-line react-hooks/exhaustive-deps
   // Drafts are scoped to the signed-in account (the router resolves /api/auth/me before any page
   // renders, so the id is available synchronously here).
   const me = useQuery<any>({ queryKey: ["/api/auth/me"] });
@@ -140,7 +142,7 @@ export default function SocialMediaPage() {
   const chosen = business && valid;
   return (
     <AppPage>
-      {!planRequired && <ToolBarSlot><BusinessSwitch business={chosen ? business : null} items={businesses.data?.items ?? []} total={businesses.data?.total ?? 0} onChange={(v) => setBusiness(v, true)} /></ToolBarSlot>}
+      {!planRequired && <ToolBarSlot><BusinessSwitch business={chosen ? business : null} items={businesses.data?.items ?? []} total={businesses.data?.total ?? 0} onChange={(v) => { if (v) { setBusiness(v, true); return; } const p = new URLSearchParams(window.location.search); p.delete("business"); p.set("pick", "1"); navigate(`${path}?${p}`); }} /></ToolBarSlot>}
       {/* Google's format (owner, 2026-10-07): quiet titles with a hairline, pills, hairline rows. */}
       <GoogleSectionHeader
         as="h1"
@@ -159,7 +161,7 @@ export default function SocialMediaPage() {
       ) : (
         <>
           {/* No business open yet: the full list to pick from (one business opens by itself). */}
-          {!chosen && view !== "guides" && <BusinessSelector value={business} onChange={v => setBusiness(v, true)} accountTotal={!businesses.isError && businesses.data ? (businesses.data.total ?? 0) : null} />}
+          {!chosen && view !== "guides" && <BusinessSelector value={business} onChange={v => { setPick(null); setBusiness(v, true); }} accountTotal={!businesses.isError && businesses.data ? (businesses.data.total ?? 0) : null} />}
           {chosen ? <SocialWorkbench key={JSON.stringify([accountId, business])} view={view} accountId={accountId} businessId={business === "all" ? null : Number(business)} all={business === "all"} draftEdits={editsFor === accountId ? draftEdits : {}} onEditDraft={editDraft} /> : <>
             {/* The guides don't depend on a business: /guides lands here. */}
             {view === "guides" && <GuidesContent />}
@@ -1493,7 +1495,7 @@ function BusinessSwitch({ business, items, total, onChange }: { business: string
         {!listed && <option value={business!}>This business</option>}
         {items.map((b) => <option key={b.id} value={String(b.id)}>{b.business_name}{b.city ? ` · ${b.city}` : ""}</option>)}
         {total > 1 && <option value="all">All clients (calendar and posts)</option>}
-        {total > items.length && <option value="__pick">Search all {total} businesses…</option>}
+        <option value="__pick">{total > 1 ? `All ${total} businesses and bulk actions…` : "Business list…"}</option>
       </select>
     </label>
   );
@@ -1505,7 +1507,7 @@ function SocialOverview({ business, businessId, accounts }: { business: string; 
   const next = useQuery<any>({
     queryKey: ["/api/social", "upcoming", businessId],
     refetchInterval: 60_000,
-    queryFn: async () => (await apiRequest("GET", `/api/social?${new URLSearchParams({ state: "queued", offset: "0", timezone, ...(businessId ? { businessId: String(businessId) } : {}) })}`)).json(),
+    queryFn: async () => (await apiRequest("GET", `/api/social?${new URLSearchParams({ state: "queued", order: "asc", offset: "0", timezone, ...(businessId ? { businessId: String(businessId) } : {}) })}`)).json(),
   });
   const failed = useQuery<any>({
     queryKey: ["/api/social", "failed-count", businessId],

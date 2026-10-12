@@ -136,7 +136,7 @@ async function connect(who: string, session = `s-${who}`) {
   const state = new URL(start.headers.get("location")!).searchParams.get("state")!;
   replies.push({ json: tokensFor(who) }, { json: channelFor(who) });
   const back = await get(`${CUSTOMER_YOUTUBE_CALLBACK_PATH}?state=${state}&code=code-${who}`, who, session);
-  expect(back.headers.get("location")).toBe("/social-media?youtube=connected");
+  expect(back.headers.get("location")).toBe("/social-media/accounts?youtube=connected");
   calls.length = 0;
 }
 
@@ -234,17 +234,17 @@ describe("connect", () => {
     const state = sessions.get("s1").youtubeCustomerOAuth.state;
     // Wrong state.
     let r = await get(`${CUSTOMER_YOUTUBE_CALLBACK_PATH}?state=${"0".repeat(64)}&code=c`, "a", "s1");
-    expect(r.headers.get("location")).toBe("/social-media?youtube=failed");
+    expect(r.headers.get("location")).toBe("/social-media/accounts?youtube=failed");
     // The pending state was consumed by that attempt: the right one no longer works either.
     r = await get(`${CUSTOMER_YOUTUBE_CALLBACK_PATH}?state=${state}&code=c`, "a", "s1");
-    expect(r.headers.get("location")).toBe("/social-media?youtube=failed");
+    expect(r.headers.get("location")).toBe("/social-media/accounts?youtube=failed");
     // Account B in the browser session where A started.
     await get("/api/social/youtube/connect", "a", "s2");
     r = await get(`${CUSTOMER_YOUTUBE_CALLBACK_PATH}?state=${sessions.get("s2").youtubeCustomerOAuth.state}&code=c`, "b", "s2");
-    expect(r.headers.get("location")).toBe("/social-media?youtube=failed");
+    expect(r.headers.get("location")).toBe("/social-media/accounts?youtube=failed");
     // No state at all.
     r = await get(`${CUSTOMER_YOUTUBE_CALLBACK_PATH}?code=c`, "a", "s3");
-    expect(r.headers.get("location")).toBe("/social-media?youtube=failed");
+    expect(r.headers.get("location")).toBe("/social-media/accounts?youtube=failed");
     expect(calls).toHaveLength(0);
     for (const who of ["a", "b"]) expect((await customerStatus(USERS[who].id)).connected).toBe(false);
     expect((await customerStatus(USERS.a.id)).lastError?.code).toBe("state");
@@ -255,7 +255,7 @@ describe("connect", () => {
     const state = new URL(start.headers.get("location")!).searchParams.get("state")!;
     replies.push({ json: tokensFor("a") }, { json: channelFor("a") });
     const back = await get(`${CUSTOMER_YOUTUBE_CALLBACK_PATH}?state=${state}&code=the-code`, "a");
-    expect(back.headers.get("location")).toBe("/social-media?business=42&youtube=connected");
+    expect(back.headers.get("location")).toBe("/social-media/accounts?business=42&youtube=connected");
     expect(calls.map((c) => c.url.split("?")[0])).toEqual(["https://oauth2.googleapis.com/token", "https://www.googleapis.com/youtube/v3/channels"]);
     expect(calls[1].headers.Authorization).toBe("Bearer access-secret-a");
     const res = await get("/api/social/youtube/status", "a");
@@ -272,12 +272,12 @@ describe("connect", () => {
   it("says why in plain words when Google is cancelled or the account has no channel, and stores no connection", async () => {
     await get("/api/social/youtube/connect", "a");
     let r = await get(`${CUSTOMER_YOUTUBE_CALLBACK_PATH}?state=${sessions.get("s1").youtubeCustomerOAuth.state}&error=access_denied`, "a");
-    expect(r.headers.get("location")).toBe("/social-media?youtube=failed");
+    expect(r.headers.get("location")).toBe("/social-media/accounts?youtube=failed");
     expect((await customerStatus(USERS.a.id)).lastError?.message).toMatch(/cancelled/);
     await get("/api/social/youtube/connect", "a");
     replies.push({ json: tokensFor("a") }, { json: { items: [] } });
     r = await get(`${CUSTOMER_YOUTUBE_CALLBACK_PATH}?state=${sessions.get("s1").youtubeCustomerOAuth.state}&code=c`, "a");
-    expect(r.headers.get("location")).toBe("/social-media?youtube=failed");
+    expect(r.headers.get("location")).toBe("/social-media/accounts?youtube=failed");
     const s = await customerStatus(USERS.a.id);
     expect(s.connected).toBe(false);
     expect(s.lastError).toMatchObject({ code: "no_channel" });

@@ -186,42 +186,76 @@ export async function postStats(client: NativeClient, submissionId: string): Pro
 export type Comment = { id: string; text: string; author: string; at: string | null; likes: number | null; hidden: boolean; mine: boolean; canHide: boolean; canDelete: boolean; replies: Comment[] };
 const NO_TIKTOK_COMMENTS = "TikTok doesn't let apps read or answer comments; open the TikTok app for those.";
 
-export async function comments(client: NativeClient, submissionId: string): Promise<{ comments: Comment[]; note: string | null }> {
-  return cached(`${client.tenant}:comments:${submissionId}`, async () => {
+const cursor = (after?: string | null) => { if (after == null || after === "") return undefined; if (!/^[\w=+/.-]{1,400}$/.test(after)) throw new SocialError("Invalid page"); return after; };
+const nextOf = (d: any): string | null => (d?.paging?.next && typeof d?.paging?.cursors?.after === "string" ? d.paging.cursors.after : null);
+
+/** One page of a post's comments (25 at a time); `next` is the cursor for the following page, or null. */
+export async function comments(client: NativeClient, submissionId: string, after?: string | null): Promise<{ comments: Comment[]; note: string | null; next: string | null }> {
+  const page = cursor(after);
+  return cached(`${client.tenant}:comments:${submissionId}${page ? `:${page}` : ""}`, async () => {
     const { sub, row, token, api } = await published(client, submissionId);
-    if (api === "tiktok") return { comments: [], note: NO_TIKTOK_COMMENTS };
-    if (sub.stage !== "published" || !sub.external_id) return { comments: [], note: sub.stage === "deleted" ? "This post was deleted." : "Comments appear once the post is published." };
+    if (api === "tiktok") return { comments: [], note: NO_TIKTOK_COMMENTS, next: null };
+    if (sub.stage !== "published" || !sub.external_id) return { comments: [], note: sub.stage === "deleted" ? "This post was deleted." : "Comments appear once the post is published.", next: null };
     const id = sub.external_id;
     if (api === "threads") {
-      const d = await g("threads", "GET", `${id}/replies`, { fields: "id,text,username,timestamp,hide_status", reverse: true }, token);
+      const d = await g("threads", "GET", `${id}/replies`, { fields: "id,text,username,timestamp,hide_status", reverse: true, ...(page ? { after: page } : {}) }, token);
       const me = row.name.replace(/^@/, "");
-      return { note: null, comments: (d.data ?? []).map((c: any): Comment => ({ id: String(c.id), text: String(c.text ?? ""), author: String(c.username ?? ""), at: c.timestamp ?? null, likes: null,
+      return { note: null, next: nextOf(d), comments: (d.data ?? []).map((c: any): Comment => ({ id: String(c.id), text: String(c.text ?? ""), author: String(c.username ?? ""), at: c.timestamp ?? null, likes: null,
         hidden: c.hide_status === "HIDDEN", mine: c.username === me, canHide: c.username !== me, canDelete: c.username === me, replies: [] })) };
     }
     if (row.platform === "facebook") {
-      const d = await g("meta", "GET", `${id}/comments`, { fields: "id,message,from{name,id},created_time,like_count,is_hidden,can_hide,can_remove,comments{id,message,from{name,id},created_time,is_hidden,can_hide,can_remove}", order: "reverse_chronological", limit: 25 }, token);
+      const d = await g("meta", "GET", `${id}/comments`, { fields: "id,message,from{name,id},created_time,like_count,is_hidden,can_hide,can_remove,comments{id,message,from{name,id},created_time,is_hidden,can_hide,can_remove}", order: "reverse_chronological", limit: 25, ...(page ? { after: page } : {}) }, token);
       const map = (c: any): Comment => ({ id: String(c.id), text: String(c.message ?? ""), author: String(c.from?.name ?? "Facebook user"), at: c.created_time ?? null, likes: num(c.like_count),
         hidden: !!c.is_hidden, mine: c.from?.id === row.external_id, canHide: !!c.can_hide, canDelete: !!c.can_remove, replies: (c.comments?.data ?? []).map(map) });
-      return { note: null, comments: (d.data ?? []).map(map) };
+      return { note: null, next: nextOf(d), comments: (d.data ?? []).map(map) };
     }
     const host = api === "ig_login" ? "ig_login" : "meta";
-    const d = await g(host, "GET", `${id}/comments`, { fields: "id,text,username,timestamp,like_count,hidden,replies{id,text,username,timestamp,hidden}", limit: 25 }, token);
+    const d = await g(host, "GET", `${id}/comments`, { fields: "id,text,username,timestamp,like_count,hidden,replies{id,text,username,timestamp,hidden}", limit: 25, ...(page ? { after: page } : {}) }, token);
     const me = row.name.replace(/^@/, "");
     const map = (c: any): Comment => ({ id: String(c.id), text: String(c.text ?? ""), author: String(c.username ?? ""), at: c.timestamp ?? null, likes: num(c.like_count),
       hidden: !!c.hidden, mine: c.username === me, canHide: c.username !== me, canDelete: true, replies: (c.replies?.data ?? []).map(map) });
-    return { note: null, comments: (d.data ?? []).map(map) };
+    return { note: null, next: nextOf(d), comments: (d.data ?? []).map(map) };
   });
 }
 
 const commentId = (id: string) => { if (!/^[\w.-]{1,120}$/.test(id)) throw new SocialError("Invalid comment"); return id; };
 
+/**
+ * The comment must be on this post (a reply to one of its comments counts) before anything is done to it: the post's
+ * token can reach other objects too, and a stray id must never delete a post or someone else's comment.
+ * Instagram and Threads say which post a comment is on; Facebook doesn't, so its post's comments (all levels) are read.
+ */
+async function commentOnPost(api: Api, row: any, postId: string, cid: string, token: string): Promise<void> {
+  const wrong = () => new SocialError("That comment isn't on this post", 404);
+  if (api === "threads") {
+    const c = await g("threads", "GET", cid, { fields: "id,root_post" }, token).catch(() => null);
+    if (String(c?.root_post?.id ?? "") !== postId) throw wrong();
+    return;
+  }
+  if (row.platform !== "facebook") {
+    const c = await g(api === "ig_login" ? "ig_login" : "meta", "GET", cid, { fields: "id,media{id}" }, token).catch(() => null);
+    if (String(c?.media?.id ?? "") !== postId) throw wrong();
+    return;
+  }
+  let after: string | undefined;
+  for (let i = 0; i < 10; i++) {
+    const d = await g("meta", "GET", `${postId}/comments`, { fields: "id", filter: "stream", limit: 100, ...(after ? { after } : {}) }, token);
+    if ((d.data ?? []).some((c: any) => String(c?.id) === cid)) return;
+    after = nextOf(d) ?? undefined;
+    if (!after) break;
+  }
+  throw wrong();
+}
+const forgetPost = (tenant: string, submissionId: string) => { forget(`${tenant}:comments:${submissionId}`); forget(`${tenant}:post:${submissionId}`); };
+
 /** Answer a comment as the business. */
 export async function replyComment(client: NativeClient, submissionId: string, comment: string, message: string) {
   const text = message.trim();
   if (!text) throw new SocialError("Write a reply first");
-  const { row, token, api } = await published(client, submissionId);
+  const { sub, row, token, api } = await published(client, submissionId);
   const cid = commentId(comment);
   if (api === "tiktok") throw new SocialError(NO_TIKTOK_COMMENTS);
+  await commentOnPost(api, row, String(sub.external_id ?? ""), cid, token);
   if (api === "threads") {
     if (text.length > 500) throw new SocialError("Threads replies are at most 500 characters");
     const c = await g("threads", "POST", `${row.external_id}/threads`, { media_type: "TEXT", text, reply_to_id: cid }, token);
@@ -229,35 +263,36 @@ export async function replyComment(client: NativeClient, submissionId: string, c
     for (let i = 0; i < 4 && !pub; i++) {
       pub = await g("threads", "POST", `${row.external_id}/threads_publish`, { creation_id: c.id }, token).catch(async (e) => { if (i === 3) throw e; await new Promise((r) => setTimeout(r, 1500)); return null; });
     }
-    forget(`${client.tenant}:comments:${submissionId}`);
+    forgetPost(client.tenant, submissionId);
     return { id: String(pub.id) };
   }
   const d = row.platform === "facebook"
     ? await g("meta", "POST", `${cid}/comments`, { message: text }, token)
     : await g(api === "ig_login" ? "ig_login" : "meta", "POST", `${cid}/replies`, { message: text }, token);
-  forget(`${client.tenant}:comments:${submissionId}`);
+  forgetPost(client.tenant, submissionId);
   return { id: String(d.id) };
 }
 
 /** Hide or show a comment (it stays for its author; nobody else sees it). */
 export async function hideComment(client: NativeClient, submissionId: string, comment: string, hidden: boolean) {
-  const { row, token, api } = await published(client, submissionId);
+  const { sub, row, token, api } = await published(client, submissionId);
   const cid = commentId(comment);
   if (api === "tiktok") throw new SocialError(NO_TIKTOK_COMMENTS);
+  await commentOnPost(api, row, String(sub.external_id ?? ""), cid, token);
   if (api === "threads") await g("threads", "POST", `${cid}/manage_reply`, { hide: hidden }, token);
   else if (row.platform === "facebook") await g("meta", "POST", cid, { is_hidden: hidden }, token);
   else await g(api === "ig_login" ? "ig_login" : "meta", "POST", cid, { hide: hidden }, token);
-  forget(`${client.tenant}:comments:${submissionId}`);
+  forgetPost(client.tenant, submissionId);
   return { ok: true };
 }
 
 export async function deleteComment(client: NativeClient, submissionId: string, comment: string) {
-  const { row, token, api } = await published(client, submissionId);
+  const { sub, row, token, api } = await published(client, submissionId);
   const cid = commentId(comment);
   if (api === "tiktok") throw new SocialError(NO_TIKTOK_COMMENTS);
+  await commentOnPost(api, row, String(sub.external_id ?? ""), cid, token);
   await g(api === "threads" ? "threads" : api === "ig_login" ? "ig_login" : "meta", "DELETE", cid, {}, token);
-  forget(`${client.tenant}:comments:${submissionId}`);
-  void row;
+  forgetPost(client.tenant, submissionId);
   return { ok: true };
 }
 
@@ -272,6 +307,6 @@ export async function deletePost(client: NativeClient, submissionId: string): Pr
   if (!sub.external_id) throw new SocialError(`The network didn't return this post's ID; delete it on ${network}.`);
   await g(api === "threads" ? "threads" : api === "ig_login" ? "ig_login" : "meta", "DELETE", sub.external_id, {}, token);
   await pool.query("UPDATE social_native_submissions SET stage='deleted',updated_at=now() WHERE tenant=$1 AND id=$2", [client.tenant, sub.id]);
-  forget(`${client.tenant}:post:${submissionId}`); forget(`${client.tenant}:comments:${submissionId}`); forget(`${client.tenant}:acct:${row.id}`);
+  forgetPost(client.tenant, submissionId); forget(`${client.tenant}:acct:${row.id}`);
   return { network };
 }

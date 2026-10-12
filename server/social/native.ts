@@ -56,7 +56,11 @@ const appBase = () => (process.env.APP_URL || "https://constructhub.us").replace
 export const nativeRedirectUri = () => `${appBase()}/api/social/native/callback`;
 
 /** Meta Graph permissions requested (docs/social-apps/meta.md §2.2 — nothing beyond posting). */
-export const META_SCOPES = ["pages_show_list", "pages_read_engagement", "pages_manage_posts", "business_management", "instagram_basic", "instagram_content_publish"];
+// Publishing, plus what stats, comments and deleting need (server/social/insights.ts): reading and managing a Page's
+// engagement and comments, Instagram comments and insights. A saved Login-for-Business configuration
+// (SOCIAL_META_CONFIG_ID) must list the same permissions.
+export const META_SCOPES = ["pages_show_list", "pages_read_engagement", "pages_manage_posts", "pages_manage_engagement", "pages_read_user_content", "read_insights",
+  "business_management", "instagram_basic", "instagram_content_publish", "instagram_manage_comments", "instagram_manage_insights"];
 
 export const nativeDeps = { http: fetch as typeof fetch, env: () => process.env, now: () => Date.now() };
 

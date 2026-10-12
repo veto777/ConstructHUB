@@ -6,7 +6,7 @@
  *   SocialPostInsights   on a published post: likes, comments, shares, views; its comments (reply, hide, delete); delete the post
  */
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
 import { GoogleSectionHeader, GooglePill } from "@/components/google";
 import { Textarea } from "@/components/ui/textarea";
@@ -151,11 +151,15 @@ export function SocialPostInsights({ post }: { post: any }) {
 function PostComments({ base, scope, postId }: { base: string; scope: string; postId: string }) {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const list = useQuery<{ comments: Comment[]; note: string | null }>({
-    queryKey: [base, "comments"], retry: false,
-    queryFn: async () => (await apiRequest("GET", `${base}/comments${scope}`)).json(),
+  const list = useInfiniteQuery<{ comments: Comment[]; note: string | null; next: string | null }>({
+    queryKey: [base, "comments"], retry: false, initialPageParam: "",
+    getNextPageParam: (last) => last.next || undefined,
+    queryFn: async ({ pageParam }) => {
+      const sep = scope ? "&" : "?";
+      return (await apiRequest("GET", `${base}/comments${scope}${pageParam ? `${sep}after=${encodeURIComponent(String(pageParam))}` : ""}`)).json();
+    },
   });
-  const refresh = () => void qc.invalidateQueries({ queryKey: [base, "comments"] });
+  const refresh = () => { void qc.invalidateQueries({ queryKey: [base, "comments"] }); void qc.invalidateQueries({ queryKey: [base, "stats"] }); };
   const act = useMutation({
     mutationFn: async (a: { kind: "reply" | "hide" | "delete"; id: string; message?: string; hidden?: boolean }) => {
       const path = `${base}/comments/${encodeURIComponent(a.id)}`;
@@ -168,12 +172,14 @@ function PostComments({ base, scope, postId }: { base: string; scope: string; po
   });
   if (list.isLoading) return <p className="text-sm g-text-2">Loading comments…</p>;
   if (list.isError) return <p role="alert" className="text-sm g-closed">{apiErrorMessage(list.error)}</p>;
-  const all = list.data?.comments ?? [];
+  const first = list.data?.pages[0];
+  const all = list.data?.pages.flatMap((p) => p.comments) ?? [];
   return (
     <div className="space-y-2 rounded-lg border p-3" data-testid={`comments-${postId}`}>
-      {list.data?.note && <p className="text-sm g-text-2">{list.data.note}</p>}
-      {!list.data?.note && all.length === 0 && <p className="text-sm g-text-2">No comments yet.</p>}
+      {first?.note && <p className="text-sm g-text-2">{first.note}</p>}
+      {!first?.note && all.length === 0 && <p className="text-sm g-text-2">No comments yet.</p>}
       {all.map((c) => <CommentRow key={c.id} c={c} busy={act.isPending} act={(a) => act.mutate(a)} />)}
+      {list.hasNextPage && <GooglePill size="sm" label={list.isFetchingNextPage ? "Loading…" : "Load more comments"} disabled={list.isFetchingNextPage} onClick={() => void list.fetchNextPage()} testId={`button-more-comments-${postId}`} />}
     </div>
   );
 }

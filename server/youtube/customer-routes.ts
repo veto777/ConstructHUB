@@ -61,7 +61,7 @@ type GetUser = (req: any, res: any) => any;
 export type CustomerYoutubeRouteOptions = { http?: typeof fetch };
 
 export const CUSTOMER_YOUTUBE_CALLBACK_PATH = "/api/social/youtube/callback";
-export const CUSTOMER_YOUTUBE_PAGE = "/social-media";
+export const CUSTOMER_YOUTUBE_PAGE = "/social-media/accounts";
 /** The redirect URI Google must have on file for customers — built exactly like the Search Console one. */
 export const customerYoutubeRedirectUri = (req: Request): string => `${oauthBaseUrl(req)}${CUSTOMER_YOUTUBE_CALLBACK_PATH}`;
 /** Files one account may have waiting in our storage at once. */

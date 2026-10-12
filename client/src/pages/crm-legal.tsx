@@ -322,16 +322,11 @@ export function CrmPrivacyPage() {
 
       <H>7. Cookies and tracking</H>
       <P>
-        We use an essential session cookie that keeps you signed in. Our cookie banner asks before
-        anything else: if you choose <strong>Accept</strong>, we set a first-party analytics cookie
-        (<code>ch_vid</code>, a random visitor id) and record the pages you view on our own sites,
-        the referring page, your browser and device type, and a shortened IP address that shows only
-        general location. If you are signed in, those page views are also linked to your account.
-        We use it to understand how the product is used. Your answer is remembered
-        in a <code>ch_consent</code> cookie for a year; if you choose <strong>Decline</strong>, no
-        analytics cookie is set and nothing is recorded. No advertising cookies, no third-party
-        trackers, no analytics that follow you around the web. The iPhone app shows no cookie banner
-        and sets no analytics cookie: only the session cookie that keeps you signed in.
+        We use an essential session cookie that keeps you signed in. The CRM, the client portal and
+        the links we send on a Contractor's behalf (estimates, invoices, contracts, review requests
+        and forms) set no analytics cookie and record no page views. No advertising cookies, no
+        third-party trackers, no analytics that follow you around the web. The iPhone app sets only
+        the session cookie that keeps you signed in.
       </P>
 
       <H>8. Retention and your rights</H>
