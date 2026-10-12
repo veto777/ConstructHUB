@@ -13,7 +13,8 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { CheckCircle2, ExternalLink, Loader2, Trash2, Unplug, Upload, Youtube } from "lucide-react";
+import { CheckCircle2, ExternalLink, Loader2, Trash2, Unplug, Upload } from "lucide-react";
+import { FaYoutube } from "react-icons/fa6";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -41,6 +42,11 @@ type Video = {
 
 const STATUS_KEY = "/api/social/youtube/status";
 const VIDEOS_KEY = "/api/social/youtube/videos";
+
+/** The official YouTube icon in YouTube red — Google's branding guidelines ask for it, unrecoloured, wherever the YouTube API has a presence. */
+const YoutubeIcon = ({ className, ...rest }: { className?: string; "aria-hidden"?: boolean | "true" | "false" }) => (
+  <FaYoutube className={className} style={{ color: "#FF0000" }} {...rest} />
+);
 const getJson = async <T,>(url: string): Promise<T> => (await apiRequest("GET", url)).json();
 const selectClass = "h-10 w-full rounded-full border border-input bg-background px-4 text-sm";
 const MIME_BY_EXT: Record<string, string> = {
@@ -208,7 +214,7 @@ export function SocialYoutube({ businessId = null }: { businessId?: number | nul
     <GoogleSectionHeader
       title="YouTube"
       titleAfter={<HelpButton k="social-youtube" />}
-      description="Connect your own YouTube channel and publish videos to it from here."
+      description={<>Connect your own YouTube channel and publish videos to it from here.<span className="block text-xs" data-testid="text-social-youtube-powered-by">Powered by YouTube</span></>}
       actions={actions}
     />
   );
@@ -227,7 +233,7 @@ export function SocialYoutube({ businessId = null }: { businessId?: number | nul
 
   const connectLabel = status.needsReconnect ? "Reconnect YouTube" : status.connected ? "Connect a different channel" : "Connect YouTube";
   const connectPill = status.configured && (
-    <GooglePill variant={usable ? "outline" : "solid"} icon={Youtube} label={connect.isPending ? "Opening Google…" : connectLabel}
+    <GooglePill variant={usable ? "outline" : "solid"} icon={YoutubeIcon} label={connect.isPending ? "Opening Google…" : connectLabel}
       disabled={connect.isPending} onClick={() => connect.mutate()} testId="button-social-youtube-connect" />
   );
   const waiting = videos.filter((v) => v.fileAvailable && (v.state === "ready" || (v.state === "failed" && !v.videoId)));
@@ -355,7 +361,7 @@ export function SocialYoutube({ businessId = null }: { businessId?: number | nul
             </select>
           </label>
           <p className="text-xs g-text-2" data-testid="text-social-youtube-privacy-note">
-            YouTube decides the final setting. Until Google has reviewed ConstructHUB’s YouTube access, it may keep a video sent from here Private whatever you choose; the list below shows what YouTube actually set, and you can change it in YouTube Studio.
+            The setting you choose here is what YouTube applies to the video. The list below shows the privacy YouTube actually returned, and you can change it at any time in YouTube Studio.
           </p>
 
           <fieldset className="space-y-1.5">
@@ -376,7 +382,7 @@ export function SocialYoutube({ businessId = null }: { businessId?: number | nul
           </label>
 
           <div className="flex flex-wrap items-center gap-3">
-            <GooglePill type="submit" variant="solid" icon={Youtube} label={publish.isPending ? "Sending…" : "Publish to YouTube"} disabled={publish.isPending || !!blocker || limitReached} testId="button-social-youtube-publish" />
+            <GooglePill type="submit" variant="solid" icon={YoutubeIcon} label={publish.isPending ? "Sending…" : "Publish to YouTube"} disabled={publish.isPending || !!blocker || limitReached} testId="button-social-youtube-publish" />
             <span className="text-sm g-text-2" data-testid="text-social-youtube-allowance">{status.limits.usedToday} of {status.limits.perDay} videos sent today</span>
           </div>
           {blocker && <p className="text-sm g-text-2" role="status" data-testid="text-social-youtube-blocker">{blocker}</p>}
