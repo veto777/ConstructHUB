@@ -13,10 +13,12 @@ import { useSidebar } from "@/components/ui/sidebar";
 import { ToolShell, type ToolShellConfig } from "@/components/tool/shell";
 import { AllTools } from "@/components/seo-tool/layout";
 import { socialNav } from "@/components/social-tool/nav";
+import { permitsNav } from "@/components/permits-tool/nav";
 
 export type ShelledTool = { nav: () => ToolShellConfig };
 export const SHELLED_TOOLS: ShelledTool[] = [
   { nav: socialNav },
+  { nav: permitsNav },
 ];
 
 const owns = (config: ToolShellConfig, location: string) =>
