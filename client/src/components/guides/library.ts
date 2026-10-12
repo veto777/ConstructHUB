@@ -100,8 +100,8 @@ export const WALKTHROUGHS: Walkthrough[] = [
     id: "manual-posting", topic: "social", title: "Manual posting", href: "/social-media", open: "Open Social Media",
     steps: [
       "Open Social Media → Compose. Select accounts/pages and enter Post text.",
-      "Use each platform’s text tweak and character counter. Add public media URLs, attach a synced business photo, or Upload through Blotato.",
-      "For YouTube, supply a title, video and privacy choice. TikTok defaults to private; choose public explicitly and set any business/paid partnership disclosures.",
+      "Use each platform’s text tweak and character counter. Add public media URLs, attach a synced business photo, or upload a photo or video.",
+      "For YouTube, supply a title, video and privacy choice. For TikTok, choose who can view the post (there is no default), which interactions to allow, and turn on the disclosure if it promotes your business or a paid partner.",
       "Choose Post now, or enter Schedule time in your browser’s local timezone and choose Schedule post. Save draft keeps the post for approval.",
       "Open Calendar & queue. Each destination has its own status. Approve & queue a draft, or cancel before submission. Follow View published post or Open Blotato status.",
       "If status is uncertain, check the submission in Blotato before creating another post. A queued or accepted submission is not a confirmed publication.",

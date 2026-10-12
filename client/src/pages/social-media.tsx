@@ -823,7 +823,7 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
                 )}
               </label>
               <label className="block space-y-1.5">
-                <span className="text-sm font-medium">Upload through Blotato (up to 100 MB)</span>
+                <span className="text-sm font-medium">{data?.provider === "outstand" || data?.provider === "native" ? "Upload a photo or video" : "Upload through Blotato"} (up to 100 MB)</span>
                 <Input
                   aria-label="Upload media"
                   type="file"
