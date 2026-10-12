@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
@@ -36,6 +36,10 @@ export function BusinessSelector({ value, onChange, accountTotal }: { value: str
   const { data: jobs } = useQuery<any>({ queryKey: ["/api/social", "bulk", jobOffset, jobSearch], enabled: bulk, refetchInterval: 15000, queryFn: async () => (await apiRequest("GET", `/api/social/bulk?offset=${jobOffset}&search=${encodeURIComponent(jobSearch)}`)).json() });
   const mutation = useMutation({ mutationFn: async (body: any) => (await apiRequest("POST", "/api/social/bulk", body)).json(), onSuccess: () => { refreshSocial(); setRequestId(crypto.randomUUID()); toast({ title: "Bulk work queued", description: "Review each business result below." }); }, onError: (e: Error) => toast({ title: "Bulk action failed", description: e.message, variant: "destructive" }) });
   const ids = Object.keys(selected).map(Number);
+  // Owner, 2026-10-12: "i did not know you can select a company". An account with one business opens it at once;
+  // with more, each row has a visible Open button and the hint above the list says what to do.
+  const only = !search && linked === "all" && offset === 0 && data?.total === 1 && data?.items?.length === 1 ? String(data.items[0].id) : null;
+  useEffect(() => { if (!value && only) onChange(only); }, [value, only]); // eslint-disable-line react-hooks/exhaustive-deps
   function enqueue(kind: string, draft = true, enabled = true) {
     mutation.mutate({ requestId, businessIds: ids, kind, ...(kind === "post" ? { text, draft, mediaUrls: bulkMedia.split("\n").map(v => v.trim()).filter(Boolean), ...(schedule ? { scheduledTime: new Date(schedule).toISOString() } : {}) } : {}), ...(kind === "settings" ? { enabled, mode, cadences: ids.map(businessId => ({ businessId, cadence: selected[businessId].cadence, period: selected[businessId].period })) } : {}) });
   }
@@ -49,7 +53,7 @@ export function BusinessSelector({ value, onChange, accountTotal }: { value: str
     <section>
       <GoogleSectionHeader
         title="Business"
-        description={error ? "Businesses unavailable." : data ? `${data.total} businesses. Choose one to manage its accounts, posts and auto mode.` : "Loading businesses…"}
+        description={error ? "Businesses unavailable." : data ? (data.total === 1 ? "Your business. Open it to connect accounts, write posts and set auto mode." : `${data.total} businesses. Click Open on the one you want to work on.`) : "Loading businesses…"}
         actions={<>
           {value && <GooglePill size="sm" onClick={() => setExpanded(false)} label="Close switcher" />}
           <GooglePill size="sm" onClick={() => choose("all")} label="All-clients calendar" />
@@ -93,9 +97,10 @@ export function BusinessSelector({ value, onChange, accountTotal }: { value: str
                 className={value === String(b.id) ? "bg-[color:var(--g-hover)] -mx-4 px-4 sm:-mx-0 sm:px-0" : undefined}
                 title={<span className="inline-flex items-center gap-3">
                   {bulk && <input type="checkbox" aria-label={`Select ${b.business_name} for bulk`} checked={!!selected[b.id]} onChange={e => setSelected(old => { const next = { ...old }; if (e.target.checked) next[b.id] = { name: b.business_name, cadence: 1, period: "week" }; else delete next[b.id]; return next; })} />}
-                  <button type="button" className="min-h-10 rounded px-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => choose(String(b.id))} aria-current={value === String(b.id) ? "true" : undefined}>{b.business_name}</button>
+                  <button type="button" className="g-link min-h-10 rounded px-1 text-left font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => choose(String(b.id))} aria-current={value === String(b.id) ? "true" : undefined}>{b.business_name}</button>
                 </span>}
                 meta={[b.city, b.gbp_location_name ? <span key="g" className="g-open">Google linked</span> : null]}
+                trailing={<GooglePill size="sm" variant={value === String(b.id) ? "outline" : "solid"} label={value === String(b.id) ? "Open now" : "Open"} onClick={() => choose(String(b.id))} testId={`button-open-business-${b.id}`} />}
               />
             ))}
           </GoogleList>
