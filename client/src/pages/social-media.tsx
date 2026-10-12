@@ -329,6 +329,8 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
       }),
   });
   const accounts: Account[] = data?.accounts || [];
+  // A saved pick for an account that is no longer connected (e.g. after a reconnect gave it a new id) is never sent.
+  const liveDestinations = destinations.filter((d) => accounts.some((x) => x.id === d.accountId));
   const current: AutoSettings =
     settings || data?.settings || autoSchema.parse({});
   const update = (key: keyof AutoSettings, value: unknown) =>
@@ -346,7 +348,7 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
   const setupProblem = data?.setupProblem as string | null | undefined;
   const draftBlocker = error ? "Refresh Social Media to check whether posting is available." : setupProblem || (!data?.connected
     ? "Connect your social accounts above to post."
-    : !destinations.length
+    : !liveDestinations.length
       ? "Choose at least one account above."
       : !text.trim()
         ? "Write the post text."
@@ -391,7 +393,7 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
     let dispatched = false;
     try {
       const body: ComposerSubmission = submission ?? postSchema.parse({
-        requestId: crypto.randomUUID(), text, tweaks, destinations, mediaUrls: urls(),
+        requestId: crypto.randomUUID(), text, tweaks, destinations: liveDestinations, mediaUrls: urls(),
         ...(schedule ? { scheduledTime: new Date(schedule).toISOString() } : {}), draft,
       });
       // Persist synchronously BEFORE dispatch: even an immediate navigation must restore
