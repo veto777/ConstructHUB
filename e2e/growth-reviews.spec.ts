@@ -54,7 +54,7 @@ for (const width of [1440, 375]) {
     const token = await review();
     await page.setViewportSize({ width, height: 900 });
     await page.goto(`/review/${token}/unsubscribe`);
-    await expect(page.getByTestId("cookie-consent-banner")).toBeVisible();
+    await expect(page.getByTestId("cookie-consent-banner")).toHaveCount(0);
     await expect(page.getByTestId("button-submit-feedback-unsubscribe")).toBeVisible();
     await page.getByTestId("button-submit-feedback-unsubscribe").click();
     await expect(page.getByTestId("text-unsubscribed")).toBeVisible();

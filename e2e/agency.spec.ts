@@ -27,17 +27,17 @@ test('1,000 locations: server search, pagination, select all matching, queued bu
   await page.getByRole('button',{name:prefix+' 0999',exact:true}).click();await expect(page.getByTestId('text-detail-name')).toHaveText(prefix+' 0999');
 });
 test('client metadata and scoped team membership are editable in the browser',async({page})=>{
-  await page.goto('/agency');await page.getByRole('button',{name:'Clients',exact:true}).click();
+  await page.goto('/agency/clients');
   await page.getByLabel('Client name').fill('Browser client created');await page.getByLabel('Contact email').fill('new-client@example.invalid');await page.getByLabel('Client folder').fill('West');await page.getByLabel('Client tags').fill('roofing, active');await page.getByLabel('Client notes').fill('Browser fixture notes');await page.getByRole('button',{name:'Create client',exact:true}).click();
   await expect(page.getByRole('button',{name:'Edit Browser client created'})).toBeVisible();await page.getByRole('button',{name:'Edit Browser client created'}).click();await page.getByLabel('Client name').fill('Browser client edited');await page.getByRole('button',{name:'Save client',exact:true}).click();await expect(page.getByRole('button',{name:'Edit Browser client edited'})).toBeVisible();
-  await page.getByRole('button',{name:'Team',exact:true}).click();const email=(await q('SELECT email FROM users WHERE id=$1',[member]))[0].email;
+  await page.getByTestId('subnav-agency-team').click();await expect(page).toHaveURL(/\/agency\/team/);const email=(await q('SELECT email FROM users WHERE id=$1',[member]))[0].email;
   await page.getByLabel('Member email').fill(email);await page.getByLabel('Member role').selectOption('viewer');await page.getByLabel('Member client IDs').fill(String(client));await page.getByRole('button',{name:'Save member',exact:true}).click();await expect(page.getByText(email+' · viewer · '+client,{exact:false})).toBeVisible();
   expect((await q('SELECT role,all_clients FROM agency_members WHERE user_id=1 AND member_id=$1',[member]))[0]).toEqual({role:'viewer',all_clients:false});
 });
 test('client onboarding queues instructions to the connected agency email and opens a capability link without OAuth',async({page})=>{
   await q("INSERT INTO gbp_grants(user_id,google_subject,email,scopes,expires_at) VALUES(1,'agency-browser-fixture','manager@example.invalid',ARRAY['https://www.googleapis.com/auth/business.manage'],now()+interval '1 hour') ON CONFLICT DO NOTHING");
   try{
-    await page.goto('/agency');await page.getByRole('button',{name:'Onboarding',exact:true}).click();
+    await page.goto('/agency/onboarding');
     await page.getByLabel('Onboarding client').selectOption(String(client));await page.getByLabel('Agency Google account').selectOption('agency-browser-fixture');
     await page.getByLabel('Onboarding business name').fill('Onboarding browser fixture');await page.getByLabel('Onboarding Place ID').fill('browser-fixture-place');
     await page.getByRole('button',{name:'Email manager instructions'}).click();await expect(page.getByText('Email queued · browser@example.invalid → manager@example.invalid')).toBeVisible();

@@ -39,7 +39,7 @@ async function mockVoice(page: Page, seen: string[]) {
   });
 }
 
-test("the dashboard is a platform page with the main sidebar; Results open the matching calls", async ({ page }) => {
+test("the dashboard is a full-screen platform tool; Results open the matching calls", async ({ page }) => {
   const seen: string[] = [];
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -47,6 +47,8 @@ test("the dashboard is a platform page with the main sidebar; Results open the m
   await page.context().addCookies([{ name: "ch_consent", value: "denied", url: SITE }]);
   await page.goto(`${SITE}/call-assistant`);
   await expect(page.getByTestId("tabs-call-assistant")).toBeVisible({ timeout: 60_000 });
+  // Its own menu, no app sidebar (components/call-assistant-tool/nav.ts).
+  await expect(page.getByTestId("call-assistant-tool-shell")).toBeVisible();
   expect(new URL(page.url()).host).toBe(new URL(SITE).host);   // never the CRM host
   const card = page.getByTestId("card-call-results");
   await expect(card).toBeVisible({ timeout: 60_000 });
@@ -69,7 +71,7 @@ test("the dashboard is a platform page with the main sidebar; Results open the m
 
   await page.getByTestId("tile-results-lead_submitted").click();
   await expect(page.getByTestId("panel-call-assistant-calls")).toBeVisible();
-  await expect(page).toHaveURL(/tab=calls&outcome=lead_submitted/);
+  await expect(page).toHaveURL(/\/call-assistant\/calls\?outcome=lead_submitted/);
   await expect.poll(() => seen.some((u) => u.startsWith("/api/crm/voice/calls?") && u.includes("outcome=lead_submitted"))).toBe(true);
 
   await page.getByTestId("tile-results-spam").click();
@@ -81,7 +83,7 @@ test("old CRM links (bell notifications, bookmarks) land on the platform page wi
   await page.context().addCookies([{ name: "ch_consent", value: "denied", url: PORTAL }]);
   await page.goto(`${PORTAL}/crm/call-assistant?tab=calls&call=abc123`);
   // A forced-portal dev server's platform face is the same host with ?portal=0 (lib/site.ts marketingUrl).
-  await expect(page).toHaveURL(/\/call-assistant\?tab=calls&call=abc123(&portal=0)?$/, { timeout: 30_000 });
+  await expect(page).toHaveURL(/\/call-assistant\/calls\?call=abc123(&portal=0)?$/, { timeout: 30_000 });
   await expect(page).not.toHaveURL(/\/crm\//);
 });
 

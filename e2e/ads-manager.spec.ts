@@ -42,7 +42,7 @@ test.afterAll(async()=>{
   await pool.query("DELETE FROM business_locations WHERE user_id=1 AND business_name LIKE 'Ads browser scale fixture %'");await pool.end();
 });
 async function post(page:any,name:string,path:string){const response=page.waitForResponse((r:any)=>r.url().endsWith('/api/ads'+path)&&r.request().method()==='POST');await page.getByRole('button',{name,exact:true}).click();expect((await response).status()).toBe(202);}
-async function open(page:any){await page.goto('/ads-manager');const cookies=page.getByTestId('button-cookies-decline');if(await cookies.isVisible())await cookies.click();await expect(page.getByRole('heading',{name:'Agency Ads & LSA manager'})).toBeVisible();}
+async function open(page:any){await page.goto('/ads-manager');await expect(page.getByRole('heading',{name:'Agency Ads & LSA manager'})).toBeVisible();}
 test('1000 client pagination, server search/filter and bulk queue',async({page})=>{
   await open(page);await expect(page.getByText('Page 1 · 1000 results')).toBeVisible();await expect(page.getByTestId('ads-row')).toHaveCount(25);
   await page.getByRole('button',{name:'Next',exact:true}).first().click();await expect(page.getByText('Page 2 · 1000 results')).toBeVisible();
@@ -50,22 +50,22 @@ test('1000 client pagination, server search/filter and bulk queue',async({page})
   await page.getByLabel('Search accounts or records').fill('Browser agency fixture 1000');await expect(page.getByTestId('ads-row')).toHaveCount(1);
   await page.getByRole('button',{name:'Select this page'}).click();await post(page,'Queue health audit','/bulk');await expect(page.getByRole('status').filter({hasText:'Queued 1'})).toBeVisible();
   await tick();
-  await page.getByRole('button',{name:'Health audit',exact:true}).click();await expect(page.getByText('No enabled conversion actions found')).toBeVisible();await expect(page.getByRole('link',{name:'Review in Google Ads'}).first()).toBeVisible();
+  await page.getByTestId('subnav-ads-manager-findings').click();await expect(page.getByText('No enabled conversion actions found')).toBeVisible();await expect(page.getByRole('link',{name:'Review in Google Ads'}).first()).toBeVisible();
 });
 test('real preview, confirmation and worker apply/reversal with mocked Google',async({page})=>{
   await open(page);await page.getByLabel('Search accounts or records').fill(cid);await expect(page.getByTestId('ads-row')).toHaveCount(1);await page.getByRole('button',{name:'Select this page'}).click();
   await post(page,'Queue protection previews','/bulk');await expect(page.getByRole('status').filter({hasText:'Queued 1'})).toBeVisible();await tick();
-  await page.getByRole('button',{name:'Protection previews',exact:true}).click();await page.getByRole('button',{name:'Review preview',exact:true}).click();await expect(page.getByText('Browser fixture search: PRESENCE_OR_INTEREST → PRESENCE')).toBeVisible();await page.getByRole('button',{name:'Select this preview for bulk confirmation'}).click();
+  await page.getByTestId('subnav-ads-manager-plans').click();await page.getByRole('button',{name:'Review preview',exact:true}).click();await expect(page.getByText('Browser fixture search: PRESENCE_OR_INTEREST → PRESENCE')).toBeVisible();await page.getByRole('button',{name:'Select this preview for bulk confirmation'}).click();
   await expect(page.getByRole('button',{name:'Confirm selected previews'})).toBeDisabled();await page.getByLabel('I reviewed the selected previews and authorize these Google Ads changes.').check();await post(page,'Confirm selected previews','/plans/confirm');await tick();await tick();
-  await page.reload();await page.getByRole('button',{name:'Protection previews',exact:true}).click();await expect(page.getByTestId('ads-row').first()).toContainText('applied');await page.getByRole('button',{name:'Select this page'}).click();await post(page,'Preview reversal of selected applied changes','/plans/undo-preview');await tick();
+  await page.reload();await page.getByTestId('subnav-ads-manager-plans').click();await expect(page.getByTestId('ads-row').first()).toContainText('applied');await page.getByRole('button',{name:'Select this page'}).click();await post(page,'Preview reversal of selected applied changes','/plans/undo-preview');await tick();
   await page.getByLabel('Status filter').selectOption('preview');await expect(page.getByTestId('ads-row')).toHaveCount(1);await page.getByRole('button',{name:'Select this page'}).click();await page.getByLabel('I reviewed the selected previews and authorize these Google Ads changes.').check();await post(page,'Confirm selected previews','/plans/confirm');await tick();await tick();expect(stateFor(cid).campaign[0].geoTargetTypeSetting.positiveGeoTargetType).toBe('PRESENCE_OR_INTEREST');
 });
 test('bulk access invitation preview, local email sink, polling and cancellation',async({page})=>{
-  await open(page);await page.getByRole('button',{name:'Access invitations',exact:true}).click();await page.getByLabel('Client invitation list').fill('4100999999,client@example.invalid');await page.getByRole('button',{name:'Preview invitations'}).click();await expect(page.getByLabel('Invitation preview')).toContainText('Access and security');await post(page,'Confirm invitations and emails','/invitations');await tick();await tick();
-  await page.reload();await page.getByRole('button',{name:'Access invitations',exact:true}).click();await expect(page.getByTestId('ads-row').first()).toContainText('Email: sent');
+  await open(page);await page.getByTestId('subnav-ads-manager-invitations').click();await page.getByLabel('Client invitation list').fill('4100999999,client@example.invalid');await page.getByRole('button',{name:'Preview invitations'}).click();await expect(page.getByLabel('Invitation preview')).toContainText('Access and security');await post(page,'Confirm invitations and emails','/invitations');await tick();await tick();
+  await page.reload();await page.getByTestId('subnav-ads-manager-invitations').click();await expect(page.getByTestId('ads-row').first()).toContainText('Email: sent');
   await post(page,'Poll invitations','/sync');await tick();
   await page.getByRole('button',{name:'Select this page'}).click();page.once('dialog',d=>d.accept());await post(page,'Cancel selected pending invitations','/invitations/cancel');await tick();
-  await page.reload();await page.getByRole('button',{name:'Access invitations',exact:true}).click();await expect(page.getByTestId('ads-row').first()).toContainText('cancelled');
+  await page.reload();await page.getByTestId('subnav-ads-manager-invitations').click();await expect(page.getByTestId('ads-row').first()).toContainText('cancelled');
 });
 
 test('editable negatives, account placements, schedules and mapped Click Guard IPs all require previews',async({page})=>{
@@ -74,12 +74,12 @@ test('editable negatives, account placements, schedules and mapped Click Guard I
   const saved=page.waitForResponse(r=>r.url().endsWith('/api/ads/domain-mappings')&&r.request().method()==='POST');
   await page.getByRole('button',{name:'Save domain mappings'}).click();expect((await saved).status()).toBe(200);
   for(const kind of ['negative','placement','schedule','ip']) {
-    await page.getByRole('button',{name:'Client accounts',exact:true}).click();await page.getByLabel('Search accounts or records').fill(cid);await expect(page.getByTestId('ads-row')).toHaveCount(1);await page.getByRole('button',{name:'Select this page'}).click();
+    await page.getByTestId('subnav-ads-manager-accounts').click();await page.getByLabel('Search accounts or records').fill(cid);await expect(page.getByTestId('ads-row')).toHaveCount(1);await page.getByRole('button',{name:'Select this page'}).click();
     await page.getByLabel('Protection',{exact:true}).selectOption(kind);
     if(kind==='negative')await page.getByLabel('Negative keywords').fill('careers\njobs');
     if(kind==='placement')await page.getByLabel('Excluded placements').fill('example.invalid');
     await post(page,'Queue protection previews','/bulk');await tick();
-    await page.getByRole('button',{name:'Protection previews',exact:true}).click();await page.getByLabel('Status filter').selectOption('preview');await expect(page.getByTestId('ads-row')).toHaveCount(1);
+    await page.getByTestId('subnav-ads-manager-plans').click();await page.getByLabel('Status filter').selectOption('preview');await expect(page.getByTestId('ads-row')).toHaveCount(1);
     await page.getByRole('button',{name:'Review preview',exact:true}).click();await expect(page.getByRole('dialog')).toContainText(kind==='ip'?'203.0.113.77':kind==='placement'?'example.invalid':kind==='negative'?'careers':'MONDAY');await page.getByRole('button',{name:'Select this preview for bulk confirmation'}).click();
     await page.getByLabel('I reviewed the selected previews and authorize these Google Ads changes.').check();await post(page,'Confirm selected previews','/plans/confirm');await tick();await tick();
     const latest=(await pool.query('SELECT status FROM ads_plans WHERE user_id=1 AND customer_id=$1 AND kind=$2 ORDER BY created_at DESC LIMIT 1',[cid,kind])).rows[0];expect(latest.status).toBe('applied');

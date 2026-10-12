@@ -1,5 +1,22 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { autoSchema } from "../shared/social";
+
+/**
+ * Social Media is a full-screen tool (components/social-tool/nav.ts): each view is its own route and the menu is the
+ * rail on wide screens and the top tabs on phones. The business switcher is in the tool bar; its "Business list…" /
+ * "All … businesses and bulk actions…" choice (?pick=1) shows the full list with its pills.
+ */
+async function openView(page: Page, key: "overview" | "calendar" | "compose" | "posts" | "analytics" | "inbox" | "accounts" | "auto" | "guides") {
+  const rail = page.getByTestId(`tool-rail-${key}`);
+  if (await rail.isVisible()) await rail.click();
+  else await page.getByTestId(`tool-tab-${key}`).click();
+  await expect(page).toHaveURL(new RegExp(`/social-media${key === "overview" ? "" : `/${key}`}(\\?|$)`));
+}
+const businessSwitch = (page: Page) => page.getByTestId("social-business-switch").locator("select");
+async function businessList(page: Page) {
+  await businessSwitch(page).selectOption("__pick");
+  await expect(page).toHaveURL(/pick=1/);
+}
 
 for (const draft of [false, true]) {
 test(`lost ${draft ? "draft" : "post"} response survives navigation and reload with one post per destination`, async ({ page }, testInfo) => {
@@ -30,7 +47,7 @@ test(`lost ${draft ? "draft" : "post"} response survives navigation and reload w
     if (path === "/api/social/youtube/status") return route.fulfill({ json: YT_STATUS });
     return route.fulfill({ json: [] });
   });
-  await page.goto("/social-media?business=1");
+  await page.goto("/social-media/compose?business=1");
   await page.getByLabel("Post text", { exact: true }).fill("Recovery fixture update");
   await page.getByLabel("threads text tweak", { exact: true }).fill("Threads recovery fixture");
   await page.getByLabel("Public media URLs", { exact: true }).fill("https://example.com/recovery.jpg");
@@ -56,8 +73,9 @@ test(`lost ${draft ? "draft" : "post"} response survives navigation and reload w
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.screenshot({ path: testInfo.outputPath("submission-recovery-desktop.png"), fullPage: true });
   await retry.click();
-  await expect(page.getByRole("heading", { name: /Calendar & queue/ })).toBeVisible();
-  await page.getByRole("button", { name: "Compose", exact: true }).click();
+  await expect(page).toHaveURL(/\/social-media\/posts\?business=1/);
+  await expect(page.getByRole("heading", { level: 1, name: "Posts" })).toBeVisible();
+  await openView(page, "compose");
   await expect(retry).toHaveCount(0);
   await expect(page.getByLabel("Post text", { exact: true })).toHaveValue("");
   expect(requests).toHaveLength(2);
@@ -78,7 +96,7 @@ test("switching account in place resets composer and restores only that account'
     if (path === "/api/social/youtube/status") return route.fulfill({ json: YT_STATUS });
     return route.fulfill({ json: [] });
   });
-  await page.goto("/social-media?business=1");
+  await page.goto("/social-media/compose?business=1");
   const text = page.getByLabel("Post text", { exact: true });
   await text.fill("Original account draft");
   const original = await page.evaluate(async () => {
@@ -120,7 +138,7 @@ test("validation rejection keeps the composer editable for a corrected new reque
     if (path === "/api/social/youtube/status") return route.fulfill({ json: YT_STATUS });
     return route.fulfill({ json: [] });
   });
-  await page.goto("/social-media?business=1");
+  await page.goto("/social-media/compose?business=1");
   const text = page.getByLabel("Post text", { exact: true });
   await text.fill("x".repeat(281));
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
@@ -231,9 +249,9 @@ test("connect, compose, schedule, approve an AI draft, configure automatic mode,
       body: JSON.stringify(result),
     });
   });
-  await page.goto("/social-media?business=1");
+  await page.goto("/social-media/accounts?business=1");
   await expect(
-    page.getByRole("heading", { name: "Social Media", exact: true }),
+    page.getByRole("heading", { level: 1, name: "Accounts", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByText("Blotato is a separate subscription you buy from Blotato.", {
@@ -245,6 +263,7 @@ test("connect, compose, schedule, approve an AI draft, configure automatic mode,
     .getByRole("button", { name: "Connect Blotato", exact: true })
     .click();
   await expect(page.getByLabel("Blotato API key")).toHaveValue("");
+  await openView(page, "compose");
   await page.locator("fieldset")
     .getByRole("checkbox", { name: "Fixture business · twitter" })
     .check();
@@ -270,7 +289,7 @@ test("connect, compose, schedule, approve an AI draft, configure automatic mode,
     page.getByText("Short fixture update", { exact: true }),
   ).toBeVisible();
   // Scheduling clears the composer (the toast says so); pick the account again for auto mode.
-  await page.getByRole("button", { name: "Compose", exact: true }).click();
+  await openView(page, "compose");
   await page.locator("fieldset")
     .getByRole("checkbox", { name: "Fixture business · twitter" })
     .check();
@@ -278,7 +297,7 @@ test("connect, compose, schedule, approve an AI draft, configure automatic mode,
   expect(post.destinations[0].accountId).toBe("fixture-x");
   expect(post.mediaUrls).toEqual(["https://example.com/fixture.jpg", "https://example.com/uploaded-fixture.jpg"]);
   expect(post.scheduledTime).toContain("2030-10-05");
-  await page.getByRole("button", { name: "Auto mode", exact: true }).click();
+  await openView(page, "auto");
   await page
     .getByRole("button", { name: "Use accounts selected in Compose" })
     .click();
@@ -289,7 +308,7 @@ test("connect, compose, schedule, approve an AI draft, configure automatic mode,
   await page
     .getByRole("button", { name: "Generate draft from saved settings" })
     .click();
-  await page.getByRole("button", { name: "Calendar & queue" }).click();
+  await openView(page, "posts");
   await expect(
     page.getByText("AI-generated draft", { exact: true }),
   ).toBeVisible();
@@ -298,11 +317,12 @@ test("connect, compose, schedule, approve an AI draft, configure automatic mode,
   await expect(
     page.getByText("Reviewed AI fixture", { exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Auto mode", exact: true }).click();
+  await openView(page, "auto");
   await page.getByLabel("Publishing mode").selectOption("automatic");
   await page.getByLabel("Daily AI budget").fill("2");
   await page.getByRole("button", { name: "Save auto settings" }).click();
   await expect.poll(() => state.settings.mode).toBe("automatic");
+  await openView(page, "accounts");
   await page.getByRole("button", { name: "Disconnect", exact: true }).click();
   await expect(page.getByText("Not connected", { exact: true })).toBeVisible();
   await page.goto("/guides");
@@ -335,7 +355,8 @@ test("guides match shipped approval controls and link to every walkthrough", asy
     await expect(main.getByText(text, { exact: false }).first()).toBeVisible();
   await expect(main).not.toContainText("labels may vary");
   await main.getByRole("link", { name: "Open Site Scan", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Site Scan", exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/site-scan(\?|$)/);
+  await expect(page.getByRole("heading", { level: 1, name: "New scan", exact: true })).toBeVisible();
 });
 
 test("growth tools remain discoverable with Google Business collapsed", async ({ page }) => {
@@ -353,8 +374,8 @@ test("social tabs and guides fit a narrow phone viewport", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.route("**/api/social**", route => { const path=new URL(route.request().url()).pathname; return route.fulfill({json:path==='/api/social/businesses'?{items:[{id:1,business_name:'Fixture business'}],total:1}:path==='/api/social/accounts'?{items:[],hasMore:false}:path==='/api/social'?{ connected: false, accounts: [], settings: autoSchema.parse({}), posts: [],defaults:[] }:path==='/api/social/youtube/status'?{ configured:false, connected:false, needsReconnect:false, channel:null, connectedAt:null, lastError:null, limits:{ perDay:3, usedToday:0, sharedLimitReached:false, maxBytes:1, maxWaitingFiles:1, fileTypes:[] } } : []}); });
   await page.goto("/social-media?business=1");
-  for (const name of ["Compose", "Calendar & queue", "Auto mode", "Guides"]) {
-    await page.getByRole("button", { name, exact: true }).click();
+  for (const key of ["compose", "posts", "auto", "guides"] as const) {
+    await openView(page, key);
     const overflowing = await page.locator("main button, main input, main select").evaluateAll(elements => elements.filter(e => { if (e.closest(".tool-tabs__scroll")) return false; const r = e.getBoundingClientRect(); return r.width > 0 && r.right > window.innerWidth + 1; }).map(e => e.textContent || e.getAttribute("aria-label")));
     expect(overflowing).toEqual([]);
   }
@@ -375,8 +396,7 @@ test("unsaved draft edits survive status-filter, tab and business-switch round t
     if (path === "/api/social/youtube/status") return route.fulfill({ json: YT_STATUS });
     return route.fulfill({ json: [] });
   });
-  await page.goto("/social-media?business=1");
-  await page.getByRole("button", { name: "Calendar & queue", exact: true }).click();
+  await page.goto("/social-media/posts?business=1");
   const edit = page.getByLabel(/^Edit draft for /);
   await edit.fill("Edited marker text");
   // The row unmounts and remounts on each of these; the edit must not die with it.
@@ -384,14 +404,17 @@ test("unsaved draft edits survive status-filter, tab and business-switch round t
   await expect(edit).toHaveCount(0);
   await page.getByLabel("Post status filter", { exact: true }).selectOption("");
   await expect(edit).toHaveValue("Edited marker text");
-  await page.getByRole("button", { name: "Auto mode", exact: true }).click();
-  await page.getByRole("button", { name: "Calendar & queue", exact: true }).click();
+  await openView(page, "auto");
+  await openView(page, "posts");
   await expect(edit).toHaveValue("Edited marker text");
-  await page.getByRole("button", { name: "Change business / bulk actions", exact: true }).click();
+  await businessList(page);
   await page.getByRole("button", { name: "All-clients calendar", exact: true }).click();
-  await page.getByRole("button", { name: "Change business / bulk actions", exact: true }).click();
-  await page.getByRole("button", { name: "Fixture business", exact: true }).click();
-  await page.getByRole("button", { name: "Calendar & queue", exact: true }).click();
+  await expect(page).toHaveURL(/business=all/);
+  // One business: the bar's menu has no other entry to pick, so go back through the list's Open button.
+  await businessList(page);
+  await page.getByTestId("button-open-business-1").click();
+  await expect(page).toHaveURL(/business=1/);
+  await openView(page, "posts");
   await expect(edit).toHaveValue("Edited marker text");
   // Discard returns to the saved text.
   await page.getByTestId(`button-post-discard-${draft.id}`).click();
@@ -407,7 +430,7 @@ test("'How it works' opens the standalone social guides from all-clients mode", 
     return route.fulfill({ json: [] });
   });
   await page.goto("/social-media?business=all");
-  await page.getByRole("heading", { name: /^All-clients calendar/ }).waitFor();
+  await page.getByRole("heading", { name: /^All clients/ }).waitFor();
   await page.getByRole("link", { name: "How it works", exact: true }).click();
   await expect(page).toHaveURL(/\/guides\?topic=social$/);
   await expect(page.getByRole("region", { name: "Guides walkthroughs" })).toBeVisible();
@@ -488,16 +511,18 @@ test('agency searches 1,000 saved businesses, remembers URL scope, isolates sour
     await page.getByLabel('Search businesses',{exact:true}).fill(`${marker} 0001`);
     await page.getByRole('button',{name:`${a.business_name} · Fixture city`,exact:true}).click();
     await expect(page).toHaveURL(new RegExp(`business=${a.id}`));
-    await page.getByRole('button',{name:'Auto mode',exact:true}).click();
+    await openView(page,'auto');
     await page.getByLabel('Source text',{exact:true}).fill('Business A private fixture source');
     await page.getByRole('button',{name:'Add content source',exact:true}).click();
     await expect(page.getByText('offers: Business A private fixture source',{exact:true})).toBeVisible();
     await page.reload();
     await expect(page).toHaveURL(new RegExp(`business=${a.id}`));
     await expect(page.getByText('offers: Business A private fixture source',{exact:true})).toBeVisible();
+    await businessList(page);
     await page.getByLabel('Search businesses',{exact:true}).fill(`${marker} 0002`);
     await page.getByRole('button',{name:`${b.business_name} · Fixture city`,exact:true}).click();
     await expect(page.getByText('offers: Business A private fixture source',{exact:true})).toHaveCount(0);
+    await businessList(page);
     await page.getByRole('button',{name:'Bulk actions (0)',exact:true}).click();
     await page.getByRole('checkbox',{name:`Select ${b.business_name} for bulk`,exact:true}).check();
     await page.getByLabel('Search businesses',{exact:true}).fill(`${marker} 0001`);
@@ -511,7 +536,7 @@ test('agency searches 1,000 saved businesses, remembers URL scope, isolates sour
     await expect(page).toHaveURL(/business=all/);
     await expect(page.getByLabel('Search calendar',{exact:true})).toBeVisible();
     await page.getByLabel('Post status filter',{exact:true}).selectOption('draft');
-    await expect(page.getByRole('heading',{name:'All-clients calendar',exact:true})).toBeVisible();
+    await expect(page.getByRole('heading',{name:/^All clients/})).toBeVisible();
   } finally {
     await db.query('DELETE FROM business_locations WHERE user_id=1 AND id=ANY($1)',[rows.map(r=>r.id)]);
     await db.end();
@@ -528,11 +553,10 @@ test("row edits and a new composition survive How it works, browser Back and bus
     if (path === "/api/social/youtube/status") return route.fulfill({ json: YT_STATUS });
     return route.fulfill({ json: [] });
   });
-  await page.goto("/social-media?business=1");
-  await page.getByRole("button", { name: "Calendar & queue", exact: true }).click();
+  await page.goto("/social-media/posts?business=1");
   const edit = page.getByLabel(/^Edit draft for /);
   await edit.fill("Surviving row edit");
-  await page.getByRole("button", { name: "Compose", exact: true }).click();
+  await openView(page, "compose");
   await page.getByLabel("Post text", { exact: true }).fill("Surviving composition");
   await page.getByLabel("Public media URLs", { exact: true }).fill("https://example.com/survives.jpg");
   await page.getByLabel("Schedule time", { exact: true }).fill("2030-10-05T10:00");
@@ -540,21 +564,19 @@ test("row edits and a new composition survive How it works, browser Back and bus
   await page.getByRole("link", { name: "How it works", exact: true }).click();
   await expect(page).toHaveURL(/\/guides\?topic=social$/);
   await page.goBack();
-  await expect(page).toHaveURL(/\/social-media\?business=1/);
-  await page.getByRole("button", { name: "Calendar & queue", exact: true }).click();
+  await expect(page).toHaveURL(/\/social-media\/compose\?business=1/);
+  await openView(page, "posts");
   await expect(edit).toHaveValue("Surviving row edit");
-  await page.getByRole("button", { name: "Compose", exact: true }).click();
+  await openView(page, "compose");
   await expect(page.getByLabel("Post text", { exact: true })).toHaveValue("Surviving composition");
   await expect(page.getByLabel("Public media URLs", { exact: true })).toHaveValue("https://example.com/survives.jpg");
   await expect(page.getByLabel("Schedule time", { exact: true })).toHaveValue("2030-10-05T10:00");
   // Switching business and coming back restores the per-business composer draft.
-  await page.getByRole("button", { name: "Change business / bulk actions", exact: true }).click();
-  await page.getByRole("button", { name: "Second business", exact: true }).click();
+  await businessSwitch(page).selectOption("2");
   await expect(page).toHaveURL(/business=2/);
-  await page.getByRole("button", { name: "Change business / bulk actions", exact: true }).click();
-  await page.getByRole("button", { name: "Fixture business", exact: true }).click();
+  await businessSwitch(page).selectOption("1");
   await expect(page).toHaveURL(/business=1/);
-  await page.getByRole("button", { name: "Compose", exact: true }).click();
+  await openView(page, "compose");
   await expect(page.getByLabel("Post text", { exact: true })).toHaveValue("Surviving composition");
 });
 

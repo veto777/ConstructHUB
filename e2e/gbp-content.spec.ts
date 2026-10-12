@@ -11,9 +11,6 @@ test.beforeAll(async () => {
 test.afterAll(async () => { await db.query('DELETE FROM business_locations WHERE id=$1', [location]); await db.end(); });
 test('real API: compose a cadence batch, schedule, reload and cancel', async ({ page }) => {
     await page.goto('/gbp-content');
-    const decline = page.getByTestId('button-cookies-decline');
-    if (await decline.isVisible())
-        await decline.click();
     await page.getByLabel('Location', { exact: true }).selectOption(String(location));
     await expect(page.getByText('Publishing worker is disabled.', { exact: false })).toBeVisible();
     await page.getByLabel('Post draft').fill('Fixture update one — browser test');

@@ -18,10 +18,10 @@ test('connection, sync errors, draft versus confirmed reply and deletion',async(
     return r.fulfill({json:{items:[{id:456,locationId:987,googleReviewId:'accounts/fixture/locations/fixture/reviews/review1',reviewerName:'Fixture Customer',rating:5,comment:'Fixture review',reviewDate:'2026-09-01T00:00:00Z',replyComment:posted?'Thank you':null,replyStatus:posted?'posted':'draft',replyDraft:draft}],total:1,unanswered:posted?0:1,average:5,distribution:{5:1}}});
   });
   await page.route('**/api/gbp/locations/987/sync',r=>{syncs++;lastError=syncs===1?'Enable Google My Business API in Google Cloud':'';return r.fulfill({json:lastError?{reviews:{kind:'disabled',message:lastError}}:{reviews:{count:1}}})});
-  await page.goto('/google-reviews');await page.getByTestId('button-cookies-decline').click();await page.getByRole('tab',{name:/Profile Reviews/i}).click();
+  await page.goto('/google-reviews/reviews');
   await expect(page.getByText('Never synced',{exact:false})).toBeVisible();
   await page.getByTestId('button-reply-456').click();await page.getByTestId('input-reply-456').fill('Thank you');await page.getByRole('button',{name:'Save draft in ConstructHUB'}).click();await expect(page.getByText('Draft saved in ConstructHUB: Thank you')).toBeVisible();await expect(page.getByText('Posted on Google:')).toHaveCount(0);
-  connected=true;await page.reload();await page.getByRole('tab',{name:/Profile Reviews/i}).click();await expect(page.getByTestId('gbp-account').filter({hasText:'fixture@example.invalid'})).toContainText('Connected');
+  connected=true;await page.reload();await expect(page.getByTestId('gbp-account').filter({hasText:'fixture@example.invalid'})).toContainText('Connected');
   await page.getByRole('button',{name:'Sync now'}).click();await expect(page.getByText('Enable Google My Business API in Google Cloud',{exact:false}).first()).toBeVisible();
   await page.getByTestId('button-reply-456').click();await page.getByRole('button',{name:'Publish reply to Google'}).click();await expect(page.getByText('Posted on Google:')).toBeVisible();await page.getByTestId('button-delete-reply-456').click();await expect(page.getByText('Posted on Google:')).toHaveCount(0);
 });
