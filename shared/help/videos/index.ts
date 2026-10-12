@@ -105,6 +105,7 @@ export { default as v_crm_team_roles } from "./crm-team-roles.json";
 export { default as v_database_directory } from "./database-directory.json";
 export { default as v_intro_ads_manager } from "./intro-ads-manager.json";
 export { default as v_intro_agency } from "./intro-agency.json";
+export { default as v_intro_call_assistant } from "./intro-call-assistant.json";
 export { default as v_intro_click_guard } from "./intro-click-guard.json";
 export { default as v_intro_cloudflare } from "./intro-cloudflare.json";
 export { default as v_intro_competitors } from "./intro-competitors.json";
