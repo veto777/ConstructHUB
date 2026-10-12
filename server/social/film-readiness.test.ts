@@ -37,8 +37,11 @@ describe("film readiness", () => {
   it("wires both submit controls to one upfront setup notice and its reason", () => {
     const page = source("../../client/src/pages/social-media.tsx");
     expect(page.match(/testId="alert-social-setup"/g)).toHaveLength(1);
-    expect(page.match(/disabled=\{!!postBlocker \|\| mutation.isPending\}/g)).toHaveLength(2);
-    expect(page.match(/title=\{postBlocker \|\| undefined\}/g)).toHaveLength(2);
+    // Post now / Schedule: every blocker, TikTok's rules included; Save draft: all but TikTok's (a draft isn't posted).
+    expect(page.match(/disabled=\{!!postBlocker \|\| mutation.isPending\}/g)).toHaveLength(1);
+    expect(page.match(/title=\{postBlocker \|\| undefined\}/g)).toHaveLength(1);
+    expect(page.match(/disabled=\{!!draftBlocker \|\| mutation.isPending\}/g)).toHaveLength(1);
+    expect(page).toContain("const postBlocker = draftBlocker || tiktokBlocker;");
     expect(page).toContain('aria-describedby={setupProblem ? "social-setup-reason" : undefined}');
     expect(page).toContain("{postBlocker && !setupProblem && (");
   });

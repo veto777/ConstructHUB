@@ -91,7 +91,10 @@ export const socialWriteOpenapi = {
           accountId: { type: "string" }, platform: { type: "string", enum: ["twitter", "facebook", "instagram", "linkedin", "threads", "bluesky", "tiktok", "youtube", "pinterest"] },
           pageId: { type: "string" }, boardId: { type: "string" }, title: { type: "string", maxLength: 100 },
           privacy: { type: "string", enum: ["public", "private", "unlisted"], default: "private" },
-          tiktokPublic: { type: "boolean", default: false }, isBrandedContent: { type: "boolean", default: false }, isYourBrand: { type: "boolean", default: false },
+          tiktokPrivacy: { type: "string", enum: ["", "PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "FOLLOWER_OF_CREATOR", "SELF_ONLY"], default: "", description: "TikTok: who can view. Required to post (not for drafts); must be one the creator offers" },
+          allowComment: { type: "boolean", default: false }, allowDuet: { type: "boolean", default: false }, allowStitch: { type: "boolean", default: false },
+          isBrandedContent: { type: "boolean", default: false }, isYourBrand: { type: "boolean", default: false },
+          tiktokPublic: { type: "boolean", deprecated: true, description: "Deprecated: use tiktokPrivacy" },
         },
       },
       SocialPostInput: {

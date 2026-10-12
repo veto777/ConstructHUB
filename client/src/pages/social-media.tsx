@@ -33,6 +33,7 @@ import { useLocation } from "wouter";
 import { ToolBarSlot } from "@/components/tool/shell";
 import { socialHref, socialViewOf, type SocialView } from "@/components/social-tool/nav";
 import { NetworkIcon, SocialWeek } from "@/components/social-week";
+import { TikTokDeclaration, TikTokPanel } from "@/components/social-tiktok";
 
 // Google's rounded field shape for the native selects (the surface supplies the hairline colour).
 const selectClass = "h-10 w-full rounded-full border border-input bg-background px-4 text-sm";
@@ -57,6 +58,13 @@ function settingsProblem(settings: unknown): string {
     settingsMessages[String(issue.path[0] ?? "")] ??
     (issue.message || "Check the auto mode settings.")
   );
+}
+/**
+ * TikTok's old "Publish publicly" checkbox (tiktokPublic) is not carried into the composer: TikTok requires the
+ * customer to choose who can view each post, with no default. Stored settings still honour it server-side.
+ */
+function withoutLegacyTikTok(ds: Destination[]): Destination[] {
+  return ds.map(({ tiktokPublic, ...d }) => ({ ...d, tiktokPrivacy: d.tiktokPrivacy ?? "", allowComment: !!d.allowComment, allowDuet: !!d.allowDuet, allowStitch: !!d.allowStitch }) as Destination);
 }
 // Number inputs keep "" while cleared instead of turning into 0.
 const numberInput = (value: string) =>
@@ -242,7 +250,8 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
   // Which section the view shows; the all-clients view has only the calendar and the posts.
   const [, navigate] = useLocation();
   const VIEW_TAB: Record<SocialView, string> = { overview: "overview", calendar: "calendar", compose: "compose", posts: "queue", analytics: "queue", inbox: "queue", accounts: "accounts", auto: "auto", guides: "guides" };
-  const tab = all ? (view === "calendar" ? "calendar" : "queue") : VIEW_TAB[view];
+  // All clients: the calendar, posts, inbox and analytics lists and the guides cover every business; the rest need one.
+  const tab = all ? (view === "calendar" ? "calendar" : view === "guides" ? "guides" : ["posts", "inbox", "analytics"].includes(view) ? "queue" : "one-business") : VIEW_TAB[view];
   const setTab = (v: string) => navigate(socialHref(v === "queue" ? "posts" : (v as SocialView), all ? "all" : String(businessId)));
   // Posts: the menu's All / Drafts / Scheduled / Published / Failed is ?state=; Inbox and Analytics list published posts.
   const [stateParam] = useUrlParam("state");
@@ -263,7 +272,7 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
   const [apiKey, setKey] = useState(""),
     [text, setText] = useState(initialDraft?.text ?? ""),
     [tweaks, setTweaks] = useState<Record<string, string>>(initialDraft?.tweaks ?? {});
-  const [destinations, setDestinations] = useState<Destination[]>(initialDraft?.destinations ?? []),
+  const [destinations, setDestinations] = useState<Destination[]>(() => withoutLegacyTikTok(initialDraft?.destinations ?? [])),
     [mediaText, setMediaText] = useState(initialDraft?.mediaText ?? ""),
     [schedule, setSchedule] = useState(initialDraft?.schedule ?? "");
   // Set when a stored draft (or a user pick) is in play: the saved mapping must not clobber it.
@@ -279,7 +288,9 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
   const [sourceKind, setSourceKind] = useState("offers"),
     [sourceText, setSourceText] = useState("");
   const [uploading, setUploading] = useState(false);
-  useEffect(() => { if (restoredRef.current) return; setDestinations(data?.defaults || []); }, [JSON.stringify(data?.defaults)]);
+  useEffect(() => { if (restoredRef.current) return; setDestinations(withoutLegacyTikTok(data?.defaults || [])); }, [JSON.stringify(data?.defaults)]);
+  // What each TikTok panel says still stops posting (components/social-tiktok.tsx), by account id.
+  const [tiktokProblems, setTiktokProblems] = useState<Record<string, string>>({});
   const mutation = useMutation({
     mutationFn: async ({
       path,
@@ -336,7 +347,7 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
     : "";
   // Why Post now / Save draft are disabled, in the order the user can fix it.
   const setupProblem = data?.setupProblem as string | null | undefined;
-  const postBlocker = error ? "Refresh Social Media to check whether posting is available." : setupProblem || (!data?.connected
+  const draftBlocker = error ? "Refresh Social Media to check whether posting is available." : setupProblem || (!data?.connected
     ? (data?.outstand || data?.native ? "Connect your social accounts above to post." : "Connect Blotato above to post.")
     : !destinations.length
       ? "Choose at least one account above."
@@ -345,6 +356,10 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
         : uploading
           ? "Wait for the upload to finish."
           : mediaProblem);
+  // TikTok's own rules (who can view, disclosure, the creator's limits) stop Post / Schedule; a draft can wait for them.
+  const tiktokShown = destinations.filter((d) => d.platform === "tiktok" && accounts.some((a) => a.id === d.accountId));
+  const tiktokBlocker = tiktokShown.map((d) => tiktokProblems[d.accountId] ?? "TikTok: loading your account details…").find(Boolean) ?? "";
+  const postBlocker = draftBlocker || tiktokBlocker;
   function choose(a: Account, checked: boolean) {
     restoredRef.current = true;
     setDestinations((ds) =>
@@ -355,7 +370,11 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
               accountId: a.id,
               platform: a.platform,
               privacy: "private",
-              tiktokPublic: false,
+              // TikTok: nothing pre-chosen (Content Sharing Guidelines) — the panel asks for each.
+              tiktokPrivacy: "",
+              allowComment: false,
+              allowDuet: false,
+              allowStitch: false,
               isBrandedContent: false,
               isYourBrand: false,
             },
@@ -398,7 +417,7 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
       setTweaks({});
       setMediaText("");
       setSchedule("");
-      setDestinations(data?.defaults || []);
+      setDestinations(withoutLegacyTikTok(data?.defaults || []));
       const count = body.destinations.length;
       const when = body.scheduledTime ? new Date(body.scheduledTime) : null;
       toast({
@@ -507,6 +526,11 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
 
       {!all && tab === "overview" && <SocialOverview business={String(businessId)} businessId={businessId} accounts={accounts} />}
       {!all && tab === "overview" && <SocialWeek businessId={businessId} all={false} business={String(businessId)} />}
+      {tab === "one-business" && (
+        <Notice tone="info" title="Choose one business" testId="notice-social-one-business">
+          {view === "compose" ? "Posts are written for one business at a time." : view === "auto" ? "Auto mode is set for each business." : view === "accounts" ? "Accounts are connected for each business." : "This view is for one business at a time."} Pick it in the Business menu above.
+        </Notice>
+      )}
       {tab === "calendar" && <SocialWeek full businessId={businessId} all={all} business={all ? "all" : String(businessId)} />}
       {!all && tab === "accounts" && data?.native && (
         <SocialConnect via="native" businessId={businessId} networks={data.native.networks} accounts={data?.provider === "native" ? accounts : []} connected={data?.provider === "native" && !!data?.connected} />
@@ -703,29 +727,16 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
                           </label>
                         )}
                         {a.platform === "tiktok" && (
-                          <div className="flex flex-wrap gap-4">
-                            {[
-                              [
-                                "tiktokPublic",
-                                "Publish publicly (otherwise private)",
-                              ],
-                              ["isBrandedContent", "Paid brand partnership"],
-                              ["isYourBrand", "Promotes my business"],
-                            ].map(([key, label]) => (
-                              <label key={key} className="flex items-center gap-1.5 text-sm">
-                                <input
-                                  type="checkbox"
-                                  checked={!!(d as any)[key]}
-                                  onChange={(e) =>
-                                    patchDestination(a.id, {
-                                      [key]: e.target.checked,
-                                    })
-                                  }
-                                />{" "}
-                                {label}
-                              </label>
-                            ))}
-                          </div>
+                          <TikTokPanel
+                            accountId={a.id}
+                            accountName={a.name}
+                            d={d}
+                            media={badMedia.length ? [] : urls()}
+                            native={data?.provider === "native"}
+                            businessId={businessId}
+                            onChange={(patch) => patchDestination(a.id, patch)}
+                            onProblem={(problem) => setTiktokProblems((old) => (old[a.id] === problem ? old : { ...old, [a.id]: problem }))}
+                          />
                         )}
                       </div>
                     )}
@@ -840,17 +851,19 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
                 onChange={(e) => setSchedule(e.target.value)}
               />
             </label>
+            {tiktokShown.length > 0 && <TikTokDeclaration branded={tiktokShown.some((d) => d.isBrandedContent)} />}
             <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Save or publish post" aria-describedby={setupProblem ? "social-setup-reason" : undefined}>
               <GooglePill
                 variant="solid"
+                testId="button-post-now"
                 disabled={!!postBlocker || mutation.isPending}
                 title={postBlocker || undefined}
                 onClick={() => void submit(false)}
                 label={schedule ? "Schedule post" : "Post now"}
               />
               <GooglePill
-                disabled={!!postBlocker || mutation.isPending}
-                title={postBlocker || undefined}
+                disabled={!!draftBlocker || mutation.isPending}
+                title={draftBlocker || undefined}
                 onClick={() => void submit(true)}
                 label="Save draft"
               />

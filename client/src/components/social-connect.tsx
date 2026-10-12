@@ -18,7 +18,7 @@ const NOTE: Record<string, string> = {
   threads: "Your Threads profile",
   facebook: "Pick the Pages to post to",
   linkedin: "Your profile or company Pages",
-  tiktok: "Posts start private until you choose public",
+  tiktok: "You choose who can view each post",
 };
 
 type Account = { id: string; platform: string; name: string };

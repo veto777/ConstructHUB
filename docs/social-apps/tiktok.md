@@ -4,10 +4,11 @@
 Blanks (`____`) are for the owner. **(verified 2026-10-11)** = read on developers.tiktok.com that
 day (sources in section 9); **(to confirm)** = our understanding only.
 
-The native TikTok connection is **not built**; today the Social Media tool reaches TikTok only via the
-customer's own Blotato key (`server/social/client.ts`). TikTok has the strictest **product UX rules**
-of the three (section 5.2) — the posting screen must be built to TikTok's spec before the demo video
-can be recorded.
+The native TikTok connection is **built** (ConstructHUB Direct, `server/social/native-nets.ts` +
+`server/social/native.ts`; admins only until `SOCIAL_NATIVE_PUBLIC=true`), including the TikTok post panel
+of section 5.2 (`client/src/components/social-tiktok.tsx`) and the webhook (`server/social/tiktok-webhook.ts`),
+on branch `social/tiktok-ux` (2026-10-12). Customers on a Blotato key or Outstand still reach TikTok through
+those, with the same panel (without the live creator info).
 
 Products: **Login Kit** (web) + **Content Posting API** with **Direct Post** enabled.
 
@@ -49,10 +50,11 @@ There are **two separate TikTok reviews**:
      must match it — **verified**).
 3. **Add products**: **Login Kit** and **Content Posting API**. In Content Posting API turn on
    **Direct Post** (**verified**: "Enable the Direct Post configuration").
-4. **Login Kit → Redirect URI** (Web): `https://constructhub.us/api/social/oauth/tiktok/callback`
+4. **Login Kit → Redirect URI** (Web): `https://constructhub.us/api/social/native/tiktok/callback`
    (https, absolute, static, no query string, no `#`, < 512 chars, max 10 URIs — **verified**).
-5. **Scopes**: `user.info.basic`, `video.publish`. Remove everything else.
-6. **Webhooks** (Callback URL): `https://constructhub.us/api/social/oauth/tiktok/webhook` (2.3).
+5. **Scopes**: `user.info.basic`, `user.info.profile`, `user.info.stats`, `video.publish` (what
+   `SCOPES.tiktok` in `server/social/native-nets.ts` asks for). Remove everything else (no `video.list`).
+6. **Webhooks** (Callback URL): `https://constructhub.us/api/social/native/tiktok/webhook` (2.3).
 7. **URL properties**: verify `constructhub.us` (1.4).
 8. **Sandbox**: create a Sandbox, add the test TikTok accounts as target users; first-time apps must
    demonstrate in the Sandbox (**verified**).
@@ -62,11 +64,13 @@ There are **two separate TikTok reviews**:
 | Scope | Why |
 | --- | --- |
 | `user.info.basic` | Show the connected account's display name and avatar and get its `open_id` **(to confirm: the creator-info call already returns nickname/avatar; `user.info.basic` is still the Login Kit base scope)** |
+| `user.info.profile` | The account's `@username`, shown on Connected accounts and used for the post's link (`/v2/user/info/?fields=…username`) |
+| `user.info.stats` | Followers, following, likes and video count on Social Media → Analytics (`server/social/insights.ts`) |
 | `video.publish` | **Direct Post** of videos and photo posts to the customer's TikTok profile (**verified**: `DIRECT_POST` needs `video.publish`), plus `creator_info/query` and `status/fetch` |
 
 Not requested: `video.upload` (only for "send to TikTok inbox as draft" — `MEDIA_UPLOAD`;
-add later if we want a draft mode, **verified** distinction), `video.list`, `user.info.profile`,
-`user.info.stats`, research/ads/DM scopes.
+add later if we want a draft mode, **verified** distinction), `video.list` (dropped 2026-10-12: per-post
+TikTok stats are not read; Analytics says to see them in the TikTok app), research/ads/DM scopes.
 
 ### 2.3 Webhooks (verified event names)
 
@@ -75,13 +79,18 @@ add later if we want a draft mode, **verified** distinction), `video.list`, `use
   TikTok has no Meta-style deletion callback; this is the equivalent.
 - `post.publish.failed`, `post.publish.complete`, `post.publish.publicly_available`,
   `post.publish.no_longer_publicaly_available` (sic) — optional; we also poll `status/fetch`.
-- Body: `client_key`, `event`, `create_time`, `user_openid`, `content` (JSON string). Signature
-  verification is described on TikTok's Webhooks Verification page, **not read on 2026-10-11 —
-  implement per that page (expected an HMAC-SHA256 header with the client secret, to confirm)**.
+- Body: `client_key`, `event`, `create_time`, `user_openid`, `content` (JSON string).
+- Signature (**verified 2026-10-12**, https://developers.tiktok.com/doc/webhooks-verification): header
+  `TikTok-Signature: t=<timestamp>,s=<signature>`; signature = HMAC-SHA256 with the **client secret** over
+  `` `${t}.${raw JSON body}` `` (hex, 64 chars in TikTok's example). TikTok leaves the tolerance to us: we
+  refuse anything more than 5 minutes off. **Built:** `POST /api/social/native/tiktok/webhook`
+  (`server/social/tiktok-webhook.ts`) — bad/stale signature → 401; `authorization.removed` deletes that
+  `user_openid`'s TikTok accounts and tokens; `post.publish.*` → 200, and the worker re-reads that post's
+  status at once. Every valid request gets 200.
 
 ### 2.4 Tokens and endpoints (verified)
 
-- Authorize: `https://www.tiktok.com/v2/auth/authorize/?client_key=…&scope=user.info.basic,video.publish&response_type=code&redirect_uri=…&state=…`
+- Authorize: `https://www.tiktok.com/v2/auth/authorize/?client_key=…&scope=user.info.basic,user.info.profile,user.info.stats,video.publish&response_type=code&redirect_uri=https://constructhub.us/api/social/native/tiktok/callback&state=…`
   (PKCE for web is not mentioned on the Login Kit web page — **to confirm**; add it anyway if the
   token endpoint accepts `code_verifier`.) Users can untick toggleable scopes — check granted scopes.
 - Token `POST https://open.tiktokapis.com/v2/oauth/token/`; **access token 24 h, refresh token 365
@@ -122,6 +131,14 @@ add later if we want a draft mode, **verified** distinction), `video.list`, `use
 > Media tool, and to show that account's display name and avatar so they always know which account a
 > post will go to. TikTok login is not used to sign in to ConstructHUB.
 
+**`user.info.profile`**
+> Used to show the connected TikTok account's @username in ConstructHUB's Connected accounts list and
+> on each post's status, and to link a published post to the right TikTok profile.
+
+**`user.info.stats`**
+> Used only to show the connected account's own follower, following, like and video counts on
+> ConstructHUB's Social Media → Analytics page, beside the customer's other networks.
+
 **Content Posting API — Direct Post / `video.publish`**
 > The customer picks one of their own videos (or a set of photos) in ConstructHUB, and on the TikTok
 > post screen we fetch their latest creator info, show their TikTok nickname, let them type or edit
@@ -157,7 +174,7 @@ up to 5 videos, 50 MB each.
 1. Browser at `https://constructhub.us/auth`, address bar visible; sign in as the reviewer account.
 2. Social Media → TikTok card, **Not connected**: explanation, link to TikTok's terms.
 3. **Connect TikTok** → TikTok authorize page (Sandbox client) listing the scopes → **Authorize**.
-4. Back on ConstructHUB: the connected account's nickname and avatar (`user.info.basic`).
+4. Back on ConstructHUB: the connected account's @username and avatar (`user.info.basic`, `user.info.profile`).
 5. **New post** → choose a 20-second vertical video → select TikTok → the TikTok post panel:
    - "Posting to: @nickname" (fresh from `creator_info/query`);
    - caption field, typed by the user (show editing an AI suggestion);
@@ -168,9 +185,10 @@ up to 5 videos, 50 MB each.
      the label prompts, turn off again;
    - the declaration "By posting, you agree to TikTok's Music Usage Confirmation" with link;
    - the video preview.
-6. Click **Post to TikTok** → status Processing → Posted; note "It may take a few minutes for the
+6. Click **Post now** (disabled, with its reason, until "Who can view" is chosen) → status Processing → Posted; note "It may take a few minutes for the
    post to appear on your profile". Open TikTok on the phone/web and show the private post.
 7. Photo post: choose 3 photos → same panel (only Allow Comment shown for photos) → Post → status.
+8. Social Media → **Analytics**: the TikTok account's followers, following, likes and videos (`user.info.stats`).
 8. **Disconnect** → Not connected.
 
 **Part B — Direct Post audit** (same flow, after app approval; if allowed, with a production client
@@ -187,11 +205,20 @@ refused before upload.
 
 ### 5.1 Server
 
-1. **Connect / callback** `GET /api/social/oauth/tiktok/connect` and
-   `GET /api/social/oauth/tiktok/callback` (state in session, 10 min; check granted scopes include
+Status 2026-10-12 (branch `social/tiktok-ux`): items 1, 2, 5, 6 **built**; 3 built for `PULL_FROM_URL`
+(videos and photos — needs the domain verified; `FILE_UPLOAD` not built); 4 built (polling + webhook
+nudge; error codes shown as TikTok's text, not yet mapped one by one); 7 built in part (send time
+re-checks creator info and stops with "Choose who can view this TikTok post again — your TikTok
+options changed"; the scheduling question for TikTok is still open).
+
+1. **Connect / callback** `POST /api/social/native/connect` (`network: "tiktok"`) and
+   `GET /api/social/native/tiktok/callback` (state in session, 10 min; check granted scopes include
    `video.publish`); tokens encrypted (`SOCIAL_ENCRYPTION_KEY` pattern); **refresh job** — access
    tokens die after 24 h, so refresh before each publish and daily.
-2. **Creator info** route called every time the TikTok post panel opens (not cached).
+2. **Creator info** route called every time the TikTok post panel opens (not cached). **Built:**
+   `GET /api/social/native/tiktok/creator-info?accountId=…&businessId=…` →
+   `{ nickname, username, avatarUrl, privacyLevelOptions, commentDisabled, duetDisabled, stitchDisabled,
+   maxVideoPostDurationSec, canPost, message? }` (`canPost: false` on TikTok's spam-risk / active-user-cap codes).
 3. **Publish worker**: video `FILE_UPLOAD` from our storage in 5–64 MB chunks (no domain
    verification needed), photos `PULL_FROM_URL` from a verified domain → serve photos from an R2
    custom domain on constructhub.us (e.g. `media.constructhub.us`), **with no redirects** (3xx URLs
@@ -201,9 +228,11 @@ refused before upload.
    Map `unaudited_client_can_only_post_to_private_accounts`, `spam_risk_too_many_posts`,
    `reached_active_user_cap`, `privacy_level_option_mismatch`, `url_ownership_unverified` to plain
    messages (**verified** codes). Respect 6 init requests/min per token.
-5. **Webhook** `POST /api/social/oauth/tiktok/webhook`: verify signature; on
-   `authorization.removed` delete that open_id's tokens and TikTok rows.
-6. **Disconnect**: call `/v2/oauth/revoke/`, delete rows. Account deletion runs the same purge.
+5. **Webhook** `POST /api/social/native/tiktok/webhook`: verify signature; on
+   `authorization.removed` delete that open_id's tokens and TikTok rows. **Built** (2.3).
+6. **Disconnect**: call `/v2/oauth/revoke/`, delete rows. **Built** (`removeNativeAccounts` revokes each
+   TikTok token first, best effort). Account deletion (`server/account/delete.ts`) deletes the rows but
+   does **not** revoke yet.
 7. **No scheduling surprise**: TikTok requires that content is sent "only after the user has
    explicitly consented" (**verified**). A scheduled TikTok post is acceptable only if the user
    completed the full TikTok panel and consent at scheduling time; at send time, re-query creator
@@ -213,26 +242,30 @@ refused before upload.
 
 ### 5.2 Posting UX (TikTok Content Sharing Guidelines — all **verified**)
 
-- [ ] Fetch creator info when the post page renders; show the creator's **nickname**; if they can't
+Built 2026-10-12 in `client/src/components/social-tiktok.tsx` (the panel under a ticked TikTok account in
+Social Media → New post) and `client/src/pages/social-media.tsx` (declaration above Post, blockers);
+`[x]` = built, `[ ]` = still open.
+
+- [x] Fetch creator info when the post page renders; show the creator's **nickname**; if they can't
       post now, stop and say "try again later"; check video duration against
       `max_video_post_duration_sec`.
-- [ ] **Title/caption** user-editable; AI drafts and hashtags are editable preset text.
-- [ ] **Privacy** dropdown from `privacy_level_options`, **no default**, user must pick.
-- [ ] **Allow Comment / Duet / Stitch**: none checked by default; greyed out when disabled in the
+- [x] **Title/caption** user-editable; AI drafts and hashtags are editable preset text.
+- [x] **Privacy** dropdown from `privacy_level_options`, **no default**, user must pick.
+- [x] **Allow Comment / Duet / Stitch**: none checked by default; greyed out when disabled in the
       creator's settings; photo posts show only Allow Comment.
-- [ ] **Commercial content disclosure** toggle, off by default; when on, "Your brand" and "Branded
+- [x] **Commercial content disclosure** toggle, off by default; when on, "Your brand" and "Branded
       content" checkboxes, at least one required (publish disabled with a hover explanation
       otherwise); prompts: Your brand → "Your photo/video will be labeled as 'Promotional content'";
       Branded content (alone or both) → "labeled as 'Paid partnership'".
-- [ ] Branded content can't be private: disable "Only me" with the tooltip "Branded content
+- [x] Branded content can't be private: disable "Only me" with the tooltip "Branded content
       visibility cannot be set to private." (or switch to public and tell the user).
-- [ ] Declaration above the Post button: default/Your brand → "By posting, you agree to TikTok's
+- [x] Declaration above the Post button: default/Your brand → "By posting, you agree to TikTok's
       Music Usage Confirmation"; Branded content → "… TikTok's Branded Content Policy and Music Usage
       Confirmation" (links).
-- [ ] **Preview** of the content before posting.
-- [ ] **No watermarks, logos or ConstructHUB branding** added to the media.
-- [ ] Content sent only after explicit consent (the Post click).
-- [ ] Tell the user processing can take a few minutes; show status.
+- [x] **Preview** of the content before posting.
+- [x] **No watermarks, logos or ConstructHUB branding** added to the media.
+- [x] Content sent only after explicit consent (the Post click).
+- [x] Tell the user processing can take a few minutes; show status.
 - [ ] `is_aigc`: offer an "AI-generated content" toggle when the media itself is AI-made (TikTok
       labels it) — not needed for AI-drafted captions **(to confirm TikTok's view)**.
 - [ ] Original content only: don't offer to post media pulled from other platforms (e.g. importing
@@ -300,7 +333,7 @@ you choose to your TikTok account. See TikTok's Privacy Policy (https://www.tikt
 | Website is a landing/login page, or Privacy/Terms links hidden in a menu or broken | Use https://constructhub.us with footer links visible on mobile and desktop |
 | App described as in development/testing or personal use | Describe the live product for contractors (3.1) |
 | Name/icon referencing social media companies or resembling a brand | "ConstructHUB" + own icon |
-| Unused products/scopes left selected | Only Login Kit + Content Posting API; only two scopes |
+| Unused products/scopes left selected | Only Login Kit + Content Posting API; only the four scopes of 2.2, each shown in the demo (4, Part A steps 4 and 8) |
 | Demo doesn't show every product/scope, wrong domain, not in Sandbox for a first-time app | Section 4 Part A |
 | (Audit) Missing any UX element of 5.2 — privacy default set, interactions pre-ticked, missing disclosure/declaration, watermark, no preview **(the most common audit failure reported by third parties — to confirm)** | Build every checkbox in 5.2, screenshot each in the audit form |
 | (Audit) Use case looks internal/test or reposts others' content | Real customers, original content only |

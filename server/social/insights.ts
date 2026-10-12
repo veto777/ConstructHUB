@@ -149,6 +149,12 @@ async function published(client: NativeClient, submissionId: string) {
   const { row, token } = await client.credentials(sub.account_id);
   return { sub, row, token, api: apiOf(row) };
 }
+/** Replying, hiding, deleting: only on a post the network has published (not queued, failed or already deleted). */
+async function live(client: NativeClient, submissionId: string) {
+  const p = await published(client, submissionId);
+  if (p.sub.stage !== "published" || !p.sub.external_id) throw new SocialError(p.sub.stage === "deleted" ? "This post was deleted." : "This post isn't published yet.", 409);
+  return p;
+}
 
 export async function postStats(client: NativeClient, submissionId: string): Promise<PostStats> {
   return cached(`${client.tenant}:post:${submissionId}`, async () => {
@@ -158,9 +164,8 @@ export async function postStats(client: NativeClient, submissionId: string): Pro
     if (sub.stage !== "published") return { ...out, note: "Stats appear once the post is published." };
     const id = sub.external_id;
     if (api === "tiktok") {
-      if (!id) return { ...out, note: "Private TikTok posts have no public stats." };
-      const v = (await tk("/v2/video/query/?fields=id,like_count,comment_count,share_count,view_count", token, { filters: { video_ids: [id] } })).data?.videos?.[0] ?? {};
-      return { ...out, likes: num(v.like_count), comments: num(v.comment_count), shares: num(v.share_count), views: num(v.view_count) };
+      // Reading a video's numbers needs the video.list scope, which ConstructHUB does not ask for (docs/social-apps/tiktok.md §2.2).
+      return { ...out, note: id ? "See this post's views and likes in the TikTok app." : "Private TikTok posts have no public stats." };
     }
     if (!id) return { ...out, note: "The network didn't return this post's ID, so its stats can't be read." };
     if (api === "threads") {
@@ -252,7 +257,7 @@ const forgetPost = (tenant: string, submissionId: string) => { forget(`${tenant}
 export async function replyComment(client: NativeClient, submissionId: string, comment: string, message: string) {
   const text = message.trim();
   if (!text) throw new SocialError("Write a reply first");
-  const { sub, row, token, api } = await published(client, submissionId);
+  const { sub, row, token, api } = await live(client, submissionId);
   const cid = commentId(comment);
   if (api === "tiktok") throw new SocialError(NO_TIKTOK_COMMENTS);
   await commentOnPost(api, row, String(sub.external_id ?? ""), cid, token);
@@ -275,7 +280,7 @@ export async function replyComment(client: NativeClient, submissionId: string, c
 
 /** Hide or show a comment (it stays for its author; nobody else sees it). */
 export async function hideComment(client: NativeClient, submissionId: string, comment: string, hidden: boolean) {
-  const { sub, row, token, api } = await published(client, submissionId);
+  const { sub, row, token, api } = await live(client, submissionId);
   const cid = commentId(comment);
   if (api === "tiktok") throw new SocialError(NO_TIKTOK_COMMENTS);
   await commentOnPost(api, row, String(sub.external_id ?? ""), cid, token);
@@ -287,7 +292,7 @@ export async function hideComment(client: NativeClient, submissionId: string, co
 }
 
 export async function deleteComment(client: NativeClient, submissionId: string, comment: string) {
-  const { sub, row, token, api } = await published(client, submissionId);
+  const { sub, row, token, api } = await live(client, submissionId);
   const cid = commentId(comment);
   if (api === "tiktok") throw new SocialError(NO_TIKTOK_COMMENTS);
   await commentOnPost(api, row, String(sub.external_id ?? ""), cid, token);
@@ -303,6 +308,7 @@ export async function deletePost(client: NativeClient, submissionId: string): Pr
   const { sub, row, token, api } = await published(client, submissionId);
   const network = api === "tiktok" ? "TikTok" : api === "threads" ? "Threads" : row.platform === "facebook" ? "Facebook" : "Instagram";
   if (sub.stage === "deleted") return { network };
+  if (sub.stage !== "published") throw new SocialError("This post isn't published yet, so there's nothing to delete on the network.", 409);
   if (api === "tiktok") throw new SocialError("TikTok doesn't let apps delete videos; delete it in the TikTok app.");
   if (!sub.external_id) throw new SocialError(`The network didn't return this post's ID; delete it on ${network}.`);
   await g(api === "threads" ? "threads" : api === "ig_login" ? "ig_login" : "meta", "DELETE", sub.external_id, {}, token);

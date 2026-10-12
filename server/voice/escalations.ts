@@ -193,7 +193,7 @@ async function notifyOwnersImpl(ctx: OrgVoiceContext, call: VoiceCallRow, kind: 
     for (const member of owners) {
       const key = createHash("sha256").update(JSON.stringify([call.id, kind, revision, member.id])).digest("hex");
       try {
-        const link = `/call-assistant?tab=calls&call=${call.id}`;
+        const link = `/call-assistant/calls?call=${call.id}`;
         const inserted = await db.insert(crmNotifications).values({
           id: `voice-owner:${key}`, orgId: ctx.org.id, memberId: member.id, type: `call.alert.${kind}`,
           title: title.slice(0, 300), body: facts.summary || null, link,

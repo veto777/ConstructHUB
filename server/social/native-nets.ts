@@ -22,7 +22,8 @@ export const netRedirect = (api: NetApi) => `${base()}/api/social/native/${api =
 const SCOPES: Record<NetApi, string[]> = {
   ig_login: ["instagram_business_basic", "instagram_business_content_publish", "instagram_business_manage_comments", "instagram_business_manage_insights"],
   threads: ["threads_basic", "threads_content_publish", "threads_manage_insights", "threads_read_replies", "threads_manage_replies", "threads_delete"],
-  tiktok: ["user.info.basic", "user.info.profile", "user.info.stats", "video.list", "video.publish"],
+  // No video.list: per-post TikTok stats are not read (server/social/insights.ts); docs/social-apps/tiktok.md §2.2.
+  tiktok: ["user.info.basic", "user.info.profile", "user.info.stats", "video.publish"],
 };
 export const netScopes = (api: NetApi) => SCOPES[api];
 
@@ -58,9 +59,10 @@ async function call(url: string, init: RequestInit & { form?: Record<string, str
   // TikTok wraps everything in { data, error: { code: "ok" | … } }; Meta's hosts use { error: { code, message } }.
   const tk = d?.error && typeof d.error.code === "string" ? d.error : null;
   if (tk && tk.code !== "ok") {
-    if (["access_token_invalid", "scope_not_authorized", "token_not_authorized_for_specified_scope"].includes(tk.code) || r.status === 401) throw reconnect();
-    if (tk.code === "rate_limit_exceeded" || tk.code === "spam_risk_too_many_posts") throw new SocialError("TikTok is limiting how fast we post; it will retry shortly", 429);
-    throw new SocialError(`TikTok refused it: ${String(tk.message || tk.code).slice(0, 200)}`, r.status >= 500 ? 502 : 400);
+    const tag = (e: SocialError) => Object.assign(e, { tiktokCode: String(tk.code) });
+    if (["access_token_invalid", "scope_not_authorized", "token_not_authorized_for_specified_scope"].includes(tk.code) || r.status === 401) throw tag(reconnect());
+    if (tk.code === "rate_limit_exceeded" || tk.code === "spam_risk_too_many_posts") throw tag(new SocialError("TikTok is limiting how fast we post; it will retry shortly", 429));
+    throw tag(new SocialError(`TikTok refused it: ${String(tk.message || tk.code).slice(0, 200)}`, r.status >= 500 ? 502 : 400));
   }
   const me = d?.error && typeof d.error === "object" && !tk ? d.error : null;
   if (!r.ok || me) {
@@ -140,21 +142,84 @@ export function threadsPlan(text: string, media: string[]): { kind: "text" } | {
   return { kind: "carousel", items: media.map((url) => ({ url, video: isVideo(url) })) };
 }
 
-/** TikTok: video (one) or photos (up to 35), pulled from our verified domain. Pure (tested). */
-export function tiktokPlan(text: string, media: string[], target: Record<string, any>) {
+// ── TikTok: creator info, the post itself (Content Sharing Guidelines, docs/social-apps/tiktok.md §5.2) ─────────
+
+export const TIKTOK_PRIVACY = ["PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "FOLLOWER_OF_CREATOR", "SELF_ONLY"] as const;
+export type CreatorInfo = {
+  nickname: string; username: string; avatarUrl: string | null; privacyLevelOptions: string[];
+  commentDisabled: boolean; duetDisabled: boolean; stitchDisabled: boolean; maxVideoPostDurationSec: number | null;
+  canPost: boolean; message?: string;
+};
+/** TikTok error codes that mean "this creator can't post right now" (not a broken connection). */
+const CANT_POST = ["spam_risk_too_many_posts", "spam_risk_user_banned_from_posting", "reached_active_user_cap", "spam_risk_too_many_pending_share", "spam_risk"];
+export const TIKTOK_CANT_POST = "This TikTok account can't post right now. Try again later.";
+export const TIKTOK_PRIVACY_CHANGED = "Choose who can view this TikTok post again — your TikTok options changed";
+export const TIKTOK_PRIVACY_MISSING = "Choose who can view this TikTok post before it is sent";
+export const TIKTOK_BRANDED_PRIVATE = "Branded content visibility cannot be set to private. Choose who can view this TikTok post again";
+
+/** creator_info/query's data → what the post panel shows. Pure (tested). */
+export function creatorInfoFrom(d: any): CreatorInfo {
+  const opts = Array.isArray(d?.privacy_level_options) ? d.privacy_level_options.map(String).filter((o: string) => (TIKTOK_PRIVACY as readonly string[]).includes(o)) : [];
+  const max = Number(d?.max_video_post_duration_sec);
+  return {
+    nickname: String(d?.creator_nickname ?? ""), username: String(d?.creator_username ?? ""), avatarUrl: typeof d?.creator_avatar_url === "string" ? d.creator_avatar_url : null,
+    privacyLevelOptions: opts, commentDisabled: !!d?.comment_disabled, duetDisabled: !!d?.duet_disabled, stitchDisabled: !!d?.stitch_disabled,
+    maxVideoPostDurationSec: Number.isFinite(max) && max > 0 ? max : null,
+    canPost: opts.length > 0, ...(opts.length ? {} : { message: TIKTOK_CANT_POST }),
+  };
+}
+/** Asked fresh every time (never cached): TikTok requires the panel to reflect the creator's settings now. */
+export async function tiktokCreatorInfo(token: string): Promise<CreatorInfo> {
+  try {
+    const ci = await call("https://open.tiktokapis.com/v2/post/publish/creator_info/query/", { json: {}, bearer: token });
+    return creatorInfoFrom(ci.data);
+  } catch (e) {
+    const code = (e as any)?.tiktokCode;
+    if (code && CANT_POST.some((c) => code === c || code.startsWith(`${c}_`))) {
+      return { nickname: "", username: "", avatarUrl: null, privacyLevelOptions: [], commentDisabled: true, duetDisabled: true, stitchDisabled: true, maxVideoPostDurationSec: null, canPost: false, message: TIKTOK_CANT_POST };
+    }
+    throw e;
+  }
+}
+/** Let go of our access at TikTok (disconnect). Best effort: the caller deletes the stored rows either way. */
+export async function tiktokRevoke(token: string): Promise<void> {
+  const env = netDeps.env();
+  await call("https://open.tiktokapis.com/v2/oauth/revoke/", { form: { client_key: String(env.SOCIAL_TIKTOK_CLIENT_KEY), client_secret: String(env.SOCIAL_TIKTOK_CLIENT_SECRET), token } });
+}
+
+/** `disableX` (native) or Blotato's `disabledX` (shared/social.ts postPayload); unknown = not allowed. */
+const off = (...v: unknown[]) => { const f = v.find((x) => x !== undefined && x !== null); return f === undefined ? true : !!f; };
+
+/**
+ * TikTok: video (one) or photos (up to 35), pulled from our verified domain. Pure (tested).
+ * The privacy level is the one the customer chose — never a default, never a silent fallback: when it is missing or the
+ * creator no longer offers it (`creator`, from creator_info at send time), the post stops and asks for a new choice.
+ */
+export function tiktokPlan(text: string, media: string[], target: Record<string, any>, creator?: Pick<CreatorInfo, "privacyLevelOptions" | "commentDisabled" | "duetDisabled" | "stitchDisabled">) {
   if (!media.length) throw new SocialError("TikTok needs a video or photos");
   const videos = media.filter(isVideo);
   if (videos.length && media.length > 1) throw new SocialError("TikTok takes one video, or photos without a video");
   if (!videos.length && media.length > 35) throw new SocialError("TikTok photo posts take up to 35 photos");
-  const post = {
-    privacy_level: String(target.privacyLevel || "SELF_ONLY"),
-    disable_comment: !!target.disableComment, disable_duet: !!target.disableDuet, disable_stitch: !!target.disableStitch,
-    brand_content_toggle: !!target.isBrandedContent, brand_organic_toggle: !!target.isYourBrand, is_aigc: !!target.isAiGenerated,
-  };
-  if (videos.length) return { kind: "video" as const, body: { post_info: { title: text.slice(0, 2200), ...post }, source_info: { source: "PULL_FROM_URL", video_url: videos[0] } } };
+  const privacy = typeof target.privacyLevel === "string" ? target.privacyLevel : "";
+  if (!privacy) throw new SocialError(TIKTOK_PRIVACY_MISSING);
+  if (!(TIKTOK_PRIVACY as readonly string[]).includes(privacy)) throw new SocialError(TIKTOK_PRIVACY_CHANGED);
+  if (creator && !creator.privacyLevelOptions.includes(privacy)) throw new SocialError(TIKTOK_PRIVACY_CHANGED);
+  if (target.isBrandedContent && privacy === "SELF_ONLY") throw new SocialError(TIKTOK_BRANDED_PRIVATE);
+  const brand = { brand_content_toggle: !!target.isBrandedContent, brand_organic_toggle: !!target.isYourBrand };
+  const disable_comment = off(target.disableComment, target.disabledComments) || !!creator?.commentDisabled;
+  if (videos.length) {
+    const post_info = {
+      title: text.slice(0, 2200), privacy_level: privacy, disable_comment,
+      disable_duet: off(target.disableDuet, target.disabledDuet) || !!creator?.duetDisabled,
+      disable_stitch: off(target.disableStitch, target.disabledStitch) || !!creator?.stitchDisabled,
+      ...brand, is_aigc: !!target.isAiGenerated,
+    };
+    return { kind: "video" as const, body: { post_info, source_info: { source: "PULL_FROM_URL", video_url: videos[0] } } };
+  }
+  // Photo posts: no Duet / Stitch (TikTok's photo post_info has neither).
   const [first, ...rest] = text.split("\n");
   return { kind: "photo" as const, body: {
-    post_info: { title: first.slice(0, 90), description: (rest.length ? rest.join("\n") : text).slice(0, 4000), ...post },
+    post_info: { title: first.slice(0, 90), description: (rest.length ? rest.join("\n") : text).slice(0, 4000), privacy_level: privacy, disable_comment, ...brand },
     source_info: { source: "PULL_FROM_URL", photo_cover_index: 0, photo_images: media },
     post_mode: "DIRECT_POST", media_type: "PHOTO" } };
 }
@@ -188,16 +253,16 @@ export async function netPublish(api: NetApi, externalId: string, token: string,
     }
     return { stage: "th_container", container: String(id) };
   }
-  const plan = tiktokPlan(text, media, target);
-  // The creator's own limits first: TikTok requires the privacy level to be one this creator offers.
-  const ci = await call("https://open.tiktokapis.com/v2/post/publish/creator_info/query/", { json: {}, bearer: token });
-  const options: string[] = ci.data?.privacy_level_options ?? [];
-  if (options.length && !options.includes(plan.body.post_info.privacy_level)) plan.body.post_info.privacy_level = options.includes("SELF_ONLY") ? "SELF_ONLY" : options[0];
+  tiktokPlan(text, media, target);   // the customer's own choices are complete before TikTok is asked anything
+  // The creator's settings now: the chosen privacy level must still be offered (no fallback), and they must be able to post.
+  const ci = await tiktokCreatorInfo(token);
+  if (!ci.canPost) throw new SocialError(ci.message ?? TIKTOK_CANT_POST, 409);
+  const plan = tiktokPlan(text, media, target, ci);
   const url = plan.kind === "video" ? "https://open.tiktokapis.com/v2/post/publish/video/init/" : "https://open.tiktokapis.com/v2/post/publish/content/init/";
   const d = await call(url, { json: plan.body, bearer: token });
   const pid = d.data?.publish_id;
   if (typeof pid !== "string") throw new SocialError("TikTok did not confirm the post", 502);
-  return { stage: "tt_publish", container: pid, external: ci.data?.creator_username ? String(ci.data.creator_username) : undefined };
+  return { stage: "tt_publish", container: pid, external: ci.username || undefined };
 }
 
 /** How far a publish has got; publishes Instagram / Threads containers once they are ready. */
