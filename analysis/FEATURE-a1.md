@@ -1,6 +1,6 @@
 # Lane a1 — Agency workspace and GBP onboarding
 
-Implemented locally in `/home/veto/ConstructHUB-a1`. No deployment or push. All fixture data is labelled test data and removed after tests; no real Google, Blotato, OpenAI, Stripe or SMTP writes were made. Lane server: 8129; database: `constructhub_dev_a1`.
+Implemented locally in `/home/veto/ConstructHUB-a1`. No deployment or push. All fixture data is labelled test data and removed after tests; no real Google, OpenAI, Stripe or SMTP writes were made. Lane server: 8129; database: `constructhub_dev_a1`.
 
 ## What is available
 

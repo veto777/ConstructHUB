@@ -186,7 +186,7 @@ export function postPayload(
       containsSyntheticMedia: ai,
     });
   if (d.platform === "tiktok") {
-    // Blotato's field names; the native adapter (server/social/native-nets.ts tiktokPlan) reads the same ones.
+    // The stored payload's field names; the native adapter (server/social/native-nets.ts tiktokPlan) reads the same ones.
     // No privacy chosen → no privacyLevel: the post can be a draft, but it is never sent with a guessed audience.
     const privacyLevel = tiktokPrivacyOf(d);
     if (d.isBrandedContent && privacyLevel === "SELF_ONLY")

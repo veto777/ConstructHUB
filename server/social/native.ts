@@ -1,9 +1,9 @@
 /**
- * ConstructHUB Direct — our own Blotato (owner, 2026-10-12: "turn constructhub into our own blatato").
+ * ConstructHUB Direct — ConstructHUB publishes for the customer itself (owner, 2026-10-12).
  *
  * The customer connects their social accounts through ConstructHUB's OWN developer apps (OAuth on each network's
  * sign-in page); the tokens live encrypted in our database and we publish to the networks' APIs ourselves. Nothing
- * of Blotato's or Outstand's is involved. A business's connection is a tenant id (`chu<user>b<business>`, the same
+ * of a third party's or Outstand's is involved. A business's connection is a tenant id (`chu<user>b<business>`, the same
  * shape Outstand uses) stored as `native:<tenant>` in social_connections.key_enc, so the queue, schedule, AI writing
  * and calendar above (server/social/service.ts) do not know which provider publishes.
  *

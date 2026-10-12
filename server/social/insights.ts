@@ -1,5 +1,5 @@
 /**
- * ConstructHUB Direct — what Blotato never showed (owner, 2026-10-12: "you cant see followers, stats, likes, or
+ * ConstructHUB Direct — what posting alone never showed (owner, 2026-10-12: "you cant see followers, stats, likes, or
  * delete videos"): account stats, per-post stats, comments (read, reply, hide, delete) and deleting a published post,
  * for the accounts connected through our own apps (server/social/native.ts). Each network says what it allows:
  *

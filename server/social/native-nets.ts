@@ -187,7 +187,7 @@ export async function tiktokRevoke(token: string): Promise<void> {
   await call("https://open.tiktokapis.com/v2/oauth/revoke/", { form: { client_key: String(env.SOCIAL_TIKTOK_CLIENT_KEY), client_secret: String(env.SOCIAL_TIKTOK_CLIENT_SECRET), token } });
 }
 
-/** `disableX` (native) or Blotato's `disabledX` (shared/social.ts postPayload); unknown = not allowed. */
+/** `disableX` (native) or the stored payload's `disabledX` (shared/social.ts postPayload); unknown = not allowed. */
 const off = (...v: unknown[]) => { const f = v.find((x) => x !== undefined && x !== null); return f === undefined ? true : !!f; };
 
 /**

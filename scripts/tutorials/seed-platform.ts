@@ -29,7 +29,7 @@
  * constructhub_dev_* lane or the schema / database is constructhub_tut_*. The password reaches psql
  * through its environment, never a command line, and is never printed.
  */
-import { TUTORIAL_SOCIAL_ENCRYPTION_KEY, TUTORIAL_BLOTATO_PLACEHOLDER } from "./social-sample";
+import { TUTORIAL_SOCIAL_ENCRYPTION_KEY, TUTORIAL_SOCIAL_TENANT } from "./social-sample";
 import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
@@ -118,18 +118,19 @@ export const platformCensusLine = (c: Record<string, number>) => Object.entries(
 /** Only the fixed sample connection is unlocked, after SQL seeding, inside its transaction. */
 export async function tutorialSocialSql(raw: string): Promise<string> {
   libpqEnvFromUrl(raw); // Refuse non-recording targets before loading encryption or changing env.
-  const { encryptKey, BlotatoClient } = await import("../../server/social/client");
+  const { encryptKey } = await import("../../server/social/client");
+  const { NATIVE_MARK, NativeClient } = await import("../../server/social/native");
   const previous = process.env.SOCIAL_ENCRYPTION_KEY;
   let box: string;
   try {
     process.env.SOCIAL_ENCRYPTION_KEY = TUTORIAL_SOCIAL_ENCRYPTION_KEY;
-    box = encryptKey(TUTORIAL_BLOTATO_PLACEHOLDER, 1);
+    box = encryptKey(NATIVE_MARK + TUTORIAL_SOCIAL_TENANT, 1);
   } finally {
     if (previous === undefined) delete process.env.SOCIAL_ENCRYPTION_KEY;
     else process.env.SOCIAL_ENCRYPTION_KEY = previous;
   }
-  // Constructor computes the app's hash without making any network request.
-  const hash = new BlotatoClient(TUTORIAL_BLOTATO_PLACEHOLDER).hash;
+  // A ConstructHUB Direct connection; the constructor computes its hash without any request.
+  const hash = new NativeClient(TUTORIAL_SOCIAL_TENANT).hash;
   return `UPDATE social_connections SET key_enc='${box}' WHERE user_id=1 AND business_id=910001 AND key_enc='fs-b-placeholder';
 UPDATE social_business_config SET connection_hash='${hash}' WHERE user_id=1 AND business_id=910001;
 UPDATE social_posts SET connection_hash='${hash}' WHERE user_id=1 AND business_id=910001 AND request_id LIKE 'fs-b-req-%';`;

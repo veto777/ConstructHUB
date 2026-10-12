@@ -233,7 +233,7 @@ of Service and Google Privacy Policy links, is shown **next to the Connect butto
 (`ConnectTerms` in `client/src/components/social-youtube.tsx`).
 
 Still open for the owner: the Social Media tool can ALSO publish to a customer's YouTube account
-through the customer's own Blotato account and API key (`server/social/client.ts`). That route does
+through ConstructHUB's Outstand account (`server/social/outstand.ts`). That route does
 not use our Google project or YouTube API Services, is outside this API client, and is not
 described in the public privacy policy or terms; whether it should be is a separate decision — it
 was not changed here.

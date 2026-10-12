@@ -55,7 +55,7 @@ export type HelpEntry = {
   parent?: string;
   /**
    * Publishing. `hold: true` — this video is NEVER scheduled by the tools on their own: not to YouTube
-   * (youtube-schedule.ts) and not to social (social-post.ts). Their dry runs list it as "held for owner
+   * (youtube-schedule.ts). Its dry run lists it as "held for owner
    * approval"; it goes out only when a person names it with `--release <key>`. Set on the overview
    * films ("Start here"): what they say about the company is the owner's to approve.
    */

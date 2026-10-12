@@ -87,13 +87,13 @@ export type Walkthrough = {
 
 export const WALKTHROUGHS: Walkthrough[] = [
   {
-    id: "blotato", topic: "social", title: "Connect Blotato", href: "/social-media", open: "Open Social Media",
+    id: "connect-social", topic: "social", title: "Connect your social accounts", href: "/social-media", open: "Open Social Media",
     steps: [
-      "Visit Blotato and create your own account. Blotato is a separate subscription you buy from Blotato; creating an API key activates its paid subscription.",
-      "Connect your social accounts inside Blotato. For Facebook, grant access to the Pages you manage.",
-      "In Blotato Settings, open API and create/copy an API key. Never send the key to anyone else.",
-      "Open Social Media, search for a business / Google profile, and select it. Choose Agency shared key or This business only, paste the Blotato API key, and choose Connect Blotato. A business without its own key falls back to the agency key.",
-      "Open Map accounts and pages to this business. Search accounts, discover pages or boards, choose the verified destinations, and Save business mapping. These become composer defaults and bulk destinations. Disconnect stops local queued posts and auto mode; manage already-submitted posts and billing in Blotato.",
+      "ConstructHUB connects your social accounts directly; there is no separate posting service to buy or set up.",
+      "Open Social Media, search for a business / Google profile, and select it. Accounts are connected for each business.",
+      "Open Accounts and choose Connect for a network (Facebook, Instagram, LinkedIn, TikTok and the others listed). Sign in to that network in the window it opens and approve access. For Facebook and LinkedIn, tick the Pages you manage when you come back.",
+      "The connected accounts appear under Accounts. Your sign-ins are stored encrypted and never shown again.",
+      "Open Map accounts and pages to this business. Search accounts, discover pages or boards, choose the verified destinations, and Save business mapping. These become composer defaults and bulk destinations. Disconnect stops local queued posts and auto mode; posts the network already published stay on the network.",
     ],
   },
   {
@@ -103,8 +103,8 @@ export const WALKTHROUGHS: Walkthrough[] = [
       "Use each platform’s text tweak and character counter. Add public media URLs, attach a synced business photo, or upload a photo or video.",
       "For YouTube, supply a title, video and privacy choice. For TikTok, choose who can view the post (there is no default), which interactions to allow, and turn on the disclosure if it promotes your business or a paid partner.",
       "Choose Post now, or enter Schedule time in your browser’s local timezone and choose Schedule post. Save draft keeps the post for approval.",
-      "Open Calendar & queue. Each destination has its own status. Approve & queue a draft, or cancel before submission. Follow View published post or Open Blotato status.",
-      "If status is uncertain, check the submission in Blotato before creating another post. A queued or accepted submission is not a confirmed publication.",
+      "Open Calendar & queue. Each destination has its own status. Approve & queue a draft, or cancel before submission. Follow View published post to see it on the network.",
+      "If status is uncertain, check the account on the network itself before creating another post. A queued or accepted submission is not a confirmed publication.",
     ],
   },
   {

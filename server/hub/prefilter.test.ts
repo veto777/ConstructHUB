@@ -84,7 +84,7 @@ describe("controls (benign questions)", () => {
     "I'm a business owner, which plan fits me?",
     "How do I import my client list?",
     "Does your database cover Texas permits?",
-    "Where do I paste my Blotato API key?",
+    "Where do I paste my Cloudflare API key?",
     "Can I change my plan to Growth?",
     "How do I cancel my subscription?",
     "What does Site Scan diagnostics check?",

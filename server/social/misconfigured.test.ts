@@ -19,7 +19,7 @@ describe("social_misconfigured", () => {
       else process.env.SOCIAL_ENCRYPTION_KEY = key;
       let caught: unknown;
       try {
-        encryptKey("blotato-api-key", 1);
+        encryptKey("native:chu1b0", 1);
       } catch (e) {
         caught = e;
       }
@@ -37,7 +37,7 @@ describe("social_misconfigured", () => {
 
   it("encrypts once a 64-hex key is set; ordinary errors carry no code", () => {
     process.env.SOCIAL_ENCRYPTION_KEY = "ab".repeat(32);
-    expect(encryptKey("blotato-api-key", 1).split(".")).toHaveLength(3);
+    expect(encryptKey("native:chu1b0", 1).split(".")).toHaveLength(3);
     expect(socialErrorBody(new SocialError("Choose a future schedule time"))).toEqual({ message: "Choose a future schedule time" });
     expect(socialErrorBody(new SocialError("Try again shortly", 429))).not.toHaveProperty("code");
     const ai = socialMisconfigured("Social Media post writing is not set up on this server yet.");

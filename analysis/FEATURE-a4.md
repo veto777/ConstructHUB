@@ -7,9 +7,9 @@ Implemented locally in `/home/veto/ConstructHUB-a4`, using port **8159** and dat
 Open **Social Media** (`/social-media`) from the growth sidebar.
 
 - Search saved **businesses / Google profiles** by name, city or phone; filter Google linkage and page through results. The selection lives in `?business=<location ID>` via `use-url-param`. Switching businesses remounts the editor, preventing old text, destinations or auto settings from carrying over.
-- **Blotato connection → Key to manage** supports an agency shared key plus optional overrides per business. A missing business key falls back to the agency key. Keys remain AES-256-GCM encrypted with owner-bound authentication and never appear in API responses or logs.
+- **Connection → Key to manage** supports an agency shared key plus optional overrides per business. A missing business key falls back to the agency key. Keys remain AES-256-GCM encrypted with owner-bound authentication and never appear in API responses or logs.
 - **Map accounts and pages to this business** searches cached accounts, discovers verified pages/boards, and saves up to 20 destinations. These are composer defaults and bulk destinations. Page/board identity is enforced on the server, including in the publishing worker. Mapping changes pause that business’s auto mode and hold unapproved automatic posts as drafts.
-- Composer, calendar, settings, sources, source refresh status, and AI generation are business-scoped. Photos come from that location’s synced GBP business media; review generation uses only its synced reviews. Offers and manually supplied published updates are stored against the selected business. Explicit HTTPS attachments and Blotato uploads remain available.
+- Composer, calendar, settings, sources, source refresh status, and AI generation are business-scoped. Photos come from that location’s synced GBP business media; review generation uses only its synced reviews. Offers and manually supplied published updates are stored against the selected business. Explicit HTTPS attachments and provider uploads remain available.
 - **Bulk actions** retains selected businesses across search pages. Select up to 1,000, write one update with `{business}`, `{city}`, `{phone}`, and create approval drafts or explicitly queue publication. Missing facts fail that business visibly rather than inventing data. Destinations and connection fingerprints are captured when work is queued; later mapping/key changes cannot silently redirect a queued request.
 - Bulk-enable or disable auto mode, set each business’s cadence, choose approval/explicit automatic mode, queue GBP source refreshes, or generate approval drafts. **Bulk results** is searchable and paginated with per-business outcomes. Newer manual settings cancel older queued automation changes; disconnect cancels dependent pending bulk work.
 - **All-clients calendar** searches post text/business names and filters day, platform, and status. It displays business names, supports pagination, and permits bulk approval/cancellation of up to 100 selected posts. Date filtering uses the browser’s timezone on the server.
@@ -31,19 +31,19 @@ Open **Social Media** (`/social-media`) from the growth sidebar.
 - `server/social/routes.ts`: authenticated, owner-scoped, Zod-validated endpoints with the existing growth mutation gate. List reads use SQL search/filter/pagination. Keys and internal fingerprints are excluded from route responses.
 - `server/social/schema.ts`: idempotent additions within the existing `ensureSocialSchema()`, already registered beside GBP initialization in `server/routes.ts`. Business foreign keys, scoped unique indexes, `social_business_config`, and `social_bulk_jobs`; no drizzle-kit operation. PostgreSQL 15+ supports the NULLS NOT DISTINCT indexes (the project uses PostgreSQL 16).
 - Existing `notifyUser` uses `social.post_published` / `social.post_failed`; `logActivity` records connection, settings, mapping, and bulk actions. **No new notification kinds and no KIND_DEFAULTS edits.**
-- Blotato’s existing database gate remains shared by API-key fingerprint (2.1-second spacing, persistent 429 cooldown). Source refreshes use the existing GBP multi-account client and project quota limiter. Worker batches are bounded: 20 bulk rows, 10 source refreshes, and 30 due business scopes per tick.
+- The provider’s existing database gate remains shared by API-key fingerprint (2.1-second spacing, persistent 429 cooldown). Source refreshes use the existing GBP multi-account client and project quota limiter. Worker batches are bounded: 20 bulk rows, 10 source refreshes, and 30 due business scopes per tick.
 - A changed key or interrupted publication remains **uncertain**, never automatically reposted. A worker interrupted during paid draft generation leaves a visible generation record and does not automatically repeat the paid call.
 
 ## Configuration and honest limits
 
-- Keep `SOCIAL_ENCRYPTION_KEY` persistent (64 hex characters). Losing it requires reconnecting all Blotato keys. Business overrides and the agency key use the same existing encryption configuration.
+- Keep `SOCIAL_ENCRYPTION_KEY` persistent (64 hex characters). Losing it requires reconnecting every social connection. Business overrides and the agency key use the same existing encryption configuration.
 - Enable the social worker by leaving `SOCIAL_WORKER_DISABLED` unset/false outside the lane. The lane server runs with it true, GBP workers disabled, blank Stripe keys, and `EMAIL_FORCE_SINK=1`.
 - Existing OpenAI configuration is required for generation. Per-business daily budget remains 0–20. A shared owner ceiling defaults to **20 generations/day**; the operator can explicitly configure `SOCIAL_AI_OWNER_DAILY_BUDGET` (0–100000) for an agency’s cost allowance. Failed attempts may consume reserved budget.
 - Legacy global automation is paused on migration and unapproved global automatic queue entries become drafts. No historical post/source/settings row is guessed into a business. Legacy posts remain visible as unassigned in the all-clients calendar; configure each business explicitly. New post/settings HTTP writes require a business.
-- Bulk posts share the supplied text/HTTPS media attachments and use each business’s saved destination defaults. Missing media, required titles or other platform requirements fail visibly. Single-business composition additionally supports platform-specific text tweaks. Blotato acceptance is not claimed as publication.
+- Bulk posts share the supplied text/HTTPS media attachments and use each business’s saved destination defaults. Missing media, required titles or other platform requirements fail visibly. Single-business composition additionally supports platform-specific text tweaks. Provider acceptance is not claimed as publication.
 - Source refresh is explicit/queued (single or bulk), not a continuously refreshed copy of all Google posts. Only recent LIVE/STANDARD GBP updates are imported. Existing GBP photo/review sync must already have populated the selected location. General unassigned Media Library photos are not silently used as client-specific AI evidence.
-- Existing provider-approved submissions must be inspected in Blotato after disconnect or key replacement. Local cancellation cannot recall them.
-- Test fixtures are clearly labelled and cleaned up. No real Blotato/Google/OpenAI integration was exercised; external boundaries are injected/mocked.
+- Existing provider-approved submissions must be inspected at the provider after disconnect or key replacement. Local cancellation cannot recall them.
+- Test fixtures are clearly labelled and cleaned up. No real posting-provider/Google/OpenAI integration was exercised; external boundaries are injected/mocked.
 
 ## Validation
 
@@ -66,12 +66,12 @@ Built on `lane/a4` from main `7d2f1d4`, in `/home/veto/ConstructHUB-a4`. Only lo
 
 Growth sidebar → **Google Business → Social Media** (`/social-media`) and **Guides** (`/guides`).
 
-- Customer-owned Blotato connection verified with `GET /users/me/accounts`; account IDs come from the provider. Keys are encrypted with AES-256-GCM, random IVs, authentication tags, and owner-bound associated data. API responses never include the key. Connect/disconnect use `logActivity`.
+- Customer-owned provider connection verified with `GET /users/me/accounts`; account IDs come from the provider. Keys are encrypted with AES-256-GCM, random IVs, authentication tags, and owner-bound associated data. API responses never include the key. Connect/disconnect use `logActivity`.
 - Compose for X/Twitter, Facebook Pages, Instagram, LinkedIn profiles/pages, Threads, Bluesky, TikTok, YouTube and Pinterest. Platform tweaks and text counters; page/board discovery; YouTube title/privacy; TikTok visibility and commercial-content choices. Server validation checks owner account/page/board selection, text limits, and required media/target fields.
-- Public HTTPS media URLs, existing owner-scoped Media Library photos, and the documented Blotato local-file upload flow (`POST /media/uploads`, browser PUT to a presigned URL). The Blotato key stays on the server. Social API response bodies are excluded from the existing request logger, including signed upload URLs.
-- Save draft, post now, or schedule for a browser-local time. A durable Postgres queue owns scheduling; it submits to Blotato when due, rather than scheduling twice. Each destination has an independent row and state. Calendar day filter, chronological agenda, approval editing, cancellation, and history with provider status/publication links.
-- Restart-safe worker, owner advisory locks across processes, unique request/destination keys, and a database-backed rate gate keyed by the SHA-256 fingerprint of the customer's Blotato key. Minimum spacing is 2.1 seconds, below 30 requests/minute even when a key is shared by multiple local users/processes. Provider 429 cooldown persists across restarts.
-- Blotato acceptance is `submitted`, not `published`. Polling confirms published/failed. Network failures or interrupted POST acknowledgement become **uncertain** and are never automatically re-POSTed. This avoids duplicate publication when provider idempotency is not documented.
+- Public HTTPS media URLs, existing owner-scoped Media Library photos, and the provider's documented local-file upload flow (`POST /media/uploads`, browser PUT to a presigned URL). The key stays on the server. Social API response bodies are excluded from the existing request logger, including signed upload URLs.
+- Save draft, post now, or schedule for a browser-local time. A durable Postgres queue owns scheduling; it submits to the provider when due, rather than scheduling twice. Each destination has an independent row and state. Calendar day filter, chronological agenda, approval editing, cancellation, and history with provider status/publication links.
+- Restart-safe worker, owner advisory locks across processes, unique request/destination keys, and a database-backed rate gate keyed by the SHA-256 fingerprint of the customer's provider key. Minimum spacing is 2.1 seconds, below 30 requests/minute even when a key is shared by multiple local users/processes. Provider 429 cooldown persists across restarts.
+- Provider acceptance is `submitted`, not `published`. Polling confirms published/failed. Network failures or interrupted POST acknowledgement become **uncertain** and are never automatically re-POSTed. This avoids duplicate publication when provider idempotency is not documented.
 - Existing `notifyUser` delivers `social.post_published` and `social.post_failed` according to existing preferences. Uncertain submissions also use `social.post_failed` with explanatory text. No notification system or `KIND_DEFAULTS` edits were introduced. Activity-only strings: `social.connected`, `social.disconnected`, `social.auto_changed`; no new notification-kind map is needed.
 - Auto mode: destinations, evenly spaced daily/weekly cadence, rotating content mix, business instructions, examples, IANA timezone, overnight blackout hours, approval vs explicit fully automatic permission, and a bounded per-user daily AI generation budget via `takeBudget`. Uses the existing OpenAI configuration through an injectable generator. Generated text remains labelled AI-generated, with approval drafts as the default.
 - Real content sources: saved business profile, project photos from Media Library, synced Google review text, explicit contractor offer text, and recent published GBP standard updates. `Sync recent GBP updates` uses the existing multi-account Google client and quota gate, scoped to linked locations. The same import runs before automatic GBP generation. It accepts only `LIVE` / `STANDARD` posts from the last 30 days, filters media URLs, and reconciles each complete location snapshot. It does not depend on the other lane's Posts & Photos table. Offers/GBP text may also be entered manually.
@@ -85,23 +85,18 @@ All Social API handlers require authentication; SQL is bound to `user_id`; path/
 
 ## Walkthroughs
 
-### Get and connect Blotato
+### Connect social accounts
 
-1. Visit [Blotato](https://www.blotato.com) and create your own account. **Blotato is a separate subscription you buy from Blotato.** Creating an API key activates its paid subscription; ConstructHUB does not bill it.
-2. Connect the social accounts you manage inside Blotato. Grant the appropriate Facebook/LinkedIn page access.
-3. In Blotato Settings → API, create/copy your key.
-4. Open ConstructHUB → Social Media, paste **Blotato API key**, and choose **Connect Blotato**. The field clears after submission and the stored key cannot be retrieved.
-5. Choose accounts in Compose. Use **Refresh pages** / **Refresh boards**, then select each target.
-6. **Disconnect** removes the key, disables auto mode and cancels unsent local drafts/queue entries. It does not cancel already-accepted provider posts or your Blotato subscription.
+The original API-key setup for the third-party posting provider was removed (2026-10-12); accounts are now connected through ConstructHUB (Social Media → Accounts, one sign-in per network).
 
 ### Manual posting
 
 1. In Compose, choose accounts/pages and enter **Post text**.
-2. Adjust each platform's text; watch its counter. Attach Media Library photos, paste public R2/other HTTPS URLs, or use **Upload through Blotato**.
+2. Adjust each platform's text; watch its counter. Attach Media Library photos, paste public R2/other HTTPS URLs, or use **Upload**.
 3. Supply required title/privacy/media fields for the selected platform. TikTok defaults to private. YouTube also defaults to private.
 4. Choose **Post now**, or fill **Schedule time** and choose **Schedule post**. **Save draft** holds the post locally.
 5. Open **Calendar & queue**; filter a day or see the agenda/history. Edit a draft and **Approve & queue**. **Cancel** works only before submission.
-6. Follow **View published post** or **Open Blotato status**. If uncertain, verify in Blotato before creating another post. The UI includes the submission ID when it was acknowledged.
+6. Follow **View published post** or the provider status link. If uncertain, verify at the provider before creating another post. The UI includes the submission ID when it was acknowledged.
 
 ### Auto mode
 
@@ -111,7 +106,7 @@ All Social API handlers require authentication; SQL is bound to `user_id`; path/
 4. Add factual offers under **Content sources**; remove them when they expire. **Sync recent GBP updates** imports recent live standard updates from linked Google locations. Automatic GBP generation refreshes that source itself.
 5. Choose **Approval queue**, enable auto mode, then **Save auto settings**. **Generate draft from saved settings** previews a draft without publishing, even when fully automatic is saved.
 6. Review/edit drafts in Calendar & queue, then approve. Only choose **Fully automatic — publish without review** when that is your intended authorization.
-7. Disable auto mode to stop generation and return pending unapproved automatically generated queued posts to drafts. Already submitted posts stay in Blotato. Missing sources/media and budget failures are shown in auto settings.
+7. Disable auto mode to stop generation and return pending unapproved automatically generated queued posts to drafts. Already submitted posts stay with the provider. Missing sources/media and budget failures are shown in auto settings.
 
 ### Other feature walkthroughs (generic pending merge)
 
@@ -125,13 +120,13 @@ All Social API handlers require authentication; SQL is bound to `user_id`; path/
 - Set `SOCIAL_ENCRYPTION_KEY` to a stable, securely generated 32-byte key encoded as **64 hexadecimal characters**. It is intentionally not provided or stored in this report. Back it up securely; rotation currently requires customers to reconnect.
 - Configure the existing `AI_INTEGRATIONS_OPENAI_API_KEY` and optional base URL for generation. `SOCIAL_AI_MODEL` defaults to `gpt-4o-mini`. Validate the desired model/account before enabling paid production generation.
 - Keep `SOCIAL_WORKER_DISABLED=true` in feature lanes/tests. The owner must unset it or set `false` in the approved deployment to run the 15-second worker. Keep `EMAIL_FORCE_SINK=1` in lanes.
-- Customers buy/connect their own Blotato subscriptions/accounts. GBP sources require the existing Google permissions, enabled APIs, valid grant and linked locations. Public media must be reachable by the provider and comply with each network's format requirements.
+- Customers connected their own posting-provider accounts (since replaced by connecting through ConstructHUB). GBP sources require the existing Google permissions, enabled APIs, valid grant and linked locations. Public media must be reachable by the provider and comply with each network's format requirements.
 
 ## Validation
 
 - `npm run check`: **0 errors**.
 - `CRM_TEST_SINGLE_PORT=true npx vitest run` with Node 20 and the lane `.env` exported: **802 passed, 43 skipped; 83 test files passed, 2 skipped**. Existing auxiliary-port and explicitly disabled suites remain skipped; no skipped test is claimed as passed.
-- **19 Social unit/integration tests** use real lane Postgres plus injected Blotato/Google fetch clients and an injected AI generator; email delivery is mocked. Covers migration re-entry, owner-bound encryption, limits, target validation, owner isolation, page lookup, idempotent enqueue, polling, drafts/schedules, crash/uncertain recovery, shared rate reservation, notifications, locks, AI budget/approval/automatic mode, disconnect, GBP source filtering/reconciliation, and route authentication/redaction.
+- **19 Social unit/integration tests** use real lane Postgres plus injected provider/Google fetch clients and an injected AI generator; email delivery is mocked. Covers migration re-entry, owner-bound encryption, limits, target validation, owner isolation, page lookup, idempotent enqueue, polling, drafts/schedules, crash/uncertain recovery, shared rate reservation, notifications, locks, AI budget/approval/automatic mode, disconnect, GBP source filtering/reconciliation, and route authentication/redaction.
 - `E2E_PORT=8159 E2E_DB=constructhub_dev_a4 npx playwright test --config playwright.social.config.ts`: **1 passed**, exercising connect, key-field clearing, compose/tweak/media, schedule, AI draft approval, automatic settings, disconnect, and all Guides sections. Social API responses are browser fixtures; no provider request is sent. Server integration tests independently exercise persistence/state transitions.
 - Mobile smoke check at 390 px: no browser page errors and no horizontal document overflow; the connection/composer navigation rendered correctly.
 - Browser server needs `VITE_FORCE_PORTAL=false` for this growth feature, with `DEV_AUTH_BYPASS_USER1=true`. CRM browser specs instead use `VITE_FORCE_PORTAL=true`.
@@ -144,11 +139,11 @@ All Social API handlers require authentication; SQL is bound to `user_id`; path/
 - GBP import is limited to 20 linked locations and recent live **standard** posts. Google offers/events are excluded to avoid losing expiry/terms. It is a read-only bridge and does not publish to Google. Source refresh reconciles only complete location snapshots.
 - History is the latest 200 local destination rows; the calendar is a date-filtered agenda, not drag-and-drop. One page/board per connected account can be selected in a composition in this UI. Additional pages can be composed separately.
 - Character counters are plain Unicode code-point counts; network-specific weighted URL/emoji rules, media restrictions, and optional advanced features remain provider-validated. No Stories, thread chains, thumbnails, platform-specific media overrides or video transcoding UI is included.
-- Blotato does not document a create-post idempotency key. Uncertain submissions intentionally stop; the user must inspect Blotato before any manual replacement. Notifications are delivered at least once across a crash between delivery and its local completion marker, so a crash at that point can duplicate a notification, never a deliberate POST retry.
-- Disconnect is local; revoke/delete the API key or cancel billing inside Blotato separately. Submitted posts cannot be cancelled from this initial UI. Key replacement does not rewrite already submitted payloads.
+- The provider did not document a create-post idempotency key. Uncertain submissions intentionally stop; the user must inspect the provider before any manual replacement. Notifications are delivered at least once across a crash between delivery and its local completion marker, so a crash at that point can duplicate a notification, never a deliberate POST retry.
+- Disconnect is local; revoke/delete the API key or cancel billing with the provider separately. Submitted posts cannot be cancelled from this initial UI. Key replacement does not rewrite already submitted payloads.
 - Generic other-lane guides do not assert those features have shipped in this branch. The owner should adjust labels after merge.
 
-## Can social posting work without Blotato?
+## Can social posting work without a third-party posting provider?
 
 **Yes, with separate direct network integrations; that is not implemented by this lane.** Each needs its own OAuth grants, secure token storage/refresh, account/page selection, media upload pipeline, scheduler/status handling and ongoing API maintenance.
 
@@ -156,12 +151,11 @@ All Social API handlers require authentication; SQL is bound to `user_id`; path/
 |---|---|---|
 | Meta (Facebook/Instagram) | Meta Graph / Instagram publishing endpoints. Facebook Pages and eligible professional Instagram accounts, appropriate publishing permissions, and App Review/advanced access for a multi-customer app; business verification requirements depend on the chosen login/product permissions. Own-app test roles are not general customer approval. | Do not assume a paid subscription substitutes for review. No blanket per-post paid tier is established by the cited publishing docs; confirm the exact product in the app dashboard. |
 | LinkedIn | Member posting can use the self-service Share on LinkedIn permission. Organization/page community management requires LinkedIn access vetting; Development → Standard tier involves an app review and demonstration. | Development/Standard are approval/access tiers, not a documented universal per-post subscription price. Confirm eligibility and any commercial agreement with LinkedIn. |
-| TikTok | Content Posting API with approved `video.publish`, user authorization and compliant creator controls. Unaudited direct-post clients are restricted to private visibility; an audit is required to lift that restriction. | The cited direct-post guide does not establish a mandatory per-post paid tier. Approval/audit is the gate, not buying Blotato or TikTok account verification. |
+| TikTok | Content Posting API with approved `video.publish`, user authorization and compliant creator controls. Unaudited direct-post clients are restricted to private visibility; an audit is required to lift that restriction. | The cited direct-post guide does not establish a mandatory per-post paid tier. Approval/audit is the gate, not buying a posting service or TikTok account verification. |
 | X | X API write endpoints, a developer app/project, user-context authorization and compliance with developer/automation policies. | Current documentation describes prepaid **pay-per-use credits**, not the historical Free/Basic/Pro monthly tiers. Configure spending limits; writes cost money and prices can change. |
 
 Sources checked 2026-09-29:
 
-- [Blotato quickstart (moved from `/api/start`)](https://help.blotato.com/start-with-an-ai-agent/start), [accounts/pages](https://help.blotato.com/rest-api-reference/accounts), [create post](https://help.blotato.com/rest-api-reference/publish-post), [status polling](https://help.blotato.com/rest-api-reference/publish-post/get-post), [media uploads](https://help.blotato.com/api-and-mcp-concepts/media-uploads-and-conversion). The documentation's full Markdown export was also read to verify target fields and local-file upload behavior.
 - [Google local-post listing](https://developers.google.com/my-business/reference/rest/v4/accounts.locations.localPosts/list) and [LocalPost resource](https://developers.google.com/my-business/reference/rest/v4/accounts.locations.localPosts).
 - [Meta's official publishing sample](https://github.com/fbsamples/reels_publishing_apis/blob/main/insta_reels_publishing_api_sample/README.md) and [App Review](https://developers.facebook.com/docs/app-review/). Meta's documentation site was not retrievable through the browsing tool; verify exact current permission/business-verification requirements in the owner dashboard before starting a direct integration.
 - [LinkedIn Share on LinkedIn](https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/share-on-linkedin) and [Community Management app review](https://learn.microsoft.com/en-us/linkedin/marketing/community-management-app-review).

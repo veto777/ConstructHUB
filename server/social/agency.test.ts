@@ -4,8 +4,9 @@ import { ensureSocialSchema } from './schema';
 import { ensureGbpSchema } from '../gbp/schema';
 import { ensureGrowthSchema } from '../growth-schema';
 import { ensureAccountEventsSchema } from '../account-events';
-import { BlotatoClient } from './client';
-import { connect, connection, createPosts, changePost, disconnect, saveSettings, workerUser, runSocialWorker, generateDue, userLock } from './service';
+import { FixtureClient, connectFixture } from './test-client';
+import { tenantFor } from './outstand';
+import { connection, createPosts, changePost, disconnect, saveSettings, workerUser, runSocialWorker, generateDue, userLock } from './service';
 import { enqueueBulk, expandVariables, listBusinesses, runAgencyWorker, saveMapping } from './agency';
 import { syncGbpSources } from './gbp-sources';
 import { registerSocialRoutes } from './routes';
@@ -14,8 +15,10 @@ vi.mock('../email',()=>({sendWithFallback:vi.fn(async()=>({}))}));
 let owner:number,other:number,a:number,b:number,foreign:number;
 const x=destinationSchema.parse({accountId:'agency-x',platform:'twitter'});
 const y=destinationSchema.parse({accountId:'client-x',platform:'twitter'});
-const http=vi.fn(async(url:any,opts:any)=>new Response(JSON.stringify(String(url).endsWith('/accounts')?{items:[{id:opts.headers['blotato-api-key']==='client-test-key'?'client-x':'agency-x',platform:'twitter',fullname:'Fixture X'}]}:{postSubmissionId:'fixture-submission'})));
-const make=(key:string)=>new BlotatoClient(key,http,async()=>{});
+// The agency-wide connection reports agency-x; business b's own connection reports client-x.
+const clientKey=()=>`native:${tenantFor(owner,b)}`;
+const http=vi.fn(async(url:any,opts:any)=>new Response(JSON.stringify(String(url).endsWith('/accounts')?{items:[{id:opts.headers['x-fixture-key']===clientKey()?'client-x':'agency-x',platform:'twitter',name:'Fixture X'}]}:{submissionId:'fixture-submission'})));
+const make=(key:string)=>new FixtureClient(key,http as any);
 const request=(extra:any={})=>({requestId:crypto.randomUUID(),text:'Fixture business post',destinations:[x],draft:true,...extra});
 const routes=new Map<string,any>();
 async function call(method:string,path:string,user=owner,body:any={},query:any={},params:any={}) {
@@ -56,7 +59,7 @@ describe('agency business scope',()=>{
     expect((await call('get','',owner,{}, {businessId:'bad'})).status).toBe(400);
   });
   it('falls back to the agency key, requires explicit mapping, and isolates request IDs',async()=>{
-    await connect(owner,'agency-test-key',null,make);
+    await connectFixture(owner,`native:${tenantFor(owner,null)}`,make);
     expect((await connection(owner,make,a)).businessId).toBeNull();
     await expect(createPosts(owner,request(),a)).rejects.toThrow('Map');
     await saveMapping(owner,a,{destinations:[x]});await saveMapping(owner,b,{destinations:[x]});
@@ -65,18 +68,18 @@ describe('agency business scope',()=>{
     expect((await createPosts(owner,input,a))[0].id).toBe(pa.id);
     await expect(changePost(owner,pa.id,'approve',undefined,b)).rejects.toMatchObject({status:404});
     expect((await call('get','',owner,{}, {businessId:a})).body.posts.every((p:any)=>p.business_id===a)).toBe(true);
-    expect(JSON.stringify((await call('get','',owner,{}, {businessId:a})).body)).not.toMatch(/key_enc|agency-test-key/);
+    expect(JSON.stringify((await call('get','',owner,{}, {businessId:a})).body)).not.toMatch(/key_enc|native:chu/);
   });
   it('supports a separate client key and invalidates stale mappings without leaking credentials',async()=>{
-    await connect(owner,'client-test-key',null,make,b);
+    await connectFixture(owner,clientKey(),make,b);
     expect((await connection(owner,make,b)).businessId).toBe(b);
     await expect(createPosts(owner,request(),b)).rejects.toThrow('Map');
     await saveMapping(owner,b,{destinations:[y]});
     const [p]=await createPosts(owner,request({destinations:[y],draft:false}),b);
     http.mockClear();await workerUser(owner,make,async()=>{throw new Error('No AI expected');},b);
-    expect(http.mock.calls.some(([,opts])=>opts.headers['blotato-api-key']==='client-test-key')).toBe(true);
+    expect(http.mock.calls.some(([,opts])=>opts.headers['x-fixture-key']===clientKey())).toBe(true);
     expect((await pool.query('SELECT state FROM social_posts WHERE id=$1',[p.id])).rows[0].state).toBe('submitted');
-    await connect(owner,'replacement-test-key',null,make,b);
+    await connectFixture(owner,`outstand:${tenantFor(owner,b)}`,make,b); // replaced by another provider
     await pool.query('UPDATE social_posts SET due_at=now() WHERE id=$1',[p.id]);
     http.mockClear();await workerUser(owner,make,async()=>'',b);expect(http).not.toHaveBeenCalled();
     await disconnect(owner,null,b);

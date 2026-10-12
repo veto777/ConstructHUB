@@ -46,7 +46,6 @@ describe("competitor prices come from the research file, in cents", () => {
     expect(priceOf("seo", "SE Ranking")).toEqual({ kind: "monthly", cents: 12900 });
     expect(priceOf("cloudflare", "UptimeRobot")).toEqual({ kind: "monthly", cents: 1300 });
     expect(priceOf("cloudflare", "AgencyAnalytics")).toEqual({ kind: "monthly", cents: 2000, billed: "annually" });
-    expect(priceOf("social", "Blotato")).toEqual({ kind: "monthly", cents: 2900 });
     expect(priceOf("social", "Marky")).toEqual({ kind: "monthly", cents: 3900 });
     expect(priceOf("social", "SocialPilot")).toEqual({ kind: "monthly", cents: 3000 });
     expect(priceOf("social", "Buffer")).toEqual({ kind: "monthly_from", cents: 500 });
@@ -122,7 +121,7 @@ describe("every Compare section", () => {
     // The honest gaps the research named.
     expect(compareOf("seo").theyNotUs).toMatch(/Daily rank checks \(ours are weekly/);
     expect(compareOf("reviews").theyNotUs).toMatch(/by text \(ours go by email\)/);
-    expect(compareOf("social").theyNotUs).toMatch(/Blotato subscription of your own/);
+    expect(compareOf("social").theyNotUs).toMatch(/does not post to your Google profile/);
     expect(compareOf("texting").theyNotUs).toMatch(/two-way inbox/);
   });
 

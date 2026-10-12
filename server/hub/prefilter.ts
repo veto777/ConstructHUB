@@ -273,7 +273,7 @@ schedule portal payment payments stripe guard tracker shield vpn ip scan scans s
 alerts notification notifications email emails texting texts sms dashboard integration integrations import export
 directory appraiser appraisers assessor assessors records domain domains master class course license licensed bond
 insured insurance llc sales rep quote quoted feature features tool setup signup constructhub hub gbp gmb lsa seo
-cloudflare blotato hover signalwire gmail telegram webhook api key keys competitor competitors grid keyword keywords
+cloudflare hover signalwire gmail telegram webhook api key keys competitor competitors grid keyword keywords
 data info details detail status code codes problem issue issues fix broken working stuck slow error errors login logged
 shingle shingles drywall concrete framing deck decks fence fences kitchen bathroom flooring tile window windows door doors
 paint repair repairs install installs installation job jobs project projects work worker workers employee employees
@@ -498,9 +498,9 @@ const P7_INTERNAL: RegExp[] = [
   /\bvb\d+\b/, /\bstripe (key|secret|webhook)/,
   /\b(your|hub'?s|gabe'?s|constructhub'?s|the site'?s|the server'?s|openai|stripe|truthcode\w*|ai|admin|master|root|internal) api[_ ]?keys?\b/,
 ];
-// narrowed: a bare "API key" is a setup step for Blotato, Cloudflare and the CRM.
+// narrowed: a bare "API key" is a setup step for Cloudflare and the CRM.
 const API_KEY = /\bapi[_ ]?keys?\b/;
-const API_KEY_FEATURE = /\b(blotato|cloudflare|crm|integrations?|webhooks?|social)\b/;
+const API_KEY_FEATURE = /\b(cloudflare|crm|integrations?|webhooks?|social)\b/;
 
 // P8 sales-only pricing
 const P8_ITEM = new RegExp(String.raw`\b(seo programs?|first page seo|seo growth|seo domination|website (build|setup)|business formation|llc (filing|formation)|done[- ]for[- ]you|dfy|complete business build|master ?class|custom (work|quote|job)|enterprise|(more than|over) ${AGENCY_SELF_SERVE_MAX_LOCATIONS} locations)\b`);
@@ -551,7 +551,7 @@ const DOMAIN_VOCAB = [
   // a few more plainly-domain words
   "company", "client", "customer", "lead", "job", "crew", "marketing", "listing", "maps", "verify", "email",
   "notification", "security", "cancel", "refund", "upgrade", "downgrade", "card", "profile", "citation",
-  "blotato", "hover", "stripe", "signalwire", "telegram", "api key", "webhook", "2fa", "two-factor",
+  "hover", "stripe", "signalwire", "telegram", "api key", "webhook", "2fa", "two-factor",
   "pay", "yearly", "monthly", "annual", "invite", "admin", "manager", "role", "receipt",
 ];
 const VOCAB_RE = new RegExp(String.raw`\b(${DOMAIN_VOCAB.map((w) => w.replace(/[-]/g, "\\-").replace(/ /g, "[ -]?")).join("|")})(s|es)?\b`);

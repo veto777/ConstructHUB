@@ -12,15 +12,27 @@ import { createHash, randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import { pool } from "../db";
 import { postSchema, postPayload, tiktokPrivacyOf, type Destination } from "../../shared/social";
-import { BlotatoClient, decryptKey, SocialError } from "./client";
+import { decryptKey, SocialError } from "./client";
 import { OutstandClient, OUTSTAND_MARK } from "./outstand";
 import type { SocialClient } from "./provider";
 
-/** The stored secret picks the provider: "outstand:<tenant>" is ConstructHUB's own Outstand account, anything else a Blotato key. */
+/**
+ * A stored connection that is neither of ours (an API key for the third-party provider Social Media used before it
+ * connected accounts itself) cannot post: the business shows as not connected and is asked to reconnect.
+ */
+export const LEGACY_CONNECTION = "This business’s old social connection is no longer supported. Reconnect your accounts through ConstructHUB in Social Media > Accounts.";
+/** The stored secret picks the provider: "native:<tenant>" is ConstructHUB Direct, "outstand:<tenant>" ConstructHUB's own Outstand account. */
 export type ClientFactory = (key: string) => SocialClient;
-export const clientFactory: ClientFactory = (key) =>
-  key.startsWith(NATIVE_MARK) ? new NativeClient(key.slice(NATIVE_MARK.length))
-  : key.startsWith(OUTSTAND_MARK) ? new OutstandClient(key.slice(OUTSTAND_MARK.length)) : new BlotatoClient(key);
+export const clientFactory: ClientFactory = (key) => {
+  if (key.startsWith(NATIVE_MARK)) return new NativeClient(key.slice(NATIVE_MARK.length));
+  if (key.startsWith(OUTSTAND_MARK)) return new OutstandClient(key.slice(OUTSTAND_MARK.length));
+  throw new SocialError(LEGACY_CONNECTION, 409);
+};
+/** Which provider a stored connection uses, or null when it cannot be read or is not one of ours (LEGACY_CONNECTION). */
+export function connectionProvider(keyEnc: string | undefined | null, userId: number): "native" | "outstand" | null {
+  if (!keyEnc) return null;
+  try { const k = decryptKey(keyEnc, userId); return k.startsWith(NATIVE_MARK) ? "native" : k.startsWith(OUTSTAND_MARK) ? "outstand" : null; } catch { return null; }
+}
 
 export async function userLock<T>(
   userId: number,

@@ -149,7 +149,7 @@ const SECTION_KEYWORDS: Record<number, RegExp> = {
   11: /\b(ranking grid|rank(ing|ings)?|grid|heatmap|credits?)\b/,
   12: /\b(site scan|website scan|scan my (site|website)|seo audit|pagespeed|free scan|free website scan)\b/,
   13: /\b(citations?|nap|directories|yelp|bbb|bing places|apple maps)\b/,
-  14: /\b(social( media)?|blotato|facebook|instagram|linkedin|tiktok|youtube|pinterest|threads|bluesky|auto mode)\b/,
+  14: /\b(social( media)?|facebook|instagram|linkedin|tiktok|youtube|pinterest|threads|bluesky|auto mode)\b/,
   15: /\b(click guard|click[- ]fraud|fraud|blocked ips?|ip exclusions?|tracking (code|script)|google ads script)\b/,
   16: /\b(ip tracker|visitors?|visitor list|traffic sources?)\b/,
   17: /\b(vpn( shield)?|proxy|proxies|datacenter)\b/,

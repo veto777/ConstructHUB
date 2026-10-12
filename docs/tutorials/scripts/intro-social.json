@@ -20,7 +20,7 @@
       "action": "click",
       "selector": "[data-testid=\"list-social-businesses\"] button:has-text(\"Summit Roofing Co.\")",
       "caption": "Open a business",
-      "narration": "Open this roofing company. It posts through Blotato, a separate service."
+      "narration": "Open this roofing company. ConstructHUB connects its social accounts directly."
     },
     {
       "action": "scroll-to",
@@ -145,7 +145,7 @@
   ],
   "youtube": {
     "title": "Social Media in about a minute | ConstructHUB",
-    "description": "A short tour of Social Media in ConstructHUB: pick a business, write a post once with a copy and character counter per network, check the calendar and queue, edit an AI draft, see auto mode's approval queue, and view every client's posts on one calendar. Posting runs through your own Blotato account.",
+    "description": "A short tour of Social Media in ConstructHUB: pick a business, write a post once with a copy and character counter per network, check the calendar and queue, edit an AI draft, see auto mode's approval queue, and view every client's posts on one calendar. ConstructHUB connects your social accounts directly and posts for you.",
     "tags": [
       "ConstructHUB",
       "social media scheduler",

@@ -1,7 +1,7 @@
 /**
  * Walkthroughs that are NOT to be posted to YouTube or social as they are — each with the reason and
- * what releases it. `youtube-schedule.ts` and `social-post.ts` list them as "held for owner approval"
- * and plan them only with `--release <key>` (the same switch as the overview films, whose hold is on
+ * what releases it. `youtube-schedule.ts` lists them as "held for owner approval"
+ * and plans them only with `--release <key>` (the same switch as the overview films, whose hold is on
  * their own help entries). A hold here does not take the video out of the app: a cut that must not be
  * SHOWN has its manifest moved to docs/tutorials/held-manifests/ instead.
  *

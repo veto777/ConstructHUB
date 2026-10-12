@@ -395,8 +395,8 @@ A film carries no Google logo: its script lists the side menu's three under `hid
 that opens on its own hook card gets a 0.8 s title card and a 2.5 s end card instead of 1.8 s and 4 s. Nothing in a brand film names a competitor or states a competitor's price without the owner's
 sign-off recorded in `VIDEO-SCRIPTS.md`.
 
-**They are held.** Every film's help entry carries `youtube: { hold: true }`: `youtube-schedule.ts` and
-`social-post.ts` never plan it and list it as "held for owner approval" until the owner releases it
+**They are held.** Every film's help entry carries `youtube: { hold: true }`: `youtube-schedule.ts`
+never plans it and lists it as "held for owner approval" until the owner releases it
 (`--release <key>` on the run that posts it). The named comparisons (`brand-vs-…`) are also
 `unlisted: true` — not in the app at all — and their manifests wait in `docs/brand/held-manifests/`;
 "Releasing a held film" in `VIDEO-SCRIPTS.md` is the checklist (re-read every price first). Their
@@ -551,7 +551,7 @@ a **finished** master — nothing is re-recorded, the voice engine is never call
 | `vertical-tiktok.mp4` | the same cut with the designed cover as its first half second (TikTok takes a moment of the video as its cover, not an image) | TikTok |
 | `feed.mp4` | 1080×1350 (4:5), 89 s at most — normally the whole walkthrough | LinkedIn, Facebook, the Instagram feed |
 | `cover-vertical.jpg`, `cover-feed.jpg` | the thumbnail's design restacked for a tall frame; headline, screenshot and gator inside the centre 4:5 | Instagram's cover image; a feed post's first image |
-| `social.json` | what was measured of every file + the post text per platform | `social-upload.ts`, `social-post.ts` |
+| `social.json` | what was measured of every file + the post text per platform | `social-upload.ts` |
 | `focus.json` | where the camera looked at each step, and how that was found | reading, when a cut looks wrong |
 
 ```bash
@@ -614,69 +614,22 @@ more are blocked or stripped (`PLATFORM_RULES.instagram.hashtags` is the one pla
 
 ## Posting to social
 
-Through **Blotato** (`https://backend.blotato.com/v2`, header `blotato-api-key`). The workspace is
-**shared with the owner's other brands**, so the poster is built to be unable to post anywhere else.
-
 ```bash
 cd ~/ConstructHUB-<checkout of main>
-npx tsx scripts/tutorials/social-upload.ts <helpKey>…          # 1. the cuts → R2 (create-only), each checked at its public address
-S="npx tsx --env-file=/home/voiceban/ConstructHUB-live/.env scripts/tutorials/social-post.ts"
-$S [helpKey…]                                                  # 2. DRY RUN (default): accounts, times, files, every caption in full
-$S [helpKey…] --go                                             # 3. create the posts
-$S --reconcile                                                 # 4. a few minutes later, and daily: what became of each post
-git add docs/tutorials/social-schedule.json && git commit      #    the ledger is the record — commit it
+npx tsx scripts/tutorials/social-upload.ts <helpKey>…          # the cuts → R2 (create-only), each checked at its public address
 ```
 
-- **Media.** Blotato needs nothing uploaded to it — "pass any publicly accessible URL in `mediaUrls`". The
-  cuts go to our own R2 as `tutorials/<helpKey>.social-<vertical|tiktok|feed|cover-vertical|cover-feed>.<hash8>.<ext>`
+- **Media.** The cuts go to our own R2 as `tutorials/<helpKey>.social-<vertical|tiktok|feed|cover-vertical|cover-feed>.<hash8>.<ext>`
   and are served by the media route already in production (`https://constructhub.us/api/tutorials/media/…`,
   public, immutable, byte ranges) — no deploy needed. `social-upload.ts` never overwrites or deletes, asks
-  every public address for its first bytes (206, right length, right type) and writes `social/hosted.json`;
-  the poster refuses a file that changed since.
-- **Who may be posted to.** `TUTORIAL_BLOTATO_ACCOUNT_IDS` in the production `.env`, comma-separated — the
-  only accounts the tool will touch. Empty → it refuses to run. On top of that, every run: (1) the ids of the
-  other brands' accounts (and of our own YouTube channel, which is posted through YouTube's API) are on a
-  **built-in denylist** (`DENYLIST` in `social-post-lib.ts`) that no flag lifts — a typo in the env cannot
-  reach another brand's audience; (2) Blotato's own account list must contain each id; (3) its username or
-  full name must look like ConstructHUB (contain "construct" or "chub") unless you pass `--i-checked <id>`;
-  (4) one bad id stops the whole run. The tool only **creates** posts and reads; it never edits, reschedules
-  or deletes anything in the workspace (tested).
-- **Adding an account** (after the owner connects it at my.blotato.com → Accounts): run the dry run — it
-  prints nothing about other accounts, so list them once with
-  `curl -s -H "blotato-api-key: $TUTORIAL_BLOTATO_KEY" https://backend.blotato.com/v2/users/me/accounts`
-  (never paste the key anywhere), take the new account's `id`, append it to `TUTORIAL_BLOTATO_ACCOUNT_IDS`
-  in `/home/voiceban/ConstructHUB-live/.env`, and run the dry run again: it must list the account by name.
-  A **Facebook** account also needs its Page: `TUTORIAL_BLOTATO_PAGE_IDS=<accountId>:<pageId>` (page ids:
-  `GET /v2/users/me/accounts/<accountId>/subaccounts`); a **LinkedIn** account posts to the personal
-  profile unless a company page is given the same way. Today: 76607 Instagram `constructhubapp`, 38445
-  LinkedIn "Construct HUB" (a profile — no company page is connected to it), 63054 TikTok `construct.hub`.
-- **When.** By default a post follows its video on YouTube (`youtube-schedule.json`): the same Eastern day,
-  30–90 minutes after YouTube publishes it; LinkedIn only on weekdays 08:30–17:00 Eastern, otherwise
-  09:00–10:59 the next weekday. The minute is a hash of the video and the account — the same every time.
-  Blotato does the timing (`scheduledTime`, an instant beside `post`); nothing of ours runs at post time.
-  `--spread M` ignores YouTube's times: per account the first post goes out now and each next one M minutes
-  (plus up to a third of M) later, accounts starting a few minutes apart.
-- **A gentle start.** New accounts are flagged easily: an account gets **one post a day for its first 14
-  days** (`--warmup-start YYYY-MM-DD` or `TUTORIAL_SOCIAL_START`; default: the day of the first post in the
-  ledger; `--warmup-days N`), then three a day like YouTube. What does not fit a day moves to the next.
-  `--per-day N` sets the share outright. `--platform instagram,tiktok` / `--account 76607` start one network
-  at a time.
-- **TikTok** is sent with every field it requires, set to what is true: public, comments / duets / stitches
-  on, not a paid partnership, `isYourBrand: true` (it promotes our own product) and `isAiGenerated: true`
-  (the narration is a synthetic voice). Its cover is the video's frame at 200 ms — the designed cover, which
-  is the first half second of `vertical-tiktok.mp4`. Instagram gets `cover-vertical.jpg` as `coverImageUrl`,
-  as a Reel shared to the feed. LinkedIn takes no cover: its first frame is the hook.
-- **Never twice.** The ledger, `docs/tutorials/social-schedule.json`, holds one entry per video and account.
-  It is written **before** each request (`sending`) and again after the answer, so an interrupted run cannot
-  repeat a post: an entry whose answer never came stays `sending`, is never sent again by the tool, and
-  `--reconcile` shouts about it — look in Blotato. Only a failure Blotato itself reported can be retried
-  (`--retry-failed`).
-- **Rate.** Blotato allows 30 post creations a minute; the tool makes one every six seconds, waits out a
-  429 for as long as it says, and reads statuses a second apart.
-- Blotato's limits and fields were read from its documentation on 2026-10-08 (`help.blotato.com/api/start`,
-  the API reference and "Media Requirements"); they are quoted in the headers of `social-post-lib.ts` and
-  `social-text.ts`. Not verified by a real post yet: that Instagram honours `coverImageUrl` and that LinkedIn
-  accepts a 4:5 video through Blotato (its page lists 16:9, 9:16 and 1:1; LinkedIn itself takes 4:5).
+  every public address for its first bytes (206, right length, right type) and writes `social/hosted.json`.
+- **Posting.** ConstructHUB's own accounts are connected directly in ConstructHUB's Social Media tool, like a
+  customer's; post the cuts from there with the text in `social.json`.
+- **TikTok** takes every field it requires, set to what is true: public, comments / duets / stitches on, not a
+  paid partnership, our own brand (it promotes our own product) and AI-generated content (the narration is a
+  synthetic voice). Its cover is the designed cover, the first half second of `vertical-tiktok.mp4`.
+  Instagram gets `cover-vertical.jpg` as its cover, as a Reel shared to the feed. LinkedIn takes no cover:
+  its first frame is the hook.
 
 ## Pitfalls already hit (and what the tools now do about them)
 

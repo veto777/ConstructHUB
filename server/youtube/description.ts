@@ -50,7 +50,7 @@ export const BANNED: readonly { name: string; re: RegExp }[] = [
   { name: "best", re: /\bbest\b/i },
   { name: "#1", re: /#\s?1\b|\bnumber\s+one\b/i },
   { name: "guarantee", re: /\bguarantee/i },
-  { name: "a data vendor's name", re: /\b(?:netr\s?online|netronline|netr|dataforseo|openai|chatgpt|elevenlabs|regrid|attom|ahrefs|semrush|openseo|blotato)\b/i },
+  { name: "a data vendor's name", re: /\b(?:netr\s?online|netronline|netr|dataforseo|openai|chatgpt|elevenlabs|regrid|attom|ahrefs|semrush|openseo)\b/i },
   { name: "portal.constructhub", re: /portal\.constructhub/i },
 ];
 /** "Good / better / best" is the name of a kind of estimate (three package options), not a claim: it is read past. */

@@ -6,7 +6,7 @@
  *   google_ads       ads_grants + ads_accounts        (Google Ads manager account)
  *   cloudflare       edge_connections + edge_assets   (provider='cloudflare')
  *   search_console   edge_connections + edge_assets   (provider='gsc')
- *   blotato          social_connections               (social media publishing)
+ *   social           social_connections               (social media publishing)
  *   registrars       domain_connections + managed_domains
  *   gmail_alerts     mail_alert_grants + mail_alert_addresses
  *
@@ -23,6 +23,7 @@ import { pool } from "../db";
 import { fromNativeApp } from "../app-shell";
 import { getEntitlements, textingNumbersAllowance } from "../entitlements";
 import { getCrmEntitlements } from "../crm/entitlements";
+import { connectionProvider } from "../social/schedule";
 import { ADDONS, PLANS, UNLIMITED, planForModule, type ModuleKey, type PlanModules } from "@shared/plans";
 
 export type IntegrationStatus = "connected" | "not_connected" | "reconnect";
@@ -87,14 +88,17 @@ function edgeBuilder(provider: "cloudflare" | "gsc", id: string, service: string
   };
 }
 
-const blotato: Builder = async (userId) => {
-  const conns = await rowsOf<{ business_id: number | null; accounts: number }>(
-    "SELECT business_id, CASE WHEN jsonb_typeof(accounts)='array' THEN jsonb_array_length(accounts) ELSE 0 END AS accounts FROM social_connections WHERE user_id=$1 ORDER BY business_id NULLS FIRST", [userId]);
-  const item = { id: "blotato", service: "Blotato (social media)", manageHref: "/social-media" };
-  if (!conns.length) return { ...item, status: "not_connected", detail: "No Blotato API key connected." };
+const social: Builder = async (userId) => {
+  const rows = await rowsOf<{ business_id: number | null; accounts: number; key_enc: string }>(
+    "SELECT business_id, key_enc, CASE WHEN jsonb_typeof(accounts)='array' THEN jsonb_array_length(accounts) ELSE 0 END AS accounts FROM social_connections WHERE user_id=$1 ORDER BY business_id NULLS FIRST", [userId]);
+  const item = { id: "social", service: "Social media accounts", manageHref: "/social-media/accounts" };
+  if (!rows.length) return { ...item, status: "not_connected", detail: "No social accounts connected." };
+  // A connection ConstructHUB cannot post through (unreadable, or a legacy key) is reconnected in Social Media.
+  const conns = rows.filter((c) => connectionProvider(c.key_enc, userId));
+  if (conns.length < rows.length) return { ...item, status: "reconnect", detail: "Reconnect your social accounts through ConstructHUB in Social Media > Accounts." };
   const accounts = conns.reduce((s, c) => s + c.accounts, 0);
   const scoped = conns.filter((c) => c.business_id != null).length;
-  return { ...item, status: "connected", detail: `${n(accounts, "social account")} linked · ${conns.some((c) => c.business_id == null) ? "agency-wide key" : "per-business keys"}${scoped ? ` · ${n(scoped, "business")} with ${scoped === 1 ? "its" : "their"} own key` : ""}.` };
+  return { ...item, status: "connected", detail: `${n(accounts, "social account")} linked · ${conns.some((c) => c.business_id == null) ? "agency-wide connection" : "per-business connections"}${scoped ? ` · ${n(scoped, "business")} with ${scoped === 1 ? "its" : "their"} own connection` : ""}.` };
 };
 
 const registrars: Builder = async (userId, modules) => {
@@ -147,7 +151,7 @@ export const INTEGRATION_BUILDERS: readonly Builder[] = [
   googleAds,
   edgeBuilder("cloudflare", "cloudflare", "Cloudflare", "/cloudflare", "zone"),
   edgeBuilder("gsc", "search_console", "Google Search Console", "/search-console", "property"),
-  blotato,
+  social,
   registrars,
   gmailAlerts,
   clientTexting,

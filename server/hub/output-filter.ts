@@ -90,7 +90,7 @@ const PLAN_WORD_OK = new Set([
   // The AI Call Assistant's tiers ("the 500 minutes tier", "the Call Assistant tier") are sold names too (shared/plans.ts CALL_ASSISTANT_TIERS).
   ...PLAN_NAMES, ...CRM_PLAN_WORDS, ...CALL_ASSISTANT_TIERS.map((t) => t.name), "Assistant", "Every", "Each", "Any", "Which", "This", "That", "Your", "The", "No", "Paid", "Monthly", "Annual",
   "Yearly", "Pricing", "A", "An", "One", "Our", "My", "Their", "Current", "New", "Same", "Right", "Cheapest", "Higher",
-  "Lower", "Bigger", "Larger", "Smaller", "Other", "Different", "Cloudflare", "Blotato", "Google", "Stripe",
+  "Lower", "Bigger", "Larger", "Smaller", "Other", "Different", "Cloudflare", "Google", "Stripe",
   "ConstructHUB", "ConstructHub", "Change", "Choose", "Switch", "Pick", "Select", "Compare", "Upgrade", "Downgrade", "Cancel",
 ]);
 // From server/pricing-copy.test.ts: the plans sold before 2026-09-30 and retired copy.
@@ -293,7 +293,7 @@ const PROFANITY = /\b(fuck\w*|shit\w*|bitch\w*|asshole\w*|bastard\w*|cunt\w*|mot
 /**
  * Other companies Gabe never names, as letters only: a name matches however it is cased, spaced or
  * hyphenated ("House Call Pro", "Job-ber", "ANGI"), but never inside a longer word ("changing").
- * Google, Stripe, Cloudflare, SignalWire, Gmail, Blotato, HOVER, NETR Online and the citation and
+ * Google, Stripe, Cloudflare, SignalWire, Gmail, HOVER, NETR Online and the citation and
  * social sites the pack lists (Yelp, BBB, Apple Maps, Bing Places, Facebook…) are named in the pack.
  */
 export const COMPETITOR_NAMES: readonly string[] = [

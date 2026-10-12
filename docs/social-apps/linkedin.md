@@ -5,7 +5,7 @@ Blanks (`____`) are for the owner. **(verified 2026-10-11)** = read on learn.mic
 that day (sources in section 9); **(to confirm)** = our understanding only.
 
 The native LinkedIn connection is **not built**; today the Social Media tool reaches LinkedIn only
-through the customer's own Blotato key (`server/social/client.ts`). Section 5 lists what to build.
+through ConstructHUB's Outstand account (`server/social/outstand.ts`). Section 5 lists what to build.
 
 **Product to apply for: Community Management API** (LinkedIn Marketing API program). It is the only
 product that grants `w_organization_social` (post as a Company Page) to a third-party app. It also

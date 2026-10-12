@@ -1,12 +1,12 @@
 # AUDIT3 a4 — Social Media and Guides
 
-Audited 2026-09-29 in `/home/veto/ConstructHUB-a4`, port **8159**, database **constructhub_dev_a4**. Read CLAUDE.md, HANDOFF.md's shipped-features section and FEATURE-a1 through FEATURE-a5. No production access, deploy, push, external publication, paid AI request, R2 write or SMTP delivery. Explicitly labelled fixture content was used only in tests; fixtures are cleaned up. Google, Blotato, upload storage and AI boundaries were injected/intercepted. `EMAIL_FORCE_SINK=1`; GBP sync, Social and Site Scan workers disabled; GBP content worker also disabled. No other lane's process or database was changed.
+Audited 2026-09-29 in `/home/veto/ConstructHUB-a4`, port **8159**, database **constructhub_dev_a4**. Read CLAUDE.md, HANDOFF.md's shipped-features section and FEATURE-a1 through FEATURE-a5. No production access, deploy, push, external publication, paid AI request, R2 write or SMTP delivery. Explicitly labelled fixture content was used only in tests; fixtures are cleaned up. Google, posting-provider, upload storage and AI boundaries were injected/intercepted. `EMAIL_FORCE_SINK=1`; GBP sync, Social and Site Scan workers disabled; GBP content worker also disabled. No other lane's process or database was changed.
 
 ## Results
 
 | Flow | How exercised | Result |
 |---|---|---|
-| Connect Blotato; encrypt key; clear input | Real PostgreSQL with injected accounts HTTP; browser connection fixture; inspect ciphertext, response and activity | PASS |
+| Connect posting provider; encrypt key; clear input | Real PostgreSQL with injected accounts HTTP; browser connection fixture; inspect ciphertext, response and activity | PASS |
 | Owner-bound encryption and tampering | Wrong-owner decryption and modified ciphertext tests | PASS |
 | Authentication and key redaction | Invoke authentication middleware on every registered Social route; inspect dashboard/upload response keys; provider failures use generic safe errors | PASS |
 | Disconnect | Assert key deletion, disabled automation, cancelled drafts/unsent queue and activity; browser disconnect | PASS; submitted provider work remains external |
@@ -18,10 +18,10 @@ Audited 2026-09-29 in `/home/veto/ConstructHUB-a4`, port **8159**, database **co
 | Platform tweaks | Browser compose/tweak; persisted payload and request-fingerprint tests | PASS |
 | Media Library and pasted URL | Browser attachment; real owner-scoped library route; exclude another owner's and nonpublic photos | PASS |
 | Media URL validation | Private/reserved literals, alternate IPv4 encodings, local suffixes, credentials, HTTP, IPv6 and nonstandard ports | FIXED `711faf2` |
-| Blotato upload | Inject upload URL response; browser raw-byte PUT; assert resulting public URL in post; reject invalid filename/private returned URL | PASS |
+| Provider upload | Inject upload URL response; browser raw-byte PUT; assert resulting public URL in post; reject invalid filename/private returned URL | PASS |
 | Save draft during upload | Hold browser PUT open and assert Save draft disabled until completion | FIXED `6a52db5` |
 | Post now / durable queue | Real insert and worker with injected provider; acceptance becomes submitted, polling becomes published, never duplicate POST | PASS |
-| Scheduled post | Future queue row stays local; browser local datetime converted to ISO; payload not independently scheduled at Blotato | PASS |
+| Scheduled post | Future queue row stays local; browser local datetime converted to ISO; payload not independently scheduled at the provider | PASS |
 | Draft, edit, approve, cancel | Real draft hold/edit/approval/cancel, final-state guards, cross-owner action denial; browser AI draft edit/approval | PASS |
 | Overlength approval edit | Attempt 281-character Twitter approval; preserve draft and return actionable 400 instead of generic 500 | FIXED `488a57f` |
 | Repeated/conflicting submission | Identical retry returns original IDs, including after approval edit; changed text/media/draft rejected, duplicate destinations rejected | FIXED `70a25ab`; compact stable SHA-256 fingerprint `7e6e8e4` |
@@ -63,8 +63,8 @@ Audited 2026-09-29 in `/home/veto/ConstructHUB-a4`, port **8159**, database **co
 No known critical/high defect remains in the exercised offline flows. These limitations remain explicit rather than being reported as successful live tests:
 
 1. **P2 — Multi-location auto context is not selectable.** `server/social/service.ts:401` selects the first saved business, and `sourceFor` uses owner-wide sources. Repro: save two businesses, select social accounts for the second, generate; the model context uses the first business. This is the existing single-business auto-mode design; adding an owner-scoped location/source selector is recommended before using one account for unrelated businesses. Manual composition is unaffected.
-2. **P2 — Private Media Library assets are unavailable to Social.** `server/social/routes.ts:132` filters for public HTTPS URLs; `server/social/service.ts:342` stops project generation without one. Repro: populate the library only with authenticated proxy URLs, then open Social's library picker or generate Project photos. Use a public URL or Blotato upload today. A narrowly scoped, expiring publication URL bridge would support the private library without making the bucket public.
-3. **P2 — Provider-specific media acceptance remains unverified.** `shared/social.ts:164` infers Facebook reels from `.mp4`/`.mov`; media validation does not inspect MIME/codec/dimensions. Repro: paste an extensionless Facebook video URL, or a JPEG for YouTube; the local queue accepts it and final acceptance is left to Blotato. No live publishing was allowed in this audit. Explicit video selection and upload MIME metadata would improve preflight without unsafe URL fetching.
+2. **P2 — Private Media Library assets are unavailable to Social.** `server/social/routes.ts:132` filters for public HTTPS URLs; `server/social/service.ts:342` stops project generation without one. Repro: populate the library only with authenticated proxy URLs, then open Social's library picker or generate Project photos. Use a public URL or provider upload today. A narrowly scoped, expiring publication URL bridge would support the private library without making the bucket public.
+3. **P2 — Provider-specific media acceptance remains unverified.** `shared/social.ts:164` infers Facebook reels from `.mp4`/`.mov`; media validation does not inspect MIME/codec/dimensions. Repro: paste an extensionless Facebook video URL, or a JPEG for YouTube; the local queue accepts it and final acceptance is left to the provider. No live publishing was allowed in this audit. Explicit video selection and upload MIME metadata would improve preflight without unsafe URL fetching.
 4. **P3 — Throughput and history bounds.** `server/social/service.ts:489` processes ten due rows per owner, and `:615` visits owners sequentially; a slow provider can delay later owners. `server/social/routes.ts:77` returns only the newest 200 rows, without pagination. Repro: inject slow HTTP for the first owner to observe later work waiting; create more than 200 destination rows to omit older history. No production-scale load benchmark was run. Preserve per-key pacing and owner locks when adding bounded cross-owner concurrency and cursor pagination.
 5. **P3 — Queue review could show more destination/media detail.** `client/src/pages/social-media.tsx:884` renders platform, text, state and source, but not a named account/page/board or media preview. Repro: create drafts for two accounts on the same platform; their rows are difficult to distinguish. Recommend explicit destination labels and media links/previews before approval.
 
@@ -75,6 +75,5 @@ No known critical/high defect remains in the exercised offline flows. These limi
 - Keep source deletion/offer expiry and uncertain-result handling explicit. Never automatically resend an ambiguous remote submission.
 - Preserve the existing tests as offline provider contracts. In a separately authorized staging exercise, validate real account scopes, upload CORS, network-specific media and final public URLs using owner-approved content.
 
-Provider contract references checked read-only: [Blotato account/page/board discovery](https://help.blotato.com/rest-api-reference/accounts), [create post](https://help.blotato.com/rest-api-reference/publish-post), [post status](https://help.blotato.com/rest-api-reference/publish-post/get-post), and [presigned media upload](https://help.blotato.com/api-and-mcp-concepts/media-uploads-and-conversion). These support the mocked request/response shapes, not a claim of live acceptance.
 
 LANE DONE a4

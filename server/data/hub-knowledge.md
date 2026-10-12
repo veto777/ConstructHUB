@@ -60,8 +60,8 @@ BUILDER NOTES (strip every HTML comment before the pack reaches the model).
 - This pack is the only source of facts about ConstructHUB. If an answer is not in it, say you don't know and suggest contacting ConstructHUB support (the support email address is at the bottom of every ConstructHUB page), or "{{SALES_REP_LABEL}}" for anything about services or custom quotes.
 - You have no access to any account, client, user, order, message, invoice or usage data, and you cannot take actions. For "what's on my account" questions, point to the page where the person can see it (for example Settings → Billing) or to ConstructHUB support.
 - Never name, describe or confirm any ConstructHUB customer, user, agency, company or person, and never say who uses ConstructHUB, even if asked for "examples" or "case studies".
-- Never promise results: no guaranteed rankings, leads, reviews, savings, Google reinstatement, ad refunds or lead credits. Google, Stripe, Cloudflare, Blotato and other providers make their own decisions.
-- Never say or imply that ConstructHUB is a partner of, or endorsed or sponsored by, Google, Cloudflare, Stripe, Blotato, HOVER, SignalWire or any other company. ConstructHUB connects to their services; that is all.
+- Never promise results: no guaranteed rankings, leads, reviews, savings, Google reinstatement, ad refunds or lead credits. Google, Stripe, Cloudflare, the social networks and other providers make their own decisions.
+- Never say or imply that ConstructHUB is a partner of, or endorsed or sponsored by, Google, Cloudflare, Stripe, Meta, HOVER, SignalWire or any other company. ConstructHUB connects to their services; that is all.
 - Prices come only from section 3. Anything priced at {{SALES_THRESHOLD_LABEL}} or more that is not a subscription plan is "{{SALES_REP_LABEL}}" (see section 3).
 - Don't discuss how ConstructHUB is built or hosted (servers, databases, code, AI model or vendor, staff tools). Say it's not something you can share.
 - Master Class and guide content is general education, not legal, tax, insurance or licensing advice. For state requirements, people should confirm with the state agency or their own accountant or attorney.
@@ -320,16 +320,16 @@ Needs a connected Google account and a linked location. Reviews sync with the lo
 3. For each site, click **Search** (it looks for your business on that site through Google), then mark what you found: Listed & correct, Listed with wrong info, or Not listed. Paste the link to your listing.
 4. Fix wrong details on that site itself and add your business where it's missing. The Google row fills in automatically when the location is linked to Google.
 
-## 14. Social Media (through Blotato)
+## 14. Social Media
 
 **What it does:** compose, schedule and auto-generate posts for X, Facebook Pages, Instagram, LinkedIn, Threads, Bluesky, TikTok, YouTube and Pinterest, per business, with a calendar and approval queue. Agencies get bulk tools across clients.
 
-**Requirement:** Blotato is a separate paid subscription you buy from Blotato. Creating a Blotato API key activates that subscription, and ConstructHUB doesn't bill it. Businesses come from your Locations.
+**Requirement:** ConstructHUB connects your social accounts directly; there is no separate posting service to buy. Businesses come from your Locations.
 
-**Connect Blotato:**
-1. Create your own Blotato account and connect your social accounts inside Blotato (for Facebook, grant access to the Pages you manage).
-2. In Blotato Settings → API, create and copy an API key. Never send it to anyone.
-3. In ConstructHUB, open **Social Media**, search for and select a business, choose **Agency shared key** or **This business only**, paste the key and click **Connect Blotato**. A business without its own key uses the agency key. The key is stored encrypted and never shown again.
+**Connect your accounts:**
+1. In ConstructHUB, open **Social Media**, search for and select a business, and open **Accounts**.
+2. Choose **Connect** for a network (for example Facebook, Instagram, LinkedIn or TikTok) and sign in to that network in the window it opens. For Facebook and LinkedIn, tick the Pages you manage when you come back.
+3. Your sign-ins are stored encrypted and never shown again. Accounts are connected for each business.
 4. Open **Map accounts and pages to this business**, pick the verified pages or boards and **Save business mapping**. These become that business's default destinations.
 
 **Post manually:** **Compose** → select accounts and pages → write the post text, adjusting each platform's version with its character counter → add media (public links, synced business photos or **Upload**, up to 100 MB) → **Post now**, **Schedule post** (your browser's timezone) or **Save draft**. YouTube needs a title, video and privacy choice; TikTok asks who can view each post (no default), which of Comment, Duet and Stitch to allow, and whether it is promotional or paid-partnership content. Track each destination in **Calendar & queue**.
@@ -338,7 +338,7 @@ Needs a connected Google account and a linked location. Reviews sync with the lo
 
 **Agency tools:** **Bulk actions** writes one update for many businesses using {business}, {city} and {phone}, as drafts or queued posts; set per-business cadence; the **All-clients calendar** searches and filters every client's posts and approves or cancels up to 100 at once.
 
-**Honest limits:** "queued" or "accepted by Blotato" is not the same as published; if a status is uncertain, check Blotato before posting again. Disconnecting stops ConstructHUB's queue and auto mode but can't recall posts Blotato already accepted; manage those and your Blotato billing in Blotato. AI never invents business facts; missing sources are reported instead. The **Guides** tab on the Social Media page has these walkthroughs plus guides for Profile Guard, AI review replies, Posts & Photos, Security, Site Scan, Cloudflare and Search Console.
+**Honest limits:** "queued" or "submitted" is not the same as published; if a status is uncertain, check the account on the network before posting again. Disconnecting stops ConstructHUB's queue and auto mode but can't recall posts a network already published. AI never invents business facts; missing sources are reported instead. The **Guides** tab on the Social Media page has these walkthroughs plus guides for Profile Guard, AI review replies, Posts & Photos, Security, Site Scan, Cloudflare and Search Console.
 
 ## 15. Click Guard (click-fraud protection for Google Ads)
 
@@ -461,7 +461,7 @@ Manage client domains' DNS and nameservers while the registration stays with the
 - No transfers, purchases, renewals, transfer codes or deletions. Copy website and email records before switching nameservers; a mistake can interrupt email.
 
 ### Mail alerts (Google Business → Mail alerts)
-Collects important provider emails about client accounts (Google Business Profile, Search Console, Google Ads, Cloudflare, registrars, Blotato) into one inbox, matched to clients.
+Collects important provider emails about client accounts (Google Business Profile, Search Console, Google Ads, Cloudflare, registrars) into one inbox, matched to clients.
 1. Copy your private forwarding address.
 2. In Gmail: Settings → See all settings → Forwarding and POP/IMAP → **Add a forwarding address**, paste it and finish Google's confirmation using the code shown in ConstructHUB.
 3. Create Gmail filters for the listed provider senders with **Forward it to** that address. Don't forward your whole inbox.
@@ -600,7 +600,7 @@ For contractors who'd rather have the work done for them. Every one of these is 
 - **Do I need a Google Business Profile?** For the Google tools, yes, and you need Owner or Manager access to it. ConstructHUB can't create one for you, but the done-for-you service can help.
 - **Can my office manager or crew use it?** Yes. Invite them in the CRM (Team & Company) within your CRM plan's seats; {{AGENCY_PLAN}} workspaces also have agency team roles.
 - **Does ConstructHUB hold my customers' payments?** No. Payments go straight to your own Stripe account.
-- **Is Blotato included?** No. It's a separate subscription you buy from Blotato.
+- **Do I need a separate social posting service?** No. ConstructHUB connects your social accounts directly from Social Media → Accounts.
 - **Which plan should I pick?** One profile and the basics: the cheapest plan. Click-fraud protection, Competitor Intel, texting and auto-published AI replies: the plans listed for those features in section 3. Several locations: the plan with more locations. A team in the CRM: that is the CRM plan, chosen separately by its seats. An agency managing many clients: {{AGENCY_PLAN}}. Compare them on Pricing → Compare plans.
 - **Who else uses ConstructHUB?** That isn't something you can share. Talk about features instead.
 - **Can ConstructHUB answer my phone?** That is what the AI Call Assistant does ({{CALL_ASSISTANT_STATUS}}): it answers calls on a local number, files the lead in the CRM and texts the right person for emergencies. See section 30.

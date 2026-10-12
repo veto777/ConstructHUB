@@ -886,9 +886,9 @@ Verified empty: `GET /api/media/folders` → `[]` (curl); Playwright shows "No f
 ---
 
 ## /social-media — client/src/pages/social-media.tsx
-One-line purpose: compose once, publish/schedule to many social accounts through a Blotato API key; calendar/queue, AI auto-mode, content sources.
+One-line purpose: compose once, publish/schedule to many social accounts connected through ConstructHUB; calendar/queue, AI auto-mode, content sources.
 
-Facts: this page uses a **Blotato API key**, not per-platform OAuth; there are no per-platform connect cards. All social tables are empty. Verified via curl for business 104296: `connected:false, accounts:[], posts:[], total:0, defaults:[]`; `/api/social/media` → `[]`; `/api/social/sources` → `[]`. Without `?business=` the page shows the business picker and "Choose a business above. Add or import businesses in Locations" (/locations route exists).
+Facts: accounts are connected per network through ConstructHUB (the original snapshot used an API-key card, since removed). All social tables are empty. Verified via curl for business 104296: `connected:false, accounts:[], posts:[], total:0, defaults:[]`; `/api/social/media` → `[]`; `/api/social/sources` → `[]`. Without `?business=` the page shows the business picker and "Choose a business above. Add or import businesses in Locations" (/locations route exists).
 
 ### Header / business selection
 | Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
@@ -897,28 +897,26 @@ Facts: this page uses a **Blotato API key**, not per-platform OAuth; there are n
 | BusinessSelector (component client/src/components/social-agency.tsx:32) | picker | Search/pick one of the owner's businesses or "All businesses" (all-clients calendar); sets `?business=` | social-media.tsx:68 | GET /api/social/businesses → server/social/routes.ts:93 → listBusinesses (business_locations owned by user) | Playwright (2 businesses listed: 104296 "K- Social workbench fixture", 506025 "AI-TEST Ridgeline Roofing") | OK |
 | "Choose a business above…" hint | text | Shown when no business selected | social-media.tsx:72 | — | Playwright | OK |
 
-### Blotato connection
-| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
+### Connected accounts
+(The API-key card this snapshot originally listed was removed; accounts are connected through ConstructHUB.)
+| Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend | Verified | Status |
 |---|---|---|---|---|---|---|
-| "Blotato connection" section + StatusPill (Connected / Not connected) | section + pill | Shows effective connection state | social-media.tsx:256-325 | GET /api/social → server/social/routes.ts:148 dashboard → social_connections (user_id,business_id scoped) | curl connected:false; Playwright pill "Not connected" | OK |
-| "Key to manage" scope select + "Effective connection" text | select + text | Choose business-only vs agency shared key; shows which is in effect (`connectionScope`) | social-media.tsx:266-275 | same dashboard payload (`agencyConnected`, `businessConnected`, `connectionScope`) | curl | OK |
-| Blotato API key input + "Connect Blotato" / "Verify / replace key" button | input + button | Sends key to server; server verifies against Blotato and stores it encrypted (never displayed again) | social-media.tsx:276-303 | POST /api/social/connect → server/social/routes.ts:150 → service.ts:connect → INSERT social_connections(user_id,key_enc,accounts,business_id) ON CONFLICT UPDATE | code (would write + call Blotato — not pressed) | OK |
-| Disconnect button | button | Removes the stored key; cancels queued posts/drafts and bulk jobs locally | social-media.tsx:304-313 | POST /api/social/disconnect → routes.ts:158 → DELETE social_connections; UPDATE social_settings enabled=false; UPDATE social_posts queued/draft→cancelled; UPDATE social_bulk_jobs→cancelled | code | OK |
-| Connected accounts line ("name (platform) · …") | text | Lists Blotato accounts for the key | social-media.tsx:317-323 | dashboard `accounts` | curl [] | OK |
+| Accounts tab: one Connect card per network (SocialConnect) | cards + buttons | Sends the owner to the network's own sign-in; Facebook/LinkedIn then pick Pages | client/src/components/social-connect.tsx | POST /api/social/native/connect or /api/social/outstand/connect → server/social/service.ts nativeConnectUrl / outstandConnectUrl → social_connections | code | OK |
+| Disconnect button | button | Removes the stored connection; cancels queued posts/drafts and bulk jobs locally | social-connect.tsx | POST /api/social/disconnect → server/social/service.ts disconnect → DELETE social_connections | code | OK |
 
 ### Mapping editor
 | Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
 |---|---|---|---|---|---|---|
-| MappingEditor (social-media.tsx:328; client/src/components/social-agency.tsx:126-158) | panel | Map Blotato accounts/pages to the business; refresh pages/boards | social-agency.tsx:126-158 | GET /api/social/accounts; PUT /api/social/mapping; POST /api/social/accounts/:id/pages → server/social/routes.ts:106,102,161 | code | OK |
+| MappingEditor (social-media.tsx:328; client/src/components/social-agency.tsx:126-158) | panel | Map connected accounts/pages to the business; refresh pages/boards | social-agency.tsx:126-158 | GET /api/social/accounts; PUT /api/social/mapping; POST /api/social/accounts/:id/pages → server/social/routes.ts:106,102,161 | code | OK |
 
 ### Compose tab
 | Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
 |---|---|---|---|---|---|---|
 | "Post to" account checkboxes + per-platform options (refresh pages/boards, page/board select, YouTube title + privacy, TikTok public/branded/own-brand flags) | checkbox cards | Choose destinations; per-platform tweak fields | social-media.tsx:352-488 | POST /api/social/accounts/:id/pages (discoverPages) | code | OK |
 | Post text textarea + per-platform tweak textareas with char counts (`socialLimits`) | textareas | Message + per-platform overrides with limits from @shared/social | social-media.tsx:489-513 | client validation | code | OK |
-| "Public media URLs" textarea + validation + "Search synced business photos" + media library select + "Upload through Blotato" file input | media inputs | Attach up to 10 public HTTPS media URLs; search synced Media Library photos; or upload ≤100 MB via presigned URL | social-media.tsx:514-561 | GET /api/social/media → server/social/routes.ts:205 (media_photos of the business owner); POST /api/social/uploads → routes.ts:214 (presigned PUT, publicUrl) | curl [] for media; code for upload | OK |
+| "Public media URLs" textarea + validation + "Search synced business photos" + media library select + "Upload a photo or video" file input | media inputs | Attach up to 10 public HTTPS media URLs; search synced Media Library photos; or upload ≤100 MB via presigned URL | social-media.tsx:514-561 | GET /api/social/media → server/social/routes.ts:205 (media_photos of the business owner); POST /api/social/uploads → routes.ts:214 (presigned PUT, publicUrl) | curl [] for media; code for upload | OK |
 | Schedule time (datetime-local) | input | Blank = post now; otherwise scheduledTime ISO | social-media.tsx:567-575 | client | code | OK |
-| "Post now"/"Schedule post" + "Save draft" buttons + postBlocker hint text | buttons | Disabled with a plain reason until connected + destination + text (+media valid); submit → create posts | social-media.tsx:576-595 | POST /api/social/posts → server/social/routes.ts:164 → createPosts → INSERT social_posts (payload, state draft/queued, due_at) | code (write not pressed); Playwright buttons render disabled with hint "Connect Blotato above to post." | OK |
+| "Post now"/"Schedule post" + "Save draft" buttons + postBlocker hint text | buttons | Disabled with a plain reason until connected + destination + text (+media valid); submit → create posts | social-media.tsx:576-595 | POST /api/social/posts → server/social/routes.ts:164 → createPosts → INSERT social_posts (payload, state draft/queued, due_at) | code (write not pressed); Playwright buttons render disabled with hint "Connect your social accounts above to post." | OK |
 
 ### Calendar & queue tab
 | Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
@@ -926,7 +924,7 @@ Facts: this page uses a **Blotato API key**, not per-platform OAuth; there are n
 | Toolbar: search, Calendar day date input, Status select (draft/queued/submitting/submitted/published/failed/uncertain/cancelled), Platform select | filters | Filters the post list (server-side via query params) | social-media.tsx:606-627 | GET /api/social?offset&search&state&platform&timezone&businessId&day → dashboard (social_posts WHERE user_id,business_id, filters; LIMIT 25) | curl total:0 | OK |
 | "No posts yet. Compose your first update or generate an AI draft." + "0 matching posts" | empty state + count | Honest empty state | social-media.tsx:628-633 | — | curl; code | OK |
 | Select this page / Approve selected drafts / Cancel selected posts + "N selected (up to 100)" + bulk error list | bulk actions | Bulk approve/cancel over selected draft/queued posts | social-media.tsx:634-639 | POST /api/social/posts/bulk-action → routes.ts:168 | code | OK |
-| Pager + PostRow list (state Badge, business name or "Legacy / unassigned", platform, local time, AI-generated badge, editable draft text, Approve & queue / Cancel, View published post, Open Blotato status, submission id) | post list | Each post row with status pill and per-post actions | social-media.tsx:640-657, 1021-1123 | POST /api/social/posts/:id/action → routes.ts:179 (approve/cancel; UPDATE social_posts state) | code | OK |
+| Pager + PostRow list (state Badge, business name or "Legacy / unassigned", platform, local time, AI-generated badge, editable draft text, Approve & queue / Cancel, View published post, submission id) | post list | Each post row with status pill and per-post actions | social-media.tsx:640-657, 1021-1123 | POST /api/social/posts/:id/action → routes.ts:179 (approve/cancel; UPDATE social_posts state) | code | OK |
 | "Status refreshes every 15 seconds" note | text | Query refetchInterval 15000 | social-media.tsx:603 | — | code | OK |
 
 ### Auto mode tab
@@ -996,7 +994,7 @@ One-line purpose: market scans that index competitors from Google Places and heu
 ---
 
 ## /mail-alerts — client/src/pages/mail-alerts.tsx
-One-line purpose: private email-in address that turns forwarded provider mail (Google, Cloudflare, registrars, Blotato) into classified, expiring alerts mapped to client locations.
+One-line purpose: private email-in address that turns forwarded provider mail (Google, Cloudflare, registrars) into classified, expiring alerts mapped to client locations.
 
 Verified: `GET /api/mail-alerts/settings?page=1` returns `address: "alerts+1382ddff5f475faf087655fe28a7c76af432a7d4dd538e08@alerts.constructhub.test"`, `oauthEnabled: false`, `grants: []`, sender lists. `mail_alert_addresses` has 1 row (user 1, `token_cipher` length 109, created 2026-09-30 08:59:33 -04). `mail_alert_messages` 0 rows → list endpoint `{items:[],total:0}`. **Factually absent vs the brief: there is no copy button, no regenerate and no delete control for the address** — the address is a read-only input, and the server auto-creates it once (`ON CONFLICT DO NOTHING`, server/mail-alerts/service.ts:13-16) with no regenerate/delete endpoint anywhere in server/mail-alerts.
 
@@ -1020,7 +1018,7 @@ Verified: `GET /api/mail-alerts/settings?page=1` returns `address: "alerts+1382d
 ### Provider inbox
 | Element (visible label / testid) | Kind | What it does, in plain words for the owner | Frontend (file:line) | Backend (METHOD /path → server/file.ts:function → tables.columns, filter, time window) | Verified how | Status |
 |---|---|---|---|---|---|---|
-| section-mail-inbox + Toolbar (search q; category select gbp/gsc/ads/cloudflare/registrar/blotato/forwarding; severity select critical/warning/info) | filters | Server-side filtered list; 5 s polling unless plan-gated | mail-alerts.tsx:242-297 | GET /api/mail-alerts?q&page&category&severity → server/mail-alerts/routes.ts:60 → mail_alert_messages WHERE user_id=1 AND expires_at>now() AND (subject ILIKE %q% OR sender ILIKE) AND category/severity/location_id filters ORDER BY received_at DESC, id DESC LIMIT 25 OFFSET (page-1)*25 + count(*) total | curl {items:[],total:0}; SQL count 0 | OK |
+| section-mail-inbox + Toolbar (search q; category select gbp/gsc/ads/cloudflare/registrar/forwarding; severity select critical/warning/info) | filters | Server-side filtered list; 5 s polling unless plan-gated | mail-alerts.tsx:242-297 | GET /api/mail-alerts?q&page&category&severity → server/mail-alerts/routes.ts:60 → mail_alert_messages WHERE user_id=1 AND expires_at>now() AND (subject ILIKE %q% OR sender ILIKE) AND category/severity/location_id filters ORDER BY received_at DESC, id DESC LIMIT 25 OFFSET (page-1)*25 + count(*) total | curl {items:[],total:0}; SQL count 0 | OK |
 | Select page checkbox + "{n} selected" + "Mark selected as read" (action("/read")) | bulk action | Marks up to 100 alerts read | mail-alerts.tsx:298-332 | POST /api/mail-alerts/read → routes.ts:99 (UPDATE mail_alert_messages SET read_at=now() WHERE user_id AND id=ANY) | code | OK |
 | Client search (GET /api/domains/locations?q&page) + "Unmapped" client select + client pager + "Map selected alerts" (action("/mapping")) | mapping controls | Maps selected alerts to a business location (or null = unmapped) | mail-alerts.tsx:333-388 | GET /api/domains/locations; POST /api/mail-alerts/mapping → routes.ts:110 (validates location belongs to user; UPDATE location_id) | code | OK |
 | Alert cards (card-alert-*): subject; "{category} · {severity} · {sender} · {toLocaleString(received_at)} · Read/Unread · Client location {id} or Unmapped/ambiguous client"; Critical/Warning StatusPill; "Forwarding confirmation code: {code}"; "Confirm forwarding at Google" link; "Read matched message" details with body | message list | One card per retained alert; empty → "No matching provider alerts." | mail-alerts.tsx:391-467 | same GET (columns id,category,severity,sender,subject,body,confirmation_code,confirmation_link,domain_id,location_id,read_at,received_at); retention: expires_at = received_at + 30 days (service.ts MAIL_RETENTION_DAYS=30) | Playwright (empty state) | OK |
@@ -1032,7 +1030,7 @@ Verified: `GET /api/mail-alerts/settings?page=1` returns `address: "alerts+1382d
 ## In-page links sanity check
 - /photos → /auth?next=/photos, /pricing, /locations (all exist); business.google.com & biz.yelp.com external.
 - /media-library → none internal beyond page itself.
-- /social-media → /locations (exists), blotato.com external, my.blotato.com external, published post URLs external.
+- /social-media → /locations (exists), network sign-in pages external, published post URLs external.
 - /ranking-grid → none internal.
 - /competitors → /pricing (exists).
 - /mail-alerts → /domains (exists), Google forwarding confirmation link external.

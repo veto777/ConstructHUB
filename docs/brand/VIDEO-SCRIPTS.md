@@ -275,8 +275,8 @@ shortest, it is true of the CRM's lead-to-paid path, and it does not say "all-in
 
 1. Re-read every figure on the competitor's own pricing page **that day** (and ours), against the
    film's claims list and `docs/brand/sources/`. If a figure moved, the film is re-recorded, not released.
-2. `youtube-schedule.ts --release <key>` (dry run first) and `social-post.ts <key> --release <key>` —
-   without `--release` both list it as "held for owner approval".
+2. `youtube-schedule.ts --release <key>` (dry run first) — without `--release` it lists it as
+   "held for owner approval". Social posts of a released film are made from ConstructHUB's Social Media tool.
 3. For a `brand-vs-…` film, to show it in the app as well: delete `unlisted: true` from its help entry,
    `git mv docs/brand/held-manifests/<key>.json shared/help/videos/`, run `gen-index.ts`, deploy.
 4. Put a reminder to re-check the prices every 90 days; unlist a film that has gone stale.

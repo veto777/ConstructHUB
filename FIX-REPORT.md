@@ -78,7 +78,7 @@ re-seed alone would not have fixed the lane). property-1 re-shot and inspected.
 - `ads.json` customerApi-2 caption "API usage by key over the last 30 days" → "API usage by key, day by day".
 - `crm.json` masterClass-1 caption "Four modules and a guide for every state" → "Modules and a state guide for
   every state".
-- `reviews.json` social-2 alt drops the third-party product name "Blotato" → "their submission status".
+- `reviews.json` social-2 alt drops a third-party product name → "their submission status".
 
 ### 7. MEDIUM — harden server/feature-pages.test.ts (mandatory) — DONE
 - Reverse coverage: every `status: "ready"` page must now have ≥1 screen (a future screen-less page fails).

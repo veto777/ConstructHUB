@@ -4,10 +4,10 @@ import { planNamesWhere } from "../plan-copy";
 
 /**
  * Social Media — every claim is backed by the code in `sources`:
- *   - posting goes through Blotato with the customer's OWN Blotato API key (a separate paid subscription that
- *     ConstructHUB does not bill for); key encrypted, never shown again; per-business key with an agency fallback:
- *     client/src/pages/social-media.tsx (Blotato connection card), server/social/client.ts, server/social/schedule.ts connection()
- *     (Blotato is named because it is a required, separately-billed integration — the buyer has to know.)
+ *   - ConstructHUB connects the customer's accounts itself: the customer signs in to each network from Social Media →
+ *     Accounts (ConstructHUB Direct, server/social/native.ts, and ConstructHUB's Outstand account, server/social/outstand.ts);
+ *     no separate posting subscription; the stored connection is encrypted, never shown again:
+ *     client/src/components/social-connect.tsx, server/social/client.ts encryptKey, server/social/schedule.ts connection()
  *   - networks: X (Twitter), Facebook, Instagram, LinkedIn, Threads, Bluesky, TikTok, YouTube, Pinterest, with a
  *     per-network text tweak and character cap: shared/social.ts platforms / socialLimits
  *   - up to 20 destinations and 10 public media links per post, uploads under 100 MB, post now / schedule / draft:
@@ -48,8 +48,8 @@ const page: FeaturePage = {
   hero: { mascot: "standing", bubble: "One post, all your accounts. Let's write it." },
   steps: [
     {
-      title: "Connect your posting account",
-      body: "Social Media posts through Blotato. Connect your social accounts there, then paste your Blotato API key into ConstructHUB.",
+      title: "Connect your social accounts",
+      body: "Sign in to each network from Social Media → Accounts. ConstructHUB connects your accounts directly; there's no separate posting service to buy.",
     },
     {
       title: "Map accounts to a business",
@@ -123,16 +123,16 @@ const page: FeaturePage = {
   pricing: {
     kind: "module",
     module: "socialPublishing",
-    note: `Also sold on its own as the ${ALACARTE.social.name} item, for an account without one of these plans. Posting runs through your own Blotato subscription, which Blotato bills separately; ConstructHUB doesn't count your posts.`,
+    note: `Also sold on its own as the ${ALACARTE.social.name} item, for an account without one of these plans. ConstructHUB connects your social accounts directly and doesn't count your posts.`,
   },
   faqs: [
     {
       q: "What do I need?",
-      a: "A Blotato account with your social accounts connected inside it, and its API key. Blotato is a separate paid subscription that you buy from Blotato. You also need the business in Locations, so its posts and calendar stay together.",
+      a: "The social accounts you post to, which you connect by signing in to each network from Social Media → Accounts. There's no separate posting service to buy. You also need the business in Locations, so its posts and calendar stay together.",
     },
     {
       q: "Which plans include it?",
-      a: `The ${SOCIAL_PLANS} plans. On ${PLANS_WITHOUT}, or with no plan, you can add the ${ALACARTE.social.name} item on its own from the pricing page. ConstructHUB doesn't count your posts; Blotato bills for posting under your own subscription.`,
+      a: `The ${SOCIAL_PLANS} plans. On ${PLANS_WITHOUT}, or with no plan, you can add the ${ALACARTE.social.name} item on its own from the pricing page. ConstructHUB doesn't count your posts.`,
     },
     {
       q: "Will it post without me?",
@@ -140,15 +140,15 @@ const page: FeaturePage = {
     },
     {
       q: "How do I know a post went live?",
-      a: "Each destination has its own status. A queued or accepted post isn't confirmed until the network publishes it; when it is, the calendar links to it. If a status is unclear, check Blotato before posting again.",
+      a: "Each destination has its own status. A queued or accepted post isn't confirmed until the network publishes it; when it is, the calendar links to it. If a status is unclear, check the account on the network before posting again.",
     },
     {
       q: "Is there a walkthrough?",
-      a: "Yes. The How it works tab on the Social Media page has step-by-step guides for connecting Blotato, manual posting, auto mode and multi-business work.",
+      a: "Yes. The How it works tab on the Social Media page has step-by-step guides for connecting your social accounts, manual posting, auto mode and multi-business work.",
     },
   ],
-  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"): the encrypted Blotato key is
-  // server/social/client.ts encryptKey + service.ts; per-network tweaks, titles and limits, 10 media links and 20
+  // The long-form explanation (WRITING-GUIDE.md → "The In Depth section"): the encrypted connection is
+  // server/social/client.ts encryptKey + service.ts (native / Outstand connect); per-network tweaks, titles and limits, 10 media links and 20
   // destinations are shared/social.ts postSchema/socialLimits; per-destination status and queued ≠ published are
   // server/social/routes.ts + client/src/pages/guides.tsx ("Manual posting"); the content mix and its sources (photos
   // from the linked profile or Media Library, tips, synced reviews, offers and Google updates from the last 30 days)
@@ -159,9 +159,9 @@ const page: FeaturePage = {
     heading: { title: "Social Media Scheduling for Contractors, ", em: "Explained" },
     paragraphs: [
       "Social Media is a social media scheduler: you write a post once, adjust it for each network, and send it to " +
-        "the pages and accounts you've mapped to a business. Publishing runs through Blotato, a separate posting " +
-        "service where you connect your social accounts. ConstructHUB stores your Blotato API key encrypted, never " +
-        "shows it again, and hands each post to Blotato for every destination you picked.",
+        "the pages and accounts you've mapped to a business. You connect each social account by " +
+        "signing in to the network from ConstructHUB; the connection is stored encrypted and never shown again, and " +
+        "ConstructHUB publishes each post to every destination you picked.",
       "Each network has its own rules, so each destination gets its own text tweak and character counter, plus the " +
         "settings some networks require, such as a YouTube title or TikTok privacy. Once a post is sent, every " +
         "destination keeps its own status. A post that is queued or accepted isn't confirmed until the network " +
@@ -176,16 +176,15 @@ const page: FeaturePage = {
       "You set how often auto mode posts, one to seven times per day or per week, your time zone, quiet hours when " +
         "automatic posts wait, and a daily AI budget. Drafts wait in the approval queue by default. Fully automatic " +
         "publishing is a separate setting, and switching back to approval returns queued automatic posts to drafts. " +
-        "ConstructHUB doesn't bill for posting or count your posts; Blotato bills you under your own subscription.",
+        "ConstructHUB doesn't bill per post or count your posts.",
     ],
   },
-  // Prices read on 2026-10-10 from: blotato.com/pricing, socialpilot.co, mymarky.ai, vistasocial.com/pricing, buffer.com/pricing
+  // Prices read on 2026-10-10 from: socialpilot.co, mymarky.ai, vistasocial.com/pricing, buffer.com/pricing
   // (~/codex-audits/a-la-carte-competitors.md → social).
   compare: {
     alacarte: ["social"],
     checkedOn: "2026-10-10",
     competitors: [
-      { name: "Blotato", price: { kind: "monthly", cents: 2900 }, note: "20 accounts; the posting service ours uses today", source: "https://www.blotato.com/pricing" },
       { name: "Marky", price: { kind: "monthly", cents: 3900 }, note: "contractor-specific: job photos to posts, posts to Google Business Profile", source: "https://www.mymarky.ai/" },
       { name: "SocialPilot", price: { kind: "monthly", cents: 3000 }, source: "https://www.socialpilot.co/" },
       { name: "Buffer", price: { kind: "monthly_from", cents: 500 }, per: "per channel", source: "https://buffer.com/pricing" },
@@ -195,7 +194,7 @@ const page: FeaturePage = {
       "A daily AI budget and quiet hours, with drafts that wait for your approval unless you choose fully automatic.",
       "Bulk posting across every business you manage, with placeholders per business.",
     ],
-    theyNotUs: "Today ours posts through a Blotato subscription of your own, and it does not post to your Google profile from here (that is AI Google posts); Marky does.",
+    theyNotUs: "Ours does not post to your Google profile from here (that is AI Google posts); Marky does.",
   },
   related: ["gbpContent", "media", "gbp"],
   app: { href: "/social-media", surface: "app" },
@@ -211,9 +210,12 @@ const page: FeaturePage = {
   sources: [
     "client/src/pages/social-media.tsx",
     "client/src/pages/guides.tsx",
+    "client/src/components/social-connect.tsx",
     "shared/social.ts",
     "server/social/client.ts",
     "server/social/schedule.ts",
+    "server/social/native.ts",
+    "server/social/outstand.ts",
     "server/social/service.ts",
     "server/social/routes.ts",
     "server/social/agency.ts",

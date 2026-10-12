@@ -28,7 +28,7 @@ export const API_EXTRA_ERROR_CODES = [
   "google_api_disabled",       // 403 the Google API is disabled for the account
   "google_quota",              // 429 Google's own quota (Retry-After)
   "google_unavailable",        // 503 Google did not confirm the operation
-  "upstream_unavailable",      // 503 a provider (Blotato, Google) failed; retry later
+  "upstream_unavailable",      // 503 a provider (a social network, Google) failed; retry later
 ] as const;
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number] | (typeof API_EXTRA_ERROR_CODES)[number];
