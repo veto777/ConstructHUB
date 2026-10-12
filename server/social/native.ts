@@ -261,7 +261,8 @@ export async function removeNativeAccounts(tenant: string): Promise<number> {
 
 // ── publishing ──────────────────────────────────────────────────────────────────────────────────────────────
 
-type Row = { id: string; platform: string; external_id: string; name: string; parent_id: string | null; token_enc: string; needs_reconnect: boolean; api: string; refresh_enc: string | null; token_expires_at: Date | null };
+export type NativeRow = { id: string; platform: string; external_id: string; name: string; parent_id: string | null; token_enc: string; needs_reconnect: boolean; api: string; refresh_enc: string | null; token_expires_at: Date | null };
+type Row = NativeRow;
 type Sub = { id: string; account_id: string; platform: string; stage: string; container_id: string | null; external_id: string | null; public_url: string | null; error: string | null; attempts: number };
 
 const isVideo = (url: string) => /\.(mp4|mov|m4v)(\?|$)/i.test(url);
@@ -324,6 +325,20 @@ export class NativeClient implements SocialClient {
   private async markReconnect(accountId: string, e: unknown) {
     if ((e as any)?.reconnect) await pool.query("UPDATE social_native_accounts SET needs_reconnect=true,last_error=$3,updated_at=now() WHERE tenant=$1 AND id=$2", [this.tenant, accountId, String((e as Error).message).slice(0, 300)]);
   }
+  // ── for stats, comments and deleting (./insights.ts) ──
+  /** Every connected account of this connection. */
+  async listRows(): Promise<NativeRow[]> { return this.rows(); }
+  /** An account and a token that is valid now (refreshed when it was about to expire). */
+  async credentials(accountId: string): Promise<{ row: NativeRow; token: string }> { const row = await this.row(accountId); return { row, token: await this.token(row) }; }
+  /** A submission of this connection, or null. */
+  async submissionRow(id: string): Promise<{ id: string; account_id: string; platform: string; stage: string; external_id: string | null; public_url: string | null } | null> {
+    if (!/^nat_[\w-]{1,64}$/.test(id)) return null;
+    const { rows: [s] } = await pool.query("SELECT id,account_id,platform,stage,external_id,public_url FROM social_native_submissions WHERE tenant=$1 AND id=$2", [this.tenant, id]);
+    return s ?? null;
+  }
+  /** An expired sign-in found while reading stats marks the account for reconnecting, as publishing does. */
+  async noteError(accountId: string, e: unknown) { await this.markReconnect(accountId, e); }
+
   async accounts(): Promise<SocialAccount[]> {
     return (await this.rows()).map((r) => r.platform === "facebook"
       ? { id: r.id, platform: r.platform, name: r.name, pages: [{ id: r.id, name: r.name }] }
@@ -406,6 +421,8 @@ export class NativeClient implements SocialClient {
     if (!s) return { state: "failed", publicUrl: null, error: "We lost track of this post; check the account before posting it again" };
     if (s.stage === "published") return { state: "published", publicUrl: s.public_url, error: null };
     if (s.stage === "failed") return { state: "failed", publicUrl: null, error: s.error };
+    // Deleted on the network from ConstructHUB (./insights.ts): it was published; its link is gone.
+    if (s.stage === "deleted") return { state: "published", publicUrl: null, error: null };
     const acct = await this.row(s.account_id).catch(() => null);
     if (!acct) return { state: "failed", publicUrl: null, error: "That social account is no longer connected" };
     try {

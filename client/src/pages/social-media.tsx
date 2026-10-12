@@ -29,6 +29,7 @@ import { GuidesContent } from "@/pages/guides";
 import { useUrlParam } from "@/hooks/use-url-param";
 import { SocialYoutube } from "@/components/social-youtube";
 import { SocialConnect } from "@/components/social-connect";
+import { SocialAccountStats, SocialPostInsights } from "@/components/social-insights";
 
 // Google's rounded field shape for the native selects (the surface supplies the hairline colour).
 const selectClass = "h-10 w-full rounded-full border border-input bg-background px-4 text-sm";
@@ -477,6 +478,7 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
       {!all && data?.native && (
         <SocialConnect via="native" businessId={businessId} networks={data.native.networks} accounts={data?.provider === "native" ? accounts : []} connected={data?.provider === "native" && !!data?.connected} />
       )}
+      {!all && data?.native && data?.provider === "native" && accounts.length > 0 && <SocialAccountStats businessId={businessId} />}
       {!all && !data?.native && data?.outstand && (
         <SocialConnect businessId={businessId} networks={data.outstand.networks} accounts={data?.provider === "outstand" ? accounts : []} connected={data?.provider === "outstand" && !!data?.connected} />
       )}
@@ -1371,6 +1373,10 @@ function PostRow({
       {p.source && (
         <p className="g-card__meta">Source: {p.source}</p>
       )}
+      {/* Published through ConstructHUB's own connection: likes, comments, views, and the post's comments. */}
+      {p.state === "published" && typeof p.submission_id === "string" && p.submission_id.startsWith("nat_") && (
+        <SocialPostInsights post={p} />
+      )}
       {p.error && (
         <p role="alert" className="text-sm g-closed">
           {p.error}
@@ -1417,7 +1423,7 @@ function PostRow({
         )}
         {["submitted", "published", "failed", "uncertain"].includes(
           p.state,
-        ) && (
+        ) && !(typeof p.submission_id === "string" && p.submission_id.startsWith("nat_")) && (
           <>
             <GooglePill
               icon={ExternalLink}

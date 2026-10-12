@@ -31,7 +31,8 @@ import {
   nativeFinalize,
 } from "./service";
 import { CONNECTABLE, outstandConfigured, webhookSigned } from "./outstand";
-import { nativeNetworksFor, receiveUpload, NATIVE_UPLOAD_MAX_BYTES } from "./native";
+import { NativeClient, nativeNetworksFor, receiveUpload, NATIVE_UPLOAD_MAX_BYTES } from "./native";
+import { accountStats, postStats, comments as postComments, replyComment, hideComment, deleteComment, deletePost } from "./insights";
 import { isPlatformAdmin } from "../admin";
 import { putToR2Key } from "../r2";
 import { registerDeletionRoutes } from "./deletion";
@@ -244,6 +245,56 @@ export function registerSocialRoutes(
     res.json(await nativeConnectUrl(id, businessId, network, req));
   });
   route("post", "/native/refresh", async (_req, res, id, businessId) => res.json(await nativeRefresh(id, businessId)));
+  // Stats, comments and deleting (./insights.ts) — for accounts connected through ConstructHUB Direct, admins only
+  // until Meta approves the app, like the rest of Direct.
+  const direct = async (req: Request, id: number, businessId: number | null): Promise<NativeClient> => {
+    if (!nativeNetworksFor(isPlatformAdmin(req.user)).length) throw new SocialError("Not found", 404);
+    const { client } = await connection(id, make, businessId);
+    if (!(client instanceof NativeClient)) throw new SocialError("This business isn't connected through ConstructHUB", 409);
+    return client;
+  };
+  /** The ConstructHUB post (this user, this business) and the submission it was published as. */
+  const nativePost = async (id: number, businessId: number | null, postId: string) => {
+    const pid = z.string().uuid().parse(postId);
+    const { rows: [p] } = await pool.query("SELECT id,submission_id,state FROM social_posts WHERE id=$1 AND user_id=$2 AND business_id IS NOT DISTINCT FROM $3", [pid, id, businessId]);
+    if (!p || typeof p.submission_id !== "string" || !p.submission_id.startsWith("nat_")) throw new SocialError("That post wasn't published through ConstructHUB's own connection", 404);
+    return p as { id: string; submission_id: string; state: string };
+  };
+  const commentParam = z.string().regex(/^[\w.-]{1,120}$/);
+  route("get", "/native/stats", async (req, res, id, businessId) => {
+    const days = z.coerce.number().pipe(z.union([z.literal(7), z.literal(28)])).catch(28).parse(req.query.days);
+    res.json({ accounts: await accountStats(await direct(req, id, businessId), days as 7 | 28) });
+  });
+  route("get", "/native/posts/:postId/stats", async (req, res, id, businessId) => {
+    const client = await direct(req, id, businessId);
+    res.json(await postStats(client, (await nativePost(id, businessId, String(req.params.postId))).submission_id));
+  });
+  route("get", "/native/posts/:postId/comments", async (req, res, id, businessId) => {
+    const client = await direct(req, id, businessId);
+    res.json(await postComments(client, (await nativePost(id, businessId, String(req.params.postId))).submission_id));
+  });
+  route("post", "/native/posts/:postId/comments/:commentId/reply", async (req, res, id, businessId) => {
+    const { message } = z.object({ message: z.string().trim().min(1, "Write a reply first").max(2200) }).strict().parse(req.body);
+    const client = await direct(req, id, businessId);
+    res.json(await replyComment(client, (await nativePost(id, businessId, String(req.params.postId))).submission_id, commentParam.parse(String(req.params.commentId)), message));
+  });
+  route("post", "/native/posts/:postId/comments/:commentId/hide", async (req, res, id, businessId) => {
+    const { hidden } = z.object({ hidden: z.boolean() }).strict().parse(req.body);
+    const client = await direct(req, id, businessId);
+    res.json(await hideComment(client, (await nativePost(id, businessId, String(req.params.postId))).submission_id, commentParam.parse(String(req.params.commentId)), hidden));
+  });
+  route("delete", "/native/posts/:postId/comments/:commentId", async (req, res, id, businessId) => {
+    const client = await direct(req, id, businessId);
+    res.json(await deleteComment(client, (await nativePost(id, businessId, String(req.params.postId))).submission_id, commentParam.parse(String(req.params.commentId))));
+  });
+  // Deleting the published post: gone from the network; ConstructHUB keeps the record, without its link, saying so.
+  route("delete", "/native/posts/:postId", async (req, res, id, businessId) => {
+    const client = await direct(req, id, businessId);
+    const p = await nativePost(id, businessId, String(req.params.postId));
+    const { network } = await deletePost(client, p.submission_id);
+    await pool.query("UPDATE social_posts SET public_url=NULL,error=$2,updated_at=now() WHERE id=$1", [p.id, `Deleted on ${network} from ConstructHUB on ${new Date().toLocaleDateString("en-US", { timeZone: "America/New_York" })}.`]);
+    res.json({ ok: true, network });
+  });
   route("get", "/native/pending/:session", async (req, res, id, businessId) => res.json(await nativePending(id, businessId, z.string().regex(/^[\w-]{20,64}$/).parse(req.params.session))));
   route("post", "/native/pending/:session/finalize", async (req, res, id, businessId) => {
     const { pageIds } = z.object({ pageIds: z.array(z.string().regex(/^\d{1,40}$/)).min(1).max(50) }).strict().parse(req.body);
