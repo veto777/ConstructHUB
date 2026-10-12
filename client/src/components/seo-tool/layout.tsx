@@ -29,8 +29,8 @@ function Glyph({ item }: { item: NavEntry }) {
   return null;
 }
 
-/** Every other ConstructHUB tool, as the sidebar lists them (its own lists: APP_NAV). */
-function AllTools({ close }: { close: () => void }) {
+/** Every other ConstructHUB tool, as the sidebar lists them (its own lists: APP_NAV). Social Media`s shell uses it too. */
+export function AllTools({ close }: { close: () => void }) {
   const [location] = useLocation();
   const item = (i: NavEntry, sub = false) => (
     <Link key={i.url} href={i.url} onClick={close} className={`tool-all__item${sub ? " tool-all__sub" : ""}`} aria-current={location === i.url ? "page" : undefined} data-testid={`all-tools-${i.url.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "home"}`}>

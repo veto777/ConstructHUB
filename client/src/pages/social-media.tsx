@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { AppPage, Notice, Toolbar } from "@/components/app-ui";
 import { PlanRequired, planRequiredFrom } from "@/components/plan-required";
-import { ToolTabs } from "@/components/tool";
 import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
 import { AlertTriangle, ExternalLink, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -30,6 +29,10 @@ import { useUrlParam } from "@/hooks/use-url-param";
 import { SocialYoutube } from "@/components/social-youtube";
 import { SocialConnect } from "@/components/social-connect";
 import { SocialAccountStats, SocialPostInsights } from "@/components/social-insights";
+import { useLocation } from "wouter";
+import { ToolBarSlot } from "@/components/tool/shell";
+import { socialHref, socialViewOf, type SocialView } from "@/components/social-tool/nav";
+import { NetworkIcon, SocialWeek } from "@/components/social-week";
 
 // Google's rounded field shape for the native selects (the surface supplies the hairline colour).
 const selectClass = "h-10 w-full rounded-full border border-input bg-background px-4 text-sm";
@@ -67,9 +70,32 @@ type Account = {
   boards?: { id: string; name: string }[];
 };
 
+/** Each view's title and line (the views: components/social-tool/nav.ts). */
+const VIEW_HEAD: Record<SocialView, [string, string]> = {
+  overview: ["Overview", "This week, what is coming up, and how your accounts are doing."],
+  calendar: ["Calendar", "Every post by day. Times are in your browser's timezone."],
+  compose: ["New post", "Write once — every chosen account gets its own version."],
+  posts: ["Posts", "Drafts, scheduled, published and failed posts, newest first."],
+  analytics: ["Analytics", "Followers, reach and engagement for each connected account, and your published posts."],
+  inbox: ["Inbox", "Comments on your published posts. Open Comments on a post to reply, hide or delete."],
+  accounts: ["Accounts", "Connect Facebook, Instagram, Threads, TikTok and YouTube, and choose where posts go."],
+  auto: ["Auto mode", "Let ConstructHUB write posts for you on a schedule, as drafts or straight to your accounts."],
+  guides: ["Guides", "Step-by-step help for Social Media."],
+};
+
 export default function SocialMediaPage() {
   const [business, setBusiness] = useUrlParam("business");
   const [tab] = useUrlParam("tab");
+  const [path, navigate] = useLocation();
+  const view = socialViewOf(path, tab);
+  // The old one-page links (?tab=queue from notifications, ?tab=guides) open their own view now.
+  useEffect(() => {
+    if (!tab) return;
+    const rest = new URLSearchParams(window.location.search);
+    rest.delete("tab");
+    const b = rest.get("business"); rest.delete("business");
+    navigate(socialHref(view, b, Object.fromEntries(rest)), { replace: true });
+  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
   // Drafts are scoped to the signed-in account (the router resolves /api/auth/me before any page
   // renders, so the id is available synchronously here).
   const me = useQuery<any>({ queryKey: ["/api/auth/me"] });
@@ -111,13 +137,15 @@ export default function SocialMediaPage() {
   });
   const planRequired = planRequiredFrom(businesses.error);
   const noBusinesses = !businesses.isError && !!businesses.data && (businesses.data.total ?? 0) === 0 && !(businesses.data.items ?? []).length;
+  const chosen = business && valid;
   return (
     <AppPage>
+      {!planRequired && <ToolBarSlot><BusinessSwitch business={chosen ? business : null} items={businesses.data?.items ?? []} total={businesses.data?.total ?? 0} onChange={(v) => setBusiness(v, true)} /></ToolBarSlot>}
       {/* Google's format (owner, 2026-10-07): quiet titles with a hairline, pills, hairline rows. */}
       <GoogleSectionHeader
         as="h1"
-        title="Social Media"
-        description="Compose once, then review, schedule and track every account."
+        title={VIEW_HEAD[view][0]}
+        description={VIEW_HEAD[view][1]}
         flush
         actions={<GooglePill href="/guides?topic=social" label="How it works" testId="link-how-it-works" />}
       />
@@ -126,11 +154,12 @@ export default function SocialMediaPage() {
         // a "could not load" notice (the sidebar and ToolRouteGate already send most such accounts to the landing).
         <>
           <PlanRequired module="socialPublishing" error={businesses.error} />
-          {tab === "guides" && <GuidesContent />}
+          {view === "guides" && <GuidesContent />}
         </>
       ) : (
         <>
-          <BusinessSelector value={business} onChange={v => setBusiness(v, true)} accountTotal={!businesses.isError && businesses.data ? (businesses.data.total ?? 0) : null} />
+          {/* No business open yet: the full list to pick from (one business opens by itself). */}
+          {!chosen && view !== "guides" && <BusinessSelector value={business} onChange={v => setBusiness(v, true)} accountTotal={!businesses.isError && businesses.data ? (businesses.data.total ?? 0) : null} />}
           {noBusinesses && !business && (
             <Notice
               tone="info"
@@ -141,21 +170,21 @@ export default function SocialMediaPage() {
               Social Media posts for a business from Locations. Add or import one there, then come back to connect its accounts.
             </Notice>
           )}
-          {business && valid ? <SocialWorkbench key={JSON.stringify([accountId, business])} accountId={accountId} businessId={business === "all" ? null : Number(business)} all={business === "all"} draftEdits={editsFor === accountId ? draftEdits : {}} onEditDraft={editDraft} /> : <>
+          {chosen ? <SocialWorkbench key={JSON.stringify([accountId, business])} view={view} accountId={accountId} businessId={business === "all" ? null : Number(business)} all={business === "all"} draftEdits={editsFor === accountId ? draftEdits : {}} onEditDraft={editDraft} /> : <>
             {/* The guides don't depend on a business: /guides lands here. */}
-            {tab === "guides" && <GuidesContent />}
-            {!business && !noBusinesses && <p className="text-sm g-text-2">Choose a business above. Add or import businesses in <a className="g-link" href="/locations">Locations</a>.</p>}
+            {view === "guides" && <GuidesContent />}
+            {!business && !noBusinesses && view !== "guides" && <p className="text-sm g-text-2">Click Open on a business above. Add or import businesses in <a className="g-link" href="/locations">Locations</a>.</p>}
           </>}
         </>
       )}
       {/* The YouTube channel belongs to the account, not to one business: it is shown with the business's other
           connection (inside the workbench) and here whenever no single business is open. */}
-      {!(business && valid && business !== "all") && <SocialYoutube />}
+      {view === "accounts" && !(chosen && business !== "all") && <SocialYoutube />}
     </AppPage>
   );
 }
 
-function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }: { accountId: number | string | null; businessId: number | null; all: boolean; draftEdits: Record<string, string>; onEditDraft: (id: string, value: string | undefined) => void }) {
+function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditDraft }: { view: SocialView; accountId: number | string | null; businessId: number | null; all: boolean; draftEdits: Record<string, string>; onEditDraft: (id: string, value: string | undefined) => void }) {
   const { toast } = useToast();
   // Selected post ids keyed to their business names (for the bulk-cancel dialog), so the names
   // survive paging and refetches even when the selected row is not on the current page.
@@ -218,8 +247,17 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
   const businessCounts = new Map<string, number>();
   for (const name of Object.values(selected)) businessCounts.set(name, (businessCounts.get(name) ?? 0) + 1);
   const businessSummary = [...businessCounts.entries()].map(([name, n]) => `${name} (${n})`).join(", ");
-  const [tabParam, setTabParam] = useUrlParam("tab");
-  const tab = all ? "queue" : tabParam || "compose", setTab = (v: string) => setTabParam(v === "compose" ? null : v);
+  // Which section the view shows; the all-clients view has only the calendar and the posts.
+  const [, navigate] = useLocation();
+  const VIEW_TAB: Record<SocialView, string> = { overview: "overview", calendar: "calendar", compose: "compose", posts: "queue", analytics: "queue", inbox: "queue", accounts: "accounts", auto: "auto", guides: "guides" };
+  const tab = all ? (view === "calendar" ? "calendar" : "queue") : VIEW_TAB[view];
+  const setTab = (v: string) => navigate(socialHref(v === "queue" ? "posts" : (v as SocialView), all ? "all" : String(businessId)));
+  // Posts: the menu's All / Drafts / Scheduled / Published / Failed is ?state=; Inbox and Analytics list published posts.
+  const [stateParam] = useUrlParam("state");
+  useEffect(() => {
+    const want = view === "inbox" || view === "analytics" ? "published" : view === "posts" ? (stateParam ?? "") : null;
+    if (want !== null) { setPostState(want); setOffset(0); }
+  }, [view, stateParam]);
   const queueTop = useRef<HTMLElement>(null);
   const queuePosts = latestPostsFirst(data?.posts || [], offset === 0 && !postSearch && !postState && !postPlatform && !calendarDate ? latestPosts : []);
   useEffect(() => {
@@ -475,15 +513,18 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
         </div>
       )}
 
-      {!all && data?.native && (
+      {!all && tab === "overview" && <SocialOverview business={String(businessId)} businessId={businessId} accounts={accounts} />}
+      {!all && tab === "overview" && <SocialWeek businessId={businessId} all={false} business={String(businessId)} />}
+      {tab === "calendar" && <SocialWeek full businessId={businessId} all={all} business={all ? "all" : String(businessId)} />}
+      {!all && tab === "accounts" && data?.native && (
         <SocialConnect via="native" businessId={businessId} networks={data.native.networks} accounts={data?.provider === "native" ? accounts : []} connected={data?.provider === "native" && !!data?.connected} />
       )}
-      {!all && data?.native && data?.provider === "native" && accounts.length > 0 && <SocialAccountStats businessId={businessId} />}
-      {!all && !data?.native && data?.outstand && (
+      {!all && (tab === "overview" || view === "analytics") && data?.native && data?.provider === "native" && accounts.length > 0 && <SocialAccountStats businessId={businessId} />}
+      {!all && tab === "accounts" && !data?.native && data?.outstand && (
         <SocialConnect businessId={businessId} networks={data.outstand.networks} accounts={data?.provider === "outstand" ? accounts : []} connected={data?.provider === "outstand" && !!data?.connected} />
       )}
 
-      {!all && !data?.outstand && !data?.native && (
+      {!all && tab === "accounts" && !data?.outstand && !data?.native && (
         <section>
           <GoogleSectionHeader
             title="Blotato connection"
@@ -554,28 +595,10 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
         </section>
       )}
 
-      {!all && <SocialYoutube businessId={businessId} />}
+      {!all && tab === "accounts" && <SocialYoutube businessId={businessId} />}
 
-      {!all && businessId && <MappingEditor businessId={businessId} defaults={data?.defaults || []} />}
+      {!all && tab === "accounts" && businessId && <MappingEditor businessId={businessId} defaults={data?.defaults || []} />}
 
-      {!all && (
-        <ToolTabs label="Social Media views">
-          {[
-            ["compose", "Compose"],
-            ["queue", "Calendar & queue"],
-            ["auto", "Auto mode"],
-            ["guides", "Guides"],
-          ].map(([key, label]) => (
-            <GooglePill
-              key={key}
-              selected={tab === key}
-              ariaPressed={tab === key}
-              onClick={() => { setTab(key); if (key === "queue") queueTop.current?.scrollIntoView({ block: "start" }); }}
-              label={label}
-            />
-          ))}
-        </ToolTabs>
-      )}
 
       {tab === "compose" && (
         <section>
@@ -852,7 +875,7 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
       {tab === "queue" && (
         <section ref={queueTop} className="scroll-mt-4">
           <GoogleSectionHeader
-            title={all ? "All-clients calendar" : "Calendar & queue"}
+            title={all ? "All clients" : view === "inbox" ? "Published posts" : view === "analytics" ? "Published posts" : ({ draft: "Drafts", queued: "Scheduled", published: "Published", failed: "Failed" } as Record<string, string>)[postState] ?? "All posts"}
             count={error ? undefined : data?.total}
             description="Times are shown in your browser&rsquo;s timezone. Status refreshes every 15 seconds — published means Blotato confirmed publication; queued means it is still in ConstructHUB."
           />
@@ -1465,5 +1488,62 @@ function PostRow({
         </AlertDialogContent>
       </AlertDialog>
     </article>
+  );
+}
+
+/** The tool bar's business switcher: which business every view is about (owner, 2026-10-12). */
+function BusinessSwitch({ business, items, total, onChange }: { business: string | null; items: any[]; total: number; onChange: (v: string) => void }) {
+  if (!total) return null;
+  const listed = items.some((b) => String(b.id) === business) || business === "all" || !business;
+  return (
+    <label className="flex min-w-0 items-center gap-2 text-sm" data-testid="social-business-switch">
+      <span className="g-text-2 shrink-0">Business</span>
+      <select aria-label="Business" className={`${selectClass} max-w-[22rem]`} value={business ?? ""} onChange={(e) => onChange(e.target.value === "__pick" ? "" : e.target.value)}>
+        {!business && <option value="">Choose a business…</option>}
+        {!listed && <option value={business!}>This business</option>}
+        {items.map((b) => <option key={b.id} value={String(b.id)}>{b.business_name}{b.city ? ` · ${b.city}` : ""}</option>)}
+        {total > 1 && <option value="all">All clients (calendar and posts)</option>}
+        {total > items.length && <option value="__pick">Search all {total} businesses…</option>}
+      </select>
+    </label>
+  );
+}
+
+/** Overview: the connected accounts at a glance and what is coming up next (Blotato's Overview, our data). */
+function SocialOverview({ business, businessId, accounts }: { business: string; businessId: number | null; accounts: Account[] }) {
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const next = useQuery<any>({
+    queryKey: ["/api/social", "upcoming", businessId],
+    refetchInterval: 60_000,
+    queryFn: async () => (await apiRequest("GET", `/api/social?${new URLSearchParams({ state: "queued", offset: "0", timezone, ...(businessId ? { businessId: String(businessId) } : {}) })}`)).json(),
+  });
+  const failed = useQuery<any>({
+    queryKey: ["/api/social", "failed-count", businessId],
+    refetchInterval: 60_000,
+    queryFn: async () => (await apiRequest("GET", `/api/social?${new URLSearchParams({ state: "failed", offset: "0", timezone, ...(businessId ? { businessId: String(businessId) } : {}) })}`)).json(),
+  });
+  const upcoming: any[] = (next.data?.posts ?? []).slice().sort((a: any, b: any) => +new Date(a.scheduled_at || a.created_at) - +new Date(b.scheduled_at || b.created_at)).slice(0, 5);
+  return (
+    <div className="grid gap-4 lg:grid-cols-2" data-testid="social-overview">
+      <section className="rounded-xl border border-border p-4">
+        <div className="mb-2 flex items-center gap-2"><h2 className="text-lg font-medium">Accounts</h2><a className="g-link ml-auto text-sm" href={socialHref("accounts", business)}>{accounts.length ? "Manage" : "Connect"}</a></div>
+        {accounts.length ? (
+          <ul className="space-y-1.5">{accounts.map((a) => <li key={a.id} className="flex items-center gap-2 text-sm"><NetworkIcon platform={a.platform} /><span className="truncate">{a.name}</span></li>)}</ul>
+        ) : <p className="text-sm g-text-2">No accounts connected yet. <a className="g-link" href={socialHref("accounts", business)}>Connect Facebook, Instagram and more</a> to start posting.</p>}
+        {(failed.data?.total ?? 0) > 0 && <p className="mt-3 text-sm text-destructive"><a className="underline" href={socialHref("posts", business, { state: "failed" })}>{failed.data.total} failed post{failed.data.total === 1 ? "" : "s"}</a> {failed.data.total === 1 ? "needs" : "need"} a look.</p>}
+      </section>
+      <section className="rounded-xl border border-border p-4">
+        <div className="mb-2 flex items-center gap-2"><h2 className="text-lg font-medium">Upcoming posts</h2><a className="g-link ml-auto text-sm" href={socialHref("calendar", business)}>Calendar</a></div>
+        {next.isLoading ? <p className="text-sm g-text-2">Loading…</p> : upcoming.length ? (
+          <ul className="space-y-2">{upcoming.map((p) => (
+            <li key={p.id} className="flex items-start gap-2 text-sm">
+              <NetworkIcon platform={p.payload?.post?.content?.platform ?? ""} className="mt-0.5 h-4 w-4 shrink-0" />
+              <span className="shrink-0 tabular-nums g-text-2">{new Date(p.scheduled_at || p.created_at).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}</span>
+              <span className="line-clamp-1 break-words">{p.payload?.post?.content?.text}</span>
+            </li>))}
+          </ul>
+        ) : <p className="text-sm g-text-2">Nothing scheduled. <a className="g-link" href={socialHref("compose", business)}>Write a post</a>.</p>}
+      </section>
+    </div>
   );
 }

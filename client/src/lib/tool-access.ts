@@ -94,6 +94,7 @@ export function toolRuleFor(url: string): Rule | undefined {
   const path = url.split(/[?#]/)[0];
   if (TOOL_RULES[path]) return TOOL_RULES[path];
   if (path.startsWith("/seo/")) return TOOL_RULES["/seo"];
+  if (path.startsWith("/social-media/")) return TOOL_RULES["/social-media"];
   return undefined;
 }
 

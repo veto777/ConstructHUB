@@ -92,6 +92,7 @@ import { copyrightNotice } from "@/lib/marketing";
 import { reportIssueHref } from "@/lib/report-issue-link";
 import { useSeoHead } from "@/lib/seo-head";
 import { SeoToolLayout } from "@/components/seo-tool/layout";
+import { SocialToolLayout } from "@/components/social-tool/layout";
 import { pageMetaFor } from "@shared/route-meta";
 
 // Pages only the CRM portal, the client portal, a customer's document link or a platform admin opens load
@@ -232,6 +233,7 @@ function DashboardRouter() {
       <Route path="/gbp-content" component={GbpContentPage} />
       <Route path="/listing-editor" component={ListingEditorPage} />
       <Route path="/social-media" component={SocialMediaPage} />
+      <Route path="/social-media/:view" component={SocialMediaPage} />
       <Route path="/guides" component={GuidesPage} />
       <Route path="/tutorials" component={TutorialsPage} />
       <Route path="/cloudflare" component={CloudflarePage} />
@@ -456,7 +458,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/schedules": "Scrape Schedules", "/history": "Search History", "/permit-alerts": "Permit Alerts", "/photos": "Photo Optimizer",
   "/gmb-monitor": "GMB Edit Monitor", "/ranking-grid": "GMB Ranking Grid", "/pricing": "Pricing",
   "/competitors": "Competitor Intel", "/agency": "Agency", "/locations": "Locations", "/domains": "Domains",
-  "/mail-alerts": "Mail Alerts", "/gbp-content": "Posts & Photos", "/listing-editor": "Listing editor", "/social-media": "Social Media",
+  "/mail-alerts": "Mail Alerts", "/gbp-content": "Posts & Photos", "/listing-editor": "Listing editor", "/social-media": "Social Media", "/social-media/calendar": "Social calendar", "/social-media/compose": "New social post", "/social-media/posts": "Social posts", "/social-media/analytics": "Social analytics", "/social-media/inbox": "Social inbox", "/social-media/accounts": "Social accounts", "/social-media/auto": "Social auto mode", "/social-media/guides": "Social guides",
   "/guides": "Guides", "/tutorials": "Tutorials", "/cloudflare": "Cloudflare", "/search-console": "Search Console", "/site-scan": "Site Scan",
   "/seo": "SEO Suite", "/seo/rank-tracker": "Rank tracker", "/seo/local-grid": "Local grid", "/seo/plan": "SEO action plan", "/seo/audit": "Site audit", "/seo/alerts": "SEO alerts", "/seo/mentions": "SEO mentions", "/seo/usage": "SEO data usage", "/seo/reports": "SEO reports", "/seo/ai": "AI visibility", "/seo/batch": "Batch analysis", "/seo/content": "Content explorer", "/seo/explorer": "Site explorer", "/seo/keywords": "Keywords explorer", "/seo/backlinks": "Backlinks", "/seo/competitors": "Competitor gap",
   "/master-class": "Master Class", "/reinstatement": "Reinstatement", "/google-business": "Google Business",
@@ -891,6 +893,19 @@ function AppContent() {
   );
   // Inside SEO the app sidebar is not shown: the SEO tool shell carries the navigation, and its "All tools" button is
   // the way back to everything else (owner, 2026-10-09). On phones the sidebar stays as the sheet the tab bar's Menu opens.
+  // Social Media is its own tool the same way (owner, 2026-10-12: "the sidebar with all features should vanish").
+  if (location === "/social-media" || location.startsWith("/social-media/")) {
+    return (
+      <SidebarProvider style={sidebarStyle as React.CSSProperties} defaultOpen={sidebarDefaultOpen()}>
+        <div className="md:hidden"><AppSidebar /></div>
+        <SocialToolLayout actions={controls} banner={<PaymentNeededBanner />} footer={footer}>
+          <ToolRouteGate location={location}><DashboardRouter /></ToolRouteGate>
+        </SocialToolLayout>
+        <AppTabBar />
+        <HubWidget surface="growth" signedIn />
+      </SidebarProvider>
+    );
+  }
   if (location === "/seo" || location.startsWith("/seo/")) {
     return (
       <SidebarProvider style={sidebarStyle as React.CSSProperties} defaultOpen={sidebarDefaultOpen()}>
