@@ -5,6 +5,8 @@ import {
   createHash,
 } from "node:crypto";
 import { pool } from "../db";
+import type { PostPayload, SocialAccount, SocialClient, StatusResult, UploadStart } from "./provider";
+import { publicMediaUrl } from "../../shared/social";
 /**
  * A stable code the Social Media page can key on. A bare 503 reads as "ConstructHUB is restarting
  * or briefly unavailable"; this one means the server is not set up for Social Media at all
@@ -62,7 +64,8 @@ export async function reserveRequest(hash: string) {
   if (!r.rowCount)
     throw new SocialError("Blotato rate limit: retry shortly", 429);
 }
-export class BlotatoClient {
+export class BlotatoClient implements SocialClient {
+  readonly provider = "blotato" as const;
   readonly hash: string;
   constructor(
     private key: string,
@@ -140,5 +143,28 @@ export class BlotatoClient {
       platform: String(a.platform),
       name: String(a.fullname || a.username || a.platform),
     }));
+  }
+  async targets(a: SocialAccount) {
+    const boards = a.platform === "pinterest";
+    if (!boards && !["facebook", "linkedin", "youtube"].includes(a.platform)) return null;
+    const data = await this.request(boards ? `/social/pinterest/boards?accountId=${a.id}` : `/users/me/accounts/${a.id}/subaccounts`);
+    if (!Array.isArray(data.items)) throw new SocialError("Invalid page list", 502);
+    return { kind: boards ? "boards" as const : "pages" as const, items: data.items.map((p: any) => ({ id: String(p.id), name: String(p.name || p.id) })) };
+  }
+  async submit(payload: PostPayload) {
+    const data = await this.request("/posts", payload);
+    if (typeof data.postSubmissionId !== "string" || !/^[-\w]+$/.test(data.postSubmissionId))
+      throw new SocialError("Blotato did not confirm a submission ID", 502);
+    return { submissionId: data.postSubmissionId };
+  }
+  async status(submissionId: string): Promise<StatusResult> {
+    const data = await this.request(`/posts/${submissionId}`);
+    const state = data.status === "published" ? "published" : data.status === "failed" ? "failed" : "submitted";
+    const url = publicMediaUrl.safeParse(data.publicUrl);
+    return { state, publicUrl: url.success ? url.data : null, error: state === "failed" ? "Blotato reports a failed post. Review it in Blotato." : null };
+  }
+  async startUpload(filename: string): Promise<UploadStart> {
+    const data = await this.request("/media/uploads", { filename });
+    return { publicUrl: publicMediaUrl.parse(data.publicUrl), presignedUrl: publicMediaUrl.parse(data.presignedUrl) };
   }
 }
