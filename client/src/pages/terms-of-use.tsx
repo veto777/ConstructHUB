@@ -11,7 +11,7 @@ import {
 } from "@shared/plan-copy";
 
 /** Shown under the title; update whenever these Terms change. */
-const LAST_UPDATED = "October 7, 2026";
+const LAST_UPDATED = "October 12, 2026";
 
 export default function TermsOfUsePage() {
   useEffect(() => {
@@ -178,6 +178,13 @@ export default function TermsOfUsePage() {
             <p>
               ConstructHUB uses YouTube API Services to publish its own tutorial videos to its own YouTube channel, and to let you connect your own YouTube channel and upload videos you choose to it. By connecting a YouTube channel, or using any other feature of ConstructHUB that relies on YouTube, you agree to be bound by the{" "}
               <a href="https://www.youtube.com/t/terms" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" data-testid="link-youtube-terms">YouTube Terms of Service</a>. You are responsible for the videos you upload: each must comply with YouTube's Community Guidelines, and you must own it or have permission to publish everything in it. How we handle YouTube data is described in our Privacy Policy.
+            </p>
+            <h3 className="text-lg font-medium mt-4 mb-2" data-testid="heading-tiktok-terms">TikTok</h3>
+            <p>
+              You may connect your own TikTok account to ConstructHUB's Social Media tool to publish videos and photos you choose. Each time, you choose the caption, who can view the post, whether comments, Duet and Stitch are allowed, and whether it is commercial content. By posting to TikTok through ConstructHUB you agree to TikTok's{" "}
+              <a href="https://www.tiktok.com/legal/page/us/terms-of-service/en" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" data-testid="link-tiktok-terms">Terms of Service</a>, Community Guidelines and{" "}
+              <a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Music Usage Confirmation</a> (and its{" "}
+              <a href="https://www.tiktok.com/legal/page/global/bc-policy/en" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Branded Content Policy</a> when you mark a post as branded content), and you confirm you own or have permission to publish everything in it. ConstructHUB is not affiliated with or endorsed by TikTok. How we handle TikTok data is described in our Privacy Policy.
             </p>
           </section>
 

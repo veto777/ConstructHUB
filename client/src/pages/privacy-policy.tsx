@@ -238,6 +238,24 @@ export default function PrivacyPolicyPage() {
           </p>
         </section>
 
+        <section className="mb-8" data-testid="section-tiktok">
+          <h3 className="text-lg font-medium mt-4 mb-2" data-testid="heading-tiktok">4.5 TikTok</h3>
+          <p className="mb-3">
+            If you connect TikTok in Social Media, you sign in on TikTok and approve ConstructHUB's request to see your basic account information (display name, avatar, username and an account identifier), your account's totals (followers, following, likes and number of videos), and to publish the videos and photos you choose to your TikTok account.
+          </p>
+          <p className="mb-3">
+            <strong>What we store:</strong> your TikTok account identifier (open ID), display name, username and avatar; the permissions you granted; the access and refresh tokens TikTok issues, stored encrypted; and, for each post you publish through ConstructHUB, the caption, who can view it, whether comments, Duet and Stitch are allowed, your commercial-content choices, the media you chose, and the publish ID, post ID and status TikTok returns. Media you upload stays in your ConstructHUB media until you delete it.
+          </p>
+          <p className="mb-3">
+            <strong>What we do not do:</strong> we do not read your TikTok videos, followers' identities, comments or messages; we never publish anything without you choosing who can view it and clicking Post; we add no watermark or branding to your media; and we do not sell TikTok data or use it for advertising.
+          </p>
+          <p className="mb-3">
+            <strong>Removing it:</strong> choose Disconnect in Social Media and we revoke our access with TikTok and delete the stored tokens and identifiers at once. If you remove ConstructHUB in TikTok's settings, TikTok notifies us and we delete the same data. Deleting your ConstructHUB account deletes it too, or email{" "}
+            <a href="mailto:support@constructhub.us" className="text-primary hover:underline">support@constructhub.us</a> and we will delete it within 30 days. Posts already on TikTok stay there until you delete them in TikTok. TikTok's own handling of your data is described in the{" "}
+            <a href="https://www.tiktok.com/legal/page/us/privacy-policy/en" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" data-testid="link-tiktok-privacy-section">TikTok Privacy Policy</a>.
+          </p>
+        </section>
+
         <section className="mb-8" data-testid="section-third-party-services">
           <h2 className="text-xl font-semibold mb-3">5. Third-Party Services</h2>
           <p className="mb-3">We integrate with the following third-party services, each of which has its own privacy policy:</p>
