@@ -79,6 +79,8 @@ export const ensureNativeSchema = async () => {
     UNIQUE (tenant, platform, external_id))`);
   await pool.query("ALTER TABLE social_native_accounts ADD COLUMN IF NOT EXISTS api text NOT NULL DEFAULT 'meta'");
   await pool.query("ALTER TABLE social_native_accounts ADD COLUMN IF NOT EXISTS refresh_enc text");
+  // Who connected it (Meta app-scoped user id): a data-deletion callback names the person, not the Page.
+  await pool.query("ALTER TABLE social_native_accounts ADD COLUMN IF NOT EXISTS owner_user_id text");
   await pool.query(`CREATE TABLE IF NOT EXISTS social_native_pending (
     session text PRIMARY KEY,
     tenant text NOT NULL,
@@ -172,13 +174,14 @@ export function metaAuthUrl(state: string): string {
   return `https://www.facebook.com/v25.0/dialog/oauth?${q}`;
 }
 
-type PendingPage = { id: string; name: string; token: string; picture: string | null; ig: { id: string; username: string; picture: string | null } | null };
+type PendingPage = { id: string; name: string; token: string; picture: string | null; ig: { id: string; username: string; picture: string | null } | null; owner?: string | null };
 
 /** The code from Meta → a long-lived user token → the Pages (with their own long-lived tokens) and linked Instagram accounts. */
 export async function metaPagesFromCode(code: string): Promise<PendingPage[]> {
   const env = nativeDeps.env();
   const short = await graph("GET", "oauth/access_token", { client_id: env.SOCIAL_META_APP_ID, client_secret: env.SOCIAL_META_APP_SECRET, redirect_uri: nativeRedirectUri(), code });
   const long = await graph("GET", "oauth/access_token", { grant_type: "fb_exchange_token", client_id: env.SOCIAL_META_APP_ID, client_secret: env.SOCIAL_META_APP_SECRET, fb_exchange_token: short.access_token });
+  const owner = await graph("GET", "me", { fields: "id" }, long.access_token).then((m) => (m?.id ? String(m.id) : null)).catch(() => null);
   const pages: PendingPage[] = [];
   let after: string | undefined;
   for (let i = 0; i < 10; i++) {
@@ -186,7 +189,7 @@ export async function metaPagesFromCode(code: string): Promise<PendingPage[]> {
     for (const p of d.data ?? []) {
       if (!p?.id || !p?.access_token) continue;
       const ig = p.instagram_business_account;
-      pages.push({ id: String(p.id), name: String(p.name || p.id), token: String(p.access_token), picture: p.picture?.data?.url ?? null,
+      pages.push({ id: String(p.id), name: String(p.name || p.id), token: String(p.access_token), picture: p.picture?.data?.url ?? null, owner,
         ig: ig?.id ? { id: String(ig.id), username: String(ig.username || ig.id), picture: ig.profile_picture_url ?? null } : null });
     }
     after = d.paging?.cursors?.after;
@@ -225,27 +228,27 @@ export async function nativeFinalize(session: string, tenant: string, userId: nu
   const want = new Set(ids);
   let n = 0;
   for (const p of pages) {
-    if (network === "facebook" && want.has(p.id)) { await upsertAccount(tenant, "facebook", p.id, p.name, p.picture, null, p.token); n++; }
-    if (network === "instagram" && p.ig && want.has(p.ig.id)) { await upsertAccount(tenant, "instagram", p.ig.id, `@${p.ig.username}`, p.ig.picture, p.id, p.token); n++; }
+    if (network === "facebook" && want.has(p.id)) { await upsertAccount(tenant, "facebook", p.id, p.name, p.picture, null, p.token, { owner: p.owner ?? null }); n++; }
+    if (network === "instagram" && p.ig && want.has(p.ig.id)) { await upsertAccount(tenant, "instagram", p.ig.id, `@${p.ig.username}`, p.ig.picture, p.id, p.token, { owner: p.owner ?? null }); n++; }
   }
   await pool.query("DELETE FROM social_native_pending WHERE session=$1", [session]);
   return n;
 }
 
 async function upsertAccount(tenant: string, platform: string, externalId: string, name: string, picture: string | null, parentId: string | null, token: string,
-  more: { api?: string; refresh?: string | null; expiresAt?: Date | null; scopes?: string[] } = {}) {
+  more: { api?: string; refresh?: string | null; expiresAt?: Date | null; scopes?: string[]; owner?: string | null } = {}) {
   await pool.query(
-    `INSERT INTO social_native_accounts(id,tenant,platform,external_id,name,picture,parent_id,token_enc,scopes,api,refresh_enc,token_expires_at)
-     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-     ON CONFLICT(tenant,platform,external_id) DO UPDATE SET name=$5,picture=$6,parent_id=$7,token_enc=$8,scopes=$9,api=$10,refresh_enc=$11,token_expires_at=$12,needs_reconnect=false,last_error=null,updated_at=now()`,
+    `INSERT INTO social_native_accounts(id,tenant,platform,external_id,name,picture,parent_id,token_enc,scopes,api,refresh_enc,token_expires_at,owner_user_id)
+     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+     ON CONFLICT(tenant,platform,external_id) DO UPDATE SET name=$5,picture=$6,parent_id=$7,token_enc=$8,scopes=$9,api=$10,refresh_enc=$11,token_expires_at=$12,owner_user_id=COALESCE($13,social_native_accounts.owner_user_id),needs_reconnect=false,last_error=null,updated_at=now()`,
     [randomUUID(), tenant, platform, externalId, name.slice(0, 200), picture, parentId, enc(token), JSON.stringify(more.scopes ?? META_SCOPES),
-     more.api ?? "meta", more.refresh ? enc(more.refresh) : null, more.expiresAt ?? null]);
+     more.api ?? "meta", more.refresh ? enc(more.refresh) : null, more.expiresAt ?? null, more.owner ?? null]);
 }
 
 /** Back from Instagram login, Threads or TikTok: the signed-in account is connected straight away (no page to pick). */
 export async function nativeNetConnect(api: NetApi, tenant: string, code: string): Promise<string> {
   const s = await netExchange(api, code);
-  await upsertAccount(tenant, API_PLATFORM[api], s.externalId, s.name, s.picture, null, s.token, { api, refresh: s.refresh, expiresAt: s.expiresAt, scopes: s.scopes });
+  await upsertAccount(tenant, API_PLATFORM[api], s.externalId, s.name, s.picture, null, s.token, { api, refresh: s.refresh, expiresAt: s.expiresAt, scopes: s.scopes, owner: s.externalId });
   return API_NETWORK[api];
 }
 export const netScopesFor = netScopes;

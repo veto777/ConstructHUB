@@ -82,6 +82,7 @@ import ReviewUnsubscribePage from "@/pages/review-unsubscribe";
 import AdsConsultantChat from "@/components/ads-consultant-chat";
 import HubWidget from "@/components/hub/hub-widget";
 import PrivacyPolicyPage from "@/pages/privacy-policy";
+import DataDeletionPage from "@/pages/data-deletion";
 import TermsOfUsePage from "@/pages/terms-of-use";
 import { CrmTermsPage, CrmPrivacyPage } from "@/pages/crm-legal";
 import MediaLibraryPage from "@/pages/media-library";
@@ -305,6 +306,7 @@ function DashboardRouter() {
       <Route path="/crm-terms" component={CrmTermsPage} />
       <Route path="/crm-privacy" component={CrmPrivacyPage} />
       <Route path="/privacy" component={PrivacyPolicyPage} />
+      <Route path="/data-deletion" component={DataDeletionPage} />
       <Route path="/terms" component={TermsOfUsePage} />
       <Route path="/support" component={SupportPage} />
       <Route path="/lsa-account-manager" component={LsaAccountManagerPage} />
@@ -409,6 +411,7 @@ function PublicRouter() {
       <Route path="/crm-terms" component={Ribboned.CrmTermsPage} />
       <Route path="/crm-privacy" component={Ribboned.CrmPrivacyPage} />
       <Route path="/privacy" component={PrivacyPolicyPage} />
+      <Route path="/data-deletion" component={DataDeletionPage} />
       <Route path="/terms" component={TermsOfUsePage} />
       <Route path="/support" component={SupportPage} />
       <Route path="/landing" component={LandingPage} />
@@ -444,7 +447,7 @@ function SignedOutFallback() {
 
 /** Tab titles for the growth app; pages that set their own title are left alone. */
 const DEFAULT_TITLE = "ConstructHUB — Nationwide Contractor Services";
-const SELF_TITLED = ["/media-library", "/privacy", "/terms", "/support", "/crm-terms", "/crm-privacy", "/features", "/done-for-you", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/youtube"];
+const SELF_TITLED = ["/media-library", "/privacy", "/data-deletion", "/terms", "/support", "/crm-terms", "/crm-privacy", "/features", "/done-for-you", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/youtube"];
 /** Feature and service pages title themselves from their content (seo.title). */
 const isSelfTitled = (location: string) =>
   SELF_TITLED.includes(location) || location.startsWith("/features/") || location.startsWith("/done-for-you/");
@@ -703,7 +706,7 @@ function AppContent() {
   // Signed out, the app is the sign-in screen (plus the legal pages and the links customers open from email);
   // signed in, the sales pages go back to Home.
   if (inNativeApp() && !portal) {
-    const open = ["/auth", "/reset-password", "/verify", "/privacy", "/terms", "/support", "/report-issue", "/crm-privacy", "/crm-terms", "/invite/", "/e/", "/i/", "/co/", "/portal/", "/lead-form/", "/review/"]
+    const open = ["/auth", "/reset-password", "/verify", "/privacy", "/data-deletion", "/terms", "/support", "/report-issue", "/crm-privacy", "/crm-terms", "/invite/", "/e/", "/i/", "/co/", "/portal/", "/lead-form/", "/review/"]
       .some((p) => location === p || location.startsWith(p.endsWith("/") ? p : `${p}`));
     if (!user && !open) return <Redirect to="/auth" />;
     if (user && APP_SALES_PATHS.some((p) => location === p || location.startsWith(`${p}/`))) return <Redirect to="/" />;
@@ -879,6 +882,8 @@ function AppContent() {
               <a href="/terms" className="hover:text-foreground transition-colors" data-testid="link-dashboard-footer-terms">Terms</a>
               <span className="mx-2 text-border">&middot;</span>
               <a href="/privacy" className="hover:text-foreground transition-colors" data-testid="link-dashboard-footer-privacy">Privacy</a>
+              <span className="mx-2 text-border">&middot;</span>
+              <a href="/data-deletion" className="hover:text-foreground transition-colors" data-testid="link-dashboard-footer-data-deletion">Data deletion</a>
               <span className="mx-2 text-border">&middot;</span>
               <span>{copyrightNotice()}</span>
             </footer>

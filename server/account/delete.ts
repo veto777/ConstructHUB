@@ -118,6 +118,12 @@ export async function closeAccount(userId: number, deps: { cancelSubscription?: 
       `UPDATE subscriptions SET status = 'canceled', cancel_at_period_end = false
         WHERE user_id = $1 AND status = ANY($2::text[])`, [userId, BILLABLE]).catch(() => undefined);
     for (const t of grantTables) await client.query(`DELETE FROM ${t} WHERE user_id = $1`, [userId]);
+    // ConstructHUB Direct (server/social/native.ts): connected accounts, their encrypted tokens and pending sign-ins
+    // are stored per tenant `chu<user>b<business>`.
+    for (const t of ["social_native_accounts", "social_native_pending", "social_native_submissions"]) {
+      if (await tableExists(t)) await client.query(`DELETE FROM ${t} WHERE tenant ~ ('^chu' || $1::text || 'b[0-9]+$')`, [userId]);
+    }
+    if (await tableExists("social_native_uploads")) await client.query("DELETE FROM social_native_uploads WHERE user_id = $1", [userId]);
     await client.query(
       `UPDATE users SET deletion_requested_at = now(), deleted_email = email,
               email = 'deleted+' || id || '.' || extract(epoch from now())::bigint || '@deleted.constructhub.invalid',
