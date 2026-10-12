@@ -2,7 +2,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { pool } from "../db";
 import {
-  NativeClient, ensureNativeSchema, facebookPlan, graphError, instagramPlan, nativeDeps, nativeNetworks, nativeNetworksFor, newOAuthState,
+  NativeClient, ensureNativeSchema, facebookPlan, graphError, instagramPlan, nativeAllowlisted, nativeDeps, nativeNetworks, nativeNetworksFor, newOAuthState,
   oauthStateMatches, receiveUpload, metaAuthUrl, savePending, nativePendingList, nativeFinalize, removeNativeAccounts,
 } from "./native";
 import { clientFactory } from "./schedule";
@@ -31,9 +31,23 @@ describe("which networks are switched on", () => {
   });
   it("is shown only to platform admins until it is opened to everyone", () => {
     const env = { SOCIAL_META_APP_ID: "1609986400506072", SOCIAL_META_APP_SECRET: "0123456789abcdef0123" } as any;
-    expect(nativeNetworksFor(false, env)).toEqual([]);
-    expect(nativeNetworksFor(true, env)).toEqual(["facebook", "instagram"]);
-    expect(nativeNetworksFor(false, { ...env, SOCIAL_NATIVE_PUBLIC: "true" })).toEqual(["facebook", "instagram"]);
+    expect(nativeNetworksFor({ email: "roofer@example.com" }, env)).toEqual([]);
+    expect(nativeNetworksFor(null, env)).toEqual([]);
+    expect(nativeNetworksFor({ email: "support@constructhub.us" }, env)).toEqual(["facebook", "instagram"]);
+    expect(nativeNetworksFor({ email: "roofer@example.com" }, { ...env, SOCIAL_NATIVE_PUBLIC: "true" })).toEqual(["facebook", "instagram"]);
+  });
+  it("is shown to the reviewer accounts SOCIAL_NATIVE_EMAILS lists, whatever the case", () => {
+    const env = { SOCIAL_META_APP_ID: "1609986400506072", SOCIAL_META_APP_SECRET: "0123456789abcdef0123",
+      SOCIAL_NATIVE_EMAILS: "Meta.Reviewer@constructhub.us, tiktok-review@constructhub.us;  spaced@example.com" } as any;
+    expect(nativeAllowlisted("meta.reviewer@constructhub.us", env)).toBe(true);
+    expect(nativeAllowlisted(" TIKTOK-REVIEW@constructhub.us ", env)).toBe(true);
+    expect(nativeAllowlisted("spaced@example.com", env)).toBe(true);
+    expect(nativeAllowlisted("roofer@example.com", env)).toBe(false);
+    expect(nativeAllowlisted("", env)).toBe(false);
+    expect(nativeAllowlisted(null, { ...env, SOCIAL_NATIVE_EMAILS: "" })).toBe(false);
+    expect(nativeNetworksFor({ email: "META.reviewer@constructhub.us" }, env)).toEqual(["facebook", "instagram"]);
+    expect(nativeNetworksFor({ email: "roofer@example.com" }, env)).toEqual([]);
+    expect(nativeNetworksFor({ email: "meta.reviewer@constructhub.us" }, { ...env, SOCIAL_NATIVE_EMAILS: undefined })).toEqual([]);
   });
   it("picks ConstructHUB Direct from the stored marker", () => {
     expect(clientFactory("native:chu1b2").provider).toBe("native");

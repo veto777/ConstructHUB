@@ -33,7 +33,6 @@ import {
 import { CONNECTABLE, outstandConfigured, webhookSigned } from "./outstand";
 import { NativeClient, nativeNetworksFor, receiveUpload, NATIVE_UPLOAD_MAX_BYTES } from "./native";
 import { accountStats, postStats, comments as postComments, replyComment, hideComment, deleteComment, deletePost } from "./insights";
-import { isPlatformAdmin } from "../admin";
 import { putToR2Key } from "../r2";
 import { registerDeletionRoutes } from "./deletion";
 import { registerTikTokWebhook } from "./tiktok-webhook";
@@ -214,7 +213,7 @@ export function registerSocialRoutes(
       boards:a.boards?.filter((p:any)=>mappings.some((d:any)=>d.accountId===a.id&&d.boardId===p.id))})) : (c?.accounts||[]).slice(0,25);
     // A connection we cannot use (unreadable, or a legacy key: LEGACY_CONNECTION) shows as not connected; setupProblem says why.
     const provider=connectionProvider(c?.key_enc,id);
-    res.json({setupProblem:socialSetupProblem(c?.key_enc,id),provider,outstand:outstandConfigured()?{networks:CONNECTABLE}:null,native:nativeNetworksFor(isPlatformAdmin(req.user)).length?{networks:nativeNetworksFor(isPlatformAdmin(req.user))}:null,connected:!!c&&!!provider,agencyConnected:!!connections?.agency,businessConnected:!!connections?.business,connectionScope:c?.business_id?'business':'agency',accounts:provider?accounts:[],settings:s?.settings||autoSchema.parse({}),
+    res.json({setupProblem:socialSetupProblem(c?.key_enc,id),provider,outstand:outstandConfigured()?{networks:CONNECTABLE}:null,native:nativeNetworksFor(req.user).length?{networks:nativeNetworksFor(req.user)}:null,connected:!!c&&!!provider,agencyConnected:!!connections?.agency,businessConnected:!!connections?.business,connectionScope:c?.business_id?'business':'agency',accounts:provider?accounts:[],settings:s?.settings||autoSchema.parse({}),
       nextAt:s?.next_at,lastError:s?.last_error,posts:posts.map(publicPost),total:count.total,defaults:mappings,sourcesSync:config,
       business:businessId?await ownedBusiness(id,businessId):null});
   };
@@ -235,14 +234,14 @@ export function registerSocialRoutes(
   // ConstructHUB Direct (server/social/native.ts): our own apps on each network.
   route("post", "/native/connect", async (req, res, id, businessId) => {
     const { network } = z.object({ network: z.string().min(2).max(20) }).strict().parse(req.body);
-    if (!nativeNetworksFor(isPlatformAdmin(req.user)).includes(network)) throw new SocialError("That network can't be connected here yet");
+    if (!nativeNetworksFor(req.user).includes(network)) throw new SocialError("That network can't be connected here yet");
     res.json(await nativeConnectUrl(id, businessId, network, req));
   });
   route("post", "/native/refresh", async (_req, res, id, businessId) => res.json(await nativeRefresh(id, businessId)));
   // Stats, comments and deleting (./insights.ts) — for accounts connected through ConstructHUB Direct, admins only
   // until Meta approves the app, like the rest of Direct.
   const direct = async (req: Request, id: number, businessId: number | null): Promise<NativeClient> => {
-    if (!nativeNetworksFor(isPlatformAdmin(req.user)).length) throw new SocialError("Not found", 404);
+    if (!nativeNetworksFor(req.user).length) throw new SocialError("Not found", 404);
     const { client } = await connection(id, make, businessId);
     if (!(client instanceof NativeClient)) throw new SocialError("This business isn't connected through ConstructHUB", 409);
     return client;

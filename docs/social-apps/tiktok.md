@@ -5,7 +5,7 @@ Blanks (`____`) are for the owner. **(verified 2026-10-11)** = read on developer
 day (sources in section 9); **(to confirm)** = our understanding only.
 
 The native TikTok connection is **built** (ConstructHUB Direct, `server/social/native-nets.ts` +
-`server/social/native.ts`; admins only until `SOCIAL_NATIVE_PUBLIC=true`), including the TikTok post panel
+`server/social/native.ts`; admins and the `SOCIAL_NATIVE_EMAILS` reviewer accounts only until `SOCIAL_NATIVE_PUBLIC=true`), including the TikTok post panel
 of section 5.2 (`client/src/components/social-tiktok.tsx`) and the webhook (`server/social/tiktok-webhook.ts`),
 on branch `social/tiktok-ux` (2026-10-12). Customers connected through Outstand still reach TikTok through
 it, with the same panel (without the live creator info).

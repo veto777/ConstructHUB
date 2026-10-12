@@ -21,6 +21,7 @@ import { encryptToken, decryptToken } from "../gbp/token-crypto";
 const enc = (v: string): string => { const b = encryptToken(v); if (!b) throw new SocialError("Social connections can't be stored right now", 503); return b; };
 const dec = (v: string): string => { const t = decryptToken(v); if (!t) throw new SocialError("This account's saved sign-in can't be read; reconnect it", 409); return t; };
 import { SocialError } from "./client";
+import { isPlatformAdmin } from "../admin";
 import type { PostPayload, SocialAccount, SocialClient, StatusResult, SubmitResult, UploadStart } from "./provider";
 import { netConfigured, netExchange, netPublish, netRead, netRefresh, needsRefresh, netScopes, tiktokCreatorInfo, tiktokRevoke, type CreatorInfo, type NetApi } from "./native-nets";
 
@@ -44,12 +45,22 @@ export const NETWORK_API: Record<string, NetApi | "meta"> = { facebook: "meta", 
 const API_PLATFORM: Record<NetApi, string> = { ig_login: "instagram", threads: "threads", tiktok: "tiktok" };
 const API_NETWORK: Record<NetApi, string> = { ig_login: "instagram_direct", threads: "threads", tiktok: "tiktok" };
 export const nativeConfigured = (env: NodeJS.ProcessEnv = process.env) => nativeNetworks(env).length > 0;
+/** Someone signed in, as far as ConstructHUB Direct cares: their email (req.user, or a users row). */
+export type NativeViewer = { email?: string | null } | null | undefined;
+/** Emails SOCIAL_NATIVE_EMAILS lists (comma, semicolon or space separated; any case): the reviewer accounts. Pure on env. */
+export function nativeAllowlisted(email: string | null | undefined, env: NodeJS.ProcessEnv = process.env): boolean {
+  const want = (email ?? "").trim().toLowerCase();
+  return !!want && (env.SOCIAL_NATIVE_EMAILS ?? "").split(/[\s,;]+/).some((e) => e.toLowerCase() === want);
+}
 /**
  * Until Meta approves the app (App Review), only people with a role on it can sign in, so customers do not see
- * ConstructHUB Direct: platform admins do, to test it on our own Page. SOCIAL_NATIVE_PUBLIC=true opens it to all. Pure on env.
+ * ConstructHUB Direct: platform admins do, to test it on our own Page, and so do the accounts SOCIAL_NATIVE_EMAILS
+ * lists (the ConstructHUB accounts Meta's and TikTok's App Review reviewers sign in with). SOCIAL_NATIVE_PUBLIC=true
+ * opens it to all. Pure on env and the viewer's email.
  */
-export function nativeNetworksFor(isAdmin: boolean, env: NodeJS.ProcessEnv = process.env): string[] {
-  return isAdmin || env.SOCIAL_NATIVE_PUBLIC === "true" ? nativeNetworks(env) : [];
+export function nativeNetworksFor(user: NativeViewer, env: NodeJS.ProcessEnv = process.env): string[] {
+  const allowed = env.SOCIAL_NATIVE_PUBLIC === "true" || isPlatformAdmin(user) || nativeAllowlisted(user?.email, env);
+  return allowed ? nativeNetworks(env) : [];
 }
 
 const appBase = () => (process.env.APP_URL || "https://constructhub.us").replace(/\/$/, "");
