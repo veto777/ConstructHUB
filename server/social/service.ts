@@ -209,8 +209,21 @@ export async function nativeRefresh(userId: number, businessId: number | null) {
     const kept = new Map((before as any[]).map((a) => [a.id, a]));
     const merged = now.map((a) => ({ ...a, ...(kept.get(a.id)?.boards ? { boards: kept.get(a.id).boards } : {}) }));
     await pool.query("UPDATE social_connections SET accounts=$3,updated_at=now() WHERE user_id=$1 AND business_id IS NOT DISTINCT FROM $2", [userId, scope, JSON.stringify(merged)]);
+    if (scope !== null && scope === businessId) await mapOwnAccounts(userId, scope, merged, client.hash);
     return { accounts: merged.map(({ id, platform, name }) => ({ id, platform, name })) };
   });
+}
+
+/** A business's own direct connection posts to every account on it: keep its post-to list in step with what is
+ *  connected (kept choices stay, gone accounts drop, new ones are added), so a freshly connected account shows up
+ *  under New post without a separate mapping step. Agency connections shared across businesses still map by hand. */
+async function mapOwnAccounts(userId: number, businessId: number, accounts: any[], hash: string) {
+  const { rows: [cfg] } = await pool.query("SELECT destinations FROM social_business_config WHERE user_id=$1 AND business_id=$2", [userId, businessId]);
+  const ids = new Set(accounts.map((a) => a.id));
+  const kept: any[] = (cfg?.destinations ?? []).filter((d: any) => ids.has(d.accountId));
+  for (const a of accounts) if (!kept.some((d) => d.accountId === a.id)) kept.push({ accountId: a.id, platform: a.platform });
+  await pool.query(`INSERT INTO social_business_config(user_id,business_id,destinations,connection_hash) VALUES($1,$2,$3,$4)
+    ON CONFLICT(business_id) DO UPDATE SET destinations=$3,connection_hash=$4`, [userId, businessId, JSON.stringify(kept), hash]);
 }
 
 export async function nativePending(userId: number, businessId: number | null, session: string) {
