@@ -9,7 +9,7 @@ import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Mic, MicOff, User, FolderKanban, RefreshCw, Send } from "lucide-react";
 import {
-  outcomeTone, outcomeLabel, fmtPhone, fmtDuration, fmtWhen, fmtUpdated, LIVE_REFRESH_MS, callStillChanging,
+  outcomeTone, outcomeLabel, fmtPhone, fmtDuration, fmtWhen, fmtUpdated, parseServerTime, LIVE_REFRESH_MS, callStillChanging,
   type VoiceCallDetail, type VoiceEscalation, type CallDelivery, type CallTaskView,
 } from "./calls-shared";
 
@@ -40,8 +40,8 @@ export function CallDetailSheet({ callId, onClose }: { callId: string | null; on
   const changing = !!call && callStillChanging(call);
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto break-words" data-testid="sheet-call-detail">
-        <SheetHeader>
+      <SheetContent side="right" className="flex flex-col w-full sm:max-w-2xl overflow-hidden break-words" data-testid="sheet-call-detail">
+        <SheetHeader className="shrink-0 pr-6">
           <SheetTitle className="flex flex-wrap items-center gap-2" data-testid="text-call-detail-title">
             {call?.callNo != null && <span className="font-mono text-base text-muted-foreground" data-testid="text-call-detail-no">Call #{call.callNo}</span>}
             {call ? (call.callerName || fmtPhone(call.fromNumber)) : "Call"}
@@ -52,6 +52,7 @@ export function CallDetailSheet({ callId, onClose }: { callId: string | null; on
           </SheetDescription>
         </SheetHeader>
 
+        <div className="min-h-0 flex-1 overflow-y-auto pr-1" data-testid="scroll-call-detail">
         {q.isLoading && <div className="mt-5 space-y-4 animate-pulse" role="status" aria-label="Loading call details" data-testid="skeleton-call-detail">
           <div className="h-20 rounded bg-muted" /><div className="h-32 rounded bg-muted" /><div className="h-24 rounded bg-muted" />
         </div>}
@@ -184,18 +185,22 @@ export function CallDetailSheet({ callId, onClose }: { callId: string | null; on
               )}
             </section>
 
-            <p className="text-xs text-muted-foreground" data-testid="text-call-reference">{call.callNo != null ? `Call #${call.callNo} · ` : ""}Reference {call.callSid}{call.model ? ` · ${call.model}` : ""}{call.profileVersion ? ` · profile v${call.profileVersion}` : ""}</p>
           </div>
         )}
+        </div>
       </SheetContent>
     </Sheet>
   );
 }
 
 const TASK_TONE: Record<CallTaskView["state"], "success" | "warning" | "danger" | "neutral"> = { done: "success", pending: "neutral", retrying: "warning", failed: "danger" };
-const isUncertain = (t: CallTaskView & { uncertain?: boolean }) => !!t.uncertain || /outcome unknown|confirmation could not be saved/i.test(t.lastError ?? "");
+export const isUncertain = (t: CallTaskView) => !!t.uncertain || /delivery uncertain|outcome unknown|confirmation could not be saved/i.test(t.lastError ?? "");
+export function automaticRetriesText(giveUpAt: string | null, now = Date.now()): string {
+  const deadline = parseServerTime(giveUpAt);
+  return `Automatic retries ${deadline && deadline.getTime() > now ? "stop" : "stopped"}${deadline ? ` ${fmtWhen(giveUpAt)}` : ""}`;
+}
 function taskStateLabel(t: CallTaskView): string {
-  if (isUncertain(t)) return "Outcome unknown";
+  if (isUncertain(t)) return "Delivery uncertain";
   if (t.state === "done") return t.kind === "notification" && !t.label.startsWith("In-app") ? "Accepted" : "Done";
   if (t.state === "failed") return "Failed";
   if (t.state === "retrying") return `Retrying · attempt ${t.attempts}`;
@@ -210,7 +215,8 @@ function taskStateLabel(t: CallTaskView): string {
 export function DeliverySection({ callId, delivery }: { callId: string; delivery: CallDelivery }) {
   const qc = useQueryClient();
   const { toast } = useToast();
-  const unfinished = delivery.tasks.some((t) => t.state !== "done" && !isUncertain(t));
+  // This endpoint retries the whole call. Do not offer it while any send needs verification.
+  const unfinished = delivery.tasks.some((t) => t.state !== "done") && !delivery.tasks.some(isUncertain);
   const crmTasks = delivery.tasks.filter(t => t.kind === "lead");
   const notifications = delivery.tasks.filter(t => t.kind === "notification");
   const retry = useMutation({
@@ -243,16 +249,16 @@ export function DeliverySection({ callId, delivery }: { callId: string; delivery
         {delivery.tasks.map((t) => (
           <li key={t.id} className="flex flex-wrap items-start gap-x-2 gap-y-1" data-testid={`row-call-task-${t.key}`}>
             <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{t.label}</span>
-            <StatusPill tone={TASK_TONE[t.state]} data-testid={`pill-call-task-${t.key}`}>{taskStateLabel(t)}</StatusPill>
+            <StatusPill tone={isUncertain(t) ? "warning" : TASK_TONE[t.state]} data-testid={`pill-call-task-${t.key}`}>{taskStateLabel(t)}</StatusPill>
             {t.state !== "done" && t.lastError && (
               <span className="basis-full text-xs text-red-600 dark:text-red-400" data-testid={`text-call-task-error-${t.key}`}>{isUncertain(t) ? "Unconfirmed: " : "Last try failed: "}{t.lastError}</span>
             )}
             {!isUncertain(t) && (t.state === "retrying" || t.state === "pending") && t.nextAttemptAt && delivery.worker.running && (
               <span className="basis-full text-xs text-muted-foreground">Next automatic try {fmtWhen(t.nextAttemptAt)}</span>
             )}
-            {isUncertain(t) && <span className="basis-full text-xs text-muted-foreground">Check with the recipient before arranging another message. Retry now excludes this message to avoid duplicates.</span>}
+            {isUncertain(t) && <span className="basis-full text-xs text-muted-foreground">Verify with the carrier before sending again. Check with the recipient to confirm receipt. Contact support to resolve the delivery status before retrying this call.</span>}
             {t.state === "failed" && !isUncertain(t) && (
-              <span className="basis-full text-xs text-muted-foreground">Automatic retries stopped{t.giveUpAt ? ` ${fmtWhen(t.giveUpAt)}` : ""}. Fix the cause, then Retry now.</span>
+              <span className="basis-full text-xs text-muted-foreground">{automaticRetriesText(t.giveUpAt)}. {unfinished ? "Fix the cause, then Retry now." : "Resolve uncertain deliveries before retrying this call."}</span>
             )}
           </li>
         ))}
@@ -280,7 +286,7 @@ export function EscalationRow({ e, callId, onOpenCall }: { e: VoiceEscalation; c
     },
     onError: (err) => toast({ title: "Couldn't close it", description: apiErrorMessage(err), variant: "destructive" }),
   });
-  const uncertain = !!e.lastError?.includes("Delivery uncertain;") || (e.sentCount > 0 && !e.lastSentAt);
+  const uncertain = /delivery uncertain|outcome unknown|confirmation could not be saved/i.test(e.lastError ?? "") || (e.sentCount > 0 && !e.lastSentAt);
   const detailsPending = e.lastError?.startsWith("Details update not sent:");
   const deliveryLabel = detailsPending ? e.lastError : uncertain ? "Delivery uncertain — verify before resending" : e.lastError || (e.sentCount ? `sent ${e.sentCount}×` : "Not sent");
   const tone: "neutral" | "warning" | "success" = e.lastError || uncertain ? "warning" : e.state === "closed" ? "neutral" : e.state === "waiting" ? "warning" : "success";

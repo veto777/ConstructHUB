@@ -265,8 +265,8 @@ function useSyncOpenCallDrawers(calls: VoiceCallListRow[]) {
 }
 
 const DELIVERY_PILL = {
-  pending: { tone: "warning", label: "Sending to CRM" },
-  failed: { tone: "danger", label: "CRM delivery failed" },
+  pending: { tone: "warning", label: "Delivery pending" },
+  failed: { tone: "danger", label: "Delivery needs attention" },
 } as const;
 
 function CallsTable({ calls, onOpen, testId, numberHint }: { calls: VoiceCallListRow[]; onOpen: (id: string) => void; testId: string; numberHint: string }) {
@@ -313,8 +313,8 @@ function CallsTable({ calls, onOpen, testId, numberHint }: { calls: VoiceCallLis
               <td className={cn(crmTable.td, crmTableCards.td)}>
                 <div className="flex flex-wrap items-center gap-1.5">
                   <StatusPill tone={outcomeTone(c.outcome)} data-testid={`pill-call-outcome-${c.id}`}>{outcomeLabel(c.outcome)}</StatusPill>
-                  {(c.deliveryState === "pending" || c.deliveryState === "failed") && (
-                    <StatusPill tone={DELIVERY_PILL[c.deliveryState].tone} data-testid={`pill-call-delivery-${c.id}`}>{DELIVERY_PILL[c.deliveryState].label}</StatusPill>
+                  {(c.deliveryLabel || c.deliveryState === "pending" || c.deliveryState === "failed") && (
+                    <StatusPill tone={c.deliveryLabel === "Delivery uncertain" ? "warning" : c.deliveryState === "failed" ? "danger" : "warning"} data-testid={`pill-call-delivery-${c.id}`}>{c.deliveryLabel ?? DELIVERY_PILL[c.deliveryState as "pending" | "failed"].label}</StatusPill>
                   )}
                   {c.customerId && (
                     <Link

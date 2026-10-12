@@ -24,7 +24,7 @@ import { openRecording, parseRange } from "./recordings";
 import { listSpamLedger, presentSpamRow, unblockNumber, blockNumber, spamNumber } from "./spam";
 import { getVoiceUsageRow, summarizeVoiceUsage, voiceMonthKey } from "./billing-usage";
 import { closeEscalation, listEscalations, confirmEscalationByToken, startVoiceEscalationWorker, voiceEscalationWorkerStatus, kindLabel } from "./escalations";
-import { listCallTasks, presentCallTask, deliveryStateOf, rearmCallTasks, callTaskWorkerStatus, type DeliveryState } from "./call-tasks";
+import { listCallTasks, presentCallTask, deliveryStateOf, deliveryLabelOf, withEscalationEvidence, rearmCallTasks, callTaskWorkerStatus, type DeliveryState, type DeliverySummaryTask, type EscalationDeliveryEvidence } from "./call-tasks";
 import { logActivity } from "../crm/activity";
 
 export const SPAM_OUTCOMES = ["spam", "blocked"] as const;
@@ -55,6 +55,12 @@ const listColumns = {
   deliveryState: sql<DeliveryState | null>`(select case when count(*) = 0 then null
       when bool_or(t.state = 'failed') then 'failed' when bool_or(t.state = 'pending') then 'pending' else 'done' end
       from voice_call_tasks t where t.call_id = "voice_calls"."id")`,
+  deliveryTasks: sql<DeliverySummaryTask[]>`(select coalesce(json_agg(json_build_object(
+    'kind', t.kind, 'state', t.state, 'payload', t.payload, 'result', t.result, 'lastError', t.last_error)), '[]'::json)
+    from voice_call_tasks t where t.call_id = "voice_calls"."id")`,
+  deliveryEscalations: sql<EscalationDeliveryEvidence[]>`(select coalesce(json_agg(json_build_object(
+    'kind', e.kind, 'sentCount', e.sent_count, 'lastSentAt', e.last_sent_at, 'lastError', e.last_error)), '[]'::json)
+    from voice_escalations e where e.call_id = "voice_calls"."id")`,
 };
 
 /** The engine retries an upload for 3 days (voice/outbox.py max_age_s); with no word from it past that (plus slack),
@@ -126,6 +132,12 @@ export async function outsideSpamSplitThisMonth(orgId: string, timezone: unknown
 
 export type CallResultsRange = "7d" | "30d" | "month" | "all";
 
+/** Office callbacks count too, including a voicemail whose message reached a person. */
+export function sentToPersonCondition(id: SQL, outcome: SQL): SQL {
+  return sql`(${outcome} = 'alerted' OR EXISTS (SELECT 1 FROM voice_escalations e
+    WHERE e.call_id = ${id} AND e.sent_count > 0 AND e.last_sent_at IS NOT NULL))`;
+}
+
 /** The Results panel's numbers for one org, counted from voice_calls (see the /calls/summary route). */
 export async function callResultsSummary(orgId: string, range: CallResultsRange, timezone: unknown) {
   const tz = summaryTimezone(timezone);
@@ -139,6 +151,7 @@ export async function callResultsSummary(orgId: string, range: CallResultsRange,
     SELECT count(*)::int AS total,
            coalesce(round(sum(coalesce(c.duration_seconds, 0)) / 60.0), 0)::int AS minutes,
            count(c.recording_key)::int AS recordings,
+           count(*) FILTER (WHERE ${sentToPersonCondition(sql`c.id`, sql`c.outcome`)})::int AS sent_to_person,
            min(c.started_at) AS first_call
       FROM voice_calls c WHERE ${where}`);
   const outcomes = await db.execute(sql`
@@ -157,6 +170,7 @@ export async function callResultsSummary(orgId: string, range: CallResultsRange,
     total: Number(t.total ?? 0),
     minutes: Number(t.minutes ?? 0),
     recordings: Number(t.recordings ?? 0),
+    sentToPerson: Number(t.sent_to_person ?? 0),
     firstCallAt: t.first_call ?? null,
     outcomes: Object.fromEntries(((outcomes as any).rows ?? []).map((r: any) => [String(r.outcome), Number(r.n)])) as Record<string, number>,
     lines: ((lines as any).rows ?? []).map((r: any) => ({ label: String(r.label), calls: Number(r.n), leads: Number(r.leads) })),
@@ -183,7 +197,8 @@ export function registerVoiceCallRoutes(app: Express, getDevUser: GetUser): void
     const q = parsed.data;
     const spamView = q.spam === "1" || q.spam === "true";
     const where: SQL[] = [eq(voiceCalls.orgId, v.ctx.org.id)];
-    if (q.outcome) where.push(eq(voiceCalls.outcome, q.outcome));
+    if (q.outcome === "alerted") where.push(sentToPersonCondition(sql`${voiceCalls.id}`, sql`${voiceCalls.outcome}`));
+    else if (q.outcome) where.push(eq(voiceCalls.outcome, q.outcome));
     // spam=all: every call, spam included (the overview's Recent calls — audit lane 1 A).
     else if (q.spam === "all") { /* no outcome filter */ }
     else if (spamView) where.push(inArray(voiceCalls.outcome, [...SPAM_OUTCOMES]));
@@ -209,9 +224,9 @@ export function registerVoiceCallRoutes(app: Express, getDevUser: GetUser): void
     const calls = await db.select(listColumns).from(voiceCalls).where(cond)
       .orderBy(desc(voiceCalls.startedAt)).limit(q.limit).offset((q.page - 1) * q.limit);
     sendUnlogged(res, {
-      calls: calls.map(({ recordingPending, recordingStatus, ...c }) => {
+      calls: calls.map(({ recordingPending, recordingStatus, deliveryTasks, deliveryEscalations, ...c }) => {
         const rec = recordingInfoOf({ ...c, recordingPending, recordingStatus });
-        return { ...c, spamConfidence: c.spamConfidence == null ? null : Number(c.spamConfidence), hasRecording: !!c.recordingKey, recordingState: rec.state, recordingReason: rec.reason };
+        return { ...c, deliveryLabel: deliveryLabelOf(deliveryTasks.map(t => withEscalationEvidence(t, deliveryEscalations))), spamConfidence: c.spamConfidence == null ? null : Number(c.spamConfidence), hasRecording: !!c.recordingKey, recordingState: rec.state, recordingReason: rec.reason };
       }),
       total, page: q.page, limit: q.limit,
     });
@@ -256,7 +271,7 @@ export function registerVoiceCallRoutes(app: Express, getDevUser: GetUser): void
         .where(and(eq(voiceNumbers.orgId, v.ctx.org.id), eq(voiceNumbers.id, call.numberId))).limit(1)
       : [];
     const escalations = (await listEscalations(v.ctx.org.id, { callId: call.id })).map(presentEscalation);
-    const tasks = await listCallTasks(call.id);
+    const tasks = (await listCallTasks(call.id)).map(t => withEscalationEvidence(t, escalations));
     const rec = recordingInfoOf(call);
     sendUnlogged(res, {
       ...call,
@@ -265,6 +280,7 @@ export function registerVoiceCallRoutes(app: Express, getDevUser: GetUser): void
       recordingState: rec.state,
       recordingReason: rec.reason,
       deliveryState: deliveryStateOf(tasks),
+      deliveryLabel: deliveryLabelOf(tasks),
       delivery: { state: deliveryStateOf(tasks), tasks: tasks.map(presentCallTask), worker: callTaskWorkerStatus() },
       recordingUrl: call.recordingKey ? `/api/crm/voice/calls/${call.id}/recording` : null,
       customer: customer ?? null, project: project ?? null, number: number ?? null, escalations,

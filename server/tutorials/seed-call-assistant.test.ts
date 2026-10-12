@@ -69,6 +69,8 @@ beforeAll(async () => {
   await client.query(`create schema "${schema}"`);
   created = true;
   await client.query(`set search_path to "${schema}"`);
+  // Read actual catalog IDs; never synthesize government county rows for a seed test.
+  await client.query("create table counties as select * from public.counties where state_code='FL' and name in ('Sarasota','Manatee')");
   for (const table of tables) {
     await client.query(`create table "${table}" (like public."${table}" including all)`);
     // LIKE copies serial defaults pointing at public sequences. Replace them with private ones.
@@ -99,6 +101,12 @@ it("seeds twice without duplicates, with linked CRM rows and honest delivery rec
   if (skipReason) { console.warn(`SKIP Call Assistant integration: ${skipReason}`); ctx.skip(); return; }
   const db = client!;
   await seedCallAssistant(raw!);
+  const { rows: [profile] } = await db.query("select profile from voice_profiles");
+  expect(profile.profile.serviceArea.counties.map((c: any) => c.name).sort()).toEqual(["Manatee", "Sarasota"]);
+  for (const county of profile.profile.serviceArea.counties) {
+    expect((await db.query("select name, state_code from counties where id=$1", [county.id])).rows[0])
+      .toEqual({ name: county.name, state_code: "FL" });
+  }
   const snapshot = async () => {
     const result: Record<string, unknown> = {};
     for (const table of tables) result[table] = (await db.query(`select * from "${table}" order by id`)).rows;
@@ -140,6 +148,24 @@ it("seeds twice without duplicates, with linked CRM rows and honest delivery rec
   expect(usage).toEqual({ calls: CALL_ASSISTANT_SAMPLE_COUNT, spam: 2 });
   expect((await db.query(`select c.id from voice_calls c join crm_orgs o on o.id=c.org_id where o.name <> 'Aspire Interiors'`)).rows).toEqual([]);
 }, 20000);
+
+it("repairs older samples' empty county selections without duplicating calls or replacing chosen counties", async ctx => {
+  if (skipReason) { ctx.skip(); return; }
+  const db = client!;
+  await db.query(`update voice_profiles set
+    profile=jsonb_set(profile,'{serviceArea,counties}','[]'),
+    published_profile=jsonb_set(published_profile,'{serviceArea,counties}','[]')`);
+  await seedCallAssistant(raw!);
+  const { rows: [row] } = await db.query("select profile, published_profile, compiled from voice_profiles");
+  expect(row.profile.serviceArea.counties.map((c: any) => c.name).sort()).toEqual(["Manatee", "Sarasota"]);
+  expect(row.published_profile.serviceArea.counties).toEqual(row.profile.serviceArea.counties);
+  expect(row.compiled).toMatchObject({ version: 1 });
+  expect((await db.query("select count(*)::int as n from voice_calls")).rows[0].n).toBe(CALL_ASSISTANT_SAMPLE_COUNT);
+  const chosen = [row.profile.serviceArea.counties[0]];
+  await db.query("update voice_profiles set profile=jsonb_set(profile,'{serviceArea,counties}',$1::jsonb)", [JSON.stringify(chosen)]);
+  await seedCallAssistant(raw!);
+  expect((await db.query("select profile from voice_profiles")).rows[0].profile.serviceArea.counties).toEqual(chosen);
+});
 
 it("rolls all writes back when a later fixture fails", async ctx => {
   if (skipReason) { ctx.skip(); return; }

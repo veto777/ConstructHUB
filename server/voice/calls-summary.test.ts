@@ -10,6 +10,7 @@ import { callResultsSummary, summaryTimezone } from "./calls";
 const ORG = `test-results-${randomUUID().slice(0, 8)}`;
 const OTHER = `test-results-other-${randomUUID().slice(0, 8)}`;
 const RUN = randomUUID().slice(0, 8);
+let safeTarget = false;
 
 async function call(n: string, o: { org?: string; outcome: string; daysAgo: number; secs?: number; market?: string; to?: string; rec?: boolean }) {
   await pool.query(
@@ -20,7 +21,10 @@ async function call(n: string, o: { org?: string; outcome: string; daysAgo: numb
 }
 
 beforeAll(async () => {
-  if (!/^\/constructhub_dev(?:_a\d+)?$/.test(new URL(process.env.DATABASE_URL!).pathname)) throw new Error("Requires a ConstructHUB development lane DB");
+  if (!process.env.DATABASE_URL) return;
+  const target = new URL(process.env.DATABASE_URL!);
+  if (!["127.0.0.1", "localhost", "[::1]"].includes(target.hostname) || target.port === "5433" || !/^\/constructhub_dev(?:_a\d+|_fs)?$/.test(target.pathname)) throw new Error("Requires a local ConstructHUB development lane DB (never port 5433)");
+  safeTarget = true;
   await call("a", { outcome: "lead_submitted", daysAgo: 1, market: "FL", rec: true, secs: 150 });
   await call("b", { outcome: "lead_submitted", daysAgo: 2, market: "WA", rec: true });
   await call("c", { outcome: "hangup", daysAgo: 3, market: "FL" });
@@ -31,10 +35,12 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  if (!safeTarget) return;
+  await pool.query(`DELETE FROM voice_escalations WHERE call_id IN (SELECT id FROM voice_calls WHERE call_sid LIKE $1)`, [`res-${RUN}-%`]);
   await pool.query(`DELETE FROM voice_calls WHERE call_sid LIKE $1`, [`res-${RUN}-%`]);
 });
 
-describe("callResultsSummary", () => {
+describe.skipIf(!process.env.DATABASE_URL)("callResultsSummary", () => {
   it("counts the last 7 days by outcome, line and recording — one org only", async () => {
     const s = await callResultsSummary(ORG, "7d", "America/New_York");
     expect(s.total).toBe(4);
@@ -60,5 +66,18 @@ describe("callResultsSummary", () => {
     expect(summaryTimezone("Not/AZone")).toBe("America/New_York");
     const m = await callResultsSummary(ORG, "month", "Mars/Olympus");
     expect(m.timezone).toBe("America/New_York");
+  });
+
+  it("counts an office-alert voicemail as sent to a person, but not an unsent alert", async () => {
+    await call("office", { outcome: "voicemail", daysAgo: 1 });
+    const { rows: [c] } = await pool.query("SELECT id FROM voice_calls WHERE call_sid=$1", [`res-${RUN}-office`]);
+    await pool.query(`INSERT INTO voice_escalations (org_id, call_id, kind, channel, recipient, body, sent_count)
+      VALUES ($1,$2,'existing_customer','email','office@example.invalid','Callback requested',0)`, [ORG, c.id]);
+    expect((await callResultsSummary(ORG, "7d", "UTC")).sentToPerson).toBe(0);
+    await pool.query("UPDATE voice_escalations SET sent_count=1,last_sent_at=now() WHERE call_id=$1", [c.id]);
+    const summary = await callResultsSummary(ORG, "7d", "UTC");
+    expect(summary.sentToPerson).toBe(1);
+    expect(summary.outcomes.voicemail).toBe(1);
+    expect(summary.outcomes.hangup).toBe(1);
   });
 });
