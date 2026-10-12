@@ -97,6 +97,11 @@ export function toolRuleFor(url: string): Rule | undefined {
   // The full-screen tools' views (components/website-tool, components/traffic-tool) share their tool's rule.
   for (const base of ["/site-scan", "/cloudflare", "/search-console", "/ip-tracker", "/vpn-shield"]) if (path.startsWith(`${base}/`) && !path.startsWith("/site-scan/report/")) return TOOL_RULES[base];
   if (path.startsWith("/social-media/")) return TOOL_RULES["/social-media"];
+  if (path.startsWith("/call-assistant/")) return TOOL_RULES["/call-assistant"];
+  if (path.startsWith("/google-reviews/")) return TOOL_RULES["/google-reviews"];
+  if (path.startsWith("/google-ads/")) return TOOL_RULES["/google-ads"];
+  if (path.startsWith("/ads-manager/")) return TOOL_RULES["/ads-manager"];
+  if (path.startsWith("/agency/")) return TOOL_RULES["/agency"];
   return undefined;
 }
 

@@ -17,7 +17,12 @@ import { socialNav } from "@/components/social-tool/nav";
 import { websiteNav } from "@/components/website-tool/nav";
 import { trafficNav } from "@/components/traffic-tool/nav";
 import { competitorsNav } from "@/components/competitors-tool/nav";
-import { SHOW_COMPETITOR_INTEL } from "@/lib/features";
+import { callAssistantNav } from "@/components/call-assistant-tool/nav";
+import { reviewsNav } from "@/components/reviews-tool/nav";
+import { SHOW_COMPETITOR_INTEL, SHOW_GOOGLE_REVIEWS } from "@/lib/features";
+import { googleAdsNav } from "@/components/google-ads-tool/nav";
+import { googleBusinessNav } from "@/components/google-business-tool/nav";
+import { permitsNav } from "@/components/permits-tool/nav";
 
 export type ShelledTool = { nav: () => ToolShellConfig };
 export const SHELLED_TOOLS: ShelledTool[] = [
@@ -25,6 +30,11 @@ export const SHELLED_TOOLS: ShelledTool[] = [
   { nav: websiteNav },
   { nav: trafficNav },
   ...(SHOW_COMPETITOR_INTEL ? [{ nav: competitorsNav }] : []),
+  { nav: callAssistantNav },
+  ...(SHOW_GOOGLE_REVIEWS ? [{ nav: reviewsNav }] : []),
+  { nav: googleAdsNav },
+  { nav: googleBusinessNav },
+  { nav: permitsNav },
 ];
 export { useInToolShell } from "@/components/tool/in-shell";
 

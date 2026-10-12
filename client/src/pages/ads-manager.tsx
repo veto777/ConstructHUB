@@ -13,7 +13,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { useUrlParam } from '@/hooks/use-url-param';
+import { useRouteTab } from '@/components/google-ads-tool/use-route-tab';
+import { ADS_MANAGER_TABS } from '@/components/google-ads-tool/nav';
+import { useToolSlot } from '@/components/tool/shell';
 import { PlanRequired, planRequiredFrom, pollUnlessPlanRequired } from '@/components/plan-required';
 type Tab='recommendations'|'accounts'|'invitations'|'plans'|'jobs'|'findings'|'landing';
 const labels:Record<Tab,string>={recommendations:'Recommendations',accounts:'Client accounts',invitations:'Access invitations',plans:'Protection previews',jobs:'Queue',findings:'Health audit',landing:'Landing door'};
@@ -62,10 +64,9 @@ function Pager({page,total,setPage}:{page:number;total:number;setPage:(n:number)
 export default function AdsManagerPage() {
   const qc=useQueryClient();
   const me=useQuery<{isPlatformAdmin?:boolean}>({queryKey:['/api/auth/me']});
-  // The section lives in the URL (?tab=jobs) so a reload or a shared link keeps it.
-  const [tabParam,setTabParam]=useUrlParam('tab');
-  const tab:Tab=(Object.keys(labels) as string[]).includes(tabParam??'')?tabParam as Tab:'recommendations';
-  const setTab=(t:Tab)=>setTabParam(t==='recommendations'?null:t);
+  // Each section is its own address (/ads-manager/queue …; components/google-ads-tool/nav.ts); old ?tab= links move there.
+  const [tab,setTab]=useRouteTab<Tab>('/ads-manager',ADS_MANAGER_TABS);
+  const inShell=!!useToolSlot();
   const [q,setQ]=useState(''),[filter,setFilter]=useState(''),[lsa,setLsa]=useState(''),[page,setPage]=useState(1);
   const [selected,setSelected]=useState<string[]>([]),[all,setAll]=useState(false),[message,setMessage]=useState(''),[manager,setManager]=useState('');
   const [kind,setKind]=useState('presence'),[keywords,setKeywords]=useState(defaults.join('\n')),[listName,setListName]=useState('Contractor starter negatives'),[placements,setPlacements]=useState('');
@@ -154,8 +155,9 @@ export default function AdsManagerPage() {
   const accountCount=all?(scopeInfo.data?.total??0):selected.length;
   const planGate=[status.error,data.error].find(e=>planRequiredFrom(e));
   // Google's page format (owner, 2026-10-07): a quiet header, pill tabs and actions, hairline cards.
-  const header=<GoogleSectionHeader as="h1" title="Agency Ads & LSA manager" description="Manage client access and review ad protections before applying them." flush actions={planGate ? null : status.data?.connected ? <GooglePill variant="solid" label="Discover clients" disabled={action.isPending} onClick={()=>run('/sync',{kind:'discover'})} /> : <GooglePill variant="solid" label="Connect MCC with Google" disabled={!status.data?.configured||action.isPending} onClick={()=>run('/connect',{managerId:manager||status.data?.defaultManagerId})} />} />;
-  const tabs=<ToolTabs as="group" label="Ads manager sections">{(Object.keys(labels) as Tab[]).filter(t=>t!=='landing'||me.data?.isPlatformAdmin).map(t=><GooglePill key={t} label={labels[t]} selected={tab===t} ariaPressed={tab===t} onClick={()=>switchTab(t)} />)}</ToolTabs>;
+  const header=<GoogleSectionHeader as="h1" title={tab==='recommendations'?'Agency Ads & LSA manager':labels[tab]} description="Manage client access and review ad protections before applying them." flush actions={planGate ? null : status.data?.connected ? <GooglePill variant="solid" label="Discover clients" disabled={action.isPending} onClick={()=>run('/sync',{kind:'discover'})} /> : <GooglePill variant="solid" label="Connect MCC with Google" disabled={!status.data?.configured||action.isPending} onClick={()=>run('/connect',{managerId:manager||status.data?.defaultManagerId})} />} />;
+  // Inside the Google Ads tool the menu on the left carries the sections; platform admins keep a link to the landing door.
+  const tabs=inShell?(me.data?.isPlatformAdmin&&tab!=='landing'?<div><GooglePill size="sm" label="Landing door (admin)" onClick={()=>switchTab('landing')} /></div>:null):<ToolTabs as="group" label="Ads manager sections">{(Object.keys(labels) as Tab[]).filter(t=>t!=='landing'||me.data?.isPlatformAdmin).map(t=><GooglePill key={t} label={labels[t]} selected={tab===t} ariaPressed={tab===t} onClick={()=>switchTab(t)} />)}</ToolTabs>;
   if(tab==='landing')return <AppPage>{header}{tabs}{me.isLoading?<p>Loading…</p>:me.data?.isPlatformAdmin?<LandingDoorTab/>:<p>Platform admin access required.</p>}</AppPage>;
   if(planGate)return <AppPage className="[&_select]:max-w-full [&_select]:min-h-10 [&_button]:min-h-10 [&_h3]:text-base [&_p]:text-sm">{header}{me.data?.isPlatformAdmin&&tabs}<PlanRequired module="adsManager" error={planGate} className="max-w-3xl"/></AppPage>;
   return <AppPage className="[&_select]:max-w-full [&_select]:min-h-10 [&_button]:min-h-10 [&_h3]:text-base [&_p]:text-sm">

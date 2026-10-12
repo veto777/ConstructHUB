@@ -2,8 +2,11 @@ import { Tabs, TabsTrigger } from "@/components/ui/tabs";
 import { AppPage, Section, AppTabsList, Toolbar, Notice, appTable, appTableCards } from "@/components/app-ui";
 import { GoogleSectionHeader, GooglePill, GoogleStat, GoogleStatGrid } from "@/components/google";
 import { useAppOrigin } from "@/lib/app-origin";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useSearch } from "wouter";
+import { ToolBarSlot, useToolSlot } from "@/components/tool/shell";
+import { CLICK_GUARD_TABS } from "@/components/google-ads-tool/nav";
+import { routeTabHref } from "@/components/google-ads-tool/use-route-tab";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -118,28 +121,29 @@ const COPY_BLOCKED = "Your browser blocked clipboard access. Select the text and
 export default function ClickGuardPage() {
   const appOrigin = useAppOrigin();
   const { toast } = useToast();
-  // The tab and domain live in the URL (?tab=settings&domain=12) so a reload
-  // or a shared link lands on the same view instead of resetting to the
-  // dashboard and the first domain.
+  // Each section is its own address (/google-ads/traffic …; components/google-ads-tool/nav.ts), the site is ?domain=.
+  // The old ?tab= links land on their section's address.
   const [location, navigate] = useLocation();
   const search = useSearch();
   const urlParams = new URLSearchParams(search);
   const tabParam = urlParams.get("tab");
-  const activeTab: PageTab = (PAGE_TABS as readonly string[]).includes(tabParam ?? "") ? (tabParam as PageTab) : "dashboard";
+  const seg = location.startsWith("/google-ads/") ? location.slice("/google-ads/".length) : "";
+  const activeTab: PageTab = (CLICK_GUARD_TABS.find(([, s]) => s === seg)?.[0] ?? "dashboard") as PageTab;
+  useEffect(() => {
+    if (!tabParam) return;
+    const wanted = (PAGE_TABS as readonly string[]).includes(tabParam) ? (tabParam as PageTab) : activeTab;
+    navigate(routeTabHref("/google-ads", CLICK_GUARD_TABS, wanted, urlParams), { replace: true });
+  }, [tabParam]); // eslint-disable-line react-hooks/exhaustive-deps
+  const inShell = !!useToolSlot();
   const domainParam = Number(urlParams.get("domain"));
   const selectedDomainId = Number.isInteger(domainParam) && domainParam > 0 ? domainParam : null;
   const updateUrl = (next: { tab?: PageTab; domain?: number | null }) => {
     const params = new URLSearchParams(search);
-    if (next.tab !== undefined) {
-      if (next.tab === "dashboard") params.delete("tab");
-      else params.set("tab", next.tab);
-    }
     if (next.domain !== undefined) {
       if (next.domain == null) params.delete("domain");
       else params.set("domain", String(next.domain));
     }
-    const qs = params.toString();
-    navigate(qs ? `${location}?${qs}` : location, { replace: true });
+    navigate(routeTabHref("/google-ads", CLICK_GUARD_TABS, next.tab ?? activeTab, params), { replace: next.tab === undefined });
   };
   const setActiveTab = (tab: PageTab) => updateUrl({ tab });
   const setSelectedDomainId = (id: number | null) => updateUrl({ domain: id });
@@ -268,11 +272,12 @@ export default function ClickGuardPage() {
       <GoogleSectionHeader
         as="h1"
         titleTestId="text-page-title"
-        title="Click fraud protection"
+        title={activeTab === "dashboard" ? "Click Guard" : CLICK_GUARD_TABS.find(([key]) => key === activeTab)![2]}
         description={<><span data-testid="text-subtitle">Track website visits and review unusual traffic.</span> <span className="g-chip g-chip--sm ml-1 align-middle" data-testid="badge-click-guard">Google Click Guard</span></>}
         flush
         actions={<GooglePill icon={Plus} variant={showAddDomain ? "outline" : "solid"} label="Add domain" onClick={() => setShowAddDomain(true)} testId="button-add-domain" />} />
-      {selectedDomain && <select aria-label="Website domain" className="h-10 w-full sm:w-72 rounded-md border bg-card px-3 text-sm" value={domainId || ""} onChange={e => setSelectedDomainId(Number(e.target.value))} data-testid="select-domain">{domains.map(d => <option key={d.id} value={d.id}>{d.name || d.domain}</option>)}</select>}
+      {/* The site every section is about: in the tool bar inside the Google Ads tool, here otherwise. */}
+      {selectedDomain && <ToolBarSlot><label className="flex min-w-0 items-center gap-2 text-sm"><span className={inShell ? "shrink-0 opacity-80" : "sr-only"}>Website</span><select aria-label="Website domain" className="h-10 w-full sm:w-72 rounded-md border bg-card px-3 text-sm text-foreground" value={domainId || ""} onChange={e => setSelectedDomainId(Number(e.target.value))} data-testid="select-domain">{domains.map(d => <option key={d.id} value={d.id}>{d.name || d.domain}</option>)}</select></label></ToolBarSlot>}
       <details className="text-sm text-muted-foreground"><summary className="cursor-pointer py-2">How protection works</summary><p>Signals do not prove fraud. Apply IP exclusions using the separate Google Ads script.</p></details>
           {showAddDomain && (
             <Section flush className="bg-card border-border mb-6" testId="card-add-domain">
@@ -312,7 +317,8 @@ export default function ClickGuardPage() {
             </Section>
           )}
 
-<Tabs value={activeTab}><AppTabsList>
+{/* Inside the Google Ads tool the menu on the left carries these sections. */}
+{!inShell && <Tabs value={activeTab}><AppTabsList>
             {PAGE_TABS.map(tab => {
               const labels: Record<string, string> = {
                 dashboard: "Dashboard",
@@ -350,7 +356,7 @@ export default function ClickGuardPage() {
                 </TabsTrigger>
               );
             })}
-          </AppTabsList></Tabs>
+          </AppTabsList></Tabs>}
 
           {activeTab === "link-ads" && <LinkGoogleAdsView domainId={domainId} trackingId={selectedDomain?.trackingId} />}
 
