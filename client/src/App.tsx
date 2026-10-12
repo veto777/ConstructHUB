@@ -225,6 +225,11 @@ function DashboardRouter() {
       <Route path="/pricing" component={PricingPage} />
       {SHOW_COMPETITOR_INTEL && <Route path="/competitors" component={CompetitorsPage} />}
       <Route path="/agency" component={AgencyPage} />
+      <Route path="/agency/clients" component={AgencyPage} />
+      <Route path="/agency/team" component={AgencyPage} />
+      <Route path="/agency/onboarding" component={AgencyPage} />
+      <Route path="/agency/jobs" component={AgencyPage} />
+      <Route path="/agency/settings" component={AgencyPage} />
       <Route path="/locations" component={LocationsPage} />
       <Route path="/google-profile" component={GoogleProfilePage} />
       <Route path="/invite/:code" component={InvitePage} />
@@ -464,7 +469,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/search": "Search Permits", "/databases": "Database Directory", "/property": "Property Records",
   "/schedules": "Scrape Schedules", "/history": "Search History", "/permit-alerts": "Permit Alerts", "/photos": "Photo Optimizer",
   "/gmb-monitor": "GMB Edit Monitor", "/ranking-grid": "GMB Ranking Grid", "/pricing": "Pricing",
-  "/competitors": "Competitor Intel", "/agency": "Agency", "/locations": "Locations", "/domains": "Domains",
+  "/competitors": "Competitor Intel", "/agency": "Agency", "/agency/clients": "Agency clients", "/agency/team": "Agency team", "/agency/onboarding": "Agency onboarding", "/agency/jobs": "Agency jobs", "/agency/settings": "Agency settings", "/locations": "Locations", "/domains": "Domains",
   "/mail-alerts": "Mail Alerts", "/gbp-content": "Posts & Photos", "/listing-editor": "Listing editor", "/social-media": "Social Media", "/social-media/calendar": "Social calendar", "/social-media/compose": "New social post", "/social-media/posts": "Social posts", "/social-media/analytics": "Social analytics", "/social-media/inbox": "Social inbox", "/social-media/accounts": "Social accounts", "/social-media/auto": "Social auto mode", "/social-media/guides": "Social guides",
   "/guides": "Guides", "/tutorials": "Tutorials", "/cloudflare": "Cloudflare", "/search-console": "Search Console", "/site-scan": "Site Scan",
   "/seo": "SEO Suite", "/seo/rank-tracker": "Rank tracker", "/seo/local-grid": "Local grid", "/seo/plan": "SEO action plan", "/seo/audit": "Site audit", "/seo/alerts": "SEO alerts", "/seo/mentions": "SEO mentions", "/seo/usage": "SEO data usage", "/seo/reports": "SEO reports", "/seo/ai": "AI visibility", "/seo/batch": "Batch analysis", "/seo/content": "Content explorer", "/seo/explorer": "Site explorer", "/seo/keywords": "Keywords explorer", "/seo/backlinks": "Backlinks", "/seo/competitors": "Competitor gap",

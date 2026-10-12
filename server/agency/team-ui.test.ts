@@ -5,6 +5,7 @@ const state = vi.hoisted(() => ({ entitled: false, teamEntitled: true, queries: 
 vi.mock('@tanstack/react-query', () => ({ useQuery: (opts: any) => { state.queries.push(opts); return { data: opts.queryKey[0] === '/api/agency/me' ? { owner: 1, actor: 1, role: 'owner', entitled: state.entitled, teamEntitled: state.teamEntitled, workspaces: [] } : undefined, refetch: vi.fn() }; } }));
 vi.mock('@/lib/queryClient', () => ({ apiRequest: vi.fn(), apiErrorMessage: vi.fn(), queryClient: {} }));
 vi.mock('@/hooks/use-url-param', () => ({ useUrlParam: () => [null, vi.fn()] }));
+vi.mock('wouter', () => ({ useLocation: () => ['/agency', vi.fn()] }));
 vi.mock('@/components/google', () => ({ GoogleSurface: ({ children }: any) => children }));
 vi.mock('@/components/app-ui', () => ({ AppPage: ({ children }: any) => children, PageHeader: ({ title }: any) => title, AppTabsList: ({ children }: any) => children, Section: ({ children }: any) => children }));
 vi.mock('@/components/ui/tabs', () => ({ Tabs: ({ children }: any) => children, TabsTrigger: ({ children }: any) => children }));
