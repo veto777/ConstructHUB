@@ -15,7 +15,8 @@ import {
 } from "../../shared/social";
 import { BlotatoClient, encryptKey, decryptKey, SocialError, socialMisconfigured } from "./client";
 import { CONNECTABLE, OUTSTAND_MARK, OutstandClient, outstandConfigured, tenantFor, type Connectable } from "./outstand";
-import { NATIVE_MARK, NativeClient, nativeNetworks, newOAuthState, oauthStateMatches, metaAuthUrl, metaPagesFromCode, savePending, nativePendingList, nativeFinalize as nativeSave, removeNativeAccounts, type PendingOAuth } from "./native";
+import { NATIVE_MARK, NativeClient, nativeNetworks, newOAuthState, oauthStateMatches, metaAuthUrl, metaPagesFromCode, savePending, nativePendingList, nativeFinalize as nativeSave, removeNativeAccounts, NETWORK_API, nativeNetConnect, type PendingOAuth } from "./native";
+import { netAuthUrl, type NetApi } from "./native-nets";
 import {
   clientFactory, userLock, ownedBusiness, connection, validateDestinations, destinationFromPayload, destinationKey, requestFingerprint, insertPosts, createPosts,
   type ClientFactory,
@@ -157,7 +158,8 @@ export async function nativeConnectUrl(userId: number, businessId: number | null
     }
     const pending = newOAuthState(userId, businessId, network);
     req.session.socialNativeOAuth = pending;
-    return { authUrl: metaAuthUrl(pending.state) };
+    const api = NETWORK_API[network];
+    return { authUrl: api === "meta" ? metaAuthUrl(pending.state) : netAuthUrl(api, pending.state) };
   });
 }
 
@@ -176,6 +178,24 @@ export async function nativeCallback(req: any, userId: number): Promise<string> 
     return back(`session=${session}`);
   } catch (e) {
     console.warn("[social] native sign-in failed:", (e as Error)?.message);
+    return back("connect_error=failed");
+  }
+}
+
+/** Back from Instagram login, Threads or TikTok: the account is connected at once. Returns where to send the browser. */
+export async function nativeNetCallback(req: any, userId: number, api: NetApi): Promise<string> {
+  const pending: PendingOAuth | undefined = req.session.socialNativeOAuth;
+  delete req.session.socialNativeOAuth;
+  const business = pending?.businessId ?? null;
+  const back = (q: string) => `/social-media?business=${business ?? "all"}&${q}`;
+  if (!oauthStateMatches(pending, userId, req.query?.state) || NETWORK_API[pending.network] !== api) return back("connect_error=expired");
+  if (typeof req.query?.error === "string" || typeof req.query?.code !== "string") return back("connect_error=cancelled");
+  try {
+    const network = await nativeNetConnect(api, tenantFor(userId, business), req.query.code);
+    await logActivity(req, userId, "social.pages_connected", { provider: "native", network });
+    return back(`connected=${network}`);
+  } catch (e) {
+    console.warn(`[social] native ${api} sign-in failed:`, (e as Error)?.message);
     return back("connect_error=failed");
   }
 }

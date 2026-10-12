@@ -22,6 +22,7 @@ const enc = (v: string): string => { const b = encryptToken(v); if (!b) throw ne
 const dec = (v: string): string => { const t = decryptToken(v); if (!t) throw new SocialError("This account's saved sign-in can't be read; reconnect it", 409); return t; };
 import { SocialError } from "./client";
 import type { PostPayload, SocialAccount, SocialClient, StatusResult, SubmitResult, UploadStart } from "./provider";
+import { netConfigured, netExchange, netPublish, netRead, netRefresh, needsRefresh, netScopes, type NetApi } from "./native-nets";
 
 export const NATIVE_MARK = "native:";
 export const GRAPH = "https://graph.facebook.com/v25.0";
@@ -31,8 +32,17 @@ const UPLOAD_MAX_BYTES = 250 * 1024 * 1024;
 /** Networks this provider can connect, given the apps configured. Pure on env. */
 export function nativeNetworks(env: NodeJS.ProcessEnv = process.env): string[] {
   const meta = /^\d{6,30}$/.test(env.SOCIAL_META_APP_ID ?? "") && /^\S{16,}$/.test(env.SOCIAL_META_APP_SECRET ?? "");
-  return meta ? ["facebook", "instagram"] : [];
+  return [
+    ...(meta ? ["facebook", "instagram"] : []),
+    ...(netConfigured("ig_login", env) ? ["instagram_direct"] : []),
+    ...(netConfigured("threads", env) ? ["threads"] : []),
+    ...(netConfigured("tiktok", env) ? ["tiktok"] : []),
+  ];
 }
+/** Connect-screen network → which sign-in it uses. `instagram_direct` = Instagram login (no Facebook Page needed). */
+export const NETWORK_API: Record<string, NetApi | "meta"> = { facebook: "meta", instagram: "meta", instagram_direct: "ig_login", threads: "threads", tiktok: "tiktok" };
+const API_PLATFORM: Record<NetApi, string> = { ig_login: "instagram", threads: "threads", tiktok: "tiktok" };
+const API_NETWORK: Record<NetApi, string> = { ig_login: "instagram_direct", threads: "threads", tiktok: "tiktok" };
 export const nativeConfigured = (env: NodeJS.ProcessEnv = process.env) => nativeNetworks(env).length > 0;
 /**
  * Until Meta approves the app (App Review), only people with a role on it can sign in, so customers do not see
@@ -67,6 +77,8 @@ export const ensureNativeSchema = async () => {
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (tenant, platform, external_id))`);
+  await pool.query("ALTER TABLE social_native_accounts ADD COLUMN IF NOT EXISTS api text NOT NULL DEFAULT 'meta'");
+  await pool.query("ALTER TABLE social_native_accounts ADD COLUMN IF NOT EXISTS refresh_enc text");
   await pool.query(`CREATE TABLE IF NOT EXISTS social_native_pending (
     session text PRIMARY KEY,
     tenant text NOT NULL,
@@ -220,13 +232,23 @@ export async function nativeFinalize(session: string, tenant: string, userId: nu
   return n;
 }
 
-async function upsertAccount(tenant: string, platform: string, externalId: string, name: string, picture: string | null, parentId: string | null, token: string) {
+async function upsertAccount(tenant: string, platform: string, externalId: string, name: string, picture: string | null, parentId: string | null, token: string,
+  more: { api?: string; refresh?: string | null; expiresAt?: Date | null; scopes?: string[] } = {}) {
   await pool.query(
-    `INSERT INTO social_native_accounts(id,tenant,platform,external_id,name,picture,parent_id,token_enc,scopes)
-     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
-     ON CONFLICT(tenant,platform,external_id) DO UPDATE SET name=$5,picture=$6,parent_id=$7,token_enc=$8,scopes=$9,needs_reconnect=false,last_error=null,updated_at=now()`,
-    [randomUUID(), tenant, platform, externalId, name.slice(0, 200), picture, parentId, enc(token), JSON.stringify(META_SCOPES)]);
+    `INSERT INTO social_native_accounts(id,tenant,platform,external_id,name,picture,parent_id,token_enc,scopes,api,refresh_enc,token_expires_at)
+     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+     ON CONFLICT(tenant,platform,external_id) DO UPDATE SET name=$5,picture=$6,parent_id=$7,token_enc=$8,scopes=$9,api=$10,refresh_enc=$11,token_expires_at=$12,needs_reconnect=false,last_error=null,updated_at=now()`,
+    [randomUUID(), tenant, platform, externalId, name.slice(0, 200), picture, parentId, enc(token), JSON.stringify(more.scopes ?? META_SCOPES),
+     more.api ?? "meta", more.refresh ? enc(more.refresh) : null, more.expiresAt ?? null]);
 }
+
+/** Back from Instagram login, Threads or TikTok: the signed-in account is connected straight away (no page to pick). */
+export async function nativeNetConnect(api: NetApi, tenant: string, code: string): Promise<string> {
+  const s = await netExchange(api, code);
+  await upsertAccount(tenant, API_PLATFORM[api], s.externalId, s.name, s.picture, null, s.token, { api, refresh: s.refresh, expiresAt: s.expiresAt, scopes: s.scopes });
+  return API_NETWORK[api];
+}
+export const netScopesFor = netScopes;
 
 export async function removeNativeAccounts(tenant: string): Promise<number> {
   const { rowCount } = await pool.query("DELETE FROM social_native_accounts WHERE tenant=$1", [tenant]);
@@ -236,7 +258,7 @@ export async function removeNativeAccounts(tenant: string): Promise<number> {
 
 // ── publishing ──────────────────────────────────────────────────────────────────────────────────────────────
 
-type Row = { id: string; platform: string; external_id: string; name: string; parent_id: string | null; token_enc: string; needs_reconnect: boolean };
+type Row = { id: string; platform: string; external_id: string; name: string; parent_id: string | null; token_enc: string; needs_reconnect: boolean; api: string; refresh_enc: string | null; token_expires_at: Date | null };
 type Sub = { id: string; account_id: string; platform: string; stage: string; container_id: string | null; external_id: string | null; public_url: string | null; error: string | null; attempts: number };
 
 const isVideo = (url: string) => /\.(mp4|mov|m4v)(\?|$)/i.test(url);
@@ -277,13 +299,24 @@ export class NativeClient implements SocialClient {
     this.hash = createHash("sha256").update(`native:${tenant}`).digest("hex");
   }
   private async rows(): Promise<Row[]> {
-    const { rows } = await pool.query("SELECT id,platform,external_id,name,parent_id,token_enc,needs_reconnect FROM social_native_accounts WHERE tenant=$1 ORDER BY platform,name", [this.tenant]);
+    const { rows } = await pool.query("SELECT id,platform,external_id,name,parent_id,token_enc,needs_reconnect,api,refresh_enc,token_expires_at FROM social_native_accounts WHERE tenant=$1 ORDER BY platform,name", [this.tenant]);
     return rows;
   }
   private async row(id: string): Promise<Row> {
-    const { rows: [r] } = await pool.query("SELECT id,platform,external_id,name,parent_id,token_enc,needs_reconnect FROM social_native_accounts WHERE tenant=$1 AND id=$2", [this.tenant, id]);
+    const { rows: [r] } = await pool.query("SELECT id,platform,external_id,name,parent_id,token_enc,needs_reconnect,api,refresh_enc,token_expires_at FROM social_native_accounts WHERE tenant=$1 AND id=$2", [this.tenant, id]);
     if (!r) throw new SocialError("That social account is no longer connected; reconnect it", 409);
     return r;
+  }
+  /** The account's token, refreshed first when it is about to expire (TikTok daily; Instagram login / Threads every 60 days). */
+  private async token(acct: Row): Promise<string> {
+    const token = dec(acct.token_enc);
+    if (acct.api === "meta" || !needsRefresh(acct.api as NetApi, acct.token_expires_at ? new Date(acct.token_expires_at) : null)) return token;
+    try {
+      const f = await netRefresh(acct.api as NetApi, token, acct.refresh_enc ? dec(acct.refresh_enc) : null);
+      await pool.query("UPDATE social_native_accounts SET token_enc=$3,refresh_enc=$4,token_expires_at=$5,updated_at=now() WHERE tenant=$1 AND id=$2",
+        [this.tenant, acct.id, enc(f.token), f.refresh ? enc(f.refresh) : acct.refresh_enc, f.expiresAt]);
+      return f.token;
+    } catch (e) { await this.markReconnect(acct.id, e); throw e; }
   }
   private async markReconnect(accountId: string, e: unknown) {
     if ((e as any)?.reconnect) await pool.query("UPDATE social_native_accounts SET needs_reconnect=true,last_error=$3,updated_at=now() WHERE tenant=$1 AND id=$2", [this.tenant, accountId, String((e as Error).message).slice(0, 300)]);
@@ -303,14 +336,17 @@ export class NativeClient implements SocialClient {
     if (seen) return { submissionId: seen.id };   // never send the same post twice
     const acct = await this.row(payload.post.accountId);
     if (acct.needs_reconnect) throw new SocialError("This account's sign-in has expired; reconnect it under Connected accounts", 409);
-    const token = dec(acct.token_enc);
+    const token = await this.token(acct);
     const text = payload.post.content.text ?? "";
     const media = (payload.post.content.mediaUrls ?? []).filter((u) => /^https:\/\//.test(u));
     const id = `nat_${randomUUID()}`;
     await pool.query("INSERT INTO social_native_submissions(id,idem_key,tenant,account_id,platform,stage) VALUES($1,$2,$3,$4,$5,'sending')",
       [id, key, this.tenant, acct.id, acct.platform]);
     try {
-      if (acct.platform === "facebook") await this.facebookSend(id, acct, token, text, media);
+      if (acct.api !== "meta") {
+        const p = await netPublish(acct.api as NetApi, acct.external_id, token, text, media, payload.post.target ?? {});
+        await this.setSub(id, { stage: p.stage, container_id: p.container ?? null, external_id: p.external ?? null });
+      } else if (acct.platform === "facebook") await this.facebookSend(id, acct, token, text, media);
       else if (acct.platform === "instagram") await this.instagramSend(id, acct, token, text, media);
       else throw new SocialError(`${acct.platform} isn't available for posting yet`);
     } catch (e) {
@@ -369,8 +405,19 @@ export class NativeClient implements SocialClient {
     if (s.stage === "failed") return { state: "failed", publicUrl: null, error: s.error };
     const acct = await this.row(s.account_id).catch(() => null);
     if (!acct) return { state: "failed", publicUrl: null, error: "That social account is no longer connected" };
-    const token = dec(acct.token_enc);
     try {
+      const token = await this.token(acct);
+      if (acct.api !== "meta" && ["ig_container", "th_container", "tt_publish"].includes(s.stage)) {
+        const r = await netRead(acct.api as NetApi, acct.external_id, token, s.stage, s.container_id, acct.api === "tiktok" ? acct.name : null);
+        if (r.state === "failed") return this.fail(s.id, r.error ?? "The network refused the post");
+        if (r.state === "submitted") {
+          if (s.attempts > 120) return this.fail(s.id, "The network took too long to process the post");
+          await this.setSub(s.id, { attempts: s.attempts + 1 });
+          return { state: "submitted", publicUrl: null, error: null };
+        }
+        await this.setSub(s.id, { stage: "published", external_id: r.external ?? null, public_url: r.url ?? null });
+        return { state: "published", publicUrl: r.url ?? null, error: null };
+      }
       if (s.stage === "fb_video") {
         const d = await graph("GET", s.external_id, { fields: "status,permalink_url" }, token);
         const st = d?.status?.video_status;

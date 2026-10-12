@@ -11,9 +11,11 @@ import { GoogleSectionHeader, GooglePill } from "@/components/google";
 import { useToast } from "@/hooks/use-toast";
 import { useUrlParam } from "@/hooks/use-url-param";
 
-const LABEL: Record<string, string> = { facebook: "Facebook", instagram: "Instagram", linkedin: "LinkedIn", tiktok: "TikTok", youtube: "YouTube", pinterest: "Pinterest", threads: "Threads", twitter: "X" };
+const LABEL: Record<string, string> = { facebook: "Facebook", instagram: "Instagram", instagram_direct: "Instagram (no Facebook Page)", linkedin: "LinkedIn", tiktok: "TikTok", youtube: "YouTube", pinterest: "Pinterest", threads: "Threads", twitter: "X" };
 const NOTE: Record<string, string> = {
-  instagram: "Business or Creator account",
+  instagram: "Business or Creator account linked to your Facebook Page",
+  instagram_direct: "Business or Creator account, signed in with Instagram",
+  threads: "Your Threads profile",
   facebook: "Pick the Pages to post to",
   linkedin: "Your profile or company Pages",
   tiktok: "Posts start private until you choose public",
@@ -70,7 +72,8 @@ export function SocialConnect({ businessId, networks, accounts, connected, via =
     onError: (e) => toast({ title: "Couldn't disconnect", description: apiErrorMessage(e), variant: "destructive" }),
   });
 
-  const byNetwork = (n: string) => accounts.filter((a) => a.platform === n);
+  // Both Instagram buttons list the Instagram accounts connected either way.
+  const byNetwork = (n: string) => accounts.filter((a) => a.platform === (n === "instagram_direct" ? "instagram" : n));
   return (
     <section data-testid="social-connect">
       <GoogleSectionHeader

@@ -25,6 +25,7 @@ import {
   outstandFinalize,
   nativeConnectUrl,
   nativeCallback,
+  nativeNetCallback,
   nativeRefresh,
   nativePending,
   nativeFinalize,
@@ -251,6 +252,14 @@ export function registerSocialRoutes(
     res.setHeader("Cache-Control", "no-store");
     res.redirect(302, await nativeCallback(req, user.id));
   });
+  // Instagram login, Threads and TikTok come back here (each registered as its app's redirect URI).
+  for (const [path, api] of [["instagram", "ig_login"], ["threads", "threads"], ["tiktok", "tiktok"]] as const) {
+    app.get(`/api/social/native/${path}/callback`, async (req: Request, res: Response) => {
+      const user = auth(req, res); if (!user) return;
+      res.setHeader("Cache-Control", "no-store");
+      res.redirect(302, await nativeNetCallback(req, user.id, api));
+    });
+  }
   // The composer's file goes through us to our storage; the networks fetch it from its public address.
   app.put("/api/social/native/upload/:token", (req: Request, res: Response, next: () => void) => { if (auth(req, res)) next(); },
     express.raw({ type: () => true, limit: NATIVE_UPLOAD_MAX_BYTES }), async (req: Request, res: Response) => {
