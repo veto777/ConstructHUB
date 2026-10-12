@@ -28,6 +28,7 @@ import {
 import { GuidesContent } from "@/pages/guides";
 import { useUrlParam } from "@/hooks/use-url-param";
 import { SocialYoutube } from "@/components/social-youtube";
+import { SocialConnect } from "@/components/social-connect";
 
 // Google's rounded field shape for the native selects (the surface supplies the hairline colour).
 const selectClass = "h-10 w-full rounded-full border border-input bg-background px-4 text-sm";
@@ -305,7 +306,7 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
   // Why Post now / Save draft are disabled, in the order the user can fix it.
   const setupProblem = data?.setupProblem as string | null | undefined;
   const postBlocker = error ? "Refresh Social Media to check whether posting is available." : setupProblem || (!data?.connected
-    ? "Connect Blotato above to post."
+    ? (data?.outstand ? "Connect your social accounts above to post." : "Connect Blotato above to post.")
     : !destinations.length
       ? "Choose at least one account above."
       : !text.trim()
@@ -418,10 +419,12 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
       const put = await fetch(r.presignedUrl, {
         method: "PUT",
         body: file,
-        headers: { "Content-Type": file.type || "application/octet-stream" },
+        headers: { "Content-Type": r.contentType || file.type || "application/octet-stream" },
       });
       if (!put.ok) throw new Error("Media upload failed");
-      setMediaText((v) => [v, r.publicUrl].filter(Boolean).join("\n"));
+      const publicUrl = r.publicUrl ?? (r.uploadId ? (await mutation.mutateAsync({ path: `/uploads/${encodeURIComponent(r.uploadId)}/confirm`, success: false })).publicUrl : null);
+      if (!publicUrl) throw new Error("Media upload failed");
+      setMediaText((v) => [v, publicUrl].filter(Boolean).join("\n"));
       toast({ title: "Media uploaded and attached" });
     } catch {
       toast({ title: "Upload failed. Try again.", variant: "destructive" });
@@ -471,7 +474,11 @@ function SocialWorkbench({ accountId, businessId, all, draftEdits, onEditDraft }
         </div>
       )}
 
-      {!all && (
+      {!all && data?.outstand && (
+        <SocialConnect businessId={businessId} networks={data.outstand.networks} accounts={data?.provider === "outstand" ? accounts : []} connected={data?.provider === "outstand" && !!data?.connected} />
+      )}
+
+      {!all && !data?.outstand && (
         <section>
           <GoogleSectionHeader
             title="Blotato connection"

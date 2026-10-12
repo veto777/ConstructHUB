@@ -12,9 +12,12 @@ import type { PoolClient } from "pg";
 import { pool } from "../db";
 import { postSchema, postPayload, type Destination } from "../../shared/social";
 import { BlotatoClient, decryptKey, SocialError } from "./client";
+import { OutstandClient, OUTSTAND_MARK } from "./outstand";
+import type { SocialClient } from "./provider";
 
-export type ClientFactory = (key: string) => BlotatoClient;
-export const clientFactory: ClientFactory = (key) => new BlotatoClient(key);
+/** The stored secret picks the provider: "outstand:<tenant>" is ConstructHUB's own Outstand account, anything else a Blotato key. */
+export type ClientFactory = (key: string) => SocialClient;
+export const clientFactory: ClientFactory = (key) => (key.startsWith(OUTSTAND_MARK) ? new OutstandClient(key.slice(OUTSTAND_MARK.length)) : new BlotatoClient(key));
 
 export async function userLock<T>(
   userId: number,
@@ -50,7 +53,7 @@ export async function connection(userId: number, make = clientFactory, businessI
     "SELECT key_enc,accounts,business_id FROM social_connections WHERE user_id=$1 AND (business_id=$2 OR business_id IS NULL) ORDER BY business_id NULLS LAST LIMIT 1",
     [userId, businessId],
   );
-  if (!r) throw new SocialError("Connect Blotato first", 409);
+  if (!r) throw new SocialError("Connect your social accounts first", 409);
   return {
     client: make(decryptKey(r.key_enc, userId)),
     accounts: r.accounts as any[],

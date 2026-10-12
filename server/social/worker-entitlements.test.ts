@@ -25,7 +25,10 @@ beforeEach(() => {
   mocks.clientQuery.mockResolvedValue({ rows: [] });
   mocks.getEntitlements.mockResolvedValue({ modules: { socialPublishing: true, autoPosts: true } });
   mocks.userLock.mockImplementation(async (_id, fn) => fn({ query: mocks.clientQuery }));
-  mocks.connection.mockResolvedValue({ client: { hash: "connection", request: mocks.request } });
+  // The provider interface (./provider.ts) over the same request mock: submit is POST /posts, status GET /posts/:id.
+  mocks.connection.mockResolvedValue({ client: { hash: "connection", request: mocks.request,
+    submit: async (payload: unknown) => ({ submissionId: (await mocks.request("/posts", payload))?.postSubmissionId }),
+    status: async (id: string) => { const d = await mocks.request(`/posts/${id}`); return { state: d?.status === "published" ? "published" : d?.status === "failed" ? "failed" : "submitted", publicUrl: d?.publicUrl ?? null, error: null }; } } });
   mocks.request.mockResolvedValue({ postSubmissionId: "submission" });
 });
 

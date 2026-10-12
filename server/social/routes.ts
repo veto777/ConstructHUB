@@ -18,7 +18,13 @@ import {
   connection,
   type ClientFactory,
   clientFactory,
+  connectionProvider,
+  outstandConnectUrl,
+  outstandRefresh,
+  outstandPending,
+  outstandFinalize,
 } from "./service";
+import { CONNECTABLE, outstandConfigured, webhookSigned } from "./outstand";
 // Curated, field-specific messages. Raw Zod text is never echoed; custom
 // refinements (written for people) pass through as-is.
 const fieldMessages: Record<string, string> = {
@@ -125,6 +131,18 @@ export function registerSocialRoutes(
       },
     );
   };
+  // Outstand tells us when a post went out or failed: the worker looks at those posts now instead of in a minute.
+  // Signed with OUTSTAND_WEBHOOK_SECRET (HMAC-SHA256 of the raw body); anything unsigned is refused.
+  app.post("/api/social/outstand/webhook", async (req: Request, res: Response) => {
+    if (!webhookSigned((req as any).rawBody, req.get("x-outstand-signature"), process.env.OUTSTAND_WEBHOOK_SECRET)) return res.status(401).json({ message: "Bad signature" });
+    const event = String(req.body?.event ?? "");
+    const postId = req.body?.data?.id ?? req.body?.data?.postId ?? req.body?.data?.post?.id;
+    if ((event === "post.published" || event === "post.error") && typeof postId === "string" && /^[\w-]{1,200}$/.test(postId)) {
+      await pool.query("UPDATE social_posts SET due_at=now(),updated_at=now() WHERE submission_id=$1 AND state='submitted'", [postId]);
+    }
+    if (event === "account.token_expired") console.warn("[social] outstand account needs reconnecting:", JSON.stringify(req.body?.data ?? {}).slice(0, 300));
+    res.json({ ok: true });
+  });
   route("get", "/businesses", async (req,res,id) => res.json(await listBusinesses(id,req.query||{})));
   // Bulk jobs of kind 'settings'/'generate' are auto-posts work (the scheduled AI
   // generation), not just publishing: they need the autoPosts module too.
@@ -182,7 +200,7 @@ export function registerSocialRoutes(
     const accounts=businessId ? (c?.accounts||[]).filter((a:any)=>mappings.some((d:any)=>d.accountId===a.id)).map((a:any)=>({...a,
       pages:a.pages?.filter((p:any)=>mappings.some((d:any)=>d.accountId===a.id&&d.pageId===p.id)),
       boards:a.boards?.filter((p:any)=>mappings.some((d:any)=>d.accountId===a.id&&d.boardId===p.id))})) : (c?.accounts||[]).slice(0,25);
-    res.json({setupProblem:socialSetupProblem(c?.key_enc,id),connected:!!c,agencyConnected:!!connections?.agency,businessConnected:!!connections?.business,connectionScope:c?.business_id?'business':'agency',accounts,settings:s?.settings||autoSchema.parse({}),
+    res.json({setupProblem:socialSetupProblem(c?.key_enc,id),provider:connectionProvider(c?.key_enc,id),outstand:outstandConfigured()?{networks:CONNECTABLE}:null,connected:!!c,agencyConnected:!!connections?.agency,businessConnected:!!connections?.business,connectionScope:c?.business_id?'business':'agency',accounts,settings:s?.settings||autoSchema.parse({}),
       nextAt:s?.next_at,lastError:s?.last_error,posts:posts.map(publicPost),total:count.total,defaults:mappings,sourcesSync:config,
       business:businessId?await ownedBusiness(id,businessId):null});
   };
@@ -199,6 +217,19 @@ export function registerSocialRoutes(
       .parse(req.body);
     const result=await connect(id, apiKey, req, make, businessId);
     res.json({connected:result.connected,accounts:result.accounts.slice(0,25).map(({id,platform,name}:any)=>({id,platform,name}))});
+  });
+  // "Connect Facebook / Instagram / …": the network's own sign-in, through ConstructHUB's publishing account.
+  route("post", "/outstand/connect", async (req, res, id, businessId) => {
+    const { network } = z.object({ network: z.enum(CONNECTABLE) }).strict().parse(req.body);
+    res.json(await outstandConnectUrl(id, businessId, network, req));
+  });
+  // Back from the sign-in: read the connected accounts again.
+  route("post", "/outstand/refresh", async (_req, res, id, businessId) => res.json(await outstandRefresh(id, businessId)));
+  // Facebook / LinkedIn come back with a session: which pages may be connected, then the ones ticked.
+  route("get", "/outstand/pending/:session", async (req, res) => res.json(await outstandPending(z.string().regex(/^[\w.-]{8,400}$/).parse(req.params.session))));
+  route("post", "/outstand/pending/:session/finalize", async (req, res, id, businessId) => {
+    const { pageIds } = z.object({ pageIds: z.array(z.string().regex(/^[\w:.-]{1,200}$/)).min(1).max(50) }).strict().parse(req.body);
+    res.json(await outstandFinalize(id, businessId, z.string().regex(/^[\w.-]{8,400}$/).parse(req.params.session), pageIds, req));
   });
   route("post", "/disconnect", async (_req, res, id, businessId) =>
     res.json(await disconnect(id, _req, businessId)),
@@ -267,10 +298,15 @@ export function registerSocialRoutes(
       .strict()
       .parse(req.body);
     const { client } = await connection(id, make, businessId);
-    const data = await client.request("/media/uploads", { filename });
-    const publicUrl = publicMediaUrl.parse(data.publicUrl),
-      presignedUrl = publicMediaUrl.parse(data.presignedUrl);
-    res.json({ publicUrl, presignedUrl });
+    const up = await client.startUpload(filename);
+    // Blotato knows the public address now; Outstand gives an upload id to confirm after the PUT (then the address).
+    res.json({ publicUrl: up.publicUrl, presignedUrl: up.presignedUrl, ...(up.uploadId ? { uploadId: up.uploadId, contentType: up.contentType ?? null } : {}) });
+  });
+  // After the browser PUT the file: providers that hand out the public address only then (Outstand) confirm it here.
+  route("post", "/uploads/:uploadId/confirm", async (req, res, id, businessId) => {
+    const { client } = await connection(id, make, businessId);
+    if (!client.confirmUpload) return res.status(400).json({ message: "Nothing to confirm for this upload." });
+    res.json({ publicUrl: publicMediaUrl.parse(await client.confirmUpload(opaqueId.parse(req.params.uploadId))) });
   });
   route("post", "/sources/sync-gbp", async(req,res,id,businessId)=>{
     if(!businessId)throw new SocialError("Choose a business");

@@ -14,6 +14,7 @@ import {
   publicMediaUrl,
 } from "../../shared/social";
 import { BlotatoClient, encryptKey, decryptKey, SocialError, socialMisconfigured } from "./client";
+import { CONNECTABLE, OUTSTAND_MARK, OutstandClient, outstandConfigured, tenantFor, type Connectable } from "./outstand";
 import {
   clientFactory, userLock, ownedBusiness, connection, validateDestinations, destinationFromPayload, destinationKey, requestFingerprint, insertPosts, createPosts,
   type ClientFactory,
@@ -48,6 +49,11 @@ export async function connect(
   });
 }
 export async function disconnect(userId: number, req: any, businessId: number | null = null) {
+  // An Outstand connection also lets go of the accounts at Outstand (best effort; ours are deleted either way).
+  const { rows: [conn] } = await pool.query("SELECT key_enc FROM social_connections WHERE user_id=$1 AND business_id IS NOT DISTINCT FROM $2", [userId, businessId]);
+  if (connectionProvider(conn?.key_enc, userId) === "outstand") {
+    await new OutstandClient(tenantFor(userId, businessId)).removeAll().catch((e) => console.warn("[social] outstand disconnect:", e?.message));
+  }
   return userLock(userId, async (c) => {
     await c.query("BEGIN");
     try {
@@ -70,6 +76,64 @@ export async function disconnect(userId: number, req: any, businessId: number | 
     return { connected: false };
   });
 }
+/** Which provider a stored connection uses ("outstand" | "blotato"), or null when it cannot be read. */
+export function connectionProvider(keyEnc: string | undefined | null, userId: number): "outstand" | "blotato" | null {
+  if (!keyEnc) return null;
+  try { return decryptKey(keyEnc, userId).startsWith(OUTSTAND_MARK) ? "outstand" : "blotato"; } catch { return null; }
+}
+
+/**
+ * "Connect Facebook / Instagram / …" (owner, 2026-10-11: "so we can add their social media for them"): the business's
+ * connection becomes ConstructHUB's Outstand tenant for that business, and the customer is sent to the network's own
+ * sign-in. They come back to /social-media with `connected=<network>` (or `session=…` for Facebook / LinkedIn, whose
+ * pages are picked next). A Blotato key the business had is replaced.
+ */
+export async function outstandConnectUrl(userId: number, businessId: number | null, network: string, req: any): Promise<{ authUrl: string }> {
+  if (!outstandConfigured()) throw new SocialError("Social posting isn't switched on yet.", 503);
+  if (!(CONNECTABLE as readonly string[]).includes(network)) throw new SocialError("That network can't be connected here yet");
+  return userLock(userId, async () => {
+    await ownedBusiness(userId, businessId);
+    const { rows: [r] } = await pool.query("SELECT key_enc FROM social_connections WHERE user_id=$1 AND business_id IS NOT DISTINCT FROM $2", [userId, businessId]);
+    const tenant = tenantFor(userId, businessId);
+    if (connectionProvider(r?.key_enc, userId) !== "outstand") {
+      await pool.query(
+        `INSERT INTO social_connections(user_id,key_enc,accounts,business_id) VALUES($1,$2,'[]',$3) ON CONFLICT(user_id,business_id) DO UPDATE SET key_enc=$2,accounts='[]',updated_at=now()`,
+        [userId, encryptKey(OUTSTAND_MARK + tenant, userId), businessId]);
+      await logActivity(req, userId, "social.connected", { provider: "outstand" });
+    }
+    const base = (process.env.APP_URL || "https://constructhub.us").replace(/\/$/, "");
+    const back = `${base}/social-media?business=${businessId ?? "all"}&connected=${network}`;
+    return { authUrl: await new OutstandClient(tenant).authUrl(network as Connectable, back) };
+  });
+}
+
+/** The connected accounts as Outstand has them now (kept pages/boards are carried over). */
+export async function outstandRefresh(userId: number, businessId: number | null) {
+  return userLock(userId, async () => {
+    const { client, accounts: before, businessId: scope } = await connection(userId, clientFactory, businessId);
+    if (!(client instanceof OutstandClient)) throw new SocialError("This business isn't connected through ConstructHUB", 409);
+    const now = await client.accounts();
+    const kept = new Map((before as any[]).map((a) => [a.id, a]));
+    const merged = now.map((a) => ({ ...a, ...(kept.get(a.id)?.boards ? { boards: kept.get(a.id).boards } : {}) }));
+    await pool.query("UPDATE social_connections SET accounts=$3,updated_at=now() WHERE user_id=$1 AND business_id IS NOT DISTINCT FROM $2", [userId, scope, JSON.stringify(merged)]);
+    return { accounts: merged.map(({ id, platform, name }) => ({ id, platform, name })) };
+  });
+}
+
+/** Facebook / LinkedIn: the pages that sign-in can connect. */
+export async function outstandPending(session: string) {
+  return OutstandClient.pending(session);
+}
+/** Facebook / LinkedIn: connect the pages the customer ticked, then read the accounts back. */
+export async function outstandFinalize(userId: number, businessId: number | null, session: string, pageIds: string[], req: any) {
+  await ownedBusiness(userId, businessId);
+  const { client } = await connection(userId, clientFactory, businessId);
+  if (!(client instanceof OutstandClient)) throw new SocialError("This business isn't connected through ConstructHUB", 409);
+  const n = await OutstandClient.finalize(session, pageIds);
+  await logActivity(req, userId, "social.pages_connected", { pages: n });
+  return outstandRefresh(userId, businessId);
+}
+
 export async function discoverPages(
   userId: number,
   accountId: string,
@@ -80,21 +144,10 @@ export async function discoverPages(
     const { client, accounts, businessId: connectionBusiness } = await connection(userId, make, businessId);
     const a = accounts.find((a) => a.id === accountId);
     if (!a) throw new SocialError("Account not found", 404);
-    const boards = a.platform === "pinterest";
-    if (!boards && !["facebook", "linkedin", "youtube"].includes(a.platform))
-      return { items: [] };
-    const data = await client.request(
-      boards
-        ? `/social/pinterest/boards?accountId=${accountId}`
-        : `/users/me/accounts/${accountId}/subaccounts`,
-    );
-    if (!Array.isArray(data.items))
-      throw new SocialError("Invalid page list", 502);
-    const items = data.items.map((p: any) => ({
-      id: String(p.id),
-      name: String(p.name || p.id),
-    }));
-    a[boards ? "boards" : "pages"] = items;
+    const found = await client.targets(a);
+    if (!found) return { items: [] };
+    const items = found.items;
+    a[found.kind] = items;
     await pool.query(
       "UPDATE social_connections SET accounts=$2 WHERE user_id=$1 AND business_id IS NOT DISTINCT FROM $3",
       [userId, JSON.stringify(accounts), connectionBusiness],
@@ -417,7 +470,7 @@ export async function workerUser(
       }
       try {
         if (p.connection_hash && p.connection_hash !== client.hash) {
-          await c.query("UPDATE social_posts SET state='uncertain',error='Blotato connection changed. Verify the original submission before creating another post.',updated_at=now() WHERE id=$1",[p.id]);
+          await c.query("UPDATE social_posts SET state='uncertain',error='The social connection changed. Check whether the original post went out before creating another one.',updated_at=now() WHERE id=$1",[p.id]);
           continue;
         }
         if (p.state === "queued") {
@@ -426,38 +479,17 @@ export async function workerUser(
             "UPDATE social_posts SET state='submitting',updated_at=now() WHERE id=$1",
             [p.id],
           );
-          const data = await client.request("/posts", p.payload);
-          if (
-            typeof data.postSubmissionId !== "string" ||
-            !/^[-\w]+$/.test(data.postSubmissionId)
-          )
-            throw new SocialError(
-              "Blotato did not confirm a submission ID",
-              502,
-            );
+          // The post's own id makes a retried submission safe: the provider answers it once.
+          const sent = await client.submit(p.payload, String(p.id));
           await c.query(
             "UPDATE social_posts SET state='submitted',submission_id=$2,due_at=now()+interval '30 seconds',error=NULL,updated_at=now() WHERE id=$1",
-            [p.id, data.postSubmissionId],
+            [p.id, sent.submissionId],
           );
         } else {
-          const data = await client.request(`/posts/${p.submission_id}`);
-          const state =
-            data.status === "published"
-              ? "published"
-              : data.status === "failed"
-                ? "failed"
-                : "submitted";
-          const url = publicMediaUrl.safeParse(data.publicUrl);
+          const got = await client.status(p.submission_id);
           await c.query(
             "UPDATE social_posts SET state=$2,public_url=$3,error=$4,due_at=now()+interval '60 seconds',updated_at=now() WHERE id=$1",
-            [
-              p.id,
-              state,
-              url.success ? url.data : null,
-              state === "failed"
-                ? "Blotato reports a failed post. Review it in Blotato."
-                : null,
-            ],
+            [p.id, got.state, got.publicUrl, got.error],
           );
         }
       } catch (e) {
@@ -477,7 +509,7 @@ export async function workerUser(
             state,
             e instanceof SocialError
               ? e.message
-              : "Social publishing failed; review in Blotato",
+              : "Social publishing failed; check the post before sending it again",
           ],
         );
         if (rate) break;
