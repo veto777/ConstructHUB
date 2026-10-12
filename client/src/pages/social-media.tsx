@@ -160,16 +160,6 @@ export default function SocialMediaPage() {
         <>
           {/* No business open yet: the full list to pick from (one business opens by itself). */}
           {!chosen && view !== "guides" && <BusinessSelector value={business} onChange={v => setBusiness(v, true)} accountTotal={!businesses.isError && businesses.data ? (businesses.data.total ?? 0) : null} />}
-          {noBusinesses && !business && (
-            <Notice
-              tone="info"
-              title="No businesses yet"
-              testId="notice-social-no-businesses"
-              action={<GooglePill size="sm" variant="solid" href="/locations" label="Add a location" />}
-            >
-              Social Media posts for a business from Locations. Add or import one there, then come back to connect its accounts.
-            </Notice>
-          )}
           {chosen ? <SocialWorkbench key={JSON.stringify([accountId, business])} view={view} accountId={accountId} businessId={business === "all" ? null : Number(business)} all={business === "all"} draftEdits={editsFor === accountId ? draftEdits : {}} onEditDraft={editDraft} /> : <>
             {/* The guides don't depend on a business: /guides lands here. */}
             {view === "guides" && <GuidesContent />}

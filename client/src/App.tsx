@@ -92,7 +92,7 @@ import { copyrightNotice } from "@/lib/marketing";
 import { reportIssueHref } from "@/lib/report-issue-link";
 import { useSeoHead } from "@/lib/seo-head";
 import { SeoToolLayout } from "@/components/seo-tool/layout";
-import { SocialToolLayout } from "@/components/social-tool/layout";
+import { ProductToolLayout, shelledToolFor } from "@/components/tool/product-shell";
 import { pageMetaFor } from "@shared/route-meta";
 
 // Pages only the CRM portal, the client portal, a customer's document link or a platform admin opens load
@@ -900,14 +900,16 @@ function AppContent() {
   );
   // Inside SEO the app sidebar is not shown: the SEO tool shell carries the navigation, and its "All tools" button is
   // the way back to everything else (owner, 2026-10-09). On phones the sidebar stays as the sheet the tab bar's Menu opens.
-  // Social Media is its own tool the same way (owner, 2026-10-12: "the sidebar with all features should vanish").
-  if (location === "/social-media" || location.startsWith("/social-media/")) {
+  // Every other full-screen tool the same way (components/tool/product-shell.tsx; owner, 2026-10-12: "the sidebar
+  // with all features should vanish", then "the same format for all other pages").
+  const shelled = shelledToolFor(location);
+  if (shelled) {
     return (
       <SidebarProvider style={sidebarStyle as React.CSSProperties} defaultOpen={sidebarDefaultOpen()}>
         <div className="md:hidden"><AppSidebar /></div>
-        <SocialToolLayout actions={controls} banner={<PaymentNeededBanner />} footer={footer}>
+        <ProductToolLayout config={shelled} actions={controls} banner={<PaymentNeededBanner />} footer={footer}>
           <ToolRouteGate location={location}><DashboardRouter /></ToolRouteGate>
-        </SocialToolLayout>
+        </ProductToolLayout>
         <AppTabBar />
         <HubWidget surface="growth" signedIn />
       </SidebarProvider>

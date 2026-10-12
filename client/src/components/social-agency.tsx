@@ -53,7 +53,7 @@ export function BusinessSelector({ value, onChange, accountTotal }: { value: str
     <section>
       <GoogleSectionHeader
         title="Business"
-        description={error ? "Businesses unavailable." : data ? (data.total === 1 ? "Your business. Open it to connect accounts, write posts and set auto mode." : `${data.total} businesses. Click Open on the one you want to work on.`) : "Loading businesses…"}
+        description={error ? "Businesses unavailable." : data ? (data.total === 0 ? "No businesses yet. Add one in Locations, then come back here." : data.total === 1 ? "Your business. Open it to connect accounts, write posts and set auto mode." : `${data.total} businesses. Click Open on the one you want to work on.`) : "Loading businesses…"}
         actions={<>
           {value && <GooglePill size="sm" onClick={() => setExpanded(false)} label="Close switcher" />}
           <GooglePill size="sm" onClick={() => choose("all")} label="All-clients calendar" />
