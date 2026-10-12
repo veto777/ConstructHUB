@@ -33,6 +33,7 @@ import { CONNECTABLE, outstandConfigured, webhookSigned } from "./outstand";
 import { nativeNetworksFor, receiveUpload, NATIVE_UPLOAD_MAX_BYTES } from "./native";
 import { isPlatformAdmin } from "../admin";
 import { putToR2Key } from "../r2";
+import { registerDeletionRoutes } from "./deletion";
 import express from "express";
 // Curated, field-specific messages. Raw Zod text is never echoed; custom
 // refinements (written for people) pass through as-is.
@@ -233,6 +234,8 @@ export function registerSocialRoutes(
     res.json(await outstandConnectUrl(id, businessId, network, req));
   });
   // Back from the sign-in: read the connected accounts again.
+  // Data deletion / deauthorize callbacks from Meta and Threads (signed_request; no session — server/social/deletion.ts).
+  registerDeletionRoutes(app);
   // ConstructHUB Direct (server/social/native.ts): our own apps on each network.
   route("post", "/native/connect", async (req, res, id, businessId) => {
     const { network } = z.object({ network: z.string().min(2).max(20) }).strict().parse(req.body);

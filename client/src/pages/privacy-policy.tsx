@@ -13,7 +13,7 @@ export default function PrivacyPolicyPage() {
       pageTestId="page-privacy-policy"
       title="Privacy Policy"
       titleTestId="heading-privacy-policy"
-      date="Effective Date: September 30, 2026 · Last updated: October 8, 2026"
+      date="Effective Date: September 30, 2026 · Last updated: October 12, 2026"
       dateTestId="text-effective-date"
       footer={copyrightNotice()}
     >
@@ -76,7 +76,9 @@ export default function PrivacyPolicyPage() {
 
           <h3 className="text-lg font-medium mt-4 mb-2" data-testid="heading-call-assistant-data">1.5 AI Features and the AI Call Assistant</h3>
           <p className="mb-3">
-            ConstructHUB's AI features (the Hub assistant, AI review replies, content writing, Site Scan summaries) and the AI Call Assistant run on ConstructHUB's own servers. Your prompts, documents, call audio and transcripts are not sent to an outside AI company.
+            ConstructHUB's AI features (the Hub assistant, AI review replies, social post and content writing, Site Scan summaries) are answered by ConstructHUB's own AI service first. If it does not answer in time, the same request is sent to OpenAI's API (model gpt-5.4-nano), which processes the request to return the answer. OpenAI's handling of that data is governed by its{" "}
+            <a href="https://openai.com/policies/api-data-usage-policies" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" data-testid="link-openai-api-data">API data usage policies</a>.
+            The AI Call Assistant's call audio and transcripts are processed by ConstructHUB's own voice engine and AI service and are not sent to OpenAI.
           </p>
           <p className="mb-3">
             When the AI Call Assistant answers your business line, we process the caller's phone number, the call audio, a recording, the transcript and a summary to answer the call and file the caller as a lead in your CRM. Calls and texts are carried by our telephone provider, SignalWire. Recordings and transcripts are kept with your account until you delete them or your account is erased.
@@ -214,6 +216,28 @@ export default function PrivacyPolicyPage() {
           </p>
         </section>
 
+        <section className="mb-8" data-testid="section-connected-social">
+          <h3 className="text-lg font-medium mt-4 mb-2" data-testid="heading-connected-social">4.4 Connected Social Accounts</h3>
+          <p className="mb-3">
+            In Social Media you can connect accounts you manage on Facebook, Instagram, Threads, TikTok, LinkedIn, YouTube, Pinterest, X and Bluesky. You sign in on the network's own page and choose which Pages, profiles or accounts ConstructHUB may use; we never see your password.
+          </p>
+          <p className="mb-3">
+            <strong>What we store:</strong> the ID, name and picture of each account or Page you connect; the ID the network gives you for our app; the permissions you granted; the access tokens the network issues, stored encrypted; the posts you write, schedule or approve, the media you attach, where and when they go, the ID and link the network returns and whether they were published; and the statistics and comments for your accounts and posts that we show you.
+          </p>
+          <p className="mb-3">
+            <strong>How it is used:</strong> only to publish the posts you choose and to show you your accounts' statistics, comments and post status, including replying to, hiding or deleting comments and deleting posts when you ask. We never sell this data, never use it for advertising, and never publish anything you have not written or approved.
+          </p>
+          <p className="mb-3">
+            <strong>Platform rules:</strong> our use of data received from Meta, TikTok, Google (YouTube), LinkedIn, Pinterest, X and Bluesky follows each platform's developer terms and policies. YouTube data is also covered by the{" "}
+            <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" data-testid="link-google-privacy-social">Google Privacy Policy</a>.
+          </p>
+          <p className="mb-3">
+            <strong>Removing it:</strong> choose Disconnect in Social Media and we delete the stored tokens and account details at once; remove ConstructHUB in the network's own settings and the network tells us to delete the same data; or delete your ConstructHUB account. Instructions and the status of a deletion request are at{" "}
+            <a href="/data-deletion" className="text-primary hover:underline" data-testid="link-privacy-data-deletion">constructhub.us/data-deletion</a>, or email{" "}
+            <a href="mailto:support@constructhub.us" className="text-primary hover:underline">support@constructhub.us</a> and we will delete it within 30 days. Posts already published on a network belong to you and stay there until you delete them on that network.
+          </p>
+        </section>
+
         <section className="mb-8" data-testid="section-third-party-services">
           <h2 className="text-xl font-semibold mb-3">5. Third-Party Services</h2>
           <p className="mb-3">We integrate with the following third-party services, each of which has its own privacy policy:</p>
@@ -233,7 +257,12 @@ export default function PrivacyPolicyPage() {
               <strong>Google Business Profile API</strong> — Used, with your authorization, to access and manage your own Google Business Profile (listing details, reviews, performance insights, and media). Our use of this data adheres to the Google API Services User Data Policy, including the Limited Use requirements (see Section 4).
             </li>
             <li>
-              <strong>AI processing</strong> — AI features and the AI Call Assistant run on ConstructHUB's own servers; prompts, documents, call audio and transcripts are not sent to an outside AI company.
+              <strong>AI processing</strong> — AI features run on ConstructHUB's own AI service first, with OpenAI's API as a fallback when it does not answer in time (see Section 1.5). The AI Call Assistant's call audio and transcripts stay with ConstructHUB's own voice engine and AI service.
+            </li>
+            <li>
+              <strong>Social networks</strong> — Meta (Facebook, Instagram, Threads), TikTok, LinkedIn, Google (YouTube), Pinterest, X and Bluesky, used with your authorization to publish the posts you choose and to show you their statistics and comments (see Section 4.4). See{" "}
+              <a href="https://www.facebook.com/privacy/policy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Meta's Privacy Policy</a> and{" "}
+              <a href="https://www.tiktok.com/legal/page/us/privacy-policy/en" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">TikTok's Privacy Policy</a>.
             </li>
             <li>
               <strong>Apple</strong> — Sign in with Apple (when you choose it) and the Apple Push Notification service (when you turn on notifications in an iPhone app). See{" "}

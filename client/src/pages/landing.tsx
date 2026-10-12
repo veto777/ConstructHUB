@@ -640,6 +640,8 @@ export default function LandingPage() {
               <a href="/terms" className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-terms">Terms of Use</a>
               <span aria-hidden className="opacity-40">·</span>
               <a href="/privacy" className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-privacy">Privacy Policy</a>
+              <span aria-hidden className="opacity-40">·</span>
+              <a href="/data-deletion" className="hover:text-mkt-navy-ink transition-colors" data-testid="link-footer-data-deletion">Data Deletion</a>
             </div>
             <p className="text-[13px] text-mkt-navy-muted">{copyrightNotice()}</p>
           </div>

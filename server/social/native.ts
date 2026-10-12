@@ -67,6 +67,8 @@ export const ensureNativeSchema = async () => {
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (tenant, platform, external_id))`);
+  // Who connected it (Meta app-scoped user id): a data-deletion callback names the person, not the Page.
+  await pool.query("ALTER TABLE social_native_accounts ADD COLUMN IF NOT EXISTS owner_user_id text");
   await pool.query(`CREATE TABLE IF NOT EXISTS social_native_pending (
     session text PRIMARY KEY,
     tenant text NOT NULL,
@@ -160,13 +162,14 @@ export function metaAuthUrl(state: string): string {
   return `https://www.facebook.com/v25.0/dialog/oauth?${q}`;
 }
 
-type PendingPage = { id: string; name: string; token: string; picture: string | null; ig: { id: string; username: string; picture: string | null } | null };
+type PendingPage = { id: string; name: string; token: string; picture: string | null; ig: { id: string; username: string; picture: string | null } | null; owner?: string | null };
 
 /** The code from Meta → a long-lived user token → the Pages (with their own long-lived tokens) and linked Instagram accounts. */
 export async function metaPagesFromCode(code: string): Promise<PendingPage[]> {
   const env = nativeDeps.env();
   const short = await graph("GET", "oauth/access_token", { client_id: env.SOCIAL_META_APP_ID, client_secret: env.SOCIAL_META_APP_SECRET, redirect_uri: nativeRedirectUri(), code });
   const long = await graph("GET", "oauth/access_token", { grant_type: "fb_exchange_token", client_id: env.SOCIAL_META_APP_ID, client_secret: env.SOCIAL_META_APP_SECRET, fb_exchange_token: short.access_token });
+  const owner = await graph("GET", "me", { fields: "id" }, long.access_token).then((m) => (m?.id ? String(m.id) : null)).catch(() => null);
   const pages: PendingPage[] = [];
   let after: string | undefined;
   for (let i = 0; i < 10; i++) {
@@ -174,7 +177,7 @@ export async function metaPagesFromCode(code: string): Promise<PendingPage[]> {
     for (const p of d.data ?? []) {
       if (!p?.id || !p?.access_token) continue;
       const ig = p.instagram_business_account;
-      pages.push({ id: String(p.id), name: String(p.name || p.id), token: String(p.access_token), picture: p.picture?.data?.url ?? null,
+      pages.push({ id: String(p.id), name: String(p.name || p.id), token: String(p.access_token), picture: p.picture?.data?.url ?? null, owner,
         ig: ig?.id ? { id: String(ig.id), username: String(ig.username || ig.id), picture: ig.profile_picture_url ?? null } : null });
     }
     after = d.paging?.cursors?.after;
@@ -213,19 +216,19 @@ export async function nativeFinalize(session: string, tenant: string, userId: nu
   const want = new Set(ids);
   let n = 0;
   for (const p of pages) {
-    if (network === "facebook" && want.has(p.id)) { await upsertAccount(tenant, "facebook", p.id, p.name, p.picture, null, p.token); n++; }
-    if (network === "instagram" && p.ig && want.has(p.ig.id)) { await upsertAccount(tenant, "instagram", p.ig.id, `@${p.ig.username}`, p.ig.picture, p.id, p.token); n++; }
+    if (network === "facebook" && want.has(p.id)) { await upsertAccount(tenant, "facebook", p.id, p.name, p.picture, null, p.token, p.owner ?? null); n++; }
+    if (network === "instagram" && p.ig && want.has(p.ig.id)) { await upsertAccount(tenant, "instagram", p.ig.id, `@${p.ig.username}`, p.ig.picture, p.id, p.token, p.owner ?? null); n++; }
   }
   await pool.query("DELETE FROM social_native_pending WHERE session=$1", [session]);
   return n;
 }
 
-async function upsertAccount(tenant: string, platform: string, externalId: string, name: string, picture: string | null, parentId: string | null, token: string) {
+async function upsertAccount(tenant: string, platform: string, externalId: string, name: string, picture: string | null, parentId: string | null, token: string, owner: string | null = null) {
   await pool.query(
-    `INSERT INTO social_native_accounts(id,tenant,platform,external_id,name,picture,parent_id,token_enc,scopes)
-     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
-     ON CONFLICT(tenant,platform,external_id) DO UPDATE SET name=$5,picture=$6,parent_id=$7,token_enc=$8,scopes=$9,needs_reconnect=false,last_error=null,updated_at=now()`,
-    [randomUUID(), tenant, platform, externalId, name.slice(0, 200), picture, parentId, enc(token), JSON.stringify(META_SCOPES)]);
+    `INSERT INTO social_native_accounts(id,tenant,platform,external_id,name,picture,parent_id,token_enc,scopes,owner_user_id)
+     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+     ON CONFLICT(tenant,platform,external_id) DO UPDATE SET name=$5,picture=$6,parent_id=$7,token_enc=$8,scopes=$9,owner_user_id=COALESCE($10,social_native_accounts.owner_user_id),needs_reconnect=false,last_error=null,updated_at=now()`,
+    [randomUUID(), tenant, platform, externalId, name.slice(0, 200), picture, parentId, enc(token), JSON.stringify(META_SCOPES), owner]);
 }
 
 export async function removeNativeAccounts(tenant: string): Promise<number> {

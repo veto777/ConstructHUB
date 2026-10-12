@@ -664,7 +664,11 @@ describe("route authentication, owner scope and key redaction", () => {
     );
     expect(routes.length).toBeGreaterThan(10);
     // Signed webhooks prove themselves with a signature, not a session (tested in outstand.test.ts).
-    for (const r of routes.filter((x) => x.path !== "/api/social/outstand/webhook")) {
+    // Signed callbacks from Meta/Threads authenticate with signed_request (tested in deletion.test.ts); the status
+    // lookup is public by design (a confirmation code reveals only "completed" and a date).
+    const signed = new Set(["/api/social/native/meta/data-deletion", "/api/social/native/meta/deauthorize", "/api/social/native/instagram/data-deletion",
+      "/api/social/native/instagram/deauthorize", "/api/social/native/threads/delete", "/api/social/native/threads/uninstall", "/api/social/native/data-deletion/status"]);
+    for (const r of routes.filter((x) => x.path !== "/api/social/outstand/webhook" && !signed.has(x.path))) {
       const next = vi.fn(),
         res: any = { status: vi.fn().mockReturnThis(), json: vi.fn() };
       await r.handlers[0]({}, res, next);
