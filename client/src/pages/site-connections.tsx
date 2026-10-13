@@ -43,7 +43,7 @@ import {
   GoogleListRow,
   GooglePill,
 } from "@/components/google";
-import { Search } from "lucide-react";
+import { Search, CheckCircle2 } from "lucide-react";
 import { HelpButton } from "@/components/help-button";
 import {
   CloudflareConnectSteps,
@@ -723,12 +723,32 @@ export default function SiteConnections({
             : "Google consent failed. Reconnect and grant Search Console access."}
         </Notice>
       )}
+      {/* Back from Cloudflare's consent page: the win gets its own card (owner, 2026-10-13: "larger, with a checkmark"). */}
       {cf &&
         new URLSearchParams(window.location.search).get("connection") ===
           "connected" && (
-          <Notice tone="info" testId="notice-connection-connected">
-            Cloudflare connected. Your sites appear under Sites within a minute or two; Work queue shows the import.
-          </Notice>
+          <div
+            role="status"
+            className="g-card mb-6 flex flex-col gap-4 rounded-2xl border px-5 py-5 sm:flex-row sm:items-center"
+            data-testid="notice-connection-connected"
+          >
+            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/10" aria-hidden="true">
+              <CheckCircle2 className="h-8 w-8 text-primary" strokeWidth={2.2} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-lg font-semibold leading-6 g-text">Cloudflare connected</p>
+              <p className="mt-1 text-sm leading-5 g-text-2">
+                Your sites appear under Sites within a minute or two. Work queue shows the import as it runs.
+              </p>
+            </div>
+            <GooglePill
+              variant="solid"
+              className="w-full sm:w-auto"
+              label="View sites"
+              testId="button-connected-view-sites"
+              onClick={() => T("Sites")}
+            />
+          </div>
         )}
       {/* Nothing connected yet: say so first and take them to the steps (on a phone the Sites tab's own prompt is below the fold). */}
       {config.data && !(config.data.total > 0) && tab !== "Connections" && (
@@ -1000,14 +1020,27 @@ export default function SiteConnections({
                     />
                     <b>{c.email ?? c.subject}</b>
                   </label>
-                  <p className="text-sm g-text-2">{c.token_name ?? c.method}</p>
                   <p className="text-sm g-text-2">
-                    {c.permissions
-                      ?.map((p: any) =>
-                        typeof p === "string" ? p : (p.name ?? p.id),
-                      )
-                      .join(", ")}
+                    {c.method === "oauth" ? "Connected with Cloudflare sign-in" : (c.token_name ?? c.method)}
                   </p>
+                  {c.method === "oauth" && Array.isArray(c.permissions) && c.permissions.length > 8 ? (
+                    <details className="text-sm g-text-2">
+                      <summary className="cursor-pointer">
+                        Full access · {formatNumber(c.permissions.length)} permissions
+                      </summary>
+                      <p className="mt-1 break-words text-xs leading-5">
+                        {c.permissions.map((p: any) => (typeof p === "string" ? p : (p.name ?? p.id))).join(", ")}
+                      </p>
+                    </details>
+                  ) : (
+                    <p className="text-sm g-text-2">
+                      {c.permissions
+                        ?.map((p: any) =>
+                          typeof p === "string" ? p : (p.name ?? p.id),
+                        )
+                        .join(", ")}
+                    </p>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <GooglePill
