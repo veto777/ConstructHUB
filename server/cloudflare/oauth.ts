@@ -21,14 +21,31 @@ export const CLOUDFLARE_OAUTH = {
 } as const;
 
 /**
- * What the ConstructHUB client asks for; the ids are Cloudflare's API-token permission names. The write scopes
- * (WAF, firewall rules, DNS, cache purge) are marked optional on the client, so Cloudflare's consent page lets a
- * customer grant read-only access. offline_access = a refresh token.
+ * What the ConstructHUB client asks for; the ids are Cloudflare's API-token permission names. Everything is required
+ * (owner, 2026-10-13: "request global access"): ConstructHUB tracks analytics, clicks and IPs across every zone,
+ * will sell domains through name.com and point them here, and coderail.com will build and host sites. The customer
+ * still chooses which of their Cloudflare ACCOUNTS to share on the consent page; inside those, this is the access.
+ * Keep this list and the client on Cloudflare (Manage Account → OAuth clients → ConstructHUB) the same.
  */
 export const CLOUDFLARE_OAUTH_SCOPES = [
-  "zone.read", "zone-settings.read", "analytics.read", "zone-waf.read", "zone-waf.write",
-  "firewall-services.read", "firewall-services.write", "dns.read", "cache.purge",
-  "memberships.read", "user-details.read", "offline_access",
+  // DNS and zones (every zone in the shared account; registrar for domains held at Cloudflare)
+  "zone.read", "zone.write", "zone-settings.read", "zone-settings.write", "dns.read", "dns.write", "zone-dns-settings.read", "zone-dns-settings.write", "account-dns-settings.read", "account-dns-settings.write", "registrar-domains.read", "registrar-domains.admin",
+  // analytics, logs, IP intelligence
+  "analytics.read", "account-analytics.read", "logs.read", "account-logs.read", "zone-observability.read", "intel.read", "radar.read",
+  // protection: WAF, firewall rules, bots, DDoS, page rules, Turnstile, security insights
+  "zone-waf.read", "zone-waf.write", "account-waf.read", "account-waf.write", "firewall-services.read", "firewall-services.write", "account-firewall-access-rules.read", "account-firewall-access-rules.write", "bot-management.read", "bot-management.write", "ddos-protection.read", "ddos-protection.write", "http-ddos-managed-ruleset.read", "http-ddos-managed-ruleset.write", "page-rules.read", "page-rules.write", "page-shield.read", "zone-security-center-insights.read", "account-security-center-insights.read", "challenge-widgets.read", "challenge-widgets.write", "url-scanner.read", "request-tracer.read", "cache.purge",
+  // cache and SSL
+  "cache-settings.read", "cache-settings.write", "ssl-and-certificates.read", "ssl-and-certificates.write", "account-ssl-and-certificates.read", "account-ssl-and-certificates.write", "config-settings.read",
+  // zone configuration and rules
+  "config-settings.write", "transform-rules.read", "transform-rules.write", "zone-transform-rules.read", "zone-transform-rules.write", "dynamic-redirect.read", "dynamic-redirect.write", "origin.read", "origin.write", "custom-pages.read", "custom-pages.write", "managed-headers.read", "managed-headers.write", "response-compression.read", "response-compression.write", "mass-url-redirects.read", "mass-url-redirects.write", "account-rulesets.read", "account-rulesets.write", "account-rule-lists.read", "account-rule-lists.write", "workers-scripts.read",
+  // developer platform, for sites coderail.com builds and hosts (Workers, Pages, KV, R2, Images)
+  "workers-scripts.write", "workers-routes.read", "workers-routes.write", "workers-kv-storage.read", "workers-kv-storage.write", "workers-r2.read", "workers-r2.write", "page.read", "page.write", "images.read", "images.write", "email-routing-rule.read",
+  // email routing for domains
+  "email-routing-rule.write", "email-routing-address.read", "email-routing-address.write", "memberships.read",
+  // who the account is
+  "user-details.read", "account-settings.read", "notifications.read", "offline_access",
+  // a refresh token
+  ,
 ] as const;
 
 export const cloudflareOAuthConfigured = (env: NodeJS.ProcessEnv = process.env) =>

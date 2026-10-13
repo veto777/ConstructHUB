@@ -782,8 +782,9 @@ export default function SiteConnections({
                   <p className="text-[14px] leading-5 g-text">
                     Sign in at Cloudflare, tick the account with your websites, and choose Authorize.{" "}
                     <span className="g-text-2">
-                      About a minute. ConstructHUB can read your sites and their traffic, and edit firewall rules only if
-                      you allow it there. Revoke it any time in Cloudflare under Manage OAuth authorizations.
+                      About a minute. ConstructHUB gets full access to the accounts you share — zones, DNS, analytics,
+                      firewall, cache, SSL and hosting — so it can run your sites, domains and protection for you. Revoke
+                      it any time in Cloudflare under Manage OAuth authorizations.
                     </span>
                   </p>
                   <GooglePill
