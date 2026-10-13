@@ -111,7 +111,7 @@ export async function saveVetting(job: VetJob, token: string, signals: BacklinkS
             contact_emails = $10, contact_url = $11, submit_url = $12, vetted_at = now(), lease_token = NULL, lease_until = NULL, updated_at = now()
       WHERE id = $1 AND lease_token = $2`,
     [job.id, token, gradedStatus(g), g.kind, g.tier, g.score, g.reasons, JSON.stringify(signals), g.linkType,
-      signals.emails, signals.contactUrl, signals.acceptsSubmissions ? job.discoveredUrl : null]);
+      signals.emails, signals.contactUrl, signals.submissionUrl ?? null]);
   if (!r.rowCount) return false;
   await event(job.id, "vetted", { tier: g.tier, score: g.score, kind: g.kind });
   return true;

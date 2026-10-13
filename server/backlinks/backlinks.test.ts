@@ -98,12 +98,12 @@ describe("vetting", () => {
     expect(page(`<html><body>${words(800)} Casino operator files for bankruptcy</body></html>`).spamHints).toEqual([]);
     expect(page(`<html><head><title>Best online casino bonuses</title></head><body>${words(800)}</body></html>`).spamHints).toEqual(["casino/betting"]);
   });
-  it("keeps a site that blocks robots as unconfirmed; authority decides it", () => {
+  it("keeps a site that blocks robots as unconfirmed — never quality on authority alone", () => {
     const blocked = { ...page("<html></html>"), httpStatus: 403 };
     const g = gradeSource("directory", blocked, null);
     expect(g.tier).toBe("C");
     expect(g.reasons[0]).toMatch(/Unconfirmed/);
-    expect(gradeSource("directory", blocked, { rank: 600, referringDomains: 50000, spamScore: 2, checkedAt: "x" }).tier).toBe("A");
+    expect(gradeSource("directory", blocked, { rank: 600, referringDomains: 50000, spamScore: 2, checkedAt: "x" }).tier).toBe("C");
     expect(gradeSource("directory", { ...blocked, httpStatus: 404 }, null).tier).toBe("X");
   });
   it("classifies by what the page shows, keeping a state search's citation", () => {
@@ -145,3 +145,48 @@ describe("outreach", () => {
     expect(sendBlocker(outreachConfig({ BACKLINKS_OUTREACH_SEND: "on", BACKLINKS_SMTP_USER: "a@outreach.example", BACKLINKS_SMTP_PASS: "x", BACKLINKS_SENDER_ADDRESS: "1 Main" }))).toBeNull();
   });
 });
+
+// 2026-10-13: the owner's screenshot showed zillow.com, raspberrypi.com and news.bloomberglaw.com graded "A 100" as guest-post
+// sites. Each case below is the shape of a real false positive; none may come out quality, however strong the domain.
+describe("vetting — false positives from the first run", () => {
+  const BIG = { rank: 640, referringDomains: 175918, spamScore: 8, checkedAt: "x" };
+  const graded = (url: string, body: string, home?: string) => {
+    const found = analyzePage({ url, status: 200, body });
+    const h = home ? analyzePage({ url: new URL("/", url).href, status: 200, body: home }) : null;
+    return gradeSource("guest_post", mergeSignals(found, h), BIG);
+  };
+  const TECH_HOME = `<html><head><title>Raspberry Pi</title></head><body>${words(900, "computer")}</body></html>`;
+  it("a user profile on a platform that says 'guest posting' (zillow.com/profile/…)", () => {
+    const g = graded("https://zillow.com/profile/livepositiv8", `<html><head><title>Guest Posting | Zillow</title></head><body>Submit a guest post about construction ${words(700, "homeowner")}</body></html>`);
+    expect(g.tier).toBe("X");
+    expect(g.reasons.join(" ")).toMatch(/user profile/);
+  });
+  it("an article that happens to contain the phrase, on a site that is not about the trades", () => {
+    const g = graded("https://raspberrypi.com/news/build-smart-doorbell-windows-10/",
+      `<html><head><title>Build a smart doorbell with Windows 10</title></head><body>${words(1200, "doorbell")} write for us windows install</body></html>`, TECH_HOME);
+    expect(g.tier).toBe("X");
+    expect(g.reasons.join(" ")).toMatch(/No page on the site invites submissions/);
+  });
+  it("a real write-for-us page on an off-topic site", () => {
+    const g = graded("https://techblog.com/write-for-us/", `<html><head><title>Write for us</title></head><body>${words(800, "software")}</body></html>`, TECH_HOME);
+    expect(g.tier).toBe("X");
+    expect(g.reasons.join(" ")).toMatch(/not about home improvement/);
+  });
+  it("lists of guest-post sites, sellers' case studies and job boards", () => {
+    expect(graded("https://ecodesoft.com/free-guest-posting-sites-list/", `<html><head><title>Free guest posting sites list</title></head><body>${words(800, "roofing")}</body></html>`).reasons.join(" ")).toMatch(/list of guest-post sites/);
+    expect(graded("https://wildnet.com/case-studies/guest-posting-case-studies", `<html><head><title>Guest posting case studies</title></head><body>write for us ${words(800, "roofing")}</body></html>`).reasons.join(" ")).toMatch(/seller/);
+    expect(graded("https://freelance.example.com/job-search/technology-guest-post-sites/", `<html><head><title>Jobs</title></head><body>write for us ${words(800, "roofing")}</body></html>`).tier).toBe("X");
+  });
+  it("a site for another country's market", () => {
+    const g = graded("https://thetimes.com.au/write-for-us", `<html><head><title>Write for us — home improvement</title></head><body>${words(800, "renovation")}</body></html>`);
+    expect(g.reasons.join(" ")).toMatch(/outside the US \(\.au\)/);
+  });
+  it("still grades a real home-improvement blog with its own write-for-us page as quality", () => {
+    const home = `<html><head><title>HomeFix Blog — roofing, plumbing and remodeling tips</title></head><body>${words(400, "kitchen remodeling")} <a href="/write-for-us/">Write for us</a></body></html>`;
+    const article = analyzePage({ url: "https://homefixblog.com/how-to-fix-gutters/", status: 200, body: `<html><head><title>How to fix gutters</title></head><body>${words(900, "gutters")} <a href="/write-for-us/">Write for us</a></body></html>` });
+    const s = mergeSignals(article, analyzePage({ url: "https://homefixblog.com/", status: 200, body: home }));
+    expect(s.submissionUrl).toBe("https://homefixblog.com/write-for-us/");
+    expect(gradeSource("guest_post", s, { rank: 300, referringDomains: 800, spamScore: 3, checkedAt: "x" }).tier).toBe("A");
+  });
+});
+

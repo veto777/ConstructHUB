@@ -83,6 +83,10 @@ export const EXCLUDED_DOMAINS = [
   "google.com", "youtube.com", "facebook.com", "instagram.com", "twitter.com", "x.com", "linkedin.com", "pinterest.com", "tiktok.com",
   "reddit.com", "quora.com", "wikipedia.org", "amazon.com", "ebay.com", "etsy.com", "apple.com", "microsoft.com", "bing.com",
   "yahoo.com", "medium.com", "github.com", "fiverr.com", "upwork.com", "craigslist.org", "indeed.com", "glassdoor.com",
+  // Platforms where anyone can post a profile/page (2026-10-13: a spammer's zillow.com profile was graded A).
+  "zillow.com", "realtor.com", "trulia.com", "redfin.com", "freelancer.com", "peopleperhour.com", "guru.com", "issuu.com",
+  "scribd.com", "slideshare.net", "tumblr.com", "flickr.com", "vimeo.com", "soundcloud.com", "behance.net", "dribbble.com",
+  "about.me", "linktr.ee", "substack.com", "patreon.com", "gumroad.com", "producthunt.com", "trustpilot.com", "yelp.com",
 ] as const;
 
 /** A host as the database keys it: lower-case, no "www.", no trailing dot. null for anything that is not a public web host. */
