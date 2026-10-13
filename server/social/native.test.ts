@@ -24,10 +24,19 @@ function fakeMeta(answer: (path: string, params: URLSearchParams, method: string
 }
 
 describe("which networks are switched on", () => {
+  it("a network that needs no review can open to everyone on its own", () => {
+    const env = { SOCIAL_BLUESKY: "on", SOCIAL_X_CLIENT_ID: "x", SOCIAL_X_CLIENT_SECRET: "y" } as any;
+    expect(nativeNetworksFor({ email: "customer@example.com" }, env)).toEqual([]);
+    expect(nativeNetworksFor({ email: "customer@example.com" }, { ...env, SOCIAL_NATIVE_PUBLIC_NETWORKS: "bluesky" })).toEqual(["bluesky"]);
+    expect(nativeNetworksFor({ email: "customer@example.com" }, { ...env, SOCIAL_NATIVE_PUBLIC: "true" })).toEqual(["x", "bluesky"]);
+  });
   it("needs both the Meta app id and secret", () => {
     expect(nativeNetworks({} as any)).toEqual([]);
     expect(nativeNetworks({ SOCIAL_META_APP_ID: "1609986400506072" } as any)).toEqual([]);
     expect(nativeNetworks({ SOCIAL_META_APP_ID: "1609986400506072", SOCIAL_META_APP_SECRET: "0123456789abcdef0123" } as any)).toEqual(["facebook", "instagram"]);
+    // Bluesky needs no app keys: a switch is enough (an app password is the customer's whole grant).
+    expect(nativeNetworks({ SOCIAL_BLUESKY: "on" } as any)).toEqual(["bluesky"]);
+    expect(nativeNetworks({ SOCIAL_BLUESKY: "off" } as any)).toEqual([]);
   });
   it("is shown only to platform admins until it is opened to everyone", () => {
     const env = { SOCIAL_META_APP_ID: "1609986400506072", SOCIAL_META_APP_SECRET: "0123456789abcdef0123" } as any;

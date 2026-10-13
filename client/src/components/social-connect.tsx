@@ -8,10 +8,11 @@ import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
 import { GoogleSectionHeader, GooglePill } from "@/components/google";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useUrlParam } from "@/hooks/use-url-param";
 
-const LABEL: Record<string, string> = { facebook: "Facebook", instagram: "Instagram", instagram_direct: "Instagram (no Facebook Page)", linkedin: "LinkedIn", tiktok: "TikTok", youtube: "YouTube", pinterest: "Pinterest", threads: "Threads", x: "X", twitter: "X" };
+const LABEL: Record<string, string> = { facebook: "Facebook", instagram: "Instagram", instagram_direct: "Instagram (no Facebook Page)", linkedin: "LinkedIn", tiktok: "TikTok", youtube: "YouTube", pinterest: "Pinterest", threads: "Threads", x: "X", twitter: "X", bluesky: "Bluesky" };
 const NOTE: Record<string, string> = {
   instagram: "Business or Creator account linked to your Facebook Page",
   instagram_direct: "Business or Creator account, signed in with Instagram",
@@ -20,9 +21,41 @@ const NOTE: Record<string, string> = {
   facebook: "Pick the Pages to post to",
   linkedin: "Your profile or company Pages",
   tiktok: "You choose who can view each post",
+  bluesky: "Your Bluesky profile · signs in with an app password",
 };
+const BLUESKY_APP_PASSWORDS = "https://bsky.app/settings/app-passwords";
 
 type Account = { id: string; platform: string; name: string };
+
+/** Bluesky has no sign-in page: the handle and an app password open the session on our server (POST …/native/bluesky/login). */
+function BlueskyForm({ api, scope, onDone, onCancel }: { api: string; scope: string; onDone: (name: string) => void; onCancel: () => void }) {
+  const [handle, setHandle] = useState("");
+  const [appPassword, setAppPassword] = useState("");
+  const login = useMutation({
+    mutationFn: async () => (await apiRequest("POST", `${api}/bluesky/login${scope}`, { handle: handle.trim(), appPassword: appPassword.trim() })).json() as Promise<{ accounts: Account[]; name: string }>,
+    onSuccess: (d) => onDone(d.name),
+  });
+  const ready = handle.trim().length >= 3 && /^[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}$/i.test(appPassword.trim());
+  return (
+    <form className="mb-4 rounded-lg border p-4" data-testid="social-bluesky-form" onSubmit={(e) => { e.preventDefault(); if (ready && !login.isPending) login.mutate(); }}>
+      <p className="mb-1 text-sm font-medium">Connect Bluesky</p>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Bluesky signs in with an <strong>app password</strong>, not your main password. Make one at{" "}
+        <a className="underline" href={BLUESKY_APP_PASSWORDS} target="_blank" rel="noreferrer">bsky.app/settings/app-passwords</a> (any name, leave “Allow access to your direct messages” off), then paste it here.
+        It is used once to open the session and is not kept.
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Input aria-label="Bluesky handle" placeholder="yourbusiness.bsky.social" autoComplete="off" value={handle} onChange={(e) => setHandle(e.target.value)} data-testid="input-bluesky-handle" />
+        <Input aria-label="Bluesky app password" placeholder="abcd-efgh-ijkl-mnop" autoComplete="off" type="password" value={appPassword} onChange={(e) => setAppPassword(e.target.value)} data-testid="input-bluesky-app-password" />
+      </div>
+      {login.isError && <p className="mt-2 text-sm text-destructive">{apiErrorMessage(login.error)}</p>}
+      <div className="mt-3 flex gap-2">
+        <GooglePill label={login.isPending ? "Connecting…" : "Connect Bluesky"} disabled={!ready || login.isPending} onClick={() => login.mutate()} testId="button-bluesky-connect" />
+        <GooglePill variant="quiet" label="Cancel" disabled={login.isPending} onClick={onCancel} />
+      </div>
+    </form>
+  );
+}
 
 /** `via`: "native" = ConstructHUB's own apps (server/social/native.ts); "outstand" = the Outstand account. */
 export function SocialConnect({ businessId, networks, accounts, connected, via = "outstand" }: { businessId: number | null; networks: readonly string[]; accounts: Account[]; connected: boolean; via?: "outstand" | "native" }) {
@@ -40,6 +73,7 @@ export function SocialConnect({ businessId, networks, accounts, connected, via =
   }, [connectError]); // eslint-disable-line react-hooks/exhaustive-deps
   const [session, setSession] = useUrlParam("session");
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [bluesky, setBluesky] = useState(false);
   const refresh = () => void qc.invalidateQueries({ queryKey: ["/api/social"] });
 
   const start = useMutation({
@@ -103,22 +137,28 @@ export function SocialConnect({ businessId, networks, accounts, connected, via =
           </>)}
         </div>
       )}
+      {bluesky && via === "native" && (
+        <BlueskyForm api={api} scope={scope}
+          onDone={(name) => { setBluesky(false); refresh(); toast({ title: "Bluesky connected", description: `${name} is connected for this business.` }); }}
+          onCancel={() => setBluesky(false)} />
+      )}
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {networks.map((n) => {
           const mine = byNetwork(n);
+          const form = n === "bluesky" && via === "native";
           return (
             <div key={n} className="flex items-center justify-between gap-2 rounded-lg border p-3" data-testid={`network-${n}`}>
               <div className="min-w-0">
                 <p className="text-sm font-medium">{LABEL[n] ?? n}</p>
                 <p className="truncate text-xs text-muted-foreground">{mine.length ? mine.map((a) => a.name).join(", ") : NOTE[n] ?? "Not connected"}</p>
               </div>
-              <GooglePill size="sm" variant={mine.length ? "outline" : "solid"} label={mine.length ? "Add another" : "Connect"} disabled={start.isPending} onClick={() => start.mutate(n)} />
+              <GooglePill size="sm" variant={mine.length ? "outline" : "solid"} label={mine.length ? "Add another" : "Connect"} disabled={start.isPending} onClick={() => (form ? setBluesky(true) : start.mutate(n))} />
             </div>
           );
         })}
       </div>
       <p className="mt-3 text-xs text-muted-foreground">
-        You sign in on the network's own page; ConstructHUB never sees your password. You can remove access any time here or in that network's settings.
+        You sign in on the network's own page; ConstructHUB never sees your password (Bluesky: an app password you can revoke any time). You can remove access any time here or in that network's settings.
         Google Business Profile posts use your Google connection under Google Business.
       </p>
       {connected && accounts.length > 0 && (

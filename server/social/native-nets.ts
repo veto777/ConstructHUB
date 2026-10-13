@@ -1,23 +1,29 @@
 /**
  * ConstructHUB Direct — the networks that sign in on their own (not through a Facebook Page): Instagram login
- * (business accounts with no Facebook Page), Threads, TikTok and X. Each adapter knows its sign-in address, how to turn
- * the code into a long-lived token (and refresh it), who signed in, how to publish, and how to read a publish back.
+ * (business accounts with no Facebook Page), Threads, TikTok, X and Bluesky. Each adapter knows its sign-in address, how
+ * to turn the code into a long-lived token (and refresh it), who signed in, how to publish, and how to read a publish back.
  * server/social/native.ts stores the accounts and drives the queue; this file only speaks to the networks.
  *
  *   instagram (Instagram login)  SOCIAL_INSTAGRAM_APP_ID / _SECRET   graph.instagram.com     token 60 days, refreshable
  *   threads                      SOCIAL_THREADS_APP_ID / _SECRET     graph.threads.net       token 60 days, refreshable
  *   tiktok                       SOCIAL_TIKTOK_CLIENT_KEY / _SECRET  open.tiktokapis.com     access 24 h, refresh 365 days
  *   x                            SOCIAL_X_CLIENT_ID / _SECRET       api.x.com              access 2 h, rotating refresh
+ *   bluesky                      SOCIAL_BLUESKY=on (no app keys)    the account's own PDS   access ~2 h, refresh ~90 days
+ *
+ * Bluesky has no app registration and no review: the customer signs in with an app password made at
+ * https://bsky.app/settings/app-passwords (docs/social-apps/bluesky.md). ConstructHUB keeps the session tokens, never
+ * the password.
  */
 import https from "node:https";
 import { lookup } from "node:dns";
 import { publicIP, siteUrl } from "../sitescan/http";
 import { createHash } from "node:crypto";
+import sharp from "sharp";
 import { xSplitText, xWeightedLength } from "../../shared/social-x";
 import { recordFailure } from "../ops/issues";
 import { SocialError } from "./client";
 
-export type NetApi = "ig_login" | "threads" | "tiktok" | "x";
+export type NetApi = "ig_login" | "threads" | "tiktok" | "x" | "bluesky";
 export type Signed = { externalId: string; name: string; picture: string | null; token: string; expiresAt: Date | null; refresh: string | null; scopes: string[] };
 export type Plan = { error?: string; stage: string; container?: string; external?: string; url?: string | null };
 export type Read = { state: "submitted" | "published" | "failed"; url?: string | null; external?: string; error?: string; stage?: string };
@@ -32,11 +38,13 @@ const SCOPES: Record<NetApi, string[]> = {
   threads: ["threads_basic", "threads_content_publish", "threads_manage_insights", "threads_read_replies", "threads_manage_replies", "threads_delete"],
   // No video.list: per-post TikTok stats are not read (server/social/insights.ts); docs/social-apps/tiktok.md §2.2.
   tiktok: ["user.info.basic", "user.info.profile", "user.info.stats", "video.publish"],
+  bluesky: [],   // an app password is the whole grant; Bluesky has no scopes
 };
 export const netScopes = (api: NetApi) => SCOPES[api];
 
-/** Which of these networks have their app keys. Pure on env. */
+/** Which of these networks have their app keys (Bluesky needs none: it is switched on with SOCIAL_BLUESKY=on). Pure on env. */
 export function netConfigured(api: NetApi, env: NodeJS.ProcessEnv = process.env): boolean {
+  if (api === "bluesky") return /^(on|true|1)$/i.test((env.SOCIAL_BLUESKY ?? "").trim());
   if (api === "x") return !!env.SOCIAL_X_CLIENT_ID?.trim() && !!env.SOCIAL_X_CLIENT_SECRET?.trim();
   if (api === "ig_login") return /^\d{6,30}$/.test(env.SOCIAL_INSTAGRAM_APP_ID ?? "") && /^\S{16,}$/.test(env.SOCIAL_INSTAGRAM_APP_SECRET ?? "");
   if (api === "threads") return /^\d{6,30}$/.test(env.SOCIAL_THREADS_APP_ID ?? "") && /^\S{16,}$/.test(env.SOCIAL_THREADS_APP_SECRET ?? "");
@@ -95,6 +103,7 @@ const inSec = (s: unknown) => (Number(s) > 0 ? new Date(netDeps.now() + Number(s
 
 export function netAuthUrl(api: NetApi, state: string, verifier?: string): string {
   const env = netDeps.env();
+  if (api === "bluesky") throw new SocialError("Bluesky signs in with an app password, not a sign-in page; use the Bluesky form");
   if (api === "x") {
     if (!verifier) throw new SocialError("X sign-in requires PKCE; connect again");
     return `https://x.com/i/oauth2/authorize?${q({ client_id: env.SOCIAL_X_CLIENT_ID, redirect_uri: netRedirect(api), response_type: "code", scope: SCOPES.x.join(" "), state, code_challenge: createHash("sha256").update(verifier).digest("base64url"), code_challenge_method: "S256" })}`;
@@ -107,6 +116,7 @@ export function netAuthUrl(api: NetApi, state: string, verifier?: string): strin
 /** The code from the network → a long-lived token and who signed in. */
 export async function netExchange(api: NetApi, code: string, verifier?: string): Promise<Signed> {
   const env = netDeps.env();
+  if (api === "bluesky") throw new SocialError("Bluesky signs in with an app password, not a sign-in page; use the Bluesky form");
   if (api === "x") {
     if (!verifier) throw new SocialError("X sign-in requires PKCE; connect again");
     const t = await xToken({ grant_type: "authorization_code", code, redirect_uri: netRedirect(api), code_verifier: verifier });
@@ -134,14 +144,15 @@ export async function netExchange(api: NetApi, code: string, verifier?: string):
   return { externalId: String(t.open_id ?? user.open_id), name: user.username ? `@${user.username}` : String(user.display_name || "TikTok"), picture: user.avatar_url ?? null, token: t.access_token, expiresAt: inSec(t.expires_in), refresh: t.refresh_token ?? null, scopes: granted };
 }
 
-/** A fresh token when the stored one is close to expiring (TikTok: within 10 minutes; the others: within 7 days). */
+/** A fresh token when the stored one is close to expiring (TikTok, X, Bluesky: within 10 minutes; the others: within 7 days). */
 export function needsRefresh(api: NetApi, expiresAt: Date | null): boolean {
   if (!expiresAt) return false;
   const left = expiresAt.getTime() - netDeps.now();
-  return api === "tiktok" || api === "x" ? left < 10 * 60_000 : left < 7 * 86_400_000;
+  return api === "tiktok" || api === "x" || api === "bluesky" ? left < 10 * 60_000 : left < 7 * 86_400_000;
 }
 export async function netRefresh(api: NetApi, token: string, refresh: string | null): Promise<Pick<Signed, "token" | "expiresAt" | "refresh">> {
   const env = netDeps.env();
+  if (api === "bluesky") return blueskyRefresh(refresh);
   if (api === "ig_login") { const d = await call(`https://graph.instagram.com/refresh_access_token?${q({ grant_type: "ig_refresh_token", access_token: token })}`); return { token: d.access_token, expiresAt: inSec(d.expires_in), refresh: null }; }
   if (api === "threads") { const d = await call(`https://graph.threads.net/refresh_access_token?${q({ grant_type: "th_refresh_token", access_token: token })}`); return { token: d.access_token, expiresAt: inSec(d.expires_in), refresh: null }; }
   if (!refresh) throw reconnect();
@@ -369,8 +380,241 @@ export function tiktokPlan(text: string, media: string[], target: Record<string,
     post_mode: "DIRECT_POST", media_type: "PHOTO" } };
 }
 
+// ── Bluesky (AT Protocol): app-password session, facets, images, video (docs/social-apps/bluesky.md) ─────────────
+
+export const BLUESKY_MAX_GRAPHEMES = 300;
+const BLUESKY_IMAGE_BYTES = 1_000_000;          // the PDS refuses larger image blobs
+const BLUESKY_VIDEO_BYTES = 100 * 1024 * 1024;  // video.bsky.app's limit
+const BLUESKY_VIDEO_HOST = "https://video.bsky.app";
+const BLUESKY_PUBLIC_API = "https://public.api.bsky.app";
+const BLUESKY_DEFAULT_PDS = "https://bsky.social";
+/** Bluesky app passwords are four groups of four, dashes between (never the account's main password). */
+export const BLUESKY_APP_PASSWORD = /^[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}$/i;
+const BLUESKY_HANDLE = /^(?=.{3,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i;
+
+/** A Bluesky handle as the network wants it: no "@", no spaces, lower case. */
+export function blueskyHandle(input: string): string {
+  const h = String(input ?? "").trim().replace(/^@/, "").toLowerCase();
+  if (!BLUESKY_HANDLE.test(h)) throw new SocialError("Enter the Bluesky handle, like yourbusiness.bsky.social");
+  return h;
+}
+/** The claims of an AT Protocol session JWT (sub = the account's DID, exp = seconds). No signature check: it is only used to find the PDS and the expiry. */
+export function jwtClaims(token: string): { sub?: string; exp?: number; aud?: string } {
+  try { return JSON.parse(Buffer.from(token.split(".")[1] ?? "", "base64url").toString("utf8")); } catch { return {}; }
+}
+const jwtExpiry = (token: string, fallbackSec: number): Date => { const e = Number(jwtClaims(token).exp); return e > 0 ? new Date(e * 1000) : new Date(netDeps.now() + fallbackSec * 1000); };
+
+/** One XRPC call. Bluesky's errors come as { error, message }; expired or revoked sessions ask to reconnect. */
+async function atp(base: string, nsid: string, init: { method?: string; bearer?: string; json?: unknown; body?: Uint8Array; contentType?: string; query?: Record<string, string> } = {}): Promise<any> {
+  const headers: Record<string, string> = {};
+  let body: BodyInit | undefined;
+  if (init.json !== undefined) { headers["Content-Type"] = "application/json"; body = JSON.stringify(init.json); }
+  else if (init.body) { headers["Content-Type"] = init.contentType ?? "application/octet-stream"; body = init.body as BodyInit; }
+  if (init.bearer) headers.Authorization = `Bearer ${init.bearer}`;
+  const url = `${base.replace(/\/$/, "")}/xrpc/${nsid}${init.query ? `?${q(init.query)}` : ""}`;
+  let r: Response;
+  try { r = await netDeps.http(url, { method: init.method ?? (body ? "POST" : "GET"), headers, body, redirect: "error", signal: AbortSignal.timeout(60_000) }); }
+  catch { throw new SocialError("Bluesky didn't answer; check the post before sending it again", 502); }
+  const d: any = await r.json().catch(() => null);
+  if (!r.ok) {
+    const code = String(d?.error ?? "");
+    if (r.status === 429 || code === "RateLimitExceeded") throw new SocialError("Bluesky is limiting how fast we post; it will retry shortly", 429);
+    // Signing in: a refused handle/password is the customer's to fix, not a lost session.
+    if (nsid === "com.atproto.server.createSession" && (r.status === 401 || r.status === 400)) throw new SocialError("Bluesky didn't accept that handle and app password. Make a new app password at bsky.app/settings/app-passwords and try again.", 400);
+    if (r.status === 401 || ["ExpiredToken", "InvalidToken", "AuthenticationRequired", "AccountTakedown", "AccountDeactivated"].includes(code)) throw reconnect();
+    const say = String(d?.message || code).slice(0, 200);
+    throw new SocialError(say ? `Bluesky refused it: ${say}` : "Bluesky refused the request", r.status >= 500 ? 502 : 400);
+  }
+  if (!d || typeof d !== "object") throw new SocialError("Bluesky sent an unreadable answer", 502);
+  return d;
+}
+
+/** Where an account lives: its DID document's #atproto_pds service (bsky.social for most; self-hosters differ). Cached for a day. */
+const pdsCache = new Map<string, { pds: string; until: number }>();
+export async function blueskyPds(did: string): Promise<string> {
+  const hit = pdsCache.get(did);
+  if (hit && hit.until > netDeps.now()) return hit.pds;
+  let doc: any = null;
+  try {
+    const url = did.startsWith("did:plc:") ? `https://plc.directory/${encodeURIComponent(did)}`
+      : did.startsWith("did:web:") ? `https://${did.slice("did:web:".length).split(":")[0]}/.well-known/did.json` : null;
+    if (url) { const r = await netDeps.http(url, { redirect: "error", signal: AbortSignal.timeout(20_000) }); if (r.ok) doc = await r.json().catch(() => null); }
+  } catch { /* fall back to bsky.social */ }
+  const svc = Array.isArray(doc?.service) ? doc.service.find((s: any) => s?.id === "#atproto_pds" || s?.type === "AtprotoPersonalDataServer") : null;
+  const pds = typeof svc?.serviceEndpoint === "string" && /^https:\/\//.test(svc.serviceEndpoint) ? svc.serviceEndpoint.replace(/\/$/, "") : BLUESKY_DEFAULT_PDS;
+  pdsCache.set(did, { pds, until: netDeps.now() + 86_400_000 });
+  return pds;
+}
+/** `@handle` → DID, for mention facets. Null when Bluesky doesn't know it (the mention stays plain text). */
+async function blueskyResolve(handle: string): Promise<string | null> {
+  try { const d = await atp(BLUESKY_PUBLIC_API, "com.atproto.identity.resolveHandle", { query: { handle } }); return typeof d.did === "string" ? d.did : null; }
+  catch { return null; }
+}
+
+/** Sign in with a handle and an app password: who it is, the session tokens, and the account's picture. */
+export async function blueskyLogin(handleInput: string, appPassword: string): Promise<Signed> {
+  const handle = blueskyHandle(handleInput);
+  const password = String(appPassword ?? "").trim();
+  if (!BLUESKY_APP_PASSWORD.test(password)) throw new SocialError("Use a Bluesky app password (four groups of four, like abcd-efgh-ijkl-mnop), not your main password. Make one at bsky.app/settings/app-passwords.");
+  const did = await blueskyResolve(handle);
+  if (!did) throw new SocialError("Bluesky doesn't know that handle. Check the spelling (yourbusiness.bsky.social, or your own domain).");
+  const pds = await blueskyPds(did);
+  const s = await atp(pds, "com.atproto.server.createSession", { json: { identifier: handle, password } });
+  if (typeof s.accessJwt !== "string" || typeof s.refreshJwt !== "string" || typeof s.did !== "string") throw new SocialError("Bluesky did not open a session", 502);
+  const profile = await atp(pds, "app.bsky.actor.getProfile", { bearer: s.accessJwt, query: { actor: s.did } }).catch(() => ({}));
+  return { externalId: s.did, name: `@${typeof s.handle === "string" && s.handle ? s.handle : handle}`, picture: typeof profile.avatar === "string" ? profile.avatar : null,
+    token: s.accessJwt, expiresAt: jwtExpiry(s.accessJwt, 7200), refresh: s.refreshJwt, scopes: SCOPES.bluesky };
+}
+/** A new access token from the refresh token (Bluesky rotates both). */
+async function blueskyRefresh(refresh: string | null): Promise<Pick<Signed, "token" | "expiresAt" | "refresh">> {
+  if (!refresh) throw reconnect();
+  const did = String(jwtClaims(refresh).sub ?? "");
+  const pds = did ? await blueskyPds(did) : BLUESKY_DEFAULT_PDS;
+  const s = await atp(pds, "com.atproto.server.refreshSession", { method: "POST", bearer: refresh });
+  if (typeof s.accessJwt !== "string") throw reconnect();
+  return { token: s.accessJwt, expiresAt: jwtExpiry(s.accessJwt, 7200), refresh: typeof s.refreshJwt === "string" ? s.refreshJwt : refresh };
+}
+
+/** Graphemes, the unit Bluesky counts (an emoji is 1, not its code points). */
+export function blueskyLength(text: string): number {
+  let n = 0;
+  for (const _ of new Intl.Segmenter("en", { granularity: "grapheme" }).segment(text.normalize("NFC"))) n++;
+  return n;
+}
+export type BlueskyFacet = { index: { byteStart: number; byteEnd: number }; features: ({ $type: "app.bsky.richtext.facet#link"; uri: string } | { $type: "app.bsky.richtext.facet#tag"; tag: string } | { $type: "app.bsky.richtext.facet#mention"; did: string })[] };
+/**
+ * Links, #hashtags and @mentions as facets with UTF-8 byte offsets — without them Bluesky shows plain text. Pure except
+ * for mentions, which `resolve` turns into DIDs (unknown handles stay plain). Trailing sentence punctuation stays outside
+ * a link, like X's splitter.
+ */
+export async function blueskyFacets(text: string, resolve: (handle: string) => Promise<string | null> = blueskyResolve): Promise<BlueskyFacet[]> {
+  const enc = new TextEncoder();
+  const bytesBefore = (i: number) => enc.encode(text.slice(0, i)).length;
+  const facets: BlueskyFacet[] = [];
+  const link = /(?<![\w@.])((?:https?:\/\/|www\.)[^\s<>()]+(?:\([^\s<>()]*\)[^\s<>()]*)*)/giu;
+  for (const m of text.matchAll(link)) {
+    let raw = m[1];
+    while (/[.,!?;:"'’”)]$/u.test(raw) && !(raw.endsWith(")") && (raw.match(/\(/g) ?? []).length >= (raw.match(/\)/g) ?? []).length)) raw = raw.slice(0, -1);
+    const start = m.index!, end = start + raw.length;
+    facets.push({ index: { byteStart: bytesBefore(start), byteEnd: bytesBefore(end) }, features: [{ $type: "app.bsky.richtext.facet#link", uri: /^www\./i.test(raw) ? `https://${raw}` : raw }] });
+  }
+  const tag = /(?<![\w/#@])#([\p{L}\p{N}_]{1,64})(?![\p{L}\p{N}_])/gu;
+  for (const m of text.matchAll(tag)) {
+    if (/^\d+$/.test(m[1])) continue;   // "#1" is a number, not a tag
+    const start = m.index!, end = start + m[0].length;
+    facets.push({ index: { byteStart: bytesBefore(start), byteEnd: bytesBefore(end) }, features: [{ $type: "app.bsky.richtext.facet#tag", tag: m[1] }] });
+  }
+  const mention = /(?<![\w@])@((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63})(?![\w.])/giu;
+  for (const m of text.matchAll(mention)) {
+    const did = await resolve(m[1].toLowerCase());
+    if (!did) continue;
+    const start = m.index!, end = start + m[0].length;
+    facets.push({ index: { byteStart: bytesBefore(start), byteEnd: bytesBefore(end) }, features: [{ $type: "app.bsky.richtext.facet#mention", did }] });
+  }
+  // Facets may not overlap: keep the first by position, drop any that start inside an earlier one.
+  facets.sort((a, b) => a.index.byteStart - b.index.byteStart);
+  const out: BlueskyFacet[] = [];
+  for (const f of facets) if (!out.length || f.index.byteStart >= out[out.length - 1].index.byteEnd) out.push(f);
+  return out;
+}
+
+/** What a Bluesky post will carry. Pure (tested): ≤ 300 graphemes, up to 4 images or one video, text optional with media. */
+export function blueskyPlan(text: string, media: string[]): { kind: "text" } | { kind: "images"; urls: string[] } | { kind: "video"; url: string } {
+  if (blueskyLength(text) > BLUESKY_MAX_GRAPHEMES) throw new SocialError(`Bluesky posts are at most ${BLUESKY_MAX_GRAPHEMES} characters`);
+  if (!media.length) {
+    if (!text.trim()) throw new SocialError("Bluesky needs text, photos or a video");
+    return { kind: "text" };
+  }
+  const videos = media.filter(isVideo);
+  if (videos.length) {
+    if (media.length > 1) throw new SocialError("Bluesky takes one video, or up to four photos without a video");
+    return { kind: "video", url: videos[0] };
+  }
+  if (media.length > 4) throw new SocialError("Bluesky takes up to four photos");
+  return { kind: "images", urls: media };
+}
+/** A public HTTPS file, through the pinned-DNS transport (no bearer, no redirects), bounded. */
+async function blueskyFetch(url: string, max: number, what: string): Promise<Buffer> {
+  const safe = siteUrl(url);
+  if (!safe.startsWith("https://")) throw new SocialError("Use a public HTTPS media URL");
+  try {
+    const response = await netDeps.mediaHttp(safe);
+    if (!response.ok) throw new Error("download failed");
+    const file = Buffer.from(await response.arrayBuffer());
+    if (!file.length || file.length > max) throw new Error("invalid size");
+    return file;
+  } catch { throw new SocialError(`Bluesky couldn't read the ${what}; use a public HTTPS file under ${Math.round(max / 1024 / 1024)} MB`); }
+}
+/** An image Bluesky will take: under 1,000,000 bytes (re-encoded as JPEG when larger), with its aspect ratio. */
+export async function blueskyImage(file: Buffer): Promise<{ bytes: Uint8Array; type: string; width: number; height: number }> {
+  const meta = await sharp(file).metadata().catch(() => null);
+  if (!meta?.width || !meta?.height) throw new SocialError("Bluesky couldn't read that image; use a JPEG, PNG or WebP");
+  const type = meta.format === "png" ? "image/png" : meta.format === "webp" ? "image/webp" : meta.format === "gif" ? "image/gif" : "image/jpeg";
+  if (file.length <= BLUESKY_IMAGE_BYTES) return { bytes: new Uint8Array(file), type, width: meta.width, height: meta.height };
+  let img = sharp(file).rotate();
+  let { width, height } = meta;
+  if (Math.max(width, height) > 2000) { img = img.resize({ width: 2000, height: 2000, fit: "inside", withoutEnlargement: true }); const s = 2000 / Math.max(width, height); width = Math.round(width * s); height = Math.round(height * s); }
+  for (const quality of [85, 75, 65, 55, 45]) {
+    const out = await img.jpeg({ quality, mozjpeg: true }).toBuffer();
+    if (out.length <= BLUESKY_IMAGE_BYTES) return { bytes: new Uint8Array(out), type: "image/jpeg", width, height };
+  }
+  throw new SocialError("That image is too large for Bluesky even after shrinking; use a smaller one");
+}
+async function blueskyUploadImages(pds: string, token: string, urls: string[]) {
+  const images: any[] = [];
+  for (const url of urls) {
+    const img = await blueskyImage(await blueskyFetch(url, 50 * 1024 * 1024, "photo"));
+    const d = await atp(pds, "com.atproto.repo.uploadBlob", { bearer: token, body: img.bytes, contentType: img.type });
+    if (!d.blob) throw new SocialError("Bluesky did not confirm the photo upload", 502);
+    images.push({ image: d.blob, alt: "", aspectRatio: { width: img.width, height: img.height } });
+  }
+  return { $type: "app.bsky.embed.images", images };
+}
+/** Video goes through video.bsky.app with a service token from the account's PDS, then is polled until processed. */
+async function blueskyUploadVideo(pds: string, did: string, token: string, url: string) {
+  const file = await blueskyFetch(url, BLUESKY_VIDEO_BYTES, "video");
+  const aud = `did:web:${new URL(pds).host}`;
+  const auth = await atp(pds, "com.atproto.server.getServiceAuth", { bearer: token, query: { aud, lxm: "com.atproto.repo.uploadBlob", exp: String(Math.floor(netDeps.now() / 1000) + 30 * 60) } });
+  if (typeof auth.token !== "string") throw new SocialError("Bluesky did not allow the video upload", 502);
+  let job = await atp(BLUESKY_VIDEO_HOST, "app.bsky.video.uploadVideo", { bearer: auth.token, body: new Uint8Array(file), contentType: /\.mov(?:\?|$)/i.test(url) ? "video/quicktime" : "video/mp4", query: { did, name: `video-${netDeps.now()}.mp4` } });
+  for (let i = 0; !job.blob && job.jobStatus?.state !== "JOB_STATE_COMPLETED"; i++) {
+    const st = job.jobStatus ?? job;
+    if (st.state === "JOB_STATE_FAILED") throw new SocialError(`Bluesky couldn't process the video${st.error ? `: ${String(st.error).slice(0, 160)}` : ""}`);
+    if (st.blob) { job = st; break; }
+    if (i >= 90) throw new SocialError("Bluesky took too long to process the video", 502);
+    await netDeps.sleep(3000);
+    const jobId = st.jobId ?? job.jobId;
+    if (!jobId) throw new SocialError("Bluesky did not confirm the video upload", 502);
+    job = await atp(BLUESKY_VIDEO_HOST, "app.bsky.video.getJobStatus", { bearer: auth.token, query: { jobId: String(jobId) } });
+  }
+  const blob = job.blob ?? job.jobStatus?.blob;
+  if (!blob) throw new SocialError("Bluesky did not return the processed video", 502);
+  return { $type: "app.bsky.embed.video", video: blob };
+}
+/** One post on Bluesky: text with facets, photos or a video. Published at once — there is nothing to poll. */
+async function blueskyPublish(did: string, token: string, text: string, media: string[], handle: string): Promise<Plan> {
+  const plan = blueskyPlan(text, media);
+  const pds = await blueskyPds(did);
+  const record: Record<string, unknown> = { $type: "app.bsky.feed.post", text: text.normalize("NFC"), createdAt: new Date(netDeps.now()).toISOString() };
+  const facets = await blueskyFacets(record.text as string);
+  if (facets.length) record.facets = facets;
+  if (plan.kind === "images") record.embed = await blueskyUploadImages(pds, token, plan.urls);
+  if (plan.kind === "video") record.embed = await blueskyUploadVideo(pds, did, token, plan.url);
+  const d = await atp(pds, "com.atproto.repo.createRecord", { bearer: token, json: { repo: did, collection: "app.bsky.feed.post", record } });
+  if (typeof d.uri !== "string") throw new SocialError("Bluesky did not confirm the post; check the account before posting again", 502);
+  const rkey = d.uri.split("/").pop();
+  return { stage: "published", external: d.uri, url: handle && rkey ? `https://bsky.app/profile/${handle.replace(/^@/, "")}/post/${rkey}` : null };
+}
+/** Take a post down on Bluesky (disconnect keeps the session; deleting a post needs it). */
+export async function blueskyDelete(did: string, token: string, uri: string): Promise<void> {
+  const m = /^at:\/\/([^/]+)\/app\.bsky\.feed\.post\/([\w.:~-]+)$/.exec(uri);
+  if (!m) throw new SocialError("That isn't a Bluesky post", 400);
+  await atp(await blueskyPds(did), "com.atproto.repo.deleteRecord", { bearer: token, json: { repo: did, collection: "app.bsky.feed.post", rkey: m[2] } });
+}
+
 /** Start a publish. Returns where it got to (a container / publish id to poll). */
 export async function netPublish(api: NetApi, externalId: string, token: string, text: string, media: string[], target: Record<string, any>): Promise<Plan> {
+  if (api === "bluesky") return blueskyPublish(externalId, token, text, media, String(target.blueskyHandle ?? ""));
   if (api === "ig_login") {
     if (!media.length) throw new SocialError("Instagram needs a photo or a video");
     const host = `https://graph.instagram.com/v25.0/${externalId}/media`;
@@ -430,6 +674,7 @@ export async function netRead(api: NetApi, externalId: string, token: string, st
     return { state: "published", external: String(pub.id), url: m?.permalink ?? null };
   }
   if (api === "x") return { state: "published", external: container, url: username ? `https://x.com/${username.replace(/^@/, "")}/status/${container}` : null };
+  if (api === "bluesky") { const rkey = container.split("/").pop(); return { state: "published", external: container, url: username && rkey ? `https://bsky.app/profile/${username.replace(/^@/, "")}/post/${rkey}` : null }; }
   const d = await call("https://open.tiktokapis.com/v2/post/publish/status/fetch/", { json: { publish_id: container }, bearer: token });
   const st = d.data?.status;
   if (st === "FAILED") return { state: "failed", error: `TikTok couldn't post it${d.data?.fail_reason ? `: ${String(d.data.fail_reason).replace(/_/g, " ")}` : ""}` };

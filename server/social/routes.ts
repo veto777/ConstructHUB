@@ -29,6 +29,7 @@ import {
   nativeRefresh,
   nativePending,
   nativeFinalize,
+  nativeBlueskyLogin,
 } from "./service";
 import { CONNECTABLE, outstandConfigured, webhookSigned } from "./outstand";
 import { NativeClient, nativeNetworksFor, receiveUpload, NATIVE_UPLOAD_MAX_BYTES } from "./native";
@@ -56,6 +57,8 @@ const fieldMessages: Record<string, string> = {
   aiDailyBudget: "Daily AI budget must be a whole number from 0 to 20.",
   kind: "Choose a source type.",
   businessIds: "Choose between 1 and 1,000 different businesses.",
+  handle: "Enter the Bluesky handle, like yourbusiness.bsky.social.",
+  appPassword: "Enter a Bluesky app password (four groups of four characters) from bsky.app/settings/app-passwords.",
 };
 /**
  * POST /posts/:id/action — approve a draft (optionally with edited text), save an edited draft
@@ -236,6 +239,13 @@ export function registerSocialRoutes(
     const { network } = z.object({ network: z.string().min(2).max(20) }).strict().parse(req.body);
     if (!nativeNetworksFor(req.user).includes(network)) throw new SocialError("That network can't be connected here yet");
     res.json(await nativeConnectUrl(id, businessId, network, req));
+  });
+  // Bluesky has no sign-in page: the handle and an app password (bsky.app/settings/app-passwords) open the session
+  // here. The password is sent to Bluesky once and never stored; the session tokens are (docs/social-apps/bluesky.md).
+  route("post", "/native/bluesky/login", async (req, res, id, businessId) => {
+    const { handle, appPassword } = z.object({ handle: z.string().trim().min(3).max(260), appPassword: z.string().trim().min(16).max(40) }).strict().parse(req.body);
+    if (!nativeNetworksFor(req.user).includes("bluesky")) throw new SocialError("That network can't be connected here yet");
+    res.json(await nativeBlueskyLogin(id, businessId, handle, appPassword, req));
   });
   route("post", "/native/refresh", async (_req, res, id, businessId) => res.json(await nativeRefresh(id, businessId)));
   // Stats, comments and deleting (./insights.ts) — for accounts connected through ConstructHUB Direct, admins only

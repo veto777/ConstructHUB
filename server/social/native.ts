@@ -23,7 +23,7 @@ const dec = (v: string): string => { const t = decryptToken(v); if (!t) throw ne
 import { SocialError } from "./client";
 import { isPlatformAdmin } from "../admin";
 import type { PostPayload, SocialAccount, SocialClient, StatusResult, SubmitResult, UploadStart } from "./provider";
-import { netConfigured, netExchange, netPublish, netRead, netRefresh, needsRefresh, netScopes, tiktokCreatorInfo, tiktokRevoke, type CreatorInfo, type NetApi } from "./native-nets";
+import { netConfigured, netExchange, netPublish, netRead, netRefresh, needsRefresh, netScopes, tiktokCreatorInfo, tiktokRevoke, blueskyLogin, type CreatorInfo, type NetApi } from "./native-nets";
 
 export const NATIVE_MARK = "native:";
 export const GRAPH = "https://graph.facebook.com/v25.0";
@@ -39,12 +39,13 @@ export function nativeNetworks(env: NodeJS.ProcessEnv = process.env): string[] {
     ...(netConfigured("threads", env) ? ["threads"] : []),
     ...(netConfigured("tiktok", env) ? ["tiktok"] : []),
     ...(netConfigured("x", env) ? ["x"] : []),
+    ...(netConfigured("bluesky", env) ? ["bluesky"] : []),
   ];
 }
 /** Connect-screen network → which sign-in it uses. `instagram_direct` = Instagram login (no Facebook Page needed). */
-export const NETWORK_API: Record<string, NetApi | "meta"> = { facebook: "meta", instagram: "meta", instagram_direct: "ig_login", threads: "threads", tiktok: "tiktok", x: "x" };
-const API_PLATFORM: Record<NetApi, string> = { ig_login: "instagram", threads: "threads", tiktok: "tiktok", x: "x" };
-const API_NETWORK: Record<NetApi, string> = { ig_login: "instagram_direct", threads: "threads", tiktok: "tiktok", x: "x" };
+export const NETWORK_API: Record<string, NetApi | "meta"> = { facebook: "meta", instagram: "meta", instagram_direct: "ig_login", threads: "threads", tiktok: "tiktok", x: "x", bluesky: "bluesky" };
+const API_PLATFORM: Record<NetApi, string> = { ig_login: "instagram", threads: "threads", tiktok: "tiktok", x: "x", bluesky: "bluesky" };
+const API_NETWORK: Record<NetApi, string> = { ig_login: "instagram_direct", threads: "threads", tiktok: "tiktok", x: "x", bluesky: "bluesky" };
 export const nativeConfigured = (env: NodeJS.ProcessEnv = process.env) => nativeNetworks(env).length > 0;
 /** Someone signed in, as far as ConstructHUB Direct cares: their email (req.user, or a users row). */
 export type NativeViewer = { email?: string | null } | null | undefined;
@@ -57,11 +58,15 @@ export function nativeAllowlisted(email: string | null | undefined, env: NodeJS.
  * Until Meta approves the app (App Review), only people with a role on it can sign in, so customers do not see
  * ConstructHUB Direct: platform admins do, to test it on our own Page, and so do the accounts SOCIAL_NATIVE_EMAILS
  * lists (the ConstructHUB accounts Meta's and TikTok's App Review reviewers sign in with). SOCIAL_NATIVE_PUBLIC=true
- * opens it to all. Pure on env and the viewer's email.
+ * opens it all to everyone; SOCIAL_NATIVE_PUBLIC_NETWORKS lists the networks open to everyone on their own (Bluesky
+ * needs no review). Pure on env and the viewer's email.
  */
 export function nativeNetworksFor(user: NativeViewer, env: NodeJS.ProcessEnv = process.env): string[] {
-  const allowed = env.SOCIAL_NATIVE_PUBLIC === "true" || isPlatformAdmin(user) || nativeAllowlisted(user?.email, env);
-  return allowed ? nativeNetworks(env) : [];
+  const all = nativeNetworks(env);
+  if (env.SOCIAL_NATIVE_PUBLIC === "true" || isPlatformAdmin(user) || nativeAllowlisted(user?.email, env)) return all;
+  // Networks that need no app review can open to every customer on their own (SOCIAL_NATIVE_PUBLIC_NETWORKS=bluesky).
+  const open = new Set((env.SOCIAL_NATIVE_PUBLIC_NETWORKS ?? "").split(/[\s,;]+/).map((n) => n.trim().toLowerCase()).filter(Boolean));
+  return all.filter((n) => open.has(n));
 }
 
 const appBase = () => (process.env.APP_URL || "https://constructhub.us").replace(/\/$/, "");
@@ -267,6 +272,12 @@ export async function nativeNetConnect(api: NetApi, tenant: string, code: string
   await upsertAccount(tenant, API_PLATFORM[api], s.externalId, s.name, s.picture, null, s.token, { api, refresh: s.refresh, expiresAt: s.expiresAt, scopes: s.scopes, owner: s.externalId });
   return API_NETWORK[api];
 }
+/** Bluesky: no sign-in page — the handle and an app password open the session here; the password is used once and not kept. */
+export async function nativeBlueskyConnect(tenant: string, handle: string, appPassword: string): Promise<{ name: string }> {
+  const s = await blueskyLogin(handle, appPassword);
+  await upsertAccount(tenant, "bluesky", s.externalId, s.name, s.picture, null, s.token, { api: "bluesky", refresh: s.refresh, expiresAt: s.expiresAt, scopes: s.scopes, owner: s.externalId });
+  return { name: s.name };
+}
 export const netScopesFor = netScopes;
 
 /** Disconnect lets go of our access at TikTok too (/v2/oauth/revoke/); best effort — the rows are deleted either way. */
@@ -435,7 +446,7 @@ export class NativeClient implements SocialClient {
       [id, key, this.tenant, acct.id, acct.platform]);
     try {
       if (acct.api !== "meta") {
-        const p = await netPublish(acct.api as NetApi, acct.external_id, token, text, media, { ...payload.post.target, xUsername: acct.name });
+        const p = await netPublish(acct.api as NetApi, acct.external_id, token, text, media, { ...payload.post.target, xUsername: acct.name, blueskyHandle: acct.name });
         await this.setSub(id, { stage: p.stage, container_id: p.container ?? null, external_id: p.external ?? null, public_url: p.url ?? null, error: p.error ?? null });
       } else if (acct.platform === "facebook") await this.facebookSend(id, acct, token, text, media);
       else if (acct.platform === "instagram") await this.instagramSend(id, acct, token, text, media);
@@ -501,7 +512,7 @@ export class NativeClient implements SocialClient {
     try {
       const token = await this.token(acct);
       if (acct.api !== "meta" && ["ig_container", "th_container", "tt_publish"].includes(s.stage)) {
-        const r = await netRead(acct.api as NetApi, acct.external_id, token, s.stage, s.container_id, acct.api === "tiktok" ? acct.name : null);
+        const r = await netRead(acct.api as NetApi, acct.external_id, token, s.stage, s.container_id, acct.api === "tiktok" || acct.api === "bluesky" ? acct.name : null);
         if (r.state === "failed") return this.fail(s.id, r.error ?? "The network refused the post");
         if (r.state === "submitted") {
           if (s.attempts > 120) return this.fail(s.id, "The network took too long to process the post");

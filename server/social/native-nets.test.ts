@@ -4,10 +4,11 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { pool } from "../db";
 import { decryptToken } from "../gbp/token-crypto";
 import { deletePost } from "./insights";
-import { creatorInfoFrom, netAuthUrl, netConfigured, netDeps, netExchange, netPublish, netRefresh, netRedirect, xDelete, needsRefresh, netScopes, threadsPlan, tiktokCreatorInfo, tiktokPlan } from "./native-nets";
+import { creatorInfoFrom, netAuthUrl, netConfigured, netDeps, netExchange, netPublish, netRefresh, netRedirect, xDelete, needsRefresh, netScopes, threadsPlan, tiktokCreatorInfo, tiktokPlan, blueskyLogin, blueskyPlan, blueskyLength, blueskyFacets, blueskyImage, blueskyDelete, netRead } from "./native-nets";
 import { NativeClient, ensureNativeSchema, nativeNetConnect, nativeNetworks, newOAuthState, oauthStateMatches, removeNativeAccounts } from "./native";
 
 import { createHash } from "node:crypto";
+import sharp from "sharp";
 import { recordFailure } from "../ops/issues";
 vi.mock("../ops/issues", () => ({ recordFailure: vi.fn(async () => {}) }));
 const realSleep = netDeps.sleep;
@@ -417,4 +418,133 @@ it("X does not post a video that failed processing or report unconfirmed deletio
   await expect(netPublish("x", "12", "access", "Video", ["https://media.example.com/a.mp4"], {})).rejects.toThrow(/process the video/);
   expect(calls.some(c => c.url.pathname === "/2/tweets")).toBe(false);
   await expect(xDelete("access", "p1")).rejects.toThrow(/confirm deletion/);
+});
+
+describe("Bluesky (app password, facets, photos, video)", () => {
+  // A 1×1 PNG: small enough to go up as-is.
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
+  const jwt = (claims: Record<string, unknown>) => `h.${Buffer.from(JSON.stringify(claims)).toString("base64url")}.s`;
+  const did = "did:plc:abc123";
+  const bsky = (overrides: Partial<Record<string, (u: URL, body: any, init: any) => unknown>> = {}) => fake((u, body, init) => {
+    const nsid = u.pathname.replace("/xrpc/", "");
+    if (overrides[nsid]) return overrides[nsid]!(u, body, init);
+    if (u.hostname === "plc.directory") return { service: [{ id: "#atproto_pds", type: "AtprotoPersonalDataServer", serviceEndpoint: "https://pds.example.com" }] };
+    if (nsid === "com.atproto.identity.resolveHandle") return u.searchParams.get("handle") === "roofer.bsky.social" || u.searchParams.get("handle") === "friend.bsky.social" ? { did: u.searchParams.get("handle") === "friend.bsky.social" ? "did:plc:friend" : did } : ok({ error: "InvalidRequest", message: "Unable to resolve handle" }, 400);
+    if (nsid === "com.atproto.server.createSession") return body.password === "abcd-efgh-ijkl-mnop" ? { accessJwt: jwt({ sub: did, exp: Math.floor(Date.now() / 1000) + 7200 }), refreshJwt: jwt({ sub: did, exp: Math.floor(Date.now() / 1000) + 90 * 86400 }), did, handle: "roofer.bsky.social" } : ok({ error: "AuthenticationRequired", message: "Invalid identifier or password" }, 401);
+    if (nsid === "app.bsky.actor.getProfile") return { did, handle: "roofer.bsky.social", avatar: "https://cdn.bsky.app/a.jpg" };
+    if (nsid === "com.atproto.server.refreshSession") return { accessJwt: jwt({ sub: did, exp: Math.floor(Date.now() / 1000) + 7200 }), refreshJwt: "r2", did };
+    if (nsid === "com.atproto.repo.uploadBlob") return { blob: { $type: "blob", ref: { $link: "bafyimg" }, mimeType: init.headers["Content-Type"], size: init.body.length } };
+    if (nsid === "com.atproto.repo.createRecord") return { uri: `at://${did}/app.bsky.feed.post/3kabc`, cid: "bafycid" };
+    if (nsid === "com.atproto.repo.deleteRecord") return {};
+    if (nsid === "com.atproto.server.getServiceAuth") return { token: "svc-token" };
+    if (nsid === "app.bsky.video.uploadVideo") return { jobId: "job1", state: "JOB_STATE_CREATED" };
+    if (nsid === "app.bsky.video.getJobStatus") return { jobStatus: { jobId: "job1", state: "JOB_STATE_COMPLETED", blob: { $type: "blob", ref: { $link: "bafyvid" }, mimeType: "video/mp4", size: 3 } } };
+    throw new Error(`Unexpected Bluesky call ${nsid}`);
+  });
+
+  it("is switched on by SOCIAL_BLUESKY, with no app keys", () => {
+    expect(netConfigured("bluesky", { SOCIAL_BLUESKY: "on" } as any)).toBe(true);
+    expect(netConfigured("bluesky", {} as any)).toBe(false);
+    expect(() => netAuthUrl("bluesky", "st")).toThrow(/app password/);
+  });
+  it("signs in with a handle and an app password, finds the account's own PDS, and never accepts a main password", async () => {
+    const calls = bsky();
+    const s = await blueskyLogin("@Roofer.bsky.social", "abcd-efgh-ijkl-mnop");
+    expect(s).toMatchObject({ externalId: did, name: "@roofer.bsky.social", picture: "https://cdn.bsky.app/a.jpg", refresh: expect.stringMatching(/^h\./), scopes: [] });
+    expect(s.expiresAt!.getTime()).toBeGreaterThan(Date.now() + 7000_000);
+    expect(calls.find((c) => c.url.pathname.endsWith("createSession"))!.url.origin).toBe("https://pds.example.com");
+    expect(calls.find((c) => c.url.pathname.endsWith("createSession"))!.body).toEqual({ identifier: "roofer.bsky.social", password: "abcd-efgh-ijkl-mnop" });
+    await expect(blueskyLogin("roofer.bsky.social", "MyRealPassword123")).rejects.toThrow(/app password/);
+    await expect(blueskyLogin("roofer.bsky.social", "zzzz-zzzz-zzzz-zzzz")).rejects.toThrow(/didn't accept/);
+    await expect(blueskyLogin("nobody.bsky.social", "abcd-efgh-ijkl-mnop")).rejects.toThrow(/doesn't know that handle/);
+    await expect(blueskyLogin("not a handle", "abcd-efgh-ijkl-mnop")).rejects.toThrow(/Enter the Bluesky handle/);
+  });
+  it("refreshes through the PDS named in the refresh token and keeps the new refresh token", async () => {
+    bsky();
+    const now = Date.now(); netDeps.now = () => now;
+    expect(needsRefresh("bluesky", new Date(now + 5 * 60_000))).toBe(true);
+    const f = await netRefresh("bluesky", "old", jwt({ sub: did, exp: 1 }));
+    expect(f.refresh).toBe("r2");
+    expect(f.expiresAt!.getTime()).toBeGreaterThan(now + 7000_000);
+    await expect(netRefresh("bluesky", "old", null)).rejects.toMatchObject({ reconnect: true });
+  });
+  it("counts graphemes and plans text, up to four photos, or one video", () => {
+    expect(blueskyLength("Hi 👋🏽 there")).toBe(10);
+    expect(blueskyPlan("Hi", [])).toEqual({ kind: "text" });
+    expect(blueskyPlan("", ["https://x.us/a.jpg"])).toEqual({ kind: "images", urls: ["https://x.us/a.jpg"] });
+    expect(blueskyPlan("Hi", ["https://x.us/a.mp4"])).toEqual({ kind: "video", url: "https://x.us/a.mp4" });
+    expect(() => blueskyPlan("", [])).toThrow(/needs text/);
+    expect(() => blueskyPlan("😀".repeat(301), [])).toThrow(/300/);
+    expect(blueskyLength("😀".repeat(300))).toBe(300);
+    expect(() => blueskyPlan("x", ["https://x.us/a.mp4", "https://x.us/b.jpg"])).toThrow(/one video/);
+    expect(() => blueskyPlan("x", Array(5).fill("https://x.us/a.jpg"))).toThrow(/four photos/);
+  });
+  it("marks links, tags and known mentions with UTF-8 byte offsets, nothing overlapping", async () => {
+    const text = "Café ✔ new roof: https://constructhub.us/jobs/1). #Roofing #1 @friend.bsky.social @nobody.bsky.social www.x.us.";
+    const resolve = async (h: string) => (h === "friend.bsky.social" ? "did:plc:friend" : null);
+    const f = await blueskyFacets(text, resolve);
+    const bytes = Buffer.from(text, "utf8");
+    const slice = (i: { byteStart: number; byteEnd: number }) => bytes.subarray(i.byteStart, i.byteEnd).toString("utf8");
+    expect(f.map((x) => [slice(x.index), x.features[0]])).toEqual([
+      ["https://constructhub.us/jobs/1", { $type: "app.bsky.richtext.facet#link", uri: "https://constructhub.us/jobs/1" }],
+      ["#Roofing", { $type: "app.bsky.richtext.facet#tag", tag: "Roofing" }],
+      ["@friend.bsky.social", { $type: "app.bsky.richtext.facet#mention", did: "did:plc:friend" }],
+      ["www.x.us", { $type: "app.bsky.richtext.facet#link", uri: "https://www.x.us" }],
+    ]);
+    expect(await blueskyFacets("plain words only", resolve)).toEqual([]);
+  });
+  it("publishes text with facets as one record, published at once with its bsky.app link", async () => {
+    const calls = bsky();
+    const p = await netPublish("bluesky", did, "tok", "New roof done #Roofing https://constructhub.us", [], { blueskyHandle: "@roofer.bsky.social" });
+    expect(p).toEqual({ stage: "published", external: `at://${did}/app.bsky.feed.post/3kabc`, url: "https://bsky.app/profile/roofer.bsky.social/post/3kabc" });
+    const rec = calls.find((c) => c.url.pathname.endsWith("createRecord"))!;
+    expect(rec.url.origin).toBe("https://pds.example.com");
+    expect(rec.init.headers.Authorization).toBe("Bearer tok");
+    expect(rec.body).toMatchObject({ repo: did, collection: "app.bsky.feed.post", record: { $type: "app.bsky.feed.post", text: "New roof done #Roofing https://constructhub.us" } });
+    expect(rec.body.record.facets.map((x: any) => x.features[0].$type)).toEqual(["app.bsky.richtext.facet#tag", "app.bsky.richtext.facet#link"]);
+    expect(rec.body.record.createdAt).toMatch(/^\d{4}-\d\d-\d\dT/);
+    expect(await netRead("bluesky", did, "tok", "published", `at://${did}/app.bsky.feed.post/3kabc`, "@roofer.bsky.social")).toMatchObject({ state: "published", url: "https://bsky.app/profile/roofer.bsky.social/post/3kabc" });
+  });
+  it("uploads photos to the PDS as blobs with their aspect ratio, and shrinks big ones under 1,000,000 bytes", async () => {
+    const calls = bsky();
+    netDeps.mediaHttp = async () => new Response(new Uint8Array(png));
+    const p = await netPublish("bluesky", did, "tok", "Before and after", ["https://constructhub.us/api/files/a.png", "https://constructhub.us/api/files/b.png"], {});
+    expect(p.stage).toBe("published");
+    const ups = calls.filter((c) => c.url.pathname.endsWith("uploadBlob"));
+    expect(ups).toHaveLength(2);
+    expect(ups[0].init.headers["Content-Type"]).toBe("image/png");
+    const rec = calls.find((c) => c.url.pathname.endsWith("createRecord"))!.body.record;
+    expect(rec.embed.$type).toBe("app.bsky.embed.images");
+    expect(rec.embed.images[0]).toMatchObject({ alt: "", aspectRatio: { width: 1, height: 1 }, image: { ref: { $link: "bafyimg" } } });
+    const big = await blueskyImage(await sharp({ create: { width: 2600, height: 1800, channels: 3, noise: { type: "gaussian", mean: 128, sigma: 60 } } }).png({ compressionLevel: 0 }).toBuffer());
+    expect(big.bytes.length).toBeLessThanOrEqual(1_000_000);
+    expect(big).toMatchObject({ type: "image/jpeg", width: 2000, height: 1385 });
+  });
+  it("sends a video through video.bsky.app with a service token from the PDS and waits for processing", async () => {
+    let polls = 0;
+    const calls = bsky({ "app.bsky.video.getJobStatus": () => (++polls < 2 ? { jobStatus: { jobId: "job1", state: "JOB_STATE_ENCODING", progress: 50 } } : { jobStatus: { jobId: "job1", state: "JOB_STATE_COMPLETED", blob: { $type: "blob", ref: { $link: "bafyvid" }, mimeType: "video/mp4", size: 3 } } }) });
+    netDeps.mediaHttp = async () => new Response(new Uint8Array([1, 2, 3]));
+    netDeps.sleep = async () => {};
+    const p = await netPublish("bluesky", did, "tok", "Job walkthrough", ["https://constructhub.us/api/files/walk.mp4"], { blueskyHandle: "@roofer.bsky.social" });
+    expect(p.url).toBe("https://bsky.app/profile/roofer.bsky.social/post/3kabc");
+    const auth = calls.find((c) => c.url.pathname.endsWith("getServiceAuth"))!;
+    expect(auth.url.searchParams.get("aud")).toBe("did:web:pds.example.com");
+    expect(auth.url.searchParams.get("lxm")).toBe("com.atproto.repo.uploadBlob");
+    const up = calls.find((c) => c.url.pathname.endsWith("uploadVideo"))!;
+    expect(up.url.origin).toBe("https://video.bsky.app");
+    expect(up.url.searchParams.get("did")).toBe(did);
+    expect(up.init.headers.Authorization).toBe("Bearer svc-token");
+    expect(polls).toBe(2);
+    expect(calls.find((c) => c.url.pathname.endsWith("createRecord"))!.body.record.embed).toEqual({ $type: "app.bsky.embed.video", video: { $type: "blob", ref: { $link: "bafyvid" }, mimeType: "video/mp4", size: 3 } });
+  });
+  it("an expired or revoked session asks to reconnect; rate limits ask to retry; deleting removes the record", async () => {
+    bsky({ "com.atproto.repo.createRecord": () => ok({ error: "ExpiredToken", message: "Token has expired" }, 400) });
+    await expect(netPublish("bluesky", did, "tok", "x", [], {})).rejects.toMatchObject({ reconnect: true });
+    bsky({ "com.atproto.repo.createRecord": () => ok({ error: "RateLimitExceeded" }, 429) });
+    await expect(netPublish("bluesky", did, "tok", "x", [], {})).rejects.toMatchObject({ status: 429 });
+    const calls = bsky();
+    await blueskyDelete(did, "tok", `at://${did}/app.bsky.feed.post/3kabc`);
+    expect(calls.find((c) => c.url.pathname.endsWith("deleteRecord"))!.body).toEqual({ repo: did, collection: "app.bsky.feed.post", rkey: "3kabc" });
+    await expect(blueskyDelete(did, "tok", "nonsense")).rejects.toThrow(/isn't a Bluesky post/);
+  });
 });

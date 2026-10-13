@@ -15,7 +15,7 @@ import {
 } from "../../shared/social";
 import { encryptKey, SocialError, socialMisconfigured } from "./client";
 import { CONNECTABLE, OUTSTAND_MARK, OutstandClient, outstandConfigured, tenantFor, type Connectable } from "./outstand";
-import { NATIVE_MARK, NativeClient, nativeNetworks, newOAuthState, oauthStateMatches, metaAuthUrl, metaPagesFromCode, savePending, nativePendingList, nativeFinalize as nativeSave, removeNativeAccounts, NETWORK_API, nativeNetConnect, type PendingOAuth } from "./native";
+import { NATIVE_MARK, NativeClient, nativeNetworks, newOAuthState, oauthStateMatches, metaAuthUrl, metaPagesFromCode, savePending, nativePendingList, nativeFinalize as nativeSave, removeNativeAccounts, NETWORK_API, nativeNetConnect, nativeBlueskyConnect, type PendingOAuth } from "./native";
 import { netAuthUrl, type NetApi } from "./native-nets";
 import {
   clientFactory, connectionProvider, LEGACY_CONNECTION, userLock, ownedBusiness, connection, validateDestinations, destinationFromPayload, destinationKey, requestFingerprint, insertPosts, createPosts,
@@ -172,6 +172,29 @@ export async function nativeNetCallback(req: any, userId: number, api: NetApi): 
     console.warn(`[social] native ${api} sign-in failed:`, (e as Error)?.message);
     return back("connect_error=failed");
   }
+}
+
+/**
+ * Bluesky: there is no sign-in page, so the handle and app password open the session here. The business's connection
+ * becomes our own tenant (as nativeConnectUrl does), the account is stored, and the refreshed account list comes back
+ * with the connected name. The password is sent to Bluesky once and not kept.
+ */
+export async function nativeBlueskyLogin(userId: number, businessId: number | null, handle: string, appPassword: string, req: any): Promise<{ accounts: { id: string; platform: string; name: string }[]; name: string }> {
+  if (!nativeNetworks().includes("bluesky")) throw new SocialError("That network can't be connected here yet");
+  const name = await userLock(userId, async () => {
+    await ownedBusiness(userId, businessId);
+    const { rows: [r] } = await pool.query("SELECT key_enc FROM social_connections WHERE user_id=$1 AND business_id IS NOT DISTINCT FROM $2", [userId, businessId]);
+    if (connectionProvider(r?.key_enc, userId) !== "native") {
+      await pool.query(
+        `INSERT INTO social_connections(user_id,key_enc,accounts,business_id) VALUES($1,$2,'[]',$3) ON CONFLICT(user_id,business_id) DO UPDATE SET key_enc=$2,accounts='[]',updated_at=now()`,
+        [userId, encryptKey(NATIVE_MARK + tenantFor(userId, businessId), userId), businessId]);
+      await logActivity(req, userId, "social.connected", { provider: "native" });
+    }
+    const s = await nativeBlueskyConnect(tenantFor(userId, businessId), handle, appPassword);
+    await logActivity(req, userId, "social.pages_connected", { provider: "native", network: "bluesky" });
+    return s.name;
+  });
+  return { ...(await nativeRefresh(userId, businessId)), name };
 }
 
 /** The connected accounts as stored now (kept boards are carried over). */

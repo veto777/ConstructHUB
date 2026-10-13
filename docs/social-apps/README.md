@@ -7,6 +7,7 @@ Kits in this folder:
 | `meta.md` | Facebook Pages + Instagram | Business app, Facebook Login for Business, App Review for Advanced Access | **Business Verification** + data-deletion callback |
 | `linkedin.md` | LinkedIn Pages (+ member profiles) | Community Management API, Development → Standard tier | **One shot per app**; new app with no other product; Page-verified app; business email |
 | `tiktok.md` | TikTok | Login Kit + Content Posting API (Direct Post), app review → Direct Post audit | **Strict posting-screen UX**; private-only until audited |
+| `bluesky.md` | Bluesky (ConstructHUB Direct) | AT Protocol, app password; no registration, no review | `SOCIAL_BLUESKY=on`; 300 graphemes; 4 photos or 1 video; facets for links/tags/mentions |
 | `~/ConstructHUB-release/docs/youtube/AUDIT-PACK.md` (tower1) | YouTube | YouTube API audit + Google OAuth verification | Draft is written and ready but **not submitted**; customer use case B is on branch `youtube-customers`, not deployed |
 
 Nothing in this folder has been sent to any platform. When these kits were written the native
