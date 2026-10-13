@@ -1,0 +1,25 @@
+{
+  "helpKey": "click-guard.one-device-many-ips",
+  "durationSec": 70,
+  "video": {
+    "key": "tutorials/click-guard.one-device-many-ips.94db528a.mp4",
+    "bytes": 7043993,
+    "sha256": "94db528a9121adae015d4a7b7a766bddc3880916c487f61917a73ddcc31da252"
+  },
+  "captions": {
+    "key": "tutorials/click-guard.one-device-many-ips.c8a269c5.vtt",
+    "bytes": 1466,
+    "sha256": "c8a269c5a203f09a42b5ac61bcd5ca22168a7947a9ad6f4991ea24bfedc4eb21"
+  },
+  "poster": {
+    "key": "tutorials/click-guard.one-device-many-ips.fc752dd1.jpg",
+    "bytes": 74141,
+    "sha256": "fc752dd130610961a1a6e5c6099e6e5091aceae1417e204fbc55eedb2c0c9e89"
+  },
+  "uploaded": {
+    "at": "2026-10-13T20:41:47.722Z",
+    "video": "367ef45d2e6dac0130e32a579ed84b43",
+    "captions": "cfd38cd8d3be3865a2bf94df6c9d6c01",
+    "poster": "827571c66b4810d8e5470ae2b326c6f0"
+  }
+}

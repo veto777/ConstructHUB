@@ -3,6 +3,9 @@
 export { default as v_brand_tour_crm } from "./brand-tour-crm.json";
 export { default as v_brand_what_is_constructhub } from "./brand-what-is-constructhub.json";
 export { default as v_brand_why_constructhub } from "./brand-why-constructhub.json";
+export { default as v_click_guard_flags_with_a_reason } from "./click-guard.flags-with-a-reason.json";
+export { default as v_click_guard } from "./click-guard.json";
+export { default as v_click_guard_one_device_many_ips } from "./click-guard.one-device-many-ips.json";
 export { default as v_crm_api_keys } from "./crm-api-keys.json";
 export { default as v_crm_billing } from "./crm-billing.json";
 export { default as v_crm_brand_color } from "./crm-brand-color.json";
