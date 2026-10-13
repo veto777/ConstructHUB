@@ -6,8 +6,8 @@ import { plansWhere } from "../plan-copy";
  * Cloudflare — half of the "Cloudflare + Search Console" module.
  *
  * Every claim below is backed by the code in `sources`:
- *   - connect: Global API key exchanged for a created token (Zone Read, Analytics Read, Zone WAF Edit) on chosen
- *     zones, key never stored; or paste a scoped token: server/cloudflare/routes.ts (/key-discovery, /exchange,
+ *   - connect: Cloudflare's own OAuth sign-in (server/cloudflare/oauth.ts, /connect, /oauth/callback); fallbacks: Global
+ *     API key exchanged for a created token on chosen zones, or paste a scoped token: server/cloudflare/routes.ts (/key-discovery, /exchange,
  *     /token), server/cloudflare/service.ts exchangeKey, server/cloudflare/client.ts ZONE_PERMISSIONS
  *   - zone discovery, linked to locations by website: server/cloudflare/service.ts discoverZones, common.ts mapLocations
  *   - analytics (last day: requests, uniques, page views, threats by day and country; latest 100 firewall events;
@@ -35,7 +35,7 @@ export const WEBSITE_TOOLS_COMPARE: FeatureCompare = {
     { name: "AgencyAnalytics", plan: "Core", price: { kind: "monthly", cents: 2000, billed: "annually" }, per: "per client", note: "Search Console reporting only", source: "https://agencyanalytics.com/pricing" },
   ],
   onlyUs: [
-    "Cloudflare rule packs, the ads door included — every one previewed, confirmed and undoable; your Global API key is used once and never stored.",
+    "Cloudflare rule packs, the ads door included — every one previewed, confirmed and undoable; you connect with one Cloudflare sign-in, no keys to copy.",
     "Click Guard's flagged IPs become a Cloudflare block rule.",
     "DNS edits at Porkbun or Name.com with a preview, an email-safety check, verification and rollback.",
     "URL inspection beside Site Scan, and provider alert emails sorted by severity and matched to the client.",
@@ -59,7 +59,7 @@ const page: FeaturePage = {
   steps: [
     {
       title: "Connect Cloudflare",
-      body: "Use a Cloudflare login email and Global API key once to create a limited key for the zones you pick, or paste a scoped API token instead.",
+      body: "Choose Connect with Cloudflare, sign in at Cloudflare, tick the account with your websites and choose Authorize. Prefer a key? A Global API key or a scoped token still works.",
     },
     {
       title: "Sync your zones",
@@ -77,8 +77,8 @@ const page: FeaturePage = {
   cards: [
     {
       icon: "key",
-      title: "A limited key, not your login",
-      body: "The key it creates has Zone Read, Analytics Read and Zone WAF Edit on the zones you chose. The Global API key is used for that one request and never stored.",
+      title: "Your sign-in, your call",
+      body: "ConstructHUB never sees your Cloudflare password. You grant it access to the accounts you choose on Cloudflare's own consent page, and you can revoke that access any time in Cloudflare under Manage OAuth authorizations.",
     },
     {
       icon: "chart",
@@ -145,7 +145,7 @@ const page: FeaturePage = {
   faqs: [
     {
       q: "What do I need to connect it?",
-      a: "A Cloudflare account with the website's zone on it, and either your Global API key to create a limited key or a scoped API token you make yourself. Bot scores and rate limiting depend on your Cloudflare plan.",
+      a: "A Cloudflare account with the website's zone on it. Sign in with it when ConstructHUB asks and authorize the account; a Global API key or a scoped token works too. Bot scores and rate limiting depend on your Cloudflare plan.",
     },
     {
       q: "Which plan includes it?",
