@@ -6,7 +6,7 @@ import { Ticket, Gift,
   HardHat, Globe, ShieldAlert, ExternalLink, ShieldCheck, BadgeCheck,
   Settings, Skull, Megaphone, TrendingUp, Fingerprint, ShieldOff, Star, PlusCircle,
   Layers, Wrench, BookOpen, Rocket, FolderOpen, Users, PhoneCall,
-  KanbanSquare, ArrowRight, Bell, Lock, Phone, LayoutGrid, Store, KeyRound, Code2, Bug, PlayCircle, PenLine,
+  KanbanSquare, ArrowRight, Bell, Lock, Phone, LayoutGrid, Store, KeyRound, Code2, Bug, Link2, PlayCircle, PenLine,
 } from "lucide-react";
 import { PLANS, planForModule, type ModuleKey } from "@shared/plans";
 import { lockedLanding, toolAccess, type ToolAccessContext } from "@/lib/tool-access";
@@ -678,6 +678,17 @@ export function AppSidebar({ sheet = false }: { sheet?: boolean } = {}) {
                     <Link href="/admin/code-api" data-testid="link-nav-admin-code-api" className="flex items-center gap-2 w-full">
                       <Code2 className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-primary" />
                       <span>Code API</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {/* Backlinks database (prototype): link sources found, vetted and pitched automatically. */}
+              {user?.isPlatformAdmin === true && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild data-active={location === "/admin/backlinks"}>
+                    <Link href="/admin/backlinks" data-testid="link-nav-admin-backlinks" className="flex items-center gap-2 w-full">
+                      <Link2 className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-primary" />
+                      <span>Backlinks</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
