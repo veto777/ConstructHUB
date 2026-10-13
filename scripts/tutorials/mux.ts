@@ -33,6 +33,16 @@ import { helpEntry } from "../../shared/help/registry";
 
 const FPS = 30;
 const FF = ["-hide_banner", "-loglevel", "error", "-y", "-threads", "4"];
+/**
+ * The CHUB signature on every video (owner, 2026-10-13: "add that bell we chose for the social media as a
+ * signature sound"): the damped tubular bell, E4 then C4, the owner picked for the gator shorts on 2026-10-08
+ * (synthesised by scripts/gator/tubular.py, +4 dB high shelf, -4 dB at 250 Hz; the same file the shorts lay on
+ * their end tag). 2.4 s, 48 kHz stereo, -3 dBFS peak. It plays from the first frame of the end card, where the
+ * narration track is silent, at CHIME_GAIN of the speech peak - a signature, not a jolt - and goes through the
+ * same two-pass loudness as the speech.
+ */
+const CHIME = path.join(import.meta.dirname, "assets", "chub-chime.wav");
+const CHIME_GAIN = 0.7;
 export const LOUDNESS = { I: -14, TP: -1, LRA: 11 };
 
 const clock = (ms: number, sep: "." | ",") => {
@@ -176,6 +186,14 @@ async function main() {
   // 2 ── One narration track: every clip at its step's time (silent under the two cards).
   const rate = narration.sampleRate;
   const samples = layNarration(narration.clips.map((clip) => ({ pcm: decodeWav(fs.readFileSync(at(clip.file))), startMs: out(timings.steps[clip.index].narrationStartMs), name: clip.file })), totalMs, rate);
+  // 2b ── The signature bell at the end card (silent under it otherwise): mono at the narration rate, then added.
+  await run("ffmpeg", [...FF, "-i", CHIME, "-ac", "1", "-ar", String(rate), at("_chime.wav")], { nice: true });
+  const chime = decodeWav(fs.readFileSync(at("_chime.wav")));
+  const chimeAt = Math.round(((totalMs - endCardMs) / 1000) * rate);
+  for (let i = 0; i < chime.samples.length && chimeAt + i < samples.length; i++) {
+    samples[chimeAt + i] = Math.max(-32768, Math.min(32767, samples[chimeAt + i] + Math.round(chime.samples[i] * CHIME_GAIN)));
+  }
+  fs.rmSync(at("_chime.wav"));
   fs.writeFileSync(at("narration.wav"), encodeWav({ sampleRate: rate, samples }));
 
   // 3 ── Loudness, pass 1: measure, so pass 2 (in the encode) can hit −14 LUFS without pumping.
