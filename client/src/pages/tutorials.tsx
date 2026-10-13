@@ -48,7 +48,10 @@ function FeatureCard({ entry, open, onToggle }: { entry: HelpEntry; open: boolea
     <li id={`help-${entry.key}`} className="g-card scroll-mt-20" data-testid={`tutorial-card-${entry.key}`}>
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0 flex-1 basis-64">
-          <h3 className="g-card__title g-card__title--md" data-testid={`tutorial-title-${entry.key}`}>{entry.title}</h3>
+          {/* The title is the link, in the page's blue (owner, 2026-10-13: "too bland"). */}
+          <h3 className="g-card__title g-card__title--md" data-testid={`tutorial-title-${entry.key}`}>
+            <a href={openHref(entry)} className="font-medium hover:underline" style={{ color: "var(--g-blue)" }}>{entry.title}</a>
+          </h3>
           <p className="g-card__line">{helpSummary(entry)}</p>
           <p className="mt-2">
             {entry.video ? (
