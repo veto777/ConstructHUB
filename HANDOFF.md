@@ -1448,8 +1448,7 @@ Production (vb11 ~/ConstructHUB-live) was built from commit 9b81dfff on `social/
 with `DEPLOY_ALLOW_UNSAFE=1` run from the worktree ~/ConstructHUB-bluesky. Why: the owner ordered the launch
 ("lets launch bluesky", "do everything yourself") and the session doing it does not merge into main itself. The
 branch is committed, pushed, type-checks and passes the social tests (the two suites failing are the same ones
-failing on main: agency.test.ts, social.test.ts). **Merge the PR for `social/bluesky-direct` before the next
-deploy from main**, or that deploy will remove Bluesky again. Env added to vb11 .env: `SOCIAL_BLUESKY=on`,
+failing on main: agency.test.ts, social.test.ts). Merged into main as 47d9d432 on 2026-10-13 (owner: "merge everything yourself"); production redeployed from main. Env added to vb11 .env: `SOCIAL_BLUESKY=on`,
 `SOCIAL_NATIVE_PUBLIC_NETWORKS=bluesky` (backup: .env.bak-bluesky-*). Kit: docs/social-apps/bluesky.md.
 
 ## 2026-10-13 — Pinterest Direct deployed dark from `social/pinterest-direct` (DEPLOY_ALLOW_UNSAFE=1)
@@ -1457,5 +1456,4 @@ deploy from main**, or that deploy will remove Bluesky again. Env added to vb11 
 Production was rebuilt from `social/pinterest-direct` (which contains `social/bluesky-direct`). Pinterest stays
 invisible until vb11 `~/ConstructHUB-live/.env` gets `SOCIAL_PINTEREST_APP_ID` / `SOCIAL_PINTEREST_APP_SECRET`
 from the owner's Pinterest developer app (docs/social-apps/pinterest.md §1) and the service restarts. Keep it
-out of `SOCIAL_NATIVE_PUBLIC_NETWORKS` until Pinterest grants Standard access. **Merge both branch PRs before the
-next deploy from main.**
+out of `SOCIAL_NATIVE_PUBLIC_NETWORKS` until Pinterest grants Standard access. Both branches were merged into main (47d9d432) on 2026-10-13 and production redeployed from main.
