@@ -12,6 +12,7 @@ import { MARKETING_ROUTES, canonicalPath } from "@shared/seo";
 import { isKnownPath, marketingRouteForCase } from "@shared/app-routes";
 import { withRouteMeta, withSeoHead } from "./seo-html";
 import { withGoogleTag } from "./google-tag";
+import { withMetaPixel } from "./meta-pixel";
 import { registerAdsLanding, ADS_LANDING_PATHS } from "./ads-landing";
 import { registerAdsLandingRecording } from "./ads-landing-recording";
 
@@ -134,10 +135,10 @@ export function serveStatic(app: Express, distPath = path.resolve(__dirname, "pu
   // signed in — crawler or person alike, never by user agent) and the build's
   // lastmod dates; the build date stands in for a page without one.
   const prerendered = loadPrerenderedPages(distPath, indexHtml);
-  // The Google tag (Ads conversions / GA4) rides on the marketing hosts' pages
-  // only — never the CRM app or the client portal, which keep `indexHtml`.
-  for (const [route, html] of prerendered) prerendered.set(route, withGoogleTag(html));
-  const marketingHtml = withGoogleTag(indexHtml);
+  // The Google tag (Ads conversions / GA4) and the Meta pixel (server/meta-pixel.ts) ride on the marketing hosts'
+  // pages only — never the CRM app or the client portal, which keep `indexHtml`.
+  for (const [route, html] of prerendered) prerendered.set(route, withMetaPixel(withGoogleTag(html)));
+  const marketingHtml = withMetaPixel(withGoogleTag(indexHtml));
   const builtOn = fs.statSync(path.resolve(distPath, "index.html")).mtime.toISOString().slice(0, 10);
   const sitemapXml = buildSitemap(readLastmod(path.resolve(distPath, "..")), builtOn);
 

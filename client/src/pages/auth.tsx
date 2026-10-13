@@ -126,7 +126,7 @@ export default function AuthPage() {
       });
       const data = await res.json();
       setMessage(data.message);
-      trackConversion("signup");
+      trackConversion("signup", {}, { eventId: typeof data.metaEventId === "string" ? data.metaEventId : undefined });
       toast({ title: "Account created!", description: "Check your email for a verification link." });
     } catch (err: any) {
       toast({ title: "Signup failed", description: apiErrorMessage(err, "Signup failed"), variant: "destructive" });

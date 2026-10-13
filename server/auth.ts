@@ -28,6 +28,7 @@ import { resolveGoogleUrl } from "./google-url-resolver";
 import { GOOGLE_REVIEW_LINK_MESSAGE, googleReviewLink } from "./route-guards";
 import { isPlatformAdmin } from "./admin";
 import { siteBaseUrl, oauthBaseUrl } from "./site-context";
+import { reportMetaSignup, requestIp } from "./meta-pixel";
 import { recordSignupAttribution } from "./analytics-attribution";
 
 export { safeNextPath } from "./app-shell";
@@ -219,6 +220,8 @@ export async function setupAuth(app: Express) {
             .catch((err: any) => console.error("Failed to send welcome email:", err?.message || err));
           // First-touch campaign of this browser, if it accepted analytics (never blocks the login).
           void recordSignupAttribution(newUser.id, req.headers?.cookie);
+          // Meta ads are judged by accounts, not form fills (server/meta-pixel.ts; never blocks the login).
+          void reportMetaSignup({ email: newUser.email, ip: requestIp(req), userAgent: req.headers?.["user-agent"], cookie: req.headers?.cookie, sourceUrl: "https://constructhub.us/auth?mode=signup" });
           // The referral program: a ?ref link this browser followed (server/referrals), new accounts only.
           void import("./referrals/service").then((m) => m.attachReferral(newUser.id, newUser.email, req.headers?.cookie));
 
@@ -464,6 +467,10 @@ export async function setupAuth(app: Express) {
 
       // First-touch campaign of this browser, if it accepted analytics (never blocks the sign-up).
       void recordSignupAttribution(newUser.id, req.headers.cookie);
+      // Meta ads are judged by accounts, not form fills (server/meta-pixel.ts): the browser reports the same event
+      // under this id, and Meta counts it once. Never blocks the sign-up.
+      const metaEventId = randomBytes(16).toString("hex");
+      void reportMetaSignup({ email: newUser.email, ip: requestIp(req), userAgent: req.headers["user-agent"], cookie: req.headers.cookie, sourceUrl: "https://constructhub.us/auth?mode=signup", eventId: metaEventId });
       // The referral program: a ?ref link this browser followed (server/referrals), new accounts only.
       void import("./referrals/service").then((m) => m.attachReferral(newUser.id, newUser.email, req.headers.cookie));
 
@@ -474,7 +481,7 @@ export async function setupAuth(app: Express) {
         console.error("Failed to send verification email:", emailErr);
       }
 
-      res.json({ message: "Account created! Check your email to verify your account.", userId: newUser.id });
+      res.json({ message: "Account created! Check your email to verify your account.", userId: newUser.id, metaEventId });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
