@@ -55,7 +55,7 @@ function FeatureCard({ entry, open, onToggle }: { entry: HelpEntry; open: boolea
               <button type="button" className="g-chip g-chip--sm !normal-case cursor-pointer" aria-expanded={watching}
                 aria-controls={`tutorial-video-slot-${entry.key}`} onClick={() => setWatching((w) => !w)}
                 data-testid={`tutorial-video-badge-${entry.key}`}>
-                <PlayCircle className="mr-1 h-3.5 w-3.5" aria-hidden="true" />{watching ? "Hide video" : "Watch"} · {formatDuration(entry.video.durationSec)}
+                <PlayCircle className="mr-1 h-3.5 w-3.5" aria-hidden="true" />{watching ? "Hide tutorial" : "Watch tutorial"} · {formatDuration(entry.video.durationSec)}
                 <ChevronDown className={`ml-1 h-3.5 w-3.5 transition-transform ${watching ? "rotate-180" : ""}`} aria-hidden="true" />
                 <span className="sr-only"> {entry.title}</span>
               </button>
