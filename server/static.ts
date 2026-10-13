@@ -190,10 +190,12 @@ export function serveStatic(app: Express, distPath = path.resolve(__dirname, "pu
   app.use(`/${PRERENDER_DIR}`, (_req, res) => { res.status(404).type("text/plain").send("Not found"); });
 
   const assetsDir = path.join(distPath, HASHED_ASSETS_PREFIX);
+  // Self-hosted fonts (client/public/fonts): a family is replaced by renaming its file, so they cache like hashed assets.
+  const fontsDir = path.join(distPath, "fonts");
   app.use(express.static(distPath, {
     index: false,
     setHeaders: (res, filePath) => {
-      if (filePath.startsWith(assetsDir)) res.setHeader("Cache-Control", IMMUTABLE_CACHE);
+      if (filePath.startsWith(assetsDir) || filePath.startsWith(fontsDir)) res.setHeader("Cache-Control", IMMUTABLE_CACHE);
       else if (filePath.endsWith(".html")) res.setHeader("Cache-Control", HTML_CACHE);
     },
   }));

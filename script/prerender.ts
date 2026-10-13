@@ -158,7 +158,8 @@ export async function prerenderMarketingPages(opts: {
   // The page's own CSS rides inline (2026-10-13): a phone on a slow connection paints a prerendered page as
   // soon as the HTML lands instead of after another round trip for the 295 KB stylesheet. Beasties keeps the
   // rules the page's markup uses and turns the stylesheet link into a deferred one (the full sheet still loads
-  // for everything React adds later). Fonts stay out; the sheet on disk is left whole.
+  // for everything React adds later). The fonts are defined in index.html itself (see there), so they stay out;
+  // the sheet on disk is left whole.
   const critical = new Beasties({ path: publicDir, publicPath: "/", preload: "media", pruneSource: false, inlineFonts: false, reduceInlineStyles: false, logLevel: "warn" });
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   let browser: Browser | null = null;
