@@ -1,13 +1,7 @@
 import { pool } from "../db";
 import { decryptToken, encryptToken } from "../gbp/token-crypto";
 import { SearchConsoleClient, GSC_SCOPE } from "./client";
-import {
-  ProviderError,
-  domain,
-  queue,
-  mapLocations,
-  withinProperty,
-} from "../cloudflare/common";
+import { ProviderError, domain, queue, mapLocations, withinProperty } from "../cloudflare/common";
 import { takeBudget } from "../growth-limits";
 export async function gscToken(c: any, http: typeof fetch = fetch) {
   if (c.token && new Date(c.expires_at).getTime() > Date.now() + 60000)
@@ -109,10 +103,12 @@ export async function discoverProperties(c: any, http: typeof fetch = fetch) {
   const { rows } = await pool.query(
     `INSERT INTO edge_assets(user_id,connection_id,provider,external_id,name,domain,status)
     SELECT $1,$2,'gsc',external_id,name,domain,status FROM jsonb_to_recordset($3::jsonb) AS r(external_id text,name text,domain text,status text)
-    ON CONFLICT(connection_id,external_id) DO UPDATE SET status=EXCLUDED.status RETURNING id,external_id`,
+    ON CONFLICT(connection_id,external_id) DO UPDATE SET status=EXCLUDED.status RETURNING id,external_id,(xmax=0) AS inserted`,
     [c.user_id, c.id, JSON.stringify(records)],
   );
   for (const a of rows) await mapLocations(c.user_id, a.id, a.external_id);
+  // A property seen for the first time is synced right away, which also submits its sitemap when Google has none.
+  for (const a of rows) if (a.inserted) await queue(c.user_id, c.id, a.id, "sync");
   await pool.query(
     `UPDATE edge_assets SET status='access_removed' WHERE connection_id=$1 AND user_id=$2 AND NOT(external_id=ANY($3::text[]))`,
     [c.id, c.user_id, sites.map((s: any) => s.siteUrl)],
@@ -131,9 +127,16 @@ export async function syncProperty(
   p: any,
   http: typeof fetch = fetch,
 ) {
-  const data = await gscFor(c, http).call(
+  const client = gscFor(c, http);
+  let data = await client.call(
     `/sites/${encodeURIComponent(a.external_id)}/sitemaps`,
   );
+  // Google lists no sitemap for this property (owner, 2026-10-13: every site should have one submitted): if the
+  // site serves /sitemap.xml, submit it now rather than waiting for someone to press the button.
+  if (!(data.sitemap ?? []).length && ["siteOwner", "siteFullUser"].includes(a.status)) {
+    const submitted = await submitSiteSitemap(a.external_id, client, http);
+    if (submitted) data = await client.call(`/sites/${encodeURIComponent(a.external_id)}/sitemaps`);
+  }
   await pool.query(
     "UPDATE edge_assets SET data=$1,synced_at=now(),error=NULL WHERE id=$2 AND user_id=$3",
     [
@@ -289,4 +292,36 @@ export async function locationSearchClicks(user: number, location: number) {
     [user, location],
   );
   return r ?? null;
+}
+
+/** The site's own sitemap address for a property: https://<domain>/sitemap.xml for a domain property, <prefix>sitemap.xml otherwise. */
+export function defaultSitemapUrl(siteUrl: string): string | null {
+  try {
+    if (siteUrl.startsWith("sc-domain:")) return `https://${siteUrl.slice(10)}/sitemap.xml`;
+    const u = new URL(siteUrl);
+    if (!["https:", "http:"].includes(u.protocol)) return null;
+    return new URL("sitemap.xml", u.href.endsWith("/") ? u.href : u.href + "/").href;
+  } catch {
+    return null;
+  }
+}
+
+/** Submits the site's /sitemap.xml to Search Console when the site answers it with XML; false when there is nothing to submit. */
+export async function submitSiteSitemap(siteUrl: string, client: { call: (path: string, method?: string) => Promise<any> }, http: typeof fetch = fetch): Promise<boolean> {
+  const url = defaultSitemapUrl(siteUrl);
+  if (!url) return false;
+  try {
+    const r = await http(url, { method: "GET", redirect: "follow", signal: AbortSignal.timeout(15000), headers: { Accept: "application/xml,text/xml" } });
+    if (!r.ok) return false;
+    const head = (await r.text()).slice(0, 4000);
+    if (!/<(urlset|sitemapindex)\b/i.test(head)) return false;
+  } catch {
+    return false;
+  }
+  try {
+    await client.call(`/sites/${encodeURIComponent(siteUrl)}/sitemaps/${encodeURIComponent(url)}`, "PUT");
+    return true;
+  } catch {
+    return false;
+  }
 }

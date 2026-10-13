@@ -180,6 +180,14 @@ export const guides: Record<string, Guide> = {
     "Inspect the page robots directives.",
     "Remove page-wide nofollow only when the linked destinations should be followed.",
   ),
+  "no-sitemap": guide(
+    "High",
+    "Without a sitemap, search engines learn about pages only by following links, so new, deep or poorly linked pages are found late or never; a sitemap also carries last-modified dates that prompt recrawls.",
+    "crawling-indexing/sitemaps/build-sitemap",
+    "Download the sitemap ConstructHUB generated from this scan (or turn on your CMS's sitemap) and publish it at /sitemap.xml.",
+    "Add a \"Sitemap: https://your-site/sitemap.xml\" line to robots.txt.",
+    "Submit the sitemap in Search Console; with Search Console connected in ConstructHUB this happens on the next sync.",
+  ),
   sitemap: guide(
     "Low",
     "Sitemaps aid discovery but are optional and do not guarantee indexing.",

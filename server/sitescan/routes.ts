@@ -1,3 +1,4 @@
+import { generatedSitemap } from "./audit";
 import type { Express } from "express";
 import { z } from "zod";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
@@ -628,6 +629,18 @@ export function registerSiteScanRoutes(
     res.json({ ok: true });
   });
   // Branded PDF export (pdfkit stream) using sitescan_branding. "Export PDF" — site-scan.tsx.
+  // The sitemap generated from a finished scan (audit.ts generatedSitemap). "Download sitemap.xml" — site-scan.tsx.
+  owner("get", "/api/sitescan/jobs/:id/sitemap.xml", async (req, res, user) => {
+    const j = await getJob(req, res, user);
+    if (!j) return;
+    if (!j.report || !j.state?.pages?.length)
+      return res.status(409).json({ message: "Wait for the report." });
+    res
+      .type("application/xml")
+      .setHeader("Content-Disposition", 'attachment; filename="sitemap.xml"')
+      .setHeader("Cache-Control", "no-store")
+      .send(generatedSitemap(j.state, new Date(j.completed_at ?? j.created_at ?? Date.now())));
+  });
   owner("get", "/api/sitescan/jobs/:id/pdf", async (req, res, user) => {
     const j = await getJob(req, res, user);
     if (!j) return;

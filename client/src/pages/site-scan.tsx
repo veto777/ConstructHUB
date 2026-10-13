@@ -1047,6 +1047,8 @@ export default function SiteScanPage() {
                         label={busy ? "Working…" : "Generate AI fix plan"}
                       />
                       <GooglePill icon={Download} href={`/api/sitescan/jobs/${selected}/pdf`} label="Export PDF" />
+                      {/* Built from the crawl: the fix for "No XML sitemap found", and a cleaner one for sites whose sitemap is stale. */}
+                      <GooglePill icon={Download} href={`/api/sitescan/jobs/${selected}/sitemap.xml`} label="Download sitemap.xml" testId="button-download-sitemap" />
                       <GooglePill
                         label={job.shareEnabled ? "Replace share link" : "Create share link"}
                         disabled={busy}

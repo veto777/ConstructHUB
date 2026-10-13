@@ -675,15 +675,28 @@ export function findingsFor(state: CrawlState, profile: any = null): Finding[] {
     "Links on these pages discourage crawler discovery.",
     "Review whether nofollow is intentional.",
   );
-  add(
-    "sitemap",
-    "technical",
-    "warning",
-    "Pages absent from discovered sitemaps",
-    urls((p) => !state.sitemap.includes(p.url)),
-    "Sitemaps help discovery but do not guarantee indexing.",
-    "Add indexable canonical pages to an XML sitemap and declare it in robots.txt.",
-  );
+  // No sitemap at all (owner, 2026-10-13: "every site should have a good sitemap"): one critical finding with the
+  // generated sitemap as the fix, instead of every page listed as "absent". With a sitemap, the absent list stands.
+  if (state.sitemap.length === 0 && state.pages.length > 0)
+    add(
+      "no-sitemap",
+      "technical",
+      "critical",
+      "No XML sitemap found",
+      [state.origin + "/sitemap.xml"],
+      "Search engines found no sitemap at /sitemap.xml and robots.txt declares none, so new and deep pages are discovered late or not at all.",
+      "Download the sitemap ConstructHUB generated from this scan, publish it at /sitemap.xml, add \"Sitemap: " + state.origin + "/sitemap.xml\" to robots.txt, then submit it in Search Console.",
+    );
+  else
+    add(
+      "sitemap",
+      "technical",
+      "warning",
+      "Pages absent from discovered sitemaps",
+      urls((p) => !state.sitemap.includes(p.url)),
+      "Sitemaps help discovery but do not guarantee indexing.",
+      "Add indexable canonical pages to an XML sitemap and declare it in robots.txt.",
+    );
   add(
     "robots",
     "technical",
@@ -1022,5 +1035,34 @@ export function scoreExplanation(
                 .join("; ") || "No deductions from available checks."
             } Removing a confirmed finding raises this audit score; it does not predict rankings.`,
     ]),
+  );
+}
+
+/**
+ * The sitemap ConstructHUB offers for a scanned site: every crawled page that answered 200, is not noindex and is
+ * its own canonical (or has none), on the site's origin, de-duplicated and sorted — the home page first. lastmod is
+ * the scan date: the crawl is the last time these pages were known to be as described.
+ */
+export function generatedSitemap(state: Pick<CrawlState, "origin" | "pages">, scannedAt: Date): string {
+  const origin = state.origin;
+  const urls = new Set<string>();
+  for (const page of state.pages) {
+    if (page.status !== 200 || page.noindex) continue;
+    if (page.canonical && page.canonical !== page.url) continue;
+    try {
+      const u = new URL(page.url);
+      if (u.origin !== origin) continue;
+      u.hash = "";
+      urls.add(u.href);
+    } catch {}
+  }
+  const list = [...urls].sort((a, b) => (a === origin + "/" ? -1 : b === origin + "/" ? 1 : a.localeCompare(b))).slice(0, 50000);
+  const lastmod = scannedAt.toISOString().slice(0, 10);
+  const esc = (v: string) => v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+  return (
+    '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+    list.map((u) => `  <url>\n    <loc>${esc(u)}</loc>\n    <lastmod>${lastmod}</lastmod>\n  </url>`).join("\n") +
+    "\n</urlset>\n"
   );
 }
