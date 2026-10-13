@@ -1,0 +1,43 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "locations.several-google-accounts",
+  "title": "Locations → Several Google accounts",
+  "viewport": { "width": 1024, "height": 576 },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    { "action": "goto", "url": "/locations", "caption": "Locations", "chapter": "Connected accounts",
+      "narration": "Your listings can live under more than one Google account. Here is how that shows." },
+    { "action": "scroll-to", "selector": "[data-testid=\"gbp-link-summary\"]", "offset": 260, "caption": "Google connection",
+      "narration": "At the bottom of Locations, Google connection lists every connected account." },
+    { "action": "highlight", "selector": "[data-testid=\"gbp-account\"]", "caption": "Connected",
+      "narration": "This account is connected. View profiles lists the listings it manages." },
+    { "action": "highlight", "selector": "[data-testid=\"gbp-account\"]:has-text(\"Reconnect needed\")", "caption": "Reconnect needed",
+      "narration": "This one needs a reconnect: its access expired. Reconnect signs in to Google again." },
+    { "action": "highlight", "selector": "[data-testid=\"gbp-link-summary\"]", "caption": "The summary line", "chapter": "What each account manages",
+      "narration": "The summary counts listings synced, ready to link, and not in a connected account." },
+    { "action": "highlight", "selector": "a[href=\"/api/gbp/connect\"]:has-text(\"Connect another Google account\")", "caption": "Connect another Google account",
+      "narration": "Connect another Google account adds the next login, through Google's own sign-in." },
+    { "action": "click", "selector": "summary:has-text(\"Sync details\")", "caption": "Sync details", "chapter": "Which account syncs which listing",
+      "narration": "Sync details shows each listing and the account it syncs through." },
+    { "action": "highlight", "selector": "div.border-t:has(strong:has-text(\"Clearpeak Exteriors\"))", "caption": "Via the second account",
+      "narration": "This listing syncs via the second account, with the last success of each part." },
+    { "action": "scroll-to", "selector": "div.border-t:has(strong:has-text(\"Summit Roofing Co.\"))", "offset": 160, "caption": "The roofing company's listing",
+      "narration": "Scroll down to this roofing company's listings." },
+    { "action": "highlight", "selector": "div.border-t:has(strong:has-text(\"Summit Roofing Co.\"))", "caption": "Via its own account",
+      "narration": "They sync via the first account. Each listing names the account that manages it." },
+    { "action": "highlight", "selector": "div.border-t:has(strong:has-text(\"Summit Roofing Co.\")) button:has-text(\"Sync now\")", "caption": "Sync now",
+      "narration": "Sync now refreshes one listing sooner; otherwise each syncs on its schedule." },
+    { "action": "highlight", "selector": "[data-testid=\"tool-rail-locations\"]", "caption": "Menu: Locations",
+      "narration": "You'll find Locations in the Google Business menu on the left." }
+  ],
+  "youtube": {
+    "title": "How to manage listings under several Google accounts | ConstructHUB",
+    "description": "How ConstructHUB handles listings that live under more than one Google account. The Google connection section on Locations lists every connected account with its state, counts what is synced, ready to link or not in a connected account, and Sync details names the account each listing syncs through.",
+    "tags": ["ConstructHUB", "Google Business Profile", "Google accounts", "multi-location", "agency", "GBP management", "contractor marketing", "contractor software"],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": { "headline": "Every Google Account, Listed", "accent": "Every", "kicker": "Google Business", "step": 2 },
+  "hideSelectors": ["div:has(> div.p-4 > a[href=\"/search-console\"])"]
+}

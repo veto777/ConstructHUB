@@ -1,0 +1,37 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "locations.photos-and-videos",
+  "title": "Locations → Photos and videos",
+  "viewport": { "width": 1024, "height": 576 },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    { "action": "goto", "url": "/locations?location=910001&tab=photos", "caption": "Photos & Videos", "chapter": "Photos from the listing",
+      "narration": "Photos & Videos shows the media on this listing, synced from Google." },
+    { "action": "highlight", "selector": "[data-testid=\"tab-photos-business\"]", "caption": "Business photos & videos",
+      "narration": "Business photos and videos are the ones you posted to the listing yourself." },
+    { "action": "highlight", "selector": "[data-testid=\"tab-photos-customer\"]", "caption": "Customer photos & videos",
+      "narration": "Customer photos and videos are the ones customers added, counted on their own." },
+    { "action": "highlight", "selector": "p:has-text(\"Showing\")", "caption": "Synced from Google", "chapter": "Synced from the listing",
+      "narration": "Below, the business photos synced from Google, and when they synced." },
+    { "action": "highlight", "selector": "[data-testid=\"gbp-media-grid\"] a", "caption": "Click one to open it on Google",
+      "narration": "Click a photo to open it on Google." },
+    { "action": "click", "selector": "[data-testid=\"tab-photos-customer\"]", "caption": "Customer photos",
+      "narration": "Choose Customer photos & videos for the ones customers added to the listing." },
+    { "action": "highlight", "selector": "text=No customer photos synced yet", "caption": "None synced yet",
+      "narration": "None synced here yet. Photos sync along with reviews and performance, on the schedule." },
+    { "action": "highlight", "selector": "[data-testid=\"button-posts-photos\"]", "caption": "Posts & Photos", "chapter": "Add new ones",
+      "narration": "To put new ones on the listing, Add or schedule photos in Posts & Photos." },
+    { "action": "highlight", "selector": "[data-testid=\"tool-rail-locations\"]", "caption": "Menu: Locations",
+      "narration": "You'll find Locations in the Google Business menu on the left." }
+  ],
+  "youtube": {
+    "title": "How to see the photos on your Google listing | ConstructHUB",
+    "description": "The Photos & Videos tab of a linked location in ConstructHUB: the photos you posted and the ones customers added, counted separately and synced from the listing along with reviews and performance. Click a photo to open it on Google; new ones go up through Posts & Photos.",
+    "tags": ["ConstructHUB", "Google Business Profile", "GBP photos", "business photos", "customer photos", "contractor marketing", "local SEO", "contractor software"],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": { "headline": "Your Listing's Photos", "accent": "Photos", "kicker": "Google Business", "step": 3 },
+  "hideSelectors": ["div:has(> div.p-4 > a[href=\"/search-console\"])"]
+}

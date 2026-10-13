@@ -1,0 +1,37 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "google-profile",
+  "title": "Google Profile",
+  "viewport": { "width": 1024, "height": 576 },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    { "action": "goto", "url": "/", "caption": "Home", "chapter": "A shortcut in the menu",
+      "narration": "Google Profile is a shortcut in the menu that opens your business's Google profile page." },
+    { "action": "click", "selector": "[data-testid=\"link-nav-group-google-business\"]", "caption": "Open Google Business",
+      "narration": "In the menu on the left, open Google Business." },
+    { "action": "highlight", "selector": "[data-testid=\"link-nav-google-profile\"]", "caption": "Google Profile",
+      "narration": "Google Profile is the first entry." },
+    { "action": "click", "selector": "[data-testid=\"link-nav-google-profile\"]", "caption": "Choose it", "chapter": "Where it lands",
+      "narration": "Choose it. With one location, it opens that location straight away." },
+    { "action": "wait", "caption": "The Locations list", "holdMs": 1200,
+      "narration": "With several, as here, it opens the Locations list to pick from." },
+    { "action": "scroll-to", "selector": "[data-testid=\"agency-location-910001\"]", "offset": 140, "caption": "Scroll to the listing",
+      "narration": "Scroll to the listing you want." },
+    { "action": "click", "selector": "[data-testid=\"button-open-location-910001\"]", "caption": "Open profile", "chapter": "Open the profile",
+      "narration": "Choose Open profile." },
+    { "action": "highlight", "selector": "[data-testid=\"text-detail-name\"]", "caption": "The location page",
+      "narration": "The location opens on its Insights tab, with its other tabs down the side." },
+    { "action": "highlight", "selector": "[data-testid=\"tool-rail-locations\"]", "caption": "Menu: Locations",
+      "narration": "Inside Google Business, the same page is Locations in the menu on the left." }
+  ],
+  "youtube": {
+    "title": "How to open your Google profile in one click | ConstructHUB",
+    "description": "Where the Google Profile shortcut in ConstructHUB takes you. With one location it opens that location's page; with several it opens the Locations list, where Open profile takes you to the listing's Insights, details, services, photos and Profile Guard tabs.",
+    "tags": ["ConstructHUB", "Google Business Profile", "Google profile", "GBP management", "contractor marketing", "local SEO", "contractor software"],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": { "headline": "One Click To Your Profile", "accent": "Profile", "kicker": "Google Business", "step": 2 },
+  "hideSelectors": ["div:has(> div.p-4 > a[href=\"/search-console\"])"]
+}

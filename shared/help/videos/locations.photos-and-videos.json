@@ -1,0 +1,25 @@
+{
+  "helpKey": "locations.photos-and-videos",
+  "durationSec": 48,
+  "video": {
+    "key": "tutorials/locations.photos-and-videos.a46cc17a.mp4",
+    "bytes": 3560872,
+    "sha256": "a46cc17a3ddd2a0427a55f586e0184c90d6c67e83aa0be0f09e0f33577064e82"
+  },
+  "captions": {
+    "key": "tutorials/locations.photos-and-videos.c8a66f8c.vtt",
+    "bytes": 968,
+    "sha256": "c8a66f8c79a4b6009064bd27c03315c2a177cfd0284a507fb9627641ef275ebe"
+  },
+  "poster": {
+    "key": "tutorials/locations.photos-and-videos.aadda12d.jpg",
+    "bytes": 78913,
+    "sha256": "aadda12db7175ed5774f8043df1cebcbcfb3e147ea2be9bc748a01998eb259ac"
+  },
+  "uploaded": {
+    "at": "2026-10-13T21:04:13.830Z",
+    "video": "a73f619e70db24c44d06be1c1fee6769",
+    "captions": "a5c68f256627418cd4e7a0504e371a15",
+    "poster": "1c6b1d08c92019e3503bc1eb7dcd20bf"
+  }
+}
