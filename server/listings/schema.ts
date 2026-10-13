@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS listing_events (
 );
 CREATE INDEX IF NOT EXISTS listing_events_profile ON listing_events(profile_id,id);
 `;
-export async function ensureListingSchema(db: { query: (sql: string) => Promise<unknown> }) {
+export async function ensureListingSchema(db: {
+  query: (sql: string) => Promise<unknown>;
+}) {
   await db.query(LISTINGS_DDL);
 }
