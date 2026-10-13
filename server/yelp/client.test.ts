@@ -23,7 +23,7 @@ describe("Yelp client", () => {
   });
   it("maps a business and a review to our shape", () => {
     expect(mapBusiness({ id: "biz1", name: "RoofElite", rating: 5, review_count: 6, url: "https://yelp.com/biz/x?utm_source=a", image_url: "https://i/x.jpg", display_phone: "(833) 553-5483", location: { display_address: ["1 Main St", "Lutz, FL 33549"] } }))
-      .toEqual({ yelpId: "biz1", name: "RoofElite", rating: 5, reviewCount: 6, url: "https://yelp.com/biz/x", imageUrl: "https://i/x.jpg", phone: "(833) 553-5483", location: "1 Main St, Lutz, FL 33549" });
+      .toEqual({ yelpId: "biz1", name: "RoofElite", rating: 5, reviewCount: 6, url: "https://yelp.com/biz/x", imageUrl: "https://i/x.jpg", phone: "(833) 553-5483", location: "1 Main St, Lutz, FL 33549", categories: [], photos: [], price: null, isOpenNow: null, coordinates: null, distanceMi: null });
     expect(mapReview({ id: "r1", rating: 5, text: "Great", time_created: "2026-07-31 14:10:01", url: "https://yelp.com/biz/x?hrid=r1", user: { name: "Ray T.", image_url: "https://i/u.jpg" } }))
       .toEqual({ id: "r1", rating: 5, text: "Great", timeCreated: "2026-07-31T14:10:01Z", url: "https://yelp.com/biz/x", user: { name: "Ray T.", imageUrl: "https://i/u.jpg" } });
   });

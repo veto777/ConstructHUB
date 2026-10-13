@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { FaYelp } from "react-icons/fa";
 import { inNativeApp } from "@/lib/app-shell";
 import { Ticket, Gift,
   Cloud, Search, Database, Clock, FileText, Building, Camera, LogIn, LogOut,
@@ -130,15 +131,7 @@ function GoogleGIcon({ className }: { className?: string }) {
 }
 
 function YelpIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} fill="#d32323" aria-hidden="true">
-      <path d="M12.9 3.2c.9-.2 1.5.3 1.5 1.2l-.2 6.2c0 .9-.6 1.2-1.3.6L9.3 8.1c-.6-.5-.5-1.1 0-1.7 0 0 2.2-2.8 3.6-3.2z"/>
-      <path d="M20.5 12.8c.7.5.6 1.3-.2 1.6l-3 1.3c-.8.3-1.3-.1-1.1-.9l.8-3.3c.2-.8.9-1 1.5-.5l2 1.8z"/>
-      <path d="M17.6 19.1c.4.7-.1 1.4-.9 1.2l-3.2-.6c-.8-.2-1-.8-.4-1.3l2.4-2.2c.6-.6 1.3-.3 1.5.5l.6 2.4z"/>
-      <path d="M9.4 19.7c-.2.8-1 1-1.6.4l-2.2-2.4c-.5-.6-.3-1.2.6-1.3l3.3-.4c.9-.1 1.2.5.9 1.3l-1 2.4z"/>
-      <path d="M4.3 11.9c-.8-.3-.9-1.1-.1-1.6l5.1-3.5c.7-.5 1.3 0 1.2.8l-.7 5.9c-.1.9-.7 1.1-1.4.6l-4.1-2.2z"/>
-    </svg>
-  );
+  return <FaYelp className={className} style={{ color: "#d32323" }} aria-hidden="true" />;
 }
 function GoogleBusinessIcon({ className }: { className?: string }) {
   return (
