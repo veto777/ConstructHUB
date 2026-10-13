@@ -148,7 +148,8 @@ export function ToolShell({ config, brand, allToolsLabel = "All tools", allTools
     else setDrawer((d) => !d);
   }, [wide, config.key]);
   const toggleGroup = (key: string) => setClosed((c) => { const next = c.includes(key) ? c.filter((k) => k !== key) : [...c, key]; write(`tool.${config.key}.groups`, JSON.stringify(next)); return next; });
-  const openAll = () => { if (phone && onAllToolsPhone) onAllToolsPhone(); else setMenu(true); };
+  // The app's own sidebar (blue) on every screen when the page provides it; the list sheet is only a fallback (owner, 2026-10-12).
+  const openAll = () => { if (onAllToolsPhone) onAllToolsPhone(); else setMenu(true); };
 
   const main = config.tools.filter((t) => !t.foot), foot = config.tools.filter((t) => t.foot);
   const railItem = (t: ToolDef) => (

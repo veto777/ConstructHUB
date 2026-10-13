@@ -969,7 +969,7 @@ function AppContent() {
   if (shelled) {
     return (
       <SidebarProvider style={sidebarStyle as React.CSSProperties} defaultOpen={sidebarDefaultOpen()}>
-        <div className="md:hidden"><AppSidebar /></div>
+        <AppSidebar sheet />
         <ProductToolLayout config={shelled} actions={controls} banner={<PaymentNeededBanner />} footer={footer}>
           <ToolRouteGate location={location}><DashboardRouter /></ToolRouteGate>
         </ProductToolLayout>
@@ -982,7 +982,7 @@ function AppContent() {
   if (location === "/seo" || location.startsWith("/seo/")) {
     return (
       <SidebarProvider style={sidebarStyle as React.CSSProperties} defaultOpen={sidebarDefaultOpen()}>
-        <div className="md:hidden"><AppSidebar /></div>
+        <AppSidebar sheet />
         <SeoToolLayout actions={controls} banner={<PaymentNeededBanner />} footer={footer}>
           <ToolRouteGate location={location}><DashboardRouter /></ToolRouteGate>
         </SeoToolLayout>

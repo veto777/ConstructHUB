@@ -155,6 +155,7 @@ function Sidebar({
   side = "left",
   variant = "sidebar",
   collapsible = "offcanvas",
+  sheet = false,
   className,
   children,
   ...props
@@ -162,6 +163,8 @@ function Sidebar({
   side?: "left" | "right"
   variant?: "sidebar" | "floating" | "inset"
   collapsible?: "offcanvas" | "icon" | "none"
+  /** Always the slide-over panel (opened with setOpenMobile), also on desktop: the full-screen tools' "All tools". */
+  sheet?: boolean
 }) {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
 
@@ -180,7 +183,7 @@ function Sidebar({
     )
   }
 
-  if (isMobile) {
+  if (isMobile || sheet) {
     return (
       <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
         <SheetContent

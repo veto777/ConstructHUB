@@ -407,7 +407,7 @@ const lockedEntry = (item: NavChild): NavChild => ({
   testId: `link-nav-more-${item.title.toLowerCase().replace(/\s+/g, "-")}`,
 });
 
-export function AppSidebar() {
+export function AppSidebar({ sheet = false }: { sheet?: boolean } = {}) {
   const [location] = useLocation();
   const queryClient = useQueryClient();
   const { isMobile, setOpenMobile } = useSidebar();
@@ -415,7 +415,7 @@ export function AppSidebar() {
   // On a phone the sidebar is a sheet over the page: close it once a link
   // (group child, standalone item or the footer Settings) has navigated.
   useEffect(() => {
-    if (isMobile) setOpenMobile(false);
+    if (isMobile || sheet) setOpenMobile(false);
   }, [location]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: dbCounts, isError: countsError } = useQuery<{ total: number; county: number; city: number }>({
@@ -500,7 +500,7 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar>
+    <Sidebar sheet={sheet}>
       <SidebarHeader className="p-4 pb-3">
         <Link href={user ? "/settings?tab=profile" : "/"} className="flex items-center justify-between gap-3 cursor-pointer" aria-label={user ? "Your profile" : "Home"} data-testid="link-logo-home">
           <span className="flex flex-col min-w-0">
