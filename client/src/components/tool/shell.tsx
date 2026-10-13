@@ -44,6 +44,8 @@ export type ToolDef = {
   path: string;
   /** Other routes that belong to this tool. */
   paths?: string[];
+  /** Routes below it that are its own too (a record's page, e.g. /crm/clients/12), when a prefix is not enough. */
+  match?: (path: string) => boolean;
   to: (ctx: ToolNavCtx) => string;
   groups: ToolSubGroup[];
   /** Sits at the bottom of the rail (settings-like). */
@@ -51,9 +53,11 @@ export type ToolDef = {
 };
 export type ToolShellConfig = { key: string; label: string; tools: ToolDef[] };
 
-/** The tool a route belongs to (the first tool when none claims it). */
+/** The tool a route belongs to: its own route, then its `match`, then the longest route it sits below (the first tool when none claims it). */
 export function toolOf(config: ToolShellConfig, path: string): ToolDef {
-  return config.tools.find((t) => t.path === path || t.paths?.includes(path)) ?? config.tools[0];
+  const below = (t: ToolDef) => Math.max(-1, ...[t.path, ...(t.paths ?? [])].filter((p) => p !== "/" && path.startsWith(`${p}/`)).map((p) => p.length));
+  const prefixed = config.tools.map((t) => [t, below(t)] as const).filter(([, n]) => n >= 0).sort((a, b) => b[1] - a[1])[0]?.[0];
+  return config.tools.find((t) => t.path === path || t.paths?.includes(path)) ?? config.tools.find((t) => t.match?.(path)) ?? prefixed ?? config.tools[0];
 }
 
 /** The groups and items shown for the current address. */
@@ -91,7 +95,7 @@ export function ToolBarSlot({ children }: { children: ReactNode }) {
 const read = (key: string) => { try { return window.localStorage.getItem(key); } catch { return null; } };
 const write = (key: string, value: string) => { try { window.localStorage.setItem(key, value); } catch { /* private window */ } };
 
-function useMedia(query: string): boolean {
+export function useMedia(query: string): boolean {
   const [on, setOn] = useState(() => typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia(query).matches);
   useEffect(() => {
     if (typeof window.matchMedia !== "function") return;

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { CRM_PERMISSION_LABELS } from "@shared/crm-access";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -309,6 +309,12 @@ export default function CrmTeamPage() {
     return t === "company" || t === "team" || t === "profile" ? t : "profile";
   })();
   const [tab, setTab] = useState(initialTab);
+  // The CRM menu's Profile / Company / Team links change only ?tab= on this page: follow them.
+  const search = useSearch();
+  useEffect(() => {
+    const t = new URLSearchParams(search).get("tab");
+    setTab(t === "company" || t === "team" ? t : "profile");
+  }, [search]);
 
   // Switching tabs also rewrites ?tab= so the URL, the banner and a page
   // refresh can never disagree about which step you're on.

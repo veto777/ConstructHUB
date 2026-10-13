@@ -9,7 +9,7 @@ test.describe("/crm home", () => {
     await gotoCrm(page, "/crm");
 
     // Header shell and workspace title.
-    await expect(page.getByTestId("link-portal-home")).toBeVisible();
+    await expect(page.getByTestId("link-crm-tool-home")).toBeVisible();
     await expect(page.locator("h1")).toBeVisible();
 
     // The three destination cards navigate somewhere valid.
@@ -73,8 +73,8 @@ test.describe("/crm home", () => {
     await gotoCrm(page, "/crm");
 
     // Regression: Schedule existed and the mobile ribbon had it, but the
-    // desktop nav didn't — the page was unreachable without the URL.
-    const schedule = page.getByTestId("link-portal-nav-schedule");
+    // desktop nav didn't — the page was unreachable without the URL. (Desktop nav = the tool rail.)
+    const schedule = page.getByTestId("tool-rail-schedule");
     await expect(schedule).toBeVisible();
     await expect(schedule).toContainText("Schedule");
     await schedule.click();

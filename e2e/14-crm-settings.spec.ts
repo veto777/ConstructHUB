@@ -96,10 +96,10 @@ test.describe("/crm/settings", () => {
   test("shell: settings nav item routes and shows the active pill", async ({ page }) => {
     const guards = watchPage(page);
     await gotoCrm(page, "/crm/clients");
-    await page.getByTestId("link-nav-settings").click();
+    await page.getByTestId("tool-rail-settings").click();
     await page.waitForURL("**/crm/settings**");
     await expect(page.locator("h1")).toContainText("Settings");
-    await expect(page.getByTestId("text-crm-section")).toHaveText("Settings");
+    await expect(page.getByTestId("tool-rail-settings")).toHaveAttribute("aria-current", "page");
     guards.assertClean("settings nav");
   });
 });
@@ -174,10 +174,10 @@ test.describe("/crm/integrations", () => {
   test("shell: integrations nav item routes and shows the active pill", async ({ page }) => {
     const guards = watchPage(page);
     await gotoCrm(page, "/crm/clients");
-    await page.getByTestId("link-nav-integrations").click();
+    await page.getByTestId("tool-rail-integrations").click();
     await page.waitForURL("**/crm/integrations**");
     await expect(page.locator("h1")).toContainText("Integrations");
-    await expect(page.getByTestId("text-crm-section")).toHaveText("Integrations");
+    await expect(page.getByTestId("tool-rail-integrations")).toHaveAttribute("aria-current", "page");
     guards.assertClean("integrations nav");
   });
 });

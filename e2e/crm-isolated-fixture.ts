@@ -15,7 +15,7 @@ export const test = base.extend<{ crmOrgId: string }>({
       expect((await (await page.request.get('/api/crm/me')).json()).org.id).toBe(orgId);
       // Wait for the actual CRM shell to mount, including a cold Vite start.
       await gotoCrm(page, "/crm");
-      await expect(page.getByTestId("link-portal-nav-clients")).toBeVisible({ timeout: 60_000 });
+      await expect(page.getByTestId("tool-rail-clients")).toBeVisible({ timeout: 60_000 });
       await use(orgId);
     } finally {
       await page.close();

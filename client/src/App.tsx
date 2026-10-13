@@ -14,6 +14,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { CrmSidebar } from "@/components/crm-sidebar";
+import { CrmFrame, CrmToolLayout } from "@/components/crm-tool/layout";
 import { CrmPaywall } from "@/components/crm-plans";
 import { CrmRibbon } from "@/components/crm-ribbon";
 import { CrmAccessGate } from "@/components/crm-access";
@@ -873,7 +874,25 @@ function AppContent() {
       location.startsWith("/crm/admin") ? "Platform Admin" :
       location.startsWith("/crm/report-issue") ? "Report an issue" :
       location.startsWith("/crm/join") ? "Join the team" : "Home";
+    // Help and "Report an issue" under every CRM page (they sell nothing, so the iPhone app keeps them too).
+    const crmFooter = (
+      <footer className="flex flex-wrap items-center justify-center gap-x-2 gap-y-2 border-t border-border/30 px-4 py-4 text-xs text-muted-foreground" data-testid="footer-crm">
+        <SocialLinks tone="app" className="basis-full" testId="social-crm-footer" />
+        <a href={marketingUrl("/tutorials#group-crm")} className="hover:text-foreground transition-colors" data-testid="link-crm-footer-help">Help</a>
+        <span className="mx-2 text-border">&middot;</span>
+        <Link href={reportIssueHref("/crm/report-issue")} className="hover:text-foreground transition-colors" data-testid="link-crm-footer-report-issue">Report an issue</Link>
+      </footer>
+    );
+    // A computer or tablet gets the full-screen tool frame (owner, 2026-10-12: "the same format for all other pages
+    // like … JobCam"); phones and the iPhone app keep the sidebar sheet + bottom ribbon below.
+    const crmTool = (
+      <>
+        <CrmToolLayout footer={crmFooter}><CrmPlanGate><PortalRouter /></CrmPlanGate></CrmToolLayout>
+        <HubWidget surface="portal" signedIn />
+      </>
+    );
     return (
+      <CrmFrame tool={inNativeApp() ? null : crmTool}>
       <SidebarProvider style={sidebarStyle as React.CSSProperties} defaultOpen={sidebarDefaultOpen()}>
         <div className="flex h-screen w-full">
           <CrmSidebar />
@@ -888,19 +907,14 @@ function AppContent() {
             {/* Bottom padding keeps content clear of the mobile ribbon; desktop is unchanged. */}
             <main className="flex-1 overflow-auto pb-[calc(88px+env(safe-area-inset-bottom))] md:pb-0">
               <CrmPlanGate><PortalRouter /></CrmPlanGate>
-              {/* Help and "Report an issue" under every CRM page (they sell nothing, so the iPhone app keeps them too). */}
-              <footer className="flex flex-wrap items-center justify-center gap-x-2 gap-y-2 border-t border-border/30 px-4 py-4 text-xs text-muted-foreground" data-testid="footer-crm">
-                <SocialLinks tone="app" className="basis-full" testId="social-crm-footer" />
-                <a href={marketingUrl("/tutorials#group-crm")} className="hover:text-foreground transition-colors" data-testid="link-crm-footer-help">Help</a>
-                <span className="mx-2 text-border">&middot;</span>
-                <Link href={reportIssueHref("/crm/report-issue")} className="hover:text-foreground transition-colors" data-testid="link-crm-footer-report-issue">Report an issue</Link>
-              </footer>
+              {crmFooter}
             </main>
           </div>
           <CrmRibbon />
           <HubWidget surface="portal" signedIn />
         </div>
       </SidebarProvider>
+      </CrmFrame>
     );
   }
 

@@ -125,7 +125,9 @@ const SWEEP_SELECTOR =
   // The CRM's nav moved from the top bar into the shadcn sidebar — sweep it too.
   ', [data-slot="sidebar"] a:visible, [data-slot="sidebar"] button:visible:enabled' +
   // …and on phones the nav is the bottom ribbon.
-  ', [data-testid="crm-ribbon"] a:visible, [data-testid="crm-ribbon"] button:visible:enabled';
+  ', [data-testid="crm-ribbon"] a:visible, [data-testid="crm-ribbon"] button:visible:enabled' +
+  // …and on a computer it is the tool shell's icon rail and sub-menu (components/crm-tool/).
+  ', .tool-rail a:visible, .tool-subnav a:visible, .tool-subnav button:visible:enabled';
 
 /**
  * Guarded every-button sweep: click each visible, enabled button and link on

@@ -67,8 +67,8 @@ test.describe("platform admin console", { tag: "@serial" }, () => {
       await expect(page.getByText("Platform admins only")).toBeVisible();
       await expect(page.getByTestId("section-overview")).not.toBeVisible();
 
-      // …and the sidebar never offers the console.
-      await expect(page.getByTestId("link-portal-nav-admin")).not.toBeVisible();
+      // …and the CRM menu never offers the console.
+      await expect(page.getByTestId("tool-rail-admin")).toHaveCount(0);
 
       guards.assertClean("non-admin");
     } finally {

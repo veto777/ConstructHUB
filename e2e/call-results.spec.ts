@@ -90,10 +90,12 @@ test("old CRM links (bell notifications, bookmarks) land on the platform page wi
 test("the CRM no longer lists the Call Assistant", async ({ page }) => {
   await page.context().addCookies([{ name: "ch_consent", value: "denied", url: PORTAL }]);
   await page.goto(`${PORTAL}/crm`);
-  await expect(page.getByTestId("link-portal-nav-clients")).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByTestId("link-portal-nav-call-assistant")).toHaveCount(0);
+  await expect(page.getByTestId("tool-rail-clients")).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId("tool-rail-call-assistant")).toHaveCount(0);
   // …and links back to the platform with every other tool (owner, 2026-10-04). On a forced-portal dev server the
   // platform face is the same host with ?portal=0 (lib/site.ts marketingUrl); in production it is constructhub.us.
-  await expect(page.getByTestId("link-portal-nav-platform")).toBeVisible();
-  await expect(page.getByTestId("link-portal-nav-platform")).toHaveAttribute("href", /^(https?:\/\/[^/]+)?\/(\?portal=0)?$/);
+  // On a computer that link sits in the CRM's "All tools" drawer.
+  await page.getByTestId("button-all-tools").click();
+  await expect(page.getByTestId("link-crm-all-tools-platform")).toBeVisible();
+  await expect(page.getByTestId("link-crm-all-tools-platform")).toHaveAttribute("href", /^(https?:\/\/[^/]+)?\/(\?portal=0)?$/);
 });
