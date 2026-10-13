@@ -73,7 +73,7 @@ export function RecentAuthModal() {
   const stepUp = method==='email' && (google || apple);
   const inputLabel = method==='password'?'Current password':method==='totp'?'Authenticator code':'Email code';
   return <Dialog open={!!challenge} onOpenChange={open=>{if(!open)close();}}>
-    <DialogContent className="sm:max-w-sm gap-5 p-6" onCloseAutoFocus={e=>{const el=returnFocus.current;returnFocus.current=null;if(el?.isConnected){e.preventDefault();el.focus();}}}>
+    <DialogContent className="sm:max-w-md gap-5 p-6" onCloseAutoFocus={e=>{const el=returnFocus.current;returnFocus.current=null;if(el?.isConnected){e.preventDefault();el.focus();}}}>
       <DialogHeader className="space-y-1.5 text-left">
         <DialogTitle className="text-lg">Verify your identity</DialogTitle>
         <DialogDescription className="text-sm leading-5" data-testid="text-reauth-reason">{forGbp
@@ -102,7 +102,7 @@ export function RecentAuthModal() {
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         <div className="flex items-center justify-between gap-3 pt-1">
           <Button type="button" variant="ghost" className="rounded-full px-3" onClick={close}>Cancel</Button>
-          <Button className="h-11 min-w-[11rem] rounded-full" disabled={busy||!value||needsCode}>Verify and continue</Button>
+          {!needsCode && <Button className="h-11 min-w-[11rem] rounded-full" disabled={busy||!value}>Verify and continue</Button>}
         </div>
       </form>}
       {!method && error && <p role="alert" className="text-sm text-destructive">{error}</p>}
