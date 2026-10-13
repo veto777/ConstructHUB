@@ -13,10 +13,11 @@ import {
   YoutubeError, getVideoStatus, getYoutubeAccessToken, revokeToken, uploadVideo, type Deps,
 } from "./client";
 import {
-  claimNextUpload, customerRefreshTokenForRevoke, customerYoutubeStore, deleteAllVideos, deleteCustomerConnection, dueChecks, failVideo,
+  claimNextUpload, customerRefreshTokenForRevoke, customerStatus, customerYoutubeStore, deleteAllVideos, deleteCustomerConnection, dueChecks, failVideo,
   filesToDelete, finishUpload, heartbeat, interruptedUploads, markFileDeleted, markQuotaSpent, recordCheck, requeueUpload, type VideoRow,
 } from "./customer-store";
 import { getEntitlements } from "../entitlements";
+import { youtubeCompanyGrant } from "./store";
 import { handleOf, keyIsOwn, storedVideoSource } from "./customer-media";
 
 /* ── Plain words ──────────────────────────────────────────────────────────── */
@@ -92,13 +93,28 @@ export async function removeStoredFile(v: VideoRow): Promise<void> {
  * every stored file. Used by Disconnect and by account deletion. The rows are
  * deleted even when Google cannot be reached.
  */
-export async function purgeCustomerYoutube(userId: number, http: typeof fetch = fetch): Promise<{ removed: boolean; revokedAtGoogle: boolean; videos: number }> {
+export async function purgeCustomerYoutube(userId: number, http: typeof fetch = fetch): Promise<{ removed: boolean; revokedAtGoogle: boolean; sharedWithCompany: boolean; videos: number }> {
   const token = await customerRefreshTokenForRevoke(userId);
-  const revokedAtGoogle = token ? await revokeToken(token, http) : false;
+  const sharedWithCompany = token ? await sharesCompanyGrant(userId) : false;
+  const revokedAtGoogle = token && !sharedWithCompany ? await revokeToken(token, http) : false;
   const removed = await deleteCustomerConnection(userId);
   const videos = await deleteAllVideos(userId);
   for (const v of videos) await removeStoredFile(v);
-  return { removed, revokedAtGoogle, videos: videos.length };
+  return { removed, revokedAtGoogle, sharedWithCompany, videos: videos.length };
+}
+
+/**
+ * Revoking a refresh token at Google kills EVERY token that Google account granted this app — the company
+ * channel's included when the same account connected both (2026-10-12: the owner's customer-side disconnect
+ * silenced the tutorial uploads for two nights). When the customer's channel IS the company channel, or the
+ * disconnecting user is the one who connected the company channel, the rows go but nothing is revoked.
+ */
+async function sharesCompanyGrant(userId: number): Promise<boolean> {
+  const company = await youtubeCompanyGrant();
+  if (!company) return false;
+  if (company.connectedBy === userId) return true;
+  const mine = await customerStatus(userId);
+  return !!mine.channelId && mine.channelId === company.channelId;
 }
 
 /* ── Worker ───────────────────────────────────────────────────────────────── */

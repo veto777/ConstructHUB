@@ -114,3 +114,14 @@ export function pgYoutubeStore(q?: Queryable): YoutubeStore {
 
 /** The library's dependencies against the real database and the real network. */
 export const youtubeDeps = (): Deps => ({ store: pgYoutubeStore() });
+
+/**
+ * The company channel's id and the app user who connected it, or null when no company channel is connected
+ * (or the table is absent, as in some test databases). Read by the customer-side disconnect: see sharesCompanyGrant.
+ */
+export async function youtubeCompanyGrant(q?: Queryable): Promise<{ channelId: string | null; connectedBy: number | null } | null> {
+  try {
+    const { rows: [r] } = await (await db(q)).query(`SELECT channel_id, connected_by FROM youtube_connection WHERE id = 1 AND refresh_token IS NOT NULL`);
+    return r ? { channelId: r.channel_id ?? null, connectedBy: r.connected_by == null ? null : Number(r.connected_by) } : null;
+  } catch { return null; }
+}
