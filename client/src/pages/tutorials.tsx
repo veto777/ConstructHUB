@@ -30,10 +30,11 @@ const FEATURES = HELP_FEATURES.filter((f) => !HIDDEN_ROUTES.has(f.route));
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 const openHref = (e: HelpEntry) => (isCrmRoute(e.route) ? portalUrl(e.route) : e.route);
 
-function VideoSlot({ entry }: { entry: HelpEntry }) {
-  if (!entry.video) return null;
+/** The player, only once "Watch" is pressed (owner, 2026-10-13: open players ate the whole feed). */
+function VideoSlot({ entry, open }: { entry: HelpEntry; open: boolean }) {
+  if (!entry.video || !open) return null;
   return (
-    <div className="mt-3 max-w-2xl">
+    <div id={`tutorial-video-slot-${entry.key}`} className="mt-3 max-w-2xl">
       <HelpVideoPlayer video={entry.video} title={entry.title} testId={`tutorial-video-${entry.key}`} />
     </div>
   );
@@ -42,6 +43,7 @@ function VideoSlot({ entry }: { entry: HelpEntry }) {
 function FeatureCard({ entry, open, onToggle }: { entry: HelpEntry; open: boolean; onToggle: () => void }) {
   const sections = helpSections(entry.key);
   const panelId = `help-panel-${entry.key}`;
+  const [watching, setWatching] = useState(false);
   return (
     <li id={`help-${entry.key}`} className="g-card scroll-mt-20" data-testid={`tutorial-card-${entry.key}`}>
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
@@ -50,9 +52,13 @@ function FeatureCard({ entry, open, onToggle }: { entry: HelpEntry; open: boolea
           <p className="g-card__line">{helpSummary(entry)}</p>
           <p className="mt-2">
             {entry.video ? (
-              <span className="g-chip g-chip--sm !normal-case" data-testid={`tutorial-video-badge-${entry.key}`}>
-                <PlayCircle className="mr-1 h-3.5 w-3.5" aria-hidden="true" />Video · {formatDuration(entry.video.durationSec)}
-              </span>
+              <button type="button" className="g-chip g-chip--sm !normal-case cursor-pointer" aria-expanded={watching}
+                aria-controls={`tutorial-video-slot-${entry.key}`} onClick={() => setWatching((w) => !w)}
+                data-testid={`tutorial-video-badge-${entry.key}`}>
+                <PlayCircle className="mr-1 h-3.5 w-3.5" aria-hidden="true" />{watching ? "Hide video" : "Watch"} · {formatDuration(entry.video.durationSec)}
+                <ChevronDown className={`ml-1 h-3.5 w-3.5 transition-transform ${watching ? "rotate-180" : ""}`} aria-hidden="true" />
+                <span className="sr-only"> {entry.title}</span>
+              </button>
             ) : (
               <span className="g-chip g-chip--sm !normal-case" data-testid={`tutorial-video-soon-${entry.key}`}>Video coming soon</span>
             )}
@@ -68,7 +74,7 @@ function FeatureCard({ entry, open, onToggle }: { entry: HelpEntry; open: boolea
           </button>
         </div>
       </div>
-      <VideoSlot entry={entry} />
+      <VideoSlot entry={entry} open={watching} />
       {open && (
         <div id={panelId} className="mt-4 max-w-3xl" data-testid={`tutorial-guide-${entry.key}`}>
           <HelpParts entry={entry} />
@@ -85,7 +91,8 @@ function FeatureCard({ entry, open, onToggle }: { entry: HelpEntry; open: boolea
                       </summary>
                       <div className="pb-3 pl-4 pt-1">
                         <HelpParts entry={s} />
-                        <VideoSlot entry={s} />
+                        {/* Already behind the section's own <details>. */}
+                        <VideoSlot entry={s} open />
                       </div>
                     </details>
                   </li>
