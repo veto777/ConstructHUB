@@ -39,6 +39,12 @@ export const CLIENT_PREFIX = (process.env.CLIENT_PREFIX || "client").toLowerCase
 
 export const CLIENT_HOSTS: string[] = SITE_DOMAINS.map((d) => `${CLIENT_PREFIX}.${d}`);
 
+/** backlink.<domain> (and the retired backlinks.<domain> preview) open the admin Backlinks page on the main site. */
+export const BACKLINKS_HOSTS: string[] = SITE_DOMAINS.flatMap((d) => [`backlink.${d}`, `backlinks.${d}`]);
+export function isBacklinksHost(host: string): boolean {
+  return BACKLINKS_HOSTS.includes(normalizeHost(host));
+}
+
 /** Every hostname we will echo back in an absolute URL. */
 const ALLOWED_HOSTS = new Set<string>([
   ...SITE_DOMAINS,

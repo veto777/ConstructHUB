@@ -1457,3 +1457,13 @@ Production was rebuilt from `social/pinterest-direct` (which contains `social/bl
 invisible until vb11 `~/ConstructHUB-live/.env` gets `SOCIAL_PINTEREST_APP_ID` / `SOCIAL_PINTEREST_APP_SECRET`
 from the owner's Pinterest developer app (docs/social-apps/pinterest.md §1) and the service restarts. Keep it
 out of `SOCIAL_NATIVE_PUBLIC_NETWORKS` until Pinterest grants Standard access. Both branches were merged into main (47d9d432) on 2026-10-13 and production redeployed from main.
+
+## 2026-10-13 — Backlinks tool live on production (merge 5c518870)
+- `backlinks.constructhub.us` (and `backlink.`) → 302 to `https://constructhub.us/admin/backlinks` (server/index.ts host
+  redirect; tunnel ingress `backlinks.constructhub.us` → :8110). Admin-only page; API answers 401 signed-out.
+- Preview data (978 vetted sources: 638 qualified A/B/C, 340 rejected; 440-query bank with run history; 258 drafts) copied
+  into prod; dump at vb11 `~/backups/backlinks-preview-data-20261013-*.sql`. The TEMP preview (`constructhub-backlinks.service`,
+  :8112, DB on SAN :5434) is stopped + disabled, data kept.
+- Prod env now has `DATAFORSEO_LOGIN/PASSWORD` (from the preview — this also switches the SEO toolset on, under
+  `SEO_MONTHLY_BUDGET_USD`), `BACKLINKS_WORKER_ENABLED=true`, budget 25, 40 searches/day. Outreach SENDING stays off
+  (`BACKLINKS_OUTREACH_SEND` + outreach mailbox/postal address are owner-pending).

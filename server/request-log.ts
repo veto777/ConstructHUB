@@ -20,7 +20,7 @@
 import { randomBytes } from "node:crypto";
 
 /** Response bodies that are never captured (Hub replies: guardrails §2/§8; site-scan tokens; domain and mail settings). */
-const NEVER_CAPTURED = ["/api/agency", "/api/sitescan", "/api/admin/sitescan", "/api/domains", "/api/mail-alerts", "/api/hub"];
+const NEVER_CAPTURED = ["/api/agency", "/api/sitescan", "/api/admin/sitescan", "/api/admin/backlinks", "/api/domains", "/api/mail-alerts", "/api/hub"];
 /** Bodies with secrets (QR seeds, recovery codes, signed upload URLs, provider credentials, API keys, account data, transcripts, issue reports). */
 const NEVER_LOGGED = [
   "/api/auth/", "/api/gbp/connect", "/api/social", "/api/ads", "/api/cloudflare", "/api/gsc",

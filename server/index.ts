@@ -1,5 +1,6 @@
 // FIRST: a process that asks for tutorial fixtures outside a recording slot refuses to boot (server/tutorials/fixtures/gate.ts).
 import "./tutorials/fixtures/boot-guard";
+import { isBacklinksHost, requestHost, PRIMARY_DOMAIN } from "./site-context";
 import { registerAppPurchaseGuard } from "./app-purchases";
 import { credentialBody } from "./cloudflare/credential-body";
 import express, { type Request, Response, NextFunction } from "express";
@@ -11,6 +12,12 @@ import { createServer } from "http";
 const app = express();
 registerAppPurchaseGuard(app);
 app.set("trust proxy", 1);
+// backlink.constructhub.us is the address of the admin Backlinks tool; it lives on the main site so sign-in,
+// admin access and the database are production's own.
+app.use((req, res, next) => {
+  if (!isBacklinksHost(requestHost(req))) return next();
+  res.redirect(302, `https://${PRIMARY_DOMAIN}/admin/backlinks`);
+});
 const httpServer = createServer(app);
 import { registerInboundMail } from "./mail-alerts/inbound";
 registerInboundMail(app);
