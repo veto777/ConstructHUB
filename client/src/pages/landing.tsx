@@ -292,7 +292,7 @@ export default function LandingPage() {
           {/* Copy */}
           <div className="contents md:block md:col-span-7 md:pt-14 lg:pt-20 md:pb-12 lg:pb-16">
             <Kicker n="" className="animate-in">Your Complete Business-Building Platform</Kicker>
-            <h1 className="font-display mt-5 text-mkt-ink animate-in-delay-1">
+            <h1 className="font-display mt-5 text-mkt-ink">
               <span className="block italic font-medium text-mkt-orange text-[clamp(1rem,calc(12vw-1.375rem),1.5rem)] sm:text-3xl leading-tight mb-2">Construct<span className="font-bold not-italic">HUB</span> —</span>
               <span className="block font-semibold text-[clamp(1.75rem,calc(19vw-2rem),2.6rem)] min-[375px]:text-[clamp(1.75rem,calc(19vw-2.25rem),2.6rem)] min-[480px]:text-[clamp(2.6rem,9vw,3.4rem)] leading-[1.04] sm:text-[3.4rem] md:text-[3.1rem] lg:text-[4.1rem] xl:text-[4.5rem] tracking-[-0.02em]">
                 Build Your Business <span className="mkt-marker">From&nbsp;the Ground&nbsp;Up</span>
