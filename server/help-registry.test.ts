@@ -78,7 +78,9 @@ describe("help registry", () => {
       "search-console.sitemaps-indexing",
     ]) expect(keys.has(k), k).toBe(true);
     // Every section in the registry is mounted somewhere: no orphan help text.
-    for (const s of HELP_ENTRIES.filter((e) => e.parent)) expect(keys.has(s.key), `${s.key} is mounted`).toBe(true);
+    // A section is reachable with its own "i" on the page, or listed under its feature's card on /tutorials (helpSections)
+    // and behind the feature's "i" ("All tutorials"): the deep-dive walkthroughs (2026-10-13) are sections of listed features.
+    for (const s of HELP_ENTRIES.filter((e) => e.parent)) expect(keys.has(s.key) || !helpEntry(s.parent!)?.unlisted, `${s.key} is mounted or listed under ${s.parent}`).toBe(true);
   });
 
   it("every entry has its four parts, a group and unique key", () => {
