@@ -1,0 +1,25 @@
+{
+  "helpKey": "posts-photos.calendar-queue-and-history",
+  "durationSec": 56,
+  "video": {
+    "key": "tutorials/posts-photos.calendar-queue-and-history.8f400d41.mp4",
+    "bytes": 4877856,
+    "sha256": "8f400d41a9844a1a7edb06f564351b072e411f1730ee1a5b06a9c5e34eaf804f"
+  },
+  "captions": {
+    "key": "tutorials/posts-photos.calendar-queue-and-history.a24b5254.vtt",
+    "bytes": 1158,
+    "sha256": "a24b5254a89091c6f6df66bff63a4d48524ced7f5b32e78867e1138147247cf2"
+  },
+  "poster": {
+    "key": "tutorials/posts-photos.calendar-queue-and-history.1b646820.jpg",
+    "bytes": 87267,
+    "sha256": "1b6468202613d3c1d61918cc4db5ce7f9bb257ea341b4de8882046f5354f42ab"
+  },
+  "uploaded": {
+    "at": "2026-10-13T21:56:28.662Z",
+    "video": "379272cd8cec6770007ace781d6e70eb",
+    "captions": "89b6df5d844f4937ed3a5f6521df0fab",
+    "poster": "8eb8cb0f64af2018e998426bb42c2dbd"
+  }
+}

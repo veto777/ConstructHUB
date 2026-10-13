@@ -1,0 +1,25 @@
+{
+  "helpKey": "posts-photos.batches-on-agency",
+  "durationSec": 74,
+  "video": {
+    "key": "tutorials/posts-photos.batches-on-agency.77f97beb.mp4",
+    "bytes": 6586826,
+    "sha256": "77f97beb3ac6f05da55c5f76a92af1de4ba922d43f84a9aadbdb340a79420a78"
+  },
+  "captions": {
+    "key": "tutorials/posts-photos.batches-on-agency.d5114325.vtt",
+    "bytes": 1422,
+    "sha256": "d5114325c71547c497fdc48487f5edc09f916fc0e03c094964ca92113f575d3f"
+  },
+  "poster": {
+    "key": "tutorials/posts-photos.batches-on-agency.c7e1aa2a.jpg",
+    "bytes": 94835,
+    "sha256": "c7e1aa2ab624df70f1fbc13006a6a236629956009936d8979d9d6e3bc10bf7e6"
+  },
+  "uploaded": {
+    "at": "2026-10-13T21:56:52.240Z",
+    "video": "aca876375588e3d492aa6d659a7d7def",
+    "captions": "a94641d0e32fe4dfdfa6ead28c5abf41",
+    "poster": "a1685e23270481ce9e5b625323f8d19c"
+  }
+}
