@@ -16,6 +16,7 @@ import { socialHref } from "@/components/social-tool/nav";
 export const NETWORK_ICON: Record<string, { icon: IconType; color: string; name: string }> = {
   facebook: { icon: FaFacebook, color: "#1877F2", name: "Facebook" }, instagram: { icon: FaInstagram, color: "#E4405F", name: "Instagram" },
   threads: { icon: FaThreads, color: "currentColor", name: "Threads" }, tiktok: { icon: FaTiktok, color: "currentColor", name: "TikTok" },
+  x: { icon: FaXTwitter, color: "currentColor", name: "X" },
   twitter: { icon: FaXTwitter, color: "currentColor", name: "X" }, linkedin: { icon: FaLinkedin, color: "#0A66C2", name: "LinkedIn" },
   youtube: { icon: FaYoutube, color: "#FF0000", name: "YouTube" }, pinterest: { icon: FaPinterest, color: "#BD081C", name: "Pinterest" },
   bluesky: { icon: FaBluesky, color: "#1185FE", name: "Bluesky" }, gbp: { icon: FaGoogle, color: "#4285F4", name: "Google" },

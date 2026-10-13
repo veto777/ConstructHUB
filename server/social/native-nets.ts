@@ -1,25 +1,33 @@
 /**
  * ConstructHUB Direct — the networks that sign in on their own (not through a Facebook Page): Instagram login
- * (business accounts with no Facebook Page), Threads and TikTok. Each adapter knows its sign-in address, how to turn
+ * (business accounts with no Facebook Page), Threads, TikTok and X. Each adapter knows its sign-in address, how to turn
  * the code into a long-lived token (and refresh it), who signed in, how to publish, and how to read a publish back.
  * server/social/native.ts stores the accounts and drives the queue; this file only speaks to the networks.
  *
  *   instagram (Instagram login)  SOCIAL_INSTAGRAM_APP_ID / _SECRET   graph.instagram.com     token 60 days, refreshable
  *   threads                      SOCIAL_THREADS_APP_ID / _SECRET     graph.threads.net       token 60 days, refreshable
  *   tiktok                       SOCIAL_TIKTOK_CLIENT_KEY / _SECRET  open.tiktokapis.com     access 24 h, refresh 365 days
+ *   x                            SOCIAL_X_CLIENT_ID / _SECRET       api.x.com              access 2 h, rotating refresh
  */
+import https from "node:https";
+import { lookup } from "node:dns";
+import { publicIP, siteUrl } from "../sitescan/http";
+import { createHash } from "node:crypto";
+import { xSplitText, xWeightedLength } from "../../shared/social-x";
+import { recordFailure } from "../ops/issues";
 import { SocialError } from "./client";
 
-export type NetApi = "ig_login" | "threads" | "tiktok";
+export type NetApi = "ig_login" | "threads" | "tiktok" | "x";
 export type Signed = { externalId: string; name: string; picture: string | null; token: string; expiresAt: Date | null; refresh: string | null; scopes: string[] };
-export type Plan = { stage: string; container?: string; external?: string; url?: string | null };
+export type Plan = { error?: string; stage: string; container?: string; external?: string; url?: string | null };
 export type Read = { state: "submitted" | "published" | "failed"; url?: string | null; external?: string; error?: string; stage?: string };
 
-export const netDeps = { http: fetch as typeof fetch, env: () => process.env, now: () => Date.now() };
+export const netDeps = { http: fetch as typeof fetch, mediaHttp: xMediaFetch, env: () => process.env, now: () => Date.now(), sleep: (ms: number) => new Promise<void>((r) => setTimeout(r, ms)) };
 const base = () => (process.env.APP_URL || "https://constructhub.us").replace(/\/$/, "");
 export const netRedirect = (api: NetApi) => `${base()}/api/social/native/${api === "ig_login" ? "instagram" : api}/callback`;
 
 const SCOPES: Record<NetApi, string[]> = {
+  x: ["tweet.read", "tweet.write", "users.read", "media.write", "offline.access"],
   ig_login: ["instagram_business_basic", "instagram_business_content_publish", "instagram_business_manage_comments", "instagram_business_manage_insights"],
   threads: ["threads_basic", "threads_content_publish", "threads_manage_insights", "threads_read_replies", "threads_manage_replies", "threads_delete"],
   // No video.list: per-post TikTok stats are not read (server/social/insights.ts); docs/social-apps/tiktok.md §2.2.
@@ -29,6 +37,7 @@ export const netScopes = (api: NetApi) => SCOPES[api];
 
 /** Which of these networks have their app keys. Pure on env. */
 export function netConfigured(api: NetApi, env: NodeJS.ProcessEnv = process.env): boolean {
+  if (api === "x") return !!env.SOCIAL_X_CLIENT_ID?.trim() && !!env.SOCIAL_X_CLIENT_SECRET?.trim();
   if (api === "ig_login") return /^\d{6,30}$/.test(env.SOCIAL_INSTAGRAM_APP_ID ?? "") && /^\S{16,}$/.test(env.SOCIAL_INSTAGRAM_APP_SECRET ?? "");
   if (api === "threads") return /^\d{6,30}$/.test(env.SOCIAL_THREADS_APP_ID ?? "") && /^\S{16,}$/.test(env.SOCIAL_THREADS_APP_SECRET ?? "");
   return /^\S{6,}$/.test(env.SOCIAL_TIKTOK_CLIENT_KEY ?? "") && /^\S{16,}$/.test(env.SOCIAL_TIKTOK_CLIENT_SECRET ?? "");
@@ -84,16 +93,27 @@ const inSec = (s: unknown) => (Number(s) > 0 ? new Date(netDeps.now() + Number(s
 
 // ── signing in ─────────────────────────────────────────────────────────────────────────────────────────────
 
-export function netAuthUrl(api: NetApi, state: string): string {
+export function netAuthUrl(api: NetApi, state: string, verifier?: string): string {
   const env = netDeps.env();
+  if (api === "x") {
+    if (!verifier) throw new SocialError("X sign-in requires PKCE; connect again");
+    return `https://x.com/i/oauth2/authorize?${q({ client_id: env.SOCIAL_X_CLIENT_ID, redirect_uri: netRedirect(api), response_type: "code", scope: SCOPES.x.join(" "), state, code_challenge: createHash("sha256").update(verifier).digest("base64url"), code_challenge_method: "S256" })}`;
+  }
   if (api === "ig_login") return `https://www.instagram.com/oauth/authorize?${q({ client_id: env.SOCIAL_INSTAGRAM_APP_ID, redirect_uri: netRedirect(api), response_type: "code", scope: SCOPES.ig_login.join(","), state })}`;
   if (api === "threads") return `https://threads.net/oauth/authorize?${q({ client_id: env.SOCIAL_THREADS_APP_ID, redirect_uri: netRedirect(api), response_type: "code", scope: SCOPES.threads.join(","), state })}`;
   return `https://www.tiktok.com/v2/auth/authorize/?${q({ client_key: env.SOCIAL_TIKTOK_CLIENT_KEY, redirect_uri: netRedirect(api), response_type: "code", scope: SCOPES.tiktok.join(","), state })}`;
 }
 
 /** The code from the network → a long-lived token and who signed in. */
-export async function netExchange(api: NetApi, code: string): Promise<Signed> {
+export async function netExchange(api: NetApi, code: string, verifier?: string): Promise<Signed> {
   const env = netDeps.env();
+  if (api === "x") {
+    if (!verifier) throw new SocialError("X sign-in requires PKCE; connect again");
+    const t = await xToken({ grant_type: "authorization_code", code, redirect_uri: netRedirect(api), code_verifier: verifier });
+    const me = (await xCall("/users/me?user.fields=profile_image_url,username,name", t.access_token)).data;
+    if (!me?.id || !me?.username) throw new SocialError("X did not identify the signed-in account", 502);
+    return { externalId: String(me.id), name: `@${me.username}`, picture: me.profile_image_url ?? null, token: t.access_token, expiresAt: inSec(t.expires_in ?? 7200), refresh: t.refresh_token, scopes: String(t.scope ?? "").split(" ").filter(Boolean) };
+  }
   if (api === "ig_login") {
     const short = await call("https://api.instagram.com/oauth/access_token", { form: { client_id: String(env.SOCIAL_INSTAGRAM_APP_ID), client_secret: String(env.SOCIAL_INSTAGRAM_APP_SECRET), grant_type: "authorization_code", redirect_uri: netRedirect(api), code } });
     const long = await call(`https://graph.instagram.com/access_token?${q({ grant_type: "ig_exchange_token", client_secret: env.SOCIAL_INSTAGRAM_APP_SECRET, access_token: short.access_token })}`);
@@ -118,13 +138,17 @@ export async function netExchange(api: NetApi, code: string): Promise<Signed> {
 export function needsRefresh(api: NetApi, expiresAt: Date | null): boolean {
   if (!expiresAt) return false;
   const left = expiresAt.getTime() - netDeps.now();
-  return api === "tiktok" ? left < 10 * 60_000 : left < 7 * 86_400_000;
+  return api === "tiktok" || api === "x" ? left < 10 * 60_000 : left < 7 * 86_400_000;
 }
 export async function netRefresh(api: NetApi, token: string, refresh: string | null): Promise<Pick<Signed, "token" | "expiresAt" | "refresh">> {
   const env = netDeps.env();
   if (api === "ig_login") { const d = await call(`https://graph.instagram.com/refresh_access_token?${q({ grant_type: "ig_refresh_token", access_token: token })}`); return { token: d.access_token, expiresAt: inSec(d.expires_in), refresh: null }; }
   if (api === "threads") { const d = await call(`https://graph.threads.net/refresh_access_token?${q({ grant_type: "th_refresh_token", access_token: token })}`); return { token: d.access_token, expiresAt: inSec(d.expires_in), refresh: null }; }
   if (!refresh) throw reconnect();
+  if (api === "x") {
+    const d = await xToken({ grant_type: "refresh_token", refresh_token: refresh });
+    return { token: d.access_token, expiresAt: inSec(d.expires_in ?? 7200), refresh: d.refresh_token };
+  }
   const d = await call("https://open.tiktokapis.com/v2/oauth/token/", { form: { client_key: String(env.SOCIAL_TIKTOK_CLIENT_KEY), client_secret: String(env.SOCIAL_TIKTOK_CLIENT_SECRET), grant_type: "refresh_token", refresh_token: refresh } });
   return { token: d.access_token, expiresAt: inSec(d.expires_in), refresh: d.refresh_token ?? refresh };
 }
@@ -132,6 +156,127 @@ export async function netRefresh(api: NetApi, token: string, refresh: string | n
 // ── publishing ─────────────────────────────────────────────────────────────────────────────────────────────
 
 const isVideo = (u: string) => /\.(mp4|mov|m4v|webm)(\?|$)/i.test(u);
+
+/** X errors never include the remote response in logs (it can contain credentials). */
+async function xRequest(path: string, init: RequestInit): Promise<any> {
+  let r: Response;
+  try { r = await netDeps.http(`https://api.x.com/2${path}`, { ...init, redirect: "error", signal: AbortSignal.timeout(30_000) }); }
+  catch { throw new SocialError("X didn't answer; check the post before sending it again", 502); }
+  const d = await r.json().catch(() => null);
+  if (!r.ok || d?.errors?.length || d?.error) {
+    const detail = JSON.stringify(d ?? {}).toLowerCase();
+    if (r.status === 401 || d?.error === "invalid_grant") throw reconnect();
+    if (r.status === 402 || /credits/.test(detail)) {
+      const e = new SocialError("X posting is paused: the ConstructHUB X account is out of credits", 402);
+      void recordFailure("job", "X posting credits", e);
+      throw e;
+    }
+    if (r.status === 429) throw new SocialError("X is limiting how fast we post; try again later", 429);
+    if (/duplicate/.test(detail)) throw new SocialError("X already has this content; change the text before posting again");
+    throw new SocialError("X refused the request; check the content and account permissions", r.status >= 500 ? 502 : 400);
+  }
+  if (r.status === 204) return {};
+  if (!d) throw new SocialError("X sent an unreadable answer", 502);
+  return d;
+}
+function xCall(path: string, token: string, json?: unknown, method?: string) {
+  return xRequest(path, { method: method ?? (json === undefined ? "GET" : "POST"), headers: { Authorization: `Bearer ${token}`, ...(json === undefined ? {} : { "Content-Type": "application/json" }) }, ...(json === undefined ? {} : { body: JSON.stringify(json) }) });
+}
+async function xToken(form: Record<string, string>) {
+  const env = netDeps.env();
+  const d = await xRequest("/oauth2/token", { method: "POST", headers: { Authorization: `Basic ${Buffer.from(`${env.SOCIAL_X_CLIENT_ID}:${env.SOCIAL_X_CLIENT_SECRET}`).toString("base64")}`, "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams(form) });
+  if (!d.access_token || !d.refresh_token) throw new SocialError("X did not return a renewable sign-in; reconnect the account", 409);
+  return d;
+}
+export async function xDelete(token: string, id: string): Promise<void> {
+  const d = await xCall(`/tweets/${encodeURIComponent(id)}`, token, undefined, "DELETE");
+  if (d.data?.deleted !== true) throw new SocialError("X did not confirm deletion; check the post on X", 502);
+}
+/** Built-in HTTPS transport with the same pinned-public-DNS policy as sitescan/http. */
+function xMediaFetch(url: string): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const request = https.get(url, {
+      agent: false,
+      signal: AbortSignal.timeout(60_000),
+      lookup: (hostname, options, callback) => lookup(hostname, { all: true }, (err, addresses) => {
+        if (err || !addresses.length || addresses.some((a) => !publicIP(a.address))) return callback(new Error("Media must use a public address"), "", 4);
+        if ((options as any).all) (callback as any)(null, addresses);
+        else callback(null, addresses[0].address, addresses[0].family);
+      }),
+    }, (response) => {
+      if (response.statusCode !== 200) { response.resume(); reject(new Error("Media download failed")); return; }
+      const chunks: Buffer[] = []; let size = 0;
+      response.on("data", (chunk: Buffer) => {
+        size += chunk.length;
+        if (size > 250 * 1024 * 1024) request.destroy(new Error("Media too large"));
+        else chunks.push(chunk);
+      });
+      response.on("error", reject);
+      response.on("end", () => resolve(new Response(new Uint8Array(Buffer.concat(chunks)))));
+    });
+    request.on("error", reject);
+  });
+}
+async function xUpload(token: string, url: string): Promise<string> {
+  // Pin public DNS results to the socket, reject redirects, bound bytes; no bearer on media downloads.
+  const safe = siteUrl(url);
+  if (!safe.startsWith("https://")) throw new SocialError("Use a public HTTPS media URL");
+  let file: Buffer;
+  try {
+    const response = await netDeps.mediaHttp(safe);
+    if (!response.ok) throw new Error("download failed");
+    file = Buffer.from(await response.arrayBuffer());
+    if (!file.length || file.length > 250 * 1024 * 1024) throw new Error("invalid size");
+  } catch { throw new SocialError("X couldn't read the media; use a public HTTPS file under 250 MB"); }
+  const video = isVideo(url);
+  const type = video ? (/\.mov(?:\?|$)/i.test(url) ? "video/quicktime" : "video/mp4") : (/\.png(?:\?|$)/i.test(url) ? "image/png" : /\.webp(?:\?|$)/i.test(url) ? "image/webp" : "image/jpeg");
+  const bytes = new Uint8Array(file);
+  const multipart = async (path: string, data: Uint8Array, fields: Record<string, string>) => {
+    const body = new FormData();
+    body.set("media", new Blob([data as BlobPart], { type }), "media");
+    for (const [k, v] of Object.entries(fields)) body.set(k, v);
+    return xRequest(path, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body });
+  };
+  let d: any;
+  if (!video) d = await multipart("/media/upload", bytes, { media_category: "tweet_image" });
+  else {
+    d = await xCall("/media/upload/initialize", token, { media_type: type, total_bytes: bytes.length, media_category: "tweet_video" });
+    const id = d.data?.id;
+    if (!id) throw new SocialError("X did not confirm the media upload", 502);
+    for (let offset = 0, i = 0; offset < bytes.length; offset += 5 * 1024 * 1024, i++) {
+      await multipart(`/media/upload/${id}/append`, bytes.slice(offset, offset + 5 * 1024 * 1024), { segment_index: String(i) });
+    }
+    d = await xCall(`/media/upload/${id}/finalize`, token, undefined, "POST");
+    for (let i = 0; d.data?.processing_info && d.data.processing_info.state !== "succeeded"; i++) {
+      if (d.data.processing_info.state === "failed") throw new SocialError("X couldn't process the video");
+      if (i >= 60) throw new SocialError("X took too long to process the video", 502);
+      await netDeps.sleep(Math.min(30, Math.max(1, Number(d.data.processing_info.check_after_secs) || 1)) * 1000);
+      d = await xCall(`/media/upload?command=STATUS&media_id=${encodeURIComponent(id)}`, token);
+    }
+    return String(id);
+  }
+  if (!d.data?.id) throw new SocialError("X did not confirm the media upload", 502);
+  return String(d.data.id);
+}
+async function xPublish(token: string, text: string, media: string[], username: string): Promise<Plan> {
+  const { main, reply } = xSplitText(text);
+  if (!main && !media.length) throw new SocialError("X needs text or media in the main post after links move to a reply");
+  if (xWeightedLength(main) > 280 || xWeightedLength(reply) > 280) throw new SocialError("X main posts and link replies are at most 280 weighted characters");
+  if (media.length > 4 || (media.some(isVideo) && media.length !== 1)) throw new SocialError("X takes up to four images or one video");
+  const ids: string[] = [];
+  for (const url of media) ids.push(await xUpload(token, url));
+  const d = await xCall("/tweets", token, { ...(main ? { text: main } : {}), ...(ids.length ? { media: { media_ids: ids } } : {}) });
+  if (!d.data?.id) throw new SocialError("X did not confirm the post; check the account before posting again", 502);
+  const plan: Plan = { stage: "published", external: String(d.data.id), url: username ? `https://x.com/${username.replace(/^@/, "")}/status/${d.data.id}` : null };
+  if (reply) {
+    try {
+      const sent = await xCall("/tweets", token, { text: reply, reply: { in_reply_to_tweet_id: String(d.data.id) } });
+      if (!sent.data?.id) throw new SocialError("X did not confirm the link reply; check X before retrying", 502);
+    }
+    catch (e) { plan.error = `Main post published. Link reply failed: ${(e as Error).message}`; }
+  }
+  return plan;
+}
 
 /** Threads: what the container looks like. Pure (tested). */
 export function threadsPlan(text: string, media: string[]): { kind: "text" } | { kind: "single"; url: string; video: boolean } | { kind: "carousel"; items: { url: string; video: boolean }[] } {
@@ -253,6 +398,7 @@ export async function netPublish(api: NetApi, externalId: string, token: string,
     }
     return { stage: "th_container", container: String(id) };
   }
+  if (api === "x") return xPublish(token, text, media, String(target.xUsername ?? ""));
   tiktokPlan(text, media, target);   // the customer's own choices are complete before TikTok is asked anything
   // The creator's settings now: the chosen privacy level must still be offered (no fallback), and they must be able to post.
   const ci = await tiktokCreatorInfo(token);
@@ -283,6 +429,7 @@ export async function netRead(api: NetApi, externalId: string, token: string, st
     const m = await call(`https://graph.threads.net/v1.0/${pub.id}?${q({ fields: "permalink", access_token: token })}`).catch(() => null);
     return { state: "published", external: String(pub.id), url: m?.permalink ?? null };
   }
+  if (api === "x") return { state: "published", external: container, url: username ? `https://x.com/${username.replace(/^@/, "")}/status/${container}` : null };
   const d = await call("https://open.tiktokapis.com/v2/post/publish/status/fetch/", { json: { publish_id: container }, bearer: token });
   const st = d.data?.status;
   if (st === "FAILED") return { state: "failed", error: `TikTok couldn't post it${d.data?.fail_reason ? `: ${String(d.data.fail_reason).replace(/_/g, " ")}` : ""}` };

@@ -1,9 +1,18 @@
 /** ConstructHUB Direct — Instagram login, Threads, TikTok (server/social/native-nets.ts): plans, sign-in, refresh, and the
  * full publish path through NativeClient against fake networks and the development database. */
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { pool } from "../db";
-import { creatorInfoFrom, netAuthUrl, netConfigured, netDeps, netExchange, netPublish, needsRefresh, netScopes, threadsPlan, tiktokCreatorInfo, tiktokPlan } from "./native-nets";
-import { NativeClient, ensureNativeSchema, nativeNetConnect, nativeNetworks, removeNativeAccounts } from "./native";
+import { decryptToken } from "../gbp/token-crypto";
+import { deletePost } from "./insights";
+import { creatorInfoFrom, netAuthUrl, netConfigured, netDeps, netExchange, netPublish, netRefresh, netRedirect, xDelete, needsRefresh, netScopes, threadsPlan, tiktokCreatorInfo, tiktokPlan } from "./native-nets";
+import { NativeClient, ensureNativeSchema, nativeNetConnect, nativeNetworks, newOAuthState, oauthStateMatches, removeNativeAccounts } from "./native";
+
+import { createHash } from "node:crypto";
+import { recordFailure } from "../ops/issues";
+vi.mock("../ops/issues", () => ({ recordFailure: vi.fn(async () => {}) }));
+const realSleep = netDeps.sleep;
+const realMediaHttp = netDeps.mediaHttp;
+afterEach(() => { netDeps.sleep = realSleep; netDeps.mediaHttp = realMediaHttp; vi.clearAllMocks(); });
 
 const ok = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 const ENV = {
@@ -132,6 +141,37 @@ describe.skipIf(!process.env.DATABASE_URL || !process.env.GBP_TOKEN_KEY)("publis
   afterAll(async () => { fake(() => ({})); await removeNativeAccounts(tenant); netDeps.http = realHttp; await pool.query("DELETE FROM social_native_submissions WHERE tenant=$1", [tenant]); });
   const post = (accountId: string, text: string, mediaUrls: string[] = [], target: Record<string, unknown> = {}) => ({ post: { accountId, content: { text, mediaUrls, platform: "x" }, target } });
 
+  it("X persists rotated tokens, published status and reply warnings, then deletes through v2", async () => {
+    let refreshing = false;
+    const calls = fake((u, body) => {
+      if (u.pathname === "/2/oauth2/token") {
+        refreshing = body.grant_type === "refresh_token";
+        return { access_token: refreshing ? "rotated-access" : "first-access", refresh_token: refreshing ? "rotated-refresh" : "first-refresh", expires_in: refreshing ? 7200 : 1, scope: netScopes("x").join(" ") };
+      }
+      if (u.pathname === "/2/users/me") return { data: { id: "xuser", username: "roofer" } };
+      if (u.pathname === "/2/tweets/xpost") return { data: { deleted: true } };
+      if (u.pathname === "/2/tweets") return body.reply ? ok({ detail: "credits" }, 402) : { data: { id: "xpost" } };
+      throw new Error("Unexpected network call");
+    });
+    netDeps.env = () => XENV;
+    expect(await nativeNetConnect("x", tenant, "code", "verifier")).toBe("x");
+    const c = new NativeClient(tenant);
+    const x = (await c.accounts()).find(a => a.platform === "x")!;
+    const payload = post(x.id, "Roof example.com");
+    const sent = await c.submit(payload, "x-idem");
+    expect(refreshing).toBe(true);
+    const { rows: [stored] } = await pool.query("SELECT refresh_enc FROM social_native_accounts WHERE tenant=$1 AND id=$2", [tenant, x.id]);
+    expect(decryptToken(stored.refresh_enc)).toBe("rotated-refresh");
+    expect(stored.refresh_enc).not.toContain("rotated-refresh");
+    expect(await c.status(sent.submissionId)).toMatchObject({ state: "published", publicUrl: "https://x.com/roofer/status/xpost", error: expect.stringContaining("Link reply failed") });
+    const count = calls.length;
+    expect(await c.submit(payload, "x-idem")).toEqual(sent);
+    expect(calls).toHaveLength(count);
+    expect((await new NativeClient("chu999995b0").status(sent.submissionId)).state).toBe("failed");
+    expect(await deletePost(c, sent.submissionId)).toEqual({ network: "X" });
+    expect((await c.status(sent.submissionId)).publicUrl).toBeNull();
+  });
+
   it("connects Threads and publishes a text post once its container is ready", async () => {
     let ready = false;
     fake((u) => {
@@ -207,4 +247,174 @@ describe.skipIf(!process.env.DATABASE_URL || !process.env.GBP_TOKEN_KEY)("publis
     const { submissionId } = await c.submit(post(ig.id, "Fresh gutters", ["https://constructhub.us/api/files/social/t/media.jpg"]) as any, "ig-1");
     expect(await c.status(submissionId)).toEqual({ state: "published", publicUrl: "https://www.instagram.com/p/xyz/", error: null });
   });
+});
+
+const XENV = { SOCIAL_X_CLIENT_ID: "test-client", SOCIAL_X_CLIENT_SECRET: "test-secret" };
+describe("X adapter", () => {
+  it("requires both keys, stores PKCE with one-use state and exposes only the S256 challenge", () => {
+    expect(netConfigured("x", {})).toBe(false);
+    expect(netConfigured("x", { SOCIAL_X_CLIENT_ID: "test-client" })).toBe(false);
+    expect(nativeNetworks(XENV)).toEqual(["x"]);
+    netDeps.env = () => XENV;
+    const pending = newOAuthState(7, 3, "x");
+    expect(pending.codeVerifier).toMatch(/^[\w-]{43}$/);
+    expect(oauthStateMatches(pending, 7, pending.state)).toBe(true);
+    expect(oauthStateMatches(pending, 8, pending.state)).toBe(false);
+    const u = new URL(netAuthUrl("x", pending.state, pending.codeVerifier));
+    expect(u.origin + u.pathname).toBe("https://x.com/i/oauth2/authorize");
+    expect(u.searchParams.get("code_challenge")).toBe(createHash("sha256").update(pending.codeVerifier!).digest("base64url"));
+    expect(u.searchParams.get("code_challenge_method")).toBe("S256");
+    expect(u.searchParams.get("scope")).toBe("tweet.read tweet.write users.read media.write offline.access");
+    expect(u.searchParams.get("redirect_uri")).toBe(netRedirect("x"));
+    expect(u.href).not.toContain(pending.codeVerifier!);
+    expect(() => netAuthUrl("x", "state")).toThrow(/PKCE/);
+  });
+  it("exchanges immediately with Basic and verifier, reads users/me, and rotates refresh tokens", async () => {
+    const calls = fake((u, body, init) => {
+      if (u.pathname === "/2/oauth2/token") {
+        expect(init.headers.Authorization).toBe(`Basic ${Buffer.from("test-client:test-secret").toString("base64")}`);
+        return { access_token: body.grant_type === "refresh_token" ? "new-access" : "access", refresh_token: body.grant_type === "refresh_token" ? "new-refresh" : "refresh", expires_in: 7200, scope: netScopes("x").join(" ") };
+      }
+      expect(u.pathname).toBe("/2/users/me");
+      expect(u.searchParams.get("user.fields")).toBe("profile_image_url,username,name");
+      expect(init.headers.Authorization).toBe("Bearer access");
+      return { data: { id: "12", username: "roofer", name: "Roofing", profile_image_url: "https://img.example/a.jpg" } };
+    });
+    netDeps.env = () => XENV;
+    const signed = await netExchange("x", "short-code", "verifier");
+    expect(calls[0].body).toEqual({ grant_type: "authorization_code", code: "short-code", redirect_uri: netRedirect("x"), code_verifier: "verifier" });
+    expect(signed).toMatchObject({ externalId: "12", name: "@roofer", token: "access", refresh: "refresh" });
+    expect(needsRefresh("x", signed.expiresAt)).toBe(false);
+    expect(needsRefresh("x", new Date(Date.now() + 300_000))).toBe(true);
+    expect(await netRefresh("x", "access", "refresh")).toMatchObject({ token: "new-access", refresh: "new-refresh" });
+    expect(calls[2].body).toEqual({ grant_type: "refresh_token", refresh_token: "refresh" });
+  });
+  it("publishes a URL-free main post and exactly one link reply, preserving main success on reply failure", async () => {
+    const calls = fake((_u, body) => body.reply ? ok({ detail: "credits exhausted" }, 402) : { data: { id: "123" } });
+    const p = await netPublish("x", "12", "access", "Our roof https://example.com/a and www.example.org", [], { xUsername: "@roofer" });
+    expect(calls.map(c => c.body)).toEqual([{ text: "Our roof and" }, { text: "https://example.com/a\nwww.example.org", reply: { in_reply_to_tweet_id: "123" } }]);
+    expect(p).toMatchObject({ stage: "published", external: "123", url: "https://x.com/roofer/status/123", error: expect.stringContaining("Main post published. Link reply failed:") });
+    expect(recordFailure).toHaveBeenCalledWith("job", "X posting credits", expect.any(Error));
+  });
+  it("publishes a successful reply and deletes via v2", async () => {
+    const calls = fake(() => ({ data: { id: "123", deleted: true } }));
+    expect(await netPublish("x", "12", "access", "Hi example.com", [], { xUsername: "roofer" })).not.toHaveProperty("error");
+    await xDelete("access", "123");
+    expect(calls[2].url.pathname).toBe("/2/tweets/123");
+    expect(calls[2].init.method).toBe("DELETE");
+  });
+  it.each([[401, {}, /reconnect/], [402, {}, /out of credits/], [403, { detail: "CreditsDepleted" }, /out of credits/], [429, {}, /try again later/], [403, { detail: "duplicate content" }, /already has this content/]])("maps X status %s", async (status, error, message) => {
+    fake(() => ok(error, status as number));
+    await expect(netPublish("x", "12", "access", "Hi", [], {})).rejects.toThrow(message as RegExp);
+  });
+  it("rejects weighted overflow and link-only text before any request", async () => {
+    const calls = fake(() => { throw new Error("unexpected request"); });
+    await expect(netPublish("x", "12", "access", "中".repeat(141), [], {})).rejects.toThrow(/280/);
+    await expect(netPublish("x", "12", "access", "https://example.com", [], {})).rejects.toThrow(/main post/);
+    await expect(netPublish("x", "12", "access", "Hi " + Array.from({ length: 12 }, (_, i) => `https://e${i}.com`).join(" "), [], {})).rejects.toThrow(/280/);
+    expect(calls).toHaveLength(0);
+  });
+  it.each([false, true])("uploads image/video (video=%s) and polls processing before posting", async (video) => {
+    const requests: { path: string; body: any }[] = [];
+    netDeps.sleep = async () => {};
+    netDeps.mediaHttp = async (url) => {
+      expect(url).toMatch(/^https:\/\/media.example.com/);
+      return new Response(new Uint8Array(video ? 5 * 1024 * 1024 + 1 : 10));
+    };
+    netDeps.http = (async (raw: any, init: any) => {
+      const u = new URL(String(raw));
+      if (u.hostname === "media.example.com") {
+        expect(init.headers?.Authorization).toBeUndefined();
+        expect(init.redirect).toBe("error");
+        return new Response(new Uint8Array(video ? 5 * 1024 * 1024 + 1 : 10));
+      }
+      const body = typeof init.body === "string" ? JSON.parse(init.body) : init.body;
+      requests.push({ path: u.pathname + u.search, body });
+      expect(init.headers.Authorization).toBe("Bearer access");
+      if (u.pathname.endsWith("/append")) return new Response(null, { status: 204 });
+      if (u.pathname.endsWith("/finalize")) return ok({ data: { id: "media1", processing_info: { state: "pending", check_after_secs: 1 } } });
+      if (u.search) return ok({ data: { processing_info: { state: "succeeded" } } });
+      return ok({ data: { id: u.pathname.endsWith("/tweets") ? "post1" : "media1" } });
+    }) as any;
+    await netPublish("x", "12", "access", "Hi", [`https://media.example.com/a.${video ? "mp4" : "jpg"}`], { xUsername: "roofer" });
+    expect(requests.at(-1)?.body).toEqual({ text: "Hi", media: { media_ids: ["media1"] } });
+    if (video) {
+      expect(requests[0].body).toEqual({ media_type: "video/mp4", total_bytes: 5 * 1024 * 1024 + 1, media_category: "tweet_video" });
+      expect(requests.slice(1, 3).map(r => r.body.get("segment_index"))).toEqual(["0", "1"]);
+      expect(requests[4].path).toBe("/2/media/upload?command=STATUS&media_id=media1");
+    } else {
+      expect(requests[0].path).toBe("/2/media/upload");
+      expect(requests[0].body.get("media_category")).toBe("tweet_image");
+      expect(requests[0].body.get("media").size).toBe(10);
+    }
+  });
+});
+
+describe("X account persistence without a database", () => {
+  afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
+  it("encrypts the connection and saves every rotated refresh token inside a row lock", async () => {
+    vi.stubEnv("GBP_TOKEN_KEY", Buffer.alloc(32, 7).toString("base64"));
+    let saved: any;
+    const query = vi.spyOn(pool, "query").mockImplementation((async (sql: string, args: any[]) => {
+      if (sql.startsWith("INSERT INTO social_native_accounts")) saved = { id: args[0], tenant: args[1], platform: args[2], external_id: args[3], name: args[4], token_enc: args[7], api: args[9], refresh_enc: args[10], token_expires_at: args[11] };
+      return { rows: sql.startsWith("SELECT") ? [saved] : [] };
+    }) as any);
+    let rotation = 0;
+    fake((u, body) => {
+      if (u.pathname === "/2/users/me") return { data: { id: "xuser", username: "roofer" } };
+      expect(u.pathname).toBe("/2/oauth2/token");
+      if (body.grant_type === "refresh_token") {
+        expect(body.refresh_token).toBe(`refresh-${rotation}`);
+        rotation++;
+      }
+      return { access_token: `access-${rotation}`, refresh_token: `refresh-${rotation}`, expires_in: 1, scope: netScopes("x").join(" ") };
+    });
+    netDeps.env = () => XENV;
+    await nativeNetConnect("x", "chu999998b0", "code", "verifier");
+    expect(saved.token_enc).not.toContain("access-0");
+    expect(decryptToken(saved.refresh_enc)).toBe("refresh-0");
+    const tx = vi.fn(async (sql: string, args?: any[]) => {
+      if (sql.startsWith("SELECT")) { expect(sql).toContain("FOR UPDATE"); return { rows: [saved] }; }
+      if (sql.startsWith("UPDATE")) {
+        expect(args?.slice(0, 2)).toEqual(["chu999998b0", saved.id]);
+        saved.token_enc = args![2]; saved.refresh_enc = args![3]; saved.token_expires_at = args![4];
+      }
+      return { rows: [] };
+    });
+    const release = vi.fn();
+    vi.spyOn(pool, "connect").mockResolvedValue({ query: tx, release } as never);
+    const c = new NativeClient("chu999998b0");
+    expect((await c.credentials(saved.id)).token).toBe("access-1");
+    expect(decryptToken(saved.refresh_enc)).toBe("refresh-1");
+    expect((await c.credentials(saved.id)).token).toBe("access-2");
+    expect(decryptToken(saved.refresh_enc)).toBe("refresh-2");
+    expect(tx.mock.calls.map(c => c[0]).filter(s => s === "COMMIT")).toHaveLength(2);
+    expect(release).toHaveBeenCalledTimes(2);
+    expect(query).toHaveBeenCalled();
+  });
+  it("returns a published post's persisted link-reply warning to the queue without retrying", async () => {
+    vi.spyOn(pool, "query").mockResolvedValue({ rows: [{ stage: "published", public_url: "https://x.com/roofer/status/123", error: "Main post published. Link reply failed: try again later" }] } as never);
+    const calls = fake(() => { throw new Error("must not repost"); });
+    expect(await new NativeClient("chu999998b0").status("nat_123")).toEqual({ state: "published", publicUrl: "https://x.com/roofer/status/123", error: "Main post published. Link reply failed: try again later" });
+    expect(calls).toHaveLength(0);
+  });
+  it("rejects an expired refresh grant as reconnect and leaves secrets out of the error", async () => {
+    fake(() => ok({ error: "invalid_grant", error_description: "secret-do-not-log" }, 400));
+    await expect(netRefresh("x", "access", "expired-refresh")).rejects.toMatchObject({ reconnect: true, message: expect.stringMatching(/reconnect/) });
+  });
+});
+
+it("X supports a media-only main post when all text moves into the reply", async () => {
+  netDeps.mediaHttp = async () => new Response(new Uint8Array([1, 2, 3]));
+  const calls = fake(u => ({ data: { id: u.pathname === "/2/media/upload" ? "m1" : "p1" } }));
+  await netPublish("x", "12", "access", "https://example.com", ["https://media.example.com/a.jpg"], { xUsername: "roofer" });
+  expect(calls[1].body).toEqual({ media: { media_ids: ["m1"] } });
+  expect(calls[2].body).toEqual({ text: "https://example.com", reply: { in_reply_to_tweet_id: "p1" } });
+});
+it("X does not post a video that failed processing or report unconfirmed deletion", async () => {
+  netDeps.mediaHttp = async () => new Response(new Uint8Array([1, 2, 3]));
+  const calls = fake(u => u.pathname.endsWith("/append") ? new Response(null, { status: 204 }) : u.pathname.endsWith("/finalize") ? { data: { processing_info: { state: "failed" } } } : { data: { id: "m1" } });
+  await expect(netPublish("x", "12", "access", "Video", ["https://media.example.com/a.mp4"], {})).rejects.toThrow(/process the video/);
+  expect(calls.some(c => c.url.pathname === "/2/tweets")).toBe(false);
+  await expect(xDelete("access", "p1")).rejects.toThrow(/confirm deletion/);
 });

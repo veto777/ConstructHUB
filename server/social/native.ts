@@ -38,12 +38,13 @@ export function nativeNetworks(env: NodeJS.ProcessEnv = process.env): string[] {
     ...(netConfigured("ig_login", env) ? ["instagram_direct"] : []),
     ...(netConfigured("threads", env) ? ["threads"] : []),
     ...(netConfigured("tiktok", env) ? ["tiktok"] : []),
+    ...(netConfigured("x", env) ? ["x"] : []),
   ];
 }
 /** Connect-screen network → which sign-in it uses. `instagram_direct` = Instagram login (no Facebook Page needed). */
-export const NETWORK_API: Record<string, NetApi | "meta"> = { facebook: "meta", instagram: "meta", instagram_direct: "ig_login", threads: "threads", tiktok: "tiktok" };
-const API_PLATFORM: Record<NetApi, string> = { ig_login: "instagram", threads: "threads", tiktok: "tiktok" };
-const API_NETWORK: Record<NetApi, string> = { ig_login: "instagram_direct", threads: "threads", tiktok: "tiktok" };
+export const NETWORK_API: Record<string, NetApi | "meta"> = { facebook: "meta", instagram: "meta", instagram_direct: "ig_login", threads: "threads", tiktok: "tiktok", x: "x" };
+const API_PLATFORM: Record<NetApi, string> = { ig_login: "instagram", threads: "threads", tiktok: "tiktok", x: "x" };
+const API_NETWORK: Record<NetApi, string> = { ig_login: "instagram_direct", threads: "threads", tiktok: "tiktok", x: "x" };
 export const nativeConfigured = (env: NodeJS.ProcessEnv = process.env) => nativeNetworks(env).length > 0;
 /** Someone signed in, as far as ConstructHUB Direct cares: their email (req.user, or a users row). */
 export type NativeViewer = { email?: string | null } | null | undefined;
@@ -167,9 +168,9 @@ async function graph(method: "GET" | "POST" | "DELETE", path: string, params: Re
 
 // ── connecting ──────────────────────────────────────────────────────────────────────────────────────────────
 
-export type PendingOAuth = { state: string; userId: number; businessId: number | null; network: string; expires: number };
+export type PendingOAuth = { codeVerifier?: string; state: string; userId: number; businessId: number | null; network: string; expires: number };
 export const newOAuthState = (userId: number, businessId: number | null, network: string): PendingOAuth =>
-  ({ state: randomBytes(32).toString("base64url"), userId, businessId, network, expires: nativeDeps.now() + 10 * 60_000 });
+  ({ ...(network === "x" ? { codeVerifier: randomBytes(32).toString("base64url") } : {}), state: randomBytes(32).toString("base64url"), userId, businessId, network, expires: nativeDeps.now() + 10 * 60_000 });
 /** The callback belongs to the sign-in we started for this signed-in user, and it is not stale. Pure. */
 export function oauthStateMatches(p: PendingOAuth | undefined | null, userId: number | undefined, state: unknown): p is PendingOAuth {
   if (!p || typeof state !== "string" || p.userId !== userId || p.expires < nativeDeps.now()) return false;
@@ -261,8 +262,8 @@ async function upsertAccount(tenant: string, platform: string, externalId: strin
 }
 
 /** Back from Instagram login, Threads or TikTok: the signed-in account is connected straight away (no page to pick). */
-export async function nativeNetConnect(api: NetApi, tenant: string, code: string): Promise<string> {
-  const s = await netExchange(api, code);
+export async function nativeNetConnect(api: NetApi, tenant: string, code: string, verifier?: string): Promise<string> {
+  const s = await netExchange(api, code, verifier);
   await upsertAccount(tenant, API_PLATFORM[api], s.externalId, s.name, s.picture, null, s.token, { api, refresh: s.refresh, expiresAt: s.expiresAt, scopes: s.scopes, owner: s.externalId });
   return API_NETWORK[api];
 }
@@ -356,6 +357,27 @@ export class NativeClient implements SocialClient {
   }
   /** The account's token, refreshed first when it is about to expire (TikTok daily; Instagram login / Threads every 60 days). */
   private async token(acct: Row): Promise<string> {
+    // X refresh tokens rotate: serialize across workers and reread after acquiring the row lock.
+    if (acct.api === "x") {
+      const db = await pool.connect();
+      try {
+        await db.query("BEGIN");
+        const { rows: [current] } = await db.query("SELECT * FROM social_native_accounts WHERE tenant=$1 AND id=$2 FOR UPDATE", [this.tenant, acct.id]);
+        if (!current || current.needs_reconnect) throw new SocialError("This X account is no longer connected; reconnect it", 409);
+        let token = dec(current.token_enc);
+        if (needsRefresh("x", current.token_expires_at ? new Date(current.token_expires_at) : null)) {
+          const f = await netRefresh("x", token, current.refresh_enc ? dec(current.refresh_enc) : null);
+          await db.query("UPDATE social_native_accounts SET token_enc=$3,refresh_enc=$4,token_expires_at=$5,updated_at=now() WHERE tenant=$1 AND id=$2", [this.tenant, acct.id, enc(f.token), f.refresh ? enc(f.refresh) : null, f.expiresAt]);
+          token = f.token;
+        }
+        await db.query("COMMIT");
+        return token;
+      } catch (e) {
+        await db.query("ROLLBACK");
+        await this.markReconnect(acct.id, e);
+        throw e;
+      } finally { db.release(); }
+    }
     const token = dec(acct.token_enc);
     if (acct.api === "meta" || !needsRefresh(acct.api as NetApi, acct.token_expires_at ? new Date(acct.token_expires_at) : null)) return token;
     try {
@@ -413,8 +435,8 @@ export class NativeClient implements SocialClient {
       [id, key, this.tenant, acct.id, acct.platform]);
     try {
       if (acct.api !== "meta") {
-        const p = await netPublish(acct.api as NetApi, acct.external_id, token, text, media, payload.post.target ?? {});
-        await this.setSub(id, { stage: p.stage, container_id: p.container ?? null, external_id: p.external ?? null });
+        const p = await netPublish(acct.api as NetApi, acct.external_id, token, text, media, { ...payload.post.target, xUsername: acct.name });
+        await this.setSub(id, { stage: p.stage, container_id: p.container ?? null, external_id: p.external ?? null, public_url: p.url ?? null, error: p.error ?? null });
       } else if (acct.platform === "facebook") await this.facebookSend(id, acct, token, text, media);
       else if (acct.platform === "instagram") await this.instagramSend(id, acct, token, text, media);
       else throw new SocialError(`${acct.platform} isn't available for posting yet`);
@@ -470,7 +492,7 @@ export class NativeClient implements SocialClient {
   async status(submissionId: string): Promise<StatusResult> {
     const { rows: [s] } = await pool.query("SELECT * FROM social_native_submissions WHERE tenant=$1 AND id=$2", [this.tenant, submissionId]);
     if (!s) return { state: "failed", publicUrl: null, error: "We lost track of this post; check the account before posting it again" };
-    if (s.stage === "published") return { state: "published", publicUrl: s.public_url, error: null };
+    if (s.stage === "published") return { state: "published", publicUrl: s.public_url, error: s.error ?? null };
     if (s.stage === "failed") return { state: "failed", publicUrl: null, error: s.error };
     // Deleted on the network from ConstructHUB (./insights.ts): it was published; its link is gone.
     if (s.stage === "deleted") return { state: "published", publicUrl: null, error: null };

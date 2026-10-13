@@ -83,15 +83,17 @@ export default function DataDeletionPage() {
       <section className="mb-8" data-testid="section-network-settings">
         <h2 className="text-xl font-semibold mb-3">3. Remove ConstructHUB in the network's own settings</h2>
         <p className="mb-2">
-          You can remove ConstructHUB's access from the network itself. The network tells us, and we delete the same data
-          automatically. For example:
+          You can remove ConstructHUB's access from the network itself. Networks with deletion notifications tell us to delete the same data automatically. For example:
         </p>
         <ul className="list-disc pl-6 space-y-1">
           <li><strong>Facebook</strong>: Settings &amp; privacy → Settings → Business integrations (or Apps and websites) → ConstructHUB → Remove.</li>
           <li><strong>Instagram</strong>: Settings → Website permissions → Apps and websites → ConstructHUB → Remove.</li>
           <li><strong>Threads</strong>: Settings → Account → Website permissions → ConstructHUB → Remove.</li>
-          <li><strong>TikTok, LinkedIn, YouTube (Google), Pinterest, X and Bluesky</strong>: remove ConstructHUB under the connected or authorized apps section of that account's settings.</li>
+          <li><strong>TikTok, LinkedIn, YouTube (Google), Pinterest and Bluesky</strong>: remove ConstructHUB under the connected or authorized apps section of that account's settings.</li>
         </ul>
+        <p className="mt-2" data-testid="x-data-deletion">
+          For X, revoke ConstructHUB at <a href="https://x.com/settings/connected_apps" className="text-primary hover:underline">X connected apps</a>. This stops access; also disconnect in ConstructHUB to delete stored access and refresh tokens and account details. Delete your ConstructHUB account or request deletion by email to remove retained post records. Published main posts and link replies remain on X until you delete them there.
+        </p>
         <p className="mt-2">
           When Meta asks us to delete data, we give you a confirmation code. You can check its status on this page at
           <code className="mx-1">constructhub.us/data-deletion?code=YOURCODE</code>.

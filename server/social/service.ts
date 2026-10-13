@@ -133,7 +133,7 @@ export async function nativeConnectUrl(userId: number, businessId: number | null
     const pending = newOAuthState(userId, businessId, network);
     req.session.socialNativeOAuth = pending;
     const api = NETWORK_API[network];
-    return { authUrl: api === "meta" ? metaAuthUrl(pending.state) : netAuthUrl(api, pending.state) };
+    return { authUrl: api === "meta" ? metaAuthUrl(pending.state) : netAuthUrl(api, pending.state, pending.codeVerifier) };
   });
 }
 
@@ -165,7 +165,7 @@ export async function nativeNetCallback(req: any, userId: number, api: NetApi): 
   if (!oauthStateMatches(pending, userId, req.query?.state) || NETWORK_API[pending.network] !== api) return back("connect_error=expired");
   if (typeof req.query?.error === "string" || typeof req.query?.code !== "string") return back("connect_error=cancelled");
   try {
-    const network = await nativeNetConnect(api, tenantFor(userId, business), req.query.code);
+    const network = await nativeNetConnect(api, tenantFor(userId, business), req.query.code, pending.codeVerifier);
     await logActivity(req, userId, "social.pages_connected", { provider: "native", network });
     return back(`connected=${network}`);
   } catch (e) {

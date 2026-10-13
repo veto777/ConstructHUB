@@ -12,6 +12,7 @@
  *
  * Answers are cached for 10 minutes per account / post, and dropped after anything is changed.
  */
+import { xDelete } from "./native-nets";
 import { pool } from "../db";
 import { SocialError } from "./client";
 import { NativeClient, graphError, nativeDeps, type NativeRow } from "./native";
@@ -31,8 +32,8 @@ const forget = (prefix: string) => { for (const k of cache.keys()) if (k.startsW
 
 // ── calls ──────────────────────────────────────────────────────────────────────────────────────────────────
 
-type Api = "meta" | "ig_login" | "threads" | "tiktok";
-const HOST: Record<Exclude<Api, "tiktok">, string> = {
+type Api = "meta" | "ig_login" | "threads" | "tiktok" | "x";
+const HOST: Record<Exclude<Api, "tiktok" | "x">, string> = {
   meta: "https://graph.facebook.com/v25.0", ig_login: "https://graph.instagram.com/v25.0", threads: "https://graph.threads.net/v1.0",
 };
 async function req(url: string, init: RequestInit): Promise<{ r: Response; d: any }> {
@@ -44,7 +45,7 @@ async function req(url: string, init: RequestInit): Promise<{ r: Response; d: an
   return { r, d };
 }
 /** Meta-family Graph (Facebook, Instagram, Threads hosts). */
-async function g(api: Exclude<Api, "tiktok">, method: "GET" | "POST" | "DELETE", path: string, params: Record<string, string | number | boolean | undefined>, token: string): Promise<any> {
+async function g(api: Exclude<Api, "tiktok" | "x">, method: "GET" | "POST" | "DELETE", path: string, params: Record<string, string | number | boolean | undefined>, token: string): Promise<any> {
   const q = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) if (v !== undefined) q.set(k, String(v));
   q.set("access_token", token);
@@ -93,6 +94,7 @@ async function accountStatsFor(row: NativeRow, token: string, days: number): Pro
   const out = blank(row, days);
   const until = Math.floor(nativeDeps.now() / 1000), since = until - days * 86400;
   const api = apiOf(row);
+  if (api === "x") return { ...out, note: "See your statistics on X." };
   if (api === "tiktok") {
     const u = (await tk("/v2/user/info/?fields=follower_count,following_count,likes_count,video_count", token)).data?.user ?? {};
     Object.assign(out, { followers: num(u.follower_count), following: num(u.following_count), likes: num(u.likes_count), posts: num(u.video_count) });
@@ -162,6 +164,7 @@ export async function postStats(client: NativeClient, submissionId: string): Pro
     const out: PostStats = { likes: null, comments: null, shares: null, views: null, reach: null, saves: null, note: null, deleted: sub.stage === "deleted" };
     if (out.deleted) return out;
     if (sub.stage !== "published") return { ...out, note: "Stats appear once the post is published." };
+    if (api === "x") return { ...out, note: "See this post’s statistics on X." };
     const id = sub.external_id;
     if (api === "tiktok") {
       // Reading a video's numbers needs the video.list scope, which ConstructHUB does not ask for (docs/social-apps/tiktok.md §2.2).
@@ -199,6 +202,7 @@ export async function comments(client: NativeClient, submissionId: string, after
   const page = cursor(after);
   return cached(`${client.tenant}:comments:${submissionId}${page ? `:${page}` : ""}`, async () => {
     const { sub, row, token, api } = await published(client, submissionId);
+    if (api === "x") return { comments: [], note: "Manage replies on X.", next: null };
     if (api === "tiktok") return { comments: [], note: NO_TIKTOK_COMMENTS, next: null };
     if (sub.stage !== "published" || !sub.external_id) return { comments: [], note: sub.stage === "deleted" ? "This post was deleted." : "Comments appear once the post is published.", next: null };
     const id = sub.external_id;
@@ -259,6 +263,7 @@ export async function replyComment(client: NativeClient, submissionId: string, c
   if (!text) throw new SocialError("Write a reply first");
   const { sub, row, token, api } = await live(client, submissionId);
   const cid = commentId(comment);
+  if (api === "x") throw new SocialError("Manage replies on X.");
   if (api === "tiktok") throw new SocialError(NO_TIKTOK_COMMENTS);
   await commentOnPost(api, row, String(sub.external_id ?? ""), cid, token);
   if (api === "threads") {
@@ -282,6 +287,7 @@ export async function replyComment(client: NativeClient, submissionId: string, c
 export async function hideComment(client: NativeClient, submissionId: string, comment: string, hidden: boolean) {
   const { sub, row, token, api } = await live(client, submissionId);
   const cid = commentId(comment);
+  if (api === "x") throw new SocialError("Manage replies on X.");
   if (api === "tiktok") throw new SocialError(NO_TIKTOK_COMMENTS);
   await commentOnPost(api, row, String(sub.external_id ?? ""), cid, token);
   if (api === "threads") await g("threads", "POST", `${cid}/manage_reply`, { hide: hidden }, token);
@@ -294,6 +300,7 @@ export async function hideComment(client: NativeClient, submissionId: string, co
 export async function deleteComment(client: NativeClient, submissionId: string, comment: string) {
   const { sub, row, token, api } = await live(client, submissionId);
   const cid = commentId(comment);
+  if (api === "x") throw new SocialError("Manage replies on X.");
   if (api === "tiktok") throw new SocialError(NO_TIKTOK_COMMENTS);
   await commentOnPost(api, row, String(sub.external_id ?? ""), cid, token);
   await g(api === "threads" ? "threads" : api === "ig_login" ? "ig_login" : "meta", "DELETE", cid, {}, token);
@@ -306,12 +313,13 @@ export async function deleteComment(client: NativeClient, submissionId: string, 
 /** Delete it on the network; ConstructHUB keeps the record, marked deleted. Returns the network's name for the message. */
 export async function deletePost(client: NativeClient, submissionId: string): Promise<{ network: string }> {
   const { sub, row, token, api } = await published(client, submissionId);
-  const network = api === "tiktok" ? "TikTok" : api === "threads" ? "Threads" : row.platform === "facebook" ? "Facebook" : "Instagram";
+  const network = api === "x" ? "X" : api === "tiktok" ? "TikTok" : api === "threads" ? "Threads" : row.platform === "facebook" ? "Facebook" : "Instagram";
   if (sub.stage === "deleted") return { network };
   if (sub.stage !== "published") throw new SocialError("This post isn't published yet, so there's nothing to delete on the network.", 409);
   if (api === "tiktok") throw new SocialError("TikTok doesn't let apps delete videos; delete it in the TikTok app.");
   if (!sub.external_id) throw new SocialError(`The network didn't return this post's ID; delete it on ${network}.`);
-  await g(api === "threads" ? "threads" : api === "ig_login" ? "ig_login" : "meta", "DELETE", sub.external_id, {}, token);
+  if (api === "x") await xDelete(token, sub.external_id);
+  else await g(api === "threads" ? "threads" : api === "ig_login" ? "ig_login" : "meta", "DELETE", sub.external_id, {}, token);
   await pool.query("UPDATE social_native_submissions SET stage='deleted',updated_at=now() WHERE tenant=$1 AND id=$2", [client.tenant, sub.id]);
   forgetPost(client.tenant, submissionId); forget(`${client.tenant}:acct:${row.id}`);
   return { network };

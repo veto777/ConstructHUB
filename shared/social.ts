@@ -1,6 +1,8 @@
+import { xSplitText, xWeightedLength } from "./social-x";
 import { z } from "zod";
 export const platforms = [
   "twitter",
+  "x",
   "facebook",
   "instagram",
   "linkedin",
@@ -13,6 +15,7 @@ export const platforms = [
 // Conservative plain-text caps; provider still validates media and account-specific restrictions.
 export const socialLimits: Record<string, number> = {
   twitter: 280,
+  x: 280,
   facebook: 63206,
   instagram: 2200,
   linkedin: 3000,
@@ -153,10 +156,15 @@ export function postPayload(
   ai = false,
 ) {
   if (!text.trim()) throw new Error(`${d.platform}: post text is required`);
-  if ([...text].length > socialLimits[d.platform])
+  if ((d.platform === "x" ? xWeightedLength(xSplitText(text).main) : [...text].length) > socialLimits[d.platform])
     throw new Error(
       `${d.platform}: text exceeds ${socialLimits[d.platform]} characters`,
     );
+  if (d.platform === "x") {
+    const { main, reply } = xSplitText(text);
+    if (!main && !mediaUrls.length) throw new Error("X needs text or media in the main post after links move to a reply");
+    if (xWeightedLength(reply) > 280) throw new Error("X link reply exceeds 280 weighted characters");
+  }
   if (d.platform === "facebook" && !d.pageId)
     throw new Error("Facebook requires a Page");
   if (

@@ -6,6 +6,7 @@
  * sessionStorage, with a try/catch + in-memory fallback, so blocked storage degrades to
  * visit-only persistence instead of losing the edit. Posting or scheduling clears the draft.
  */
+import { xSplitText, xWeightedLength } from "@shared/social-x";
 import { destinationSchema, postSchema, socialLimits, type Destination } from "@shared/social";
 import type { z } from "zod";
 
@@ -112,7 +113,7 @@ export function saveRowEdits(accountId: string | number | null | undefined, edit
 
 /** Display stored destinations without exposing provider identifiers to people. */
 export function destinationLabel(d: Destination, accounts: { id: string; name?: string; pages?: { id: string; name?: string }[]; boards?: { id: string; name?: string }[] }[]): string {
-  const platform = ({ facebook: "Facebook", linkedin: "LinkedIn", pinterest: "Pinterest", twitter: "X", instagram: "Instagram", youtube: "YouTube", tiktok: "TikTok", threads: "Threads", bluesky: "Bluesky" })[d.platform];
+  const platform = ({ facebook: "Facebook", linkedin: "LinkedIn", pinterest: "Pinterest", twitter: "X", x: "X", instagram: "Instagram", youtube: "YouTube", tiktok: "TikTok", threads: "Threads", bluesky: "Bluesky" })[d.platform];
   const account = accounts.find(a => a.id === d.accountId);
   const name = account?.name?.trim() || platform + " account";
   const target = d.pageId ? account?.pages?.find(p => p.id === d.pageId)?.name?.trim() || platform + " page"
@@ -122,7 +123,7 @@ export function destinationLabel(d: Destination, accounts: { id: string; name?: 
 
 /** Large Facebook limits matter only when the text approaches the cap. */
 export function characterCount(platform: string, text: string): string {
-  const count = [...text].length;
+  const count = platform === "x" ? xWeightedLength(xSplitText(text).main) : [...text].length;
   const limit = socialLimits[platform];
   return platform === "facebook" && count < limit * 0.9
     ? `${count} characters` : `${count}/${limit} characters`;

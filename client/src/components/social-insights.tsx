@@ -24,7 +24,7 @@ type AccountStats = {
 type PostStats = { likes: number | null; comments: number | null; shares: number | null; views: number | null; reach: number | null; saves: number | null; note: string | null; deleted: boolean };
 type Comment = { id: string; text: string; author: string; at: string | null; likes: number | null; hidden: boolean; mine: boolean; canHide: boolean; canDelete: boolean; replies: Comment[] };
 
-const NETWORK: Record<string, string> = { facebook: "Facebook", instagram: "Instagram", threads: "Threads", tiktok: "TikTok" };
+const NETWORK: Record<string, string> = { facebook: "Facebook", instagram: "Instagram", threads: "Threads", tiktok: "TikTok", x: "X" };
 const fmt = (n: number | null) => (n === null ? "—" : n >= 10_000 ? `${(n / 1000).toFixed(n >= 100_000 ? 0 : 1)}K` : n.toLocaleString());
 const scopeOf = (businessId: number | null | undefined) => (businessId ? `?businessId=${businessId}` : "");
 const withScope = (path: string, businessId: number | null | undefined) => `${path}${businessId ? `${path.includes("?") ? "&" : "?"}businessId=${businessId}` : ""}`;
@@ -121,7 +121,7 @@ export function SocialPostInsights({ post }: { post: any }) {
       </div>
       {!s?.deleted && (
         <div className="flex flex-wrap gap-2">
-          {platform !== "tiktok" && <GooglePill size="sm" variant="outline" label={open ? "Hide comments" : "Comments"} onClick={() => setOpen((o) => !o)} testId={`button-comments-${post.id}`} />}
+          {platform !== "tiktok" && platform !== "x" && <GooglePill size="sm" variant="outline" label={open ? "Hide comments" : "Comments"} onClick={() => setOpen((o) => !o)} testId={`button-comments-${post.id}`} />}
           {platform !== "tiktok" ? (
             <GooglePill size="sm" variant="quiet" label={`Delete from ${network}`} disabled={del.isPending} onClick={() => setConfirmDelete(true)} testId={`button-delete-published-${post.id}`} />
           ) : (

@@ -11,11 +11,12 @@ import { GoogleSectionHeader, GooglePill } from "@/components/google";
 import { useToast } from "@/hooks/use-toast";
 import { useUrlParam } from "@/hooks/use-url-param";
 
-const LABEL: Record<string, string> = { facebook: "Facebook", instagram: "Instagram", instagram_direct: "Instagram (no Facebook Page)", linkedin: "LinkedIn", tiktok: "TikTok", youtube: "YouTube", pinterest: "Pinterest", threads: "Threads", twitter: "X" };
+const LABEL: Record<string, string> = { facebook: "Facebook", instagram: "Instagram", instagram_direct: "Instagram (no Facebook Page)", linkedin: "LinkedIn", tiktok: "TikTok", youtube: "YouTube", pinterest: "Pinterest", threads: "Threads", x: "X", twitter: "X" };
 const NOTE: Record<string, string> = {
   instagram: "Business or Creator account linked to your Facebook Page",
   instagram_direct: "Business or Creator account, signed in with Instagram",
   threads: "Your Threads profile",
+  x: "Your X profile · links move to a reply",
   facebook: "Pick the Pages to post to",
   linkedin: "Your profile or company Pages",
   tiktok: "You choose who can view each post",

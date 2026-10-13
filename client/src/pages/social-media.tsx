@@ -33,6 +33,7 @@ import { useLocation } from "wouter";
 import { ToolBarSlot } from "@/components/tool/shell";
 import { socialHref, socialViewOf, type SocialView } from "@/components/social-tool/nav";
 import { NetworkIcon, SocialWeek } from "@/components/social-week";
+import { XPreview } from "@/components/social-x";
 import { TikTokDeclaration, TikTokPanel } from "@/components/social-tiktok";
 
 // Google's rounded field shape for the native selects (the surface supplies the hairline colour).
@@ -692,15 +693,16 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
             {[...new Set(destinations.map((d) => d.platform))].map((p) => (
               <label className="block space-y-1" key={p}>
                 <span className="text-sm">
-                  {p} text tweak · {characterCount(p, tweaks[p] ?? text)}
+                  {p === "x" ? "X" : p} text tweak · {characterCount(p, tweaks[p] ?? text)}
                 </span>
                 <Textarea
-                  aria-label={`${p} text tweak`}
+                  aria-label={`${p === "x" ? "X" : p} text tweak`}
                   value={tweaks[p] ?? text}
                   onChange={(e) =>
                     setTweaks({ ...tweaks, [p]: e.target.value })
                   }
                 />
+                {p === "x" && <XPreview text={tweaks[p] ?? text} />}
               </label>
             ))}
             <label className="block space-y-2">

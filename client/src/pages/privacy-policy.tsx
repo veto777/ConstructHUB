@@ -256,6 +256,13 @@ export default function PrivacyPolicyPage() {
           </p>
         </section>
 
+        <section className="mb-8" data-testid="section-x">
+          <h3 className="text-lg font-medium mt-4 mb-2">4.6 X (Twitter)</h3>
+          <p><strong>What we access and why:</strong> when you connect X through ConstructHUB Direct, we access your account ID, username, display name and profile image to identify your account. Encrypted access and rotating refresh tokens let us upload your chosen media, publish and delete your posts, and publish links as one reply to your main post. We request tweet.read, tweet.write, users.read, media.write and offline.access; we do not access direct messages.</p>
+          <p><strong>Retention:</strong> tokens and connected account details remain until you disconnect or delete your ConstructHUB account. Your captions, chosen media, post IDs, links, status and reply-failure messages remain in your ConstructHUB records until deleted. We do not sell X data or use it for advertising.</p>
+          <p><strong>Revocation and deletion:</strong> Disconnect in Social Media deletes our stored tokens and account details. You can also revoke access at <a href="https://x.com/settings/connected_apps" className="text-primary hover:underline">X connected apps</a>; revocation stops our access but does not itself delete our stored records. Disconnect here, delete your ConstructHUB account, or email support@constructhub.us for deletion within 30 days. Posts and link replies already on X remain until deleted on X. See our <a href="/data-deletion" className="text-primary hover:underline">data-deletion instructions</a> and <a href="https://x.com/en/privacy" className="text-primary hover:underline">X Privacy Policy</a>.</p>
+        </section>
+
         <section className="mb-8" data-testid="section-third-party-services">
           <h2 className="text-xl font-semibold mb-3">5. Third-Party Services</h2>
           <p className="mb-3">We integrate with the following third-party services, each of which has its own privacy policy:</p>

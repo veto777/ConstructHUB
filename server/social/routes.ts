@@ -308,7 +308,7 @@ export function registerSocialRoutes(
     res.redirect(302, await nativeCallback(req, user.id));
   });
   // Instagram login, Threads and TikTok come back here (each registered as its app's redirect URI).
-  for (const [path, api] of [["instagram", "ig_login"], ["threads", "threads"], ["tiktok", "tiktok"]] as const) {
+  for (const [path, api] of [["instagram", "ig_login"], ["threads", "threads"], ["tiktok", "tiktok"], ["x", "x"]] as const) {
     app.get(`/api/social/native/${path}/callback`, async (req: Request, res: Response) => {
       const user = auth(req, res); if (!user) return;
       res.setHeader("Cache-Control", "no-store");
