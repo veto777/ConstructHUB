@@ -3,7 +3,6 @@ import type { Express } from "express";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { pool } from "../db";
-import { requireRecentAuth } from "../account-security";
 import { oauthBaseUrl } from "../site-context";
 import {
   routeFor,
@@ -46,8 +45,8 @@ export function registerGscRoutes(
   const route = routeFor(app, auth);
   // Starts Google OAuth for Search Console (Search-Console-only scope) and returns the
   // consent URL. "Connect Google Search Console" — site-connections.tsx.
+  // No "verify your identity" step (owner, 2026-10-13, as for Cloudflare): Google checks who the customer is next.
   route("get", "/api/gsc/connect", async (req, res, user) => {
-    if (!requireRecentAuth(req, res)) return;
     await budget(user, "connect");
     if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET)
       throw new ProviderError("Google OAuth is not configured", 503);
