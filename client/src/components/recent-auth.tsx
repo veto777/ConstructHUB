@@ -68,25 +68,43 @@ export function RecentAuthModal() {
     try{const r=await apiRequest('POST','/api/auth/reauth/email');const d=await r.json().catch(()=>({}));setSentTo(typeof d?.sentTo==='string'?d.sentTo:'');setSent(true);setValue('');}
     catch(e){setError(apiErrorMessage(e));}finally{setBusy(false);}
   };
-  return <Dialog open={!!challenge} onOpenChange={open=>{if(!open)close();}}><DialogContent onCloseAutoFocus={e=>{const el=returnFocus.current;returnFocus.current=null;if(el?.isConnected){e.preventDefault();el.focus();}}}><DialogHeader><DialogTitle>Verify your identity</DialogTitle><DialogDescription data-testid="text-reauth-reason">{forGbp
-      ?"To connect Google Business Profile, confirm it's you first. Google's sign-in opens next."
-      :"A quick security check on your own account, so nobody else can act as you. Nothing is sent to anyone else, and your action continues as soon as you confirm."}</DialogDescription></DialogHeader>
-    {method && <form className="space-y-4" onSubmit={async e=>{e.preventDefault();if(needsCode)return;setBusy(true);setError('');try{await apiRequest('POST','/api/auth/reauth',{value});challenge?.resolve();setChallenge(null);}catch(e){setError(apiErrorMessage(e));}finally{setBusy(false);}}}>
-      {method==='email' && apple && <div className="space-y-2">
-        {/* Inside the iPhone app: the Apple ID linked to this account confirms it (server/apple-auth.ts, purpose reauth). */}
-        <Button type="button" className="w-full bg-black text-white hover:bg-black/90" disabled={busy} onClick={()=>{setBusy(true);setError('');requestAppleReauth().then(()=>{challenge?.resolve();setChallenge(null);}).catch(e=>setError(e.message)).finally(()=>setBusy(false));}} data-testid="button-reauth-apple"><AppleMark className="h-4 w-4"/>Continue with Apple</Button>
-        {!google && <p className="text-xs text-muted-foreground text-center">or use an emailed code</p>}
-      </div>}
-      {method==='email' && google && <div className="space-y-2">
-        <Button type="button" className="w-full" disabled={busy} onClick={continueWithGoogle} data-testid="button-reauth-google">Continue with Google</Button>
-        <p className="text-xs text-muted-foreground text-center">or use an emailed code</p>
-      </div>}
-      {method==='email' && <div className="space-y-2">
-        <p className="text-sm" data-testid="text-reauth-email-status">{sent?`We emailed a 6-digit code to your own email, ${sentTo||accountEmail||'the one on your account'}. It expires in 10 minutes.`:`We will email a 6-digit code to your own email, ${accountEmail||'the one on your account'}.`}</p>
-        <Button type="button" variant="outline" disabled={busy} onClick={sendCode} data-testid="button-reauth-send-code">{sent?'Code sent — resend':'Email a verification code'}</Button>
-      </div>}
-      <label className="block">{method==='password'?'Current password':method==='totp'?'Authenticator code':'Email code'}<Input autoFocus={!needsCode} disabled={needsCode} aria-label="Verification" type={method==='password'?'password':'text'} inputMode={method==='password'?undefined:'numeric'} autoComplete={method==='password'?'current-password':'one-time-code'} placeholder={needsCode?'Send the code first':undefined} value={value} onChange={e=>setValue(e.target.value)} maxLength={256}/></label>
-      <Button disabled={busy||!value||needsCode}>Verify and continue</Button><Button type="button" variant="ghost" onClick={close}>Cancel</Button>
-    </form>}{error && <p role="alert">{error}</p>}
-  </DialogContent></Dialog>;
+  // One screen, one job (owner, 2026-10-13: "make it sleeker"): the quickest way to confirm first, the emailed code
+  // as a single row underneath, and the code box only once a code exists.
+  const stepUp = method==='email' && (google || apple);
+  const inputLabel = method==='password'?'Current password':method==='totp'?'Authenticator code':'Email code';
+  return <Dialog open={!!challenge} onOpenChange={open=>{if(!open)close();}}>
+    <DialogContent className="sm:max-w-sm gap-5 p-6" onCloseAutoFocus={e=>{const el=returnFocus.current;returnFocus.current=null;if(el?.isConnected){e.preventDefault();el.focus();}}}>
+      <DialogHeader className="space-y-1.5 text-left">
+        <DialogTitle className="text-lg">Verify your identity</DialogTitle>
+        <DialogDescription className="text-sm leading-5" data-testid="text-reauth-reason">{forGbp
+          ?"Confirm it's you, then Google's sign-in opens."
+          :"A quick check that it's you. Your action continues right after."}</DialogDescription>
+      </DialogHeader>
+      {method && <form className="space-y-4" onSubmit={async e=>{e.preventDefault();if(needsCode)return;setBusy(true);setError('');try{await apiRequest('POST','/api/auth/reauth',{value});challenge?.resolve();setChallenge(null);}catch(e){setError(apiErrorMessage(e));}finally{setBusy(false);}}}>
+        {stepUp && <div className="space-y-3">
+          {apple && (
+            /* Inside the iPhone app: the Apple ID linked to this account confirms it (server/apple-auth.ts, purpose reauth). */
+            <Button type="button" className="h-11 w-full rounded-full bg-black text-white hover:bg-black/90" disabled={busy} onClick={()=>{setBusy(true);setError('');requestAppleReauth().then(()=>{challenge?.resolve();setChallenge(null);}).catch(e=>setError(e.message)).finally(()=>setBusy(false));}} data-testid="button-reauth-apple"><AppleMark className="h-4 w-4"/>Continue with Apple</Button>
+          )}
+          {google && <Button type="button" className="h-11 w-full rounded-full" disabled={busy} onClick={continueWithGoogle} data-testid="button-reauth-google">Continue with Google</Button>}
+          <div className="flex items-center gap-3 text-xs text-muted-foreground" aria-hidden="true"><span className="h-px flex-1 bg-border"/>or use an emailed code<span className="h-px flex-1 bg-border"/></div>
+        </div>}
+        {method==='email' && <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <p className="min-w-0 flex-1 text-sm text-muted-foreground" data-testid="text-reauth-email-status">{sent
+            ?<>Code sent to <span className="text-foreground">{sentTo||accountEmail||'your email'}</span> · expires in 10 minutes.</>
+            :<>We'll email a 6-digit code to <span className="text-foreground">{accountEmail||'your email'}</span>.</>}</p>
+          <Button type="button" variant={sent?'ghost':'outline'} size="sm" className="rounded-full" disabled={busy} onClick={sendCode} data-testid="button-reauth-send-code">{sent?'Resend code':'Email a verification code'}</Button>
+        </div>}
+        {!needsCode && <label className="block space-y-1.5 text-sm font-medium">{inputLabel}
+          <Input autoFocus aria-label="Verification" type={method==='password'?'password':'text'} inputMode={method==='password'?undefined:'numeric'} autoComplete={method==='password'?'current-password':'one-time-code'}
+            className={method==='password'?'h-11':'h-12 text-center text-xl tracking-[0.45em] font-medium'} value={value} onChange={e=>setValue(e.target.value)} maxLength={method==='password'?256:method==='totp'?8:6} placeholder={method==='password'?undefined:'••••••'}/>
+        </label>}
+        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+        <div className="flex items-center justify-between gap-3 pt-1">
+          <Button type="button" variant="ghost" className="rounded-full px-3" onClick={close}>Cancel</Button>
+          <Button className="h-11 min-w-[11rem] rounded-full" disabled={busy||!value||needsCode}>Verify and continue</Button>
+        </div>
+      </form>}
+      {!method && error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+    </DialogContent></Dialog>;
 }
