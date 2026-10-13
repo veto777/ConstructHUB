@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { primaryKey, pgTable, text, varchar, integer, serial, bigserial, bigint, boolean, timestamp, jsonb, real, doublePrecision, numeric, date, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { check, primaryKey, pgTable, text, varchar, integer, serial, bigserial, bigint, boolean, timestamp, jsonb, real, doublePrecision, numeric, date, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -378,6 +378,95 @@ export const businessLocations = pgTable("business_locations", {
   avgRating: real("avg_rating"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// NAP-sync ledger. Additive boot/migration constraints: server/listings/schema.ts.
+export const listingProfiles = pgTable("listing_profiles", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  locationId: integer("location_id").notNull().unique().references(() => businessLocations.id, { onDelete: "cascade" }),
+  name: text("name"),
+  streetAddress: text("street_address"),
+  addressLine2: text("address_line2"),
+  city: text("city"),
+  state: text("state"),
+  postalCode: text("postal_code"),
+  country: text("country"),
+  serviceAreaOnly: boolean("service_area_only"),
+  serviceAreas: jsonb("service_areas"),
+  phone: text("phone"),
+  website: text("website"),
+  hours: jsonb("hours"),
+  holidayHours: jsonb("holiday_hours"),
+  primaryCategory: text("primary_category"),
+  secondaryCategories: text("secondary_categories").array(),
+  shortDescription: text("short_description"),
+  longDescription: text("long_description"),
+  services: jsonb("services"),
+  logoKey: text("logo_key"),
+  coverPhotoKey: text("cover_photo_key"),
+  photoKeys: text("photo_keys").array(),
+  yearFounded: integer("year_founded"),
+  licenceNumbers: text("licence_numbers").array(),
+  insuranceNumbers: text("insurance_numbers").array(),
+  paymentMethods: text("payment_methods").array(),
+  socialLinks: jsonb("social_links"),
+  quoteLink: text("quote_link"),
+  reviewLink: text("review_link"),
+  source: text("source").notNull(),
+  ownerEditedFields: text("owner_edited_fields").array().notNull().default(sql`'{}'`),
+  revision: integer("revision").notNull().default(1),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [check("listing_profiles_source", sql`${t.source} IN ('gbp','manual')`)]);
+export const listingDirectories = pgTable("listing_directories", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  domain: text("domain").unique(),
+  kind: text("kind").notNull(),
+  tier: integer("tier").notNull(),
+  category: text("category").notNull(),
+  trades: text("trades").array(),
+  states: text("states").array(),
+  requiresStreetAddress: boolean("requires_street_address"),
+  requiresPhoneVerification: boolean("requires_phone_verification"),
+  requiresPostcard: boolean("requires_postcard"),
+  paid: boolean("paid"),
+  active: boolean("active").notNull().default(true),
+  source: text("source").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  check("listing_directories_kind", sql`${t.kind} IN ('api','aggregator','partner','submission')`),
+  check("listing_directories_tier", sql`${t.tier} BETWEEN 1 AND 4`),
+  check("listing_directories_category", sql`${t.category} IN ('general','maps_nav','social','contractor','trade_assoc','manufacturer','state_local','ai')`),
+]);
+export const listings = pgTable("listings", {
+  id: serial("id").primaryKey(),
+  profileId: integer("profile_id").notNull().references(() => listingProfiles.id, { onDelete: "cascade" }),
+  directoryId: integer("directory_id").notNull().references(() => listingDirectories.id),
+  status: text("status").notNull().default("queued"),
+  listingUrl: text("listing_url"),
+  lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
+  napResult: jsonb("nap_result"),
+  evidence: jsonb("evidence"),
+  billable: boolean("billable").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  check("listings_status", sql`${t.status} IN ('queued','submitted','needs_owner_action','live','mismatch','duplicate','suppressed','failed')`),
+  uniqueIndex("listings_profile_directory").on(t.profileId, t.directoryId),
+  check("listings_billable_verified", sql`NOT ${t.billable} OR (${t.status}='live' AND ${t.lastCheckedAt} IS NOT NULL AND ${t.listingUrl} IS NOT NULL AND (${t.napResult}->>'matches') IS NOT DISTINCT FROM 'true' AND (${t.evidence}->>'confirmation') IS NOT DISTINCT FROM 'confirmed')`),
+]);
+export const listingEvents = pgTable("listing_events", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  profileId: integer("profile_id").notNull().references(() => listingProfiles.id, { onDelete: "cascade" }),
+  listingId: integer("listing_id").references(() => listings.id, { onDelete: "cascade" }),
+  actorUserId: integer("actor_user_id").references(() => users.id),
+  type: text("type").notNull(),
+  detail: jsonb("detail"),
+  at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const citationCampaigns = pgTable("citation_campaigns", {

@@ -462,6 +462,12 @@ export async function registerRoutes(
   startSiteScanWorker();
   await ensureCompetitorWorkerSchema();
   startCompetitorWorker();
+  const { ensureListingSchema } = await import("./listings/schema");
+  const { seedListingDirectories } = await import("./listings/catalogue");
+  await ensureListingSchema(pool);
+  await seedListingDirectories(pool);
+  const { registerListingsRoutes } = await import("./listings/routes");
+  registerListingsRoutes(app, getDevUser);
   // Backlinks database (server/backlinks, admin-only prototype): discovery → vetting → authority → outreach drafts.
   // The worker runs only with BACKLINKS_WORKER_ENABLED=true; outreach sends only when configured (outreach.ts).
   const { ensureBacklinkSchema } = await import("./backlinks/schema");
