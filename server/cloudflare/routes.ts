@@ -557,8 +557,9 @@ export function registerCloudflareRoutes(
   });
   // "Connect with Cloudflare": Cloudflare's own sign-in-and-allow (server/cloudflare/oauth.ts). Answers the
   // consent URL; the customer picks the accounts to share on Cloudflare's page. site-connections.tsx.
+  // No "verify your identity" step here (owner, 2026-10-13): nothing secret is handled on this side, and Cloudflare
+  // checks who the customer is on the very next screen. The Global-Key and pasted-token paths keep it.
   route("get", "/api/cloudflare/connect", async (req, res, user) => {
-    if (!requireRecentAuth(req, res)) return;
     await budget(user, "connect");
     if (!cloudflareOAuthConfigured()) throw new ProviderError("Cloudflare sign-in is not set up on this server", 503);
     const state = randomBytes(32).toString("hex"),
