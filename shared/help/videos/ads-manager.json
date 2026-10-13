@@ -1,0 +1,25 @@
+{
+  "helpKey": "ads-manager",
+  "durationSec": 79,
+  "video": {
+    "key": "tutorials/ads-manager.4332e08b.mp4",
+    "bytes": 7258836,
+    "sha256": "4332e08b5b563387dce4bf849a749b71504a96ed22899fe16f79f46a88461c45"
+  },
+  "captions": {
+    "key": "tutorials/ads-manager.1f2019da.vtt",
+    "bytes": 1714,
+    "sha256": "1f2019da00e929905cf5bda2cfcbb08c9c98d9cb7720737f15495abf232c3864"
+  },
+  "poster": {
+    "key": "tutorials/ads-manager.a42bbf56.jpg",
+    "bytes": 84171,
+    "sha256": "a42bbf566a3d38c300104ebafc5039d97cbc6a7d4854b98a07e5e8f0d4ca4da7"
+  },
+  "uploaded": {
+    "at": "2026-10-13T20:16:14.267Z",
+    "video": "fa95394fb525d6e67d8353db926be531",
+    "captions": "1ea392a910a56e6e48afe202cd2dac56",
+    "poster": "ea4af9abed692aaa5a35852fbf28fd65"
+  }
+}
