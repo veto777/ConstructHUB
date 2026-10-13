@@ -973,22 +973,8 @@ export default function SiteConnections({
                 </details>
                   </div>
                 </details>
-                <div className="flex flex-wrap items-center gap-2 g-divider pt-4">
-                  <p className="min-w-0 flex-1 text-sm g-text-2">
-                    Agency member email:{" "}
-                    {config.data?.agencyEmail ?? "Not configured"}
-                  </p>
-                  <GooglePill
-                    disabled={busy}
-                    onClick={() =>
-                      act(
-                        () => post("/agency", {}),
-                        "Agency membership worker connected",
-                      )
-                    }
-                    label="Enable agency membership connection"
-                  />
-                </div>
+                {/* The ops-only agency-membership connection (env CLOUDFLARE_AGENCY_*, POST /api/cloudflare/agency) is not offered
+                    here any more (owner, 2026-10-13: "not sure what this is and why we need it"); the route stays for ops. */}
               </div>
             ) : (
               <GooglePill
