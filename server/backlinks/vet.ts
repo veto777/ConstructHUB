@@ -8,8 +8,35 @@ import type { BacklinkKind, BacklinkMetrics, BacklinkSignals, BacklinkTier, Link
 import { safeFetch as siteFetch, type PageResponse } from "../sitescan/http";
 import { normalizeDomain } from "./discover";
 
-/** Contractor / home-service vocabulary: how on-topic a page is. */
-const NICHE_WORDS = /\b(roof\w*|plumb\w*|hvac|heating|cooling|air condition\w*|electric\w*|remodel\w*|renovat\w*|contractor\w*|construction|builder\w*|home improvement|homeowner\w*|landscap\w*|kitchen|bathroom|flooring|siding|gutter\w*|window\w*|concrete|paint\w*|solar|real estate|house|home\w*|repair\w*|install\w*)\b/gi;
+/** Contractor / home-service vocabulary: how on-topic a page is. Specific trade words only — "home", "window",
+ *  "install" and "repair" alone also describe software, cars and electronics (Raspberry Pi's "Windows 10" doorbell). */
+const NICHE_WORDS = /\b(roof(s|ing|er|ers)?|plumb(ing|er|ers)|hvac|furnaces?|air condition(ing|ers?)|electricians?|remodel(s|ing|ers?)?|renovat(e|es|ed|ion|ions|ing)|contractors?|construction|home ?builders?|home improvements?|homeowners?|landscap(e|es|ing|ers?)|kitchens?|bathrooms?|flooring|siding|gutters?|replacement windows|window (installation|replacement)|concrete|decks?|decking|fenc(e|es|ing)|drywall|insulation|masonry|carpentry|handyman|house painting|painting contractors?|solar (panels?|install\w*)|foundation repair|basements?|cabinets?|countertops?|garage doors?|tile|tiling)\b/gi;
+const NICHE_ONE = new RegExp(NICHE_WORDS.source, "i");
+
+/** A page that IS the site's invitation (in its title, heading or address) — or a link to one. */
+const SUBMISSION_PAGE = /write[- ]?for[- ]?us|guest[- ]?post(ing)?[- ]?guidelines|contribut(e|or|ors)([- ]guidelines)?\b|become[- ]a[- ]contributor|submission[- ]guidelines|submit[- ](a[- ])?(guest[- ]?post|article|story|press[- ]release|your[- ](business|listing|site|press release))|add[- ](your[- ])?(business|listing|company)|list[- ]your[- ]business|claim[- ](your[- ])?listing|send[- ]us[- ]a[- ](news[- ])?tip|press[- ]release[- ]submission/i;
+
+/** Pages ABOUT guest posting (lists of sites, sellers, agencies' case studies) and job boards are not publishers. */
+const LIST_PAGE: { why: string; re: RegExp }[] = [
+  { why: "a list of guest-post sites", re: /(guest[- ]?post(ing)?|backlinks?|blog commenting)[- ](sites?|websites?|list|lists)\b|free[- ]guest[- ]posting|sites?[- ](that[- ])?accept(ing)?[- ]guest[- ]posts?|top[- ]\d+[- ].*guest[- ]?post|high[- ](da|dr|pa)\b/i },
+  { why: "a guest-post / link-building seller", re: /(guest[- ]?post(ing)?|link[- ]building|backlinks?|outreach)[- ](services?|packages?|agency|case[- ]stud(y|ies)|pricing|marketplace)|buy[- ](guest[- ]?posts?|backlinks?)/i },
+  { why: "a job board", re: /job[- ]?search|\/jobs?\/|\bjobs? (board|listings?)\b/i },
+];
+const PROFILE_PATH = /^\/(@[^/]+|(profiles?|users?|members?|people|u|authors?|community\/profile)\/)/i;
+
+/** Sites written for another country's audience: no use to a US contractor's local SEO. Generic-use ccTLDs are kept. */
+const GENERIC_CCTLD = new Set(["us", "co", "io", "ai", "me", "tv", "cc", "ly", "fm", "to", "ws"]);
+export function foreignTld(domain: string): string | null {
+  const tld = domain.split(".").pop() ?? "";
+  return tld.length === 2 && !GENERIC_CCTLD.has(tld) ? tld : null;
+}
+
+/** Is the SITE about home improvement / construction? Its home page title names a trade, or trade words are dense on it. */
+export function siteOnTopic(s: BacklinkSignals): boolean {
+  const title = s.homeTitle ?? s.title ?? "";
+  const hits = s.homeNicheHits ?? s.nicheHits, words = s.homeWords ?? s.words;
+  return NICHE_ONE.test(title) || (hits >= 8 && (hits * 1000) / Math.max(words, 1) >= 4);
+}
 
 const SUBMISSION_PATTERNS: { hint: string; re: RegExp; kind: BacklinkKind }[] = [
   { hint: "write for us", re: /write for us/i, kind: "guest_post" },
@@ -76,6 +103,11 @@ export function analyzePage(page: { url: string; status: number; body: string })
   let outbound = 0;
   let contactUrl: string | null = null;
   const submissionHints = new Set<string>();
+  let submissionLink: string | null = null;
+  let path = "/";
+  try { path = new URL(page.url).pathname; } catch { /* keep "/" */ }
+  const heading = `${$("title").first().text()} ${$("h1").first().text()}`;
+  const profilePage = PROFILE_PATH.test(path);
   $("a[href]").each((_, a) => {
     const href = String($(a).attr("href") ?? "");
     let abs: URL | null = null;
@@ -89,6 +121,7 @@ export function analyzePage(page: { url: string; status: number; body: string })
       if (/sponsored/.test(r)) rel.sponsored++; else if (/nofollow|ugc/.test(r)) rel.nofollow++; else rel.dofollow++;
     } else if (!contactUrl && /\bcontact\b/.test(label)) contactUrl = abs.href;
     for (const p of SUBMISSION_PATTERNS) if (p.re.test(label)) submissionHints.add(p.hint);
+    if (!submissionLink && host && (host === domain || host.endsWith(`.${domain}`)) && SUBMISSION_PAGE.test(label) && !PROFILE_PATH.test(abs.pathname)) submissionLink = abs.href;
   });
   const scan = `${$("title").text()} ${text}`.slice(0, 200_000);
   for (const p of SUBMISSION_PATTERNS) if (p.re.test(scan)) submissionHints.add(p.hint);
@@ -110,6 +143,10 @@ export function analyzePage(page: { url: string; status: number; body: string })
     emails: extractEmails($, domain),
     contactUrl,
     rel,
+    // A user profile on a platform never speaks for the site, even when it says "guest posting".
+    submissionUrl: profilePage ? null : SUBMISSION_PAGE.test(`${heading} ${decodeURIComponent(path)}`) ? page.url : submissionLink,
+    profilePage,
+    listPage: LIST_PAGE.find((l) => l.re.test(`${heading} ${decodeURIComponent(path)}`))?.why ?? null,
   };
 }
 
@@ -134,6 +171,13 @@ export function mergeSignals(a: BacklinkSignals, b: BacklinkSignals | null): Bac
     emails: u(a.emails, b.emails).slice(0, 10),
     contactUrl: a.contactUrl ?? b.contactUrl,
     rel: { dofollow: a.rel.dofollow + b.rel.dofollow, nofollow: a.rel.nofollow + b.rel.nofollow, sponsored: a.rel.sponsored + b.rel.sponsored },
+    // `a` is the page the search found, `b` the home page.
+    submissionUrl: a.submissionUrl ?? b.submissionUrl ?? null,
+    profilePage: a.profilePage,
+    listPage: a.listPage ?? null,
+    homeTitle: b.title,
+    homeNicheHits: b.nicheHits,
+    homeWords: b.words,
   };
 }
 
@@ -157,9 +201,9 @@ function gradeBlocked(kind: BacklinkKind, status: number, m: BacklinkMetrics | n
   const reasons = [`Unconfirmed: the site blocked our crawler (${status}); on-page checks could not run`];
   if (!m || m.rank == null) return { kind, tier: "C", score: 30, reasons: [...reasons, "authority not measured yet"], linkType };
   if (m.spamScore != null && m.spamScore >= 40) return { kind, tier: "X", score: 0, reasons: [...reasons, `Spam score ${m.spamScore}/100`], linkType };
-  const score = Math.max(0, Math.min(100, Math.round(20 + m.rank / 10)));
-  reasons.push(`domain rank ${m.rank} sets the grade`);
-  return { kind, tier: score >= 70 ? "A" : score >= 50 ? "B" : score >= 30 ? "C" : "X", score, reasons, linkType };
+  // Authority alone never makes a source "quality": whether it takes submissions is unknown until a person checks.
+  reasons.push(`domain rank ${m.rank}; capped at C until someone confirms the site takes submissions`);
+  return { kind, tier: "C", score: 30, reasons, linkType };
 }
 
 /**
@@ -179,17 +223,24 @@ export function gradeSource(hint: BacklinkKind, s: BacklinkSignals, m: BacklinkM
   if (kind === "pbn") return stop(`Looks like a private blog network / link seller (${s.pbnHints.join(", ")})`);
   if (s.spamHints.length >= 2) return stop(`Spam topics on the site (${s.spamHints.join(", ")})`);
   if (m?.spamScore != null && m.spamScore >= 40) return stop(`Spam score ${m.spamScore}/100`);
+  // 2026-10-13 hard rules (owner: "fix everything"): a source is real only when the SITE invites it, the site is about
+  // the trades (for content links), and it is a publisher — not a list, a seller, a job board or a foreign-market site.
+  const tld = foreignTld(normalizeDomain(s.fetchedUrl) ?? "");
+  if (tld) return stop(`A site for an audience outside the US (.${tld})`);
+  if (s.listPage) return stop(`The page found is ${s.listPage}, not a publisher`);
+  if (!s.submissionUrl) return stop(s.profilePage
+    ? "Found on a user profile — the site itself does not invite submissions"
+    : "No page on the site invites submissions (a phrase inside an article does not count)");
+  const topical = kind === "guest_post" || kind === "resource_page" || kind === "editorial";
+  if (topical && !siteOnTopic(s)) return stop(`The site is not about home improvement or construction (home page: "${(s.homeTitle ?? s.title ?? "").slice(0, 80)}")`);
 
   let score = 30;
   const add = (n: number, why: string) => { score += n; reasons.push(`${n > 0 ? "+" : ""}${n} ${why}`); };
   if (s.https) add(5, "HTTPS"); else add(-5, "no HTTPS");
   if (s.words >= 600) add(10, `${s.words} words of content`); else if (s.words < 200) add(-10, `thin page (${s.words} words)`);
-  if (s.acceptsSubmissions) add(15, `takes submissions (${s.submissionHints.join(", ")})`);
+  add(15, `invites submissions on its own page (${s.submissionUrl})`);
   if (s.emails.length || s.contactUrl) add(5, s.emails.length ? "publishes a contact email" : "has a contact page");
-  const topical = kind === "guest_post" || kind === "resource_page" || kind === "editorial";
-  if (topical) {
-    if (s.nicheHits >= 15) add(10, "on-topic for contractors"); else if (s.nicheHits < 3) add(-10, "off-topic for contractors");
-  }
+  if (topical) add(10, "the site is about home improvement / construction");
   if (s.spamHints.length === 1) add(-15, `spam topic on the site (${s.spamHints[0]})`);
   if (s.pbnHints.length === 1) add(-15, `link-selling language (${s.pbnHints[0]})`);
   if (s.outboundLinks > 150) add(-10, `${s.outboundLinks} outbound links on one page`);

@@ -81,6 +81,17 @@ export type BacklinkSignals = {
   contactUrl: string | null;
   /** Link attribute on the site's own outbound links, by count. */
   rel: { dofollow: number; nofollow: number; sponsored: number };
+  /** The site's OWN invitation: a submission page ("write for us" in its title/heading/address) or a link to one on the site.
+   *  A phrase inside an article or on a user profile is not an invitation. Absent on sources vetted before 2026-10-13. */
+  submissionUrl?: string | null;
+  /** The found page is a user profile on a platform (it speaks for its author, not for the site). */
+  profilePage?: boolean;
+  /** Why the found page is a list/seller of guest-post sites or a job board, not a publisher. */
+  listPage?: string | null;
+  /** The home page: what the SITE is about (topic is judged here, not on the page a search happened to hit). */
+  homeTitle?: string | null;
+  homeNicheHits?: number;
+  homeWords?: number;
 };
 
 /** Third-party authority numbers, when the data source is connected (DataForSEO backlinks bulk endpoints). */
