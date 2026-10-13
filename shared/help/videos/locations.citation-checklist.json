@@ -1,0 +1,25 @@
+{
+  "helpKey": "locations.citation-checklist",
+  "durationSec": 68,
+  "video": {
+    "key": "tutorials/locations.citation-checklist.eddc2f41.mp4",
+    "bytes": 4994307,
+    "sha256": "eddc2f4191391256df39380054134327cc697ff3cda483dff94ca4831dabe8c0"
+  },
+  "captions": {
+    "key": "tutorials/locations.citation-checklist.e9fa4d98.vtt",
+    "bytes": 1246,
+    "sha256": "e9fa4d98df3be722d85c9c7bc1887b455b7f4f1f9ff3bf61ffd06b2b4d8f8c0e"
+  },
+  "poster": {
+    "key": "tutorials/locations.citation-checklist.9abffd5d.jpg",
+    "bytes": 65974,
+    "sha256": "9abffd5d9fa23e6b197d68419558c70d44ed72814eceacfa22c4376e5f262bb5"
+  },
+  "uploaded": {
+    "at": "2026-10-13T21:11:32.672Z",
+    "video": "455b01ea971796ccdfe553cc9b6b91a8",
+    "captions": "9ac2440b1656d16563909442a414319e",
+    "poster": "e44fc049a04ccbe784adb6d7609b19e9"
+  }
+}

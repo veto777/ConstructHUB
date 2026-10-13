@@ -1,0 +1,25 @@
+{
+  "helpKey": "locations.several-google-accounts",
+  "durationSec": 64,
+  "video": {
+    "key": "tutorials/locations.several-google-accounts.89491db1.mp4",
+    "bytes": 6393356,
+    "sha256": "89491db10d0cec4dd5b3b0c1dcadf0eef480b3c082a8a02245fe236a7e2d3c02"
+  },
+  "captions": {
+    "key": "tutorials/locations.several-google-accounts.5fcc4609.vtt",
+    "bytes": 1437,
+    "sha256": "5fcc4609954e29899b7d66b8ab68a8a3aab455461d719ad7905a63b250325b1b"
+  },
+  "poster": {
+    "key": "tutorials/locations.several-google-accounts.e0d919de.jpg",
+    "bytes": 73514,
+    "sha256": "e0d919de3d8fc51493b705d5669a7b49d9dd4c5ab337fe47cd818bb6960a4bf8"
+  },
+  "uploaded": {
+    "at": "2026-10-13T21:20:29.466Z",
+    "video": "5f3c9e1fa19476954028dd82205617e2",
+    "captions": "a474dc8805776fdcbc3db73dd864c5a8",
+    "poster": "fa5e88e06f2fda8291cd08c75c581854"
+  }
+}

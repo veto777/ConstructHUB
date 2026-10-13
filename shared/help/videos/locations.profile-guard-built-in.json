@@ -1,0 +1,25 @@
+{
+  "helpKey": "locations.profile-guard-built-in",
+  "durationSec": 62,
+  "video": {
+    "key": "tutorials/locations.profile-guard-built-in.486fe9ce.mp4",
+    "bytes": 5652421,
+    "sha256": "486fe9ce539f16ee795070262ebdb2e57aa32809bcb38db364ea373303f8399e"
+  },
+  "captions": {
+    "key": "tutorials/locations.profile-guard-built-in.2aba7fe2.vtt",
+    "bytes": 1307,
+    "sha256": "2aba7fe263158464dafc81e8567182de17a07501fb12687bb580061d6d790edf"
+  },
+  "poster": {
+    "key": "tutorials/locations.profile-guard-built-in.f190f93a.jpg",
+    "bytes": 72508,
+    "sha256": "f190f93a0bcef1c92012dfda567ef7dc498646d655ce1d99601e03c3650ef97b"
+  },
+  "uploaded": {
+    "at": "2026-10-13T21:15:17.849Z",
+    "video": "23cc8a0eaa4d570fa8f79d01517d066a",
+    "captions": "c42f12c6b09c11b592c15fb4fa15af2b",
+    "poster": "6132ea87b4a04cdc633939ad3c9cb697"
+  }
+}

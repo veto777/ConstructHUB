@@ -13,6 +13,6 @@ const entry: HelpDraft = {
     "Choose Queue selected action, then follow the jobs under Agency → Jobs.",
   ],
   howItWorks: "Each queued action becomes one job per location, run by a background worker a few seconds later; a location you lose access to while a job waits is skipped. Set Guard mode needs a previously approved snapshot on each location and fails safely where there is none. Unlink removes the synced Google data in ConstructHUB and never changes the listing on Google.",
-  needs: ["The Agency plan (the Agency workspace).", "A role in the workspace that can change locations: owner, admin or manager."],
+  needs: ["The Agency workspace (the agency module; which plan carries it comes from the plan model).", "A role in the workspace that can change locations: owner, admin or manager."],
 };
 export default entry;
