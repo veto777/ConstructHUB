@@ -85,7 +85,7 @@ export function Summary({ locationId }: { locationId: number }) {
             ["total", "Total listings"],
             ["live", "Live"],
             ["mismatch", "Details differ"],
-            ["billable", "Billable"],
+            ["billable", "Verified"],
           ] as const
         ).map(([key, title]) => (
           <Stat
@@ -101,8 +101,8 @@ export function Summary({ locationId }: { locationId: number }) {
         ))}
       </StatGrid>
       <p className="text-sm text-muted-foreground">
-        Billable counts only listings our checker verified live with matching
-        name, address, and phone. This is a verification count, not a charge.
+        Verified counts only listings our checker found live with matching
+        name, address, and phone.
       </p>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {Object.entries(TIER_LABELS).map(([tier, title]) => {
@@ -115,7 +115,7 @@ export function Summary({ locationId }: { locationId: number }) {
               <p className="mt-1 text-muted-foreground">
                 {counts?.total ?? 0} total · {counts?.live ?? 0} live ·{" "}
                 {counts?.mismatch ?? 0} differ · {counts?.billable ?? 0}{" "}
-                billable
+                verified
               </p>
             </div>
           );
@@ -257,7 +257,7 @@ export function ListingsTable({
                       </StatusPill>
                       {row.billable && (
                         <p className="mt-1 text-xs text-muted-foreground">
-                          Billable
+                          {admin ? "Billable" : "Verified"}
                         </p>
                       )}
                     </td>
