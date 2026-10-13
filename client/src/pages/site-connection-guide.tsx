@@ -54,10 +54,16 @@ export function SiteConnectionGuide() {
         </CardHeader>
         <CardContent className="space-y-3">
           <p>
-            Recommended: Cloudflare → My Profile → API Tokens → Global API Key →
-            View. Open ConstructHUB → Cloudflare → Connections. Enter your
-            Cloudflare login email and Global API Key, verify, select the zones,
-            and create the limited key.
+            Recommended: open ConstructHUB → Cloudflare → Connections and choose
+            “Connect with Cloudflare”. Sign in at Cloudflare, tick the account
+            with your websites, and choose Authorize; you are brought straight
+            back and your sites import on their own.
+          </p>
+          <p>
+            Without the sign-in: Cloudflare → My Profile → API Tokens → Global
+            API Key → View. Under “Other ways to connect”, enter your Cloudflare
+            login email and Global API Key, verify, select the zones, and create
+            the limited key.
           </p>
           <p>
             Your Global Key is used once to create a limited ConstructHUB key

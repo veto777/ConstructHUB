@@ -87,16 +87,17 @@ const entries: Draft[] = [
   {
     key: "cloudflare.connections", parent: "cloudflare", group: "Tools", route: "/cloudflare", title: "Cloudflare → Connections",
     whatItIs: "Where you give ConstructHUB access to a Cloudflare account, see the accounts already connected, and remove them.",
-    whatItDoes: "There are three ways in. Recommended: enter your Cloudflare login email and Global API Key (Cloudflare’s master key). ConstructHUB checks them with Cloudflare, lists your accounts and zones, and you tick the zones to share; “Create limited key” then has Cloudflare make a new key named “ConstructHUB (date)” that can do only three things on the zones you ticked: Zone Read, Analytics Read and Zone WAF Edit (WAF is Cloudflare’s firewall rules). Fallback: paste a limited token you created yourself in Cloudflare. Agency membership: a path for ConstructHUB’s own agency account only — on any other account the button answers that it is not configured.",
+    whatItDoes: "There are three ways in. Recommended: “Connect with Cloudflare” — you sign in at Cloudflare, tick the account with your websites, and choose Authorize; ConstructHUB gets full access to that account (zones, DNS, analytics, firewall, cache, SSL, hosting) that you can revoke in Cloudflare under Manage OAuth authorizations. Fallback: enter your Cloudflare login email and Global API Key (Cloudflare’s master key). ConstructHUB checks them with Cloudflare, lists your accounts and zones, and you tick the zones to share; “Create limited key” then has Cloudflare make a new key named “ConstructHUB (date)” that can do only three things on the zones you ticked: Zone Read, Analytics Read and Zone WAF Edit (WAF is Cloudflare’s firewall rules). Fallback: paste a limited token you created yourself in Cloudflare. Agency membership: a path for ConstructHUB’s own agency account only — on any other account the button answers that it is not configured.",
     howToUse: [
-      "In Cloudflare open My Profile → API Tokens → Global API Key → View, and copy the key.",
+      "Choose “Connect with Cloudflare”, sign in at Cloudflare, tick the account to share and choose Authorize. You are brought back here and the sites import on their own.",
+      "Fallback with a key: in Cloudflare open My Profile → API Tokens → Global API Key → View, and copy the key.",
       "Here, enter your Cloudflare login email and the key (optionally a domain to find), then choose “Verify and choose zones”. Confirm it’s you when asked.",
       "Tick the zones to share and choose “Create limited key”.",
       "The connection appears in the list and its sites are imported for you. “Discover sites” imports them again later.",
       "“Disconnect” removes a connection.",
     ],
     howItWorks: "The Global API Key travels with the verify request and the create request and is used only for them: to confirm the email matches the Cloudflare user, to list zones, and to create the limited key. It is never saved; the server wipes it from each request and the form clears it once the limited key exists. The limited key is stored encrypted. A pasted token is checked with Cloudflare (it must be active and able to list zones) before it is saved; ConstructHUB cannot read what it is allowed to do, so the list says to verify its permissions in Cloudflare. Disconnect deletes the saved key and cached data here and, for a key ConstructHUB created, asks Cloudflare to delete it. Rules already applied stay in Cloudflare until you undo them or remove them there. Connecting and disconnecting are written to your account activity and send a notification.",
-    needs: [EDGE, "The Cloudflare login email and Global API Key, or a token with Zone Read, Analytics Read and Zone WAF Edit on the chosen zones.", IDENTITY],
+    needs: [EDGE, "A Cloudflare login (the sign-in button), or the Cloudflare login email and Global API Key, or a token with Zone Read, Analytics Read and Zone WAF Edit on the chosen zones.", IDENTITY],
   },
   {
     key: "cloudflare.onboarding", parent: "cloudflare", group: "Tools", route: "/cloudflare", title: "Cloudflare → Onboarding",

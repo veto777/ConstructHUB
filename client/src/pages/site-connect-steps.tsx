@@ -64,8 +64,8 @@ export function CloudflareConnectSteps({ open }: { open: boolean }) {
   return (
     <Shell title="First time? How to connect your Cloudflare account" open={open} testId="cloudflare-connect-steps">
       <p className="g-text-2 text-[14px] leading-5">
-        Cloudflare has no "sign in and allow" button for outside apps. Instead you copy one key from your own
-        Cloudflare profile and paste it here once. It takes about two minutes.
+        Prefer not to sign in with the button above? You can copy one key from your own Cloudflare profile and
+        paste it here once instead. It takes about two minutes.
       </p>
       <ol className="space-y-3">
         <Step n={1} title="Open your Cloudflare API Tokens page">

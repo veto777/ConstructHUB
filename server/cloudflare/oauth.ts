@@ -33,19 +33,19 @@ export const CLOUDFLARE_OAUTH_SCOPES = [
   // analytics, logs, IP intelligence
   "analytics.read", "account-analytics.read", "logs.read", "account-logs.read", "zone-observability.read", "intel.read", "radar.read",
   // protection: WAF, firewall rules, bots, DDoS, page rules, Turnstile, security insights
-  "zone-waf.read", "zone-waf.write", "account-waf.read", "account-waf.write", "firewall-services.read", "firewall-services.write", "account-firewall-access-rules.read", "account-firewall-access-rules.write", "bot-management.read", "bot-management.write", "ddos-protection.read", "ddos-protection.write", "http-ddos-managed-ruleset.read", "http-ddos-managed-ruleset.write", "page-rules.read", "page-rules.write", "page-shield.read", "zone-security-center-insights.read", "account-security-center-insights.read", "challenge-widgets.read", "challenge-widgets.write", "url-scanner.read", "request-tracer.read", "cache.purge",
+  "zone-waf.read", "zone-waf.write", "account-waf.read", "account-waf.write", "firewall-services.read", "firewall-services.write", "account-firewall-access-rules.read", "account-firewall-access-rules.write", "bot-management.read", "bot-management.write", "ddos-protection.read", "ddos-protection.write", "http-ddos-managed-ruleset.read", "http-ddos-managed-ruleset.write", "page-rules.read", "page-rules.write", "page-shield.read", "zone-security-center-insights.read", "account-security-center-insights.read", "challenge-widgets.read", "challenge-widgets.write", "url-scanner.read", "request-tracer.read",
   // cache and SSL
-  "cache-settings.read", "cache-settings.write", "ssl-and-certificates.read", "ssl-and-certificates.write", "account-ssl-and-certificates.read", "account-ssl-and-certificates.write", "config-settings.read",
+  "cache.purge", "cache-settings.read", "cache-settings.write", "ssl-and-certificates.read", "ssl-and-certificates.write", "account-ssl-and-certificates.read", "account-ssl-and-certificates.write",
   // zone configuration and rules
-  "config-settings.write", "transform-rules.read", "transform-rules.write", "zone-transform-rules.read", "zone-transform-rules.write", "dynamic-redirect.read", "dynamic-redirect.write", "origin.read", "origin.write", "custom-pages.read", "custom-pages.write", "managed-headers.read", "managed-headers.write", "response-compression.read", "response-compression.write", "mass-url-redirects.read", "mass-url-redirects.write", "account-rulesets.read", "account-rulesets.write", "account-rule-lists.read", "account-rule-lists.write", "workers-scripts.read",
+  "config-settings.read", "config-settings.write", "transform-rules.read", "transform-rules.write", "zone-transform-rules.read", "zone-transform-rules.write", "dynamic-redirect.read", "dynamic-redirect.write", "origin.read", "origin.write", "custom-pages.read", "custom-pages.write", "managed-headers.read", "managed-headers.write", "response-compression.read", "response-compression.write", "mass-url-redirects.read", "mass-url-redirects.write", "account-rulesets.read", "account-rulesets.write", "account-rule-lists.read", "account-rule-lists.write",
   // developer platform, for sites coderail.com builds and hosts (Workers, Pages, KV, R2, Images)
-  "workers-scripts.write", "workers-routes.read", "workers-routes.write", "workers-kv-storage.read", "workers-kv-storage.write", "workers-r2.read", "workers-r2.write", "page.read", "page.write", "images.read", "images.write", "email-routing-rule.read",
+  "workers-scripts.read", "workers-scripts.write", "workers-routes.read", "workers-routes.write", "workers-kv-storage.read", "workers-kv-storage.write", "workers-r2.read", "workers-r2.write", "page.read", "page.write", "images.read", "images.write",
   // email routing for domains
-  "email-routing-rule.write", "email-routing-address.read", "email-routing-address.write", "memberships.read",
+  "email-routing-rule.read", "email-routing-rule.write", "email-routing-address.read", "email-routing-address.write",
   // who the account is
-  "user-details.read", "account-settings.read", "notifications.read", "offline_access",
+  "memberships.read", "user-details.read", "account-settings.read", "notifications.read",
   // a refresh token
-  ,
+  "offline_access",
 ] as const;
 
 export const cloudflareOAuthConfigured = (env: NodeJS.ProcessEnv = process.env) =>
