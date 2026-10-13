@@ -16,7 +16,8 @@ export const storeDeps: { db: Q } = { db: pool as unknown as Q };
 const db = () => storeDeps.db;
 
 export const MAX_VET_ATTEMPTS = 3;
-const QUALITY_SQL = `tier IN (${QUALITY_TIERS.map((t) => `'${t}'`).join(",")}) AND kind <> 'pbn'`;
+// A grade counts only while it stands: a source back in the vetting queue is not quality until it is graded again.
+const QUALITY_SQL = `tier IN (${QUALITY_TIERS.map((t) => `'${t}'`).join(",")}) AND kind <> 'pbn' AND status IN ('qualified','contacted','replied','agreed','active')`;
 
 export const monthKey = (d = new Date()) => d.toISOString().slice(0, 7);
 
@@ -226,7 +227,7 @@ export async function setStatus(id: number, status: BacklinkStatus, by: number, 
 
 /** Send a source back through vetting (an admin's "Re-check"). */
 export async function requeue(id: number): Promise<boolean> {
-  const r = await db().query(`UPDATE backlink_sources SET status = 'discovered', attempts = 0, lease_token = NULL, lease_until = NULL, updated_at = now() WHERE id = $1 AND status <> 'vetting'`, [id]);
+  const r = await db().query(`UPDATE backlink_sources SET status = 'discovered', tier = NULL, score = NULL, attempts = 0, lease_token = NULL, lease_until = NULL, updated_at = now() WHERE id = $1 AND status <> 'vetting'`, [id]);
   if (r.rowCount) await event(id, "requeued");
   return !!r.rowCount;
 }

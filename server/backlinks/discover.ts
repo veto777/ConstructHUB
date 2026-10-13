@@ -87,6 +87,7 @@ export const EXCLUDED_DOMAINS = [
   "zillow.com", "realtor.com", "trulia.com", "redfin.com", "freelancer.com", "peopleperhour.com", "guru.com", "issuu.com",
   "scribd.com", "slideshare.net", "tumblr.com", "flickr.com", "vimeo.com", "soundcloud.com", "behance.net", "dribbble.com",
   "about.me", "linktr.ee", "substack.com", "patreon.com", "gumroad.com", "producthunt.com", "trustpilot.com", "yelp.com",
+  "homeadvisor.com", "angi.com", "thumbtack.com", "beacons.ai", "bbb.org", "nextdoor.com",
 ] as const;
 
 /** A host as the database keys it: lower-case, no "www.", no trailing dot. null for anything that is not a public web host. */
