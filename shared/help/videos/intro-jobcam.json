@@ -1,0 +1,25 @@
+{
+  "helpKey": "intro-jobcam",
+  "durationSec": 64,
+  "video": {
+    "key": "tutorials/intro-jobcam.fc40493c.mp4",
+    "bytes": 4686700,
+    "sha256": "fc40493c55d5579b628e904e078e2a7cc2dcf990863792d0cd7e8da25fdb21a1"
+  },
+  "captions": {
+    "key": "tutorials/intro-jobcam.30044964.vtt",
+    "bytes": 1445,
+    "sha256": "300449642427e565065ea1d72d3ea6939dc3b5ae442f28f4ed3c1183b6556644"
+  },
+  "poster": {
+    "key": "tutorials/intro-jobcam.1066828e.jpg",
+    "bytes": 98999,
+    "sha256": "1066828e5970b081b3a4ae7b26b1bef1d804014b77e9d0785d0e24b8245f575c"
+  },
+  "uploaded": {
+    "at": "2026-10-13T14:41:54.820Z",
+    "video": "23e3f7aab2a4d6b891a10be7afb5c51f",
+    "captions": "072545481026daac9428568939490f39",
+    "poster": "74eb28e5c8be3f927bb296968ee083ad"
+  }
+}

@@ -54,6 +54,12 @@
       "narration": "Close brings you back to the feed."
     },
     {
+      "action": "highlight",
+      "selector": "text=Open camera",
+      "caption": "Open camera",
+      "narration": "On site, Open camera shoots straight from your phone, stamped the moment it is taken."
+    },
+    {
       "action": "click",
       "selector": "[data-testid=\"jobcam-view-toggle\"]",
       "caption": "Timeline",
@@ -68,13 +74,6 @@
     },
     {
       "action": "highlight",
-      "selector": "[data-testid=\"jobcam-capture\"]",
-      "caption": "Open camera",
-      "chapter": "Shoot on site",
-      "narration": "On site, Open camera shoots straight from your phone, stamped the moment it is taken."
-    },
-    {
-      "action": "highlight",
       "selector": "[data-testid=\"link-portal-nav-jobcam\"]",
       "caption": "Menu: JobCam",
       "narration": "You will find JobCam in the menu on the left."
@@ -82,7 +81,7 @@
   ],
   "youtube": {
     "title": "JobCam in about a minute | ConstructHUB",
-    "description": "A one-minute tour of JobCam in ConstructHUB: every job-site photo and video filed to its project with the time and place it was shot, what each shot keeps, choosing what the client may see, the day-by-day timeline, and shooting from your phone on site.",
+    "description": "A one-minute tour of JobCam in ConstructHUB: every job-site photo and video filed to its project with the time and place it was shot, what each shot keeps, choosing what the client may see, shooting from your phone on site, and the day-by-day timeline.",
     "tags": [
       "ConstructHUB",
       "JobCam",
