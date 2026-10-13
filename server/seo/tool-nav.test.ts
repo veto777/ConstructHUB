@@ -36,7 +36,7 @@ describe("the tools are the SEO routes", () => {
   it("App.tsx renders the tool shell under /seo, without the app sidebar on a desktop, and keeps the app's controls", () => {
     expect(app).toContain('if (location === "/seo" || location.startsWith("/seo/")) {');
     expect(app).toContain("<SeoToolLayout actions={controls} banner={<PaymentNeededBanner />} footer={footer}>");
-    expect(app).toContain('<div className="md:hidden"><AppSidebar /></div>');
+    expect(app).toContain('<AppSidebar sheet />');
   });
 });
 

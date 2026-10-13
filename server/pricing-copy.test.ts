@@ -388,7 +388,7 @@ describe("page copy outside /pricing", () => {
 
   it("the Terms are dated October 7, 2026 and list plans from the price book", () => {
     const src = read("client/src/pages/terms-of-use.tsx");
-    expect(src).toContain('const LAST_UPDATED = "October 7, 2026"');
+    expect(src).toContain('const LAST_UPDATED = "October 12, 2026"');
     // The CRM is a separate product (owner, 2026-10-07): the Terms never say a plan includes it.
     expect(src).not.toMatch(/CRM is included/i);
     expect(src).toContain("is a separate product with its own subscription plans");
