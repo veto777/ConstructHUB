@@ -196,6 +196,7 @@ describe("vetting — false positives from the first run", () => {
     expect(wfu("https://brandingmarketingagency.com/write-for-us/", "").reasons.join(" ")).toMatch(/agency/);
     expect(wfu("https://elitebreeze.com/write-for-us/", "EliteBreeze HVAC – Top HVAC Service Provider in Mumbai").reasons.join(" ")).toMatch(/outside the US/);
     expect(wfu("https://roofblog.wordpress.com/write-for-us/", "Roofing tips for homeowners").tier).toBe("C");
+    expect(wfu("https://houseupgrades.home.blog/write-for-us/", "Roofing tips for homeowners").tier).toBe("C");
     expect(wfu("https://roofingcontractorblog.com/write-for-us/", "Roofing tips for homeowners").tier).toBe("A");
     expect(gradeSource("directory", { ...analyzePage({ url: "https://yelp.com/", status: 403, body: "" }) }, { rank: 700, referringDomains: 1, spamScore: 1, checkedAt: "x" }).tier).toBe("X");
   });

@@ -36,7 +36,7 @@ const AGENCY = /\b(seo|digital marketing|marketing|branding|link[- ]building|web
 /** A site written for another country (named in its home-page title). */
 const FOREIGN_PLACE = /\b(india|mumbai|delhi|bangalore|bengaluru|chennai|hyderabad|kolkata|pune|pakistan|lahore|karachi|islamabad|bangladesh|dhaka|nigeria|lagos|philippines|manila|dubai|uae|qatar|saudi|kenya|nairobi|united kingdom|london|uk|australia|sydney|melbourne|new zealand|singapore|malaysia|south africa)\b/i;
 /** Free blog sub-domains: anyone can open one in a minute; never a quality source. */
-const FREE_BLOG = /\.(wordpress\.com|blogspot\.com|wixsite\.com|weebly\.com|webflow\.io|squarespace\.com|tumblr\.com|site123\.me|jimdosite\.com|business\.site|godaddysites\.com|strikingly\.com|ghost\.io|hashnode\.dev|over-blog\.com)$/i;
+const FREE_BLOG = /\.(wordpress\.com|blogspot\.com|wixsite\.com|weebly\.com|webflow\.io|squarespace\.com|tumblr\.com|site123\.me|jimdosite\.com|business\.site|godaddysites\.com|strikingly\.com|ghost\.io|hashnode\.dev|over-blog\.com|home\.blog|blog\.com)$/i;
 
 /** Is the SITE about home improvement / construction? Its home page title names a trade, or trade words are dense on it. */
 export function siteOnTopic(s: BacklinkSignals): boolean {
