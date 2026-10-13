@@ -2,9 +2,9 @@
   "helpKey": "intro-call-assistant",
   "durationSec": 89,
   "video": {
-    "key": "tutorials/intro-call-assistant.fd242129.mp4",
-    "bytes": 8283343,
-    "sha256": "fd242129b6e61b25c068f3c04af0b4f3258ced8449aab62fdd6fabdefe68502e"
+    "key": "tutorials/intro-call-assistant.1eda88e2.mp4",
+    "bytes": 8330105,
+    "sha256": "1eda88e29b5df9e12ccd0112a41375362e25f525de6943cd3e4dbb6adf4303d4"
   },
   "captions": {
     "key": "tutorials/intro-call-assistant.b2f93197.vtt",
@@ -17,8 +17,8 @@
     "sha256": "ac5eb1c137e4955b6536f4ca4e1620be8d05e3165e772551265d00f4b9f1e4ad"
   },
   "uploaded": {
-    "at": "2026-10-12T19:36:07.661Z",
-    "video": "74bf178fed5ae40f3d608fa314d5888a",
+    "at": "2026-10-13T17:28:01.118Z",
+    "video": "c97d49db32284fa1002e6809b4cc60b3",
     "captions": "1a1021eaac64f075803894978803f43e",
     "poster": "304ca60c5e45eb3077ffef96415711b8"
   }

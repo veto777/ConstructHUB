@@ -2,9 +2,9 @@
   "helpKey": "intro-vpn-shield",
   "durationSec": 80,
   "video": {
-    "key": "tutorials/intro-vpn-shield.07237486.mp4",
-    "bytes": 7282875,
-    "sha256": "07237486f057617f55bae814eae16e5a38953132d6c23478facde6a6d34d94d5"
+    "key": "tutorials/intro-vpn-shield.1e22f145.mp4",
+    "bytes": 7333779,
+    "sha256": "1e22f1456642eca334d695db9c332a1e5ca5e2882fd44e7eed34b7e256498ae1"
   },
   "captions": {
     "key": "tutorials/intro-vpn-shield.3ee2d31c.vtt",
@@ -17,8 +17,8 @@
     "sha256": "8046b8873b40a4f1d94478319a580382bb2d22ceae4b705fa74977b8e729b33b"
   },
   "uploaded": {
-    "at": "2026-10-11T15:56:45.239Z",
-    "video": "8dcdb72fe5901cb92faf38319f77ad13",
+    "at": "2026-10-13T17:38:26.118Z",
+    "video": "4231cc33f3d824444235cee68cd4b23c",
     "captions": "7c3f0afe1e6dd3bb1cd90f604c3b1523",
     "poster": "646b50eda2f193aac34742921b39fa4c"
   }

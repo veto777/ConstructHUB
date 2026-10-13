@@ -2,9 +2,9 @@
   "helpKey": "intro-reinstatement",
   "durationSec": 90,
   "video": {
-    "key": "tutorials/intro-reinstatement.9e094668.mp4",
-    "bytes": 7066800,
-    "sha256": "9e094668efb11dcf90f822347383da331cb98d78c58de2eed8b9ab9a3026a4ed"
+    "key": "tutorials/intro-reinstatement.a168893a.mp4",
+    "bytes": 7113286,
+    "sha256": "a168893afd7cd163f0a9a42e3f2775aeb12a8c8dc3d5dfe6355d3881e526c291"
   },
   "captions": {
     "key": "tutorials/intro-reinstatement.42a4546c.vtt",
@@ -17,8 +17,8 @@
     "sha256": "78fb76cf69c87b1cb61b88182bbb6e4f4f5662c1fab33b09afba8302f51c85cf"
   },
   "uploaded": {
-    "at": "2026-10-11T14:18:28.453Z",
-    "video": "a68627df80169b2b13eb9b25b46363d7",
+    "at": "2026-10-13T17:36:14.176Z",
+    "video": "aadf2b45f424b921dc85856fcc3123c0",
     "captions": "48189ae7f7ba0b1ab2ba518843eb30c7",
     "poster": "75f10ab850070983f9dfae25d2e5ba17"
   }

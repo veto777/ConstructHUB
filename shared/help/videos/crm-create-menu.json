@@ -2,9 +2,9 @@
   "helpKey": "crm-create-menu",
   "durationSec": 62,
   "video": {
-    "key": "tutorials/crm-create-menu.625812c5.mp4",
-    "bytes": 4249095,
-    "sha256": "625812c58c420f6c5ae0b18fec63c00cfaa5a700f09fb655a2ffca26ad7f6e8b"
+    "key": "tutorials/crm-create-menu.1435ff80.mp4",
+    "bytes": 4294331,
+    "sha256": "1435ff802d0dce42903f27d2d0dba4c17673d1c891a332d84a5fdf6bb8a5e320"
   },
   "captions": {
     "key": "tutorials/crm-create-menu.aef7f029.vtt",
@@ -17,8 +17,8 @@
     "sha256": "966e24d64018d0a730417aed770132af1e1032a8314277e9467051e21113bd3b"
   },
   "uploaded": {
-    "at": "2026-10-08T05:09:34.471Z",
-    "video": "13e1b6d7d5cf8985a1c924dfd323775f",
+    "at": "2026-10-13T17:39:50.704Z",
+    "video": "88129f915371ab2c770783e9599a78f9",
     "captions": "8a905181ccb3227cb5c45ba8a58638da",
     "poster": "fb880a69de4f71ddc088a29855cf3305"
   }

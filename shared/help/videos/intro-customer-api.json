@@ -2,9 +2,9 @@
   "helpKey": "intro-customer-api",
   "durationSec": 89,
   "video": {
-    "key": "tutorials/intro-customer-api.5d3fcc7f.mp4",
-    "bytes": 9449920,
-    "sha256": "5d3fcc7f9d6182ad9f8bb045943c616af5ad59e017f175180bf18ad553e8d107"
+    "key": "tutorials/intro-customer-api.643d811e.mp4",
+    "bytes": 9496298,
+    "sha256": "643d811e90e083e40203cd128b189fdfa945508427ece1b1153aa47bf89fce58"
   },
   "captions": {
     "key": "tutorials/intro-customer-api.7ac4121a.vtt",
@@ -17,8 +17,8 @@
     "sha256": "02e6a494cdaa02310f543a1b48709f31de4e69ad010b330c848e9d126cf130c6"
   },
   "uploaded": {
-    "at": "2026-10-11T18:48:18.583Z",
-    "video": "5f485f6200e3a991fee0cfa336e113ae",
+    "at": "2026-10-13T17:29:42.544Z",
+    "video": "9504e825ec85fa611e4b30e6416d4c20",
     "captions": "70fa294d87ce3adfd5175d07c50b65b9",
     "poster": "b13d860eddb625ff3e2cdcfd1ee9ce89"
   }

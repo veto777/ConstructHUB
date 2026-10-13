@@ -2,9 +2,9 @@
   "helpKey": "intro-lsa-leads",
   "durationSec": 81,
   "video": {
-    "key": "tutorials/intro-lsa-leads.ca177a6a.mp4",
-    "bytes": 5965029,
-    "sha256": "ca177a6a6afa5035ab22c561fbfb662fbfe3fb415c7d7f684d4298a7a2ac310f"
+    "key": "tutorials/intro-lsa-leads.027cfdbf.mp4",
+    "bytes": 6013774,
+    "sha256": "027cfdbf71e954eade241a744cd61aa8081dce7e26091ba32ada4f30d2825aa4"
   },
   "captions": {
     "key": "tutorials/intro-lsa-leads.c1a4edcb.vtt",
@@ -17,8 +17,8 @@
     "sha256": "aefe542a5580db6f63f518dd2c4666379dbda7dc67e7a1bd454e8ccdb56f6bf7"
   },
   "uploaded": {
-    "at": "2026-10-11T14:03:08.751Z",
-    "video": "5e5c4f013a7e85d60180c5394f3aa77d",
+    "at": "2026-10-13T17:32:52.005Z",
+    "video": "e3331df90e5866c32a2a96f871f2d987",
     "captions": "242c2b0c13e4496a5742937ca3c98e3e",
     "poster": "3d783919580189458744d68229e1f75d"
   }

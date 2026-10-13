@@ -2,9 +2,9 @@
   "helpKey": "intro-domains",
   "durationSec": 86,
   "video": {
-    "key": "tutorials/intro-domains.39cdcf0c.mp4",
-    "bytes": 7947592,
-    "sha256": "39cdcf0ce0c42ab86ecdd743f492160f4013be6228e4140c7e97f33289fecf51"
+    "key": "tutorials/intro-domains.e9b4704c.mp4",
+    "bytes": 7993156,
+    "sha256": "e9b4704c936de4491f1c560bab865df3e899d16a1efb2f108614165b270ce45b"
   },
   "captions": {
     "key": "tutorials/intro-domains.359be6a4.vtt",
@@ -17,8 +17,8 @@
     "sha256": "d7dd5ab5db062ea01a41bfe1feb3af9b6fd5bd2ba1f26e6ce26105abe2bcf296"
   },
   "uploaded": {
-    "at": "2026-10-11T15:21:37.097Z",
-    "video": "0e7923c18824823a864c2489e02c641c",
+    "at": "2026-10-13T17:30:08.381Z",
+    "video": "076648329d807cf862632014ca9bc263",
     "captions": "544407f751681b2e431df8a5494d3a77",
     "poster": "ffe9accf2db065a1d41d27933fba7c8c"
   }

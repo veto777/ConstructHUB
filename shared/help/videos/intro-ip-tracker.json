@@ -2,9 +2,9 @@
   "helpKey": "intro-ip-tracker",
   "durationSec": 81,
   "video": {
-    "key": "tutorials/intro-ip-tracker.016c2dfb.mp4",
-    "bytes": 6584644,
-    "sha256": "016c2dfbb7bd793984be627f070e3b1ad29917d52ef80f1d84eef0ad0c41c8f3"
+    "key": "tutorials/intro-ip-tracker.3fd68eb5.mp4",
+    "bytes": 6633002,
+    "sha256": "3fd68eb58fe6481f5045538f0ea6c6d79e2959ea0817b1967fc368803e55d53c"
   },
   "captions": {
     "key": "tutorials/intro-ip-tracker.b4d32c39.vtt",
@@ -17,8 +17,8 @@
     "sha256": "16b95bc355f55a4bfb933b8480a04e3524a39ec40f2e8c2a596556f4c06048e7"
   },
   "uploaded": {
-    "at": "2026-10-11T15:56:40.911Z",
-    "video": "f0964743e3762408a50ad5a98c307fa3",
+    "at": "2026-10-13T17:32:28.164Z",
+    "video": "9f5ce33eb9c55285100de0a344ae80f6",
     "captions": "d199d87cab6bd75306cdff392762575b",
     "poster": "74fd52ea1d0f797d860ab7a2e7a81543"
   }

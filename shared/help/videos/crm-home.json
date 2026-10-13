@@ -2,24 +2,24 @@
   "helpKey": "crm-home",
   "durationSec": 72,
   "video": {
-    "key": "tutorials/crm-home.5529a576.mp4",
-    "bytes": 6479706,
-    "sha256": "5529a5760713e506ebfd81d6a9b0a8c1a9e82b773b7daec2d74e4eea395b12f3"
+    "key": "tutorials/crm-home.6dec48bf.mp4",
+    "bytes": 7137516,
+    "sha256": "6dec48bf2b21d002e3a8feec9aa363900daf91a07822f73359202d012f38ae4b"
   },
   "captions": {
-    "key": "tutorials/crm-home.9aeb810c.vtt",
+    "key": "tutorials/crm-home.60a7ba26.vtt",
     "bytes": 1705,
-    "sha256": "9aeb810c29a69ccae91f59fb235f7b59af97dc62b44e12f42d357facfe67fb23"
+    "sha256": "60a7ba260d66d527fe6b81e0bf57c19dbeb5aa0d9af510ac8b97cf346c77a1f1"
   },
   "poster": {
-    "key": "tutorials/crm-home.7a3ef412.jpg",
-    "bytes": 93885,
-    "sha256": "7a3ef41293fabe933df840682881fa3748034fd140068868fc7f11eed8c7853a"
+    "key": "tutorials/crm-home.a15755fc.jpg",
+    "bytes": 95055,
+    "sha256": "a15755fc56a8e98bc5ca4ca7461e370e0efc1eaefe57f29f67d752ce517c5ea5"
   },
   "uploaded": {
-    "at": "2026-10-08T05:13:13.250Z",
-    "video": "8756e8001691d42d5cb469ad7b63c73f",
-    "captions": "ebad9be71f49f41c06e93142c6aa63a5",
-    "poster": "08edab09a98346ec5f62c46296d878f4"
+    "at": "2026-10-13T17:57:17.049Z",
+    "video": "63e442ee37883f96af655e8eac64c241",
+    "captions": "d1aca145e19e4cf3abeb4349702a0c39",
+    "poster": "563d42980709a15e1b37a38e84ffa307"
   }
 }

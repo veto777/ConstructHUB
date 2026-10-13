@@ -2,9 +2,9 @@
   "helpKey": "crm-estimate-options",
   "durationSec": 99,
   "video": {
-    "key": "tutorials/crm-estimate-options.11ccbd7e.mp4",
-    "bytes": 8508553,
-    "sha256": "11ccbd7efb983d5559187815abe1da0cfffeff942c2c08d1d3ad0992ab273a14"
+    "key": "tutorials/crm-estimate-options.a2f1ec4e.mp4",
+    "bytes": 8551675,
+    "sha256": "a2f1ec4eff2e9f7d76f4b4f471c858e05326480a3dd2618804f7887c10389ddb"
   },
   "captions": {
     "key": "tutorials/crm-estimate-options.52d3e7ee.vtt",
@@ -17,8 +17,8 @@
     "sha256": "bec4603387b17a57549422c7331ad20df19ffb1188cd90db3262f2035475d3e2"
   },
   "uploaded": {
-    "at": "2026-10-08T06:26:41.370Z",
-    "video": "f2602e827012cddcc00f4097cd5f4b37",
+    "at": "2026-10-13T16:55:04.494Z",
+    "video": "241e0be184a78f90105c2ed0c1a88ec3",
     "captions": "9f8aa01a45a6aaaad4d8231754952d4f",
     "poster": "aa964fbcb68f32dd161e03d3e8d0958c"
   }

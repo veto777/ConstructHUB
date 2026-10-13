@@ -2,9 +2,9 @@
   "helpKey": "crm-project-punch-list",
   "durationSec": 61,
   "video": {
-    "key": "tutorials/crm-project-punch-list.77cc012d.mp4",
-    "bytes": 4282894,
-    "sha256": "77cc012daecaefa65645cc9ee5b9e0e9612f8a57f835c496fb72c6caaff5d218"
+    "key": "tutorials/crm-project-punch-list.06394d26.mp4",
+    "bytes": 4326360,
+    "sha256": "06394d26bc5284184f313409baee862faee07a6d161681a49692f5eee5e4bf7b"
   },
   "captions": {
     "key": "tutorials/crm-project-punch-list.c06f2e45.vtt",
@@ -17,8 +17,8 @@
     "sha256": "18c1d5bc3524220fe86acfa0f503e0fc1939e7aa071e02ce937bcd1699031527"
   },
   "uploaded": {
-    "at": "2026-10-08T02:51:10.066Z",
-    "video": "b41351bfc12b139d4f1d56b146baee13",
+    "at": "2026-10-13T17:13:33.565Z",
+    "video": "1863c4b260bfeae1393a9adacbd6d385",
     "captions": "676a6e44e9fe2e4e71afd308a74369de",
     "poster": "8b61e228fa8183a550a0bf99099fa73c"
   }

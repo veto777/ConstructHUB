@@ -1,25 +1,25 @@
 {
   "helpKey": "crm-jobcam-timeline",
-  "durationSec": 57,
+  "durationSec": 64,
   "video": {
-    "key": "tutorials/crm-jobcam-timeline.6edb937b.mp4",
-    "bytes": 5265756,
-    "sha256": "6edb937b35191cfebe177f853e97210ed6fbd81b40f169ea704ffda2fc006b56"
+    "key": "tutorials/crm-jobcam-timeline.90c6846d.mp4",
+    "bytes": 4278699,
+    "sha256": "90c6846d62a40141c77cf77657f439616eb59c8a90e6d4662f33e4a574423422"
   },
   "captions": {
-    "key": "tutorials/crm-jobcam-timeline.56fbb55e.vtt",
+    "key": "tutorials/crm-jobcam-timeline.de72d997.vtt",
     "bytes": 1346,
-    "sha256": "56fbb55e8eee918ba60f01b543da78636d062683fb8fcc901cc70f4fc72e5f6b"
+    "sha256": "de72d997d47d3f4dfd736d1572f9a8f53f76bff1c01fcc68f93522a43eaee689"
   },
   "poster": {
-    "key": "tutorials/crm-jobcam-timeline.26feb0a0.jpg",
-    "bytes": 92230,
-    "sha256": "26feb0a03b366704dba8d0780ec954d598d9829f94f08da4bf3d327f0da48d4c"
+    "key": "tutorials/crm-jobcam-timeline.22171844.jpg",
+    "bytes": 76911,
+    "sha256": "221718449643289e38ffb6b4323d950ed5274a6c9237298da88195d14a99809c"
   },
   "uploaded": {
-    "at": "2026-10-08T00:51:58.148Z",
-    "video": "54857c831138a26add7a7a81ba28aece",
-    "captions": "66dea4f2b0cf55bd0641a55a0594d4c1",
-    "poster": "09e3aaa4b7dd9c591a678d895bb1a36b"
+    "at": "2026-10-13T18:01:16.328Z",
+    "video": "ec78d81212b190f82b3d2ca5a23b2346",
+    "captions": "cddc890dfc20f69bdb7895b95400e8d6",
+    "poster": "56ecb4169391966e2062ec5e609ccced"
   }
 }

@@ -2,9 +2,9 @@
   "helpKey": "crm-migrate-assisted",
   "durationSec": 58,
   "video": {
-    "key": "tutorials/crm-migrate-assisted.ca304e4d.mp4",
-    "bytes": 4857752,
-    "sha256": "ca304e4d0b492d9cfa74e99a7f33208df8e326af1bf773cbc5707d880a9ea0b7"
+    "key": "tutorials/crm-migrate-assisted.aabf8664.mp4",
+    "bytes": 4903298,
+    "sha256": "aabf8664e19605a6ae2269986474ee5a8504764926887df646f353dff0f8a7cc"
   },
   "captions": {
     "key": "tutorials/crm-migrate-assisted.c3484ed8.vtt",
@@ -17,8 +17,8 @@
     "sha256": "12aac9da2092bacdba038855656dd43befe91275fb547ef8e0a6783bd984859f"
   },
   "uploaded": {
-    "at": "2026-10-08T05:36:34.847Z",
-    "video": "0c5c72a906adcd21e95a300bcbeb6d22",
+    "at": "2026-10-13T17:05:07.526Z",
+    "video": "4dd2b93bbe93111e74b02bca2cf8e500",
     "captions": "8aaa0135366f41afb618d982e6cfec34",
     "poster": "f7e5f6f56c66a9075ffd9d09b9adc76c"
   }
