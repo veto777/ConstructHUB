@@ -113,7 +113,7 @@ export function saveRowEdits(accountId: string | number | null | undefined, edit
 
 /** Display stored destinations without exposing provider identifiers to people. */
 export function destinationLabel(d: Destination, accounts: { id: string; name?: string; pages?: { id: string; name?: string }[]; boards?: { id: string; name?: string }[] }[]): string {
-  const platform = ({ facebook: "Facebook", linkedin: "LinkedIn", pinterest: "Pinterest", twitter: "X", x: "X", instagram: "Instagram", youtube: "YouTube", tiktok: "TikTok", threads: "Threads", bluesky: "Bluesky" })[d.platform];
+  const platform = ({ facebook: "Facebook", linkedin: "LinkedIn", pinterest: "Pinterest", twitter: "X", x: "X", instagram: "Instagram", youtube: "YouTube", tiktok: "TikTok", threads: "Threads", bluesky: "Bluesky", reddit: "Reddit", mastodon: "Mastodon", tumblr: "Tumblr" })[d.platform];
   const account = accounts.find(a => a.id === d.accountId);
   const name = account?.name?.trim() || platform + " account";
   const target = d.pageId ? account?.pages?.find(p => p.id === d.pageId)?.name?.trim() || platform + " page"

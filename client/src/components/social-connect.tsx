@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useUrlParam } from "@/hooks/use-url-param";
 
-const LABEL: Record<string, string> = { facebook: "Facebook", instagram: "Instagram", instagram_direct: "Instagram (no Facebook Page)", linkedin: "LinkedIn", tiktok: "TikTok", youtube: "YouTube", pinterest: "Pinterest", threads: "Threads", x: "X", twitter: "X", bluesky: "Bluesky" };
+const LABEL: Record<string, string> = { facebook: "Facebook", instagram: "Instagram", instagram_direct: "Instagram (no Facebook Page)", linkedin: "LinkedIn", tiktok: "TikTok", youtube: "YouTube", pinterest: "Pinterest", threads: "Threads", x: "X", twitter: "X", bluesky: "Bluesky", reddit: "Reddit", mastodon: "Mastodon", tumblr: "Tumblr" };
 const NOTE: Record<string, string> = {
   instagram: "Business or Creator account linked to your Facebook Page",
   instagram_direct: "Business or Creator account, signed in with Instagram",
@@ -23,6 +23,9 @@ const NOTE: Record<string, string> = {
   tiktok: "You choose who can view each post",
   bluesky: "Your Bluesky profile · signs in with an app password",
   pinterest: "Your Pinterest business account · pick a board for each pin",
+  reddit: "Your Reddit account · pick a subreddit and a title for each post",
+  mastodon: "Your Mastodon profile, on any server",
+  tumblr: "Your Tumblr blogs · pick a blog for each post",
 };
 const BLUESKY_APP_PASSWORDS = "https://bsky.app/settings/app-passwords";
 
@@ -64,6 +67,28 @@ function BlueskyForm({ api, scope, mode, onDone, onCancel }: { api: string; scop
   );
 }
 
+/** Mastodon connect: the customer names their server; we register there and send them to its sign-in (POST …/native/mastodon/connect → redirect). */
+function MastodonForm({ api, scope, onCancel }: { api: string; scope: string; onCancel: () => void }) {
+  const [server, setServer] = useState("");
+  const start = useMutation({
+    mutationFn: async () => (await apiRequest("POST", `${api}/mastodon/connect${scope}`, { server: server.trim() })).json() as Promise<{ authUrl: string }>,
+    onSuccess: (d) => window.location.assign(d.authUrl),
+  });
+  const ready = /\.[a-z]{2,}$/i.test(server.trim().replace(/\/.*$/, ""));
+  return (
+    <form className="mb-4 rounded-lg border p-4" data-testid="social-mastodon-form" onSubmit={(e) => { e.preventDefault(); if (ready && !start.isPending) start.mutate(); }}>
+      <p className="mb-1 text-sm font-medium">Connect Mastodon</p>
+      <p className="mb-3 text-xs text-muted-foreground">Enter the server your account is on (the part after the second @ in your handle) and we’ll send you there to approve ConstructHUB. You sign in on your server’s own page.</p>
+      <Input aria-label="Mastodon server" placeholder="mastodon.social" autoComplete="off" value={server} onChange={(e) => setServer(e.target.value)} data-testid="input-mastodon-server" />
+      {start.isError && <p className="mt-2 text-sm text-destructive">{apiErrorMessage(start.error)}</p>}
+      <div className="mt-3 flex gap-2">
+        <GooglePill label={start.isPending ? "Opening your server…" : "Continue to Mastodon"} disabled={!ready || start.isPending} onClick={() => start.mutate()} testId="button-mastodon-connect" />
+        <GooglePill variant="quiet" label="Cancel" disabled={start.isPending} onClick={onCancel} />
+      </div>
+    </form>
+  );
+}
+
 /** `via`: "native" = ConstructHUB's own apps (server/social/native.ts); "outstand" = the Outstand account. */
 export function SocialConnect({ businessId, networks, accounts, connected, via = "outstand", blueskyAuth = "app_password" }: { businessId: number | null; networks: readonly string[]; accounts: Account[]; connected: boolean; via?: "outstand" | "native"; blueskyAuth?: "oauth" | "app_password" }) {
   const api = `/api/social/${via}`;
@@ -81,6 +106,7 @@ export function SocialConnect({ businessId, networks, accounts, connected, via =
   const [session, setSession] = useUrlParam("session");
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [bluesky, setBluesky] = useState(false);
+  const [mastodon, setMastodon] = useState(false);
   const refresh = () => void qc.invalidateQueries({ queryKey: ["/api/social"] });
 
   const start = useMutation({
@@ -149,17 +175,18 @@ export function SocialConnect({ businessId, networks, accounts, connected, via =
           onDone={(name) => { setBluesky(false); refresh(); toast({ title: "Bluesky connected", description: `${name} is connected for this business.` }); }}
           onCancel={() => setBluesky(false)} />
       )}
+      {mastodon && via === "native" && <MastodonForm api={api} scope={scope} onCancel={() => setMastodon(false)} />}
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {networks.map((n) => {
           const mine = byNetwork(n);
-          const form = n === "bluesky" && via === "native";
+          const form = (n === "bluesky" || n === "mastodon") && via === "native";
           return (
             <div key={n} className="flex items-center justify-between gap-2 rounded-lg border p-3" data-testid={`network-${n}`}>
               <div className="min-w-0">
                 <p className="text-sm font-medium">{LABEL[n] ?? n}</p>
                 <p className="truncate text-xs text-muted-foreground">{mine.length ? mine.map((a) => a.name).join(", ") : NOTE[n] ?? "Not connected"}</p>
               </div>
-              <GooglePill size="sm" variant={mine.length ? "outline" : "solid"} label={mine.length ? "Add another" : "Connect"} disabled={start.isPending} onClick={() => (form ? setBluesky(true) : start.mutate(n))} />
+              <GooglePill size="sm" variant={mine.length ? "outline" : "solid"} label={mine.length ? "Add another" : "Connect"} disabled={start.isPending} onClick={() => (form ? (n === "mastodon" ? setMastodon(true) : setBluesky(true)) : start.mutate(n))} />
             </div>
           );
         })}

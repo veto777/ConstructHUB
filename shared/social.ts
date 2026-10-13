@@ -11,6 +11,9 @@ export const platforms = [
   "tiktok",
   "youtube",
   "pinterest",
+  "reddit",
+  "mastodon",
+  "tumblr",
 ] as const;
 // Conservative plain-text caps; provider still validates media and account-specific restrictions.
 export const socialLimits: Record<string, number> = {
@@ -24,6 +27,9 @@ export const socialLimits: Record<string, number> = {
   tiktok: 2200,
   youtube: 5000,
   pinterest: 500,
+  reddit: 40000,
+  mastodon: 500,
+  tumblr: 4096,
 };
 export const opaqueId = z
   .string()
@@ -174,12 +180,22 @@ export function postPayload(
     throw new Error(`${d.platform} requires media`);
   if (d.platform === "pinterest" && !d.boardId)
     throw new Error("Pinterest requires a board");
+  if (d.platform === "reddit" && !d.boardId)
+    throw new Error("Reddit requires a subreddit");
+  if (d.platform === "reddit" && !d.title?.trim())
+    throw new Error("Reddit requires a title");
+  if (d.platform === "tumblr" && !d.boardId)
+    throw new Error("Tumblr requires a blog");
   if (d.platform === "youtube" && !d.title?.trim())
     throw new Error("YouTube requires a title");
   const target: Record<string, unknown> = { targetType: d.platform };
   if (d.pageId) target.pageId = d.pageId;
   if (d.platform === "pinterest")
     Object.assign(target, { boardId: d.boardId, title: d.title });
+  if (d.platform === "reddit")
+    Object.assign(target, { subreddit: d.boardId, title: d.title });
+  if (d.platform === "tumblr")
+    Object.assign(target, { blog: d.boardId });
   if (
     d.platform === "facebook" &&
     mediaUrls.some((u) => /\.(mp4|mov)(\?|$)/i.test(u))

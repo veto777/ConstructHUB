@@ -38,6 +38,8 @@ import { TikTokDeclaration, TikTokPanel } from "@/components/social-tiktok";
 
 // Google's rounded field shape for the native selects (the surface supplies the hairline colour).
 const selectClass = "h-10 w-full rounded-full border border-input bg-background px-4 text-sm";
+/** What each account picks a destination from, when it isn't a page. */
+const PICK_NOUN: Record<string, string> = { pinterest: "boards", reddit: "subreddits", tumblr: "blogs" };
 
 // Mirrors the server's curated messages so a bad field is named before saving.
 const settingsMessages: Record<string, string> = {
@@ -591,7 +593,7 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
                     </label>
                     {d && (
                       <div className="space-y-2">
-                        {["facebook", "linkedin", "pinterest"].includes(
+                        {["facebook", "linkedin", "pinterest", "reddit", "tumblr"].includes(
                           a.platform,
                         ) && (
                           <>
@@ -601,10 +603,10 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
                               onClick={() =>
                                 mutation.mutate({
                                   path: `/accounts/${a.id}/pages`,
-                                  success: a.platform === "pinterest" ? "Boards refreshed" : "Pages refreshed",
+                                  success: `${PICK_NOUN[a.platform] ? PICK_NOUN[a.platform][0].toUpperCase() + PICK_NOUN[a.platform].slice(1) : "Pages"} refreshed`,
                                 })
                               }
-                              label={`Refresh ${a.platform === "pinterest" ? "boards" : "pages"} for ${a.name}`}
+                              label={`Refresh ${PICK_NOUN[a.platform] ?? "pages"} for ${a.name}`}
                             />
                             <select
                               aria-label={`${a.name} page or board`}
@@ -613,7 +615,7 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
                               onChange={(e) =>
                                 patchDestination(
                                   a.id,
-                                  a.platform === "pinterest"
+                                  ["pinterest", "reddit", "tumblr"].includes(a.platform)
                                     ? { boardId: e.target.value || undefined }
                                     : { pageId: e.target.value || undefined },
                                 )
@@ -632,7 +634,7 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
                             </select>
                           </>
                         )}
-                        {["youtube", "pinterest"].includes(a.platform) && (
+                        {["youtube", "pinterest", "reddit"].includes(a.platform) && (
                           <Input
                             aria-label={`${a.platform} title`}
                             placeholder="Title"
