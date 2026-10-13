@@ -28,7 +28,7 @@ import { xSplitText, xWeightedLength } from "../../shared/social-x";
 import { recordFailure } from "../ops/issues";
 import { SocialError } from "./client";
 
-export type NetApi = "ig_login" | "threads" | "tiktok" | "x" | "bluesky" | "pinterest";
+export type NetApi = "ig_login" | "threads" | "tiktok" | "x" | "bluesky" | "pinterest" | "reddit" | "mastodon" | "tumblr";
 export type Signed = { externalId: string; name: string; picture: string | null; token: string; expiresAt: Date | null; refresh: string | null; scopes: string[] };
 export type Plan = { error?: string; stage: string; container?: string; external?: string; url?: string | null };
 export type Read = { state: "submitted" | "published" | "failed"; url?: string | null; external?: string; error?: string; stage?: string };
@@ -46,6 +46,12 @@ const SCOPES: Record<NetApi, string[]> = {
   bluesky: [],   // an app password is the whole grant; Bluesky has no scopes
   // Boards to pick from, pins to create and read back, who signed in (docs/social-apps/pinterest.md §2).
   pinterest: ["boards:read", "pins:read", "pins:write", "user_accounts:read"],
+  // Who signed in, the subreddits they can post to, and posting itself (docs/social-apps/reddit.md).
+  reddit: ["identity", "mysubreddits", "submit"],
+  // A Mastodon app is registered on the customer's own server; "read write" works on every instance.
+  mastodon: ["read", "write"],
+  // Tumblr: who signed in and their blogs, posting, and a refresh token.
+  tumblr: ["basic", "write", "offline_access"],
 };
 export const netScopes = (api: NetApi) => SCOPES[api];
 
@@ -53,6 +59,9 @@ export const netScopes = (api: NetApi) => SCOPES[api];
 export function netConfigured(api: NetApi, env: NodeJS.ProcessEnv = process.env): boolean {
   if (api === "bluesky") return /^(on|true|1)$/i.test((env.SOCIAL_BLUESKY ?? "").trim());
   if (api === "pinterest") return /^\d{5,30}$/.test(env.SOCIAL_PINTEREST_APP_ID ?? "") && /^\S{16,}$/.test(env.SOCIAL_PINTEREST_APP_SECRET ?? "");
+  if (api === "reddit") return /^\S{6,}$/.test(env.SOCIAL_REDDIT_CLIENT_ID ?? "") && /^\S{10,}$/.test(env.SOCIAL_REDDIT_CLIENT_SECRET ?? "");
+  if (api === "mastodon") return /^(on|true|1)$/i.test((env.SOCIAL_MASTODON ?? "").trim());
+  if (api === "tumblr") return /^\S{6,}$/.test(env.SOCIAL_TUMBLR_CLIENT_ID ?? "") && /^\S{10,}$/.test(env.SOCIAL_TUMBLR_CLIENT_SECRET ?? "");
   if (api === "x") return !!env.SOCIAL_X_CLIENT_ID?.trim() && !!env.SOCIAL_X_CLIENT_SECRET?.trim();
   if (api === "ig_login") return /^\d{6,30}$/.test(env.SOCIAL_INSTAGRAM_APP_ID ?? "") && /^\S{16,}$/.test(env.SOCIAL_INSTAGRAM_APP_SECRET ?? "");
   if (api === "threads") return /^\d{6,30}$/.test(env.SOCIAL_THREADS_APP_ID ?? "") && /^\S{16,}$/.test(env.SOCIAL_THREADS_APP_SECRET ?? "");
@@ -112,6 +121,9 @@ const inSec = (s: unknown) => (Number(s) > 0 ? new Date(netDeps.now() + Number(s
 export function netAuthUrl(api: NetApi, state: string, verifier?: string): string {
   const env = netDeps.env();
   if (api === "bluesky") throw new SocialError("Bluesky signs in with an app password, not a sign-in page; use the Bluesky form");
+  if (api === "mastodon") throw new SocialError("Mastodon asks for your server first; use the Mastodon form");
+  if (api === "reddit") return `https://www.reddit.com/api/v1/authorize?${q({ client_id: env.SOCIAL_REDDIT_CLIENT_ID, response_type: "code", state, redirect_uri: netRedirect(api), duration: "permanent", scope: SCOPES.reddit.join(" ") })}`;
+  if (api === "tumblr") return `https://www.tumblr.com/oauth2/authorize?${q({ client_id: env.SOCIAL_TUMBLR_CLIENT_ID, response_type: "code", scope: SCOPES.tumblr.join(" "), state, redirect_uri: netRedirect(api) })}`;
   if (api === "pinterest") return `https://www.pinterest.com/oauth/?${q({ client_id: env.SOCIAL_PINTEREST_APP_ID, redirect_uri: netRedirect(api), response_type: "code", scope: SCOPES.pinterest.join(","), state })}`;
   if (api === "x") {
     if (!verifier) throw new SocialError("X sign-in requires PKCE; connect again");
@@ -126,6 +138,9 @@ export function netAuthUrl(api: NetApi, state: string, verifier?: string): strin
 export async function netExchange(api: NetApi, code: string, verifier?: string): Promise<Signed> {
   const env = netDeps.env();
   if (api === "bluesky") throw new SocialError("Bluesky signs in with an app password, not a sign-in page; use the Bluesky form");
+  if (api === "mastodon") throw new SocialError("Mastodon asks for your server first; use the Mastodon form");
+  if (api === "reddit") return redditExchange(code);
+  if (api === "tumblr") return tumblrExchange(code);
   if (api === "pinterest") {
     const t = await pinterestToken({ grant_type: "authorization_code", code, redirect_uri: netRedirect(api) });
     const granted = String(t.scope ?? "").split(/[\s,]+/).filter(Boolean);
@@ -165,11 +180,14 @@ export async function netExchange(api: NetApi, code: string, verifier?: string):
 export function needsRefresh(api: NetApi, expiresAt: Date | null): boolean {
   if (!expiresAt) return false;
   const left = expiresAt.getTime() - netDeps.now();
-  return api === "tiktok" || api === "x" || api === "bluesky" ? left < 10 * 60_000 : left < 7 * 86_400_000;
+  return api === "tiktok" || api === "x" || api === "bluesky" || api === "reddit" || api === "tumblr" ? left < 10 * 60_000 : left < 7 * 86_400_000;
 }
 export async function netRefresh(api: NetApi, token: string, refresh: string | null): Promise<Pick<Signed, "token" | "expiresAt" | "refresh">> {
   const env = netDeps.env();
   if (api === "bluesky") return blueskyRefresh(refresh);
+  if (api === "mastodon") return { token, expiresAt: null, refresh };   // Mastodon access tokens don't expire
+  if (api === "reddit") { if (!refresh) throw reconnect(); return redditRefresh(refresh); }
+  if (api === "tumblr") { if (!refresh) throw reconnect(); return tumblrRefreshToken(refresh); }
   if (api === "pinterest") {
     if (!refresh) throw reconnect();
     const d = await pinterestToken({ grant_type: "refresh_token", refresh_token: refresh });
@@ -759,10 +777,233 @@ export async function pinterestDelete(token: string, id: string): Promise<void> 
   await pinterestCall(`/pins/${id}`, token, undefined, "DELETE");
 }
 
+
+// ── Reddit, Mastodon, Tumblr (docs/social-apps) ───────────────────────────────────────────────────────────────
+
+const REDDIT_UA = "web:com.constructhub:v1.0 (ConstructHUB social publishing)";
+async function redditToken(form: Record<string, string>): Promise<any> {
+  const env = netDeps.env();
+  const basic = Buffer.from(`${env.SOCIAL_REDDIT_CLIENT_ID}:${env.SOCIAL_REDDIT_CLIENT_SECRET}`).toString("base64");
+  let r: Response;
+  try { r = await netDeps.http("https://www.reddit.com/api/v1/access_token", { method: "POST", headers: { Authorization: `Basic ${basic}`, "Content-Type": "application/x-www-form-urlencoded", "User-Agent": REDDIT_UA }, body: new URLSearchParams(form), redirect: "error", signal: AbortSignal.timeout(30_000) }); }
+  catch { throw new SocialError("Reddit didn't answer; try again", 502); }
+  const d: any = await r.json().catch(() => null);
+  if (!r.ok || !d?.access_token) { if (r.status === 401) throw reconnect(); throw new SocialError("Reddit refused the sign-in; reconnect the account", r.status >= 500 ? 502 : 400); }
+  return d;
+}
+async function redditCall(path: string, token: string, init: { method?: string; form?: Record<string, string> } = {}): Promise<any> {
+  const headers: Record<string, string> = { Authorization: `Bearer ${token}`, "User-Agent": REDDIT_UA };
+  let body: BodyInit | undefined;
+  if (init.form) { headers["Content-Type"] = "application/x-www-form-urlencoded"; body = new URLSearchParams({ ...init.form, raw_json: "1", api_type: "json" }); }
+  let r: Response;
+  try { r = await netDeps.http(`https://oauth.reddit.com${path}`, { method: init.method ?? (body ? "POST" : "GET"), headers, body, redirect: "error", signal: AbortSignal.timeout(30_000) }); }
+  catch { throw new SocialError("Reddit didn't answer; check the post before sending it again", 502); }
+  const d: any = await r.json().catch(() => null);
+  if (r.status === 401) throw reconnect();
+  if (r.status === 429) throw new SocialError("Reddit is limiting how fast we post; it will retry shortly", 429);
+  if (!r.ok) throw new SocialError("Reddit refused the request", r.status >= 500 ? 502 : 400);
+  return d;
+}
+async function redditExchange(code: string): Promise<Signed> {
+  const t = await redditToken({ grant_type: "authorization_code", code, redirect_uri: netRedirect("reddit") });
+  const granted = String(t.scope ?? "").split(/[\s,]+/).filter(Boolean);
+  if (!granted.includes("submit")) throw new SocialError("Reddit didn't allow posting. Connect again and allow every permission it asks for.");
+  const me = await redditCall("/api/v1/me", t.access_token);
+  if (!me?.name) throw new SocialError("Reddit did not identify the signed-in account", 502);
+  const icon = typeof me.icon_img === "string" ? me.icon_img.split("?")[0] : (typeof me.subreddit?.icon_img === "string" ? me.subreddit.icon_img.split("?")[0] : null);
+  return { externalId: String(me.id ?? me.name), name: `u/${me.name}`, picture: icon || null, token: t.access_token, expiresAt: inSec(t.expires_in ?? 3600), refresh: t.refresh_token ?? null, scopes: granted };
+}
+async function redditRefresh(refresh: string): Promise<Pick<Signed, "token" | "expiresAt" | "refresh">> {
+  const t = await redditToken({ grant_type: "refresh_token", refresh_token: refresh });
+  return { token: t.access_token, expiresAt: inSec(t.expires_in ?? 3600), refresh: t.refresh_token ?? refresh };
+}
+/** The subreddits this account may post to — its subscriptions, plus its own profile (for u/ posts). */
+export async function redditSubreddits(token: string): Promise<{ id: string; name: string }[]> {
+  const out: { id: string; name: string }[] = [];
+  const me = await redditCall("/api/v1/me", token).catch(() => null);
+  if (me?.name) out.push({ id: `u_${me.name}`, name: `u/${me.name} (your profile)` });
+  const d = await redditCall("/subreddits/mine/subscriber?limit=100", token).catch(() => null);
+  for (const c of (Array.isArray(d?.data?.children) ? d.data.children : [])) {
+    const s = c?.data;
+    if (s?.display_name && !s.quarantine && s.submission_type !== "none") out.push({ id: String(s.display_name), name: `r/${s.display_name}` });
+  }
+  return out.slice(0, 100);
+}
+/** Reddit self (text) post to a subreddit; image posts are a later addition (the asset-lease flow). */
+async function redditPublish(token: string, text: string, media: string[], target: Record<string, any>): Promise<Plan> {
+  const sr = String(target.subreddit ?? "").replace(/^[ru]\//, "");
+  const title = String(target.title ?? "").trim();
+  if (!sr) throw new SocialError("Choose a subreddit for the Reddit post");
+  if (!title) throw new SocialError("Reddit needs a title");
+  if (title.length > 300) throw new SocialError("Reddit titles are at most 300 characters");
+  if (media.length) throw new SocialError("Reddit image posts aren't supported here yet — post a text update for now");
+  const d = await redditCall("/api/submit", token, { form: { sr, title: title.slice(0, 300), kind: "self", text: text.slice(0, 40000), resubmit: "true", sendreplies: "true" } });
+  const errs = d?.json?.errors;
+  if (Array.isArray(errs) && errs.length) throw new SocialError(`Reddit refused it: ${String(errs[0]?.[1] ?? errs[0]?.[0] ?? "rejected").slice(0, 160)}`);
+  const data = d?.json?.data;
+  const name = typeof data?.name === "string" ? data.name : (typeof data?.id === "string" ? `t3_${data.id}` : "");
+  if (!name) throw new SocialError("Reddit didn't confirm the post; check the subreddit before posting again", 502);
+  return { stage: "published", external: name, url: typeof data?.url === "string" ? data.url : null };
+}
+export async function redditDelete(token: string, fullname: string): Promise<void> {
+  if (!/^t3_\w+$/.test(fullname)) throw new SocialError("That isn't a Reddit post", 400);
+  await redditCall("/api/del", token, { form: { id: fullname } });
+}
+
+const MASTODON_HOST = /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i;
+/** A Mastodon server from what the customer typed (strips scheme, path, "@user@"). */
+export function mastodonHost(input: string): string {
+  let h = String(input ?? "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "").replace(/^@/, "");
+  if (h.includes("@")) h = h.split("@").filter(Boolean).pop() ?? "";
+  if (!MASTODON_HOST.test(h) || !/[a-z]/.test(h.split(".").pop() ?? "")) throw new SocialError("Enter your Mastodon server, like mastodon.social");
+  return h;
+}
+/** A customer-typed server must resolve only to public addresses before we talk to it (no internal hosts). */
+export const mastodonDns = { check: (host: string) => new Promise<void>((resolve, reject) => lookup(host, { all: true }, (err, addresses) => {
+  if (err || !addresses.length || addresses.some((a) => !publicIP(a.address))) reject(new SocialError("That Mastodon server didn't answer; check the address and try again", 400));
+  else resolve();
+})) };
+async function mastodonApi(instance: string, path: string, init: { method?: string; token?: string; form?: Record<string, string>; body?: FormData } = {}): Promise<any> {
+  const headers: Record<string, string> = {};
+  let body: BodyInit | undefined;
+  if (init.form) { headers["Content-Type"] = "application/x-www-form-urlencoded"; body = new URLSearchParams(init.form); }
+  else if (init.body) body = init.body as BodyInit;
+  if (init.token) headers.Authorization = `Bearer ${init.token}`;
+  await mastodonDns.check(mastodonHost(instance));
+  let r: Response;
+  try { r = await netDeps.http(`https://${instance}${path}`, { method: init.method ?? (body ? "POST" : "GET"), headers, body, redirect: "error", signal: AbortSignal.timeout(60_000) }); }
+  catch { throw new SocialError("That Mastodon server didn't answer; check the address and try again", 502); }
+  const d: any = await r.json().catch(() => null);
+  if (r.status === 401) throw reconnect();
+  if (r.status === 429) throw new SocialError("Mastodon is limiting how fast we post; it will retry shortly", 429);
+  if (!r.ok) { const say = String(d?.error ?? "").slice(0, 160); throw new SocialError(say ? `Mastodon refused it: ${say}` : "Mastodon refused the request", r.status >= 500 ? 502 : 400); }
+  if (!d || typeof d !== "object") throw new SocialError("Mastodon sent an unreadable answer", 502);
+  return d;
+}
+/** Register ConstructHUB as an app on the customer's own Mastodon server (each instance issues its own keys). */
+export async function mastodonRegisterApp(instance: string): Promise<{ clientId: string; clientSecret: string }> {
+  const d = await mastodonApi(instance, "/api/v1/apps", { form: { client_name: "ConstructHUB", redirect_uris: netRedirect("mastodon"), scopes: SCOPES.mastodon.join(" "), website: base() } });
+  if (!d?.client_id || !d?.client_secret) throw new SocialError("That Mastodon server didn't register ConstructHUB; check the address", 502);
+  return { clientId: String(d.client_id), clientSecret: String(d.client_secret) };
+}
+export function mastodonAuthorizeUrl(instance: string, clientId: string, state: string): string {
+  return `https://${instance}/oauth/authorize?${q({ client_id: clientId, redirect_uri: netRedirect("mastodon"), response_type: "code", scope: SCOPES.mastodon.join(" "), state })}`;
+}
+export async function mastodonExchange(instance: string, clientId: string, clientSecret: string, code: string): Promise<Signed> {
+  const t = await mastodonApi(instance, "/oauth/token", { form: { client_id: clientId, client_secret: clientSecret, grant_type: "authorization_code", code, redirect_uri: netRedirect("mastodon"), scope: SCOPES.mastodon.join(" ") } });
+  if (!t?.access_token) throw new SocialError("Mastodon did not return a sign-in", 502);
+  const me = await mastodonApi(instance, "/api/v1/accounts/verify_credentials", { token: t.access_token });
+  if (!me?.username) throw new SocialError("Mastodon did not identify the signed-in account", 502);
+  return { externalId: String(me.id ?? me.username), name: `@${me.username}@${instance}`, picture: typeof me.avatar === "string" ? me.avatar : null, token: t.access_token, expiresAt: null, refresh: null, scopes: SCOPES.mastodon };
+}
+async function mastodonUpload(instance: string, token: string, url: string): Promise<string> {
+  const safe = siteUrl(url);
+  if (!safe.startsWith("https://")) throw new SocialError("Use a public HTTPS media URL");
+  let file: Buffer;
+  try { const resp = await netDeps.mediaHttp(safe); if (!resp.ok) throw new Error("dl"); file = Buffer.from(await resp.arrayBuffer()); if (!file.length || file.length > 200 * 1024 * 1024) throw new Error("size"); }
+  catch { throw new SocialError("Mastodon couldn't read the media; use a public HTTPS file under 200 MB", 400); }
+  const video = isVideo(url);
+  const type = video ? (/\.mov(?:\?|$)/i.test(url) ? "video/quicktime" : /\.webm(?:\?|$)/i.test(url) ? "video/webm" : "video/mp4")
+    : (/\.png(?:\?|$)/i.test(url) ? "image/png" : /\.gif(?:\?|$)/i.test(url) ? "image/gif" : /\.webp(?:\?|$)/i.test(url) ? "image/webp" : "image/jpeg");
+  const fd = new FormData();
+  fd.set("file", new Blob([new Uint8Array(file) as BlobPart], { type }), video ? "media.mp4" : "media.jpg");
+  const d = await mastodonApi(instance, "/api/v2/media", { token, body: fd });
+  if (!d?.id) throw new SocialError("Mastodon did not accept the media", 502);
+  return String(d.id);
+}
+async function mastodonPublish(instance: string, token: string, text: string, media: string[]): Promise<Plan> {
+  if (!instance) throw reconnect();
+  if (media.length > 4) throw new SocialError("Mastodon takes up to four images, or one video");
+  if (media.some(isVideo) && media.length > 1) throw new SocialError("Mastodon takes one video, or up to four images");
+  const ids: string[] = [];
+  for (const u of media) ids.push(await mastodonUpload(instance, token, u));
+  if (!text && !ids.length) throw new SocialError("Mastodon needs text or media");
+  const params = new URLSearchParams();
+  if (text) params.set("status", text);
+  for (const id of ids) params.append("media_ids[]", id);
+  await mastodonDns.check(mastodonHost(instance));
+  const idem = createHash("sha256").update(`${instance}:${token.slice(-8)}:${text}:${ids.join(",")}`).digest("hex");
+  let r: Response;
+  try { r = await netDeps.http(`https://${instance}/api/v1/statuses`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/x-www-form-urlencoded", "Idempotency-Key": idem }, body: params, redirect: "error", signal: AbortSignal.timeout(60_000) }); }
+  catch { throw new SocialError("Mastodon didn't answer; check the post before sending it again", 502); }
+  const d: any = await r.json().catch(() => null);
+  if (r.status === 401) throw reconnect();
+  if (!r.ok || !d?.id) { const say = String(d?.error ?? "").slice(0, 160); throw new SocialError(say ? `Mastodon refused it: ${say}` : "Mastodon did not confirm the post", r.status >= 500 ? 502 : 400); }
+  return { stage: "published", external: String(d.id), url: typeof d.url === "string" ? d.url : null };
+}
+export async function mastodonDelete(instance: string, token: string, id: string): Promise<void> {
+  if (!instance || !/^\w{1,40}$/.test(id)) throw new SocialError("That isn't a Mastodon post", 400);
+  await mastodonApi(instance, `/api/v1/statuses/${id}`, { method: "DELETE", token });
+}
+
+async function tumblrTokenCall(form: Record<string, string>): Promise<any> {
+  const env = netDeps.env();
+  let r: Response;
+  try { r = await netDeps.http("https://api.tumblr.com/v2/oauth2/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ ...form, client_id: String(env.SOCIAL_TUMBLR_CLIENT_ID), client_secret: String(env.SOCIAL_TUMBLR_CLIENT_SECRET) }), redirect: "error", signal: AbortSignal.timeout(30_000) }); }
+  catch { throw new SocialError("Tumblr didn't answer; try again", 502); }
+  const d: any = await r.json().catch(() => null);
+  if (!r.ok || !d?.access_token) { if (r.status === 401) throw reconnect(); throw new SocialError("Tumblr refused the sign-in; reconnect the account", r.status >= 500 ? 502 : 400); }
+  return d;
+}
+async function tumblrFetch(url: string, init: { method?: string; token?: string; form?: Record<string, string>; json?: unknown } = {}): Promise<any> {
+  const headers: Record<string, string> = {};
+  let body: BodyInit | undefined;
+  if (init.form) { headers["Content-Type"] = "application/x-www-form-urlencoded"; body = new URLSearchParams(init.form); }
+  if (init.json !== undefined) { headers["Content-Type"] = "application/json"; body = JSON.stringify(init.json); }
+  if (init.token) headers.Authorization = `Bearer ${init.token}`;
+  let r: Response;
+  try { r = await netDeps.http(url, { method: init.method ?? (body ? "POST" : "GET"), headers, body, redirect: "error", signal: AbortSignal.timeout(30_000) }); }
+  catch { throw new SocialError("Tumblr didn't answer; check the post before sending it again", 502); }
+  const d: any = await r.json().catch(() => null);
+  const status = Number(d?.meta?.status ?? r.status);
+  if (status === 401) throw reconnect();
+  if (status === 429) throw new SocialError("Tumblr is limiting how fast we post; it will retry shortly", 429);
+  if (!r.ok || status >= 400) { const say = String(d?.errors?.[0]?.detail || d?.meta?.msg || "").slice(0, 160); throw new SocialError(say ? `Tumblr refused it: ${say}` : "Tumblr refused the request", status >= 500 ? 502 : 400); }
+  return d;
+}
+async function tumblrExchange(code: string): Promise<Signed> {
+  const t = await tumblrTokenCall({ grant_type: "authorization_code", code, redirect_uri: netRedirect("tumblr") });
+  const info = await tumblrFetch("https://api.tumblr.com/v2/user/info", { token: t.access_token });
+  const u = info?.response?.user;
+  if (!u?.name) throw new SocialError("Tumblr did not identify the signed-in account", 502);
+  const primary = Array.isArray(u.blogs) ? (u.blogs.find((b: any) => b.primary) ?? u.blogs[0]) : null;
+  return { externalId: String(u.name), name: primary?.name ? `@${primary.name}` : `@${u.name}`, picture: primary?.avatar?.[0]?.url ?? null, token: t.access_token, expiresAt: inSec(t.expires_in ?? 3600), refresh: t.refresh_token ?? null, scopes: SCOPES.tumblr };
+}
+async function tumblrRefreshToken(refresh: string): Promise<Pick<Signed, "token" | "expiresAt" | "refresh">> {
+  const t = await tumblrTokenCall({ grant_type: "refresh_token", refresh_token: refresh });
+  return { token: t.access_token, expiresAt: inSec(t.expires_in ?? 3600), refresh: t.refresh_token ?? refresh };
+}
+/** The blogs this Tumblr account can post to (the composer keeps the chosen one on the post). */
+export async function tumblrBlogs(token: string): Promise<{ id: string; name: string }[]> {
+  const info = await tumblrFetch("https://api.tumblr.com/v2/user/info", { token });
+  const blogs = Array.isArray(info?.response?.user?.blogs) ? info.response.user.blogs : [];
+  return blogs.map((b: any) => ({ id: String(b.name), name: b.title ? `${b.title} (@${b.name})` : `@${b.name}` })).slice(0, 50);
+}
+async function tumblrPublish(token: string, text: string, media: string[], target: Record<string, any>): Promise<Plan> {
+  const blog = String(target.blog ?? "").replace(/^@/, "");
+  if (!blog) throw new SocialError("Choose a Tumblr blog to post to");
+  const content: any[] = [];
+  if (text) content.push({ type: "text", text });
+  for (const u of media) content.push(isVideo(u) ? { type: "video", media: [{ url: u }] } : { type: "image", media: [{ url: u }] });
+  if (!content.length) throw new SocialError("Tumblr needs text or media");
+  const d = await tumblrFetch(`https://api.tumblr.com/v2/blog/${encodeURIComponent(blog)}/posts`, { token, json: { content, state: "published" } });
+  const id = d?.response?.id_string ?? d?.response?.id;
+  if (!id) throw new SocialError("Tumblr didn't confirm the post; check the blog before posting again", 502);
+  return { stage: "published", external: `${blog}:${id}`, url: `https://${blog}.tumblr.com/post/${id}` };
+}
+export async function tumblrDelete(token: string, external: string): Promise<void> {
+  const [blog, id] = String(external).split(":");
+  if (!blog || !/^\d{1,30}$/.test(id ?? "")) throw new SocialError("That isn't a Tumblr post", 400);
+  await tumblrFetch(`https://api.tumblr.com/v2/blog/${encodeURIComponent(blog.replace(/^@/, ""))}/post/delete`, { token, form: { id } });
+}
+
 /** Start a publish. Returns where it got to (a container / publish id to poll). */
 export async function netPublish(api: NetApi, externalId: string, token: string, text: string, media: string[], target: Record<string, any>): Promise<Plan> {
   if (api === "bluesky") return blueskyPublish(externalId, token, text, media, String(target.blueskyHandle ?? ""));
   if (api === "pinterest") return pinterestPublish(token, text, media, target);
+  if (api === "reddit") return redditPublish(token, text, media, target);
+  if (api === "mastodon") return mastodonPublish(String(target.mastodonInstance ?? ""), token, text, media);
+  if (api === "tumblr") return tumblrPublish(token, text, media, target);
   if (api === "ig_login") {
     if (!media.length) throw new SocialError("Instagram needs a photo or a video");
     const host = `https://graph.instagram.com/v25.0/${externalId}/media`;
@@ -824,6 +1065,7 @@ export async function netRead(api: NetApi, externalId: string, token: string, st
   if (api === "x") return { state: "published", external: container, url: username ? `https://x.com/${username.replace(/^@/, "")}/status/${container}` : null };
   if (api === "bluesky") { const rkey = container.split("/").pop(); return { state: "published", external: container, url: username && rkey ? `https://bsky.app/profile/${username.replace(/^@/, "")}/post/${rkey}` : null }; }
   if (api === "pinterest") return { state: "published", external: container, url: `https://www.pinterest.com/pin/${container}/` };
+  if (api === "reddit" || api === "mastodon" || api === "tumblr") return { state: "published", external: container, url: null };
   const d = await call("https://open.tiktokapis.com/v2/post/publish/status/fetch/", { json: { publish_id: container }, bearer: token });
   const st = d.data?.status;
   if (st === "FAILED") return { state: "failed", error: `TikTok couldn't post it${d.data?.fail_reason ? `: ${String(d.data.fail_reason).replace(/_/g, " ")}` : ""}` };

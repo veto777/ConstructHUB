@@ -88,7 +88,7 @@ export const socialWriteOpenapi = {
       SocialDestination: {
         type: "object", required: ["accountId", "platform"],
         properties: {
-          accountId: { type: "string" }, platform: { type: "string", enum: ["twitter", "facebook", "instagram", "linkedin", "threads", "bluesky", "tiktok", "youtube", "pinterest"] },
+          accountId: { type: "string" }, platform: { type: "string", enum: ["twitter", "facebook", "instagram", "linkedin", "threads", "bluesky", "tiktok", "youtube", "pinterest", "reddit", "mastodon", "tumblr"] },
           pageId: { type: "string" }, boardId: { type: "string" }, title: { type: "string", maxLength: 100 },
           privacy: { type: "string", enum: ["public", "private", "unlisted"], default: "private" },
           tiktokPrivacy: { type: "string", enum: ["", "PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "FOLLOWER_OF_CREATOR", "SELF_ONLY"], default: "", description: "TikTok: who can view. Required to post (not for drafts); must be one the creator offers" },

@@ -9,6 +9,9 @@ Kits in this folder:
 | `tiktok.md` | TikTok | Login Kit + Content Posting API (Direct Post), app review → Direct Post audit | **Strict posting-screen UX**; private-only until audited |
 | `bluesky.md` | Bluesky (ConstructHUB Direct) | AT Protocol, app password; no registration, no review | `SOCIAL_BLUESKY=on`; 300 graphemes; 4 photos or 1 video; facets for links/tags/mentions |
 | `pinterest.md` | Pinterest (ConstructHUB Direct) | Pinterest API v5 OAuth app; Trial access → Standard access review | Business account + developer verification; `SOCIAL_PINTEREST_APP_ID/_SECRET`; board per pin; 1 photo, 2–5 carousel, or 1 video (+cover) |
+| `reddit.md` | Reddit (ConstructHUB Direct) | Reddit web app (OAuth2, permanent); Data API commercial-use request | `SOCIAL_REDDIT_CLIENT_ID/_SECRET`; subreddit + title per post; text posts only for now |
+| `mastodon.md` | Mastodon (ConstructHUB Direct) | Registers itself on each customer's server; no review | `SOCIAL_MASTODON=on`; 500 chars; 4 photos or 1 video |
+| `tumblr.md` | Tumblr (ConstructHUB Direct) | Tumblr OAuth2 app; no review | `SOCIAL_TUMBLR_CLIENT_ID/_SECRET`; blog per post; NPF text + media |
 | `~/ConstructHUB-release/docs/youtube/AUDIT-PACK.md` (tower1) | YouTube | YouTube API audit + Google OAuth verification | Draft is written and ready but **not submitted**; customer use case B is on branch `youtube-customers`, not deployed |
 
 Nothing in this folder has been sent to any platform. When these kits were written the native

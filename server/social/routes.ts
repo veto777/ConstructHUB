@@ -32,6 +32,8 @@ import {
   nativeBlueskyLogin,
   nativeBlueskyConnectUrl,
   nativeBlueskyOauthCallback,
+  nativeMastodonConnectUrl,
+  nativeMastodonCallback,
 } from "./service";
 import { CONNECTABLE, outstandConfigured, webhookSigned } from "./outstand";
 import { blueskyOauthConfigured, blueskyClientMetadata, blueskyJwks } from "./bluesky-oauth";
@@ -257,6 +259,13 @@ export function registerSocialRoutes(
     if (!nativeNetworksFor(req.user).includes("bluesky")) throw new SocialError("That network can't be connected here yet");
     res.json(await nativeBlueskyConnectUrl(id, businessId, handle, req));
   });
+  // Mastodon: the customer names their server; ConstructHUB registers there and sends them to its sign-in
+  // (docs/social-apps/mastodon.md). They come back through /api/social/native/mastodon/callback.
+  route("post", "/native/mastodon/connect", async (req, res, id, businessId) => {
+    const { server } = z.object({ server: z.string().trim().min(3).max(260) }).strict().parse(req.body);
+    if (!nativeNetworksFor(req.user).includes("mastodon")) throw new SocialError("That network can't be connected here yet");
+    res.json(await nativeMastodonConnectUrl(id, businessId, server, req));
+  });
   route("post", "/native/refresh", async (_req, res, id, businessId) => res.json(await nativeRefresh(id, businessId)));
   // Stats, comments and deleting (./insights.ts) — for accounts connected through ConstructHUB Direct, admins only
   // until Meta approves the app, like the rest of Direct.
@@ -327,14 +336,20 @@ export function registerSocialRoutes(
     res.setHeader("Cache-Control", "no-store");
     res.redirect(302, await nativeCallback(req, user.id));
   });
-  // Instagram login, Threads, TikTok, X and Pinterest come back here (each registered as its app's redirect URI).
-  for (const [path, api] of [["instagram", "ig_login"], ["threads", "threads"], ["tiktok", "tiktok"], ["x", "x"], ["pinterest", "pinterest"]] as const) {
+  // Instagram login, Threads, TikTok, X, Pinterest, Reddit and Tumblr come back here (each registered as its app's redirect URI).
+  for (const [path, api] of [["instagram", "ig_login"], ["threads", "threads"], ["tiktok", "tiktok"], ["x", "x"], ["pinterest", "pinterest"], ["reddit", "reddit"], ["tumblr", "tumblr"]] as const) {
     app.get(`/api/social/native/${path}/callback`, async (req: Request, res: Response) => {
       const user = auth(req, res); if (!user) return;
       res.setHeader("Cache-Control", "no-store");
       res.redirect(302, await nativeNetCallback(req, user.id, api));
     });
   }
+  // Back from the customer's own Mastodon server (the app we registered there names this redirect URI).
+  app.get("/api/social/native/mastodon/callback", async (req: Request, res: Response) => {
+    const user = auth(req, res); if (!user) return;
+    res.setHeader("Cache-Control", "no-store");
+    res.redirect(302, await nativeMastodonCallback(req, user.id));
+  });
   // AT Protocol OAuth: the client-metadata document (its URL is the client_id) and the app's public key, both public.
   app.get("/api/social/bluesky/client-metadata.json", (_req: Request, res: Response) => { res.setHeader("Cache-Control", "public, max-age=300"); res.json(blueskyClientMetadata()); });
   app.get("/api/social/bluesky/jwks.json", (_req: Request, res: Response) => { res.setHeader("Cache-Control", "public, max-age=300"); res.json(blueskyJwks()); });

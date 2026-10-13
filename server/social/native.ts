@@ -23,7 +23,7 @@ const dec = (v: string): string => { const t = decryptToken(v); if (!t) throw ne
 import { SocialError } from "./client";
 import { isPlatformAdmin } from "../admin";
 import type { PostPayload, SocialAccount, SocialClient, StatusResult, SubmitResult, UploadStart } from "./provider";
-import { netConfigured, netExchange, netPublish, netRead, netRefresh, needsRefresh, netScopes, tiktokCreatorInfo, tiktokRevoke, blueskyLogin, pinterestBoards, type CreatorInfo, type NetApi } from "./native-nets";
+import { netConfigured, netExchange, netPublish, netRead, netRefresh, needsRefresh, netScopes, tiktokCreatorInfo, tiktokRevoke, blueskyLogin, pinterestBoards, redditSubreddits, tumblrBlogs, mastodonExchange, mastodonDelete, type CreatorInfo, type NetApi } from "./native-nets";
 import { blueskyOauthConfigured, blueskyOauthRefresh, blueskyOauthPublish, blueskyOauthDelete, oauthNeedsRefresh, type OauthSession } from "./bluesky-oauth";
 
 export const NATIVE_MARK = "native:";
@@ -42,12 +42,15 @@ export function nativeNetworks(env: NodeJS.ProcessEnv = process.env): string[] {
     ...(netConfigured("x", env) ? ["x"] : []),
     ...(netConfigured("bluesky", env) || blueskyOauthConfigured(env) ? ["bluesky"] : []),
     ...(netConfigured("pinterest", env) ? ["pinterest"] : []),
+    ...(netConfigured("reddit", env) ? ["reddit"] : []),
+    ...(netConfigured("mastodon", env) ? ["mastodon"] : []),
+    ...(netConfigured("tumblr", env) ? ["tumblr"] : []),
   ];
 }
 /** Connect-screen network → which sign-in it uses. `instagram_direct` = Instagram login (no Facebook Page needed). */
-export const NETWORK_API: Record<string, NetApi | "meta"> = { facebook: "meta", instagram: "meta", instagram_direct: "ig_login", threads: "threads", tiktok: "tiktok", x: "x", bluesky: "bluesky", pinterest: "pinterest" };
-const API_PLATFORM: Record<NetApi, string> = { ig_login: "instagram", threads: "threads", tiktok: "tiktok", x: "x", bluesky: "bluesky", pinterest: "pinterest" };
-const API_NETWORK: Record<NetApi, string> = { ig_login: "instagram_direct", threads: "threads", tiktok: "tiktok", x: "x", bluesky: "bluesky", pinterest: "pinterest" };
+export const NETWORK_API: Record<string, NetApi | "meta"> = { facebook: "meta", instagram: "meta", instagram_direct: "ig_login", threads: "threads", tiktok: "tiktok", x: "x", bluesky: "bluesky", pinterest: "pinterest", reddit: "reddit", mastodon: "mastodon", tumblr: "tumblr" };
+const API_PLATFORM: Record<NetApi, string> = { ig_login: "instagram", threads: "threads", tiktok: "tiktok", x: "x", bluesky: "bluesky", pinterest: "pinterest", reddit: "reddit", mastodon: "mastodon", tumblr: "tumblr" };
+const API_NETWORK: Record<NetApi, string> = { ig_login: "instagram_direct", threads: "threads", tiktok: "tiktok", x: "x", bluesky: "bluesky", pinterest: "pinterest", reddit: "reddit", mastodon: "mastodon", tumblr: "tumblr" };
 export const nativeConfigured = (env: NodeJS.ProcessEnv = process.env) => nativeNetworks(env).length > 0;
 /** Someone signed in, as far as ConstructHUB Direct cares: their email (req.user, or a users row). */
 export type NativeViewer = { email?: string | null } | null | undefined;
@@ -288,6 +291,12 @@ export async function nativeBlueskyOauthConnect(tenant: string, ex: { externalId
   await upsertAccount(tenant, "bluesky", ex.externalId, ex.name, ex.picture, null, ex.token, { api: "bluesky", refresh: ex.refresh, expiresAt: ex.expiresAt, scopes: ex.scopes, owner: ex.externalId, oauthEnc });
   return { name: ex.name };
 }
+/** Mastodon: the app is registered on the customer's own server; we keep the access token plus the server (oauth_enc) that publishing needs. */
+export async function nativeMastodonConnect(tenant: string, instance: string, clientId: string, clientSecret: string, code: string): Promise<{ name: string }> {
+  const s = await mastodonExchange(instance, clientId, clientSecret, code);
+  await upsertAccount(tenant, "mastodon", s.externalId, s.name, s.picture, null, s.token, { api: "mastodon", refresh: s.refresh, expiresAt: s.expiresAt, scopes: s.scopes, owner: s.externalId, oauthEnc: enc(JSON.stringify({ instance })) });
+  return { name: s.name };
+}
 export const netScopesFor = netScopes;
 
 /** Disconnect lets go of our access at TikTok too (/v2/oauth/revoke/); best effort — the rows are deleted either way. */
@@ -458,12 +467,22 @@ export class NativeClient implements SocialClient {
   }
   async targets(account: SocialAccount) {
     if (account.platform === "facebook") return { kind: "pages" as const, items: [{ id: account.id, name: account.name }] };
-    if (account.platform !== "pinterest") return null;
-    // Pinterest: the boards this account can pin to, read now (the composer keeps the chosen board on the post).
+    if (!["pinterest", "reddit", "tumblr"].includes(account.platform)) return null;
+    // The sub-destinations this account posts to — Pinterest boards, subreddits, Tumblr blogs — read now; the composer keeps the chosen one on the post.
     const row = await this.row(account.id);
-    if (row.api !== "pinterest") return null;
-    try { return { kind: "boards" as const, items: await pinterestBoards(await this.token(row)) }; }
+    try {
+      const items = row.api === "pinterest" ? await pinterestBoards(await this.token(row))
+        : row.api === "reddit" ? await redditSubreddits(await this.token(row))
+        : row.api === "tumblr" ? await tumblrBlogs(await this.token(row)) : null;
+      return items ? { kind: "boards" as const, items } : null;
+    }
     catch (e) { await this.markReconnect(row.id, e); throw e; }
+  }
+  /** Delete a published Mastodon status (the server is stored in oauth_enc). */
+  async mastodonDeletePost(row: Row, id: string) {
+    let instance = "";
+    try { instance = JSON.parse((row.oauth_enc ? dec(row.oauth_enc) : "") || "{}").instance ?? ""; } catch { /* mastodonDelete rejects an empty server */ }
+    await mastodonDelete(String(instance), await this.token(row), id);
   }
 
   async submit(payload: PostPayload, idempotencyKey: string): Promise<SubmitResult> {
@@ -494,7 +513,9 @@ export class NativeClient implements SocialClient {
     const token = await this.token(acct);
     try {
       if (acct.api !== "meta") {
-        const p = await netPublish(acct.api as NetApi, acct.external_id, token, text, media, { ...payload.post.target, xUsername: acct.name, blueskyHandle: acct.name });
+        const extra: Record<string, any> = { xUsername: acct.name, blueskyHandle: acct.name };
+        if (acct.api === "mastodon" && acct.oauth_enc) { try { extra.mastodonInstance = JSON.parse(dec(acct.oauth_enc) || "{}").instance; } catch { /* markReconnect handles a bad record */ } }
+        const p = await netPublish(acct.api as NetApi, acct.external_id, token, text, media, { ...payload.post.target, ...extra });
         await this.setSub(id, { stage: p.stage, container_id: p.container ?? null, external_id: p.external ?? null, public_url: p.url ?? null, error: p.error ?? null });
       } else if (acct.platform === "facebook") await this.facebookSend(id, acct, token, text, media);
       else if (acct.platform === "instagram") await this.instagramSend(id, acct, token, text, media);
