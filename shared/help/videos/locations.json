@@ -1,0 +1,25 @@
+{
+  "helpKey": "locations",
+  "durationSec": 73,
+  "video": {
+    "key": "tutorials/locations.da334201.mp4",
+    "bytes": 7816910,
+    "sha256": "da3342019e855c743c3af469fe6b52a29cbaed7314695148d6886b9fa189fd2b"
+  },
+  "captions": {
+    "key": "tutorials/locations.f137dd51.vtt",
+    "bytes": 1524,
+    "sha256": "f137dd518967c6001186400d8d99f39f1a94872ed71aea44ac852ebbe115ad0b"
+  },
+  "poster": {
+    "key": "tutorials/locations.2da45b4b.jpg",
+    "bytes": 106645,
+    "sha256": "2da45b4b2e6532991368ee72f8535129c97b9579998959118f0643901e06ebc2"
+  },
+  "uploaded": {
+    "at": "2026-10-13T20:30:51.641Z",
+    "video": "ad7f9170f82e4d3147e92f3f078e5e6b",
+    "captions": "1aaa85dc4292fcfbeec8dfb2bdce1183",
+    "poster": "c45312edcfcf9db2506287498005ba45"
+  }
+}

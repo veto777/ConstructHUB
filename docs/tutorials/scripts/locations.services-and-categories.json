@@ -1,0 +1,37 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "locations.services-and-categories",
+  "title": "Locations → Services and categories",
+  "viewport": { "width": 1024, "height": 576 },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    { "action": "goto", "url": "/locations?location=910001&tab=services", "caption": "Services", "chapter": "Every service on the listing",
+      "narration": "Services lists every service and category on this listing, as Google has them." },
+    { "action": "highlight", "selector": "[data-testid=\"badge-service-count\"]", "caption": "The count",
+      "narration": "The badge counts the services: fourteen here." },
+    { "action": "highlight", "selector": "[data-testid=\"service-categories\"]", "caption": "Categories, primary marked", "chapter": "Primary category",
+      "narration": "Categories come first, with the primary category marked: Roofing contractor here." },
+    { "action": "highlight", "selector": "[data-testid=\"service-row-0\"]", "caption": "One service per row",
+      "narration": "Then each service, one per row: roof replacement, roof repair, hail damage repair, and on." },
+    { "action": "type", "selector": "[data-testid=\"input-service-filter\"]", "value": "gutter", "caption": "Search the list", "chapter": "Find one fast",
+      "narration": "When the list is long, type in the search to narrow it." },
+    { "action": "highlight", "selector": "[data-testid=\"service-row-0\"]", "caption": "Matches",
+      "narration": "Two gutter services match." },
+    { "action": "type", "selector": "[data-testid=\"input-service-filter\"]", "value": "roof", "caption": "Another search",
+      "narration": "Or search for roof." },
+    { "action": "highlight", "selector": "[data-testid=\"service-categories\"]", "caption": "Edit them on Google",
+      "narration": "Change services or categories in Google Business Profile; the next sync brings them here." },
+    { "action": "highlight", "selector": "[data-testid=\"tool-rail-locations\"]", "caption": "Menu: Locations",
+      "narration": "You'll find Locations in the Google Business menu on the left." }
+  ],
+  "youtube": {
+    "title": "How to see your services and categories from Google | ConstructHUB",
+    "description": "The Services tab of a linked location in ConstructHUB: every category on the listing with the primary one marked, every service one per row, a count badge, and a search that narrows a long list. Services are read from Google on each sync; you edit them in Google Business Profile.",
+    "tags": ["ConstructHUB", "Google Business Profile", "GBP services", "business categories", "contractor marketing", "local SEO", "contractor software"],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": { "headline": "Every Service, Listed", "accent": "Listed", "kicker": "Google Business", "step": 2 },
+  "hideSelectors": ["div:has(> div.p-4 > a[href=\"/search-console\"])"]
+}
