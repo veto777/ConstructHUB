@@ -283,7 +283,7 @@ export function ScreensSection({ page, screens, n, tone }: { page: Pick<LandingC
               <X size={20} />
             </button>
           </DialogClose>
-          <img src={shot.src} alt={shot.alt} width={shot.width} height={shot.height} className="block w-full h-auto rounded-lg" />
+          <img src={shot.src} alt={shot.alt} width={shot.width} height={shot.height} loading="lazy" decoding="async" className="block w-full h-auto rounded-lg" />
         </DialogContent>
       </Dialog>
     </Band>

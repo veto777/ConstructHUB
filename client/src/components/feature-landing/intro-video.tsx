@@ -52,7 +52,7 @@ export function IntroVideoFrame({ video, title, testId, className }: {
           data-testid={`${testId}-play`}
         >
           {video.poster
-            ? <img src={video.poster} alt="" className="absolute inset-0 h-full w-full object-cover" decoding="async" />
+            ? <img src={video.poster} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" decoding="async" />
             : <span className="absolute inset-0 mkt-grid-paper-panel" aria-hidden />}
           <span className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/5 to-transparent" aria-hidden />
           <span className="absolute inset-0 flex items-center justify-center" aria-hidden>
