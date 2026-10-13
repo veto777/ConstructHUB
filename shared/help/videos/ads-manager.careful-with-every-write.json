@@ -1,0 +1,25 @@
+{
+  "helpKey": "ads-manager.careful-with-every-write",
+  "durationSec": 74,
+  "video": {
+    "key": "tutorials/ads-manager.careful-with-every-write.ef61ccf1.mp4",
+    "bytes": 7300838,
+    "sha256": "ef61ccf129a9e71fdfe844b46618591b22612a063a56bc3f2b22690b0d3bbc53"
+  },
+  "captions": {
+    "key": "tutorials/ads-manager.careful-with-every-write.15973d28.vtt",
+    "bytes": 1626,
+    "sha256": "15973d286d77dc8db22ed783bf47d643ef790a69a4ea68add263495ee7dc0d22"
+  },
+  "poster": {
+    "key": "tutorials/ads-manager.careful-with-every-write.ba65c497.jpg",
+    "bytes": 91375,
+    "sha256": "ba65c4971d27fb5a4104bf0f399f2ef20d7b7bedc267f2940a852183d5e98bbe"
+  },
+  "uploaded": {
+    "at": "2026-10-13T21:40:18.967Z",
+    "video": "85e699fe590733d1577b5592a988c202",
+    "captions": "e4676e385bac04ca99bfe796678894a2",
+    "poster": "61cceb3fcc28073f5ce4bc32f844738e"
+  }
+}

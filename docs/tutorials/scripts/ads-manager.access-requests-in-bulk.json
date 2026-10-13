@@ -1,0 +1,43 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "ads-manager.access-requests-in-bulk",
+  "title": "Access requests in bulk",
+  "viewport": { "width": 1024, "height": 576 },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    { "action": "goto", "url": "/ads-manager/invitations", "caption": "Access invitations", "chapter": "Invitations",
+      "narration": "Here's how to request access to client accounts and keep track of the invitations." },
+    { "action": "highlight", "selector": "[data-testid=\"ads-row\"]:has-text(\"5550100110\")", "caption": "A pending invitation",
+      "narration": "Each invitation shows the client's customer ID, the email it went to, and its status: this one is Pending." },
+    { "action": "highlight", "selector": "[data-testid=\"ads-row\"]:has-text(\"5550100111\")", "caption": "Accepted",
+      "narration": "This one was Accepted. Clients can also decline." },
+    { "action": "highlight", "selector": "text=Request client account access", "caption": "Request client account access", "chapter": "Request access",
+      "narration": "To request more, use Request client account access: one customer ID and email pair per line, up to one thousand clients." },
+    { "action": "type", "selector": "textarea[aria-label=\"Client invitation list\"]", "value": "123-555-0113,owner@example.com\n124-555-0114,ads@example.com", "caption": "Customer ID, email",
+      "narration": "Type the customer ID, a comma, and the client's email. One line per client." },
+    { "action": "click", "selector": "button:has-text(\"Preview invitations\")", "caption": "Preview invitations",
+      "narration": "Choose Preview invitations." },
+    { "action": "highlight", "selector": "section[aria-label=\"Invitation preview\"] strong", "caption": "Review the list",
+      "narration": "The review counts the invitations and names the MCC they come from." },
+    { "action": "highlight", "selector": "section[aria-label=\"Invitation preview\"] p:first-of-type", "caption": "What the client receives",
+      "narration": "Each client gets a Google manager invitation and an email that explains how to accept it." },
+    { "action": "highlight", "selector": "button:has-text(\"Confirm invitations and emails\")", "caption": "Confirm invitations and emails",
+      "narration": "Nothing is sent until you choose Confirm invitations and emails." },
+    { "action": "highlight", "selector": "button:has-text(\"Cancel selected pending invitations\")", "caption": "Cancel pending", "chapter": "Cancel and poll",
+      "narration": "To withdraw one, tick a pending invitation in the list and choose Cancel selected pending invitations." },
+    { "action": "highlight", "selector": "button:has-text(\"Poll invitations\")", "caption": "Poll invitations",
+      "narration": "Poll invitations asks Google which ones were accepted. It also runs on its schedule." },
+    { "action": "highlight", "selector": "[data-testid=\"subnav-ads-manager-invitations\"]", "caption": "Menu: Access invitations",
+      "narration": "Access invitations is in the Agency Ads and LSA menu on the left." }
+  ],
+  "youtube": {
+    "title": "How to request client Google Ads access in bulk | ConstructHUB",
+    "description": "A short walkthrough of Access invitations in the ConstructHUB Agency Ads & LSA manager. You will read the status of each invitation, paste customer ID and email pairs for up to 1,000 clients, preview what each client receives, and see where a pending invitation is cancelled.",
+    "tags": ["ConstructHUB", "Google Ads agency", "MCC", "manager invitation", "client access", "Google Ads manager account", "contractor marketing agency"],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": { "headline": "Request Access In Bulk", "accent": "Bulk", "kicker": "Agency Ads & LSA", "step": 6 },
+  "removeSelectors": ["#agency-connection [role=\"alert\"]"]
+}
