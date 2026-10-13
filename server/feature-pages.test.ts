@@ -421,7 +421,7 @@ describe("feature pages on the server", () => {
     const app = express();
     app.use((req, _res, next) => {
       const as = req.headers["x-test-user"];
-      if (as === "admin") (req as any).user = { id: 1, email: "alpinesidingcompany@gmail.com" };
+      if (as === "admin") (req as any).user = { id: 1, email: "social@constructhub.us" };
       if (as === "member") (req as any).user = { id: 2, email: "someone@example.com" };
       next();
     });

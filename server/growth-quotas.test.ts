@@ -155,7 +155,7 @@ describe("reserving quota", () => {
     // A customer would be refused here: takeBudget says the month is spent.
     mocks.take.mockResolvedValue(false);
     mocks.used = 1_000_000;
-    for (const row of [{ email: "alpinesidingcompany@gmail.com", plan: null }, plan("platinum", { email: "alpinesidingcompany@gmail.com", stripe_subscription_id: null }), plan("starter", { email: "support@constructhub.us" })]) {
+    for (const row of [{ email: "social@constructhub.us", plan: null }, plan("platinum", { email: "social@constructhub.us", stripe_subscription_id: null }), plan("starter", { email: "support@constructhub.us" })]) {
       mocks.row = row;
       const ent = await getEntitlements(1);
       for (const feature of ["searches", "rankings", "siteScans", "competitorScans", "photos", "texts", "gabeQuestions"] as const) {
@@ -177,7 +177,7 @@ describe("reserving quota", () => {
   });
 
   it("an admin's counted use is refundable like any reservation", async () => {
-    mocks.row = { email: "alpinesidingcompany@gmail.com", plan: null };
+    mocks.row = { email: "social@constructhub.us", plan: null };
     const r = res();
     expect(await reserveMonthlyQuota(req(1), r, "siteScans", 3)).toBe(true);
     expect(r.locals.growthQuota).toMatchObject({ key: quotaKey(1, "siteScans"), remaining: 3 });
@@ -186,7 +186,7 @@ describe("reserving quota", () => {
   });
 
   it("a failed count never blocks an admin", async () => {
-    mocks.row = { email: "alpinesidingcompany@gmail.com", plan: null };
+    mocks.row = { email: "social@constructhub.us", plan: null };
     const { pool } = await import("./db");
     const base = (pool.query as any).getMockImplementation();
     (pool.query as any).mockImplementation(async (text: string, values: any[]) => {

@@ -5,7 +5,8 @@
  * platform routes only ever consult this list.
  */
 
-export const ADMIN_EMAILS = ["alpinesidingcompany@gmail.com", "support@constructhub.us"];
+// Owner, 2026-10-13: only the two ConstructHUB mailboxes run the platform; the Alpine account is a customer like any other.
+export const ADMIN_EMAILS = ["support@constructhub.us", "social@constructhub.us"];
 
 // Local dev only: the seeded dev account (dev@constructhub.local, user 1) is a
 // platform admin so the admin console is exercisable without a real admin

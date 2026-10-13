@@ -8,7 +8,7 @@
  *   sendPlanRequired(res, ...)    -> the one 402 body the client understands
  *   sendLimitReached(res, ...)    -> the one 403 body for "you've used what your plan includes"
  *
- * Platform admins (server/admin.ts ADMIN_EMAILS — the Alpine account) are
+ * Platform admins (server/admin.ts ADMIN_EMAILS — support@ and social@constructhub.us) are
  * all-access, owner 2026-10-02: every module and every add-on module, and every
  * numeric usage limit unlimited (-1, the price book's convention —
  * platformAdminAllowances). The AI Call Assistant keeps a ceiling on numbers

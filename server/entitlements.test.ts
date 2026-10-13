@@ -93,7 +93,7 @@ describe("plan resolution", () => {
     expect(Object.values(ent.modules).every(Boolean)).toBe(true);
     expect(Object.values(ent.addonModules).every(Boolean)).toBe(true);
     // An admin on a small plan (or the Alpine account's legacy Platinum grant) is just as unlimited.
-    for (const row of [customer("starter", { email: "support@constructhub.us" }), customer("platinum", { email: "alpinesidingcompany@gmail.com", stripe_subscription_id: null })]) {
+    for (const row of [customer("starter", { email: "support@constructhub.us" }), customer("platinum", { email: "social@constructhub.us", stripe_subscription_id: null })]) {
       mocks.row = row;
       const admin = await getEntitlements(1);
       expect(admin.allowances).toEqual(platformAdminAllowances());
@@ -116,7 +116,7 @@ describe("platform admin all-access matrix (admin vs agency vs pro)", () => {
   });
 
   it("admin: every usage cap is -1, the rest are sane, every module and add-on module is on", async () => {
-    mocks.row = { email: "alpinesidingcompany@gmail.com", plan: "platinum", status: "active", stripe_subscription_id: null, current_period_end: null };
+    mocks.row = { email: "social@constructhub.us", plan: "platinum", status: "active", stripe_subscription_id: null, current_period_end: null };
     const ent = await getEntitlements(1);
     for (const k of USAGE_CAPS) expect(ent.allowances![k], k).toBe(-1);
     expect(ent.allowances!.guardCadenceMinutes).toBe(Math.min(...Object.values(PLANS).map((p) => p.limits.guardCadenceMinutes)));
