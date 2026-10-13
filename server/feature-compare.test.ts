@@ -137,9 +137,10 @@ describe("every Compare section", () => {
     expect(offerLine("reviews", "addon", true)).toBe("$39/mo as an add-on to your plan ($59/mo on its own).");
     expect(offerLine("seo_basic", "standalone", true)).toBe("$59/mo on its own, or $29/mo as an add-on to any plan.");
     expect(offerLine("jobcam", "standalone", false)).toBe("$59/mo on its own, or $39/mo as an add-on to any plan.");
-    // A signed-in account that lacks a tool and lands on its route gets the landing page (the route gate).
+    // A signed-in account that lacks a tool and lands on its route gets the landing page (the route gate) — in each
+    // signed-in frame: the app with its sidebar, SEO Suite, and every other full-screen tool (components/tool/product-shell).
     const app = read("client/src/App.tsx");
-    expect(app.match(/<ToolRouteGate location=\{location\}><DashboardRouter \/><\/ToolRouteGate>/g)?.length).toBe(2);
+    expect(app.match(/<ToolRouteGate location=\{location\}><DashboardRouter \/><\/ToolRouteGate>/g)?.length).toBe(3);
     const gate = read("client/src/components/tool-route-gate.tsx");
     expect(gate).toContain("if (!user || inNativeApp()) return <>{children}</>;");
     expect(gate).toContain("<FeatureLanding key={page.slug} page={page} />");

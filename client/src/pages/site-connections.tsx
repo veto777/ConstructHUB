@@ -656,13 +656,13 @@ export default function SiteConnections({
   }
   // Google's format (owner, 2026-10-07): a quiet page title, the views as pills, hairline lists, pill actions.
   const TABS = cf ? CLOUDFLARE_TABS : SEARCH_CONSOLE_TABS;
-  const viewHelp = TABS.find((t) => t.tab === tab)?.helpKey;
+  const helpKey = TABS.find((t) => t.tab === tab)?.helpKey;
   // In the full-screen tool the title is the view (the shell's menu says which tool); elsewhere the tool's name.
   const header = inShell ? (
     <GoogleSectionHeader
       as="h1"
       title={tab}
-      titleAfter={viewHelp ? <HelpButton k={viewHelp} /> : undefined}
+      titleAfter={helpKey ? <HelpButton k={helpKey} /> : undefined}
       description={VIEW_LINE[cf ? "cloudflare" : "gsc"][tab]}
       flush
     />
