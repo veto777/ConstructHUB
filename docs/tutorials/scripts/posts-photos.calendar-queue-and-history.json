@@ -1,0 +1,41 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "posts-photos.calendar-queue-and-history",
+  "title": "Calendar, queue and history",
+  "viewport": { "width": 1024, "height": 576 },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    { "action": "goto", "url": "/gbp-content?location=910001", "selector": "xpath=//button[normalize-space(.)=\"Calendar\"]", "offset": 140, "caption": "Calendar, queue & history", "chapter": "Every item in one list",
+      "narration": "Calendar, queue and history is where every post and photo of the listing is tracked." },
+    { "action": "highlight", "selector": "xpath=//button[normalize-space(.)=\"Queue\"]", "caption": "Queue",
+      "narration": "Queue lists the items newest first." },
+    { "action": "highlight", "selector": "xpath=(//article[contains(.,\"queued\")])[1]", "caption": "Kind, time, status",
+      "narration": "Each item shows its kind, its time and its status, with a Cancel button while it is queued." },
+    { "action": "click", "selector": "xpath=//button[normalize-space(.)=\"Calendar\"]", "caption": "Calendar", "chapter": "Calendar",
+      "narration": "Choose Calendar, and the same items are grouped under the day they are due." },
+    { "action": "highlight", "selector": "xpath=(//h3[contains(@class,\"font-semibold\")])[1]", "caption": "A heading per day",
+      "narration": "Each day is a heading, with the items due that day listed under it." },
+    { "action": "highlight", "selector": "xpath=(//article[contains(.,\"published\")])[1]", "caption": "History", "chapter": "History",
+      "narration": "The past is history: a published post also shows Google's own status, LIVE." },
+    { "action": "highlight", "selector": "xpath=//button[normalize-space(.)=\"Refresh Google status\"]", "caption": "Refresh Google status",
+      "narration": "Refresh Google status asks Google again about the published posts." },
+    { "action": "scroll-to", "selector": "xpath=(//article[contains(.,\"queued\")])[1]", "offset": 200, "caption": "The queued items", "chapter": "Cancel",
+      "narration": "Further down come the items still waiting, in the order they are due." },
+    { "action": "click", "selector": "xpath=(//article[contains(.,\"queued\")])[1]//button[normalize-space(.)=\"Cancel\"]", "caption": "Cancel",
+      "narration": "Cancel takes a queued item out of the queue." },
+    { "action": "highlight", "selector": "xpath=(//article[contains(.,\"cancelled\")])[1]", "caption": "Marked cancelled",
+      "narration": "It stays in the list, marked cancelled, so the record is complete." },
+    { "action": "highlight", "selector": "[data-testid=\"tool-rail-content\"]", "caption": "Google Business → Posts & Photos",
+      "narration": "You'll find Posts and Photos in the Google Business rail on the left." }
+  ],
+  "youtube": {
+    "title": "Track every Google post: calendar, queue and history | ConstructHUB",
+    "description": "How Calendar, queue & history works in Posts & Photos in ConstructHUB: the queue newest first, the calendar by day, published items with Google's own status, Refresh Google status, and Cancel on anything still queued.",
+    "tags": ["ConstructHUB", "Google Business Profile posts", "post queue", "content calendar", "post history", "contractor marketing", "local SEO", "roofing marketing"],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": { "headline": "Queue, Calendar And History", "accent": "History", "kicker": "Posts & Photos", "step": 5 },
+  "removeSelectors": ["div[role=\"alert\"].rounded-xl"]
+}

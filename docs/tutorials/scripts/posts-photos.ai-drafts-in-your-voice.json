@@ -1,0 +1,43 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "posts-photos.ai-drafts-in-your-voice",
+  "title": "AI drafts in your voice",
+  "viewport": { "width": 1024, "height": 576 },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    { "action": "goto", "url": "/gbp-content?location=910001", "selector": "xpath=//summary[normalize-space(.)=\"AI drafts and style\"]", "offset": 120, "caption": "AI drafts and style", "chapter": "AI drafts",
+      "narration": "AI drafts write captions and posts in your own voice. Here is where that voice is set." },
+    { "action": "click", "selector": "xpath=//summary[normalize-space(.)=\"AI drafts and style\"]", "caption": "Open AI drafts and style",
+      "narration": "Open AI drafts and style." },
+    { "action": "type", "selector": "textarea[aria-label=\"Instructions\"]", "value": "Announce fall gutter clean-outs. Name the Denver neighborhoods we serve. End with a call to book a free inspection.", "caption": "Instructions",
+      "narration": "Instructions tell the AI what this post or caption is about." },
+    { "action": "type", "selector": "xpath=//label[contains(.,\"Example descriptions\")]/textarea", "value": "Crew finishing a tear-off on a ranch home in Wheat Ridge. Done in one day, yard cleaned up.", "caption": "Example descriptions",
+      "narration": "Example descriptions show it the wording you like." },
+    { "action": "highlight", "selector": "xpath=//button[normalize-space(.)=\"Generate caption drafts\"]", "caption": "Generate caption drafts", "chapter": "Drafts",
+      "narration": "Generate caption drafts writes one caption per ticked photo, so it needs a photo ticked first." },
+    { "action": "highlight", "selector": "xpath=//button[normalize-space(.)=\"Generate post draft\"]", "caption": "Generate post draft",
+      "narration": "Generate post draft puts a draft in the Post draft box below, ready to edit." },
+    { "action": "highlight", "selector": "textarea[aria-label=\"Style guidance\"]", "caption": "Style guidance", "chapter": "Your voice",
+      "narration": "Style guidance is the voice every draft follows. This listing's notes are already saved." },
+    { "action": "highlight", "selector": "xpath=//button[normalize-space(.)=\"Learn from past updates\"]", "caption": "Learn from past updates",
+      "narration": "Learn from past updates reads the posts already on the Google listing and suggests notes." },
+    { "action": "type", "selector": "textarea[aria-label=\"Style guidance\"]", "value": "Friendly, plain-spoken and local. Lead with the homeowner benefit, name the Denver neighborhood when we know it, keep posts under 120 words, one clear call to action. No hype, no prices.", "caption": "Edit the notes",
+      "narration": "Edit the notes in your own words." },
+    { "action": "click", "selector": "xpath=//button[normalize-space(.)=\"Save style guidance\"]", "caption": "Save style guidance",
+      "narration": "They count as a draft until you choose Save style guidance." },
+    { "action": "scroll-to", "selector": "textarea[aria-label=\"Post draft\"]", "offset": 200, "caption": "Post draft", "chapter": "Still a draft",
+      "narration": "A generated post lands in the Post draft box, where you can change any word." },
+    { "action": "highlight", "selector": "xpath=//p[contains(.,\"AI text remains a draft\")]", "caption": "AI text remains a draft until you approve it",
+      "narration": "And AI text remains a draft until you approve it." }
+  ],
+  "youtube": {
+    "title": "AI post and caption drafts in your own voice | ConstructHUB",
+    "description": "How AI drafts work in Posts & Photos in ConstructHUB: give instructions and example wording, keep style guidance that every draft follows, or let it learn from the updates already on your Google listing. A draft stays a draft until you approve it.",
+    "tags": ["ConstructHUB", "AI post drafts", "Google Business Profile posts", "AI captions", "style guidance", "contractor marketing", "local SEO", "roofing marketing"],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": { "headline": "AI Drafts In Your Voice", "accent": "Voice", "kicker": "Posts & Photos", "step": 6 },
+  "removeSelectors": ["div[role=\"alert\"].rounded-xl"]
+}

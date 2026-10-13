@@ -1,0 +1,41 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "posts-photos.photos-by-category",
+  "title": "Photos by category",
+  "viewport": { "width": 1024, "height": 576 },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    { "action": "goto", "url": "/gbp-content?location=910001", "caption": "Posts & photos", "chapter": "Job photos",
+      "narration": "Job photos go on the Google listing filed by photo category. Here is how to pick and file them." },
+    { "action": "click", "selector": "xpath=//summary[normalize-space(.)=\"Photos and media library\"]", "caption": "Photos and media library",
+      "narration": "Open Photos and media library." },
+    { "action": "highlight", "selector": "input[aria-label=\"Upload photos\"]", "caption": "Upload photos",
+      "narration": "Upload photos takes up to one hundred at a time, fifteen megabytes each." },
+    { "action": "click", "selector": "xpath=(//div[contains(@class,\"max-h-96\")]//input[@type=\"checkbox\"])[1]", "caption": "Tick a photo", "chapter": "Pick and caption",
+      "narration": "Or tick photos already in the media library." },
+    { "action": "click", "selector": "xpath=(//div[contains(@class,\"max-h-96\")]//input[@type=\"checkbox\"])[4]", "caption": "Tick another",
+      "narration": "Tick as many as you want." },
+    { "action": "type", "selector": "xpath=(//textarea[starts-with(@aria-label,\"Caption for\")])[1]", "value": "Front elevation after a full tear-off and new architectural shingles in Highland.", "caption": "Caption",
+      "narration": "Each ticked photo gets a caption box. Type what the photo shows." },
+    { "action": "highlight", "selector": "select[aria-label=\"Photo category\"]", "caption": "Photo category", "chapter": "Google's categories",
+      "narration": "Photo category is Google's own list: exterior, interior, at work, teams, cover and more." },
+    { "action": "select", "selector": "select[aria-label=\"Photo category\"]", "value": "at work", "caption": "At work",
+      "narration": "Choose at work for crew photos from the job." },
+    { "action": "scroll-to", "selector": "xpath=//button[normalize-space(.)=\"Approve & queue photos\"]", "offset": 300, "caption": "Schedule and approve", "chapter": "Approve",
+      "narration": "Under Schedule and approve, nothing goes to Google until you approve." },
+    { "action": "highlight", "selector": "xpath=//button[normalize-space(.)=\"Approve & queue photos\"]", "caption": "Approve & queue photos",
+      "narration": "Approve and queue photos queues one item per ticked photo, in the category you chose." },
+    { "action": "highlight", "selector": "xpath=(//article[contains(.,\"photo ·\")])[1]", "caption": "Photo items in the queue",
+      "narration": "Queued photos then show in Calendar, queue and history as photo items, with their time and status." }
+  ],
+  "youtube": {
+    "title": "How to file job photos by Google category | ConstructHUB",
+    "description": "How to pick job photos for a Google Business Profile in ConstructHUB: upload or tick photos from the media library, caption each one, choose a Google photo category such as exterior, interior, at work or teams, and approve them for the queue.",
+    "tags": ["ConstructHUB", "Google Business Profile photos", "GBP photos", "Google photo category", "job photos", "contractor marketing", "local SEO", "roofing marketing"],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": { "headline": "Photos By Google Category", "accent": "Category", "kicker": "Posts & Photos", "step": 6 },
+  "removeSelectors": ["div[role=\"alert\"].rounded-xl"]
+}

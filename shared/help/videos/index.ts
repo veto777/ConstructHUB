@@ -157,3 +157,12 @@ export { default as v_locations_profile_details_at_a_glance } from "./locations.
 export { default as v_locations_profile_guard_built_in } from "./locations.profile-guard-built-in.json";
 export { default as v_locations_services_and_categories } from "./locations.services-and-categories.json";
 export { default as v_locations_several_google_accounts } from "./locations.several-google-accounts.json";
+export { default as v_posts_photos_ai_drafts_in_your_voice } from "./posts-photos.ai-drafts-in-your-voice.json";
+export { default as v_posts_photos_approval_first } from "./posts-photos.approval-first.json";
+export { default as v_posts_photos_batches_on_agency } from "./posts-photos.batches-on-agency.json";
+export { default as v_posts_photos_cadence_and_business_hours } from "./posts-photos.cadence-and-business-hours.json";
+export { default as v_posts_photos_calendar_queue_and_history } from "./posts-photos.calendar-queue-and-history.json";
+export { default as v_posts_photos_filenames_and_photo_details } from "./posts-photos.filenames-and-photo-details.json";
+export { default as v_posts_photos } from "./posts-photos.json";
+export { default as v_posts_photos_photos_by_category } from "./posts-photos.photos-by-category.json";
+export { default as v_posts_photos_updates_events_and_offers } from "./posts-photos.updates-events-and-offers.json";

@@ -1,0 +1,25 @@
+{
+  "helpKey": "posts-photos.filenames-and-photo-details",
+  "durationSec": 72,
+  "video": {
+    "key": "tutorials/posts-photos.filenames-and-photo-details.bcec1bf6.mp4",
+    "bytes": 5785810,
+    "sha256": "bcec1bf6d17a340525a25f20ab437f08a859df42510162fafbc01b7ba39157e4"
+  },
+  "captions": {
+    "key": "tutorials/posts-photos.filenames-and-photo-details.593b75c3.vtt",
+    "bytes": 1287,
+    "sha256": "593b75c38fc470630f5b5d3c2bd8fa6b3a520df15827d64bf2dabf008ea4ed1f"
+  },
+  "poster": {
+    "key": "tutorials/posts-photos.filenames-and-photo-details.e6f7c9d4.jpg",
+    "bytes": 71565,
+    "sha256": "e6f7c9d4811af87f7e81a44f09093c23ef89d1871403341f05de961381298a18"
+  },
+  "uploaded": {
+    "at": "2026-10-13T21:56:39.809Z",
+    "video": "1bff54513a6f583ecb41dc0becb55f1d",
+    "captions": "8f9e5c3125cc3d0dd43f736e9310a57f",
+    "poster": "474dc79af6fdee9c5b34a8f089d96447"
+  }
+}

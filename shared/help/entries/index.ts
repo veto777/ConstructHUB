@@ -112,6 +112,14 @@ export { default as e_locations_profile_details_at_a_glance } from "./google-bus
 export { default as e_locations_profile_guard_built_in } from "./google-business/locations.profile-guard-built-in";
 export { default as e_locations_services_and_categories } from "./google-business/locations.services-and-categories";
 export { default as e_locations_several_google_accounts } from "./google-business/locations.several-google-accounts";
+export { default as e_posts_photos_ai_drafts_in_your_voice } from "./google-business/posts-photos.ai-drafts-in-your-voice";
+export { default as e_posts_photos_approval_first } from "./google-business/posts-photos.approval-first";
+export { default as e_posts_photos_batches_on_agency } from "./google-business/posts-photos.batches-on-agency";
+export { default as e_posts_photos_cadence_and_business_hours } from "./google-business/posts-photos.cadence-and-business-hours";
+export { default as e_posts_photos_calendar_queue_and_history } from "./google-business/posts-photos.calendar-queue-and-history";
+export { default as e_posts_photos_filenames_and_photo_details } from "./google-business/posts-photos.filenames-and-photo-details";
+export { default as e_posts_photos_photos_by_category } from "./google-business/posts-photos.photos-by-category";
+export { default as e_posts_photos_updates_events_and_offers } from "./google-business/posts-photos.updates-events-and-offers";
 export { default as e_brand_tour_crm } from "./start-here/brand-tour-crm";
 export { default as e_brand_vs_housecall_pro } from "./start-here/brand-vs-housecall-pro";
 export { default as e_brand_vs_jobber } from "./start-here/brand-vs-jobber";
