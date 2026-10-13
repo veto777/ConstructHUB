@@ -36,6 +36,7 @@ describe("which networks are switched on", () => {
     expect(nativeNetworks({ SOCIAL_META_APP_ID: "1609986400506072", SOCIAL_META_APP_SECRET: "0123456789abcdef0123" } as any)).toEqual(["facebook", "instagram"]);
     // Bluesky needs no app keys: a switch is enough (an app password is the customer's whole grant).
     expect(nativeNetworks({ SOCIAL_BLUESKY: "on" } as any)).toEqual(["bluesky"]);
+    expect(nativeNetworks({ SOCIAL_PINTEREST_APP_ID: "1510000", SOCIAL_PINTEREST_APP_SECRET: "pin-secret-0123456789abcdef" } as any)).toEqual(["pinterest"]);
     expect(nativeNetworks({ SOCIAL_BLUESKY: "off" } as any)).toEqual([]);
   });
   it("is shown only to platform admins until it is opened to everyone", () => {

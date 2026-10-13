@@ -23,7 +23,7 @@ const dec = (v: string): string => { const t = decryptToken(v); if (!t) throw ne
 import { SocialError } from "./client";
 import { isPlatformAdmin } from "../admin";
 import type { PostPayload, SocialAccount, SocialClient, StatusResult, SubmitResult, UploadStart } from "./provider";
-import { netConfigured, netExchange, netPublish, netRead, netRefresh, needsRefresh, netScopes, tiktokCreatorInfo, tiktokRevoke, blueskyLogin, type CreatorInfo, type NetApi } from "./native-nets";
+import { netConfigured, netExchange, netPublish, netRead, netRefresh, needsRefresh, netScopes, tiktokCreatorInfo, tiktokRevoke, blueskyLogin, pinterestBoards, type CreatorInfo, type NetApi } from "./native-nets";
 
 export const NATIVE_MARK = "native:";
 export const GRAPH = "https://graph.facebook.com/v25.0";
@@ -40,12 +40,13 @@ export function nativeNetworks(env: NodeJS.ProcessEnv = process.env): string[] {
     ...(netConfigured("tiktok", env) ? ["tiktok"] : []),
     ...(netConfigured("x", env) ? ["x"] : []),
     ...(netConfigured("bluesky", env) ? ["bluesky"] : []),
+    ...(netConfigured("pinterest", env) ? ["pinterest"] : []),
   ];
 }
 /** Connect-screen network → which sign-in it uses. `instagram_direct` = Instagram login (no Facebook Page needed). */
-export const NETWORK_API: Record<string, NetApi | "meta"> = { facebook: "meta", instagram: "meta", instagram_direct: "ig_login", threads: "threads", tiktok: "tiktok", x: "x", bluesky: "bluesky" };
-const API_PLATFORM: Record<NetApi, string> = { ig_login: "instagram", threads: "threads", tiktok: "tiktok", x: "x", bluesky: "bluesky" };
-const API_NETWORK: Record<NetApi, string> = { ig_login: "instagram_direct", threads: "threads", tiktok: "tiktok", x: "x", bluesky: "bluesky" };
+export const NETWORK_API: Record<string, NetApi | "meta"> = { facebook: "meta", instagram: "meta", instagram_direct: "ig_login", threads: "threads", tiktok: "tiktok", x: "x", bluesky: "bluesky", pinterest: "pinterest" };
+const API_PLATFORM: Record<NetApi, string> = { ig_login: "instagram", threads: "threads", tiktok: "tiktok", x: "x", bluesky: "bluesky", pinterest: "pinterest" };
+const API_NETWORK: Record<NetApi, string> = { ig_login: "instagram_direct", threads: "threads", tiktok: "tiktok", x: "x", bluesky: "bluesky", pinterest: "pinterest" };
 export const nativeConfigured = (env: NodeJS.ProcessEnv = process.env) => nativeNetworks(env).length > 0;
 /** Someone signed in, as far as ConstructHUB Direct cares: their email (req.user, or a users row). */
 export type NativeViewer = { email?: string | null } | null | undefined;
@@ -429,7 +430,13 @@ export class NativeClient implements SocialClient {
       : { id: r.id, platform: r.platform, name: r.name });
   }
   async targets(account: SocialAccount) {
-    return account.platform === "facebook" ? { kind: "pages" as const, items: [{ id: account.id, name: account.name }] } : null;
+    if (account.platform === "facebook") return { kind: "pages" as const, items: [{ id: account.id, name: account.name }] };
+    if (account.platform !== "pinterest") return null;
+    // Pinterest: the boards this account can pin to, read now (the composer keeps the chosen board on the post).
+    const row = await this.row(account.id);
+    if (row.api !== "pinterest") return null;
+    try { return { kind: "boards" as const, items: await pinterestBoards(await this.token(row)) }; }
+    catch (e) { await this.markReconnect(row.id, e); throw e; }
   }
 
   async submit(payload: PostPayload, idempotencyKey: string): Promise<SubmitResult> {

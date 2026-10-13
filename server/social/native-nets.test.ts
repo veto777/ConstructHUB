@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { pool } from "../db";
 import { decryptToken } from "../gbp/token-crypto";
 import { deletePost } from "./insights";
-import { creatorInfoFrom, netAuthUrl, netConfigured, netDeps, netExchange, netPublish, netRefresh, netRedirect, xDelete, needsRefresh, netScopes, threadsPlan, tiktokCreatorInfo, tiktokPlan, blueskyLogin, blueskyPlan, blueskyLength, blueskyFacets, blueskyImage, blueskyDelete, netRead } from "./native-nets";
+import { creatorInfoFrom, netAuthUrl, netConfigured, netDeps, netExchange, netPublish, netRefresh, netRedirect, xDelete, needsRefresh, netScopes, threadsPlan, tiktokCreatorInfo, tiktokPlan, blueskyLogin, blueskyPlan, blueskyLength, blueskyFacets, blueskyImage, blueskyDelete, netRead, pinterestPlan, pinterestBoards, pinterestDelete, pinterestCover } from "./native-nets";
 import { NativeClient, ensureNativeSchema, nativeNetConnect, nativeNetworks, newOAuthState, oauthStateMatches, removeNativeAccounts } from "./native";
 
 import { createHash } from "node:crypto";
@@ -546,5 +546,105 @@ describe("Bluesky (app password, facets, photos, video)", () => {
     await blueskyDelete(did, "tok", `at://${did}/app.bsky.feed.post/3kabc`);
     expect(calls.find((c) => c.url.pathname.endsWith("deleteRecord"))!.body).toEqual({ repo: did, collection: "app.bsky.feed.post", rkey: "3kabc" });
     await expect(blueskyDelete(did, "tok", "nonsense")).rejects.toThrow(/isn't a Bluesky post/);
+  });
+});
+
+describe("Pinterest (OAuth app, boards, image / carousel / video pins)", () => {
+  const ENVP = { ...ENV, SOCIAL_PINTEREST_APP_ID: "1510000", SOCIAL_PINTEREST_APP_SECRET: "pin-secret-0123456789abcdef" } as any;
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
+  const pin = (overrides: Partial<Record<string, (u: URL, body: any, init: any) => unknown>> = {}) => {
+    const calls = fake((u, body, init) => {
+      const p = u.pathname.replace("/v5", "");
+      if (overrides[p]) return overrides[p]!(u, body, init);
+      if (p === "/oauth/token") return { access_token: body.grant_type === "refresh_token" ? "acc2" : "acc1", refresh_token: body.grant_type === "refresh_token" ? undefined : "ref1", expires_in: 2592000, scope: "boards:read,pins:read,pins:write,user_accounts:read" };
+      if (p === "/user_account") return { id: "pinuser", username: "constructhub", profile_image: "https://i.pinimg.com/a.jpg" };
+      if (p === "/boards") return u.searchParams.get("bookmark") ? { items: [{ id: "b2", name: "Before & after" }], bookmark: null } : { items: [{ id: "b1", name: "Roofing" }], bookmark: "next" };
+      if (p === "/media") return { media_id: "m1", upload_url: "https://pinterest-media-upload.s3.amazonaws.com/", upload_parameters: { key: "k", policy: "p" } };
+      if (p === "/media/m1") return { media_id: "m1", status: "succeeded" };
+      if (p === "/pins") return init.method === "DELETE" ? new Response(null, { status: 204 }) : { id: "9001" };
+      if (p === "/pins/9001") return new Response(null, { status: 204 });
+      if (u.hostname.endsWith("amazonaws.com")) return new Response(null, { status: 204 });
+      throw new Error(`Unexpected Pinterest call ${u.href}`);
+    });
+    netDeps.env = () => ENVP;
+    return calls;
+  };
+  it("needs the app id and secret, and sends the sign-in to Pinterest with our scopes", () => {
+    expect(netConfigured("pinterest", ENVP)).toBe(true);
+    expect(netConfigured("pinterest", ENV)).toBe(false);
+    netDeps.env = () => ENVP;
+    const u = new URL(netAuthUrl("pinterest", "st"));
+    expect(u.host).toBe("www.pinterest.com");
+    expect(u.searchParams.get("client_id")).toBe("1510000");
+    expect(u.searchParams.get("redirect_uri")).toMatch(/\/api\/social\/native\/pinterest\/callback$/);
+    expect(u.searchParams.get("scope")).toBe("boards:read,pins:read,pins:write,user_accounts:read");
+  });
+  it("exchanges the code with Basic auth, refuses a sign-in without pins:write, and refreshes keeping the refresh token", async () => {
+    const calls = pin();
+    const s = await netExchange("pinterest", "code1");
+    expect(s).toMatchObject({ externalId: "pinuser", name: "@constructhub", picture: "https://i.pinimg.com/a.jpg", token: "acc1", refresh: "ref1" });
+    const tok = calls.find((c) => c.url.pathname.endsWith("/oauth/token"))!;
+    expect(tok.init.headers.Authorization).toBe(`Basic ${Buffer.from("1510000:pin-secret-0123456789abcdef").toString("base64")}`);
+    expect(tok.body).toMatchObject({ grant_type: "authorization_code", code: "code1" });
+    pin({ "/oauth/token": () => ({ access_token: "a", refresh_token: "r", expires_in: 100, scope: "boards:read" }) });
+    await expect(netExchange("pinterest", "code1")).rejects.toThrow(/didn't allow posting/);
+    pin();
+    expect(await netRefresh("pinterest", "acc1", "ref1")).toMatchObject({ token: "acc2", refresh: "ref1" });
+    await expect(netRefresh("pinterest", "acc1", null)).rejects.toMatchObject({ reconnect: true });
+  });
+  it("lists every page of boards", async () => {
+    pin();
+    expect(await pinterestBoards("acc1")).toEqual([{ id: "b1", name: "Roofing" }, { id: "b2", name: "Before & after" }]);
+  });
+  it("plans a pin: board required, title from the composer or the first line, link from the text, media rules", () => {
+    expect(() => pinterestPlan("x", ["https://x.us/a.jpg"], {})).toThrow(/Choose a Pinterest board/);
+    expect(() => pinterestPlan("x", [], { boardId: "1" })).toThrow(/needs a photo or a video/);
+    expect(pinterestPlan("New roof in Largo\nCall us https://constructhub.us/jobs.", ["https://x.us/a.jpg"], { boardId: "12" }))
+      .toEqual({ kind: "image", url: "https://x.us/a.jpg", boardId: "12", title: "New roof in Largo", description: "New roof in Largo\nCall us https://constructhub.us/jobs.", link: "https://constructhub.us/jobs" });
+    expect(pinterestPlan("x", ["https://x.us/a.jpg", "https://x.us/b.jpg"], { boardId: "12", title: "T".repeat(120) }).title).toHaveLength(100);
+    expect(pinterestPlan("x", ["https://x.us/a.jpg", "https://x.us/b.jpg"], { boardId: "12", title: "Two" })).toMatchObject({ kind: "carousel", urls: ["https://x.us/a.jpg", "https://x.us/b.jpg"] });
+    expect(() => pinterestPlan("x", Array(6).fill("https://x.us/a.jpg"), { boardId: "12", title: "Six" })).toThrow(/five photos/);
+    expect(pinterestPlan("x", ["https://x.us/v.mp4", "https://x.us/c.jpg"], { boardId: "12", title: "V" })).toMatchObject({ kind: "video", url: "https://x.us/v.mp4", cover: "https://x.us/c.jpg" });
+    expect(() => pinterestPlan("x", ["https://x.us/v.mp4", "https://x.us/w.mp4"], { boardId: "12", title: "V" })).toThrow(/one video/);
+  });
+  it("creates an image pin and a carousel on the chosen board, published at once with the pin link", async () => {
+    const calls = pin();
+    const p = await netPublish("pinterest", "pinuser", "acc1", "Before and after\nhttps://constructhub.us", ["https://x.us/a.jpg"], { boardId: "12", title: "Before and after" });
+    expect(p).toEqual({ stage: "published", external: "9001", url: "https://www.pinterest.com/pin/9001/" });
+    const body = calls.find((c) => c.url.pathname.endsWith("/pins"))!.body;
+    expect(body).toEqual({ board_id: "12", title: "Before and after", description: "Before and after\nhttps://constructhub.us", link: "https://constructhub.us", media_source: { source_type: "image_url", url: "https://x.us/a.jpg" } });
+    const c2 = pin();
+    await netPublish("pinterest", "pinuser", "acc1", "Gallery", ["https://x.us/a.jpg", "https://x.us/b.jpg", "https://x.us/c.jpg"], { boardId: "12" });
+    expect(c2.find((c) => c.url.pathname.endsWith("/pins"))!.body.media_source).toEqual({ source_type: "multiple_image_urls", items: [{ url: "https://x.us/a.jpg" }, { url: "https://x.us/b.jpg" }, { url: "https://x.us/c.jpg" }] });
+    expect(await netRead("pinterest", "pinuser", "acc1", "published", "9001")).toEqual({ state: "published", external: "9001", url: "https://www.pinterest.com/pin/9001/" });
+  });
+  it("uploads a video to Pinterest's storage, waits for processing, and pins it with the customer's cover photo", async () => {
+    let polls = 0;
+    const calls = pin({ "/media/m1": () => ({ media_id: "m1", status: ++polls < 2 ? "processing" : "succeeded" }) });
+    netDeps.mediaHttp = async (url: string) => new Response(new Uint8Array(/\.jpg$/.test(url) ? png : [1, 2, 3]));
+    netDeps.sleep = async () => {};
+    const p = await netPublish("pinterest", "pinuser", "acc1", "Job walkthrough", ["https://x.us/v.mp4", "https://x.us/c.jpg"], { boardId: "12", title: "Walkthrough" });
+    expect(p.url).toBe("https://www.pinterest.com/pin/9001/");
+    expect(calls.find((c) => c.url.pathname.endsWith("/media"))!.body).toEqual({ media_type: "video" });
+    const up = calls.find((c) => c.url.hostname.endsWith("amazonaws.com"))!;
+    expect(up.init.method).toBe("POST");
+    expect(up.init.body).toBeInstanceOf(FormData);
+    expect(polls).toBe(2);
+    const ms = calls.find((c) => c.url.pathname.endsWith("/pins"))!.body.media_source;
+    expect(ms).toMatchObject({ source_type: "video_id", media_id: "m1", cover_image_content_type: "image/jpeg" });
+    expect(Buffer.from(ms.cover_image_data, "base64").equals(png)).toBe(true);
+    await expect(pinterestCover(Buffer.from([1, 2, 3]), null)).rejects.toThrow(/cover photo/);   // not a real video: ffmpeg can't frame it
+  });
+  it("maps Pinterest's answers: expired token → reconnect, rate limit → retry, Trial access → told so; deletes a pin", async () => {
+    pin({ "/pins": () => ok({ code: 2, message: "Authentication failed." }, 401) });
+    await expect(netPublish("pinterest", "pinuser", "acc1", "x", ["https://x.us/a.jpg"], { boardId: "12", title: "t" })).rejects.toMatchObject({ reconnect: true });
+    pin({ "/pins": () => ok({ code: 8, message: "Too many requests" }, 429) });
+    await expect(netPublish("pinterest", "pinuser", "acc1", "x", ["https://x.us/a.jpg"], { boardId: "12", title: "t" })).rejects.toMatchObject({ status: 429 });
+    pin({ "/pins": () => ok({ code: 29, message: "Your app is in Trial access and can only act on its own account" }, 403) });
+    await expect(netPublish("pinterest", "pinuser", "acc1", "x", ["https://x.us/a.jpg"], { boardId: "12", title: "t" })).rejects.toThrow(/Standard access/);
+    const calls = pin();
+    await pinterestDelete("acc1", "9001");
+    expect(calls.find((c) => c.url.pathname.endsWith("/pins/9001"))!.init.method).toBe("DELETE");
+    await expect(pinterestDelete("acc1", "nope")).rejects.toThrow(/isn't a Pinterest pin/);
   });
 });

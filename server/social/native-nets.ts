@@ -9,6 +9,7 @@
  *   tiktok                       SOCIAL_TIKTOK_CLIENT_KEY / _SECRET  open.tiktokapis.com     access 24 h, refresh 365 days
  *   x                            SOCIAL_X_CLIENT_ID / _SECRET       api.x.com              access 2 h, rotating refresh
  *   bluesky                      SOCIAL_BLUESKY=on (no app keys)    the account's own PDS   access ~2 h, refresh ~90 days
+ *   pinterest                    SOCIAL_PINTEREST_APP_ID / _SECRET  api.pinterest.com/v5    access 30 days, refresh 1 year
  *
  * Bluesky has no app registration and no review: the customer signs in with an app password made at
  * https://bsky.app/settings/app-passwords (docs/social-apps/bluesky.md). ConstructHUB keeps the session tokens, never
@@ -19,11 +20,15 @@ import { lookup } from "node:dns";
 import { publicIP, siteUrl } from "../sitescan/http";
 import { createHash } from "node:crypto";
 import sharp from "sharp";
+import { execFile } from "node:child_process";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { xSplitText, xWeightedLength } from "../../shared/social-x";
 import { recordFailure } from "../ops/issues";
 import { SocialError } from "./client";
 
-export type NetApi = "ig_login" | "threads" | "tiktok" | "x" | "bluesky";
+export type NetApi = "ig_login" | "threads" | "tiktok" | "x" | "bluesky" | "pinterest";
 export type Signed = { externalId: string; name: string; picture: string | null; token: string; expiresAt: Date | null; refresh: string | null; scopes: string[] };
 export type Plan = { error?: string; stage: string; container?: string; external?: string; url?: string | null };
 export type Read = { state: "submitted" | "published" | "failed"; url?: string | null; external?: string; error?: string; stage?: string };
@@ -39,12 +44,15 @@ const SCOPES: Record<NetApi, string[]> = {
   // No video.list: per-post TikTok stats are not read (server/social/insights.ts); docs/social-apps/tiktok.md §2.2.
   tiktok: ["user.info.basic", "user.info.profile", "user.info.stats", "video.publish"],
   bluesky: [],   // an app password is the whole grant; Bluesky has no scopes
+  // Boards to pick from, pins to create and read back, who signed in (docs/social-apps/pinterest.md §2).
+  pinterest: ["boards:read", "pins:read", "pins:write", "user_accounts:read"],
 };
 export const netScopes = (api: NetApi) => SCOPES[api];
 
 /** Which of these networks have their app keys (Bluesky needs none: it is switched on with SOCIAL_BLUESKY=on). Pure on env. */
 export function netConfigured(api: NetApi, env: NodeJS.ProcessEnv = process.env): boolean {
   if (api === "bluesky") return /^(on|true|1)$/i.test((env.SOCIAL_BLUESKY ?? "").trim());
+  if (api === "pinterest") return /^\d{5,30}$/.test(env.SOCIAL_PINTEREST_APP_ID ?? "") && /^\S{16,}$/.test(env.SOCIAL_PINTEREST_APP_SECRET ?? "");
   if (api === "x") return !!env.SOCIAL_X_CLIENT_ID?.trim() && !!env.SOCIAL_X_CLIENT_SECRET?.trim();
   if (api === "ig_login") return /^\d{6,30}$/.test(env.SOCIAL_INSTAGRAM_APP_ID ?? "") && /^\S{16,}$/.test(env.SOCIAL_INSTAGRAM_APP_SECRET ?? "");
   if (api === "threads") return /^\d{6,30}$/.test(env.SOCIAL_THREADS_APP_ID ?? "") && /^\S{16,}$/.test(env.SOCIAL_THREADS_APP_SECRET ?? "");
@@ -104,6 +112,7 @@ const inSec = (s: unknown) => (Number(s) > 0 ? new Date(netDeps.now() + Number(s
 export function netAuthUrl(api: NetApi, state: string, verifier?: string): string {
   const env = netDeps.env();
   if (api === "bluesky") throw new SocialError("Bluesky signs in with an app password, not a sign-in page; use the Bluesky form");
+  if (api === "pinterest") return `https://www.pinterest.com/oauth/?${q({ client_id: env.SOCIAL_PINTEREST_APP_ID, redirect_uri: netRedirect(api), response_type: "code", scope: SCOPES.pinterest.join(","), state })}`;
   if (api === "x") {
     if (!verifier) throw new SocialError("X sign-in requires PKCE; connect again");
     return `https://x.com/i/oauth2/authorize?${q({ client_id: env.SOCIAL_X_CLIENT_ID, redirect_uri: netRedirect(api), response_type: "code", scope: SCOPES.x.join(" "), state, code_challenge: createHash("sha256").update(verifier).digest("base64url"), code_challenge_method: "S256" })}`;
@@ -117,6 +126,14 @@ export function netAuthUrl(api: NetApi, state: string, verifier?: string): strin
 export async function netExchange(api: NetApi, code: string, verifier?: string): Promise<Signed> {
   const env = netDeps.env();
   if (api === "bluesky") throw new SocialError("Bluesky signs in with an app password, not a sign-in page; use the Bluesky form");
+  if (api === "pinterest") {
+    const t = await pinterestToken({ grant_type: "authorization_code", code, redirect_uri: netRedirect(api) });
+    const granted = String(t.scope ?? "").split(/[\s,]+/).filter(Boolean);
+    if (!granted.includes("pins:write")) throw new SocialError("Pinterest didn't allow posting. Connect again and allow every permission it asks for.");
+    const me = await pinterestCall("/user_account", t.access_token);
+    if (!me?.username) throw new SocialError("Pinterest did not identify the signed-in account", 502);
+    return { externalId: String(me.id ?? me.username), name: `@${me.username}`, picture: typeof me.profile_image === "string" ? me.profile_image : null, token: t.access_token, expiresAt: inSec(t.expires_in ?? 30 * 86400), refresh: t.refresh_token ?? null, scopes: granted };
+  }
   if (api === "x") {
     if (!verifier) throw new SocialError("X sign-in requires PKCE; connect again");
     const t = await xToken({ grant_type: "authorization_code", code, redirect_uri: netRedirect(api), code_verifier: verifier });
@@ -153,6 +170,11 @@ export function needsRefresh(api: NetApi, expiresAt: Date | null): boolean {
 export async function netRefresh(api: NetApi, token: string, refresh: string | null): Promise<Pick<Signed, "token" | "expiresAt" | "refresh">> {
   const env = netDeps.env();
   if (api === "bluesky") return blueskyRefresh(refresh);
+  if (api === "pinterest") {
+    if (!refresh) throw reconnect();
+    const d = await pinterestToken({ grant_type: "refresh_token", refresh_token: refresh });
+    return { token: d.access_token, expiresAt: inSec(d.expires_in ?? 30 * 86400), refresh: d.refresh_token ?? refresh };
+  }
   if (api === "ig_login") { const d = await call(`https://graph.instagram.com/refresh_access_token?${q({ grant_type: "ig_refresh_token", access_token: token })}`); return { token: d.access_token, expiresAt: inSec(d.expires_in), refresh: null }; }
   if (api === "threads") { const d = await call(`https://graph.threads.net/refresh_access_token?${q({ grant_type: "th_refresh_token", access_token: token })}`); return { token: d.access_token, expiresAt: inSec(d.expires_in), refresh: null }; }
   if (!refresh) throw reconnect();
@@ -612,9 +634,135 @@ export async function blueskyDelete(did: string, token: string, uri: string): Pr
   await atp(await blueskyPds(did), "com.atproto.repo.deleteRecord", { bearer: token, json: { repo: did, collection: "app.bsky.feed.post", rkey: m[2] } });
 }
 
+// ── Pinterest (API v5): OAuth app, boards, image / carousel / video pins (docs/social-apps/pinterest.md) ─────────
+
+const PINTEREST_API = "https://api.pinterest.com/v5";
+const PINTEREST_VIDEO_BYTES = 2 * 1024 * 1024 * 1024;   // Pinterest's limit for a video pin is 2 GB; ours is bounded by the media transport
+export const PINTEREST_TITLE_MAX = 100;
+export const PINTEREST_DESCRIPTION_MAX = 800;
+
+/** One v5 call. Pinterest's errors come as { code, message }; 401 asks to reconnect; a Trial-access app is told so. */
+async function pinterestRequest(path: string, init: RequestInit & { bearer?: string; json?: unknown; basic?: string; form?: Record<string, string> } = {}): Promise<any> {
+  const headers: Record<string, string> = {};
+  let body: BodyInit | undefined;
+  if (init.json !== undefined) { headers["Content-Type"] = "application/json"; body = JSON.stringify(init.json); }
+  if (init.form) { headers["Content-Type"] = "application/x-www-form-urlencoded"; body = new URLSearchParams(init.form); }
+  if (init.bearer) headers.Authorization = `Bearer ${init.bearer}`;
+  if (init.basic) headers.Authorization = `Basic ${init.basic}`;
+  let r: Response;
+  try { r = await netDeps.http(`${PINTEREST_API}${path}`, { method: init.method ?? (body ? "POST" : "GET"), headers, body, redirect: "error", signal: AbortSignal.timeout(60_000) }); }
+  catch { throw new SocialError("Pinterest didn't answer; check the post before sending it again", 502); }
+  if (r.status === 204) return {};
+  const d: any = await r.json().catch(() => null);
+  if (!r.ok) {
+    const say = String(d?.message ?? "").slice(0, 200);
+    if (r.status === 401 || /token.*(expired|invalid)|invalid_grant/i.test(say)) throw reconnect();
+    if (r.status === 429) throw new SocialError("Pinterest is limiting how fast we post; it will retry shortly", 429);
+    if (r.status === 403 && /trial/i.test(say)) throw new SocialError("Pinterest only lets this app post to the ConstructHUB account until Pinterest approves it (Standard access)", 403);
+    throw new SocialError(say ? `Pinterest refused it: ${say}` : "Pinterest refused the request", r.status >= 500 ? 502 : 400);
+  }
+  if (!d || typeof d !== "object") throw new SocialError("Pinterest sent an unreadable answer", 502);
+  return d;
+}
+const pinterestCall = (path: string, token: string, json?: unknown, method?: string) => pinterestRequest(path, { method: method ?? (json === undefined ? "GET" : "POST"), bearer: token, ...(json === undefined ? {} : { json }) });
+/** OAuth token calls: the app's id and secret as HTTP Basic (Pinterest v5). */
+async function pinterestToken(form: Record<string, string>) {
+  const env = netDeps.env();
+  const d = await pinterestRequest("/oauth/token", { method: "POST", basic: Buffer.from(`${env.SOCIAL_PINTEREST_APP_ID}:${env.SOCIAL_PINTEREST_APP_SECRET}`).toString("base64"), form });
+  if (!d.access_token) throw new SocialError("Pinterest did not return a sign-in; reconnect the account", 409);
+  return d;
+}
+/** The boards this account can pin to (all pages). */
+export async function pinterestBoards(token: string): Promise<{ id: string; name: string }[]> {
+  const out: { id: string; name: string }[] = [];
+  for (let bookmark: string | null = null, i = 0; i < 20; i++) {
+    const d = await pinterestCall(`/boards?${q({ page_size: 250, ...(bookmark ? { bookmark } : {}) })}`, token);
+    for (const b of Array.isArray(d.items) ? d.items : []) if (b?.id) out.push({ id: String(b.id), name: String(b.name || b.id) });
+    bookmark = typeof d.bookmark === "string" && d.bookmark ? d.bookmark : null;
+    if (!bookmark) break;
+  }
+  return out;
+}
+const firstLink = /(?:https?:\/\/|www\.)[^\s<>()]+/i;
+/**
+ * What a pin will carry. Pure (tested): a board is required; title ≤ 100 (the composer's, else the first line); description ≤ 800;
+ * the first link in the text becomes the pin's link; one photo, a carousel of 2–5 photos, or one video (with a cover photo
+ * when one is given, else a frame from the video).
+ */
+export function pinterestPlan(text: string, media: string[], target: Record<string, any>) {
+  const boardId = String(target.boardId ?? "").trim();
+  if (!/^\d{1,30}$/.test(boardId)) throw new SocialError("Choose a Pinterest board for this post");
+  if (!media.length) throw new SocialError("Pinterest needs a photo or a video");
+  const lines = text.trim().split("\n").map((l) => l.trim()).filter(Boolean);
+  const title = String(target.title ?? "").trim().slice(0, PINTEREST_TITLE_MAX) || (lines[0] ?? "").slice(0, PINTEREST_TITLE_MAX);
+  if (!title) throw new SocialError("Pinterest needs a title or a first line of text");
+  const link = text.match(firstLink)?.[0].replace(/[.,!?;:"'’”)]+$/u, "");
+  const base = { boardId, title, description: text.trim().slice(0, PINTEREST_DESCRIPTION_MAX), link: link ? (/^www\./i.test(link) ? `https://${link}` : link) : null };
+  const videos = media.filter(isVideo), images = media.filter((u) => !isVideo(u));
+  if (videos.length > 1) throw new SocialError("Pinterest takes one video per pin");
+  if (videos.length) return { ...base, kind: "video" as const, url: videos[0], cover: images[0] ?? null };
+  if (images.length > 5) throw new SocialError("Pinterest carousels take up to five photos");
+  return images.length === 1 ? { ...base, kind: "image" as const, url: images[0] } : { ...base, kind: "carousel" as const, urls: images };
+}
+/** A cover for a video pin: the customer's photo, else the frame one second in (ffmpeg). Returns JPEG bytes. */
+export async function pinterestCover(video: Buffer, coverUrl: string | null): Promise<Buffer> {
+  if (coverUrl) return blueskyFetchPublic(coverUrl, 50 * 1024 * 1024, "cover photo");
+  const dir = await mkdtemp(join(tmpdir(), "chub-pin-"));
+  try {
+    const src = join(dir, "video.mp4"), out = join(dir, "cover.jpg");
+    await writeFile(src, video);
+    await new Promise<void>((resolve, reject) => execFile("ffmpeg", ["-y", "-loglevel", "error", "-ss", "1", "-i", src, "-frames:v", "1", "-q:v", "3", out], { timeout: 60_000 }, (e) => (e ? reject(e) : resolve())));
+    return await readFile(out);
+  } catch { throw new SocialError("Pinterest video pins need a cover photo: add one photo with the video"); }
+  finally { await rm(dir, { recursive: true, force: true }).catch(() => {}); }
+}
+const blueskyFetchPublic = (url: string, max: number, what: string) => blueskyFetch(url, max, what);
+/** Video: register, upload to Pinterest's storage, wait for processing; returns the media id. */
+async function pinterestUploadVideo(token: string, file: Buffer): Promise<string> {
+  const reg = await pinterestCall("/media", token, { media_type: "video" });
+  const id = reg.media_id, uploadUrl = reg.upload_url, params = reg.upload_parameters;
+  if (typeof id !== "string" || typeof uploadUrl !== "string" || !params || typeof params !== "object") throw new SocialError("Pinterest did not start the video upload", 502);
+  if (!/^https:\/\//.test(uploadUrl)) throw new SocialError("Pinterest sent an unusable upload address", 502);
+  const form = new FormData();
+  for (const [k, v] of Object.entries(params as Record<string, string>)) form.set(k, String(v));
+  form.set("file", new Blob([new Uint8Array(file) as BlobPart], { type: "video/mp4" }), "video.mp4");
+  let up: Response;
+  try { up = await netDeps.http(uploadUrl, { method: "POST", body: form, redirect: "error", signal: AbortSignal.timeout(10 * 60_000) }); }
+  catch { throw new SocialError("Pinterest's storage didn't accept the video; try again", 502); }
+  if (!up.ok) throw new SocialError("Pinterest's storage refused the video", 502);
+  for (let i = 0; ; i++) {
+    const s = await pinterestCall(`/media/${encodeURIComponent(id)}`, token);
+    if (s.status === "succeeded") return id;
+    if (s.status === "failed") throw new SocialError("Pinterest couldn't process the video");
+    if (i >= 60) throw new SocialError("Pinterest took too long to process the video", 502);
+    await netDeps.sleep(5000);
+  }
+}
+/** One pin: image, carousel or video. Pinterest returns the pin at once (a video keeps processing behind it). */
+async function pinterestPublish(token: string, text: string, media: string[], target: Record<string, any>): Promise<Plan> {
+  const plan = pinterestPlan(text, media, target);
+  const body: Record<string, unknown> = { board_id: plan.boardId, title: plan.title, description: plan.description, ...(plan.link ? { link: plan.link } : {}) };
+  if (plan.kind === "image") body.media_source = { source_type: "image_url", url: plan.url };
+  else if (plan.kind === "carousel") body.media_source = { source_type: "multiple_image_urls", items: plan.urls.map((url) => ({ url })) };
+  else {
+    const video = await blueskyFetch(plan.url, Math.min(PINTEREST_VIDEO_BYTES, 250 * 1024 * 1024), "video");
+    const cover = await pinterestCover(video, plan.cover);
+    const mediaId = await pinterestUploadVideo(token, video);
+    body.media_source = { source_type: "video_id", media_id: mediaId, cover_image_content_type: "image/jpeg", cover_image_data: cover.toString("base64") };
+  }
+  const d = await pinterestCall("/pins", token, body);
+  if (!d?.id) throw new SocialError("Pinterest did not confirm the pin; check the board before posting again", 502);
+  return { stage: "published", external: String(d.id), url: `https://www.pinterest.com/pin/${d.id}/` };
+}
+export async function pinterestDelete(token: string, id: string): Promise<void> {
+  if (!/^\d{1,30}$/.test(id)) throw new SocialError("That isn't a Pinterest pin", 400);
+  await pinterestCall(`/pins/${id}`, token, undefined, "DELETE");
+}
+
 /** Start a publish. Returns where it got to (a container / publish id to poll). */
 export async function netPublish(api: NetApi, externalId: string, token: string, text: string, media: string[], target: Record<string, any>): Promise<Plan> {
   if (api === "bluesky") return blueskyPublish(externalId, token, text, media, String(target.blueskyHandle ?? ""));
+  if (api === "pinterest") return pinterestPublish(token, text, media, target);
   if (api === "ig_login") {
     if (!media.length) throw new SocialError("Instagram needs a photo or a video");
     const host = `https://graph.instagram.com/v25.0/${externalId}/media`;
@@ -675,6 +823,7 @@ export async function netRead(api: NetApi, externalId: string, token: string, st
   }
   if (api === "x") return { state: "published", external: container, url: username ? `https://x.com/${username.replace(/^@/, "")}/status/${container}` : null };
   if (api === "bluesky") { const rkey = container.split("/").pop(); return { state: "published", external: container, url: username && rkey ? `https://bsky.app/profile/${username.replace(/^@/, "")}/post/${rkey}` : null }; }
+  if (api === "pinterest") return { state: "published", external: container, url: `https://www.pinterest.com/pin/${container}/` };
   const d = await call("https://open.tiktokapis.com/v2/post/publish/status/fetch/", { json: { publish_id: container }, bearer: token });
   const st = d.data?.status;
   if (st === "FAILED") return { state: "failed", error: `TikTok couldn't post it${d.data?.fail_reason ? `: ${String(d.data.fail_reason).replace(/_/g, " ")}` : ""}` };

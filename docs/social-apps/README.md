@@ -8,6 +8,7 @@ Kits in this folder:
 | `linkedin.md` | LinkedIn Pages (+ member profiles) | Community Management API, Development → Standard tier | **One shot per app**; new app with no other product; Page-verified app; business email |
 | `tiktok.md` | TikTok | Login Kit + Content Posting API (Direct Post), app review → Direct Post audit | **Strict posting-screen UX**; private-only until audited |
 | `bluesky.md` | Bluesky (ConstructHUB Direct) | AT Protocol, app password; no registration, no review | `SOCIAL_BLUESKY=on`; 300 graphemes; 4 photos or 1 video; facets for links/tags/mentions |
+| `pinterest.md` | Pinterest (ConstructHUB Direct) | Pinterest API v5 OAuth app; Trial access → Standard access review | Business account + developer verification; `SOCIAL_PINTEREST_APP_ID/_SECRET`; board per pin; 1 photo, 2–5 carousel, or 1 video (+cover) |
 | `~/ConstructHUB-release/docs/youtube/AUDIT-PACK.md` (tower1) | YouTube | YouTube API audit + Google OAuth verification | Draft is written and ready but **not submitted**; customer use case B is on branch `youtube-customers`, not deployed |
 
 Nothing in this folder has been sent to any platform. When these kits were written the native

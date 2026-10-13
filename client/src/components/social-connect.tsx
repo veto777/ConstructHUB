@@ -22,6 +22,7 @@ const NOTE: Record<string, string> = {
   linkedin: "Your profile or company Pages",
   tiktok: "You choose who can view each post",
   bluesky: "Your Bluesky profile · signs in with an app password",
+  pinterest: "Your Pinterest business account · pick a board for each pin",
 };
 const BLUESKY_APP_PASSWORDS = "https://bsky.app/settings/app-passwords";
 
