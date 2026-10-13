@@ -1451,3 +1451,11 @@ branch is committed, pushed, type-checks and passes the social tests (the two su
 failing on main: agency.test.ts, social.test.ts). **Merge the PR for `social/bluesky-direct` before the next
 deploy from main**, or that deploy will remove Bluesky again. Env added to vb11 .env: `SOCIAL_BLUESKY=on`,
 `SOCIAL_NATIVE_PUBLIC_NETWORKS=bluesky` (backup: .env.bak-bluesky-*). Kit: docs/social-apps/bluesky.md.
+
+## 2026-10-13 — Pinterest Direct deployed dark from `social/pinterest-direct` (DEPLOY_ALLOW_UNSAFE=1)
+
+Production was rebuilt from `social/pinterest-direct` (which contains `social/bluesky-direct`). Pinterest stays
+invisible until vb11 `~/ConstructHUB-live/.env` gets `SOCIAL_PINTEREST_APP_ID` / `SOCIAL_PINTEREST_APP_SECRET`
+from the owner's Pinterest developer app (docs/social-apps/pinterest.md §1) and the service restarts. Keep it
+out of `SOCIAL_NATIVE_PUBLIC_NETWORKS` until Pinterest grants Standard access. **Merge both branch PRs before the
+next deploy from main.**
