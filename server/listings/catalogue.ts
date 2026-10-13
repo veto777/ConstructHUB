@@ -2,7 +2,15 @@
  * Semrush US list: https://www.semrush.com/kb/874-listing-management-citation-websites (2026-10-13).
  * Null requirements/trades/states mean unresearched, not unrestricted/free.
  */
-export type DirectorySeed = { name: string; domain: string; kind: string; tier: number; category: string; source: string; notes: string | null };
+export type DirectorySeed = {
+  name: string;
+  domain: string;
+  kind: string;
+  tier: number;
+  category: string;
+  source: string;
+  notes: string | null;
+};
 const checklist: [string, string, string][] = [
   ["Google Business Profile", "google.com", "maps_nav"],
   ["Yelp", "yelp.com", "general"],
@@ -34,47 +42,144 @@ const checklist: [string, string, string][] = [
   ["ShowMeLocal", "showmelocal.com", "general"],
   ["EZLocal", "ezlocal.com", "general"],
   ["Local.com", "local.com", "general"],
- ];
+];
 const semrush: [string, string, string?][] = [
- ['8coupons','8coupons.com'], ['Amazon Alexa','alexa.amazon.com','ai'],
- ['American Express','americanexpress.com'], ['Apple Maps','maps.apple.com','maps_nav'],
- ['AroundMe','aroundmeapp.com','maps_nav'], ['BBB','bbb.org'], ['Bing Places','bing.com','maps_nav'],
- ['Brave','brave.com'], ['Brownbook','brownbook.net'], ['Central Index US','centralindex.com'],
- ['Chamber of Commerce','chamberofcommerce.com'], ['Citysearch','citysearch.com'], ['CitySquares','citysquares.com'],
- ['Cylex','cylex.us.com'], ['DoorDash','doordash.com'], ['Dun & Bradstreet','dnb.com'], ['eLocal','elocal.com'],
- ['EZlocal','ezlocal.com'], ['Facebook','facebook.com','social'], ['Foursquare','foursquare.com','maps_nav'],
- ['GoLocal247','golocal247.com'], ['Google Business Profile','google.com','maps_nav'], ['HERE','here.com','maps_nav'],
- ['HostMe','hostmeapp.com'], ['Hotfrog','hotfrog.com'], ['Hours.com','hours.com'], ['iBegin','ibegin.com'],
- ['iGlobal','iglobal.co'], ['Insider Pages','insiderpages.com'], ['Instacart','instacart.com'],
- ['Mapbox','mapbox.com','maps_nav'], ['MapQuest','mapquest.com','maps_nav'], ['Mapstr','mapstr.com','maps_nav'],
- ['MerchantCircle','merchantcircle.com'], ['Money Mailer','moneymailer.com'], ['My Local Services','mylocalservices.com'],
- ['n49','n49.com'], ['Navmii','navmii.com','maps_nav'], ['Nextdoor','nextdoor.com','social'], ['OpenAI','openai.com','ai'],
- ['Opendi','opendi.us'], ['Pitney Bowes','pitneybowes.com'], ['Property Capsule','propertycapsule.com'],
- ['Quinceanera.com','quinceanera.com'], ['SafeGraph','safegraph.com'], ['ShowMeLocal','showmelocal.com'],
- ['Snapchat','snapchat.com','social'], ['Soleo','soleo.com'], ['tellows','tellows.com'], ['TikTok','tiktok.com','social'],
- ['TomTom','tomtom.com','maps_nav'], ['Top Rated Local','topratedlocal.com'], ['TripAdvisor','tripadvisor.com'],
- ['Tupalo','tupalo.com'], ['Uber Eats','ubereats.com'], ['Uber','uber.com','maps_nav'], ['USCity.net','uscity.net'],
- ['Where To?','whereto.app','maps_nav'], ['Winnie','winnie.com'], ['wogibtswas.de','wogibtswas.de'],
- ['Yahoo','yahoo.com'], ['Yandex','yandex.com'], ['YellowPagesDirectory','yellowpagesdirectory.com'],
- ['Yelp','yelp.com'], ['Yellow Pages','yellowpages.com'], ['Siri','apple.com','ai'],
+  ["8coupons", "8coupons.com"],
+  ["Amazon Alexa", "alexa.amazon.com", "ai"],
+  ["American Express", "americanexpress.com"],
+  ["Apple Maps", "maps.apple.com", "maps_nav"],
+  ["AroundMe", "aroundmeapp.com", "maps_nav"],
+  ["BBB", "bbb.org"],
+  ["Bing Places", "bing.com", "maps_nav"],
+  ["Brave", "brave.com"],
+  ["Brownbook", "brownbook.net"],
+  ["Central Index US", "centralindex.com"],
+  ["Chamber of Commerce", "chamberofcommerce.com"],
+  ["Citysearch", "citysearch.com"],
+  ["CitySquares", "citysquares.com"],
+  ["Cylex", "cylex.us.com"],
+  ["DoorDash", "doordash.com"],
+  ["Dun & Bradstreet", "dnb.com"],
+  ["eLocal", "elocal.com"],
+  ["EZlocal", "ezlocal.com"],
+  ["Facebook", "facebook.com", "social"],
+  ["Foursquare", "foursquare.com", "maps_nav"],
+  ["GoLocal247", "golocal247.com"],
+  ["Google Business Profile", "google.com", "maps_nav"],
+  ["HERE", "here.com", "maps_nav"],
+  ["HostMe", "hostmeapp.com"],
+  ["Hotfrog", "hotfrog.com"],
+  ["Hours.com", "hours.com"],
+  ["iBegin", "ibegin.com"],
+  ["iGlobal", "iglobal.co"],
+  ["Insider Pages", "insiderpages.com"],
+  ["Instacart", "instacart.com"],
+  ["Mapbox", "mapbox.com", "maps_nav"],
+  ["MapQuest", "mapquest.com", "maps_nav"],
+  ["Mapstr", "mapstr.com", "maps_nav"],
+  ["MerchantCircle", "merchantcircle.com"],
+  ["Money Mailer", "moneymailer.com"],
+  ["My Local Services", "mylocalservices.com"],
+  ["n49", "n49.com"],
+  ["Navmii", "navmii.com", "maps_nav"],
+  ["Nextdoor", "nextdoor.com", "social"],
+  ["OpenAI", "openai.com", "ai"],
+  ["Opendi", "opendi.us"],
+  ["Pitney Bowes", "pitneybowes.com"],
+  ["Property Capsule", "propertycapsule.com"],
+  ["Quinceanera.com", "quinceanera.com"],
+  ["SafeGraph", "safegraph.com"],
+  ["ShowMeLocal", "showmelocal.com"],
+  ["Snapchat", "snapchat.com", "social"],
+  ["Soleo", "soleo.com"],
+  ["tellows", "tellows.com"],
+  ["TikTok", "tiktok.com", "social"],
+  ["TomTom", "tomtom.com", "maps_nav"],
+  ["Top Rated Local", "topratedlocal.com"],
+  ["TripAdvisor", "tripadvisor.com"],
+  ["Tupalo", "tupalo.com"],
+  ["Uber Eats", "ubereats.com"],
+  ["Uber", "uber.com", "maps_nav"],
+  ["USCity.net", "uscity.net"],
+  ["Where To?", "whereto.app", "maps_nav"],
+  ["Winnie", "winnie.com"],
+  ["wogibtswas.de", "wogibtswas.de"],
+  ["Yahoo", "yahoo.com"],
+  ["Yandex", "yandex.com"],
+  ["YellowPagesDirectory", "yellowpagesdirectory.com"],
+  ["Yelp", "yelp.com"],
+  ["Yellow Pages", "yellowpages.com"],
+  ["Siri", "apple.com", "ai"],
 ];
 // RexLocal is named in the KB, but its US publisher domain could not be substantiated.
 // Do not substitute the unrelated Australian rexlocal.io or invent a domain.
-export const unresolvedDirectories = [{ name: 'RexLocal', domain: null, source: 'semrush-kb-874',
-  notes: 'US publisher domain needs research: https://www.yext.com/integrations/publishers/rexlocal' }];
+export const unresolvedDirectories = [
+  {
+    name: "RexLocal",
+    domain: null,
+    source: "semrush-kb-874",
+    notes:
+      "US publisher domain needs research: https://www.yext.com/integrations/publishers/rexlocal",
+  },
+];
 export function catalogue(): DirectorySeed[] {
- const byDomain = new Map<string, DirectorySeed>();
- for (const [name, domain, category] of checklist) byDomain.set(domain, {name, domain, category, kind:'submission', tier:4, source:'citations-checklist', notes:null});
- for (const [name, domain, category] of semrush) byDomain.set(domain, {name, domain, category:category ?? 'general', kind:'partner', tier:3, source:'semrush-kb-874', notes:'Source-listed distribution target; eligibility and access unconfirmed.'});
- for (const [domain, name] of [['google.com','Google Business Profile'],['bing.com','Bing Places'],['maps.apple.com','Apple Business Connect'],['facebook.com','Facebook'],['foursquare.com','Foursquare'],['yelp.com','Yelp-claim']]) {
-  const d = byDomain.get(domain)!;
-  byDomain.set(domain, {...d, name, tier:1, kind:domain === 'yelp.com' ? 'submission' : 'api', notes:domain === 'yelp.com' ? 'Claim only; no write API. Also citations checklist and Semrush KB 874.' : 'Phase 2 API target; integration not implied. Also citations checklist and Semrush KB 874.'});
- }
- return [...byDomain.values()];
+  const byDomain = new Map<string, DirectorySeed>();
+  for (const [name, domain, category] of checklist)
+    byDomain.set(domain, {
+      name,
+      domain,
+      category,
+      kind: "submission",
+      tier: 4,
+      source: "citations-checklist",
+      notes: null,
+    });
+  for (const [name, domain, category] of semrush)
+    byDomain.set(domain, {
+      name,
+      domain,
+      category: category ?? "general",
+      kind: "partner",
+      tier: 3,
+      source: "semrush-kb-874",
+      notes:
+        "Source-listed distribution target; eligibility and access unconfirmed.",
+    });
+  for (const [domain, name] of [
+    ["google.com", "Google Business Profile"],
+    ["bing.com", "Bing Places"],
+    ["maps.apple.com", "Apple Business Connect"],
+    ["facebook.com", "Facebook"],
+    ["foursquare.com", "Foursquare"],
+    ["yelp.com", "Yelp-claim"],
+  ]) {
+    const d = byDomain.get(domain)!;
+    byDomain.set(domain, {
+      ...d,
+      name,
+      tier: 1,
+      kind: domain === "yelp.com" ? "submission" : "api",
+      notes:
+        domain === "yelp.com"
+          ? "Claim only; no write API. Also citations checklist and Semrush KB 874."
+          : "Phase 2 API target; integration not implied. Also citations checklist and Semrush KB 874.",
+    });
+  }
+  return [...byDomain.values()];
 }
-export async function seedListingDirectories(db: { query: (sql: string, values?: any[]) => Promise<unknown> }) {
- for (const d of catalogue()) await db.query(`INSERT INTO listing_directories(name,domain,kind,tier,category,source,notes)
- VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(domain) DO NOTHING`, [d.name,d.domain,d.kind,d.tier,d.category,d.source,d.notes]);
- for (const d of unresolvedDirectories) await db.query(`INSERT INTO listing_directories(name,domain,kind,tier,category,source,notes,active)
- VALUES($1,NULL,'partner',3,'contractor',$2,$3,false) ON CONFLICT(name) DO NOTHING`,[d.name,d.source,d.notes]);
+export async function seedListingDirectories(db: {
+  query: (sql: string, values?: any[]) => Promise<unknown>;
+}) {
+  for (const d of catalogue())
+    await db.query(
+      `INSERT INTO listing_directories(name,domain,kind,tier,category,source,notes)
+ VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(domain) DO NOTHING`,
+      [d.name, d.domain, d.kind, d.tier, d.category, d.source, d.notes],
+    );
+  for (const d of unresolvedDirectories)
+    await db.query(
+      `INSERT INTO listing_directories(name,domain,kind,tier,category,source,notes,active)
+ VALUES($1,NULL,'partner',3,'contractor',$2,$3,false) ON CONFLICT(name) DO NOTHING`,
+      [d.name, d.source, d.notes],
+    );
 }

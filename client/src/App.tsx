@@ -72,6 +72,8 @@ const GmbMonitorPage = lazyPage(() => import("@/pages/gmb-monitor"));
 const RankingGridPage = lazyPage(() => import("@/pages/ranking-grid"));
 const CompetitorsPage = lazyPage(() => import("@/pages/competitors"));
 const GbpContentPage = lazyPage(() => import("@/pages/gbp-content"));
+const ListingsPage = lazyPage(() => import("@/pages/listings"));
+const AdminListingsPage = lazyPage(() => import("@/pages/admin-listings"));
 const ListingEditorPage = lazyPage(() => import("@/pages/listing-editor"));
 const DomainsPage = lazyPage(() => import("@/pages/domains"));
 const MailAlertsPage = lazyPage(() => import("@/pages/mail-alerts"));
@@ -248,6 +250,7 @@ function DashboardRouter() {
       <Route path="/mail-alerts" component={MailAlertsPage} />
       <Route path="/gbp-content" component={GbpContentPage} />
       <Route path="/listing-editor" component={ListingEditorPage} />
+      <Route path="/listings" component={ListingsPage} />
       <Route path="/social-media" component={SocialMediaPage} />
       <Route path="/social-media/calendar" component={SocialMediaPage} />
       <Route path="/social-media/compose" component={SocialMediaPage} />
@@ -344,6 +347,7 @@ function DashboardRouter() {
       {/* Platform admins: the issue desk — captured failures and Claude's reports (the API answers 403 to anyone else). */}
       <Route path="/admin/issues" component={AdminIssuesPage} />
       <Route path="/admin/backlinks" component={AdminBacklinksPage} />
+      <Route path="/admin/listings" component={AdminListingsPage} />
       <Route path="/admin/tickets" component={AdminTicketsPage} />
       <Route path="/admin/tickets/:id" component={AdminTicketsPage} />
       <Route path="/admin/referrals" component={AdminReferralsPage} />
@@ -515,7 +519,7 @@ function PublicRouter() {
 const SIGNED_IN_ONLY = [
   "/search", "/schedules", "/history", "/permit-alerts", "/media-library", "/gmb-monitor", "/ranking-grid",
   "/social-media", "/call-assistant", "/guides", "/tutorials", "/cloudflare", "/search-console", "/seo", "/lsa-leads", "/lsa-account-manager", "/settings", "/site-scan/history",
-  "/agency", "/locations", "/domains", "/mail-alerts", "/gbp-content", "/listing-editor", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/backlinks", "/admin/youtube",
+  "/agency", "/locations", "/domains", "/mail-alerts", "/gbp-content", "/listing-editor", "/listings", "/admin/listings", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/backlinks", "/admin/youtube",
   ...(SHOW_COMPETITOR_INTEL ? ["/competitors"] : []),
   ...(SHOW_GOOGLE_REVIEWS ? ["/google-reviews"] : []),
 ];
@@ -543,7 +547,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/schedules": "Scrape Schedules", "/history": "Search History", "/permit-alerts": "Permit Alerts", "/photos": "Photo Optimizer",
   "/gmb-monitor": "GMB Edit Monitor", "/ranking-grid": "GMB Ranking Grid", "/pricing": "Pricing",
   "/competitors": "Competitor Intel", "/agency": "Agency", "/agency/clients": "Agency clients", "/agency/team": "Agency team", "/agency/onboarding": "Agency onboarding", "/agency/jobs": "Agency jobs", "/agency/settings": "Agency settings", "/locations": "Locations", "/domains": "Domains",
-  "/mail-alerts": "Mail Alerts", "/gbp-content": "Posts & Photos", "/listing-editor": "Listing editor", "/social-media": "Social Media", "/social-media/calendar": "Social calendar", "/social-media/compose": "New social post", "/social-media/posts": "Social posts", "/social-media/analytics": "Social analytics", "/social-media/inbox": "Social inbox", "/social-media/accounts": "Social accounts", "/social-media/auto": "Social auto mode", "/social-media/guides": "Social guides",
+  "/mail-alerts": "Mail Alerts", "/gbp-content": "Posts & Photos", "/listing-editor": "Listing editor", "/listings": "Listings & NAP sync", "/admin/listings": "Listings administration", "/social-media": "Social Media", "/social-media/calendar": "Social calendar", "/social-media/compose": "New social post", "/social-media/posts": "Social posts", "/social-media/analytics": "Social analytics", "/social-media/inbox": "Social inbox", "/social-media/accounts": "Social accounts", "/social-media/auto": "Social auto mode", "/social-media/guides": "Social guides",
   "/guides": "Guides", "/tutorials": "Tutorials", "/cloudflare": "Cloudflare", "/search-console": "Search Console", "/site-scan": "Site Scan", "/site-scan/history": "Site Scan history",
   "/seo": "SEO Suite", "/seo/rank-tracker": "Rank tracker", "/seo/local-grid": "Local grid", "/seo/plan": "SEO action plan", "/seo/audit": "Site audit", "/seo/alerts": "SEO alerts", "/seo/mentions": "SEO mentions", "/seo/usage": "SEO data usage", "/seo/reports": "SEO reports", "/seo/ai": "AI visibility", "/seo/batch": "Batch analysis", "/seo/content": "Content explorer", "/seo/explorer": "Site explorer", "/seo/keywords": "Keywords explorer", "/seo/backlinks": "Backlinks", "/seo/competitors": "Competitor gap",
   "/master-class": "Master Class", "/reinstatement": "Reinstatement", "/google-business": "Google Business",
