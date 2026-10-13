@@ -1,0 +1,104 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "intro-jobcam",
+  "title": "JobCam",
+  "viewport": {
+    "width": 1024,
+    "height": 576
+  },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    {
+      "action": "goto",
+      "url": "/crm/jobcam",
+      "caption": "JobCam",
+      "chapter": "Every shot, filed",
+      "narration": "This is JobCam. Every job-site photo and video your crew takes, filed to its project with the time and the place it was shot."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"jobcam-grid\"]",
+      "caption": "Newest shots first",
+      "narration": "Recent shows the newest shots first, across every job you have going."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-tile-demo-photo-06\"]",
+      "caption": "Open a shot",
+      "chapter": "What a shot keeps",
+      "narration": "Open one and it opens over the feed."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"jobcam-lightbox-project\"]",
+      "caption": "When, who, which project",
+      "narration": "Under it you see when it was taken, who took it, and the project it belongs to. That is your record of what was done, and when."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"jobcam-lightbox-client-visible\"]",
+      "caption": "What the client may see",
+      "narration": "You decide what the client sees. Switch a shot on and it shows in their portal; leave it off and it stays with the team."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-lightbox-star\"]",
+      "caption": "Star it",
+      "narration": "Star the ones that matter, like the before and after you will want again."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-lightbox-close\"]",
+      "caption": "Back to the feed",
+      "narration": "Close brings you back to the feed."
+    },
+    {
+      "action": "highlight",
+      "selector": "text=Open camera",
+      "caption": "Open camera",
+      "narration": "On site, Open camera shoots straight from your phone, stamped the moment it is taken."
+    },
+    {
+      "action": "click",
+      "selector": "[data-testid=\"jobcam-view-toggle\"]",
+      "caption": "Timeline",
+      "chapter": "Day by day",
+      "narration": "Timeline reads the same shots day by day, with the project named beside each day."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid^=\"jobcam-day-\"] >> nth=0",
+      "caption": "A job as a story",
+      "narration": "So a job reads as a story: what the crew did, and on which day."
+    },
+    {
+      "action": "highlight",
+      "selector": "[data-testid=\"link-portal-nav-jobcam\"]",
+      "caption": "Menu: JobCam",
+      "narration": "You will find JobCam in the menu on the left."
+    }
+  ],
+  "youtube": {
+    "title": "JobCam in about a minute | ConstructHUB",
+    "description": "A one-minute tour of JobCam in ConstructHUB: every job-site photo and video filed to its project with the time and place it was shot, what each shot keeps, choosing what the client may see, shooting from your phone on site, and the day-by-day timeline.",
+    "tags": [
+      "ConstructHUB",
+      "JobCam",
+      "job site photos",
+      "construction photo app",
+      "jobsite photo documentation",
+      "before and after photos",
+      "contractor CRM",
+      "contractor software"
+    ],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": {
+    "headline": "Every Shot, Filed",
+    "accent": "Filed",
+    "kicker": "JobCam",
+    "step": 1
+  }
+}

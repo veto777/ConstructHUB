@@ -116,6 +116,7 @@ export { default as v_intro_gbp_content } from "./intro-gbp-content.json";
 export { default as v_intro_gbp } from "./intro-gbp.json";
 export { default as v_intro_guides } from "./intro-guides.json";
 export { default as v_intro_ip_tracker } from "./intro-ip-tracker.json";
+export { default as v_intro_jobcam } from "./intro-jobcam.json";
 export { default as v_intro_lsa_leads } from "./intro-lsa-leads.json";
 export { default as v_intro_mail_alerts } from "./intro-mail-alerts.json";
 export { default as v_intro_master_class } from "./intro-master-class.json";
