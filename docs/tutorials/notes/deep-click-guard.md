@@ -1,8 +1,9 @@
 # Deep dives — Click Guard (slot 5, branch video/deep-click-guard, 2026-10-13)
 
-Done (7): `click-guard` (page tour, 78 s), `click-guard.flags-with-a-reason`, `click-guard.one-device-many-ips`,
-`click-guard.automatic-and-manual-blocks`, `click-guard.your-exclusion-rules`, `click-guard.a-script-for-your-ads-account`,
-`click-guard.traffic-at-a-glance`. One video per card; no card was merged with another.
+Done (7): `click-guard` (page tour, 78 s), `click-guard.flags-with-a-reason` (75 s), `click-guard.one-device-many-ips` (70 s),
+`click-guard.automatic-and-manual-blocks` (75 s), `click-guard.your-exclusion-rules` (87 s),
+`click-guard.a-script-for-your-ads-account` (82 s), `click-guard.traffic-at-a-glance` (66 s). One video per card; no card was
+merged with another. Every production passed on its first run (no drift, no re-record).
 
 Skipped, with the exact reason:
 - `ad-fraud` (/google-ad-fraud): a public opinion article, not a tool. Its "What This Page Is Based On" card names three other
