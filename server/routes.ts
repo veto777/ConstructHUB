@@ -460,6 +460,16 @@ export async function registerRoutes(
   startSiteScanWorker();
   await ensureCompetitorWorkerSchema();
   startCompetitorWorker();
+  // Backlinks database (server/backlinks, admin-only prototype): discovery → vetting → authority → outreach drafts.
+  // The worker runs only with BACKLINKS_WORKER_ENABLED=true; outreach sends only when configured (outreach.ts).
+  const { ensureBacklinkSchema } = await import("./backlinks/schema");
+  await ensureBacklinkSchema();
+  const { seedQueries } = await import("./backlinks/store");
+  await seedQueries();
+  const { registerBacklinkRoutes } = await import("./backlinks/routes");
+  registerBacklinkRoutes(app, getDevUser);
+  const { startBacklinkWorker } = await import("./backlinks/worker");
+  startBacklinkWorker();
   // SEO toolset (server/seo): rank tracker, keyword research, backlinks,
   // competitor gap on DataForSEO pay-as-you-go, capped by SEO_MONTHLY_BUDGET_USD.
   // Guarded (server/seo/boot.ts): the schema step runs zero DDL when its stored hash matches, with lock and

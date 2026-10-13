@@ -117,6 +117,7 @@ const SeoCompetitorsPage = lazyPage(() => import("@/pages/seo/competitors"));
 const AdminAccessPage = lazyPage(() => import("@/pages/admin-access"));
 const AdminCodeApiPage = lazyPage(() => import("@/pages/admin-code-api"));
 const AdminIssuesPage = lazyPage(() => import("@/pages/admin-issues"));
+const AdminBacklinksPage = lazyPage(() => import("@/pages/admin-backlinks"));
 const AdminTicketsPage = lazyPage(() => import("@/pages/admin-tickets"));
 const AdminReferralsPage = lazyPage(() => import("@/pages/admin-referrals"));
 const AdminYoutubePage = lazyPage(() => import("@/pages/admin-youtube"));
@@ -332,6 +333,7 @@ function DashboardRouter() {
       <Route path="/admin/code-api" component={AdminCodeApiPage} />
       {/* Platform admins: the issue desk — captured failures and Claude's reports (the API answers 403 to anyone else). */}
       <Route path="/admin/issues" component={AdminIssuesPage} />
+      <Route path="/admin/backlinks" component={AdminBacklinksPage} />
       <Route path="/admin/tickets" component={AdminTicketsPage} />
       <Route path="/admin/tickets/:id" component={AdminTicketsPage} />
       <Route path="/admin/referrals" component={AdminReferralsPage} />
