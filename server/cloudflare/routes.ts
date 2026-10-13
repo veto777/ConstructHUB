@@ -1,6 +1,15 @@
 import { flaggedIpsForZone } from "./hooks";
 import type { Express, NextFunction, Request, Response } from "express";
+import { randomBytes } from "node:crypto";
 import { z } from "zod";
+import { oauthBaseUrl } from "../site-context";
+import {
+  cloudflareOAuthConfigured,
+  cloudflareConsentUrl,
+  exchangeCloudflareCode,
+  saveCloudflareGrant,
+  revokeCloudflareGrant,
+} from "./oauth";
 import { pool } from "../db";
 import { requireRecentAuth } from "../account-security";
 import { logActivity, notifyUser } from "../account-events";
@@ -20,6 +29,11 @@ import {
   queue,
   domain,
 } from "./common";
+declare module "express-session" {
+  interface SessionData {
+    cfOAuth?: { state: string; userId: number; expires: number; redirect: string };
+  }
+}
 export type Auth = (req: any, res: any) => any;
 export function routeFor(app: Express, auth: Auth) {
   return (
@@ -312,6 +326,8 @@ export function registerAssetRoutes(
         await db.query("SELECT pg_advisory_lock(8275,$1)", [id]);
         const c = await ownedConnection(user, id, provider);
         let revoked = !c.created_token;
+        // An OAuth grant is ended at Cloudflare too (the customer can also revoke it under Manage OAuth authorizations).
+        if (provider === "cloudflare" && c.method === "oauth") revoked = await revokeCloudflareGrant(c, http);
         if (provider === "cloudflare" && c.created_token) {
           try {
             await cfFor(c, http).call(`/user/tokens/${c.token_id}`, "DELETE");
@@ -538,6 +554,43 @@ export function registerCloudflareRoutes(
       rows: [n],
     } = await pool.query(`SELECT count(*)::int total ${from}`, values);
     res.json({ items: rows.map((r) => r.value), total: n.total });
+  });
+  // "Connect with Cloudflare": Cloudflare's own sign-in-and-allow (server/cloudflare/oauth.ts). Answers the
+  // consent URL; the customer picks the accounts to share on Cloudflare's page. site-connections.tsx.
+  route("get", "/api/cloudflare/connect", async (req, res, user) => {
+    if (!requireRecentAuth(req, res)) return;
+    await budget(user, "connect");
+    if (!cloudflareOAuthConfigured()) throw new ProviderError("Cloudflare sign-in is not set up on this server", 503);
+    const state = randomBytes(32).toString("hex"),
+      redirect = `${oauthBaseUrl(req)}/api/cloudflare/oauth/callback`;
+    req.session.cfOAuth = { state, userId: user, expires: Date.now() + 600000, redirect };
+    res.json({ url: cloudflareConsentUrl(redirect, state) });
+  });
+  // Back from Cloudflare's consent page (the client's registered redirect URI): the code becomes tokens, the
+  // grant is saved as the connection (edge_connections, method 'oauth') with zone discovery queued, and the
+  // browser lands on Connections with ?connection=connected|failed. site-connections.tsx.
+  route("get", "/api/cloudflare/oauth/callback", async (req, res, user) => {
+    const pending = req.session.cfOAuth;
+    delete req.session.cfOAuth;
+    res.setHeader("Cache-Control", "no-store");
+    const back = (outcome: "connected" | "failed") => res.redirect(302, `/cloudflare/connections?connection=${outcome}`);
+    if (
+      !pending ||
+      pending.userId !== user ||
+      pending.expires < Date.now() ||
+      pending.state !== req.query.state ||
+      typeof req.query.code !== "string" ||
+      !req.query.code
+    )
+      return back("failed");
+    try {
+      const tokens = await exchangeCloudflareCode(req.query.code, pending.redirect, http);
+      const grant = await saveCloudflareGrant(user, tokens, http);
+      await connectionNotice(req, user, "cloudflare", true, grant.email ?? "Cloudflare sign-in");
+      return back("connected");
+    } catch {
+      return back("failed");
+    }
   });
   // Global-Key connect step 1: verifies the email+key with Cloudflare and lists accounts/
   // zones to pick from (50/page). The key is wiped from the request afterwards.

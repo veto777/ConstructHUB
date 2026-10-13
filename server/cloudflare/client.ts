@@ -7,7 +7,7 @@ export const ZONE_PERMISSIONS = [
 /** No provider response/error is ever reflected: it may echo the Global Key. */
 export class CloudflareClient {
   constructor(
-    private auth: { token: string } | { email: string; key: string },
+    private auth: { token: string } | { tokenFor: () => Promise<string> } | { email: string; key: string },
     private http: typeof fetch = fetch,
     private limit: () => Promise<void> = () => pace("cloudflare"),
   ) {}
@@ -18,15 +18,17 @@ export class CloudflareClient {
     )
       throw new ProviderError("Invalid Cloudflare resource", 400);
     await this.limit();
+    // An OAuth connection's token is looked up (and refreshed) per call; its failure is a "reconnect", not a network error.
+    const bearer = "tokenFor" in this.auth ? await this.auth.tokenFor() : "token" in this.auth ? this.auth.token : null;
     let r: Response, d: any;
     try {
       r = await this.http(`https://api.cloudflare.com/client/v4${path}`, {
         method,
         headers: {
           "Content-Type": "application/json",
-          ...("token" in this.auth
-            ? { Authorization: `Bearer ${this.auth.token}` }
-            : { "X-Auth-Email": this.auth.email, "X-Auth-Key": this.auth.key }),
+          ...(bearer !== null
+            ? { Authorization: `Bearer ${bearer}` }
+            : { "X-Auth-Email": (this.auth as { email: string }).email, "X-Auth-Key": (this.auth as { key: string }).key }),
         },
         body: body === undefined ? undefined : JSON.stringify(body),
         signal: AbortSignal.timeout(20000),

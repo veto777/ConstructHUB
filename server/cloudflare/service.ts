@@ -2,13 +2,16 @@ import { pool } from "../db";
 import { encryptToken, decryptToken } from "../gbp/token-crypto";
 import { CloudflareClient, tokenPolicies, ZONE_PERMISSIONS } from "./client";
 import { ProviderError, domain, mapLocations, queue } from "./common";
+import { cloudflareOAuthToken } from "./oauth";
 import { logActivity, notifyUser } from "../account-events";
 import { isIP } from "node:net";
 export const cfFor = (c: any, http: typeof fetch = fetch) =>
   new CloudflareClient(
     c.method === "member"
       ? { token: process.env.CLOUDFLARE_AGENCY_TOKEN! }
-      : { token: decryptToken(c.token)! },
+      : c.method === "oauth"
+        ? { tokenFor: () => cloudflareOAuthToken(c, http) }
+        : { token: decryptToken(c.token)! },
     http,
   );
 export async function saveConnection(

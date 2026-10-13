@@ -715,11 +715,19 @@ export default function SiteConnections({
           owner enables the site integration worker.
         </Notice>
       )}
-      {!cf &&
+      {new URLSearchParams(window.location.search).get("connection") ===
+        "failed" && (
+        <Notice tone="danger" testId="notice-connection-failed">
+          {cf
+            ? "Cloudflare sign-in did not finish. Connect again and choose Authorize on Cloudflare's page."
+            : "Google consent failed. Reconnect and grant Search Console access."}
+        </Notice>
+      )}
+      {cf &&
         new URLSearchParams(window.location.search).get("connection") ===
-          "failed" && (
-          <Notice tone="danger">
-            Google consent failed. Reconnect and grant Search Console access.
+          "connected" && (
+          <Notice tone="info" testId="notice-connection-connected">
+            Cloudflare connected. Your sites appear under Sites within a minute or two; Work queue shows the import.
           </Notice>
         )}
       {/* Nothing connected yet: say so first and take them to the steps (on a phone the Sites tab's own prompt is below the fold). */}
@@ -754,20 +762,54 @@ export default function SiteConnections({
               title={`Connect ${cf ? "Cloudflare" : "Google"}`}
               description={
                 cf
-                  ? "Your Global Key is used once to create a limited ConstructHUB key and is never saved."
+                  ? "Sign in at Cloudflare and choose which of your accounts ConstructHUB may see. Nothing to copy or paste."
                   : "Connect the agency’s Google account. Search Console permissions are stored separately from GBP and Calendar."
               }
             />
-            {/* Click-by-click: most people have never fetched a key from Cloudflare (owner, 2026-10-07). */}
-            <div className="mb-4">
-              {cf ? (
-                <CloudflareConnectSteps open={!(config.data?.total > 0)} />
-              ) : (
+            {/* Click-by-click: most people have never fetched a key from Cloudflare (owner, 2026-10-07). Since
+                Cloudflare opened OAuth to outside apps (June 2026) the sign-in button leads and the key is the fallback. */}
+            {!cf && (
+              <div className="mb-4">
                 <SearchConsoleConnectSteps open={!(config.data?.total > 0)} />
-              )}
-            </div>
+              </div>
+            )}
             {cf ? (
               <div className="space-y-4">
+                <div
+                  className="g-callout flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+                  data-testid="cloudflare-oauth-connect"
+                >
+                  <p className="text-[14px] leading-5 g-text">
+                    Sign in at Cloudflare, tick the account with your websites, and choose Authorize.{" "}
+                    <span className="g-text-2">
+                      About a minute. ConstructHUB can read your sites and their traffic, and edit firewall rules only if
+                      you allow it there. Revoke it any time in Cloudflare under Manage OAuth authorizations.
+                    </span>
+                  </p>
+                  <GooglePill
+                    variant="solid"
+                    disabled={busy}
+                    className="w-full sm:w-auto"
+                    testId="button-connect-cloudflare"
+                    label="Connect with Cloudflare"
+                    onClick={() =>
+                      act(
+                        async () => {
+                          const d = await read(`${base}/connect`);
+                          window.location.assign(d.url);
+                        },
+                        "",
+                        false,
+                      )
+                    }
+                  />
+                </div>
+                <details className="g-card border-t" data-testid="cloudflare-key-fallback">
+                  <summary className="cursor-pointer text-sm font-medium">
+                    Other ways to connect: Global API Key or a scoped token
+                  </summary>
+                  <div className="mt-3 space-y-4">
+                <CloudflareConnectSteps open={!(config.data?.total > 0)} />
                 <div className="grid gap-3 md:grid-cols-2">
                   <Field
                     label="Cloudflare login email"
@@ -906,6 +948,8 @@ export default function SiteConnections({
                         }
                       }}
                     />
+                  </div>
+                </details>
                   </div>
                 </details>
                 <div className="flex flex-wrap items-center gap-2 g-divider pt-4">
