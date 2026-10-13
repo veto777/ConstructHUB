@@ -1,0 +1,25 @@
+{
+  "helpKey": "posts-photos.ai-drafts-in-your-voice",
+  "durationSec": 99,
+  "video": {
+    "key": "tutorials/posts-photos.ai-drafts-in-your-voice.9f24cc70.mp4",
+    "bytes": 7066526,
+    "sha256": "9f24cc70924882838814f22bf12da3ff1fca392f21192145f6b6bcafe6a85b9a"
+  },
+  "captions": {
+    "key": "tutorials/posts-photos.ai-drafts-in-your-voice.3e5294c6.vtt",
+    "bytes": 1339,
+    "sha256": "3e5294c66604e550e4d493b4b6733dcd22f21abe9d07711878a07a3c1f5619c2"
+  },
+  "poster": {
+    "key": "tutorials/posts-photos.ai-drafts-in-your-voice.f6424b0b.jpg",
+    "bytes": 75794,
+    "sha256": "f6424b0b93b87dffca45f9dadc78e8112d1edf2690469348d59256830f875d1f"
+  },
+  "uploaded": {
+    "at": "2026-10-13T21:22:42.227Z",
+    "video": "00865a42facc3beda795d714130ca2ce",
+    "captions": "daab6e63585b2a8cb49f9131327f733e",
+    "poster": "bd86e54742378b1662da2f98c1d72a31"
+  }
+}

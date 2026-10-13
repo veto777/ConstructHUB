@@ -133,5 +133,7 @@ export { default as v_intro_site_scan } from "./intro-site-scan.json";
 export { default as v_intro_social } from "./intro-social.json";
 export { default as v_intro_vpn_shield } from "./intro-vpn-shield.json";
 export { default as v_jobcam } from "./jobcam.json";
+export { default as v_posts_photos_ai_drafts_in_your_voice } from "./posts-photos.ai-drafts-in-your-voice.json";
 export { default as v_posts_photos } from "./posts-photos.json";
+export { default as v_posts_photos_photos_by_category } from "./posts-photos.photos-by-category.json";
 export { default as v_posts_photos_updates_events_and_offers } from "./posts-photos.updates-events-and-offers.json";
