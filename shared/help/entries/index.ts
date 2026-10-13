@@ -97,6 +97,12 @@ export { default as e_ads_manager_every_client_in_one_list } from "./google-ads/
 export { default as e_ads_manager_health_audit } from "./google-ads/ads-manager.health-audit";
 export { default as e_ads_manager_local_services_checks } from "./google-ads/ads-manager.local-services-checks";
 export { default as e_ads_manager_protections_previewed } from "./google-ads/ads-manager.protections-previewed";
+export { default as e_click_guard_a_script_for_your_ads_account } from "./google-ads/click-guard.a-script-for-your-ads-account";
+export { default as e_click_guard_automatic_and_manual_blocks } from "./google-ads/click-guard.automatic-and-manual-blocks";
+export { default as e_click_guard_flags_with_a_reason } from "./google-ads/click-guard.flags-with-a-reason";
+export { default as e_click_guard_one_device_many_ips } from "./google-ads/click-guard.one-device-many-ips";
+export { default as e_click_guard_traffic_at_a_glance } from "./google-ads/click-guard.traffic-at-a-glance";
+export { default as e_click_guard_your_exclusion_rules } from "./google-ads/click-guard.your-exclusion-rules";
 export { default as e_listing_editor } from "./google-business/listing-editor";
 export { default as e_locations_bulk_tools_on_agency } from "./google-business/locations.bulk-tools-on-agency";
 export { default as e_locations_citation_checklist } from "./google-business/locations.citation-checklist";

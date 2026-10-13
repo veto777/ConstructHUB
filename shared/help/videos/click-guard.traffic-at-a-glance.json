@@ -1,0 +1,25 @@
+{
+  "helpKey": "click-guard.traffic-at-a-glance",
+  "durationSec": 66,
+  "video": {
+    "key": "tutorials/click-guard.traffic-at-a-glance.07c47035.mp4",
+    "bytes": 4800435,
+    "sha256": "07c47035bfc62f9923b03748127890a1a2e2bd8ebdb05a70f935f7918ea54979"
+  },
+  "captions": {
+    "key": "tutorials/click-guard.traffic-at-a-glance.9ca5df95.vtt",
+    "bytes": 1354,
+    "sha256": "9ca5df95585081f93d19bf5274f427faa57d69dc36e4c65a6b8ba6eb3879652e"
+  },
+  "poster": {
+    "key": "tutorials/click-guard.traffic-at-a-glance.96d87fc7.jpg",
+    "bytes": 65921,
+    "sha256": "96d87fc7be39200018e23bf4f30ac939c3e48812c45c72203a239a6da7b7fb04"
+  },
+  "uploaded": {
+    "at": "2026-10-13T21:47:04.476Z",
+    "video": "c0f512aa58d9cdeed0460e13d4d4629b",
+    "captions": "41beec482781d61fa567f2f404083dbd",
+    "poster": "4a67874efade3f2b342638a7e74ab5e0"
+  }
+}

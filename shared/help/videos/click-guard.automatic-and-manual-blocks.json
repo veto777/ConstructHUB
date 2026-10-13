@@ -1,0 +1,25 @@
+{
+  "helpKey": "click-guard.automatic-and-manual-blocks",
+  "durationSec": 75,
+  "video": {
+    "key": "tutorials/click-guard.automatic-and-manual-blocks.7cffc948.mp4",
+    "bytes": 6966351,
+    "sha256": "7cffc948075b9d972d57caf9fa02a854d630ca5fc959f0caa7110a127a1c3481"
+  },
+  "captions": {
+    "key": "tutorials/click-guard.automatic-and-manual-blocks.e6586dd2.vtt",
+    "bytes": 1743,
+    "sha256": "e6586dd2c7fccbfbf3e9b5b785e79f875818d3da8bdfbd9d370fcfb1ed815d91"
+  },
+  "poster": {
+    "key": "tutorials/click-guard.automatic-and-manual-blocks.0308ae78.jpg",
+    "bytes": 81495,
+    "sha256": "0308ae781130f2962a59bf6b613cf3a394030d1e14337bf3a6929a1419cb09a4"
+  },
+  "uploaded": {
+    "at": "2026-10-13T21:22:39.172Z",
+    "video": "bbf304d1208a17ace477341834a3f70e",
+    "captions": "592a5f4e0185ec406e2034c5289d5d1e",
+    "poster": "e9815b4713fac67e354f7f7a80764fea"
+  }
+}

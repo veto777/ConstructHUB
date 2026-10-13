@@ -1,0 +1,25 @@
+{
+  "helpKey": "click-guard.flags-with-a-reason",
+  "durationSec": 75,
+  "video": {
+    "key": "tutorials/click-guard.flags-with-a-reason.456c12a8.mp4",
+    "bytes": 7326519,
+    "sha256": "456c12a865fd440e9325fdf9521c2adbe823559fd64e7a390deebda4da34c563"
+  },
+  "captions": {
+    "key": "tutorials/click-guard.flags-with-a-reason.daed231d.vtt",
+    "bytes": 1538,
+    "sha256": "daed231d7f1000b98ba1051be45a663f30b93dced19cb8807b0702be3a8b930f"
+  },
+  "poster": {
+    "key": "tutorials/click-guard.flags-with-a-reason.b8a361aa.jpg",
+    "bytes": 73893,
+    "sha256": "b8a361aae991f906382db15a9f4730fcb2aa63801093d076560910d23f473307"
+  },
+  "uploaded": {
+    "at": "2026-10-13T20:30:59.078Z",
+    "video": "117302feda936089bc67d4444a533a1d",
+    "captions": "0bb8321922c4e2e6b5c18e3b051b0f20",
+    "poster": "5739aa7db533d1b4bbc2e21052c7a904"
+  }
+}
