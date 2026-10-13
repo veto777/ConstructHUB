@@ -368,6 +368,7 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
             {
               accountId: a.id,
               platform: a.platform,
+              ...(a.pages?.length === 1 ? { pageId: a.pages[0].id } : {}),
               privacy: "private",
               // TikTok: nothing pre-chosen (Content Sharing Guidelines) — the panel asks for each.
               tiktokPrivacy: "",

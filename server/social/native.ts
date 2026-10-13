@@ -244,7 +244,7 @@ export async function nativeFinalize(session: string, tenant: string, userId: nu
   let n = 0;
   for (const p of pages) {
     if (network === "facebook" && want.has(p.id)) { await upsertAccount(tenant, "facebook", p.id, p.name, p.picture, null, p.token, { owner: p.owner ?? null }); n++; }
-    if (network === "instagram" && p.ig && want.has(p.ig.id)) { await upsertAccount(tenant, "instagram", p.ig.id, `@${p.ig.username}`, p.ig.picture, p.id, p.token, { owner: p.owner ?? null }); n++; }
+    if (p.ig && (want.has(p.ig.id) || (network === "facebook" && want.has(p.id)))) { await upsertAccount(tenant, "instagram", p.ig.id, `@${p.ig.username}`, p.ig.picture, p.id, p.token, { owner: p.owner ?? null }); n++; }
   }
   await pool.query("DELETE FROM social_native_pending WHERE session=$1", [session]);
   return n;

@@ -195,7 +195,12 @@ async function mapOwnAccounts(userId: number, businessId: number, accounts: any[
   const { rows: [cfg] } = await pool.query("SELECT destinations FROM social_business_config WHERE user_id=$1 AND business_id=$2", [userId, businessId]);
   const ids = new Set(accounts.map((a) => a.id));
   const kept: any[] = (cfg?.destinations ?? []).filter((d: any) => ids.has(d.accountId));
-  for (const a of accounts) if (!kept.some((d) => d.accountId === a.id)) kept.push({ accountId: a.id, platform: a.platform });
+  for (const a of accounts) {
+    if (kept.some((d) => d.accountId === a.id)) continue;
+    if (a.pages?.length) for (const pg of a.pages) kept.push({ accountId: a.id, platform: a.platform, pageId: pg.id });
+    else if (a.boards?.length) for (const bd of a.boards) kept.push({ accountId: a.id, platform: a.platform, boardId: bd.id });
+    else kept.push({ accountId: a.id, platform: a.platform });
+  }
   await pool.query(`INSERT INTO social_business_config(user_id,business_id,destinations,connection_hash) VALUES($1,$2,$3,$4)
     ON CONFLICT(business_id) DO UPDATE SET destinations=$3,connection_hash=$4`, [userId, businessId, JSON.stringify(kept), hash]);
 }
