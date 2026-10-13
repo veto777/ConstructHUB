@@ -180,10 +180,11 @@ const page: FeaturePage = {
         "connects your Cloudflare accounts so you can read each zone's traffic and roll out a few prepared rules " +
         "without writing rule expressions by hand. A zone is one website's domain in Cloudflare; zones are found " +
         "automatically and linked to the location whose website matches.",
-      "There are two ways to connect. Give your Cloudflare login email and Global API key once, and ConstructHUB uses " +
-        "them in that one request to create a new API token limited to Zone Read, Analytics Read and Zone WAF Edit on " +
-        "the zones you pick; the Global API key is never stored. Or create a scoped token in Cloudflare yourself and " +
-        "paste it in. Each sync reads the last day of the zone's analytics: requests, unique visitors, page views and " +
+      "There are three ways to connect. The usual one is a Cloudflare sign-in: choose Connect with Cloudflare, sign in " +
+        "on Cloudflare's own page, tick the accounts with your websites and choose Authorize; ConstructHUB never sees " +
+        "your password and you can revoke the access in Cloudflare at any time. If you would rather not sign in, give " +
+        "your Cloudflare login email and Global API key once to create a limited key for the zones you pick (the Global " +
+        "API key is never stored), or create a scoped token in Cloudflare yourself and paste it in. Each sync reads the last day of the zone's analytics: requests, unique visitors, page views and " +
         "threats by day and country, the latest 100 firewall events and the 20 most requested paths, plus bot scores " +
         "where your Cloudflare plan provides them. Cloudflare samples some of these numbers.",
       "There are three rule packs. The ads door guards the exact path your Google Ads land on. It blocks requests " +
