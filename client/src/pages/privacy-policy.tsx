@@ -210,9 +210,8 @@ export default function PrivacyPolicyPage() {
           </p>
           <p>
             Access can be revoked at any time: you can choose Disconnect in the YouTube section of Social Media (an administrator does the same on the company channel page), which asks Google to cancel the grant and deletes it from our systems, or the grant can be removed on Google's{" "}
-            <a href="https://security.google.com/settings/security/permissions" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" data-testid="link-google-security-permissions">security settings page</a>. Stored YouTube data (the channel details, the access grant and the upload records) is deleted when the channel is disconnected or your ConstructHUB account is deleted, and on request to{" "}
-            <a href="mailto:support@constructhub.us" className="text-primary hover:underline">support@constructhub.us</a>{" "}
-            within 30 days.
+            <a href="https://security.google.com/settings/security/permissions" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" data-testid="link-google-security-permissions">security settings page</a>. Stored YouTube data (the channel details, the access grant and the upload records) is deleted at once when the channel is disconnected or your ConstructHUB account is deleted. You can also ask us to delete it by emailing{" "}
+            <a href="mailto:support@constructhub.us" className="text-primary hover:underline">support@constructhub.us</a>; we delete YouTube data as soon as possible and in any case within 7 days of your request.
           </p>
         </section>
 
@@ -234,7 +233,7 @@ export default function PrivacyPolicyPage() {
           <p className="mb-3">
             <strong>Removing it:</strong> choose Disconnect in Social Media and we delete the stored tokens and account details at once; remove ConstructHUB in the network's own settings and the network tells us to delete the same data; or delete your ConstructHUB account. Instructions and the status of a deletion request are at{" "}
             <a href="/data-deletion" className="text-primary hover:underline" data-testid="link-privacy-data-deletion">constructhub.us/data-deletion</a>, or email{" "}
-            <a href="mailto:support@constructhub.us" className="text-primary hover:underline">support@constructhub.us</a> and we will delete it within 30 days. Posts already published on a network belong to you and stay there until you delete them on that network.
+            <a href="mailto:support@constructhub.us" className="text-primary hover:underline">support@constructhub.us</a> and we will delete it within 30 days (YouTube data within 7 days; see section 4.3). Posts already published on a network belong to you and stay there until you delete them on that network.
           </p>
         </section>
 

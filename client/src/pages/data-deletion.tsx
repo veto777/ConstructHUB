@@ -106,7 +106,8 @@ export default function DataDeletionPage() {
           Email{" "}
           <a href="mailto:support@constructhub.us" className="text-primary hover:underline" data-testid="link-deletion-email">support@constructhub.us</a>{" "}
           from the address on your ConstructHUB account and tell us which connected accounts to delete. We will delete the
-          data within 30 days and confirm by email.
+          data within 30 days and confirm by email. YouTube data is deleted sooner: at once when you disconnect the channel,
+          and in any case within 7 days of your request.
         </p>
       </section>
 

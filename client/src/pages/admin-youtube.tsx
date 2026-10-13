@@ -15,7 +15,8 @@ import { GoogleList, GoogleListRow, GooglePill, GoogleSectionHeader } from "@/co
 import { useEffect, useMemo } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { CheckCircle2, Copy, ExternalLink, Loader2, Lock, Unplug, Youtube } from "lucide-react";
+import { CheckCircle2, Copy, ExternalLink, Loader2, Lock, Unplug } from "lucide-react";
+import { FaYoutube } from "react-icons/fa6";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/components/feature-landing/primitives";
@@ -47,6 +48,11 @@ const SCOPE_LABELS: Record<string, string> = {
   "https://www.googleapis.com/auth/youtube.force-ssl": "Manage captions and playlists",
 };
 const shortScope = (s: string) => s.replace("https://www.googleapis.com", "...");
+
+/** The official YouTube icon in YouTube red — Google's branding guidelines ask for it, unrecoloured, wherever the YouTube API has a presence. */
+const YoutubeIcon = ({ className, ...rest }: { className?: string; "aria-hidden"?: boolean | "true" | "false" }) => (
+  <FaYoutube className={className} style={{ color: "#FF0000" }} {...rest} />
+);
 
 function failure(err: unknown): { status: number; body: any } {
   const raw = String((err as Error | null)?.message ?? "");
@@ -113,7 +119,7 @@ export function YoutubeChannelCard({ enabled = true, heading = "h2" }: { enabled
   return (
     <section data-testid="card-youtube" data-connected={usable ? "true" : "false"} className="space-y-5">
       {header(<>
-        {data.configured && <GooglePill variant={usable ? "outline" : "solid"} icon={Youtube} href={CONNECT_URL} label={connectLabel} testId="link-youtube-connect" />}
+        {data.configured && <GooglePill variant={usable ? "outline" : "solid"} icon={YoutubeIcon} href={CONNECT_URL} label={connectLabel} testId="link-youtube-connect" />}
         {data.connected && (
           <GooglePill variant="danger" icon={Unplug} label={disconnect.isPending ? "Disconnecting…" : "Disconnect"} disabled={disconnect.isPending} testId="button-youtube-disconnect"
             onClick={() => { if (window.confirm("Disconnect the YouTube channel? Uploads stop until it is connected again. Videos already on YouTube stay there.")) disconnect.mutate(); }} />
@@ -199,10 +205,9 @@ export function YoutubeChannelCard({ enabled = true, heading = "h2" }: { enabled
 
       <Notice tone="info" title="Good to know" testId="notice-youtube-good-to-know">
         <ul className="list-disc space-y-1 pl-4">
-          <li>Google keeps videos uploaded through its API locked as Private when the app that uploaded them has not passed YouTube's API compliance audit. Ours has not been audited yet.</li>
-          <li>A video uploaded this way can be made public by hand in YouTube Studio only if Google allows it for that upload. We cannot promise it will.</li>
+          <li>The privacy setting chosen for each upload is what YouTube applies. Uploads from the tutorial script start as Private; a scheduled one is made public by YouTube at its publish time. The schedule ledger records the status YouTube actually returned.</li>
+          <li>A video's privacy can be changed at any time in YouTube Studio.</li>
           <li>The number of uploads per day is limited by Google's daily quota for the app.</li>
-          <li>Every upload from here starts as Private.</li>
         </ul>
       </Notice>
     </section>
