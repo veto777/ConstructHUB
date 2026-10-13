@@ -1,0 +1,43 @@
+{
+  "$schema": "../../../shared/help/step-script.schema.json",
+  "helpKey": "posts-photos.approval-first",
+  "title": "Approval first",
+  "viewport": { "width": 1024, "height": 576 },
+  "zoom": 1.875,
+  "narrator": "janice",
+  "steps": [
+    { "action": "goto", "url": "/gbp-content?location=910001", "selector": "textarea[aria-label=\"Post draft\"]", "offset": 160, "caption": "Compose a Google update", "chapter": "Nothing without approval",
+      "narration": "Nothing publishes from this page until you approve it. Here is what approving means." },
+    { "action": "highlight", "selector": "textarea[aria-label=\"Post draft\"]", "caption": "Post draft",
+      "narration": "A post you type, or one the AI drafts, sits in the Post draft box as a draft." },
+    { "action": "type", "selector": "textarea[aria-label=\"Post draft\"]", "value": "Insurance adjuster coming out? We meet them on the roof and document every hail strike with photos.", "caption": "Write or edit the draft",
+      "narration": "Type it, or edit the draft, until it reads right." },
+    { "action": "click", "selector": "xpath=//button[normalize-space(.)=\"Add post to draft batch\"]", "caption": "Add post to draft batch", "chapter": "A draft batch",
+      "narration": "Add post to draft batch keeps it as Draft 1 and clears the box for the next." },
+    { "action": "highlight", "selector": "textarea[aria-label=\"Batch post 1\"]", "caption": "Draft 1",
+      "narration": "The batch lists each draft, still editable, with a Remove button." },
+    { "action": "type", "selector": "textarea[aria-label=\"Post draft\"]", "value": "Meet Tom, our Englewood project lead, with 15 years on Colorado roofs.", "caption": "Write the next one",
+      "narration": "Write the next one." },
+    { "action": "click", "selector": "xpath=//button[normalize-space(.)=\"Add post to draft batch\"]", "caption": "Add it to the batch",
+      "narration": "And add it to the batch." },
+    { "action": "scroll-to", "selector": "xpath=//p[contains(.,\"Approving authorizes\")]", "offset": 200, "caption": "Schedule and approve", "chapter": "Approve",
+      "narration": "Under Schedule and approve: approving authorizes Google publishing at the scheduled times." },
+    { "action": "highlight", "selector": "xpath=//p[contains(.,\"Approving authorizes\")]", "caption": "AI text remains a draft until you approve it",
+      "narration": "AI text remains a draft until you approve it. With a draft batch, approval queues only the posts in that batch." },
+    { "action": "click", "selector": "xpath=//button[normalize-space(.)=\"Approve & queue post\"]", "caption": "Approve & queue post",
+      "narration": "Choose Approve and queue post." },
+    { "action": "highlight", "selector": "xpath=(//article[contains(.,\"queued\")])[1]", "caption": "Queued",
+      "narration": "Both posts are now queued, each with its time and the status queued." },
+    { "action": "highlight", "selector": "xpath=(//article[contains(.,\"queued\")])[1]//button[normalize-space(.)=\"Cancel\"]", "caption": "Cancel",
+      "narration": "Until it publishes, Cancel takes a post back out." }
+  ],
+  "youtube": {
+    "title": "How approval works for Google posts | ConstructHUB",
+    "description": "How approval works in Posts & Photos in ConstructHUB: a typed or AI-drafted post stays a draft, a draft batch keeps several posts to approve together, and Approve & queue post is what authorizes publishing at the scheduled times. A queued post can still be cancelled.",
+    "tags": ["ConstructHUB", "Google Business Profile posts", "approve posts", "draft batch", "post scheduler", "contractor marketing", "local SEO", "roofing marketing"],
+    "playlist": "ConstructHUB tutorials",
+    "category": 28
+  },
+  "thumbnail": { "headline": "Nothing Publishes Unapproved", "accent": "Unapproved", "kicker": "Posts & Photos", "step": 8 },
+  "removeSelectors": ["div[role=\"alert\"].rounded-xl"]
+}

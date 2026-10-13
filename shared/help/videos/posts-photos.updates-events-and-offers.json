@@ -1,0 +1,25 @@
+{
+  "helpKey": "posts-photos.updates-events-and-offers",
+  "durationSec": 96,
+  "video": {
+    "key": "tutorials/posts-photos.updates-events-and-offers.834bc569.mp4",
+    "bytes": 6706759,
+    "sha256": "834bc5695a753900550059ed8556ec470bb6745ca94cb4c68f7acd8cbcb49433"
+  },
+  "captions": {
+    "key": "tutorials/posts-photos.updates-events-and-offers.920539a6.vtt",
+    "bytes": 1775,
+    "sha256": "920539a6ed7d3e1bce98b8d7760ffe9646dd690ded0ca74a70d16521286ae59b"
+  },
+  "poster": {
+    "key": "tutorials/posts-photos.updates-events-and-offers.40261596.jpg",
+    "bytes": 63306,
+    "sha256": "40261596ab5ed0db84ec8e87058cd52a22d27deee64c9f21412806ff8fc37386"
+  },
+  "uploaded": {
+    "at": "2026-10-13T20:42:02.373Z",
+    "video": "e5fff88735eddd83af16f355d498f094",
+    "captions": "fe38eae01747e1f95e84577490936fc5",
+    "poster": "38bb4a199297775fa57371a689e6067a"
+  }
+}
