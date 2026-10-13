@@ -211,7 +211,7 @@ export function registerCustomerYoutubeRoutes(app: Express, auth: GetUser, opts:
     try {
       const r = await purgeCustomerYoutube(user.id, http);
       if (r.removed) {
-        console.log(`[youtube] customer channel disconnected by user ${user.id} (revoked at Google: ${r.revokedAtGoogle})`);
+        console.log(`[youtube] customer channel disconnected by user ${user.id} (revoked at Google: ${r.revokedAtGoogle}${r.sharedWithCompany ? ", kept: it is the company channel's grant" : ""})`);
         await logActivity(req, user.id, "youtube.disconnected").catch(() => undefined);
       }
       res.json({ disconnected: true, removed: r.removed, revokedAtGoogle: r.revokedAtGoogle, videosRemoved: r.videos });

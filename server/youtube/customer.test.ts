@@ -30,6 +30,10 @@ import { CUSTOMER_YOUTUBE_CALLBACK_PATH, MAX_OPEN_FILES, publishInput, registerC
 import { VIDEO_PART_BYTES, keyIsOwn, validateVideoFile, videoKey } from "./customer-media";
 import { customerMessage, processingMessage, purgeCustomerYoutube, removeStoredFile, runCheck, runUpload } from "./customer-service";
 import { claimNextUpload, customerStatus, dailyUsage, filesToDelete, getVideo, markFileDeleted } from "./customer-store";
+
+/** The company channel (admin-connected, server/youtube/store.ts): tests set it; null = no company channel. */
+let companyGrant: { channelId: string | null; connectedBy: number | null } | null = null;
+vi.mock("./store", async (importOriginal) => ({ ...(await importOriginal<typeof import("./store")>()), youtubeCompanyGrant: async () => companyGrant }));
 import { objectSize } from "../jobcam/storage";
 
 type Call = { url: string; method: string; headers: Record<string, string>; body: any };
@@ -573,6 +577,22 @@ describe("the upload job", () => {
 });
 
 describe("disconnect", () => {
+  it("keeps Google's grant when the customer's channel is the company channel (a revoke would kill the company sign-in too)", async () => {
+    await connect("a");
+    companyGrant = { channelId: "UCa-channel-000000000000", connectedBy: 424242 };
+    try {
+      const out = await (await post("/api/social/youtube/disconnect", "a")).json();
+      expect(out).toMatchObject({ disconnected: true, removed: true, revokedAtGoogle: false });
+      expect(calls).toHaveLength(0);
+      expect(await customerStatus(USERS.a.id)).toMatchObject({ connected: false });
+      // Same when the disconnecting user is the one who connected the company channel, whatever channel they linked.
+      await connect("b");
+      companyGrant = { channelId: "UCcompany-other-channel-00", connectedBy: USERS.b.id };
+      expect(await (await post("/api/social/youtube/disconnect", "b")).json()).toMatchObject({ removed: true, revokedAtGoogle: false });
+      expect(calls).toHaveLength(0);
+    } finally { companyGrant = null; }
+  });
+
   it("revokes at Google and deletes the connection, every video record and every stored file of that account", async () => {
     await connect("a");
     const ready = await storeVideo("a", 2048);
@@ -592,7 +612,7 @@ describe("disconnect", () => {
     await connect("a");
     await storeVideo("a", 2048);
     const out = await purgeCustomerYoutube(USERS.a.id, (async () => { throw new Error("offline"); }) as unknown as typeof fetch);
-    expect(out).toEqual({ removed: true, revokedAtGoogle: false, videos: 1 });
+    expect(out).toEqual({ removed: true, revokedAtGoogle: false, sharedWithCompany: false, videos: 1 });
     expect((await customerStatus(USERS.a.id)).connected).toBe(false);
   });
 });
