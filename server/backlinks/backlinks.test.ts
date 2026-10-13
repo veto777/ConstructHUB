@@ -159,7 +159,7 @@ describe("vetting — false positives from the first run", () => {
   it("a user profile on a platform that says 'guest posting' (zillow.com/profile/…)", () => {
     const g = graded("https://zillow.com/profile/livepositiv8", `<html><head><title>Guest Posting | Zillow</title></head><body>Submit a guest post about construction ${words(700, "homeowner")}</body></html>`);
     expect(g.tier).toBe("X");
-    expect(g.reasons.join(" ")).toMatch(/user profile/);
+    expect(g.reasons.join(" ")).toMatch(/user profile|platform where anyone can post/);
   });
   it("an article that happens to contain the phrase, on a site that is not about the trades", () => {
     const g = graded("https://raspberrypi.com/news/build-smart-doorbell-windows-10/",
@@ -188,5 +188,15 @@ describe("vetting — false positives from the first run", () => {
     expect(s.submissionUrl).toBe("https://homefixblog.com/write-for-us/");
     expect(gradeSource("guest_post", s, { rank: 300, referringDomains: 800, spamScore: 3, checkedAt: "x" }).tier).toBe("A");
   });
+  it("SEO/marketing agencies, foreign-market sites, platforms and free blog sub-domains", () => {
+    const wfu = (url: string, homeTitle: string) => gradeSource("guest_post", mergeSignals(
+      analyzePage({ url, status: 200, body: `<html><head><title>Write for us</title></head><body>${words(800, "roofing")}</body></html>` }),
+      analyzePage({ url: new URL("/", url).href, status: 200, body: `<html><head><title>${homeTitle}</title></head><body>${words(600, "roofing contractors")}</body></html>` })), { rank: 300, referringDomains: 900, spamScore: 2, checkedAt: "x" });
+    expect(wfu("https://localseoguy.digital/write-for-us", "Home Services Local SEO Consultant").reasons.join(" ")).toMatch(/agency/);
+    expect(wfu("https://brandingmarketingagency.com/write-for-us/", "").reasons.join(" ")).toMatch(/agency/);
+    expect(wfu("https://elitebreeze.com/write-for-us/", "EliteBreeze HVAC – Top HVAC Service Provider in Mumbai").reasons.join(" ")).toMatch(/outside the US/);
+    expect(wfu("https://roofblog.wordpress.com/write-for-us/", "Roofing tips for homeowners").tier).toBe("C");
+    expect(wfu("https://roofingcontractorblog.com/write-for-us/", "Roofing tips for homeowners").tier).toBe("A");
+    expect(gradeSource("directory", { ...analyzePage({ url: "https://yelp.com/", status: 403, body: "" }) }, { rank: 700, referringDomains: 1, spamScore: 1, checkedAt: "x" }).tier).toBe("X");
+  });
 });
-

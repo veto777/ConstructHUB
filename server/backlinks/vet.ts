@@ -6,7 +6,7 @@
 import * as cheerio from "cheerio";
 import type { BacklinkKind, BacklinkMetrics, BacklinkSignals, BacklinkTier, LinkType } from "@shared/backlinks";
 import { safeFetch as siteFetch, type PageResponse } from "../sitescan/http";
-import { normalizeDomain } from "./discover";
+import { isExcluded, normalizeDomain } from "./discover";
 
 /** Contractor / home-service vocabulary: how on-topic a page is. Specific trade words only — "home", "window",
  *  "install" and "repair" alone also describe software, cars and electronics (Raspberry Pi's "Windows 10" doorbell). */
@@ -30,6 +30,13 @@ export function foreignTld(domain: string): string | null {
   const tld = domain.split(".").pop() ?? "";
   return tld.length === 2 && !GENERIC_CCTLD.has(tld) ? tld : null;
 }
+
+/** Marketing / SEO agencies write "write for us" pages to sell links; they are sellers, not publishers. */
+const AGENCY = /\b(seo|digital marketing|marketing|branding|link[- ]building|web design|advertising) (agency|agencies|consultants?|company|services|expert|guy)\b|\bseo (consultant|services|company|agency)\b/i;
+/** A site written for another country (named in its home-page title). */
+const FOREIGN_PLACE = /\b(india|mumbai|delhi|bangalore|bengaluru|chennai|hyderabad|kolkata|pune|pakistan|lahore|karachi|islamabad|bangladesh|dhaka|nigeria|lagos|philippines|manila|dubai|uae|qatar|saudi|kenya|nairobi|united kingdom|london|uk|australia|sydney|melbourne|new zealand|singapore|malaysia|south africa)\b/i;
+/** Free blog sub-domains: anyone can open one in a minute; never a quality source. */
+const FREE_BLOG = /\.(wordpress\.com|blogspot\.com|wixsite\.com|weebly\.com|webflow\.io|squarespace\.com|tumblr\.com|site123\.me|jimdosite\.com|business\.site|godaddysites\.com|strikingly\.com|ghost\.io|hashnode\.dev|over-blog\.com)$/i;
 
 /** Is the SITE about home improvement / construction? Its home page title names a trade, or trade words are dense on it. */
 export function siteOnTopic(s: BacklinkSignals): boolean {
@@ -216,6 +223,7 @@ export function gradeSource(hint: BacklinkKind, s: BacklinkSignals, m: BacklinkM
   const relTotal = s.rel.dofollow + s.rel.nofollow + s.rel.sponsored;
   const linkType: LinkType = relTotal < 3 ? "unknown" : s.rel.sponsored / relTotal > 0.5 ? "sponsored" : s.rel.nofollow / relTotal > 0.6 ? "nofollow" : "dofollow";
   const stop = (why: string): Grade => ({ kind, tier: "X", score: 0, reasons: [...reasons, why], linkType });
+  if (isExcluded(normalizeDomain(s.fetchedUrl) ?? "")) return stop("A platform where anyone can post, not a publisher");
   if (BOT_WALL.has(s.httpStatus)) return gradeBlocked(kind, s.httpStatus, m, linkType);
   if (s.httpStatus >= 400 || s.httpStatus === 0) return stop(`The site answered ${s.httpStatus || "nothing"}`);
   if (s.parked) return stop("Parked or for-sale domain");
@@ -225,12 +233,18 @@ export function gradeSource(hint: BacklinkKind, s: BacklinkSignals, m: BacklinkM
   if (m?.spamScore != null && m.spamScore >= 40) return stop(`Spam score ${m.spamScore}/100`);
   // 2026-10-13 hard rules (owner: "fix everything"): a source is real only when the SITE invites it, the site is about
   // the trades (for content links), and it is a publisher — not a list, a seller, a job board or a foreign-market site.
-  const tld = foreignTld(normalizeDomain(s.fetchedUrl) ?? "");
+  const site = normalizeDomain(s.fetchedUrl) ?? "";
+  if (isExcluded(site)) return stop("A platform where anyone can post, not a publisher");
+  const tld = foreignTld(site);
   if (tld) return stop(`A site for an audience outside the US (.${tld})`);
   if (s.listPage) return stop(`The page found is ${s.listPage}, not a publisher`);
   if (!s.submissionUrl) return stop(s.profilePage
     ? "Found on a user profile — the site itself does not invite submissions"
     : "No page on the site invites submissions (a phrase inside an article does not count)");
+  const homeTitle = s.homeTitle || s.title || "";
+  if (AGENCY.test(`${homeTitle} ${site.replace(/[.-]/g, " ")}`)) return stop(`An SEO / marketing agency (sells links), not a publisher: "${homeTitle.slice(0, 80)}"`);
+  const place = homeTitle.match(FOREIGN_PLACE)?.[0];
+  if (place) return stop(`A site for an audience outside the US ("${place}" in its title)`);
   const topical = kind === "guest_post" || kind === "resource_page" || kind === "editorial";
   if (topical && !siteOnTopic(s)) return stop(`The site is not about home improvement or construction (home page: "${(s.homeTitle ?? s.title ?? "").slice(0, 80)}")`);
 
@@ -257,6 +271,7 @@ export function gradeSource(hint: BacklinkKind, s: BacklinkSignals, m: BacklinkM
   } else reasons.push("authority not measured yet (tier capped at B)");
   score = Math.max(0, Math.min(100, score));
   let tier: BacklinkTier = score >= 70 ? "A" : score >= 50 ? "B" : score >= 30 ? "C" : "X";
+  if (FREE_BLOG.test(site) && (tier === "A" || tier === "B")) { tier = "C"; reasons.push("a free blog sub-domain (capped at C)"); }
   if (!m && tier === "A") tier = "B";
   return { kind, tier, score, reasons, linkType };
 }
