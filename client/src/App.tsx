@@ -1,15 +1,7 @@
-import AgencyPage from "@/pages/agency";
 import { SocialLinks } from "@/components/social-links";
-import GoogleProfilePage from "@/pages/google-profile";
-import InvitePage from "@/pages/invite";
 import { PaymentNeededBanner } from "@/components/payment-needed-banner";
-import { CloudflarePage, SearchConsolePage } from "@/pages/site-connections";
 import { NotificationBell } from "@/components/account-security";
 import { RecentAuthModal } from "@/components/recent-auth";
-import SocialMediaPage from "@/pages/social-media";
-import GuidesPage from "@/pages/guides";
-import TutorialsPage from "@/pages/tutorials";
-import SiteScanPage, { FreeSiteScanPage, SharedSiteScanPage } from "@/pages/site-scan";
 import { Switch, Route, useLocation, Link, Redirect } from "wouter";
 import { Suspense, useEffect, type ComponentType } from "react";
 import { lazyPage } from "@/lib/lazy-page";
@@ -35,58 +27,17 @@ import { CartProvider } from "@/contexts/cart-context";
 import { CartSheet } from "@/components/cart-sheet";
 import { Settings } from "lucide-react";
 import NotFound from "@/pages/not-found";
-import SearchPage from "@/pages/search";
-import DatabasesPage from "@/pages/databases";
-import SchedulesPage from "@/pages/schedules";
-import HistoryPage from "@/pages/history";
-import PropertyPage from "@/pages/property";
-import PhotosPage from "@/pages/photos";
 import AuthPage from "@/pages/auth";
 import LandingPage from "@/pages/landing";
-import GmbMonitorPage from "@/pages/gmb-monitor";
-import RankingGridPage from "@/pages/ranking-grid";
 import PricingPage from "@/pages/pricing";
-import CompetitorsPage from "@/pages/competitors";
-import GbpContentPage from "@/pages/gbp-content";
-import ListingEditorPage from "@/pages/listing-editor";
-import DomainsPage from "@/pages/domains";
-import MailAlertsPage from "@/pages/mail-alerts";
-import PermitAlertsPage from "@/pages/permit-alerts";
-import LocationsPage from "@/pages/locations";
-import MasterClassPage from "@/pages/master-class";
-import ReinstatementPage from "@/pages/reinstatement";
-import GoogleBusinessPage from "@/pages/google-business";
-import AdsManagerPage from "@/pages/ads-manager";
-import GoogleAdsPage from "@/pages/google-ads";
-import GoogleAdsGuidePage from "@/pages/google-ads-guide";
-import GoogleAdsGuideSectionPage from "@/pages/google-ads-guide-section";
-import GoogleAdFraudPage from "@/pages/google-ad-fraud";
-import LsaGuidePage from "@/pages/lsa-guide";
-import LsaLeadsPage from "@/pages/lsa-leads";
 import CallAssistantLandingPage from "@/pages/call-assistant-landing";
 import { FeaturesCataloguePage, FeaturePageRoute, FeatureAdLanding, LegacyLanding } from "@/pages/features";
 import { ToolRouteGate } from "@/components/tool-route-gate";
-import { DfyCataloguePage, DfyPageRoute } from "@/pages/done-for-you";
-import SettingsPage from "@/pages/settings";
-import DevelopersPage from "@/pages/developers";
 import { CrmLogo } from "@/components/crm-logo";
 import { isPortal, isClientPortal, CRM_NAME, marketingUrl } from "@/lib/site";
-import IpTrackerPage from "@/pages/ip-tracker";
-import CrmGatewayPage from "@/pages/crm-gateway";
-import VpnShieldPage from "@/pages/vpn-shield";
 import HomePage from "@/pages/home";
-import ContractSignPage from "@/pages/contract-sign";
-import GoogleReviewsPage from "@/pages/google-reviews";
-import ReviewFeedbackPage from "@/pages/review-feedback";
-import ReviewUnsubscribePage from "@/pages/review-unsubscribe";
 import AdsConsultantChat from "@/components/ads-consultant-chat";
 import HubWidget from "@/components/hub/hub-widget";
-import PrivacyPolicyPage from "@/pages/privacy-policy";
-import DataDeletionPage from "@/pages/data-deletion";
-import TermsOfUsePage from "@/pages/terms-of-use";
-import { CrmTermsPage, CrmPrivacyPage } from "@/pages/crm-legal";
-import MediaLibraryPage from "@/pages/media-library";
-import LsaAccountManagerPage from "@/pages/lsa-account-manager";
 import { SHOW_COMPETITOR_INTEL, SHOW_GOOGLE_REVIEWS } from "@/lib/features";
 import { copyrightNotice } from "@/lib/marketing";
 import { reportIssueHref } from "@/lib/report-issue-link";
@@ -95,6 +46,63 @@ import { SeoToolLayout } from "@/components/seo-tool/layout";
 import { ProductToolLayout, shelledToolFor } from "@/components/tool/product-shell";
 import { pageMetaFor } from "@shared/route-meta";
 
+// Every other page loads on demand too (2026-10-13): the whole app shipped as one 1.2 MB script, and a
+// Meta ad click on a phone waited 8-15 s before the landing page drew anything. Only the pages a
+// signed-out visitor lands on (home, features, Call Assistant, pricing, sign-in) stay in the first download.
+const AgencyPage = lazyPage(() => import("@/pages/agency"));
+const GoogleProfilePage = lazyPage(() => import("@/pages/google-profile"));
+const InvitePage = lazyPage(() => import("@/pages/invite"));
+const CloudflarePage = lazyPage(() => import("@/pages/site-connections").then((m) => ({ default: m.CloudflarePage })));
+const SearchConsolePage = lazyPage(() => import("@/pages/site-connections").then((m) => ({ default: m.SearchConsolePage })));
+const SocialMediaPage = lazyPage(() => import("@/pages/social-media"));
+const GuidesPage = lazyPage(() => import("@/pages/guides"));
+const TutorialsPage = lazyPage(() => import("@/pages/tutorials"));
+const SiteScanPage = lazyPage(() => import("@/pages/site-scan"));
+const FreeSiteScanPage = lazyPage(() => import("@/pages/site-scan").then((m) => ({ default: m.FreeSiteScanPage })));
+const SharedSiteScanPage = lazyPage(() => import("@/pages/site-scan").then((m) => ({ default: m.SharedSiteScanPage })));
+const SearchPage = lazyPage(() => import("@/pages/search"));
+const DatabasesPage = lazyPage(() => import("@/pages/databases"));
+const SchedulesPage = lazyPage(() => import("@/pages/schedules"));
+const HistoryPage = lazyPage(() => import("@/pages/history"));
+const PropertyPage = lazyPage(() => import("@/pages/property"));
+const PhotosPage = lazyPage(() => import("@/pages/photos"));
+const GmbMonitorPage = lazyPage(() => import("@/pages/gmb-monitor"));
+const RankingGridPage = lazyPage(() => import("@/pages/ranking-grid"));
+const CompetitorsPage = lazyPage(() => import("@/pages/competitors"));
+const GbpContentPage = lazyPage(() => import("@/pages/gbp-content"));
+const ListingEditorPage = lazyPage(() => import("@/pages/listing-editor"));
+const DomainsPage = lazyPage(() => import("@/pages/domains"));
+const MailAlertsPage = lazyPage(() => import("@/pages/mail-alerts"));
+const PermitAlertsPage = lazyPage(() => import("@/pages/permit-alerts"));
+const LocationsPage = lazyPage(() => import("@/pages/locations"));
+const MasterClassPage = lazyPage(() => import("@/pages/master-class"));
+const ReinstatementPage = lazyPage(() => import("@/pages/reinstatement"));
+const GoogleBusinessPage = lazyPage(() => import("@/pages/google-business"));
+const AdsManagerPage = lazyPage(() => import("@/pages/ads-manager"));
+const GoogleAdsPage = lazyPage(() => import("@/pages/google-ads"));
+const GoogleAdsGuidePage = lazyPage(() => import("@/pages/google-ads-guide"));
+const GoogleAdsGuideSectionPage = lazyPage(() => import("@/pages/google-ads-guide-section"));
+const GoogleAdFraudPage = lazyPage(() => import("@/pages/google-ad-fraud"));
+const LsaGuidePage = lazyPage(() => import("@/pages/lsa-guide"));
+const LsaLeadsPage = lazyPage(() => import("@/pages/lsa-leads"));
+const DfyCataloguePage = lazyPage(() => import("@/pages/done-for-you").then((m) => ({ default: m.DfyCataloguePage })));
+const DfyPageRoute = lazyPage(() => import("@/pages/done-for-you").then((m) => ({ default: m.DfyPageRoute })));
+const SettingsPage = lazyPage(() => import("@/pages/settings"));
+const DevelopersPage = lazyPage(() => import("@/pages/developers"));
+const IpTrackerPage = lazyPage(() => import("@/pages/ip-tracker"));
+const CrmGatewayPage = lazyPage(() => import("@/pages/crm-gateway"));
+const VpnShieldPage = lazyPage(() => import("@/pages/vpn-shield"));
+const ContractSignPage = lazyPage(() => import("@/pages/contract-sign"));
+const GoogleReviewsPage = lazyPage(() => import("@/pages/google-reviews"));
+const ReviewFeedbackPage = lazyPage(() => import("@/pages/review-feedback"));
+const ReviewUnsubscribePage = lazyPage(() => import("@/pages/review-unsubscribe"));
+const PrivacyPolicyPage = lazyPage(() => import("@/pages/privacy-policy"));
+const DataDeletionPage = lazyPage(() => import("@/pages/data-deletion"));
+const TermsOfUsePage = lazyPage(() => import("@/pages/terms-of-use"));
+const CrmTermsPage = lazyPage(() => import("@/pages/crm-legal").then((m) => ({ default: m.CrmTermsPage })));
+const CrmPrivacyPage = lazyPage(() => import("@/pages/crm-legal").then((m) => ({ default: m.CrmPrivacyPage })));
+const MediaLibraryPage = lazyPage(() => import("@/pages/media-library"));
+const LsaAccountManagerPage = lazyPage(() => import("@/pages/lsa-account-manager"));
 // Pages only the CRM portal, the client portal, a customer's document link or a platform admin opens load
 // on demand, so the marketing pages (and every signed-out visitor) don't download them.
 const AdminFeaturePagesPage = lazyPage(() => import("@/pages/admin-feature-pages"));
@@ -421,6 +429,7 @@ const Ribboned = {
 
 function PublicRouter() {
   return (
+    <Suspense fallback={null}>
     <Switch>
       <Route path="/" component={LandingPage} />
       <Route path="/auth" component={AuthPage} />
@@ -493,6 +502,7 @@ function PublicRouter() {
           other unknown URL is an honest 404, never the landing page. */}
       <Route component={SignedOutFallback} />
     </Switch>
+    </Suspense>
   );
 }
 

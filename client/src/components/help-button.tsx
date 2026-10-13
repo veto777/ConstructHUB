@@ -5,7 +5,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { helpEntry, type HelpEntry, type HelpVideo } from "@shared/help/registry";
+import type { HelpEntry, HelpVideo } from "@shared/help/types";
+import { useHelpEntry } from "@/lib/use-help-entry";
 import { cn } from "@/lib/utils";
 
 /**
@@ -146,7 +147,7 @@ export function HelpButton({ k, className, tutorialsLink = true, videoOnly = fal
   /** Show "All tutorials" in the panel (off on the Tutorials page itself). */
   tutorialsLink?: boolean;
 }) {
-  const entry = helpEntry(k);
+  const entry = useHelpEntry(k);
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const [watching, setWatching] = useState(false);

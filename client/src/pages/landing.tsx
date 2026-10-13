@@ -34,7 +34,7 @@ import { FEATURES_PATH, featureIntroPath } from "@shared/feature-pages";
 import { FooterGuides } from "@/components/public-page-chrome";
 import { SocialLinks } from "@/components/social-links";
 import { DFY_PATH, dfyPageByKey, dfyPagePath } from "@shared/dfy-pages";
-import { helpEntry } from "@shared/help/registry";
+import { useHelpEntry } from "@/lib/use-help-entry";
 import { IntroVideoFrame } from "@/components/feature-landing/intro-video";
 
 /**
@@ -242,7 +242,7 @@ export default function LandingPage() {
   });
   const { data: counts } = usePermitDirectoryCounts();
   const hasVerified = typeof counts?.verifiedPortals === "number";
-  const film = helpEntry(BRAND_FILM_KEY);
+  const film = useHelpEntry(BRAND_FILM_KEY);
   // Only jurisdictions with a real permit portal behind them are counted (audit lane 6, owner 2026-10-04: the old
   // "Jurisdictions Listed" headline counted all 32,853 directory rows although only ~2% have a portal).
   const stats: { value: number | undefined; suffix?: string; label: string }[] = [

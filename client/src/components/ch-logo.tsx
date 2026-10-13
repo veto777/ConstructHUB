@@ -12,7 +12,7 @@ export function CHLogo({ height = 36, className = "" }: { height?: number; class
   return (
     <div className={`relative inline-flex items-center justify-center ${className}`}>
       <img
-        src="/chub-logo-trimmed.png"
+        src="/chub-logo-trimmed.webp"
         alt="CHUB"
         className="object-contain shrink-0"
         style={{ height }}

@@ -3,7 +3,7 @@ import { Info } from "lucide-react";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
-import { INFO_CONTENT } from "@/lib/info-content";
+import { useInfoContent } from "@/lib/use-info-content";
 import { cn } from "@/lib/utils";
 
 /**
@@ -28,7 +28,7 @@ import { cn } from "@/lib/utils";
  */
 export function InfoTip({ k, className }: { k: string; className?: string }) {
   const [open, setOpen] = useState(false);
-  const entry = INFO_CONTENT[k];
+  const entry = useInfoContent(k);
 
   useEffect(() => {
     if (!open) return;

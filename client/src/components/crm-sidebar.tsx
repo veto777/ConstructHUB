@@ -148,7 +148,7 @@ export function CrmSidebar() {
               </span>
             )}
           </div>
-          <img src="/chub-logo-trimmed.png" alt="CHUB" className="hidden w-10 max-w-none shrink-0 object-contain group-data-[collapsible=icon]:block" data-testid="img-crm-brand-mark" />
+          <img src="/chub-logo-trimmed.webp" alt="CHUB" className="hidden w-10 max-w-none shrink-0 object-contain group-data-[collapsible=icon]:block" data-testid="img-crm-brand-mark" />
           {/* The mascot stands beside the mark on every ConstructHUB sidebar; gone with the rail. */}
           <StandingGator height={56} className="ml-auto shrink-0 -my-1 group-data-[collapsible=icon]:hidden" />
         </Link>
