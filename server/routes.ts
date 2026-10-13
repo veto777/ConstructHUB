@@ -323,6 +323,8 @@ export async function registerRoutes(
   const { ensureDashboardPrefsSchema } = await import("./dashboard/prefs");
   await ensureDashboardPrefsSchema();
   registerDashboardRoutes(app, getDevUser);
+  const { registerYelpRoutes } = await import("./yelp/routes");
+  registerYelpRoutes(app, getDevUser);
   // The admins' index of the feature intro pages (/admin/feature-pages).
   const { registerFeaturePageRoutes } = await import("./feature-pages");
   registerFeaturePageRoutes(app);

@@ -129,6 +129,17 @@ function GoogleGIcon({ className }: { className?: string }) {
   );
 }
 
+function YelpIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="#d32323" aria-hidden="true">
+      <path d="M12.9 3.2c.9-.2 1.5.3 1.5 1.2l-.2 6.2c0 .9-.6 1.2-1.3.6L9.3 8.1c-.6-.5-.5-1.1 0-1.7 0 0 2.2-2.8 3.6-3.2z"/>
+      <path d="M20.5 12.8c.7.5.6 1.3-.2 1.6l-3 1.3c-.8.3-1.3-.1-1.1-.9l.8-3.3c.2-.8.9-1 1.5-.5l2 1.8z"/>
+      <path d="M17.6 19.1c.4.7-.1 1.4-.9 1.2l-3.2-.6c-.8-.2-1-.8-.4-1.3l2.4-2.2c.6-.6 1.3-.3 1.5.5l.6 2.4z"/>
+      <path d="M9.4 19.7c-.2.8-1 1-1.6.4l-2.2-2.4c-.5-.6-.3-1.2.6-1.3l3.3-.4c.9-.1 1.2.5.9 1.3l-1 2.4z"/>
+      <path d="M4.3 11.9c-.8-.3-.9-1.1-.1-1.6l5.1-3.5c.7-.5 1.3 0 1.2.8l-.7 5.9c-.1.9-.7 1.1-1.4.6l-4.1-2.2z"/>
+    </svg>
+  );
+}
 function GoogleBusinessIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" className={className} fill="none">
@@ -276,6 +287,7 @@ const googleGroups: NavGroup[] = [
 ];
 
 const googleReviewsItem = { title: "Google Reviews", url: "/google-reviews", icon: Star, logoComponent: GoogleGIcon, badge: "best" as BadgeType };
+const yelpReviewsItem = { title: "Yelp", url: "/yelp", icon: Star, logoComponent: YelpIcon, badge: "new" as BadgeType };
 
 const standaloneItems: { title: string; url: string; icon: any; logo?: string; logoComponent?: (props: { className?: string }) => JSX.Element; landingUrl?: string; badge?: BadgeType }[] = [
   // The AI Call Assistant's dashboard is a platform page (/call-assistant signed in); the CRM is a standalone
@@ -384,7 +396,7 @@ function CollapsibleNavGroup({ group, planBadgeFor = () => null }: { group: NavG
 }
 
 /** The same lists, for the tool shell's "All tools" drawer (components/seo-tool/layout.tsx) — the sidebar itself is unchanged. */
-export const APP_NAV = { permitsGroup, googleGroups, googleReviewsItem, standaloneItems, pricingGroup, shownHere };
+export const APP_NAV = { permitsGroup, googleGroups, googleReviewsItem, yelpReviewsItem, standaloneItems, pricingGroup, shownHere };
 
 /** A tool the account lacks (owner, 2026-10-10): a lock, and the entry opens the tool's landing page, not the tool. */
 function LockedBadge({ label }: { label: string }) {
@@ -546,7 +558,7 @@ export function AppSidebar({ sheet = false }: { sheet?: boolean } = {}) {
 
         {keptPermits && <SidebarSeparator />}
 
-        {(keptGoogle.length > 0 || reviewsShown) && <SidebarGroup>
+        {(keptGoogle.length > 0 || reviewsShown || true) && <SidebarGroup>
           <SidebarGroupContent>
             <div className="px-2 pb-2 text-xs font-medium text-muted-foreground">Growth</div>
             <SidebarMenu>
@@ -567,6 +579,18 @@ export function AppSidebar({ sheet = false }: { sheet?: boolean } = {}) {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  data-active={location === yelpReviewsItem.url}
+                >
+                  <Link href={yelpReviewsItem.url} data-testid="link-nav-yelp" className="flex items-center gap-2 w-full">
+                    <YelpIcon className="h-5 w-5 min-w-5 min-h-5 shrink-0" />
+                    <span>Yelp</span>
+                    <FeatureBadge type="new" label="Yelp" />
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>}

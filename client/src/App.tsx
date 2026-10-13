@@ -55,6 +55,7 @@ const InvitePage = lazyPage(() => import("@/pages/invite"));
 const CloudflarePage = lazyPage(() => import("@/pages/site-connections").then((m) => ({ default: m.CloudflarePage })));
 const SearchConsolePage = lazyPage(() => import("@/pages/site-connections").then((m) => ({ default: m.SearchConsolePage })));
 const SocialMediaPage = lazyPage(() => import("@/pages/social-media"));
+const YelpPage = lazyPage(() => import("@/pages/yelp"));
 const GuidesPage = lazyPage(() => import("@/pages/guides"));
 const TutorialsPage = lazyPage(() => import("@/pages/tutorials"));
 const SiteScanPage = lazyPage(() => import("@/pages/site-scan"));
@@ -357,6 +358,7 @@ function DashboardRouter() {
       {SHOW_COMPETITOR_INTEL && <Route path="/competitors-landing" component={CompetitorsLanding} />}
       <Route path="/master-class-landing" component={MasterClassLanding} />
       {SHOW_GOOGLE_REVIEWS && <Route path="/google-reviews" component={GoogleReviewsPage} />}
+      <Route path="/yelp" component={YelpPage} />
       {SHOW_GOOGLE_REVIEWS && <Route path="/google-reviews/reviews" component={GoogleReviewsPage} />}
       {SHOW_GOOGLE_REVIEWS && <Route path="/google-reviews/profiles" component={GoogleReviewsPage} />}
       {SHOW_GOOGLE_REVIEWS && <Route path="/google-reviews/settings" component={GoogleReviewsPage} />}
