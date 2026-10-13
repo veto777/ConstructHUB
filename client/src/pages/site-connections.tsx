@@ -724,9 +724,8 @@ export default function SiteConnections({
         </Notice>
       )}
       {/* Back from Cloudflare's consent page: the win gets its own card (owner, 2026-10-13: "larger, with a checkmark"). */}
-      {cf &&
-        new URLSearchParams(window.location.search).get("connection") ===
-          "connected" && (
+      {new URLSearchParams(window.location.search).get("connection") ===
+        "connected" && (
           <div
             role="status"
             className="g-card mb-6 flex flex-col gap-4 rounded-2xl border px-5 py-5 sm:flex-row sm:items-center"
@@ -736,9 +735,14 @@ export default function SiteConnections({
               <CheckCircle2 className="h-8 w-8 text-primary" strokeWidth={2.2} />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-lg font-semibold leading-6 g-text">Cloudflare connected</p>
+              <p className="text-lg font-semibold leading-6 g-text">
+                {cf ? "Cloudflare connected" : "Search Console connected"}
+                {config.data?.items?.[0]?.email ? <span className="font-normal g-text-2"> · {config.data.items[0].email}</span> : null}
+              </p>
               <p className="mt-1 text-sm leading-5 g-text-2">
-                Your sites appear under Sites within a minute or two. Work queue shows the import as it runs.
+                {cf
+                  ? "Your sites appear under Sites within a minute or two. Work queue shows the import as it runs."
+                  : "Your Search Console properties appear under Sites within a minute. Work queue shows the import as it runs."}
               </p>
             </div>
             <GooglePill
@@ -749,6 +753,16 @@ export default function SiteConnections({
               onClick={() => T("Sites")}
             />
           </div>
+        )}
+      {config.data && config.data.total > 0 && tab !== "Connections" &&
+        new URLSearchParams(window.location.search).get("connection") !== "connected" && (
+          <p className="mb-4 flex items-center gap-2 text-sm g-text" data-testid="connected-line">
+            <CheckCircle2 className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+            <span>
+              {cf ? "Cloudflare" : "Search Console"} connected
+              {config.data.items?.[0]?.email ? <span className="g-text-2"> · {config.data.items[0].email}{config.data.total > 1 ? ` and ${formatNumber(config.data.total - 1)} more` : ""}</span> : null}
+            </span>
+          </p>
         )}
       {/* Nothing connected yet: say so first and take them to the steps (on a phone the Sites tab's own prompt is below the fold). */}
       {config.data && !(config.data.total > 0) && tab !== "Connections" && (
@@ -1384,23 +1398,43 @@ export default function SiteConnections({
                     </GoogleList>
                   ) : (
                     <div className="py-6 space-y-3">
-                      <p className="text-sm g-text-2">
-                        No connected sites yet. Connect{" "}
-                        {cf
-                          ? "your Cloudflare account"
-                          : "Google Search Console"}{" "}
-                        first — the steps are on the Connections tab.
-                      </p>
-                      <GooglePill
-                        variant="solid"
-                        label={
-                          cf
-                            ? "Connect Cloudflare — show me how"
-                            : "Connect Search Console — show me how"
-                        }
-                        onClick={() => T("Connections")}
-                        testId="button-open-connect-steps"
-                      />
+                      {config.data && config.data.total > 0 ? (
+                        <>
+                          {/* Connected, but the account owns nothing we can list (owner, 2026-10-13: support@ had no Search Console properties). */}
+                          <p className="text-sm g-text" data-testid="text-connected-but-empty">
+                            <b>{config.data.items?.[0]?.email ?? "The connected account"}</b> is connected, but{" "}
+                            {cf
+                              ? "no zones were found in the Cloudflare accounts you shared. Add your website to Cloudflare, or connect the account that holds it, then choose Discover sites on the Connections tab."
+                              : "that Google account has no Search Console properties. Add your website at Google Search Console with this account, or add this account as a user on the existing property, then choose Discover sites on the Connections tab."}
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {!cf && (
+                              <GooglePill variant="solid" href="https://search.google.com/search-console" external label="Open Google Search Console" testId="button-open-search-console" />
+                            )}
+                            <GooglePill label="Connections" onClick={() => T("Connections")} testId="button-open-connect-steps" />
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-sm g-text-2">
+                            No connected sites yet. Connect{" "}
+                            {cf
+                              ? "your Cloudflare account"
+                              : "Google Search Console"}{" "}
+                            first — the steps are on the Connections tab.
+                          </p>
+                          <GooglePill
+                            variant="solid"
+                            label={
+                              cf
+                                ? "Connect Cloudflare — show me how"
+                                : "Connect Search Console — show me how"
+                            }
+                            onClick={() => T("Connections")}
+                            testId="button-open-connect-steps"
+                          />
+                        </>
+                      )}
                     </div>
                   )}
                   <div className="flex flex-wrap items-center gap-2">
