@@ -42,6 +42,9 @@ import { readOrder, trackOf } from "../../server/youtube/schedule";
 
 const FPS = 30, RATE = 48000;
 const FF = ["-hide_banner", "-loglevel", "error", "-y", "-threads", "4"];
+/** The CHUB signature bell (see mux.ts): on a phone cut it sits under the end card at CHIME_CUT_GAIN of full scale. */
+const CHIME = path.join(import.meta.dirname, "assets", "chub-chime.wav");
+const CHIME_CUT_GAIN = 0.5;
 const CODEC = ["-c:v", "libx264", "-profile:v", "high", "-preset", "medium", "-crf", "21", "-maxrate", "9M", "-bufsize", "18M", "-pix_fmt", "yuv420p", "-r", String(FPS), "-g", String(FPS * 2),
   "-c:a", "aac", "-b:a", "128k", "-ar", String(RATE), "-ac", "2"];
 /** No cut may weigh more than this (every platform takes far more; a phone on mobile data should not). */
@@ -282,13 +285,17 @@ async function renderCut(o: {
     `[b5][hook]overlay=x=0:y=${l.panel.y}:enable='lt(t,1.6)'[b6]`,
     `[3:v]format=rgba,fade=t=in:st=${bodyS.toFixed(3)}:d=0.25:alpha=1[end]`,
     `[b6][end]overlay=0:0:enable='gte(t,${bodyS.toFixed(3)})',format=yuv420p,setsar=1[v]`,
-    `[4:a]${tempo}${loudnorm},apad=whole_dur=${totalS.toFixed(3)},aresample=${RATE},aformat=sample_fmts=fltp:channel_layouts=stereo[a]`,
+    // The narration (speed-changed, loudness-normalised), then the CHUB signature bell at the end card, mixed in
+    // AFTER atempo/loudnorm so it is never sped up or re-levelled (owner, 2026-10-13; the same file the shorts use).
+    `[4:a]${tempo}${loudnorm},apad=whole_dur=${totalS.toFixed(3)},aresample=${RATE},aformat=sample_fmts=fltp:channel_layouts=stereo[nar]`,
+    `[5:a]aresample=${RATE},aformat=sample_fmts=fltp:channel_layouts=stereo,volume=${CHIME_CUT_GAIN},adelay=${Math.round(plan.bodyMs)}:all=1,apad=whole_dur=${totalS.toFixed(3)}[ch]`,
+    `[nar][ch]amix=inputs=2:duration=first:normalize=0[a]`,
   ].join(";\n");
   fs.writeFileSync(w(`${name}.graph`), graph);
   const still = (file: string, seconds: number) => ["-loop", "1", "-framerate", String(FPS), "-t", seconds.toFixed(3), "-i", file];
   const file = `${name}.mp4`;
   await run("ffmpeg", [
-    ...FF, "-i", o.master, ...still(`${name}-frame.png`, totalS + 1), ...still(`${name}-hook.png`, 2), ...still(`${name}-end.png`, totalS + 1), "-i", `${name}.wav`,
+    ...FF, "-i", o.master, ...still(`${name}-frame.png`, totalS + 1), ...still(`${name}-hook.png`, 2), ...still(`${name}-end.png`, totalS + 1), "-i", `${name}.wav`, "-i", CHIME,
     "-filter_complex_threads", "4", "-filter_complex_script", `${name}.graph`, "-map", "[v]", "-map", "[a]",
     ...CODEC,
     "-t", totalS.toFixed(3), "-movflags", "+faststart", o.out(file),
