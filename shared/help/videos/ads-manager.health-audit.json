@@ -1,0 +1,25 @@
+{
+  "helpKey": "ads-manager.health-audit",
+  "durationSec": 71,
+  "video": {
+    "key": "tutorials/ads-manager.health-audit.c52fe450.mp4",
+    "bytes": 6829753,
+    "sha256": "c52fe450fb2c90359436a6a5a57e40b0e11c228a690ae91ae0db643f6264db46"
+  },
+  "captions": {
+    "key": "tutorials/ads-manager.health-audit.4e8ff8c9.vtt",
+    "bytes": 1545,
+    "sha256": "4e8ff8c9aec38196797b141d63956aaac5c536215d8c2a12061e18088128baed"
+  },
+  "poster": {
+    "key": "tutorials/ads-manager.health-audit.8526163b.jpg",
+    "bytes": 81416,
+    "sha256": "8526163babcaf77301d6c0d55e9fd1f2252fd0ae0fd8fb70beda1aed3f023e6e"
+  },
+  "uploaded": {
+    "at": "2026-10-13T20:43:51.355Z",
+    "video": "2fbfc52a5f2c6877b729389bc7b56e82",
+    "captions": "664b986b118285ed9e99e76749525de6",
+    "poster": "edbc810d841e90c2b566164a7a6ccae8"
+  }
+}

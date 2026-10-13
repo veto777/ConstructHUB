@@ -1,0 +1,25 @@
+{
+  "helpKey": "ads-manager.protections-previewed",
+  "durationSec": 91,
+  "video": {
+    "key": "tutorials/ads-manager.protections-previewed.200de5d2.mp4",
+    "bytes": 7815595,
+    "sha256": "200de5d225e447bc6773d905292547cf4bfcfc3cc9c443fc37b0d5100a59b0a0"
+  },
+  "captions": {
+    "key": "tutorials/ads-manager.protections-previewed.d8180604.vtt",
+    "bytes": 2012,
+    "sha256": "d81806047c14886456f320800d38a0985264563d20f067c38dfa3f5f728269e0"
+  },
+  "poster": {
+    "key": "tutorials/ads-manager.protections-previewed.9e538617.jpg",
+    "bytes": 93757,
+    "sha256": "9e53861770522794cc059d289bab61a7aecfd1b97919bc9c1011125d98200f93"
+  },
+  "uploaded": {
+    "at": "2026-10-13T21:22:58.148Z",
+    "video": "a6c7c7830c4884a3efb3e92bb306e8e0",
+    "captions": "07ba427702e632517e2920303d2ae53f",
+    "poster": "80e5618c455e431260732c73a3667c85"
+  }
+}

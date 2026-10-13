@@ -22,7 +22,7 @@
       "narration": "Close it." },
     { "action": "click", "selector": "[data-testid=\"subnav-ads-manager-findings\"]", "caption": "Health audit", "chapter": "LSA findings",
       "narration": "The health audit has Local Services checks too." },
-    { "action": "type", "selector": "input[aria-label=\"Search accounts or records\"]", "value": "leads", "caption": "Search: leads",
+    { "action": "type", "selector": "input[aria-label=\"Search accounts or records\"]", "value": "leads", "caption": "Search: leads", "holdMs": 1500,
       "narration": "Search for leads." },
     { "action": "highlight", "selector": "[data-testid=\"ads-row\"]:has-text(\"charged leads\")", "caption": "Charged leads to review",
       "narration": "Three charged leads still need feedback. Unrated doesn't mean invalid, or eligible for credit." },
