@@ -9,7 +9,7 @@
     { "action": "goto", "url": "/locations?location=910001&tab=services", "caption": "Services", "chapter": "Every service on the listing",
       "narration": "Services lists every service and category on this listing, as Google has them." },
     { "action": "highlight", "selector": "[data-testid=\"badge-service-count\"]", "caption": "The count",
-      "narration": "The badge counts the services: fourteen here." },
+      "narration": "The badge counts the services on the listing: fourteen here, all synced from Google." },
     { "action": "highlight", "selector": "[data-testid=\"service-categories\"]", "caption": "Categories, primary marked", "chapter": "Primary category",
       "narration": "Categories come first, with the primary category marked: Roofing contractor here." },
     { "action": "highlight", "selector": "[data-testid=\"service-row-0\"]", "caption": "One service per row",

@@ -136,3 +136,6 @@ export { default as v_intro_vpn_shield } from "./intro-vpn-shield.json";
 export { default as v_jobcam } from "./jobcam.json";
 export { default as v_locations_google_performance_kept } from "./locations.google-performance-kept.json";
 export { default as v_locations } from "./locations.json";
+export { default as v_locations_photos_and_videos } from "./locations.photos-and-videos.json";
+export { default as v_locations_profile_details_at_a_glance } from "./locations.profile-details-at-a-glance.json";
+export { default as v_locations_services_and_categories } from "./locations.services-and-categories.json";
