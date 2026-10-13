@@ -534,7 +534,7 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
       )}
       {tab === "calendar" && <SocialWeek full businessId={businessId} all={all} business={all ? "all" : String(businessId)} />}
       {!all && tab === "accounts" && data?.native && (
-        <SocialConnect via="native" businessId={businessId} networks={data.native.networks} accounts={data?.provider === "native" ? accounts : []} connected={data?.provider === "native" && !!data?.connected} />
+        <SocialConnect via="native" blueskyAuth={data.native.blueskyAuth} businessId={businessId} networks={data.native.networks} accounts={data?.provider === "native" ? accounts : []} connected={data?.provider === "native" && !!data?.connected} />
       )}
       {!all && (tab === "overview" || view === "analytics") && data?.native && data?.provider === "native" && accounts.length > 0 && <SocialAccountStats businessId={businessId} />}
       {!all && tab === "accounts" && !data?.native && data?.outstand && (

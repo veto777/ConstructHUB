@@ -325,7 +325,7 @@ export async function deletePost(client: NativeClient, submissionId: string): Pr
   if (api === "tiktok") throw new SocialError("TikTok doesn't let apps delete videos; delete it in the TikTok app.");
   if (!sub.external_id) throw new SocialError(`The network didn't return this post's ID; delete it on ${network}.`);
   if (api === "x") await xDelete(token, sub.external_id);
-  else if (api === "bluesky") await blueskyDelete(row.external_id, token, sub.external_id);
+  else if (api === "bluesky") { if (row.oauth_enc) await client.blueskyOauthDeletePost(row, sub.external_id); else await blueskyDelete(row.external_id, token, sub.external_id); }
   else if (api === "pinterest") await pinterestDelete(token, sub.external_id);
   else await g(api === "threads" ? "threads" : api === "ig_login" ? "ig_login" : "meta", "DELETE", sub.external_id, {}, token);
   await pool.query("UPDATE social_native_submissions SET stage='deleted',updated_at=now() WHERE tenant=$1 AND id=$2", [client.tenant, sub.id]);

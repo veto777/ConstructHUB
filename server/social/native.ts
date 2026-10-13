@@ -24,6 +24,7 @@ import { SocialError } from "./client";
 import { isPlatformAdmin } from "../admin";
 import type { PostPayload, SocialAccount, SocialClient, StatusResult, SubmitResult, UploadStart } from "./provider";
 import { netConfigured, netExchange, netPublish, netRead, netRefresh, needsRefresh, netScopes, tiktokCreatorInfo, tiktokRevoke, blueskyLogin, pinterestBoards, type CreatorInfo, type NetApi } from "./native-nets";
+import { blueskyOauthConfigured, blueskyOauthRefresh, blueskyOauthPublish, blueskyOauthDelete, oauthNeedsRefresh, type OauthSession } from "./bluesky-oauth";
 
 export const NATIVE_MARK = "native:";
 export const GRAPH = "https://graph.facebook.com/v25.0";
@@ -39,7 +40,7 @@ export function nativeNetworks(env: NodeJS.ProcessEnv = process.env): string[] {
     ...(netConfigured("threads", env) ? ["threads"] : []),
     ...(netConfigured("tiktok", env) ? ["tiktok"] : []),
     ...(netConfigured("x", env) ? ["x"] : []),
-    ...(netConfigured("bluesky", env) ? ["bluesky"] : []),
+    ...(netConfigured("bluesky", env) || blueskyOauthConfigured(env) ? ["bluesky"] : []),
     ...(netConfigured("pinterest", env) ? ["pinterest"] : []),
   ];
 }
@@ -103,6 +104,8 @@ export const ensureNativeSchema = async () => {
   await pool.query("ALTER TABLE social_native_accounts ADD COLUMN IF NOT EXISTS refresh_enc text");
   // Who connected it (Meta app-scoped user id): a data-deletion callback names the person, not the Page.
   await pool.query("ALTER TABLE social_native_accounts ADD COLUMN IF NOT EXISTS owner_user_id text");
+  // Bluesky "Sign in with Bluesky" (OAuth/DPoP): the per-connection DPoP key + token endpoint + PDS, encrypted. Present = OAuth mode.
+  await pool.query("ALTER TABLE social_native_accounts ADD COLUMN IF NOT EXISTS oauth_enc text");
   await pool.query(`CREATE TABLE IF NOT EXISTS social_native_pending (
     session text PRIMARY KEY,
     tenant text NOT NULL,
@@ -258,13 +261,13 @@ export async function nativeFinalize(session: string, tenant: string, userId: nu
 }
 
 async function upsertAccount(tenant: string, platform: string, externalId: string, name: string, picture: string | null, parentId: string | null, token: string,
-  more: { api?: string; refresh?: string | null; expiresAt?: Date | null; scopes?: string[]; owner?: string | null } = {}) {
+  more: { api?: string; refresh?: string | null; expiresAt?: Date | null; scopes?: string[]; owner?: string | null; oauthEnc?: string | null } = {}) {
   await pool.query(
-    `INSERT INTO social_native_accounts(id,tenant,platform,external_id,name,picture,parent_id,token_enc,scopes,api,refresh_enc,token_expires_at,owner_user_id)
-     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-     ON CONFLICT(tenant,platform,external_id) DO UPDATE SET name=$5,picture=$6,parent_id=$7,token_enc=$8,scopes=$9,api=$10,refresh_enc=$11,token_expires_at=$12,owner_user_id=COALESCE($13,social_native_accounts.owner_user_id),needs_reconnect=false,last_error=null,updated_at=now()`,
+    `INSERT INTO social_native_accounts(id,tenant,platform,external_id,name,picture,parent_id,token_enc,scopes,api,refresh_enc,token_expires_at,owner_user_id,oauth_enc)
+     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+     ON CONFLICT(tenant,platform,external_id) DO UPDATE SET name=$5,picture=$6,parent_id=$7,token_enc=$8,scopes=$9,api=$10,refresh_enc=$11,token_expires_at=$12,owner_user_id=COALESCE($13,social_native_accounts.owner_user_id),oauth_enc=$14,needs_reconnect=false,last_error=null,updated_at=now()`,
     [randomUUID(), tenant, platform, externalId, name.slice(0, 200), picture, parentId, enc(token), JSON.stringify(more.scopes ?? META_SCOPES),
-     more.api ?? "meta", more.refresh ? enc(more.refresh) : null, more.expiresAt ?? null, more.owner ?? null]);
+     more.api ?? "meta", more.refresh ? enc(more.refresh) : null, more.expiresAt ?? null, more.owner ?? null, more.oauthEnc ?? null]);
 }
 
 /** Back from Instagram login, Threads or TikTok: the signed-in account is connected straight away (no page to pick). */
@@ -278,6 +281,12 @@ export async function nativeBlueskyConnect(tenant: string, handle: string, appPa
   const s = await blueskyLogin(handle, appPassword);
   await upsertAccount(tenant, "bluesky", s.externalId, s.name, s.picture, null, s.token, { api: "bluesky", refresh: s.refresh, expiresAt: s.expiresAt, scopes: s.scopes, owner: s.externalId });
   return { name: s.name };
+}
+/** "Sign in with Bluesky" (OAuth): store the DPoP-bound tokens plus the DPoP key / token endpoint / PDS (oauth_enc) that publishing needs. */
+export async function nativeBlueskyOauthConnect(tenant: string, ex: { externalId: string; name: string; picture: string | null; token: string; refresh: string | null; expiresAt: Date | null; scopes: string[]; dpopPriv: any; dpopPub: any; tokenEndpoint: string; pds: string }): Promise<{ name: string }> {
+  const oauthEnc = enc(JSON.stringify({ dpopPriv: ex.dpopPriv, dpopPub: ex.dpopPub, tokenEndpoint: ex.tokenEndpoint, pds: ex.pds }));
+  await upsertAccount(tenant, "bluesky", ex.externalId, ex.name, ex.picture, null, ex.token, { api: "bluesky", refresh: ex.refresh, expiresAt: ex.expiresAt, scopes: ex.scopes, owner: ex.externalId, oauthEnc });
+  return { name: ex.name };
 }
 export const netScopesFor = netScopes;
 
@@ -317,7 +326,7 @@ export async function removeTikTokOpenId(openId: string): Promise<number> {
 
 // ── publishing ──────────────────────────────────────────────────────────────────────────────────────────────
 
-export type NativeRow = { id: string; platform: string; external_id: string; name: string; parent_id: string | null; token_enc: string; needs_reconnect: boolean; api: string; refresh_enc: string | null; token_expires_at: Date | null };
+export type NativeRow = { id: string; platform: string; external_id: string; name: string; parent_id: string | null; token_enc: string; needs_reconnect: boolean; api: string; refresh_enc: string | null; token_expires_at: Date | null; oauth_enc: string | null };
 type Row = NativeRow;
 type Sub = { id: string; account_id: string; platform: string; stage: string; container_id: string | null; external_id: string | null; public_url: string | null; error: string | null; attempts: number };
 
@@ -359,11 +368,11 @@ export class NativeClient implements SocialClient {
     this.hash = createHash("sha256").update(`native:${tenant}`).digest("hex");
   }
   private async rows(): Promise<Row[]> {
-    const { rows } = await pool.query("SELECT id,platform,external_id,name,parent_id,token_enc,needs_reconnect,api,refresh_enc,token_expires_at FROM social_native_accounts WHERE tenant=$1 ORDER BY platform,name", [this.tenant]);
+    const { rows } = await pool.query("SELECT id,platform,external_id,name,parent_id,token_enc,needs_reconnect,api,refresh_enc,token_expires_at,oauth_enc FROM social_native_accounts WHERE tenant=$1 ORDER BY platform,name", [this.tenant]);
     return rows;
   }
   private async row(id: string): Promise<Row> {
-    const { rows: [r] } = await pool.query("SELECT id,platform,external_id,name,parent_id,token_enc,needs_reconnect,api,refresh_enc,token_expires_at FROM social_native_accounts WHERE tenant=$1 AND id=$2", [this.tenant, id]);
+    const { rows: [r] } = await pool.query("SELECT id,platform,external_id,name,parent_id,token_enc,needs_reconnect,api,refresh_enc,token_expires_at,oauth_enc FROM social_native_accounts WHERE tenant=$1 AND id=$2", [this.tenant, id]);
     if (!r) throw new SocialError("That social account is no longer connected; reconnect it", 409);
     return r;
   }
@@ -401,6 +410,24 @@ export class NativeClient implements SocialClient {
   }
   private async markReconnect(accountId: string, e: unknown) {
     if ((e as any)?.reconnect) await pool.query("UPDATE social_native_accounts SET needs_reconnect=true,last_error=$3,updated_at=now() WHERE tenant=$1 AND id=$2", [this.tenant, accountId, String((e as Error).message).slice(0, 300)]);
+  }
+  /** A ready-to-use Bluesky OAuth session (DPoP key + tokens), refreshed and persisted when the access token is near expiry. */
+  private async oauthSession(acct: Row): Promise<OauthSession> {
+    if (!acct.oauth_enc) throw new SocialError("That isn't a Bluesky sign-in", 400);
+    const meta = JSON.parse(dec(acct.oauth_enc)) as { dpopPriv: any; dpopPub: any; tokenEndpoint: string; pds: string };
+    let s: OauthSession = { accessToken: dec(acct.token_enc), refresh: acct.refresh_enc ? dec(acct.refresh_enc) : null, dpop: { priv: meta.dpopPriv, pub: meta.dpopPub }, tokenEndpoint: meta.tokenEndpoint, pds: meta.pds, did: acct.external_id, expiresAt: acct.token_expires_at ? new Date(acct.token_expires_at) : null };
+    if (oauthNeedsRefresh(s.expiresAt)) {
+      const f = await blueskyOauthRefresh(s);
+      await pool.query("UPDATE social_native_accounts SET token_enc=$3,refresh_enc=$4,token_expires_at=$5,updated_at=now() WHERE tenant=$1 AND id=$2",
+        [this.tenant, acct.id, enc(f.accessToken), f.refresh ? enc(f.refresh) : acct.refresh_enc, f.expiresAt]);
+      s = { ...s, accessToken: f.accessToken, refresh: f.refresh, expiresAt: f.expiresAt };
+    }
+    return s;
+  }
+  /** Delete a Bluesky OAuth post (insights.ts routes bluesky-oauth rows here instead of the bearer deleteRecord). */
+  async blueskyOauthDeletePost(row: NativeRow, uri: string): Promise<void> {
+    try { await blueskyOauthDelete(await this.oauthSession(row), uri); }
+    catch (e) { await this.markReconnect(row.id, e); throw e; }
   }
   // ── for stats, comments and deleting (./insights.ts) ──
   /** Every connected account of this connection. */
@@ -445,12 +472,26 @@ export class NativeClient implements SocialClient {
     if (seen) return { submissionId: seen.id };   // never send the same post twice
     const acct = await this.row(payload.post.accountId);
     if (acct.needs_reconnect) throw new SocialError("This account's sign-in has expired; reconnect it under Connected accounts", 409);
-    const token = await this.token(acct);
     const text = payload.post.content.text ?? "";
     const media = (payload.post.content.mediaUrls ?? []).filter((u) => /^https:\/\//.test(u));
     const id = `nat_${randomUUID()}`;
     await pool.query("INSERT INTO social_native_submissions(id,idem_key,tenant,account_id,platform,stage) VALUES($1,$2,$3,$4,$5,'sending')",
       [id, key, this.tenant, acct.id, acct.platform]);
+    // Bluesky "Sign in with Bluesky" (OAuth/DPoP): its own publish path — the generic bearer path can't speak DPoP.
+    if (acct.api === "bluesky" && acct.oauth_enc) {
+      try {
+        const s = await this.oauthSession(acct);
+        const p = await blueskyOauthPublish(s, text, media, acct.name);
+        await this.setSub(id, { stage: p.stage, external_id: p.external ?? null, public_url: p.url ?? null });
+      } catch (e) {
+        await this.markReconnect(acct.id, e);
+        const { rows: [row] } = await pool.query("SELECT stage FROM social_native_submissions WHERE id=$1", [id]);
+        if (row?.stage === "sending") await pool.query("DELETE FROM social_native_submissions WHERE id=$1", [id]);
+        throw e;
+      }
+      return { submissionId: id };
+    }
+    const token = await this.token(acct);
     try {
       if (acct.api !== "meta") {
         const p = await netPublish(acct.api as NetApi, acct.external_id, token, text, media, { ...payload.post.target, xUsername: acct.name, blueskyHandle: acct.name });

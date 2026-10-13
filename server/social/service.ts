@@ -15,7 +15,8 @@ import {
 } from "../../shared/social";
 import { encryptKey, SocialError, socialMisconfigured } from "./client";
 import { CONNECTABLE, OUTSTAND_MARK, OutstandClient, outstandConfigured, tenantFor, type Connectable } from "./outstand";
-import { NATIVE_MARK, NativeClient, nativeNetworks, newOAuthState, oauthStateMatches, metaAuthUrl, metaPagesFromCode, savePending, nativePendingList, nativeFinalize as nativeSave, removeNativeAccounts, NETWORK_API, nativeNetConnect, nativeBlueskyConnect, type PendingOAuth } from "./native";
+import { NATIVE_MARK, NativeClient, nativeNetworks, newOAuthState, oauthStateMatches, metaAuthUrl, metaPagesFromCode, savePending, nativePendingList, nativeFinalize as nativeSave, removeNativeAccounts, NETWORK_API, nativeNetConnect, nativeBlueskyConnect, nativeBlueskyOauthConnect, type PendingOAuth } from "./native";
+import { blueskyOauthConfigured, blueskyAuthorizeUrl, blueskyExchange, type PendingBsky } from "./bluesky-oauth";
 import { netAuthUrl, type NetApi } from "./native-nets";
 import {
   clientFactory, connectionProvider, LEGACY_CONNECTION, userLock, ownedBusiness, connection, validateDestinations, destinationFromPayload, destinationKey, requestFingerprint, insertPosts, createPosts,
@@ -195,6 +196,44 @@ export async function nativeBlueskyLogin(userId: number, businessId: number | nu
     return s.name;
   });
   return { ...(await nativeRefresh(userId, businessId)), name };
+}
+
+/** "Sign in with Bluesky" (OAuth) start: make the native connection ours, push the authorization request, keep the pending state in the session, and return where to send the browser. */
+export async function nativeBlueskyConnectUrl(userId: number, businessId: number | null, handle: string, req: any): Promise<{ authUrl: string }> {
+  if (!blueskyOauthConfigured()) throw new SocialError("Bluesky sign-in isn't available here; use an app password instead", 409);
+  return userLock(userId, async () => {
+    await ownedBusiness(userId, businessId);
+    const { rows: [r] } = await pool.query("SELECT key_enc FROM social_connections WHERE user_id=$1 AND business_id IS NOT DISTINCT FROM $2", [userId, businessId]);
+    if (connectionProvider(r?.key_enc, userId) !== "native") {
+      await pool.query(
+        `INSERT INTO social_connections(user_id,key_enc,accounts,business_id) VALUES($1,$2,'[]',$3) ON CONFLICT(user_id,business_id) DO UPDATE SET key_enc=$2,accounts='[]',updated_at=now()`,
+        [userId, encryptKey(NATIVE_MARK + tenantFor(userId, businessId), userId), businessId]);
+      await logActivity(req, userId, "social.connected", { provider: "native" });
+    }
+    const { authUrl, pending } = await blueskyAuthorizeUrl(handle);
+    req.session.socialBlueskyOAuth = { ...pending, userId, businessId };
+    return { authUrl };
+  });
+}
+
+/** Back from Bluesky's sign-in: exchange the code for DPoP-bound tokens and store the account. Returns where to send the browser. */
+export async function nativeBlueskyOauthCallback(req: any, userId: number): Promise<string> {
+  const pending: (PendingBsky & { userId: number; businessId: number | null }) | undefined = req.session.socialBlueskyOAuth;
+  delete req.session.socialBlueskyOAuth;
+  const business = pending?.businessId ?? null;
+  const back = (q: string) => `/social-media/accounts?business=${business ?? "all"}&${q}`;
+  if (!pending || pending.userId !== userId || pending.expires < Date.now() || req.query?.state !== pending.state) return back("connect_error=expired");
+  if (typeof req.query?.error === "string" || typeof req.query?.code !== "string") return back("connect_error=cancelled");
+  try {
+    const ex = await blueskyExchange(pending, req.query.code);
+    await nativeBlueskyOauthConnect(tenantFor(userId, business), ex);
+    await nativeRefresh(userId, business);
+    await logActivity(req, userId, "social.pages_connected", { provider: "native", network: "bluesky" });
+    return back("connected=bluesky");
+  } catch (e) {
+    console.warn("[social] bluesky oauth sign-in failed:", (e as Error)?.message);
+    return back("connect_error=failed");
+  }
 }
 
 /** The connected accounts as stored now (kept boards are carried over). */

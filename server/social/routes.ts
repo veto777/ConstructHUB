@@ -30,8 +30,11 @@ import {
   nativePending,
   nativeFinalize,
   nativeBlueskyLogin,
+  nativeBlueskyConnectUrl,
+  nativeBlueskyOauthCallback,
 } from "./service";
 import { CONNECTABLE, outstandConfigured, webhookSigned } from "./outstand";
+import { blueskyOauthConfigured, blueskyClientMetadata, blueskyJwks } from "./bluesky-oauth";
 import { NativeClient, nativeNetworksFor, receiveUpload, NATIVE_UPLOAD_MAX_BYTES } from "./native";
 import { accountStats, postStats, comments as postComments, replyComment, hideComment, deleteComment, deletePost } from "./insights";
 import { putToR2Key } from "../r2";
@@ -216,7 +219,7 @@ export function registerSocialRoutes(
       boards:a.boards?.filter((p:any)=>mappings.some((d:any)=>d.accountId===a.id&&d.boardId===p.id))})) : (c?.accounts||[]).slice(0,25);
     // A connection we cannot use (unreadable, or a legacy key: LEGACY_CONNECTION) shows as not connected; setupProblem says why.
     const provider=connectionProvider(c?.key_enc,id);
-    res.json({setupProblem:socialSetupProblem(c?.key_enc,id),provider,outstand:outstandConfigured()?{networks:CONNECTABLE}:null,native:nativeNetworksFor(req.user).length?{networks:nativeNetworksFor(req.user)}:null,connected:!!c&&!!provider,agencyConnected:!!connections?.agency,businessConnected:!!connections?.business,connectionScope:c?.business_id?'business':'agency',accounts:provider?accounts:[],settings:s?.settings||autoSchema.parse({}),
+    res.json({setupProblem:socialSetupProblem(c?.key_enc,id),provider,outstand:outstandConfigured()?{networks:CONNECTABLE}:null,native:nativeNetworksFor(req.user).length?{networks:nativeNetworksFor(req.user),blueskyAuth:blueskyOauthConfigured()?'oauth':'app_password'}:null,connected:!!c&&!!provider,agencyConnected:!!connections?.agency,businessConnected:!!connections?.business,connectionScope:c?.business_id?'business':'agency',accounts:provider?accounts:[],settings:s?.settings||autoSchema.parse({}),
       nextAt:s?.next_at,lastError:s?.last_error,posts:posts.map(publicPost),total:count.total,defaults:mappings,sourcesSync:config,
       business:businessId?await ownedBusiness(id,businessId):null});
   };
@@ -246,6 +249,13 @@ export function registerSocialRoutes(
     const { handle, appPassword } = z.object({ handle: z.string().trim().min(3).max(260), appPassword: z.string().trim().min(16).max(40) }).strict().parse(req.body);
     if (!nativeNetworksFor(req.user).includes("bluesky")) throw new SocialError("That network can't be connected here yet");
     res.json(await nativeBlueskyLogin(id, businessId, handle, appPassword, req));
+  });
+  // "Sign in with Bluesky" (OAuth): the handle is all we need up front — we discover the account's server and send the
+  // customer there to approve; they come back through /api/social/bluesky/callback (docs/social-apps/bluesky.md).
+  route("post", "/native/bluesky/connect", async (req, res, id, businessId) => {
+    const { handle } = z.object({ handle: z.string().trim().min(3).max(260) }).strict().parse(req.body);
+    if (!nativeNetworksFor(req.user).includes("bluesky")) throw new SocialError("That network can't be connected here yet");
+    res.json(await nativeBlueskyConnectUrl(id, businessId, handle, req));
   });
   route("post", "/native/refresh", async (_req, res, id, businessId) => res.json(await nativeRefresh(id, businessId)));
   // Stats, comments and deleting (./insights.ts) — for accounts connected through ConstructHUB Direct, admins only
@@ -325,6 +335,15 @@ export function registerSocialRoutes(
       res.redirect(302, await nativeNetCallback(req, user.id, api));
     });
   }
+  // AT Protocol OAuth: the client-metadata document (its URL is the client_id) and the app's public key, both public.
+  app.get("/api/social/bluesky/client-metadata.json", (_req: Request, res: Response) => { res.setHeader("Cache-Control", "public, max-age=300"); res.json(blueskyClientMetadata()); });
+  app.get("/api/social/bluesky/jwks.json", (_req: Request, res: Response) => { res.setHeader("Cache-Control", "public, max-age=300"); res.json(blueskyJwks()); });
+  // Back from "Sign in with Bluesky" (the redirect_uri in the client metadata).
+  app.get("/api/social/bluesky/callback", async (req: Request, res: Response) => {
+    const user = auth(req, res); if (!user) return;
+    res.setHeader("Cache-Control", "no-store");
+    res.redirect(302, await nativeBlueskyOauthCallback(req, user.id));
+  });
   // The composer's file goes through us to our storage; the networks fetch it from its public address.
   app.put("/api/social/native/upload/:token", (req: Request, res: Response, next: () => void) => { if (auth(req, res)) next(); },
     express.raw({ type: () => true, limit: NATIVE_UPLOAD_MAX_BYTES }), async (req: Request, res: Response) => {

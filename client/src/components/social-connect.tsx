@@ -28,38 +28,44 @@ const BLUESKY_APP_PASSWORDS = "https://bsky.app/settings/app-passwords";
 
 type Account = { id: string; platform: string; name: string };
 
-/** Bluesky has no sign-in page: the handle and an app password open the session on our server (POST …/native/bluesky/login). */
-function BlueskyForm({ api, scope, onDone, onCancel }: { api: string; scope: string; onDone: (name: string) => void; onCancel: () => void }) {
+/**
+ * Bluesky connect. OAuth ("Sign in with Bluesky"): just the handle → we send them to Bluesky to approve (POST
+ * …/native/bluesky/connect → redirect). App-password fallback: handle + an app password (POST …/native/bluesky/login).
+ */
+function BlueskyForm({ api, scope, mode, onDone, onCancel }: { api: string; scope: string; mode: "oauth" | "app_password"; onDone: (name: string) => void; onCancel: () => void }) {
   const [handle, setHandle] = useState("");
   const [appPassword, setAppPassword] = useState("");
-  const login = useMutation({
-    mutationFn: async () => (await apiRequest("POST", `${api}/bluesky/login${scope}`, { handle: handle.trim(), appPassword: appPassword.trim() })).json() as Promise<{ accounts: Account[]; name: string }>,
-    onSuccess: (d) => onDone(d.name),
+  const oauth = mode === "oauth";
+  const start = useMutation({
+    mutationFn: async () => (await apiRequest("POST", oauth ? `${api}/bluesky/connect${scope}` : `${api}/bluesky/login${scope}`,
+      oauth ? { handle: handle.trim() } : { handle: handle.trim(), appPassword: appPassword.trim() })).json() as Promise<{ authUrl?: string; accounts?: Account[]; name?: string }>,
+    onSuccess: (d) => { if (oauth && d.authUrl) window.location.assign(d.authUrl); else onDone(d.name ?? "Bluesky"); },
   });
-  const ready = handle.trim().length >= 3 && /^[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}$/i.test(appPassword.trim());
+  const ready = handle.trim().length >= 3 && (oauth || /^[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}$/i.test(appPassword.trim()));
   return (
-    <form className="mb-4 rounded-lg border p-4" data-testid="social-bluesky-form" onSubmit={(e) => { e.preventDefault(); if (ready && !login.isPending) login.mutate(); }}>
+    <form className="mb-4 rounded-lg border p-4" data-testid="social-bluesky-form" onSubmit={(e) => { e.preventDefault(); if (ready && !start.isPending) start.mutate(); }}>
       <p className="mb-1 text-sm font-medium">Connect Bluesky</p>
       <p className="mb-3 text-xs text-muted-foreground">
-        Bluesky signs in with an <strong>app password</strong>, not your main password. Make one at{" "}
-        <a className="underline" href={BLUESKY_APP_PASSWORDS} target="_blank" rel="noreferrer">bsky.app/settings/app-passwords</a> (any name, leave “Allow access to your direct messages” off), then paste it here.
-        It is used once to open the session and is not kept.
+        {oauth
+          ? <>Enter your Bluesky handle and we’ll send you to Bluesky to approve ConstructHUB. Nothing to paste — you sign in on Bluesky’s own page.</>
+          : <>Bluesky signs in with an <strong>app password</strong>, not your main password. Make one at{" "}
+            <a className="underline" href={BLUESKY_APP_PASSWORDS} target="_blank" rel="noreferrer">bsky.app/settings/app-passwords</a> (any name, leave “Allow access to your direct messages” off), then paste it here. It is used once and not kept.</>}
       </p>
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className={`grid gap-2 ${oauth ? "" : "sm:grid-cols-2"}`}>
         <Input aria-label="Bluesky handle" placeholder="yourbusiness.bsky.social" autoComplete="off" value={handle} onChange={(e) => setHandle(e.target.value)} data-testid="input-bluesky-handle" />
-        <Input aria-label="Bluesky app password" placeholder="abcd-efgh-ijkl-mnop" autoComplete="off" type="password" value={appPassword} onChange={(e) => setAppPassword(e.target.value)} data-testid="input-bluesky-app-password" />
+        {!oauth && <Input aria-label="Bluesky app password" placeholder="abcd-efgh-ijkl-mnop" autoComplete="off" type="password" value={appPassword} onChange={(e) => setAppPassword(e.target.value)} data-testid="input-bluesky-app-password" />}
       </div>
-      {login.isError && <p className="mt-2 text-sm text-destructive">{apiErrorMessage(login.error)}</p>}
+      {start.isError && <p className="mt-2 text-sm text-destructive">{apiErrorMessage(start.error)}</p>}
       <div className="mt-3 flex gap-2">
-        <GooglePill label={login.isPending ? "Connecting…" : "Connect Bluesky"} disabled={!ready || login.isPending} onClick={() => login.mutate()} testId="button-bluesky-connect" />
-        <GooglePill variant="quiet" label="Cancel" disabled={login.isPending} onClick={onCancel} />
+        <GooglePill label={start.isPending ? (oauth ? "Opening Bluesky…" : "Connecting…") : (oauth ? "Continue to Bluesky" : "Connect Bluesky")} disabled={!ready || start.isPending} onClick={() => start.mutate()} testId="button-bluesky-connect" />
+        <GooglePill variant="quiet" label="Cancel" disabled={start.isPending} onClick={onCancel} />
       </div>
     </form>
   );
 }
 
 /** `via`: "native" = ConstructHUB's own apps (server/social/native.ts); "outstand" = the Outstand account. */
-export function SocialConnect({ businessId, networks, accounts, connected, via = "outstand" }: { businessId: number | null; networks: readonly string[]; accounts: Account[]; connected: boolean; via?: "outstand" | "native" }) {
+export function SocialConnect({ businessId, networks, accounts, connected, via = "outstand", blueskyAuth = "app_password" }: { businessId: number | null; networks: readonly string[]; accounts: Account[]; connected: boolean; via?: "outstand" | "native"; blueskyAuth?: "oauth" | "app_password" }) {
   const api = `/api/social/${via}`;
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -139,7 +145,7 @@ export function SocialConnect({ businessId, networks, accounts, connected, via =
         </div>
       )}
       {bluesky && via === "native" && (
-        <BlueskyForm api={api} scope={scope}
+        <BlueskyForm api={api} scope={scope} mode={blueskyAuth}
           onDone={(name) => { setBluesky(false); refresh(); toast({ title: "Bluesky connected", description: `${name} is connected for this business.` }); }}
           onCancel={() => setBluesky(false)} />
       )}
