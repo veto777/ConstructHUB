@@ -35,6 +35,7 @@ import path from "path";
 import type { AddressInfo } from "net";
 import type { Server } from "http";
 import { chromium, type Browser } from "playwright-core";
+import Beasties from "beasties";
 import { MARKETING_ROUTES, canonicalPath, faqPageJsonLd, seoHeadFor, type JsonLd } from "../shared/seo";
 import { withSeoHead } from "../server/seo-html";
 import { PRERENDER_DIR } from "../server/static";
@@ -154,6 +155,11 @@ export async function prerenderMarketingPages(opts: {
   fs.rmSync(path.join(publicDir, PRERENDER_DIR), { recursive: true, force: true });
 
   const server = await startShellServer(publicDir, shell, apiCalls);
+  // The page's own CSS rides inline (2026-10-13): a phone on a slow connection paints a prerendered page as
+  // soon as the HTML lands instead of after another round trip for the 295 KB stylesheet. Beasties keeps the
+  // rules the page's markup uses and turns the stylesheet link into a deferred one (the full sheet still loads
+  // for everything React adds later). Fonts stay out; the sheet on disk is left whole.
+  const critical = new Beasties({ path: publicDir, publicPath: "/", preload: "media", pruneSource: false, inlineFonts: false, reduceInlineStyles: false, logLevel: "warn" });
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   let browser: Browser | null = null;
   try {
@@ -169,7 +175,8 @@ export async function prerenderMarketingPages(opts: {
           const extra = !hasFaq && faq.length ? [faqPageJsonLd(faq)].filter((n): n is JsonLd => n !== null) : [];
           const file = prerenderFile(publicDir, route);
           fs.mkdirSync(path.dirname(file), { recursive: true });
-          fs.writeFileSync(file, composePage(shell, route, `${banner ? consentSlot(banner) : ""}${html}`, extra));
+          const page = composePage(shell, route, `${banner ? consentSlot(banner) : ""}${html}`, extra);
+          fs.writeFileSync(file, await critical.process(page).catch((err: unknown) => { log(`  critical CSS skipped for ${route}: ${String((err as Error)?.message ?? err).split("\n")[0]}`); return page; }));
           result.written.push(route);
         } catch (err: any) {
           result.failed.push({ route, reason: String(err?.message ?? err).split("\n")[0] });
