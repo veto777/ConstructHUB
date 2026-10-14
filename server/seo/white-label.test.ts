@@ -614,7 +614,9 @@ describe("the vendor is not named in anything shipped to the browser", () => {
    * "Data source" card (client/src/pages/seo/shell.tsx DataSourceCard) prints `admin.vendor` from
    * the admin-only API block, so even the admin bundle does not carry the name.
    */
-  const ALLOWED: string[] = [];
+  // State agency data: "DFS" there is a real agency acronym (Division of Fire Safety, Department of Financial
+  // Services), not the vendor. Government data is never edited to suit a test (CLAUDE.md: never fabricate).
+  const ALLOWED: string[] = ["shared/compliance/state-agencies.json"];
   const root = path.resolve(import.meta.dirname, "../..");
   const TEXT = /\.(tsx?|jsx?|mjs|cjs|css|html?|json|md|mdx|txt|svg|xml|webmanifest)$/i;
   const walk = (dir: string): string[] => !fs.existsSync(dir) ? [] : fs.readdirSync(dir, { withFileTypes: true }).flatMap((d) =>
