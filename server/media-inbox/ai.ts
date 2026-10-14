@@ -135,33 +135,97 @@ export async function decide(thread: ThreadMessage[], env: NodeJS.ProcessEnv = p
 }
 
 const NEXT_STEP_SYSTEM = `You read automatic replies (auto-responders) that companies sent to the ConstructHUB Media Team after we asked
-about a listings, content or news partnership. Nobody answers an auto-reply, but it often says what to do next: fill in a
-form, use another address, submit through a portal, wait a number of days.
-Return JSON only: {"next_step": string|null, "link": string|null, "contact": string|null, "summary": string}
+about a listings, content or news partnership. We are a software company: we want a free partnership, a partner or agency
+program, API or bulk-upload access, or a way to submit editorial content. We are not buying advertising.
+Nobody answers an auto-reply, but it often says what to do next: fill in a form, use another address, join a partner
+program, wait a number of days. When it lists several routes, pick the ONE that fits our purpose (partners, agencies, API,
+editorial or press submissions) — never advertising sales, billing, subscriber support, deliveries, careers or listing edits
+for a single business.
+Return JSON only: {"next_step": string|null, "link": string|null, "contact": string|null, "contact_role": string|null, "summary": string}
 - next_step: the concrete thing we should do, in one plain sentence (null if the reply only says "we got your message").
-- link: the URL they point us to, copied exactly from the email (null if none). contact: another email address they give (null if none).
+- link: the URL of that route, copied exactly from the email (null if none).
+- contact: another email address for that route (null if none). contact_role: one of partnerships, editorial, advertising,
+  billing, support, other — what that address is for.
 - summary: one short sentence on what the auto-reply says. Never invent a link or address that is not in the email.`;
 
-export type NextStep = { nextStep: string | null; link: string | null; contact: string | null; summary: string; provider: string };
+export const CONTACT_ROLES = ["partnerships", "editorial", "advertising", "billing", "support", "other"] as const;
+export type NextStep = { nextStep: string | null; link: string | null; contact: string | null; contactRole: (typeof CONTACT_ROLES)[number] | null; summary: string; provider: string };
+
+/** Ask each provider in turn for JSON (our API first); the first one `parse` accepts wins. */
+async function askJson<T>(user: string, system: string, parse: (j: any) => T, env: NodeJS.ProcessEnv): Promise<T & { provider: string }> {
+  const providers = mediaAiProviders(env);
+  if (!providers.length) throw new Error("No AI key configured for the media inbox");
+  const errors: string[] = [];
+  for (const p of providers) {
+    try { return { ...parse(JSON.parse((await ask(p, user, system)).replace(/^```(json)?\s*|\s*```$/g, ""))), provider: `${p.name} (${p.model})` }; }
+    catch (e: any) { errors.push(`${p.name}: ${String(e?.message ?? e).slice(0, 200)}`); }
+  }
+  throw new Error(`Every AI provider failed — ${errors.join(" · ")}`);
+}
 
 /** Read an auto-reply for its next step (no reply is ever sent to an auto-reply). */
 export async function extractNextStep(thread: ThreadMessage[], env: NodeJS.ProcessEnv = process.env): Promise<NextStep> {
-  const providers = mediaAiProviders(env);
-  if (!providers.length) throw new Error("No AI key configured for the media inbox");
+  const body = thread.at(-1)?.body ?? "";
   const user = `The thread, oldest first. Read the last email (the automatic reply).\n\n${threadPrompt(thread)}`;
-  const errors: string[] = [];
-  for (const p of providers) {
-    try {
-      const j = JSON.parse((await ask(p, user, NEXT_STEP_SYSTEM)).replace(/^```(json)?\s*|\s*```$/g, ""));
-      const body = thread.at(-1)?.body ?? "";
-      // Only keep a link or address that is really in the email.
-      const link = typeof j.link === "string" && j.link.trim() && body.includes(j.link.trim()) ? j.link.trim().slice(0, 500) : null;
-      const contact = typeof j.contact === "string" && /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(j.contact.trim()) && body.toLowerCase().includes(j.contact.trim().toLowerCase()) ? j.contact.trim().toLowerCase() : null;
-      return {
-        nextStep: typeof j.next_step === "string" && j.next_step.trim() ? j.next_step.trim().slice(0, 500) : null,
-        link, contact, summary: typeof j.summary === "string" ? j.summary.trim().slice(0, 400) : "", provider: `${p.name} (${p.model})`,
-      };
-    } catch (e: any) { errors.push(`${p.name}: ${String(e?.message ?? e).slice(0, 200)}`); }
-  }
-  throw new Error(`Every AI provider failed — ${errors.join(" · ")}`);
+  return askJson(user, NEXT_STEP_SYSTEM, (j) => {
+    // Only keep a link or address that is really in the email.
+    const link = typeof j.link === "string" && j.link.trim() && body.includes(j.link.trim()) ? j.link.trim().slice(0, 500) : null;
+    const contact = typeof j.contact === "string" && /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(j.contact.trim()) && body.toLowerCase().includes(j.contact.trim().toLowerCase()) ? j.contact.trim().toLowerCase() : null;
+    return {
+      nextStep: typeof j.next_step === "string" && j.next_step.trim() ? j.next_step.trim().slice(0, 500) : null,
+      link, contact, contactRole: contact && (CONTACT_ROLES as readonly string[]).includes(j.contact_role) ? j.contact_role : contact ? "other" : null,
+      summary: typeof j.summary === "string" ? j.summary.trim().slice(0, 400) : "",
+    };
+  }, env);
+}
+
+/** Who we are on a web form (the same details as the email signature, server/email-signature.ts). */
+export const FORM_IDENTITY = {
+  company: "ConstructHUB", website: "https://constructhub.us", email: "media@constructhub.us", phone: "(832) 399-0560",
+  name: "Construct HUB Media Team", title: "Partnerships", country: "United States",
+};
+
+const FORM_SYSTEM = `You fill in a partner's web form for the ConstructHUB Media Team. The company's auto-reply sent us to this page.
+
+Facts you may use (never invent anything else):
+${FACTS}
+Our details: ${Object.entries(FORM_IDENTITY).map(([k, v]) => `${k}: ${v}`).join("; ")}.
+
+Rules:
+- Fill only fields you can answer truthfully from the facts. A number we don't have (sales volume, revenue, customer count,
+  budget) is answered "Not disclosed — early-stage, launched in 2026". Never make up a number.
+- Pick only free options: partnership, listings, API, editorial, agency programs. Never pick a paid option (buy credits,
+  promo codes, advertising, sponsored posts, premium plans) and never agree to pay. Leave marketing opt-ins unticked; tick
+  a privacy or data-retention consent the form requires.
+- The main message / description / comments field gets OUR MESSAGE (below) exactly as written — never your own words.
+  Any other free-text answer is short and factual; never claim a location, launch, event, customer, offer or material that
+  is not in the facts.
+- submit = false when the form is not for a partnership/listing/editorial request (a newsletter, a job application, a
+  search box, a single business's listing edit) or asks for payment, a password or an account.
+- pricing: copy any price the page states for partner, API or listing plans, exactly as written (null if none).
+- api: one sentence on any API or bulk access the page describes (null if none).
+
+Return JSON only: {"submit": boolean, "fill": {"<field key>": string | string[] | boolean}, "pricing": string|null, "api": string|null, "why": string}
+Use the field keys exactly as given. string[] is for checkbox groups (the option texts to tick).`;
+
+export type FormField = { key: string; label: string; type: string; required: boolean; options?: string[] };
+export type FormPlan = { submit: boolean; fill: Record<string, string | string[] | boolean>; pricing: string | null; api: string | null; why: string; provider: string };
+
+/** Plan a form: what to put in each field, whether to send it, and any price or API the page describes. */
+export async function planForm(page: { url: string; title: string; text: string; fields: FormField[] }, message: string, env: NodeJS.ProcessEnv = process.env): Promise<FormPlan> {
+  const keys = new Set(page.fields.map((f) => f.key));
+  const user = `Page: ${page.title} (${page.url})\n\nPage text:\n${page.text.slice(0, 8000)}\n\nForm fields:\n${page.fields.length ? JSON.stringify(page.fields) : "(no form on this page)"}\n\nOUR MESSAGE:\n${message}`;
+  return askJson(user, FORM_SYSTEM, (j) => {
+    const fill: FormPlan["fill"] = {};
+    for (const [k, v] of Object.entries(j.fill ?? {})) {
+      if (!keys.has(k)) continue;
+      if (typeof v === "string" || typeof v === "boolean") fill[k] = typeof v === "string" ? v.slice(0, 3000) : v;
+      else if (Array.isArray(v)) fill[k] = v.filter((x): x is string => typeof x === "string");
+    }
+    // A price is kept only when every amount in it is on the page.
+    const pricing = typeof j.pricing === "string" && j.pricing.trim() && (j.pricing.match(/\$\s?[\d.,]+/g) ?? []).every((a: string) => page.text.includes(a.replace(/\s/g, ""))) ? j.pricing.trim().slice(0, 500) : null;
+    // A long answer that is not our message is the model writing its own pitch: not sent.
+    const ownWords = Object.values(fill).some((v) => typeof v === "string" && v.split(/\s+/).length > 40 && !message.includes(v.trim().slice(0, 60)));
+    return { submit: j.submit === true && page.fields.length > 0 && !ownWords, fill, pricing, api: typeof j.api === "string" && j.api.trim() ? j.api.trim().slice(0, 500) : null, why: typeof j.why === "string" ? j.why.slice(0, 400) : "" };
+  }, env);
 }

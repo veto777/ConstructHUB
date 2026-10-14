@@ -8,14 +8,16 @@
  *      5 days later → another contact address from their site (up to 3 per company), else a note for the owner;
  *   5. first contact: vetted directories, article sites and news outlets that publish an email are queued (also loaded
  *      from research lists) and sent at dailyAllowance() a day (50, +25 a day, up to 400).
+ *   2b. auto-replies are read for their next step, and 2c. that step is carried out (actOnNextSteps).
  * Anyone who asks us to stop is never emailed again (backlink_suppression).
  * One process at a time (a Postgres advisory lock).
  */
 import { MEDIA_INBOX_PARAMETERS } from "@shared/media-inbox";
 import { pool } from "../db";
 import { recordFailure } from "../ops/issues";
-import { decide, extractNextStep, mediaAiConfigured } from "./ai";
-import { companyDomain, firstNameOf, holdingReply, isOptOut, machineReason, replyProblem, replySubject } from "./guard";
+import { decide, extractNextStep, mediaAiConfigured, planForm } from "./ai";
+import { closeBrowser, readPage, submitGoogleForm, submitHtmlForm } from "./browse";
+import { companyDomain, firstNameOf, formMessage, holdingReply, isOptOut, machineReason, replyProblem, replySubject } from "./guard";
 import { pickEmail, siteName } from "../backlinks/outreach";
 import { isSuppressed } from "../backlinks/store";
 import { fetchSince, mailboxConfig, mailboxConfigured, sendMail } from "./mailbox";
@@ -46,6 +48,82 @@ export async function readAutoReplies(): Promise<{ read: number }> {
     } catch { await store.markAutoReplyTried(m.id); }
   }
   return { read };
+}
+
+export const actDeps = { readPage, planForm, submitGoogleForm, submitHtmlForm, closeBrowser };
+const ROUTES_TO_WRITE = new Set(["partnerships", "editorial", "other"]);
+const today = () => new Date().toISOString().slice(0, 10);
+
+/**
+ * Step 2c: carry out the next step an auto-reply gave (owner, 2026-10-14: "do everything automatically"):
+ *  - another address for partnerships or editorial → our first email goes there (never advertising, billing or support);
+ *  - a page → read it; a price for a partner or API plan goes on the company's cost terms and the owner's list (we never
+ *    buy); its form is filled from the approved facts and submitted unless it needs a CAPTCHA, an account or payment.
+ */
+export async function actOnNextSteps(): Promise<{ acted: number; emailed: number; submitted: number; blocked: number }> {
+  const mailbox = mailboxConfig().user;
+  const out = { acted: 0, emailed: 0, submitted: 0, blocked: 0 };
+  try {
+    for (const a of await store.pendingActions()) {
+      const done: string[] = [];
+      let toFinalize: string | null = null, costTerms: string | null = null, ownerQuestion: string | null = null;
+      try {
+        if (a.contact && ROUTES_TO_WRITE.has(a.contactRole ?? "other")) {
+          const tried = new Set(a.triedEmails.map((e) => e.toLowerCase()));
+          if (tried.has(a.contact)) done.push(`Already wrote to ${a.contact}`);
+          else if (await isSuppressed(a.contact)) done.push(`${a.contact} asked not to be emailed`);
+          else if (tried.size >= MEDIA_INBOX_PARAMETERS.maxContactsPerCompany) done.push(`Not writing to ${a.contact}: ${tried.size} addresses already tried`);
+          else {
+            const first = await store.firstOutbound(a.partnerId);
+            const subject = first?.subject ?? `Partnership: ${a.company} and ConstructHUB`;
+            const body = newContactBody(a.company, first?.body ?? firstContactBody(a.company));
+            const messageId = await workerDeps.sendMail({ to: a.contact, subject, body });
+            await store.saveOutbound(mailbox, { messageId, threadKey: null, to: a.contact, subject, body, partnerId: a.partnerId, purpose: "outreach" });
+            done.push(`Emailed ${a.contact} (their ${a.contactRole} address) on ${today()}`);
+            toFinalize = `Waiting for ${a.contact} to answer (emailed ${today()}).`;
+            out.emailed++;
+          }
+        } else if (a.contact) done.push(`Did not write to ${a.contact}: it is their ${a.contactRole} address, not partnerships`);
+
+        if (a.link) {
+          const page = await actDeps.readPage(/^https?:\/\//i.test(a.link) ? a.link : `https://${a.link}`);
+          const first = await store.firstOutbound(a.partnerId);
+          const plan = await actDeps.planForm(page, formMessage(first?.body ?? firstContactBody(a.company)));
+          if (plan.pricing) {
+            costTerms = `${plan.pricing} (${page.url})`;
+            ownerQuestion = `${a.company} lists a paid plan: ${plan.pricing}. Nothing was bought; buy it only once customer purchases cover it.`;
+            done.push(`Price on their page: ${plan.pricing}`);
+          }
+          if (plan.api) done.push(`API: ${plan.api}`);
+          const problem = Object.values(plan.fill).flat().map((v) => (typeof v === "string" ? replyProblem(v) : null)).find(Boolean);
+          if (page.blocked) {
+            done.push(`${page.blocked} (${page.url}); it cannot be sent automatically`);
+            toFinalize ??= `${page.blocked}: a person has to submit ${page.url}`;
+            out.blocked++;
+          } else if (!plan.submit) {
+            done.push(`Read ${page.url}; nothing to submit (${plan.why || "no partnership form"})`);
+            toFinalize ??= plan.pricing ? `Partner plan priced on ${page.url}; join once customer purchases cover it.` : `Nothing to submit on ${page.url}; waiting for ${a.company}.`;
+          } else if (problem) {
+            done.push(`Did not submit ${page.url}: the answers broke a law (${problem})`);
+            toFinalize ??= `The form at ${page.url} was not sent (${problem}).`;
+          } else {
+            const r = page.googleForm ? await actDeps.submitGoogleForm(page.googleForm, plan.fill) : await actDeps.submitHtmlForm(page, plan.fill);
+            done.push(r.ok ? `Submitted the form at ${page.url} on ${today()}: ${r.detail}` : `Could not submit ${page.url}: ${r.detail}`);
+            if (r.ok) out.submitted++;
+            toFinalize ??= r.ok ? `Form submitted ${today()}; waiting for ${a.company} to answer.` : `The form at ${page.url} did not go through (${r.detail}).`;
+          }
+        }
+      } catch (e: any) {
+        done.push(`Failed: ${String(e?.message ?? e).slice(0, 200)}`);
+        console.error(`[media-inbox] next step for ${a.company} failed: ${e?.message ?? e}`);
+      }
+      await store.recordAction(a.id, a.partnerId, { result: done.join(" · ") || "Nothing to do", toFinalize: toFinalize ?? done.at(-1) ?? null, costTerms, ownerQuestion });
+      out.acted++;
+    }
+  } finally {
+    await actDeps.closeBrowser();
+  }
+  return out;
 }
 
 /** Step 1: store every new email. */
@@ -264,7 +342,7 @@ export async function sendQueued(): Promise<{ queued: number; sent: number; skip
 const LOCK_KEY = 0x6d656469; // "medi"
 let running = false;
 
-export async function runMediaPass(): Promise<{ ok: boolean; skipped?: string; read?: number; replied?: number; held?: number; failed?: number; followedUp?: number; newContacts?: number; exhausted?: number; optedOut?: number; newlyQueued?: number; outreachSent?: number; autoRepliesRead?: number }> {
+export async function runMediaPass(): Promise<{ ok: boolean; skipped?: string; read?: number; replied?: number; held?: number; failed?: number; followedUp?: number; newContacts?: number; exhausted?: number; optedOut?: number; newlyQueued?: number; outreachSent?: number; autoRepliesRead?: number; nextSteps?: Awaited<ReturnType<typeof actOnNextSteps>> }> {
   if (!mailboxConfigured()) return { ok: false, skipped: "The media@ mailbox is not configured (MEDIA_EMAIL / MEDIA_APP_PASSWORD)" };
   if (!mediaAiConfigured()) return { ok: false, skipped: "No AI key configured for the media inbox" };
   if (running) return { ok: false, skipped: "A pass is already running" };
@@ -276,10 +354,11 @@ export async function runMediaPass(): Promise<{ ok: boolean; skipped?: string; r
       const r = await readInbox();
       const a = await answerPending();
       const ar = await readAutoReplies();
+      const act = await actOnNextSteps();
       const f = await followUpSilent();
       const q = await sendQueued();
       await store.markPass(mailboxConfig().user, null);
-      return { ok: true, read: r.read, ...a, autoRepliesRead: ar.read, ...f, newlyQueued: q.queued, outreachSent: q.sent };
+      return { ok: true, read: r.read, ...a, autoRepliesRead: ar.read, nextSteps: act, ...f, newlyQueued: q.queued, outreachSent: q.sent };
     } catch (e: any) {
       await store.markPass(mailboxConfig().user, String(e?.message ?? e).slice(0, 500)).catch(() => undefined);
       throw e;
