@@ -486,6 +486,13 @@ export async function registerRoutes(
   registerBacklinkRoutes(app, getDevUser);
   const { startBacklinkWorker } = await import("./backlinks/worker");
   startBacklinkWorker();
+  // Partnerships: the media@ relationships inbox, read and answered every 30 minutes (server/media-inbox).
+  const { ensureMediaInboxSchema } = await import("./media-inbox/schema");
+  await ensureMediaInboxSchema(pool);
+  const { registerMediaInboxRoutes } = await import("./media-inbox/routes");
+  registerMediaInboxRoutes(app, getDevUser);
+  const { startMediaInboxWorker } = await import("./media-inbox/worker");
+  startMediaInboxWorker();
   // SEO toolset (server/seo): rank tracker, keyword research, backlinks,
   // competitor gap on DataForSEO pay-as-you-go, capped by SEO_MONTHLY_BUDGET_USD.
   // Guarded (server/seo/boot.ts): the schema step runs zero DDL when its stored hash matches, with lock and
