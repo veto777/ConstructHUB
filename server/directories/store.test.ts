@@ -10,26 +10,22 @@ import {
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import pg from "pg";
-import { ensureListingSchema } from "./schema";
-import {
-  catalogue,
-  seedListingDirectories,
-  unresolvedDirectories,
-} from "./catalogue";
+import { ensureDirectorySchema } from "./schema";
+import { catalogue, seedDirectories, unresolvedDirectories } from "./catalogue";
 import { loadScoutedDirectories } from "./scouted";
-import { ListingStore, domainAllows, type Scope } from "./store";
-import { analyzeListing } from "./nap";
-const bin = process.env.LISTINGS_TEST_PG_BIN ?? "/usr/lib/postgresql/16/bin";
+import { DirectoryStore, domainAllows, type Scope } from "./store";
+import { analyzeDirectoryProfile } from "./nap";
+const bin = process.env.DIRECTORIES_TEST_PG_BIN ?? "/usr/lib/postgresql/16/bin";
 const a: Scope = { userId: 1, actorId: 1, admin: false },
   b: Scope = { userId: 2, actorId: 2, admin: false },
   admin: Scope = { userId: 3, actorId: 3, admin: true };
 let root: string,
   db: pg.Pool,
-  store: ListingStore,
+  store: DirectoryStore,
   profile: any,
   other: any,
   directory: number,
-  listing: any;
+  entry: any;
 function command(name: string, args: string[]) {
   const r = spawnSync(path.join(bin, name), args, {
     encoding: "utf8",
@@ -42,7 +38,7 @@ describe.skipIf(!existsSync(path.join(bin, "initdb")))(
   () => {
     beforeAll(async () => {
       mkdirSync(".cache", { recursive: true });
-      root = mkdtempSync(path.resolve(".cache/listings-pg-"));
+      root = mkdtempSync(path.resolve(".cache/directories-pg-"));
       mkdirSync(path.join(root, "socket"));
       command("initdb", [
         "-D",
@@ -71,11 +67,11 @@ describe.skipIf(!existsSync(path.join(bin, "initdb")))(
       await db.query(`CREATE TABLE users(id integer PRIMARY KEY,email text); INSERT INTO users VALUES(1,'one@example.com'),(2,'two@example.com'),(3,'admin@example.com');
    CREATE TABLE business_locations(id integer PRIMARY KEY,user_id integer NOT NULL,business_name text,address text,phone text,gbp_location_name text);
    INSERT INTO business_locations VALUES(1,1,'Fixture Roofing','12 Main St','2125550100',NULL),(2,2,'Other Company',NULL,NULL,NULL)`);
-      await ensureListingSchema(db);
-      await ensureListingSchema(db);
-      await seedListingDirectories(db);
-      store = new ListingStore(db, async (url, p, status) =>
-        analyzeListing(
+      await ensureDirectorySchema(db);
+      await ensureDirectorySchema(db);
+      await seedDirectories(db);
+      store = new DirectoryStore(db, async (url, p, status) =>
+        analyzeDirectoryProfile(
           {
             url,
             status: 200,
@@ -120,7 +116,11 @@ describe.skipIf(!existsSync(path.join(bin, "initdb")))(
       const count = (
         await db.query("SELECT count(*)::int n FROM listing_directories")
       ).rows[0].n;
-      expect(count).toBe(catalogue().length + unresolvedDirectories.length + loadScoutedDirectories().length);
+      expect(count).toBe(
+        catalogue().length +
+          unresolvedDirectories.length +
+          loadScoutedDirectories().length,
+      );
       const routes = readFileSync(
         new URL("../routes.ts", import.meta.url),
         "utf8",
@@ -133,7 +133,7 @@ describe.skipIf(!existsSync(path.join(bin, "initdb")))(
       await db.query(
         "UPDATE listing_directories SET notes='owner note',active=false WHERE domain='google.com'",
       );
-      await seedListingDirectories(db);
+      await seedDirectories(db);
       expect(
         (await db.query("SELECT count(*)::int n FROM listing_directories"))
           .rows[0].n,
@@ -180,26 +180,26 @@ describe.skipIf(!existsSync(path.join(bin, "initdb")))(
           "https://yelp.com.attacker.test/biz/test",
         ),
       ).rejects.toMatchObject({ status: 400 });
-      listing = await store.add(
+      entry = await store.add(
         a,
         profile.id,
         directory,
         "https://www.yelp.com/biz/fixture",
       );
-      expect(listing.status).toBe("queued");
-      expect(listing.billable).toBe(false);
-      expect(listing.last_checked_at).toBeNull();
+      expect(entry.status).toBe("queued");
+      expect(entry.billable).toBe(false);
+      expect(entry.last_checked_at).toBeNull();
       await expect(
-        store.add(a, profile.id, directory, listing.listing_url),
+        store.add(a, profile.id, directory, entry.listing_url),
       ).rejects.toMatchObject({ status: 409 });
-      await expect(store.recheck(b, listing.id)).rejects.toMatchObject({
+      await expect(store.recheck(b, entry.id)).rejects.toMatchObject({
         status: 404,
       });
     });
     it("scopes lists, summary, and events; crawler alone establishes billability", async () => {
       expect(await store.list(b, { limit: 50, offset: 0 })).toEqual([]);
       expect(await store.list(admin, { limit: 50, offset: 0 })).toHaveLength(1);
-      const verified = await store.recheck(a, listing.id);
+      const verified = await store.recheck(a, entry.id);
       expect(verified.status).toBe("live");
       expect(verified.billable).toBe(true);
       expect(await store.summary(a)).toMatchObject({
@@ -220,7 +220,7 @@ describe.skipIf(!existsSync(path.join(bin, "initdb")))(
         billable: 1,
       });
       const events = await store.events(a, 1, 100, 0);
-      expect(events.at(-1).type).toBe("listing_checked");
+      expect(events.at(-1).type).toBe("directory_profile_checked");
       expect(events.at(-1).detail.evidence.confirmation).toBe("confirmed");
       expect(events.map((e) => Number(e.id))).toEqual(
         events.map((e) => Number(e.id)).sort((x, y) => x - y),
@@ -238,7 +238,7 @@ describe.skipIf(!existsSync(path.join(bin, "initdb")))(
         await expect(
           db.query(
             `UPDATE listings SET billable=true,${fragment} WHERE id=$1`,
-            [listing.id],
+            [entry.id],
           ),
         ).rejects.toMatchObject({ code: "23514" });
       }
@@ -259,11 +259,15 @@ describe.skipIf(!existsSync(path.join(bin, "initdb")))(
       expect(l.nap_result).toBeNull();
     });
     it("rejects stale in-flight checks after a profile edit", async () => {
-      const racing = new ListingStore(db, async (url, p, status) => {
+      const racing = new DirectoryStore(db, async (url, p, status) => {
         await store.saveProfile(a, 1, { name: "Changed during fetch" });
-        return analyzeListing({ url, status: 200, body: "" }, p, status);
+        return analyzeDirectoryProfile(
+          { url, status: 200, body: "" },
+          p,
+          status,
+        );
       });
-      await expect(racing.recheck(a, listing.id)).rejects.toMatchObject({
+      await expect(racing.recheck(a, entry.id)).rejects.toMatchObject({
         status: 409,
       });
     });
@@ -346,6 +350,208 @@ describe.skipIf(!existsSync(path.join(bin, "initdb")))(
           "https://directory.example.com.attacker.test/business",
         ),
       ).rejects.toMatchObject({ status: 400 });
+    });
+    it("pages catalogue totals and keeps unknown metrics null without the backlinks table", async () => {
+      const all = await store.directories({});
+      const first = await store.directories({ limit: 10, offset: 0 }, true);
+      const second = await store.directories({ limit: 10, offset: 10 }, true);
+      expect(first.total).toBe(all.length);
+      expect(first.rows).toHaveLength(10);
+      expect(second.rows).toEqual(all.slice(10, 20));
+      expect(
+        first.rows.every((row: any) => row.dr === null && row.grade === null),
+      ).toBe(true);
+      expect(
+        await store.directories({ limit: 10, offset: all.length + 1 }, true),
+      ).toEqual({ rows: [], total: all.length });
+    });
+    it("joins real ranks and grades, applies all filters, sorts nulls last, and counts facets", async () => {
+      await db.query(
+        "CREATE TABLE backlink_sources(domain text UNIQUE, metrics jsonb, tier text)",
+      );
+      const fixtures = [
+        [
+          "Alpha metric",
+          "alpha.metrics.example",
+          "general",
+          1,
+          "api",
+          "NY",
+          true,
+          "Link verified",
+          805,
+          "A",
+        ],
+        [
+          "Beta metric",
+          "beta.metrics.example",
+          "contractor",
+          4,
+          "submission",
+          "CA",
+          false,
+          "Link unconfirmed",
+          405,
+          "B",
+        ],
+        [
+          "Gamma metric",
+          "gamma.metrics.example",
+          "general",
+          4,
+          "partner",
+          "NY",
+          null,
+          null,
+          null,
+          null,
+        ],
+        [
+          "Delta metric",
+          "delta.metrics.example",
+          "contractor",
+          3,
+          "aggregator",
+          "NY",
+          null,
+          "Link verified",
+          "invalid",
+          "C",
+        ],
+        [
+          "Zero metric",
+          "zero.metrics.example",
+          "general",
+          2,
+          "aggregator",
+          "NY",
+          false,
+          null,
+          0,
+          "X",
+        ],
+      ];
+      for (const [
+        name,
+        domain,
+        category,
+        tier,
+        kind,
+        state,
+        paid,
+        notes,
+        rank,
+        grade,
+      ] of fixtures) {
+        await db.query(
+          "INSERT INTO listing_directories(name,domain,category,tier,kind,states,trades,paid,notes,source) VALUES($1,$2,$3,$4,$5,ARRAY[$6]::text[],ARRAY['roofing'], $7,$8,'fixture')",
+          [name, domain, category, tier, kind, state, paid, notes],
+        );
+        if (grade)
+          await db.query("INSERT INTO backlink_sources VALUES($1,$2,$3)", [
+            domain,
+            JSON.stringify({ rank }),
+            grade,
+          ]);
+      }
+      try {
+        const rows = await store.directories({
+          q: ".METRICS.example",
+          sort: "dr",
+          dir: "desc",
+        });
+        expect(rows.map((row) => row.dr)).toEqual([81, 41, 0, null, null]);
+        expect(rows.map((row) => row.grade)).toEqual([
+          "A",
+          "B",
+          "X",
+          "C",
+          null,
+        ]);
+        const asc = await store.directories({
+          q: "metric",
+          sort: "dr",
+          dir: "asc",
+        });
+        expect(asc.map((row) => row.dr)).toEqual([0, 41, 81, null, null]);
+        expect(
+          await store.directories({
+            q: "metric",
+            category: ["general", "contractor"],
+            tier: ["1", "4"],
+            kind: ["api", "submission"],
+            grade: ["A", "B"],
+            dr_min: 40,
+            dr_max: 90,
+          }),
+        ).toHaveLength(2);
+        const filtered = await store.directories({
+          q: "metric",
+          state: "NY",
+          trade: "ROOF",
+          link: "verified",
+          paid: "true",
+          active: true,
+        });
+        expect(filtered.map((row) => row.name)).toEqual(["Alpha metric"]);
+        expect(filtered[0].link_status).toBe("verified");
+        expect(
+          (
+            await store.directories({
+              q: "metric",
+              link: "unconfirmed",
+              paid: "false",
+            })
+          )[0].name,
+        ).toBe("Beta metric");
+        expect(
+          await store.directories({ q: "metric", paid: "unknown" }),
+        ).toHaveLength(2);
+        expect(
+          await store.directories({ q: "metric", grade: ["ungraded"] }),
+        ).toHaveLength(1);
+        expect(
+          await store.directories({ q: "metric", active: false }),
+        ).toHaveLength(0);
+        expect(
+          await store.directories({ q: "metric", dr_min: 0 }),
+        ).toHaveLength(3);
+        const facets = await store.directoryFacets({
+          q: "metric",
+          state: "NY",
+          category: ["contractor"],
+          kind: ["submission"],
+          tier: ["4"],
+          grade: ["B"],
+          dr_min: 90,
+          dr_max: 100,
+        });
+        expect(facets).toEqual({
+          category: { general: 3, contractor: 1 },
+          tier: { "1": 1, "2": 1, "3": 1, "4": 1 },
+          kind: { api: 1, aggregator: 2, partner: 1 },
+          grade: { A: 1, C: 1, X: 1, ungraded: 1 },
+          dr: { "81–100": 1, "0–20": 1, unknown: 2 },
+        });
+        for (const sort of ["name", "tier", "category", "state"]) {
+          const sorted = await store.directories({
+            q: "metric",
+            sort,
+            dir: "asc",
+          });
+          const values = sorted.map((row) =>
+            sort === "state" ? row.states[0] : row[sort],
+          );
+          expect(values).toEqual(
+            [...values].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
+          );
+        }
+      } finally {
+        await db.query("DROP TABLE backlink_sources");
+        await db.query(
+          "DELETE FROM listing_directories WHERE domain LIKE '%.metrics.example'",
+        );
+      }
     });
   },
 );

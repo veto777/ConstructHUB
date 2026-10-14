@@ -5,8 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
-import type { ListingProfile } from "@shared/listings";
-import { refreshListings, selectClass } from "./common";
+import type { BusinessProfile } from "@shared/directories";
+import { refreshDirectories, selectClass } from "./common";
 
 type Field = {
   key: string;
@@ -214,7 +214,7 @@ export function ProfileForm({
   locationId,
   googleLinked,
 }: {
-  profile: ListingProfile | null;
+  profile: BusinessProfile | null;
   locationId: number;
   googleLinked: boolean;
 }) {
@@ -228,7 +228,7 @@ export function ProfileForm({
     mutationFn: (action: "save" | "import") =>
       apiRequest(
         action === "save" ? "PUT" : "POST",
-        `/api/listings/profiles/${locationId}${action === "import" ? "/import-from-gbp" : ""}`,
+        `/api/directories/profiles/${locationId}${action === "import" ? "/import-from-gbp" : ""}`,
         action === "save"
           ? Object.fromEntries(
               Object.entries(edits).map(([key, entry]) => [
@@ -246,13 +246,13 @@ export function ProfileForm({
       ),
     onSuccess: async (_, action) => {
       setEdits({});
-      await refreshListings();
+      await refreshDirectories();
       toast({
         title:
           action === "save"
             ? "Business profile saved"
             : "Google details imported",
-        description: "Existing listings need a fresh check.",
+        description: "Existing directory profiles need a fresh check.",
       });
     },
     onError: (error) =>

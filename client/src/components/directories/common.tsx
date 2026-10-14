@@ -8,25 +8,26 @@ import { useToast } from "@/hooks/use-toast";
 import { StatusPill } from "@/components/crm-ui";
 import {
   DIRECTORY_CATEGORIES,
-  LISTING_LABELS,
-  LISTING_STATUSES,
+  DIRECTORY_LABELS,
+  DIRECTORY_STATUSES,
   TIER_LABELS,
   type Directory,
-  type ListingRow,
-  type ListingSummary,
-} from "@shared/listings";
+  type DirectoryProfileRow,
+  type DirectorySummary,
+} from "@shared/directories";
 
 export const selectClass =
   "h-10 rounded-md border border-input bg-background px-3 text-sm w-full";
 export const label = (value: string) =>
-  LISTING_LABELS[value] ?? value.replaceAll("_", " ");
+  DIRECTORY_LABELS[value] ?? value.replaceAll("_", " ");
 export const dateLabel = (value: string | null) =>
   value ? new Date(value).toLocaleString("en-US") : "Not checked";
 export const getJson = async <T,>(url: string): Promise<T> =>
   (await apiRequest("GET", url)).json();
-export function refreshListings() {
+export function refreshDirectories() {
   return queryClient.invalidateQueries({
-    predicate: (query) => String(query.queryKey[0]).startsWith("/api/listings"),
+    predicate: (query) =>
+      String(query.queryKey[0]).startsWith("/api/directories"),
   });
 }
 export function LoadError({
@@ -69,20 +70,21 @@ export function SafeLink({
   );
 }
 export function Summary({ locationId }: { locationId: number }) {
-  const url = `/api/listings/summary?location_id=${locationId}`;
-  const query = useQuery<ListingSummary>({
+  const url = `/api/directories/summary?location_id=${locationId}`;
+  const query = useQuery<DirectorySummary>({
     queryKey: [url],
     queryFn: () => getJson(url),
   });
   if (query.error)
     return <LoadError error={query.error} retry={() => void query.refetch()} />;
-  if (!query.data) return <p role="status">Loading listing counts…</p>;
+  if (!query.data)
+    return <p role="status">Loading directory profile counts…</p>;
   return (
     <div className="space-y-4">
       <StatGrid>
         {(
           [
-            ["total", "Total listings"],
+            ["total", "Total directory profiles"],
             ["live", "Live"],
             ["mismatch", "Details differ"],
             ["billable", "Verified"],
@@ -101,8 +103,8 @@ export function Summary({ locationId }: { locationId: number }) {
         ))}
       </StatGrid>
       <p className="text-sm text-muted-foreground">
-        Verified counts only listings our checker found live with matching
-        name, address, and phone.
+        Verified counts only directory profiles our checker found live with
+        matching name, address, and phone.
       </p>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {Object.entries(TIER_LABELS).map(([tier, title]) => {
@@ -155,7 +157,7 @@ export function Pager({
     </div>
   );
 }
-export function ListingsTable({
+export function DirectoryProfilesTable({
   locationId,
   admin = false,
 }: {
@@ -168,21 +170,21 @@ export function ListingsTable({
   const params = new URLSearchParams({ limit: "50", offset: String(offset) });
   if (locationId) params.set("location_id", String(locationId));
   if (status) params.set("status", status);
-  const url = `/api/listings?${params}`;
-  const query = useQuery<ListingRow[]>({
+  const url = `/api/directories?${params}`;
+  const query = useQuery<DirectoryProfileRow[]>({
     queryKey: [url],
     queryFn: () => getJson(url),
   });
   const recheck = useMutation({
     mutationFn: (id: number) =>
-      apiRequest("POST", `/api/listings/${id}/recheck`),
+      apiRequest("POST", `/api/directories/${id}/recheck`),
     onSuccess: async () => {
-      await refreshListings();
+      await refreshDirectories();
       toast({ title: "Check complete" });
     },
     onError: (error) =>
       toast({
-        title: "Could not check listing",
+        title: "Could not check directory profile",
         description: apiErrorMessage(error),
         variant: "destructive",
       }),
@@ -200,7 +202,7 @@ export function ListingsTable({
           }}
         >
           <option value="">All statuses</option>
-          {LISTING_STATUSES.map((value) => (
+          {DIRECTORY_STATUSES.map((value) => (
             <option key={value} value={value}>
               {label(value)}
             </option>
@@ -208,7 +210,7 @@ export function ListingsTable({
         </select>
       </label>
       <LoadError error={query.error} retry={() => void query.refetch()} />
-      {query.isLoading && <p role="status">Loading listings…</p>}
+      {query.isLoading && <p role="status">Loading directory profiles…</p>}
       {query.data && (
         <>
           <div className="overflow-x-auto rounded-lg border">
@@ -234,7 +236,9 @@ export function ListingsTable({
                   <tr key={row.id}>
                     <td className="p-3 min-w-40">
                       <p className="font-medium">{row.directory_name}</p>
-                      <SafeLink url={row.listing_url}>Open listing</SafeLink>
+                      <SafeLink url={row.listing_url}>
+                        Open directory profile
+                      </SafeLink>
                     </td>
                     {admin && (
                       <td className="p-3">
@@ -325,10 +329,10 @@ export function ListingsTable({
             </table>
             {!query.data.length && (
               <p className="p-8 text-center text-muted-foreground">
-                No listings
+                No directory profiles
                 {status
                   ? " match this status"
-                  : " yet. Add an existing listing URL to start checking your details"}
+                  : " yet. Add an existing directory profile URL to start checking your details"}
                 .
               </p>
             )}
@@ -343,177 +347,4 @@ export function ListingsTable({
     </div>
   );
 }
-export function Catalogue({
-  directories,
-  adminActions,
-}: {
-  directories: Directory[];
-  adminActions?: (directory: Directory) => React.ReactNode;
-}) {
-  const [tier, setTier] = useState("");
-  const [category, setCategory] = useState("");
-  const [trade, setTrade] = useState("");
-  const [state, setState] = useState("");
-  const rows = directories.filter(
-    (directory) =>
-      (!tier || String(directory.tier) === tier) &&
-      (!category || directory.category === category) &&
-      (!trade ||
-        directory.trades?.some((value) =>
-          value.toLowerCase().includes(trade.toLowerCase()),
-        )) &&
-      (!state || directory.states?.includes(state.toUpperCase())),
-  );
-  return (
-    <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        Catalogue entries are research targets, not a promise of distribution.
-        Unknown coverage and requirements need research.
-      </p>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <label className="text-sm">
-          Tier
-          <select
-            className={selectClass}
-            value={tier}
-            onChange={(event) => setTier(event.target.value)}
-          >
-            <option value="">All tiers</option>
-            {Object.entries(TIER_LABELS).map(([value, title]) => (
-              <option key={value} value={value}>
-                Tier {value} · {title}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-sm">
-          Category
-          <select
-            className={selectClass}
-            value={category}
-            onChange={(event) => setCategory(event.target.value)}
-          >
-            <option value="">All categories</option>
-            {DIRECTORY_CATEGORIES.map((value) => (
-              <option key={value} value={value}>
-                {label(value)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-sm">
-          Trade
-          <Input
-            value={trade}
-            onChange={(event) => setTrade(event.target.value)}
-            placeholder="Filter researched trades"
-          />
-        </label>
-        <label className="text-sm">
-          State
-          <Input
-            value={state}
-            maxLength={2}
-            onChange={(event) => setState(event.target.value.toUpperCase())}
-            placeholder="Two-letter state"
-          />
-        </label>
-      </div>
-      <p className="text-sm text-muted-foreground">
-        {rows.length} of {directories.length} directories
-        {(trade || state) &&
-          " · Unresearched coverage is excluded from these filters."}
-      </p>
-      <div className="overflow-x-auto rounded-lg border">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-muted/50">
-            <tr>
-              {[
-                "Directory",
-                "Tier / category",
-                "Coverage",
-                "Status",
-                ...(adminActions ? ["Manage"] : []),
-              ].map((title) => (
-                <th key={title} className="p-3 font-medium">
-                  {title}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {rows.map((directory) => (
-              <tr key={directory.id}>
-                <td className="p-3 min-w-48">
-                  <p className="font-medium">{directory.name}</p>
-                  <p className="text-muted-foreground">
-                    {directory.domain ?? "Domain unconfirmed"}
-                  </p>
-                  <details className="mt-1">
-                    <summary className="cursor-pointer text-primary">
-                      Details & source
-                    </summary>
-                    <div className="mt-2 space-y-1 max-w-md">
-                      <p>{label(directory.kind)}</p>
-                      <p>{directory.notes || "No research notes yet."}</p>
-                      <p>
-                        Street address:{" "}
-                        {directory.requires_street_address === null
-                          ? "Unknown"
-                          : directory.requires_street_address
-                            ? "Required"
-                            : "Not required"}
-                      </p>
-                      <p>
-                        Phone verification:{" "}
-                        {directory.requires_phone_verification === null
-                          ? "Unknown"
-                          : directory.requires_phone_verification
-                            ? "Required"
-                            : "Not required"}
-                      </p>
-                      <p>
-                        Postcard:{" "}
-                        {directory.requires_postcard === null
-                          ? "Unknown"
-                          : directory.requires_postcard
-                            ? "Required"
-                            : "Not required"}
-                      </p>
-                      <SafeLink url={directory.source}>
-                        {directory.source}
-                      </SafeLink>
-                    </div>
-                  </details>
-                </td>
-                <td className="p-3">
-                  Tier {directory.tier}
-                  <br />
-                  {label(directory.category)}
-                </td>
-                <td className="p-3">
-                  Trades: {directory.trades?.join(", ") || "Unresearched"}
-                  <br />
-                  States: {directory.states?.join(", ") || "Unresearched"}
-                </td>
-                <td className="p-3">
-                  <StatusPill tone={directory.active ? "success" : "neutral"}>
-                    {directory.active ? "Active" : "Inactive"}
-                  </StatusPill>
-                </td>
-                {adminActions && (
-                  <td className="p-3">{adminActions(directory)}</td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {!rows.length && (
-          <p className="p-8 text-center text-muted-foreground">
-            No directories match these filters.
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
+export { Catalogue } from "./catalogue";

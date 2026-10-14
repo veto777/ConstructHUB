@@ -380,8 +380,8 @@ export const businessLocations = pgTable("business_locations", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-// NAP-sync ledger. Additive boot/migration constraints: server/listings/schema.ts.
-export const listingProfiles = pgTable("listing_profiles", {
+// Directory Sync ledger. Database tables and columns retain their original names. Additive boot/migration constraints: server/directories/schema.ts.
+export const directoryBusinessProfiles = pgTable("listing_profiles", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
   locationId: integer("location_id").notNull().unique().references(() => businessLocations.id, { onDelete: "cascade" }),
@@ -419,7 +419,7 @@ export const listingProfiles = pgTable("listing_profiles", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [check("listing_profiles_source", sql`${t.source} IN ('gbp','manual')`)]);
-export const listingDirectories = pgTable("listing_directories", {
+export const catalogueDirectories = pgTable("listing_directories", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().unique(),
   domain: text("domain").unique(),
@@ -442,12 +442,12 @@ export const listingDirectories = pgTable("listing_directories", {
   check("listing_directories_tier", sql`${t.tier} BETWEEN 1 AND 4`),
   check("listing_directories_category", sql`${t.category} IN ('general','maps_nav','social','contractor','trade_assoc','manufacturer','state_local','ai')`),
 ]);
-export const listings = pgTable("listings", {
+export const directoryProfiles = pgTable("listings", {
   id: serial("id").primaryKey(),
-  profileId: integer("profile_id").notNull().references(() => listingProfiles.id, { onDelete: "cascade" }),
-  directoryId: integer("directory_id").notNull().references(() => listingDirectories.id),
+  profileId: integer("profile_id").notNull().references(() => directoryBusinessProfiles.id, { onDelete: "cascade" }),
+  directoryId: integer("directory_id").notNull().references(() => catalogueDirectories.id),
   status: text("status").notNull().default("queued"),
-  listingUrl: text("listing_url"),
+  directoryProfileUrl: text("listing_url"),
   lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
   napResult: jsonb("nap_result"),
   evidence: jsonb("evidence"),
@@ -457,12 +457,12 @@ export const listings = pgTable("listings", {
 }, (t) => [
   check("listings_status", sql`${t.status} IN ('queued','submitted','needs_owner_action','live','mismatch','duplicate','suppressed','failed')`),
   uniqueIndex("listings_profile_directory").on(t.profileId, t.directoryId),
-  check("listings_billable_verified", sql`NOT ${t.billable} OR (${t.status}='live' AND ${t.lastCheckedAt} IS NOT NULL AND ${t.listingUrl} IS NOT NULL AND (${t.napResult}->>'matches') IS NOT DISTINCT FROM 'true' AND (${t.evidence}->>'confirmation') IS NOT DISTINCT FROM 'confirmed')`),
+  check("listings_billable_verified", sql`NOT ${t.billable} OR (${t.status}='live' AND ${t.lastCheckedAt} IS NOT NULL AND ${t.directoryProfileUrl} IS NOT NULL AND (${t.napResult}->>'matches') IS NOT DISTINCT FROM 'true' AND (${t.evidence}->>'confirmation') IS NOT DISTINCT FROM 'confirmed')`),
 ]);
-export const listingEvents = pgTable("listing_events", {
+export const directoryEvents = pgTable("listing_events", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
-  profileId: integer("profile_id").notNull().references(() => listingProfiles.id, { onDelete: "cascade" }),
-  listingId: integer("listing_id").references(() => listings.id, { onDelete: "cascade" }),
+  profileId: integer("profile_id").notNull().references(() => directoryBusinessProfiles.id, { onDelete: "cascade" }),
+  directoryProfileId: integer("listing_id").references(() => directoryProfiles.id, { onDelete: "cascade" }),
   actorUserId: integer("actor_user_id").references(() => users.id),
   type: text("type").notNull(),
   detail: jsonb("detail"),

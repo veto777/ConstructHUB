@@ -8,7 +8,8 @@ import { loadListing } from "../gbp/listing-editor";
 import { siteUrl } from "../sitescan/http";
 import { profileInput } from "./profile";
 import { directoryCreateInput, directoryPatchInput } from "./directory";
-import { ListingStore, ListingError, type Scope } from "./store";
+import { DirectoryStore, DirectoryError, type Scope } from "./store";
+import { catalogueQuery } from "./catalogue-query";
 const id = z.coerce.number().int().positive().max(2147483647);
 const statuses = z.enum([
   "queued",
@@ -20,17 +21,17 @@ const statuses = z.enum([
   "suppressed",
   "failed",
 ]);
-export function registerListingsRoutes(
+export function registerDirectoryRoutes(
   app: Express,
   auth: (req: any, res: any) => any,
   options: {
-    store?: ListingStore;
+    store?: DirectoryStore;
     scope?: (req: Request, res: Response, user: any) => Promise<Scope | null>;
     load?: typeof loadListing;
     budget?: typeof takeBudget;
   } = {},
 ) {
-  const store = options.store ?? new ListingStore(pool);
+  const store = options.store ?? new DirectoryStore(pool);
   const load = options.load ?? loadListing;
   const scopeFor =
     options.scope ??
@@ -52,7 +53,7 @@ export function registerListingsRoutes(
     path: string,
     fn: (req: Request, res: Response, scope: Scope) => Promise<unknown>,
   ) => {
-    app[method]("/api/listings" + path, async (req, res) => {
+    const handler = async (req: Request, res: Response) => {
       const user = auth(req, res);
       if (!user) return;
       try {
@@ -61,13 +62,13 @@ export function registerListingsRoutes(
         if (
           method !== "get" &&
           !(await (options.budget ?? takeBudget)(
-            `listings:${scope.actorId}`,
+            `directories:${scope.actorId}`,
             30,
             1,
             600_000,
           ))
         )
-          throw new ListingError(429, "Too many requests; try again later");
+          throw new DirectoryError(429, "Too many requests; try again later");
         await fn(req, res, scope);
       } catch (error) {
         if (error instanceof z.ZodError) {
@@ -76,17 +77,20 @@ export function registerListingsRoutes(
             .json({ message: "Invalid input", issues: error.issues });
           return;
         }
-        res.status(error instanceof ListingError ? error.status : 500).json({
+        res.status(error instanceof DirectoryError ? error.status : 500).json({
           message:
-            error instanceof ListingError
+            error instanceof DirectoryError
               ? error.message
-              : "Listing operation failed",
+              : "Directory profile operation failed",
         });
       }
-    });
+    };
+    app[method]("/api/directories" + path, handler);
+    // Deprecated compatibility alias; both URLs run exactly the same handler.
+    app[method]("/api/listings" + path, handler);
   };
   const requireAdmin = (scope: Scope) => {
-    if (!scope.admin) throw new ListingError(403, "Platform admins only");
+    if (!scope.admin) throw new DirectoryError(403, "Platform admins only");
   };
   route("get", "/admin/profiles", async (req, res, scope) => {
     requireAdmin(scope);
@@ -146,35 +150,16 @@ export function registerListingsRoutes(
     },
   );
   route("get", "/directories", async (req, res) => {
-    const filters = z
-      .object({
-        kind: z.enum(["api", "aggregator", "partner", "submission"]).optional(),
-        tier: z.coerce.number().int().min(1).max(4).optional(),
-        category: z
-          .enum([
-            "general",
-            "maps_nav",
-            "social",
-            "contractor",
-            "trade_assoc",
-            "manufacturer",
-            "state_local",
-            "ai",
-          ])
-          .optional(),
-        trade: z.string().max(100).optional(),
-        state: z
-          .string()
-          .regex(/^[A-Z]{2}$/)
-          .optional(),
-        active: z
-          .enum(["true", "false"])
-          .transform((value) => value === "true")
-          .optional(),
-      })
-      .strict()
-      .parse(req.query);
-    res.json(await store.directories(filters));
+    const filters = catalogueQuery.parse(req.query);
+    res.json(
+      await store.directories(
+        filters,
+        req.query.limit !== undefined || req.query.offset !== undefined,
+      ),
+    );
+  });
+  route("get", "/directories/facets", async (req, res) => {
+    res.json(await store.directoryFacets(catalogueQuery.parse(req.query)));
   });
   route("get", "/summary", async (req, res, scope) =>
     res.json(
@@ -210,7 +195,10 @@ export function registerListingsRoutes(
     try {
       url = siteUrl(body.listing_url);
     } catch {
-      throw new ListingError(400, "Use a public HTTP(S) listing URL");
+      throw new DirectoryError(
+        400,
+        "Use a public HTTP(S) directory profile URL",
+      );
     }
     res
       .status(201)

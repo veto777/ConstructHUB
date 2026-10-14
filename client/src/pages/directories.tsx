@@ -3,7 +3,6 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { ListChecks } from "lucide-react";
 import { Link } from "wouter";
 import { AppPage, PageHeader, Section } from "@/components/app-ui";
-import { useAgencyFilter } from "@/components/agency-workspace";
 import { useUrlParam } from "@/hooks/use-url-param";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,17 +17,21 @@ import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
   Catalogue,
-  ListingsTable,
+  DirectoryProfilesTable,
   LoadError,
   Summary,
   dateLabel,
   getJson,
   label,
-  refreshListings,
+  refreshDirectories,
   selectClass,
-} from "@/components/listings/common";
-import { ProfileForm } from "@/components/listings/profile-form";
-import type { Directory, ListingProfile, ListingEvent } from "@shared/listings";
+} from "@/components/directories/common";
+import { ProfileForm } from "@/components/directories/profile-form";
+import type {
+  Directory,
+  BusinessProfile,
+  DirectoryEvent,
+} from "@shared/directories";
 
 type Location = {
   id: number;
@@ -36,7 +39,7 @@ type Location = {
   city: string | null;
   gbpLocationName: string | null;
 };
-function AddListing({
+function AddDirectoryProfile({
   profileId,
   directories,
 }: {
@@ -49,18 +52,18 @@ function AddListing({
   const { toast } = useToast();
   const mutation = useMutation({
     mutationFn: () =>
-      apiRequest("POST", "/api/listings", {
+      apiRequest("POST", "/api/directories", {
         profile_id: profileId,
         directory_id: Number(directoryId),
         listing_url: url,
       }),
     onSuccess: async () => {
-      await refreshListings();
+      await refreshDirectories();
       setOpen(false);
       setUrl("");
       setDirectoryId("");
       toast({
-        title: "Listing URL added",
+        title: "Directory profile URL added",
         description: "Re-check it to compare your business details.",
       });
     },
@@ -73,15 +76,15 @@ function AddListing({
           setOpen(true);
         }}
       >
-        Add a listing URL
+        Add a directory profile URL
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add a listing URL</DialogTitle>
+            <DialogTitle>Add a directory profile URL</DialogTitle>
             <DialogDescription>
               Use an existing page for your business on the selected directory.
-              This does not submit a new business listing.
+              This does not submit a new business directory profile.
             </DialogDescription>
           </DialogHeader>
           <form
@@ -111,7 +114,7 @@ function AddListing({
               </select>
             </label>
             <label className="block text-sm">
-              Listing URL
+              Directory profile URL
               <Input
                 required
                 type="url"
@@ -138,8 +141,8 @@ function AddListing({
 }
 function Activity({ locationId }: { locationId: number }) {
   const [after, setAfter] = useState("0");
-  const url = `/api/listings/profiles/${locationId}/events?limit=50&after=${after}`;
-  const query = useQuery<ListingEvent[]>({
+  const url = `/api/directories/profiles/${locationId}/events?limit=50&after=${after}`;
+  const query = useQuery<DirectoryEvent[]>({
     queryKey: [url],
     queryFn: () => getJson(url),
   });
@@ -153,8 +156,14 @@ function Activity({ locationId }: { locationId: number }) {
             {query.data.map((event) => (
               <li key={event.id} className="py-3 text-sm">
                 <p className="font-medium capitalize">
-                  {label(event.type)}
-                  {event.listing_id ? ` · Listing ${event.listing_id}` : ""}
+                  {event.type.endsWith("_checked")
+                    ? "Directory profile checked"
+                    : event.type.endsWith("_added")
+                      ? "Directory profile added"
+                      : label(event.type)}
+                  {event.listing_id
+                    ? ` · Directory profile ${event.listing_id}`
+                    : ""}
                 </p>
                 <p className="text-muted-foreground">{dateLabel(event.at)}</p>
                 {event.detail?.fields && (
@@ -193,15 +202,15 @@ function Activity({ locationId }: { locationId: number }) {
     </>
   );
 }
-function LocationListings({
+function LocationDirectories({
   location,
   directories,
 }: {
   location: Location;
   directories: Directory[];
 }) {
-  const url = `/api/listings/profiles/${location.id}`;
-  const query = useQuery<ListingProfile | null>({
+  const url = `/api/directories/profiles/${location.id}`;
+  const query = useQuery<BusinessProfile | null>({
     queryKey: [url],
     queryFn: () => getJson(url),
   });
@@ -225,48 +234,53 @@ function LocationListings({
         )}
       </Section>
       <Section
-        title="Listings"
-        description="Track existing listing pages and compare their published details."
+        title="Directory profiles"
+        description="Track existing directory profile pages and compare their published details."
       >
         <div className="mb-4">
           {query.data ? (
-            <AddListing profileId={query.data.id} directories={directories} />
+            <AddDirectoryProfile
+              profileId={query.data.id}
+              directories={directories}
+            />
           ) : (
             <p className="text-sm text-muted-foreground">
-              Save a business profile before adding listing URLs.
+              Save a business profile before adding directory profile URLs.
             </p>
           )}
         </div>
-        <ListingsTable locationId={location.id} />
+        <DirectoryProfilesTable locationId={location.id} />
       </Section>
       <Section
         title="Activity"
-        description="Profile updates and listing checks, in time order."
+        description="Profile updates and directory profile checks, in time order."
       >
         <Activity locationId={location.id} />
       </Section>
     </div>
   );
 }
-export default function ListingsPage() {
-  const filter = useAgencyFilter();
+export default function DirectoriesPage() {
+  const [clientId] = useUrlParam("clientId");
+  const locationParams = new URLSearchParams(clientId ? { clientId } : {});
   const locations = useQuery<Location[]>({
-    queryKey: [`/api/locations?${filter.params}`],
+    queryKey: [`/api/locations?${locationParams}`],
   });
   const [selected, setSelected] = useUrlParam("location");
   const chosen = locations.data?.find(
     (location) => String(location.id) === selected,
   );
   const directories = useQuery<Directory[]>({
-    queryKey: ["/api/listings/directories"],
-    queryFn: () => getJson("/api/listings/directories"),
+    queryKey: ["/api/directories/directories"],
+    queryFn: () => getJson("/api/directories/directories"),
+    enabled: !!chosen,
   });
   return (
-    <AppPage width="wide" testId="page-listings" className="space-y-6 pb-16">
+    <AppPage width="wide" testId="page-directories" className="space-y-6 pb-16">
       <PageHeader
         icon={ListChecks}
-        title="Listings & NAP sync"
-        description="Keep your name, address, and phone (NAP) consistent across business directories."
+        title="Directory Sync"
+        description="Keep your business name, address and phone the same on every directory that lists you."
       />
       <Section title="Business location">
         <LoadError
@@ -303,24 +317,20 @@ export default function ListingsPage() {
         )}
         {!chosen && !!locations.data?.length && (
           <p className="mt-3 text-sm text-muted-foreground">
-            Choose a location to view its profile, listings, and activity.
+            Choose a location to view its profile, directory profiles, and
+            activity.
           </p>
         )}
       </Section>
       {chosen && (
-        <LocationListings
+        <LocationDirectories
           key={chosen.id}
           location={chosen}
           directories={directories.data ?? []}
         />
       )}
       <Section title="Directory catalogue">
-        <LoadError
-          error={directories.error}
-          retry={() => void directories.refetch()}
-        />
-        {directories.isLoading && <p role="status">Loading directories…</p>}
-        {directories.data && <Catalogue directories={directories.data} />}
+        <Catalogue />
       </Section>
     </AppPage>
   );
