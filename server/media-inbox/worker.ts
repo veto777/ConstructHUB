@@ -224,7 +224,9 @@ export const outreachPerDay = perDay;
 /** Step 5: queue new vetted directories, then send today's share of first-contact emails (MEDIA_OUTREACH_PER_DAY). */
 export async function sendQueued(): Promise<{ queued: number; sent: number; skipped: number }> {
   const mailbox = mailboxConfig().user;
-  const queued = (await store.queueVettedDirectories(pickEmail, siteName)) + (await store.queueVettedPublishers(pickEmail, siteName));
+  // Directories come only from reviewed research lists (store.queueList): the crawler's directory picks were licence
+  // lookups, chambers and listed businesses' own Gmail addresses (2026-10-14). Publishers need real readers (below).
+  const queued = await store.queueVettedPublishers(pickEmail, siteName);
   const allowance = dailyAllowance(await store.daysSending());
   if (!allowance) return { queued, sent: 0, skipped: 0 };
   const room = Math.max(0, allowance - (await store.outreachSentToday()));
