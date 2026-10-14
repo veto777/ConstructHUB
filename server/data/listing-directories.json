@@ -301,6 +301,29 @@
   "checkedAt": "2026-10-14T00:35:08.605Z"
  },
  {
+  "name": "Roofing Companies Florida - Florida Roofing Company Directory",
+  "domain": "roofingcompaniesflorida.com",
+  "category": "contractor",
+  "trades": [
+   "roofing"
+  ],
+  "states": [
+   "FL"
+  ],
+  "requiresStreetAddress": false,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://roofingcompaniesflorida.com/",
+  "joinUrl": "https://roofingcompaniesflorida.com/list-your-company/",
+  "evidence": "'List your company in Florida's verified directory. Enter your license and company details; RCF checks the license with Florida DBPR before a profile goes live. Free to list.' Directory: 'Search the directory' by city/county across Florida",
+  "notes": "FL-only roofing directory; free listing plus paid Partner/Gold plans; listing form asks Florida license number, company name and email (phone/cities optional); license evidence from Florida DBPR shown on every profile.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
   "name": "Sebago Lake Contractor Index",
   "domain": "sebagolakecontractorindex.com",
   "category": "contractor",
@@ -320,6 +343,27 @@
   "foundBy": "state-04",
   "linkStatus": "verified",
   "checkedAt": "2026-10-13T23:58:19.782Z"
+ },
+ {
+  "name": "Team Dave Logan - Contractor Directory (Denver metro)",
+  "domain": "teamdavelogan.com",
+  "category": "contractor",
+  "trades": null,
+  "states": [
+   "CO"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://teamdavelogan.com/company-categories/painting-contractor-denver-co/",
+  "joinUrl": "https://teamdavelogan.com/how-to-join-our-team/",
+  "evidence": "Best Painting Contractors in the Denver Metro Area; Since 2009, Team Dave Logan has helped millions of Colorado homeowners connect with background-checked, local contractors",
+  "notes": "Colorado (Denver metro) screened-contractor platform covering painting, roofing, plumbing, electrical, HVAC, remodeling, windows, siding, gutters, landscaping, garage doors. Annual screening incl. license verification and insurance.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
  },
  {
   "name": "Washington Contractor Directory",
@@ -381,6 +425,27 @@
   "foundBy": "platforms",
   "linkStatus": "verified",
   "checkedAt": "2026-10-13T23:58:19.782Z"
+ },
+ {
+  "name": "411.info U.S. Business Directory",
+  "domain": "411.info",
+  "category": "general",
+  "trades": null,
+  "states": [
+   "DE"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": false,
+  "membershipRequired": null,
+  "directoryUrl": "https://411.info/business-directory/Delaware",
+  "joinUrl": "https://411.info/manage/business",
+  "evidence": "Business Services in Dover, DE ( 1 - 30 of 54 businesses) Add your business to 411.info(TM) for FREE Click here to start ... (listings show) 2 K B & M (302) 674-6468 20 E Division St Dover , DE 19901-7366",
+  "notes": "General US/Canada directory with Delaware city and category pages; businesses add themselves for free via /manage/business.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
  },
  {
   "name": "AiLOQ",
@@ -623,6 +688,27 @@
   "foundBy": "state-07",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T00:35:08.605Z"
+ },
+ {
+  "name": "Bristol All Heart Community Directory",
+  "domain": "bristolallheart.com",
+  "category": "general",
+  "trades": null,
+  "states": [
+   "CT"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": false,
+  "membershipRequired": false,
+  "directoryUrl": "https://bristolallheart.com/directory/",
+  "joinUrl": "https://bristolallheart.com/directory-request/",
+  "evidence": "APK Electric LLC - Serving All Your Electric Needs - A Bristol-based business, serving anywhere in Connecticut (listed in directory); The following form can be used to submit your Bristol-based organization or business.",
+  "notes": "City of Bristol Economic & Community Development community directory; submissions reviewed and approved by staff before publishing.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
  },
  {
   "name": "Buffalo Niagara Partnership",
@@ -1014,6 +1100,27 @@
   "foundBy": "platforms",
   "linkStatus": "unconfirmed",
   "checkedAt": "2026-10-13T23:58:19.782Z"
+ },
+ {
+  "name": "Georgia Business Journal (gbj.com) - Georgia Business Directory",
+  "domain": "gbj.com",
+  "category": "general",
+  "trades": null,
+  "states": [
+   "GA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": false,
+  "directoryUrl": "https://gbj.com/georgia/swimming-pool-contractors",
+  "joinUrl": null,
+  "evidence": "Swimming Pool Contractors Results - Georgia - Anthony & Sylvan Pools Marietta, Georgia, 30067 ... View Listing",
+  "notes": "Georgia regional business directory with contractor categories (browse by Georgia city/trade); businesses list via 'List Your Business'.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
  },
  {
   "name": "Grand Forks East Grand Forks Chamber",
@@ -6138,6 +6245,168 @@
   "checkedAt": "2026-10-13T23:58:19.782Z"
  },
  {
+  "name": "City and County of Denver - Verify a Contractor's License",
+  "domain": "denvergov.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "CO"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": false,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.denvergov.org/Government/Agencies-Departments-Offices/Agencies-Departments-Offices-Directory/Community-Planning-and-Development/Contractor-Licensing/Contractor-License-Search",
+  "joinUrl": null,
+  "evidence": "Verify a Contractor's License - City and County of Denver; page loads the contractor license search service",
+  "notes": "Business appears automatically once licensed. Denver Community Planning & Development contractor license search (Class A/B/C general + Class D specialty certificates).",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "City of Atlanta - Find a Registered Business (ATLBIZ business license search)",
+  "domain": "atlantaga.gov",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "GA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": false,
+  "membershipRequired": true,
+  "directoryUrl": "https://atlbiz.atlantaga.gov",
+  "joinUrl": "https://www.atlantaga.gov/government/departments/finance/office-of-revenue/apply-for-a-new-business-occupational-tax-certificate",
+  "evidence": "Find a registered business - Use this wizard to find a business registered through the City. A license is required to operate a business within Atlanta city limits.",
+  "notes": "Business appears automatically once licensed/registered. City of Atlanta business (occupational tax) license search; city business services moved from ATLCORE to the ATLBIZ portal (atlbiz.atlantaga.gov) effective Sept 15, 2025. GA trade licenses are state-level.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "City of Aurora - Contractor Lookup Tool",
+  "domain": "auroragov.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "CO"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": false,
+  "membershipRequired": true,
+  "directoryUrl": "https://apps2.auroragov.org/Onlinecontractorlookup/",
+  "joinUrl": null,
+  "evidence": "Contractor Lookup Tool; Type in as much of the business name as you can then click the search button. Or, search by license type.",
+  "notes": "Business appears automatically once licensed. Aurora Building Division online contractor lookup.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "City of Boulder - Find a Licensed Contractor",
+  "domain": "bouldercolorado.gov",
+  "category": "state_local",
+  "trades": [
+   "general",
+   "electrical",
+   "mechanical",
+   "plumbing"
+  ],
+  "states": [
+   "CO"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": false,
+  "membershipRequired": true,
+  "directoryUrl": "https://bouldercolorado.gov/energovcss",
+  "joinUrl": "https://bouldercolorado.gov/services/contractor-licensing",
+  "evidence": "Search for a licensed contractor on our Customer Self Service portal by using the search tool in the black bar; A list of City of Boulder-licensed contractors updates regularly on the City of Boulder Open Data webpage.",
+  "notes": "Business appears automatically once licensed. EnerGov Customer Self-Service portal is the public license search.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "Cobb County, GA - License Search (Accela Citizen Access)",
+  "domain": "cobbcounty.gov",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "GA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": false,
+  "membershipRequired": true,
+  "directoryUrl": "https://cobbca.cobbcounty.gov/CitizenAccess/Cap/CapHome.aspx?IsToShowInspection=yes&module=Licenses&TabName=Licenses",
+  "joinUrl": null,
+  "evidence": "Search for Records - Enter information below to search for records. Site Address, Contractor License Information, Parcel Number, Record Information, Contact Information",
+  "notes": "Business appears automatically once licensed. Cobb County (GA) public license-record search (Accela Citizen Access, module=Licenses); search by Contractor License Information. GA trade licenses are state-level; this is the county business/occupational license record.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "Colorado DORA - Verify a Professional or Business License (Division of Professions and Occupations)",
+  "domain": "colorado.gov",
+  "category": "state_local",
+  "trades": [
+   "plumbing",
+   "electrical"
+  ],
+  "states": [
+   "CO"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": false,
+  "membershipRequired": true,
+  "directoryUrl": "https://apps2.colorado.gov/dora/licensing/Lookup/LicenseLookup.aspx",
+  "joinUrl": null,
+  "evidence": "Verify a Colorado Professional or Business License",
+  "notes": "Business appears automatically once licensed. State-level licensing for plumbing & electrical contractors (DORA/DPO); GC/HVAC/roofing are licensed locally.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "Connecticut eLicense Public License Lookup",
+  "domain": "elicense.ct.gov",
+  "category": "state_local",
+  "trades": [
+   "electrical",
+   "plumbing",
+   "hvac",
+   "general",
+   "solar",
+   "pest_control"
+  ],
+  "states": [
+   "CT"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": false,
+  "membershipRequired": true,
+  "directoryUrl": "https://elicense.ct.gov/lookup/licenselookup.aspx",
+  "joinUrl": "https://portal.ct.gov/dcp/license-services-division/all-license-applications/home-improvement-applications",
+  "evidence": "LICENSE LOOKUP: Search for License, Permit, Certification, or Registration — license type list includes ELECTRICAL, PLUMBING & PIPING, HEATING, PIPING & COOLING, Home Improvement Contractor, New Home Construction Contractor, SOLAR THERMAL SYSTEMS, PESTICIDE BUSINESS",
+  "notes": "Business appears automatically once licensed. Public lookup covers all DCP trade licenses and HIC registrations.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
   "name": "Cranston Chamber of Commerce",
   "domain": "cranstonchamber.com",
   "category": "state_local",
@@ -6157,6 +6426,32 @@
   "foundBy": "state-08",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T00:35:08.605Z"
+ },
+ {
+  "name": "CT DCP Verify a License Permit or Registration",
+  "domain": "portal.ct.gov",
+  "category": "state_local",
+  "trades": [
+   "electrical",
+   "plumbing",
+   "hvac",
+   "general"
+  ],
+  "states": [
+   "CT"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": false,
+  "membershipRequired": true,
+  "directoryUrl": "https://portal.ct.gov/dcp/license-services-division/license-division/verify-a-license-permit-or-registration",
+  "joinUrl": "https://portal.ct.gov/dcp/license-services-division/all-license-applications/home-improvement-applications",
+  "evidence": "eLicense is a public portal that allows users to efficiently search for licenses, permits, and registrations for individuals and businesses ensuring accurate and up-to-date information.",
+  "notes": "Business appears automatically once licensed. DCP verify page; also offers Generate a Roster of licenses, permits, and registrations using eLicense.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
  },
  {
   "name": "Dallas Regional Chamber",
@@ -6226,6 +6521,52 @@
   "checkedAt": "2026-10-14T00:35:08.605Z"
  },
  {
+  "name": "Delaware DELPROS License Look-Up (DPR)",
+  "domain": "delpros.delaware.gov",
+  "category": "state_local",
+  "trades": [
+   "plumbing",
+   "electrical",
+   "hvac"
+  ],
+  "states": [
+   "DE"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": false,
+  "membershipRequired": true,
+  "directoryUrl": "https://delpros.delaware.gov/OH_VerifyLicense",
+  "joinUrl": null,
+  "evidence": "To look up a license, first select 'INDIVIDUAL' or 'FACILITY' under the search option below. Enter your search criteria, then click the ' SEARCH ' button. ... DELPROS online verifications are considered primary source verifications and are free of charge.",
+  "notes": "Business appears automatically once licensed. Covers DE Division of Professional Regulation licenses for home-service trades (master plumbers, electricians, HVAC/refrigeration).",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "Delaware Registered Construction Contractors Registry",
+  "domain": "contractorregistry.delaware.gov",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "DE"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": false,
+  "membershipRequired": true,
+  "directoryUrl": "https://contractorregistry.delaware.gov/",
+  "joinUrl": null,
+  "evidence": "This is a registry of businesses certified as construction contractors in the State of Delaware. ... We found 362 results ... 3 BROTHERS HELP LLC Certificate No. DE-2026-000015023 Trade Name (DBA): Premier Home Solutions Valid until: 05/05/2027 ... Wilmington, DE",
+  "notes": "Business appears automatically once registered under the DE Contractor Registration Act (Office of Contractor Registration, Dept. of Labor). Searchable by name, ZIP, NAICS (incl. roofing, plumbing, electrical, HVAC, remodeling).",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
   "name": "Elevate Rapid City",
   "domain": "elevaterapidcity.com",
   "category": "state_local",
@@ -6268,6 +6609,33 @@
   "checkedAt": "2026-10-14T00:35:08.605Z"
  },
  {
+  "name": "Florida DBPR Online Services - Licensee Search (Verify a Licensee)",
+  "domain": "myfloridalicense.com",
+  "category": "state_local",
+  "trades": [
+   "roofing",
+   "hvac",
+   "plumbing",
+   "electrical",
+   "general"
+  ],
+  "states": [
+   "FL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": false,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.myfloridalicense.com/portalsearches/VerifyLicensee",
+  "joinUrl": null,
+  "evidence": "LICENSEE SEARCH OPTIONS — Search by Name / Search by License Number / Search by City or County / Search by License Type. 'The DBPR Online Services website provides information about applicants and licensed individuals for those professions and businesses that are regulated by the Department.'",
+  "notes": "Business appears automatically once licensed. Covers Florida construction-industry licenses (CILB): certified roofing, air conditioning/HVAC, plumbing, electrical, and general/building/residential contractors.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
   "name": "Frederick County Chamber of Commerce",
   "domain": "frederickchamber.org",
   "category": "state_local",
@@ -6287,6 +6655,32 @@
   "foundBy": "state-04",
   "linkStatus": "verified",
   "checkedAt": "2026-10-13T23:58:19.782Z"
+ },
+ {
+  "name": "Georgia Secretary of State - Professional Licensee Verification (Web Lookup)",
+  "domain": "verify.sos.ga.gov",
+  "category": "state_local",
+  "trades": [
+   "electrical",
+   "plumbing",
+   "hvac",
+   "general"
+  ],
+  "states": [
+   "GA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": false,
+  "membershipRequired": true,
+  "directoryUrl": "https://verify.sos.ga.gov/verification/Search.aspx",
+  "joinUrl": null,
+  "evidence": "Search for a Professional Licensee - Welcome to Web Lookup/Verification",
+  "notes": "Business appears automatically once licensed. State-level licensing via GA Construction Industry Licensing Board (SOS Professional Licensing Boards): Residential & Commercial General Contractors, Conditioned Air (HVAC), Electrical, Plumbing, Low Voltage. Roofing has NO state license in GA. (Live page Cloudflare-protected; verified via official GA Licensing Boards page sos.ga.gov/page/georgia-licensing-boards which links here and lists the boards.)",
+  "foundBy": "state-02",
+  "linkStatus": "unconfirmed",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
  },
  {
   "name": "Grand Island Area Chamber of Commerce",
@@ -7141,6 +7535,31 @@
   "checkedAt": "2026-10-14T00:35:08.605Z"
  },
  {
+  "name": "Larimer County - Contractor Licensing (licensed building contractor search)",
+  "domain": "larimer.gov",
+  "category": "state_local",
+  "trades": [
+   "general",
+   "roofing",
+   "mechanical"
+  ],
+  "states": [
+   "CO"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": false,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.larimer.gov/building/contractor-licensing",
+  "joinUrl": null,
+  "evidence": "The Contractor Licensing Program is created to protect the public health, safety, and welfare of the citizens of unincorporated Larimer County.",
+  "notes": "Business appears automatically once licensed. Page hosts the licensed building contractor search (Search Building Contractors) for unincorporated Larimer County; classes incl. general, roofing, mechanical.",
+  "foundBy": "state-02",
+  "linkStatus": "unconfirmed",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
   "name": "Lewiston Auburn Metropolitan Chamber of Commerce",
   "domain": "lametrochamber.com",
   "category": "state_local",
@@ -7608,6 +8027,27 @@
   "foundBy": "state-06",
   "linkStatus": "verified",
   "checkedAt": "2026-10-13T23:58:19.782Z"
+ },
+ {
+  "name": "New Castle County Licensed Contractor Search",
+  "domain": "newcastlede.gov",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "DE"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": false,
+  "membershipRequired": true,
+  "directoryUrl": "https://www3.newcastlede.gov/contractorlicense/search/",
+  "joinUrl": null,
+  "evidence": "This site allows you to determine whether a contractor is licensed to work in New Castle County. ... Only currently licensed contractors matching your search criteria will be displayed. (Search for 'a' returned: There are 300 license holders matching your search criteria. License Holder Details A & E BUILDERS LLC ... DUCKETT PLUMBING LLC)",
+  "notes": "Business appears automatically once licensed. County contractor license required for work in New Castle County; results show license holder names with detail pages.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
  },
  {
   "name": "New Jersey Chamber of Commerce Business Directory",
@@ -8146,6 +8586,27 @@
   "foundBy": "state-03",
   "linkStatus": "verified",
   "checkedAt": "2026-10-13T23:58:19.782Z"
+ },
+ {
+  "name": "Pikes Peak Regional Building Department - Contractor and Mechanic Search",
+  "domain": "pprbd.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "CO"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": false,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.pprbd.org/Search/ContractorAndMechanic",
+  "joinUrl": null,
+  "evidence": "Contractor and Mechanic Search - Pikes Peak Regional Building Department; search licensed contractors in the city of Colorado Springs and El Paso County.",
+  "notes": "Business appears automatically once licensed. Regional building dept covering Colorado Springs & El Paso County (building trades incl. roofing, mechanical, electrical, plumbing, general).",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
  },
  {
   "name": "Pittsburgh North Regional Chamber",
@@ -8914,6 +9375,27 @@
   "checkedAt": "2026-10-14T00:35:08.605Z"
  },
  {
+  "name": "ABC Delaware Membership Directory",
+  "domain": "abcdelaware.com",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "DE"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.abcdelaware.com/membership/membership-directory/",
+  "joinUrl": "https://www.abcdelaware.com/membership/membership-application/",
+  "evidence": "Membership Directory ... AMP Electric, LLC Electrical Electrical Contractor (302) 337-8050 ... Ansul Construction Company General Contractor, Construction Management (302) 559-9260 ... APEX Mechanical & Fabrication Plumbing Heating, Ventilating, and Air Conditioning (HVAC) (302) 995-6136",
+  "notes": "Associated Builders and Contractors Delaware chapter; public directory lists member firms with trade category, phone and contact email. Membership application required.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
   "name": "ABC Metro Washington Certified Member Firms",
   "domain": "abcmetrowashington.org",
   "category": "trade_assoc",
@@ -9416,6 +9898,29 @@
   "checkedAt": "2026-10-14T00:35:08.605Z"
  },
  {
+  "name": "Associated Landscape Contractors of Colorado (ALCC) - Find a Landscape Pro",
+  "domain": "alcc.com",
+  "category": "trade_assoc",
+  "trades": [
+   "landscaping"
+  ],
+  "states": [
+   "CO"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.alcc.com/find-a-landscape-professional",
+  "joinUrl": "https://www.alcc.com/join",
+  "evidence": "Use our find-a-pro search engine to find landscape professionals in your area",
+  "notes": "Public find-a-pro search (residential / commercial / other); membership via Join ALCC page.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
   "name": "Associated Roofing Contractors of Oregon & Southwest Washington",
   "domain": "arcosww.org",
   "category": "trade_assoc",
@@ -9487,6 +9992,71 @@
   "foundBy": "state-06",
   "linkStatus": "verified",
   "checkedAt": "2026-10-13T23:58:19.782Z"
+ },
+ {
+  "name": "Atlanta Electrical Contractors Association (AECA) - Member Directory",
+  "domain": "atlantaelectrical.org",
+  "category": "trade_assoc",
+  "trades": [
+   "electrical"
+  ],
+  "states": [
+   "GA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://atlantaelectricalcontractorsassociation.growthzoneapp.com/activememberdirectory",
+  "joinUrl": "https://atlantaelectrical.org/join-aeca/",
+  "evidence": "Need a qualified electrical contractor? Our directory features experienced, trusted, and certified professionals across Georgia.",
+  "notes": "Public member directory (GrowthZone) with Associate Member / Contractor Member filter. Atlanta chapter of NECA. Membership required.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "Augusta Metro Chamber of Commerce - Member Directory",
+  "domain": "augustametrochamber.com",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "GA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.augustametrochamber.com/members",
+  "joinUrl": "https://www.augustametrochamber.com/membership-information",
+  "evidence": "The Augusta Metro Chamber is the largest business membership organization in the area - we are 1,200 members strong and growing! ... Access the Member Directory",
+  "notes": "chamber of commerce - member directory. Public GrowthZone member directory with public member profile pages.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "Aurora Chamber of Commerce - Business Directory",
+  "domain": "aurorachamber.org",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "CO"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.aurorachamber.org/list",
+  "joinUrl": null,
+  "evidence": "Business Directory Search (business.aurorachamber.org/list, linked from aurorachamber.org as 'Browse Online Directory')",
+  "notes": "chamber of commerce - member directory.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
  },
  {
   "name": "AZNECA — Arizona Chapter of NECA Member Listings",
@@ -9575,6 +10145,27 @@
   "checkedAt": "2026-10-14T00:35:08.605Z"
  },
  {
+  "name": "Boulder Chamber - Active Member Directory",
+  "domain": "boulderchamber.com",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "CO"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.boulderchamber.com/active-member-directory",
+  "joinUrl": null,
+  "evidence": "Member Directory - Active Member Directory - Search Radius... 1 mi 5 mi 10 mi 50 mi 100 mi - 0-9 A B C D... Advertising & Media...",
+  "notes": "chamber of commerce - member directory.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
   "name": "BPI Contractor Locator",
   "domain": "bpi.org",
   "category": "trade_assoc",
@@ -9597,6 +10188,27 @@
   "foundBy": "assoc-national",
   "linkStatus": "verified",
   "checkedAt": "2026-10-13T23:58:19.782Z"
+ },
+ {
+  "name": "Bridgeport Regional Business Council Member Directory",
+  "domain": "brbc.org",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "CT"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.brbc.org/activememberdirectory",
+  "joinUrl": "https://business.brbc.org/ap/Membership/Application/yr4qY1pl",
+  "evidence": "Directory of Our Valued Members — Results: 14 — Ralph & Rich's Inc. 815 Main Street, Bridgeport, CT 06604 (203) 366-3597",
+  "notes": "chamber of commerce — member directory. BRBC covers Bridgeport, Stratford, Trumbull chambers; GrowthZone directory browse by letter/category with addresses and phones.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
  },
  {
   "name": "Buffalo Niagara Builders Association",
@@ -9748,6 +10360,27 @@
   "foundBy": "state-06",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T00:35:08.605Z"
+ },
+ {
+  "name": "Builders Association of South Florida (BASF) - Member Directory",
+  "domain": "basfonline.org",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "FL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.basfonline.org/list/",
+  "joinUrl": null,
+  "evidence": "Member Directory Search — All Categories... Builder- Building Contractors, Builder- Custom Homes, Builder-General Contractors, Roofing Contractors, Windows",
+  "notes": "Miami-Dade/Broward HBA (Building Great Cities since 1944); directory hosted on ChamberMaster (business.basfonline.org); no public join page found on basfonline.org.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
  },
  {
   "name": "Builders Exchange of East Central Ohio",
@@ -10009,6 +10642,27 @@
   "checkedAt": "2026-10-13T23:58:19.782Z"
  },
  {
+  "name": "Central Connecticut Chambers of Commerce Member Directory",
+  "domain": "centralctchambers.org",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "CT"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.centralctchambers.org/member-directory",
+  "joinUrl": "https://business.centralctchambers.org/membership-application",
+  "evidence": "Member Directory — Results: 47 — Pinnacle Dental, 218 Main Street, Farmington, CT 06032 (860) 470-3660",
+  "notes": "chamber of commerce — member directory. GrowthZone directory for Bristol, Berlin, Plainville, Plymouth, Wolcott area.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
   "name": "Central Nebraska Home Builders Association",
   "domain": "centralnebraskahba.org",
   "category": "trade_assoc",
@@ -10070,6 +10724,27 @@
   "foundBy": "state-10",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T00:35:08.605Z"
+ },
+ {
+  "name": "Chamber of Commerce of Eastern Connecticut Member Directory",
+  "domain": "chamberect.com",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "CT"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://info.chamberect.com/list",
+  "joinUrl": "https://info.chamberect.com/member-application",
+  "evidence": "Member Directory — Use this directory to explore a list of our valued member businesses and organizations in eastern Connecticut and beyond. — Results: 34 incl. R & W Heating Energy Solutions LLC, 10 Witter Road, Salem, CT 06420",
+  "notes": "chamber of commerce — member directory. GrowthZone directory; search by radius, letter, category.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
  },
  {
   "name": "Chicago Roofing Contractors Association",
@@ -10142,6 +10817,71 @@
   "checkedAt": "2026-10-14T00:35:08.605Z"
  },
  {
+  "name": "Colorado Chamber of Commerce - Members",
+  "domain": "cochamber.com",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "CO"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://cochamber.com/membership/partner-members/",
+  "joinUrl": "https://cochamber.com/membership/benefits/",
+  "evidence": "Colorado Chamber Members - Investors; Gold Partners, Aluminum Partners, Silver Partners, Bronze Partners: AAA, American Furniture Warehouse, Anschutz Corporation, Ardent Mills...",
+  "notes": "chamber of commerce - member directory (public list of member companies by investor tier; not searchable).",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "Colorado Roofing Association - Member Directory",
+  "domain": "coloradoroofing.org",
+  "category": "trade_assoc",
+  "trades": [
+   "roofing"
+  ],
+  "states": [
+   "CO"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.coloradoroofing.org/members/",
+  "joinUrl": "https://www.coloradoroofing.org/register",
+  "evidence": "Member Directory - Colorado Roofing Association; While our contractors do meet set requirements to join the CRA",
+  "notes": "Public member directory (list/map, filterable); 'Contractor Search' view filters member type. Join via membership registration.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "Colorado Springs Chamber & EDC - Business Directory",
+  "domain": "coloradospringschamberedc.com",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "CO"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.coloradospringschamberedc.com/list/",
+  "joinUrl": "https://business.coloradospringschamberedc.com/member-application",
+  "evidence": "Member Directory - Directory of Our Valued Members - Search Radius... 1 mi 5 mi 10 mi... A B C D... Advertising & Media...",
+  "notes": "chamber of commerce - member directory.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
   "name": "Community Associations Institute New Jersey Chapter",
   "domain": "cainj.org",
   "category": "trade_assoc",
@@ -10161,6 +10901,122 @@
   "foundBy": "state-06",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T00:35:08.605Z"
+ },
+ {
+  "name": "Conditioned Air Association of Georgia (CAAG) - Member Directory",
+  "domain": "caag.org",
+  "category": "trade_assoc",
+  "trades": [
+   "hvac"
+  ],
+  "states": [
+   "GA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.caag.org/directories",
+  "joinUrl": "https://www.caag.org/join-now",
+  "evidence": "Providing a centralized listing of all current CAAG members, making it easy to find and connect with individuals and organizations within the CAAG community.",
+  "notes": "Public member directory (list/map) of Georgia HVAC-R contractors, e.g. Action Air Conditioning and Heating Co., Absolute Comfort Air Conditioning with addresses. Membership required.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "Connecticut Heating & Cooling Contractors Association Find a Contractor",
+  "domain": "chcca.net",
+  "category": "trade_assoc",
+  "trades": [
+   "hvac",
+   "plumbing"
+  ],
+  "states": [
+   "CT"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://members.chcca.net/find-a-contractor/",
+  "joinUrl": "https://members.chcca.net/applicationtojoin",
+  "evidence": "Find a Contractor — Results: 10 — C & G Heating & A/C - 977 East Main Street, Torrington, CT 06790 - (860) 482-3400",
+  "notes": "Browse by letter or category (Air Conditioning, Heating, Plumbing, Residential, Solar, Geothermal, Controls); powered by GrowthZone.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "Connecticut Nursery & Landscape Association Find a Professional",
+  "domain": "cnla.biz",
+  "category": "trade_assoc",
+  "trades": [
+   "landscaping"
+  ],
+  "states": [
+   "CT"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.cnla.biz/consumers/find-a-professional/",
+  "joinUrl": "https://www.cnla.biz/membership/",
+  "evidence": "Use the search fields below to find a professional in your area. — map data lists members such as Al's Landscaping Co, 204 Kelsey St, Newington, Connecticut 06111 (Arborist, Landscaper, Retail Nursery / Garden Center)",
+  "notes": "Search by category (e.g. landscaper), ZIP and radius; member businesses shown on map with categories.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "Connecticut Roofing Contractors Association Contractor Members",
+  "domain": "crcainc.org",
+  "category": "trade_assoc",
+  "trades": [
+   "roofing"
+  ],
+  "states": [
+   "CT"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "http://crcainc.org/contractor-members/",
+  "joinUrl": "http://crcainc.org/membership/",
+  "evidence": "Contractor Members — Accurate Sheet Metal and Copper Works, LLC _Commercial Contractor_ 94 Gracey Avenue, Meriden, CT 06450 Phone: 203-941-4949",
+  "notes": "Public page lists residential and commercial roofing contractor members with address, phone, email, website.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "Connecticut Tree Protective Association Find An Arborist",
+  "domain": "ctpa.org",
+  "category": "trade_assoc",
+  "trades": [
+   "tree_service"
+  ],
+  "states": [
+   "CT"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://ctpa.org/find-arborist/",
+  "joinUrl": null,
+  "evidence": "To find CTPA members, including CTPA members who are licensed arborists, use the searchable CTPA Membership Directory.",
+  "notes": "Searchable membership directory of CT tree care/arborist companies; individual member pages exist (e.g. E Andersen Landscape Contractor LLC). Membership join page not retrievable (site 403 on curl).",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
  },
  {
   "name": "Contractors Association of West Virginia",
@@ -10252,6 +11108,142 @@
   "checkedAt": "2026-10-14T00:35:08.605Z"
  },
  {
+  "name": "Delaware Nursery & Landscape Association Member Directory",
+  "domain": "dnlaonline.org",
+  "category": "trade_assoc",
+  "trades": [
+   "landscaping",
+   "nursery",
+   "lawn care",
+   "tree service",
+   "irrigation",
+   "snow removal",
+   "garden center"
+  ],
+  "states": [
+   "DE"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://dnlaonline.org/member-directory/",
+  "joinUrl": "https://dnlaonline.org/for-professionals/join-the-dnla/",
+  "evidence": "Professional Services: Member Directory - Services Offered Through Our Trusted Network of Professionals ... (members listed) AC Landscaping & Hardscaping LLC, Ace Property Solutions Inc., Angelica Nurseries, Inc, Ashton Pools By Design, Atlantic Landscapes ... Jump to page: 1 of 10",
+  "notes": "Public member directory with service-type and county filters (New Castle/Kent/Sussex). Member listings render via JavaScript (verified in headless browser).",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "Delaware Pest Control Association Member Directory",
+  "domain": "depca.wildapricot.org",
+  "category": "trade_assoc",
+  "trades": [
+   "pest control"
+  ],
+  "states": [
+   "DE"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://depca.wildapricot.org/directory",
+  "joinUrl": "https://depca.wildapricot.org/page-18055",
+  "evidence": "Found: 21 ... Company Name Website - Accurate Termite & Pest Control (7) www.accurate.pro ... Brasure's Pest Control, Inc. (5) www.brasurespestcontrol.com ... Wilkins Wildlife & BedBug 911 (1). Join page: Membership in the Delaware Pest Control Association is split into two membership categories: Active Membership includes licensed Pest Control Operators.",
+  "notes": "Wild Apricot directory of DE pest control companies with websites. Member listings render via JavaScript (verified in headless browser).",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "Delaware Small Business Chamber Member Directory",
+  "domain": "dsbchamber.com",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "DE"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.dsbchamber.com/member-directory",
+  "joinUrl": "https://www.dsbchamber.com/join-us-today",
+  "evidence": "Business Directory - Member Directory ... (categories include) Construction, Contractor, Electrical, Heating & Air Services, Hvac, Home Improvements, Landscaping, Painting, Pest Control, Plumbing, Roofing, Tree Services ... RAPA Scrapple - Ralph and Paul Adams, Inc 800-338-4727 Contact",
+  "notes": "chamber of commerce — member directory. Statewide small-business chamber based in Newark DE; searchable by category/city/ZIP, listings render via JavaScript (verified in headless browser).",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "Delaware State Chamber of Commerce Member Directory",
+  "domain": "dscc.com",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "DE"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://web.dscc.com/atlas/directory/search",
+  "joinUrl": "https://www.dscc.com/whythechamber.html",
+  "evidence": "MEMBER DIRECTORY ... Popular Categories: Banks, Nonprofit Organizations, Insurance Agents ... (category page) Filters 15 of 15 Results - Ballard Spahr LLP (302) 252-4465 ... 222 Delaware Ave 10th Floor, Wilmington, DE 19801 www.ballardspahr.com. Join page: Greater SEO through a listing on DSCC Membership Directory",
+  "notes": "chamber of commerce — member directory. Atlas platform; listings render via JavaScript (verified in headless browser).",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "Delaware Union Contractors Association Membership Directory",
+  "domain": "ducabuilds.com",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "DE"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://ducabuilds.com/duca-membership-directory/",
+  "joinUrl": "https://ducabuilds.com/membership-application/",
+  "evidence": "The Delaware Union Contractors Association's mission is to assist and promote the collective interests of Union Contractors ... Delaware Construction Cleaning LLC Contact: Carie Dennis-Mayer, President Phone: (302) 494-6576 ... Address: 1722 Newport Gap Pike, Wilmington, DE 19808",
+  "notes": "Union contractors directory with trade filters (carpentry, concrete, electrical, mechanical, masonry, landscaping...). Many listed firms are PA/NJ-based signatory contractors working in DE.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "Denver Metro Chamber of Commerce - Member Directory",
+  "domain": "denverchamber.org",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "CO"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://denverchamber.org/member/member-directory/",
+  "joinUrl": null,
+  "evidence": "Search the directory and start connecting with business leaders across Colorado who share your drive for growth and impact.",
+  "notes": "chamber of commerce - member directory (searchable with category filters).",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
   "name": "Eastern Oklahoma Chapter NECA",
   "domain": "eocneca.com",
   "category": "trade_assoc",
@@ -10321,6 +11313,27 @@
   "checkedAt": "2026-10-13T23:58:19.782Z"
  },
  {
+  "name": "Fairfield County NEX Chamber CT Directory",
+  "domain": "fairfieldcountychamber.org",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "CT"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.fairfieldcountychamber.org/search_results",
+  "joinUrl": "https://www.fairfieldcountychamber.org/join",
+  "evidence": "Small Businesses - Find & Compare small business Professionals — search for roofing returns 5 of 5 Results incl. North East Roofing and Home Improvement, Stamford, Connecticut, View Listing",
+  "notes": "chamber of commerce — member directory. Homepage also shows Recent Members with city and View Listing links.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
   "name": "Fayetteville Chamber of Commerce — Active Member Directory",
   "domain": "business.fayettevillear.com",
   "category": "trade_assoc",
@@ -10361,6 +11374,121 @@
   "foundBy": "state-06",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T00:35:08.605Z"
+ },
+ {
+  "name": "Florida Pest Management Association (FPMA) - Online Directory (Find-A-Pro)",
+  "domain": "flpma.org",
+  "category": "trade_assoc",
+  "trades": [
+   "pest_control"
+  ],
+  "states": [
+   "FL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://flpma.org/AF_MemberDirectory.asp",
+  "joinUrl": "https://flpma.org/join-fpma",
+  "evidence": "Online Directory — Directory Search — 'Looking for a Pest Management Professional? Choose from the Directory Categories headed by \"PMP\"' (PMP: Ants, Bats, Bedbugs...); join page: 'FPMA members can maintain a company listing in our online directory, helping consumers find pest management professionals throughout Florida.'",
+  "notes": "Statewide pest control association based in Oakland, FL; directory search is public.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "Florida Roofing & Sheet Metal Contractors Association (FRSA) - Member Search / Find a Contractor",
+  "domain": "floridaroof.com",
+  "category": "trade_assoc",
+  "trades": [
+   "roofing"
+  ],
+  "states": [
+   "FL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.floridaroof.com/member-search/index",
+  "joinUrl": "https://www.floridaroof.com/Membership-Information-6-33.html",
+  "evidence": "Member Search — Find a Contractor — search by City, County, or Company; member categories include 'Contractor in FL'",
+  "notes": "FRSA represents over 1,000 member companies; Membership Information page: 'Join Now ... Join today!' (frsa.org domain is parked; association now at floridaroof.com).",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "Florida Solar Energy Industries Association (FlaSEIA) - Member Directory / Find an Installer",
+  "domain": "flaseia.org",
+  "category": "trade_assoc",
+  "trades": [
+   "solar"
+  ],
+  "states": [
+   "FL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://members.flaseia.org/directory",
+  "joinUrl": "https://members.flaseia.org/join",
+  "evidence": "Current FlaSEIA members — 'Directory of Our Valued Members' — search radius 1/5/10/50/100 mi, A-Z browse, category filter (Consultant, Contractor, Distributor, Engineer...); site nav has 'Find an Installer'",
+  "notes": "Join page: 'Join FlaSEIA Instructions — By completing this membership application, you are authorizing FlaSEIA...'",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "Florida Swimming Pool Association (FSPA) - Member Directory (Find a Pro)",
+  "domain": "floridapoolpro.com",
+  "category": "trade_assoc",
+  "trades": [
+   "pools"
+  ],
+  "states": [
+   "FL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://members.floridapoolpro.com/search",
+  "joinUrl": "https://fspa.com/pool-pros/",
+  "evidence": "Member Directory — Search | Advanced Search | New Members | All Categories — Search by Category: Builder or Installer, Service (Cleaning / Water Treatment / Maintenance), Service (Full service / Repairs), Solar, Hot Tubs, Leak Detection",
+  "notes": "fspa.com/pool-pros/: 'Find a proven Florida Pool Pro in your area — Search Directory' and 'Become a Member ... Apply Online'.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "FNGLA (Florida Nursery, Growers and Landscape Association) - Member Map",
+  "domain": "fngla.org",
+  "category": "trade_assoc",
+  "trades": [
+   "landscaping"
+  ],
+  "states": [
+   "FL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.fngla.org/about-fngla/about/member-map",
+  "joinUrl": "https://www.fngla.org/membership/join-fngla",
+  "evidence": "FNGLA Member Map — 'Member Organizations — Show/Hide Filters' with Chapter, Division, County, Company and Zip filters; member markers load via Google Maps JS",
+  "notes": "Join page: 'Join Us: Strengthening the Green Industry Together'; member map is a public searchable directory of FNGLA member businesses.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
  },
  {
   "name": "Fort Smith Regional Chamber of Commerce — Member Directory",
@@ -10406,6 +11534,27 @@
   "checkedAt": "2026-10-14T00:35:08.605Z"
  },
  {
+  "name": "Four Corners Builders Association - Member Directory",
+  "domain": "fourcornersbuilders.com",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "CO"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.fourcornersbuilders.com/members",
+  "joinUrl": "https://www.fourcornersbuilders.com/application",
+  "evidence": "Members of the Four Corners Builders Association Listed by Business Category",
+  "notes": "SW Colorado (Durango/Four Corners) builders association; category pages list member companies with phone, contact and website.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
   "name": "General Contractors Association of Hawaii",
   "domain": "gcahawaii.org",
   "category": "trade_assoc",
@@ -10425,6 +11574,96 @@
   "foundBy": "state-03",
   "linkStatus": "verified",
   "checkedAt": "2026-10-13T23:58:19.782Z"
+ },
+ {
+  "name": "Georgia Chamber of Commerce - Business Directory",
+  "domain": "gachamber.com",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "GA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://my.gachamber.com/business-directory?state=GA",
+  "joinUrl": null,
+  "evidence": "Business Directory - Search by Company Name /Keyword /Website ... 154 Advisors 1707 E Clifton Rd NE Atlanta, GA 30307-1247 US County: DeKalb",
+  "notes": "chamber of commerce - member directory. Statewide Georgia Chamber public business directory (search by company, industry, city, state, zip).",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "Georgia Pest Control Association (GPCA) - Active Members",
+  "domain": "gpca.org",
+  "category": "trade_assoc",
+  "trades": [
+   "pest_control"
+  ],
+  "states": [
+   "GA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.gpca.org/active-members",
+  "joinUrl": "https://www.gpca.org/membership-information",
+  "evidence": "All Exterminating Company - Georgia Pest Control Association ... Back to Active Members ... Company Member Region 4 Contact 2034 Beaver Ruin Road Norcross, Georgia",
+  "notes": "Public Active Members directory (search by postal code / city, list+map) with public member profile pages. Membership required.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "Georgia Roofing Contractors Association (GARCA) - Member Directory",
+  "domain": "garca.org",
+  "category": "trade_assoc",
+  "trades": [
+   "roofing"
+  ],
+  "states": [
+   "GA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://garca.org/page-1221378",
+  "joinUrl": "https://garca.org/join",
+  "evidence": "Welcome to the GARCA Member Directory! GARCA is comprised of Contractors and Associates that supply services to the roofing industry.",
+  "notes": "Public member directory browsable by county and by Commercial (Low Slope) / Residential (Steep Slope). Membership required.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "Greater Atlanta Home Builders Association (GAHBA) - Membership Directory",
+  "domain": "atlantahomebuilders.com",
+  "category": "trade_assoc",
+  "trades": [
+   "general"
+  ],
+  "states": [
+   "GA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.atlantahomebuilders.com/membership-directory",
+  "joinUrl": "https://www.atlantahomebuilders.com/become-a-member",
+  "evidence": "Membership Directory - Greater Atlanta Home Builders Association; Search Filters ... Member Type: Builder Member, Remodeler Member, Associate Member",
+  "notes": "Public member directory with search filters (counties, member type incl. Builder and Remodeler). Free member directory listing is a membership benefit. Chapters incl. Cobb, Cherokee, Forsyth, Gwinnett.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
  },
  {
   "name": "Greater Birmingham Association of Home Builders - Professional Services Directory",
@@ -10601,6 +11840,69 @@
   "checkedAt": "2026-10-13T23:58:19.782Z"
  },
  {
+  "name": "Greater Miami Chamber of Commerce (GMCC) - Member Directory",
+  "domain": "miamichamber.com",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "FL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://web.miamichamber.com/atlas/directory/search",
+  "joinUrl": "https://www.miamichamber.com/members",
+  "evidence": "miamichamber.com site menu lists 'Members — Member Directory' linking to web.miamichamber.com/atlas/directory/search (GrowthZone Atlas directory app; opened page loads 'Atlas Loading secure content...')",
+  "notes": "chamber of commerce — member directory. JS-rendered directory; /members page explains membership levels ('Small Business (General) $820 ... Join us today').",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "Greater New Haven Chamber of Commerce Directory",
+  "domain": "gnhcc.com",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "CT"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://directory.gnhcc.com/",
+  "joinUrl": "https://gnhcc.com/membership",
+  "evidence": "Home Page | GNHCC Directory — Search Listings in Contractor Showing 10 of 20 results",
+  "notes": "chamber of commerce — member directory. Categories include Contractor, Construction, Home Services; listings show city and contact links.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "Greater Orlando Builders Association (GOBA) - Member Directory",
+  "domain": "greaterorlandoba.com",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "FL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://members.greaterorlandoba.com/list/",
+  "joinUrl": "https://www.greaterorlandoba.com/membership-information/",
+  "evidence": "Member Directory Search — All Categories... BUILDERS, CUSTOM HOME BUILDER, CONCRETE/CONCRETE COATING & PUMPING, ELECTRICAL (public GrowthZone member directory)",
+  "notes": "Local HBA for Orange, Seminole, Osceola counties; membership page: 'THREE MEMBERSHIPS FOR THE PRICE OF ONE! LOCAL MEMBERSHIP: GOBA'.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
   "name": "Greater Peoria Contractors and Suppliers Association",
   "domain": "gpcsa.org",
   "category": "trade_assoc",
@@ -10664,6 +11966,27 @@
   "checkedAt": "2026-10-14T00:35:08.605Z"
  },
  {
+  "name": "Gwinnett Chamber of Commerce - Member Directory",
+  "domain": "gwinnettchamber.org",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "GA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://web.gwinnettchamber.org/search",
+  "joinUrl": null,
+  "evidence": "Member Directory (web.gwinnettchamber.org/search) with category browse (/Organizations/Trade-Organizations, /Organizations/Associations, ...); public member profile pages, e.g. 'Metro Atlanta Chamber' at /Organizations/Metro-Atlanta-Chamber-16372",
+  "notes": "chamber of commerce - member directory. Metro-Atlanta (Gwinnett County) chamber public member directory. Included because Metro Atlanta Chamber (metroatlantachamber.com) has no public member directory.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
   "name": "Hawaii Island Contractors Association",
   "domain": "hicassociation.com",
   "category": "trade_assoc",
@@ -10685,6 +12008,27 @@
   "checkedAt": "2026-10-13T23:58:19.782Z"
  },
  {
+  "name": "HBA of Metro Denver - Member Directory",
+  "domain": "hbadenver.com",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "CO"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.hbadenver.com/list/",
+  "joinUrl": "https://www.hbadenver.com/hba-membership-details/",
+  "evidence": "HBA Member Directory Search - GrowthZone - HBA of Metro Denver",
+  "notes": "Public member directory of builders, remodelers and trade partners; two membership categories (Builder and Associate).",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
   "name": "HBA of Metro Mobile - Active Member Directory",
   "domain": "hbamm.com",
   "category": "trade_assoc",
@@ -10704,6 +12048,30 @@
   "foundBy": "state-01",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T00:35:08.605Z"
+ },
+ {
+  "name": "Home Builders & Remodelers Association of Connecticut Member Directory",
+  "domain": "hbra-ct.org",
+  "category": "trade_assoc",
+  "trades": [
+   "general",
+   "remodeling"
+  ],
+  "states": [
+   "CT"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://hbra-ct.org/directory/",
+  "joinUrl": "https://hbra-ct.org/membership/",
+  "evidence": "Directory — 1-800 Water Damage of Fairfield & Westchester, 14B Trowbridge Dr, Bethel CT 06801 (live directory data via embedded MembershipWorks widget, org 28778, ~827 member entries)",
+  "notes": "Statewide HBRA; 3-in-1 membership with local HBRA chapters and NAHB. Directory lists builders, remodelers and allied businesses with addresses.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
  },
  {
   "name": "Home Builders and Remodelers Association of Cape Cod",
@@ -10872,6 +12240,27 @@
   "foundBy": "state-05",
   "linkStatus": "verified",
   "checkedAt": "2026-10-13T23:58:19.782Z"
+ },
+ {
+  "name": "Home Builders Association of Delaware Active Member Directory",
+  "domain": "hbade.org",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "DE"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.hbade.org/list",
+  "joinUrl": "https://business.hbade.org/member-application",
+  "evidence": "Active Member Directory - Directory of Our Valued Members ... Roofing/Siding/Sheet Metal Work; Plumbing/Heating/Airconditioning; Remodelers (member example: ACC Exterior, LLC - Send Email / Visit Website). Join page: Select An Option Builder Price of Level Selected (Price Range: $935 - $9900 Annually)",
+  "notes": "GrowthZone directory with trade categories and radius/ZIP search; join via membership application with annual dues.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
  },
  {
   "name": "Home Builders Association of Fort Wayne",
@@ -11044,6 +12433,29 @@
   "checkedAt": "2026-10-13T23:58:19.782Z"
  },
  {
+  "name": "Home Builders Association of Greater Savannah - Find a Professional",
+  "domain": "homebuildersofsavannah.com",
+  "category": "trade_assoc",
+  "trades": [
+   "general"
+  ],
+  "states": [
+   "GA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.homebuildersofsavannah.com/find-a-professional/",
+  "joinUrl": "https://www.homebuildersofsavannah.com/home-builders-membership/",
+  "evidence": "Find a Professional - Home Builders Association of Greater Savannah; Category Any Accounting Advertising Alarm Systems Appliances Appraiser Attorney ...",
+  "notes": "Public member directory browsable by trade category. Local HBA chapter. Membership required.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
   "name": "Home Builders Association of Greater Springfield Home Pros",
   "domain": "hbaspringfield.com",
   "category": "trade_assoc",
@@ -11212,6 +12624,27 @@
   "checkedAt": "2026-10-13T23:58:19.782Z"
  },
  {
+  "name": "Home Builders Association of Northern Colorado (NoCo HBA) - Membership Directory",
+  "domain": "nocohba.com",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "CO"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.nocohba.com/membership-directory",
+  "joinUrl": "https://www.nocohba.com/membership-information",
+  "evidence": "Membership Directory - Home Builders Association of Northern Colorado; Membership Directory Search Filters Business Category",
+  "notes": "Public membership directory with business-category filters (builders, roofers, electricians, HVAC, etc.).",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
   "name": "Home Builders Association of Northwest Louisiana",
   "domain": "nwlahba.org",
   "category": "trade_assoc",
@@ -11339,6 +12772,27 @@
   "foundBy": "state-08",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T00:35:08.605Z"
+ },
+ {
+  "name": "Housing & Building Association of Colorado Springs (CSHBA) - Member Directory",
+  "domain": "cshba.com",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "CO"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://members.cshba.com/active-member-directory",
+  "joinUrl": "https://cshba.com/join/",
+  "evidence": "CSHBA Member Directory; Looking for a builder, contractor, supplier, or service provider? Our Member Directory makes it easy to co",
+  "notes": "Public active-member directory; join page at cshba.com/join.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
  },
  {
   "name": "Huntsville Madison County Builders Association (We Build North Alabama) - Find Your Builder",
@@ -11569,6 +13023,29 @@
   "foundBy": "state-09",
   "linkStatus": "unconfirmed",
   "checkedAt": "2026-10-14T00:35:08.605Z"
+ },
+ {
+  "name": "IEC New England Member Directory",
+  "domain": "iecne.org",
+  "category": "trade_assoc",
+  "trades": [
+   "electrical"
+  ],
+  "states": [
+   "CT"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.iecne.org/membership/member-directory/",
+  "joinUrl": "https://www.iecne.org/membership/",
+  "evidence": "IEC-NE Contractor Members; A & S Electrical Services | Durham, CT; Advantage Electrical Services, Inc. | Danbury, CT",
+  "notes": "Independent Electrical Contractors of New England represents CT electrical contractors; directory lists contractor members by city.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
  },
  {
   "name": "IICRC Global Locator",
@@ -11895,6 +13372,27 @@
   "foundBy": "assoc-national",
   "linkStatus": "verified",
   "checkedAt": "2026-10-13T23:58:19.782Z"
+ },
+ {
+  "name": "JAX Chamber (Jacksonville) - Member Directory",
+  "domain": "jaxchamber.com",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "FL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://members.jaxchamber.com/search",
+  "joinUrl": "https://jaxchamber.com/joinnow/",
+  "evidence": "Members.jaxchamber.com/search — 'Member Directory' with directory search controls (Directory1$DirectorySearch1$txtKeyword / btnSimpleSearch); nav: 'Expand Your Network — Find Your Council — Member Directory' and 'Join Now'",
+  "notes": "chamber of commerce — member directory.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
  },
  {
   "name": "Kansas Chapter NECA",
@@ -12460,6 +13958,27 @@
   "checkedAt": "2026-10-14T00:35:08.605Z"
  },
  {
+  "name": "MetroHartford Alliance Business Directory",
+  "domain": "metrohartford.com",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "CT"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://web.metrohartford.com/directory",
+  "joinUrl": "https://www.metrohartford.com/investing-in-the-mha/",
+  "evidence": "To view the full list of Alliance Investors, click here. — listings include AARP Connecticut, 21 Oak St, Hartford, CT 06106, (860) 548-3161",
+  "notes": "chamber of commerce — member directory. Search by keyword/category/city; full investor roster public (results.aspx?affcode=member).",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
   "name": "Michigan Chapter NECA member directory",
   "domain": "michiganneca.org",
   "category": "trade_assoc",
@@ -12928,6 +14447,29 @@
   "checkedAt": "2026-10-13T23:58:19.782Z"
  },
  {
+  "name": "NARI Atlanta - Find a Contractor (Remodelers)",
+  "domain": "nariatlanta.org",
+  "category": "trade_assoc",
+  "trades": [
+   "general"
+  ],
+  "states": [
+   "GA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.nariatlanta.org/directory",
+  "joinUrl": "https://www.nariatlanta.org/membership-information",
+  "evidence": "Atlanta-area Contractors and Remodelers - Find A Contractor - Contractors/Remodelers - Vendors, Suppliers & Service Providers - Search By Name",
+  "notes": "Public member directory of remodeling contractors (search by name / near address). NARI Atlanta chapter. Membership required.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
   "name": "NARI Find a Professional Remodeler",
   "domain": "nari.org",
   "category": "trade_assoc",
@@ -13098,6 +14640,29 @@
   "foundBy": "state-01",
   "linkStatus": "verified",
   "checkedAt": "2026-10-13T23:58:19.782Z"
+ },
+ {
+  "name": "NARI Tampa Bay Chapter - Member Directory (Find a Contractor)",
+  "domain": "naritb.org",
+  "category": "trade_assoc",
+  "trades": [
+   "remodeling"
+  ],
+  "states": [
+   "FL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://naritb.org/directory",
+  "joinUrl": "https://naritb.org/join-nari-tampa-bay",
+  "evidence": "'FIND A CONTRACTOR! ... Member Directory' with service categories: Bathroom Remodeling, Aging-in-Place, Cabinetry, Design / Build Remodeling, Electrical, Flooring, General Contractor, Gutters, Roofing",
+  "notes": "NARI remodeling chapter serving Tampa Bay; join page loads the NARI membership application (annual fee shown on form).",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
  },
  {
   "name": "National Chimney Sweep Guild Member Search",
@@ -13284,6 +14849,29 @@
   "checkedAt": "2026-10-14T00:35:08.605Z"
  },
  {
+  "name": "NECA Penn-Del-Jersey Contractor Member Directory (Delaware)",
+  "domain": "neca-pdj.org",
+  "category": "trade_assoc",
+  "trades": [
+   "electrical"
+  ],
+  "states": [
+   "DE"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://neca-pdj.org/directory-contractor_m/categories/delaware/",
+  "joinUrl": "https://neca-pdj.org/add-directory-listing/",
+  "evidence": "Category: Delaware ... 12 listings ... Battaglia Electric, Inc. 11 Industrial Boulevard, Delaware 19720, United States 302-325-6100 ... First State Electric Co. 25 King Court, New Castle, Delaware 19720",
+  "notes": "NECA chapter serving PA-DE-NJ; Delaware category lists electrical contractors with address, phone, email and website. Listing added via membership (Add Listing page).",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
   "name": "NECA Washington DC Chapter",
   "domain": "wdcneca.org",
   "category": "trade_assoc",
@@ -13351,6 +14939,27 @@
   "foundBy": "state-06",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T00:35:08.605Z"
+ },
+ {
+  "name": "New Castle County Chamber of Commerce Business Directory",
+  "domain": "ncccc.com",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "DE"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://ncccc-chambermaster.chambermaster.com/list/",
+  "joinUrl": "https://ncccc.com/member-benefits-plans/",
+  "evidence": "Business Directory Search ... Construction/Contractors - Results Found: 42 ... Rytech Restoration of Northern Delaware 24/7 water damage & mold remediation for homes and businesses, backed by an experienced, IICRC-certified team. Join page: Annual Membership Whether you are a small business or large corporation ... Annually $370- $500 Zero to 10 full-time employees.",
+  "notes": "chamber of commerce — member directory. ChamberMaster platform; categories include Construction/Contractors, Electricians, HVAC.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
  },
  {
   "name": "New England Mechanical Service Contractors Association",
@@ -13656,6 +15265,27 @@
   "foundBy": "state-03",
   "linkStatus": "verified",
   "checkedAt": "2026-10-13T23:58:19.782Z"
+ },
+ {
+  "name": "Northeast Florida Builders Association (NEFBA) - Member Directory",
+  "domain": "nefba.com",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "FL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://members.nefba.com/directory",
+  "joinUrl": "https://members.nefba.com/ap/Membership/Application/9pQYj3p8",
+  "evidence": "Directory page titled 'Directories | NEFBA'; nefba.com links public member directory category searches, e.g. 'members.nefba.com/directory/Search/heating-air-hvac-supplies-114576' and 'members.nefba.com/directory/Search/carpentry-framing-trim-114583'",
+  "notes": "Jacksonville-area HBA; application form: 'Membership Application Form ... BLDR $840 Annually Builder/Developer/Remodeler'.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
  },
  {
   "name": "Northeast Spa and Pool Association",
@@ -14066,6 +15696,30 @@
   "checkedAt": "2026-10-14T00:35:08.605Z"
  },
  {
+  "name": "PHCC Colorado (Plumbing-Heating-Cooling Contractors Association of Colorado) - Find a Contractor",
+  "domain": "coloradophcc.org",
+  "category": "trade_assoc",
+  "trades": [
+   "plumbing",
+   "hvac"
+  ],
+  "states": [
+   "CO"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.coloradophcc.org/find-a-contractor",
+  "joinUrl": "https://www.coloradophcc.org/contractor-membership",
+  "evidence": "Consumers - Click Here to Find a Contractor. Our members provide the following services: Residential Plumbing, Heating & Cooling",
+  "notes": "State PHCC chapter; find-a-contractor links out to the national PHCC contractor search. Contractor Membership page explains joining.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
   "name": "PHCC Find a Contractor",
   "domain": "phccweb.org",
   "category": "trade_assoc",
@@ -14087,6 +15741,30 @@
   "foundBy": "assoc-national",
   "linkStatus": "verified",
   "checkedAt": "2026-10-13T23:58:19.782Z"
+ },
+ {
+  "name": "PHCC of Georgia (Plumbing-Heating-Cooling Contractors) - Find a Contractor",
+  "domain": "phccga.org",
+  "category": "trade_assoc",
+  "trades": [
+   "plumbing",
+   "hvac"
+  ],
+  "states": [
+   "GA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.phccga.org/find-a-contractor",
+  "joinUrl": "https://www.phccga.org/membership",
+  "evidence": "Search our directory to find a licensed PHCC of Georgia Contractor near you! Whether you need plumbing repairs, HVAC installation, water heater replacement ... PHCC of Georgia has a qualified contractor",
+  "notes": "Public member contractor directory (search by zip / type of work: Plumbing, HVAC). Membership required.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
  },
  {
   "name": "PHCC San Diego (Plumbing-Heating-Cooling Contractors) — Find a Contractor",
@@ -14404,6 +16082,29 @@
   "foundBy": "assoc-national",
   "linkStatus": "verified",
   "checkedAt": "2026-10-13T23:58:19.782Z"
+ },
+ {
+  "name": "RACCA (Refrigeration & Air Conditioning Contractors Association) Florida - Contractor Members",
+  "domain": "racca-florida.org",
+  "category": "trade_assoc",
+  "trades": [
+   "hvac"
+  ],
+  "states": [
+   "FL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.racca-florida.org/contractor-members/",
+  "joinUrl": "https://racca-florida.org/join-racca/",
+  "evidence": "Contractor Members — 'Company Phone Address City State Zip License # Website — Action Air Conditioning, Inc. 813-935-6644 8926 N. Armenia Ave Tampa Fl. 33604 CAC042730'",
+  "notes": "Public table of Florida HVACR contractor members with DBPR license numbers (CAC/CMC); join page 'Why Join? ... Join RACCA'.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
  },
  {
   "name": "Renewable Energy Vermont",
@@ -14813,6 +16514,27 @@
   "checkedAt": "2026-10-13T23:58:19.782Z"
  },
  {
+  "name": "Savannah Area Chamber of Commerce - Member Directory",
+  "domain": "savannahchamber.com",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "GA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.savannahchamber.com/membership/member-directory/",
+  "joinUrl": "https://www.savannahchamber.com/membership/",
+  "evidence": "SEARCH MEMBER DIRECTORY - Architects, Attorneys, Bail/Bonding, Business Brokers, Business Consultants ... All Chamber members are featured in the member directory",
+  "notes": "chamber of commerce - member directory. Public member directory browsable by category; public member profile pages (e.g., HBA of Greater Savannah listing). 2,200+ members.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
   "name": "Shoals Home Builders Association - Member Directory (Builder/Residential)",
   "domain": "shoalshomebuilders.com",
   "category": "trade_assoc",
@@ -15026,6 +16748,29 @@
   "checkedAt": "2026-10-14T00:35:08.605Z"
  },
  {
+  "name": "South Florida Air Conditioning Contractors Association (SFACCA) - Membership Directory",
+  "domain": "sfacca.com",
+  "category": "trade_assoc",
+  "trades": [
+   "hvac"
+  ],
+  "states": [
+   "FL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://sfacca.com/wp-content/uploads/2026/10/SFACCA_Current_Membership_Directory_Updated.pdf",
+  "joinUrl": "https://sfacca.com/membership/join-sfaca/",
+  "evidence": "South Florida Air Conditioning Contractors Association — Current Membership Directory — Current as of October 2026 — 'A-1 Paradise Plumbing LLC ... Address: 260 SW 21st Terrace Ft Lauderdale, FL 33312'",
+  "notes": "Public membership directory PDF linked from site nav; consumer page sfacca.com/find-a-contractor/ states 'This section has been developed as a reference guide for consumers and industry professionals who wish to do business with SFACCA Contractors.'",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
   "name": "South Texas Builders Association",
   "domain": "stba.org",
   "category": "trade_assoc",
@@ -15198,6 +16943,69 @@
   "foundBy": "assoc-national",
   "linkStatus": "verified",
   "checkedAt": "2026-10-13T23:58:19.782Z"
+ },
+ {
+  "name": "Stamford Chamber of Commerce Business Directory",
+  "domain": "stamfordchamber.com",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "CT"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://members.stamfordchamber.com/list",
+  "joinUrl": "https://members.stamfordchamber.com/member/newmemberapp",
+  "evidence": "Business Directory Search — All Categories... Accountants-Certified Public, Advertising, Appliances, Attorney / Law Firm...",
+  "notes": "chamber of commerce — member directory. Searchable member directory for Stamford and surrounding communities.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "Tampa Bay Builders Association (TBBA) - Business Directory",
+  "domain": "tbba.net",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "FL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://members.tbba.net/list/",
+  "joinUrl": "https://www.tbba.net/membership/",
+  "evidence": "Business Directory Search — All Categories... A/C & Heating Contractors, A/C & Heating Equip & Supplies, Aluminum Products, Appliance Installations (public GrowthZone member directory)",
+  "notes": "TBBA is 'comprised of builders, remodeling contractors' and associates in Pasco, Pinellas and Hillsborough counties; affiliated with FHBA/NAHB.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
+ },
+ {
+  "name": "Tampa Bay Chamber of Commerce - Member Directory",
+  "domain": "tampabaychamber.com",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "FL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.tampabaychamber.com/membership/",
+  "joinUrl": "https://www.tampabaychamber.com/forms/join-the-chamber/",
+  "evidence": "Member Directory Search — 'Search By Name, Description, etc: Business Name: City: Business Category Keywords: Search by Primary Category: Accounting Advertising ... Construction ...'",
+  "notes": "chamber of commerce — member directory.",
+  "foundBy": "state-02",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T00:37:40.408Z"
  },
  {
   "name": "TCIA Tree Care Company Directory",
