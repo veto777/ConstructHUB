@@ -4,6 +4,7 @@ import { counties, propertyAppraisers } from "@shared/schema";
 import { sql, eq } from "drizzle-orm";
 import { readFileSync } from "fs";
 import { join } from "path";
+import { normCounty } from "./county-name";
 
 const REAL_DATA_MARKER = "Sourced from NETR Online.";
 
@@ -20,17 +21,6 @@ export interface AppraiserRecord {
   source: string;
   linkStatus?: string;
   lastVerifiedAt?: string | null;
-}
-
-// Normalize a county name for matching NETR display names against the counties
-// table (handles "St." vs "Saint", punctuation, "County"/"Parish" suffixes, case).
-function normCounty(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/\bst\.?\b/g, "saint")
-    .replace(/\bste\.?\b/g, "sainte")
-    .replace(/\s+(county|parish|borough|census area|municipality|city and borough)$/i, "")
-    .replace(/[^a-z0-9]/g, "");
 }
 
 const SEARCHABLE_FIELDS = ["Address", "Owner", "Parcel"];

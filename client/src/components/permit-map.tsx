@@ -57,7 +57,7 @@ function gridStep(zoom: number): number {
 }
 
 /** The card frame shared by the map and its failure fallback, so the page layout never jumps. */
-function MapFrame({ children }: { children: ReactNode }) {
+export function MapFrame({ children }: { children: ReactNode }) {
   return (
     <div className="permit-map rounded-xl border g-card overflow-hidden">
       <style>{`
@@ -78,7 +78,7 @@ function MapFrame({ children }: { children: ReactNode }) {
  * with a retry, so the Search page (search form, results, watches) keeps
  * working. React still reports the error to the console.
  */
-export class PermitMapBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+export class PermitMapBoundary extends Component<{ children: ReactNode; message?: string }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() {
     return { failed: true };
@@ -91,7 +91,7 @@ export class PermitMapBoundary extends Component<{ children: ReactNode }, { fail
     return (
       <MapFrame>
         <div className="flex h-[300px] flex-col items-center justify-center gap-3 px-4 text-center text-sm g-text-2" role="alert" data-testid="permit-map-fallback">
-          <span>The coverage map could not be drawn. Searching below still works.</span>
+          <span>{this.props.message ?? "The coverage map could not be drawn. Searching below still works."}</span>
           <Button type="button" variant="outline" onClick={() => this.setState({ failed: false })}>Try again</Button>
         </div>
       </MapFrame>
