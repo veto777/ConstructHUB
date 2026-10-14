@@ -19,7 +19,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -129,9 +128,8 @@ export default function SchedulesPage() {
         flush
         actions={
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <GooglePill icon={Plus} variant="solid" label="Add schedule" testId="button-add-schedule" />
-            </DialogTrigger>
+            {/* GooglePill takes no ref, so it opens the (controlled) dialog itself rather than through DialogTrigger asChild. */}
+            <GooglePill icon={Plus} variant="solid" label="Add schedule" testId="button-add-schedule" onClick={() => setDialogOpen(true)} />
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Create scrape schedule</DialogTitle>

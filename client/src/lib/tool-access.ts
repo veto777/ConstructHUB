@@ -63,6 +63,8 @@ export const TOOL_RULES: Record<string, Rule> = {
   "/google-profile": { landing: "/features/gbp", has: (e) => count(e, "locations") },
   "/locations": { landing: "/features/gbp", has: (e) => count(e, "locations") },
   "/listing-editor": { landing: "/features/gbp", has: (e) => count(e, "locations") },
+  // Directory profiles belong to a business location.
+  "/directories": { landing: "/features/gbp", has: (e) => count(e, "locations") },
   "/gmb-monitor": { landing: "/features/profile-guard", has: (e) => count(e, "locations") },
   "/gbp-content": { landing: "/features/gbp-content", has: (e) => count(e, "locations") || module(e, "autoPosts") },
   "/photos": { landing: "/features/media", has: (e) => count(e, "locations") },
