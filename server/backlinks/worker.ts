@@ -87,6 +87,21 @@ export async function runMetrics(capUsd = workerConfig().capUsd, force = false):
   return { measured, costUsd, stopped: null };
 }
 
+/**
+ * DR for the directory catalogue's own rows the Backlinks database does not hold or never measured (Google, Apple
+ * Maps, Facebook; directories rejected before measuring). Display only: it grades nothing. Same budget as above.
+ */
+export async function runDirectoryAuthority(capUsd = workerConfig().capUsd): Promise<{ measured: number; costUsd: number; stopped: string | null }> {
+  if (!isConfigured()) return { measured: 0, costUsd: 0, stopped: "The authority data source is not connected" };
+  const domains = await store.directoriesNeedingAuthority(METRICS_BATCH);
+  if (!domains.length) return { measured: 0, costUsd: 0, stopped: null };
+  if ((await budgetLeft(capUsd)) < metricsEstimateUsd(domains.length)) return { measured: 0, costUsd: 0, stopped: "Monthly budget reached" };
+  const { metrics, costUsd } = await fetchMetrics(domains);
+  await store.addSpend(costUsd);
+  for (const [domain, m] of metrics) await store.saveDirectoryAuthority(domain, m);
+  return { measured: metrics.size, costUsd, stopped: null };
+}
+
 /** A draft pitch for quality sources that publish an email (never to a suppressed address). */
 export async function runDrafts(n = 20): Promise<{ drafted: number }> {
   const { name } = outreachConfig();
@@ -119,6 +134,7 @@ export async function runPass(): Promise<void> {
       if (ranToday < cfg.queriesPerDay) await runDiscovery(Math.min(QUERIES_PER_PASS, cfg.queriesPerDay - ranToday), cfg.capUsd);
       await runVetting();
       await runMetrics(cfg.capUsd);
+      await runDirectoryAuthority(cfg.capUsd);
       await runDrafts();
       await sendApproved();
     } finally {

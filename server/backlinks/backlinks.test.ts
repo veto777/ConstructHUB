@@ -199,7 +199,7 @@ describe("vetting — false positives from the first run", () => {
     expect(wfu("https://roofblog.wordpress.com/write-for-us/", "Roofing tips for homeowners").tier).toBe("C");
     expect(wfu("https://houseupgrades.home.blog/write-for-us/", "Roofing tips for homeowners").tier).toBe("C");
     expect(wfu("https://roofingcontractorblog.com/write-for-us/", "Roofing tips for homeowners").tier).toBe("A");
-    expect(gradeSource("directory", { ...analyzePage({ url: "https://yelp.com/", status: 403, body: "" }) }, { rank: 700, referringDomains: 1, spamScore: 1, checkedAt: "x" }).tier).toBe("X");
+    expect(gradeSource("directory", { ...analyzePage({ url: "https://yelp.com/", status: 403, body: "" }) }, { rank: 700, referringDomains: 1, spamScore: 1, checkedAt: "x" }).tier).toBe("C"); // 2026-10-14: a Yelp listing is a citation; blocked crawler → unconfirmed C
   });
 });
 
@@ -297,5 +297,19 @@ describe("links from sites nobody visits, and anchor text", () => {
       expect(metrics.get("a.com")).toMatchObject({ rank: 310, organicTraffic: 54.1 });
       expect(costUsd).toBeCloseTo(0.0726, 4);
     } finally { metricsDeps.request = saved; }
+  });
+});
+
+// 2026-10-14: Yelp showed grade X ("a platform where anyone can post") in the directory catalogue. A listing there IS the citation.
+describe("big directories are citations, not 'anyone can post' publishers", () => {
+  const yelp = analyzePage({ url: "https://biz.yelp.com/claim", status: 200,
+    body: `<html lang="en"><head><title>Yelp for Business</title></head><body><h1>Business Directory</h1><p>${words(700, "contractor")}</p></body></html>` });
+  it("grades a catalogue directory on a platform domain instead of rejecting it", () => {
+    const g = gradeSource("citation", { ...yelp, directoryUrl: "https://biz.yelp.com/claim" }, null);
+    expect(g.reasons.join(" ")).not.toMatch(/anyone can post/);
+    expect(g.tier).not.toBe("X");
+  });
+  it("still rejects the same platform as a guest-post site", () => {
+    expect(gradeSource("guest_post", { ...yelp, submissionUrl: "https://biz.yelp.com/claim" }, null).reasons.join(" ")).toMatch(/anyone can post/);
   });
 });

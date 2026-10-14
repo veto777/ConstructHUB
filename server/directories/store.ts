@@ -175,8 +175,8 @@ export class DirectoryStore {
       rows: [relation],
     } = await this.db.query("SELECT to_regclass('backlink_sources') AS name");
     const base = relation.name
-      ? `SELECT d.*, CASE WHEN b.metrics->>'rank' ~ '^[0-9]+([.][0-9]+)?$'
-          THEN round((b.metrics->>'rank')::numeric / 10)::int END AS dr,
+      ? `SELECT d.*, CASE WHEN coalesce(b.metrics->>'rank', d.authority->>'rank') ~ '^[0-9]+([.][0-9]+)?$'
+          THEN round(coalesce(b.metrics->>'rank', d.authority->>'rank')::numeric / 10)::int END AS dr,
           b.tier AS grade FROM listing_directories d
           LEFT JOIN backlink_sources b ON b.domain = d.domain`
       : "SELECT d.*, NULL::integer AS dr, NULL::text AS grade FROM listing_directories d";
