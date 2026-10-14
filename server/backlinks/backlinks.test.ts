@@ -313,3 +313,12 @@ describe("big directories are citations, not 'anyone can post' publishers", () =
     expect(gradeSource("guest_post", { ...yelp, submissionUrl: "https://biz.yelp.com/claim" }, null).reasons.join(" ")).toMatch(/anyone can post/);
   });
 });
+
+describe("DR, the 0–100 figure both pages show", () => {
+  it("converts the provider's 0–1000 rank, in new and stored reasons", async () => {
+    const { toDr, reasonWithDr } = await import("@shared/backlinks");
+    expect(toDr(402)).toBe(40);
+    expect(reasonWithDr("+25 domain rank 497")).toBe("+25 DR 50");
+    expect(reasonWithDr("-10 low domain rank 120")).toBe("-10 low DR 12");
+  });
+});

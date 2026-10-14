@@ -4,7 +4,7 @@
  * HTML. A grade rests only on what was read: unmeasured authority is said, never assumed.
  */
 import * as cheerio from "cheerio";
-import { LOW_TRAFFIC, type BacklinkKind, type BacklinkMetrics, type BacklinkSignals, type BacklinkTier, type LinkType } from "@shared/backlinks";
+import { LOW_TRAFFIC, toDr, type BacklinkKind, type BacklinkMetrics, type BacklinkSignals, type BacklinkTier, type LinkType } from "@shared/backlinks";
 import { safeFetch as siteFetch, type PageResponse } from "../sitescan/http";
 import { isExcluded, normalizeDomain } from "./discover";
 
@@ -224,7 +224,7 @@ function gradeBlocked(kind: BacklinkKind, status: number, m: BacklinkMetrics | n
   if (!m || m.rank == null) return { kind, tier: "C", score: 30, reasons: [...reasons, "authority not measured yet"], linkType };
   if (m.spamScore != null && m.spamScore >= 40) return { kind, tier: "X", score: 0, reasons: [...reasons, `Spam score ${m.spamScore}/100`], linkType };
   // Authority alone never makes a source "quality": whether it takes submissions is unknown until a person checks.
-  reasons.push(`domain rank ${m.rank}; capped at C until someone confirms the site takes submissions`);
+  reasons.push(`DR ${toDr(m.rank)}; capped at C until someone confirms the site takes submissions`);
   return { kind, tier: "C", score: 30, reasons, linkType };
 }
 
@@ -283,10 +283,10 @@ export function gradeSource(hint: BacklinkKind, s: BacklinkSignals, m: BacklinkM
   if (linkType === "nofollow" || linkType === "sponsored") add(-5, `its outbound links are mostly ${linkType}`);
   if (m) {
     if (m.rank != null) {
-      if (m.rank >= 400) add(25, `domain rank ${m.rank}`);
-      else if (m.rank >= 250) add(15, `domain rank ${m.rank}`);
-      else if (m.rank >= 150) add(5, `domain rank ${m.rank}`);
-      else add(-10, `low domain rank ${m.rank}`);
+      if (m.rank >= 400) add(25, `DR ${toDr(m.rank)}`);
+      else if (m.rank >= 250) add(15, `DR ${toDr(m.rank)}`);
+      else if (m.rank >= 150) add(5, `DR ${toDr(m.rank)}`);
+      else add(-10, `low DR ${toDr(m.rank)}`);
     }
     if (m.referringDomains != null && m.referringDomains < 20) add(-10, `only ${m.referringDomains} referring domains`);
     if (m.spamScore != null && m.spamScore >= 20) add(-10, `spam score ${m.spamScore}/100`);
