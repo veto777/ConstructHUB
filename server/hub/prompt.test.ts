@@ -88,7 +88,7 @@ describe("no database in the AI path", () => {
 describe("knowledge pack", () => {
   it("contains the price book verbatim and the reinstatement price from the shared constant", () => {
     expect(book.pack).toContain(pricingKnowledge());
-    expect(book.pack).toContain("$599 per project");
+    expect(book.pack).toContain("$999 per project");
   });
 
   it("states only price-book amounts, and no done-for-you or course price", () => {

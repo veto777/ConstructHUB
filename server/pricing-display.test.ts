@@ -132,8 +132,8 @@ describe("pricing display: comparison tables (shared/plan-matrix.ts)", () => {
       starter: false, team: false, pro: false, growth: false,
       agency: newProductNote ? `2 seats (${newProductNote})` : "2 seats",
     });
-    expect(byKey.gbpReinstatement.cells.starter).toBe("$599");
-    expect(byKey.gbpReinstatement.cells.agency).toBe("$299.50 — half price");
+    expect(byKey.gbpReinstatement.cells.starter).toBe("$999");
+    expect(byKey.gbpReinstatement.cells.agency).toBe("$499.50 — half price");
     // Support is inherited down the ladder through each plan's "Everything in …" bullet.
     expect(byKey.support.cells).toEqual({
       starter: "Email support", team: "Email support", pro: "Priority email support",

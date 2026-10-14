@@ -302,7 +302,7 @@ describe("AI assistant prompts use the price book", () => {
     const overThreshold = dollarAmounts(text).filter((c) => c >= SALES_THRESHOLD_CENTS && !planAnnual.has(c));
     expect(overThreshold.map(formatUsd)).toEqual([]);
     expect(text).not.toMatch(/32,864/);
-    expect(text).toContain("$599 per project");
+    expect(text).toContain("$999 per project");
   });
 
   it("ads consultant derives Ads & LSA manager access from the price book", () => {

@@ -6,7 +6,7 @@
 import { alacartePriceCents } from "@shared/alacarte";
 import { alacarteLines } from "./knowledge";
 import { describe, expect, it } from "vitest";
-import { PLANS, PLAN_KEYS, ADDONS, ANNUAL_MONTHS } from "@shared/plans";
+import { PLANS, PLAN_KEYS, ADDONS, ANNUAL_MONTHS, GBP_REINSTATEMENT_CENTS } from "@shared/plans";
 import { formatUsd, planPriceLine } from "@shared/plan-copy";
 import { FOUNDING_OFFER_LINE } from "@shared/pricing-terms";
 import { PRESET_IDS } from "@shared/hub-presets";
@@ -102,7 +102,8 @@ describe("red-team model outputs", () => {
   });
 
   it("O11: a sales-only service next to a price is blocked", () => {
-    blocked("The Master Class costs $599.", "O11");
+    // A listed price (the reinstatement project) next to a sales-only service: O11, not O8.
+    blocked(`The Master Class costs ${formatUsd(GBP_REINSTATEMENT_CENTS)}.`, "O11");
   });
 
   it("RT54: naming a competitor is blocked (O14)", () => {
