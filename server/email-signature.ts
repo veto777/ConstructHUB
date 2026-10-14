@@ -13,9 +13,6 @@ export const SIGNATURE_PHONE = "+1 (832) 399-0560";
 const PHONE_TEL = "+18323990560";
 const LOGO_URL = `${SIGNATURE_SITE}/chub-logo-square-text.png`;
 
-/** "https://www.youtube.com/@x/" → "youtube.com/@x": the address as people read it. */
-export const displayUrl = (url: string) => url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
-
 const escapeHtml = (value: string) =>
   value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
@@ -34,9 +31,9 @@ export function signatureText(): string {
 /** HTML signature block: inline styles and a table layout so it renders in Gmail, Outlook and Apple Mail. */
 export function signatureHtml(): string {
   const link = "color:#F97316;text-decoration:none;";
-  // Each account's own address, shown in full (owner, 2026-10-14: "real links, not just words").
+  // Each account as its logo (owner, 2026-10-14: "logos/icons"), hosted on constructhub.us — mail apps block SVG and data: images.
   const socials = SOCIAL_LINKS.map(
-    (social) => `<div><span style="color:#888;">${escapeHtml(social.name)}:</span> <a href="${escapeHtml(social.url)}" style="${link}" aria-label="${escapeHtml(social.label)}">${escapeHtml(displayUrl(social.url))}</a></div>`,
+    (social) => `<a href="${escapeHtml(social.url)}" style="display:inline-block;margin-right:8px;text-decoration:none;" aria-label="${escapeHtml(social.label)}"><img src="${SIGNATURE_SITE}/email/social-${escapeHtml(social.key)}.png" alt="${escapeHtml(social.name)}" width="24" height="24" style="width:24px;height:24px;border:0;display:block;" /></a>`,
   ).join("");
   return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0 0;border-top:1px solid #eee;padding-top:16px;font-family:'Segoe UI',Arial,sans-serif;">
 <tr>
@@ -46,7 +43,7 @@ export function signatureHtml(): string {
 <div style="color:#888;">Software for US contractors</div>
 <div><a href="tel:${PHONE_TEL}" style="${link}">${SIGNATURE_PHONE}</a> <span style="color:#ccc;">·</span> <a href="mailto:${SIGNATURE_EMAIL}" style="${link}">${SIGNATURE_EMAIL}</a></div>
 <div><a href="${SIGNATURE_SITE}" style="${link}">constructhub.us</a></div>
-<div style="margin-top:6px;">${socials}</div>
+<div style="margin-top:8px;font-size:0;line-height:0;">${socials}</div>
 </td>
 </tr>
 </table>`;
