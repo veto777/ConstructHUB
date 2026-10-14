@@ -36,7 +36,7 @@ describe("tool access", () => {
       if (slug) expect(slugs.has(slug), `${url} → ${rule.landing}`).toBe(true);
       else expect(rule.landing, url).toBe("/call-assistant");
     }
-    const free = ["/yelp", "/databases", "/reinstatement", "/google-ad-fraud", "/google-ads-guide", "/lsa-guide", "/lsa-leads", "/master-class"];
+    const free = ["/yelp", "/databases", "/reinstatement", "/compliance", "/google-ad-fraud", "/google-ads-guide", "/lsa-guide", "/lsa-leads", "/master-class"];
     for (const url of SIDEBAR_URLS) expect(!!toolRuleFor(url) || free.includes(url), url).toBe(true);
     expect(toolRuleFor("/seo/keywords")).toBe(TOOL_RULES["/seo"]);
     expect(toolRuleFor("/pricing#add-ons")).toBeUndefined();

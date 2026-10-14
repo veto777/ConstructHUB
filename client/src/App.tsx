@@ -81,6 +81,9 @@ const PermitAlertsPage = lazyPage(() => import("@/pages/permit-alerts"));
 const LocationsPage = lazyPage(() => import("@/pages/locations"));
 const MasterClassPage = lazyPage(() => import("@/pages/master-class"));
 const ReinstatementPage = lazyPage(() => import("@/pages/reinstatement"));
+const CompliancePage = lazyPage(() => import("@/pages/compliance"));
+const ResearchOrderPage = lazyPage(() => import("@/pages/compliance-research"));
+const ResearchOrderStatusPage = lazyPage(() => import("@/pages/compliance-research").then((m) => ({ default: m.ResearchOrderStatusPage })));
 const GoogleBusinessPage = lazyPage(() => import("@/pages/google-business"));
 const AdsManagerPage = lazyPage(() => import("@/pages/ads-manager"));
 const GoogleAdsPage = lazyPage(() => import("@/pages/google-ads"));
@@ -294,6 +297,9 @@ function DashboardRouter() {
       <Route path="/seo/competitors" component={SeoCompetitorsPage} />
       <Route path="/master-class" component={MasterClassPage} />
       <Route path="/reinstatement" component={ReinstatementPage} />
+      <Route path="/compliance" component={CompliancePage} />
+      <Route path="/compliance/research" component={ResearchOrderPage} />
+      <Route path="/compliance/research/orders/:id" component={ResearchOrderStatusPage} />
       <Route path="/google-business" component={GoogleBusinessPage} />
       <Route path="/google-ads" component={GoogleAdsPage} />
       <Route path="/google-ads/traffic" component={GoogleAdsPage} />
@@ -453,6 +459,9 @@ function PublicRouter() {
       <Route path="/site-scan" component={FreeSiteScanPage} />
       <Route path="/master-class" component={MasterClassPage} />
       <Route path="/reinstatement" component={ReinstatementPage} />
+      <Route path="/compliance" component={CompliancePage} />
+      <Route path="/compliance/research" component={ResearchOrderPage} />
+      <Route path="/compliance/research/orders/:id" component={ResearchOrderStatusPage} />
       <Route path="/google-business" component={GoogleBusinessPage} />
       <Route path="/google-ads" component={Ribboned.GoogleAdsPage} />
       <Route path="/google-ads/traffic" component={Ribboned.GoogleAdsPage} />
@@ -552,7 +561,7 @@ const PAGE_TITLES: Record<string, string> = {
   "/mail-alerts": "Mail Alerts", "/gbp-content": "Posts & Photos", "/listing-editor": "Listing editor", "/directories": "Directory Sync", "/admin/directories": "Directory Sync — admin", "/social-media": "Social Media", "/social-media/calendar": "Social calendar", "/social-media/compose": "New social post", "/social-media/posts": "Social posts", "/social-media/analytics": "Social analytics", "/social-media/inbox": "Social inbox", "/social-media/accounts": "Social accounts", "/social-media/auto": "Social auto mode", "/social-media/guides": "Social guides",
   "/guides": "Guides", "/tutorials": "Tutorials", "/cloudflare": "Cloudflare", "/search-console": "Search Console", "/site-scan": "Site Scan", "/site-scan/history": "Site Scan history",
   "/seo": "SEO Suite", "/seo/rank-tracker": "Rank tracker", "/seo/local-grid": "Local grid", "/seo/plan": "SEO action plan", "/seo/audit": "Site audit", "/seo/alerts": "SEO alerts", "/seo/mentions": "SEO mentions", "/seo/usage": "SEO data usage", "/seo/reports": "SEO reports", "/seo/ai": "AI visibility", "/seo/batch": "Batch analysis", "/seo/content": "Content explorer", "/seo/explorer": "Site explorer", "/seo/keywords": "Keywords explorer", "/seo/backlinks": "Backlinks", "/seo/competitors": "Competitor gap",
-  "/master-class": "Master Class", "/reinstatement": "Reinstatement", "/google-business": "Google Business",
+  "/master-class": "Master Class", "/reinstatement": "Reinstatement", "/compliance": "Compliance Dept", "/google-business": "Google Business",
   "/google-ads": "Click Guard", "/ads-manager": "Agency Ads & LSA", "/google-ads-guide": "Google Ads Guide",
   "/google-ad-fraud": "Ad Fraud", "/lsa-guide": "LSA Guide", "/lsa-leads": "LSA Leads", "/ip-tracker": "IP Tracker",
   "/vpn-shield": "VPN Shield", "/google-reviews": "Google Reviews", "/google-reviews/reviews": "Google reviews", "/google-reviews/profiles": "Review profiles & links", "/google-reviews/settings": "Review settings",
@@ -1062,7 +1071,7 @@ function AppContent() {
 }
 
 /** Marketing and sales pages: never inside the iPhone apps (they sell nothing). */
-const APP_SALES_PATHS = ["/pricing", "/googleads-features", "/googleads-crm", "/googleads-pricing", "/individual-pricing", "/features", "/done-for-you", "/landing", "/master-class", "/reinstatement", "/contract", "/call-assistant-pricing", "/crm-app", "/google-ads-guide"];
+const APP_SALES_PATHS = ["/pricing", "/googleads-features", "/googleads-crm", "/googleads-pricing", "/individual-pricing", "/features", "/done-for-you", "/landing", "/master-class", "/reinstatement", "/compliance/research", "/contract", "/call-assistant-pricing", "/crm-app", "/google-ads-guide"];
 
 function App() {
   return (

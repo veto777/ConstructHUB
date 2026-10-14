@@ -9,7 +9,7 @@ import { Ticket, Gift,
   Settings, Skull, Megaphone, TrendingUp, Fingerprint, ShieldOff, Star, PlusCircle,
   Layers, Wrench, BookOpen, Rocket, FolderOpen, Users, PhoneCall,
   KanbanSquare, ArrowRight, Bell, Lock, Phone, LayoutGrid, Store, KeyRound, Code2, Bug, Link2, PlayCircle, PenLine,
-  ListChecks,
+  ListChecks, ClipboardCheck,
 } from "lucide-react";
 import { PLANS, planForModule, type ModuleKey } from "@shared/plans";
 import { lockedLanding, toolAccess, type ToolAccessContext } from "@/lib/tool-access";
@@ -277,6 +277,7 @@ const standaloneItems: { title: string; url: string; icon: any; logo?: string; l
   { title: "IP Tracker", url: "/ip-tracker", icon: Fingerprint, logo: ipTrackerLogo, badge: "hot" },
   { title: "VPN Shield", url: "/vpn-shield", icon: ShieldOff, logo: vpnBlockerLogo, badge: "new" },
   ...(SHOW_COMPETITOR_INTEL ? [{ title: "Competitor Intel", url: "/competitors", icon: Shield, landingUrl: "/features/competitors" }] : []),
+  { title: "Compliance Dept", url: "/compliance", icon: ClipboardCheck, badge: "new" },
   { title: "Master Class", url: "/master-class", icon: GraduationCap, logo: masterclassLogo, landingUrl: "/features/master-class" },
 ];
 

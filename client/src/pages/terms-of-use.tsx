@@ -11,7 +11,7 @@ import {
 } from "@shared/plan-copy";
 
 /** Shown under the title; update whenever these Terms change. */
-const LAST_UPDATED = "October 12, 2026";
+const LAST_UPDATED = "October 14, 2026";
 
 export default function TermsOfUsePage() {
   useEffect(() => {
@@ -97,6 +97,8 @@ export default function TermsOfUsePage() {
             <p className="mb-2">ConstructHUB offers Done-For-You services, including but not limited to business formation and licensing, GMB &amp; website setup, SEO programs, the Complete Business Build, and custom work.</p>
             <p className="mb-2">Services priced at {SALES_THRESHOLD_LABEL} or more are not sold through online checkout. A sales rep (&ldquo;{SALES_REP_LABEL}&rdquo;) confirms the scope and the price with you before you commit or pay.</p>
             <p className="mb-2">SEO packages require a minimum 6-month contract commitment. Early termination of SEO contracts is subject to an early termination penalty equal to 50% of the remaining contract value. Done-For-You service fees are non-refundable once work has commenced.</p>
+            <p className="mb-2"><strong>GBP Reinstatement.</strong> GBP Reinstatement fees are non-refundable. Google alone decides whether a suspended profile is reinstated, so reinstatement is not guaranteed.</p>
+            <p className="mb-2"><strong>Permit &amp; License Research Reports.</strong> Research reports are paid in full up front and are non-refundable, including when the search finds nothing. Nothing is guaranteed: we search only what permit offices and licensing boards publish online, records can be missing, late or wrong at the source, and some portals are unavailable or block searches when we run. A research report is not a consumer report under the Fair Credit Reporting Act and may not be used to decide anyone&rsquo;s eligibility for employment, credit, insurance, housing or any other purpose covered by that Act.</p>
             </>}
           </section>
 
@@ -104,7 +106,7 @@ export default function TermsOfUsePage() {
             <h2 className="text-xl font-semibold mb-3">7. Master Class</h2>
             {inNativeApp() ? <p>Master Class content isn't sold in the ConstructHUB apps. Master Class materials you have access to are proprietary; you may not redistribute, share, copy, or resell them.</p> : <>
             <p className="mb-2">ConstructHUB offers educational Master Class content as individual modules and as a complete bundle. Master Class items priced at {SALES_THRESHOLD_LABEL} or more are quoted by a sales rep before purchase; items under {SALES_THRESHOLD_LABEL} show their price at checkout.</p>
-            <p>Master Class purchases are non-refundable once access has been granted. All Master Class materials are proprietary and protected by intellectual property laws. You may not redistribute, share, copy, or resell any Master Class content.</p>
+            <p>Master Class purchases are non-refundable. Master Class content is educational and does not guarantee any result for your business. All Master Class materials are proprietary and protected by intellectual property laws. You may not redistribute, share, copy, or resell any Master Class content.</p>
             </>}
           </section>
 
@@ -125,6 +127,8 @@ export default function TermsOfUsePage() {
               <li>Digital services, tools, and Master Class content are generally non-refundable.</li>
               <li>Subscription plans may be eligible for pro-rated refunds at our discretion if canceled within the first 7 days of a billing cycle.</li>
               <li>Done-For-You services are non-refundable once work has commenced.</li>
+              <li>Master Class purchases, GBP Reinstatement fees and Permit &amp; License Research Reports are non-refundable.</li>
+              <li>No service, report, course or tool guarantees any result: not rankings, leads, reviews, reinstatement, or that any record will be found.</li>
               <li>Refund requests should be directed to support@constructhub.us.</li>
             </ul>
           </section>

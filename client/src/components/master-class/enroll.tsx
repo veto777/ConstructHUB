@@ -153,7 +153,7 @@ export function EnrollTab(p: EnrollTabProps) {
                 </Button>
               ) : !bundlePriceShown ? (
                 <TalkToSalesButton topic={catalog.bundle.name} size="lg" className="w-full sm:w-auto" data-testid="button-bundle-sales" />
-              ) : (
+              ) : (<>
                 <div className="flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
                   <Button size="lg" variant="outline" className="w-full sm:w-auto" disabled={isInCart("course_bundle")}
                     onClick={() => {
@@ -168,6 +168,8 @@ export function EnrollTab(p: EnrollTabProps) {
                     Buy now — {formatUsd(catalog.bundle.priceCents)}
                   </Button>
                 </div>
+                <p className="mt-2 text-xs text-muted-foreground" data-testid="text-master-class-terms">Master Class purchases are non-refundable. The course teaches the work; it doesn't guarantee any result.</p>
+              </>
               )}
             </div>
           </Section>

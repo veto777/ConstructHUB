@@ -50,6 +50,16 @@ export const ROUTE_META: Readonly<Record<string, RouteMeta>> = {
       `Every ConstructHUB plan and add-on side by side, from ${formatUsd(STARTING_MONTHLY_CENTS)}/month; a new account starts with a ${TRIAL_LABEL}. ` +
       "Done-for-you work is quoted by a sales rep.",
   },
+  "/compliance": {
+    title: "Contractor Licensing & Electrical Permits by State | ConstructHUB",
+    description:
+      "Who licenses contractors and electricians and who issues electrical permits in every state, with links to official license and permit lookups.",
+  },
+  "/compliance/research": {
+    title: "Permit & License Research Reports | ConstructHUB",
+    description:
+      "Find permits and contractor licenses tied to a person or company. Our bot searches state license records and permit portals and sends a sourced report.",
+  },
   "/reinstatement": {
     title: "Request GBP Reinstatement Help | ConstructHUB",
     description:

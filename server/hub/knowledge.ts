@@ -14,7 +14,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import {
   PLANS, PLAN_KEYS, ADDONS, ADDON_MAX_QUANTITY, AGENCY_LOCATION_BANDS, ANNUAL_MONTHS, LEGACY_BAND_ANNUAL_MONTHS, SALES_THRESHOLD_CENTS,
-  GBP_REINSTATEMENT_CENTS, gridCreditCost,
+  GBP_REINSTATEMENT_CENTS, RESEARCH_STANDARD_CENTS, RESEARCH_EXTENDED_CENTS, gridCreditCost,
 } from "@shared/plans";
 import {
   pricingKnowledge, joinNames, planNamesWhere, formatUsd, TRIAL_LABEL, SALES_REP_LABEL, SALES_THRESHOLD_LABEL,
@@ -70,6 +70,8 @@ export function knowledgeTokens(): Record<string, string> {
     GRID_CREDIT_COSTS: [3, 5, 7, 9, 11, 13, 15].map((n) => `${n}x${n} = ${gridCreditCost(n)}`).join(", "),
     ADDON_MAX_QUANTITY: String(ADDON_MAX_QUANTITY),
     GBP_REINSTATEMENT_PRICE: formatUsd(GBP_REINSTATEMENT_CENTS),
+    RESEARCH_STANDARD_PRICE: formatUsd(RESEARCH_STANDARD_CENTS),
+    RESEARCH_EXTENDED_PRICE: formatUsd(RESEARCH_EXTENDED_CENTS),
     ANNUAL_MONTHS: String(ANNUAL_MONTHS),
     ANNUAL_FREE_MONTHS: String(12 - ANNUAL_MONTHS),
     CALL_ASSISTANT_SEPARATE_LINE,
@@ -246,7 +248,7 @@ export function dollarAmounts(text: string): number[] {
  * launch price exists any more.
  */
 export function priceBookCents(): Set<number> {
-  const cents = new Set<number>([SALES_THRESHOLD_CENTS, GBP_REINSTATEMENT_CENTS]);
+  const cents = new Set<number>([SALES_THRESHOLD_CENTS, GBP_REINSTATEMENT_CENTS, RESEARCH_STANDARD_CENTS, RESEARCH_EXTENDED_CENTS]);
   for (const key of PLAN_KEYS) { cents.add(PLANS[key].monthlyCents); cents.add(PLANS[key].annualCents); }
   for (const addon of Object.values(ADDONS)) {
     cents.add(addon.monthlyCents); cents.add(addon.annualCents);

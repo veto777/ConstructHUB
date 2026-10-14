@@ -11,6 +11,7 @@ const gridRound6 = (n: number) => Math.round(n * 1e6) / 1e6;
 import { getEntitlements, requirePlan, requireModule, hasModule, usersWithModule, sendModuleRequired, sendPlanRequired, sendLimitReached, sendLocationLimit, raiseHint, cheapestPlanWhere, locationCount, plural, inUse, redeemTrialCode, endRevokedTrial, TOP_PLAN, TRIAL_CODE_PLAN, accessPlanName } from "./entitlements";
 import { PAYMENT_NEEDED_STATUSES, PLANS, fitsLimit } from "@shared/plans";
 import { isSalesOnly, sendTalkToSales, salesInquirySubject } from "./catalog";
+import { startResearchWorker } from "./research/runner";
 import { isReviewSuppressed, unsubscribeRecipient, resubscribeRecipient } from "./review-suppression";
 import { reminderSettingsInput, calculateNextReminderTime, inReminderWindow, canonicalAppOrigin } from "./review-reminders";
 import { presentListing } from "./competitor-analysis";
@@ -403,6 +404,8 @@ export async function registerRoutes(
   registerPermitAlertRoutes(app, getDevUser);
   const { startPermitAlertsWorker } = await import("./permits/poller");
   startPermitAlertsWorker();
+  // Paid research report orders (server/research/runner.ts): one at a time, re-queued after a restart.
+  startResearchWorker();
   const { ensureGbpTokenEncryption } = await import("./gbp/token-crypto");
   await ensureGbpTokenEncryption();
   const { ensureAccountSecuritySchema, registerAccountSecurityRoutes } = await import("./account-security");

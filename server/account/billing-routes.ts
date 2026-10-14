@@ -248,6 +248,7 @@ export function purchaseKind(metadata: Record<string, string> | null | undefined
   const type = metadata?.type;
   if (type === "master_class") return "course";
   if (type === "reinstatement") return "reinstatement";
+  if (type === "research_report") return "service";
   if (type === "cart") {
     let items: any[] = [];
     try { items = JSON.parse(metadata?.items || "[]"); } catch { items = []; }

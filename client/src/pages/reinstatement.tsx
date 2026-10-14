@@ -193,6 +193,7 @@ export default function ReinstatementPage() {
   if (user) return <GoogleSurface page><AppPage width="narrow" testId="page-reinstatement">
     <GoogleSectionHeader as="h1" titleTestId="text-reinstatement-title" title="Profile reinstatement" description="Request help with a suspended Google Business Profile." flush/>
     <div data-testid="reinstatement-facts"><div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] gap-3"><GoogleStat label="Flat project rate" value={formatUsd(GBP_REINSTATEMENT_CENTS)} testId="card-reinstatement-pricing"/><GoogleStat label="Initial review" value="1–2 days" hint="Business days"/></div></div>
+    <p className="text-xs text-muted-foreground" data-testid="text-reinstatement-terms">Non-refundable. Google alone decides whether a profile is reinstated, so nothing is guaranteed.</p>
     <section id="request" data-testid="card-reinstatement-form">
       <GoogleSectionHeader titleTestId="text-form-title" title="Tell us about your suspension" description="We’ll review your case before taking it on."/>
       {requestForm}
@@ -274,6 +275,7 @@ export default function ReinstatementPage() {
                 >
                   Request a case review
                 </button>
+                <p className="mt-3 text-[12.5px] text-mkt-muted leading-snug" data-testid="text-reinstatement-terms">Non-refundable. Google alone decides whether a profile is reinstated, so nothing is guaranteed.</p>
                 <p className="text-[13px] text-mkt-muted text-center mt-3">
                   We only take cases where we're confident we can help.
                 </p>

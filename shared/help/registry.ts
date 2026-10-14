@@ -737,6 +737,19 @@ const entries: Draft[] = [
     needs: ["A Master Class purchase for the full modules."],
   },
 
+  {
+    key: "compliance", group: "Tools", route: "/compliance", title: "Compliance Dept",
+    whatItIs: "A state-by-state directory of who licenses contractors and trades and who issues electrical permits, plus paid Permit & License Research Reports.",
+    whatItDoes: "For each state it lists the licensing boards and permit agencies (the equivalents of Washington's Labor & Industries) with links to their official license and permit lookups. A research report searches state license records and every live permit portal we reach in the chosen states for the names you give, and returns a sourced report.",
+    howToUse: [
+      "Sidebar → Compliance Dept.",
+      "Find a state to see its agencies and lookup links.",
+      "To order a report: Order a report → add names, pick up to three states and any trades → accept the terms → see the free preview → pay.",
+      "When the report is ready you get an email; open it from Compliance Dept → Research reports and print it or save it as a PDF.",
+    ],
+    howItWorks: "The research bot runs the same live permit searches as Search Permits and reads official state license data. Reports are paid up front and non-refundable, nothing is guaranteed, and a report is not an FCRA consumer report.",
+  },
+
   /* ══ CRM (served by the CRM host) ═════════════════════════════════════════════════════════════ */
   {
     key: "crm-home", group: "CRM", route: "/crm", title: "CRM Home",

@@ -5,6 +5,7 @@ import { subscriptions, masterClassModules } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { getBaseUrl } from "./auth";
 import { appReturnBaseUrl } from "./site-context";
+import { registerResearchRoutes, fulfilResearchCheckout } from "./research/routes";
 import { SEO_CREDIT_PACKS, isSeoCreditPack, creditUsd } from "@shared/seo-credits";
 import { fulfilSeoCredits } from "./seo/credits";
 import { applySeoCreditEvent, type ReversalStripe } from "./seo/credit-reversals";
@@ -251,6 +252,8 @@ async function recentAuthOk(req: Request, res: Response): Promise<boolean> {
 async function applyOneTimeCheckout(session: Stripe.Checkout.Session, userId: number, eventId: string | null = null): Promise<void> {
   // A prepaid SEO data credit pack (POST /api/seo/credits/checkout): credited once per session.
   await fulfilSeoCredits(session, userId, eventId);
+  // A research report order (server/research): marked paid once, then the research bot runs it.
+  await fulfilResearchCheckout(session, userId);
   const result = await fulfilOneTimePurchase(session, userId);
   if (!result.fulfilled && result.reason === "unpaid") {
     console.log(`[billing] checkout ${session.id} (user ${userId}) completed ${session.payment_status}: nothing granted until Stripe reports it paid.`);
@@ -274,6 +277,11 @@ export function registerStripeRoutes(app: Express) {
     getOrCreateCustomer: (userId, email) => getOrCreateCustomer(userId, email),
     sendStripeError,
     recentAuthOk,
+  });
+  // Permit & License Research Reports (owner, 2026-10-14): paid up front, researched by the bot (server/research).
+  registerResearchRoutes(app, {
+    getOrCreateCustomer: (userId, email) => getOrCreateCustomer(userId, email),
+    sendStripeError,
   });
   // And every tool à la carte (owner, 2026-10-10): one subscription per item, with or without a plan (server/billing/alacarte.ts).
   registerAlacarteBillingRoutes(app, {

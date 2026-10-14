@@ -50,6 +50,8 @@ export const MARKETING_ROUTES: readonly string[] = [
   DFY_PATH,
   ...READY_DFY_PAGES.map(dfyPagePath),
   REINSTATEMENT_PATH,
+  "/compliance",
+  "/compliance/research",
   "/pricing",
   "/google-business",
   "/google-ads-guide",
@@ -66,6 +68,8 @@ const PAGE_NAMES: Record<string, string> = {
   [DFY_PATH]: "Done-For-You Services",
   [CALL_ASSISTANT_PATH]: "AI Call Assistant",
   [REINSTATEMENT_PATH]: "GBP Reinstatement",
+  "/compliance": "Compliance Dept",
+  "/compliance/research": "Research Reports",
   "/pricing": "Pricing",
   "/google-business": "Google Business Profile",
   "/google-ads-guide": "Google Ads Guide",
@@ -92,6 +96,8 @@ export function routeSourceFile(path: string): string | null {
     [CALL_ASSISTANT_PATH]: "client/src/pages/call-assistant-landing.tsx",
     [DFY_PATH]: "client/src/pages/done-for-you.tsx",
     [REINSTATEMENT_PATH]: "client/src/pages/reinstatement.tsx",
+    "/compliance": "shared/compliance/state-agencies.json",
+    "/compliance/research": "client/src/pages/compliance-research.tsx",
     "/pricing": "client/src/pages/pricing.tsx",
     "/google-business": "client/src/pages/google-business.tsx",
     "/google-ads-guide": "client/src/pages/google-ads-guide.tsx",
@@ -195,6 +201,7 @@ export function breadcrumbTrail(path: string): { name: string; path: string }[] 
   if (dfy) return [home, { name: PAGE_NAMES[DFY_PATH], path: DFY_PATH }, { name: dfy.title, path }];
   if (path === CALL_ASSISTANT_PATH) return [home, { name: PAGE_NAMES[FEATURES_PATH], path: FEATURES_PATH }, { name: PAGE_NAMES[path], path }];
   if (path === REINSTATEMENT_PATH) return [home, { name: PAGE_NAMES[DFY_PATH], path: DFY_PATH }, { name: PAGE_NAMES[path], path }];
+  if (path === "/compliance/research") return [home, { name: PAGE_NAMES["/compliance"], path: "/compliance" }, { name: PAGE_NAMES[path], path }];
   const name = PAGE_NAMES[path] ?? ROUTE_META[path]?.title.replace(/\s*\|\s*ConstructHUB$/, "");
   return name ? [home, { name, path }] : [home];
 }

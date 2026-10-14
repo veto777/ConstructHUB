@@ -488,6 +488,12 @@ For a suspended Google Business Profile. Go to **Reinstatement** in the sidebar 
 
 The price is {{GBP_REINSTATEMENT_PRICE}} per project, also shown on the Reinstatement page. Common suspension causes: keyword stuffing in the business name, virtual-office or PO-box addresses, duplicate listings, suspicious review patterns, and wrong service areas or categories. Google alone decides whether a profile is reinstated, so no outcome is guaranteed.
 
+### Compliance Dept and Permit & License Research Reports
+
+**Compliance Dept** (/compliance, in the sidebar) lists, for every state, who licenses contractors and trades (electrical, plumbing, HVAC, low voltage, alarm) and who issues electrical permits, with links to each agency's official license and permit lookups. In Washington that's Labor & Industries; other states use licensing boards, a fire marshal, or the city or county. Browsing it is free.
+
+**Research reports** (/compliance/research): give names of people or companies, up to three states and any trades. The research bot searches the state contractor-license records it can read and every live permit portal ConstructHUB reaches in those states, by name, then emails a report that links each finding to its source and lists which portals it could and couldn't search. A free preview shows before paying. {{RESEARCH_STANDARD_PRICE}} for one name in one state; {{RESEARCH_EXTENDED_PRICE}} for up to five names in up to three states. Paid up front and non-refundable, including when nothing is found. Nothing is guaranteed: the bot can only search what agencies publish online. A report is not an FCRA consumer report and can't be used for employment, credit, insurance or housing decisions. Research reports aren't sold in the iPhone apps.
+
 ## 24. The ConstructHub CRM
 
 **Access:** the CRM is a separate product with its own plans and subscription (prices in section 3); a platform plan does not include it. Seats per CRM plan: {{CRM_SEATS_LINE}}, plus an Extra seat add-on. Click **ConstructHub CRM** at the top of the growth sidebar (/crm-app) → **Open your CRM** (portal.constructhub.us). Your workspace is created the first time you open the CRM; without an active CRM plan (or its trial) the CRM shows the CRM plans instead of the workspace. On a phone the CRM has a bottom bar (Dashboard, Schedule, Inbox, Clients, More).
