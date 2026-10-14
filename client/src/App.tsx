@@ -133,6 +133,7 @@ const AdminAccessPage = lazyPage(() => import("@/pages/admin-access"));
 const AdminCodeApiPage = lazyPage(() => import("@/pages/admin-code-api"));
 const AdminIssuesPage = lazyPage(() => import("@/pages/admin-issues"));
 const AdminBacklinksPage = lazyPage(() => import("@/pages/admin-backlinks"));
+const AdminPartnershipsPage = lazyPage(() => import("@/pages/admin-partnerships"));
 const AdminTicketsPage = lazyPage(() => import("@/pages/admin-tickets"));
 const AdminReferralsPage = lazyPage(() => import("@/pages/admin-referrals"));
 const AdminYoutubePage = lazyPage(() => import("@/pages/admin-youtube"));
@@ -354,6 +355,7 @@ function DashboardRouter() {
       {/* Platform admins: the issue desk — captured failures and Claude's reports (the API answers 403 to anyone else). */}
       <Route path="/admin/issues" component={AdminIssuesPage} />
       <Route path="/admin/backlinks" component={AdminBacklinksPage} />
+      <Route path="/admin/partnerships" component={AdminPartnershipsPage} />
       <Route path="/admin/listings"><Redirect to={"/admin/directories" + window.location.search} /></Route>
       <Route path="/admin/directories" component={AdminDirectoriesPage} />
       <Route path="/admin/tickets" component={AdminTicketsPage} />
@@ -530,7 +532,7 @@ function PublicRouter() {
 const SIGNED_IN_ONLY = [
   "/search", "/schedules", "/history", "/permit-alerts", "/media-library", "/gmb-monitor", "/ranking-grid",
   "/social-media", "/call-assistant", "/guides", "/tutorials", "/cloudflare", "/search-console", "/seo", "/lsa-leads", "/lsa-account-manager", "/settings", "/site-scan/history",
-  "/listings", "/admin/listings", "/agency", "/locations", "/domains", "/mail-alerts", "/gbp-content", "/listing-editor", "/directories", "/admin/directories", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/backlinks", "/admin/youtube",
+  "/listings", "/admin/listings", "/agency", "/locations", "/domains", "/mail-alerts", "/gbp-content", "/listing-editor", "/directories", "/admin/directories", "/admin/feature-pages", "/admin/access", "/admin/code-api", "/admin/issues", "/admin/backlinks", "/admin/partnerships", "/admin/youtube",
   ...(SHOW_COMPETITOR_INTEL ? ["/competitors"] : []),
   ...(SHOW_GOOGLE_REVIEWS ? ["/google-reviews"] : []),
 ];

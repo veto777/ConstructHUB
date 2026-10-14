@@ -18,21 +18,24 @@ export const SIGNATURE_ICON_STYLE: "dark" | "color" = "dark";
 const escapeHtml = (value: string) =>
   value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+/** Which team signs and its mailbox: support@ by default; the media@ relationships inbox signs as its own team. */
+export type SignatureOptions = { team?: string; email?: string };
+
 /** Plain-text signature, starting with the "-- " delimiter mail apps recognise. */
-export function signatureText(): string {
+export function signatureText({ team = "The ConstructHUB Team", email = SIGNATURE_EMAIL }: SignatureOptions = {}): string {
   return [
     "-- ",
-    "The ConstructHUB Team",
+    team,
     "Software for US contractors",
     SIGNATURE_PHONE,
-    SIGNATURE_EMAIL,
+    email,
     SIGNATURE_SITE,
     ...SOCIAL_LINKS.map((link) => `${link.name}: ${link.url}`),
   ].join("\n");
 }
 
 /** HTML signature block: inline styles and a table layout so it renders in Gmail, Outlook and Apple Mail. */
-export function signatureHtml(): string {
+export function signatureHtml({ team = "The ConstructHUB Team", email = SIGNATURE_EMAIL }: SignatureOptions = {}): string {
   const link = "color:#F97316;text-decoration:none;";
   // Each account as its logo (owner, 2026-10-14: "logos/icons"), hosted on constructhub.us — mail apps block SVG and data: images.
   const socials = SOCIAL_LINKS.map(
@@ -42,10 +45,10 @@ export function signatureHtml(): string {
 <tr>
 <td style="vertical-align:top;padding:16px 14px 0 0;"><a href="${SIGNATURE_SITE}"><img src="${LOGO_URL}" alt="ConstructHUB" width="48" height="48" style="width:48px;height:48px;border-radius:10px;display:block;" /></a></td>
 <td style="vertical-align:top;padding-top:16px;font-size:13px;line-height:1.55;color:#444;">
-<div style="font-weight:700;color:#1a1a2e;">The ConstructHUB Team</div>
+<div style="font-weight:700;color:#1a1a2e;">${escapeHtml(team)}</div>
 <div style="color:#888;">Software for US contractors</div>
 <div><a href="tel:${PHONE_TEL}" style="${link}">${SIGNATURE_PHONE}</a></div>
-<div><a href="mailto:${SIGNATURE_EMAIL}" style="${link}">${SIGNATURE_EMAIL}</a></div>
+<div><a href="mailto:${escapeHtml(email)}" style="${link}">${escapeHtml(email)}</a></div>
 <div><a href="${SIGNATURE_SITE}" style="${link}">constructhub.us</a></div>
 <div style="margin-top:8px;font-size:0;line-height:0;">${socials}</div>
 </td>

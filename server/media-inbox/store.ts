@@ -1,0 +1,226 @@
+/** The media inbox's database access (./schema.ts). */
+import { pool } from "../db";
+import type { MediaDecision } from "./ai";
+import type { Inbound } from "./mailbox";
+import type { MediaPartnerKind } from "@shared/media-inbox";
+
+export const storeDeps = { db: () => pool };
+const db = () => storeDeps.db();
+
+export async function getState(mailbox: string): Promise<{ uidValidity: string | null; lastUid: number }> {
+  const r = await db().query(`SELECT uid_validity, last_uid FROM media_inbox_state WHERE mailbox = $1`, [mailbox]);
+  return { uidValidity: r.rows[0]?.uid_validity ?? null, lastUid: Number(r.rows[0]?.last_uid ?? 0) };
+}
+
+export async function saveState(mailbox: string, uidValidity: string, lastUid: number) {
+  await db().query(
+    `INSERT INTO media_inbox_state (mailbox, uid_validity, last_uid) VALUES ($1, $2, $3)
+     ON CONFLICT (mailbox) DO UPDATE SET uid_validity = $2, last_uid = GREATEST(CASE WHEN media_inbox_state.uid_validity = $2 THEN media_inbox_state.last_uid ELSE 0 END, $3)`,
+    [mailbox, uidValidity, lastUid]);
+}
+
+export async function markPass(mailbox: string, error: string | null) {
+  await db().query(
+    `INSERT INTO media_inbox_state (mailbox, last_pass_at, last_pass_error) VALUES ($1, now(), $2)
+     ON CONFLICT (mailbox) DO UPDATE SET last_pass_at = now(), last_pass_error = $2`, [mailbox, error]);
+}
+
+/** Store an inbound email once (by Message-ID). `reason` set = a machine sender, logged as automated. */
+export async function saveInbound(mailbox: string, m: Inbound, reason: string | null): Promise<boolean> {
+  // A reply to an email we sent joins that email's thread and company (our first-contact emails have no Gmail thread id).
+  const known = m.references.length
+    ? (await db().query(`SELECT thread_key, partner_id FROM media_messages WHERE message_id = ANY($1) ORDER BY id LIMIT 1`, [m.references])).rows[0]
+    : null;
+  const r = await db().query(
+    `INSERT INTO media_messages (mailbox, message_id, thread_key, direction, from_email, from_name, to_email, cc, subject, body, references_ids, received_at, status, reason, partner_id)
+     VALUES ($1, $2, $3, 'in', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) ON CONFLICT (message_id) DO NOTHING RETURNING id`,
+    [mailbox, m.messageId, known?.thread_key ?? m.threadKey, m.fromEmail, m.fromName, m.to, m.cc, m.subject.slice(0, 500), m.body, m.references.join(" "), m.date,
+      reason ? "automated" : "new", reason, known?.partner_id ?? null]);
+  return Boolean(r.rows[0]);
+}
+
+export type PendingMessage = {
+  id: number; messageId: string; threadKey: string | null; fromEmail: string; fromName: string | null; cc: string | null;
+  subject: string; references: string[]; attempts: number;
+};
+
+export async function pending(limit: number): Promise<PendingMessage[]> {
+  const r = await db().query(
+    `SELECT id, message_id, thread_key, from_email, from_name, cc, subject, references_ids, attempts FROM media_messages
+      WHERE direction = 'in' AND status = 'new' ORDER BY received_at LIMIT $1`, [limit]);
+  return r.rows.map((x) => ({
+    id: x.id, messageId: x.message_id, threadKey: x.thread_key, fromEmail: x.from_email, fromName: x.from_name, cc: x.cc,
+    subject: x.subject, references: String(x.references_ids ?? "").split(/\s+/).filter(Boolean), attempts: x.attempts,
+  }));
+}
+
+export async function thread(threadKey: string | null, id: number) {
+  const r = await db().query(
+    `SELECT direction, from_email, received_at, subject, body FROM media_messages
+      WHERE (thread_key = $1 AND $1 IS NOT NULL) OR id = $2 ORDER BY received_at, id`, [threadKey, id]);
+  return r.rows.map((x) => ({ direction: x.direction, from: x.from_email, at: new Date(x.received_at).toISOString(), subject: x.subject, body: x.body }));
+}
+
+export async function bumpAttempt(id: number, error: string) {
+  await db().query(`UPDATE media_messages SET attempts = attempts + 1, reason = $2 WHERE id = $1`, [id, error.slice(0, 500)]);
+}
+
+/** Replies already sent to this address today (loop protection against another auto-responder). */
+export async function repliesToday(email: string): Promise<number> {
+  const r = await db().query(`SELECT count(*)::int n FROM media_messages WHERE direction = 'out' AND lower(to_email) = lower($1) AND received_at > now() - interval '24 hours'`, [email]);
+  return Number(r.rows[0]?.n ?? 0);
+}
+
+export async function saveOutbound(mailbox: string, o: { messageId: string; threadKey: string | null; to: string; cc?: string | null; subject: string; body: string; partnerId: number | null }): Promise<number> {
+  const r = await db().query(
+    `INSERT INTO media_messages (mailbox, message_id, thread_key, direction, from_email, to_email, cc, subject, body, status, partner_id)
+     VALUES ($1, $2, $3, 'out', $1, $4, $5, $6, $7, 'replied', $8) ON CONFLICT (message_id) DO NOTHING RETURNING id`,
+    [mailbox, o.messageId, o.threadKey ?? o.messageId, o.to, o.cc ?? null, o.subject, o.body, o.partnerId]);
+  return r.rows[0]?.id ?? 0;
+}
+
+export async function finishMessage(id: number, status: "replied" | "needs_owner" | "failed", reason: string | null, replyId: number | null, partnerId: number | null) {
+  await db().query(`UPDATE media_messages SET status = $2, reason = $3, reply_id = $4, partner_id = COALESCE($5, partner_id) WHERE id = $1`,
+    [id, status, reason, replyId, partnerId]);
+}
+
+export type PartnerRow = { id: number; company: string; domain: string | null; kind: MediaPartnerKind; status: string; costTerms: string | null; agreement: string | null; addedTo: string | null; contactEmail: string | null };
+const partnerRow = (x: any): PartnerRow => ({ id: x.id, company: x.company, domain: x.domain, kind: x.kind, status: x.status, costTerms: x.cost_terms, agreement: x.agreement, addedTo: x.added_to, contactEmail: x.contact_email });
+
+/**
+ * Create or update the company behind an email from the model's reading of the thread. Status only moves forward
+ * (finalized is the admin's call and is never undone here); agreed stamps agreed_at once.
+ */
+export async function upsertPartner(p: { domain: string | null; contactEmail: string; contactName: string | null; d: MediaDecision }): Promise<{ partner: PartnerRow; newlyAgreed: boolean }> {
+  const found = p.domain
+    ? await db().query(`SELECT * FROM media_partners WHERE domain = $1`, [p.domain])
+    : await db().query(`SELECT * FROM media_partners WHERE domain IS NULL AND lower(contact_email) = lower($1)`, [p.contactEmail]);
+  const d = p.d;
+  const company = d.company ?? p.domain ?? p.contactEmail;
+  if (!found.rows[0]) {
+    const r = await db().query(
+      `INSERT INTO media_partners (company, domain, kind, status, contact_name, contact_email, summary, agreement, to_finalize, cost_terms, owner_question, agreed_at, last_message_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CASE WHEN $4 = 'agreed' THEN now() END, now()) RETURNING *`,
+      [company, p.domain, d.kind, d.stage, p.contactName, p.contactEmail, d.summary, d.agreement, d.toFinalize, d.costTerms, d.ownerQuestion]);
+    return { partner: partnerRow(r.rows[0]), newlyAgreed: d.stage === "agreed" };
+  }
+  const cur = found.rows[0];
+  const next = cur.status === "finalized" ? "finalized" : cur.status === "agreed" && d.stage === "talking" ? "agreed" : d.stage;
+  const r = await db().query(
+    `UPDATE media_partners SET company = COALESCE($2, company), kind = CASE WHEN kind = 'other' THEN $3 ELSE kind END, status = $4,
+       contact_name = COALESCE(contact_name, $5), contact_email = COALESCE(contact_email, $6), summary = COALESCE(NULLIF($7, ''), summary),
+       agreement = COALESCE($8, agreement), to_finalize = COALESCE($9, to_finalize), cost_terms = COALESCE($10, cost_terms),
+       owner_question = $11, agreed_at = CASE WHEN $4 = 'agreed' AND agreed_at IS NULL THEN now() ELSE agreed_at END,
+       last_message_at = now(), updated_at = now() WHERE id = $1 RETURNING *`,
+    [cur.id, d.company, d.kind, next, p.contactName, p.contactEmail, d.summary, d.agreement, d.toFinalize, d.costTerms, d.ownerQuestion]);
+  return { partner: partnerRow(r.rows[0]), newlyAgreed: next === "agreed" && cur.status !== "agreed" && cur.status !== "finalized" };
+}
+
+/** Find or create the company we email first (outreach from the admin page). */
+export async function partnerForOutreach(company: string, domain: string | null, kind: MediaPartnerKind, email: string): Promise<number> {
+  const r = await db().query(
+    `INSERT INTO media_partners (company, domain, kind, contact_email, last_message_at) VALUES ($1, $2, $3, $4, now())
+     ON CONFLICT (domain) DO UPDATE SET last_message_at = now(), updated_at = now() RETURNING id`,
+    [company, domain, kind, email]);
+  return r.rows[0].id;
+}
+
+const BACKLINK_KIND: Partial<Record<MediaPartnerKind, string>> = { article: "guest_post", news: "editorial", pbn: "pbn" };
+
+/**
+ * An agreed company joins our own lists: a directory → the directory catalogue (listing_directories, kind "partner");
+ * an article site, news outlet or PBN → the Backlinks database as "agreed". Returns where it went, or why it could not.
+ */
+export async function addAgreedPartner(p: PartnerRow): Promise<{ addedTo: string | null; note: string | null }> {
+  if (p.addedTo) return { addedTo: p.addedTo, note: null };
+  if (!p.domain) return { addedTo: null, note: "Need the company's website to add it to our lists" };
+  const when = new Date().toISOString().slice(0, 10);
+  let addedTo: string | null = null;
+  if (p.kind === "directory") {
+    const note = `Partner agreement via media@ (${when}): ${p.agreement ?? "agreed"}`.slice(0, 1000);
+    const hit = await db().query(`UPDATE listing_directories SET notes = concat_ws(' · ', notes, $2), active = true, updated_at = now() WHERE domain = $1 RETURNING id`, [p.domain, note]);
+    if (!hit.rows[0]) {
+      const taken = await db().query(`SELECT 1 FROM listing_directories WHERE name = $1`, [p.company]);
+      await db().query(
+        `INSERT INTO listing_directories (name, domain, kind, tier, category, paid, source, notes) VALUES ($1, $2, 'partner', 3, 'general', $3, $4, $5)`,
+        [taken.rows[0] ? `${p.company} (${p.domain})` : p.company, p.domain, Boolean(p.costTerms), `https://${p.domain}/`, note]);
+    }
+    addedTo = "Directory catalogue";
+  } else if (BACKLINK_KIND[p.kind]) {
+    const r = await db().query(
+      `INSERT INTO backlink_sources (domain, kind, discovered_url, discovered_via, status) VALUES ($1, $2, $3, 'media-inbox', 'agreed')
+       ON CONFLICT (domain) DO UPDATE SET status = 'agreed', updated_at = now() RETURNING id`,
+      [p.domain, BACKLINK_KIND[p.kind], `https://${p.domain}/`]);
+    await db().query(`INSERT INTO backlink_events (source_id, type, detail) VALUES ($1, 'agreed', $2)`, [r.rows[0].id, JSON.stringify({ via: "media-inbox", agreement: p.agreement })]);
+    addedTo = "Backlinks database";
+  } else {
+    return { addedTo: null, note: null };
+  }
+  await db().query(`UPDATE media_partners SET added_to = $2, updated_at = now() WHERE id = $1`, [p.id, addedTo]);
+  return { addedTo, note: null };
+}
+
+// ── admin reads ──────────────────────────────────────────────────────────────────────────────────────────────────────
+
+export async function summary(mailbox: string) {
+  const [m, p, s] = await Promise.all([
+    db().query(`SELECT status, count(*)::int n FROM media_messages WHERE direction = 'in' GROUP BY status`),
+    db().query(`SELECT status, count(*)::int n FROM media_partners GROUP BY status`),
+    db().query(`SELECT last_pass_at, last_pass_error FROM media_inbox_state WHERE mailbox = $1`, [mailbox]),
+  ]);
+  const sent = await db().query(`SELECT count(*)::int n FROM media_messages WHERE direction = 'out'`);
+  return {
+    counts: Object.fromEntries(m.rows.map((x) => [x.status, x.n])),
+    partners: Object.fromEntries(p.rows.map((x) => [x.status, x.n])),
+    sent: Number(sent.rows[0]?.n ?? 0),
+    lastPassAt: s.rows[0]?.last_pass_at ? new Date(s.rows[0].last_pass_at).toISOString() : null,
+    lastPassError: s.rows[0]?.last_pass_error ?? null,
+  };
+}
+
+export async function listPartners(status?: string) {
+  const r = await db().query(
+    `SELECT p.*, (SELECT count(*)::int FROM media_messages m WHERE m.partner_id = p.id) AS messages FROM media_partners p
+      WHERE ($1::text IS NULL OR p.status = $1) ORDER BY CASE p.status WHEN 'agreed' THEN 0 WHEN 'talking' THEN 1 WHEN 'finalized' THEN 2 ELSE 3 END, p.last_message_at DESC NULLS LAST`,
+    [status ?? null]);
+  return r.rows.map((x) => ({
+    id: x.id, company: x.company, domain: x.domain, kind: x.kind, status: x.status, contactName: x.contact_name, contactEmail: x.contact_email,
+    summary: x.summary, agreement: x.agreement, toFinalize: x.to_finalize, costTerms: x.cost_terms, ownerQuestion: x.owner_question,
+    agreedAt: x.agreed_at ? new Date(x.agreed_at).toISOString() : null, addedTo: x.added_to,
+    lastMessageAt: x.last_message_at ? new Date(x.last_message_at).toISOString() : null, messages: x.messages,
+  }));
+}
+
+export async function listMessages(f: { status?: string; direction?: string; partnerId?: number; limit: number; offset: number }) {
+  const r = await db().query(
+    `SELECT m.*, p.company, count(*) OVER()::int AS total FROM media_messages m LEFT JOIN media_partners p ON p.id = m.partner_id
+      WHERE ($1::text IS NULL OR m.status = $1) AND ($2::text IS NULL OR m.direction = $2) AND ($3::int IS NULL OR m.partner_id = $3)
+      ORDER BY m.received_at DESC, m.id DESC LIMIT $4 OFFSET $5`,
+    [f.status ?? null, f.direction ?? null, f.partnerId ?? null, f.limit, f.offset]);
+  return {
+    total: Number(r.rows[0]?.total ?? 0),
+    rows: r.rows.map((x) => ({
+      id: x.id, direction: x.direction, fromEmail: x.from_email, fromName: x.from_name, toEmail: x.to_email, subject: x.subject,
+      body: x.body, receivedAt: new Date(x.received_at).toISOString(), status: x.status, reason: x.reason, partnerId: x.partner_id, company: x.company,
+    })),
+  };
+}
+
+export async function getPartner(id: number): Promise<PartnerRow | null> {
+  const r = await db().query(`SELECT * FROM media_partners WHERE id = $1`, [id]);
+  return r.rows[0] ? partnerRow(r.rows[0]) : null;
+}
+
+export async function updatePartner(id: number, f: { status?: string; kind?: string; toFinalize?: string | null; ownerQuestion?: string | null; domain?: string | null }) {
+  await db().query(
+    `UPDATE media_partners SET status = COALESCE($2, status), kind = COALESCE($3, kind),
+       to_finalize = CASE WHEN $4::boolean THEN $5 ELSE to_finalize END, owner_question = CASE WHEN $6::boolean THEN $7 ELSE owner_question END,
+       domain = CASE WHEN $8::boolean THEN $9 ELSE domain END,
+       agreed_at = CASE WHEN $2 IN ('agreed','finalized') AND agreed_at IS NULL THEN now() ELSE agreed_at END, updated_at = now() WHERE id = $1`,
+    [id, f.status ?? null, f.kind ?? null, f.toFinalize !== undefined, f.toFinalize ?? null, f.ownerQuestion !== undefined, f.ownerQuestion ?? null,
+      f.domain !== undefined, f.domain ?? null]);
+}
+
+export async function markHandled(id: number) {
+  await db().query(`UPDATE media_messages SET status = 'replied', reason = concat_ws(' · ', reason, 'Handled by an admin') WHERE id = $1 AND status IN ('needs_owner','failed')`, [id]);
+}
