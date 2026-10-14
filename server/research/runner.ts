@@ -4,9 +4,10 @@
  *   1. State contractor-license records (./licenses) for every name in every state that publishes them.
  *   2. Every live-searchable permit portal in the chosen states (the same portals and adapters as the Search page,
  *      server/scraper.ts startLiveSearch), by name for a person and by company for a business, falling back to the
- *      other where a portal offers only one. Matches are read back from the stored results, so each one links to its
- *      source record.
- *   3. Trades flag matching permits (listed first); a since-year drops older permits (undated ones are kept, marked).
+ *      other where a portal offers only one; a slow portal is retried, one missing that field gets its next search type.
+ *      Matches are read back from the stored results, so each one links to its source record.
+ *   3. For companies: state AG consumer complaints, federal court dockets and federal OSHA inspections (./records).
+ *   4. Trades flag matching permits (listed first); a since-year drops older permits (undated ones are kept, marked).
  *
  * Every portal is reported with what happened (searched, not searched, error), so the report says what was covered
  * and never turns "we could not search it" into "nothing found". One order runs at a time; a restart re-queues it.
@@ -26,6 +27,7 @@ import {
 } from "@shared/research-reports";
 import { SITE_ORIGIN as SITE } from "@shared/seo";
 import { licenseSourcesFor, searchLicenses } from "./licenses";
+import { previewCompanyRecords, searchCompanyRecords } from "./records";
 import { claimNext, failOrder, finishOrder, requeueInterrupted, type ResearchOrderRow } from "./store";
 
 const MAX_PERMITS_PER_SUBJECT = 1000;
@@ -60,7 +62,14 @@ export async function buildPreview(input: Pick<ResearchOrderInput, "subjects" | 
     }
   }
   const portals = await portalsInStates(input.states);
-  return { licenseMatches, licenseSourceStates, portalsByState: Object.fromEntries(Array.from(portals, ([s, l]) => [s, l.length])) };
+  let records: ResearchPreview["records"];
+  for (const s of input.subjects.filter((x) => x.kind === "company")) {
+    const r = await previewCompanyRecords(s.name, input.states);
+    records = records
+      ? { complaints: records.complaints + r.complaints, courtCases: records.courtCases + r.courtCases, osha: records.osha + r.osha, searched: Array.from(new Set([...records.searched, ...r.searched])) }
+      : r;
+  }
+  return { licenseMatches, licenseSourceStates, portalsByState: Object.fromEntries(Array.from(portals, ([s, l]) => [s, l.length])), ...(records ? { records } : {}) };
 }
 
 function tradesFor(text: string, trades: ResearchTrade[]): string[] {
@@ -73,54 +82,90 @@ const yearOf = (d: string | null): number | null => {
   return m ? Number(m[0]) : null;
 };
 
-/** The search type a portal can run for this subject, or null. */
-function searchTypeFor(d: Db, kind: "person" | "company"): string | null {
+/** The search types a portal can run for this subject, best first (empty: it has no name, company or keyword search). */
+function searchTypesFor(d: Db, kind: "person" | "company"): string[] {
   const adapter = getAdapterFor({ platform: d.platform, jurisdiction: d.jurisdiction });
   // Legacy adapters (server/scraper.ts) take any type; they are routed by platform there.
-  if (!adapter || isLegacyAdapter(adapter)) return kind === "company" ? "company" : "name";
+  if (!adapter || isLegacyAdapter(adapter)) return [kind === "company" ? "company" : "name"];
   const supported = adapter.capabilities.search as string[];
   const order = kind === "company" ? ["company", "name", "keyword"] : ["name", "company", "keyword"];
-  return order.find((t) => supported.includes(t)) ?? null;
+  return order.filter((t) => supported.includes(t));
 }
 
+/** A failure worth one more try: the portal was slow (same search again) or lacks that search field (the next type). */
+export function retryPlan(message: string): "same" | "next" | null {
+  if (/aborted|timed out|timeout|ETIMEDOUT|ECONNRESET|socket hang up/i.test(message)) return "same";
+  if (/field unavailable|does not expose|requested search field/i.test(message)) return "next";
+  return null;
+}
+
+/** One live search of a set of portals with one search type, read back as coverage per portal. */
+async function runSweep(userId: number, name: string, type: string, group: Db[], log: (m: string) => void): Promise<Map<number, PortalCoverage>> {
+  const [query] = await db.insert(searchQueries).values({ userId, searchType: type, searchValue: name, countyId: null }).returning();
+  const searchId = `research-${query.id}-${Date.now()}`;
+  log(`sweeping ${group.length} portal(s) by ${type} for "${name}"`);
+  await startLiveSearch(searchId, query.id, type, name, group.map((d) => ({
+    id: d.id, name: d.name, jurisdiction: d.jurisdiction, countyId: d.countyId, platform: d.platform,
+    searchUrl: d.searchUrl, portalUrl: d.portalUrl, isActive: d.isActive,
+  })));
+  const started = Date.now();
+  let job = getLiveSearchJob(searchId);
+  while (job && job.status === "running" && Date.now() - started < SWEEP_BUDGET_MS) {
+    await new Promise((r) => setTimeout(r, POLL_MS));
+    job = getLiveSearchJob(searchId) ?? job;
+  }
+  const out = new Map<number, PortalCoverage>();
+  for (const e of job?.databases ?? []) {
+    const outcome = e.status === "completed" ? "searched" : e.status === "error" ? "error" : "not_searched";
+    out.set(e.id, { jurisdiction: e.jurisdiction ?? e.name, outcome, found: e.resultsFound, message: outcome === "not_searched" ? "Did not finish in time" : e.message });
+  }
+  // startLiveSearch leaves out portals it cannot scrape; say so rather than drop them.
+  for (const d of group) if (!out.has(d.id)) out.set(d.id, { jurisdiction: d.jurisdiction, outcome: "not_searched", message: "Portal unavailable for live search today", found: 0 });
+  return out;
+}
+
+const SWEEP_ROUNDS = 4;
+
+/**
+ * Every portal, best search type first. A portal that timed out is tried once more; one that lacks the field gets
+ * its next search type (a SmartGov tenant without a contractor field still has keyword search). Coverage keeps the
+ * last attempt for each portal; matches are read back for every type that ran.
+ */
 async function sweepPortals(userId: number, name: string, kind: "person" | "company", dbs: Db[], log: (m: string) => void): Promise<{ coverage: PortalCoverage[]; rows: any[] }> {
-  const coverage: PortalCoverage[] = [];
-  const byType = new Map<string, Db[]>();
+  type Pending = { d: Db; types: string[]; i: number; retriedSame: boolean };
+  const final = new Map<number, PortalCoverage>();
+  const ran: { type: string; ids: number[] }[] = [];
+  let pending: Pending[] = [];
   for (const d of dbs) {
-    const t = searchTypeFor(d, kind);
-    if (!t) { coverage.push({ jurisdiction: d.jurisdiction, outcome: "not_searched", message: "This portal has no name or company search", found: 0 }); continue; }
-    byType.set(t, [...(byType.get(t) ?? []), d]);
+    const types = searchTypesFor(d, kind);
+    if (!types.length) final.set(d.id, { jurisdiction: d.jurisdiction, outcome: "not_searched", message: "This portal has no name or company search", found: 0 });
+    else pending.push({ d, types, i: 0, retriedSame: false });
+  }
+  for (let round = 0; round < SWEEP_ROUNDS && pending.length; round++) {
+    const byType = new Map<string, Pending[]>();
+    for (const p of pending) byType.set(p.types[p.i], [...(byType.get(p.types[p.i]) ?? []), p]);
+    const next: Pending[] = [];
+    for (const [type, group] of Array.from(byType)) {
+      const result = await runSweep(userId, name, type, group.map((p) => p.d), log);
+      ran.push({ type, ids: group.map((p) => p.d.id) });
+      for (const p of group) {
+        const c = result.get(p.d.id)!;
+        final.set(p.d.id, round > 0 && c.outcome === "searched" ? { ...c, message: `${c.message} (by ${type}, on retry)` } : c);
+        if (c.outcome === "searched") continue;
+        const plan = retryPlan(c.message);
+        if (plan === "same" && !p.retriedSame) next.push({ ...p, retriedSame: true });
+        else if (plan === "next" && p.i + 1 < p.types.length) next.push({ ...p, i: p.i + 1 });
+      }
+    }
+    if (next.length) log(`retrying ${next.length} portal(s)`);
+    pending = next;
   }
   const rows: any[] = [];
-  for (const [type, group] of byType) {
-    const [query] = await db.insert(searchQueries).values({ userId, searchType: type, searchValue: name, countyId: null }).returning();
-    const searchId = `research-${query.id}-${Date.now()}`;
-    log(`sweeping ${group.length} portal(s) by ${type} for "${name}"`);
-    await startLiveSearch(searchId, query.id, type, name, group.map((d) => ({
-      id: d.id, name: d.name, jurisdiction: d.jurisdiction, countyId: d.countyId, platform: d.platform,
-      searchUrl: d.searchUrl, portalUrl: d.portalUrl, isActive: d.isActive,
-    })));
-    const started = Date.now();
-    let job = getLiveSearchJob(searchId);
-    while (job && job.status === "running" && Date.now() - started < SWEEP_BUDGET_MS) {
-      await new Promise((r) => setTimeout(r, POLL_MS));
-      job = getLiveSearchJob(searchId) ?? job;
-    }
-    const seen = new Set<number>();
-    for (const e of job?.databases ?? []) {
-      seen.add(e.id);
-      const outcome = e.status === "completed" ? "searched" : e.status === "error" ? "error" : "not_searched";
-      coverage.push({
-        jurisdiction: e.jurisdiction ?? e.name, outcome, found: e.resultsFound,
-        message: outcome === "not_searched" ? "Did not finish in time" : e.message,
-      });
-    }
-    // startLiveSearch leaves out portals it cannot scrape; say so rather than drop them.
-    for (const d of group) if (!seen.has(d.id)) coverage.push({ jurisdiction: d.jurisdiction, outcome: "not_searched", message: "Portal unavailable for live search today", found: 0 });
-    const page = await storage.searchLocalResults(type, name, { databaseIds: group.map((d) => d.id), limit: MAX_PERMITS_PER_SUBJECT });
+  for (const r of ran) {
+    const page = await storage.searchLocalResults(r.type, name, { databaseIds: r.ids, limit: MAX_PERMITS_PER_SUBJECT });
     rows.push(...page.results);
   }
-  return { coverage, rows };
+  return { coverage: Array.from(final.values()), rows };
 }
 
 /** True when every word of the name is a whole word of one of the record's name fields (a portal's fuzzy match is not proof). */
@@ -189,7 +234,14 @@ export async function runResearch(order: Pick<ResearchOrderRow, "id" | "user_id"
     }
     const permits = Array.from(dedup.values()).sort((a, b) =>
       (b.tradeMatch.length > 0 ? 1 : 0) - (a.tradeMatch.length > 0 ? 1 : 0) || String(b.issuedDate ?? "").localeCompare(String(a.issuedDate ?? "")));
-    subjects.push({ name: subject.name, kind: subject.kind, licenses, permits, licenseSources, portals: coverage.sort((a, b) => a.jurisdiction.localeCompare(b.jurisdiction)) });
+    const records = subject.kind === "company"
+      ? await searchCompanyRecords(subject.name, input.states)
+      : { complaints: [], courtCases: [], osha: [], sources: [{ source: "Complaints, lawsuits and OSHA records", scope: "", searched: false, note: "Searched for companies only, not for individual people" }] };
+    log(`records for "${subject.name}": ${records.complaints.length} complaint(s), ${records.courtCases.length} federal case(s), ${records.osha.length} OSHA inspection(s)`);
+    subjects.push({
+      name: subject.name, kind: subject.kind, licenses, permits, licenseSources, portals: coverage.sort((a, b) => a.jurisdiction.localeCompare(b.jurisdiction)),
+      complaints: records.complaints, courtCases: records.courtCases, osha: records.osha, recordSources: records.sources,
+    });
   }
   const allCoverage = subjects.flatMap((s) => s.portals);
   return {
@@ -200,6 +252,9 @@ export async function runResearch(order: Pick<ResearchOrderRow, "id" | "user_id"
       permits: subjects.reduce((n, s) => n + s.permits.length, 0),
       portalsSearched: allCoverage.filter((c) => c.outcome === "searched").length,
       portalsNotSearched: allCoverage.filter((c) => c.outcome !== "searched").length,
+      complaints: subjects.reduce((n, s) => n + (s.complaints?.length ?? 0), 0),
+      courtCases: subjects.reduce((n, s) => n + (s.courtCases?.length ?? 0), 0),
+      osha: subjects.reduce((n, s) => n + (s.osha?.length ?? 0), 0),
     },
   };
 }
@@ -207,7 +262,9 @@ export async function runResearch(order: Pick<ResearchOrderRow, "id" | "user_id"
 async function sendReportEmails(order: ResearchOrderRow, report: ResearchReport) {
   const link = `${SITE}${RESEARCH_PATH}/orders/${order.id}`;
   const names = order.input.subjects.map((s) => s.name).join(", ");
-  const summary = `${report.totals.licenses} license record(s) and ${report.totals.permits} permit(s) across ${report.totals.portalsSearched} searched portal(s)`;
+  const t = report.totals;
+  const records = t.complaints || t.courtCases || t.osha ? `, ${t.complaints ?? 0} consumer complaint(s), ${t.courtCases ?? 0} federal court case(s) and ${t.osha ?? 0} OSHA inspection(s)` : "";
+  const summary = `${t.licenses} license record(s) and ${t.permits} permit(s) across ${t.portalsSearched} searched portal(s)${records}`;
   await sendWithFallback({
     from: `"ConstructHUB" <${process.env.SMTP_EMAIL}>`,
     to: order.email,

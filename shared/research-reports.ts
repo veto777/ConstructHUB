@@ -52,7 +52,7 @@ export function researchTierFor(names: number, states: number): ResearchTier | n
 export const RESEARCH_NONREFUNDABLE =
   "Research reports are paid in full up front and are non-refundable, including when the search finds nothing.";
 export const RESEARCH_NO_GUARANTEE =
-  "Nothing is guaranteed. We can only search what permit offices and licensing boards publish online, records can be " +
+  "Nothing is guaranteed. We can only search what permit offices, licensing boards, courts and agencies publish online, records can be " +
   "missing, late or wrong at the source, and some portals are down or block searches on the day we run.";
 export const RESEARCH_NOT_FCRA =
   "This is not a consumer report under the Fair Credit Reporting Act. It may not be used to decide anyone's " +
@@ -96,18 +96,43 @@ export type PermitHit = {
 
 export type PortalCoverage = { jurisdiction: string; outcome: "searched" | "not_searched" | "error"; message: string; found: number };
 
+/** A consumer complaint filed with a state attorney general (open data: dates and status; some states add the text). */
+export type ComplaintHit = {
+  state: string; source: string; sourceUrl: string; id: string | null; opened: string | null; closed: string | null;
+  status: string | null; business: string | null; city: string | null; category: string | null;
+  description: string | null; resolution: string | null; savings: number | null;
+};
+
+/** A federal court docket naming the company (CourtListener). A case filed is not a finding against anyone. */
+export type CourtCaseHit = {
+  caseName: string; court: string | null; courtId: string | null; state: string | null; docketNumber: string | null;
+  filed: string | null; terminated: string | null; nature: string | null; url: string;
+};
+
+/** A federal OSHA inspection of the company's establishment, with its violations and penalties. */
+export type OshaHit = {
+  activityNr: string; establishment: string | null; city: string | null; state: string | null; opened: string | null;
+  closed: string | null; inspectionType: string | null; violations: number | null; seriousViolations: number | null;
+  penalty: number | null; url: string;
+};
+
+export type RecordSource = { source: string; scope: string; searched: boolean; note: string };
+
 export type ResearchSubjectReport = {
   name: string; kind: "person" | "company";
   licenses: LicenseHit[]; permits: PermitHit[];
   licenseSources: { state: string; source: string; searched: boolean; note: string }[];
   portals: PortalCoverage[];
+  /** Complaints, lawsuits and safety records: companies only (reports made before 2026-10-14 have none). */
+  complaints?: ComplaintHit[]; courtCases?: CourtCaseHit[]; osha?: OshaHit[];
+  recordSources?: RecordSource[];
 };
 
 export type ResearchReport = {
   generatedAt: string;
   states: string[]; trades: string[]; sinceYear: number | null;
   subjects: ResearchSubjectReport[];
-  totals: { licenses: number; permits: number; portalsSearched: number; portalsNotSearched: number };
+  totals: { licenses: number; permits: number; portalsSearched: number; portalsNotSearched: number; complaints?: number; courtCases?: number; osha?: number };
 };
 
 /** The free look before paying: license matches now, and how many live portals the full report will sweep. */
@@ -115,6 +140,8 @@ export type ResearchPreview = {
   licenseMatches: number;
   licenseSourceStates: string[];
   portalsByState: Record<string, number>;
+  /** Companies only: complaint, federal case and OSHA inspection counts (absent on older previews). */
+  records?: { complaints: number; courtCases: number; osha: number; searched: string[] };
 };
 
 export type ResearchOrderView = {

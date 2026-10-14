@@ -100,7 +100,8 @@ export function ResearchOffer({ compact = false }: { compact?: boolean }) {
         <p className={compact ? "font-semibold" : "text-lg font-semibold"}>Let our research bot search every permit portal in a state for you.</p>
         <p className="text-sm text-muted-foreground leading-relaxed">
           Give us names of people or companies, the states and the trades you care about. We search the state license
-          records and every city and county permit portal we can reach there, and send you a sourced report.
+          records and every city and county permit portal we can reach there, plus consumer complaints, federal lawsuits
+          and OSHA inspections for companies, and send you a sourced report.
           {" "}{formatUsd(RESEARCH_STANDARD_CENTS)} for one name in one state, {formatUsd(RESEARCH_EXTENDED_CENTS)} for up to five names in up to three states.
           Paid up front and non-refundable. Nothing is guaranteed.
         </p>

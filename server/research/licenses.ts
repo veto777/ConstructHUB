@@ -87,21 +87,22 @@ export const licenseSourcesFor = (state: string): LicenseSource[] => LICENSE_SOU
 
 const quote = (v: string) => `'${v.replace(/'/g, "''")}'`;
 /** Words of the name, each required (any order): "Aaron Johnson" also finds "JOHNSON, AARON N". */
-function nameClause(field: string | string[], name: string): string {
+export function nameClause(field: string | string[], name: string): string {
   const words = name.toUpperCase().replace(/[^A-Z0-9&' -]/g, " ").split(/\s+/).filter((w) => w.length >= 2).slice(0, 6);
   if (!words.length) throw new Error("Name has no searchable words");
   const fields = Array.isArray(field) ? field : [field];
   return words.map((w) => "(" + fields.map((f) => `upper(${f}) like ${quote(`%${w}%`)}`).join(" OR ") + ")").join(" AND ");
 }
 
-async function sodaRows(url: string, where: string, limit = 200): Promise<Record<string, unknown>[]> {
+export async function sodaRows(url: string, where: string, limit = 200, label = "License data", order?: string): Promise<Record<string, unknown>[]> {
   const q = new URL(url);
   q.searchParams.set("$where", where);
   q.searchParams.set("$limit", String(limit));
+  if (order) q.searchParams.set("$order", order);
   const res = await politeFetch(q.toString(), { headers: { Accept: "application/json" } }, { minDelayMs: 300 });
-  if (!res.ok) throw new Error(`License data returned HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`${label} returned HTTP ${res.status}`);
   const rows = await res.json();
-  if (!Array.isArray(rows)) throw new Error("License data returned an unexpected payload");
+  if (!Array.isArray(rows)) throw new Error(`${label} returned an unexpected payload`);
   return rows;
 }
 
@@ -125,7 +126,7 @@ function toHit(src: LicenseSource, row: Record<string, unknown>, matchedOn: Lice
   };
 }
 
-const tokens = (v: string) => v.toUpperCase().split(/[^A-Z0-9&']+/).filter((w) => w.length >= 2);
+export const tokens = (v: string) => v.toUpperCase().split(/[^A-Z0-9&']+/).filter((w) => w.length >= 2);
 /** Every word of the searched name is a whole word of the matched name ("Smith" is not "Locksmith"). */
 export function wholeWordMatch(name: string, hit: Pick<LicenseHit, "businessName" | "principal">): boolean {
   const want = tokens(name);

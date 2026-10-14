@@ -91,8 +91,9 @@ export default function ResearchOrderPage() {
         <h1 className="text-3xl font-semibold tracking-tight" data-testid="text-research-title">Find every permit and license tied to a name</h1>
         <p className="text-muted-foreground max-w-3xl leading-relaxed">
           Tell us who to look for and where. Our research bot searches the state contractor-license records and every city and
-          county permit portal we can reach in those states, by name, and builds a report that links each finding to its
-          official source. Reports are usually ready the same day.
+          county permit portal we can reach in those states, by name. For a company it also pulls state attorney general
+          consumer complaints, federal court cases and OSHA safety inspections. Every finding links to its official
+          source. Reports are usually ready the same day.
         </p>
       </header>
 
@@ -218,6 +219,87 @@ function StatusBadge({ status }: { status: ResearchOrderView["status"] }) {
   return <Badge variant={status === "complete" ? "default" : status === "failed" ? "destructive" : "secondary"}>{label}</Badge>;
 }
 
+const money = (n: number) => `$${Math.round(n).toLocaleString()}`;
+const ExtA = ({ href, children }: { href: string; children: React.ReactNode }) => (
+  <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline inline-flex items-center gap-0.5">{children} <ArrowUpRight className="h-3 w-3" aria-hidden="true" /></a>
+);
+
+/** Complaints, federal cases and OSHA inspections (companies only; reports made before these were added have none). */
+function SubjectRecords({ s }: { s: ResearchSubjectReport }) {
+  if (!s.recordSources) return null;
+  const complaints = s.complaints ?? [], cases = s.courtCases ?? [], osha = s.osha ?? [];
+  const byYear = new Map<string, number>();
+  for (const c of complaints) { const y = c.opened?.slice(0, 4) ?? "Undated"; byYear.set(y, (byYear.get(y) ?? 0) + 1); }
+  const savings = complaints.reduce((n, c) => n + (c.savings ?? 0), 0);
+  return (
+    <>
+      <div className="space-y-2">
+        <h3 className="font-semibold">Consumer complaints ({complaints.length})</h3>
+        {s.recordSources.filter((r) => /complaint/i.test(r.source)).map((r, j) => (
+          <p key={j} className="text-xs text-muted-foreground">{r.source} ({r.scope}): {r.note}</p>
+        ))}
+        {complaints.length > 0 && (<>
+          <p className="text-sm">By year: {Array.from(byYear).sort().map(([y, n]) => `${y}: ${n}`).join(" · ")}{savings > 0 ? ` · "Actual savings" to consumers recorded by the AG: ${money(savings)}` : ""}</p>
+          <div className="overflow-x-auto max-h-[28rem] print:max-h-none"><table className="w-full text-sm border-collapse">
+            <thead><tr className="border-b text-left text-xs text-muted-foreground"><th className="py-2 pr-3">Opened</th><th className="pr-3">Status</th><th className="pr-3">Business on file</th><th className="pr-3">Complaint</th><th className="pr-3">Outcome</th><th className="whitespace-nowrap">Source</th></tr></thead>
+            <tbody>{complaints.map((c, j) => (
+              <tr key={j} className="border-b align-top">
+                <td className="py-2 pr-3 whitespace-nowrap">{c.opened ?? "—"}</td><td className="pr-3">{c.status ?? "—"}</td>
+                <td className="pr-3">{c.business ?? "—"}{c.city ? `, ${c.city}` : ""}</td>
+                <td className="pr-3">{c.description ?? c.category ?? "—"}</td>
+                <td className="pr-3">{c.resolution ?? (c.savings ? `${money(c.savings)} saved` : "—")}</td>
+                <td className="whitespace-nowrap"><ExtA href={c.sourceUrl}>{c.state} AG{c.id ? ` #${c.id}` : ""}</ExtA></td>
+              </tr>))}</tbody>
+          </table></div>
+        </>)}
+      </div>
+
+      <div className="space-y-2">
+        <h3 className="font-semibold">Federal court cases ({cases.length})</h3>
+        <p className="text-xs text-muted-foreground">
+          {s.recordSources.filter((r) => /court/i.test(r.source)).map((r) => `${r.source}: ${r.note}`).join(". ")}.
+          {" "}A case filed is not a finding against anyone; open the docket for what happened.
+        </p>
+        {cases.length > 0 && (
+          <div className="overflow-x-auto"><table className="w-full text-sm border-collapse">
+            <thead><tr className="border-b text-left text-xs text-muted-foreground"><th className="py-2 pr-3">Filed</th><th className="pr-3">Case</th><th className="pr-3">Court</th><th className="pr-3">Type</th><th className="pr-3">Closed</th></tr></thead>
+            <tbody>{cases.map((c, j) => (
+              <tr key={j} className="border-b align-top">
+                <td className="py-2 pr-3 whitespace-nowrap">{c.filed ?? "—"}</td>
+                <td className="pr-3"><ExtA href={c.url}>{c.caseName}</ExtA>{c.docketNumber ? <span className="block text-xs text-muted-foreground font-mono">{c.docketNumber}</span> : null}</td>
+                <td className="pr-3">{c.court ?? "—"}</td><td className="pr-3">{c.nature ?? "—"}</td><td className="pr-3 whitespace-nowrap">{c.terminated ?? "Open"}</td>
+              </tr>))}</tbody>
+          </table></div>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <h3 className="font-semibold">OSHA inspections ({osha.length})</h3>
+        {s.recordSources.filter((r) => /OSHA/.test(r.source)).map((r, j) => (
+          <p key={j} className="text-xs text-muted-foreground">{r.source} ({r.scope}): {r.note}</p>
+        ))}
+        {osha.length > 0 && (
+          <div className="overflow-x-auto"><table className="w-full text-sm border-collapse">
+            <thead><tr className="border-b text-left text-xs text-muted-foreground"><th className="py-2 pr-3">Opened</th><th className="pr-3">Establishment</th><th className="pr-3">Where</th><th className="pr-3">Violations</th><th className="pr-3">Penalty</th><th className="whitespace-nowrap">Source</th></tr></thead>
+            <tbody>{osha.map((h, j) => (
+              <tr key={j} className="border-b align-top">
+                <td className="py-2 pr-3 whitespace-nowrap">{h.opened ?? "—"}</td><td className="pr-3">{h.establishment ?? "—"}</td>
+                <td className="pr-3">{[h.city, h.state].filter(Boolean).join(", ") || "—"}</td>
+                <td className="pr-3">{h.violations == null ? "—" : `${h.violations}${h.seriousViolations ? ` (${h.seriousViolations} serious, willful or repeat)` : ""}`}</td>
+                <td className="pr-3">{h.penalty == null ? "—" : money(h.penalty)}</td>
+                <td className="whitespace-nowrap"><ExtA href={h.url}>OSHA #{h.activityNr}</ExtA></td>
+              </tr>))}</tbody>
+          </table></div>
+        )}
+      </div>
+
+      {s.recordSources.some((r) => !r.searched) && (
+        <p className="text-xs text-muted-foreground">Not searched: {s.recordSources.filter((r) => !r.searched).map((r) => `${r.source}${r.note ? ` (${r.note})` : ""}`).join("; ")}.</p>
+      )}
+    </>
+  );
+}
+
 function SubjectReport({ s, i }: { s: ResearchSubjectReport; i: number }) {
   const searched = s.portals.filter((p) => p.outcome === "searched");
   const missed = s.portals.filter((p) => p.outcome !== "searched");
@@ -260,6 +342,8 @@ function SubjectReport({ s, i }: { s: ResearchSubjectReport; i: number }) {
           </table></div>
         )}
       </div>
+
+      <SubjectRecords s={s} />
 
       <details className="text-sm">
         <summary className="cursor-pointer font-semibold">Coverage: {searched.length} portal(s) searched, {missed.length} not searched</summary>
@@ -321,6 +405,9 @@ export function ResearchOrderStatusPage() {
                     ? <p>{o.preview.licenseMatches} license record(s) match in {o.preview.licenseSourceStates.join(", ")} state license data.</p>
                     : <p>We don't search state license records for {o.input.states.join(", ")} yet. The report covers permit portals only there.</p>}
                   {Object.entries(o.preview.portalsByState).map(([st, n]) => <p key={st}>The report will search {n} live permit portal(s) in {stateName(st)} by name.</p>)}
+                  {o.preview.records && (o.preview.records.complaints > 0 || o.preview.records.courtCases > 0 || o.preview.records.osha > 0) && (
+                    <p data-testid="text-preview-records">Records on file: {o.preview.records.complaints} consumer complaint(s), about {o.preview.records.courtCases} federal court docket(s){o.preview.records.osha ? ` and ${o.preview.records.osha} OSHA inspection(s)` : ""}.</p>
+                  )}
                   <p className="text-muted-foreground">Details, permit matches and sources come with the full report.</p>
                 </div>
               )}
@@ -344,7 +431,7 @@ export function ResearchOrderStatusPage() {
           {o.status === "failed" && <p className="rounded-lg border border-destructive p-4 text-sm">Something went wrong while researching. Our team has been told and will rerun it; you don't need to do anything.</p>}
           {o.status === "complete" && o.report && (
             <div className="space-y-10">
-              <p className="text-sm">Found {o.report.totals.licenses} license record(s) and {o.report.totals.permits} permit(s). {o.report.totals.portalsSearched} portal search(es) ran; {o.report.totals.portalsNotSearched} could not. Generated {new Date(o.report.generatedAt).toLocaleString()}.</p>
+              <p className="text-sm">Found {o.report.totals.licenses} license record(s) and {o.report.totals.permits} permit(s){o.report.totals.complaints != null ? `, ${o.report.totals.complaints} consumer complaint(s), ${o.report.totals.courtCases ?? 0} federal court case(s) and ${o.report.totals.osha ?? 0} OSHA inspection(s)` : ""}. {o.report.totals.portalsSearched} portal search(es) ran; {o.report.totals.portalsNotSearched} could not. Generated {new Date(o.report.generatedAt).toLocaleString()}.</p>
               {o.report.subjects.map((s, i) => <SubjectReport key={i} s={s} i={i} />)}
               <div className="border-t pt-4"><Terms /></div>
             </div>
