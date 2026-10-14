@@ -73,7 +73,10 @@ export async function readPage(url: string): Promise<PageRead> {
     const r = await page.evaluate((captchaSel) => {
       const labelOf = (e: any) => (e.labels?.[0]?.innerText || e.getAttribute("aria-label") || e.placeholder || e.name || "").trim().slice(0, 120);
       const forms = [...document.forms].map((f) => {
-        const els = [...f.elements].filter((e: any) => e.name && !["hidden", "submit", "button", "image", "reset", "file"].includes(e.type)) as any[];
+        // Hidden inputs, CAPTCHA tokens and honeypots (invisible trap fields) are never offered for filling.
+        const visible = (e: any) => { const r = e.getBoundingClientRect(); const cs = getComputedStyle(e); return (r.width > 0 || r.height > 0 || e.type === "checkbox" || e.type === "radio") && cs.visibility !== "hidden" && cs.display !== "none"; };
+        const els = [...f.elements].filter((e: any) => e.name && !["hidden", "submit", "button", "image", "reset", "file"].includes(e.type)
+          && !/recaptcha|captcha|bot-field|honeypot|^hp[_-]|^ak_hp/i.test(e.name) && visible(e)) as any[];
         const seen = new Set<string>();
         const fields = els.filter((e) => (e.type === "radio" || e.type === "checkbox" ? !seen.has(e.name) && seen.add(e.name) : true)).map((e) => {
           const group = e.type === "radio" || e.type === "checkbox" ? els.filter((x) => x.name === e.name) : [];
@@ -136,14 +139,19 @@ export async function submitHtmlForm(read: PageRead, fill: Fill): Promise<Submit
       } else await form.locator(sel).first().fill(String(v));
     }
     const before = page.url();
+    const beforeText = await page.innerText("body").catch(() => "");
     await Promise.all([
       page.waitForLoadState("networkidle", { timeout: 20_000 }).catch(() => undefined),
       form.locator('[type="submit"], button:not([type="button"])').first().click({ timeout: 10_000 }),
     ]);
     await page.waitForTimeout(4000);
-    const after = (await page.innerText("body").catch(() => "")).slice(0, 4000);
-    return DONE.test(after) || page.url() !== before
-      ? { ok: true, detail: `Submitted; the page said: ${(after.match(new RegExp(`[^.\\n]*${DONE.source}[^.\\n]*`, "i"))?.[0] ?? "(moved to a new page)").trim().slice(0, 200)}` }
+    // Confirmed = a thank-you / received line that was not on the page before, or a move to another page.
+    const after = await page.innerText("body").catch(() => "");
+    if (/performing security verification|just a moment|attention required/i.test(after.slice(0, 600)))
+      return { ok: false, detail: "The site's bot protection refused the submission; a person has to send it" };
+    const said = after.split(/\n+/).map((l) => l.trim()).find((l) => DONE.test(l) && l.length < 300 && !beforeText.includes(l));
+    return said || page.url() !== before
+      ? { ok: true, detail: `Submitted; the page said: ${(said ?? `(moved to ${page.url()})`).slice(0, 200)}` }
       : { ok: false, detail: "Submitted, but the page did not confirm it" };
   } finally {
     await page.close().catch(() => undefined);

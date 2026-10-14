@@ -95,7 +95,7 @@ export async function actOnNextSteps(): Promise<{ acted: number; emailed: number
             done.push(`Price on their page: ${plan.pricing}`);
           }
           if (plan.api) done.push(`API: ${plan.api}`);
-          const problem = Object.values(plan.fill).flat().map((v) => (typeof v === "string" ? replyProblem(v) : null)).find(Boolean);
+          const problem = Object.values(plan.fill).flat().map((v) => (typeof v === "string" && v.trim() ? replyProblem(v) : null)).find(Boolean);
           if (page.blocked) {
             done.push(`${page.blocked} (${page.url}); it cannot be sent automatically`);
             toFinalize ??= `${page.blocked}: a person has to submit ${page.url}`;
