@@ -12,7 +12,7 @@ import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import { formatDistanceToNowStrict, format } from "date-fns";
 import { CheckCircle2, ExternalLink, Link2, Loader2, Lock, Mail, Play, RotateCcw, Upload } from "lucide-react";
 import {
-  BACKLINK_ADMIN_STATUSES, BACKLINK_KINDS, BACKLINK_KIND_LABELS, BACKLINK_STATUSES, BACKLINK_STATUS_LABELS, BACKLINK_TIERS, PBN_POLICY, ANCHOR_POLICY,
+  BACKLINK_ADMIN_STATUSES, BACKLINK_KINDS, BACKLINK_KIND_LABELS, BACKLINK_STATUSES, BACKLINK_STATUS_LABELS, BACKLINK_TIERS, PBN_POLICY, ANCHOR_POLICY, toDr, reasonWithDr,
   type BacklinkKind, type BacklinkSource, type BacklinkSourceRow, type BacklinkStatus, type BacklinkSummary,
 } from "@shared/backlinks";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
@@ -170,12 +170,12 @@ function SourceSheet({ id, onClose }: { id: number | null; onClose: () => void }
               <StatusPill tone={STATUS_TONE[s.status]}>{BACKLINK_STATUS_LABELS[s.status]}</StatusPill>
               {s.tier && <StatusPill tone={TIER_TONE[s.tier]}>Tier {s.tier}{s.score != null ? ` · ${s.score}` : ""}</StatusPill>}
               <StatusPill tone="neutral" dot={false}>Links: {s.linkType}</StatusPill>
-              {s.metrics?.rank != null && <StatusPill tone="neutral" dot={false}>Rank {s.metrics.rank}/1000</StatusPill>}
+              {s.metrics?.rank != null && <StatusPill tone="neutral" dot={false}>DR {toDr(s.metrics.rank)}</StatusPill>}
             </div>
             {s.kind === "pbn" && <Notice tone="warning" title="Blocked">{PBN_POLICY}</Notice>}
             <div>
               <h3 className="mb-1 text-sm font-semibold">Why this grade</h3>
-              <ul className="space-y-0.5 text-sm text-muted-foreground">{s.reasons.length ? s.reasons.map((r) => <li key={r}>{r}</li>) : <li>Not vetted yet.</li>}</ul>
+              <ul className="space-y-0.5 text-sm text-muted-foreground">{s.reasons.length ? s.reasons.map((r) => <li key={r}>{reasonWithDr(r)}</li>) : <li>Not vetted yet.</li>}</ul>
             </div>
             {s.signals && (
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
@@ -325,7 +325,7 @@ export default function AdminBacklinksPage() {
                   <div className="truncate font-medium">{r.domain}</div>
                   <div className="truncate text-xs text-muted-foreground">{BACKLINK_KIND_LABELS[r.kind]}{r.niches.length ? ` · ${r.niches.slice(0, 3).join(", ")}` : ""}{r.contactEmails.length ? " · has email" : ""}</div>
                 </div>
-                {r.rank != null && <span className="hidden text-xs tabular-nums text-muted-foreground sm:inline">rank {r.rank}</span>}
+                {r.rank != null && <span className="hidden text-xs tabular-nums text-muted-foreground sm:inline">DR {toDr(r.rank)}</span>}
                 {r.tier && <StatusPill tone={TIER_TONE[r.tier]} dot={false}>{r.tier}{r.score != null ? ` ${r.score}` : ""}</StatusPill>}
                 <StatusPill tone={STATUS_TONE[r.status]}>{BACKLINK_STATUS_LABELS[r.status]}</StatusPill>
               </button>

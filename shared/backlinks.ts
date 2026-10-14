@@ -107,6 +107,11 @@ export type BacklinkSignals = {
   homeWords?: number;
 };
 
+/** The provider's domain rank (0–1000) as the 0–100 "DR" people know — the same figure the Directories page shows. */
+export const toDr = (rank: number) => Math.round(rank / 10);
+/** Grade reasons stored before 2026-10-14 say "domain rank 450"; show them as "DR 45". */
+export const reasonWithDr = (reason: string) => reason.replace(/domain rank (\d+)/g, (_, n) => `DR ${toDr(Number(n))}`);
+
 /** Third-party authority numbers, when the data source is connected (the SEO data provider's bulk backlinks endpoints). */
 export type BacklinkMetrics = {
   /** Provider domain rank, 0–1000 scale. */
