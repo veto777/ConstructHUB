@@ -115,7 +115,9 @@ export async function claimForVetting(token: string, leaseMs: number, limit: num
          WHERE (status = 'discovered' OR (status = 'vetting' AND lease_until < now())) AND attempts < $4
          ORDER BY id LIMIT $3 FOR UPDATE SKIP LOCKED)
       RETURNING id, domain, kind, discovered_url, metrics, attempts,
-        (SELECT d.source FROM listing_directories d WHERE d.domain = s.domain AND d.active AND d.source ~ '^https?://' ORDER BY d.tier LIMIT 1) AS catalogue_url`,
+        -- The original directories (Google, BBB, Angi…) carry a reference label, not a page, as their source: their home page is the way in.
+        (SELECT CASE WHEN d.source ~ '^https?://' THEN d.source ELSE 'https://' || d.domain || '/' END
+           FROM listing_directories d WHERE d.domain = s.domain AND d.active ORDER BY (d.source ~ '^https?://') DESC, d.tier LIMIT 1) AS catalogue_url`,
     [token, leaseMs / 1000, limit, MAX_VET_ATTEMPTS]);
   return r.rows.map((x) => ({ id: x.id, domain: x.domain, kind: x.kind, discoveredUrl: x.discovered_url, catalogueUrl: x.catalogue_url, metrics: x.metrics, attempts: x.attempts }));
 }
