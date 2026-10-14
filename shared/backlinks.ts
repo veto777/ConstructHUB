@@ -27,6 +27,17 @@ export const BACKLINK_KIND_LABELS: Record<BacklinkKind, string> = {
   pbn: "PBN (blocked)",
 };
 
+/**
+ * Anchor text (2026-10-14): links that all use the same money keyword ("roofing contractor Dallas") are a classic
+ * penalty trigger. We ask for the company name or web address; a keyword anchor is the exception, never the plan.
+ */
+export const ANCHOR_POLICY =
+  "Links we ask for use the company's name or web address (\"ConstructHUB\", \"constructhub.us\"), not a keyword phrase. " +
+  "A link profile built on repeated keyword anchors is a classic trigger for a Google penalty.";
+
+/** Estimated monthly Google visits under which a site counts as having no real audience (link-network footprint). */
+export const LOW_TRAFFIC = 10;
+
 export const PBN_POLICY =
   "Links from private blog networks break Google's spam policies and can get a customer's site demoted or removed. " +
   "Sites that look like one are labelled and blocked; they never count toward the quality goal and are never sold.";
@@ -96,13 +107,15 @@ export type BacklinkSignals = {
   homeWords?: number;
 };
 
-/** Third-party authority numbers, when the data source is connected (DataForSEO backlinks bulk endpoints). */
+/** Third-party authority numbers, when the data source is connected (the SEO data provider's bulk backlinks endpoints). */
 export type BacklinkMetrics = {
-  /** DataForSEO domain rank, 0–1000 scale. */
+  /** Provider domain rank, 0–1000 scale. */
   rank: number | null;
   referringDomains: number | null;
   /** 0–100, higher = spammier. */
   spamScore: number | null;
+  /** Estimated monthly US Google visits (the provider's traffic estimate). Absent on sources measured before 2026-10-14. */
+  organicTraffic?: number | null;
   checkedAt: string;
 };
 

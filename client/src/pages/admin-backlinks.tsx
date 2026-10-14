@@ -12,7 +12,7 @@ import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import { formatDistanceToNowStrict, format } from "date-fns";
 import { CheckCircle2, ExternalLink, Link2, Loader2, Lock, Mail, Play, RotateCcw, Upload } from "lucide-react";
 import {
-  BACKLINK_ADMIN_STATUSES, BACKLINK_KINDS, BACKLINK_KIND_LABELS, BACKLINK_STATUSES, BACKLINK_STATUS_LABELS, BACKLINK_TIERS, PBN_POLICY,
+  BACKLINK_ADMIN_STATUSES, BACKLINK_KINDS, BACKLINK_KIND_LABELS, BACKLINK_STATUSES, BACKLINK_STATUS_LABELS, BACKLINK_TIERS, PBN_POLICY, ANCHOR_POLICY,
   type BacklinkKind, type BacklinkSource, type BacklinkSourceRow, type BacklinkStatus, type BacklinkSummary,
 } from "@shared/backlinks";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
@@ -70,7 +70,7 @@ function GoalCard({ s }: { s: BacklinkSummary }) {
 
 function ConfigNotice({ s }: { s: BacklinkSummary }) {
   const missing: string[] = [];
-  if (!s.config.dataSource) missing.push("search and authority data are not connected (DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD) — only imports and vetting run");
+  if (!s.config.dataSource) missing.push("search and authority data are not connected (the SEO data login in the server .env) — only imports and vetting run");
   if (!s.config.worker) missing.push("automation is off (BACKLINKS_WORKER_ENABLED=true turns it on) — use the Run buttons");
   if (!s.config.outreachSend) missing.push("sending is off — approved pitches wait (needs a separate outreach mailbox and a postal address)");
   if (!missing.length) return null;
@@ -185,7 +185,8 @@ function SourceSheet({ id, onClose }: { id: number | null; onClose: () => void }
                 <span className="text-muted-foreground">Takes submissions</span><span>{s.signals.submissionHints.join(", ") || "not shown"}</span>
                 <span className="text-muted-foreground">Contact</span>
                 <span className="break-all">{s.contactEmails.join(", ") || (s.contactUrl ? <a className="underline" href={s.contactUrl} target="_blank" rel="noreferrer noopener">contact page</a> : "none published")}</span>
-                {s.metrics && (<><span className="text-muted-foreground">Referring domains</span><span>{s.metrics.referringDomains ?? "—"} · spam {s.metrics.spamScore ?? "—"}/100</span></>)}
+                {s.metrics && (<><span className="text-muted-foreground">Referring domains</span><span>{s.metrics.referringDomains ?? "—"} · spam {s.metrics.spamScore ?? "—"}/100</span>
+                  <span className="text-muted-foreground">Google visits / month</span><span>{s.metrics.organicTraffic == null ? "not measured" : `about ${n(Math.round(s.metrics.organicTraffic))}`}</span></>)}
               </div>
             )}
             <div className="space-y-2">
@@ -202,6 +203,7 @@ function SourceSheet({ id, onClose }: { id: number | null; onClose: () => void }
             {s.outreach.length > 0 && (
               <div className="space-y-2">
                 <h3 className="text-sm font-semibold">Outreach</h3>
+                <p className="text-xs text-muted-foreground">{ANCHOR_POLICY}</p>
                 {s.outreach.map((o) => (
                   <div key={o.id} className="rounded-lg border p-3 text-sm" data-testid={`outreach-${o.id}`}>
                     <div className="flex items-center justify-between gap-2">

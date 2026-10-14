@@ -67,12 +67,14 @@ export function composePitch(kind: BacklinkKind, domain: string, signals: Backli
   const name = siteName(domain, signals);
   const hello = `Hi ${name} team,`;
   const sign = `\n\nThanks,\n${senderName}`; // withFooter adds the ConstructHUB signature
+  // ANCHOR_POLICY: we ask for the company's name or web address as the link text, never a keyword phrase.
+  const anchor = `\n\nAny link back to the contractor would use their company name or web address as the link text.`;
   switch (kind) {
     case "guest_post":
       return {
         subject: `Contributor article for ${name}`,
         body: `${hello}\n\nWe work with licensed contractors across the US — roofers, plumbers, HVAC and remodeling companies — and write practical articles for homeowners from what they see on the job (costs, timelines, permits, what to ask before hiring).\n\nWe'd like to contribute an original article to ${name}. Could you share your guidelines, any topics you're looking for, and whether you charge for contributed posts? If a placement is paid, we're happy for the link to be marked rel="sponsored".`
-          + sign,
+          + anchor + sign,
       };
     case "resource_page":
       return {
@@ -90,7 +92,7 @@ export function composePitch(kind: BacklinkKind, domain: string, signals: Backli
       return {
         subject: `Press release submissions on ${name}`,
         body: `${hello}\n\nWe help home-service contractors announce real company news (new locations, certifications, community projects). Could you tell us how to submit a release to ${name}, what it costs, and whether published releases include a link to the company's website?`
-          + sign,
+          + anchor + sign,
       };
     default:
       return { subject: `Listing on ${name}`, body: `${hello}\n\nHow can a home-service contractor be listed on ${name}?` + sign };

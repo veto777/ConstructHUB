@@ -4,7 +4,7 @@
  * HTML. A grade rests only on what was read: unmeasured authority is said, never assumed.
  */
 import * as cheerio from "cheerio";
-import type { BacklinkKind, BacklinkMetrics, BacklinkSignals, BacklinkTier, LinkType } from "@shared/backlinks";
+import { LOW_TRAFFIC, type BacklinkKind, type BacklinkMetrics, type BacklinkSignals, type BacklinkTier, type LinkType } from "@shared/backlinks";
 import { safeFetch as siteFetch, type PageResponse } from "../sitescan/http";
 import { isExcluded, normalizeDomain } from "./discover";
 
@@ -288,11 +288,16 @@ export function gradeSource(hint: BacklinkKind, s: BacklinkSignals, m: BacklinkM
     }
     if (m.referringDomains != null && m.referringDomains < 20) add(-10, `only ${m.referringDomains} referring domains`);
     if (m.spamScore != null && m.spamScore >= 20) add(-10, `spam score ${m.spamScore}/100`);
+    // Rank and referring domains can be manufactured; real visitors cannot. Directories/citations (a county chamber)
+    // can be legitimate with few searchers, so they lose points; a content site with no audience is capped below.
+    if (m.organicTraffic != null && m.organicTraffic < LOW_TRAFFIC && !topical) add(-10, `almost no Google visitors (about ${Math.round(m.organicTraffic)} a month)`);
   } else reasons.push("authority not measured yet (tier capped at B)");
   score = Math.max(0, Math.min(100, score));
   let tier: BacklinkTier = score >= 70 ? "A" : score >= 50 ? "B" : score >= 30 ? "C" : "X";
   if (FREE_BLOG.test(site) && (tier === "A" || tier === "B")) { tier = "C"; reasons.push("a free blog sub-domain (capped at C)"); }
   if (!m && tier === "A") tier = "B";
+  const ghost = (topical || kind === "press_release") && m?.organicTraffic != null && m.organicTraffic < LOW_TRAFFIC;
+  if (ghost && (tier === "A" || tier === "B")) { tier = "C"; reasons.push(`almost no Google visitors (about ${Math.round(m!.organicTraffic!)} a month) — capped at C: links from sites nobody reads are a penalty risk`); }
   return { kind, tier, score, reasons, linkType };
 }
 

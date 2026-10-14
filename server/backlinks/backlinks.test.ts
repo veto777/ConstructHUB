@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildQueryBank, hitsFromItems, isExcluded, normalizeDomain, parseImportLine, QUERY_TEMPLATES, NICHES, US_STATES } from "./discover";
 import { analyzePage, classifyKind, gradeSource, mergeSignals } from "./vet";
 import { composePitch, siteName, pickEmail, sendBlocker, outreachConfig, withFooter } from "./outreach";
+import { fetchMetrics, metricsDeps } from "./metrics";
 import type { BacklinkSignals } from "@shared/backlinks";
 
 const page = (body: string, url = "https://homefixblog.com/write-for-us/") => analyzePage({ url, status: 200, body });
@@ -247,5 +248,54 @@ describe("manufacturer locators count as directory pages", () => {
   });
   it("an ordinary article is not a directory page", () => {
     expect(analyzePage({ url: "https://homefixblog.com/2026/how-to-find-a-good-roof/", status: 200, body: "<html><head><title>Tips</title></head><body>x</body></html>" }).directoryUrl).toBeNull();
+  });
+});
+
+// 2026-10-14: a penalty case study (30k → 918 monthly visitors) blamed links from sites with no traffic and keyword-heavy anchors.
+describe("links from sites nobody visits, and anchor text", () => {
+  const blog = () => mergeSignals(
+    analyzePage({ url: "https://homefixblog.com/how-to-fix-gutters/", status: 200, body: `<html><head><title>How to fix gutters</title></head><body>${words(900, "gutters")} <a href="/write-for-us/">Write for us</a></body></html>` }),
+    analyzePage({ url: "https://homefixblog.com/", status: 200, body: `<html><head><title>HomeFix Blog — roofing, plumbing and remodeling tips</title></head><body>${words(400, "kitchen remodeling")}</body></html>` }));
+  const strong = { rank: 300, referringDomains: 800, spamScore: 3, checkedAt: "x" };
+
+  it("caps a content site with almost no Google visitors at C, however strong its rank", () => {
+    const g = gradeSource("guest_post", blog(), { ...strong, organicTraffic: 3 });
+    expect(g.tier).toBe("C");
+    expect(g.reasons.join(" ")).toMatch(/almost no Google visitors \(about 3 a month\)/);
+    expect(gradeSource("guest_post", blog(), { ...strong, organicTraffic: 2500 }).tier).toBe("A");
+    // Not measured yet (sources measured before traffic was) grades as before.
+    expect(gradeSource("guest_post", blog(), strong).tier).toBe("A");
+  });
+
+  it("only takes points off a directory with few visitors (a county chamber can be real)", () => {
+    const chamber = analyzePage({ url: "https://business.greaterlowellcc.org/list/ql/contractors-7", status: 200,
+      body: `<html lang="en"><head><title>Contractors | Greater Lowell Chamber</title></head><body><h1>Member Directory</h1><p>${words(700, "contractor")}</p></body></html>` });
+    const busy = gradeSource("directory", chamber, { ...strong, organicTraffic: 400 });
+    const quiet = gradeSource("directory", chamber, { ...strong, organicTraffic: 0 });
+    expect(busy.score - quiet.score).toBe(10);
+    expect(quiet.tier).not.toBe("X");
+  });
+
+  it("asks for the company name or address as the link text, never a keyword", () => {
+    expect(composePitch("guest_post", "homefixblog.com", page(GUEST), "Pat").body).toMatch(/company name or web address as the link text/);
+    expect(composePitch("press_release", "prwire.example", null, "Pat").body).toMatch(/company name or web address as the link text/);
+  });
+
+  it("measures traffic with the authority numbers", async () => {
+    const ok = (items: unknown[], cost: number) => ({ status_code: 20000, tasks: [{ status_code: 20000, cost, result: [{ items }] }] });
+    const saved = metricsDeps.request;
+    const paths: string[] = [];
+    metricsDeps.request = (async (_m: string, path: string) => {
+      paths.push(path);
+      if (path.includes("bulk_traffic")) return ok([{ target: "a.com", metrics: { organic: { etv: 54.1, count: 74 } } }], 0.0126);
+      if (path.includes("bulk_ranks")) return ok([{ target: "a.com", rank: 310 }], 0.02);
+      return ok([], 0.02);
+    }) as any;
+    try {
+      const { metrics, costUsd } = await fetchMetrics(["a.com"]);
+      expect(paths.some((x) => x.includes("bulk_traffic_estimation"))).toBe(true);
+      expect(metrics.get("a.com")).toMatchObject({ rank: 310, organicTraffic: 54.1 });
+      expect(costUsd).toBeCloseTo(0.0726, 4);
+    } finally { metricsDeps.request = saved; }
   });
 });

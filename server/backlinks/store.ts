@@ -151,12 +151,12 @@ export async function failVetting(job: VetJob, token: string, error: string) {
   if (r.rowCount) await event(job.id, last ? "vet_failed" : "vet_retry", { error: error.slice(0, 300), attempt: job.attempts });
 }
 
-/** Sources worth an authority check: graded on the page, never measured (or measured over 90 days ago). */
+/** Sources worth an authority check: graded on the page, never measured, measured before traffic was (2026-10-14), or over 90 days ago. */
 export async function needingMetrics(limit: number): Promise<{ id: number; domain: string; kind: BacklinkKind; signals: BacklinkSignals }[]> {
   const r = await db().query(
     `SELECT id, domain, kind, signals FROM backlink_sources
       WHERE status IN ('qualified','contacted','replied','agreed','active') AND signals IS NOT NULL
-        AND (metrics_at IS NULL OR metrics_at < now() - interval '90 days')
+        AND (metrics_at IS NULL OR NOT (metrics ? 'organicTraffic') OR metrics_at < now() - interval '90 days')
       ORDER BY metrics_at NULLS FIRST, id LIMIT $1`, [limit]);
   return r.rows;
 }
@@ -167,7 +167,7 @@ export async function saveMetrics(id: number, metrics: BacklinkMetrics, g: Grade
     `UPDATE backlink_sources SET metrics = $2, metrics_at = now(), tier = $3, score = $4, reasons = $5, kind = $6,
             status = CASE WHEN $3 = 'X' THEN 'rejected' ELSE status END, updated_at = now() WHERE id = $1`,
     [id, JSON.stringify(metrics), g.tier, g.score, g.reasons, g.kind]);
-  await event(id, "measured", { rank: metrics.rank, spamScore: metrics.spamScore, referringDomains: metrics.referringDomains, tier: g.tier });
+  await event(id, "measured", { rank: metrics.rank, spamScore: metrics.spamScore, referringDomains: metrics.referringDomains, organicTraffic: metrics.organicTraffic ?? null, tier: g.tier });
 }
 
 // ── Admin reads ─────────────────────────────────────────────────────────────
