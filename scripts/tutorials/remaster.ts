@@ -19,7 +19,8 @@
  *     after it moves by that much; a shorter one leaves silence, as between any two lines. Captions
  *     (.vtt/.srt) and the YouTube chapters are timed again from the new step times;
  *   · ONE encode of the picture at the master's settings; the sound is copied untouched when no line
- *     changes, else encoded as mux.ts does it (two-pass loudness to −14 LUFS, AAC 48 kHz stereo);
+ *     changes, else encoded as mux.ts does it (two-pass loudness to −14 LUFS, AAC 48 kHz stereo) —
+ *     WITHOUT the music bed: run music.ts <helpKey> --upload on such a result afterwards;
  *   · the poster and the thumbnail are frames of unchanged moments: they are kept;
  *   · check.ts' checks, then a strip of frames around every repaired span (old above new) to LOOK at.
  *

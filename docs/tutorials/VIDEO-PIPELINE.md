@@ -36,6 +36,28 @@ single feature we have! Start with the CRM make hundreds of videos if you have t
 video also goes to YouTube (channel "Construct HUB"), with catchy thumbnails in the brand blue and
 orange with the mascot.
 
+## Music bed (owner, 2026-10-14)
+
+"All the tutorial videos would sound better with music … 10 %, quiet enough so you can hear the voiceover
+no issues … use the same music I shared for the ad videos … a variation of these, just nothing too jumpy."
+
+- The beds are four of the seven MUSIC4VIDEO tracks the owner shared for the Meta ads (the calm ones:
+  Business Technology, Educational, Hi-Tech Ambient, Hi-Tech Presentation), in
+  `scripts/tutorials/assets/music/` as 160 kbps AAC, cut in at the bars the ads cue on.
+- One bed per tool group (`bedFor` in `scripts/tutorials/music.ts`): CRM → Business Technology, the
+  Start-here intros → Educational, the Google Business tools → Hi-Tech Ambient, ads / Click Guard / brand /
+  data → Hi-Tech Presentation. A new group is hashed onto a bed.
+- Level: the bed is loudness-normalised, then 20 dB under the narration (≈ 10 %); the narration itself is
+  not re-normalised, so the mix still measures −14 LUFS (check.ts' ±1 holds). 1 s fade in under the
+  title card, 2 s fade out under the end card, looped when a video outlasts the track.
+- `mux.ts` adds it to every new video (`--no-music` leaves it out). Existing masters:
+  `npx tsx scripts/tutorials/music.ts --all --upload` fetches each current master from the live media
+  route, checks it against its manifest, re-muxes the sound only (picture copied), uploads the new mp4
+  (new hashed name; captions and poster keep their keys) and writes the manifest. Idempotent through
+  `analysis/music-out/report.json`. 2026-10-14: run over all 166 videos.
+- `remaster.ts`: when it rebuilds the narration track (a lexicon change) the result has no bed — run
+  `music.ts <helpKey> --upload` on it afterwards. When no line changes the sound is copied, bed included.
+
 ## The production line
 
 | Piece | Where |

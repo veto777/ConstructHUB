@@ -248,7 +248,8 @@ that each point at something.
 lines: 84 characters at most is safe (longer ones are split at a comma). Say the label exactly as the
 screen shows it ("Choose Send estimate", "Tick who is going"). Phrase clicks as *choose / click /
 tick / type / open* — never "simply", "just", "easily". Open by saying what the viewer will do; end
-on where the feature is in the menu. No "welcome", no sign-off, no music.
+on where the feature is in the menu. No "welcome", no sign-off. (The quiet music bed under the voice is
+mux.ts's doing — `scripts/tutorials/music.ts` — never the script's; the narration does not mention it.)
 
 **The demo is a demo.** Narration must never claim the demo company or its numbers are real customers
 or real results — no "our customer", no "contractors see", no "this company made". Say what the screen
@@ -572,7 +573,7 @@ highlighted control**, easing from step to step; large word-by-word captions (An
 dark edge, the word being said in the brand orange, two lines at most) in their own strip *under* the
 recording, so they never cover a control; a thin orange progress bar; the gator and the address at the
 bottom; a 2 s end card. The first second and a half is the headline, large, over the recording while the
-camera pushes in — not a still title card. No music.
+camera pushes in — not a still title card. The only music is the bed mux.ts lays under the voice (music.ts).
 
 **Safe areas** (`SAFE_AREA` in `social-lib.ts`, tested): on the vertical cut nothing that must be read is in
 the top 14% (the platform's tabs), the bottom 22% (account name, caption, audio) or the right 16% of the
