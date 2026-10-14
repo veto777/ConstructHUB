@@ -148,6 +148,9 @@
     "scroll": "[data-testid=img-ranking-map]"
    },
    {
+    "evaluate": "document.querySelector('main').scrollTop -= 40"
+   },
+   {
     "wait": 800
    }
   ],
@@ -177,7 +180,7 @@
   "wait": "Roofing Contractor",
   "actions": [
    {
-    "click": "[data-testid=card-scan-910001] .cursor-pointer"
+    "click": "[data-testid=button-expand-scan-910001]"
    },
    {
     "wait": 1500
@@ -193,7 +196,7 @@
   "wait": "Roofing Contractor",
   "actions": [
    {
-    "click": "[data-testid=card-scan-910001] .cursor-pointer"
+    "click": "[data-testid=button-expand-scan-910001]"
    },
    {
     "wait": 1500
@@ -216,7 +219,7 @@
   "wait": "Someone suggested",
   "actions": [
    {
-    "scroll": "text=Your Business Profile category was updated"
+    "evaluate": "(()=>{const m=document.querySelector('main');const el=[...m.querySelectorAll('*')].filter(e=>/^Provider inbox\\s*\\d+$/.test(e.textContent.trim())).pop();m.scrollTop+=el.getBoundingClientRect().top-m.getBoundingClientRect().top-30})()"
    },
    {
     "wait": 400
@@ -294,6 +297,9 @@
    },
    {
     "click": "role=option[name=\"Service area business (no storefront)\"]"
+   },
+   {
+    "click": "role=radio[name=\"No\"]"
    },
    {
     "fill": "[data-testid=textarea-problem-description]",

@@ -170,19 +170,8 @@
  {
   "key": "guides",
   "n": 1,
-  "route": "/social-media?tab=guides",
+  "route": "/social-media/guides?business=910001",
   "wait": "Find a guide",
-  "actions": [
-   {
-    "scroll": "[aria-label=\"Guide topics\"]"
-   },
-   {
-    "evaluate": "document.querySelector('main').scrollTop -= 80"
-   },
-   {
-    "wait": 500
-   }
-  ],
   "alt": "The Guides page with a Find a guide list of topics and the first step-by-step walkthrough below it.",
   "caption": "Step-by-step guides for every tool"
  },
@@ -197,22 +186,8 @@
  {
   "key": "masterClass",
   "n": 2,
-  "route": "/master-class",
-  "wait": "Master Class",
-  "actions": [
-   {
-    "click": "role=tab[name=\"State guide\"]"
-   },
-   {
-    "click": "text=Select your state..."
-   },
-   {
-    "click": "role=option[name=\"Colorado\"]"
-   },
-   {
-    "wait": 1000
-   }
-  ],
+  "route": "/master-class?tab=state-guide&state=CO",
+  "wait": "Colorado does not",
   "alt": "The Master Class state guide for Colorado, showing licensing, workers comp, tax and bond requirements with links to the state agencies.",
   "caption": "State guide: Colorado licensing, insurance and taxes"
  },
@@ -252,6 +227,9 @@
     "value": "roof"
    },
    {
+    "evaluate": "(()=>{const m=document.querySelector('main');const el=document.querySelector('[role=radio]');m.scrollTop+=el.getBoundingClientRect().top-m.getBoundingClientRect().top-40})()"
+   },
+   {
     "wait": 500
    }
   ],
@@ -272,6 +250,15 @@
    },
    {
     "wait": 1000
+   },
+   {
+    "click": "text=Filters"
+   },
+   {
+    "wait": 500
+   },
+   {
+    "evaluate": "(()=>{const m=document.querySelector('main');const el=document.querySelector('[role=radio]');m.scrollTop+=el.getBoundingClientRect().top-m.getBoundingClientRect().top-40})()"
    },
    {
     "click": "[data-testid=select-scope-location]"
@@ -321,13 +308,13 @@
  {
   "key": "callAssistant",
   "n": 3,
-  "route": "/call-assistant?tab=calls",
-  "wait": "Spam blocked",
+  "route": "/call-assistant/calls",
+  "wait": "Call log",
   "alt": "The Call Assistant call log listing recent sample calls with caller, city, outcome and a one-line summary of each call.",
   "caption": "Call log with outcomes and summaries",
   "actions": [
    {
-    "scroll": "text=Skylight and re-roof"
+    "evaluate": "(()=>{const m=document.querySelector('main');const el=[...m.querySelectorAll('*')].filter(e=>e.textContent.trim()==='Call log').pop();m.scrollTop+=el.getBoundingClientRect().top-m.getBoundingClientRect().top-70})()"
    },
    {
     "wait": 500

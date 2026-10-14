@@ -67,7 +67,12 @@
   "route": "/vpn-shield",
   "wait": "Top VPN providers",
   "alt": "VPN Shield overview with total VPN or proxy detections, detections today, visits blocked and unique VPN IP addresses, plus a breakdown of detections by country.",
-  "caption": "VPN and proxy traffic at a glance"
+  "caption": "VPN and proxy traffic at a glance",
+  "actions": [
+   {
+    "evaluate": "(()=>{const m=document.querySelector('main');const el=[...m.querySelectorAll('*')].filter(e=>e.textContent.trim()==='Detections, last 30 days').pop();m.scrollTop+=el.getBoundingClientRect().top-m.getBoundingClientRect().top-40})()"
+   }
+  ]
  },
  {
   "key": "vpnShield",
@@ -130,7 +135,10 @@
   "wait": "What raised or lowered",
   "actions": [
    {
-    "scroll": "h2:has-text(\"Technical\")"
+    "scroll": "text=What raised or lowered"
+   },
+   {
+    "evaluate": "(()=>{const m=document.querySelector('main');const el=[...m.querySelectorAll('*')].find(e=>e.childElementCount===0&&e.textContent.trim()==='Overall');m.scrollTop+=el.getBoundingClientRect().top-m.getBoundingClientRect().top-150})()"
    }
   ],
   "alt": "Site Scan report for a contractor website with an overall score and Local, Content, Technical, Performance and AI Readiness scores, followed by prioritized findings with why each matters and how to fix it.",
@@ -139,13 +147,8 @@
  {
   "key": "siteScan",
   "n": 2,
-  "route": "/site-scan?scan=93000000-0000-4000-8000-00000000f004",
-  "wait": "What raised or lowered",
-  "actions": [
-   {
-    "scroll": "[data-testid=section-scan-history]"
-   }
-  ],
+  "route": "/site-scan/history",
+  "wait": "Previous scans",
   "alt": "Site Scan history listing past scans of several client websites with dates, overall scores and the score change since the prior scan.",
   "caption": "Scan history and score trend for every client"
  },
@@ -183,7 +186,10 @@
     "wait": 1500
    },
    {
-    "scroll": "text=198.51.100.201"
+    "scroll": "button:has-text(\"Add to preview\")"
+   },
+   {
+    "evaluate": "(()=>{const m=document.querySelector('main');const el=document.querySelector('input[placeholder*=flagged i]');m.scrollTop+=el.getBoundingClientRect().top-m.getBoundingClientRect().top-100})()"
    }
   ],
   "alt": "Cloudflare zone details showing IP addresses flagged by Click Guard with the reason for each and a button to add it to an edge blocking rule preview.",
@@ -192,16 +198,8 @@
  {
   "key": "cloudflare",
   "n": 3,
-  "route": "/cloudflare",
-  "wait": "summitroofing.example",
-  "actions": [
-   {
-    "click": "[data-testid=tab-connection-edge-audit]"
-   },
-   {
-    "wait": 1200
-   }
-  ],
+  "route": "/cloudflare/edge-audit",
+  "wait": "Changes",
   "alt": "Cloudflare edge audit listing rule changes for client zones, one applied IP block and one ads-path rule awaiting review, with before and after snapshots and an undo button.",
   "caption": "Every edge rule change audited, with undo"
  },
@@ -242,6 +240,9 @@
    },
    {
     "evaluate": "document.querySelector('main').scrollTop += 34"
+   },
+   {
+    "hover": "[data-testid=tool-top-title]"
    }
   ],
   "alt": "Search analytics for a roofing website broken down by search query, showing clicks, impressions, click-through rate and average position per day.",
@@ -260,7 +261,7 @@
     "wait": 1500
    },
    {
-    "scroll": "h3:has-text(\"Inspections\")"
+    "evaluate": "(()=>{const m=document.querySelector('main');const el=[...m.querySelectorAll('*')].filter(e=>/^Sitemaps\\s*\\d+$/.test(e.textContent.trim())).pop();m.scrollTop+=el.getBoundingClientRect().top-m.getBoundingClientRect().top-70})()"
    }
   ],
   "alt": "Search Console sitemaps and URL inspection results for a website, showing which pages are indexed, crawled but not indexed, or not found.",

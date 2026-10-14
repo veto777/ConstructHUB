@@ -66,7 +66,7 @@
   "wait": "Your Google Ads accounts",
   "actions": [
    {
-    "click": "text=Summit Roofing Co. \u2013 Denver"
+    "click": "text=Summit Roofing Co. – Denver"
    },
    {
     "wait": 1000
@@ -142,7 +142,14 @@
     "click": "[data-testid=button-add-manual-cities]"
    },
    {
+    "evaluate": "(()=>{const m=document.querySelector('main');const el=document.querySelector('[data-testid=select-category]');m.scrollTop+=el.getBoundingClientRect().top-m.getBoundingClientRect().top-120})()"
+   },
+   {
     "click": "[data-testid=select-category] button"
+   },
+   {
+    "fill": "[data-testid=input-category-search]",
+    "value": "Roofing"
    },
    {
     "click": "[data-testid=category-option-roofing]"
@@ -157,7 +164,7 @@
     "wait": 6000
    },
    {
-    "scroll": "text=Or add specific cities manually"
+    "evaluate": "(()=>{const m=document.querySelector('main');const el=[...m.querySelectorAll('*')].filter(e=>e.textContent.trim()==='Or add specific cities manually').pop();m.scrollTop+=el.getBoundingClientRect().top-m.getBoundingClientRect().top-20})()"
    },
    {
     "wait": 300
@@ -185,6 +192,9 @@
    },
    {
     "wait": 1000
+   },
+   {
+    "hover": "[data-testid=tool-top-title]"
    }
   ],
   "alt": "A Media Library folder open, showing a grid of job photos with SEO file names, sizes and a GPS Embedded badge.",

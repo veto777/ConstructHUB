@@ -9,7 +9,7 @@ export const FEATURE_SCREENS: Readonly<Record<string, readonly FeatureScreen[]>>
   "adsManager": [
     {"src":"/feature-shots/adsManager-1.webp","alt":"Agency Ads and LSA manager client accounts table listing connected Google Ads accounts with customer ID, LSA status, currency and time zone, linked Click Guard site, last audit time and account status.","caption":"All client Google Ads accounts under one agency login","url":"constructhub.us/ads-manager?tab=accounts","width":1600,"height":1000},
     {"src":"/feature-shots/adsManager-2.webp","alt":"Ads health audit findings for client accounts, such as campaigns not set to presence-only targeting, search terms with spend and no conversions, missing ad schedules and budget-limited campaigns, each with a fix button.","caption":"Health audit findings with one-click fix previews","url":"constructhub.us/ads-manager?tab=findings","width":1600,"height":1000},
-    {"src":"/feature-shots/adsManager-3.webp","alt":"Protection change preview dialog listing the exact Google Ads changes to be made: IP exclusions from Click Guard added to two search campaigns, with a warning and the number of operations.","caption":"Review every change before it touches Google Ads","url":"constructhub.us/ads-manager?tab=plans","width":1536,"height":1532},
+    {"src":"/feature-shots/adsManager-3.webp","alt":"Protection change preview dialog listing the exact Google Ads changes to be made: IP exclusions from Click Guard added to two search campaigns, with a warning and the number of operations.","caption":"Review every change before it touches Google Ads","url":"constructhub.us/ads-manager?tab=plans","width":1536,"height":1048},
   ],
   "agency": [
     {"src":"/feature-shots/agency-1.webp","alt":"Agency workspace Locations tab with location and reconnect counts, client and status filters, and client businesses shown as Google-style listings.","caption":"Every client location in one workspace","url":"constructhub.us/agency","width":1600,"height":1000},
@@ -19,7 +19,7 @@ export const FEATURE_SCREENS: Readonly<Record<string, readonly FeatureScreen[]>>
   "callAssistant": [
     {"src":"/feature-shots/callAssistant-1.webp","alt":"The AI Call Assistant overview with the last 30 days of results: calls answered, estimate requests, urgent calls sent to a person, questions answered and spam blocked.","caption":"Every call answered, sorted by what happened","url":"constructhub.us/call-assistant","width":1600,"height":1000},
     {"src":"/feature-shots/callAssistant-2.webp","alt":"The Call Assistant agent studio with the company profile for the sample roofing business and sections for services, service area, policies, persona, intake questions and escalations.","caption":"Agent studio: teach the assistant your business","url":"constructhub.us/call-assistant?tab=studio","width":1600,"height":1000},
-    {"src":"/feature-shots/callAssistant-3.webp","alt":"The Call Assistant call log listing recent sample calls with caller, city, outcome and a one-line summary of each call.","caption":"Call log with outcomes and summaries","url":"constructhub.us/call-assistant?tab=calls","width":1600,"height":1000},
+    {"src":"/feature-shots/callAssistant-3.webp","alt":"The Call Assistant call log listing recent sample calls with caller, city, outcome and a one-line summary of each call.","caption":"Call log with outcomes and summaries","url":"constructhub.us/call-assistant/calls","width":1600,"height":1000},
   ],
   "clickGuard": [
     {"src":"/feature-shots/clickGuard-1.webp","alt":"Click Guard traffic signals for a roofing website, listing blocked IP addresses with the reason each was flagged (repeat ad clicks, shared device fingerprint, bot user agents), whether it was blocked automatically or manually, and the date.","caption":"Repeat ad clickers and bots, blocked automatically","url":"constructhub.us/google-ads?tab=fraud","width":1600,"height":1000},
@@ -29,7 +29,7 @@ export const FEATURE_SCREENS: Readonly<Record<string, readonly FeatureScreen[]>>
   "cloudflare": [
     {"src":"/feature-shots/cloudflare-1.webp","alt":"Cloudflare protection page listing connected client websites (zones) with status, linked locations and last sync time.","caption":"Client Cloudflare zones in one list","url":"constructhub.us/cloudflare","width":1600,"height":1000},
     {"src":"/feature-shots/cloudflare-2.webp","alt":"Cloudflare zone details showing IP addresses flagged by Click Guard with the reason for each and a button to add it to an edge blocking rule preview.","caption":"Push Click Guard's flagged IPs to the edge","url":"constructhub.us/cloudflare","width":1600,"height":1000},
-    {"src":"/feature-shots/cloudflare-3.webp","alt":"Cloudflare edge audit listing rule changes for client zones, one applied IP block and one ads-path rule awaiting review, with before and after snapshots and an undo button.","caption":"Every edge rule change audited, with undo","url":"constructhub.us/cloudflare","width":1600,"height":1000},
+    {"src":"/feature-shots/cloudflare-3.webp","alt":"Cloudflare edge audit listing rule changes for client zones, one applied IP block and one ads-path rule awaiting review, with before and after snapshots and an undo button.","caption":"Every edge rule change audited, with undo","url":"constructhub.us/cloudflare/edge-audit","width":1600,"height":1000},
   ],
   "competitors": [
     {"src":"/feature-shots/competitors-1.webp","alt":"Competitor market scan for roofing contractors in Denver with 12 competitors found, an overview, and counts of listings with few, some or more review signals.","caption":"A market scan of local competitors","url":"constructhub.us/competitors","width":1600,"height":1000},
@@ -71,7 +71,7 @@ export const FEATURE_SCREENS: Readonly<Record<string, readonly FeatureScreen[]>>
     {"src":"/feature-shots/gbpContent-3.webp","alt":"Calendar view of scheduled and published Google Business Profile posts and photos, grouped by day.","caption":"Calendar view of everything going to Google","url":"constructhub.us/gbp-content?location=910001","width":1600,"height":1000},
   ],
   "guides": [
-    {"src":"/feature-shots/guides-1.webp","alt":"The Guides page with a Find a guide list of topics and the first step-by-step walkthrough below it.","caption":"Step-by-step guides for every tool","url":"constructhub.us/social-media?tab=guides","width":1600,"height":1000},
+    {"src":"/feature-shots/guides-1.webp","alt":"The Guides page with a Find a guide list of topics and the first step-by-step walkthrough below it.","caption":"Step-by-step guides for every tool","url":"constructhub.us/social-media/guides?business=910001","width":1600,"height":1000},
   ],
   "ipTracker": [
     {"src":"/feature-shots/ipTracker-1.webp","alt":"IP Tracker visitor list showing each website visitor's IP address, visits, pages viewed, city, browser and last seen time, with visitors online now and a suspicious visitor marked.","caption":"Every visitor, live, with location and device","url":"constructhub.us/ip-tracker?tab=visitors","width":1600,"height":1000},
@@ -91,7 +91,7 @@ export const FEATURE_SCREENS: Readonly<Record<string, readonly FeatureScreen[]>>
   ],
   "masterClass": [
     {"src":"/feature-shots/masterClass-1.webp","alt":"The Master Class overview with four in-depth modules, 50 state guides and the course module list.","caption":"Modules and a state guide for every state","url":"constructhub.us/master-class","width":1600,"height":1000},
-    {"src":"/feature-shots/masterClass-2.webp","alt":"The Master Class state guide for Colorado, showing licensing, workers comp, tax and bond requirements with links to the state agencies.","caption":"State guide: Colorado licensing, insurance and taxes","url":"constructhub.us/master-class","width":1600,"height":1000},
+    {"src":"/feature-shots/masterClass-2.webp","alt":"The Master Class state guide for Colorado, showing licensing, workers comp, tax and bond requirements with links to the state agencies.","caption":"State guide: Colorado licensing, insurance and taxes","url":"constructhub.us/master-class?tab=state-guide&state=CO","width":1600,"height":1000},
   ],
   "media": [
     {"src":"/feature-shots/media-1.webp","alt":"SEO photo optimizer set up for a roofing business: six Denver-area service-area cities selected and roofing keywords chosen for the next batch of photos.","caption":"Service-area cities and keywords for every photo","url":"constructhub.us/photos","width":1600,"height":1000},
@@ -134,7 +134,7 @@ export const FEATURE_SCREENS: Readonly<Record<string, readonly FeatureScreen[]>>
   ],
   "siteScan": [
     {"src":"/feature-shots/siteScan-1.webp","alt":"Site Scan report for a contractor website with an overall score and Local, Content, Technical, Performance and AI Readiness scores, followed by prioritized findings with why each matters and how to fix it.","caption":"A finished scan: scores and prioritized fixes","url":"constructhub.us/site-scan?scan=93000000-0000-4000-8000-00000000f004","width":1600,"height":1000},
-    {"src":"/feature-shots/siteScan-2.webp","alt":"Site Scan history listing past scans of several client websites with dates, overall scores and the score change since the prior scan.","caption":"Scan history and score trend for every client","url":"constructhub.us/site-scan?scan=93000000-0000-4000-8000-00000000f004","width":1600,"height":1000},
+    {"src":"/feature-shots/siteScan-2.webp","alt":"Site Scan history listing past scans of several client websites with dates, overall scores and the score change since the prior scan.","caption":"Scan history and score trend for every client","url":"constructhub.us/site-scan/history","width":1600,"height":1000},
     {"src":"/feature-shots/siteScan-3.webp","alt":"Site Scan findings for local and content issues, such as duplicate titles and images missing alt text, each with impact, Google guidance link, fix steps and affected URLs.","caption":"Each finding explained, with steps and affected pages","url":"constructhub.us/site-scan?scan=93000000-0000-4000-8000-00000000f004","width":1600,"height":1000},
   ],
   "social": [
@@ -143,7 +143,7 @@ export const FEATURE_SCREENS: Readonly<Record<string, readonly FeatureScreen[]>>
   ],
   "texting": [
     {"src":"/feature-shots/texting-1.webp","alt":"Client record with the text messages the office and crew sent to a homeowner, each logged with sender and time.","caption":"Texts to clients, logged on the client record","url":"portal.constructhub.us/crm/clients/40000000-0002-4000-8000-000000000001?portal=1","width":1600,"height":1043},
-    {"src":"/feature-shots/texting-2.webp","alt":"The CRM's text messaging settings card showing the company's texting number as configured.","caption":"Your company's own texting number, set up in Settings","url":"portal.constructhub.us/crm/settings?portal=1#sms","width":1600,"height":1328},
+    {"src":"/feature-shots/texting-2.webp","alt":"The CRM's text messaging settings card showing the company's texting number as configured.","caption":"Your company's own texting number, set up in Settings","url":"portal.constructhub.us/crm/settings?portal=1#sms","width":1600,"height":1306},
   ],
   "vpnShield": [
     {"src":"/feature-shots/vpnShield-1.webp","alt":"VPN Shield overview with total VPN or proxy detections, detections today, visits blocked and unique VPN IP addresses, plus a breakdown of detections by country.","caption":"VPN and proxy traffic at a glance","url":"constructhub.us/vpn-shield","width":1600,"height":1000},
