@@ -1,4 +1,5 @@
 import { formatNumber } from "@/components/site-connections/format";
+import { BRAND, BrandBadge, BrandIcon } from "@/components/brand-icon";
 import {
   LoadingReport,
   ReportError,
@@ -669,7 +670,7 @@ export default function SiteConnections({
   ) : (
     <GoogleSectionHeader
       as="h1"
-      title={cf ? "Cloudflare protection" : "Google Search Console"}
+      title={<BrandBadge brand={cf ? "cloudflare" : "search_console"} label={cf ? "Cloudflare protection" : "Google Search Console"} iconClassName="h-6 w-6" />}
       titleAfter={
         cf ? <HelpButton k="cloudflare" /> : <HelpButton k="search-console" />
       }
@@ -731,8 +732,9 @@ export default function SiteConnections({
             className="g-card mb-6 flex flex-col gap-4 rounded-2xl border px-5 py-5 sm:flex-row sm:items-center"
             data-testid="notice-connection-connected"
           >
-            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/10" aria-hidden="true">
-              <CheckCircle2 className="h-8 w-8 text-primary" strokeWidth={2.2} />
+            <span className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/10" aria-hidden="true">
+              <BrandIcon brand={cf ? "cloudflare" : "search_console"} className="h-8 w-8" />
+              <CheckCircle2 className="absolute -bottom-0.5 -right-0.5 h-5 w-5 rounded-full bg-white text-primary" strokeWidth={2.4} />
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-lg font-semibold leading-6 g-text">
@@ -826,6 +828,7 @@ export default function SiteConnections({
                     disabled={busy}
                     className="w-full sm:w-auto"
                     testId="button-connect-cloudflare"
+                    icon={BRAND.cloudflare.icon}
                     label="Connect with Cloudflare"
                     onClick={() =>
                       act(
@@ -1001,6 +1004,7 @@ export default function SiteConnections({
                     window.location.assign(d.url);
                   })
                 }
+                icon={BRAND.search_console.icon}
                 label="Connect Google Search Console"
               />
             )}
@@ -1021,7 +1025,7 @@ export default function SiteConnections({
                     <b>{c.email ?? c.subject}</b>
                   </label>
                   <p className="text-sm g-text-2">
-                    {c.method === "oauth" ? "Connected with Cloudflare sign-in" : (c.token_name ?? c.method)}
+                    <BrandIcon brand={cf ? "cloudflare" : "search_console"} className="mr-1.5 inline h-3.5 w-3.5 align-[-2px]" />{c.method === "oauth" ? (cf ? "Connected with Cloudflare sign-in" : "Connected with Google sign-in") : (c.token_name ?? c.method)}
                   </p>
                   {c.method === "oauth" && Array.isArray(c.permissions) && c.permissions.length > 8 ? (
                     <details className="text-sm g-text-2">

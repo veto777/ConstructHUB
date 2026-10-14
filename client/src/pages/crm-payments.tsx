@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { brandIcon } from "@/components/brand-icon";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -197,7 +198,7 @@ export default function CrmPaymentsPage() {
   return (
     <CrmPage className="max-w-3xl">
       <CrmPageHeader
-        icon={Landmark}
+        icon={brandIcon("stripe")}
         title="Payments"
         infoKey="payments"
         subtitle="Connect your own Stripe account. Money goes straight to you — we never hold it."
