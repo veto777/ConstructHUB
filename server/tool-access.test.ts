@@ -36,7 +36,7 @@ describe("tool access", () => {
       if (slug) expect(slugs.has(slug), `${url} → ${rule.landing}`).toBe(true);
       else expect(rule.landing, url).toBe("/call-assistant");
     }
-    const free = ["/databases", "/reinstatement", "/google-ad-fraud", "/google-ads-guide", "/lsa-guide", "/lsa-leads", "/master-class"];
+    const free = ["/yelp", "/databases", "/reinstatement", "/google-ad-fraud", "/google-ads-guide", "/lsa-guide", "/lsa-leads", "/master-class"];
     for (const url of SIDEBAR_URLS) expect(!!toolRuleFor(url) || free.includes(url), url).toBe(true);
     expect(toolRuleFor("/seo/keywords")).toBe(TOOL_RULES["/seo"]);
     expect(toolRuleFor("/pricing#add-ons")).toBeUndefined();
@@ -109,7 +109,7 @@ describe("the sidebar", () => {
     expect(src).toContain("toolAccess(url, accessCtx)");
     expect(src).toContain('queryKey: ["/api/crm/billing/subscription"]');
     expect(src).toContain("agencyMe.owner !== agencyMe.actor");
-    expect(src).toContain("export const APP_NAV = { permitsGroup, googleGroups, googleReviewsItem, standaloneItems, pricingGroup, shownHere };");
+    expect(src).toContain("export const APP_NAV = { permitsGroup, googleGroups, googleReviewsItem, yelpReviewsItem, standaloneItems, pricingGroup, shownHere };");
     // The iPhone apps: a locked entry goes to the tool (its page says it is not on the account), never a sales page.
     expect(src).toContain("url: inNativeApp() ? item.url : lockedLanding(item.url)");
     expect(src).toContain('data-testid="group-more-tools"');

@@ -357,6 +357,19 @@ const entries: Draft[] = [
     howItWorks: "The button only redirects; everything it opens lives under Locations.",
   },
   {
+    key: "directories", group: "Google Business", route: "/directories", title: "Directory Sync",
+    whatItIs: "One business profile for a location, and the directories that list it.",
+    whatItDoes: "Keeps your business name, address and phone the same everywhere you are listed. For each location it holds one business profile, tracks a directory profile per directory with its status, and logs every change. The directory catalogue lists the directories a contractor can be listed on, with filters by category, state, trade and more.",
+    howToUse: [
+      "Sidebar → Google Business → Directories, and choose a location (add one under Locations first).",
+      "Check the business profile: it starts from the linked Google Business Profile, and your own edits are kept.",
+      "Review the directory profiles and their status; open the activity log to see what changed and when.",
+      "Browse the directory catalogue below to find more directories for your trade and state.",
+    ],
+    howItWorks: "A directory profile counts as Verified only when it is live, was checked, and its name, address and phone match your business profile.",
+    needs: ["A business location in ConstructHUB."],
+  },
+  {
     key: "locations", group: "Google Business", route: "/locations", title: "Locations",
     whatItIs: "Where each business lives — yours, or your clients’ if you are an agency.",
     whatItDoes: "Linking a location to its Google Business Profile listing syncs its reviews, photos, services and Google performance numbers, and unlocks Profile Guard, AI replies and Posts & Photos. A location’s page has Insights, Profile Guard, Location Info, Services, Photos & Videos, Social Profiles, Settings and Citations.",
@@ -587,6 +600,20 @@ const entries: Draft[] = [
     ],
     howItWorks: "Every client is asked to rate the job and every answer reaches you. A score below your feedback-routing threshold shows the private “What could we have done better?” form and alerts you at once (bell, email and Telegram when linked) with the name, score, job and their words; a score at or above it goes straight to the Google review step. The “Caught privately” tile and the “Private feedback” badge count those requests. Reminders stop when the client responds, unsubscribes or reaches the maximum you set. AI can get facts wrong, so check every reply.",
     needs: ["Any plan.", "Google Profile Reviews needs a connected Google account and a linked location."],
+  },
+
+  {
+    key: "yelp", group: "Reviews", route: "/yelp", title: "Yelp",
+    whatItIs: "Your Yelp business page's rating and reviews, inside ConstructHUB.",
+    whatItDoes: "Shows each connected Yelp business's rating, review count, latest reviews and 30-day trend, and the nearby businesses in your category with how they compare. AI drafts a reply to a review for you to copy.",
+    howToUse: [
+      "Sidebar → Yelp → connect a business: search by business name and city, address or ZIP, then pick yours from the results.",
+      "Use Refresh to pull the latest rating and reviews.",
+      "On a review, choose “Draft reply with AI”, edit the draft, copy it and post it on Yelp from the review's link.",
+      "Open the competitors panel to see nearby businesses in your category and whether they are ahead of you.",
+    ],
+    howItWorks: "Yelp's own API is read-only and lists only a few recent reviews per business; it has no way to post a reply, so replies are drafted here and posted on Yelp by you. AI can get facts wrong, so check every draft.",
+    needs: ["A ConstructHUB account.", "A business page on Yelp."],
   },
 
   /* ══ Tools ════════════════════════════════════════════════════════════════════════════════════ */

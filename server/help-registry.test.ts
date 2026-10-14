@@ -223,7 +223,8 @@ describe("help registry", () => {
     expect(button).toMatch(/\{entry\.video && \(\s*<>\s*<button[^>]*aria-label=\{`Watch the walkthrough/);
     expect(button).toContain("Video walkthrough coming soon");
     const page = read("client/src/pages/tutorials.tsx");
-    expect(page).toMatch(/if \(!entry\.video\) return null;/);
+    // The player also waits for "Watch" (owner, 2026-10-13); it never renders without a real video.
+    expect(page).toMatch(/if \(!entry\.video(?: \|\| !open)?\) return null;/);
     expect(page).toContain("Video coming soon");
     // No video file is checked in, and nothing in the client links one.
     expect(fs.existsSync(path.join(ROOT, "client/public/tutorials"))).toBe(false);

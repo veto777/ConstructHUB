@@ -62,6 +62,7 @@ describe("film readiness", () => {
     const mapping = source("../../client/src/components/social-agency.tsx");
     expect(mapping).toContain('aria-label={`Map: ${a.name} · ${a.platform}`}');
     expect(mapping).toContain("focus-visible:outline-2");
-    expect(mapping).toContain("Map {a.name} · {a.platform}");
+    // The visible label shows the network's logo and name (18fb07f4), not its key.
+    expect(mapping).toContain("Map <NetworkIcon platform={a.platform} /> {a.name} · {networkName(a.platform)}");
   });
 });
