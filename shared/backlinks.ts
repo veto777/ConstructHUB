@@ -140,6 +140,8 @@ export type BacklinkSourceRow = {
   vettedAt: string | null;
   updatedAt: string;
   rank: number | null;
+  /** The reason that decided a rejection (the last one recorded); null for a source that was not rejected. */
+  rejectReason?: string | null;
 };
 
 export type BacklinkSource = BacklinkSourceRow & {

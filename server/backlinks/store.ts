@@ -197,15 +197,19 @@ const toRow = (x: any): BacklinkSourceRow => ({
   submitUrl: x.submit_url, contactEmails: x.contact_emails ?? [], linkType: x.link_type, priceUsd: x.price_usd == null ? null : Number(x.price_usd),
   discoveredVia: x.discovered_via, vettedAt: x.vetted_at?.toISOString?.() ?? x.vetted_at ?? null, updatedAt: x.updated_at?.toISOString?.() ?? x.updated_at,
   rank: x.metrics?.rank ?? null,
+  rejectReason: x.status === "rejected" ? (x.reasons?.at?.(-1) ?? null) : null,
 });
 
-export type ListFilter = { kind?: BacklinkKind; status?: BacklinkStatus; tier?: string; q?: string; quality?: boolean; limit: number; offset: number };
+/** view: "kept" = everything but rejected (the admin page's main tab), "rejected" = only rejected. */
+export type ListFilter = { kind?: BacklinkKind; status?: BacklinkStatus; tier?: string; q?: string; quality?: boolean; view?: "kept" | "rejected"; limit: number; offset: number };
 export async function listSources(f: ListFilter): Promise<{ rows: BacklinkSourceRow[]; total: number }> {
   const where: string[] = [];
   const v: unknown[] = [];
   const p = (x: unknown) => (v.push(x), `$${v.length}`);
   if (f.kind) where.push(`kind = ${p(f.kind)}`);
   if (f.status) where.push(`status = ${p(f.status)}`);
+  if (f.view === "kept") where.push(`status <> 'rejected'`);
+  if (f.view === "rejected") where.push(`status = 'rejected'`);
   if (f.tier) where.push(`tier = ${p(f.tier)}`);
   if (f.quality) where.push(QUALITY_SQL);
   if (f.q) where.push(`domain ILIKE ${p(`%${f.q.replace(/[%_\\]/g, (c) => `\\${c}`)}%`)}`);

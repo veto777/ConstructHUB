@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useDocumentTitle } from "@/components/feature-landing/primitives";
 import { VerificationCancelled } from "@/components/recent-auth";
@@ -232,6 +233,7 @@ function SourceSheet({ id, onClose }: { id: number | null; onClose: () => void }
 
 export default function AdminBacklinksPage() {
   useDocumentTitle("Backlinks | ConstructHUB");
+  const [view, setView] = useState<"kept" | "rejected">("kept");
   const [kind, setKind] = useState<string>("all");
   const [status, setStatusFilter] = useState<string>("all");
   const [tier, setTier] = useState<string>("all");
@@ -243,10 +245,10 @@ export default function AdminBacklinksPage() {
     queryKey: ["/api/admin/backlinks/summary"], queryFn: () => getJson("/api/admin/backlinks/summary"),
     refetchInterval: (qq) => (qq.state.data ? 60_000 : false),
   });
-  const params = new URLSearchParams({ limit: String(PAGE), offset: String(page * PAGE) });
+  const params = new URLSearchParams({ view, limit: String(PAGE), offset: String(page * PAGE) });
   if (kind !== "all") params.set("kind", kind);
-  if (status !== "all") params.set("status", status);
-  if (tier === "quality") params.set("quality", "1"); else if (tier !== "all") params.set("tier", tier);
+  if (view === "kept" && status !== "all") params.set("status", status);
+  if (view === "kept") { if (tier === "quality") params.set("quality", "1"); else if (tier !== "all") params.set("tier", tier); }
   if (q.trim()) params.set("q", q.trim());
   const listUrl = `/api/admin/backlinks/sources?${params}`;
   const { data: list } = useQuery<ListPayload>({ queryKey: [listUrl], queryFn: () => getJson(listUrl), enabled: !!s, placeholderData: keepPreviousData });
@@ -277,7 +279,7 @@ export default function AdminBacklinksPage() {
   // A tile is a list: clicking it shows every source of that kind (all tiers and statuses) in Sources below.
   const showList = (k: string) => {
     const next = kind === k ? "all" : k;
-    setKind(next); setTier("all"); setStatusFilter("all"); setQ(""); setPage(0);
+    setView("kept"); setKind(next); setTier("all"); setStatusFilter("all"); setQ(""); setPage(0);
     if (next !== "all") document.getElementById("backlinks-sources")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
   return (
@@ -303,20 +305,29 @@ export default function AdminBacklinksPage() {
         </Section>
 
         <Section title="Sources" icon={Link2} id="backlinks-sources">
+          {/* Rejected sources (tier X) live on their own tab, each with the reason it was rejected. */}
+          <Tabs value={view} onValueChange={(v) => { setView(v as "kept" | "rejected"); setTier("all"); setStatusFilter("all"); setPage(0); }} className="mb-3">
+            <TabsList>
+              <TabsTrigger value="kept" data-testid="tab-backlinks-kept">Kept ({n(s.total - s.byStatus.rejected)})</TabsTrigger>
+              <TabsTrigger value="rejected" data-testid="tab-backlinks-rejected">Rejected ({n(s.byStatus.rejected)})</TabsTrigger>
+            </TabsList>
+          </Tabs>
           <div className="mb-3 flex flex-wrap gap-2">
             <Input className="w-48" placeholder="Search domain" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} data-testid="input-backlinks-search" />
             <Select value={kind} onValueChange={filter(setKind)}>
               <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
               <SelectContent><SelectItem value="all">All kinds</SelectItem>{BACKLINK_KINDS.map((k) => <SelectItem key={k} value={k}>{BACKLINK_KIND_LABELS[k]}</SelectItem>)}</SelectContent>
             </Select>
+            {view === "kept" && <>
             <Select value={tier} onValueChange={filter(setTier)}>
               <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-              <SelectContent><SelectItem value="all">All tiers</SelectItem><SelectItem value="quality">Quality (A+B)</SelectItem>{BACKLINK_TIERS.map((t) => <SelectItem key={t} value={t}>Tier {t}</SelectItem>)}</SelectContent>
+              <SelectContent><SelectItem value="all">All tiers</SelectItem><SelectItem value="quality">Quality (A+B)</SelectItem>{BACKLINK_TIERS.filter((t) => t !== "X").map((t) => <SelectItem key={t} value={t}>Tier {t}</SelectItem>)}</SelectContent>
             </Select>
             <Select value={status} onValueChange={filter(setStatusFilter)}>
               <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-              <SelectContent><SelectItem value="all">All statuses</SelectItem>{BACKLINK_STATUSES.map((x) => <SelectItem key={x} value={x}>{BACKLINK_STATUS_LABELS[x]} ({n(s.byStatus[x])})</SelectItem>)}</SelectContent>
+              <SelectContent><SelectItem value="all">All statuses</SelectItem>{BACKLINK_STATUSES.filter((x) => x !== "rejected").map((x) => <SelectItem key={x} value={x}>{BACKLINK_STATUS_LABELS[x]} ({n(s.byStatus[x])})</SelectItem>)}</SelectContent>
             </Select>
+            </>}
           </div>
           <div className="divide-y rounded-lg border" data-testid="list-backlink-sources">
             {(list?.rows ?? []).map((r) => (
@@ -324,13 +335,14 @@ export default function AdminBacklinksPage() {
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium">{r.domain}</div>
                   <div className="truncate text-xs text-muted-foreground">{BACKLINK_KIND_LABELS[r.kind]}{r.niches.length ? ` · ${r.niches.slice(0, 3).join(", ")}` : ""}{r.contactEmails.length ? " · has email" : ""}</div>
+                  {r.rejectReason && <div className="truncate text-xs text-muted-foreground" data-testid={`text-backlink-reject-${r.id}`}>{reasonWithDr(r.rejectReason)}</div>}
                 </div>
                 {r.rank != null && <span className="hidden text-xs tabular-nums text-muted-foreground sm:inline">DR {toDr(r.rank)}</span>}
                 {r.tier && <StatusPill tone={TIER_TONE[r.tier]} dot={false}>{r.tier}{r.score != null ? ` ${r.score}` : ""}</StatusPill>}
                 <StatusPill tone={STATUS_TONE[r.status]}>{BACKLINK_STATUS_LABELS[r.status]}</StatusPill>
               </button>
             ))}
-            {list && !list.rows.length && <p className="px-3 py-8 text-center text-sm text-muted-foreground">No sources match. Run a search or import a list.</p>}
+            {list && !list.rows.length && <p className="px-3 py-8 text-center text-sm text-muted-foreground">{view === "rejected" ? "No rejected sources match." : "No sources match. Run a search or import a list."}</p>}
           </div>
           {pages > 1 && (
             <div className="mt-3 flex items-center justify-between text-sm">

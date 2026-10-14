@@ -31,6 +31,7 @@ const listQuery = z.object({
   tier: z.enum(BACKLINK_TIERS).optional(),
   q: z.string().trim().max(100).optional(),
   quality: z.enum(["0", "1"]).optional(),
+  view: z.enum(["kept", "rejected"]).optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),
   offset: z.coerce.number().int().min(0).max(1_000_000).default(0),
 });
