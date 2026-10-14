@@ -805,6 +805,15 @@ function AppContent() {
     if (user && APP_SALES_PATHS.some((p) => location === p || location.startsWith(`${p}/`))) return <Redirect to="/" />;
   }
 
+  // Links a contractor's customer opens (estimate, invoice, change order, job photos, lead form, client portal)
+  // render full-bleed on any host, signed in or not (2026-10-14 crawl: signed out on constructhub.us they 404'd).
+  if (location.startsWith("/e/")) return <PublicEstimatePage />;
+  if (location.startsWith("/i/")) return <PublicInvoicePage />;
+  if (location.startsWith("/co/")) return <PublicChangeOrderPage />;
+  if (location.startsWith("/jc/")) return <JobcamSharePage />;
+  if (location.startsWith("/lead-form/")) return <PublicLeadFormPage />;
+  if (location.startsWith("/portal/")) return <PublicPortalPage />;
+
   if (!user) {
     // On the portal, an anonymous visitor gets the sign-in screen. Never the
     // marketing site — the two are deliberately separate products.
@@ -954,12 +963,6 @@ function AppContent() {
   // Client-facing pages render full-bleed on any host — no app chrome.
   if (location === "/crm-terms") return <CrmTermsPage />;
   if (location === "/crm-privacy") return <CrmPrivacyPage />;
-  if (location.startsWith("/e/")) return <PublicEstimatePage />;
-  if (location.startsWith("/i/")) return <PublicInvoicePage />;
-  if (location.startsWith("/co/")) return <PublicChangeOrderPage />;
-    if (location.startsWith("/jc/")) return <JobcamSharePage />;
-  if (location.startsWith("/lead-form/")) return <PublicLeadFormPage />;
-  if (location.startsWith("/portal/")) return <PublicPortalPage />;
 
   // The app's own controls (top right) and the footer: the same in the normal layout and in a tool shell.
   const controls = (
@@ -1059,7 +1062,7 @@ function AppContent() {
 }
 
 /** Marketing and sales pages: never inside the iPhone apps (they sell nothing). */
-const APP_SALES_PATHS = ["/pricing", "/individual-pricing", "/features", "/done-for-you", "/landing", "/master-class", "/reinstatement", "/contract", "/call-assistant-pricing", "/crm-app", "/google-ads-guide"];
+const APP_SALES_PATHS = ["/pricing", "/googleads-features", "/googleads-crm", "/googleads-pricing", "/individual-pricing", "/features", "/done-for-you", "/landing", "/master-class", "/reinstatement", "/contract", "/call-assistant-pricing", "/crm-app", "/google-ads-guide"];
 
 function App() {
   return (
