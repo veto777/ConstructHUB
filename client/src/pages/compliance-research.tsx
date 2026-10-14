@@ -291,6 +291,7 @@ function SubjectRecords({ s }: { s: ResearchSubjectReport }) {
               </tr>))}</tbody>
           </table></div>
         )}
+        {osha.length > 0 && <p className="text-xs text-muted-foreground">Inspection numbers come from the U.S. Department of Labor's enforcement data. osha.gov blocks automated link checks, so the OSHA links are unconfirmed.</p>}
       </div>
 
       {s.recordSources.some((r) => !r.searched) && (
