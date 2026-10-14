@@ -200,7 +200,9 @@ Rules:
 - The main message / description / comments field gets OUR MESSAGE (below) exactly as written — never your own words.
   Any other free-text answer is short and factual; never claim a location, launch, event, customer, offer or material that
   is not in the facts.
-- submit = false when the form is not for a partnership/listing/editorial request (a newsletter, a job application, a
+- The company itself sent us to this page, so its partnership / intake / contact / press form IS the right place even if
+  its options don't match our idea exactly: submit = true, picking the closest free option.
+- submit = false only when the form is not for a partnership/listing/editorial request (a newsletter, a job application, a
   search box, a single business's listing edit) or asks for payment, a password or an account.
 - pricing: copy any price the page states for partner, API or listing plans, exactly as written (null if none).
 - api: one sentence on any API or bulk access the page describes (null if none).
