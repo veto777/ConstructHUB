@@ -313,6 +313,53 @@ export async function queueVettedDirectories(pick: (emails: string[]) => string 
   return added;
 }
 
+const FREE_MAIL_ADDR = /@(gmail|googlemail|yahoo|ymail|hotmail|outlook|live|aol|icloud|proton(mail)?)\./i;
+
+/**
+ * Queue vetted article / guest-post sites and news outlets (Backlinks kinds guest_post, editorial, press_release; tier
+ * A or B; publishes an email; never contacted). Same exclusions as directories, plus free-mail addresses (on these
+ * sites they are mostly guest-post sellers, not editors). press_release / editorial → "news", guest_post → "article".
+ */
+export async function queueVettedPublishers(pick: (emails: string[]) => string | null, name: (domain: string, signals: any) => string): Promise<number> {
+  const r = await db().query(
+    `SELECT s.domain, s.kind, s.contact_emails, s.signals FROM backlink_sources s
+      WHERE s.kind IN ('guest_post', 'editorial', 'press_release') AND s.tier IN ('A', 'B') AND cardinality(s.contact_emails) > 0
+        AND NOT EXISTS (SELECT 1 FROM media_outreach_queue q WHERE q.domain = s.domain)
+        AND NOT EXISTS (SELECT 1 FROM media_partners p WHERE p.domain = s.domain)
+      ORDER BY s.tier, s.score DESC NULLS LAST`);
+  let added = 0;
+  for (const x of r.rows) {
+    if (NOT_A_LISTINGS_BUSINESS.test(x.domain)) continue;
+    const to = pick((x.contact_emails as string[]).filter((e) => !NOT_A_PARTNER_ADDRESS.test(e) && !FREE_MAIL_ADDR.test(e)));
+    if (!to) continue;
+    const ins = await db().query(
+      `INSERT INTO media_outreach_queue (domain, company, kind, to_email, source) VALUES ($1, $2, $3, $4, 'backlinks-db') ON CONFLICT (domain) DO NOTHING RETURNING id`,
+      [x.domain, name(x.domain, x.signals).slice(0, 120), x.kind === "guest_post" ? "article" : "news", to.toLowerCase()]);
+    if (ins.rows[0]) added++;
+  }
+  return added;
+}
+
+/** Load a researched list (news outlets, directories) into the queue; existing domains and contacted companies are skipped. */
+export async function queueList(rows: { domain: string; company: string; kind: "directory" | "article" | "news"; email: string }[], source: string): Promise<number> {
+  let added = 0;
+  for (const r of rows) {
+    const ins = await db().query(
+      `INSERT INTO media_outreach_queue (domain, company, kind, to_email, source)
+       SELECT $1, $2, $3, $4, $5 WHERE NOT EXISTS (SELECT 1 FROM media_partners p WHERE p.domain = $1)
+       ON CONFLICT (domain) DO NOTHING RETURNING id`,
+      [r.domain.toLowerCase(), r.company.slice(0, 120), r.kind, r.email.toLowerCase(), source.slice(0, 60)]);
+    if (ins.rows[0]) added++;
+  }
+  return added;
+}
+
+/** Whole days since the first first-contact email (the sending ramp). */
+export async function daysSending(): Promise<number> {
+  const r = await db().query(`SELECT floor(extract(epoch FROM now() - min(received_at)) / 86400)::int d FROM media_messages WHERE direction = 'out' AND purpose = 'outreach'`);
+  return Number(r.rows[0]?.d ?? 0);
+}
+
 export async function outreachSentToday(): Promise<number> {
   const r = await db().query(`SELECT count(*)::int n FROM media_messages WHERE direction = 'out' AND purpose = 'outreach' AND received_at >= date_trunc('day', now())`);
   return Number(r.rows[0]?.n ?? 0);
