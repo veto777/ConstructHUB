@@ -26,7 +26,15 @@ const LIST_PAGE: { why: string; re: RegExp }[] = [
  * A public directory page: how a business gets onto a directory, chamber, association or manufacturer locator is to be
  * LISTED there (join, claim, certify), not to "write for us". Matched on the found page's title/heading/path.
  */
-const DIRECTORY_PAGE = /member(ship)?[- ]?(directory|search|list)|business[- ]directory|company[- ]directory|contractor[- ](directory|locator|search|finder|list)|(dealer|installer|pro|contractor)[- ]locator|find[- ](a|an|your)[- ](local[- ])?(member|contractor|pro|professional|dealer|installer|builder|remodell?er|company|business|plumber|roofer|electrician)|verify[- ](a[- ])?licen[cs]e|licen[cs]e[- ](lookup|search|verification)|\/list\/(category|ql|search)|\bdirectory\b/i;
+const DIRECTORY_PAGE = new RegExp([
+  String.raw`member(ship)?[- ]?(directory|search|list)|business[- ]directory|company[- ]directory`,
+  String.raw`contractor[- ](directory|locator|search|finder|list)|certified[- ](contractors?|installers?|pros?)`,
+  // manufacturer and brand locators: "find a dealer", "find-a-garaga-dealer", "find your water expert", "store locator"
+  String.raw`(find|locate|search)[- ](a[n]?[- ]|your[- ]|the[- ]|local[- ])*([a-z]+[- ]){0,3}(member|contractor|pro|professional|dealer|retailer|installer|builder|remodell?er|company|business|plumber|roofer|electrician|expert|showroom)s?\b`,
+  String.raw`(store|dealer|retailer|installer|pro|contractor)[- ]?(locator|search|finder|list)|\blocator\b|where[- ]to[- ]buy|pro[- ]search`,
+  String.raw`verify[- ](a[- ])?licen[cs]e|licen[cs]e[- ](lookup|search|verification)`,
+  String.raw`\/list\/(category|ql|search)|\/(installers|contractors|dealers|retailers|members|pros)\/?$|\bdirectory\b`,
+].join("|"), "i");
 const PROFILE_PATH = /^\/(@[^/]+|(profiles?|users?|members?|people|u|authors?|community\/profile)\/)/i;
 
 /** Sites written for another country's audience: no use to a US contractor's local SEO. Generic-use ccTLDs are kept. */
