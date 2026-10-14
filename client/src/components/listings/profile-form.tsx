@@ -252,7 +252,7 @@ export function ProfileForm({
           action === "save"
             ? "Business profile saved"
             : "Google details imported",
-        description: "Existing listings need a fresh check.",
+        description: "Existing directory profiles need a fresh check.",
       });
     },
     onError: (error) =>

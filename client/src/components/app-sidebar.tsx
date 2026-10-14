@@ -256,7 +256,7 @@ const googleGroups: NavGroup[] = [
       { title: "Mail alerts", url: "/mail-alerts", icon: Bell },
       { title: "Posts & Photos", url: "/gbp-content", icon: Camera },
       { title: "Listing editor", url: "/listing-editor", icon: PenLine },
-      { title: "Listings & NAP sync", url: "/listings", icon: ListChecks },
+      { title: "Directories", url: "/directories", icon: ListChecks },
       { title: "GMB Edit Monitor", url: "/gmb-monitor", icon: Eye },
       { title: "GMB Ranking Grid", url: "/ranking-grid", icon: Grid3X3, badge: "hot" as BadgeType },
       { title: "Photo Optimizer", url: "/photos", icon: Camera, subChildren: [
@@ -714,10 +714,10 @@ export function AppSidebar({ sheet = false }: { sheet?: boolean } = {}) {
               )}
               {user?.isPlatformAdmin === true && (
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild data-active={location === "/admin/listings"}>
-                    <Link href="/admin/listings" data-testid="link-nav-admin-listings" className="flex items-center gap-2 w-full">
+                  <SidebarMenuButton asChild data-active={location === "/admin/listings" || location === "/admin/directories"}>
+                    <Link href="/admin/directories" data-testid="link-nav-admin-listings" className="flex items-center gap-2 w-full">
                       <ListChecks className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-primary" />
-                      <span>Listings</span>
+                      <span>Directories</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
