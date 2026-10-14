@@ -95,12 +95,12 @@ export function threadPrompt(thread: ThreadMessage[]): string {
 
 export const aiDeps = { fetch: (url: string, init: RequestInit) => fetch(url, init) };
 
-async function ask(p: MediaAiProvider, user: string): Promise<string> {
+async function ask(p: MediaAiProvider, user: string, system: string = SYSTEM): Promise<string> {
   const init: RequestInit = p.style === "anthropic"
     ? {
       method: "POST",
       headers: { "x-api-key": p.key, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
-      body: JSON.stringify({ model: p.model, max_tokens: 4000, system: SYSTEM, messages: [{ role: "user", content: user }] }),
+      body: JSON.stringify({ model: p.model, max_tokens: 4000, system, messages: [{ role: "user", content: user }] }),
     }
     : {
       method: "POST",
@@ -110,7 +110,7 @@ async function ask(p: MediaAiProvider, user: string): Promise<string> {
         response_format: { type: "json_object" },
         // TruthCoder reads max_tokens; OpenAI's GPT-5 models want max_completion_tokens.
         ...(p.name === "OpenAI" ? { max_completion_tokens: 4000 } : { max_tokens: 4000 }),
-        messages: [{ role: "system", content: SYSTEM }, { role: "user", content: user }],
+        messages: [{ role: "system", content: system }, { role: "user", content: user }],
       }),
     };
   const res = await aiDeps.fetch(p.url, { ...init, signal: AbortSignal.timeout(p.name.startsWith("TruthCoder") ? 180_000 : 90_000) });
@@ -130,6 +130,38 @@ export async function decide(thread: ThreadMessage[], env: NodeJS.ProcessEnv = p
   for (const p of providers) {
     try { return { ...parseDecision(await ask(p, user)), provider: `${p.name} (${p.model})` }; }
     catch (e: any) { errors.push(`${p.name}: ${String(e?.message ?? e).slice(0, 200)}`); }
+  }
+  throw new Error(`Every AI provider failed — ${errors.join(" · ")}`);
+}
+
+const NEXT_STEP_SYSTEM = `You read automatic replies (auto-responders) that companies sent to the ConstructHUB Media Team after we asked
+about a listings, content or news partnership. Nobody answers an auto-reply, but it often says what to do next: fill in a
+form, use another address, submit through a portal, wait a number of days.
+Return JSON only: {"next_step": string|null, "link": string|null, "contact": string|null, "summary": string}
+- next_step: the concrete thing we should do, in one plain sentence (null if the reply only says "we got your message").
+- link: the URL they point us to, copied exactly from the email (null if none). contact: another email address they give (null if none).
+- summary: one short sentence on what the auto-reply says. Never invent a link or address that is not in the email.`;
+
+export type NextStep = { nextStep: string | null; link: string | null; contact: string | null; summary: string; provider: string };
+
+/** Read an auto-reply for its next step (no reply is ever sent to an auto-reply). */
+export async function extractNextStep(thread: ThreadMessage[], env: NodeJS.ProcessEnv = process.env): Promise<NextStep> {
+  const providers = mediaAiProviders(env);
+  if (!providers.length) throw new Error("No AI key configured for the media inbox");
+  const user = `The thread, oldest first. Read the last email (the automatic reply).\n\n${threadPrompt(thread)}`;
+  const errors: string[] = [];
+  for (const p of providers) {
+    try {
+      const j = JSON.parse((await ask(p, user, NEXT_STEP_SYSTEM)).replace(/^```(json)?\s*|\s*```$/g, ""));
+      const body = thread.at(-1)?.body ?? "";
+      // Only keep a link or address that is really in the email.
+      const link = typeof j.link === "string" && j.link.trim() && body.includes(j.link.trim()) ? j.link.trim().slice(0, 500) : null;
+      const contact = typeof j.contact === "string" && /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(j.contact.trim()) && body.toLowerCase().includes(j.contact.trim().toLowerCase()) ? j.contact.trim().toLowerCase() : null;
+      return {
+        nextStep: typeof j.next_step === "string" && j.next_step.trim() ? j.next_step.trim().slice(0, 500) : null,
+        link, contact, summary: typeof j.summary === "string" ? j.summary.trim().slice(0, 400) : "", provider: `${p.name} (${p.model})`,
+      };
+    } catch (e: any) { errors.push(`${p.name}: ${String(e?.message ?? e).slice(0, 200)}`); }
   }
   throw new Error(`Every AI provider failed — ${errors.join(" · ")}`);
 }
