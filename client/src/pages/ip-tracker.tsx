@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, type UseQueryResult } from "@tanstack/react-query";
-import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
+import { apiErrorMessage, apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
 import { useAppOrigin } from "@/lib/app-origin";
 import {
   AppPage, Section, StatusPill, Notice,
@@ -1087,11 +1087,14 @@ export default function IpTrackerPage() {
   const [newDomainName, setNewDomainName] = useState("");
   const { toast } = useToast();
 
-  const domainsQuery = useQuery<DomainWithStats[]>({
+  // Signed out (the public preview of this page): the site list answers 401 — a sign-in prompt, not a failure.
+  const domainsQuery = useQuery<DomainWithStats[] | null>({
     queryKey: ["/api/click-guard/domains"],
-    refetchInterval: ANALYTICS_REFETCH_MS,
+    queryFn: getQueryFn({ on401: "returnNull" }),
+    refetchInterval: (q) => (q.state.data === null ? false : ANALYTICS_REFETCH_MS),
   });
-  const domains = domainsQuery.data;
+  const signedOut = domainsQuery.data === null;
+  const domains = domainsQuery.data ?? undefined;
   const domainsLoading = domainsQuery.isLoading;
   const domainsError = domainsQuery.isError && !domains;
 
@@ -1279,6 +1282,11 @@ export default function IpTrackerPage() {
 
       {domainsLoading ? (
         <div className="flex justify-center py-12"><div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" /></div>
+      ) : signedOut ? (
+        <Notice tone="info" title="Sign in to see your sites" testId="notice-domains-signed-out"
+          action={<Button asChild size="sm" variant="outline" className="h-7 text-xs"><a href={`/auth?next=${encodeURIComponent("/ip-tracker")}`} data-testid="link-ip-tracker-sign-in">Sign in</a></Button>}>
+          This tool watches the websites you add to your ConstructHUB account.
+        </Notice>
       ) : domainsError ? (
         <Notice tone="danger" title="Couldn't load your sites" testId="notice-domains-error"
           action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void domainsQuery.refetch()} data-testid="button-retry-domains">Retry</Button>}>

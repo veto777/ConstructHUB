@@ -72,7 +72,8 @@ function ReportIssueView({ crm = false }: { crm?: boolean }) {
     queryKey: ["/api/issues/mine"],
     queryFn: async () => {
       const res = await fetch("/api/issues/mine", { credentials: "include", cache: "no-store" });
-      if (res.status === 401) return null;
+      // Read (and drop) the 401 body so the request finishes; an unread body leaves it open and the page never settles.
+      if (res.status === 401) { await res.body?.cancel().catch(() => {}); return null; }
       if (!res.ok) throw new Error(`${res.status}`);
       return res.json();
     },

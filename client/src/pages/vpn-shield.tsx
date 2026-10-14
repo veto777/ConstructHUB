@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, type UseQueryResult } from "@tanstack/react-query";
-import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
+import { apiErrorMessage, apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
 import {
   AppPage,
   Section,
@@ -789,11 +789,14 @@ export default function VpnShieldPage() {
   const selectedDomainId = Number(params.get("site")) || null;
   const setSelectedDomainId = (id: number | null) => setUrlParam("site", id ? String(id) : null);
 
-  const domainsQuery = useQuery<VpnDomain[]>({
+  // Signed out (the public preview of this page): the site list answers 401 — a sign-in prompt, not a failure.
+  const domainsQuery = useQuery<VpnDomain[] | null>({
     queryKey: ["/api/vpn-shield/domains"],
-    refetchInterval: VPN_REFETCH_MS,
+    queryFn: getQueryFn({ on401: "returnNull" }),
+    refetchInterval: (q) => (q.state.data === null ? false : VPN_REFETCH_MS),
   });
-  const domains = domainsQuery.data;
+  const signedOut = domainsQuery.data === null;
+  const domains = domainsQuery.data ?? undefined;
   const domainsLoading = domainsQuery.isLoading;
   const domainsError = domainsQuery.isError && !domains;
 
@@ -919,6 +922,11 @@ export default function VpnShieldPage() {
         <div className="flex items-center justify-center py-20">
           <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
         </div>
+      ) : signedOut ? (
+        <Notice tone="info" title="Sign in to see your sites" testId="notice-vpn-domains-signed-out"
+          action={<Button asChild size="sm" variant="outline" className="h-7 text-xs"><a href={`/auth?next=${encodeURIComponent("/vpn-shield")}`} data-testid="link-vpn-shield-sign-in">Sign in</a></Button>}>
+          This tool watches the websites you add to your ConstructHUB account.
+        </Notice>
       ) : domainsError ? (
         <Notice tone="danger" title="Couldn't load your sites" testId="notice-vpn-domains-error"
           action={<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void domainsQuery.refetch()} data-testid="button-retry-vpn-domains">Retry</Button>}>
