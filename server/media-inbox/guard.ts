@@ -35,7 +35,7 @@ export function machineReason(h: InboundHeaders): string | null {
 
 const MONEY_AMOUNT = /(\$|€|£|usd\b|eur\b|dollars?\b)\s?\d|\d[\d,.]*\s?(\$|€|£|usd\b|eur\b|dollars?\b)/i;
 const MONEY_COMMIT = /\b(we|i|our team)(['’](d|ll))?\s+(will\s+|can\s+|would\s+)?(agree to|be happy to|are happy to|accept to)?\s*(pay|purchase|buy|prepay|sign|commit|subscribe|wire|transfer|cover)\b/i;
-const PAYMENT_WORDS = /\b(credit card|debit card|card details|invoice (us|me)|send (us|me) (an|the) invoice|paypal|wire transfer|bank (details|transfer)|payment (link|details|method)|deposit)\b/i;
+const PAYMENT_WORDS = /\b(credit card|debit card|card details|invoice (us|me)|send (us|me) (an|the) invoice|paypal|wire transfer|bank (details|transfer)|payment (link|details|method)|deposit|card[ -]on[ -]file|order form)\b/i;
 const SIGNED = /\b(we('ve| have)? signed|signed (the|your) (contract|agreement|order|io)|i accept the terms|we accept (the|your) terms)\b/i;
 const MEETING_TIME = /\b(\d{1,2}(:\d{2})?\s?(am|pm)\b|(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s+at\s+\d)/i;
 
