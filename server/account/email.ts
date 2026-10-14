@@ -13,6 +13,7 @@
  */
 import { pool } from "../db";
 import { sendWithFallback } from "../email";
+import { signatureHtml, signatureText } from "../email-signature";
 
 export type EmailAttachment = { filename: string; content: Buffer | string; contentType?: string };
 
@@ -82,6 +83,7 @@ ${input.preheader ? `<div style="display:none;max-height:0;overflow:hidden;opaci
   ${input.intro ? `<p style="color:#444;line-height:1.6;margin:0 0 8px;">${escapeHtml(input.intro)}</p>` : ""}
   ${rowsHtml}
   ${ctaHtml}
+  ${signatureHtml()}
   ${input.footer ? `<p style="color:#888;font-size:12px;line-height:1.6;margin:24px 0 0;">${escapeHtml(input.footer)}</p>` : ""}
   <p style="color:#bbb;font-size:11px;margin:20px 0 0;text-align:center;">Sent by ConstructHUB · <a href="${base}/settings?tab=billing" style="color:#aaa;">Billing &amp; invoices</a></p>
 </div>
@@ -91,6 +93,7 @@ ${input.preheader ? `<div style="display:none;max-height:0;overflow:hidden;opaci
     input.intro ?? "",
     rows.map(([label, value]) => `${label}: ${value}`).join("\n"),
     input.cta ? `${input.cta.label}: ${input.cta.url}` : "",
+    signatureText(),
     input.footer ?? "",
     `Sent by ConstructHUB — ${base}/settings?tab=billing`,
   ].filter(Boolean).join("\n\n");

@@ -16,6 +16,7 @@
  */
 
 import { SOCIAL_LINKS } from "@shared/social-links";
+import { signatureHtml, signatureText } from "../email-signature";
 
 export type EmailMessage = { subject: string; html: string; text: string };
 
@@ -155,6 +156,7 @@ ${stepsHtml(opts.steps ?? [])}
 ${cta ? `<div style="text-align:center;margin:8px 0 12px;"><a href="${esc(cta.url)}" style="background:linear-gradient(135deg,#F97316,#FB923C);color:#ffffff;padding:13px 32px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block;font-size:15px;box-shadow:0 4px 12px rgba(249,115,22,0.3);">${esc(cta.label)}</a></div>` : ""}
 ${secondary.length ? `<p style="text-align:center;margin:0 0 12px;font-size:13px;">${secondary.map((link) => `<a href="${esc(link.url)}" style="color:${ACCENT};font-weight:600;text-decoration:none;margin:0 10px;">${esc(link.label)}</a>`).join("")}</p>` : ""}
 ${opts.note ? `<p style="color:${MUTED};font-size:12px;line-height:1.6;margin:12px 0 0;border-top:1px solid #f1f5f9;padding-top:12px;">${esc(opts.note)}</p>` : ""}
+${signatureHtml()}
 </div>
 </div>
 ${follow.length ? `<p style="color:${MUTED};font-size:12px;line-height:1.8;text-align:center;margin:18px 0 0;">Follow ${BRAND}: ${follow.map((link) => `<a href="${esc(link.url)}" style="color:${MUTED};font-weight:600;text-decoration:underline;margin:0 6px;">${esc(link.label)}</a>`).join("")}</p>` : ""}
@@ -183,7 +185,7 @@ ${follow.length ? `<p style="color:${MUTED};font-size:12px;line-height:1.8;text-
     for (const link of follow) textParts.push(`${link.label}: ${link.url}`);
     textParts.push("");
   }
-  textParts.push(footer);
+  textParts.push(signatureText(), "", footer);
   return { html, text: textParts.join("\n") };
 }
 
