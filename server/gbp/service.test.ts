@@ -75,6 +75,14 @@ describe('GBP persistence and state machines (mocked HTTP, real lane Postgres)',
     await importLocations(userId,[{...d.locations[0],businessName:'Untrusted client name'}],client);await importLocations(userId,d.locations,client);
     const {rows}=await pool.query('SELECT * FROM business_locations WHERE user_id=$1',[userId]);expect(rows).toHaveLength(1);expect(rows[0].id).toBe(manual.id);expect(rows[0].gbp_location_name).toBe('locations/fixture');expect(rows[0].business_name).toBe('Fixture business');locationId=rows[0].id;
   });
+  it('links a hand-added location (no place id) in place when the listing carries its name',async()=>{
+    const d=await discover(client);
+    const {rows:[typed]}=await pool.query(`INSERT INTO business_locations(user_id,business_name,phone) VALUES($1,'fixture business!','(555) 010-0000') RETURNING id`,[otherId]);
+    await importLocations(otherId,d.locations,client);
+    const {rows}=await pool.query('SELECT * FROM business_locations WHERE user_id=$1',[otherId]);
+    expect(rows).toHaveLength(1);expect(rows[0].id).toBe(typed.id);expect(rows[0].gbp_location_name).toBe('locations/fixture');expect(rows[0].place_id).toBe('ChIJfixtureplace');expect(rows[0].business_name).toBe('Fixture business');
+    await pool.query('DELETE FROM business_locations WHERE id=$1',[typed.id]);
+  });
   it('upserts edits and reconciles deletions only after complete successful review sync',async()=>{
     reviewRows=[fixtureReview()];await syncLocation(userId,locationId,client);reviewRows[0].comment='Updated by Google';await syncLocation(userId,locationId,client);
     let rows=(await pool.query('SELECT * FROM google_profile_reviews WHERE user_id=$1',[userId])).rows;expect(rows).toHaveLength(1);expect(rows[0].comment).toBe('Updated by Google');reviewId=rows[0].id;

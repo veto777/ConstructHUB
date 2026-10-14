@@ -84,6 +84,15 @@ export async function importVerifiedLocations(userId:number,selected:any[]) {
           [userId,l.accountResource,l.gbpName,l.businessName,l.placeId,l.grantSubject]);
         if (linked) { imported.push(linked); continue; }
       }
+      // A location the contractor typed in by hand (no place id) is linked in place too when its name is the
+      // listing's name — otherwise it could never be linked, and Import made a duplicate (owner, 2026-10-14:
+      // the hand-added "Construct HUB" stayed "Not linked" after its Google account was connected).
+      {
+        const {rows:[byName]} = await c.query(`UPDATE business_locations SET gbp_account_name=$2,gbp_location_name=$3,business_name=$4,place_id=COALESCE(place_id,$5),gbp_google_subject=$6,gbp_unlinked_by_user=false,updated_at=now()
+          WHERE id=(SELECT id FROM business_locations WHERE user_id=$1 AND gbp_location_name IS NULL AND place_id IS NULL AND regexp_replace(lower(business_name),'[^a-z0-9]','','g')=regexp_replace(lower($4::text),'[^a-z0-9]','','g') ORDER BY id LIMIT 1) RETURNING id`,
+          [userId,l.accountResource,l.gbpName,l.businessName,l.placeId??null,l.grantSubject]);
+        if (byName) { imported.push(byName); continue; }
+      }
       const used = await locationCount(userId, c);
       if (limit !== -1 && used >= limit) {
         throw importRefusal(res => sendLocationLimit(res, ent, used));

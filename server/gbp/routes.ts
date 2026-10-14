@@ -109,14 +109,19 @@ export function registerGbpRoutes(app: Express, auth: (req: any,res: any)=>any, 
   // Per-location answer to "which Google account is this synced through, and which still need one?"
   route('get','/api/gbp/linkage',async(req,res,id)=>{
     const page=await listLocations(await accessFor(id),filters.parse(req.query));
-    const {rows:locations}=await pool.query(`SELECT l.id,l.place_id,l.gbp_location_name,l.gbp_unlinked_by_user,g.email AS account_email,(g.google_subject IS NOT NULL AND NOT g.reconnect_required) AS account_ok,
+    const {rows:locations}=await pool.query(`SELECT l.id,l.place_id,l.business_name,l.gbp_location_name,l.gbp_unlinked_by_user,g.email AS account_email,(g.google_subject IS NOT NULL AND NOT g.reconnect_required) AS account_ok,
       (SELECT max(last_success) FROM gbp_sync_status s WHERE s.location_id=l.id) AS last_success,
       (SELECT string_agg(last_error,'; ') FROM gbp_sync_status s WHERE s.location_id=l.id AND last_error IS NOT NULL) AS last_error
       FROM business_locations l LEFT JOIN gbp_grants g ON g.user_id=l.user_id AND g.google_subject=l.gbp_google_subject WHERE l.user_id=$1 AND l.id=ANY($2::int[]) ORDER BY l.id`,[id,page.items.map(l=>l.id)]);
-    const {rows:found}=await pool.query(`SELECT d.data,d.subject,g.email FROM agency_discovery d JOIN gbp_grants g ON g.user_id=d.user_id AND g.google_subject=d.subject AND NOT g.reconnect_required WHERE d.user_id=$1 AND d.seen_at>now()-interval '24 hours' AND d.data->>'placeId'=ANY($2::text[])`,[id,locations.map(l=>l.place_id).filter(Boolean)]);
+    const {rows:found}=await pool.query(`SELECT d.data,d.subject,g.email FROM agency_discovery d JOIN gbp_grants g ON g.user_id=d.user_id AND g.google_subject=d.subject AND NOT g.reconnect_required WHERE d.user_id=$1 AND d.seen_at>now()-interval '24 hours'`,[id]);
+    // A listing is "ready to link" to a location by place id, or — for a location typed in by hand, which has
+    // none — by business name when exactly one discovered listing carries that name (a chain's identically
+    // named branches are left to the Import tab). Mirrors importVerifiedLocations.
+    const key=(s:unknown)=>String(s??'').toLowerCase().replace(/[^a-z0-9]/g,'');
     res.json({accounts:(await grantStatus(id)).accounts,errors:[],total:page.total,locations:locations.map(l=>{
       if(l.gbp_location_name)return {id:l.id,state:l.account_ok?'synced':'reconnect',accountEmail:l.account_email,lastSuccess:l.last_success,lastError:l.last_error};
-      const match=found.find(f=>f.data.placeId===l.place_id);
+      let match=l.place_id?found.find(f=>f.data.placeId===l.place_id):undefined;
+      if(!match&&!l.place_id){const same=found.filter(f=>key(f.data.businessName)===key(l.business_name));if(same.length===1)match=same[0];}
       return match?{id:l.id,state:'available',unlinkedByUser:l.gbp_unlinked_by_user,accountEmail:match.email,listing:{accountResource:match.data.accountResource,gbpName:match.data.gbpName,grantSubject:match.subject}}:{id:l.id,state:'unlinked'};
     })});
   });
