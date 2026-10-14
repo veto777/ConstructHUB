@@ -85,6 +85,8 @@ export function parseSmartGovResults(html: string, ctx: AdapterCtx, url: string)
     const statusDate = state.match(/,\s*(\d{1,2}\/\d{1,2}\/\d{4})\s*$/)?.[1];
     const status = state.replace(/,\s*\d{1,2}\/\d{1,2}\/\d{4}\s*$/, '').trim() || null;
     const address = cols.eq(1).children('div').map((_j,d) => $(d).text().trim()).get().filter(s => /[\w\d]/.test(s)).join(', ') || null;
+    // The third column lists the people/companies on the permit (owner, contractor or both; the list does not say which).
+    const listedNames = cols.eq(2).children('div').map((_j,d) => $(d).text().trim()).get().filter(s => /[a-z]/i.test(s));
     const action = link.attr('onclick')?.match(/['"](Detail\/[\w-]+)['"]/)?.[1];
     const form = $('form[action]').first().attr('action') ?? new URL(url).pathname.replace(/\/(Search|SearchPage)$/, '');
     records.push({ permitNumber, jurisdiction: ctx.jurisdiction, databaseId: ctx.databaseId,
@@ -93,7 +95,7 @@ export function parseSmartGovResults(html: string, ctx: AdapterCtx, url: string)
       issuedAt: status && /^(?:Step\s+\d+\s+of\s+\d+:\s*)?issued\b/i.test(status) ? isoDate(statusDate) : null,
       appliedAt: null, contractorName: null, applicantName: null,
       sourceUrl: action ? new URL(`${form}/${action}`,url).href : null,
-      raw: { html: $.html(e) },
+      raw: { html: $.html(e), ...(listedNames.length ? { listedNames } : {}) },
     });
   });
   if (!records.length && !/No results found/i.test($('.alert-info').text())) throw new Error('Unrecognized SmartGov result page');

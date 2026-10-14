@@ -18,6 +18,7 @@ describe('SmartGov recorded public responses',()=>{
     expect(basic[0]).toMatchObject({permitNumber:'EQ-22-1477',issuedAt:null,contractorName:null,databaseId:42});
     const advanced=parseSmartGovResults(fixture('Coconino-address-2'),ctx,'https://co-coconino-az.smartgovcommunity.com/ApplicationPublic/ApplicationSearchAdvanced/Search');
     expect(advanced).toHaveLength(10);expect(advanced[0]).toMatchObject({permitNumber:'PZ-LDP-00-099',address:'MAINE AVE, PARKS, AZ',issuedAt:'2011-05-31'});
+    expect(advanced[0].raw?.listedNames).toEqual(['HANSON ROBERT & MARY CPWROS']);
     expect(advanced[0].sourceUrl).toContain('/ApplicationSearchAdvanced/Detail/');expect(advanced[0].raw?.html).toContain('PZ-LDP-00-099');
   });
   it('parses labeled details, dates and contact roles',()=>{

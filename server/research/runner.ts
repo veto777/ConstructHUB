@@ -129,9 +129,18 @@ function namesMatch(name: string, row: any): boolean {
   const want = tok(name);
   const contacts = Array.isArray(row.contacts) ? row.contacts.map((c: any) => [c?.name, c?.company].filter(Boolean).join(" ")) : [];
   const record = row.rawData?.record ?? {};
-  const fields = [row.contractorName, row.applicantName, record.ownerName, record.applicantName, record.contractorName, ...contacts, row.description]
+  const listed = listedNamesOf(row);
+  // Rows saved before a parser learned a field still carry the result's own HTML; its text counts too.
+  const html = typeof row.rawData?.raw?.html === "string" ? row.rawData.raw.html.replace(/<[^>]*>/g, " ").replace(/&amp;/g, "&") : "";
+  const fields = [row.contractorName, row.applicantName, record.ownerName, record.applicantName, record.contractorName, ...contacts, ...listed, row.description, html]
     .filter((v): v is string => typeof v === "string" && v.length > 0);
   return fields.some((f) => { const have = new Set(tok(f)); return want.every((w) => have.has(w)); });
+}
+
+/** Names a results list shows without saying their role (SmartGov's party column). */
+function listedNamesOf(row: any): string[] {
+  const v = row.rawData?.raw?.listedNames;
+  return Array.isArray(v) ? v.filter((x: unknown): x is string => typeof x === "string" && x.length > 0) : [];
 }
 
 function toPermitHit(row: any, trades: ResearchTrade[]): PermitHit {
@@ -141,7 +150,8 @@ function toPermitHit(row: any, trades: ResearchTrade[]): PermitHit {
     jurisdiction: row.jurisdiction ?? row.databaseName ?? "", permitNumber: row.permitNumber ?? null, permitType: row.permitType ?? null,
     status: row.status ?? null, address: row.address ?? null, issuedDate: row.issuedDate ?? null,
     contractorName: row.contractorName ?? null, applicantName: row.applicantName ?? null,
-    description: row.description ? String(row.description).slice(0, 500) : null,
+    description: row.description ? String(row.description).slice(0, 500)
+      : listedNamesOf(row).length ? `Names listed on the permit: ${listedNamesOf(row).join(" / ")}`.slice(0, 500) : null,
     sourceUrl: sourceUrl && /^https?:\/\//.test(sourceUrl) ? sourceUrl : null,
     tradeMatch: trades.length ? tradesFor(text, trades) : [], undated: !yearOf(row.issuedDate ?? null),
   };
