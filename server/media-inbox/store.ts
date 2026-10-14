@@ -279,23 +279,35 @@ export async function markHandled(id: number) {
 // ── first-contact queue ──────────────────────────────────────────────────────────────────────────────────────────────
 
 /**
- * Queue every vetted directory (Backlinks database, kind directory/citation, tier A or B) that publishes an email and
- * that we have never contacted. `pick` chooses the address and `name` the greeting name. Returns how many were added.
+ * Queue the vetted directories that are listings businesses (owner, 2026-10-14). Only general business directories
+ * and contractor directories qualify: the directory catalogue's "general" / "contractor" rows, or a Backlinks
+ * "citation" source the catalogue does not hold. Government sites (licence lookups), trade associations (they sell
+ * memberships), chambers and manufacturer dealer locators are places to be listed, not listings partners, and the
+ * first batch of 2026-10-14 wrongly reached a state attorney general. Graded A or B, publishes an email, never
+ * contacted. `pick` chooses the address; `name` is the fallback greeting name. Returns how many were added.
  */
+export const NOT_A_LISTINGS_BUSINESS = /(\.(gov|mil|edu)$)|(\.(state|k12|co|ci|city)\.[a-z]{2}\.us$)|chamber|association|assoc\b|institute|council|society|federation|union\b/i;
+export const NOT_A_PARTNER_ADDRESS = /^(membership|members|member|diversity|hr|careers|jobs|customer[._-]?(support|service|care)|hic|complaints?|legal|privacy|accounting|billing|webmaster)[._@+-]/i;
+
 export async function queueVettedDirectories(pick: (emails: string[]) => string | null, name: (domain: string, signals: any) => string): Promise<number> {
   const r = await db().query(
-    `SELECT s.domain, s.kind, s.contact_emails, s.signals FROM backlink_sources s
+    `SELECT s.domain, s.kind, s.contact_emails, s.signals, d.name AS catalogue_name FROM backlink_sources s
+       LEFT JOIN listing_directories d ON d.domain = s.domain
       WHERE s.kind IN ('directory', 'citation') AND s.tier IN ('A', 'B') AND cardinality(s.contact_emails) > 0
+        AND (d.category IN ('general', 'contractor') OR (d.id IS NULL AND s.kind = 'citation'))
         AND NOT EXISTS (SELECT 1 FROM media_outreach_queue q WHERE q.domain = s.domain)
         AND NOT EXISTS (SELECT 1 FROM media_partners p WHERE p.domain = s.domain)
       ORDER BY s.tier, s.score DESC NULLS LAST`);
   let added = 0;
   for (const x of r.rows) {
-    const to = pick(x.contact_emails);
+    if (NOT_A_LISTINGS_BUSINESS.test(x.domain) || NOT_A_LISTINGS_BUSINESS.test(x.catalogue_name ?? "")) continue;
+    const to = pick((x.contact_emails as string[]).filter((e) => !NOT_A_PARTNER_ADDRESS.test(e)));
     if (!to) continue;
+    const fallback = name(x.domain, x.signals);
+    const company = (x.catalogue_name && fallback === x.domain ? x.catalogue_name : fallback).slice(0, 120);
     const ins = await db().query(
       `INSERT INTO media_outreach_queue (domain, company, kind, to_email, source) VALUES ($1, $2, 'directory', $3, 'backlinks-db') ON CONFLICT (domain) DO NOTHING RETURNING id`,
-      [x.domain, name(x.domain, x.signals).slice(0, 120), to.toLowerCase()]);
+      [x.domain, company, to.toLowerCase()]);
     if (ins.rows[0]) added++;
   }
   return added;

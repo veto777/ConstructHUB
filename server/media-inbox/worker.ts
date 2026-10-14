@@ -166,13 +166,18 @@ Best regards,`;
 }
 export const FIRST_CONTACT_SUBJECT = "Listings partnership: ConstructHUB (software for US contractors)";
 
-const perDay = (env: NodeJS.ProcessEnv = process.env) => num(env.MEDIA_OUTREACH_PER_DAY, MEDIA_INBOX_PARAMETERS.newContactsPerDay);
+/** MEDIA_OUTREACH_PER_DAY; 0 pauses first contact (replies and follow-ups carry on). */
+const perDay = (env: NodeJS.ProcessEnv = process.env) => {
+  const v = Number(env.MEDIA_OUTREACH_PER_DAY);
+  return env.MEDIA_OUTREACH_PER_DAY?.trim() && Number.isFinite(v) && v >= 0 ? Math.floor(v) : MEDIA_INBOX_PARAMETERS.newContactsPerDay;
+};
 export const outreachPerDay = perDay;
 
 /** Step 5: queue new vetted directories, then send today's share of first-contact emails (MEDIA_OUTREACH_PER_DAY). */
 export async function sendQueued(): Promise<{ queued: number; sent: number; skipped: number }> {
   const mailbox = mailboxConfig().user;
   const queued = await store.queueVettedDirectories(pickEmail, siteName);
+  if (!perDay()) return { queued, sent: 0, skipped: 0 };
   const room = Math.max(0, perDay() - (await store.outreachSentToday()));
   let sent = 0, skipped = 0;
   // Spread through the day: at most a quarter of the daily share per pass.

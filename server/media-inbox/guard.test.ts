@@ -147,3 +147,15 @@ describe("opt-outs", () => {
     expect(replyProblem(b)).toBeNull();
   });
 });
+
+describe("the first-contact queue only takes listings businesses", () => {
+  it("leaves out government, associations, chambers; and member/HR/support-desk addresses", async () => {
+    const { NOT_A_LISTINGS_BUSINESS, NOT_A_PARTNER_ADDRESS } = await import("./store");
+    for (const d of ["nebraska.gov", "toledo.oh.gov", "attorneygeneral.gov", "dot.state.tx.us", "springfieldchamber.com", "americanfenceassociation.com", "Texas Association of Builders"])
+      expect(NOT_A_LISTINGS_BUSINESS.test(d)).toBe(true);
+    for (const d of ["citysquares.com", "hotfrog.com", "brownbook.net", "Manta"]) expect(NOT_A_LISTINGS_BUSINESS.test(d)).toBe(false);
+    for (const e of ["membership@acca.org", "diversity&inclusion@toledo.oh.gov".replace("&inclusion", ""), "customersupport@samsunghvac.com", "hic@attorneygeneral.gov"])
+      expect(NOT_A_PARTNER_ADDRESS.test(e)).toBe(true);
+    for (const e of ["info@citysquares.com", "partners@tupalo.com", "sales@x.com"]) expect(NOT_A_PARTNER_ADDRESS.test(e)).toBe(false);
+  });
+});
