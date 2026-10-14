@@ -161,6 +161,16 @@ describe("the stale tab (client/src/lib/stale-build.ts)", () => {
     expect(e.reloads).toBe(2);
   });
 
+  it("reloads again for a second deploy inside the window — once per build, never a loop", async () => {
+    const e = env();
+    expect(await decideStaleBuild(e)).toBe("reloading");
+    e.now = () => 1_000_000 + 60_000;
+    e.fetchIndex = async () => indexHtml("NEWERbuild"); // deployed again a minute later
+    expect(await decideStaleBuild(e)).toBe("reloading");
+    expect(await decideStaleBuild(e)).toBe("already_reloaded");
+    expect(e.reloads).toBe(2);
+  });
+
   it("does not reload when sessionStorage is unavailable or broken (nothing could stop a loop)", async () => {
     for (const storage of [null, { getItem: () => { throw new Error("denied"); }, setItem: () => {} }, { getItem: () => null, setItem: () => {} }]) {
       const e = env({ storage: storage as any });

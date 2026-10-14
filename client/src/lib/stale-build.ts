@@ -16,9 +16,12 @@
  *                           reason (a real fault, worth a report)
  *       "offline"           the server could not be reached — nothing to load
  *
- * The reload is guarded by a sessionStorage timestamp (per tab): at most one
- * automatic reload per RELOAD_WINDOW_MS, and none at all when sessionStorage
- * is unavailable, so a broken deploy can never put a tab in a reload loop.
+ * The reload is guarded by a sessionStorage timestamp (per tab) and the build it
+ * reloaded for: at most one automatic reload per build within RELOAD_WINDOW_MS,
+ * and none at all when sessionStorage is unavailable, so a broken deploy can
+ * never put a tab in a reload loop. A second deploy minutes later is a new
+ * build and gets its own reload (2026-10-14: three deploys in 30 minutes left
+ * an open /reinstatement tab on "This page could not be loaded").
  * No "@/…" imports: the vitest (server/client-stale-build.test.ts) loads this file directly.
  */
 
@@ -35,6 +38,7 @@ export function isChunkLoadError(err: unknown): boolean {
 }
 
 export const RELOAD_KEY = "chub.staleBuildReloadAt";
+export const RELOAD_BUILD_KEY = "chub.staleBuildReloadFor";
 export const RELOAD_WINDOW_MS = 10 * 60_000;
 export const UPDATING_TEXT = "Updating to the latest version…";
 
@@ -64,12 +68,14 @@ export function isNewerBuild(current: readonly string[], html: string): boolean 
   return current.some((ref) => !served.includes(ref));
 }
 
-/** May this tab reload itself now? Marks the attempt when it may. */
-export function takeReloadSlot(storage: StaleBuildEnv["storage"], now: number): boolean {
+/** May this tab reload itself now, for build `build` (the served bundles)? Marks the attempt when it may. */
+export function takeReloadSlot(storage: StaleBuildEnv["storage"], now: number, build = ""): boolean {
   if (!storage) return false;
   try {
     const last = Number(storage.getItem(RELOAD_KEY));
-    if (Number.isFinite(last) && last > 0 && now - last < RELOAD_WINDOW_MS) return false;
+    const sameBuild = (storage.getItem(RELOAD_BUILD_KEY) ?? "") === build;
+    if (sameBuild && Number.isFinite(last) && last > 0 && now - last < RELOAD_WINDOW_MS) return false;
+    storage.setItem(RELOAD_BUILD_KEY, build);
     storage.setItem(RELOAD_KEY, String(now));
     // Only a mark that can be read back guards the next load.
     return storage.getItem(RELOAD_KEY) === String(now);
@@ -83,7 +89,7 @@ export async function decideStaleBuild(env: StaleBuildEnv): Promise<StaleBuildOu
   try { html = await env.fetchIndex(); } catch { html = null; }
   if (html === null) return "offline";
   if (!isNewerBuild(env.currentAssets(), html)) return "same_build";
-  if (!takeReloadSlot(env.storage, env.now())) return "already_reloaded";
+  if (!takeReloadSlot(env.storage, env.now(), assetRefs(html).join(" "))) return "already_reloaded";
   env.showUpdating();
   env.reload();
   return "reloading";
