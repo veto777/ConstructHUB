@@ -454,7 +454,7 @@ export default function AdminListingsPage() {
     <AppPage width="wide" testId="page-admin-listings" className="space-y-6">
       <PageHeader
         icon={ListChecks}
-        title="Listings administration"
+        title="Directory Sync — admin"
         description="Manage directory research and review listing verification across accounts."
       />
       {gate.isLoading ? (
@@ -468,7 +468,7 @@ export default function AdminListingsPage() {
           <TabsList>
             <TabsTrigger value="directories">Directories</TabsTrigger>
             <TabsTrigger value="profiles">Profiles</TabsTrigger>
-            <TabsTrigger value="listings">Listings</TabsTrigger>
+            <TabsTrigger value="listings">Directory profiles</TabsTrigger>
           </TabsList>
           <TabsContent value="directories">
             <DirectoriesTab />
@@ -477,7 +477,7 @@ export default function AdminListingsPage() {
             <ProfilesTab />
           </TabsContent>
           <TabsContent value="listings">
-            <Section title="All listings">
+            <Section title="All directory profiles">
               <ListingsTable admin />
             </Section>
           </TabsContent>
