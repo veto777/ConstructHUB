@@ -6,7 +6,8 @@
  *   3. records the company and where the relationship stands; an agreement adds it to our lists (store.addAgreedPartner);
  *   4. follows up (owner, 2026-10-14): no answer 5 days after our last email → one follow-up in the thread; still nothing
  *      5 days later → another contact address from their site (up to 3 per company), else a note for the owner;
- *   5. first contact: vetted directories that publish an email are queued and sent MEDIA_OUTREACH_PER_DAY a day (default 50).
+ *   5. first contact: vetted directories, article sites and news outlets that publish an email are queued (also loaded
+ *      from research lists) and sent at dailyAllowance() a day (50, +25 a day, up to 400).
  * Anyone who asks us to stop is never emailed again (backlink_suppression).
  * One process at a time (a Postgres advisory lock).
  */
@@ -165,29 +166,78 @@ If this isn't something you handle, reply "stop" and we won't email you again.
 Best regards,`;
 }
 export const FIRST_CONTACT_SUBJECT = "Listings partnership: ConstructHUB (software for US contractors)";
+const STOP_LINE = `If this isn't something you handle, reply "stop" and we won't email you again.`;
 
-/** MEDIA_OUTREACH_PER_DAY; 0 pauses first contact (replies and follow-ups carry on). */
-const perDay = (env: NodeJS.ProcessEnv = process.env) => {
-  const v = Number(env.MEDIA_OUTREACH_PER_DAY);
-  return env.MEDIA_OUTREACH_PER_DAY?.trim() && Number.isFinite(v) && v >= 0 ? Math.floor(v) : MEDIA_INBOX_PARAMETERS.newContactsPerDay;
+/** First contact for an article or guest-post site (owner-approved wording, 2026-10-14, with the API question). */
+export function articleContactBody(company: string): string {
+  return `Hi ${company} team,
+
+ConstructHUB is software for US contractors (roofers, HVAC, plumbers, remodelers). We work with contractors every day on permits, estimates, Google Business Profiles and getting found online, and we'd like to build an ongoing content partnership with ${company}.
+
+We can offer practical, original articles written for your readers: real how-tos from the contractor side, never promotional fluff. We're building an automated system for this, so could you tell us:
+1. Whether you have an API, feed or other automated way to submit articles, and how we get access.
+2. Your editorial guidelines and the topics you're looking for.
+3. Whether you accept regular contributors or a recurring column.
+4. How links and author bios are handled.
+
+${STOP_LINE}
+
+Best regards,`;
+}
+
+/** First contact for a news outlet (owner-approved wording, 2026-10-14, with the API question). */
+export function newsContactBody(company: string): string {
+  return `Hi ${company} team,
+
+ConstructHUB is software for US contractors. Many of our customers are local roofers, HVAC and plumbing companies with real news: new hires, expansions, community projects and storm-season advice. We'd like to build a relationship with ${company} for local contractor stories.
+
+We're building an automated system for this, so could you tell us:
+1. Whether you have an API, feed or other automated way to submit press releases, and how we get access.
+2. How you prefer to receive press releases and story pitches, and any guidelines.
+3. Whether you offer a partner or sponsored-content program for local businesses.
+
+${STOP_LINE}
+
+Best regards,`;
+}
+
+export const QUEUE_TEMPLATES: Record<string, { subject: string; body: (company: string) => string; kind: "directory" | "article" | "news" }> = {
+  directory: { subject: FIRST_CONTACT_SUBJECT, body: firstContactBody, kind: "directory" },
+  article: { subject: "Content partnership: ConstructHUB (software for US contractors)", body: articleContactBody, kind: "article" },
+  news: { subject: "Local contractor news: partnership with ConstructHUB", body: newsContactBody, kind: "news" },
 };
+
+/**
+ * First-contact emails a day. MEDIA_OUTREACH_PER_DAY fixes it (0 pauses first contact; replies and follow-ups carry
+ * on). Unset, it ramps so a new Gmail mailbox is not flagged: 50 on the first sending day, +25 a day after, up to
+ * MEDIA_OUTREACH_MAX_PER_DAY (default 400). `daysSending` = days since the first first-contact email.
+ */
+export function dailyAllowance(daysSending: number, env: NodeJS.ProcessEnv = process.env): number {
+  const fixed = Number(env.MEDIA_OUTREACH_PER_DAY);
+  if (env.MEDIA_OUTREACH_PER_DAY?.trim() && Number.isFinite(fixed) && fixed >= 0) return Math.floor(fixed);
+  const max = num(env.MEDIA_OUTREACH_MAX_PER_DAY, 400);
+  return Math.min(max, MEDIA_INBOX_PARAMETERS.newContactsPerDay + 25 * Math.max(0, Math.floor(daysSending)));
+}
+const perDay = (env: NodeJS.ProcessEnv = process.env) => dailyAllowance(0, env);
 export const outreachPerDay = perDay;
 
 /** Step 5: queue new vetted directories, then send today's share of first-contact emails (MEDIA_OUTREACH_PER_DAY). */
 export async function sendQueued(): Promise<{ queued: number; sent: number; skipped: number }> {
   const mailbox = mailboxConfig().user;
-  const queued = await store.queueVettedDirectories(pickEmail, siteName);
-  if (!perDay()) return { queued, sent: 0, skipped: 0 };
-  const room = Math.max(0, perDay() - (await store.outreachSentToday()));
+  const queued = (await store.queueVettedDirectories(pickEmail, siteName)) + (await store.queueVettedPublishers(pickEmail, siteName));
+  const allowance = dailyAllowance(await store.daysSending());
+  if (!allowance) return { queued, sent: 0, skipped: 0 };
+  const room = Math.max(0, allowance - (await store.outreachSentToday()));
   let sent = 0, skipped = 0;
   // Spread through the day: at most a quarter of the daily share per pass.
-  for (const q of await store.nextQueued(Math.min(room, Math.max(1, Math.ceil(perDay() / 4))))) {
+  for (const q of await store.nextQueued(Math.min(room, Math.max(1, Math.ceil(allowance / 4))))) {
     if (await isSuppressed(q.to_email) || machineReason({ fromEmail: q.to_email, subject: "" })) { await store.finishQueued(q.id, "skipped", "Suppressed or not a person's address"); skipped++; continue; }
     if (await store.partnerIdForEmail(q.to_email, q.domain)) { await store.finishQueued(q.id, "skipped", "Already in contact"); skipped++; continue; }
-    const body = firstContactBody(q.company);
-    const messageId = await workerDeps.sendMail({ to: q.to_email, subject: FIRST_CONTACT_SUBJECT, body });
-    const partnerId = await store.partnerForOutreach(q.company, q.domain, "directory", q.to_email);
-    await store.saveOutbound(mailbox, { messageId, threadKey: null, to: q.to_email, subject: FIRST_CONTACT_SUBJECT, body, partnerId, purpose: "outreach" });
+    const t = QUEUE_TEMPLATES[q.kind] ?? QUEUE_TEMPLATES.directory;
+    const body = t.body(q.company);
+    const messageId = await workerDeps.sendMail({ to: q.to_email, subject: t.subject, body });
+    const partnerId = await store.partnerForOutreach(q.company, q.domain, t.kind, q.to_email);
+    await store.saveOutbound(mailbox, { messageId, threadKey: null, to: q.to_email, subject: t.subject, body, partnerId, purpose: "outreach" });
     await store.finishQueued(q.id, "sent", null);
     sent++;
   }

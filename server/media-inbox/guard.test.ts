@@ -159,3 +159,24 @@ describe("the first-contact queue only takes listings businesses", () => {
     for (const e of ["info@citysquares.com", "partners@tupalo.com", "sales@x.com"]) expect(NOT_A_PARTNER_ADDRESS.test(e)).toBe(false);
   });
 });
+
+describe("sending ramp and templates", () => {
+  it("ramps 50 → +25 a day → 400, or follows MEDIA_OUTREACH_PER_DAY (0 pauses)", async () => {
+    const { dailyAllowance } = await import("./worker");
+    expect(dailyAllowance(0, {} as any)).toBe(50);
+    expect(dailyAllowance(4, {} as any)).toBe(150);
+    expect(dailyAllowance(100, {} as any)).toBe(400);
+    expect(dailyAllowance(100, { MEDIA_OUTREACH_MAX_PER_DAY: "250" } as any)).toBe(250);
+    expect(dailyAllowance(9, { MEDIA_OUTREACH_PER_DAY: "0" } as any)).toBe(0);
+    expect(dailyAllowance(9, { MEDIA_OUTREACH_PER_DAY: "120" } as any)).toBe(120);
+  });
+  it("every template asks about an API, carries the stop line and passes the laws", async () => {
+    const { QUEUE_TEMPLATES } = await import("./worker");
+    for (const t of Object.values(QUEUE_TEMPLATES)) {
+      const b = t.body("Example Site");
+      expect(b).toMatch(/API/);
+      expect(b).toContain('reply "stop"');
+      expect(replyProblem(b)).toBeNull();
+    }
+  });
+});
