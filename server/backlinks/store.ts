@@ -103,7 +103,10 @@ export async function syncCatalogueDirectories(): Promise<number> {
   return r.rows.length;
 }
 
-export type VetJob = { id: number; domain: string; kind: BacklinkKind; discoveredUrl: string | null; metrics: BacklinkMetrics | null; attempts: number };
+export type VetJob = { id: number; domain: string; kind: BacklinkKind; discoveredUrl: string | null; discoveredVia?: string | null; metrics: BacklinkMetrics | null; attempts: number };
+
+/** Sources the directory catalogue brought in ('listing-catalogue' before the 2026-10-13 rename). */
+export const CATALOGUE_VIA: readonly string[] = ["directory-catalogue", "listing-catalogue"];
 
 /** Lease up to `limit` sources for vetting: new ones, and ones whose vetting lease lapsed (a worker died). */
 export async function claimForVetting(token: string, leaseMs: number, limit: number): Promise<VetJob[]> {
@@ -113,9 +116,9 @@ export async function claimForVetting(token: string, leaseMs: number, limit: num
         SELECT id FROM backlink_sources
          WHERE (status = 'discovered' OR (status = 'vetting' AND lease_until < now())) AND attempts < $4
          ORDER BY id LIMIT $3 FOR UPDATE SKIP LOCKED)
-      RETURNING id, domain, kind, discovered_url, metrics, attempts`,
+      RETURNING id, domain, kind, discovered_url, discovered_via, metrics, attempts`,
     [token, leaseMs / 1000, limit, MAX_VET_ATTEMPTS]);
-  return r.rows.map((x) => ({ id: x.id, domain: x.domain, kind: x.kind, discoveredUrl: x.discovered_url, metrics: x.metrics, attempts: x.attempts }));
+  return r.rows.map((x) => ({ id: x.id, domain: x.domain, kind: x.kind, discoveredUrl: x.discovered_url, discoveredVia: x.discovered_via, metrics: x.metrics, attempts: x.attempts }));
 }
 
 /** Out of tries while still "vetting" (every try's worker died): rejected, with the reason. */

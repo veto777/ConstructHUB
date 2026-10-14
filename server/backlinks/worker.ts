@@ -59,6 +59,9 @@ export async function runVetting(n = VET_BATCH): Promise<{ vetted: number; faile
     for (let job = queue.shift(); job; job = queue.shift()) {
       try {
         const signals = await readSite(job.discoveredUrl ?? `https://${job.domain}/`, job.domain);
+        // A catalogue directory's source page was checked when it was catalogued: that page is the way in, even when
+        // its heading does not say "directory" (bbb.org, a state licence lookup).
+        if (store.CATALOGUE_VIA.includes(job.discoveredVia ?? "") && (job.kind === "directory" || job.kind === "citation") && !signals.directoryUrl) signals.directoryUrl = job.discoveredUrl;
         if (await store.saveVetting(job, token, signals, gradeSource(job.kind, signals, job.metrics))) vetted++;
       } catch (e: any) {
         await store.failVetting(job, token, e?.message ?? String(e));
