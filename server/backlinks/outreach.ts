@@ -12,6 +12,7 @@
  * Directories and citations get no email: they take a form submission (a later phase).
  */
 import nodemailer from "nodemailer";
+import { signatureText } from "../email-signature";
 import type { BacklinkKind, BacklinkSignals } from "@shared/backlinks";
 import { pool } from "../db";
 import { isSuppressed } from "./store";
@@ -65,7 +66,7 @@ export function siteName(domain: string, s: BacklinkSignals | null): string {
 export function composePitch(kind: BacklinkKind, domain: string, signals: BacklinkSignals | null, senderName: string): { subject: string; body: string } {
   const name = siteName(domain, signals);
   const hello = `Hi ${name} team,`;
-  const sign = `\n\nThanks,\n${senderName}\nConstructHUB — software for home-service contractors\nhttps://constructhub.us`;
+  const sign = `\n\nThanks,\n${senderName}`; // withFooter adds the ConstructHUB signature
   switch (kind) {
     case "guest_post":
       return {
@@ -98,7 +99,7 @@ export function composePitch(kind: BacklinkKind, domain: string, signals: Backli
 
 /** Every commercial email: the sender's postal address and a working way to stop more email (CAN-SPAM). */
 export function withFooter(body: string, address: string): string {
-  return `${body}\n\n—\n${address}\nNot interested? Reply "stop" and we won't email you again.`;
+  return `${body}\n\n${signatureText()}\n\n—\n${address}\nNot interested? Reply "stop" and we won't email you again.`;
 }
 
 export const sendDeps = {
