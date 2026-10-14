@@ -1,3 +1,5 @@
+import { loadScoutedDirectories, toDirectoryRow } from "./scouted";
+
 /** Catalogue sources are discovery evidence, never proof of a business listing or API access.
  * Semrush US list: https://www.semrush.com/kb/874-listing-management-citation-websites (2026-10-13).
  * Null requirements/trades/states mean unresearched, not unrestricted/free.
@@ -176,6 +178,37 @@ export async function seedListingDirectories(db: {
  VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(domain) DO NOTHING`,
       [d.name, d.domain, d.kind, d.tier, d.category, d.source, d.notes],
     );
+  // Scouted long tail (tier 4). DO NOTHING on any conflict: an admin's edits to an existing row are never overwritten,
+  // and a scouted name that collides with an existing directory is skipped rather than renamed.
+  for (const scouted of loadScoutedDirectories()) {
+    let row;
+    try {
+      row = toDirectoryRow(scouted);
+    } catch {
+      continue; // the build script validates rows; a bad one never blocks boot
+    }
+    await db.query(
+      `INSERT INTO listing_directories(name,domain,kind,tier,category,trades,states,requires_street_address,
+   requires_phone_verification,requires_postcard,paid,active,source,notes)
+ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) ON CONFLICT DO NOTHING`,
+      [
+        row.name,
+        row.domain,
+        row.kind,
+        row.tier,
+        row.category,
+        row.trades,
+        row.states,
+        row.requires_street_address,
+        row.requires_phone_verification,
+        row.requires_postcard,
+        row.paid,
+        row.active,
+        row.source,
+        row.notes,
+      ],
+    );
+  }
   for (const d of unresolvedDirectories)
     await db.query(
       `INSERT INTO listing_directories(name,domain,kind,tier,category,source,notes,active)

@@ -16,6 +16,7 @@ import {
   seedListingDirectories,
   unresolvedDirectories,
 } from "./catalogue";
+import { loadScoutedDirectories } from "./scouted";
 import { ListingStore, domainAllows, type Scope } from "./store";
 import { analyzeListing } from "./nap";
 const bin = process.env.LISTINGS_TEST_PG_BIN ?? "/usr/lib/postgresql/16/bin";
@@ -119,7 +120,7 @@ describe.skipIf(!existsSync(path.join(bin, "initdb")))(
       const count = (
         await db.query("SELECT count(*)::int n FROM listing_directories")
       ).rows[0].n;
-      expect(count).toBe(catalogue().length + unresolvedDirectories.length);
+      expect(count).toBe(catalogue().length + unresolvedDirectories.length + loadScoutedDirectories().length);
       const routes = readFileSync(
         new URL("../routes.ts", import.meta.url),
         "utf8",
