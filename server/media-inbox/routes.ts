@@ -17,7 +17,7 @@ import { mediaAiConfigured } from "./ai";
 import { companyDomain } from "./guard";
 import { mailboxConfig, mailboxConfigured, sendMail } from "./mailbox";
 import * as store from "./store";
-import { mediaWorkerConfig, runMediaPass } from "./worker";
+import { mediaWorkerConfig, outreachPerDay, runMediaPass } from "./worker";
 
 type GetUser = (req: any, res: any) => any;
 const idParam = z.coerce.number().int().positive().max(2_147_483_647);
@@ -59,7 +59,7 @@ export function registerMediaInboxRoutes(app: Express, getDevUser: GetUser): voi
     const cfg = mediaWorkerConfig();
     try {
       const s = await store.summary(mailboxConfig().user);
-      res.json({ ...s, mailbox: mailboxConfig().user || null, configured: mailboxConfigured() && mediaAiConfigured(), enabled: cfg.enabled, intervalMin: cfg.intervalMin });
+      res.json({ ...s, queue: { ...s.queue, perDay: outreachPerDay() }, mailbox: mailboxConfig().user || null, configured: mailboxConfigured() && mediaAiConfigured(), enabled: cfg.enabled, intervalMin: cfg.intervalMin });
     } catch (e) { failed(res, "load the summary", e); }
   });
 

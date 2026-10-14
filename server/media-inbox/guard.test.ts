@@ -130,3 +130,20 @@ describe("follow-ups", () => {
     expect(replyProblem(n)).toBeNull();
   });
 });
+
+describe("opt-outs", () => {
+  it.each(["stop", "STOP", "Please remove me from your list.", "Unsubscribe", "Not interested, thanks.", "Please don't email us again."])("%s is an opt-out", async (b) => {
+    const { isOptOut } = await import("./guard");
+    expect(isOptOut(b)).toBe(true);
+  });
+  it.each(["We'd love to work together. Our API docs are attached.", "Could you stop by our booth at the expo?"])("%s is not", async (b) => {
+    const { isOptOut } = await import("./guard");
+    expect(isOptOut(b)).toBe(false);
+  });
+  it("the first-contact email passes the laws and carries the stop line", async () => {
+    const { firstContactBody } = await import("./worker");
+    const b = firstContactBody("HomeFix Directory");
+    expect(b).toContain('reply "stop"');
+    expect(replyProblem(b)).toBeNull();
+  });
+});

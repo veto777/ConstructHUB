@@ -5,15 +5,18 @@
  *      a model failure (after 3 tries) or a money / meeting / contract question gets a holding reply and waits for the owner;
  *   3. records the company and where the relationship stands; an agreement adds it to our lists (store.addAgreedPartner);
  *   4. follows up (owner, 2026-10-14): no answer 5 days after our last email → one follow-up in the thread; still nothing
- *      5 days later → another contact address from their site (up to 3 per company), else a note for the owner.
+ *      5 days later → another contact address from their site (up to 3 per company), else a note for the owner;
+ *   5. first contact: vetted directories that publish an email are queued and sent MEDIA_OUTREACH_PER_DAY a day (default 50).
+ * Anyone who asks us to stop is never emailed again (backlink_suppression).
  * One process at a time (a Postgres advisory lock).
  */
 import { MEDIA_INBOX_PARAMETERS } from "@shared/media-inbox";
 import { pool } from "../db";
 import { recordFailure } from "../ops/issues";
 import { decide, mediaAiConfigured } from "./ai";
-import { companyDomain, firstNameOf, holdingReply, machineReason, replyProblem, replySubject } from "./guard";
-import { pickEmail } from "../backlinks/outreach";
+import { companyDomain, firstNameOf, holdingReply, isOptOut, machineReason, replyProblem, replySubject } from "./guard";
+import { pickEmail, siteName } from "../backlinks/outreach";
+import { isSuppressed } from "../backlinks/store";
 import { fetchSince, mailboxConfig, mailboxConfigured, sendMail } from "./mailbox";
 import * as store from "./store";
 
@@ -45,14 +48,19 @@ export async function readInbox(): Promise<{ read: number; automated: number }> 
 }
 
 /** Step 2 + 3: answer every waiting email. */
-export async function answerPending(): Promise<{ replied: number; held: number; failed: number }> {
+export async function answerPending(): Promise<{ replied: number; held: number; failed: number; optedOut: number }> {
   const mailbox = mailboxConfig().user;
-  const out = { replied: 0, held: 0, failed: 0 };
+  const out = { replied: 0, held: 0, failed: 0, optedOut: 0 };
   for (const m of await store.pending(ANSWER_BATCH)) {
     const first = firstNameOf(m.fromName);
     let body: string, status: "replied" | "needs_owner" | "failed", reason: string | null = null, partnerId: number | null = null;
     let newlyAgreed: Awaited<ReturnType<typeof store.upsertPartner>> | null = null;
     try {
+      if (isOptOut(m.body)) {
+        await store.optOut(m.id, m.fromEmail, m.partnerId ?? (await store.partnerIdForEmail(m.fromEmail, companyDomain(m.fromEmail))));
+        out.optedOut++;
+        continue;
+      }
       if ((await store.repliesToday(m.fromEmail)) >= MAX_REPLIES_PER_DAY) {
         await store.finishMessage(m.id, "needs_owner", `Reply limit for this sender reached (${MAX_REPLIES_PER_DAY} in 24 hours) — loop protection`, null, null);
         out.held++;
@@ -105,6 +113,7 @@ export async function followUpSilent(): Promise<{ followedUp: number; newContact
   const mailbox = mailboxConfig().user;
   const out = { followedUp: 0, newContacts: 0, exhausted: 0 };
   for (const t of await store.silentThreads(MEDIA_INBOX_PARAMETERS.followUpAfterDays)) {
+    if (await isSuppressed(t.to)) { await store.markFollowedUp(t.lastId); continue; }
     if (t.followups === 0) {
       const body = followUpBody(t.to.toLowerCase() === (t.triedEmails[0] ?? "") ? firstNameOf(t.contactName) : null, t.company, t.firstBody);
       const subject = replySubject(t.firstSubject);
@@ -120,7 +129,9 @@ export async function followUpSilent(): Promise<{ followedUp: number; newContact
     if (t.domain && tried.size < MEDIA_INBOX_PARAMETERS.maxContactsPerCompany) {
       const found = [...(await store.knownEmails(t.domain)), ...(await followDeps.readEmails(t.domain))]
         .map((e) => e.toLowerCase()).filter((e) => !tried.has(e) && !machineReason({ fromEmail: e, subject: "" }));
-      next = pickEmail([...new Set(found)]);
+      const fresh: string[] = [];
+      for (const e of new Set(found)) if (!(await isSuppressed(e))) fresh.push(e);
+      next = pickEmail(fresh);
     }
     if (!next) {
       await store.noteOnPartner(t.partnerId, `No reply from ${[...tried].join(", ")} after a follow-up, and no other contact address found on ${t.domain ?? "their site"}.`);
@@ -135,10 +146,53 @@ export async function followUpSilent(): Promise<{ followedUp: number; newContact
   return out;
 }
 
+/** First contact for a directory from the queue (fixed wording; every one carries the stop line). */
+export function firstContactBody(company: string): string {
+  return `Hi ${company} team,
+
+ConstructHUB is software for US contractors (roofers, HVAC, plumbers, remodelers). We're launching Directory Sync, which keeps our customers' business listings accurate across the directories that matter, and ${company} is one of the directories we'd like to work with directly.
+
+Could you tell us:
+1. How we can add and update listings for many businesses (an API, bulk upload or partner program) and what approval involves.
+2. Your pricing per listing, plus any setup fee or minimum.
+3. Whether you accept service-area businesses that hide their street address (common for contractors).
+4. What happens to a listing if a customer cancels.
+
+We expect to start with 50–200 contractor locations and grow from there.
+
+If this isn't something you handle, reply "stop" and we won't email you again.
+
+Best regards,`;
+}
+export const FIRST_CONTACT_SUBJECT = "Listings partnership: ConstructHUB (software for US contractors)";
+
+const perDay = (env: NodeJS.ProcessEnv = process.env) => num(env.MEDIA_OUTREACH_PER_DAY, MEDIA_INBOX_PARAMETERS.newContactsPerDay);
+export const outreachPerDay = perDay;
+
+/** Step 5: queue new vetted directories, then send today's share of first-contact emails (MEDIA_OUTREACH_PER_DAY). */
+export async function sendQueued(): Promise<{ queued: number; sent: number; skipped: number }> {
+  const mailbox = mailboxConfig().user;
+  const queued = await store.queueVettedDirectories(pickEmail, siteName);
+  const room = Math.max(0, perDay() - (await store.outreachSentToday()));
+  let sent = 0, skipped = 0;
+  // Spread through the day: at most a quarter of the daily share per pass.
+  for (const q of await store.nextQueued(Math.min(room, Math.max(1, Math.ceil(perDay() / 4))))) {
+    if (await isSuppressed(q.to_email) || machineReason({ fromEmail: q.to_email, subject: "" })) { await store.finishQueued(q.id, "skipped", "Suppressed or not a person's address"); skipped++; continue; }
+    if (await store.partnerIdForEmail(q.to_email, q.domain)) { await store.finishQueued(q.id, "skipped", "Already in contact"); skipped++; continue; }
+    const body = firstContactBody(q.company);
+    const messageId = await workerDeps.sendMail({ to: q.to_email, subject: FIRST_CONTACT_SUBJECT, body });
+    const partnerId = await store.partnerForOutreach(q.company, q.domain, "directory", q.to_email);
+    await store.saveOutbound(mailbox, { messageId, threadKey: null, to: q.to_email, subject: FIRST_CONTACT_SUBJECT, body, partnerId, purpose: "outreach" });
+    await store.finishQueued(q.id, "sent", null);
+    sent++;
+  }
+  return { queued, sent, skipped };
+}
+
 const LOCK_KEY = 0x6d656469; // "medi"
 let running = false;
 
-export async function runMediaPass(): Promise<{ ok: boolean; skipped?: string; read?: number; replied?: number; held?: number; failed?: number; followedUp?: number; newContacts?: number; exhausted?: number }> {
+export async function runMediaPass(): Promise<{ ok: boolean; skipped?: string; read?: number; replied?: number; held?: number; failed?: number; followedUp?: number; newContacts?: number; exhausted?: number; optedOut?: number; newlyQueued?: number; outreachSent?: number }> {
   if (!mailboxConfigured()) return { ok: false, skipped: "The media@ mailbox is not configured (MEDIA_EMAIL / MEDIA_APP_PASSWORD)" };
   if (!mediaAiConfigured()) return { ok: false, skipped: "No AI key configured for the media inbox" };
   if (running) return { ok: false, skipped: "A pass is already running" };
@@ -150,8 +204,9 @@ export async function runMediaPass(): Promise<{ ok: boolean; skipped?: string; r
       const r = await readInbox();
       const a = await answerPending();
       const f = await followUpSilent();
+      const q = await sendQueued();
       await store.markPass(mailboxConfig().user, null);
-      return { ok: true, read: r.read, ...a, ...f };
+      return { ok: true, read: r.read, ...a, ...f, newlyQueued: q.queued, outreachSent: q.sent };
     } catch (e: any) {
       await store.markPass(mailboxConfig().user, String(e?.message ?? e).slice(0, 500)).catch(() => undefined);
       throw e;
