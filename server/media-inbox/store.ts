@@ -395,3 +395,31 @@ export async function partnerIdForEmail(email: string, domain: string | null): P
   const r = await db().query(`SELECT id FROM media_partners WHERE (domain = $2 AND $2 IS NOT NULL) OR lower(contact_email) = lower($1) OR lower($1) = ANY(tried_emails) LIMIT 1`, [email, domain]);
   return r.rows[0]?.id ?? null;
 }
+
+// ── auto-replies from companies we contacted ─────────────────────────────────────────────────────────────────────────
+
+/** Auto-replies (not bounces or system mail) not yet read for a next step, with the company they belong to. */
+export async function unreadAutoReplies(limit = 20) {
+  const r = await db().query(
+    `SELECT m.id, m.thread_key, m.from_email, m.body, COALESCE(m.partner_id,
+            (SELECT p.id FROM media_partners p WHERE p.domain = split_part(lower(m.from_email), '@', 2)
+               OR split_part(lower(m.from_email), '@', 2) LIKE '%.' || p.domain OR lower(m.from_email) = ANY(p.tried_emails) LIMIT 1)) AS partner_id
+       FROM media_messages m
+      WHERE m.direction = 'in' AND m.status = 'automated' AND m.attempts = 0 AND m.reason LIKE 'Automatic message%'
+      ORDER BY m.id LIMIT $1`, [limit]);
+  return r.rows.filter((x) => x.partner_id) as { id: number; thread_key: string | null; from_email: string; body: string; partner_id: number }[];
+}
+
+export async function saveNextStep(messageId: number, partnerId: number, step: { nextStep: string | null; link: string | null; contact: string | null; summary: string }) {
+  const action = [step.nextStep, step.link, step.contact ? `Contact: ${step.contact}` : null].filter(Boolean).join(" — ");
+  await db().query(`UPDATE media_messages SET attempts = 1, partner_id = $2, reason = concat_ws(' · ', reason, $3::text) WHERE id = $1`,
+    [messageId, partnerId, action ? `Next step: ${action}` : `Auto-reply read: ${step.summary}`]);
+  if (action) await db().query(
+    `UPDATE media_partners SET to_finalize = concat_ws(' · ', to_finalize, $2::text), owner_question = COALESCE(owner_question, $3),
+       summary = concat_ws(' ', summary, $4::text), updated_at = now() WHERE id = $1`,
+    [partnerId, action, step.link || step.nextStep ? `Their auto-reply asks for a next step: ${action}` : null, `Auto-reply: ${step.summary}`]);
+}
+
+export async function markAutoReplyTried(messageId: number) {
+  await db().query(`UPDATE media_messages SET attempts = attempts + 1 WHERE id = $1`, [messageId]);
+}

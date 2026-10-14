@@ -14,7 +14,7 @@
 import { MEDIA_INBOX_PARAMETERS } from "@shared/media-inbox";
 import { pool } from "../db";
 import { recordFailure } from "../ops/issues";
-import { decide, mediaAiConfigured } from "./ai";
+import { decide, extractNextStep, mediaAiConfigured } from "./ai";
 import { companyDomain, firstNameOf, holdingReply, isOptOut, machineReason, replyProblem, replySubject } from "./guard";
 import { pickEmail, siteName } from "../backlinks/outreach";
 import { isSuppressed } from "../backlinks/store";
@@ -31,7 +31,22 @@ export const MAX_ATTEMPTS = MEDIA_INBOX_PARAMETERS.aiAttemptsBeforeHolding;
 export const MAX_REPLIES_PER_DAY = MEDIA_INBOX_PARAMETERS.maxRepliesPerSenderPerDay;
 const ANSWER_BATCH = 25;
 
-export const workerDeps = { fetchSince, sendMail, decide };
+export const workerDeps = { fetchSince, sendMail, decide, extractNextStep };
+
+/**
+ * Step 2b: an auto-reply from a company we contacted is never answered, but it is read (owner, 2026-10-14: "do not
+ * ignore any emails"): its next step — a form to fill, another address, a portal — goes on the company's record.
+ */
+export async function readAutoReplies(): Promise<{ read: number }> {
+  let read = 0;
+  for (const m of await store.unreadAutoReplies()) {
+    try {
+      await store.saveNextStep(m.id, m.partner_id, await workerDeps.extractNextStep(await store.thread(m.thread_key, m.id)));
+      read++;
+    } catch { await store.markAutoReplyTried(m.id); }
+  }
+  return { read };
+}
 
 /** Step 1: store every new email. */
 export async function readInbox(): Promise<{ read: number; automated: number }> {
@@ -249,7 +264,7 @@ export async function sendQueued(): Promise<{ queued: number; sent: number; skip
 const LOCK_KEY = 0x6d656469; // "medi"
 let running = false;
 
-export async function runMediaPass(): Promise<{ ok: boolean; skipped?: string; read?: number; replied?: number; held?: number; failed?: number; followedUp?: number; newContacts?: number; exhausted?: number; optedOut?: number; newlyQueued?: number; outreachSent?: number }> {
+export async function runMediaPass(): Promise<{ ok: boolean; skipped?: string; read?: number; replied?: number; held?: number; failed?: number; followedUp?: number; newContacts?: number; exhausted?: number; optedOut?: number; newlyQueued?: number; outreachSent?: number; autoRepliesRead?: number }> {
   if (!mailboxConfigured()) return { ok: false, skipped: "The media@ mailbox is not configured (MEDIA_EMAIL / MEDIA_APP_PASSWORD)" };
   if (!mediaAiConfigured()) return { ok: false, skipped: "No AI key configured for the media inbox" };
   if (running) return { ok: false, skipped: "A pass is already running" };
@@ -260,10 +275,11 @@ export async function runMediaPass(): Promise<{ ok: boolean; skipped?: string; r
     try {
       const r = await readInbox();
       const a = await answerPending();
+      const ar = await readAutoReplies();
       const f = await followUpSilent();
       const q = await sendQueued();
       await store.markPass(mailboxConfig().user, null);
-      return { ok: true, read: r.read, ...a, ...f, newlyQueued: q.queued, outreachSent: q.sent };
+      return { ok: true, read: r.read, ...a, autoRepliesRead: ar.read, ...f, newlyQueued: q.queued, outreachSent: q.sent };
     } catch (e: any) {
       await store.markPass(mailboxConfig().user, String(e?.message ?? e).slice(0, 500)).catch(() => undefined);
       throw e;

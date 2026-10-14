@@ -83,6 +83,7 @@ export type MediaInboxSummary = {
  */
 export const MEDIA_INBOX_LAWS: { law: string; enforced: "code" | "instructions" }[] = [
   { law: "Answer every email a person sends. Machine mail (no-reply, bounces, newsletters, out-of-office) is logged and shown, never answered.", enforced: "code" },
+  { law: "Read every auto-reply from a company we contacted: its next step (a form, a portal, another address) goes on that company's record and on the owner's list. Every email is marked read in Gmail once it is handled.", enforced: "code" },
   { law: "Never agree to pay, buy, prepay, subscribe, sign or commit to anything that costs money.", enforced: "code" },
   { law: "Never write an amount of money, and never repeat a price they quoted.", enforced: "code" },
   { law: "How we pay, the only answer to any fee: per listing or placement, and only after one of our customers has purchased it on our platform. No upfront fees, minimums, setup fees or prepayment.", enforced: "instructions" },

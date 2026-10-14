@@ -95,6 +95,8 @@ export async function fetchSince(lastUid: number, uidValidity: string | null): P
           listId: headerText(p.headers.get("list-id")),
         });
       }
+      // Read in Gmail once stored here (owner, 2026-10-14: an unread email looks ignored). Stored = it will be handled.
+      if (messages.length) await client.messageFlagsAdd(messages.map((m) => m.uid).join(","), ["\\Seen"], { uid: true }).catch(() => undefined);
     } finally {
       lock.release();
     }
