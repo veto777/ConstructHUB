@@ -235,3 +235,17 @@ describe("directories are joined by being listed", () => {
     expect(g.reasons.at(-1)).toContain("No page on the site invites submissions");
   });
 });
+
+describe("manufacturer locators count as directory pages", () => {
+  const paths = [
+    "https://www.garaga.com/find-a-garaga-dealer", "https://www.daltile.com/store-locator", "https://www.rinnai.us/find-pro",
+    "https://www.heatnglo.com/where-to-buy", "https://www.navieninc.com/installers", "https://www.kinetico.com/find-your-water-expert/",
+    "https://www.lennox.com/residential/locate/dealer-list/", "https://www.owenscorning.com/en-us/roofing/contractors",
+  ];
+  for (const url of paths) it(url, () => {
+    expect(analyzePage({ url, status: 200, body: "<html><head><title>Brand</title></head><body>x</body></html>" }).directoryUrl).toBe(url);
+  });
+  it("an ordinary article is not a directory page", () => {
+    expect(analyzePage({ url: "https://homefixblog.com/2026/how-to-find-a-good-roof/", status: 200, body: "<html><head><title>Tips</title></head><body>x</body></html>" }).directoryUrl).toBeNull();
+  });
+});
