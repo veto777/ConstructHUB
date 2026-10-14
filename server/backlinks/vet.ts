@@ -22,6 +22,11 @@ const LIST_PAGE: { why: string; re: RegExp }[] = [
   { why: "a guest-post / link-building seller", re: /(guest[- ]?post(ing)?|link[- ]building|backlinks?|outreach)[- ](services?|packages?|agency|case[- ]stud(y|ies)|pricing|marketplace)|buy[- ](guest[- ]?posts?|backlinks?)/i },
   { why: "a job board", re: /job[- ]?search|\/jobs?\/|\bjobs? (board|listings?)\b/i },
 ];
+/**
+ * A public directory page: how a business gets onto a directory, chamber, association or manufacturer locator is to be
+ * LISTED there (join, claim, certify), not to "write for us". Matched on the found page's title/heading/path.
+ */
+const DIRECTORY_PAGE = /member(ship)?[- ]?(directory|search|list)|business[- ]directory|company[- ]directory|contractor[- ](directory|locator|search|finder|list)|(dealer|installer|pro|contractor)[- ]locator|find[- ](a|an|your)[- ](local[- ])?(member|contractor|pro|professional|dealer|installer|builder|remodell?er|company|business|plumber|roofer|electrician)|verify[- ](a[- ])?licen[cs]e|licen[cs]e[- ](lookup|search|verification)|\/list\/(category|ql|search)|\bdirectory\b/i;
 const PROFILE_PATH = /^\/(@[^/]+|(profiles?|users?|members?|people|u|authors?|community\/profile)\/)/i;
 
 /** Sites written for another country's audience: no use to a US contractor's local SEO. Generic-use ccTLDs are kept. */
@@ -152,6 +157,7 @@ export function analyzePage(page: { url: string; status: number; body: string })
     rel,
     // A user profile on a platform never speaks for the site, even when it says "guest posting".
     submissionUrl: profilePage ? null : SUBMISSION_PAGE.test(`${heading} ${decodeURIComponent(path)}`) ? page.url : submissionLink,
+    directoryUrl: DIRECTORY_PAGE.test(`${heading} ${decodeURIComponent(path)}`) ? page.url : null,
     profilePage,
     listPage: LIST_PAGE.find((l) => l.re.test(`${heading} ${decodeURIComponent(path)}`))?.why ?? null,
   };
@@ -180,6 +186,7 @@ export function mergeSignals(a: BacklinkSignals, b: BacklinkSignals | null): Bac
     rel: { dofollow: a.rel.dofollow + b.rel.dofollow, nofollow: a.rel.nofollow + b.rel.nofollow, sponsored: a.rel.sponsored + b.rel.sponsored },
     // `a` is the page the search found, `b` the home page.
     submissionUrl: a.submissionUrl ?? b.submissionUrl ?? null,
+    directoryUrl: a.directoryUrl ?? b.directoryUrl ?? null,
     profilePage: a.profilePage,
     listPage: a.listPage ?? null,
     homeTitle: b.title,
@@ -238,7 +245,10 @@ export function gradeSource(hint: BacklinkKind, s: BacklinkSignals, m: BacklinkM
   const tld = foreignTld(site);
   if (tld) return stop(`A site for an audience outside the US (.${tld})`);
   if (s.listPage) return stop(`The page found is ${s.listPage}, not a publisher`);
-  if (!s.submissionUrl) return stop(s.profilePage
+  // Directories and citations are joined by being listed: their own public directory page counts as the way in.
+  const listed = kind === "directory" || kind === "citation";
+  const entryUrl = s.submissionUrl ?? (listed ? s.directoryUrl ?? null : null);
+  if (!entryUrl) return stop(s.profilePage
     ? "Found on a user profile — the site itself does not invite submissions"
     : "No page on the site invites submissions (a phrase inside an article does not count)");
   const homeTitle = s.homeTitle || s.title || "";
@@ -252,7 +262,9 @@ export function gradeSource(hint: BacklinkKind, s: BacklinkSignals, m: BacklinkM
   const add = (n: number, why: string) => { score += n; reasons.push(`${n > 0 ? "+" : ""}${n} ${why}`); };
   if (s.https) add(5, "HTTPS"); else add(-5, "no HTTPS");
   if (s.words >= 600) add(10, `${s.words} words of content`); else if (s.words < 200) add(-10, `thin page (${s.words} words)`);
-  add(15, `invites submissions on its own page (${s.submissionUrl})`);
+  add(15, s.submissionUrl
+    ? `invites submissions on its own page (${s.submissionUrl})`
+    : `publishes a public business directory (${entryUrl})`);
   if (s.emails.length || s.contactUrl) add(5, s.emails.length ? "publishes a contact email" : "has a contact page");
   if (topical) add(10, "the site is about home improvement / construction");
   if (s.spamHints.length === 1) add(-15, `spam topic on the site (${s.spamHints[0]})`);

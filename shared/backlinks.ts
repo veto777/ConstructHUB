@@ -84,6 +84,8 @@ export type BacklinkSignals = {
   /** The site's OWN invitation: a submission page ("write for us" in its title/heading/address) or a link to one on the site.
    *  A phrase inside an article or on a user profile is not an invitation. Absent on sources vetted before 2026-10-13. */
   submissionUrl?: string | null;
+  /** The found page is a public business/member directory (directories and citations are joined by being listed). */
+  directoryUrl?: string | null;
   /** The found page is a user profile on a platform (it speaks for its author, not for the site). */
   profilePage?: boolean;
   /** Why the found page is a list/seller of guest-post sites or a job board, not a publisher. */
