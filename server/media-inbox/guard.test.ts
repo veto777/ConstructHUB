@@ -30,6 +30,7 @@ describe("replyProblem — a reply never commits money, a meeting time or a sign
     "We'd be happy to sign the agreement.",
     "Please send us an invoice.",
     "Here are our credit card details.",
+    "We'll review the order form and card-on-file.",
     "We've signed the contract.",
     "Does Tuesday at 2 work for a call?",
     "Let's talk at 3:30 pm.",
@@ -79,4 +80,34 @@ describe("parseDecision", () => {
   });
   it("throws without a reply", () => expect(() => parseDecision(JSON.stringify({ kind: "news" }))).toThrow());
   it("reads fenced JSON", () => expect(parseDecision("```json\n{\"reply\":\"Hi\",\"stage\":\"agreed\",\"kind\":\"directory\"}\n```").stage).toBe("agreed"));
+});
+
+describe("AI providers — our API first, then OpenAI, then Anthropic", () => {
+  it("orders TruthCoder, TruthCoder 2.0, OpenAI, Anthropic and skips keyless ones", async () => {
+    const { mediaAiProviders } = await import("./ai");
+    const env = { AI_INTEGRATIONS_OPENAI_BASE_URL: "http://127.0.0.1:8250/api/", AI_INTEGRATIONS_OPENAI_API_KEY: "a", AI_MODEL: "truthcode-api",
+      TRUTHCODER_API_KEY: "b", HUB_OPENAI_API_KEY: "c" } as any;
+    const p = mediaAiProviders(env);
+    expect(p.map((x) => x.name)).toEqual(["TruthCoder", "TruthCoder 2.0", "OpenAI"]);
+    expect(p[0].url).toBe("http://127.0.0.1:8250/api/chat/completions");
+    expect(p[1].model).toBe("truthcoder:2.0");
+    expect(mediaAiProviders({ ...env, ANTHROPIC_API_KEY: "d" }).at(-1)?.name).toBe("Anthropic");
+  });
+  it("falls through to the next provider when one fails", async () => {
+    const { aiDeps, decide } = await import("./ai");
+    const seen: string[] = [];
+    const orig = aiDeps.fetch;
+    aiDeps.fetch = async (url: string, init: RequestInit) => {
+      const model = JSON.parse(String(init.body)).model;
+      seen.push(model);
+      if (model === "truthcode-api") return new Response("down", { status: 503 });
+      return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ reply: "Hi", kind: "news", stage: "talking" }) } }] }));
+    };
+    try {
+      const d = await decide([{ direction: "in", from: "a@b.com", at: "x", subject: "s", body: "b" }],
+        { AI_INTEGRATIONS_OPENAI_BASE_URL: "http://tc/api", AI_INTEGRATIONS_OPENAI_API_KEY: "a", AI_MODEL: "truthcode-api", TRUTHCODER_API_KEY: "b" } as any);
+      expect(seen).toEqual(["truthcode-api", "truthcoder:2.0"]);
+      expect(d.provider).toBe("TruthCoder 2.0 (truthcoder:2.0)");
+    } finally { aiDeps.fetch = orig; }
+  });
 });

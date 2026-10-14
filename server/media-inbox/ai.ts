@@ -1,21 +1,35 @@
 /**
- * Drafts the media inbox's replies and reads where each relationship stands. The platform's AI by default
- * (AI_INTEGRATIONS_OPENAI_BASE_URL + _API_KEY, model AI_MODEL — server/ai-config.ts); MEDIA_AI_PROVIDER=openai uses
- * OpenAI's own API with HUB_OPENAI_API_KEY and MEDIA_AI_MODEL (default gpt-5.4-mini). MEDIA_AI_MODEL overrides either.
- * The prompt asks for good manners; the money / meeting / contract rules are enforced again in ./guard.ts.
+ * Drafts the media inbox's replies and reads where each relationship stands. Owner rule (2026-10-14): "always use our
+ * API first then OpenAI or Anthropic as a fallback". Each provider is tried in order until one gives a usable answer:
+ *   1. TruthCoder, the platform's AI   AI_INTEGRATIONS_OPENAI_BASE_URL + _API_KEY, model AI_MODEL (server/ai-config.ts)
+ *   2. TruthCoder 2.0                  TRUTHCODER_API_KEY, model TRUTHCODER_MODEL (default truthcoder:2.0), same server
+ *                                      unless TRUTHCODER_BASE_URL
+ *   3. OpenAI                          HUB_OPENAI_API_KEY, MEDIA_OPENAI_MODEL (default gpt-5.4-mini)
+ *   4. Anthropic                       ANTHROPIC_API_KEY, MEDIA_ANTHROPIC_MODEL (default claude-haiku-5-5)
+ * A provider without a key is skipped. The prompt asks for good manners; the money / meeting / contract rules are
+ * enforced again in ./guard.ts whichever model answered.
  */
 import { aiModel } from "../ai-config";
 import { MEDIA_PARTNER_KINDS, MEDIA_PARTNER_STATUSES, type MediaPartnerKind, type MediaPartnerStatus } from "@shared/media-inbox";
 
-export const MEDIA_AI_DEFAULT_MODEL = "gpt-5.4-mini";
-const useOpenAi = (env: NodeJS.ProcessEnv) => (env.MEDIA_AI_PROVIDER ?? "").trim().toLowerCase() === "openai";
-/** Where the model is: [chat-completions URL, key, model]. */
-export function mediaAiEndpoint(env: NodeJS.ProcessEnv = process.env): { url: string; key: string; model: string } {
-  if (useOpenAi(env)) return { url: "https://api.openai.com/v1/chat/completions", key: env.HUB_OPENAI_API_KEY?.trim() ?? "", model: env.MEDIA_AI_MODEL?.trim() || MEDIA_AI_DEFAULT_MODEL };
-  const base = (env.AI_INTEGRATIONS_OPENAI_BASE_URL ?? "").trim().replace(/\/+$/, "") || "https://api.openai.com/v1";
-  return { url: `${base}/chat/completions`, key: env.AI_INTEGRATIONS_OPENAI_API_KEY?.trim() ?? "", model: env.MEDIA_AI_MODEL?.trim() || aiModel(env.AI_MODEL) };
+export const MEDIA_OPENAI_DEFAULT_MODEL = "gpt-5.4-mini";
+export const MEDIA_ANTHROPIC_DEFAULT_MODEL = "claude-haiku-5-5";
+export type MediaAiProvider = { name: string; style: "openai" | "anthropic"; url: string; key: string; model: string };
+
+const trimUrl = (v: string | undefined) => (v ?? "").trim().replace(/\/+$/, "");
+
+/** The providers to try, in order (keyless ones left out). */
+export function mediaAiProviders(env: NodeJS.ProcessEnv = process.env): MediaAiProvider[] {
+  const tcBase = trimUrl(env.AI_INTEGRATIONS_OPENAI_BASE_URL);
+  const all: MediaAiProvider[] = [
+    { name: "TruthCoder", style: "openai", url: `${tcBase}/chat/completions`, key: env.AI_INTEGRATIONS_OPENAI_API_KEY?.trim() && tcBase ? env.AI_INTEGRATIONS_OPENAI_API_KEY.trim() : "", model: aiModel(env.AI_MODEL) },
+    { name: "TruthCoder 2.0", style: "openai", url: `${trimUrl(env.TRUTHCODER_BASE_URL) || tcBase}/chat/completions`, key: (trimUrl(env.TRUTHCODER_BASE_URL) || tcBase) ? env.TRUTHCODER_API_KEY?.trim() ?? "" : "", model: env.TRUTHCODER_MODEL?.trim() || "truthcoder:2.0" },
+    { name: "OpenAI", style: "openai", url: "https://api.openai.com/v1/chat/completions", key: env.HUB_OPENAI_API_KEY?.trim() ?? "", model: env.MEDIA_OPENAI_MODEL?.trim() || MEDIA_OPENAI_DEFAULT_MODEL },
+    { name: "Anthropic", style: "anthropic", url: "https://api.anthropic.com/v1/messages", key: env.ANTHROPIC_API_KEY?.trim() ?? "", model: env.MEDIA_ANTHROPIC_MODEL?.trim() || MEDIA_ANTHROPIC_DEFAULT_MODEL },
+  ];
+  return all.filter((p) => p.key);
 }
-export const mediaAiConfigured = (env: NodeJS.ProcessEnv = process.env) => Boolean(mediaAiEndpoint(env).key);
+export const mediaAiConfigured = (env: NodeJS.ProcessEnv = process.env) => mediaAiProviders(env).length > 0;
 
 export const FACTS = `ConstructHUB (constructhub.us) is software for US contractors: roofers, HVAC, plumbers, electricians, remodelers.
 It includes Google Business Profile tools, a CRM, permit data, SEO tools, and Directory Sync, which keeps a contractor's
@@ -83,24 +97,41 @@ export function threadPrompt(thread: ThreadMessage[]): string {
 
 export const aiDeps = { fetch: (url: string, init: RequestInit) => fetch(url, init) };
 
-export async function decide(thread: ThreadMessage[], env: NodeJS.ProcessEnv = process.env): Promise<MediaDecision> {
-  const { url, key, model } = mediaAiEndpoint(env);
-  if (!key) throw new Error("No AI key configured for the media inbox");
-  const res = await aiDeps.fetch(url, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model,
-      response_format: { type: "json_object" },
-      max_completion_tokens: 4000,
-      messages: [
-        { role: "system", content: SYSTEM },
-        { role: "user", content: `The thread, oldest first. Answer the last email from THEM.\n\n${threadPrompt(thread)}` },
-      ],
-    }),
-    signal: AbortSignal.timeout(300_000),
-  });
-  if (!res.ok) throw new Error(`AI request failed (${res.status}): ${(await res.text()).slice(0, 300)}`);
+async function ask(p: MediaAiProvider, user: string): Promise<string> {
+  const init: RequestInit = p.style === "anthropic"
+    ? {
+      method: "POST",
+      headers: { "x-api-key": p.key, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
+      body: JSON.stringify({ model: p.model, max_tokens: 4000, system: SYSTEM, messages: [{ role: "user", content: user }] }),
+    }
+    : {
+      method: "POST",
+      headers: { Authorization: `Bearer ${p.key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: p.model,
+        response_format: { type: "json_object" },
+        // TruthCoder reads max_tokens; OpenAI's GPT-5 models want max_completion_tokens.
+        ...(p.name === "OpenAI" ? { max_completion_tokens: 4000 } : { max_tokens: 4000 }),
+        messages: [{ role: "system", content: SYSTEM }, { role: "user", content: user }],
+      }),
+    };
+  const res = await aiDeps.fetch(p.url, { ...init, signal: AbortSignal.timeout(p.name.startsWith("TruthCoder") ? 180_000 : 90_000) });
+  if (!res.ok) throw new Error(`${p.name} failed (${res.status}): ${(await res.text()).slice(0, 200)}`);
   const data: any = await res.json();
-  return parseDecision(String(data?.choices?.[0]?.message?.content ?? ""));
+  return p.style === "anthropic"
+    ? String((data?.content ?? []).map((c: any) => (c?.type === "text" ? c.text : "")).join(""))
+    : String(data?.choices?.[0]?.message?.content ?? "");
+}
+
+/** Our API first, then OpenAI, then Anthropic: the first usable answer wins (records which one in `provider`). */
+export async function decide(thread: ThreadMessage[], env: NodeJS.ProcessEnv = process.env): Promise<MediaDecision & { provider: string }> {
+  const providers = mediaAiProviders(env);
+  if (!providers.length) throw new Error("No AI key configured for the media inbox");
+  const user = `The thread, oldest first. Answer the last email from THEM.\n\n${threadPrompt(thread)}`;
+  const errors: string[] = [];
+  for (const p of providers) {
+    try { return { ...parseDecision(await ask(p, user)), provider: `${p.name} (${p.model})` }; }
+    catch (e: any) { errors.push(`${p.name}: ${String(e?.message ?? e).slice(0, 200)}`); }
+  }
+  throw new Error(`Every AI provider failed — ${errors.join(" · ")}`);
 }

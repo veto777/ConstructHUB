@@ -60,8 +60,8 @@ export async function answerPending(): Promise<{ replied: number; held: number; 
         partnerId = newlyAgreed.partner.id;
       }
       const problem = replyProblem(d.reply);
-      if (problem) { body = holdingReply(first); status = "needs_owner"; reason = [problem, d.ownerQuestion].filter(Boolean).join(" — "); }
-      else { body = d.reply; status = d.needsOwner ? "needs_owner" : "replied"; reason = d.needsOwner ? d.ownerQuestion ?? "Owner decision needed" : null; }
+      if (problem) { body = holdingReply(first); status = "needs_owner"; reason = [problem, d.ownerQuestion, `Drafted by ${d.provider}`].filter(Boolean).join(" — "); }
+      else { body = d.reply; status = d.needsOwner ? "needs_owner" : "replied"; reason = [d.needsOwner ? d.ownerQuestion ?? "Owner decision needed" : null, `Answered by ${d.provider}`].filter(Boolean).join(" — "); }
     } catch (e: any) {
       if (m.attempts + 1 < MAX_ATTEMPTS) { await store.bumpAttempt(m.id, e?.message ?? String(e)); continue; }
       body = holdingReply(first); status = "failed"; reason = `Could not draft an answer: ${String(e?.message ?? e).slice(0, 300)}`;
