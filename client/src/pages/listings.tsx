@@ -60,7 +60,7 @@ function AddListing({
       setUrl("");
       setDirectoryId("");
       toast({
-        title: "Listing URL added",
+        title: "Directory profile added",
         description: "Re-check it to compare your business details.",
       });
     },
@@ -78,7 +78,7 @@ function AddListing({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add a listing URL</DialogTitle>
+            <DialogTitle>Add a directory profile URL</DialogTitle>
             <DialogDescription>
               Use an existing page for your business on the selected directory.
               This does not submit a new business listing.
@@ -225,8 +225,8 @@ function LocationListings({
         )}
       </Section>
       <Section
-        title="Listings"
-        description="Track existing listing pages and compare their published details."
+        title="Directory profiles"
+        description="Your business pages on each directory, checked against your profile."
       >
         <div className="mb-4">
           {query.data ? (
@@ -241,7 +241,7 @@ function LocationListings({
       </Section>
       <Section
         title="Activity"
-        description="Profile updates and listing checks, in time order."
+        description="Profile updates and directory checks, in time order."
       >
         <Activity locationId={location.id} />
       </Section>
@@ -265,7 +265,7 @@ export default function ListingsPage() {
     <AppPage width="wide" testId="page-listings" className="space-y-6 pb-16">
       <PageHeader
         icon={ListChecks}
-        title="Listings & NAP sync"
+        title="Directory Sync"
         description="Keep your name, address, and phone (NAP) consistent across business directories."
       />
       <Section title="Business location">

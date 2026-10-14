@@ -76,13 +76,13 @@ export function Summary({ locationId }: { locationId: number }) {
   });
   if (query.error)
     return <LoadError error={query.error} retry={() => void query.refetch()} />;
-  if (!query.data) return <p role="status">Loading listing counts…</p>;
+  if (!query.data) return <p role="status">Loading directory counts…</p>;
   return (
     <div className="space-y-4">
       <StatGrid>
         {(
           [
-            ["total", "Total listings"],
+            ["total", "Directory profiles"],
             ["live", "Live"],
             ["mismatch", "Details differ"],
             ["billable", "Verified"],
@@ -182,7 +182,7 @@ export function ListingsTable({
     },
     onError: (error) =>
       toast({
-        title: "Could not check listing",
+        title: "Could not check directory profile",
         description: apiErrorMessage(error),
         variant: "destructive",
       }),
@@ -208,7 +208,7 @@ export function ListingsTable({
         </select>
       </label>
       <LoadError error={query.error} retry={() => void query.refetch()} />
-      {query.isLoading && <p role="status">Loading listings…</p>}
+      {query.isLoading && <p role="status">Loading directory profiles…</p>}
       {query.data && (
         <>
           <div className="overflow-x-auto rounded-lg border">
@@ -328,7 +328,7 @@ export function ListingsTable({
                 No listings
                 {status
                   ? " match this status"
-                  : " yet. Add an existing listing URL to start checking your details"}
+                  : " yet. Add an existing directory profile URL to start checking your details"}
                 .
               </p>
             )}
