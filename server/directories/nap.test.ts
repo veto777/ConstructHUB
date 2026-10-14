@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import {
-  analyzeListing,
-  checkListing,
+  analyzeDirectoryProfile,
+  checkDirectoryProfile,
   normalizeAddress,
   normalizeName,
   normalizePhone,
@@ -54,7 +54,7 @@ describe("normalization and NAP evidence", () => {
   it.each(["local-business", "microdata", "visible"])(
     "confirms complete NAP from %s fixture",
     (name) => {
-      const r = analyzeListing(page(fixture(name)), p);
+      const r = analyzeDirectoryProfile(page(fixture(name)), p);
       expect(r.status).toBe("live");
       expect(r.billable).toBe(true);
       expect(r.nap?.fields.phone.observed).toBeTruthy();
@@ -62,7 +62,7 @@ describe("normalization and NAP evidence", () => {
     },
   );
   it("returns actual diffs", () => {
-    const r = analyzeListing(
+    const r = analyzeDirectoryProfile(
       page(fixture("local-business").replaceAll("555-0100", "555-0199")),
       p,
     );
@@ -78,11 +78,11 @@ describe("normalization and NAP evidence", () => {
       telephone: p.phone,
     });
     expect(
-      analyzeListing(page(body), { ...p, service_area_only: true }).billable,
+      analyzeDirectoryProfile(page(body), { ...p, service_area_only: true }).billable,
     ).toBe(true);
-    expect(analyzeListing(page(body), p).status).toBe("mismatch");
+    expect(analyzeDirectoryProfile(page(body), p).status).toBe("mismatch");
     expect(
-      analyzeListing(page(body), { ...p, service_area_only: null }).billable,
+      analyzeDirectoryProfile(page(body), { ...p, service_area_only: null }).billable,
     ).toBe(false);
   });
   it("does not bill unknown canonical names or phones", () => {
@@ -92,7 +92,7 @@ describe("normalization and NAP evidence", () => {
   it.each(["queued", "live", "mismatch"])(
     "bot walls preserve %s but remove billability",
     (status) => {
-      const r = analyzeListing(page(fixture("bot-wall")), p, status);
+      const r = analyzeDirectoryProfile(page(fixture("bot-wall")), p, status);
       expect(r.status).toBe(status);
       expect(r.billable).toBe(false);
       expect(r.evidence.confirmation).toBe("unconfirmed");
@@ -100,9 +100,9 @@ describe("normalization and NAP evidence", () => {
   );
   it("HTTP errors and fetch errors never certify", async () => {
     expect(
-      analyzeListing(page(fixture("local-business"), 403), p).billable,
+      analyzeDirectoryProfile(page(fixture("local-business"), 403), p).billable,
     ).toBe(false);
-    const r = await checkListing(
+    const r = await checkDirectoryProfile(
       "https://directory.example",
       p,
       "live",
@@ -119,11 +119,11 @@ describe("normalization and NAP evidence", () => {
       { "@type": "LocalBusiness", name: p.name, telephone: "2125550199" },
       { "@type": "LocalBusiness", name: "Other Company", telephone: p.phone },
     ]);
-    expect(analyzeListing(page(body), p).evidence.confirmation).toBe(
+    expect(analyzeDirectoryProfile(page(body), p).evidence.confirmation).toBe(
       "unconfirmed",
     );
     expect(
-      analyzeListing(
+      analyzeDirectoryProfile(
         page(fixture("local-business") + fixture("local-business")),
         p,
       ).billable,
@@ -135,7 +135,7 @@ describe("normalization and NAP evidence", () => {
         .businesses,
     ).toEqual([]);
     expect(
-      analyzeListing(
+      analyzeDirectoryProfile(
         page("<h1>Fixture Roofing</h1><div hidden>212-555-0100</div>"),
         p,
       ).billable,
@@ -143,7 +143,7 @@ describe("normalization and NAP evidence", () => {
   });
   it("preserves duplicate/suppression states even with matching NAP", () => {
     for (const status of ["duplicate", "suppressed"]) {
-      const r = analyzeListing(page(fixture("local-business")), p, status);
+      const r = analyzeDirectoryProfile(page(fixture("local-business")), p, status);
       expect(r.status).toBe(status);
       expect(r.billable).toBe(false);
     }

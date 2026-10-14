@@ -29,8 +29,8 @@ import { YOUTUBE_DDL } from "../server/youtube/schema";
 import { YOUTUBE_CUSTOMER_DDL } from "../server/youtube/customer-schema";
 import { ANALYTICS_ATTRIBUTION_DDL } from "../server/analytics-attribution";
 
-import { ensureListingSchema } from "../server/listings/schema";
-import { seedListingDirectories } from "../server/listings/catalogue";
+import { ensureDirectorySchema } from "../server/directories/schema";
+import { seedDirectories } from "../server/directories/catalogue";
 
 const STATEMENTS = [
   // Appraiser portal fields become nullable ("no portal on record" is honest).
@@ -180,8 +180,8 @@ async function main() {
   // yet. A table that still has repeats is skipped with the repeats named —
   // existing customer documents are never renumbered here.
   await ensureDocNumberUniqueIndexes(pool, undefined, (line) => console.log(`${line.endsWith(" added") ? "✓" : "•"} ${line}`));
-  await ensureListingSchema(pool);
-  await seedListingDirectories(pool);
+  await ensureDirectorySchema(pool);
+  await seedDirectories(pool);
   await pinDatabaseTimeZone(pool);
   await pool.end();
   console.log("\nSchema migration complete.");

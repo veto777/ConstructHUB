@@ -207,7 +207,7 @@ export function parseBusinesses(html: string): {
         ),
       ];
       const addresses = scope.find("address");
-      // Multiple contacts can be unrelated listings; leave inconclusive.
+      // Multiple contacts can be unrelated directory profiles; leave inconclusive.
       const addressText = addresses.length
         ? addresses.text().replace(/\s+/g, " ").trim()
         : (scope
@@ -294,7 +294,7 @@ export function isBillable(
 ) {
   return status === "live" && confirmed && nap?.matches === true;
 }
-export function analyzeListing(
+export function analyzeDirectoryProfile(
   page: Pick<PageResponse, "url" | "status" | "body">,
   profile: NapProfile,
   previous = "queued",
@@ -333,7 +333,7 @@ export function analyzeListing(
   if (ranked.length !== 1)
     return unconfirmed(
       ranked.length
-        ? "Multiple businesses match; use an individual listing URL"
+        ? "Multiple businesses match; use an individual directory profile URL"
         : "Business identity not confirmed",
     );
   const nap = ranked[0].nap;
@@ -355,7 +355,7 @@ export function analyzeListing(
       : "mismatch";
   return { status, nap, evidence, billable: isBillable(status, nap, true) };
 }
-export async function checkListing(
+export async function checkDirectoryProfile(
   url: string,
   profile: NapProfile,
   previous = "queued",
@@ -363,7 +363,7 @@ export async function checkListing(
   allowed: (url: string) => boolean = () => true,
 ): Promise<CheckResult> {
   try {
-    return analyzeListing(await fetcher(url, allowed), profile, previous);
+    return analyzeDirectoryProfile(await fetcher(url, allowed), profile, previous);
   } catch {
     return {
       status: previous,

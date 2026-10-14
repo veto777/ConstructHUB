@@ -201,3 +201,37 @@ describe("vetting — false positives from the first run", () => {
     expect(gradeSource("directory", { ...analyzePage({ url: "https://yelp.com/", status: 403, body: "" }) }, { rank: 700, referringDomains: 1, spamScore: 1, checkedAt: "x" }).tier).toBe("X");
   });
 });
+
+describe("directories are joined by being listed", () => {
+  const chamber = analyzePage({
+    url: "https://business.greaterlowellcc.org/list/ql/contractors-architects-trade-services-7",
+    status: 200,
+    body: `<html lang="en"><head><title>Contractors | Greater Lowell Chamber of Commerce</title></head><body>
+      <h1>Member Directory</h1><p>${"Caron Heating & Cooling, Inc. roofing plumbing contractor ".repeat(60)}</p>
+      <a href="/join">Join the Chamber</a></body></html>`,
+  });
+
+  it("finds the public directory page", () => {
+    expect(chamber.directoryUrl).toBe("https://business.greaterlowellcc.org/list/ql/contractors-architects-trade-services-7");
+    expect(chamber.submissionUrl).toBeNull();
+  });
+
+  it("grades a directory on its public directory page instead of rejecting it for having no 'write for us'", () => {
+    const g = gradeSource("directory", chamber, null);
+    expect(g.tier).not.toBe("X");
+    expect(g.reasons.join(" ")).toContain("publishes a public business directory");
+  });
+
+  it("still requires a real submission page for a guest post", () => {
+    const article = analyzePage({
+      url: "https://homefixblog.com/2026/roof-repair-tips/",
+      status: 200,
+      body: `<html lang="en"><head><title>Roof repair tips | HomeFix Blog</title></head><body>
+        <h1>Roof repair tips</h1><p>${"roofing contractor home improvement remodeling ".repeat(80)}</p></body></html>`,
+    });
+    expect(article.directoryUrl).toBeNull();
+    const g = gradeSource("guest_post", article, null);
+    expect(g.tier).toBe("X");
+    expect(g.reasons.at(-1)).toContain("No page on the site invites submissions");
+  });
+});

@@ -1,5 +1,6 @@
+// Postgres tables and columns keep their original names for compatibility.
 /** Shared by boot and the explicit migration. Additive only; no live DB access on import. */
-export const LISTINGS_DDL = `
+export const DIRECTORIES_DDL = `
 CREATE TABLE IF NOT EXISTS listing_profiles (
  id serial PRIMARY KEY, user_id integer NOT NULL REFERENCES users(id),
  location_id integer NOT NULL UNIQUE REFERENCES business_locations(id) ON DELETE CASCADE,
@@ -42,8 +43,8 @@ CREATE TABLE IF NOT EXISTS listing_events (
 );
 CREATE INDEX IF NOT EXISTS listing_events_profile ON listing_events(profile_id,id);
 `;
-export async function ensureListingSchema(db: {
+export async function ensureDirectorySchema(db: {
   query: (sql: string) => Promise<unknown>;
 }) {
-  await db.query(LISTINGS_DDL);
+  await db.query(DIRECTORIES_DDL);
 }

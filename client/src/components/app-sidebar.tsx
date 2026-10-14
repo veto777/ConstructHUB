@@ -714,8 +714,8 @@ export function AppSidebar({ sheet = false }: { sheet?: boolean } = {}) {
               )}
               {user?.isPlatformAdmin === true && (
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild data-active={location === "/admin/listings" || location === "/admin/directories"}>
-                    <Link href="/admin/directories" data-testid="link-nav-admin-listings" className="flex items-center gap-2 w-full">
+                  <SidebarMenuButton asChild data-active={location === "/admin/directories"}>
+                    <Link href="/admin/directories" data-testid="link-nav-admin-directories" className="flex items-center gap-2 w-full">
                       <ListChecks className="h-5 w-5 min-w-5 min-h-5 shrink-0 text-primary" />
                       <span>Directories</span>
                     </Link>

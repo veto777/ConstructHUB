@@ -1,6 +1,6 @@
 /**
  * Scouted long-tail directories (tier 4): contractor locators, trade associations, state licence lookups, chambers and
- * local directories found by the directory scouts and re-checked by scripts/build-listing-directories.ts.
+ * local directories found by the directory scouts and re-checked by scripts/build-directories.ts.
  *
  * Every row is a page a scout opened; the build script re-fetches it. "verified" = the page loaded; "unconfirmed" = the
  * site blocked our check (bot wall, timeout) but the scout saw it. Dead pages never reach the data file.
@@ -11,7 +11,7 @@ import path from "node:path";
 import { z } from "zod";
 import { directoryInput } from "./directory";
 
-export const SCOUTED_FILE = "listing-directories.json";
+export const SCOUTED_FILE = "directories.json";
 
 const SCOUT_CATEGORIES = ["manufacturer", "trade_assoc", "state_local", "contractor", "general"] as const;
 

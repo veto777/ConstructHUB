@@ -7,7 +7,7 @@ vi.mock("../crm/admin", () => ({
 }));
 vi.mock("../growth-limits", () => ({ takeBudget: vi.fn(async () => true) }));
 vi.mock("../gbp/listing-editor", () => ({ loadListing: vi.fn() }));
-import { registerListingsRoutes } from "./routes";
+import { registerDirectoryRoutes } from "./routes";
 import { pool } from "../db";
 import { platformGatePassed } from "../crm/admin";
 function harness(user: any = { id: 1 }, actor: any = { id: 1 }) {
@@ -24,6 +24,7 @@ function harness(user: any = { id: 1 }, actor: any = { id: 1 }) {
       "saveProfile",
       "location",
       "directories",
+      "directoryFacets",
       "summary",
       "list",
       "add",
@@ -33,7 +34,7 @@ function harness(user: any = { id: 1 }, actor: any = { id: 1 }) {
       "adminProfiles",
     ].map((k) => [k, vi.fn(async () => [])]),
   );
-  registerListingsRoutes(
+  registerDirectoryRoutes(
     app,
     (_req, res) => {
       if (!user) {
@@ -57,7 +58,7 @@ function harness(user: any = { id: 1 }, actor: any = { id: 1 }) {
         return this;
       },
     };
-    await handlers.get(`${method} /api/listings${path}`)(
+    await handlers.get(`${method} /api/directories${path}`)(
       {
         user: actor,
         params: { locationId: "2", id: "4" },
@@ -69,7 +70,7 @@ function harness(user: any = { id: 1 }, actor: any = { id: 1 }) {
     );
     return res;
   };
-  return { store, call };
+  return { store, call, handlers };
 }
 describe("signed-in API and trusted scope", () => {
   it("requires authentication on every route", async () => {
@@ -294,5 +295,44 @@ describe("admin directory and profile endpoints", () => {
       );
     expect(store.saveDirectory).not.toHaveBeenCalled();
     expect(store.adminProfiles).not.toHaveBeenCalled();
+  });
+});
+
+describe("catalogue handlers and compatibility", () => {
+  it("registers identical handlers for every deprecated API alias", () => {
+    const { handlers } = harness();
+    for (const [key, handler] of handlers) {
+      if (key.includes("/api/directories")) {
+        expect(
+          handlers.get(key.replace("/api/directories", "/api/listings")),
+        ).toBe(handler);
+      }
+    }
+  });
+  it("validates paging and forwards parsed facets", async () => {
+    vi.mocked(pool.query).mockResolvedValue({
+      rows: [{ email: "customer@example.com" }],
+    } as never);
+    const { call, store } = harness();
+    expect(
+      (await call("get", "/directories", { query: { limit: "12" } }))
+        .statusCode,
+    ).toBe(400);
+    await call("get", "/directories", {
+      query: { limit: "10", offset: "20", grade: "A,B" },
+    });
+    expect(store.directories).toHaveBeenLastCalledWith(
+      expect.objectContaining({ limit: 10, offset: 20, grade: ["A", "B"] }),
+      true,
+    );
+    await call("get", "/directories");
+    expect(store.directories).toHaveBeenLastCalledWith(
+      expect.objectContaining({ limit: 25 }),
+      false,
+    );
+    await call("get", "/directories/facets", { query: { state: "NY" } });
+    expect(store.directoryFacets).toHaveBeenLastCalledWith(
+      expect.objectContaining({ state: "NY" }),
+    );
   });
 });

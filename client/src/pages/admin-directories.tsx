@@ -17,23 +17,23 @@ import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
   Catalogue,
-  ListingsTable,
+  DirectoryProfilesTable,
   LoadError,
   Pager,
   getJson,
   label,
-  refreshListings,
+  refreshDirectories,
   selectClass,
-} from "@/components/listings/common";
+} from "@/components/directories/common";
 import {
   DIRECTORY_CATEGORIES,
   DIRECTORY_KINDS,
   TIER_LABELS,
   type Directory,
-  type ListingProfile,
-} from "@shared/listings";
+  type BusinessProfile,
+} from "@shared/directories";
 
-type AdminProfile = ListingProfile & {
+type AdminProfile = BusinessProfile & {
   account_email: string;
   total: number;
   live: number;
@@ -104,12 +104,12 @@ function DirectoryForm({
       );
       return apiRequest(
         directory ? "PATCH" : "POST",
-        `/api/listings/directories${directory ? `/${directory.id}` : ""}`,
+        `/api/directories/directories${directory ? `/${directory.id}` : ""}`,
         body,
       );
     },
     onSuccess: async () => {
-      await refreshListings();
+      await refreshDirectories();
       toast({ title: "Directory saved" });
       onDone();
     },
@@ -145,8 +145,8 @@ function DirectoryForm({
             />
             {key === "domain" && (
               <span className="text-xs text-muted-foreground">
-                Leave empty if unconfirmed. A domain used by listings cannot
-                change.
+                Leave empty if unconfirmed. A domain used by directory profiles
+                cannot change.
               </span>
             )}
             {key === "source" && (
@@ -269,20 +269,16 @@ function DirectoryForm({
   );
 }
 function DirectoriesTab() {
-  const query = useQuery<Directory[]>({
-    queryKey: ["/api/listings/directories"],
-    queryFn: () => getJson("/api/listings/directories"),
-  });
   const [editing, setEditing] = useState<Directory | null | undefined>(
     undefined,
   );
   const { toast } = useToast();
   const toggle = useMutation({
     mutationFn: (directory: Directory) =>
-      apiRequest("PATCH", `/api/listings/directories/${directory.id}`, {
+      apiRequest("PATCH", `/api/directories/directories/${directory.id}`, {
         active: !directory.active,
       }),
-    onSuccess: refreshListings,
+    onSuccess: refreshDirectories,
     onError: (error) =>
       toast({
         title: "Could not update directory",
@@ -290,61 +286,35 @@ function DirectoriesTab() {
         variant: "destructive",
       }),
   });
-  const count = (key: "tier" | "category", value: string) =>
-    query.data?.filter((directory) => String(directory[key]) === value)
-      .length ?? 0;
   return (
     <Section
       title="Directory catalogue"
-      description="Research coverage, edit directory details, and control which directories accept listing URLs."
+      description="Research coverage, edit directory details, and control which directories accept directory profile URLs."
     >
       <Button className="mb-4" onClick={() => setEditing(null)}>
         Add directory
       </Button>
-      <LoadError error={query.error} retry={() => void query.refetch()} />
-      {query.isLoading && <p role="status">Loading directories…</p>}
-      {query.data && (
-        <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {Object.entries(TIER_LABELS).map(([tier, title]) => (
-              <div key={tier} className="rounded-lg border p-3">
-                <p className="text-sm text-muted-foreground">
-                  Tier {tier} · {title}
-                </p>
-                <p className="text-2xl font-semibold">{count("tier", tier)}</p>
-              </div>
-            ))}
+      <Catalogue
+        adminActions={(directory) => (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setEditing(directory)}
+            >
+              Edit
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={toggle.isPending}
+              onClick={() => toggle.mutate(directory)}
+            >
+              {directory.active ? "Deactivate" : "Activate"}
+            </Button>
           </div>
-          <p className="text-sm text-muted-foreground">
-            {DIRECTORY_CATEGORIES.map(
-              (category) =>
-                `${label(category)}: ${count("category", category)}`,
-            ).join(" · ")}
-          </p>
-          <Catalogue
-            directories={query.data}
-            adminActions={(directory) => (
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setEditing(directory)}
-                >
-                  Edit
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={toggle.isPending}
-                  onClick={() => toggle.mutate(directory)}
-                >
-                  {directory.active ? "Deactivate" : "Activate"}
-                </Button>
-              </div>
-            )}
-          />
-        </div>
-      )}
+        )}
+      />
       <Dialog
         open={editing !== undefined}
         onOpenChange={(open) => {
@@ -375,7 +345,7 @@ function DirectoriesTab() {
 }
 function ProfilesTab() {
   const [offset, setOffset] = useState(0);
-  const url = `/api/listings/admin/profiles?limit=50&offset=${offset}`;
+  const url = `/api/directories/admin/profiles?limit=50&offset=${offset}`;
   const query = useQuery<AdminProfile[]>({
     queryKey: [url],
     queryFn: () => getJson(url),
@@ -383,7 +353,7 @@ function ProfilesTab() {
   return (
     <Section
       title="Business profiles"
-      description="Profiles across all accounts. Verification counts come from the listing checker."
+      description="Profiles across all accounts. Verification counts come from the directory profile checker."
     >
       <LoadError error={query.error} retry={() => void query.refetch()} />
       {query.isLoading && <p role="status">Loading profiles…</p>}
@@ -443,19 +413,19 @@ function ProfilesTab() {
     </Section>
   );
 }
-export default function AdminListingsPage() {
+export default function AdminDirectoriesPage() {
   // This admin-only read gates every tab and uses apiRequest's existing recent-auth flow.
   const gate = useQuery<AdminProfile[]>({
-    queryKey: ["/api/listings/admin/profiles?limit=1"],
-    queryFn: () => getJson("/api/listings/admin/profiles?limit=1"),
+    queryKey: ["/api/directories/admin/profiles?limit=1"],
+    queryFn: () => getJson("/api/directories/admin/profiles?limit=1"),
     retry: false,
   });
   return (
-    <AppPage width="wide" testId="page-admin-listings" className="space-y-6">
+    <AppPage width="wide" testId="page-admin-directories" className="space-y-6">
       <PageHeader
         icon={ListChecks}
         title="Directory Sync — admin"
-        description="Manage directory research and review listing verification across accounts."
+        description="Manage directory research and review directory profile verification across accounts."
       />
       {gate.isLoading ? (
         <p role="status">Checking admin access…</p>
@@ -468,7 +438,9 @@ export default function AdminListingsPage() {
           <TabsList>
             <TabsTrigger value="directories">Directories</TabsTrigger>
             <TabsTrigger value="profiles">Profiles</TabsTrigger>
-            <TabsTrigger value="listings">Directory profiles</TabsTrigger>
+            <TabsTrigger value="directory-profiles">
+              Directory profiles
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="directories">
             <DirectoriesTab />
@@ -476,9 +448,9 @@ export default function AdminListingsPage() {
           <TabsContent value="profiles">
             <ProfilesTab />
           </TabsContent>
-          <TabsContent value="listings">
+          <TabsContent value="directory-profiles">
             <Section title="All directory profiles">
-              <ListingsTable admin />
+              <DirectoryProfilesTable admin />
             </Section>
           </TabsContent>
         </Tabs>
