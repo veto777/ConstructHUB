@@ -24,7 +24,8 @@ export function signatureText(): string {
     "-- ",
     "The ConstructHUB Team",
     "Software for US contractors",
-    `${SIGNATURE_PHONE} · ${SIGNATURE_EMAIL}`,
+    SIGNATURE_PHONE,
+    SIGNATURE_EMAIL,
     SIGNATURE_SITE,
     ...SOCIAL_LINKS.map((link) => `${link.name}: ${link.url}`),
   ].join("\n");
@@ -43,7 +44,8 @@ export function signatureHtml(): string {
 <td style="vertical-align:top;padding-top:16px;font-size:13px;line-height:1.55;color:#444;">
 <div style="font-weight:700;color:#1a1a2e;">The ConstructHUB Team</div>
 <div style="color:#888;">Software for US contractors</div>
-<div><a href="tel:${PHONE_TEL}" style="${link}">${SIGNATURE_PHONE}</a> <span style="color:#ccc;">·</span> <a href="mailto:${SIGNATURE_EMAIL}" style="${link}">${SIGNATURE_EMAIL}</a></div>
+<div><a href="tel:${PHONE_TEL}" style="${link}">${SIGNATURE_PHONE}</a></div>
+<div><a href="mailto:${SIGNATURE_EMAIL}" style="${link}">${SIGNATURE_EMAIL}</a></div>
 <div><a href="${SIGNATURE_SITE}" style="${link}">constructhub.us</a></div>
 <div style="margin-top:8px;font-size:0;line-height:0;">${socials}</div>
 </td>
