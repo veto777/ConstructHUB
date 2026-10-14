@@ -12,6 +12,7 @@ import { inNativeApp } from '@/lib/app-shell';
 import { MODULE_NAMES, PLANS, planForModule } from '@shared/plans';
 import { fullAddress } from '@/lib/address';
 import { LocationLocalCard, type LatestReview } from '@/components/location-local-card';
+import { GbpLinkCell } from '@/components/gbp-connection';
 export function useAgencyFilter() {
   const [client,setClient]=useUrlParam('clientId'),[q,setQ]=useUrlParam('q'),[status,setStatus]=useUrlParam('status'),[offset,setOffset]=useUrlParam('offset');
   const params=new URLSearchParams({q:q||'',status:status||'all',offset:offset||'0',...(client?{clientId:client}:{})});
@@ -50,7 +51,7 @@ function OwnLocations({onOpen}:{onOpen?:(id:number)=>void}) {
     {/* One location: its profile up front, one click away (owner 2026-10-02: "no link or button to access the account"). */}
     {data&&data.total===1&&data.items.length===1&&!f.q&&f.status==='all'&&(()=>{const l=data.items[0];return <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/30 p-4" data-testid="own-location-single">
       <div className="min-w-0"><p className="font-semibold truncate">{l.businessName}</p><p className="text-sm text-muted-foreground truncate">{fullAddress(l)||'Address not set'} · {l.gbpLocationName?'Linked to Google':'Not linked to Google yet'}</p></div>
-      <Button variant="outline" onClick={()=>open(l.id)} data-testid="button-open-single-location">Open your Business Profile</Button>
+      <div className="flex flex-wrap items-center gap-3"><GbpLinkCell locationId={l.id}/><Button variant="outline" onClick={()=>open(l.id)} data-testid="button-open-single-location">Open your Business Profile</Button></div>
     </div>;})()}
     {/* Each location as a Google local-pack entry (owner, 2026-10-06), from our stored data only. */}
     <div className="g-surface" data-testid="own-locations-list">{data?.items.map((l:any)=><LocationLocalCard key={l.id} location={l} latestReview={latestReviews.get(l.id)} onOpen={()=>open(l.id)} testId={`own-location-${l.id}`}/>)}</div>
@@ -102,6 +103,9 @@ function AgencyBulkWorkspace({onOpen,compact=false}:{onOpen?:(id:number)=>void;c
   const [selectionKey,setSelectionKey]=useState(selectedKey);
   const selected=selectionKey===selectedKey?ids:[],selectAll=selectionKey===selectedKey&&all;
   const writable=me?.role!=='viewer';
+  // Selected rows with no Google listing behind them (page-level selection only; "all matching" is counted server-side).
+  // "Sync now" needs a linked listing; "Link & sync" also works on a listing a connected account already manages ("available").
+  const notLinkedSelected=selectAll?0:selected.filter(id=>{const st=linkage?.locations?.find((x:any)=>x.id===id)?.state;return st==='unlinked'||(action==='sync'&&st==='available');}).length;
   const mutation=useMutation({mutationFn:async()=>{
     let payload:any={};
     if(action==='guard')payload={mode:guard,watched:['title','phoneNumbers','websiteUri','storefrontAddress','categories','profile.description','regularHours','specialHours','serviceArea','openInfo.openingDate','openInfo.status']};
@@ -132,6 +136,8 @@ function AgencyBulkWorkspace({onOpen,compact=false}:{onOpen?:(id:number)=>void;c
       <div className="g-surface" data-testid="agency-locations-list">{data?.items.map((l:any)=>{const p=googlePill(l);return <div key={l.id} className="flex items-start gap-3 g-divider first:border-t-0" data-testid={`agency-location-${l.id}`}>
         <input aria-label={`Select ${l.businessName}`} className="mt-5 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]" type="checkbox" checked={selectAll||selected.includes(l.id)} onChange={e=>{setSelectionKey(selectedKey);setAll(false);setIds(e.target.checked?[...selected,l.id]:selected.filter(id=>id!==l.id));}}/>
         <div className="min-w-0 flex-1"><LocationLocalCard location={l} latestReview={latestReviews.get(l.id)} onOpen={()=>onOpen?onOpen(l.id):window.location.assign(`/locations?location=${l.id}`)} meta={<>{l.clientName||'Unassigned'} · <span className={p.tone==='success'?'g-open':p.tone==='warning'?'g-closed':undefined}>{p.label}</span></>}/></div>
+        {/* The Google step for this row — Connect, Link & sync, or Synced — on the row itself (owner 2026-10-14: "i cant sync it"). */}
+        {writable&&<div className="shrink-0 pt-4 pr-2 w-full sm:w-auto sm:max-w-[240px]"><GbpLinkCell locationId={l.id}/></div>}
       </div>;})}</div>
       <Pager offset={f.offset} total={data?.total??0} onChange={f.setOffset}/>
       {writable&&(selectAll||selected.length>0)&&<fieldset disabled={mutation.isPending} className="border rounded p-3 space-y-3"><legend>Apply to selected locations</legend>
@@ -141,6 +147,10 @@ function AgencyBulkWorkspace({onOpen,compact=false}:{onOpen?:(id:number)=>void;c
         {action==='ai-replies'&&<><select className={selectClass} aria-label="AI reply mode" value={aiMode} onChange={e=>setAiMode(e.target.value)}><option value="off">Off</option><option value="draft">Draft for approval</option><option value="auto">Auto-publish future 3–5 star replies</option></select><Input aria-label="Reply tone" value={tone} onChange={e=>setTone(e.target.value)}/><Input aria-label="Reply sign-off" placeholder="Sign-off" value={signOff} onChange={e=>setSignOff(e.target.value)}/><p className="text-sm">Applies to future reviews. Low ratings stay drafts. Choosing auto-publish explicitly authorizes future publication.</p></>}
         {action==='content'&&<><select className={selectClass} aria-label="Content kind" value={kind} onChange={e=>setKind(e.target.value)}><option value="post">Post</option><option value="photo">Photo batch</option></select><Textarea aria-label="Approved content" placeholder="Write or paste text for review. This stays a draft until you queue it." value={text} onChange={e=>setText(e.target.value)}/><Input aria-label="Media photo IDs" placeholder="Media library photo IDs, comma separated" value={photoIds} onChange={e=>setPhotoIds(e.target.value)}/><Input aria-label="Batch start time" type="datetime-local" value={start} onChange={e=>setStart(e.target.value)}/><p className="text-sm">Queueing approves this content for every selected location. Photos must belong to the agency. Publishing uses the existing content queue and daily budget.</p></>}
         {action==='unlink'&&<p>Unlink removes synced Google data in ConstructHUB and stops syncing. It does not remove the listing from Google.</p>}
+        {(action==='sync'||action==='link')&&notLinkedSelected>0&&<p role="alert" className="text-sm" data-testid="bulk-not-linked-notice">
+          {notLinkedSelected===1&&selected.length===1?'This location':`${notLinkedSelected} of the selected locations`} {notLinkedSelected===1&&selected.length===1?'is':'are'} not linked to Google, so {action==='sync'?'Sync now':'Link & sync'} will fail for {notLinkedSelected===1&&selected.length===1?'it':'them'}.{' '}
+          {(linkage?.accounts??[]).length===0?<>Connect the Google account that owns the listing first: <a href="/api/gbp/connect" className="text-primary underline">Connect Google Business Profile</a>.</>:'Connect the Google login that manages those listings, then use Link & sync.'}
+        </p>}
         <Button variant="outline" disabled={(!selectAll&&!selected.length)||mutation.isPending} onClick={()=>mutation.mutate()}>{action==='content'?'Approve & queue batch':'Queue selected action'}</Button>
       </fieldset>}
     </>}

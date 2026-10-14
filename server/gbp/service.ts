@@ -113,6 +113,8 @@ export function mapReview(r: any, parent: string) {
 export const PERFORMANCE_HISTORY_DAYS = 540;
 export async function syncLocation(userId: number, id: number, client?: GoogleClient) {
   const l = await ownedLocation(userId,id);
+  // A location nobody has linked has no Google listing to read; say so instead of asking Google for "/v1/null".
+  if (!l.gbp_location_name) throw new GoogleError('invalid','This location is not linked to Google yet. Connect the Google account that owns the listing, then use Link & sync.',409);
   const subject = l.gbp_google_subject ?? await soleSubject(userId);
   client ??= clientFor(userId, subject);
   return withLocationLock(id, async c => {

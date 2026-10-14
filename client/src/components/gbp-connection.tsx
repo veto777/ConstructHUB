@@ -4,6 +4,7 @@ import { apiRequest, apiErrorMessage, queryClient } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
+import { BrandIcon } from '@/components/brand-icon';
 
 type Linkage = {
   accounts: { subject: string; email: string; connected: boolean; reconnectRequired: boolean }[];
@@ -81,10 +82,15 @@ export function GbpLinkCell({ locationId }: { locationId: number }) {
     <p className="text-xs text-muted-foreground truncate max-w-[220px]">Managed by {row.accountEmail}</p>
     <Button size="sm" variant="outline" className="min-h-10 text-xs" disabled={link.isPending} onClick={(e) => { stop(e); link.mutate([row.listing!]); }} data-testid={`button-link-gbp-${locationId}`}>Link &amp; sync</Button>
   </div>;
+  // No Google account connected at all: the one next step is the connect button, right here on the row
+  // (owner 2026-10-14: "fix this i cant sync it" — the only way in was a card further down the page).
+  const noAccount = (data?.accounts ?? []).length === 0;
   return <div className="space-y-1" data-testid={`gbp-link-${locationId}`}>
     <Badge variant="outline" className="text-[10px]">Not linked</Badge>
-    <p className="text-xs text-muted-foreground max-w-[220px]">Not managed by a connected Google account.</p>
-    <a href="/api/gbp/connect" onClick={stop} className="text-xs text-primary underline">Connect its Google account</a>
+    <p className="text-xs text-muted-foreground max-w-[220px]">{noAccount ? 'Connect the Google account that owns this listing, then link it.' : 'Not managed by a connected Google account.'}</p>
+    <Button asChild size="sm" variant={noAccount ? 'default' : 'outline'} className="min-h-10 text-xs" data-testid={`button-connect-gbp-${locationId}`}>
+      <a href="/api/gbp/connect" onClick={stop}><BrandIcon brand="google" className="h-3.5 w-3.5" />{noAccount ? 'Connect Google Business Profile' : 'Connect its Google account'}</a>
+    </Button>
   </div>;
 }
 
