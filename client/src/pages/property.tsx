@@ -1,7 +1,8 @@
 import { PlanRequired, planRequiredFrom } from "@/components/plan-required";
 import { planNamesWhere } from "@shared/plan-copy";
-import { propertyCheckedNotice, propertyJurisdictionLabel, propertyOfficeForDisplay, resolvePropertyScope } from "./property-display";
-import { governmentLinksAvailable, isChallengeUrl } from "@shared/government-links";
+import { propertyJurisdictionLabel, propertyOfficeForDisplay, resolvePropertyScope } from "./property-display";
+import { PropertyOfficeRow, type PropertyAppraiser } from "@/components/property-office-row";
+import { PropertyMap } from "@/components/property-map";
 import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { readQueryInt, readQueryParam, replaceQueryParams } from "@/lib/url-query";
@@ -14,33 +15,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AppPage, Toolbar, EmptyState, Notice } from "@/components/app-ui";
-import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
-import {
-  Building,
-  Search,
-  ExternalLink,
-  Phone,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
-import type { County } from "@shared/schema";
-
-interface PropertyAppraiser {
-  id: number;
-  name: string;
-  countyId: number;
-  portalUrl: string | null;
-  searchUrl: string | null;
-  platform: string | null;
-  linkStatus: string | null;
-  lastVerifiedAt?: string | null;
-  phone: string | null;
-  address: string | null;
-  searchableFields: string[] | null;
-  isActive: boolean;
-  notes: string | null;
-  county?: County;
-}
+import { GoogleSectionHeader, GoogleList } from "@/components/google";
+import { Building, ChevronLeft, ChevronRight } from "lucide-react";
 
 export default function PropertyPage() {
   const { data: rawAppraisers, isLoading, error, refetch } = useQuery<PropertyAppraiser[]>({
@@ -147,6 +123,23 @@ export default function PropertyPage() {
     setPage(1);
   };
 
+  const scrollToList = () => requestAnimationFrame(() =>
+    document.querySelector('[data-testid="text-result-count"]')?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  const showCountyInList = (countyId: number, stateCode: string) => {
+    setScopeNotice("");
+    setSearchQuery("");
+    setStateFilter(stateCode);
+    setCountyFilter(String(countyId));
+    setPage(1);
+    scrollToList();
+  };
+  const showStateInList = (stateCode: string) => {
+    setScopeNotice("");
+    setSearchQuery("");
+    handleStateChange(stateCode);
+    scrollToList();
+  };
+
   const handleCountyChange = (val: string) => {
     setCountyFilter(val);
     setPage(1);
@@ -180,6 +173,12 @@ export default function PropertyPage() {
         description={`Find assessor and appraiser offices. Their own sites hold ownership, values, construction history and tax records where published. Included with ${planNamesWhere(p => p.modules.propertyRecords)}.`}
         flush
       />
+
+      {/* County map (owner, 2026-10-14): each county shaded by what the list holds for it; a click shows
+          the same office row the list shows and can filter the list to that county. */}
+      {appraisers && appraisers.length > 0 && (
+        <PropertyMap offices={appraisers} onShowCounty={showCountyInList} onShowState={showStateInList} />
+      )}
 
       {page > totalPages && totalPages > 0 && <Notice tone="info">That page is no longer available. Showing the last available page.</Notice>}
       {scopeNotice && <Notice tone="info">{scopeNotice}</Notice>}
@@ -246,55 +245,7 @@ export default function PropertyPage() {
               : `${filtered.length} office${filtered.length !== 1 ? "s" : ""}`}
           </p>
           <GoogleList testId="list-appraisers">
-            {paginated.map((appraiser) => {
-              const portalChallenge = isChallengeUrl(appraiser.portalUrl);
-              const searchChallenge = isChallengeUrl(appraiser.searchUrl);
-              const challenge = portalChallenge || searchChallenge;
-              const linksOk = governmentLinksAvailable(appraiser);
-              const notice = challenge ? "The recorded link leads to a bot challenge. Find the official office below." : linksOk ? propertyCheckedNotice(appraiser) : null;
-              // No usable official link on record: an honest web search, never a fabricated portal.
-              const fallback = appraiser.linkStatus === "unconfirmed" || !linksOk || (!appraiser.portalUrl && !appraiser.searchUrl);
-              return (
-                <GoogleListRow
-                  key={appraiser.id}
-                  testId={`card-appraiser-${appraiser.id}`}
-                  title={appraiser.name}
-                  meta={[
-                    appraiser.county ? `${propertyJurisdictionLabel(appraiser.county)}, ${appraiser.county.state}` : null,
-                    appraiser.address,
-                  ]}
-                  line={notice || appraiser.notes ? (
-                    <>
-                      {notice && <span>{notice}</span>}
-                      {notice && appraiser.notes && <span aria-hidden="true"> · </span>}
-                      {appraiser.notes && <span>{appraiser.notes}</span>}
-                    </>
-                  ) : undefined}
-                  actions={<>
-                    {linksOk && appraiser.portalUrl && !portalChallenge && (
-                      <GooglePill icon={ExternalLink} label={appraiser.linkStatus === "unconfirmed" ? "Open unconfirmed site" : "Open portal"} href={appraiser.portalUrl} external testId={`button-visit-appraiser-${appraiser.id}`} />
-                    )}
-                    {linksOk && appraiser.searchUrl && !searchChallenge && appraiser.searchUrl !== appraiser.portalUrl && (
-                      <GooglePill icon={Search} label={appraiser.linkStatus === "unconfirmed" ? "Search unconfirmed site" : "Search records"} href={appraiser.searchUrl} external testId={`button-search-appraiser-${appraiser.id}`} />
-                    )}
-                    {fallback && (
-                      <GooglePill
-                        icon={Search}
-                        variant={challenge ? "solid" : "quiet"}
-                        label="Find property records"
-                        external
-                        testId={`link-appraiser-fallback-${appraiser.id}`}
-                        title="Find the official property records office through a web search"
-                        href={`https://www.google.com/search?q=${encodeURIComponent(`${appraiser.county?.name || appraiser.name} ${appraiser.county?.stateCode || ""} assessor property records`)}`}
-                      />
-                    )}
-                    {appraiser.phone && (
-                      <GooglePill icon={Phone} label="Call" href={`tel:${appraiser.phone.replace(/[^\d+]/g, "")}`} title={appraiser.phone} testId={`link-phone-${appraiser.id}`} />
-                    )}
-                  </>}
-                />
-              );
-            })}
+            {paginated.map((appraiser) => <PropertyOfficeRow key={appraiser.id} appraiser={appraiser} />)}
           </GoogleList>
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-3 py-4" data-testid="pagination">

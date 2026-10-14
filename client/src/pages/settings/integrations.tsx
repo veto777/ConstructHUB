@@ -1,6 +1,7 @@
 import { ExternalLink, Plug } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { GoogleList, GoogleListRow, GooglePill } from "@/components/google";
+import { BrandIcon } from "@/components/brand-icon";
 import { apiErrorMessage } from "@/lib/queryClient";
 import { LoadingCard, useOptionalQuery } from "./shared";
 import type { SettingsSectionProps } from "./types";
@@ -21,16 +22,24 @@ const STATUS: Record<IntegrationStatus, { label: string; className: string }> = 
 };
 
 /** Where each connection is managed when the status endpoint isn't on this server yet (routes in App.tsx). */
-const MANAGE_PAGES: { service: string; href: string }[] = [
-  { service: "Google Business Profile", href: "/locations" },
-  { service: "Cloudflare", href: "/cloudflare" },
-  { service: "Google Search Console", href: "/search-console" },
-  { service: "Google Ads & Local Services Ads", href: "/ads-manager" },
-  { service: "Gmail (mail alerts)", href: "/mail-alerts" },
+const MANAGE_PAGES: { service: string; href: string; brand?: string }[] = [
+  { service: "Google Business Profile", href: "/locations", brand: "google_business" },
+  { service: "Cloudflare", href: "/cloudflare", brand: "cloudflare" },
+  { service: "Google Search Console", href: "/search-console", brand: "search_console" },
+  { service: "Google Ads & Local Services Ads", href: "/ads-manager", brand: "google_ads" },
+  { service: "Gmail (mail alerts)", href: "/mail-alerts", brand: "google" },
   { service: "Domain registrar", href: "/domains" },
   { service: "HOVER & lead capture (CRM)", href: "/crm/integrations" },
-  { service: "Stripe payments (CRM)", href: "/crm/payments" },
+  { service: "Stripe payments (CRM)", href: "/crm/payments", brand: "stripe" },
 ];
+/** The logo for a connection the status service names ("Google Ads", "Stripe", "Cloudflare", "YouTube"…). */
+const brandOf = (service: string): string | null => {
+  const s = service.toLowerCase();
+  for (const [needle, brand] of [["cloudflare", "cloudflare"], ["search console", "search_console"], ["google ads", "google_ads"], ["local services", "google_ads"], ["analytics", "google_analytics"],
+    ["business profile", "google_business"], ["gmail", "google"], ["google", "google"], ["stripe", "stripe"], ["yelp", "yelp"], ["youtube", "youtube"], ["quickbooks", "quickbooks"], ["zapier", "zapier"],
+    ["facebook", "facebook"], ["instagram", "instagram"], ["tiktok", "tiktok"], ["pinterest", "pinterest"], ["linkedin", "linkedin"]] as const) if (s.includes(needle)) return brand;
+  return null;
+};
 
 function ManageLink({ href, label, testId }: { href: string; label: string; testId: string }) {
   if (/^https?:\/\//i.test(href)) {
@@ -66,7 +75,7 @@ export function IntegrationsSection(_props: SettingsSectionProps) {
           </p>
           <GoogleList as="ul">
             {MANAGE_PAGES.map((p) => (
-              <GoogleListRow as="li" size="md" key={p.href} testId="row-integration-page" title={p.service}
+              <GoogleListRow as="li" size="md" key={p.href} testId="row-integration-page" title={p.service} leading={p.brand ? <BrandIcon brand={p.brand} className="h-5 w-5" /> : undefined}
                 trailing={<ManageLink href={p.href} label="Open" testId={`link-integration-page-${p.href.replace(/[^a-z]+/gi, "-").replace(/^-|-$/g, "")}`} />} />
             ))}
           </GoogleList>
@@ -98,6 +107,7 @@ export function IntegrationsSection(_props: SettingsSectionProps) {
                     key={item.id}
                     testId={`row-integration-${item.id}`}
                     title={<span data-testid={`text-integration-service-${item.id}`}>{item.service}</span>}
+                    leading={brandOf(item.service) ? <BrandIcon brand={brandOf(item.service)!} className="h-5 w-5" /> : undefined}
                     meta={[
                       <span key="s" className={status.className} data-testid={`badge-integration-status-${item.id}`}>{status.label}</span>,
                       item.detail ? <span key="d" data-testid={`text-integration-detail-${item.id}`}>{item.detail}</span> : null,

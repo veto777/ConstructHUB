@@ -3,7 +3,8 @@
  * Site Scan, Search Console and Cloudflare share the rail — all three are about the client's website — and each
  * one's views are its sub-menu. Every view is a named route of App.tsx; the chosen ?site= carries along.
  */
-import { Cloud, ScanSearch, SearchCheck } from "lucide-react";
+import { ScanSearch } from "lucide-react";
+import { brandIcon } from "@/components/brand-icon";
 import type { ToolNavCtx, ToolShellConfig, ToolSubItem } from "@/components/tool/shell";
 import { viewHref } from "@/hooks/use-tool-view";
 
@@ -25,9 +26,9 @@ export function websiteNav(): ToolShellConfig {
     tools: [
       { key: "site-scan", label: "Site Scan", icon: ScanSearch, path: "/site-scan", paths: paths("/site-scan", SITE_SCAN_VIEWS), to: () => "/site-scan",
         groups: [{ key: "views", items: items("/site-scan", SITE_SCAN_VIEWS, { scan: "New scan", history: "Scan history" }, []) }] },
-      { key: "search-console", label: "Search Console", rail: "Search Console", icon: SearchCheck, path: "/search-console", paths: paths("/search-console", SEARCH_CONSOLE_VIEWS), to: () => "/search-console",
+      { key: "search-console", label: "Search Console", rail: "Search Console", icon: brandIcon("search_console"), path: "/search-console", paths: paths("/search-console", SEARCH_CONSOLE_VIEWS), to: () => "/search-console",
         groups: [{ key: "views", items: items("/search-console", SEARCH_CONSOLE_VIEWS) }] },
-      { key: "cloudflare", label: "Cloudflare", icon: Cloud, path: "/cloudflare", paths: paths("/cloudflare", CLOUDFLARE_VIEWS), to: () => "/cloudflare",
+      { key: "cloudflare", label: "Cloudflare", icon: brandIcon("cloudflare"), path: "/cloudflare", paths: paths("/cloudflare", CLOUDFLARE_VIEWS), to: () => "/cloudflare",
         groups: [{ key: "views", items: items("/cloudflare", CLOUDFLARE_VIEWS) }] },
     ],
   };

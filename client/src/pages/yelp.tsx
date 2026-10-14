@@ -4,6 +4,7 @@
  * are drafted here and posted on Yelp via a deep link.
  */
 import { useState } from "react";
+import { brandIcon } from "@/components/brand-icon";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, apiErrorMessage } from "@/lib/queryClient";
 import { AppPage, PageHeader } from "@/components/app-ui";
@@ -229,7 +230,7 @@ export default function YelpPage() {
   const list = businesses.data?.businesses ?? [];
   return (
     <AppPage testId="page-yelp">
-      <PageHeader title="Yelp" icon={Star} description="Your Yelp rating, latest reviews and trend — draft replies with AI and post them on Yelp."
+      <PageHeader title="Yelp" icon={brandIcon("yelp")} description="Your Yelp rating, latest reviews and trend — draft replies with AI and post them on Yelp."
         actions={status.data?.available && list.length > 0 && !adding ? <Button className="gap-1.5 text-white" style={{ background: YELP_RED }} onClick={() => setAdding(true)} data-testid="yelp-add"><Plus className="h-4 w-4" /> Add business</Button> : undefined} />
       {status.data && !status.data.available && <Card className="p-6 text-sm text-muted-foreground" data-testid="yelp-unavailable">Yelp isn't switched on for this workspace yet.</Card>}
       {status.data?.available && (

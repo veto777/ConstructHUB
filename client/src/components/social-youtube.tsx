@@ -12,6 +12,7 @@
  * YouTube. Every one of those states is shown as it is; an error is the server's sentence, never a guess.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import { BrandBadge } from "@/components/brand-icon";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { CheckCircle2, ExternalLink, Loader2, Trash2, Unplug, Upload } from "lucide-react";
 import { FaYoutube } from "react-icons/fa6";
@@ -212,7 +213,7 @@ export function SocialYoutube({ businessId = null }: { businessId?: number | nul
 
   const header = (actions?: React.ReactNode) => (
     <GoogleSectionHeader
-      title="YouTube"
+      title={<BrandBadge brand="youtube" label="YouTube" iconClassName="h-5 w-5" />}
       titleAfter={<HelpButton k="social-youtube" />}
       description={<>Connect your own YouTube channel and publish videos to it from here.<span className="block text-xs" data-testid="text-social-youtube-powered-by">Powered by YouTube</span></>}
       actions={actions}

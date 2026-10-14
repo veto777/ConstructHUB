@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { FaYelp } from "react-icons/fa";
+import { BrandIcon } from "@/components/brand-icon";
 import { inNativeApp } from "@/lib/app-shell";
 import { Ticket, Gift,
   Cloud, Search, Database, Clock, FileText, Building, Camera, LogIn, LogOut,
@@ -96,29 +97,9 @@ function SiteScanIcon({ className }: { className?: string }) {
   );
 }
 
-function CloudflareIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
-      <circle cx="24" cy="24" r="24" fill="#F1592F" />
-      <path d="M15 31h19.5a5.5 5.5 0 0 0 .8-10.94A8 8 0 0 0 20 19.2 6 6 0 0 0 15 31z" fill="#fff" />
-      <path d="M18 27.5h14" stroke="#3F4650" strokeWidth="2.4" strokeLinecap="round" />
-      <path d="M21 31.5h8" stroke="#3F4650" strokeWidth="2.4" strokeLinecap="round" />
-    </svg>
-  );
-}
+const CloudflareIcon = ({ className }: { className?: string }) => <BrandIcon brand="cloudflare" className={className ?? "h-5 w-5"} />;
 
-function SearchConsoleIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
-      <circle cx="24" cy="24" r="24" fill="#F1592F" />
-      <rect x="11" y="24" width="4.5" height="10" rx="1.2" fill="#fff" />
-      <rect x="18" y="18" width="4.5" height="16" rx="1.2" fill="#fff" />
-      <rect x="25" y="13" width="4.5" height="21" rx="1.2" fill="#fff" />
-      <circle cx="31" cy="27" r="5.2" fill="#fff" stroke="#3F4650" strokeWidth="2.4" />
-      <path d="M34.8 30.8l4.2 4.2" stroke="#3F4650" strokeWidth="3" strokeLinecap="round" />
-    </svg>
-  );
-}
+const SearchConsoleIcon = ({ className }: { className?: string }) => <BrandIcon brand="search_console" className={className ?? "h-5 w-5"} />;
 
 function GoogleGIcon({ className }: { className?: string }) {
   return (
