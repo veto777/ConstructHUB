@@ -261,6 +261,27 @@
   "checkedAt": "2026-10-13T23:58:19.782Z"
  },
  {
+  "name": "Marion Economic Development Corporation (MEDCO) Business Directory",
+  "domain": "medcoiowa.org",
+  "category": "contractor",
+  "trades": null,
+  "states": [
+   "IA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.medcoiowa.org/business-directory/",
+  "joinUrl": null,
+  "evidence": "'Business Directory - Marion Economic Development Corporation': 'MEDCO is supported by over 190 businesses in the Iowa City Cedar Rapids Corridor (ICR)... Please support these businesses with your next project.' Industry filter includes Construction Services; entries show company, industry and investment level (Silver/Bronze Investor)",
+  "notes": "Marion IA (Linn County, Cedar Rapids metro); EDC investor directory; businesses listed by investing (paid)",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "MidTen Home Pros",
   "domain": "midtenhomepros.com",
   "category": "contractor",
@@ -404,6 +425,27 @@
   "foundBy": "state-04",
   "linkStatus": "verified",
   "checkedAt": "2026-10-13T23:58:19.782Z"
+ },
+ {
+  "name": "Shaw Local / Kankakee County Daily Journal Local Business Directory",
+  "domain": "daily-journal.com",
+  "category": "contractor",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": null,
+  "directoryUrl": "https://local.shawlocal.daily-journal.com/categories/construction",
+  "joinUrl": null,
+  "evidence": "Construction in Kankakee - Kankakee County Daily Journal ... Roofing Contractor Langlois Roofing 1850 Grinnell Rd, Kankakee, IL 60901 ... Glade Plumbing & Piping Company 211 W Water St, Kankakee, IL 60901 - Mechanical Contractor",
+  "notes": "Kankakee County, IL. 'Shop Local'-style regional directory from Shaw Local media; browsable by category (Construction, House & Home, etc.). No public submission/claim page found - listings appear data-fed; join model unverified.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "South Florida Contractors",
@@ -881,6 +923,27 @@
   "checkedAt": "2026-10-13T23:58:19.782Z"
  },
  {
+  "name": "Business Brownsburg Business Directory (Discover Brownsburg)",
+  "domain": "discoverbrownsburg.org",
+  "category": "general",
+  "trades": null,
+  "states": [
+   "IN"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": null,
+  "directoryUrl": "https://discoverbrownsburg.org/discover/business-brownsburg-business-directory/",
+  "joinUrl": null,
+  "evidence": "'Business Brownsburg Business Directory' under 'Shop Local' with categories Food & Drink (31), Services (26), Shopping (17); lists 'Big Sky Roofing ... (317) 296-3255 ... 311 E Main St Suite C, Brownsburg, IN 46112' and \"Ben's Garage ... 9195 US Hwy 136, Brownsburg, IN 46112\"",
+  "notes": "Brownsburg, IN (Hendricks County) — town economic-development 'Shop Local' business directory; lists contractors.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Business Council of New York State",
   "domain": "bcnys.org",
   "category": "general",
@@ -1048,6 +1111,27 @@
   "foundBy": "city-01",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T01:39:30.535Z"
+ },
+ {
+  "name": "City of Huntingburg IN — Business Directory",
+  "domain": "huntingburg-in.gov",
+  "category": "general",
+  "trades": null,
+  "states": [
+   "IN"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": null,
+  "directoryUrl": "https://www.huntingburg-in.gov/egov/apps/business/directory.egov?view=group;group=type",
+  "joinUrl": "https://www.huntingburg-in.gov/egov/apps/business/directory.egov",
+  "evidence": "'Business Directory / Businesses by Name / Huntingburg, Indiana' with Browse All / By Type / By Name; 'Construction & Maintenance' category lists 'Blitz Building Inc', 'IMI-Irving Materials Inc', 'Southern Indiana Supply, Inc', \"Steinkamp's Home Center\"",
+  "notes": "Huntingburg, IN (Dubois County) — official city business directory open to local businesses.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "City of Lisbon Business Listing",
@@ -1313,6 +1397,69 @@
   "foundBy": "state-04",
   "linkStatus": "verified",
   "checkedAt": "2026-10-13T23:58:19.782Z"
+ },
+ {
+  "name": "Downtown Bloomington IL - Business Directory",
+  "domain": "downtownbloomington.org",
+  "category": "general",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": null,
+  "directoryUrl": "https://www.downtownbloomington.org/explore/business-directory",
+  "joinUrl": null,
+  "evidence": "'Business Directory | Downtown Bloomington, IL' — alphabetical A-Z browse of downtown businesses with Address/Phone/Email/Website for each, e.g. '2 FruGals Thrift 406-410 N Main St Bloomington, IL 61701 (309) 530-5592', 'A. Gridley Antiques 217 E. Front Street', category chips incl. Services; 'The energy emanating from Downtown Bloomington is generated in part by its dynamic work environment...'",
+  "notes": "Bloomington, IL (McLean County). Downtown association business directory (retrieved via FetchURL; direct curl is Akamai-blocked). Primarily retail/dining/professional services; businesses listed downtown can appear.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
+  "name": "Downtown Boise Association",
+  "domain": "downtownboise.org",
+  "category": "general",
+  "trades": null,
+  "states": [
+   "ID"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": null,
+  "directoryUrl": "https://downtownboise.org/shop/professional-services",
+  "joinUrl": "https://downtownboise.org/work/dba-membership-resources",
+  "evidence": "'Personal & Professional Services' directory with category list incl. 'Construction & Development'; category page (/shop/professional-services/construction-development) lists Capital City Development Corp (121 N 9th St), McKinstry Co. (950 W Bannock St), Ogata Construction (106 N 6th St), Okland Construction (101 S Capitol Blvd), Oppenheimer Development Corporation (877 W Main St), Retail West Properties (199 N Capitol Blvd) - public A-Z browsing, no login.",
+  "notes": "Downtown Boise business improvement district association; directory covers downtown Boise businesses by category",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
+  "name": "Downtown Wheaton Association Gift Cards - Local Business Directory",
+  "domain": "downtownwheaton.yiftee.com",
+  "category": "general",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": null,
+  "directoryUrl": "https://downtownwheaton.yiftee.com/explore-businesses",
+  "joinUrl": "https://www.visitdowntownwheaton.org/forbusiness",
+  "evidence": "'DOWNTOWN WHEATON GIFT CARDS DIRECTORY — Explore Local Businesses. Discover over 50 amazing local businesses in Wheaton — more are added every day. Browse our complete directory... Support local, build community.' Filterable by category (Eat + Drink, Shopping, Professional Services, Beauty + Hair Care, Wellness, Art + Entertainment) with search box, grid/map views: 'Showing 21 of 60 businesses' incl. home services such as 'Best Way Rug & Furniture Cleaners ... professional cleaning services'.",
+  "notes": "Wheaton, IL. 'Shop local' gift-card program (Yiftee) run with the Downtown Wheaton Association; any local business can join as a participating merchant (forbusiness page). Home-service listings are sparse but present.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "DowntownME.com (Maine Business Search Engine)",
@@ -2439,6 +2586,27 @@
   "foundBy": "state-07",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T00:35:08.605Z"
+ },
+ {
+  "name": "Shop Local with The Idaho State Journal",
+  "domain": "shoplocal.idahostatejournal.com",
+  "category": "general",
+  "trades": null,
+  "states": [
+   "ID"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": null,
+  "directoryUrl": "https://shoplocal.idahostatejournal.com/",
+  "joinUrl": null,
+  "evidence": "'Shop Local with The Idaho State Journal' with category browse (Services, etc.) and city filters for Ammon, Blackfoot, Idaho Falls, Pocatello, Twin Falls, etc.; public business pages incl. 'Vogts Heating & Air, Pocatello, ID' and B&G Plumbing Heating",
+  "notes": "SE Idaho 'shop local' business-directory platform run by the Idaho State Journal newspaper; covers a handful of out-of-state cities (Tampa, West Des Moines) but primarily SE Idaho",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Smithfield Local",
@@ -7369,6 +7537,27 @@
   "checkedAt": "2026-10-14T02:00:03.606Z"
  },
  {
+  "name": "Ankeny Area Chamber of Commerce",
+  "domain": "ankeny.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://web.ankeny.org/directory/",
+  "joinUrl": "https://www.ankeny.org/chamber-membership/",
+  "evidence": "Official 'Member Directory' (ankeny.org, Updated September 2025, PDF opened) has 'Construction/Contractor' section listing 1 Tom Plumber, 8x8 Electrical Contracting, Accurate Commercial & Residential Construction, All Iowa Roofing, Baker Electric, Heartland Roofing, Siding, and Solar",
+  "notes": "Ankeny IA (north Des Moines metro); online directory at web.ankeny.org/directory (ChamberMaster Atlas, JS-rendered); printable member directory PDF verified with construction/contractor section",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Ann Arbor/Ypsilanti Regional Chamber",
   "domain": "a2ychamber.org",
   "category": "state_local",
@@ -7497,6 +7686,27 @@
   "checkedAt": "2026-10-13T23:58:19.782Z"
  },
  {
+  "name": "Arlington Heights Chamber of Commerce Business Directory",
+  "domain": "arlingtonhcc.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.arlingtonhcc.com/list",
+  "joinUrl": "https://arlingtonhcc.com/join/",
+  "evidence": "Results Found: 1 ... Marc Poulos Painting & Decorating 33 N Hickory Arlington Heights IL 60004 (847) 483-9094 (business.arlingtonhcc.com/list/category/painters-448)",
+  "notes": "Arlington Heights, IL (NW suburb of Chicago).",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Ascension Chamber of Commerce",
   "domain": "ascensionchamber.com",
   "category": "state_local",
@@ -7558,6 +7768,27 @@
   "foundBy": "city-08",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T02:00:03.606Z"
+ },
+ {
+  "name": "Aspire Economic Development + Chamber Alliance (Johnson County)",
+  "domain": "aspirejohnsoncounty.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IN"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://web.aspirejohnsoncounty.com/2018/search",
+  "joinUrl": "https://www.aspirejohnsoncounty.com/join",
+  "evidence": "'Johnson County and Southern Indy Business Directory' (ChamberMaster) with Show All Categories / Advanced Search; Heating & Air Conditioning category lists members with addresses/phones e.g. '3604 South US Highway 31 Franklin, IN 46131 (317) 738-5940 Member Since: 2023'; categories incl. Plumbing, Piping Contractor",
+  "notes": "Greenwood / Johnson County (merged Greenwood Chamber + Johnson County Development Corp, 2019). ChamberMaster public directory.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Athens Area Chamber of Commerce Member Directory",
@@ -8744,6 +8975,27 @@
   "checkedAt": "2026-10-14T02:00:03.606Z"
  },
  {
+  "name": "Caldwell Chamber of Commerce",
+  "domain": "caldwellchamber.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "ID"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.caldwellchamber.org/list",
+  "joinUrl": "https://www.caldwellchamber.org/membership/",
+  "evidence": "'Active Member Directory'; A-Z 'B' results (28) include 'Beacon Plumbing & Mechanical Inc (208) 593-3268'",
+  "notes": "Caldwell (Canyon County); GrowthZone directory",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "California Contractors State License Board (CSLB) — Find a Licensed Contractor / License Check",
   "domain": "cslb.ca.gov",
   "category": "state_local",
@@ -9374,6 +9626,27 @@
   "checkedAt": "2026-10-14T00:35:08.605Z"
  },
  {
+  "name": "Champaign County Chamber of Commerce Directory",
+  "domain": "champaigncounty.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.champaigncounty.org/list/",
+  "joinUrl": "https://business.champaigncounty.org/member/newmemberapp/",
+  "evidence": "Results Found: 2 ... Mid Illinois Concrete & Excavation, Inc. 1212 E. University Ave.,Ste. C Urbana IL 61802-2011 (business.champaigncounty.org/list/category/concrete-contractors-155)",
+  "notes": "Champaign-Urbana, IL (Champaign County). Categories include concrete contractors, contractors equip/supplies, electric companies.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Chandler Chamber of Commerce",
   "domain": "chandlerchamber.com",
   "category": "state_local",
@@ -9393,6 +9666,27 @@
   "foundBy": "city-01",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T01:39:30.535Z"
+ },
+ {
+  "name": "Charles City Area Economic Development (membership directory)",
+  "domain": "charlescityia.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.charlescityia.com/membership",
+  "joinUrl": null,
+  "evidence": "'Membership Directory' lists member investors incl. Cedar Hearth / Mick Gage Plumbing and Heating, Inc., Henkel Construction Company, Laube's Backhoe and Hauling LLC, Perry Novak Electric Inc., Point Builders, Woodruff Construction (Charles City area)",
+  "notes": "Charles City IA (Floyd County); EDC membership/investor directory with public business list",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Charles River Regional Chamber",
@@ -9435,6 +9729,27 @@
   "foundBy": "state-10",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T00:35:08.605Z"
+ },
+ {
+  "name": "Charleston Area Chamber of Commerce Directory (IL)",
+  "domain": "charlestonchamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.charlestonchamber.com/directory/",
+  "joinUrl": "https://business.charlestonchamber.com/applicationtojoin",
+  "evidence": "Results: 6 ... Bloomfield Garden Center 312 North Logan , Mattoon , IL 61938 ... Home & Garden (business.charlestonchamber.com/directory/Search/home-garden-439677)",
+  "notes": "Charleston, IL (Coles County; serves Charleston-Mattoon area). Categories include construction-equipment-contractors, home-garden.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Charleston Metro Chamber",
@@ -9540,6 +9855,27 @@
   "foundBy": "state-03",
   "linkStatus": "verified",
   "checkedAt": "2026-10-13T23:58:19.782Z"
+ },
+ {
+  "name": "Chinese Chamber of Commerce of Hawaii",
+  "domain": "chinesechamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "HI"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.chinesechamber.com/member-directory",
+  "joinUrl": "https://business.chinesechamber.com/member-application",
+  "evidence": "'Active Member Directory - Directory of Our Valued Members' with categories 'Building Materials & Real Estate Development', 'Construction', 'Construction Management', 'Electrical Engineering', 'Civil Engineering'",
+  "notes": "Honolulu / Chinatown; GrowthZone directory with online member application",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Christian County Chamber of Commerce (Hopkinsville)",
@@ -9748,6 +10084,33 @@
   "checkedAt": "2026-10-14T01:39:30.535Z"
  },
  {
+  "name": "City of Chicago Licensed Trade Contractors Lookup",
+  "domain": "webapps1.chicago.gov",
+  "category": "state_local",
+  "trades": [
+   "electrical",
+   "elevator",
+   "general_contracting",
+   "masonry",
+   "plumbing"
+  ],
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://webapps1.chicago.gov/licensedcontractors/",
+  "joinUrl": "https://www.chicago.gov/city/en/depts/bldgs/supp_info/TLdetails/GC.html",
+  "evidence": "Using this site, you can find currently licensed contractors and contractors with recently expired or inactivated licenses. ... General Contractors (Active) - License Type / License Number / Name / Address / Phone columns; data endpoint returned 11,649 active general contractor records (e.g., \"D\" CONSTRUCTION, INC, COAL CITY, IL, lic TGC04300)",
+  "notes": "City of Chicago, IL. Public lookup of City-licensed general, electrical, mason, plumbing and elevator contractors. Business appears automatically once licensed by the City; categories Electrical/Elevator/General/Mason/Plumbing.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "City of Columbus Licensed and Registered Contractor Search",
   "domain": "columbus.gov",
   "category": "state_local",
@@ -9790,6 +10153,27 @@
   "checkedAt": "2026-10-14T03:16:56.857Z"
  },
  {
+  "name": "City of Evanston IL - Search for a Registered Contractor",
+  "domain": "aca-prod.accela.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://aca-prod.accela.com/EVANSTON/GeneralProperty/PropertyLookUp.aspx?isLicensee=Y&TabName=APO",
+  "joinUrl": "https://www.cityofevanston.org/departments/community_development/building_development_services/building_permits/contractor_registration.php",
+  "evidence": "Page heading 'Search for a Registered Contractor' (Accela Citizen Access portal for City of Evanston): 'Please use one of the main three methods to search for a contractor registration number... Company Name - Enter a partial company name using the wildcard symbol (%)... Last Name - Enter the last name of the licensee and click the search button.' Portal banner: 'Building contractors must register using Bldg Permits/Contractor Reg — not Business Licenses.'",
+  "notes": "Evanston, IL (Cook County). Public license-lookup form (license number / business name / last name) for building contractor registrations; search UI verified live but results require ASP.NET postback (could not enumerate individual records in curl). City contractor-registration page confirms contractors register with the City to pull permits.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "City of Framingham Licensed Drainlayers",
   "domain": "framinghamma.gov",
   "category": "state_local",
@@ -9813,6 +10197,27 @@
   "foundBy": "city-05",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T01:39:30.535Z"
+ },
+ {
+  "name": "City of Goshen IN - Public Permit & License Search",
+  "domain": "cityportal.goshencity.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IN"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://cityportal.goshencity.com/Search.aspx",
+  "joinUrl": "https://cityportal.goshencity.com/",
+  "evidence": "Public search page ('This site allows you to search permit data on-line') with record-type tabs 'Permit | License | Project | Violation' and sort by Person/Business; portal Help page: 'What can I search for in the basic search box? ... Licensed contractor name. License holder name.' Portal also offers 'Contractor Status — Check your current contractor status' and online license application/renewal; Goshen Common Council passed 'Ordinance 5258, Electrical and Mechanical Contractors Licensing and Registration' (June 2026).",
+  "notes": "Goshen, IN (Elkhart County). City licenses/permits portal (cityportal.goshencity.com) with public license-record search by contractor name; actual result rows not enumerable via curl (JS/POST), so evidence is the public search UI + documented search fields.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "City of Grandview Registered Contractors",
@@ -9862,6 +10267,48 @@
   "foundBy": "city-07",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T01:39:30.535Z"
+ },
+ {
+  "name": "City of Hammond IN - Licensed Contractors",
+  "domain": "gohammond.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IN"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.gohammond.com/departments/inspections-department/building-division/licensed-contractors/",
+  "joinUrl": "https://www.gohammond.com/document/building_contractor_application/",
+  "evidence": "Live HTML table 'Licensed Contractors — NAME / PHONE / TYPE' on the City of Hammond Building Division page, e.g. '21ST CENTURY CONTRACTORS, INC 708-362-2673 EXTERIOR REMODELING; 360 DEGREE CONSTRUCTION LLC 219-310-0290 ASPHALT PAVING; 3B'S CONTRACTING 219-427-2774 ELECTRICAL / RESIDENTIAL GENERAL / HVAC; 3C PRICE INC 773-406-4004 ELECTRICAL; 4 COMFORT HEATING AND COOLING 773-543-2919 HVAC'. Building Division page: 'Any contractor, sub-contractor, or specialty contractor working within the city limits must [register]'.",
+  "notes": "Hammond, IN (Lake County). City licenses contractors by trade (electrical, HVAC, residential general, roofing, etc.) and publishes the full licensed-contractor roster as a searchable web page.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
+  "name": "City of Idaho Falls - Municipal Code Title 4 Ch. 7 Building Contractors",
+  "domain": "idahofallsidaho.gov",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "ID"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.idahofallsidaho.gov/DocumentCenter/View/172/Title-4---Business-Regulations-PDF",
+  "joinUrl": "https://www.idahofallsidaho.gov/380/Business-Licenses",
+  "evidence": "City Code 'CHAPTER 7 BUILDING CONTRACTORS' sections '4-7-3: LICENSE REQUIRED; Exceptions', '4-7-5: CONTRACTORS REGISTRATION', '4-7-7: LICENSES AUTHORIZED'; defines BUILDING CONTRACTOR as 'any person or firm that undertakes to construct, alter, repair, or demolish any structure'",
+  "notes": "Idaho Falls; city code requires building contractor licensing/registration (verify current status vs. Idaho's 2024 statewide GC registration before pitching); businesses appear once licensed",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "City of Jamestown Licensed Contractors",
@@ -9927,6 +10374,27 @@
   "checkedAt": "2026-10-14T03:16:56.857Z"
  },
  {
+  "name": "City of Lewiston - Business Licensing",
+  "domain": "cityoflewiston.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "ID"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.cityoflewiston.org/255/Business-Licensing",
+  "joinUrl": "https://www.cityoflewiston.org/255/Business-Licensing",
+  "evidence": "'A business license is required when: ... Selling or performing any services ...'; page links 'Search for an Active City Business License' to the GovWell public-records portal (app.govwell.com/lewiston/public-records)",
+  "notes": "Lewiston (Nez Perce County); public license lookup runs on external GovWell portal linked from the .gov page",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "City of Manhattan KS Licensed Contractor Lookup",
   "domain": "cityofmhkdata.com",
   "category": "state_local",
@@ -9946,6 +10414,27 @@
   "foundBy": "city-04",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T03:16:56.857Z"
+ },
+ {
+  "name": "City of McCall - Business License (incl. general contractors)",
+  "domain": "mccall.id.us",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "ID"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://mccall.id.us/195/Licenses-Permits-Forms",
+  "joinUrl": "https://mccall.id.us/195/Licenses-Permits-Forms",
+  "evidence": "'A business license is required by law of any commercial or home based business with a physical location inside the city limits and anyone acting as a general contractor, offering snow removal services or taxi services within city limits.' New application $140, renewal $70/year",
+  "notes": "McCall; online business license application/renewal forms; businesses appear once licensed",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "City of Minneapolis Licensed Mechanical and Heating Contractors",
@@ -10013,6 +10502,48 @@
   "foundBy": "city-04",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T03:16:56.857Z"
+ },
+ {
+  "name": "City of Pocatello - Contractor Licenses",
+  "domain": "pocatello.gov",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "ID"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://pocatello.gov/166/Contractor-Licenses",
+  "joinUrl": "https://pocatello.gov/166/Contractor-Licenses",
+  "evidence": "'The City of Pocatello offers various contractor licenses as listed below' - Building Class A-1 $150, Building Class A-2 $100, Building Class B $50, Sign Contractor, Electrical/Mechanical/Plumbing Contractor (requires State of Idaho license); 'To apply for a contactor license, please submit a Contractor License Application online' (eTRAKiT portal)",
+  "notes": "Pocatello; city licenses building/sign contractors directly; businesses appear once licensed (see eTRAKiT portal)",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
+  "name": "City of Portage IN - 2026 Contractor List",
+  "domain": "portagein.gov",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IN"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.portagein.gov/158/Building-Department",
+  "joinUrl": "https://www.portagein.gov/158/Building-Department",
+  "evidence": "Building Department page: 'Contractors and sub-contractors must be licensed, bonded, and insured to work in the City of Portage' and links 'Contractor List A-Z.pdf' (/DocumentCenter/View/6950) — 25-page 'City of Portage 2026 Contractor List' with columns NAME / PHONE#: '1-800-Hansons LLC 248-633-8146; 1st Choice Fire & Water Restoration LLC 574-217-1343; 21st Century Contractors Inc. 219-865-5544; 3B's Contracting Inc. 219-427-2774; AAA Valley Fire Protection Inc...'",
+  "notes": "Portage, IN (Porter County). City licenses contractors (license numbers like CL0052-2026 per third-party records) and publishes an annual A-Z contractor list PDF.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "City of Revere Licensed Drain Layers",
@@ -10190,6 +10721,27 @@
   "checkedAt": "2026-10-14T01:39:30.535Z"
  },
  {
+  "name": "City of Waukegan Chamber of Commerce Member Directory",
+  "domain": "waukeganchamber.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.waukeganchamber.org/member-directory.html",
+  "joinUrl": "https://www.waukeganchamber.org/membership-levels.html",
+  "evidence": "Member Business Directory Search ... CONSTRUCTION, LANDSCAPING ... Heating & Plumbing Co - Jackson Kipp - 847-782-9690 - 1949 Swanson Ct, Gurnee, IL 60031 ... Rodriguez Exterminating - 847-625-9550 - Waukegan",
+  "notes": "Waukegan, IL (Lake County). Static categorized member list on chamber site; nav includes Membership Levels / Renew my Membership.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Claremore Area Chamber of Commerce",
   "domain": "claremore.org",
   "category": "state_local",
@@ -10258,6 +10810,27 @@
   "foundBy": "regional-dirs",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T03:16:56.857Z"
+ },
+ {
+  "name": "Clear Lake Area Chamber of Commerce",
+  "domain": "clearlakeiowa.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://members.clearlakeiowa.com/list/ql/construction-equipment-contractors-7",
+  "joinUrl": "https://clearlakeiowa.com/join-the-clear-lake-chamber/",
+  "evidence": "Directory categories incl. 'Construction Companies-Homebuilders, General Contractors/Dev' and 'Contractors-Electrical, Plumbing, Mechanical, Etc.'; 'Construction Equipment & Contractors... Results Found: 41' listing A-1 Roofing Services (commercial roofing, Clear Lake/north Iowa)",
+  "notes": "Clear Lake IA (Cerro Gordo County); ChamberMaster directory",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Clemson Area Chamber of Commerce",
@@ -10428,6 +11001,27 @@
   "checkedAt": "2026-10-14T02:00:03.606Z"
  },
  {
+  "name": "Coeur d'Alene Regional Chamber",
+  "domain": "cdachamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "ID"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.cdachamber.com/member-directory",
+  "joinUrl": "https://business.cdachamber.com/member/newmemberapp/",
+  "evidence": "'MEMBER DIRECTORY - Discover the businesses and organizations that make our community thrive. Explore the Coeur d'Alene Regional Chamber's Member Directory...'; A-Z 'C' results (92) include C&K Roofing and CAC Roofing, 4410 W. Industrial Loop / 418 E Lakeside Ave, Coeur d'Alene, ID",
+  "notes": "Coeur d'Alene / Kootenai County; GrowthZone directory",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Colorado DORA - Verify a Professional or Business License (Division of Professions and Occupations)",
   "domain": "colorado.gov",
   "category": "state_local",
@@ -10515,6 +11109,27 @@
   "checkedAt": "2026-10-14T02:00:03.606Z"
  },
  {
+  "name": "Columbus Area Chamber of Commerce (IN)",
+  "domain": "columbusareachamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IN"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.columbusareachamber.com/list",
+  "joinUrl": "https://business.columbusareachamber.com/member/newmemberapp",
+  "evidence": "Directory page 'Business Directory Search'; category 'Construction & Contractors' shows 'Results Found: 31' incl. 'Dunlap & Co. Inc. ... General and Mechanical Contractor ... 6325 E 100 S Columbus IN 47202-0328 (812) 376-3021' and 'Cooper Electric LLC'",
+  "notes": "Columbus, IN (Bartholomew County). GrowthZone directory; New Member Application page with investment levels.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Columbus Lowndes Chamber of Commerce",
   "domain": "clchamber.org",
   "category": "state_local",
@@ -10591,6 +11206,27 @@
   "checkedAt": "2026-10-14T03:16:56.857Z"
  },
  {
+  "name": "Cook County Registered Contractors Search",
+  "domain": "secure.cookcountyil.gov",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": true,
+  "directoryUrl": "https://secure.cookcountyil.gov/b_z/contractors_info.php",
+  "joinUrl": "https://bzpermits.cookcountyil.gov/contractor/General",
+  "evidence": "Registered Contractors Search ... The Department of Building and Zoning allows building permit applicants to view contractors who are registered to do work in unincorporated Cook County ... 288 records found - Concrete - 8PEX BUILDERS LLC 6138 W. 55TH STREET CHICAGO, IL 60638 (contractors_results.php?code=4)",
+  "notes": "Cook County, IL (unincorporated areas). Contractors register with the Dept. of Building and Zoning and appear in this public search by speciality (concrete, general, etc.); registration required prior to work, per Cook County Building Code 5.4-3.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Cookeville Putnam County Chamber of Commerce Member Directory",
   "domain": "cookevillechamber.com",
   "category": "state_local",
@@ -10659,6 +11295,27 @@
   "checkedAt": "2026-10-14T01:39:30.535Z"
  },
  {
+  "name": "Council Bluffs Area Chamber of Commerce",
+  "domain": "councilbluffsiowa.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://councilbluffsareachamberofcommerce.growthzoneapp.com/member-directory",
+  "joinUrl": "https://www.councilbluffsiowa.com/join-the-chamber/",
+  "evidence": "Member Directory category cards incl. 'Construction' with subcategory 'Construction Equipment & Contractors'; 'Construction Results: 27' listing Acreage Fences, Inc., ASC Hauling & Excavation, Alley Poyner Macchietto Architecture",
+  "notes": "Council Bluffs / Pottawattamie County (Omaha metro IA side); GrowthZone member directory",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Cranston Chamber of Commerce",
   "domain": "cranstonchamber.com",
   "category": "state_local",
@@ -10678,6 +11335,27 @@
   "foundBy": "state-08",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T00:35:08.605Z"
+ },
+ {
+  "name": "Crossroads Chamber of Commerce (Crown Point)",
+  "domain": "crossroadschamber.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IN"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://crossroadschamber.chambermaster.com/list",
+  "joinUrl": "https://crossroadschamber.chambermaster.com/member/newmemberapp/",
+  "evidence": "ChamberMaster 'Business Directory Search' nav 'Member Directory'; category Roofing shows 'Results Found: 3' incl. 'Great Lakes Roofing 1334 Field St Hammond IN 46320 (219) 808-9972' and 'Eenigenburg Exteriors Inc 13926 W 117th Ave Cedar Lake IN 46303'; trade categories Contractor, General Contractor, Plumbing, Electric Contractors",
+  "notes": "Crown Point / Hobart (Lake County) — formerly Crown Point Chamber. ChamberMaster directory; New Member Application with investment levels.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "CT DCP Verify a License Permit or Registration",
@@ -10920,6 +11598,27 @@
   "checkedAt": "2026-10-14T00:35:08.605Z"
  },
  {
+  "name": "Decatur Regional Chamber of Commerce Membership Directory",
+  "domain": "decaturchamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.decaturchamber.com/list/",
+  "joinUrl": "https://business.decaturchamber.com/member/newmemberapp",
+  "evidence": "Results Found: 36 ... Dunn Company 724 North Mercer Street Decatur IL 62522 ... AD Binder Plumbing & Heating, LLC (business.decaturchamber.com/list/ql/construction-equipment-contractors-7)",
+  "notes": "Decatur, IL (Macon County).",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Decatur-Morgan County Chamber of Commerce",
   "domain": "dcc.org",
   "category": "state_local",
@@ -11092,6 +11791,27 @@
   "checkedAt": "2026-10-14T03:16:56.857Z"
  },
  {
+  "name": "Des Plaines Chamber of Commerce & Industry Business Directory",
+  "domain": "dpchamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.dpchamber.com/list/",
+  "joinUrl": "https://business.dpchamber.com/member/newmemberapp",
+  "evidence": "Results Found: 1 ... The Missner Group 1700 W Higgins Road Suite 400 Des Plaines IL 60018 (business.dpchamber.com/list/category/contractors-general-66)",
+  "notes": "Des Plaines, IL (NW suburb of Chicago). Categories: contractors-general, contractors-specialty, construction.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Dickinson Area Chamber of Commerce (North Dakota)",
   "domain": "dickinsonchamber.org",
   "category": "state_local",
@@ -11223,6 +11943,48 @@
   "checkedAt": "2026-10-14T03:16:56.857Z"
  },
  {
+  "name": "Dubuque Area Chamber of Commerce",
+  "domain": "dubuquechamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.dubuquechamber.com/list",
+  "joinUrl": "https://www.dubuquechamber.com/membership/join-the-chamber/",
+  "evidence": "'Find a Business' member directory; browse-by-category list includes CONCRETE, CONSTRUCTION MANAGEMENT, CONTRACTORS, DRYWALL, ELECTRICAL, EXCAVATING, FIRE AND WATER RESTORATION; category page 'Construction, Equipment & Contractors QuickLink Category | Dubuque Area Chamber of Commerce'",
+  "notes": "Dubuque IA; ChamberMaster directory (member cards render via JS; category pages and dropdown browsable)",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
+  "name": "DuPage County IL - Registered Contractors List",
+  "domain": "dupagecounty.gov",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.dupagecounty.gov/government/departments/building_and_zoning/building_and_permits/contractor_registration.php",
+  "joinUrl": "https://www.dupagecounty.gov/government/departments/building_and_zoning/building_and_permits/contractor_registration.php",
+  "evidence": "'Contractor Registration Information — List of Registered Contractors (PDF) Listed by type of Contractor. Register or renew your contractor registration in our Accela Citizen Access system. All General and Sub-Contractors performing work in Unincorporated DuPage County are required to be registered with the DuPage County Building Official prior to permit issuance...' The linked Accela report (aca-prod.accela.com/DUPAGE/Report/ShowReport.aspx?module=Licenses&reportID=31886) generates an 87-page PDF 'DuPage County Registered Contractors List' with columns BUSINESS NAME / ADDRESS / CITY / STATE (4EVER REMODELING LLC; AIRHART CONSTRUCTION CORP 500 E. Roosevelt Road West Chicago IL; AMERICAN CONTRACTING GROUP 311 S. Wacker Drive Chicago IL; ARRIAGA PAVERS & LANDSCAPING LLC...).",
+  "notes": "DuPage County, IL (unincorporated county; complements Cook County list already captured). County Building & Zoning registers GCs and sub-contractors (plumbers, irrigation, fire alarm exempt from fee but must register); public Accela-generated PDF roster of registered contractors.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Dutchess County Regional Chamber of Commerce",
   "domain": "dcrcoc.org",
   "category": "state_local",
@@ -11242,6 +12004,27 @@
   "foundBy": "city-07",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T01:39:30.535Z"
+ },
+ {
+  "name": "Eagle Chamber of Commerce",
+  "domain": "eaglechamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "ID"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.eaglechamber.com/list",
+  "joinUrl": "http://business.eaglechamber.com/form/view/40240",
+  "evidence": "'Construction Equipment & Contractors ... Results Found: 23' incl. CORE Construction (Boise), TruBlue Home Service Ally ('kitchen and bathroom remodels, skilled home repairs...'), Eagle River LLC",
+  "notes": "Eagle (Boise metro suburb); GrowthZone Go Pages directory; member application form on business.eaglechamber.com",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "East Bay Chamber of Commerce",
@@ -11424,6 +12207,27 @@
   "checkedAt": "2026-10-14T03:16:56.857Z"
  },
  {
+  "name": "Effingham County Chamber Business Directory",
+  "domain": "effinghamcountychamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.effinghamcountychamber.com/list",
+  "joinUrl": "https://effinghamcountychamber.com/membership/",
+  "evidence": "Results Found: 9 ... K. Wohltman Construction, Inc. 18700 N US Hwy 45 Effingham IL 62401 ... Heritage Builders of Effingham, Inc. (business.effinghamcountychamber.com/list/category/general-contractors-69)",
+  "notes": "Effingham, IL (Effingham County). Categories include general contractors, HVAC, concrete contractors.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "El Dorado County Chamber of Commerce",
   "domain": "eldoradocounty.org",
   "category": "state_local",
@@ -11487,6 +12291,27 @@
   "checkedAt": "2026-10-14T00:35:08.605Z"
  },
  {
+  "name": "Elgin Area Chamber of Commerce Member Directory",
+  "domain": "elginchamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.elginchamber.com/list",
+  "joinUrl": "https://www.elginchamber.com/whyjoin",
+  "evidence": "Plumber Results: 1 ... Restore Plumbing and Drain Inc 1401 Timber Dr , Elgin , IL 60123 ... (business.elginchamber.com/list/Search/home-property-services-465849?cid=465735)",
+  "notes": "Elgin, IL (NW suburb of Chicago). Directory categories include Plumber, Roofer, Remodeling Contractor, Electrical Contractor, Pest Control.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Elgin Chamber of Commerce",
   "domain": "elginchamber.net",
   "category": "state_local",
@@ -11548,6 +12373,27 @@
   "foundBy": "city-04",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T03:16:56.857Z"
+ },
+ {
+  "name": "Elmhurst Chamber of Commerce & Industry Directory",
+  "domain": "elmhurstchamber.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://chambermaster.elmhurstchamber.org/list/",
+  "joinUrl": "https://chambermaster.elmhurstchamber.org/member/newmemberapp/",
+  "evidence": "Results Found: 1 ... Raceway Electric Co., Inc. 270 W. St. Charles Rd. Elmhurst IL 60126 (630) 501-1180 (chambermaster.elmhurstchamber.org/list/category/electrical-contractors-179)",
+  "notes": "Elmhurst, IL (DuPage County suburb of Chicago). Directory hosted on chambermaster.elmhurstchamber.org subdomain.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Emporia Area Chamber & Visit Emporia Member Directory",
@@ -11686,6 +12532,27 @@
   "checkedAt": "2026-10-14T00:35:08.605Z"
  },
  {
+  "name": "Evanston Chamber of Commerce - Member Business Directory",
+  "domain": "evchamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.evchamber.com/businessdirectory",
+  "joinUrl": "https://www.evchamber.com/membership/jointhechamber",
+  "evidence": "'Member Business Directory' with categories incl. 'Construction Equipment & Contractors' and live listings: 'AA Service Heating, Cooling & Plumbing Company 550 Anthony Trail Northbrook, Illinois 60062 (847) 729-7889', 'American Vintage Home 1523 Payne Street Evanston, Illinois (847)...', '1620 Central... 1744 Marketing...' (retrieved via crawler prerender of the ChamberMate SPA). Join page: 'Join Today | Member Login ... membership/jointhechamber'.",
+  "notes": "Evanston, IL. ChamberMate-platform chamber; member directory is a JS SPA that prerenders for search-engine UAs (plain curl returns an empty shell). Membership join page live.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Evanston Chamber of Commerce Member Directory",
   "domain": "evanstonwyo.com",
   "category": "state_local",
@@ -11705,6 +12572,27 @@
   "foundBy": "city-10",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T02:00:03.606Z"
+ },
+ {
+  "name": "Evansville Regional Economic Partnership (Chamber)",
+  "domain": "evansvilleregion.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IN"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://members.evansvilleregion.com/list",
+  "joinUrl": "https://members.evansvilleregion.com/member-application",
+  "evidence": "Nav 'E-REP Member Directory'; category '*Plumbing, Heating, Air-conditioning (SIC 1711)' lists 'Koch Air, LLC 1900 W. Lloyd Expressway, Evansville, IN 47712 (812) 962-5200'; categories incl. General Contractors (SIC 15)",
+  "notes": "Evansville / Vanderburgh County (formerly Chamber of Commerce of Southwest Indiana). GrowthZone members subdomain; Member Application page.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Evergy Authorized Contractor Finder",
@@ -12103,6 +12991,27 @@
   "checkedAt": "2026-10-14T01:39:30.535Z"
  },
  {
+  "name": "Galesburg Area Chamber of Commerce Member Directory",
+  "domain": "galesburg.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.galesburg.org/list",
+  "joinUrl": "https://business.galesburg.org/member/newmemberapp/",
+  "evidence": "Results Found: 3 ... Basio Plumbing, Heating & Air Conditioning ... Galesburg, Illinois (business.galesburg.org/list/category/air-conditioning-heating-installation-repair-5)",
+  "notes": "Galesburg, IL (Knox County).",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Gallatin Area Chamber Member Directory",
   "domain": "gallatintn.org",
   "category": "state_local",
@@ -12206,6 +13115,27 @@
   "foundBy": "city-09",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T02:00:03.606Z"
+ },
+ {
+  "name": "Garner Chamber of Commerce",
+  "domain": "garneriowachamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.garneriowachamber.com/directory/",
+  "joinUrl": null,
+  "evidence": "'Construction Results: 4' in member directory listing Henkel Construction (Mason City), Kettlefield (Clear Lake), King Construction and Overhead Door (Clear Lake); categories Construction, Excavation, Concrete",
+  "notes": "Garner IA (Hancock County, north Iowa); GrowthZone directory",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Gaston Business Association",
@@ -12339,6 +13269,48 @@
   "checkedAt": "2026-10-14T02:00:03.606Z"
  },
  {
+  "name": "Glenview Chamber of Commerce Member Directory",
+  "domain": "glenviewchamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.glenviewchamber.com/list/",
+  "joinUrl": "https://growthzonecmsprodeastus.azureedge.net/sites/2656/2026/03/Application.2026-fillable.pdf",
+  "evidence": "Results Found: 22 (business.glenviewchamber.com/list/ql/contractors-homeimprovement-construction-38); quicklinks also 'Heat-Electrical-Plumbing' and 'Home Design-Remodeling-Construction'",
+  "notes": "Glenview, IL (North Shore suburb of Chicago). Join link on chamber site points to 2026 fillable membership application PDF.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
+  "name": "Goshen Chamber of Commerce",
+  "domain": "goshen.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IN"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.goshen.org/list",
+  "joinUrl": "https://goshen.org/business-directory/",
+  "evidence": "'Business Directory Search - Business Directory - Goshen Chamber of Commerce'; category General Contractors 'Results Found: 7' incl. 'Ancon Construction designs, builds, repairs and maintains commercial and industrial buildings'; trade categories Commercial Contractors, Contractors - General, Contractors-Remodeling",
+  "notes": "Goshen, IN (Elkhart County). ChamberMaster directory; 'Join the Chamber' / Member Application.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Grand Island Area Chamber of Commerce",
   "domain": "grandisland.org",
   "category": "state_local",
@@ -12465,6 +13437,27 @@
   "checkedAt": "2026-10-14T01:39:30.535Z"
  },
  {
+  "name": "Greater Avon Chamber of Commerce",
+  "domain": "avonchamber.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IN"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.avonchamber.org/directory",
+  "joinUrl": "https://business.avonchamber.org/join",
+  "evidence": "'Directories - default - Greater Avon Chamber of Commerce' / 'MEMBER BUSINESS DIRECTORY'; category Contractors 'Results: 4' incl. 'Rigdon Construction, Inc. (317) 745-0033'; trade categories Electrical Contractors, Heating & Air Conditioning Installation & Repair, Plumbers, Landscaping",
+  "notes": "Avon / Hendricks County (suburban Indianapolis). GrowthZone directory; 'Join the Chamber'.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Greater Baton Rouge Economic Partnership",
   "domain": "greaterbatonrouge.org",
   "category": "state_local",
@@ -12547,6 +13540,27 @@
   "foundBy": "city-02",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T01:39:30.535Z"
+ },
+ {
+  "name": "Greater Burlington Partnership",
+  "domain": "greaterburlington.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://members.greaterburlington.com/memberdirectory/",
+  "joinUrl": "https://www.greaterburlington.com/chamber-of-commerce/join-the-chamber/",
+  "evidence": "'Member Directory' (GrowthZone) with subcategories Contractors, Excavating Contractors, Grading Contractor, 'Heating, Cooling & HVAC Contractor'; 'Contractors Results: 11' listing Brueck Construction, Inc., Community Radon Solutions LLC",
+  "notes": "Burlington IA (Des Moines County); chamber+economic development partnership",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Greater Cape Ann Chamber of Commerce",
@@ -12801,6 +13815,27 @@
   "checkedAt": "2026-10-14T02:00:03.606Z"
  },
  {
+  "name": "Greater Elkhart Chamber of Commerce",
+  "domain": "elkhart.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IN"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.elkhart.org/business-directory/",
+  "joinUrl": "https://www.elkhart.org/join-the-chamber/",
+  "evidence": "Page title 'Business Directory - Greater Elkhart Chamber of Commerce'; directory lists contractor websites incl. churchplumbing.com, billsheatinginc.com, finalphaseelectric.net, legacyheatingandairinc.com, morenosroofing.com, nolimitroofingin.com, relentlessroofingco.com",
+  "notes": "Elkhart, IN. Public business directory of chamber members; 'Join the Chamber' page.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Greater Federal Way Chamber of Commerce Member Directory",
   "domain": "fedwaychamber.com",
   "category": "state_local",
@@ -12862,6 +13897,27 @@
   "foundBy": "city-08",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T02:00:03.606Z"
+ },
+ {
+  "name": "Greater Fort Dodge Growth Alliance",
+  "domain": "greaterfortdodge.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.greaterfortdodge.com/member-list/",
+  "joinUrl": "https://business.greaterfortdodge.com/membership-application",
+  "evidence": "'Member List' directory with category 'Construction'; 'Construction Results: 36' listing 3E Electrical Engineering & Equipment Company, 777 REMODELING, RENOVATIONS, AND REPAIRS LLC",
+  "notes": "Fort Dodge IA (Webster County); GrowthZone directory with online membership application",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Greater Fort Kent Area Chamber of Commerce",
@@ -12927,6 +13983,27 @@
   "checkedAt": "2026-10-14T03:16:56.857Z"
  },
  {
+  "name": "Greater Freeport Partnership Member Directory",
+  "domain": "greaterfreeport.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://greaterfreeportpartnershipchamber.growthzoneapp.com/list",
+  "joinUrl": "https://greaterfreeport.com/business/membership/",
+  "evidence": "Results: 3 ... Pearson Plumbing & Heating ... Building & Construction Services (greaterfreeportpartnershipchamber.growthzoneapp.com/list/Search/electrician-513330); growthzoneapp list shows categories electricians-513330, plumbers-605296",
+  "notes": "Freeport, IL (Stephenson County). Chamber + economic development + tourism partnership.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Greater Gainesville Chamber of Commerce Member Directory",
   "domain": "gainesvillechamber.com",
   "category": "state_local",
@@ -12946,6 +14023,27 @@
   "foundBy": "city-02",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T01:39:30.535Z"
+ },
+ {
+  "name": "Greater Grant County Chamber of Commerce",
+  "domain": "gogreatergrant.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IN"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.gogreatergrant.org/list",
+  "joinUrl": "https://business.gogreatergrant.org/form/view/35725",
+  "evidence": "'Business Directory Search'; category Heating & Cooling/HVAC 'Results Found: 2' incl. 'Kennedy's Inc. 214 East 2nd Street Marion IN 46952 (765) 664-5578' and 'Custom Comfort Heating & Cooling'; trade categories Contractors, Electrical, Plumbing; membership application form",
+  "notes": "Marion / Grant County. GrowthZone directory; benefits page cites 'A business directory listing on the Chamber's high-traffic website'.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Greater Green Bay Chamber",
@@ -13137,6 +14235,27 @@
   "checkedAt": "2026-10-14T03:16:56.857Z"
  },
  {
+  "name": "Greater Iowa City, Inc. (Iowa City Area Business Partnership)",
+  "domain": "greateriowacity.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://member.greateriowacity.com/memberdirectory",
+  "joinUrl": "https://greateriowacity.com/invest/",
+  "evidence": "Page title 'Investor Directory - Greater Iowa City, Inc.'; category 'Roofing/Roofing Contractors Results: 3' listing Carbon Builders (Iowa City), Hahn Roofing and TMJ Construction Services; categories include Air Conditioning Contractors, Construction - Homebuilders, Contractors - General, Electrical Contractors, Plumbing Services & Supplies",
+  "notes": "Iowa City metro (Iowa City, Coralville, North Liberty, Cedar Rapids corridor); GrowthZone member directory; businesses join as investors (dues)",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Greater Irvine Chamber of Commerce",
   "domain": "greaterirvinechamber.com",
   "category": "state_local",
@@ -13262,6 +14381,48 @@
   "foundBy": "city-10",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T02:00:03.606Z"
+ },
+ {
+  "name": "Greater Kokomo Chamber of Commerce",
+  "domain": "greaterkokomo.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IN"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "http://greaterkokomo.chambermaster.com/list",
+  "joinUrl": "https://greaterkokomo.com/chamber-of-commerce/",
+  "evidence": "ChamberMaster 'Member Directory Search'; category 'CONTRACTORS - HVAC & PLUMBING' shows 'Results Found: 7' incl. \"Brandt's Heating Cooling & Electrical 1245 E. Gano St. Kokomo IN 46901 (765) 452-1855\" and \"King's Heating & Plumbing, Inc. 115 E. Vaile Ave. Kokomo IN 46901\"",
+  "notes": "Kokomo / Howard County (Greater Kokomo Economic Development Alliance). ChamberMaster directory; contractors by trade category.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
+  "name": "Greater Lafayette Commerce",
+  "domain": "greaterlafayettecommerce.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IN"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://greaterlafayettecommerce.growthzoneapp.com/list",
+  "joinUrl": "https://www.greaterlafayettecommerce.com/membership/",
+  "evidence": "H1 'Active Member Directory'; category 'Roofing Contractors' lists e.g. 'Bone Dry Roofing 1250 S Creasy Ln Suite B, Lafayette, IN 47905 (765) 735-3908'; site menu 'Member Application'",
+  "notes": "Lafayette / West Lafayette (Tippecanoe County). GrowthZone directory; membership tiers Nonprofit $275, Tier 1 $375, Tier 2 $500+/yr.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Greater Lake Charles Chamber (Chamber Southwest Louisiana)",
@@ -13535,6 +14696,48 @@
   "foundBy": "city-06",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T02:00:03.606Z"
+ },
+ {
+  "name": "Greater Muncie Chamber of Commerce",
+  "domain": "munciechamber.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IN"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.munciechamber.org/directory",
+  "joinUrl": "https://business.munciechamber.org/member-application",
+  "evidence": "H1 'Active Member Directory' / 'Directory of Our Valued Members'; category Construction Equipment & Contractors > Plumbing lists 'Rooterman of Indiana ... (765) 228-2371' and 'Gregory's Sewer & Drain Cleaning LLC 5200 S Edgewood Dr, Muncie, IN 47302'",
+  "notes": "Muncie / Delaware County. GrowthZone 'business.' subdomain directory; membership application with investment levels.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
+  "name": "Greater Muscatine Chamber of Commerce & Industry",
+  "domain": "muscatine.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.muscatine.com/list",
+  "joinUrl": "https://muscatine.com/membership-benefits/",
+  "evidence": "'Chamber Member Directory - Growthzone Directory : Greater Muscatine Chamber of Commerce and Industry'; category 'Construction Equipment & Contractors' incl. subcategories Roofing, Plumbing, 'Results Found: 37' with ServiceMaster Cleaning & Restoration, Shaw Electric",
+  "notes": "Muscatine IA; ChamberMaster/GrowthZone directory",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Greater Nashua Chamber of Commerce",
@@ -14440,6 +15643,69 @@
   "checkedAt": "2026-10-14T02:00:03.606Z"
  },
  {
+  "name": "Grimes Area Chamber of Commerce & Economic Development",
+  "domain": "grimesiowa.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.grimesiowa.com/list",
+  "joinUrl": "https://business.grimesiowa.com/member/newmemberapp",
+  "evidence": "'Contractors QuickLink Category | Grimes Area Chamber of Commerce' with subcats Contractor/Pool, Flooring, Landscaping; 'Results Found: 6' listing Urban Flooring and Design, Yardworks Lawncare & Landscaping LLC, Unlimited Tree Service",
+  "notes": "Grimes IA (northwest Des Moines metro); MemberZone directory; site menu 'Become a Member/Investor'",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
+  "name": "Grow Cedar Valley (Greater Cedar Valley Alliance & Chamber)",
+  "domain": "growcedarvalley.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://members.growcedarvalley.com/list",
+  "joinUrl": "https://members.growcedarvalley.com/member-application",
+  "evidence": "'Grow Cedar Valley Business Directory' with category 'Construction & Trades Results: 75' incl. Cardinal Construction, Inc., Young Plumbing & Heating, Bergen Plumbing Heating Cooling, Dream Homes Construction & Design (Waterloo/Cedar Falls)",
+  "notes": "Waterloo–Cedar Falls metro; GrowthZone directory; online member application",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
+  "name": "Grow Clinton (Clinton area chamber & economic development)",
+  "domain": "growclinton.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://members.growclinton.com/list",
+  "joinUrl": "https://members.growclinton.com/member/NewMemberApp/",
+  "evidence": "'Business Directory Search - Grow Clinton'; Construction category with subcats Contractors-Electrical/Industrial/Mechanical, Contractors-Roofing & Siding, Excavating, Gutter Installation; 'Results Found: 32' incl. First Onsite Property Restoration, Russell Construction Company",
+  "notes": "Clinton IA (Clinton County); MemberZone directory; chamber merged into Grow Clinton economic development org",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Haines Chamber of Commerce",
   "domain": "haineschamber.org",
   "category": "state_local",
@@ -14944,6 +16210,27 @@
   "checkedAt": "2026-10-14T02:00:03.606Z"
  },
  {
+  "name": "Hispanic Chamber of Commerce Hawaii",
+  "domain": "hcchawaii.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "HI"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.hcchawaii.org/business-directory",
+  "joinUrl": "https://www.hcchawaii.org/become-a-member",
+  "evidence": "'Our public directory is a gateway to the diverse talent within our community, allowing you to browse and support Hispanic-owned businesses across the islands.' Filter by Industry includes 'Home Services', 'HVAC Trucking', 'Landscaping', 'Construction Education'; embedded Wix dataset (~68 public records) lists Kings AC Hawaii (HVAC Trucking, O'ahu), Anuhea Cleaning Services LLC (Home Services, O'ahu), Lanai Scapes (Landscaping, O'ahu).",
+  "notes": "Statewide, Oahu-based; public directory open for browsing; separate 'Pro Member Directory' with contact details for members only",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Hobbs Chamber of Commerce",
   "domain": "hobbschamber.org",
   "category": "state_local",
@@ -14963,6 +16250,27 @@
   "foundBy": "city-07",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T01:39:30.535Z"
+ },
+ {
+  "name": "Hoffman Estates Chamber of Commerce & Industry Business Directory",
+  "domain": "hechamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "http://members.hechamber.com/list/",
+  "joinUrl": "http://members.hechamber.com/member/newmemberapp/",
+  "evidence": "Results Found: 4 ... The Junkluggers of Chicago NW Suburbs 425 Airport Rd. Elgin IL 60123 (members.hechamber.com/list/category/contractors-29); categories: contractors, heating-air-conditioning, home-maintenance-remodeling",
+  "notes": "Hoffman Estates, IL (NW suburb of Chicago).",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Hoover Area Chamber of Commerce",
@@ -15133,6 +16441,27 @@
   "checkedAt": "2026-10-14T00:35:08.605Z"
  },
  {
+  "name": "Huntley Area Chamber of Commerce Business Directory",
+  "domain": "huntleychamber.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "http://huntleychamber.chambermaster.com/list",
+  "joinUrl": "http://huntleychamber.chambermaster.com/member/newmemberapp",
+  "evidence": "Results Found: 24 ... A-1 Restoration, Inc. 10639 Wolf Drive Huntley IL 60142 (847) 854-1119 ... O'Connor Electric, Inc. (huntleychamber.chambermaster.com/list/category/contractors-40)",
+  "notes": "Huntley, IL (McHenry County suburb of Chicago). Directory embedded via chambermaster.com subdomain.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Hurricane Valley Chamber Member Directory",
   "domain": "hvchamber.com",
   "category": "state_local",
@@ -15215,6 +16544,27 @@
   "foundBy": "state-03",
   "linkStatus": "verified",
   "checkedAt": "2026-10-13T23:58:19.782Z"
+ },
+ {
+  "name": "Idaho Hispanic Chamber of Commerce",
+  "domain": "idahohcc.net",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "ID"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.idahohcc.net/state-directory",
+  "joinUrl": "https://mms.idahohcc.net/members/newmem/new-mem-reg.php?org_id=IHCC",
+  "evidence": "'Business Directory | Idaho Hispanic Chamber of Commerce' with 'MEMBER DIRECTORY ... View All Businesses' A-Z browse; public member data (~380 records) includes BuildPro Construction LLC (Meridian), AC Heating & Cooling (Meridian), All Seasons Lawn Care LLC (Kuna)",
+  "notes": "Statewide ID (office in Nampa); Chamber Nation platform; directory content loads via JS but public member JSON endpoint confirmed listings",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Idaho Veterans Chamber Veteran and Spouse Business Directory",
@@ -15312,6 +16662,29 @@
   "checkedAt": "2026-10-13T23:58:19.782Z"
  },
  {
+  "name": "Indianapolis BNS — Licensed General Contractor List",
+  "domain": "indy.gov",
+  "category": "state_local",
+  "trades": [
+   "general"
+  ],
+  "states": [
+   "IN"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": null,
+  "directoryUrl": "https://citybase-cms-prod.s3.amazonaws.com/55cddef24a20407990c8798f20740740.pdf",
+  "joinUrl": "https://www.indy.gov/activity/contractor-licenses",
+  "evidence": "PDF header 'City of Indianapolis Department of Business & Neighborhood Services — General Contractor' listing licensed firms + contact, e.g. '180 CONSTRUCTION LLC — SCOTT ROCAP', '1ST CHOICE CONSTRUCTION LLC — ROB MILLS'; BNS licenses general, electrical, HVAC, wrecking, plumbing contractors",
+  "notes": "Indianapolis / Marion County. Business appears on list once licensed by BNS; indy.gov 'Contractor Licenses' page hosts the trade lists (general/electrical/HVAC/wrecking/plumbing).",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Indy Chamber",
   "domain": "indychamber.com",
   "category": "state_local",
@@ -15356,6 +16729,27 @@
   "checkedAt": "2026-10-13T23:58:19.782Z"
  },
  {
+  "name": "Jackson County Chamber (Seymour)",
+  "domain": "jacksoncochamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IN"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.jacksoncochamber.com/list",
+  "joinUrl": "https://jacksoncochamber.com/membership-info/",
+  "evidence": "'Business Directory Search - Jackson County Chamber'; category Electricians 'Results Found: 5' incl. 'Dreyer Carpentry & Electrical 100 N Ewing St Suite C Seymour IN 47274 (812) 672-1100' and 'Bode Electric'; trade categories Heating & Cooling, Residential Services & Contractors",
+  "notes": "Seymour / Jackson County. GrowthZone directory; 'Join Today' / Member Application.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Jackson County Chamber of Commerce",
   "domain": "jacksonchamber.org",
   "category": "state_local",
@@ -15398,6 +16792,27 @@
   "checkedAt": "2026-10-14T01:39:30.535Z"
  },
  {
+  "name": "Jacksonville Area Chamber of Commerce Business Directory",
+  "domain": "jacksonvilleareachamber.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.jacksonvilleareachamber.org/list/",
+  "joinUrl": "https://business.jacksonvilleareachamber.org/member/newmemberapp",
+  "evidence": "Results Found: 4 ... JIC Professional Roofing 2018 Southbrook Road Jacksonville IL 62650 (217) 245-7508 ... The Other Guys Construction (jacksonvilleareachamber.org/list/category/roofing-154)",
+  "notes": "Jacksonville, IL (Morgan County).",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Jamestown Area Chamber of Commerce",
   "domain": "jamestownchamber.com",
   "category": "state_local",
@@ -15417,6 +16832,27 @@
   "foundBy": "city-07",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T01:39:30.535Z"
+ },
+ {
+  "name": "Japanese Chamber of Commerce & Industry of Hawaii",
+  "domain": "jccih.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "HI"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://japanesechamberofcommerceindustryofhawaiijccih.growthzoneapp.com/directory",
+  "joinUrl": "https://jccih.org/membership/",
+  "evidence": "'Active Member Directory - Directory of Our Valued Members' with category 'Construction & Building Services'; A-Z listing shows member 'Takamine Construction, Inc.' (Hilo, HI); membership page: 'JCCIH is 300 members strong and growing. Want to know who's a member? Visit our directory.'",
+  "notes": "Hilo, Big Island; distinct org from HICC (hicc.biz, covered round 1); GrowthZone directory",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Jefferson Chamber",
@@ -15503,6 +16939,27 @@
   "checkedAt": "2026-10-14T03:16:56.857Z"
  },
  {
+  "name": "Joliet Region Chamber of Commerce Business/Member Directory",
+  "domain": "jolietchamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://jolietchamber.chambermaster.com/list/",
+  "joinUrl": "https://jolietchamber.com/join/",
+  "evidence": "Results Found: 9 ... Breeze-Air Heating & Air Conditioning 413 Davy Lane Wilmington IL 60436 (815) 476-6615 (jolietchamber.chambermaster.com/list/category/heating-and-air-conditioning-74)",
+  "notes": "Joliet, IL. Directory hosted on chambermaster.com subdomain; site nav 'Business/Member Directory Search - Joliet Region Chamber of Commerce'.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Jones County Chamber of Commerce",
   "domain": "visitjones.com",
   "category": "state_local",
@@ -15524,6 +16981,27 @@
   "checkedAt": "2026-10-14T01:39:30.535Z"
  },
  {
+  "name": "Kailua Chamber of Commerce",
+  "domain": "kailuachamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "HI"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://md2.kailuachamber.com/",
+  "joinUrl": "https://www.kailuachamber.com/membership",
+  "evidence": "Page title 'Kailua Chamber Member Directory'; directory data includes category 'Construction & Home Services' with members HC&D (concrete) and Complete Construction Services",
+  "notes": "Kailua, Oahu; membership page lists dues tiers ($350/$450/$850)",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Kalispell Chamber of Commerce",
   "domain": "kalispellchamber.com",
   "category": "state_local",
@@ -15543,6 +17021,27 @@
   "foundBy": "city-06",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T02:00:03.606Z"
+ },
+ {
+  "name": "Kankakee County Chamber of Commerce Business Directory",
+  "domain": "kankakeecountychamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.kankakeecountychamber.com/list",
+  "joinUrl": "https://business.kankakeecountychamber.com/member/newmemberapp/",
+  "evidence": "Results Found: 44 ... PSI Construction Inc 660 N Cherry Kankakee IL 60901 (815) 932-4194 ... Kankakee Area Contractors Association (business.kankakeecountychamber.com/list/category/architecture-construction-equipment-contractors-12)",
+  "notes": "Kankakee County, IL.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Kansas Attorney General Roofing Registration Directory",
@@ -15568,6 +17067,27 @@
   "checkedAt": "2026-10-14T03:16:56.857Z"
  },
  {
+  "name": "Kapolei Chamber of Commerce",
+  "domain": "kapoleichamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "HI"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.kapoleichamber.com/member-directory/",
+  "joinUrl": "https://www.kapoleichamber.com/membership-benefits/",
+  "evidence": "'Kapolei Chamber Member Directory - Directory of our valued Chamber members'; category 'Construction Equipment & Contractors' shows 'Results: 8' incl. Kapili Construction LLC, Layton Construction Company, LLC, Goodfellow Bros.",
+  "notes": "Kapolei / West Oahu (Ewa Beach, Waianae, Nanakuli); GrowthZone member directory; chamber dues apply",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Katahdin Chamber of Commerce",
   "domain": "katahdinmaine.com",
   "category": "state_local",
@@ -15587,6 +17107,48 @@
   "foundBy": "city-04",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T03:16:56.857Z"
+ },
+ {
+  "name": "Kauai Chamber of Commerce",
+  "domain": "kauaichamber.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "HI"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://cca.kauaichamber.org/businesssearch.aspx",
+  "joinUrl": "https://cca.kauaichamber.org/memapp.aspx",
+  "evidence": "Live homepage (via fetch tool): 'Search our local member businesses to find your next fix.' ChamberMaster directory page (same live URL, opened via 2025-12-04 archived capture): title 'Member Search By Category - Kauai Chamber of Commerce', nav 'Business Directory' / 'Become a Member -> memapp.aspx', category list includes 'Contractors-Building/General', 'Contractors-General/Engineering', 'Contractors-Landscaping/Maintenance', 'Contractors-Paint & Manufacturers', 'Contractors-Roofing' (5 contractor categories).",
+  "notes": "Lihue, Kauai; ChamberMaster platform at cca.kauaichamber.org; live directory Cloudflare/IP-blocked to this session's datacenter IP (sgcaptcha PoW + 403) - existence and categories verified via live homepage text plus Dec-2025 archive of the live URL; site still actively crawled Feb-Mar 2026",
+  "foundBy": "city-03",
+  "linkStatus": "unconfirmed",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
+  "name": "Kauai Filipino Chamber of Commerce",
+  "domain": "kauaifilipinochamber.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "HI"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://kauaifilipinochamber.org/kfcc-members-list/",
+  "joinUrl": "https://kauaifilipinochamber.org/join/",
+  "evidence": "'KFCC Members List' page lists 'CORPORATE MEMBERS ... Kauai Airconditioning - Bobby & Cindy Ayonon ... Ink Spot Printing Corp ... Harley's Barbeque'; nav has 'Join the KFCC'",
+  "notes": "Lihue, Kauai; plain public members list page (not a searchable directory)",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Kearney Area Chamber of Commerce",
@@ -15908,6 +17470,48 @@
   "checkedAt": "2026-10-14T01:39:30.535Z"
  },
  {
+  "name": "Kona-Kohala Chamber of Commerce",
+  "domain": "kona-kohala.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "HI"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.kona-kohala.com/list/",
+  "joinUrl": "https://www.kona-kohala.com/why-join-the-chamber",
+  "evidence": "'Business Directory - Kona-Kohala Chamber of Commerce, HI'; 'Construction Equipment & Contractors ... Results Found: 31' incl. Kokua Roofing Service, P & S Plumbing LLC, Hawaii Air Conditioning, Dickinson General Contracting (Kailua-Kona)",
+  "notes": "West Hawaii / Big Island (Kailua-Kona, Waikoloa, Kamuela); GrowthZone directory",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
+  "name": "Kosciusko Chamber of Commerce",
+  "domain": "kchamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IN"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://my.kchamber.com/memberdirectory",
+  "joinUrl": "https://www.kchamber.com/member-directory/",
+  "evidence": "'Kosciusko Chamber of Commerce Member Directory' with Search Radius and full A-Z member browse index; 'Join the Chamber Today ... Join Now'",
+  "notes": "Warsaw / Kosciusko County. GrowthZone member directory (same platform as Lafayette/Muncie chambers).",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "KSL Services",
   "domain": "ksl.com",
   "category": "state_local",
@@ -15950,6 +17554,27 @@
   "checkedAt": "2026-10-14T02:00:03.606Z"
  },
  {
+  "name": "La Porte Economic Advancement Partnership",
+  "domain": "laportepartnership.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IN"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://members.laportepartnership.com/list",
+  "joinUrl": "https://members.laportepartnership.com/member/NewMemberApp/",
+  "evidence": "'Business Directory Search' (GrowthZone); category 'Residental Contractors, Developers & Investment' 'Results Found: 8' incl. 'Mitch Feikes Builders, Inc.' and 'Micro City 372 Melrose Street La Porte IN 46350 (219) 575-2851'; trade categories Commercial Contractors/Developers, Contractors - Specialty, Electrical Equipment & Supplies",
+  "notes": "La Porte, IN (La Porte County). GrowthZone directory; Member Application with investment levels.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Lake Champlain Chamber Business Directory",
   "domain": "vermont.org",
   "category": "state_local",
@@ -15969,6 +17594,27 @@
   "foundBy": "state-09",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T00:35:08.605Z"
+ },
+ {
+  "name": "Lake County Chamber of Commerce (IL) Business Directory",
+  "domain": "lakecountychamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.lakecountychamber.com/list",
+  "joinUrl": "https://business.lakecountychamber.com/member/newmemberapp",
+  "evidence": "Results Found: 18 ... Kelso Burnett Co. 1378 St. Paul Avenue Gurnee IL 60031 (847) 804-0903 (business.lakecountychamber.com/list/category/contractors-19)",
+  "notes": "Lake County, IL (county-wide chamber; Waukegan/Gurnee area). Membership levels page: lakecountychamber.com/membership-levels/.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Lake County Contractor Search",
@@ -16053,6 +17699,27 @@
   "foundBy": "city-06",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T02:00:03.606Z"
+ },
+ {
+  "name": "Lakeshore Chamber of Commerce (Hammond & East Chicago)",
+  "domain": "lakeshorechamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IN"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://lakeshorechamber.com/member-directory/",
+  "joinUrl": "https://lakeshorechamber.com/join-the-chamber/",
+  "evidence": "'Member Directory – Lakeshore Chamber of Commerce | Hammond & East Chicago' public search with category filter options incl. 'Contractors-General', 'Electrical Contractors', 'Plumbing', 'Roofing Contractors', 'Sheet Metal Fab/HVAC'; footer 'Directory > Search Directory', 'Become a Member'",
+  "notes": "Hammond / East Chicago (Lake County). WordPress member directory with trade-category filters; member listings load via site AJAX.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Lakeville Chamber of Commerce",
@@ -16584,6 +18251,27 @@
   "checkedAt": "2026-10-14T00:35:08.605Z"
  },
  {
+  "name": "Lombard Area Chamber of Commerce Directory",
+  "domain": "lombardchamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.lombardchamber.com/directory",
+  "joinUrl": "https://www.lombardchamber.com/join",
+  "evidence": "Directory page shows category 'Construction Companies-Homebuilders, General Contractors/Dev' (1) and 'Home Improvement' (14); member listing page: 'Pro Restoration LLC | Lombard Area Chamber of Commerce' (lombardchamber.com/directory/listings/193249)",
+  "notes": "Lombard, IL (DuPage County suburb of Chicago).",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Long Beach Area Chamber of Commerce",
   "domain": "lbchamber.com",
   "category": "state_local",
@@ -16781,6 +18469,27 @@
   "checkedAt": "2026-10-14T02:00:03.606Z"
  },
  {
+  "name": "Macomb Area Chamber of Commerce Business Directory",
+  "domain": "macombareachamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.macombareachamber.com/list/",
+  "joinUrl": "https://business.macombareachamber.com/member/newmemberapp",
+  "evidence": "Results Found: 6 ... AMP Companies, Inc. 137 Columbia St. Macomb IL 61455 ... Kirby Risk Electrical Supply (business.macombareachamber.com/list/category/heating-air-plumbing-electric-65)",
+  "notes": "Macomb, IL (McDonough County).",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Madison Chamber of Commerce",
   "domain": "madisonalchamber.com",
   "category": "state_local",
@@ -16800,6 +18509,48 @@
   "foundBy": "city-01",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T01:39:30.535Z"
+ },
+ {
+  "name": "Madison County Alliance",
+  "domain": "madisoncountyalliance.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IN"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.madisoncountyalliance.org/list/",
+  "joinUrl": "https://business.madisoncountyalliance.org/member/newmemberapp/",
+  "evidence": "'Business Directory Search - Madison County Alliance'; category Heating & Air Conditioning 'Results Found: 2' incl. 'Nardco Heating & Air Conditioning, Inc. 2327 Delaware St. Anderson IN 46016 (765) 644-3358'; trade categories Contractor, Contractors-General, Contractor-Electrical, Plumbing & Supplies, Asphalt & Concrete Contractors, Bath Remodeling; 'Join Now'",
+  "notes": "Anderson / Madison County (formerly Anderson-Madison County Chamber). ChamberMaster directory; New Member Application.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
+  "name": "Mahaska Chamber & Development Group (Oskaloosa)",
+  "domain": "mahaskachamber.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.mahaskachamber.org/directory/",
+  "joinUrl": "https://mahaskachamber.org/about/join/",
+  "evidence": "'Hundreds of area businesses are members of the Mahaska Chamber & Development Group. Find them by keyword, category, or browse by letter in our interactive directory.' A-Z browse lists Christner Contracting, Century Homes of Oskaloosa, Climate Control Solutions",
+  "notes": "Oskaloosa / Mahaska County; chamber+development group; WP directory browsable by letter",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Mahwah Regional Chamber of Commerce",
@@ -16911,6 +18662,27 @@
   "checkedAt": "2026-10-14T02:00:03.606Z"
  },
  {
+  "name": "Marshalltown Area Chamber of Commerce",
+  "domain": "marshalltown.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.marshalltown.org/directory",
+  "joinUrl": "https://www.marshalltown.org/",
+  "evidence": "Directory categories include Construction, Contractors-Roofing, Home Remodeling & Designing, Plumbing; 'AIR CONDITIONING & HEATING Results: 5' listing B & G HVAC, Ethington Heating & Cooling, Hardon's, Inc. (Tama)",
+  "notes": "Marshalltown IA; GrowthZone directory; 'Join the Chamber' in site menu (no separate join URL captured)",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Martinsburg-Berkeley County Chamber of Commerce Member Directory",
   "domain": "berkeleycounty.org",
   "category": "state_local",
@@ -16978,6 +18750,27 @@
   "foundBy": "state-04",
   "linkStatus": "verified",
   "checkedAt": "2026-10-13T23:58:19.782Z"
+ },
+ {
+  "name": "Mason City Area Chamber of Commerce",
+  "domain": "masoncityia.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.masoncityia.com/list/",
+  "joinUrl": "https://business.masoncityia.com/member/NewMemberApp/",
+  "evidence": "'Construction & Contractors' QuickLink category with subcats Doors, Electrical, Insulation, Remodeling, Roofing, Siding & Gutter Contractors; 'Results Found: 76' incl. Blazek Electric, Inc. (Mason City), AJ's Service",
+  "notes": "Mason City / North Iowa; ChamberMaster directory with online membership application",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Mass Save Contractor and Heat Pump Installer Directory",
@@ -17054,6 +18847,27 @@
   "checkedAt": "2026-10-13T23:58:19.782Z"
  },
  {
+  "name": "McCall Area Chamber of Commerce",
+  "domain": "visitmccall.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "ID"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://visitmccall.org/directory/",
+  "joinUrl": "https://visitmccall.org/mccall-chamber/join-the-chamber/",
+  "evidence": "'Business Directory - Search business listings' (31 pages of listings); listing pages include 'Action Garage Door - McCall Idaho' and 'Americool Heating & Cooling LLC'; members manage profiles ('Member Login - Please login to access your business profile')",
+  "notes": "McCall (Valley County); chamber business directory on the visitmccall.org tourism site",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "McKinney Chamber Member Directory",
   "domain": "mckinneychamber.com",
   "category": "state_local",
@@ -17075,6 +18889,27 @@
   "checkedAt": "2026-10-14T02:00:03.606Z"
  },
  {
+  "name": "McLean County Chamber of Commerce Member Directory",
+  "domain": "mcleancochamber.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.mcleancochamber.org/active-member-directory",
+  "joinUrl": "https://www.mcleancochamber.org/become-a-member/",
+  "evidence": "Results: 78 ... A-1 Haney Plumbing, Inc. (309) 661-8200 ... Home Improvement / Construction / Plumbing-Sewer & Drain Cleaning (business.mcleancochamber.org/active-member-directory/Search/home-improvement-640237)",
+  "notes": "Bloomington-Normal, IL (McLean County).",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Mercer County Chamber of Commerce (Harrodsburg)",
   "domain": "mercerchamber.com",
   "category": "state_local",
@@ -17094,6 +18929,27 @@
   "foundBy": "city-04",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T03:16:56.857Z"
+ },
+ {
+  "name": "Meridian Chamber of Commerce",
+  "domain": "meridianchamber.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "ID"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://meridianchamberofcommerce.growthzoneapp.com/memberdirectory",
+  "joinUrl": "https://meridianchamber.org/membership/",
+  "evidence": "'Member Directory'; category 'Construction & Contractors Results: 73' incl. A-1 Heating, Air Conditioning & Electric (Meridian), Cloverdale Plumbing, The Azek Company",
+  "notes": "Meridian (Boise metro suburb, distinct from boisechamber.org/bcaswi.org)",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Mesquite Chamber of Commerce",
@@ -17373,6 +19229,27 @@
   "foundBy": "city-02",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T01:39:30.535Z"
+ },
+ {
+  "name": "Mini-Cassia Chamber of Commerce",
+  "domain": "minicassiachamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "ID"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.minicassiachamber.com/member-directory",
+  "joinUrl": "https://www.minicassiachamber.com/join-us",
+  "evidence": "Directory heading 'Join the Chamber Directory' with category list incl. Construction, Home Construction, Home Improvement, HVAC, Landscaping, Plumbing, Remodel; ChamberWidgets/ChamberOrganizer API (auth.chamberwidgets.com/cn-api/org/mms/mms_members, org_id=MCID) returns 11 construction-category members incl. Koyle's Classic Construction (Burley, ID), All Brite Services LLC (Rupert, ID; Construction/Remodel/Roofing), Mountain Heights Custom Homes (Burley), Elite Restoration (Burley).",
+  "notes": "Heyburn/Burley (Mini-Cassia area), south-central ID; Chamber Nation / ChamberOrganizer platform; public member browsing",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Minnesota DLI license and registration lookup",
@@ -17818,6 +19695,48 @@
   "checkedAt": "2026-10-14T03:16:56.857Z"
  },
  {
+  "name": "Nampa Chamber of Commerce",
+  "domain": "nampa.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "ID"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://members.nampa.com/directory",
+  "joinUrl": "https://members.nampa.com/member/newmemberapp/",
+  "evidence": "'This directory is intended for public use to support and connect with our member businesses'; category 'Construction, Contractors & Services Results: 89' incl. Abstract Residential Design + Build (Nampa), Adler Industrial LLC",
+  "notes": "Nampa (Canyon County); GrowthZone directory",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
+  "name": "Naperville Area Chamber of Commerce Member Directory",
+  "domain": "naperville.net",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://members.naperville.net/directory",
+  "joinUrl": "https://members.naperville.net/application",
+  "evidence": "Results: 59 ... Dykstra Home Services 13450 South Cicero Avenue , Crestwood , IL 60445 (844) 371-3220 Visit Website ... HVAC, Plumbing Services (members.naperville.net/directory/Search/home-garden-145976)",
+  "notes": "Naperville, IL (west suburb of Chicago). GrowthZone-powered member directory; membership application linked in site nav.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Narragansett Chamber of Commerce",
   "domain": "narragansettcoc.com",
   "category": "state_local",
@@ -17905,6 +19824,27 @@
   "foundBy": "city-04",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T03:16:56.857Z"
+ },
+ {
+  "name": "Native Hawaiian Chamber of Commerce",
+  "domain": "nativehawaiianchamberofcommerce.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "HI"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.nativehawaiianchamberofcommerce.org/directory",
+  "joinUrl": "https://www.nativehawaiianchamberofcommerce.org/join",
+  "evidence": "Directory page title 'Native Hawaiian Business Directory | NHCC Member Listings'; 'Browse NHCC's Business Directory to find local member businesses across Hawaiʻi.' ChamberMate public API (api.chambermate.com/core/biz/webPresence/searchMembershipDirectory) category list includes 'Construction Equipment & Contractors'; searchText=construction returns Haloa Construction LLC (Kapolei, HI), Hawaii 5-0 Development Construction & Maintenance, Inc. (Waipahu), Makainai Construction LLC (Kaneohe).",
+  "notes": "Statewide Native Hawaiian business chamber (Honolulu HQ); ChamberMate platform (directory widget id 529a510e-f43e-bf13-1d70-5314127045b8); member listings visible publicly, membership application via /join",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Nebraska Chamber of Commerce and Industry",
@@ -18588,6 +20528,48 @@
   "checkedAt": "2026-10-14T03:16:56.857Z"
  },
  {
+  "name": "Oak Lawn Chamber of Commerce Member Directory",
+  "domain": "oaklawnchamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.oaklawnchamber.com/member-directory",
+  "joinUrl": "https://business.oaklawnchamber.com/member-application",
+  "evidence": "Results: 1 ... Act Construction & Design, Inc. 3415 N Harlem Ave , Chicago , IL 60634 (business.oaklawnchamber.com/member-directory/Search/construction-equipment-contractors-478170)",
+  "notes": "Oak Lawn, IL (SW suburb of Chicago).",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
+  "name": "Oak Park-River Forest Chamber of Commerce Business Directory",
+  "domain": "oprfchamber.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.oprfchamber.org/list/",
+  "joinUrl": "https://www.oprfchamber.org/member/newmemberapp/",
+  "evidence": "Results Found: 13 ... Eco General 6204 Roosevelt Road Oak Park IL 60304 (oprfchamber.org/list/category/contractors-43); categories include contractors, electrical, general-contractor",
+  "notes": "Oak Park / River Forest, IL (West suburb of Chicago).",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Ocala Metro Chamber and Economic Partnership Partner Directory",
   "domain": "ocalacep.com",
   "category": "state_local",
@@ -18921,6 +20903,27 @@
   "checkedAt": "2026-10-14T00:35:08.605Z"
  },
  {
+  "name": "Orland Park Area Chamber of Commerce Member Directory",
+  "domain": "orlandparkchamber.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.orlandparkchamber.org/list/",
+  "joinUrl": "https://business.orlandparkchamber.org/member-application",
+  "evidence": "Results: 36 ... A Better Door & Window Co. (708) 479-5559 ... Home & Garden (business.orlandparkchamber.org/list/Search/home-garden-615611)",
+  "notes": "Orland Park, IL (SW suburb of Chicago).",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Orlando Goes Local Contractor Directory",
   "domain": "orlandogoeslocal.com",
   "category": "state_local",
@@ -18961,6 +20964,27 @@
   "foundBy": "city-10",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T02:00:03.606Z"
+ },
+ {
+  "name": "Ottawa Area Chamber of Commerce & Industry Directory",
+  "domain": "ottawachamberillinois.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.ottawachamberillinois.com/list",
+  "joinUrl": "https://business.ottawachamberillinois.com/member/newmemberapp/",
+  "evidence": "Results Found: 7 ... Liebhart Construction, Inc. ... Burns Machine Co. PO Box 828 4000 Burmac Dr Ottawa IL 61350 (business.ottawachamberillinois.com/list/category/building-contractors-supplies-358)",
+  "notes": "Ottawa, IL (LaSalle County). Categories include building-contractors-supplies, concrete, electrical, landscaping, carpeting-flooring.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Overland Park Chamber of Commerce Member Directory",
@@ -19045,6 +21069,27 @@
   "foundBy": "city-06",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T02:00:03.606Z"
+ },
+ {
+  "name": "Palatine Area Chamber of Commerce Business Directory",
+  "domain": "palatinechamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.palatinechamber.com/list",
+  "joinUrl": "https://business.palatinechamber.com/member/newmemberapp",
+  "evidence": "Results Found: 3 ... W. Brothers Roofing 115 W. Palatine Rd. Palatine IL 60067 (847) 991-1902 (business.palatinechamber.com/list/category/windows-roofing-siding-gutters-94)",
+  "notes": "Palatine, IL (NW suburb of Chicago). Categories include Windows/Roofing/Siding/Gutters, Heating & Air Conditioning, Construction/Electrical/Home Improvement.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Palm Beaches Chamber of Commerce Member Directory",
@@ -19411,6 +21456,27 @@
   "checkedAt": "2026-10-14T00:35:08.605Z"
  },
  {
+  "name": "Plainfield Chamber of Commerce",
+  "domain": "plainfield-in.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IN"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.plainfield-in.com/directory",
+  "joinUrl": "https://business.plainfield-in.com/membership-application",
+  "evidence": "'MEMBER DIRECTORY — your go-to resource for connecting with over 470 (and growing!) local businesses!'; category Heating/Cooling/Plumbing 'Results: 6' incl. 'Bassett Services (317) 839-5877' and 'Bulldog Home Comfort'; trade categories Electrical, Painting, Remodel, Roofs/Gutters, Flooring, Landscaping; 'Join Now' membership application",
+  "notes": "Plainfield / Hendricks County (suburban Indianapolis). GrowthZone directory; membership application page.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Plano Chamber Member Directory",
   "domain": "planochamber.org",
   "category": "state_local",
@@ -19430,6 +21496,27 @@
   "foundBy": "city-09",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T02:00:03.606Z"
+ },
+ {
+  "name": "Pocatello-Chubbuck Chamber of Commerce",
+  "domain": "pocatelloidaho.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "ID"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://members.pocatelloidaho.com/list",
+  "joinUrl": "https://members.pocatelloidaho.com/member-application",
+  "evidence": "'Member Directory - Directory of Our Valued Members' with categories 'Concrete Construction, Contractors, Building services' and 'Electrician/Electrical'; category page 'Construction, Contractors, Building services Results: 56' incl. Adair Homes, A-Team Home Pro, Big D Construction; application page lists dues by employee count",
+  "notes": "Pocatello / Chubbuck (Bannock County); GrowthZone directory",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Polson Chamber of Commerce",
@@ -19516,6 +21603,27 @@
   "checkedAt": "2026-10-13T23:58:19.782Z"
  },
  {
+  "name": "Post Falls Chamber of Commerce",
+  "domain": "postfallschamber.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "ID"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://member.postfallschamber.org/list",
+  "joinUrl": "https://member.postfallschamber.org/member/newmemberapp/",
+  "evidence": "'Member Directory - Directory of Our Valued Members'; category 'Contractors Results: 15' incl. American Air (heating/air), Badlands Seamless Gutters, Baker Construction & Development, Creekside Construction, Ginno Construction Company",
+  "notes": "Post Falls (Kootenai County); GrowthZone directory",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Prattville Area Chamber of Commerce",
   "domain": "prattvillechamber.com",
   "category": "state_local",
@@ -19577,6 +21685,27 @@
   "foundBy": "city-01",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T01:39:30.535Z"
+ },
+ {
+  "name": "Preston Chamber of Commerce",
+  "domain": "prestonchamber.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "ID"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://prestonchamber.org/business-directory/",
+  "joinUrl": "https://prestonchamber.org/chamber/become-a-member/",
+  "evidence": "'BUSINESS DIRECTORY - Preston Chamber ... Check out all Preston Area Businesses have to offer! Click here to become a member and get your business added. Email [email protected] (Cloudflare-obfuscated) to add non-member (free) listings.' Category dropdown 'Construction & Contractor Services (18)'; public A-Z listings with phone/email (WP Business Directory plugin), e.g. Acme Discount Fireworks, Advanced Dental Center, Advantage Plus FCU.",
+  "notes": "Preston / Franklin County, southeast ID; free non-member listings accepted per page text; membership via become-a-member page",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Prince George's County Chamber of Commerce",
@@ -19704,6 +21833,27 @@
   "foundBy": "city-04",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T03:16:56.857Z"
+ },
+ {
+  "name": "Quincy Area Chamber Business Directory",
+  "domain": "quincychamber.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.quincychamber.org/directory",
+  "joinUrl": null,
+  "evidence": "Electrical Results: 8 ... Albsmeyer Electric Inc ... Quincy , IL (business.quincychamber.org/directory/Search/electrical-590290); directory shows categories Contractors, Electrical Contractors, Mason Contractors",
+  "notes": "Quincy, IL (Adams County). Membership Levels & Benefits page linked in directory nav (quincychamber.org).",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Quincy Chamber of Commerce",
@@ -20320,6 +22470,48 @@
   "checkedAt": "2026-10-14T02:00:03.606Z"
  },
  {
+  "name": "Sauk Valley Area Chamber of Commerce Business Directory",
+  "domain": "saukvalleyareachamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "http://saukvalleyareachamber.chambermaster.com/list/",
+  "joinUrl": "https://business.saukvalleyareachamber.com/member/newmemberapp",
+  "evidence": "Results Found: 4 ... Dennis Electric of Tampico, Inc. ... Helm Electric 1514 W 4th St, Sterling IL 61081 (815) 625-5949 (saukvalleyareachamber.chambermaster.com/list/category/electricians-19)",
+  "notes": "Sterling-Rock Falls, IL (Whiteside County).",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
+  "name": "Schaumburg Business Association Member Directory",
+  "domain": "schaumburgbusiness.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://members.schaumburgbusiness.com/list/",
+  "joinUrl": "https://members.schaumburgbusiness.com/member/NewMemberApp/",
+  "evidence": "Results Found: 10 ... (members.schaumburgbusiness.com/list/category/contractors-general-235); directory page shows categories contractors-commercial, contractors-general, floor-coverings, pest-control",
+  "notes": "Schaumburg, IL (NW suburb of Chicago). ChamberMaster/GrowthZone directory.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Scott City Area Chamber of Commerce",
   "domain": "scottcitymochamber.org",
   "category": "state_local",
@@ -20614,6 +22806,27 @@
   "checkedAt": "2026-10-14T01:39:30.535Z"
  },
  {
+  "name": "Sioux Center Chamber of Commerce",
+  "domain": "siouxcenterchamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.siouxcenterchamber.com/directory/",
+  "joinUrl": "https://business.siouxcenterchamber.com/join",
+  "evidence": "'Directory of Our Valued Members' with Construction, Home Maintenance, Landscaping & Lawncare categories; 'Construction Results: 38' listing B & B Plumbing & Heating (Sioux Center)",
+  "notes": "Sioux Center IA (northwest Iowa); GrowthZone directory; join page = 'Membership Application - Sioux Center Chamber of Commerce'",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Sioux Falls Local",
   "domain": "siouxfallslocal.com",
   "category": "state_local",
@@ -20635,6 +22848,27 @@
   "checkedAt": "2026-10-14T00:35:08.605Z"
  },
  {
+  "name": "Siouxland Chamber of Commerce",
+  "domain": "siouxlandchamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://directory.siouxlandchamber.com/list",
+  "joinUrl": "https://directory.siouxlandchamber.com/member/newmemberapp",
+  "evidence": "'Contractors, Building & Construction Equipment' QuickLink category listing members Knife River Midwest, HCI Construction, Mid States Electric, J Lind Construction LLC, Guarantee Roofing, Siding, Insulation; homepage links 'Member Application'",
+  "notes": "Sioux City IA metro (tri-state IA-NE-SD); MemberZone-hosted directory",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Skagit Valley Chamber of Commerce Member Directory",
   "domain": "mountvernonchamber.com",
   "category": "state_local",
@@ -20654,6 +22888,27 @@
   "foundBy": "city-10",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T02:00:03.606Z"
+ },
+ {
+  "name": "Skokie Chamber of Commerce and Industry Directory",
+  "domain": "skokiechamber.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://members.skokiechamber.org/list",
+  "joinUrl": "https://www.skokiechamber.org/join-the-chamber/",
+  "evidence": "Results Found: 4 ... Remodeling by the Tin Man, Inc. (members.skokiechamber.org/list/category/contractor-general-remodeler-202); categories include bathroom-remodeling, construction-home-remodeling, electric-company",
+  "notes": "Skokie, IL (North Shore suburb of Chicago).",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Skowhegan Region Chamber of Commerce",
@@ -21483,6 +23738,27 @@
   "checkedAt": "2026-10-14T00:35:08.605Z"
  },
  {
+  "name": "Terre Haute Chamber",
+  "domain": "terrehautechamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IN"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.terrehautechamber.com/chambermemberdirectory",
+  "joinUrl": "https://business.terrehautechamber.com/applicationtojoin",
+  "evidence": "Page heading 'Chamber Member Directory'; category 'Contractors' shows 'Contractors Results: 45' incl. 'A&B Windows 1800 Wabash Ave, Terre Haute, IN 47807' and 'A&W Construction 2022 South 18th Street, Terre Haute, IN 47802'; join page 'Application to Join'",
+  "notes": "Terre Haute / Vigo County. GrowthZone directory; categories AC, Heating & Plumbing and Contractors.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Texarkana USA Chamber of Commerce",
   "domain": "texarkana.org",
   "category": "state_local",
@@ -21696,6 +23972,27 @@
   "checkedAt": "2026-10-14T02:00:03.606Z"
  },
  {
+  "name": "Tinley Park Chamber of Commerce Member Directory",
+  "domain": "tinleychamber.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://tools.tinleychamber.org/directory",
+  "joinUrl": "https://tinleychamber.org/membership-tiers/",
+  "evidence": "Results: 1 ... J. Wooten Contracting, LLC 6555 Parkside Dr. , Tinley Park , IL 60477 (708) 560-5933 ... Electricians (tools.tinleychamber.org/directory/Search/electricians-658590)",
+  "notes": "Tinley Park, IL (SW suburb of Chicago). GrowthZone directory.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Toledo Regional Chamber of Commerce",
   "domain": "toledochamber.com",
   "category": "state_local",
@@ -21822,6 +24119,53 @@
   "checkedAt": "2026-10-14T02:00:03.606Z"
  },
  {
+  "name": "Town of Munster IN - Contractor List (Registered/Licensed)",
+  "domain": "munster.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IN"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.munster.org/department/index.php?fDD=3-0",
+  "joinUrl": "https://www.munster.org/egov/apps/services/index.egov?view=detail;id=185",
+  "evidence": "Community Development page: 'List of contractors currently registered in the Town of Munster, please click on the following link: Contractor List. Contractors working in the Town of Munster are to have current Town of Munster Contractor registration.' Linked PDF 'Contractor/Licensee Details' (53 pages) lists contractors by license type, e.g. 'Building - Carpentry/Framing: THE NEAL COMPANY dba WINDOW WORLD VALPARAISO, IN (219) 477-2500; BRG CONSTRUCTION INC GRANT PARK, IL; WOODBRIDGE CONSTRUCTION & CARPENTRY INC CROWN POINT, IN...'",
+  "notes": "Munster, IN (Lake County). Town publishes current registered-contractor PDF by trade (building trades, painting, roofing, etc.); registration required before permit release.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
+  "name": "Town of Normal IL - Licensed Contractors open data",
+  "domain": "town-of-normal-open-data-tongis.hub.arcgis.com",
+  "category": "state_local",
+  "trades": [
+   "electrical",
+   "plumbing",
+   "hvac",
+   "general"
+  ],
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://town-of-normal-open-data-tongis.hub.arcgis.com/maps/licensed-contractors",
+  "joinUrl": null,
+  "evidence": "ArcGIS open-data page 'Licensed Contractors' — 'Contractors with licenses that are issued or recognized by the Town of Normal' (Department: Inspections, Update Frequency: Daily). Underlying map service gispub.normal.org/tongis/rest/services/OpenData/Contractors_Public/MapServer returns 967 records, e.g. licenseNo 'ELEC-1001', licenseType 'Electrical', status 'CURRENT', company \"ART'S HEATING AND ELECTRICAL\"; distinct licenseTypes: Plumbing, HVAC, Electrical, General Contractor.",
+  "notes": "Normal, IL (McLean County, adjacent to Bloomington IL). Public ArcGIS open-data dataset of all licensed contractors; licenses issued via Town of Normal Inspections (electrical contractor registration, plumbing, HVAC, general contractor).",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Town of Skowhegan Resource Directory",
   "domain": "skowhegan.org",
   "category": "state_local",
@@ -21841,6 +24185,27 @@
   "foundBy": "city-04",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T03:16:56.857Z"
+ },
+ {
+  "name": "Town of St. John IN — Registered Contractors",
+  "domain": "stjohnin.gov",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IN"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": null,
+  "membershipRequired": null,
+  "directoryUrl": "https://stjohnin.gov/building-and-planning/registeredcontractors/",
+  "joinUrl": "https://stjohnin.gov/building-and-planning/",
+  "evidence": "'Registered Contractors' — 'List is organized by Trade then Alphabetically. Current as of: 07/01/2026. Trade, Company Name, Company Phone, Street Address, City'; rows e.g. 'Building Contractor ... Seal Tight Roofing & Exteriors of IN, Inc. (219) 588-0192 P.O. Box 232 St. John IN 46373', 'Electrical Contractor ... Amps & Volts Electric Inc ... Valparaiso IN'",
+  "notes": "St. John, IN (Lake County). Town-published list of contractors registered with the Building Dept; business appears once registered.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Traverse Connect",
@@ -21939,6 +24304,27 @@
   "checkedAt": "2026-10-14T03:16:56.857Z"
  },
  {
+  "name": "Twin Falls Area Chamber of Commerce",
+  "domain": "twinfallschamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "ID"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://twinfallschamberofcommerce.growthzoneapp.com/member-directory",
+  "joinUrl": "http://twinfallschamberofcommerce.growthzoneapp.com/member-application",
+  "evidence": "'Member Directory' (GrowthZone); search 'Construction' gives 'Back to Search Results: 25' incl. Willow Exterior Renovation & Construction and Summit Restoration & Construction (Kimberly, ID); categories include Home & Garden",
+  "notes": "Twin Falls / Magic Valley",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Ulster County Regional Chamber of Commerce",
   "domain": "ulsterchamber.org",
   "category": "state_local",
@@ -21979,6 +24365,27 @@
   "foundBy": "city-09",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T02:00:03.606Z"
+ },
+ {
+  "name": "Urbandale Chamber of Commerce (Uniquely Urbandale)",
+  "domain": "uniquelyurbandale.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://businesses.uniquelyurbandale.com/list",
+  "joinUrl": "https://businesses.uniquelyurbandale.com/member/newmemberapp",
+  "evidence": "'Business Directory Search - Urbandale Chamber'; Contractors category (incl. Solar, Tree Service, Water Removal subcats) 'Results Found: 117' listing 3E (Electrical Engineering & Equipment Co.), A New Look Exteriors (remodeler)",
+  "notes": "Urbandale IA (Des Moines metro); MemberZone directory",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Utah DOPL Construction Business Registry",
@@ -22044,6 +24451,27 @@
   "checkedAt": "2026-10-14T01:39:30.535Z"
  },
  {
+  "name": "Valley Chamber (Wood River Valley)",
+  "domain": "haileyidaho.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "ID"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://members.haileyidaho.com/list/",
+  "joinUrl": "https://members.haileyidaho.com/member/newmemberapp/",
+  "evidence": "'Business Directory Search - Discover the Wood River Valley - Valley Chamber'; category 'Contractors / Construction ... Results Found: 16' incl. Bashista Construction Corp (Ketchum), Glassford Construction & Management (Hailey), Elite Restoration Inc (Bellevue), Mountain Fireplace & Chimney",
+  "notes": "Hailey HQ serving Bellevue/Ketchum/Sun Valley (Blaine County); member directory hosted on legacy domain members.haileyidaho.com; main site valleychamber.org",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Vegas Chamber",
   "domain": "vegaschamber.com",
   "category": "state_local",
@@ -22063,6 +24491,27 @@
   "foundBy": "state-06",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T00:35:08.605Z"
+ },
+ {
+  "name": "Vermilion Advantage Member Directory",
+  "domain": "vermilionadvantage.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://members.vermilionadvantage.com/memberdirectory",
+  "joinUrl": "https://members.vermilionadvantage.com/ap/Membership/Application/WpMAQbpY",
+  "evidence": "Results: 28 ... A-10 Excavation (217) 933-2836 ... Landscaping ... Construction & Engineering (members.vermilionadvantage.com/memberdirectory/Search/construction-engineering-677208)",
+  "notes": "Danville, IL / Vermilion County (chamber + economic development alliance).",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Vermillion Area Chamber and Development Company Member Directory",
@@ -22158,6 +24607,48 @@
   "foundBy": "city-09",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T02:00:03.606Z"
+ },
+ {
+  "name": "Village of Arlington Heights IL - Licensed Contractors",
+  "domain": "vah.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.vah.com/government/departments/building___life_safety/licensed_contractors.php",
+  "joinUrl": "https://www.vah.com/government/permits___licenses_/register_as_a_contractor.php",
+  "evidence": "'The Building & Life Safety Department's page aims to ensure the safety and well-being of our community. We provide citizens with a list of registered contractors who are currently licensed in the Village. To access the most up-to-date list, please refer to the attachment below: Licensed Contractors - April 2026' — 171-page PDF 'Village of Arlington Heights | Licensed Contractors ... This contractors list is updated frequently' with License Classification sections (ALARM, ASPHALT, BRICK MASON, BRICK PAVER, BUILDER, CARPENTER...) and named contractors.",
+  "notes": "Arlington Heights, IL (Cook/Lake County suburb, NW of Chicago). Village publishes monthly 'Licensed Contractors' PDF (current: April 2026) listing all licensed contractors by license classification; contractors register online through the Village Civic Access portal.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
+  "name": "Village of Skokie IL - Registered Contractors",
+  "domain": "skokie.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.skokie.org/1669/Registered-Contractors",
+  "joinUrl": "https://www.skokie.org/210/Selecting-a-Contractor",
+  "evidence": "'This page shows all contractors currently registered with the Village of Skokie. Contractor registration in the Village of Skokie is not a recommendation... Page last updated: March 2026.' Table columns 'Contractor Name City Phone Email' with trade sections 'Carpenter Contractors' (1611 ELMWOOD LLC WILMETTE (847) 251-9190...), 'Cement and Mason Contractors' (3D BRICK PAVING DES PLAINES (847) 297-7966...), etc.",
+  "notes": "Skokie, IL (Cook County village). Published HTML list of all currently registered contractors with names, city, phone, email by trade category (carpenter, cement/mason, electrical, HVAC, plumbing, roofing, etc.). Contractors must register with the Village Building Division to work in Skokie.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Virginia Chamber of Commerce",
@@ -22349,6 +24840,48 @@
   "checkedAt": "2026-10-14T01:39:30.535Z"
  },
  {
+  "name": "Waukee Area Chamber of Commerce",
+  "domain": "waukeechamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://members.waukeechamber.com/list",
+  "joinUrl": "https://members.waukeechamber.com/member/NewMemberApp/",
+  "evidence": "'Business Directory Search' with categories Contractors (subcats Design Build, General Contractor), Home Services, Lawn & Landscaping; 'Contractors... Results Found: 16' listing Paradise Outdoor Lifestyles, Window Worx LLC",
+  "notes": "Waukee IA (west Des Moines metro); MemberZone directory",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
+  "name": "Wayne County Area Chamber of Commerce",
+  "domain": "wcareachamber.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IN"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://web.wcareachamber.org/search",
+  "joinUrl": "https://www.wcareachamber.org/membership-application.html",
+  "evidence": "Page title 'Member Directory' with 'Search by Keyword' / 'Search by Category' form; category list includes 'Construction, Contractors, & Home Improvement', 'Roofing', 'Sewer/Septic Service'; 'Membership Application' page with form",
+  "notes": "Richmond / Wayne County, IN. Weblink server-side directory embedded on web. subdomain.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Weirton Area Chamber of Commerce Member Directory",
   "domain": "weirtonchamber.com",
   "category": "state_local",
@@ -22412,6 +24945,27 @@
   "checkedAt": "2026-10-14T02:00:03.606Z"
  },
  {
+  "name": "West Des Moines Chamber of Commerce",
+  "domain": "wdmchamber.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://members.wdmchamber.org/list",
+  "joinUrl": "https://members.wdmchamber.org/member/NewMemberApp/",
+  "evidence": "'Business Directory Search - Directory - West Des Moines Chamber of Commerce'; Contractors category with subcats Doors, Painters, Plumbing, Remodeling, Roofing-Gutters; 'Results Found: 50' incl. Baker Group, MacPro Restore Cleaning & Restoration",
+  "notes": "West Des Moines IA (Des Moines metro); MemberZone directory",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "West Hartford Chamber of Commerce Member Directory",
   "domain": "whchamber.com",
   "category": "state_local",
@@ -22431,6 +24985,27 @@
   "foundBy": "city-02",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T01:39:30.535Z"
+ },
+ {
+  "name": "West Liberty Chamber of Commerce",
+  "domain": "westlibertyiowa.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://westlibertyiowa.com/members/",
+  "joinUrl": "https://westlibertyiowa.com/membership/",
+  "evidence": "Member directory with category filter 'Construction / Contractors'; listings include 'All American Concrete, Inc. West Liberty 319-627-2226 — Construction / Contractors'",
+  "notes": "West Liberty IA (Muscatine County); WP directory plugin with category/location search",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "West Virginia Chamber of Commerce",
@@ -22524,6 +25099,27 @@
   "checkedAt": "2026-10-14T01:39:30.535Z"
  },
  {
+  "name": "Westfield Chamber of Commerce",
+  "domain": "westfieldchamberindy.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IN"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.westfieldchamberindy.com/partner-directory/",
+  "joinUrl": "https://business.westfieldchamberindy.com/applicationtojoin",
+  "evidence": "'Directories - Westfield Chamber of Commerce' with trade categories Construction Equipment & Contractors, Contractors, Electrical, Landscaping, Plumbing Services; Plumbing Services 'Results: 4' incl. 'Isley Plumbing 421 Alpha Drive, Westfield, IN 46074' and 'Hot Water Pros'; 'Join' application",
+  "notes": "Westfield, IN (Hamilton County, suburban Indianapolis). GrowthZone 'Partner Directory' with partner tiers (Bronze/Gold).",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Westminster Chamber of Commerce Member Directory",
   "domain": "westminsterchamber.biz",
   "category": "state_local",
@@ -22564,6 +25160,27 @@
   "foundBy": "city-08",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T02:00:03.606Z"
+ },
+ {
+  "name": "Wheaton Chamber of Commerce - Business Directory",
+  "domain": "wheatonchamber.com",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IL"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://www.wheatonchamber.com/directory",
+  "joinUrl": "https://www.wheatonchamber.com/join/the-advantages-of-membership",
+  "evidence": "'Wheaton Chamber of Commerce Business Directory — See our Digital Directory' with categories 'Builders and Developers, Heating and Air Conditioning, Plumbing, Home & Garden' and listings: 'Advanced Windows & Siding 309 Oswald Ave. Batavia, Illinois 60510 (630) 231-5390', 'Advantage Energy Services, LLC 20 Henry Clay Ave. (248) 875-2800', '2 Better Health Chiropractic 311 South County Farm Road, Suite B Wheaton...' (retrieved via crawler prerender of the ChamberMate SPA).",
+  "notes": "Wheaton, IL (DuPage County). ChamberMate SPA directory prerendered for search-engine UAs; join page 'The Advantages of Membership' live in site nav/sitemap.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "White Pine Chamber of Commerce",
@@ -23031,6 +25648,27 @@
   "foundBy": "city-01",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T01:39:30.535Z"
+ },
+ {
+  "name": "Zionsville Chamber of Commerce",
+  "domain": "zionsvillechamber.org",
+  "category": "state_local",
+  "trades": null,
+  "states": [
+   "IN"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://business.zionsvillechamber.org/directory",
+  "joinUrl": "https://business.zionsvillechamber.org/ap/Membership/Application/QLmw8op4",
+  "evidence": "'Directories - Zionsville Chamber of Commerce' with trade categories Contractors, Electric, Heating/Air Conditioning, Landscaping, Plumbing/Heating/Solar, Roofing, Builders/General Contractors; Roofing 'Results: 4' incl. 'Big Sky Roofing LLC 115 E. Main Street, Brownsburg, IN 46112 317-296-3255'; nav 'Join the Chamber'",
+  "notes": "Zionsville, IN (Boone County, suburban Indianapolis). GrowthZone directory; membership application linked.",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "ABC Delaware Membership Directory",
@@ -25913,6 +28551,29 @@
   "checkedAt": "2026-10-14T02:00:03.606Z"
  },
  {
+  "name": "Eastern Idaho Home Builders Association",
+  "domain": "easternidahohomebuilders.com",
+  "category": "trade_assoc",
+  "trades": [
+   "construction"
+  ],
+  "states": [
+   "ID"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://easternidahohomebuilders.com/member-directory/",
+  "joinUrl": "https://easternidahohomebuilders.com/why-join/",
+  "evidence": "'Member Directory ... Showing all 166 members' with specialty filters incl. Builder, General Contractors, Custom Homes, Remodeler, Roofing, Plumbing, Electrical, Concrete, Drywall; directory API (/umbraco/Api/DirectoryApi/GetBuilders) returns members incl. Castlerock Homes, Falken Construction (Idaho Falls), Guardian Homes, Heartland Builders (General Contractor), Hapco Construction, Discovery Construction.",
+  "notes": "Local HBA chapter for eastern Idaho (Idaho Falls, Rexburg, Pocatello); own public member directory distinct from state idahohomebuilders.com",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
+ },
+ {
   "name": "Eastern Oklahoma Chapter NECA",
   "domain": "eocneca.com",
   "category": "trade_assoc",
@@ -26593,6 +29254,27 @@
   "foundBy": "hba-west",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T03:16:56.857Z"
+ },
+ {
+  "name": "Greater Cedar Rapids Housing & Building Association",
+  "domain": "gcrhba.org",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "IA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://gcrhba.org/index.php/directory/",
+  "joinUrl": "https://gcrhba.org/index.php/join-now/",
+  "evidence": "'Directory - Greater Cedar Rapids Housing & Building Association': 'Membership Directory' categories include Builder/General Contractor, Heating & Cooling, Plumbing, Remodeler, Roofing; alphabetical member entries with addresses/phones follow category list",
+  "notes": "Cedar Rapids IA metro HBA; public membership directory; 'Join Now' page",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Greater Cleveland and North Central Ohio NECA Member Directory",
@@ -27853,6 +30535,27 @@
   "foundBy": "state-08",
   "linkStatus": "verified",
   "checkedAt": "2026-10-14T00:35:08.605Z"
+ },
+ {
+  "name": "Home Builders Association of Iowa City",
+  "domain": "hbaofic.org",
+  "category": "trade_assoc",
+  "trades": null,
+  "states": [
+   "IA"
+  ],
+  "requiresStreetAddress": null,
+  "requiresPhoneVerification": null,
+  "requiresPostcard": null,
+  "paid": true,
+  "membershipRequired": true,
+  "directoryUrl": "https://hbaofic.org/member-directory/",
+  "joinUrl": null,
+  "evidence": "'Member Directory - Home Builders Association of Iowa City': 'A treasure of resources is in our 2026 Membership Directory... Considering building a new home or a remodeling project? ... selecting an Iowa City Area HBA member to do the job.' Category list includes Builders/General Contractors, Electrical Contractors, HVAC; 'Not a member? Join today! Go to NAHB.org/join and enter 52240'",
+  "notes": "Iowa City area HBA; public digital membership directory (2026); membership dues via NAHB join path (zip 52240)",
+  "foundBy": "city-03",
+  "linkStatus": "verified",
+  "checkedAt": "2026-10-14T03:31:51.062Z"
  },
  {
   "name": "Home Builders Association of Jackson",
