@@ -151,6 +151,10 @@ export default function SocialMediaPage() {
   const planRequired = planRequiredFrom(businesses.error);
   const noBusinesses = !businesses.isError && !!businesses.data && (businesses.data.total ?? 0) === 0 && !(businesses.data.items ?? []).length;
   const chosen = business && valid;
+  // One business only: there is no "All clients" to be in (the menu has no such row), so ?business=all opens that business
+  // instead of a page that asks for a choice it cannot show (owner, 2026-10-13: "doesnt let you choose anything").
+  const onlyId = businesses.data?.total === 1 && businesses.data?.items?.length === 1 ? String(businesses.data.items[0].id) : null;
+  useEffect(() => { if (business === "all" && onlyId) setBusiness(onlyId, true); }, [business, onlyId]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <AppPage>
       {!planRequired && <ToolBarSlot><BusinessSwitch business={chosen ? business : null} items={businesses.data?.items ?? []} total={businesses.data?.total ?? 0} onChange={(v) => { if (v) { setBusiness(v, true); return; } const p = new URLSearchParams(window.location.search); p.delete("business"); p.set("pick", "1"); navigate(`${path}?${p}`); }} /></ToolBarSlot>}
@@ -530,7 +534,7 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
       {!all && tab === "overview" && <SocialOverview business={String(businessId)} businessId={businessId} accounts={accounts} />}
       {!all && tab === "overview" && <SocialWeek businessId={businessId} all={false} business={String(businessId)} />}
       {tab === "one-business" && (
-        <Notice tone="info" title="Choose one business" testId="notice-social-one-business">
+        <Notice tone="info" title="Choose one business" testId="notice-social-one-business" action={<OpenOneBusiness view={view} />}>
           {view === "compose" ? "Posts are written for one business at a time." : view === "auto" ? "Auto mode is set for each business." : view === "accounts" ? "Accounts are connected for each business." : "This view is for one business at a time."} Pick it in the Business menu above.
         </Notice>
       )}
@@ -1419,6 +1423,23 @@ function PostRow({
   );
 }
 
+/** Open buttons for the "Choose one business" notice: the first businesses by name, then the full list (owner, 2026-10-13). */
+function OpenOneBusiness({ view }: { view: SocialView }) {
+  const [, navigate] = useLocation();
+  const businesses = useQuery<any>({
+    queryKey: ["/api/social", "businesses", "", 0, "all"],
+    queryFn: async () => (await apiRequest("GET", `/api/social/businesses?${new URLSearchParams({ search: "", offset: "0", linked: "all" })}`)).json(),
+  });
+  const items: any[] = (businesses.data?.items ?? []).slice(0, 6);
+  const total: number = businesses.data?.total ?? 0;
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      {items.map((b) => <GooglePill key={b.id} size="sm" label={`Open ${b.business_name}${b.city ? ` · ${b.city}` : ""}`} onClick={() => navigate(socialHref(view, String(b.id)))} testId={`button-open-business-${b.id}`} />)}
+      {total > items.length && <GooglePill size="sm" variant="outline" label={`All ${total} businesses…`} onClick={() => navigate(socialHref(view, null, { pick: "1" }))} />}
+    </span>
+  );
+}
+
 /** The tool bar's business switcher: which business every view is about (owner, 2026-10-12). */
 function BusinessSwitch({ business, items, total, onChange }: { business: string | null; items: any[]; total: number; onChange: (v: string) => void }) {
   if (!total) return null;
@@ -1430,7 +1451,7 @@ function BusinessSwitch({ business, items, total, onChange }: { business: string
         {!business && <option value="">Choose a business…</option>}
         {!listed && <option value={business!}>This business</option>}
         {items.map((b) => <option key={b.id} value={String(b.id)}>{b.business_name}{b.city ? ` · ${b.city}` : ""}</option>)}
-        {total > 1 && <option value="all">All clients (calendar and posts)</option>}
+        {(total > 1 || business === "all") && <option value="all">All clients (calendar and posts)</option>}
         <option value="__pick">{total > 1 ? `All ${total} businesses and bulk actions…` : "Business list…"}</option>
       </select>
     </label>
