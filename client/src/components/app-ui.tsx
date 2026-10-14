@@ -164,6 +164,10 @@ type StatProps = {
   hint?: ReactNode;
   /** A number that stands for a list links to it. */
   href?: string;
+  /** Same idea as href for a list on this page: clicking the tile shows it (e.g. filters a table below). */
+  onClick?: () => void;
+  /** The tile's list is the one showing. */
+  selected?: boolean;
   tone?: "default" | "good" | "warn" | "bad";
   /** The tile's color; StatGrid gives each tile one in turn when not set. */
   accent?: Accent;
@@ -171,14 +175,15 @@ type StatProps = {
   testId?: string;
 };
 
-export function Stat({ label, value, hint, href, tone = "default", accent, icon: Icon, testId }: StatProps) {
+export function Stat({ label, value, hint, href, onClick, selected, tone = "default", accent, icon: Icon, testId }: StatProps) {
   const toneClass = { default: "", good: "text-primary", warn: "text-primary", bad: "text-red-600 dark:text-red-400" }[tone];
   const a = accent ? ACCENTS[accent] : null;
   const body = (
     <div className={cn(
       "h-full rounded-xl border bg-card p-3.5 sm:p-4",
       // one brand color, used lightly: a white tile, an orange dot (owner, 2026-10-04: no rainbow)
-      href && "transition-shadow hover:shadow-md",
+      (href || onClick) && "transition-shadow hover:shadow-md",
+      selected && "border-primary ring-1 ring-primary",
     )} data-testid={testId} data-ui="stat">
       <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground" data-ui="stat-label">
         {Icon ? <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : a ? <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", a.dot)} aria-hidden="true" /> : null}
@@ -188,7 +193,15 @@ export function Stat({ label, value, hint, href, tone = "default", accent, icon:
       {hint && <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{hint}</div>}
     </div>
   );
-  return href ? <Link href={href} className="block h-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{body}</Link> : body;
+  if (href) return <Link href={href} className="block h-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{body}</Link>;
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} aria-pressed={selected ?? false} className="block h-full w-full rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        {body}
+      </button>
+    );
+  }
+  return body;
 }
 
 /* ── Sections ───────────────────────────────────────────────────────────────── */
