@@ -81,6 +81,28 @@ export async function addCandidates(hits: Pick<SerpHit, "domain" | "url">[], kin
   return added;
 }
 
+/**
+ * The listing catalogue's scouted directories (server/listings, tier 3–4) are backlink sources too: each becomes a
+ * "directory" (associations, chambers, locators, licence lookups) or "citation" (general business directories) source
+ * here, then the worker vets and grades it like any other. Maps, social and AI platforms are left out (big platforms
+ * are never sold as backlinks). New domains only; existing sources keep their grade. Returns how many were added.
+ */
+export async function syncListingDirectories(): Promise<number> {
+  const exists = await db().query(`SELECT to_regclass('listing_directories') IS NOT NULL AS ok`);
+  if (!exists.rows[0]?.ok) return 0;
+  const r = await db().query(
+    `INSERT INTO backlink_sources (domain, kind, discovered_url, discovered_via, niches)
+     SELECT d.domain, CASE WHEN d.category = 'general' THEN 'citation' ELSE 'directory' END, d.source, 'listing-catalogue',
+            COALESCE(d.trades[1:20], '{}')
+       FROM listing_directories d
+      WHERE d.domain IS NOT NULL AND d.active AND d.tier >= 3
+        AND d.category NOT IN ('maps_nav', 'social', 'ai') AND d.source ~ '^https?://'
+     ON CONFLICT (domain) DO NOTHING
+     RETURNING id, discovered_url`);
+  for (const row of r.rows) await event(row.id, "discovered", { via: "listing-catalogue", url: row.discovered_url });
+  return r.rows.length;
+}
+
 export type VetJob = { id: number; domain: string; kind: BacklinkKind; discoveredUrl: string | null; metrics: BacklinkMetrics | null; attempts: number };
 
 /** Lease up to `limit` sources for vetting: new ones, and ones whose vetting lease lapsed (a worker died). */

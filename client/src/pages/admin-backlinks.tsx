@@ -272,6 +272,12 @@ export default function AdminBacklinksPage() {
 
   const pages = Math.max(1, Math.ceil((list?.total ?? 0) / PAGE));
   const filter = (set: (v: string) => void) => (v: string) => { set(v); setPage(0); };
+  // A tile is a list: clicking it shows every source of that kind (all tiers and statuses) in Sources below.
+  const showList = (k: string) => {
+    const next = kind === k ? "all" : k;
+    setKind(next); setTier("all"); setStatusFilter("all"); setQ(""); setPage(0);
+    if (next !== "all") document.getElementById("backlinks-sources")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
   return (
     <AppPage testId="page-admin-backlinks">
       <GoogleSectionHeader as="h1" title="Backlinks database" count={s.total || null} description="Sites that can link to a contractor: found, vetted, measured and pitched automatically." flush />
@@ -280,9 +286,11 @@ export default function AdminBacklinksPage() {
         <GoalCard s={s} />
         <StatGrid cols={4}>
           {BACKLINK_KINDS.filter((k) => k !== "pbn").map((k) => (
-            <Stat key={k} label={BACKLINK_KIND_LABELS[k]} value={n(s.byKind[k].quality)} hint={`quality · ${n(s.byKind[k].total)} found`} testId={`stat-backlinks-${k}`} />
+            <Stat key={k} label={BACKLINK_KIND_LABELS[k]} value={n(s.byKind[k].quality)} hint={`quality · ${n(s.byKind[k].total)} found`} testId={`stat-backlinks-${k}`}
+              onClick={() => showList(k)} selected={kind === k} />
           ))}
-          <Stat label="Blocked PBNs" value={n(s.byKind.pbn.total)} hint="never counted or sold" tone={s.byKind.pbn.total ? "bad" : "default"} />
+          <Stat label="Blocked PBNs" value={n(s.byKind.pbn.total)} hint="never counted or sold" tone={s.byKind.pbn.total ? "bad" : "default"}
+            onClick={() => showList("pbn")} selected={kind === "pbn"} testId="stat-backlinks-pbn" />
           <Stat label="This month's data spend" value={`$${s.spend.usd.toFixed(2)}`} hint={`cap $${s.spend.capUsd}`} />
           <Stat label="Searches run" value={`${n(s.queries.run)} / ${n(s.queries.total)}`} hint={`last ${ago(s.lastRunAt)}`} />
           <Stat label="Waiting to vet" value={n(s.byStatus.discovered + s.byStatus.vetting)} />
@@ -292,7 +300,7 @@ export default function AdminBacklinksPage() {
           <RunButtons />
         </Section>
 
-        <Section title="Sources" icon={Link2}>
+        <Section title="Sources" icon={Link2} id="backlinks-sources">
           <div className="mb-3 flex flex-wrap gap-2">
             <Input className="w-48" placeholder="Search domain" value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} data-testid="input-backlinks-search" />
             <Select value={kind} onValueChange={filter(setKind)}>

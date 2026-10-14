@@ -472,6 +472,11 @@ export async function registerRoutes(
   // The worker runs only with BACKLINKS_WORKER_ENABLED=true; outreach sends only when configured (outreach.ts).
   const { ensureBacklinkSchema } = await import("./backlinks/schema");
   await ensureBacklinkSchema();
+  // The listing catalogue's directories join the backlinks database (seeded above; vetted by the worker).
+  const { syncListingDirectories } = await import("./backlinks/store");
+  syncListingDirectories()
+    .then((added) => { if (added) console.log(`[backlinks] ${added} listing-catalogue directories added for vetting`); })
+    .catch((err) => console.error("[backlinks] listing-catalogue sync failed:", err));
   const { seedQueries } = await import("./backlinks/store");
   await seedQueries();
   const { registerBacklinkRoutes } = await import("./backlinks/routes");
