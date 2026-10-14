@@ -1,4 +1,4 @@
-export const LISTING_STATUSES = [
+export const DIRECTORY_STATUSES = [
   "queued",
   "submitted",
   "needs_owner_action",
@@ -24,7 +24,7 @@ export const DIRECTORY_KINDS = [
   "partner",
   "submission",
 ] as const;
-export const LISTING_LABELS: Record<string, string> = {
+export const DIRECTORY_LABELS: Record<string, string> = {
   queued: "Waiting to check",
   submitted: "Submitted",
   needs_owner_action: "Needs your action",
@@ -52,6 +52,14 @@ export const TIER_LABELS: Record<string, string> = {
   3: "Distribution partners",
   4: "Contractor & local directories",
 };
+export type CatalogueDirectory = Directory & {
+  dr: number | null;
+  grade: string | null;
+  link_status: "verified" | "unconfirmed" | null;
+};
+export type CataloguePage = { rows: CatalogueDirectory[]; total: number };
+export type CatalogueFacets = Record<string, Record<string, number>>;
+
 export type Directory = {
   id: number;
   name: string;
@@ -69,17 +77,17 @@ export type Directory = {
   source: string;
   notes: string | null;
 };
-export type ListingCounts = {
+export type DirectoryCounts = {
   total: number;
   live: number;
   mismatch: number;
   billable: number;
 };
-export type ListingSummary = ListingCounts & {
-  by_tier: Record<string, ListingCounts>;
-  by_category: Record<string, ListingCounts>;
+export type DirectorySummary = DirectoryCounts & {
+  by_tier: Record<string, DirectoryCounts>;
+  by_category: Record<string, DirectoryCounts>;
 };
-export type ListingRow = {
+export type DirectoryProfileRow = {
   id: number;
   profile_id: number;
   location_id: number;
@@ -104,7 +112,7 @@ export type ListingRow = {
   } | null;
   evidence: { reason: string | null } | null;
 };
-export type ListingProfile = Record<string, unknown> & {
+export type BusinessProfile = Record<string, unknown> & {
   id: number;
   location_id: number;
   user_id: number;
@@ -112,7 +120,7 @@ export type ListingProfile = Record<string, unknown> & {
   owner_edited_fields: string[];
   revision: number;
 };
-export type ListingEvent = {
+export type DirectoryEvent = {
   id: string;
   type: string;
   at: string;

@@ -462,21 +462,21 @@ export async function registerRoutes(
   startSiteScanWorker();
   await ensureCompetitorWorkerSchema();
   startCompetitorWorker();
-  const { ensureListingSchema } = await import("./listings/schema");
-  const { seedListingDirectories } = await import("./listings/catalogue");
-  await ensureListingSchema(pool);
-  await seedListingDirectories(pool);
-  const { registerListingsRoutes } = await import("./listings/routes");
-  registerListingsRoutes(app, getDevUser);
+  const { ensureDirectorySchema } = await import("./directories/schema");
+  const { seedDirectories } = await import("./directories/catalogue");
+  await ensureDirectorySchema(pool);
+  await seedDirectories(pool);
+  const { registerDirectoryRoutes } = await import("./directories/routes");
+  registerDirectoryRoutes(app, getDevUser);
   // Backlinks database (server/backlinks, admin-only prototype): discovery → vetting → authority → outreach drafts.
   // The worker runs only with BACKLINKS_WORKER_ENABLED=true; outreach sends only when configured (outreach.ts).
   const { ensureBacklinkSchema } = await import("./backlinks/schema");
   await ensureBacklinkSchema();
-  // The listing catalogue's directories join the backlinks database (seeded above; vetted by the worker).
-  const { syncListingDirectories } = await import("./backlinks/store");
-  syncListingDirectories()
-    .then((added) => { if (added) console.log(`[backlinks] ${added} listing-catalogue directories added for vetting`); })
-    .catch((err) => console.error("[backlinks] listing-catalogue sync failed:", err));
+  // The directory catalogue's directories join the backlinks database (seeded above; vetted by the worker).
+  const { syncCatalogueDirectories } = await import("./backlinks/store");
+  syncCatalogueDirectories()
+    .then((added) => { if (added) console.log(`[backlinks] ${added} directory-catalogue directories added for vetting`); })
+    .catch((err) => console.error("[backlinks] directory-catalogue sync failed:", err));
   const { seedQueries } = await import("./backlinks/store");
   await seedQueries();
   const { registerBacklinkRoutes } = await import("./backlinks/routes");

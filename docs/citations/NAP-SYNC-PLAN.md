@@ -1,3 +1,5 @@
+Product name: Directory Sync.
+
 # NAP Sync — one profile, pushed to 500–1,000 directories (plan, 2026-10-13)
 
 Owner: "the NAP update … is important for SEO: when you change it on Google you can sync with all other directories.

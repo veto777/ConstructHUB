@@ -1,9 +1,9 @@
 /**
- * Scouted directories → server/data/listing-directories.json (tier 4 of the listings catalogue).
+ * Scouted directories → server/data/directories.json (tier 4 of the directory catalogue).
  *
- *   npx tsx scripts/build-listing-directories.ts <scout-dir>/*\/directories.jsonl [--recheck]
+ *   npx tsx scripts/build-directories.ts <scout-dir>/*\/directories.jsonl [--recheck]
  *
- * Each scout line is validated (server/listings/scouted.ts), skipped if its domain is already in the catalogue or the
+ * Each scout line is validated (server/directories/scouted.ts), skipped if its domain is already in the catalogue or the
  * data file, and its directory page is fetched again:
  *   - loads (2xx after redirects, not parked, not a soft 404)  → "verified"
  *   - bot wall / rate limit / server error / timeout           → "unconfirmed" (kept: the scout saw the page)
@@ -13,8 +13,8 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { catalogue } from "../server/listings/catalogue";
-import { scoutRow, toDirectoryRow, SCOUTED_FILE, type ScoutedDirectory } from "../server/listings/scouted";
+import { catalogue } from "../server/directories/catalogue";
+import { scoutRow, toDirectoryRow, SCOUTED_FILE, type ScoutedDirectory } from "../server/directories/scouted";
 import { siteUrl } from "../server/sitescan/http";
 
 const OUT = path.join(import.meta.dirname, "..", "server", "data", SCOUTED_FILE);

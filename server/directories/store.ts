@@ -10,9 +10,9 @@ import {
   profileFields,
   jsonFields,
 } from "./profile";
-import { checkListing, type NapProfile } from "./nap";
+import { checkDirectoryProfile, type NapProfile } from "./nap";
 export type Scope = { userId: number; actorId: number; admin: boolean };
-export class ListingError extends Error {
+export class DirectoryError extends Error {
   constructor(
     public status: number,
     message: string,
@@ -25,10 +25,10 @@ export function domainAllows(domain: string, raw: string) {
   return hostname === domain || hostname.endsWith(`.${domain}`);
 }
 // All ownership predicates use the authenticated account scope, never body/query user_id.
-export class ListingStore {
+export class DirectoryStore {
   constructor(
     private db: Pool,
-    private checker = checkListing,
+    private checker = checkDirectoryProfile,
   ) {}
   async location(
     scope: Scope,
@@ -41,7 +41,7 @@ export class ListingStore {
       "SELECT * FROM business_locations WHERE id=$1 AND (user_id=$2 OR $3::boolean)",
       [id, scope.userId, scope.admin],
     );
-    if (!row) throw new ListingError(404, "Location not found");
+    if (!row) throw new DirectoryError(404, "Location not found");
     return row;
   }
   async profile(scope: Scope, locationId: number) {
@@ -72,13 +72,19 @@ export class ListingStore {
     client: PoolClient,
     scope: Scope,
     profileId: number,
-    listingId: number | null,
+    directoryProfileId: number | null,
     type: string,
     detail: unknown,
   ) {
     await client.query(
       "INSERT INTO listing_events(profile_id,listing_id,actor_user_id,type,detail) VALUES($1,$2,$3,$4,$5)",
-      [profileId, listingId, scope.actorId, type, JSON.stringify(detail)],
+      [
+        profileId,
+        directoryProfileId,
+        scope.actorId,
+        type,
+        JSON.stringify(detail),
+      ],
     );
   }
   async saveProfile(
@@ -164,34 +170,122 @@ export class ListingStore {
       return saved;
     });
   }
-  async directories(filters: Record<string, any>) {
-    const predicates: string[] = [],
-      values: any[] = [];
-    for (const key of ["kind", "tier", "category", "active"])
+  private async catalogueSql(filters: Record<string, any>) {
+    const {
+      rows: [relation],
+    } = await this.db.query("SELECT to_regclass('backlink_sources') AS name");
+    const base = relation.name
+      ? `SELECT d.*, CASE WHEN b.metrics->>'rank' ~ '^[0-9]+([.][0-9]+)?$'
+          THEN round((b.metrics->>'rank')::numeric / 10)::int END AS dr,
+          b.tier AS grade FROM listing_directories d
+          LEFT JOIN backlink_sources b ON b.domain = d.domain`
+      : "SELECT d.*, NULL::integer AS dr, NULL::text AS grade FROM listing_directories d";
+    const values: unknown[] = [];
+    const predicates: string[] = [];
+    const param = (value: unknown) => {
+      values.push(value);
+      return `$${values.length}`;
+    };
+    for (const key of ["kind", "tier", "category", "grade"]) {
       if (filters[key] !== undefined) {
-        values.push(filters[key]);
-        predicates.push(`${key}=$${values.length}`);
+        const entries = Array.isArray(filters[key])
+          ? filters[key]
+          : [filters[key]];
+        predicates.push(
+          `${key === "grade" ? "coalesce(grade, 'ungraded')" : key + "::text"} = ANY(${param(entries)}::text[])`,
+        );
       }
-    for (const [key, column] of [
-      ["trade", "trades"],
-      ["state", "states"],
-    ])
-      if (filters[key]) {
-        values.push(filters[key]);
-        predicates.push(`$${values.length}=ANY(${column})`);
-      }
-    return (
-      await this.db.query(
-        `SELECT * FROM listing_directories ${predicates.length ? "WHERE " + predicates.join(" AND ") : ""} ORDER BY tier,name`,
-        values,
-      )
-    ).rows;
+    }
+    if (filters.active !== undefined)
+      predicates.push(`active = ${param(filters.active)}`);
+    if (filters.q) {
+      const value = param(filters.q);
+      predicates.push(
+        `(strpos(lower(name), lower(${value})) > 0 OR strpos(lower(domain), lower(${value})) > 0)`,
+      );
+    }
+    if (filters.state) predicates.push(`${param(filters.state)} = ANY(states)`);
+    if (filters.trade)
+      predicates.push(
+        `EXISTS (SELECT 1 FROM unnest(trades) trade WHERE strpos(lower(trade), lower(${param(filters.trade)})) > 0)`,
+      );
+    if (filters.link) predicates.push(`link_status = ${param(filters.link)}`);
+    if (filters.paid)
+      predicates.push(
+        filters.paid === "unknown"
+          ? "paid IS NULL"
+          : `paid = ${param(filters.paid === "true")}`,
+      );
+    if (filters.dr_min !== undefined)
+      predicates.push(`dr >= ${param(filters.dr_min)}`);
+    if (filters.dr_max !== undefined)
+      predicates.push(`dr <= ${param(filters.dr_max)}`);
+    return {
+      sql: `WITH catalogue AS (SELECT enriched.*, CASE
+        WHEN notes ~* 'Link verified' THEN 'verified'
+        WHEN notes ~* 'Link unconfirmed' THEN 'unconfirmed'
+        ELSE NULL END AS link_status FROM (${base}) enriched)
+        SELECT * FROM catalogue ${predicates.length ? "WHERE " + predicates.join(" AND ") : ""}`,
+      values,
+    };
+  }
+  async directories(filters: Record<string, any>, paged = false) {
+    const { sql, values } = await this.catalogueSql(filters);
+    const columns: Record<string, string> = {
+      name: "name",
+      dr: "dr",
+      tier: "tier",
+      category: "category",
+      state: "states[1]",
+    };
+    const order = `${columns[filters.sort] ?? "tier"} ${filters.dir === "desc" ? "DESC" : "ASC"} NULLS LAST, name ASC, id ASC`;
+    if (!paged)
+      return (await this.db.query(`${sql} ORDER BY ${order}`, values)).rows;
+    // Count separately so a page beyond the last row still reports the correct total.
+    const {
+      rows: [count],
+    } = await this.db.query(
+      `SELECT count(*)::int AS total FROM (${sql}) filtered`,
+      values,
+    );
+    const { rows } = await this.db.query(
+      `${sql} ORDER BY ${order} LIMIT $${values.length + 1} OFFSET $${values.length + 2}`,
+      [...values, filters.limit ?? 25, filters.offset ?? 0],
+    );
+    return { rows, total: count.total };
+  }
+  async directoryFacets(filters: Record<string, any>) {
+    // Facets share search/coverage/status filters, excluding all facet selections and paging.
+    const { category, tier, kind, grade, dr_min, dr_max, ...nonFacet } =
+      filters;
+    const { sql, values } = await this.catalogueSql(nonFacet);
+    const { rows } = await this.db.query(
+      `WITH filtered AS (${sql})
+      SELECT facet.key, facet.value, count(*)::int AS count FROM filtered
+      CROSS JOIN LATERAL (VALUES
+        ('category', category), ('tier', tier::text), ('kind', kind),
+        ('grade', coalesce(grade, 'ungraded')),
+        ('dr', CASE WHEN dr IS NULL THEN 'unknown' WHEN dr <= 20 THEN '0–20'
+          WHEN dr <= 40 THEN '21–40' WHEN dr <= 60 THEN '41–60'
+          WHEN dr <= 80 THEN '61–80' ELSE '81–100' END)
+      ) facet(key, value) GROUP BY facet.key, facet.value`,
+      values,
+    );
+    const result: Record<string, Record<string, number>> = {
+      category: {},
+      tier: {},
+      kind: {},
+      grade: {},
+      dr: {},
+    };
+    for (const row of rows) result[row.key][row.value] = row.count;
+    return result;
   }
   async adminProfiles(
     scope: Scope,
     filters: { limit: number; offset: number },
   ) {
-    if (!scope.admin) throw new ListingError(403, "Platform admins only");
+    if (!scope.admin) throw new DirectoryError(403, "Platform admins only");
     return (
       await this.db.query(
         `SELECT p.*, u.email AS account_email,
@@ -210,7 +304,7 @@ export class ListingStore {
     directoryId: number | null,
     input: DirectoryEdits,
   ) {
-    if (!scope.admin) throw new ListingError(403, "Platform admins only");
+    if (!scope.admin) throw new DirectoryError(403, "Platform admins only");
     const edits =
       directoryId === null
         ? directoryCreateInput.parse(input)
@@ -224,7 +318,7 @@ export class ListingStore {
             "SELECT * FROM listing_directories WHERE id=$1 FOR UPDATE",
             [directoryId],
           );
-          if (!current) throw new ListingError(404, "Directory not found");
+          if (!current) throw new DirectoryError(404, "Directory not found");
           // Existing evidence was checked against this domain. Do not silently retarget it.
           if (edits.domain !== undefined && edits.domain !== current.domain) {
             const { rows } = await client.query(
@@ -232,9 +326,9 @@ export class ListingStore {
               [directoryId],
             );
             if (rows.length)
-              throw new ListingError(
+              throw new DirectoryError(
                 409,
-                "A directory with listings cannot change domains. Add a new directory instead.",
+                "A directory with directory profiles cannot change domains. Add a new directory instead.",
               );
           }
         }
@@ -260,7 +354,7 @@ export class ListingStore {
       });
     } catch (error) {
       if ((error as { code?: string }).code === "23505")
-        throw new ListingError(
+        throw new DirectoryError(
           409,
           "A directory with that name or domain already exists",
         );
@@ -301,35 +395,43 @@ export class ListingStore {
         "SELECT * FROM listing_profiles WHERE id=$1 AND (user_id=$2 OR $3::boolean) FOR UPDATE",
         [profileId, scope.userId, scope.admin],
       );
-      if (!profile) throw new ListingError(404, "Profile not found");
+      if (!profile) throw new DirectoryError(404, "Profile not found");
       const {
         rows: [directory],
       } = await client.query(
         "SELECT * FROM listing_directories WHERE id=$1 AND active=true FOR SHARE",
         [directoryId],
       );
-      if (!directory) throw new ListingError(404, "Active directory not found");
+      if (!directory)
+        throw new DirectoryError(404, "Active directory not found");
       if (!directory.domain || !domainAllows(directory.domain, url))
-        throw new ListingError(
+        throw new DirectoryError(
           400,
-          "Listing URL must belong to the selected directory",
+          "Directory profile URL must belong to the selected directory",
         );
       const {
-        rows: [listing],
+        rows: [entry],
       } = await client.query(
         `INSERT INTO listings(profile_id,directory_id,listing_url) VALUES($1,$2,$3)
     ON CONFLICT(profile_id,directory_id) DO NOTHING RETURNING *`,
         [profile.id, directory.id, url],
       );
-      if (!listing)
-        throw new ListingError(
+      if (!entry)
+        throw new DirectoryError(
           409,
-          "A listing already exists for this profile and directory",
+          "A directory profile already exists for this profile and directory",
         );
-      await this.event(client, scope, profile.id, listing.id, "listing_added", {
-        url,
-      });
-      return listing;
+      await this.event(
+        client,
+        scope,
+        profile.id,
+        entry.id,
+        "directory_profile_added",
+        {
+          url,
+        },
+      );
+      return entry;
     });
   }
   async recheck(scope: Scope, id: number) {
@@ -341,9 +443,9 @@ export class ListingStore {
    JOIN listing_directories d ON d.id=l.directory_id WHERE l.id=$1 AND (p.user_id=$2 OR $3::boolean)`,
       [id, scope.userId, scope.admin],
     );
-    if (!row) throw new ListingError(404, "Listing not found");
+    if (!row) throw new DirectoryError(404, "Directory profile not found");
     if (!row.listing_url || !row.domain)
-      throw new ListingError(400, "No checkable listing URL");
+      throw new DirectoryError(400, "No checkable directory profile URL");
     const result = await this.checker(
       row.listing_url,
       row.profile as NapProfile,
@@ -358,21 +460,21 @@ export class ListingStore {
         "SELECT * FROM listing_profiles WHERE id=$1 AND (user_id=$2 OR $3::boolean) FOR UPDATE",
         [row.profile_id, scope.userId, scope.admin],
       );
-      if (!profile) throw new ListingError(404, "Profile not found");
+      if (!profile) throw new DirectoryError(404, "Profile not found");
       const {
         rows: [fresh],
       } = await client.query(
         "SELECT *,xmin::text AS row_version FROM listings WHERE id=$1 FOR UPDATE",
         [id],
       );
-      if (!fresh) throw new ListingError(404, "Listing not found");
+      if (!fresh) throw new DirectoryError(404, "Directory profile not found");
       if (
         profile.revision !== row.profile.revision ||
         fresh.row_version !== row.row_version
       )
-        throw new ListingError(
+        throw new DirectoryError(
           409,
-          "Profile or listing changed during crawl; recheck again",
+          "Profile or directory profile changed during crawl; recheck again",
         );
       const {
         rows: [saved],
@@ -391,7 +493,7 @@ export class ListingStore {
         scope,
         profile.id,
         id,
-        "listing_checked",
+        "directory_profile_checked",
         result,
       );
       return saved;

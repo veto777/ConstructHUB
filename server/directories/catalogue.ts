@@ -1,7 +1,7 @@
 import { loadScoutedDirectories, toDirectoryRow } from "./scouted";
 
-/** Catalogue sources are discovery evidence, never proof of a business listing or API access.
- * Semrush US list: https://www.semrush.com/kb/874-listing-management-citation-websites (2026-10-13).
+/** Catalogue sources are discovery evidence, never proof of a business entry or API access.
+ * Semrush US list: https://www.semrush.com/kb/874-entry-management-citation-websites (2026-10-13).
  * Null requirements/trades/states mean unresearched, not unrestricted/free.
  */
 export type DirectorySeed = {
@@ -169,7 +169,7 @@ export function catalogue(): DirectorySeed[] {
   }
   return [...byDomain.values()];
 }
-export async function seedListingDirectories(db: {
+export async function seedDirectories(db: {
   query: (sql: string, values?: any[]) => Promise<unknown>;
 }) {
   for (const d of catalogue())
