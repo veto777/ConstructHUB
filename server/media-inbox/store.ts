@@ -317,13 +317,15 @@ const FREE_MAIL_ADDR = /@(gmail|googlemail|yahoo|ymail|hotmail|outlook|live|aol|
 
 /**
  * Queue vetted article / guest-post sites and news outlets (Backlinks kinds guest_post, editorial, press_release; tier
- * A or B; publishes an email; never contacted). Same exclusions as directories, plus free-mail addresses (on these
+ * A or B; at least 500 Google visits a month — below that it is a contractor's own blog or a link farm; publishes an
+ * email; never contacted). Same exclusions as directories, plus free-mail addresses (on these
  * sites they are mostly guest-post sellers, not editors). press_release / editorial → "news", guest_post → "article".
  */
 export async function queueVettedPublishers(pick: (emails: string[]) => string | null, name: (domain: string, signals: any) => string): Promise<number> {
   const r = await db().query(
     `SELECT s.domain, s.kind, s.contact_emails, s.signals FROM backlink_sources s
       WHERE s.kind IN ('guest_post', 'editorial', 'press_release') AND s.tier IN ('A', 'B') AND cardinality(s.contact_emails) > 0
+        AND COALESCE((s.metrics->>'organicTraffic')::numeric, 0) >= 500
         AND NOT EXISTS (SELECT 1 FROM media_outreach_queue q WHERE q.domain = s.domain)
         AND NOT EXISTS (SELECT 1 FROM media_partners p WHERE p.domain = s.domain)
       ORDER BY s.tier, s.score DESC NULLS LAST`);
