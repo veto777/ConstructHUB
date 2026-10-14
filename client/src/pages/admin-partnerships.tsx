@@ -7,9 +7,9 @@
 import { useMemo, useState } from "react";
 import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import { formatDistanceToNowStrict } from "date-fns";
-import { Handshake, Inbox, Loader2, Lock, Mail, Play, Send } from "lucide-react";
+import { Handshake, Inbox, Loader2, Lock, Mail, Play, Scale, Send } from "lucide-react";
 import {
-  MEDIA_MESSAGE_STATUS_LABELS, MEDIA_PARTNER_KINDS, MEDIA_PARTNER_KIND_LABELS, MEDIA_PARTNER_STATUSES, MEDIA_PARTNER_STATUS_LABELS,
+  MEDIA_INBOX_LAWS, MEDIA_INBOX_PARAMETERS, MEDIA_MESSAGE_STATUS_LABELS, MEDIA_PARTNER_KINDS, MEDIA_PARTNER_KIND_LABELS, MEDIA_PARTNER_STATUSES, MEDIA_PARTNER_STATUS_LABELS,
   type MediaMessage, type MediaMessageStatus, type MediaPartner, type MediaPartnerKind, type MediaPartnerStatus,
 } from "@shared/media-inbox";
 import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
@@ -256,6 +256,25 @@ export default function AdminPartnershipsPage() {
               </div>
             </div>
           )}
+        </Section>
+
+        <Section title="Inbox laws" icon={Scale} description="What the AI answering media@ must follow. Laws marked “Checked in code” are verified on every reply before it is sent, whichever model wrote it; a reply that breaks one is replaced by a holding reply and waits for you.">
+          <ol className="list-decimal space-y-1.5 pl-5 text-sm" data-testid="list-inbox-laws">
+            {MEDIA_INBOX_LAWS.map((l) => (
+              <li key={l.law}>
+                {l.law}{" "}
+                <StatusPill tone={l.enforced === "code" ? "success" : "neutral"} dot={false}>{l.enforced === "code" ? "Checked in code" : "Instruction"}</StatusPill>
+              </li>
+            ))}
+          </ol>
+          <dl className="mt-4 grid grid-cols-[minmax(0,14rem)_1fr] gap-x-3 gap-y-1.5 text-sm" data-testid="list-inbox-parameters">
+            <dt className="text-muted-foreground">Checks the inbox</dt><dd>every {s.intervalMin} minutes</dd>
+            <dt className="text-muted-foreground">Reply length</dt><dd>under {MEDIA_INBOX_PARAMETERS.maxReplyWords} words (never sent over {MEDIA_INBOX_PARAMETERS.hardReplyWordLimit})</dd>
+            <dt className="text-muted-foreground">Replies to one sender</dt><dd>at most {MEDIA_INBOX_PARAMETERS.maxRepliesPerSenderPerDay} a day (stops loops with other auto-responders)</dd>
+            <dt className="text-muted-foreground">If the AI fails</dt><dd>{MEDIA_INBOX_PARAMETERS.aiAttemptsBeforeHolding} tries, then a holding reply</dd>
+            <dt className="text-muted-foreground">No answer</dt><dd>a follow-up after {MEDIA_INBOX_PARAMETERS.followUpAfterDays} days; {MEDIA_INBOX_PARAMETERS.followUpAfterDays} more days → a new contact from their website (up to {MEDIA_INBOX_PARAMETERS.maxContactsPerCompany} addresses per company)</dd>
+            <dt className="text-muted-foreground">AI order</dt><dd>{MEDIA_INBOX_PARAMETERS.aiOrder.join(" → ")}</dd>
+          </dl>
         </Section>
 
         <Section title="Email a company" description="First contact from media@. Replies are answered automatically every 30 minutes; nothing that costs money is agreed.">

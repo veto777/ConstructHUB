@@ -3,24 +3,28 @@
  *   1. reads new email in media@ — machine senders are logged as automated, everything else waits for an answer;
  *   2. answers each waiting email (owner's law: none is ignored) — the model drafts, ./guard.ts checks; a refused draft,
  *      a model failure (after 3 tries) or a money / meeting / contract question gets a holding reply and waits for the owner;
- *   3. records the company and where the relationship stands; an agreement adds it to our lists (store.addAgreedPartner).
+ *   3. records the company and where the relationship stands; an agreement adds it to our lists (store.addAgreedPartner);
+ *   4. follows up (owner, 2026-10-14): no answer 5 days after our last email → one follow-up in the thread; still nothing
+ *      5 days later → another contact address from their site (up to 3 per company), else a note for the owner.
  * One process at a time (a Postgres advisory lock).
  */
+import { MEDIA_INBOX_PARAMETERS } from "@shared/media-inbox";
 import { pool } from "../db";
 import { recordFailure } from "../ops/issues";
 import { decide, mediaAiConfigured } from "./ai";
 import { companyDomain, firstNameOf, holdingReply, machineReason, replyProblem, replySubject } from "./guard";
+import { pickEmail } from "../backlinks/outreach";
 import { fetchSince, mailboxConfig, mailboxConfigured, sendMail } from "./mailbox";
 import * as store from "./store";
 
 const num = (v: string | undefined, d: number) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : d; };
 export const mediaWorkerConfig = (env: NodeJS.ProcessEnv = process.env) => ({
   enabled: env.MEDIA_INBOX_ENABLED === "true",
-  intervalMin: num(env.MEDIA_INBOX_INTERVAL_MIN, 30),
+  intervalMin: num(env.MEDIA_INBOX_INTERVAL_MIN, MEDIA_INBOX_PARAMETERS.checkEveryMin),
 });
 
-export const MAX_ATTEMPTS = 3;
-export const MAX_REPLIES_PER_DAY = 4;
+export const MAX_ATTEMPTS = MEDIA_INBOX_PARAMETERS.aiAttemptsBeforeHolding;
+export const MAX_REPLIES_PER_DAY = MEDIA_INBOX_PARAMETERS.maxRepliesPerSenderPerDay;
 const ANSWER_BATCH = 25;
 
 export const workerDeps = { fetchSince, sendMail, decide };
@@ -68,7 +72,7 @@ export async function answerPending(): Promise<{ replied: number; held: number; 
     }
     const subject = replySubject(m.subject);
     const messageId = await workerDeps.sendMail({ to: m.fromEmail, cc: m.cc, subject, body, inReplyTo: m.messageId, references: m.references });
-    const replyId = await store.saveOutbound(mailbox, { messageId, threadKey: m.threadKey, to: m.fromEmail, cc: m.cc, subject, body, partnerId });
+    const replyId = await store.saveOutbound(mailbox, { messageId, threadKey: m.threadKey, to: m.fromEmail, cc: m.cc, subject, body, partnerId, purpose: "reply" });
     await store.finishMessage(m.id, status, reason, replyId || null, partnerId);
     if (newlyAgreed?.newlyAgreed) await store.addAgreedPartner(newlyAgreed.partner);
     if (status === "replied") out.replied++; else if (status === "needs_owner") out.held++; else out.failed++;
@@ -76,10 +80,65 @@ export async function answerPending(): Promise<{ replied: number; held: number; 
   return out;
 }
 
+/** The follow-up in the same thread (no model: fixed, law-safe wording). */
+export function followUpBody(firstName: string | null, company: string, firstBody: string): string {
+  const hi = firstName ? `Hi ${firstName},` : "Hi,";
+  return `${hi}\n\nWe wanted to follow up on our email below about working together with ${company}. If you're not the right person, could you point us to whoever handles partnerships or listings?\n\nBest regards,\n\n--- Our earlier email ---\n${firstBody.trim()}`;
+}
+
+/** First contact to another address at the same company, after the first one went quiet. */
+export function newContactBody(company: string, firstBody: string): string {
+  const body = firstBody.trim().replace(/^(hi|hello|dear)[^\n]*\n+/i, "");
+  return `Hi,\n\nWe tried to reach ${company} at another address and may have had the wrong contact. ${body}`;
+}
+
+export const followDeps = {
+  readEmails: async (domain: string): Promise<string[]> => {
+    const { readSite } = await import("../backlinks/vet");
+    const s = await readSite(`https://${domain}/contact`, domain).catch(() => null);
+    return s?.emails ?? [];
+  },
+};
+
+/** Step 4: nobody answered → follow up once; still nothing → a new address at the company (owner, 2026-10-14). */
+export async function followUpSilent(): Promise<{ followedUp: number; newContacts: number; exhausted: number }> {
+  const mailbox = mailboxConfig().user;
+  const out = { followedUp: 0, newContacts: 0, exhausted: 0 };
+  for (const t of await store.silentThreads(MEDIA_INBOX_PARAMETERS.followUpAfterDays)) {
+    if (t.followups === 0) {
+      const body = followUpBody(t.to.toLowerCase() === (t.triedEmails[0] ?? "") ? firstNameOf(t.contactName) : null, t.company, t.firstBody);
+      const subject = replySubject(t.firstSubject);
+      const messageId = await workerDeps.sendMail({ to: t.to, cc: t.cc, subject, body, inReplyTo: t.lastMessageId, references: t.references });
+      await store.saveOutbound(mailbox, { messageId, threadKey: t.threadKey, to: t.to, cc: t.cc, subject, body, partnerId: t.partnerId, purpose: "followup" });
+      await store.markFollowedUp(t.lastId);
+      out.followedUp++;
+      continue;
+    }
+    await store.markFollowedUp(t.lastId);
+    const tried = new Set(t.triedEmails.map((e) => e.toLowerCase()));
+    let next: string | null = null;
+    if (t.domain && tried.size < MEDIA_INBOX_PARAMETERS.maxContactsPerCompany) {
+      const found = [...(await store.knownEmails(t.domain)), ...(await followDeps.readEmails(t.domain))]
+        .map((e) => e.toLowerCase()).filter((e) => !tried.has(e) && !machineReason({ fromEmail: e, subject: "" }));
+      next = pickEmail([...new Set(found)]);
+    }
+    if (!next) {
+      await store.noteOnPartner(t.partnerId, `No reply from ${[...tried].join(", ")} after a follow-up, and no other contact address found on ${t.domain ?? "their site"}.`);
+      out.exhausted++;
+      continue;
+    }
+    const body = newContactBody(t.company, t.firstBody);
+    const messageId = await workerDeps.sendMail({ to: next, subject: t.firstSubject, body });
+    await store.saveOutbound(mailbox, { messageId, threadKey: null, to: next, subject: t.firstSubject, body, partnerId: t.partnerId, purpose: "outreach" });
+    out.newContacts++;
+  }
+  return out;
+}
+
 const LOCK_KEY = 0x6d656469; // "medi"
 let running = false;
 
-export async function runMediaPass(): Promise<{ ok: boolean; skipped?: string; read?: number; replied?: number; held?: number; failed?: number }> {
+export async function runMediaPass(): Promise<{ ok: boolean; skipped?: string; read?: number; replied?: number; held?: number; failed?: number; followedUp?: number; newContacts?: number; exhausted?: number }> {
   if (!mailboxConfigured()) return { ok: false, skipped: "The media@ mailbox is not configured (MEDIA_EMAIL / MEDIA_APP_PASSWORD)" };
   if (!mediaAiConfigured()) return { ok: false, skipped: "No AI key configured for the media inbox" };
   if (running) return { ok: false, skipped: "A pass is already running" };
@@ -90,8 +149,9 @@ export async function runMediaPass(): Promise<{ ok: boolean; skipped?: string; r
     try {
       const r = await readInbox();
       const a = await answerPending();
+      const f = await followUpSilent();
       await store.markPass(mailboxConfig().user, null);
-      return { ok: true, read: r.read, ...a };
+      return { ok: true, read: r.read, ...a, ...f };
     } catch (e: any) {
       await store.markPass(mailboxConfig().user, String(e?.message ?? e).slice(0, 500)).catch(() => undefined);
       throw e;

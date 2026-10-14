@@ -19,6 +19,9 @@ CREATE TABLE IF NOT EXISTS media_messages (
 );
 CREATE INDEX IF NOT EXISTS media_messages_thread ON media_messages(thread_key, received_at);
 CREATE INDEX IF NOT EXISTS media_messages_status ON media_messages(status, received_at);
+-- Follow-ups (owner, 2026-10-14): what each email we sent was for, and when an unanswered one was acted on.
+ALTER TABLE media_messages ADD COLUMN IF NOT EXISTS purpose text, ADD COLUMN IF NOT EXISTS followed_up_at timestamptz;
+ALTER TABLE media_partners ADD COLUMN IF NOT EXISTS tried_emails text[] NOT NULL DEFAULT '{}';
 CREATE TABLE IF NOT EXISTS media_inbox_state (
  mailbox text PRIMARY KEY, uid_validity text, last_uid bigint NOT NULL DEFAULT 0,
  last_pass_at timestamptz, last_pass_error text

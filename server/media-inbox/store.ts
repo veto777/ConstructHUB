@@ -71,12 +71,61 @@ export async function repliesToday(email: string): Promise<number> {
   return Number(r.rows[0]?.n ?? 0);
 }
 
-export async function saveOutbound(mailbox: string, o: { messageId: string; threadKey: string | null; to: string; cc?: string | null; subject: string; body: string; partnerId: number | null }): Promise<number> {
+export type OutboundPurpose = "reply" | "outreach" | "followup";
+export async function saveOutbound(mailbox: string, o: { messageId: string; threadKey: string | null; to: string; cc?: string | null; subject: string; body: string; partnerId: number | null; purpose: OutboundPurpose }): Promise<number> {
   const r = await db().query(
-    `INSERT INTO media_messages (mailbox, message_id, thread_key, direction, from_email, to_email, cc, subject, body, status, partner_id)
-     VALUES ($1, $2, $3, 'out', $1, $4, $5, $6, $7, 'replied', $8) ON CONFLICT (message_id) DO NOTHING RETURNING id`,
-    [mailbox, o.messageId, o.threadKey ?? o.messageId, o.to, o.cc ?? null, o.subject, o.body, o.partnerId]);
+    `INSERT INTO media_messages (mailbox, message_id, thread_key, direction, from_email, to_email, cc, subject, body, status, partner_id, purpose)
+     VALUES ($1, $2, $3, 'out', $1, $4, $5, $6, $7, 'replied', $8, $9) ON CONFLICT (message_id) DO NOTHING RETURNING id`,
+    [mailbox, o.messageId, o.threadKey ?? o.messageId, o.to, o.cc ?? null, o.subject, o.body, o.partnerId, o.purpose]);
+  if (o.partnerId) await db().query(
+    `UPDATE media_partners SET tried_emails = CASE WHEN lower($2) = ANY(tried_emails) THEN tried_emails ELSE array_append(tried_emails, lower($2)) END, last_message_at = now() WHERE id = $1`,
+    [o.partnerId, o.to]);
   return r.rows[0]?.id ?? 0;
+}
+
+export type SilentThread = {
+  lastId: number; threadKey: string; to: string; cc: string | null; lastMessageId: string; references: string[];
+  partnerId: number; company: string; domain: string | null; contactName: string | null; triedEmails: string[];
+  followups: number; firstSubject: string; firstBody: string;
+};
+
+/**
+ * Threads where we wrote last, nobody answered for `days`, the ball is not in our court (no email waiting for the
+ * owner) and the company is still live (talking / agreed). Each is acted on once (followed_up_at on our last email).
+ */
+export async function silentThreads(days: number, limit = 20): Promise<SilentThread[]> {
+  const r = await db().query(
+    `WITH last AS (
+       SELECT DISTINCT ON (thread_key) * FROM media_messages WHERE thread_key IS NOT NULL ORDER BY thread_key, received_at DESC, id DESC)
+     SELECT l.id, l.thread_key, l.to_email, l.cc, l.message_id, l.partner_id, p.company, p.domain, p.contact_name, p.tried_emails,
+            (SELECT count(*)::int FROM media_messages f WHERE f.thread_key = l.thread_key AND f.purpose = 'followup') AS followups,
+            (SELECT string_agg(o.message_id, ' ' ORDER BY o.received_at) FROM media_messages o WHERE o.thread_key = l.thread_key) AS refs,
+            (SELECT o.subject FROM media_messages o WHERE o.thread_key = l.thread_key AND o.direction = 'out' ORDER BY o.received_at, o.id LIMIT 1) AS first_subject,
+            (SELECT o.body FROM media_messages o WHERE o.thread_key = l.thread_key AND o.direction = 'out' ORDER BY o.received_at, o.id LIMIT 1) AS first_body
+       FROM last l JOIN media_partners p ON p.id = l.partner_id
+      WHERE l.direction = 'out' AND l.followed_up_at IS NULL AND l.received_at < now() - make_interval(days => $1)
+        AND p.status IN ('talking', 'agreed')
+        AND NOT EXISTS (SELECT 1 FROM media_messages i WHERE i.thread_key = l.thread_key AND i.direction = 'in' AND i.status IN ('needs_owner', 'failed', 'new'))
+      ORDER BY l.received_at LIMIT $2`, [days, limit]);
+  return r.rows.map((x) => ({
+    lastId: x.id, threadKey: x.thread_key, to: x.to_email, cc: x.cc, lastMessageId: x.message_id, references: String(x.refs ?? "").split(" ").filter(Boolean),
+    partnerId: x.partner_id, company: x.company, domain: x.domain, contactName: x.contact_name, triedEmails: x.tried_emails ?? [],
+    followups: x.followups, firstSubject: x.first_subject ?? "", firstBody: x.first_body ?? "",
+  }));
+}
+
+export async function markFollowedUp(messageId: number) {
+  await db().query(`UPDATE media_messages SET followed_up_at = now() WHERE id = $1`, [messageId]);
+}
+
+/** Contact addresses we already hold for a domain (the Backlinks database's crawl). */
+export async function knownEmails(domain: string): Promise<string[]> {
+  const r = await db().query(`SELECT contact_emails FROM backlink_sources WHERE domain = $1`, [domain]).catch(() => ({ rows: [] as any[] }));
+  return (r.rows[0]?.contact_emails ?? []) as string[];
+}
+
+export async function noteOnPartner(id: number, ownerQuestion: string) {
+  await db().query(`UPDATE media_partners SET owner_question = $2, updated_at = now() WHERE id = $1`, [id, ownerQuestion]);
 }
 
 export async function finishMessage(id: number, status: "replied" | "needs_owner" | "failed", reason: string | null, replyId: number | null, partnerId: number | null) {
