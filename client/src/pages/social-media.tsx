@@ -32,7 +32,7 @@ import { SocialAccountStats, SocialPostInsights } from "@/components/social-insi
 import { useLocation } from "wouter";
 import { ToolBarSlot } from "@/components/tool/shell";
 import { socialHref, socialViewOf, type SocialView } from "@/components/social-tool/nav";
-import { NetworkIcon, SocialWeek } from "@/components/social-week";
+import { NetworkBadge, NetworkIcon, SocialWeek, networkName } from "@/components/social-week";
 import { XPreview } from "@/components/social-x";
 import { TikTokDeclaration, TikTokPanel } from "@/components/social-tiktok";
 
@@ -89,7 +89,7 @@ const VIEW_HEAD: Record<SocialView, [string, string]> = {
   posts: ["Posts", "Drafts, scheduled, published and failed posts, newest first."],
   analytics: ["Analytics", "Followers, reach and engagement for each connected account, and your published posts."],
   inbox: ["Inbox", "Comments on your published posts. Open Comments on a post to reply, hide or delete."],
-  accounts: ["Accounts", "Connect Facebook, Instagram, Threads, TikTok and YouTube, and choose where posts go."],
+  accounts: ["Accounts", "Connect your social accounts and choose where posts go."],
   auto: ["Auto mode", "Let ConstructHUB write posts for you on a schedule, as drafts or straight to your accounts."],
   guides: ["Guides", "Step-by-step help for Social Media."],
 };
@@ -589,7 +589,8 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
                         checked={!!d}
                         onChange={(e) => choose(a, e.target.checked)}
                       />
-                      {a.name} · {a.platform}
+                      <NetworkIcon platform={a.platform} />
+                      {a.name} · {networkName(a.platform)}
                     </label>
                     {d && (
                       <div className="space-y-2">
@@ -694,11 +695,11 @@ function SocialWorkbench({ view, accountId, businessId, all, draftEdits, onEditD
             </label>
             {[...new Set(destinations.map((d) => d.platform))].map((p) => (
               <label className="block space-y-1" key={p}>
-                <span className="text-sm">
-                  {p === "x" ? "X" : p} text tweak · {characterCount(p, tweaks[p] ?? text)}
+                <span className="flex items-center gap-1.5 text-sm">
+                  <NetworkIcon platform={p} /> {networkName(p)} text tweak · {characterCount(p, tweaks[p] ?? text)}
                 </span>
                 <Textarea
-                  aria-label={`${p === "x" ? "X" : p} text tweak`}
+                  aria-label={`${networkName(p)} text tweak`}
                   value={tweaks[p] ?? text}
                   onChange={(e) =>
                     setTweaks({ ...tweaks, [p]: e.target.value })
@@ -1317,7 +1318,7 @@ function PostRow({
         {["draft", "queued"].includes(p.state) && <input type="checkbox" aria-label={`Select post ${p.id}`} checked={selected} onChange={e => onSelect(e.target.checked)} />}
         <span className={`g-chip g-chip--sm ${p.state === "failed" ? "g-closed" : p.state === "published" ? "g-open" : ""}`}>{p.state}</span>
         <span className="g-card__title g-card__title--md">{p.business_name || "Legacy / unassigned"}</span>
-        <span className="text-sm g-text-2">{p.payload.post.content.platform}</span>
+        <NetworkBadge platform={p.payload.post.content.platform} className="text-sm g-text-2" />
         <span className="text-sm g-text-2">
           · {when.toLocaleString()}
         </span>
@@ -1403,8 +1404,8 @@ function PostRow({
             <AlertDialogTitle>Cancel this {p.state === "draft" ? "draft" : "post"}?</AlertDialogTitle>
             <AlertDialogDescription>
               {p.state === "queued"
-                ? `It is queued for ${when.toLocaleString()} on ${p.payload.post.content.platform} and won't be published.`
-                : `The draft for ${p.payload.post.content.platform} is removed from the queue.`}{" "}
+                ? `It is queued for ${when.toLocaleString()} on ${networkName(p.payload.post.content.platform)} and won't be published.`
+                : `The draft for ${networkName(p.payload.post.content.platform)} is removed from the queue.`}{" "}
               This can't be undone; compose a new post if you change your mind.
             </AlertDialogDescription>
           </AlertDialogHeader>

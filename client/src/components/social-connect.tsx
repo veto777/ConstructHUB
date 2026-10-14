@@ -11,6 +11,7 @@ import { GoogleSectionHeader, GooglePill } from "@/components/google";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useUrlParam } from "@/hooks/use-url-param";
+import { NetworkIcon } from "@/components/social-week";
 
 const LABEL: Record<string, string> = { facebook: "Facebook", instagram: "Instagram", instagram_direct: "Instagram (no Facebook Page)", linkedin: "LinkedIn", tiktok: "TikTok", youtube: "YouTube", pinterest: "Pinterest", threads: "Threads", x: "X", twitter: "X", bluesky: "Bluesky", reddit: "Reddit", mastodon: "Mastodon", tumblr: "Tumblr" };
 const NOTE: Record<string, string> = {
@@ -154,7 +155,7 @@ export function SocialConnect({ businessId, networks, accounts, connected, via =
           {pending.isLoading && <p className="text-sm">Loading the pages you can connect…</p>}
           {pending.isError && <p className="text-sm text-destructive">{apiErrorMessage(pending.error)} Start again with the button below.</p>}
           {pending.data && (<>
-            <p className="mb-2 text-sm font-medium">Which {LABEL[pending.data.network] ?? pending.data.network} pages should ConstructHUB post to?</p>
+            <p className="mb-2 flex items-center gap-2 text-sm font-medium"><NetworkIcon platform={pending.data.network} />Which {LABEL[pending.data.network] ?? pending.data.network} pages should ConstructHUB post to?</p>
             {pending.data.pages.length === 0 && <p className="text-sm text-muted-foreground">This sign-in has no pages you manage. Sign in with the account that runs the business page.</p>}
             <div className="space-y-1.5">
               {pending.data.pages.map((p) => (
@@ -182,9 +183,12 @@ export function SocialConnect({ businessId, networks, accounts, connected, via =
           const form = (n === "bluesky" || n === "mastodon") && via === "native";
           return (
             <div key={n} className="flex items-center justify-between gap-2 rounded-lg border p-3" data-testid={`network-${n}`}>
-              <div className="min-w-0">
-                <p className="text-sm font-medium">{LABEL[n] ?? n}</p>
-                <p className="truncate text-xs text-muted-foreground">{mine.length ? mine.map((a) => a.name).join(", ") : NOTE[n] ?? "Not connected"}</p>
+              <div className="flex min-w-0 items-center gap-3">
+                <NetworkIcon platform={n} className="h-7 w-7" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">{LABEL[n] ?? n}</p>
+                  <p className="truncate text-xs text-muted-foreground">{mine.length ? mine.map((a) => a.name).join(", ") : NOTE[n] ?? "Not connected"}</p>
+                </div>
               </div>
               <GooglePill size="sm" variant={mine.length ? "outline" : "solid"} label={mine.length ? "Add another" : "Connect"} disabled={start.isPending} onClick={() => (form ? (n === "mastodon" ? setMastodon(true) : setBluesky(true)) : start.mutate(n))} />
             </div>

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Toolbar } from "@/components/app-ui";
 import { GoogleSectionHeader, GoogleList, GoogleListRow, GooglePill } from "@/components/google";
 import { useToast } from "@/hooks/use-toast";
+import { NetworkIcon, networkName } from "@/components/social-week";
 import { destinationSchema, platforms, type Destination } from "@shared/social";
 
 // Google's rounded field shape for the native selects (the surface supplies the hairline colour).
@@ -176,9 +177,9 @@ export function MappingEditor({ businessId, defaults }: { businessId: number; de
           const d = choices.find(d => d.accountId === a.id);
           return (
             <div key={a.id} className="space-y-2 rounded-lg border p-3">
-              <label className="flex gap-2 text-sm">
+              <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" aria-label={`Map: ${a.name} · ${a.platform}`} className="focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" disabled={!platforms.includes(a.platform)} checked={!!d} onChange={e => setDraft(e.target.checked ? [...choices, destinationSchema.parse({ accountId: a.id, platform: a.platform })] : choices.filter(d => d.accountId !== a.id))} />
-                Map {a.name} · {a.platform}
+                Map <NetworkIcon platform={a.platform} /> {a.name} · {networkName(a.platform)}
               </label>
               {d && ["facebook", "linkedin", "pinterest", "reddit", "tumblr"].includes(a.platform) && <><GooglePill size="sm" disabled={mutation.isPending} onClick={() => mutation.mutate({ path: `/accounts/${a.id}/pages` })} label={`Discover pages for ${a.name}`} /><TargetPicker businessId={businessId} account={a} destination={d} onChange={value => patch(a.id, ["pinterest", "reddit", "tumblr"].includes(a.platform) ? { boardId: value || undefined } : { pageId: value || undefined })} /></>}
               {d && ["youtube", "pinterest", "reddit"].includes(a.platform) && <Input aria-label={`Default title for ${a.name}`} value={d.title || ""} onChange={e => patch(a.id, { title: e.target.value })} />}
