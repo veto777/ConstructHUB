@@ -6,6 +6,7 @@
  *   GET  /api/research-reports/orders           my orders (an admin: everyone's, ?all=1)
  *   GET  /api/research-reports/orders/:id       one order, with the report when complete (owner or admin)
  *   POST /api/research-reports/orders/:id/retry  admin: re-queue a failed order
+ *   POST /api/research-reports/orders/:id/run    admin: run an unpaid order without checkout (no charge)
  * The webhook side is fulfilResearchCheckout, called from server/stripe.ts applyOneTimeCheckout.
  */
 import type { Express, Request, Response } from "express";
@@ -104,6 +105,18 @@ export function registerResearchRoutes(app: Express, deps: Deps) {
   app.get("/api/research-reports/orders/:id", async (req, res) => {
     const found = await own(req, res);
     if (found) res.json(orderView(found.row));
+  });
+
+  // Platform admins skip the paywall: the order is marked paid with no Stripe session and no charge.
+  app.post("/api/research-reports/orders/:id/run", async (req, res) => {
+    const found = await own(req, res);
+    if (!found) return;
+    const { user, row } = found;
+    if (!isPlatformAdmin(user)) return res.status(403).json({ message: "Administrator access required" });
+    if (!(await markPaid(row.id, row.user_id, `admin-run-${row.id}`))) return res.status(409).json({ message: "This order is already paid" });
+    console.log(`[research] order ${row.id} run by admin ${user.email} without payment; queued`);
+    void drainResearchQueue().catch((err) => console.error("[research] queue:", err));
+    res.json({ ok: true });
   });
 
   app.post("/api/research-reports/orders/:id/retry", async (req, res) => {

@@ -8,7 +8,7 @@ import { useState } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowUpRight, CheckCircle2, FileSearch, Loader2, Plus, Printer, Trash2, XCircle } from "lucide-react";
-import { apiErrorMessage, apiRequest } from "@/lib/queryClient";
+import { apiErrorMessage, apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,6 +50,7 @@ export default function ResearchOrderPage() {
   const [trades, setTrades] = useState<ResearchTrade[]>([]);
   const [sinceYear, setSinceYear] = useState("");
   const [purpose, setPurpose] = useState("");
+  const [wantExtended, setWantExtended] = useState(false);
   const [agree, setAgree] = useState({ refund: false, guarantee: false, fcra: false });
 
   const named = subjects.filter((s) => s.name.trim().length >= 2);
@@ -70,6 +71,16 @@ export default function ResearchOrderPage() {
     return <ComplianceFrame next={RESEARCH_PATH} testId="page-research"><p className="text-sm text-muted-foreground">Research reports are ordered on constructhub.us.</p></ComplianceFrame>;
   }
 
+  const pickTier = (k: keyof typeof RESEARCH_TIERS) => {
+    setWantExtended(k === "extended");
+    if (k === "standard") {
+      setSubjects((p) => [p.find((x) => x.name.trim()) ?? p[0]]);
+      setStates((p) => p.slice(0, 1));
+    } else if (subjects.length < 2) {
+      setSubjects((p) => [...p, { name: "", kind: "person" }]);
+      requestAnimationFrame(() => (document.querySelector('[data-testid="input-subject-1"]') as HTMLInputElement | null)?.focus());
+    }
+  };
   const toggleState = (code: string) => setStates((prev) => prev.includes(code) ? prev.filter((s) => s !== code) : prev.length >= MAX_STATES ? prev : [...prev, code]);
 
   return (
@@ -85,17 +96,25 @@ export default function ResearchOrderPage() {
         </p>
       </header>
 
-      <div className="grid gap-3 sm:grid-cols-2 max-w-3xl">
+      {/* Picking a card shapes the form; the price always follows what's entered (one name in one state is Standard). */}
+      <div className="grid gap-3 sm:grid-cols-2 max-w-3xl" role="group" aria-label="Report size">
         {(Object.keys(RESEARCH_TIERS) as (keyof typeof RESEARCH_TIERS)[]).map((k) => (
-          <div key={k} className={`rounded-lg border p-4 ${tier === k ? "border-primary ring-1 ring-primary" : ""}`} data-testid={`card-tier-${k}`}>
+          <button key={k} type="button" onClick={() => pickTier(k)} aria-pressed={tier === k}
+            className={`rounded-lg border p-4 text-left transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${tier === k ? "border-primary ring-1 ring-primary" : ""}`}
+            data-testid={`card-tier-${k}`}>
             <p className="font-semibold">{RESEARCH_TIERS[k].label}</p>
             <p className="text-2xl font-semibold mt-1">{formatUsd(RESEARCH_TIERS[k].cents)}</p>
             <p className="text-sm text-muted-foreground mt-1">
               {RESEARCH_TIERS[k].maxNames === 1 ? "One name" : `Up to ${RESEARCH_TIERS[k].maxNames} names`} in {RESEARCH_TIERS[k].maxStates === 1 ? "one state" : `up to ${RESEARCH_TIERS[k].maxStates} states`}. Paid up front.
             </p>
-          </div>
+          </button>
         ))}
       </div>
+      {wantExtended && tier === "standard" && (
+        <p className="text-sm text-muted-foreground max-w-3xl -mt-4" data-testid="text-extended-hint">
+          Add a second name or a second state for the Extended report. With one name in one state you pay the Standard price.
+        </p>
+      )}
 
       <form className="space-y-6 max-w-3xl" onSubmit={(e) => { e.preventDefault(); if (!user) { navigate(`/auth?next=${encodeURIComponent(RESEARCH_PATH)}`); return; } if (ready) create.mutate(); }} data-testid="form-research">
         <fieldset className="space-y-3">
@@ -269,6 +288,12 @@ export function ResearchOrderStatusPage() {
     onSuccess: ({ url }) => { window.location.href = url; },
     onError: (err) => toast({ title: "Couldn't open checkout", description: apiErrorMessage(err), variant: "destructive" }),
   });
+  const { data: me } = useQuery<{ isPlatformAdmin?: boolean } | null>({ queryKey: ["/api/auth/me"] });
+  const adminRun = useMutation({
+    mutationFn: async () => (await apiRequest("POST", `/api/research-reports/orders/${id}/run`, {})).json(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/research-reports/orders/${id}`] }),
+    onError: (err) => toast({ title: "Couldn't start the research", description: apiErrorMessage(err), variant: "destructive" }),
+  });
 
   return (
     <ComplianceFrame next={`${RESEARCH_PATH}/orders/${id}`} testId="page-research-order">
@@ -304,6 +329,12 @@ export function ResearchOrderStatusPage() {
                 {pay.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
                 Pay {formatUsd(o.priceCents)} and start the research
               </Button>
+              {me?.isPlatformAdmin === true && (
+                <Button variant="outline" className="sm:ml-2" onClick={() => adminRun.mutate()} disabled={adminRun.isPending} data-testid="button-admin-run">
+                  {adminRun.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+                  Admin: run without paying
+                </Button>
+              )}
             </div>
           )}
           {(o.status === "paid" || o.status === "researching") && (
