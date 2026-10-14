@@ -85,3 +85,9 @@ export function companyDomain(email: string): string | null {
 
 /** The reply's subject: "Re: " once. */
 export const replySubject = (subject: string) => (/^re:/i.test(subject.trim()) ? subject.trim() : `Re: ${subject.trim() || "your email"}`);
+
+const OPT_OUT = /^\W*(stop|unsubscribe)\W*$|\b(unsubscribe|remove (me|us)( from (your|this) (list|emails?))?|stop (emailing|contacting|sending)|do not (email|contact)|don'?t (email|contact)|opt(ed)? out|take (me|us) off)\b|^\W*not interested\b/im;
+/** Did they ask us to stop? (first lines only, so a quoted footer of ours never counts). */
+export function isOptOut(body: string): boolean {
+  return OPT_OUT.test(body.split("\n").slice(0, 8).join("\n"));
+}

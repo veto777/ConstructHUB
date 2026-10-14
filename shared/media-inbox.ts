@@ -73,6 +73,7 @@ export type MediaInboxSummary = {
   lastPassError: string | null;
   counts: Record<MediaMessageStatus, number>;
   partners: Record<MediaPartnerStatus, number>;
+  queue: { queued: number; sent: number; sentToday: number; perDay: number };
 };
 
 /**
@@ -94,6 +95,7 @@ export const MEDIA_INBOX_LAWS: { law: string; enforced: "code" | "instructions" 
   { law: "Warm, professional, plain English. Never claim to be a specific person and never say it is an AI. Sign as the Construct HUB Media Team.", enforced: "code" },
   { law: "Money, meetings, contracts, legal questions and data access go to the owner (\"Waiting for you\"); they get a polite reply that the team will review and follow up.", enforced: "code" },
   { law: "Never let a company go quiet: no answer 5 days after our last email → one polite follow-up in the same thread; still nothing 5 days later → find another contact address on their website and write to them (at most 3 addresses per company, never one that is already tried).", enforced: "code" },
+  { law: "Anyone who says stop, unsubscribe, remove me or not interested is never emailed again (no reply, no follow-up); every first-contact email says so.", enforced: "code" },
   { law: "Record every company: what kind it is, where the relationship stands, any cost terms quoted, what was agreed and what is left to finalize.", enforced: "code" },
 ];
 
@@ -106,5 +108,6 @@ export const MEDIA_INBOX_PARAMETERS = {
   aiAttemptsBeforeHolding: 3,
   followUpAfterDays: 5,
   maxContactsPerCompany: 3,
+  newContactsPerDay: 50,
   aiOrder: ["TruthCoder", "TruthCoder 2.0", "OpenAI", "Anthropic"],
 } as const;

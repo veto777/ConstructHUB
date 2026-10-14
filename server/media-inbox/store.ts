@@ -40,16 +40,16 @@ export async function saveInbound(mailbox: string, m: Inbound, reason: string | 
 }
 
 export type PendingMessage = {
-  id: number; messageId: string; threadKey: string | null; fromEmail: string; fromName: string | null; cc: string | null;
+  id: number; body: string; partnerId: number | null; messageId: string; threadKey: string | null; fromEmail: string; fromName: string | null; cc: string | null;
   subject: string; references: string[]; attempts: number;
 };
 
 export async function pending(limit: number): Promise<PendingMessage[]> {
   const r = await db().query(
-    `SELECT id, message_id, thread_key, from_email, from_name, cc, subject, references_ids, attempts FROM media_messages
+    `SELECT id, body, partner_id, message_id, thread_key, from_email, from_name, cc, subject, references_ids, attempts FROM media_messages
       WHERE direction = 'in' AND status = 'new' ORDER BY received_at LIMIT $1`, [limit]);
   return r.rows.map((x) => ({
-    id: x.id, messageId: x.message_id, threadKey: x.thread_key, fromEmail: x.from_email, fromName: x.from_name, cc: x.cc,
+    id: x.id, body: x.body ?? "", partnerId: x.partner_id, messageId: x.message_id, threadKey: x.thread_key, fromEmail: x.from_email, fromName: x.from_name, cc: x.cc,
     subject: x.subject, references: String(x.references_ids ?? "").split(/\s+/).filter(Boolean), attempts: x.attempts,
   }));
 }
@@ -218,10 +218,12 @@ export async function summary(mailbox: string) {
     db().query(`SELECT last_pass_at, last_pass_error FROM media_inbox_state WHERE mailbox = $1`, [mailbox]),
   ]);
   const sent = await db().query(`SELECT count(*)::int n FROM media_messages WHERE direction = 'out'`);
+  const queue = await queueCounts();
   return {
     counts: Object.fromEntries(m.rows.map((x) => [x.status, x.n])),
     partners: Object.fromEntries(p.rows.map((x) => [x.status, x.n])),
     sent: Number(sent.rows[0]?.n ?? 0),
+    queue,
     lastPassAt: s.rows[0]?.last_pass_at ? new Date(s.rows[0].last_pass_at).toISOString() : null,
     lastPassError: s.rows[0]?.last_pass_error ?? null,
   };
@@ -272,4 +274,63 @@ export async function updatePartner(id: number, f: { status?: string; kind?: str
 
 export async function markHandled(id: number) {
   await db().query(`UPDATE media_messages SET status = 'replied', reason = concat_ws(' · ', reason, 'Handled by an admin') WHERE id = $1 AND status IN ('needs_owner','failed')`, [id]);
+}
+
+// ── first-contact queue ──────────────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Queue every vetted directory (Backlinks database, kind directory/citation, tier A or B) that publishes an email and
+ * that we have never contacted. `pick` chooses the address and `name` the greeting name. Returns how many were added.
+ */
+export async function queueVettedDirectories(pick: (emails: string[]) => string | null, name: (domain: string, signals: any) => string): Promise<number> {
+  const r = await db().query(
+    `SELECT s.domain, s.kind, s.contact_emails, s.signals FROM backlink_sources s
+      WHERE s.kind IN ('directory', 'citation') AND s.tier IN ('A', 'B') AND cardinality(s.contact_emails) > 0
+        AND NOT EXISTS (SELECT 1 FROM media_outreach_queue q WHERE q.domain = s.domain)
+        AND NOT EXISTS (SELECT 1 FROM media_partners p WHERE p.domain = s.domain)
+      ORDER BY s.tier, s.score DESC NULLS LAST`);
+  let added = 0;
+  for (const x of r.rows) {
+    const to = pick(x.contact_emails);
+    if (!to) continue;
+    const ins = await db().query(
+      `INSERT INTO media_outreach_queue (domain, company, kind, to_email, source) VALUES ($1, $2, 'directory', $3, 'backlinks-db') ON CONFLICT (domain) DO NOTHING RETURNING id`,
+      [x.domain, name(x.domain, x.signals).slice(0, 120), to.toLowerCase()]);
+    if (ins.rows[0]) added++;
+  }
+  return added;
+}
+
+export async function outreachSentToday(): Promise<number> {
+  const r = await db().query(`SELECT count(*)::int n FROM media_messages WHERE direction = 'out' AND purpose = 'outreach' AND received_at >= date_trunc('day', now())`);
+  return Number(r.rows[0]?.n ?? 0);
+}
+
+export async function nextQueued(limit: number) {
+  const r = await db().query(`SELECT id, domain, company, kind, to_email FROM media_outreach_queue WHERE status = 'queued' ORDER BY id LIMIT $1`, [limit]);
+  return r.rows as { id: number; domain: string; company: string; kind: string; to_email: string }[];
+}
+
+export async function finishQueued(id: number, status: "sent" | "skipped", reason: string | null) {
+  await db().query(`UPDATE media_outreach_queue SET status = $2, reason = $3, sent_at = CASE WHEN $2 = 'sent' THEN now() END WHERE id = $1`, [id, status, reason]);
+}
+
+export async function queueCounts() {
+  const r = await db().query(`SELECT count(*) FILTER (WHERE status = 'queued')::int queued, count(*) FILTER (WHERE status = 'sent')::int sent,
+    count(*) FILTER (WHERE status = 'sent' AND sent_at >= date_trunc('day', now()))::int sent_today FROM media_outreach_queue`);
+  return { queued: r.rows[0]?.queued ?? 0, sent: r.rows[0]?.sent ?? 0, sentToday: r.rows[0]?.sent_today ?? 0 };
+}
+
+/** They asked us to stop: the company is declined and the address never gets another email. */
+export async function optOut(messageId: number, email: string, partnerId: number | null) {
+  const { suppress } = await import("../backlinks/store");
+  await suppress(email, "Asked the media inbox to stop");
+  await db().query(`UPDATE media_messages SET status = 'replied', reason = 'Asked us to stop — no reply, never emailed again' WHERE id = $1`, [messageId]);
+  if (partnerId) await db().query(`UPDATE media_partners SET status = 'declined', owner_question = NULL, updated_at = now() WHERE id = $1 AND status <> 'finalized'`, [partnerId]);
+  await db().query(`UPDATE media_outreach_queue SET status = 'skipped', reason = 'Opted out' WHERE to_email = lower($1) AND status = 'queued'`, [email]);
+}
+
+export async function partnerIdForEmail(email: string, domain: string | null): Promise<number | null> {
+  const r = await db().query(`SELECT id FROM media_partners WHERE (domain = $2 AND $2 IS NOT NULL) OR lower(contact_email) = lower($1) OR lower($1) = ANY(tried_emails) LIMIT 1`, [email, domain]);
+  return r.rows[0]?.id ?? null;
 }

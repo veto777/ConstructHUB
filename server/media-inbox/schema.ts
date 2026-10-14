@@ -22,6 +22,14 @@ CREATE INDEX IF NOT EXISTS media_messages_status ON media_messages(status, recei
 -- Follow-ups (owner, 2026-10-14): what each email we sent was for, and when an unanswered one was acted on.
 ALTER TABLE media_messages ADD COLUMN IF NOT EXISTS purpose text, ADD COLUMN IF NOT EXISTS followed_up_at timestamptz;
 ALTER TABLE media_partners ADD COLUMN IF NOT EXISTS tried_emails text[] NOT NULL DEFAULT '{}';
+-- First-contact queue (owner, 2026-10-14: "find many many more"): vetted directories that publish an email, sent a
+-- few a day so a new mailbox stays out of spam folders.
+CREATE TABLE IF NOT EXISTS media_outreach_queue (
+ id serial PRIMARY KEY, domain text NOT NULL UNIQUE, company text NOT NULL, kind text NOT NULL DEFAULT 'directory',
+ to_email text NOT NULL, status text NOT NULL DEFAULT 'queued' CHECK(status IN ('queued','sent','skipped')), reason text,
+ source text NOT NULL, queued_at timestamptz NOT NULL DEFAULT now(), sent_at timestamptz
+);
+CREATE INDEX IF NOT EXISTS media_outreach_queue_status ON media_outreach_queue(status, id);
 CREATE TABLE IF NOT EXISTS media_inbox_state (
  mailbox text PRIMARY KEY, uid_validity text, last_uid bigint NOT NULL DEFAULT 0,
  last_pass_at timestamptz, last_pass_error text

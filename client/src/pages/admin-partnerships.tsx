@@ -29,6 +29,7 @@ import { VerificationCancelled } from "@/components/recent-auth";
 type Summary = {
   mailbox: string | null; configured: boolean; enabled: boolean; intervalMin: number; lastPassAt: string | null; lastPassError: string | null;
   counts: Partial<Record<MediaMessageStatus, number>>; partners: Partial<Record<MediaPartnerStatus, number>>; sent: number;
+  queue: { queued: number; sent: number; sentToday: number; perDay: number };
 };
 type MessagesPayload = { rows: MediaMessage[]; total: number };
 
@@ -205,6 +206,7 @@ export default function AdminPartnershipsPage() {
           <Stat label="Finalized" value={n(s.partners.finalized)} onClick={() => setPartnerTab("finalized")} selected={partnerTab === "finalized"} />
           <Stat label="Talking" value={n(s.partners.talking)} onClick={() => setPartnerTab("talking")} selected={partnerTab === "talking"} />
           <Stat label="Emails sent" value={n(s.sent)} hint={`${n(received)} received`} onClick={() => setMailTab("out")} />
+          <Stat label="Directories queued" value={n(s.queue.queued)} hint={`${n(s.queue.sentToday)} of ${n(s.queue.perDay)} sent today · ${n(s.queue.sent)} so far`} testId="stat-partners-queue" />
           <Stat label="Waiting for you" value={n(s.counts.needs_owner)} tone={s.counts.needs_owner ? "bad" : "default"} onClick={() => setMailTab("needs_owner")} hint={`checked ${ago(s.lastPassAt)}`} />
         </StatGrid>
 
@@ -273,6 +275,7 @@ export default function AdminPartnershipsPage() {
             <dt className="text-muted-foreground">Replies to one sender</dt><dd>at most {MEDIA_INBOX_PARAMETERS.maxRepliesPerSenderPerDay} a day (stops loops with other auto-responders)</dd>
             <dt className="text-muted-foreground">If the AI fails</dt><dd>{MEDIA_INBOX_PARAMETERS.aiAttemptsBeforeHolding} tries, then a holding reply</dd>
             <dt className="text-muted-foreground">No answer</dt><dd>a follow-up after {MEDIA_INBOX_PARAMETERS.followUpAfterDays} days; {MEDIA_INBOX_PARAMETERS.followUpAfterDays} more days → a new contact from their website (up to {MEDIA_INBOX_PARAMETERS.maxContactsPerCompany} addresses per company)</dd>
+            <dt className="text-muted-foreground">New directories</dt><dd>{s.queue.perDay} first-contact emails a day from the queue (vetted directories that publish an email), spread across the day</dd>
             <dt className="text-muted-foreground">AI order</dt><dd>{MEDIA_INBOX_PARAMETERS.aiOrder.join(" → ")}</dd>
           </dl>
         </Section>
