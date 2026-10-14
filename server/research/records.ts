@@ -4,7 +4,8 @@
  *
  *   - State attorney general consumer complaints, from official open data (WA statewide and current; OR 2017–2019).
  *   - Federal court dockets naming the company, nationwide (CourtListener's RECAP archive, free API).
- *   - Federal OSHA inspections of the company's establishments in the chosen states (U.S. DOL API, needs DOL_API_KEY).
+ *   - Federal OSHA inspections of the company's establishments, nationwide (U.S. DOL API v4, needs DOL_API_KEY; the key
+ *     goes in the query string, `like` is case-sensitive, no match is HTTP 204).
  *
  * Every dataset here was checked live (CLAUDE.md: never fabricate government data). A source that could not be
  * searched is reported as not searched, never as "nothing found".
@@ -119,36 +120,37 @@ async function dol(dataset: string, filter: unknown, limit: number): Promise<any
   return rows;
 }
 
-export async function searchOsha(name: string, states: string[]): Promise<OshaHit[]> {
+/** Every federal OSHA inspection of an establishment with this name, nationwide, with its violations and penalties. */
+export async function searchOsha(name: string): Promise<OshaHit[]> {
   const words = name.toUpperCase().replace(/[^A-Z0-9&' -]/g, " ").split(/\s+/).filter((w) => w.length >= 2);
   if (!words.length) return [];
-  // The longest word narrows the search on the server; whole-word matching on every word happens here.
+  // `like` is case-sensitive and names are stored uppercase. The longest word narrows the search on the server;
+  // whole-word matching on every word happens here.
   const longest = words.reduce((a, b) => (b.length > a.length ? b : a));
+  const rows = await dol("inspection", { field: "estab_name", operator: "like", value: `%${longest}%` }, MAX_OSHA);
   const out: OshaHit[] = [];
-  for (const state of states) {
-    const rows = await dol("inspection", { and: [
-      { field: "site_state", operator: "eq", value: state },
-      { field: "estab_name", operator: "like", value: `%${longest}%` },
-    ] }, MAX_OSHA);
-    for (const r of rows) {
-      if (!namedIn(name, r.estab_name)) continue;
-      const activityNr = s(r.activity_nr);
-      if (!activityNr) continue;
-      out.push({
-        activityNr, establishment: s(r.estab_name), city: s(r.site_city), state: s(r.site_state), opened: day(r.open_date),
-        closed: day(r.close_case_date), inspectionType: s(r.insp_type), violations: null, seriousViolations: null, penalty: null,
-        url: oshaUrl(activityNr),
-      });
-    }
+  for (const r of rows) {
+    const activityNr = s(r.activity_nr);
+    if (!activityNr || !namedIn(name, r.estab_name)) continue;
+    out.push({
+      activityNr, establishment: s(r.estab_name), city: s(r.site_city), state: s(r.site_state), opened: day(r.open_date),
+      closed: day(r.close_case_date), inspectionType: s(r.insp_type), violations: null, seriousViolations: null, penalty: null,
+      url: oshaUrl(activityNr),
+    });
   }
-  // Violations and penalties for each inspection found.
-  for (const hit of out.slice(0, 100)) {
+  // Violations for all of them in a few calls (the key is rate-limited hard); deleted citations don't count.
+  for (let i = 0; i < out.length; i += 50) {
+    const chunk = out.slice(i, i + 50);
     try {
-      const v = await dol("violation", { field: "activity_nr", operator: "eq", value: hit.activityNr }, 200);
-      hit.violations = v.length;
-      hit.seriousViolations = v.filter((x) => ["S", "W", "R"].includes(String(x.viol_type ?? "").toUpperCase())).length;
-      hit.penalty = v.reduce((sum, x) => sum + (num(x.current_penalty) ?? num(x.initial_penalty) ?? 0), 0);
-    } catch { /* the inspection stands without its violation detail */ }
+      const v = (await dol("violation", { field: "activity_nr", operator: "in", value: chunk.map((h) => h.activityNr) }, 5000))
+        .filter((x) => !s(x.delete_flag));
+      for (const hit of chunk) {
+        const mine = v.filter((x) => String(x.activity_nr) === hit.activityNr);
+        hit.violations = mine.length;
+        hit.seriousViolations = mine.filter((x) => ["S", "W", "R"].includes(String(x.viol_type ?? "").toUpperCase())).length;
+        hit.penalty = mine.reduce((sum, x) => sum + (num(x.current_penalty) ?? num(x.initial_penalty) ?? 0), 0);
+      }
+    } catch { /* the inspections stand without their violation detail */ }
   }
   return out.sort((a, b) => String(b.opened ?? "").localeCompare(String(a.opened ?? "")));
 }
@@ -184,11 +186,11 @@ export async function searchCompanyRecords(name: string, states: string[]): Prom
   }
   let osha: OshaHit[] = [];
   try {
-    osha = await searchOsha(name, states);
-    sources.push({ source: "Federal OSHA inspections (U.S. Department of Labor)", scope: states.join(", "), searched: true, note: `${osha.length} inspection(s)` });
+    osha = await searchOsha(name);
+    sources.push({ source: "Federal OSHA inspections (U.S. Department of Labor)", scope: "All states", searched: true, note: `${osha.length} inspection(s)` });
   } catch (err: any) {
     const msg = String(err?.message ?? err);
-    sources.push({ source: "Federal OSHA inspections (U.S. Department of Labor)", scope: states.join(", "), searched: false,
+    sources.push({ source: "Federal OSHA inspections (U.S. Department of Labor)", scope: "All states", searched: false,
       note: msg === "not configured" ? "Not searched yet" : `Could not search: ${msg.slice(0, 200)}` });
   }
   return { complaints, courtCases, osha, sources };
@@ -203,7 +205,7 @@ export async function previewCompanyRecords(name: string, states: string[]): Pro
   }
   try { courtCases = (await searchCourtCases(name, 1)).total; searched.push("Federal court dockets"); } catch { /* ditto */ }
   if (process.env.DOL_API_KEY) {
-    try { osha = (await searchOsha(name, states)).length; searched.push("Federal OSHA inspections"); } catch { /* ditto */ }
+    try { osha = (await searchOsha(name)).length; searched.push("Federal OSHA inspections"); } catch { /* ditto */ }
   }
   return { complaints, courtCases, osha, searched };
 }
