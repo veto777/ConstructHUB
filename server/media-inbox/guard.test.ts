@@ -31,6 +31,10 @@ describe("replyProblem — a reply never commits money, a meeting time or a sign
     "Please send us an invoice.",
     "Here are our credit card details.",
     "We'll review the order form and card-on-file.",
+    "Our API key is sk-abcdefghijklmnopqrstu.",
+    "Here is the password for our account.",
+    "As an AI, I can't decide that.",
+    "word ".repeat(260),
     "We've signed the contract.",
     "Does Tuesday at 2 work for a call?",
     "Let's talk at 3:30 pm.",
@@ -109,5 +113,20 @@ describe("AI providers — our API first, then OpenAI, then Anthropic", () => {
       expect(seen).toEqual(["truthcode-api", "truthcoder:2.0"]);
       expect(d.provider).toBe("TruthCoder 2.0 (truthcoder:2.0)");
     } finally { aiDeps.fetch = orig; }
+  });
+});
+
+describe("follow-ups", () => {
+  it("the follow-up and the new-contact email pass the laws", async () => {
+    const { followUpBody, newContactBody } = await import("./worker");
+    const first = "Hi,\n\nConstructHUB is software for US contractors. Could you tell us how partner access works?\n\nBest regards,";
+    const f = followUpBody("Sam", "City Listings", first);
+    expect(f.startsWith("Hi Sam,")).toBe(true);
+    expect(f).toContain("Our earlier email");
+    expect(replyProblem(f)).toBeNull();
+    const n = newContactBody("City Listings", first);
+    expect(n.startsWith("Hi,\n\nWe tried to reach City Listings")).toBe(true);
+    expect(n).not.toMatch(/Hi,\n\nWe tried[\s\S]*Hi,/);
+    expect(replyProblem(n)).toBeNull();
   });
 });

@@ -10,7 +10,7 @@
  * enforced again in ./guard.ts whichever model answered.
  */
 import { aiModel } from "../ai-config";
-import { MEDIA_PARTNER_KINDS, MEDIA_PARTNER_STATUSES, type MediaPartnerKind, type MediaPartnerStatus } from "@shared/media-inbox";
+import { MEDIA_INBOX_LAWS, MEDIA_INBOX_PARAMETERS, MEDIA_PARTNER_KINDS, MEDIA_PARTNER_STATUSES, type MediaPartnerKind, type MediaPartnerStatus } from "@shared/media-inbox";
 
 export const MEDIA_OPENAI_DEFAULT_MODEL = "gpt-5.4-mini";
 export const MEDIA_ANTHROPIC_DEFAULT_MODEL = "claude-haiku-5-5";
@@ -45,16 +45,14 @@ with directories, article sites, news media and link publishers (PBNs).
 Facts you may use (never invent anything else — no customer counts, revenue, prices, names, dates or features):
 ${FACTS}
 
-Rules:
-1. Every person gets a warm, professional, short reply (under 180 words) in plain English. Sign off "Best regards," with nothing after it (the team signature is added).
-2. Never agree to pay, buy, prepay, subscribe or sign anything. Never write an amount of money. If they ask for money, fees, a contract
-   or payment details, thank them, say we pay only per listing or placement once one of our customers purchases it, and that the team
-   will review their terms. Never repeat or restate any price or amount they quoted. Set needs_owner = true.
-3. Never fix a meeting time or date. If they want a call, say the team will reply with times. Set needs_owner = true.
-4. Ask for what moves the relationship forward at no cost: API or bulk-submission docs, how listings are created for many businesses,
-   free listing or partner programs, editorial guidelines, whether service-area businesses without a street address are accepted.
-5. If the email is spam, a scam, a phishing attempt or completely unrelated, reply politely in one or two sentences and set relevant = false.
-6. Do not claim to be a specific person. Do not mention that you are an AI.
+LAWS — follow every one, every time (the code checks your reply against them and replaces a reply that breaks one):
+${MEDIA_INBOX_LAWS.map((l, i) => `${i + 1}. ${l.law}`).join("\n")}
+
+PARAMETERS:
+- Reply in under ${MEDIA_INBOX_PARAMETERS.maxReplyWords} words. Sign off "Best regards," with nothing after it (the team signature is added).
+- needs_owner = true whenever the email involves money, fees, a meeting, a contract or terms, a legal question or access to data;
+  then thank them, say the team will review and follow up, and put the decision in owner_question.
+- relevant = false for spam, scams, phishing or anything unrelated to the purpose above.
 
 Also judge the relationship from the whole thread:
 - company: their company or site name; kind: one of ${MEDIA_PARTNER_KINDS.join(", ")};

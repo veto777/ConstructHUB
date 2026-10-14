@@ -1,3 +1,5 @@
+import { MEDIA_INBOX_PARAMETERS } from "@shared/media-inbox";
+
 /**
  * The media inbox's rules in code, not in the prompt (shared/media-inbox.ts):
  *   - a machine sender (no-reply, bounce, newsletter, out-of-office, our own mailboxes) is logged, never answered;
@@ -39,9 +41,15 @@ const PAYMENT_WORDS = /\b(credit card|debit card|card details|invoice (us|me)|se
 const SIGNED = /\b(we('ve| have)? signed|signed (the|your) (contract|agreement|order|io)|i accept the terms|we accept (the|your) terms)\b/i;
 const MEETING_TIME = /\b(\d{1,2}(:\d{2})?\s?(am|pm)\b|(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s+at\s+\d)/i;
 
-/** Why a drafted reply must not go out, or null when it is safe. */
+const SECRETS = /\b(password|passcode|api[ _-]?key|secret key|access token|login details|credentials)\b|\bsk-[a-z0-9]{16,}|\b(card|account|routing) number\b/i;
+const AI_SELF = /\b(as an ai|an ai (language )?model|i('| a)?m an ai|language model|chatgpt|openai|truthcoder|anthropic|claude)\b/i;
+
+/** Why a drafted reply must not go out, or null when it is safe (the laws marked `code` in shared/media-inbox.ts). */
 export function replyProblem(reply: string): string | null {
   if (!reply.trim()) return "Empty reply";
+  if (reply.trim().split(/\s+/).length > MEDIA_INBOX_PARAMETERS.hardReplyWordLimit) return `The reply is longer than ${MEDIA_INBOX_PARAMETERS.hardReplyWordLimit} words`;
+  if (SECRETS.test(reply)) return "The reply mentions passwords, keys, logins or account numbers";
+  if (AI_SELF.test(reply)) return "The reply talks about being an AI or names an AI provider";
   if (MONEY_AMOUNT.test(reply)) return "The reply mentions an amount of money";
   if (MONEY_COMMIT.test(reply)) return "The reply commits us to paying, buying or signing";
   if (PAYMENT_WORDS.test(reply)) return "The reply talks about payment details";

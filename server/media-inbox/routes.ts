@@ -109,7 +109,7 @@ export function registerMediaInboxRoutes(app: Express, getDevUser: GetUser): voi
       const domain = b.data.domain ?? companyDomain(b.data.to);
       const partnerId = await store.partnerForOutreach(b.data.company, domain, b.data.kind, b.data.to);
       const messageId = await sendMail({ to: b.data.to, subject: b.data.subject, body: b.data.body });
-      await store.saveOutbound(mailboxConfig().user, { messageId, threadKey: null, to: b.data.to, subject: b.data.subject, body: b.data.body, partnerId });
+      await store.saveOutbound(mailboxConfig().user, { messageId, threadKey: null, to: b.data.to, subject: b.data.subject, body: b.data.body, partnerId, purpose: "outreach" });
       res.json({ ok: true, messageId, partnerId });
     } catch (e) { failed(res, "send the email", e); }
   });
