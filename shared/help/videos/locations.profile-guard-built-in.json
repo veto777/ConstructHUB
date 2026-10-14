@@ -2,9 +2,9 @@
   "helpKey": "locations.profile-guard-built-in",
   "durationSec": 62,
   "video": {
-    "key": "tutorials/locations.profile-guard-built-in.486fe9ce.mp4",
-    "bytes": 5652421,
-    "sha256": "486fe9ce539f16ee795070262ebdb2e57aa32809bcb38db364ea373303f8399e"
+    "key": "tutorials/locations.profile-guard-built-in.7ae2cd72.mp4",
+    "bytes": 5863279,
+    "sha256": "7ae2cd7239f6b9f5e5e462cdf3abaa0e8b6fb4b357050e21f6bf6c8ec661a6db"
   },
   "captions": {
     "key": "tutorials/locations.profile-guard-built-in.2aba7fe2.vtt",
@@ -17,8 +17,8 @@
     "sha256": "f190f93a0bcef1c92012dfda567ef7dc498646d655ce1d99601e03c3650ef97b"
   },
   "uploaded": {
-    "at": "2026-10-13T21:15:17.849Z",
-    "video": "23cc8a0eaa4d570fa8f79d01517d066a",
+    "at": "2026-10-14T03:17:02.922Z",
+    "video": "24a058416bcd597b6faa307549eb6ad3",
     "captions": "c42f12c6b09c11b592c15fb4fa15af2b",
     "poster": "6132ea87b4a04cdc633939ad3c9cb697"
   }

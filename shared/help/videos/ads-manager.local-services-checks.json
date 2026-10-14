@@ -2,9 +2,9 @@
   "helpKey": "ads-manager.local-services-checks",
   "durationSec": 69,
   "video": {
-    "key": "tutorials/ads-manager.local-services-checks.8e6edec5.mp4",
-    "bytes": 5977940,
-    "sha256": "8e6edec591ea5849bdcd8c945ed62328f3dcf11ba13970e66d2ea2f01ffd37a1"
+    "key": "tutorials/ads-manager.local-services-checks.ecb101a7.mp4",
+    "bytes": 6331315,
+    "sha256": "ecb101a7428fa5b226b135b05a7ceae648f36076017049c8404bdf02f4a7a7bb"
   },
   "captions": {
     "key": "tutorials/ads-manager.local-services-checks.ee027a32.vtt",
@@ -17,8 +17,8 @@
     "sha256": "b89d3812bbcfa773268988236be71246a73544884a2f2f1b146f05f82a368e98"
   },
   "uploaded": {
-    "at": "2026-10-13T21:40:46.754Z",
-    "video": "2f56e66a36e64a3b0acd2383452667ff",
+    "at": "2026-10-14T02:57:46.155Z",
+    "video": "e47d95a018f3ff7fdcc346cf6d2425ca",
     "captions": "0681b1e53489ceec9b721a4f39e0931d",
     "poster": "40dad244ea3457c2aa8832a99224e0bb"
   }

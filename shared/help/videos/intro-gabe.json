@@ -2,9 +2,9 @@
   "helpKey": "intro-gabe",
   "durationSec": 84,
   "video": {
-    "key": "tutorials/intro-gabe.a09f2283.mp4",
-    "bytes": 7715128,
-    "sha256": "a09f22836dd56db0305b6797dfacd710affb748fadc2dc73a6d78103e2587ad4"
+    "key": "tutorials/intro-gabe.d80c72eb.mp4",
+    "bytes": 8207410,
+    "sha256": "d80c72eb2bf394a4f4dbd0b5cae17cf395b7498d2b66458982e701cf75f902d1"
   },
   "captions": {
     "key": "tutorials/intro-gabe.a491ebf9.vtt",
@@ -17,8 +17,8 @@
     "sha256": "53d04f54014f637bbb50b3afe778a97fd05469a6d24b94174e2e93aa4dfec747"
   },
   "uploaded": {
-    "at": "2026-10-13T17:30:42.559Z",
-    "video": "79eac5b87a2f0185ea63cd5930bca75b",
+    "at": "2026-10-14T03:10:10.454Z",
+    "video": "ef077373a2d643ef9838fc1058c9751d",
     "captions": "185f6f7d37afcd76a50ebcf807a8da29",
     "poster": "4352873b680bf142e87a9173390fd9da"
   }

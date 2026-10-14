@@ -2,9 +2,9 @@
   "helpKey": "intro-reviews",
   "durationSec": 80,
   "video": {
-    "key": "tutorials/intro-reviews.0a68efca.mp4",
-    "bytes": 6979052,
-    "sha256": "0a68efca0bcc4f4c8c2e4e254fcbad98818784334108ff25b1a718528667a20f"
+    "key": "tutorials/intro-reviews.5aa6d12b.mp4",
+    "bytes": 7210217,
+    "sha256": "5aa6d12b8d94017be14480b9c28e6a080dc0fcd8eb25e7e04a5a42493830622f"
   },
   "captions": {
     "key": "tutorials/intro-reviews.f20e01ad.vtt",
@@ -17,8 +17,8 @@
     "sha256": "626e6975cf774fb591ebf6b48d18a07901aa3dc5410653b27e57b799c7bb62dc"
   },
   "uploaded": {
-    "at": "2026-10-13T15:53:42.856Z",
-    "video": "eb65222bd2fcb6cf196214cdc730304c",
+    "at": "2026-10-14T03:13:59.839Z",
+    "video": "99059f3bcf083dbeb9affbf26c3c864c",
     "captions": "218b1de342d49b1f093a1bcfd4856eb1",
     "poster": "7ee427bcf036b46a2f4413ccc5808d31"
   }

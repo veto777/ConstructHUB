@@ -2,9 +2,9 @@
   "helpKey": "crm-pricebook-template",
   "durationSec": 53,
   "video": {
-    "key": "tutorials/crm-pricebook-template.9fb20e2f.mp4",
-    "bytes": 5399062,
-    "sha256": "9fb20e2f648eadf2a9cc2e4c4dd70246905788022221793753c71b5d550a7c78"
+    "key": "tutorials/crm-pricebook-template.26e4f11a.mp4",
+    "bytes": 5611076,
+    "sha256": "26e4f11afa43c108f6c04e33036769d75569d9c6eaddfeaadafedfe08c023d2b"
   },
   "captions": {
     "key": "tutorials/crm-pricebook-template.df1daa17.vtt",
@@ -17,8 +17,8 @@
     "sha256": "1bdd20931a66ca2347ef41ac6f2a7f0ec60b508143dd4d813dc8e023ba6c0d02"
   },
   "uploaded": {
-    "at": "2026-10-13T17:10:28.390Z",
-    "video": "977caa8d8bf1e4e2e7b472ec4f5e0d46",
+    "at": "2026-10-14T03:02:39.630Z",
+    "video": "647cc87efda9d8ad8c2980e2f984a508",
     "captions": "d5d7e68c49d5e01978f63f4dbc04ca31",
     "poster": "db59b0aaa624562718e183866a434f85"
   }

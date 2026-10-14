@@ -2,9 +2,9 @@
   "helpKey": "crm-pipeline-move",
   "durationSec": 64,
   "video": {
-    "key": "tutorials/crm-pipeline-move.5ce2067b.mp4",
-    "bytes": 5034858,
-    "sha256": "5ce2067b4c36359248bb0155675fe2565a39720b0ed8e42253820d452554f378"
+    "key": "tutorials/crm-pipeline-move.add05ba7.mp4",
+    "bytes": 5348850,
+    "sha256": "add05ba73c6f996ab99b1bcdeb6b3b52cab59a017937776203d1f3d984aa4260"
   },
   "captions": {
     "key": "tutorials/crm-pipeline-move.791d34dd.vtt",
@@ -17,8 +17,8 @@
     "sha256": "485e5517ad93e98d2a3a9404dc6d7d950ec4f45c2ae989a54fccb6e058772927"
   },
   "uploaded": {
-    "at": "2026-10-13T17:08:04.211Z",
-    "video": "5854fb7e89c57a00554931232b6ea347",
+    "at": "2026-10-14T03:01:17.226Z",
+    "video": "7485f418e5d572bceef793a454417fdc",
     "captions": "97f6ffbee6592e71964eee5579157226",
     "poster": "5309fd2c0acd05244a95b9f1079bd4ae"
   }

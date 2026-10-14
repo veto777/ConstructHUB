@@ -2,9 +2,9 @@
   "helpKey": "crm-payment-methods",
   "durationSec": 67,
   "video": {
-    "key": "tutorials/crm-payment-methods.349b5e0e.mp4",
-    "bytes": 6972394,
-    "sha256": "349b5e0e7f5331e13c75cedd542739378be4bc06deccb4ce9fe95283260292b7"
+    "key": "tutorials/crm-payment-methods.a500fbe1.mp4",
+    "bytes": 7303739,
+    "sha256": "a500fbe1f7095551d8bf92bdefcac434a8cd4c5affb12f96e9dda7b2fb0359c2"
   },
   "captions": {
     "key": "tutorials/crm-payment-methods.5a328e2c.vtt",
@@ -17,8 +17,8 @@
     "sha256": "deeeabaee1ea1f9ebb9ee721a3fd12385ee7aa2306046ff849bd6c99d75f0baf"
   },
   "uploaded": {
-    "at": "2026-10-13T17:06:35.792Z",
-    "video": "b1ec19ea2c5c3e75f5ab60d7446e3486",
+    "at": "2026-10-14T03:00:15.603Z",
+    "video": "1eb4e57292584a9062165ff1c01f4361",
     "captions": "6d1d46e67b8a06e88ff738e9f4924b46",
     "poster": "f9cb67d5eaf8a57612a0708bca8ef688"
   }

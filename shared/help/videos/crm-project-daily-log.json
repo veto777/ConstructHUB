@@ -2,9 +2,9 @@
   "helpKey": "crm-project-daily-log",
   "durationSec": 75,
   "video": {
-    "key": "tutorials/crm-project-daily-log.c0f9093d.mp4",
-    "bytes": 5305626,
-    "sha256": "c0f9093d7853d49410e8c21f5707df6d9fedcfa64080b16fc742faf23d992d91"
+    "key": "tutorials/crm-project-daily-log.78f4fc21.mp4",
+    "bytes": 6009720,
+    "sha256": "78f4fc212f1a4ae437cfd60e215c53f023b0f3206827bdd11622cb7597580d72"
   },
   "captions": {
     "key": "tutorials/crm-project-daily-log.e1e8a7d1.vtt",
@@ -17,8 +17,8 @@
     "sha256": "b0fe5d15c2ad911a771036c9656a50dedb6bb95572dc6890d5fbd00d07554947"
   },
   "uploaded": {
-    "at": "2026-10-13T17:12:07.114Z",
-    "video": "eced0844bd2e4da690054305090aabbf",
+    "at": "2026-10-14T03:03:33.321Z",
+    "video": "c3e502c5a43fad55879ae0fc5f21c15a",
     "captions": "d4f360f6eabf517282e2e6e9a6fc8a36",
     "poster": "1d84e0e28a1f5017b41fe865415fd57c"
   }

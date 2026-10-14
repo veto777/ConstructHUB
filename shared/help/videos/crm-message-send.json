@@ -2,9 +2,9 @@
   "helpKey": "crm-message-send",
   "durationSec": 67,
   "video": {
-    "key": "tutorials/crm-message-send.daf532c4.mp4",
-    "bytes": 5594921,
-    "sha256": "daf532c4b262c92d83820d0c24e1ae4e87b07d8b3f14266054969182c5b9568b"
+    "key": "tutorials/crm-message-send.98109671.mp4",
+    "bytes": 6112564,
+    "sha256": "98109671d891f44dbd7e4b0a7c7e956d0caa27b41c66c78ec2595f6ddbbfbd3a"
   },
   "captions": {
     "key": "tutorials/crm-message-send.ed8ebe36.vtt",
@@ -17,8 +17,8 @@
     "sha256": "ddfa31bbc48d14fcfc4d19bda1344bea6ed6f583b9f6b3f4c9680a8d94724dce"
   },
   "uploaded": {
-    "at": "2026-10-13T17:04:24.975Z",
-    "video": "a1ab463c5b779facc5a2237561926dd4",
+    "at": "2026-10-14T03:34:07.898Z",
+    "video": "8774e657f69ca58358ea3b84b53088b4",
     "captions": "6d12189ec01a3f1e5f725267d134e73e",
     "poster": "138c1e1b770ed96f0cba1aefc122bd5f"
   }

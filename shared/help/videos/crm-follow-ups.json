@@ -2,9 +2,9 @@
   "helpKey": "crm-follow-ups",
   "durationSec": 56,
   "video": {
-    "key": "tutorials/crm-follow-ups.d044c0bf.mp4",
-    "bytes": 5691994,
-    "sha256": "d044c0bfb7be41498f5914efcd5d3d12641786a6ead80e033c804cc36ed3a3c6"
+    "key": "tutorials/crm-follow-ups.b539a8cc.mp4",
+    "bytes": 5971929,
+    "sha256": "b539a8cc1a8a5e34e898784ab755e0a5451e56a8ea289fa8c02af36c021af2ee"
   },
   "captions": {
     "key": "tutorials/crm-follow-ups.2b08ee59.vtt",
@@ -17,8 +17,8 @@
     "sha256": "6abc3b53e042d16b79dc562c9b01740833f96c8002ae2f8349220f87d56fa54f"
   },
   "uploaded": {
-    "at": "2026-10-13T16:58:32.159Z",
-    "video": "6ea0f00716ab79f2e25eb87eeda69ff4",
+    "at": "2026-10-14T03:30:06.527Z",
+    "video": "c80c6bcc80d087947cdcf9dae2496395",
     "captions": "be828e04d5e01eb068b1a43a4a24ef46",
     "poster": "6b2122ac03c3ac80913cc81819f16ceb"
   }

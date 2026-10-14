@@ -2,9 +2,9 @@
   "helpKey": "locations.bulk-tools-on-agency",
   "durationSec": 64,
   "video": {
-    "key": "tutorials/locations.bulk-tools-on-agency.3dbd7f7d.mp4",
-    "bytes": 5833521,
-    "sha256": "3dbd7f7d687d8f928fa94b7a93bc08598aaec176c0266a03cdf83fc399089d20"
+    "key": "tutorials/locations.bulk-tools-on-agency.83b4059f.mp4",
+    "bytes": 6113586,
+    "sha256": "83b4059f6fca928b60234adf7c4f8919cd57c9e493c497577ce934a6aec651a3"
   },
   "captions": {
     "key": "tutorials/locations.bulk-tools-on-agency.bf1b08fe.vtt",
@@ -17,8 +17,8 @@
     "sha256": "69c390a49d17ec63fcaf2efda3f41a0e14d4c6f5164b8d426c200aee9bbe9bde"
   },
   "uploaded": {
-    "at": "2026-10-13T21:24:20.052Z",
-    "video": "2ca35671c5848a7f188423f5534b4c46",
+    "at": "2026-10-14T03:15:58.572Z",
+    "video": "4ccbf02370ca1565211d96dfe18815fe",
     "captions": "c2b043534c703dac1f0df4094a414fd7",
     "poster": "18e57a87ba1f5dc16a798587664b57df"
   }

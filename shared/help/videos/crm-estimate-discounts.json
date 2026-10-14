@@ -2,9 +2,9 @@
   "helpKey": "crm-estimate-discounts",
   "durationSec": 69,
   "video": {
-    "key": "tutorials/crm-estimate-discounts.6a932171.mp4",
-    "bytes": 6072130,
-    "sha256": "6a932171827ad01decde099fb29134ee167216510a2dc26cabf3b2d61cfe7bc5"
+    "key": "tutorials/crm-estimate-discounts.b619ddf9.mp4",
+    "bytes": 6484842,
+    "sha256": "b619ddf9b6b710862c7d9a2cb2f84df38c0ece2f5ed15c7993b0d72a2afeb905"
   },
   "captions": {
     "key": "tutorials/crm-estimate-discounts.523b5591.vtt",
@@ -17,8 +17,8 @@
     "sha256": "d6d4bbbaaf3b9cad89ee7fcec25bbaac3d60d2773cc9a79b147385185b8133d7"
   },
   "uploaded": {
-    "at": "2026-10-13T16:53:51.171Z",
-    "video": "c867475959531aad0eedabeca5b13c97",
+    "at": "2026-10-14T03:27:28.445Z",
+    "video": "a9624c9e07b9a9401f131d5b59c9bfee",
     "captions": "dda5085bd190a9baae3f71932096abbc",
     "poster": "846a17094d48333fea9dcc6d26380253"
   }

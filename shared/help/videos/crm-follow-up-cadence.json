@@ -2,9 +2,9 @@
   "helpKey": "crm-follow-up-cadence",
   "durationSec": 64,
   "video": {
-    "key": "tutorials/crm-follow-up-cadence.50408072.mp4",
-    "bytes": 5676761,
-    "sha256": "5040807251e6b8005a3c1c2198768dbca2d05bbf1794e82cd800c1591948ff55"
+    "key": "tutorials/crm-follow-up-cadence.cd3c8634.mp4",
+    "bytes": 6021356,
+    "sha256": "cd3c86341deb59d62c2d55d9da64a2a0cd1f4defd20934fc5487a5f4d6e86ba7"
   },
   "captions": {
     "key": "tutorials/crm-follow-up-cadence.fc8086ad.vtt",
@@ -17,8 +17,8 @@
     "sha256": "6cb6e4660a1589a26af1e8cdce16984e567088e985c9cc8560ad63f651e19f8c"
   },
   "uploaded": {
-    "at": "2026-10-13T16:58:10.623Z",
-    "video": "c180257802bb7b3e7bc11d780b50041b",
+    "at": "2026-10-14T03:29:55.464Z",
+    "video": "ff8ac5eb1bc1163f593aa57e83585bda",
     "captions": "a4d953f5f9317f40101559ea2af34f55",
     "poster": "fd1960e7d7a5efe787791c1baaf616e2"
   }

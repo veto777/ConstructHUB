@@ -2,9 +2,9 @@
   "helpKey": "intro-gbp",
   "durationSec": 86,
   "video": {
-    "key": "tutorials/intro-gbp.23f21dd4.mp4",
-    "bytes": 7633279,
-    "sha256": "23f21dd4dcafbcc367a5c26c88df388e7ee42caabed2e93e6c31fd7b49b24f8b"
+    "key": "tutorials/intro-gbp.e0aaac60.mp4",
+    "bytes": 7886009,
+    "sha256": "e0aaac609f43d03e06e13a671c67e82df0c442ab4daaf094ecafe276bf17ec51"
   },
   "captions": {
     "key": "tutorials/intro-gbp.5af2a660.vtt",
@@ -17,8 +17,8 @@
     "sha256": "d5e724498cb32d9b33065fa6b548a65645300b08bf35a91b84a66fc133c0156c"
   },
   "uploaded": {
-    "at": "2026-10-13T17:31:38.764Z",
-    "video": "e6a0b6cdfbf95acf93858588a8b28f2d",
+    "at": "2026-10-14T03:10:25.961Z",
+    "video": "cb86ebfeb7bf2814599a4c99ef3585f5",
     "captions": "3cf1f5770397ae552d8eb4dd2146c9bd",
     "poster": "a4d40fadadb1ba09854789eb99c42c9e"
   }

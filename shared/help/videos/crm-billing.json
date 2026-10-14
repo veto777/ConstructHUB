@@ -2,9 +2,9 @@
   "helpKey": "crm-billing",
   "durationSec": 49,
   "video": {
-    "key": "tutorials/crm-billing.59448dc2.mp4",
-    "bytes": 4958056,
-    "sha256": "59448dc2568667ac42a01fbd78dbdc92e1ce9e7a6c51bebc1960c465162c58e0"
+    "key": "tutorials/crm-billing.a149f58c.mp4",
+    "bytes": 5137034,
+    "sha256": "a149f58cd848a066394eb9e7a02c77fe7db9d55ea719f138e0dcc90dec464a1b"
   },
   "captions": {
     "key": "tutorials/crm-billing.0b92e5d5.vtt",
@@ -17,8 +17,8 @@
     "sha256": "e68839a0237c82eccddaae88ee0a82b95c5161209edb8393d49ae829bc42bc84"
   },
   "uploaded": {
-    "at": "2026-10-13T16:34:50.040Z",
-    "video": "554833ae370fd153af02b551891a5999",
+    "at": "2026-10-14T03:21:12.812Z",
+    "video": "93a48c0599f7774e187c76eaa00eb238",
     "captions": "b50d1fc0b3d750a1c82304a9127b8555",
     "poster": "0f2a486ce6f07d6536de17283fde6da0"
   }

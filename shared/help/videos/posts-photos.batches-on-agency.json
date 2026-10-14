@@ -2,9 +2,9 @@
   "helpKey": "posts-photos.batches-on-agency",
   "durationSec": 74,
   "video": {
-    "key": "tutorials/posts-photos.batches-on-agency.77f97beb.mp4",
-    "bytes": 6586826,
-    "sha256": "77f97beb3ac6f05da55c5f76a92af1de4ba922d43f84a9aadbdb340a79420a78"
+    "key": "tutorials/posts-photos.batches-on-agency.d09e4933.mp4",
+    "bytes": 6950721,
+    "sha256": "d09e4933903a6b94fe54cabebae8c0231d6ddba7cd76d4ce85595e1976df05e6"
   },
   "captions": {
     "key": "tutorials/posts-photos.batches-on-agency.d5114325.vtt",
@@ -17,8 +17,8 @@
     "sha256": "c7e1aa2ab624df70f1fbc13006a6a236629956009936d8979d9d6e3bc10bf7e6"
   },
   "uploaded": {
-    "at": "2026-10-13T21:56:52.240Z",
-    "video": "aca876375588e3d492aa6d659a7d7def",
+    "at": "2026-10-14T03:18:30.939Z",
+    "video": "db457938bdd342ab0608187d0277cc71",
     "captions": "a94641d0e32fe4dfdfa6ead28c5abf41",
     "poster": "a1685e23270481ce9e5b625323f8d19c"
   }

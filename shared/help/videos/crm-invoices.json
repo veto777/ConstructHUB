@@ -2,9 +2,9 @@
   "helpKey": "crm-invoices",
   "durationSec": 60,
   "video": {
-    "key": "tutorials/crm-invoices.496f10e7.mp4",
-    "bytes": 5075265,
-    "sha256": "496f10e7bae1557cdc005a0f7e13d0e9b8583b7e28b3d2fa8f0a5191c5dd9f9b"
+    "key": "tutorials/crm-invoices.bede1ad1.mp4",
+    "bytes": 5313600,
+    "sha256": "bede1ad1ed47eff593af7e8bdd7df8712855fa75dc706d85c1f36ab211e8b95b"
   },
   "captions": {
     "key": "tutorials/crm-invoices.9d676c02.vtt",
@@ -17,8 +17,8 @@
     "sha256": "f71bebe39add1693301e86f0b8ce99b77bd6cf99b7c05fc41c5787db8666557c"
   },
   "uploaded": {
-    "at": "2026-10-13T17:01:44.598Z",
-    "video": "a582f54725220d4654aee04335305f15",
+    "at": "2026-10-14T03:31:47.708Z",
+    "video": "5be1afe960cd5577600f1f86ff2229ef",
     "captions": "517c88ca6220733e7ad88bcc403493ce",
     "poster": "101444d28296a6637053db0567a0d2b8"
   }

@@ -2,9 +2,9 @@
   "helpKey": "crm-brand-color",
   "durationSec": 60,
   "video": {
-    "key": "tutorials/crm-brand-color.8b277292.mp4",
-    "bytes": 4986681,
-    "sha256": "8b2772924ab120c8e2a5e304678d48198f989de0afc04c93b7b6ad64415223ac"
+    "key": "tutorials/crm-brand-color.103a6c59.mp4",
+    "bytes": 5360380,
+    "sha256": "103a6c59e32d06907210bf2d8548680c50b4febf2b56e4dffeca1c8d5247dd08"
   },
   "captions": {
     "key": "tutorials/crm-brand-color.b21c4dc0.vtt",
@@ -17,8 +17,8 @@
     "sha256": "7834994eb827284cf09fc28a6ab030eadd0b54fe852c3e0eba6aa2e1163a52a0"
   },
   "uploaded": {
-    "at": "2026-10-13T16:35:12.277Z",
-    "video": "cdd857ecf29b419a9dd71dd52fc17408",
+    "at": "2026-10-14T03:21:24.490Z",
+    "video": "8f4ba9c8fa6077a56911fd29ef29cad7",
     "captions": "30e2b3632129c02ac680104a93543145",
     "poster": "279e8f30c148779e50e82211688a4846"
   }

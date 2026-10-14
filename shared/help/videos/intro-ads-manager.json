@@ -2,9 +2,9 @@
   "helpKey": "intro-ads-manager",
   "durationSec": 93,
   "video": {
-    "key": "tutorials/intro-ads-manager.7fe2c4cf.mp4",
-    "bytes": 9626683,
-    "sha256": "7fe2c4cf9c14d739e0ec29440b24ea3131e2db0b85dcf6eb141faf16e22648c7"
+    "key": "tutorials/intro-ads-manager.75054929.mp4",
+    "bytes": 9935431,
+    "sha256": "7505492912901280c6decf02c1a090ee4e29db242cf8a8a4e25f5d1f6fe3eb9d"
   },
   "captions": {
     "key": "tutorials/intro-ads-manager.af6c95fa.vtt",
@@ -17,8 +17,8 @@
     "sha256": "e576eeb1e595fbda82a3b05a783e3e3cae3b9e21ded01bf0fd28a700941b71a8"
   },
   "uploaded": {
-    "at": "2026-10-13T17:27:09.989Z",
-    "video": "8214776521e738e352148284086683b4",
+    "at": "2026-10-14T03:08:07.709Z",
+    "video": "a9d056cec7387c204e2e39d19ce45b3e",
     "captions": "56838cba23397f05b3793cddcd09645f",
     "poster": "4117bff38b1d69a26a895c343a7a3d4b"
   }

@@ -2,9 +2,9 @@
   "helpKey": "crm-notifications",
   "durationSec": 58,
   "video": {
-    "key": "tutorials/crm-notifications.a6d1d38a.mp4",
-    "bytes": 5583678,
-    "sha256": "a6d1d38abff93fa9138d46065e610b87dbccd6dbf8b2dfb584b623b7f6a4299d"
+    "key": "tutorials/crm-notifications.c1f1dcae.mp4",
+    "bytes": 5791196,
+    "sha256": "c1f1dcaee786fccd18ae0086417dae0ab43e8d6d3839f5822c9137490e48d195"
   },
   "captions": {
     "key": "tutorials/crm-notifications.28518117.vtt",
@@ -17,8 +17,8 @@
     "sha256": "b0ea23d81078a4b40e7782ca4a0143abc0a0490ec3a09fe37fe513302214d921"
   },
   "uploaded": {
-    "at": "2026-10-13T17:05:51.329Z",
-    "video": "47e684336b42e9aad4a59b503c75b9e7",
+    "at": "2026-10-14T03:34:55.417Z",
+    "video": "8099409ec43d2ce9484810009655bd19",
     "captions": "6ea2a8b87ebc506aad4aa1a5afb26aac",
     "poster": "c3f0e77e16dd4a7f1e26638e51416ac7"
   }

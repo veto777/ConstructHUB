@@ -2,9 +2,9 @@
   "helpKey": "crm-project-budget",
   "durationSec": 83,
   "video": {
-    "key": "tutorials/crm-project-budget.5fe33c89.mp4",
-    "bytes": 6239113,
-    "sha256": "5fe33c895c812b1f1492dea3eb578ce4e48161c1318b3d5ce58e70d8417e4016"
+    "key": "tutorials/crm-project-budget.7b8acb89.mp4",
+    "bytes": 6776189,
+    "sha256": "7b8acb89b15b7cd711ee7483bed0a950787be51b84507824d9e5725a83a1f20c"
   },
   "captions": {
     "key": "tutorials/crm-project-budget.57fcc3d9.vtt",
@@ -17,8 +17,8 @@
     "sha256": "187f300cc0ff948bf56e7f65718c01cee6023c17233fee4e5d2782153586e47b"
   },
   "uploaded": {
-    "at": "2026-10-13T17:11:19.143Z",
-    "video": "831a0e5cfd65558376fec895622a654d",
+    "at": "2026-10-14T03:03:06.447Z",
+    "video": "5e4ab491f1fd39e2428f1013d27017c6",
     "captions": "e87ee81da40fae7c566ca5293728dfb8",
     "poster": "24d14c96d22a2c068aa8fd29817ffd96"
   }

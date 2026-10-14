@@ -2,9 +2,9 @@
   "helpKey": "crm-price-floor",
   "durationSec": 83,
   "video": {
-    "key": "tutorials/crm-price-floor.2bd1ef00.mp4",
-    "bytes": 7546730,
-    "sha256": "2bd1ef003a372af4ab635eb2fd0d24711db727c6c1b62115971001bdd626b372"
+    "key": "tutorials/crm-price-floor.0c50e96a.mp4",
+    "bytes": 8098064,
+    "sha256": "0c50e96a0193a410dc658b7012d8bacbf5b48ebc8d639b679e12b8ff8a979fed"
   },
   "captions": {
     "key": "tutorials/crm-price-floor.27af2215.vtt",
@@ -17,8 +17,8 @@
     "sha256": "6d470bbb93ba415ea0398102fdef807395403a6c5b5e1f4f5eafb2d82c93a735"
   },
   "uploaded": {
-    "at": "2026-10-13T17:08:52.902Z",
-    "video": "81d57f53e157d16ab7861bc3ba2096ef",
+    "at": "2026-10-14T03:01:32.431Z",
+    "video": "c45cdc4890ef0856fb6523c63a80ec81",
     "captions": "cd8428b565c7c4b681869a804f348f08",
     "poster": "e9138d11416b0c2d693c0282ab4e09cf"
   }

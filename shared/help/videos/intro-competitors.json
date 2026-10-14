@@ -2,9 +2,9 @@
   "helpKey": "intro-competitors",
   "durationSec": 86,
   "video": {
-    "key": "tutorials/intro-competitors.2c5b94c3.mp4",
-    "bytes": 7999905,
-    "sha256": "2c5b94c32026476cbcb91c7ea9180e444c105e5d394d9b7a97030a801433e567"
+    "key": "tutorials/intro-competitors.e50e0bf1.mp4",
+    "bytes": 8246157,
+    "sha256": "e50e0bf1e1eb829e2895ccb962d9ea2867132a700a915c927e12e5f1c8f73cb7"
   },
   "captions": {
     "key": "tutorials/intro-competitors.24e12fc7.vtt",
@@ -17,8 +17,8 @@
     "sha256": "9f73c43faa82f8d06f5bea15737ab1c999dcea5d6aeee68fdaa2f71c0fcf894b"
   },
   "uploaded": {
-    "at": "2026-10-13T17:29:15.316Z",
-    "video": "b4ddb4188d309cb52682b7a80c33a7dc",
+    "at": "2026-10-14T03:09:23.128Z",
+    "video": "23ffaa261e68ad19d61d64b49c82c5e2",
     "captions": "7a357a8029a45dcc2f554b458caeece0",
     "poster": "42feb5ff5f2e9f6c4be00e64df488c2d"
   }

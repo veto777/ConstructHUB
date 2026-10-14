@@ -2,9 +2,9 @@
   "helpKey": "crm-jobcam-project",
   "durationSec": 51,
   "video": {
-    "key": "tutorials/crm-jobcam-project.74b9ceba.mp4",
-    "bytes": 4617844,
-    "sha256": "74b9cebaf7ab4362ba3789677f409d3fe377b0a2c10c1d69c29a62920a765133"
+    "key": "tutorials/crm-jobcam-project.c500a0ee.mp4",
+    "bytes": 4892280,
+    "sha256": "c500a0eeec1819d81913592a222fed938bc4eb0a1bb267dfb85fc3db431d5daa"
   },
   "captions": {
     "key": "tutorials/crm-jobcam-project.394dd4b3.vtt",
@@ -17,8 +17,8 @@
     "sha256": "71308b712a22de4c99f6d6ee3550de9a0050ca3f14de5af5583992a4af11906f"
   },
   "uploaded": {
-    "at": "2026-10-13T17:02:04.337Z",
-    "video": "9b9d1cdba710649a5b943e3773e973ee",
+    "at": "2026-10-14T03:31:58.074Z",
+    "video": "87fb930322d5d7bf658d0bcf8a8c73ac",
     "captions": "62f6c768e47de7b9ad0d09f9c15a2b96",
     "poster": "38b39337770c229d84fcfa38e11cc850"
   }

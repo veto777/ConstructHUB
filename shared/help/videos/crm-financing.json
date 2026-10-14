@@ -2,9 +2,9 @@
   "helpKey": "crm-financing",
   "durationSec": 78,
   "video": {
-    "key": "tutorials/crm-financing.f340ff15.mp4",
-    "bytes": 8022685,
-    "sha256": "f340ff153000a619dae56a8b3a9b6c81d2e0d5a9abf8e263733e82bd8b501ff6"
+    "key": "tutorials/crm-financing.2f59caa3.mp4",
+    "bytes": 8518886,
+    "sha256": "2f59caa3ecee248ea6da25ee976e342f164fe1b836024cc45e807bb30db55113"
   },
   "captions": {
     "key": "tutorials/crm-financing.9c169de2.vtt",
@@ -17,8 +17,8 @@
     "sha256": "e8c077027d9c28f9d9edb63da8dc1e8c0c5a2440134e93d322d955a692ed7e00"
   },
   "uploaded": {
-    "at": "2026-10-13T16:57:48.578Z",
-    "video": "cefaf602d6e266f24246a4877822fa0c",
+    "at": "2026-10-14T03:29:43.199Z",
+    "video": "6d75c9e3595b6281b6c58a87c6d944ad",
     "captions": "1c24b2519703dfbe5eabd22aeb98cc67",
     "poster": "4a8edfb0123ecd2c633715916717c657"
   }

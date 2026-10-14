@@ -2,9 +2,9 @@
   "helpKey": "crm-integrations",
   "durationSec": 70,
   "video": {
-    "key": "tutorials/crm-integrations.c15d4f05.mp4",
-    "bytes": 5662581,
-    "sha256": "c15d4f05f4dc01edae67f85867ee287cee99cd543133d1bb5e65aa1f50e7b579"
+    "key": "tutorials/crm-integrations.bd516e0b.mp4",
+    "bytes": 5888895,
+    "sha256": "bd516e0b701c7506bb02b4123442cde8abcbe59ff3f641a9951ffe7b75f39361"
   },
   "captions": {
     "key": "tutorials/crm-integrations.28a5a013.vtt",
@@ -17,8 +17,8 @@
     "sha256": "858b853632fbe1310658a0f5b18ae26cc47f37cc3beda8c827bd549e1914cd7d"
   },
   "uploaded": {
-    "at": "2026-10-13T17:00:01.436Z",
-    "video": "7b1dad42d497b004e0c2753a5563fdc4",
+    "at": "2026-10-14T03:30:57.648Z",
+    "video": "d8fc3529766c35c9d35d91c294f63a9d",
     "captions": "b4ef77e8a628f6bf19714046067f0fda",
     "poster": "71a312ef960a5450e008e53afaabdd77"
   }

@@ -2,9 +2,9 @@
   "helpKey": "ads-manager.access-requests-in-bulk",
   "durationSec": 76,
   "video": {
-    "key": "tutorials/ads-manager.access-requests-in-bulk.ded3bccf.mp4",
-    "bytes": 6678229,
-    "sha256": "ded3bccfa0f7d5f3c5ec7d6261424126646c3887f3fc10583060c85e66ccaacf"
+    "key": "tutorials/ads-manager.access-requests-in-bulk.b68c7826.mp4",
+    "bytes": 6963994,
+    "sha256": "b68c7826bb301c4c6faaed98dd7ee1465795723144589578015221dddcf40de2"
   },
   "captions": {
     "key": "tutorials/ads-manager.access-requests-in-bulk.db5b4077.vtt",
@@ -17,8 +17,8 @@
     "sha256": "87fd45e7e2c2d502c97920cba6f833e465288e98086e52866a991022db7cf110"
   },
   "uploaded": {
-    "at": "2026-10-13T20:30:53.411Z",
-    "video": "b9e11b6817cc903c4f6c0a15a8466c79",
+    "at": "2026-10-14T02:56:49.320Z",
+    "video": "275f2034a3dd35f59ac0dab26e39ab21",
     "captions": "ed530ac0c9f6f8a5864d1eb8841a647c",
     "poster": "19660304346f286e31b5bc0229418e2e"
   }

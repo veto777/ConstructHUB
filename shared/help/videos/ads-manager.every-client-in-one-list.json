@@ -2,9 +2,9 @@
   "helpKey": "ads-manager.every-client-in-one-list",
   "durationSec": 69,
   "video": {
-    "key": "tutorials/ads-manager.every-client-in-one-list.25474463.mp4",
-    "bytes": 7994247,
-    "sha256": "25474463f85187dda218397770cc7c142d1c1d7d6a1f499936d803ddef5c4fa0"
+    "key": "tutorials/ads-manager.every-client-in-one-list.387af320.mp4",
+    "bytes": 8270454,
+    "sha256": "387af32050d3dfaa71b1baf01e22ff1b5728e35891c3e50fcaa3ac9db31648c3"
   },
   "captions": {
     "key": "tutorials/ads-manager.every-client-in-one-list.2e68567e.vtt",
@@ -17,8 +17,8 @@
     "sha256": "897ec961cbf917efb9c42a351ac327a3b8882397d141a448c024db0db6964652"
   },
   "uploaded": {
-    "at": "2026-10-13T20:22:38.208Z",
-    "video": "a16b8d6e435f9f0b31cb5867ff49e5a0",
+    "at": "2026-10-14T02:57:17.818Z",
+    "video": "2e5caae70ea5e760d912b3b06e149057",
     "captions": "5c70da14dcc37be03ac7da43f1b6d7e4",
     "poster": "6f5fb6f861261b50d96043f233be4c8f"
   }

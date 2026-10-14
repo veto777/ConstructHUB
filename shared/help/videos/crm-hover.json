@@ -2,9 +2,9 @@
   "helpKey": "crm-hover",
   "durationSec": 75,
   "video": {
-    "key": "tutorials/crm-hover.20bfedb0.mp4",
-    "bytes": 6769766,
-    "sha256": "20bfedb06b43285b4b766378a2674d21d5aa444b9a15e385c76474e73cff3365"
+    "key": "tutorials/crm-hover.161513ba.mp4",
+    "bytes": 7061225,
+    "sha256": "161513ba447773a202253ca23fdb1bfaa97fa47d1ce2f4210000e683733f0ebd"
   },
   "captions": {
     "key": "tutorials/crm-hover.f0abbca9.vtt",
@@ -17,8 +17,8 @@
     "sha256": "5ba804dcd0ef3e9f10400e80275d29732741a560355adc3e268f7edde5d3aa45"
   },
   "uploaded": {
-    "at": "2026-10-13T16:59:38.463Z",
-    "video": "7debbb094699ec302f62b77ce2798d31",
+    "at": "2026-10-14T03:30:44.762Z",
+    "video": "baead99805b0c67af2162f32b73147fa",
     "captions": "d2e603c74ae1fd135bd9c6bf0cc30dc6",
     "poster": "601d91f0065d93cb99e2152ca9b00b17"
   }

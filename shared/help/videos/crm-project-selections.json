@@ -2,9 +2,9 @@
   "helpKey": "crm-project-selections",
   "durationSec": 69,
   "video": {
-    "key": "tutorials/crm-project-selections.d493ff3c.mp4",
-    "bytes": 4899801,
-    "sha256": "d493ff3c975186b196d9da3b84adecece09d4b7121da69603b17b84e7420a332"
+    "key": "tutorials/crm-project-selections.c9ba6c9c.mp4",
+    "bytes": 5459633,
+    "sha256": "c9ba6c9ce84990f3059aee9dcbd0cc50b894021d8cdd5f49e020504b22b095ea"
   },
   "captions": {
     "key": "tutorials/crm-project-selections.9c056518.vtt",
@@ -17,8 +17,8 @@
     "sha256": "d6e8064fa0451b29eba871f52ce343506d55b57f067625a58b862e55eaa04c73"
   },
   "uploaded": {
-    "at": "2026-10-13T17:13:56.737Z",
-    "video": "4ac05ec1fab8864e1aaa5c1546b69a88",
+    "at": "2026-10-14T03:04:32.977Z",
+    "video": "fc13ac1a1a44e7ac596bc186837e7b08",
     "captions": "6bf740866df6b21d112c90055041f90b",
     "poster": "bf19e549a2142fb56b3fe737290ccbbc"
   }

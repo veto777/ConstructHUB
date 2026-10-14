@@ -2,9 +2,9 @@
   "helpKey": "brand-why-constructhub",
   "durationSec": 45,
   "video": {
-    "key": "tutorials/brand-why-constructhub.6a447706.mp4",
-    "bytes": 7804198,
-    "sha256": "6a4477069fc1961dafa108dac9662cf83bb183eafd198242662ae65389e8f423"
+    "key": "tutorials/brand-why-constructhub.504b6e74.mp4",
+    "bytes": 8028117,
+    "sha256": "504b6e74c70ba21b1fe33b73fe72b5b2ef5bbc0147fe16d321f3ed1c422898de"
   },
   "captions": {
     "key": "tutorials/brand-why-constructhub.e60564f9.vtt",
@@ -17,8 +17,8 @@
     "sha256": "e7e27d0f080e574ded2e485cb772c8edac029aa2e042c788da819fe76cdd120e"
   },
   "uploaded": {
-    "at": "2026-10-13T16:31:07.374Z",
-    "video": "618cb7f41af2d81c8044c2a1d5df8c0f",
+    "at": "2026-10-14T02:58:39.402Z",
+    "video": "93a2b06fb5bf02bcdbd659372fc4dbc2",
     "captions": "51f8efad707be638789986ff00072e91",
     "poster": "74519fe13d6a2aa9b6d1186112dedd83"
   }

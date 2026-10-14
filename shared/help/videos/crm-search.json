@@ -2,9 +2,9 @@
   "helpKey": "crm-search",
   "durationSec": 49,
   "video": {
-    "key": "tutorials/crm-search.be4478c9.mp4",
-    "bytes": 4784557,
-    "sha256": "be4478c9d7d8d5ae2acd189ac102edc7c3c5aed9ccd62b7c63993fc931aecfad"
+    "key": "tutorials/crm-search.171ba402.mp4",
+    "bytes": 4973104,
+    "sha256": "171ba402bddd24ce1fcacba58c1e64556ff8d4fb0d31dca88196c1de03914f45"
   },
   "captions": {
     "key": "tutorials/crm-search.4190a9fb.vtt",
@@ -17,8 +17,8 @@
     "sha256": "1e35988b1e3a57d80e7af641bc43b14ad362efc65da6b33d58171aefe357a5bb"
   },
   "uploaded": {
-    "at": "2026-10-13T17:21:18.541Z",
-    "video": "962c13034a284160d4508a155cf3549c",
+    "at": "2026-10-14T03:06:12.644Z",
+    "video": "36dd4f16b505d3ec4c944a7311459015",
     "captions": "70eded3612785aac14669d2aed8aafb3",
     "poster": "1e563cbbc18fc5d2652d7def3711f041"
   }

@@ -2,9 +2,9 @@
   "helpKey": "intro-cloudflare",
   "durationSec": 82,
   "video": {
-    "key": "tutorials/intro-cloudflare.934e975f.mp4",
-    "bytes": 7376221,
-    "sha256": "934e975f4699041419da279620bbe39a87373cbe45cd04d4af14f6ff9141c443"
+    "key": "tutorials/intro-cloudflare.25b25c5d.mp4",
+    "bytes": 7650142,
+    "sha256": "25b25c5d8408017864cbcf0a1b7c0d4110b28a2d7e378128c390aaab96134391"
   },
   "captions": {
     "key": "tutorials/intro-cloudflare.65cd1202.vtt",
@@ -17,8 +17,8 @@
     "sha256": "5635e2b7d13e38385d16d833c550d94d8ef5c66abcd61a4e62f4f36bc733aed0"
   },
   "uploaded": {
-    "at": "2026-10-13T17:28:50.144Z",
-    "video": "c5bb2bb271ba9ac3517cdde903f32ae9",
+    "at": "2026-10-14T03:09:07.708Z",
+    "video": "0a65a8b1ad55cdd3817d75d625a180cc",
     "captions": "40668ef68a37ce94bf63cc2ba9c61dba",
     "poster": "df55ea797026009d412beced260980f8"
   }

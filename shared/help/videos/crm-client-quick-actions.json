@@ -2,9 +2,9 @@
   "helpKey": "crm-client-quick-actions",
   "durationSec": 90,
   "video": {
-    "key": "tutorials/crm-client-quick-actions.db6af5a9.mp4",
-    "bytes": 8121657,
-    "sha256": "db6af5a9d606bfb73eaab3ead65d7a58fbdedf1b284ce22d111027e17dc283ca"
+    "key": "tutorials/crm-client-quick-actions.938ce5e3.mp4",
+    "bytes": 8720612,
+    "sha256": "938ce5e33b3b29bce219c4a1ee2082ac2cb26efca48bfedc16d5996d02f13911"
   },
   "captions": {
     "key": "tutorials/crm-client-quick-actions.4ad936ec.vtt",
@@ -17,8 +17,8 @@
     "sha256": "02e3399c677e50113fce8e9ffaaf2c5dfc33e77ad154c62c5472c64108b97790"
   },
   "uploaded": {
-    "at": "2026-10-13T16:40:28.472Z",
-    "video": "944e8b30cf25323bb471c1698d9940d7",
+    "at": "2026-10-14T03:24:14.578Z",
+    "video": "0347f29d0ad3da70e86d825b8d95a40d",
     "captions": "64a63fcfa54d302ce16e7045198826a5",
     "poster": "c856a5a34281b5a79a6ee546721b9f5e"
   }

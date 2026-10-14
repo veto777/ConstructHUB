@@ -2,9 +2,9 @@
   "helpKey": "intro-agency",
   "durationSec": 86,
   "video": {
-    "key": "tutorials/intro-agency.2e29d32a.mp4",
-    "bytes": 6943338,
-    "sha256": "2e29d32a2a793fbbcbbdc0ef3541f449c52b8d6a18a7222018ef49126d044a72"
+    "key": "tutorials/intro-agency.5aae726b.mp4",
+    "bytes": 7182399,
+    "sha256": "5aae726b830202a02a66c423978ad515e982723212fb33b46618e2671b60da29"
   },
   "captions": {
     "key": "tutorials/intro-agency.0ef6672b.vtt",
@@ -17,8 +17,8 @@
     "sha256": "df9d3940a1661436bc63ca7e28c8b5e1db68b420ad00ad74db09db3e3862d390"
   },
   "uploaded": {
-    "at": "2026-10-13T17:27:34.760Z",
-    "video": "3e9d0e5299a312832d0269cc13097d59",
+    "at": "2026-10-14T03:08:22.639Z",
+    "video": "f5227d727353339d3d1027b02142e980",
     "captions": "3dcb4086bc84b1e8e3c4e5ccf0bf860a",
     "poster": "2084f6fae00e4f504c2f4c8b6e7cf4db"
   }

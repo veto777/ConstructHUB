@@ -2,9 +2,9 @@
   "helpKey": "crm-schedule-views",
   "durationSec": 74,
   "video": {
-    "key": "tutorials/crm-schedule-views.4f6b36d9.mp4",
-    "bytes": 5471030,
-    "sha256": "4f6b36d9a55159627694ee14f39c494e9c2566ca8ae22487448a16cc1cc9d4b3"
+    "key": "tutorials/crm-schedule-views.586b844d.mp4",
+    "bytes": 5905121,
+    "sha256": "586b844df78310870c79b5807b167ee8ef701ab5fadefc23576f894d92f436ea"
   },
   "captions": {
     "key": "tutorials/crm-schedule-views.1db08a51.vtt",
@@ -17,8 +17,8 @@
     "sha256": "5b048a87ba0e8bb8fdb567c8f66c096687784c40c39e95b01484712f6163534c"
   },
   "uploaded": {
-    "at": "2026-10-13T17:16:22.019Z",
-    "video": "dbe4fe4377c12dd447a7ad2601a446cd",
+    "at": "2026-10-14T03:05:48.620Z",
+    "video": "f826353e9d53ad0fa1872c77bb486927",
     "captions": "93e03090aa5dadd7df43d30cffd0c8b7",
     "poster": "4400768012867fa55ce3d34490010ed4"
   }

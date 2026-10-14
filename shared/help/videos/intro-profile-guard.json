@@ -2,9 +2,9 @@
   "helpKey": "intro-profile-guard",
   "durationSec": 89,
   "video": {
-    "key": "tutorials/intro-profile-guard.3a9a9bf2.mp4",
-    "bytes": 6754560,
-    "sha256": "3a9a9bf29b4b02fdb14d3d4e70b380e2e1107aae0ac36c5767fd4fdd34776b62"
+    "key": "tutorials/intro-profile-guard.9408a983.mp4",
+    "bytes": 6981590,
+    "sha256": "9408a9836807e1fea252077b3ea9e0004d2d8058c12ba56eb28b650c95900230"
   },
   "captions": {
     "key": "tutorials/intro-profile-guard.40fd511a.vtt",
@@ -17,8 +17,8 @@
     "sha256": "474a3b00fbd60dd6c1a22883e6f3d09709a3071d8e0a9f37e64e269a7bd0ea0c"
   },
   "uploaded": {
-    "at": "2026-10-13T17:34:57.743Z",
-    "video": "c76442ea31486d33013d13d506b58a66",
+    "at": "2026-10-14T03:12:55.483Z",
+    "video": "7d7ecf140aa502134cc59c2a696e4893",
     "captions": "4804c77bab93a991a69ff97bce9dbe9e",
     "poster": "c46c81026e70f5aaf503c13d870bce83"
   }

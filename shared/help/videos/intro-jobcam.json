@@ -2,9 +2,9 @@
   "helpKey": "intro-jobcam",
   "durationSec": 64,
   "video": {
-    "key": "tutorials/intro-jobcam.6abedbc5.mp4",
-    "bytes": 4731551,
-    "sha256": "6abedbc59b0216147ff6857ad000e7310ca29b666aeaa76cdd02560a45c3640f"
+    "key": "tutorials/intro-jobcam.93d048ff.mp4",
+    "bytes": 4971379,
+    "sha256": "93d048ff6d6ce36d50a1d4e0373fd9fa8835cf120115b8b2c213f502f39b1d24"
   },
   "captions": {
     "key": "tutorials/intro-jobcam.f0c43ead.vtt",
@@ -17,8 +17,8 @@
     "sha256": "3e7a641bda186edc5d21bf0bd2a9a1a0b2987db9f3177a8943012e1ff9d33a3f"
   },
   "uploaded": {
-    "at": "2026-10-13T15:53:47.579Z",
-    "video": "ed56db069865e5516052a081c76212c7",
+    "at": "2026-10-14T03:11:25.775Z",
+    "video": "af7aef8d8f091ba640359afa72f217a4",
     "captions": "0cfc549a3966f94b399527eca01014d6",
     "poster": "4b8308c0ace0bb4a4f3cc798437f5b71"
   }

@@ -2,9 +2,9 @@
   "helpKey": "posts-photos.cadence-and-business-hours",
   "durationSec": 93,
   "video": {
-    "key": "tutorials/posts-photos.cadence-and-business-hours.6a84e98b.mp4",
-    "bytes": 7113038,
-    "sha256": "6a84e98b067af6d7b5e0456220cd3a9c25c57cea21cf06c81a79acfae4f976de"
+    "key": "tutorials/posts-photos.cadence-and-business-hours.c272e528.mp4",
+    "bytes": 7667955,
+    "sha256": "c272e52885c29da9ba9755ed341ab58250493cefeda31d793c8fb5c5fed968ad"
   },
   "captions": {
     "key": "tutorials/posts-photos.cadence-and-business-hours.2d9d709e.vtt",
@@ -17,8 +17,8 @@
     "sha256": "6be2b83ed622fd8c39607f32d35fa1ad216df8331acdd4bdd05244b11272f0e2"
   },
   "uploaded": {
-    "at": "2026-10-13T21:46:09.265Z",
-    "video": "a32aa1b26a839e1c99cd63c042c13c4d",
+    "at": "2026-10-14T03:18:48.233Z",
+    "video": "40412fdb204f39074578d6feebbc0d3b",
     "captions": "cc4cef6c450338424ad800a7ac4531a8",
     "poster": "e4f17f5f25591ed71eb9a27ee9671774"
   }

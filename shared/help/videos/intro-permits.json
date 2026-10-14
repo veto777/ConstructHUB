@@ -2,9 +2,9 @@
   "helpKey": "intro-permits",
   "durationSec": 92,
   "video": {
-    "key": "tutorials/intro-permits.d1ae9b2b.mp4",
-    "bytes": 7929116,
-    "sha256": "d1ae9b2b5d5ebcf99fae7d486c0a7d9232e2766ddc6f960aa0f41e23e656f9d4"
+    "key": "tutorials/intro-permits.dc10e9aa.mp4",
+    "bytes": 8316668,
+    "sha256": "dc10e9aafb0b4c7d51ba59f0d064e16a28da9e37dc83ae109d484dddd273e1e4"
   },
   "captions": {
     "key": "tutorials/intro-permits.0d82e1c5.vtt",
@@ -17,8 +17,8 @@
     "sha256": "201a366f5e793e73c3010be66f26283d0f857711c92e251495a47685e4547cee"
   },
   "uploaded": {
-    "at": "2026-10-13T17:34:32.839Z",
-    "video": "9f33471439f646f99afc94c8948a00de",
+    "at": "2026-10-14T03:12:40.018Z",
+    "video": "0749cf1a90a25db0718719342aec9637",
     "captions": "a0fe2746ee5b984da197d382b9514967",
     "poster": "b23117624051bfd157b58871fd96740a"
   }

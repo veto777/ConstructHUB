@@ -2,9 +2,9 @@
   "helpKey": "crm-client-export",
   "durationSec": 52,
   "video": {
-    "key": "tutorials/crm-client-export.0798f010.mp4",
-    "bytes": 4417156,
-    "sha256": "0798f0105f503418f47a1c03b4f4120e446b2f092772488c29e971488825a68d"
+    "key": "tutorials/crm-client-export.2d085d13.mp4",
+    "bytes": 4628725,
+    "sha256": "2d085d13d758c5cc0fbabb9d813de0790d867f325c349e933cb764fb376bfe1f"
   },
   "captions": {
     "key": "tutorials/crm-client-export.ae7fec44.vtt",
@@ -17,8 +17,8 @@
     "sha256": "b56663c8cd00a33d7800117b3750fec20971ba82e355fd8c735dac3f6f902ef5"
   },
   "uploaded": {
-    "at": "2026-10-13T16:36:58.642Z",
-    "video": "a7b1cdfc0f8a694ba40c98218689e56b",
+    "at": "2026-10-14T03:22:21.388Z",
+    "video": "ce494fe42c017af3eeaaf2551edf3d80",
     "captions": "7365ca473b79faf299353112e76ebe87",
     "poster": "e1881798729d85c7ab05bacad1d03adb"
   }

@@ -2,9 +2,9 @@
   "helpKey": "click-guard.your-exclusion-rules",
   "durationSec": 87,
   "video": {
-    "key": "tutorials/click-guard.your-exclusion-rules.1164421d.mp4",
-    "bytes": 7419726,
-    "sha256": "1164421d8ae55bc79607a8f831bb582ffc1256e5df78ca08598ae6a815224b22"
+    "key": "tutorials/click-guard.your-exclusion-rules.83da49ad.mp4",
+    "bytes": 7815706,
+    "sha256": "83da49ad50c3a37864e4a3878fccf6f164b7e2461531ecc34553a7688d5a1135"
   },
   "captions": {
     "key": "tutorials/click-guard.your-exclusion-rules.88722cbc.vtt",
@@ -17,8 +17,8 @@
     "sha256": "7b734fb6cef680fe776afdad8086fdde5ba2a9c526f80bad045c445298b98127"
   },
   "uploaded": {
-    "at": "2026-10-13T21:46:37.148Z",
-    "video": "5b06ced3b562ae9170d476f70ef41530",
+    "at": "2026-10-14T03:20:50.021Z",
+    "video": "33490ff1ecd426bd4febc5b5594b89fc",
     "captions": "b8f3fd30dc3b7b2edc6313b74d36b512",
     "poster": "84e1aaef36c33579cada250454680b95"
   }

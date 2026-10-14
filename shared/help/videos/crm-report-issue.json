@@ -2,9 +2,9 @@
   "helpKey": "crm-report-issue",
   "durationSec": 59,
   "video": {
-    "key": "tutorials/crm-report-issue.8a6746de.mp4",
-    "bytes": 4761814,
-    "sha256": "8a6746de86e634ddabb9fa377aacfaf7746da83ca7d23c51dd260abc75b75fda"
+    "key": "tutorials/crm-report-issue.092a4763.mp4",
+    "bytes": 5042678,
+    "sha256": "092a4763af29491c4a7562e38f904548cf2d8cf7def7074befaff64f1a7b9f87"
   },
   "captions": {
     "key": "tutorials/crm-report-issue.24274902.vtt",
@@ -17,8 +17,8 @@
     "sha256": "368ef3007d215e43ec3003c368f29f7047046b74c2c07c16f08ff891e627c2b3"
   },
   "uploaded": {
-    "at": "2026-10-13T17:14:40.982Z",
-    "video": "0c06e5855fbceba3ca7da7af146629d4",
+    "at": "2026-10-14T03:04:44.781Z",
+    "video": "da5c403776f0111355a2931142fd77b9",
     "captions": "2809d59fda5113d274f61667a099aace",
     "poster": "6d1d9114b98e0ded1cfd26ba2c8ff38b"
   }

@@ -2,9 +2,9 @@
   "helpKey": "crm-project-permits",
   "durationSec": 51,
   "video": {
-    "key": "tutorials/crm-project-permits.1a036b0b.mp4",
-    "bytes": 4165004,
-    "sha256": "1a036b0b4f7733b24b9116b3717dfcfd9c56243c10cf2d027f9c808549ce8d82"
+    "key": "tutorials/crm-project-permits.3f8e16ca.mp4",
+    "bytes": 4411549,
+    "sha256": "3f8e16caf501150340c54073ab4b1357501911ce344fa9d7a63ebd0ec369406f"
   },
   "captions": {
     "key": "tutorials/crm-project-permits.c734aa86.vtt",
@@ -17,8 +17,8 @@
     "sha256": "9dde2db0d77b5f5e6b34c4e7864395298aa4f4fb315fdd75b9655ec294a21111"
   },
   "uploaded": {
-    "at": "2026-10-13T17:13:11.662Z",
-    "video": "4a460785f8596261985706b7d3ee7a2e",
+    "at": "2026-10-14T03:04:08.170Z",
+    "video": "49cb1ea7c73995197fe8d105dc20fd50",
     "captions": "018bb89575d255f475fadaa177a3159b",
     "poster": "1b17887bcc89a955a1feeda2ebb6e66c"
   }

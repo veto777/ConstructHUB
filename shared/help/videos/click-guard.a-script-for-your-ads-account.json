@@ -2,9 +2,9 @@
   "helpKey": "click-guard.a-script-for-your-ads-account",
   "durationSec": 82,
   "video": {
-    "key": "tutorials/click-guard.a-script-for-your-ads-account.824ec6be.mp4",
-    "bytes": 7656687,
-    "sha256": "824ec6beb681c8f9a5b7a89d62fde892f0711a931ed0ca79232516a99146b296"
+    "key": "tutorials/click-guard.a-script-for-your-ads-account.1721527c.mp4",
+    "bytes": 7908493,
+    "sha256": "1721527c3e0620d41af4b5de67ce563282be7c2049cdf8e42e70ca8ec94cbf2b"
   },
   "captions": {
     "key": "tutorials/click-guard.a-script-for-your-ads-account.1c6780ad.vtt",
@@ -17,8 +17,8 @@
     "sha256": "d310e3053db136129925ee33cf07a65f853641310d7bd9cd11f43bdaf0620d4f"
   },
   "uploaded": {
-    "at": "2026-10-13T21:46:49.440Z",
-    "video": "2ae9391af14c491da96344c7172bf6c1",
+    "at": "2026-10-14T02:59:10.932Z",
+    "video": "b54ceb6e834c1c5c8e69b71021fab29c",
     "captions": "c3b65b7e24480b76604c7cbaa04211bd",
     "poster": "efa09989ab38b54a085d397ee04dc959"
   }

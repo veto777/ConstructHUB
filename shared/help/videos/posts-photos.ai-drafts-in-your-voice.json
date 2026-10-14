@@ -2,9 +2,9 @@
   "helpKey": "posts-photos.ai-drafts-in-your-voice",
   "durationSec": 99,
   "video": {
-    "key": "tutorials/posts-photos.ai-drafts-in-your-voice.9f24cc70.mp4",
-    "bytes": 7066526,
-    "sha256": "9f24cc70924882838814f22bf12da3ff1fca392f21192145f6b6bcafe6a85b9a"
+    "key": "tutorials/posts-photos.ai-drafts-in-your-voice.c47e94e3.mp4",
+    "bytes": 7897282,
+    "sha256": "c47e94e37d79050a2a59a7c338630139f2849730ec85dafeea60c802f8b21369"
   },
   "captions": {
     "key": "tutorials/posts-photos.ai-drafts-in-your-voice.3e5294c6.vtt",
@@ -17,8 +17,8 @@
     "sha256": "f6424b0b93b87dffca45f9dadc78e8112d1edf2690469348d59256830f875d1f"
   },
   "uploaded": {
-    "at": "2026-10-13T21:22:42.227Z",
-    "video": "00865a42facc3beda795d714130ca2ce",
+    "at": "2026-10-14T03:18:01.175Z",
+    "video": "64718444e31b1c3f116735fecf1f593d",
     "captions": "daab6e63585b2a8cb49f9131327f733e",
     "poster": "bd86e54742378b1662da2f98c1d72a31"
   }
